@@ -659,6 +659,8 @@ function assert_search_candidates(opt, lens_grid, val_grid)::Nothing
 end
 """
     pin_draw(cv::MultipleRandomised)
+    pin_draw(cv::MultipleRandomised, seed::Nothing)
+    pin_draw(cv::MultipleRandomised, seed::Integer)
     pin_draw(cv)
 
 Fix the folds a search scores every candidate over.
@@ -668,6 +670,7 @@ A search splits its data once and scores every candidate against the same folds,
 # Arguments
 
   - `cv`: The search's scheme.
+  - `seed`: The `seed` field of `cv`. Its type selects the method.
 
 # Returns
 
@@ -680,7 +683,15 @@ A search splits its data once and scores every candidate against the same folds,
   - [`resolve_rng`](@ref)
 """
 function pin_draw(cv::MultipleRandomised)
-    return isnothing(cv.seed) ? Accessors.@set(cv.seed = rand(cv.rng, UInt32)) : cv
+    return pin_draw(cv, cv.seed)
+end
+function pin_draw(cv::MultipleRandomised, ::Nothing)
+    return MultipleRandomised(cv.cv; subset_size = cv.subset_size, n_subsets = cv.n_subsets,
+                              max_comb = cv.max_comb, window_size = cv.window_size,
+                              rng = cv.rng, seed = rand(cv.rng, UInt32))
+end
+function pin_draw(cv::MultipleRandomised, ::Integer)
+    return cv
 end
 function pin_draw(cv)
     return cv

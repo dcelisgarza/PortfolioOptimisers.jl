@@ -1343,7 +1343,8 @@ function coverage_peel(cvg::CoveragePolicy, cmsk::Option{BitVector},
     if isempty(idx)
         return cmsk
     end
-    strict_diagnostic(peel_msg(idx, count(U) ÷ 2, cvg.peel), strict)
+    strict_diagnostic(peel_msg(idx, count(U) ÷ 2, cvg.peel), strict;
+                      id = @log_id(typeof(cvg.peel)))
     out = isnothing(cmsk) ? trues(size(nu, 1)) : copy(cmsk)
     out[idx] .= false
     return out

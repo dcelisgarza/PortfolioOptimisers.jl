@@ -51,15 +51,15 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged field is automatically propagated:
+[`factory`](@ref) passes its arguments on to this `@fprop` field:
 
-  - `cache`: Carried unchanged via [`factory`](@ref).
+  - `cache`: Carried unchanged through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged field is automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of this `@vprop` field at the selected indices:
 
-  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).
 
 # Examples
 

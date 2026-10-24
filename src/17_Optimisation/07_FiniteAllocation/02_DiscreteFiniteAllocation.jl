@@ -35,7 +35,7 @@ Keywords correspond to the struct's fields.
 
 # References
 
-  - $(ref_dict[:martin2021])
+  - $(ref_dict[:martin2021]) Methods, page 3. $(ref_dict[:no_original_source])
 """
 @concrete struct DiscreteAllocationResult <: FiniteAllocationOptimisationResult
     """
@@ -110,7 +110,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Discrete Allocation portfolio optimiser.
 
-`DiscreteAllocation` turns target weights into whole share counts by solving a Mixed-Integer Programming (MIP) problem. The book tracks the target as closely as the error of `wf` measures it, and leaves as little cash idle as it can.
+`DiscreteAllocation` turns target weights into whole share counts by solving a Mixed-Integer Programming (MIP) problem. [martin2021](@cite) states only that the package it describes converts optimal weights into a discrete allocation, in its Methods on page 3. It does not state the programme. The book tracks the target as closely as the error of `wf` measures it, and leaves as little cash idle as it can.
 
 The long and the short side of a book are two separate sub-problems, each with its own cash and its own budget. Each sub-problem holds a non-negative share vector, and [`optimise`](@ref) negates the short side when it recombines the two. `s_retcode` and `l_retcode` of the result carry the two return codes.
 
@@ -215,7 +215,7 @@ DiscreteAllocation
 
 # References
 
-  - $(ref_dict[:martin2021])
+  - $(ref_dict[:martin2021]) Methods, page 3. $(ref_dict[:no_original_source])
 """
 @concrete struct DiscreteAllocation <: FiniteAllocationOptimisationEstimator
     """
@@ -692,10 +692,12 @@ function _optimise(da::DiscreteAllocation, fai::FiniteAllocationInput;
     res[sidx, 3] = -sw
     retcode = if isa(sretcode, OptimisationFailure) || isa(lretcode, OptimisationFailure)
         if isa(sretcode, OptimisationFailure)
-            @warn("Failed to solve sub optimisation problem. Check `s_retcode.res` for details.")
+            @warn("Failed to solve sub optimisation problem. Check `s_retcode.res` for details.",
+                  maxlog = log_limit(:warn), _id = @log_id())
         end
         if isa(lretcode, OptimisationFailure)
-            @warn("Failed to solve sub optimisation problem. Check `l_retcode.res` for details.")
+            @warn("Failed to solve sub optimisation problem. Check `l_retcode.res` for details.",
+                  maxlog = log_limit(:warn), _id = @log_id())
         end
         OptimisationFailure()
     else

@@ -1,9 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype of the rules that build the diagonal covariance shape of a [`NormalUncertaintySet`](@ref).
+Abstract supertype of the rules that build the diagonal covariance shape of a normal uncertainty set.
 
-The shape of the covariance set is the asymptotic covariance of ``\\operatorname{vec}(\\hat{\\mathbf{\\Sigma}})``, ``N^{2} \\times N^{2}``. A `diagonal = true` algorithm keeps one variance per entry of ``\\hat{\\mathbf{\\Sigma}}``, and a member states which variance. The mean axis does not read the rule, because the diagonal of ``\\hat{\\mathbf{\\Sigma}} / T`` is the same under every member.
+The rules are for a [`NormalUncertaintySet`](@ref). The shape of the covariance set is the asymptotic covariance of ``\\operatorname{vec}(\\hat{\\mathbf{\\Sigma}})``, of size ``N^{2} \\times N^{2}``. An algorithm with `diagonal = true` keeps one variance for each entry of ``\\hat{\\mathbf{\\Sigma}}``, and each subtype states which variance. The mean axis does not read the rule, because its diagonal shape is the diagonal of ``\\hat{\\mathbf{\\Sigma}} / T`` under every subtype.
 
 # Interfaces
 
@@ -22,9 +22,9 @@ abstract type AbstractDiagonalConstruction <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Takes the diagonal of the full covariance shape, the default.
+Takes the diagonal of the full covariance shape.
 
-Each entry is the exact variance of its entry of ``\\hat{\\mathbf{\\Sigma}}`` at the covariance matrix the set is centred on, so the diagonal set and the full set (`diagonal = false`) read one sampling law.
+This is the default rule. Each entry is the exact variance of the matching entry of ``\\hat{\\mathbf{\\Sigma}}``, at the covariance matrix at the centre of the set. So the diagonal set and the full set, with `diagonal = false`, use the same sampling law.
 
 # Mathematical definition
 
@@ -45,9 +45,9 @@ It is the variance of the ``(i, j)`` entry of a ``\\mathrm{Wishart}(T, \\hat{\\m
 
 # Algorithm
 
-The branch of [`diagonal_sigma_shape`](@ref) that this tag selects runs these steps.
+The method of [`diagonal_sigma_shape`](@ref) for this type does these steps.
 
- 1. Build the full shape with [`sigma_asymptotic_cov`](@ref), repaired under `pdm`.
+ 1. Build the full shape with [`sigma_asymptotic_cov`](@ref), which repairs it under `pdm`.
  2. Return its diagonal as a `LinearAlgebra.Diagonal`.
 
 # Examples
@@ -69,7 +69,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Sets the covariances of ``\\hat{\\mathbf{\\Sigma}}`` to zero, then builds the covariance shape.
 
-Each entry is the variance of its entry of ``\\hat{\\mathbf{\\Sigma}}`` under an assumed ``\\hat{\\mathbf{\\Sigma}}_{ij} = 0`` for ``i \\neq j``, while the set stays centred on ``\\hat{\\mathbf{\\Sigma}}`` with its covariances. It drops ``\\hat{\\mathbf{\\Sigma}}_{ij}^{2}`` from each off-diagonal entry that [`DiagonalOfShape`](@ref) keeps, so it is the less exact rule, and its diagonal set can differ from the full set (`diagonal = false`).
+Each entry is the variance of the matching entry of ``\\hat{\\mathbf{\\Sigma}}`` if ``\\hat{\\mathbf{\\Sigma}}_{ij} = 0`` for ``i \\neq j``. The centre of the set stays ``\\hat{\\mathbf{\\Sigma}}``, with its covariances. The rule drops the term ``\\hat{\\mathbf{\\Sigma}}_{ij}^{2}`` from each off-diagonal entry, and [`DiagonalOfShape`](@ref) keeps that term. So this rule is less exact, and its diagonal set can differ from the full set, with `diagonal = false`.
 
 # Mathematical definition
 
@@ -86,16 +86,16 @@ Where:
   - $(math_dict[:Sigma_hat_ii])
   - $(math_dict[:T])
 
-It is the diagonal of ``T (\\mathbf{I} + \\mathbf{K})(\\mathbf{D} \\otimes \\mathbf{D})``, with ``\\mathbf{D}`` the diagonal of ``\\mathbf{\\Sigma}_{\\boldsymbol{\\mu}}``. The two rules agree on each entry ``(i, i)``.
+It is the diagonal of ``T (\\mathbf{I} + \\mathbf{K})(\\mathbf{D} \\otimes \\mathbf{D})``, where ``\\mathbf{D}`` is the diagonal of ``\\mathbf{\\Sigma}_{\\boldsymbol{\\mu}}``. The two rules give the same value at each entry ``(i, i)``.
 
 # Algorithm
 
-The branch of [`diagonal_sigma_shape`](@ref) that this tag selects runs these steps.
+The method of [`diagonal_sigma_shape`](@ref) for this type does these steps.
 
  1. Read `d`, the diagonal of `sigma_mu`.
  2. Form the vector `v = vec(T .* d .* transpose(d))`, whose entry ``(i, j)`` in column-major order is ``T d_{i} d_{j}``.
  3. Double the ``N`` entries ``(i, i)``, at the stride `N + 1` of `v`.
- 4. Return `LinearAlgebra.Diagonal(v)`. No ``N^{2} \\times N^{2}`` matrix is formed, and `pdm` is not read: a diagonal of non-negative entries is positive semi-definite, and the repair of `posdef!` leaves such a matrix unchanged.
+ 4. Return `LinearAlgebra.Diagonal(v)`. The method makes no ``N^{2} \\times N^{2}`` matrix, and it does not read `pdm`. A diagonal matrix with non-negative entries is positive semi-definite, and `posdef!` does not change such a matrix.
 
 # Examples
 
@@ -114,9 +114,11 @@ struct ShapeOfDiagonal <: AbstractDiagonalConstruction end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Fits a box or an ellipsoidal uncertainty set from the sampling laws that normal returns imply: the mean is normal and the covariance is Wishart.
+Fits a box, an ellipsoidal or a norm-ball uncertainty set from the sampling laws of normal returns.
 
-The two laws are Equation 11.16 of the source. `alg` picks the shape, and `n_sim` sets the number of Wishart draws the covariance bounds are read from. Its sampling-free counterpart is [`DeltaUncertaintySet`](@ref), and its distribution-free counterpart is [`ARCHUncertaintySet`](@ref).
+Under normal returns, the sample mean has a normal law, and the sample covariance has a Wishart law. Equation 11.16 of [cajas2025](@cite) states the two laws. The Wishart law is the distribution of Equation 9 of [wishart1928](@cite). Corollary 4.2 of [magnus1979](@cite) gives the covariance of that law, which is the shape of the ellipsoid on the covariance axis. Equation 11.17 of [cajas2025](@cite) takes the box from the quantiles of the two laws.
+
+`alg` selects the shape of the set. `n_sim` sets the number of draws on each route that simulates. [`DeltaUncertaintySet`](@ref) fits a box with no sample, and [`ARCHUncertaintySet`](@ref) fits a set with no assumed law.
 
 # Fields
 
@@ -137,7 +139,7 @@ $(DocStringExtensions.FIELDS)
         kwargs::NamedTuple = (;),
     ) -> NormalUncertaintySet
 
-Keywords correspond to the struct's fields.
+The keywords are the fields of the struct.
 
 ## Validation
 
@@ -196,9 +198,9 @@ NormalUncertaintySet
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equations 11.16, 11.17 and 11.24.
-  - $(ref_dict[:fabozzi2007])
-  - $(ref_dict[:meucci2005])
+  - $(ref_dict[:wishart1928]) Section 3, Equation 9.
+  - $(ref_dict[:magnus1979]) Section 4, Corollary 4.2.
+  - $(ref_dict[:cajas2025]) Equations 11.16 and 11.17. $(ref_dict[:no_original_source])
 """
 @concrete struct NormalUncertaintySet <: AbstractUncertaintySetEstimator
     """
@@ -278,9 +280,9 @@ end
 """
     commutation_matrix(X::MatNum)
 
-Constructs the commutation matrix for a given matrix.
+Builds the commutation matrix for the size of `X`.
 
-The commutation matrix is the permutation that carries the column-major vectorisation of a matrix into the vectorisation of its transpose. It is its own inverse, and it holds one entry per row, so it is built as a sparse matrix. Only the shape of `X` is read, never its entries.
+The commutation matrix is the permutation that maps the column-major vectorisation of a matrix to the vectorisation of its transpose. For a square matrix, it is its own inverse. It holds one non-zero entry in each row, so the function returns a sparse matrix. The function reads the size of `X`, and it does not read the entries.
 
 # Mathematical definition
 
@@ -294,22 +296,22 @@ Where:
   - ``\\mathbf{A}``: Any ``m \\times n`` matrix.
   - ``\\operatorname{vec}``: Column-major vectorisation.
 
-A symmetric ``\\mathbf{A}`` satisfies ``\\mathbf{K}_{n,n} \\operatorname{vec}(\\mathbf{A}) = \\operatorname{vec}(\\mathbf{A})``, so it cannot separate ``\\mathbf{K}`` from the identity.
+For a symmetric ``\\mathbf{A}``, ``\\mathbf{K}_{n,n} \\operatorname{vec}(\\mathbf{A}) = \\operatorname{vec}(\\mathbf{A})``. So a symmetric matrix cannot show the difference between ``\\mathbf{K}`` and the identity.
 
 # Algorithm
 
- 1. Read `m, n = size(X)` and form `mn = m * n`, the side of the result.
- 2. Number the entries of an `m` by `n` matrix in column-major order, giving `row = 1:mn`.
- 3. Send each number through the transpose with `col = vec(transpose(reshape(row, m, n)))`, the position that entry takes in the vectorised transpose.
- 4. Write a one at every `(row, col)` pair, giving the sparse `mn` by `mn` matrix `cX`.
+ 1. Read `m, n = size(X)`, and set `mn = m * n`, the side of the result.
+ 2. Number the entries of an `m` by `n` matrix in column-major order. This gives `row = 1:mn`.
+ 3. Find the position of each entry in the vectorised transpose with `col = vec(transpose(reshape(row, m, n)))`.
+ 4. Write a one at each `(row, col)` pair. The result is the sparse `mn` by `mn` matrix `cX`.
 
 # Arguments
 
-  - `X`: Input matrix. Used to determine the dimensions of the commutation matrix.
+  - `X`: Matrix whose size sets the size of the commutation matrix.
 
 # Returns
 
-  - `cX::SparseArrays.SparseMatrixCSC{<:Number, <:Integer}`: Returns a sparse commutation matrix of size `(m*n, m*n)` where `m, n = size(X)`.
+  - `cX::SparseArrays.SparseMatrixCSC{<:Number, <:Integer}`: Sparse commutation matrix of size `(m*n, m*n)`, where `m, n = size(X)`.
 
 # Examples
 
@@ -347,8 +349,8 @@ julia> PortfolioOptimisers.commutation_matrix(rand(3, 2))
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equation 11.17.
-  - $(ref_dict[:meucci2005])
+  - $(ref_dict[:magnus1979]) Section 3, Definition 3.1 and Theorem 3.1 (vii). $(ref_dict[:no_original_source])
+  - $(ref_dict[:tracy1969])
 """
 function commutation_matrix(X::MatNum)
     m, n = size(X)
@@ -361,20 +363,22 @@ end
 """
     choose_scaling_parameter(ue, pr)
 
-Return ``T``, the effective number of observations that divides the covariance to give the asymptotic covariance of the mean.
+Returns ``T``, the effective number of observations. The covariance divided by ``T`` is the asymptotic covariance of the mean.
 
-Three sources are read in order, and the first that is not `nothing` wins: the estimator's own `ens`, the prior's `ens`, and the row count of the prior's returns matrix. The first two exist because a weighted or a shrunk prior carries fewer effective observations than it has rows, and because a prior under a Scenario Cap carries fewer rows than the observations its moments were fitted over, which it states in `ens`. Every set the file builds is scaled by ``T``, and the width of a set scales as ``T^{-1/2}``, so a prior that reports fewer effective scenarios than it has rows widens the set. Quartering ``T`` doubles the width of the mean box.
+The function reads three sources in order, and it returns the first that is not `nothing`. The sources are the `ens` of the estimator, the `ens` of the prior, and the row count of the returns matrix of the prior. A weighted or shrunk prior has fewer effective observations than rows. A prior under a Scenario Cap has fewer rows than the observations of its moments, and it states the larger count in `ens`. The first two sources are for these two cases.
+
+Each set of this estimator scales with ``T``. The width of a set is proportional to ``T^{-1/2}``, so a prior with fewer effective scenarios than rows gives a wider set. A division of ``T`` by four doubles the width of the mean box.
 
 # Algorithm
 
- 1. Return `ue.ens` when it is not `nothing`, the effective count the estimator states.
- 2. Otherwise return `pr.ens` when it is not `nothing`, the effective count the prior carries.
- 3. Otherwise return `size(pr.X, 1)`, the row count of the prior's returns matrix.
+ 1. If `ue.ens` is not `nothing`, return it. It is the effective count that the estimator states.
+ 2. Otherwise, if `pr.ens` is not `nothing`, return it. It is the effective count that the prior holds.
+ 3. Otherwise, return `size(pr.X, 1)`, the row count of the returns matrix of the prior.
 
 # Arguments
 
   - `ue`: [`NormalUncertaintySet`](@ref) estimator.
-  - `pr`: Prior result.
+  - `pr`: Prior Result.
 
 # Returns
 
@@ -397,9 +401,9 @@ end
 """
     mu_asymptotic_cov(pdm, sigma, T)
 
-Asymptotic covariance of the mean estimator, projected to the nearest positive definite matrix with `pdm`.
+Returns the asymptotic covariance of the mean estimator, projected to the nearest positive definite matrix with `pdm`.
 
-Shared by the box and the ellipsoidal [`NormalUncertaintySet`](@ref) constructions, so the two routes cannot drift apart. The division is by a positive scalar, so it preserves definiteness: `posdef!` moves nothing when `sigma` is already positive definite.
+Every route of [`NormalUncertaintySet`](@ref) calls this function, so all routes use the same mean shape. A division by a positive scalar keeps the definiteness of `sigma`. So `posdef!` changes nothing when `sigma` is positive definite.
 
 # Mathematical definition
 
@@ -415,7 +419,7 @@ Where:
 
 # Algorithm
 
- 1. Divide `sigma` by `T`, giving `sigma_mu`.
+ 1. Divide `sigma` by `T` to get `sigma_mu`.
  2. Repair `sigma_mu` in place with `posdef!` under `pdm`.
  3. Return `sigma_mu`.
 
@@ -437,8 +441,7 @@ Where:
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equation 11.16.
-  - $(ref_dict[:meucci2005])
+  - $(ref_dict[:cajas2025]) Equations 11.16 and 11.24. $(ref_dict[:no_original_source])
 """
 function mu_asymptotic_cov(pdm::Option{<:AbstractPosdefEstimator}, sigma::MatNum, T::Number)
     sigma_mu = sigma / T
@@ -448,9 +451,9 @@ end
 """
     sigma_asymptotic_cov(pdm, sigma_mu, sigma, T)
 
-Asymptotic covariance of the vectorised covariance estimator, projected to the nearest positive definite matrix with `pdm`.
+Returns the asymptotic covariance of the vectorised covariance estimator, projected to the nearest positive definite matrix with `pdm`.
 
-`sigma_mu` is the raw, pre-diagonalisation mean asymptotic covariance from [`mu_asymptotic_cov`](@ref), and ``\\mathbf{K}`` is the [`commutation_matrix`](@ref) of `sigma`. The two matrix arguments are not independent: the form below reduces to the sampling law of a normal sample only when `sigma_mu` was built from the same `sigma` and the same `T`.
+`sigma_mu` is the full mean asymptotic covariance from [`mu_asymptotic_cov`](@ref), before any diagonal step. ``\\mathbf{K}`` is the [`commutation_matrix`](@ref) of `sigma`. The two matrix arguments depend on each other. The form below is the sampling law of a normal sample only if `sigma_mu` comes from the same `sigma` and the same `T`.
 
 # Mathematical definition
 
@@ -468,7 +471,9 @@ Where:
   - $(math_dict[:Sigma_hat])
   - $(math_dict[:T])
 
-The right-hand form is the asymptotic covariance of ``\\operatorname{vec}(\\hat{\\mathbf{\\Sigma}})`` for a normal sample. Its ``(i,j)`` diagonal entry is ``\\left(\\hat{\\Sigma}_{ii} \\hat{\\Sigma}_{jj} + \\hat{\\Sigma}_{ij}^{2}\\right) / T``, which is the variance of the ``(i,j)`` entry of a ``\\mathrm{Wishart}(T, \\hat{\\mathbf{\\Sigma}}/T)`` draw. The sample that [`ucs`](@ref) builds from those draws and the shape matrix it measures that sample against are therefore on one scale. A `diagonal = true` set keeps this diagonal under [`DiagonalOfShape`](@ref), the default. [`ShapeOfDiagonal`](@ref) builds the diagonal from the variances alone, and [`diagonal_sigma_shape`](@ref) states both rules.
+The left-hand form is Corollary 4.2 of [magnus1979](@cite), ``\\operatorname{Var}(\\operatorname{vec} \\mathbf{S}) = k (\\mathbf{I} + \\mathbf{K})(\\mathbf{V} \\otimes \\mathbf{V})`` for ``\\mathbf{S} \\sim \\mathrm{Wishart}(k, \\mathbf{V})``, at ``k = T`` and ``\\mathbf{V} = \\mathbf{\\Sigma}_{\\boldsymbol{\\mu}}``. The right-hand form is the asymptotic covariance of ``\\operatorname{vec}(\\hat{\\mathbf{\\Sigma}})`` for a normal sample. Its diagonal entry at ``(i,j)`` is ``\\left(\\hat{\\Sigma}_{ii} \\hat{\\Sigma}_{jj} + \\hat{\\Sigma}_{ij}^{2}\\right) / T``, the variance of the ``(i,j)`` entry of a ``\\mathrm{Wishart}(T, \\hat{\\mathbf{\\Sigma}}/T)`` draw. So the sample that [`ucs`](@ref) draws and the shape matrix that measures the sample have the same scale.
+
+A set with `diagonal = true` keeps this diagonal under [`DiagonalOfShape`](@ref), the default. [`ShapeOfDiagonal`](@ref) builds the diagonal from the variances alone. [`diagonal_sigma_shape`](@ref) states both rules.
 
 # Algorithm
 
@@ -481,7 +486,7 @@ The right-hand form is the asymptotic covariance of ``\\operatorname{vec}(\\hat{
 
   - `pdm`: Positive definite matrix estimator. `nothing` skips the repair.
   - `sigma_mu`: Mean asymptotic covariance from [`mu_asymptotic_cov`](@ref).
-  - `sigma`: Point estimate of the covariance matrix. Only its shape is read, through [`commutation_matrix`](@ref).
+  - `sigma`: Point estimate of the covariance matrix. The function reads only its size, through [`commutation_matrix`](@ref).
   - `T`: Scaling parameter from [`choose_scaling_parameter`](@ref).
 
 # Returns
@@ -497,8 +502,7 @@ The right-hand form is the asymptotic covariance of ``\\operatorname{vec}(\\hat{
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equations 11.17 and 11.24.
-  - $(ref_dict[:meucci2005])
+  - $(ref_dict[:magnus1979]) Section 4, Corollary 4.2.
 """
 function sigma_asymptotic_cov(pdm::Option{<:AbstractPosdefEstimator}, sigma_mu::MatNum,
                               sigma::MatNum, T::Number)
@@ -513,7 +517,7 @@ end
     diagonal_sigma_shape(::ShapeOfDiagonal, ::Option{<:AbstractPosdefEstimator},
                          sigma_mu::MatNum, ::MatNum, T::Number)
 
-Diagonal covariance shape of a [`NormalUncertaintySet`](@ref) under the rule that `dc` names.
+Returns the diagonal covariance shape of a [`NormalUncertaintySet`](@ref) under the rule that `dc` names.
 
 # Algorithm
 
@@ -525,7 +529,7 @@ Diagonal covariance shape of a [`NormalUncertaintySet`](@ref) under the rule tha
   - `dc`: Construction of the diagonal shape.
   - `pdm`: Positive definite matrix estimator of the full shape. [`ShapeOfDiagonal`](@ref) does not read it.
   - `sigma_mu`: Mean asymptotic covariance from [`mu_asymptotic_cov`](@ref).
-  - `sigma`: Point estimate of the covariance matrix. Only its shape is read, and only by [`DiagonalOfShape`](@ref).
+  - `sigma`: Point estimate of the covariance matrix. Only [`DiagonalOfShape`](@ref) reads it, and it reads only the size.
   - `T`: Scaling parameter from [`choose_scaling_parameter`](@ref).
 
 # Returns
@@ -555,14 +559,14 @@ end
 """
     normal_sigma_shape(ue::NormalUncertaintySet, sigma_mu::MatNum, sigma::MatNum, T::Number)
 
-Covariance shape that an ellipsoidal or norm-ball [`NormalUncertaintySet`](@ref) measures its set against.
+Returns the covariance shape of an ellipsoidal or norm-ball [`NormalUncertaintySet`](@ref).
 
-Each ellipsoidal and norm-ball arm of [`ucs`](@ref) and [`sigma_ucs`](@ref) builds its shape here, so the rule of `ue.dc` reaches every route that reads a diagonal shape. The box arms read no shape.
+Each ellipsoidal and norm-ball method of [`ucs`](@ref) and [`sigma_ucs`](@ref) builds its shape with this function. So the rule of `ue.dc` applies on every route that reads a diagonal shape. The box methods read no shape.
 
 # Algorithm
 
- 1. When `ue.alg.diagonal` is `true`, return [`diagonal_sigma_shape`](@ref) under `ue.dc`.
- 2. Otherwise return the full shape of [`sigma_asymptotic_cov`](@ref). `ue.dc` is not read.
+ 1. If `ue.alg.diagonal` is `true`, return [`diagonal_sigma_shape`](@ref) under `ue.dc`.
+ 2. Otherwise, return the full shape of [`sigma_asymptotic_cov`](@ref). The function does not read `ue.dc` in this case.
 
 # Arguments
 
@@ -592,9 +596,9 @@ end
 """
     mu_normal_box_set(mu::VecNum, sigma_mu::MatNum, q::Number)
 
-Box uncertainty set for expected returns under normality: a zero lower bound, and an upper bound that carries the whole width of the box.
+Builds the box of the mean axis under normal returns, with a lower bound of zero and the full width in the upper bound.
 
-`q` is the already-halved significance level. [`set_ucs_return_constraints!`](@ref) reads the pair only through its half-width ``(\\boldsymbol{\\mu}_{u} - \\boldsymbol{\\mu}_{l})/2``, which is therefore ``z_{q} \\sqrt{\\operatorname{diag}(\\mathbf{\\Sigma}_{\\boldsymbol{\\mu}})}``, and it centres that width on the vector the set carries. Neither bound is a bound on the mean on its own. Shared by the box [`ucs`](@ref) and [`mu_ucs`](@ref) constructions for [`NormalUncertaintySet`](@ref).
+`q` is the significance level after the halving. [`set_ucs_return_constraints!`](@ref) reads only the half-width ``(\\boldsymbol{\\mu}_{u} - \\boldsymbol{\\mu}_{l})/2`` of the pair, and it centres that width on `val`. So the half-width is ``z_{q} \\sqrt{\\operatorname{diag}(\\mathbf{\\Sigma}_{\\boldsymbol{\\mu}})}``. Neither bound is a bound on the mean. The box methods of [`ucs`](@ref) and [`mu_ucs`](@ref) for [`NormalUncertaintySet`](@ref) call this function.
 
 # Mathematical definition
 
@@ -612,20 +616,22 @@ Where:
   - ``z_{q}``: Normal complementary quantile at the halved significance level.
   - ``q``: Half significance level.
 
-Each entry of the resulting interval covers ``1 - 2q`` of the sampling law of that entry, because the two tails carry ``q`` each. The interval is one entry at a time, so it is not a joint region for the whole vector.
+Each interval covers ``1 - 2q`` of the sampling law of its entry, because each of the two tails holds ``q``. Each interval applies to one entry, so the box is not a joint region for the full vector.
+
+The half-width is the ``\\delta_{\\boldsymbol{\\mu},i}`` of Equation 11.17 of [cajas2025](@cite). The text of that equation calls ``\\sigma_i`` the standard deviation of the asset. But its Listing 11.7 and this method use the standard error of the mean, ``\\sqrt{(\\hat{\\mathbf{\\Sigma}} / T)_{ii}}``.
 
 # Algorithm
 
- 1. Take the ``1 - q`` standard normal quantile with `Distributions.cquantile`, giving the multiplier ``z_{q}``.
- 2. Multiply it by the square roots of `LinearAlgebra.diag(sigma_mu)` and by two, giving `mu_u`, the width of the box on each asset.
- 3. Build `mu_l`, a vector of zeros of the same length and element type.
- 4. Return a [`BoxUncertaintySet`](@ref) carrying `mu_l`, `mu_u`, and `mu`, the vector the width is centred on.
+ 1. Get the ``1 - q`` standard normal quantile with `Distributions.cquantile`. This is the multiplier ``z_{q}``.
+ 2. Multiply it by the square roots of `LinearAlgebra.diag(sigma_mu)` and by two. The result `mu_u` is the width of the box on each asset.
+ 3. Build `mu_l`, a range of zeros with the same length and element type.
+ 4. Return a [`BoxUncertaintySet`](@ref) that holds `mu_l`, `mu_u` and `mu`. `mu` is the centre of the width.
 
 # Arguments
 
-  - `mu`: Point estimate of the expected returns vector, carried by the set as its centre.
+  - `mu`: Point estimate of the expected returns vector. The set holds it as its centre.
   - `sigma_mu`: Mean asymptotic covariance from [`mu_asymptotic_cov`](@ref).
-  - `q`: Half significance level, already halved by [`normal_box_preamble`](@ref).
+  - `q`: Half significance level, which [`normal_box_preamble`](@ref) halved.
 
 # Returns
 
@@ -641,8 +647,7 @@ Each entry of the resulting interval covers ``1 - 2q`` of the sampling law of th
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equations 11.14 and 11.19.
-  - $(ref_dict[:fabozzi2007])
+  - $(ref_dict[:cajas2025]) Equation 11.17 and Listing 11.7. $(ref_dict[:no_original_source])
 """
 function mu_normal_box_set(mu::VecNum, sigma_mu::MatNum, q::Number)
     mu_u = Distributions.cquantile(Distributions.Normal(), q) *
@@ -655,25 +660,27 @@ end
     sigma_normal_box_set(ue::NormalUncertaintySet, pr::LowOrderPrior, T::Number,
                          sigma_mu::MatNum, q::Number)
 
-Covariance box uncertainty set of a [`NormalUncertaintySet`](@ref).
+Builds the box of the covariance axis of a [`NormalUncertaintySet`](@ref).
 
-Draws `ue.n_sim` Wishart matrices with `T` degrees of freedom and scale `sigma_mu`, takes the element-wise `q` and `1 - q` quantiles as the bounds, then projects each bound to the nearest positive definite matrix. This is the covariance half of [`ucs`](@ref) and the whole of [`sigma_ucs`](@ref), so the simulation is written once and the two entry points cannot drift apart. The mean of a ``\\mathrm{Wishart}(T, \\mathbf{\\Sigma}_{\\boldsymbol{\\mu}})`` draw is ``T \\mathbf{\\Sigma}_{\\boldsymbol{\\mu}}``, which is ``\\hat{\\mathbf{\\Sigma}}``, so the draws centre on the point estimate and the bounds bracket it.
+The function draws `ue.n_sim` Wishart matrices with `T` degrees of freedom and scale `sigma_mu`. The element-wise `q` and `1 - q` quantiles of the draws are the bounds. The function then projects each bound to the nearest positive definite matrix. The box methods of [`ucs`](@ref) and [`sigma_ucs`](@ref) both call it, so the two give the same box under one seed.
+
+The mean of a ``\\mathrm{Wishart}(T, \\mathbf{\\Sigma}_{\\boldsymbol{\\mu}})`` draw is ``T \\mathbf{\\Sigma}_{\\boldsymbol{\\mu}}``, which is ``\\hat{\\mathbf{\\Sigma}}``. So the draws are centred on the point estimate, and the two bounds are on the two sides of it.
 
 # Algorithm
 
- 1. Read the point estimate `sigma = pr.sigma`, the centre the bounds bracket.
+ 1. Read the point estimate `sigma = pr.sigma`, the centre of the bounds.
  2. Resolve the random number generator from `ue.rng` and `ue.seed` with [`resolve_rng`](@ref).
  3. Draw `ue.n_sim` matrices `sigmas` from `Distributions.Wishart(T, sigma_mu)`.
- 4. Take the element-wise `q` and `1 - q` quantiles of `sigmas` with [`box_quantile_bounds`](@ref), giving `sigma_l` and `sigma_u`.
- 5. Repair `sigma_l` and `sigma_u` in place with `posdef!`. A quantile is taken entry by entry, so neither bound is a Wishart draw and neither is positive definite by construction. A bound that is already positive definite is not moved.
- 6. Return a [`BoxUncertaintySet`](@ref) carrying `sigma_l`, `sigma_u` and `sigma`.
+ 4. Take the element-wise `q` and `1 - q` quantiles of `sigmas` with [`box_quantile_bounds`](@ref) to get `sigma_l` and `sigma_u`.
+ 5. Repair `sigma_l` and `sigma_u` in place with `posdef!`. The quantiles are entry by entry, so neither bound is a Wishart draw, and neither bound is always positive definite. `posdef!` does not change a bound that is already positive definite.
+ 6. Return a [`BoxUncertaintySet`](@ref) that holds `sigma_l`, `sigma_u` and `sigma`.
 
 # Arguments
 
   - `ue`: Normal uncertainty set estimator.
-  - `pr`: Prior result carrying the point estimate `pr.sigma`.
-  - `T`: Scaling parameter from [`choose_scaling_parameter`](@ref), used as the Wishart degrees of freedom.
-  - `sigma_mu`: Mean asymptotic covariance from [`mu_asymptotic_cov`](@ref), used as the Wishart scale.
+  - `pr`: Prior Result. The function reads the point estimate `pr.sigma` and the asset count `size(pr.X, 2)`.
+  - `T`: Scaling parameter from [`choose_scaling_parameter`](@ref), the degrees of freedom of the Wishart law.
+  - `sigma_mu`: Mean asymptotic covariance from [`mu_asymptotic_cov`](@ref), the scale of the Wishart law.
   - `q`: Half significance level.
 
 # Returns
@@ -702,21 +709,23 @@ end
 """
     normal_box_preamble(ue::NormalUncertaintySet, pr::AbstractPriorResult)
 
-Shared preamble of the three box entry points of a [`NormalUncertaintySet`](@ref).
+Does the first steps that the three box methods of a [`NormalUncertaintySet`](@ref) have in common.
 
-Resolves the scaling parameter and derives the two quantities both box sets are built from, off the prior result the set is calibrated on. [`ucs`](@ref), [`mu_ucs`](@ref) and [`sigma_ucs`](@ref) all start here, so the scaling choice is written once instead of three times. **The returned `q` is halved, and the ellipsoidal route halves nothing.** A box bounds each entry on both sides, so half of the significance level goes into each tail. An ellipsoid cuts only the upper tail of a distance that cannot be negative, so one cut at the ``1 - q`` quantile already covers ``1 - q``.
+The function finds the scaling parameter from the Prior Result, and then it makes the two values that the two boxes use. The box methods of [`ucs`](@ref), [`mu_ucs`](@ref) and [`sigma_ucs`](@ref) all call it first.
+
+The returned `q` is half of `ue.q`, and the ellipsoidal route does not halve the level. A box bounds each entry on two sides, so each tail gets half of the significance level. An ellipsoid cuts only the upper tail of a non-negative distance. So one cut at the ``1 - q`` quantile covers ``1 - q``.
 
 # Algorithm
 
- 1. Resolve the scaling parameter with [`choose_scaling_parameter`](@ref), giving `T`.
- 2. Build the mean asymptotic covariance with [`mu_asymptotic_cov`](@ref), giving `sigma_mu`.
- 3. Halve `ue.q`, giving `q`, the significance level of one tail.
+ 1. Resolve the scaling parameter with [`choose_scaling_parameter`](@ref) to get `T`.
+ 2. Build the mean asymptotic covariance with [`mu_asymptotic_cov`](@ref) to get `sigma_mu`.
+ 3. Halve `ue.q` to get `q`, the significance level of one tail.
  4. Return `T`, `sigma_mu` and `q` as a tuple.
 
 # Arguments
 
   - `ue`: Normal uncertainty set estimator.
-  - `pr`: Fitted prior result the set is calibrated on.
+  - `pr`: Prior Result that the set fits on.
 
 # Returns
 
@@ -738,20 +747,20 @@ end
     normal_mu_error_sample(ue::NormalUncertaintySet, rng::Random.AbstractRNG, mu::VecNum,
                            sigma_mu::MatNum)
 
-Draw `ue.n_sim` estimation errors of the mean from the sampling law that normal returns imply.
+Draws `ue.n_sim` estimation errors of the mean from the sampling law of normal returns.
 
-**The sample is the estimation error, not the level.** The draws come from ``\\mathcal{N}(\\hat{\\boldsymbol{\\mu}}, \\hat{\\mathbf{\\Sigma}}/T)`` and `mu` is subtracted from each, so the sample and the shape it is measured against are on one scale. A draw from ``\\mathcal{N}(\\hat{\\boldsymbol{\\mu}}, \\hat{\\mathbf{\\Sigma}})`` in its place multiplies every deviation, and therefore the radius, by ``\\sqrt{T}``. The generator is passed in rather than resolved here, so a caller that needs both axes draws them off one stream.
+Each row of the sample is an estimation error, a draw minus `mu`. The draws come from ``\\mathcal{N}(\\hat{\\boldsymbol{\\mu}}, \\hat{\\mathbf{\\Sigma}}/T)``, so the sample and its shape matrix have the same scale. A draw from ``\\mathcal{N}(\\hat{\\boldsymbol{\\mu}}, \\hat{\\mathbf{\\Sigma}})`` multiplies every deviation by ``\\sqrt{T}``, so it also multiplies the radius by ``\\sqrt{T}``. The caller resolves the generator and gives it to the function. So a caller that needs both axes draws them from one stream.
 
 # Algorithm
 
- 1. Draw `ue.n_sim` vectors from `Distributions.MvNormal(mu, sigma_mu)`, giving one column per simulation.
- 2. Subtract `mu` from every column, and transpose, giving one estimation error per row.
+ 1. Draw `ue.n_sim` vectors from `Distributions.MvNormal(mu, sigma_mu)`. The result has one column for each draw.
+ 2. Subtract `mu` from each column. Transpose the result, so that each row holds one estimation error.
 
 # Arguments
 
   - `ue`: Normal uncertainty set estimator.
-  - `rng`: Random number generator, resolved by the caller with [`resolve_rng`](@ref).
-  - `mu`: Point estimate of the expected returns vector, the centre the draws are taken around.
+  - `rng`: Random number generator, which the caller resolves with [`resolve_rng`](@ref).
+  - `mu`: Point estimate of the expected returns vector, the centre of the draws.
   - `sigma_mu`: Mean asymptotic covariance from [`mu_asymptotic_cov`](@ref).
 
 # Returns
@@ -774,24 +783,24 @@ end
     normal_sigma_error_sample(ue::NormalUncertaintySet, rng::Random.AbstractRNG,
                               sigma::MatNum, sigma_mu::MatNum, T::Number, N::Integer)
 
-Draw `ue.n_sim` estimation errors of the vectorised covariance from the Wishart law that normal returns imply.
+Draws `ue.n_sim` estimation errors of the vectorised covariance from the Wishart law of normal returns.
 
-**The sample is the estimation error, not the level.** Each draw has `sigma` subtracted from it, and the variance of an entry of a ``\\mathrm{Wishart}(T, \\hat{\\mathbf{\\Sigma}}/T)`` draw is the matching diagonal entry of the covariance asymptotic covariance, so the sample and the shape it is measured against are on one scale. `N` is passed in rather than read from `sigma`, so every caller reads the asset count from one source, `size(pr.X, 2)`.
+Each row of the sample is an estimation error, a draw minus `sigma`. The variance of an entry of a ``\\mathrm{Wishart}(T, \\hat{\\mathbf{\\Sigma}}/T)`` draw is the matching diagonal entry of ``\\mathbf{\\Sigma}_{\\mathbf{\\Sigma}}``, the asymptotic covariance of the covariance estimator. So the sample and its shape matrix have the same scale. The caller gives `N`, and the function does not read it from `sigma`. So every caller reads the asset count from one source, `size(pr.X, 2)`.
 
 # Algorithm
 
- 1. Draw `ue.n_sim` matrices from `Distributions.Wishart(T, sigma_mu)`, giving `sigmas`.
+ 1. Draw `ue.n_sim` matrices from `Distributions.Wishart(T, sigma_mu)` to get `sigmas`.
  2. Subtract `sigma` from each draw into an `N` by `N` by `ue.n_sim` array.
- 3. Reshape to `N^2` columns and transpose, giving one vectorised estimation error per row.
+ 3. Reshape the array to `N^2` rows, with one column for each draw. Transpose it, so that each row holds one vectorised estimation error.
 
 # Arguments
 
   - `ue`: Normal uncertainty set estimator.
-  - `rng`: Random number generator, resolved by the caller with [`resolve_rng`](@ref).
-  - `sigma`: Point estimate of the covariance matrix, the centre the draws are taken around.
-  - `sigma_mu`: Mean asymptotic covariance from [`mu_asymptotic_cov`](@ref), the Wishart scale.
-  - `T`: Scaling parameter from [`choose_scaling_parameter`](@ref), the Wishart degrees of freedom.
-  - `N`: Asset count, read by the caller from `size(pr.X, 2)`.
+  - `rng`: Random number generator, which the caller resolves with [`resolve_rng`](@ref).
+  - `sigma`: Point estimate of the covariance matrix, the centre of the draws.
+  - `sigma_mu`: Mean asymptotic covariance from [`mu_asymptotic_cov`](@ref), the scale of the Wishart law.
+  - `T`: Scaling parameter from [`choose_scaling_parameter`](@ref), the degrees of freedom of the Wishart law.
+  - `N`: Asset count. The caller reads it from `size(pr.X, 2)`.
 
 # Returns
 
@@ -827,26 +836,28 @@ end
     sigma_ucs(ue::NormalUncertaintySet, X::MatNum,
               F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
-Fits a [`NormalUncertaintySet`](@ref) from returns data, by fitting the set's own prior and calibrating the set on the result.
+Fits the sets of a [`NormalUncertaintySet`](@ref) from returns data, through the prior of the set.
 
-These are the returns-data arms of the three verbs, and they are one method each whatever shape the set builds, because the shape is decided one call later. Each fits `ue.pe` once through [`ucs_prior`](@ref), which refuses a `pe` of `nothing` by name, and hands the result to the prior-result arm of the same verb on the same set with its `pe` set to `nothing`, which is where the box, the ellipsoid and the norm ball are dispatched. A set with a prior of its own is therefore calibrated on that prior fitted on the returns it is handed, and on nothing else; the two routes share one body per shape, so a set reached through `ucs(ue, X)` and one reached through `ucs(ue′, prior(ue.pe, X))` with `ue′` the same set without its prior are the same set to the last bit.
+These are the returns-data methods of the three verbs. Each verb has one such method for all shapes, because the next call selects the shape. Each method fits `ue.pe` once through [`ucs_prior`](@ref). It then gives the result to the prior-result method of the same verb, on the same set with `pe = nothing`. That method dispatches on the box, the ellipsoid or the norm ball.
+
+So a set with a prior of its own fits on that prior alone, and the prior fits on the returns that the caller gives. The two routes use the same body for each shape. Let `ue′` be `ue` with `pe = nothing`. Then `ucs(ue, X)` and `ucs(ue′, prior(ue.pe, X))` give identical sets.
 
 # Algorithm
 
- 1. Fit the prior with [`ucs_prior`](@ref) on `ue.pe`, `X` and `F`, giving `pr`.
- 2. Forward to the prior-result arm of the verb on the set with `pe = nothing`, which builds the set of the shape `ue.alg` names from `pr`.
+ 1. Fit the prior with [`ucs_prior`](@ref) on `ue.pe`, `X` and `F` to get `pr`.
+ 2. Call the prior-result method of the verb on `pr` and on the set with `pe = nothing`. That method builds the set of the shape that `ue.alg` names.
 
 # Arguments
 
   - `ue`: Normal uncertainty set estimator.
-  - `X`: Data matrix.
-  - `F`: Optional factor matrix. Used by the prior estimator.
+  - `X`: Matrix of asset returns.
+  - `F`: Optional matrix of factor returns, which a factor prior needs.
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+  - `kwargs...`: More keyword arguments, which the method gives to the prior estimator.
 
 # Validation
 
-  - `ue.pe` is not `nothing`. An `ArgumentError` naming the prior-result form is thrown otherwise.
+  - `ue.pe` is not `nothing`. If it is, [`ucs_prior`](@ref) raises an `ArgumentError` that names the prior-result calls.
 
 # Returns
 
@@ -866,29 +877,29 @@ These are the returns-data arms of the three verbs, and they are one method each
 function ucs(ue::NormalUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
              dims::Int = 1, kwargs...)
     pr = ucs_prior(ue.pe, X, F; dims = dims, kwargs...)
-    return ucs(Accessors.@set(ue.pe = nothing), pr)
+    return ucs(rebuild_estimator(ue, (; pe = nothing)), pr)
 end
 function mu_ucs(ue::NormalUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
                 dims::Int = 1, kwargs...)
     pr = ucs_prior(ue.pe, X, F; dims = dims, kwargs...)
-    return mu_ucs(Accessors.@set(ue.pe = nothing), pr)
+    return mu_ucs(rebuild_estimator(ue, (; pe = nothing)), pr)
 end
 function sigma_ucs(ue::NormalUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
                    dims::Int = 1, kwargs...)
     pr = ucs_prior(ue.pe, X, F; dims = dims, kwargs...)
-    return sigma_ucs(Accessors.@set(ue.pe = nothing), pr)
+    return sigma_ucs(rebuild_estimator(ue, (; pe = nothing)), pr)
 end
 """
     ucs(ue::NormalUncertaintySet{Nothing, <:BoxUncertaintySetAlgorithm, <:Any, <:Any, <:Any},
         pr::AbstractPriorResult; rd = nothing, kwargs...)
 
-Constructs box uncertainty sets for mean and covariance statistics under the assumption of normally distributed returns.
+Fits the box sets of the mean and the covariance under normal returns.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result method of the verb, and only a set whose `pe` is `nothing` has it. Inside an optimiser, `pr` is the prior that the optimiser solves on. So the set and the objective have the same centre, and the set folds with that prior under the online step. Outside an optimiser, the caller gives `prior(pe, X)`. The returns-data method of the same verb fits the prior of the set through [`ucs_prior`](@ref), and then it calls this method. So the two routes use the same body.
 
 # Mathematical definition
 
-Simulates ``M`` covariance matrices ``\\hat{\\mathbf{\\Sigma}}^{(m)} \\sim \\mathrm{Wishart}(T,\\, \\hat{\\mathbf{\\Sigma}}/T)`` and computes element-wise quantile bounds:
+The method draws ``M`` covariance matrices ``\\hat{\\mathbf{\\Sigma}}^{(m)} \\sim \\mathrm{Wishart}(T,\\, \\hat{\\mathbf{\\Sigma}}/T)``, and the element-wise quantiles of the draws are the bounds:
 
 ```math
 \\begin{align}
@@ -897,7 +908,7 @@ Simulates ``M`` covariance matrices ``\\hat{\\mathbf{\\Sigma}}^{(m)} \\sim \\mat
 \\end{align}
 ```
 
-Mean bounds use the normal complementary quantile ``z_{q/2} = \\Phi^{-1}(1-q/2)``:
+The bounds of the mean use the normal complementary quantile ``z_{q/2} = \\Phi^{-1}(1-q/2)``:
 
 ```math
 \\begin{align}
@@ -908,10 +919,11 @@ Mean bounds use the normal complementary quantile ``z_{q/2} = \\Phi^{-1}(1-q/2)`
 
 Where:
 
-  - ``(\\mathbf{\\Sigma}_{l})_{ij}``, ``(\\mathbf{\\Sigma}_{u})_{ij}``: Element-wise lower/upper covariance bounds.
-  - ``Q_{q/2}``, ``Q_{1-q/2}``: Lower and upper quantile functions at level ``q/2``.
-  - ``\\hat{\\Sigma}^{(m)}_{ij}``: ``(i,j)``-element of the ``m``-th simulated Wishart covariance draw.
-  - ``\\boldsymbol{\\mu}_{l}``, ``\\mu_{u,i}``: Lower and upper bounds for expected returns.
+  - ``(\\mathbf{\\Sigma}_{l})_{ij}``, ``(\\mathbf{\\Sigma}_{u})_{ij}``: Element-wise lower and upper bounds of the covariance.
+  - ``Q_{q/2}``, ``Q_{1-q/2}``: Quantile functions at the levels ``q/2`` and ``1 - q/2``.
+  - ``\\hat{\\Sigma}^{(m)}_{ij}``: Entry ``(i,j)`` of the ``m``-th Wishart draw.
+  - ``M``: Number of draws, `ue.n_sim`.
+  - ``\\boldsymbol{\\mu}_{l}``, ``\\mu_{u,i}``: Lower bound, and ``i``-th entry of the upper bound, that the builder writes for the mean axis.
   - ``z_{q/2} = \\Phi^{-1}(1 - q/2)``: Normal complementary quantile.
   - $(math_dict[:Sigma_hat])
   - $(math_dict[:T])
@@ -919,24 +931,24 @@ Where:
 
 # Algorithm
 
- 1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
- 2. Run [`normal_box_preamble`](@ref) on the prior result `pr` the set is calibrated on, giving `T`, `sigma_mu` and the halved `q`.
- 3. Build the mean set with [`mu_normal_box_set`](@ref) from `pr.mu`, `sigma_mu` and `q`.
- 4. Build the covariance set with [`sigma_normal_box_set`](@ref) from `ue`, `pr`, `T`, `sigma_mu` and `q`.
- 5. Return the two sets as a tuple, mean first.
- 6. Before the two sets leave, write both back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
+ 1. Reduce the Prior Result `pr` to the Investable Mask with [`investable_ucs_reduction`](@ref) to get `prr`. Inside an optimiser, `pr` is already reduced, and the step changes nothing. Outside an optimiser, on a prior fitted on a point-in-time Asset Panel, the step makes the reduction that an optimiser makes.
+ 2. Run [`normal_box_preamble`](@ref) on `prr` to get `T`, `sigma_mu` and the halved `q`.
+ 3. Build the mean set with [`mu_normal_box_set`](@ref) from `prr.mu`, `sigma_mu` and `q`.
+ 4. Build the covariance set with [`sigma_normal_box_set`](@ref) from `ue`, `prr`, `T`, `sigma_mu` and `q`.
+ 5. Write both sets back onto the full universe with [`expand_investable_ucs`](@ref). A set fitted outside an optimiser then covers the same assets as the prior. A view of the set at the mask gives the reduced fit again.
+ 6. Return the two sets as a tuple, mean first.
 
 # Arguments
 
   - `ue`: Normal uncertainty set estimator with no prior of its own.
-  - `pr`: Fitted prior result the set is calibrated on.
-  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `pr`: Prior Result that the set fits on.
+  - `rd`: Returns Result that the three-argument form gives beside the prior. The reduction takes a view of it, and the method does not use the view.
+  - `kwargs...`: More keyword arguments. The method ignores them.
 
 # Returns
 
   - `mu_ucs::BoxUncertaintySet`: Expected returns uncertainty set.
-  - `sigma_ucs::BoxUncertaintySet`: Covariance uncertainty sets.
+  - `sigma_ucs::BoxUncertaintySet`: Covariance uncertainty set.
 
 # Related
 
@@ -960,9 +972,9 @@ end
     mu_ucs(ue::NormalUncertaintySet{Nothing, <:BoxUncertaintySetAlgorithm, <:Any, <:Any, <:Any},
            pr::AbstractPriorResult; rd = nothing, kwargs...)
 
-Constructs a box uncertainty set for expected returns under the assumption of normally distributed returns.
+Fits the box set of the mean under normal returns.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result method of the verb, and only a set whose `pe` is `nothing` has it. Inside an optimiser, `pr` is the prior that the optimiser solves on. So the set and the objective have the same centre, and the set folds with that prior under the online step. Outside an optimiser, the caller gives `prior(pe, X)`. The returns-data method of the same verb fits the prior of the set through [`ucs_prior`](@ref), and then it calls this method. So the two routes use the same body.
 
 # Mathematical definition
 
@@ -975,7 +987,7 @@ This is the prior-result arm of the verb, defined for a set whose `pe` is `nothi
 
 Where:
 
-  - ``\\boldsymbol{\\mu}_{l}``, ``\\mu_{u,i}``: Lower and upper bounds for expected returns.
+  - ``\\boldsymbol{\\mu}_{l}``, ``\\mu_{u,i}``: Lower bound, and ``i``-th entry of the upper bound, that the builder writes for the mean axis.
   - ``\\Phi^{-1}(1 - q/2)``: Normal complementary quantile.
   - $(math_dict[:Sigma_hat])
   - $(math_dict[:T])
@@ -983,17 +995,17 @@ Where:
 
 # Algorithm
 
- 1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
- 2. Run [`normal_box_preamble`](@ref) on the prior result `pr` the set is calibrated on, giving `sigma_mu` and the halved `q`. The scaling parameter is dropped, because only the covariance set reads it.
- 3. Build and return the mean set with [`mu_normal_box_set`](@ref) from `pr.mu`, `sigma_mu` and `q`.
- 4. Before the set leaves, write it back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
+ 1. Reduce the Prior Result `pr` to the Investable Mask with [`investable_ucs_reduction`](@ref) to get `prr`. Inside an optimiser, `pr` is already reduced, and the step changes nothing. Outside an optimiser, on a prior fitted on a point-in-time Asset Panel, the step makes the reduction that an optimiser makes.
+ 2. Run [`normal_box_preamble`](@ref) on `prr` to get `sigma_mu` and the halved `q`. The method discards `T`, because only the covariance set reads it.
+ 3. Build the mean set with [`mu_normal_box_set`](@ref) from `prr.mu`, `sigma_mu` and `q`.
+ 4. Write the set back onto the full universe with [`expand_investable_ucs`](@ref), and return it. A set fitted outside an optimiser then covers the same assets as the prior. A view of the set at the mask gives the reduced fit again.
 
 # Arguments
 
   - `ue`: Normal uncertainty set estimator with no prior of its own.
-  - `pr`: Fitted prior result the set is calibrated on.
-  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `pr`: Prior Result that the set fits on.
+  - `rd`: Returns Result that the three-argument form gives beside the prior. The reduction takes a view of it, and the method does not use the view.
+  - `kwargs...`: More keyword arguments. The method ignores them.
 
 # Returns
 
@@ -1019,13 +1031,13 @@ end
     sigma_ucs(ue::NormalUncertaintySet{Nothing, <:BoxUncertaintySetAlgorithm, <:Any, <:Any, <:Any},
               pr::AbstractPriorResult; rd = nothing, kwargs...)
 
-Constructs a box uncertainty set for covariance under the assumption of normally distributed returns.
+Fits the box set of the covariance under normal returns.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result method of the verb, and only a set whose `pe` is `nothing` has it. Inside an optimiser, `pr` is the prior that the optimiser solves on. So the set and the objective have the same centre, and the set folds with that prior under the online step. Outside an optimiser, the caller gives `prior(pe, X)`. The returns-data method of the same verb fits the prior of the set through [`ucs_prior`](@ref), and then it calls this method. So the two routes use the same body.
 
 # Mathematical definition
 
-Simulates ``M`` matrices ``\\hat{\\mathbf{\\Sigma}}^{(m)} \\sim \\mathrm{Wishart}(T,\\,\\hat{\\mathbf{\\Sigma}}/T)`` and takes element-wise quantiles:
+The method draws ``M`` matrices ``\\hat{\\mathbf{\\Sigma}}^{(m)} \\sim \\mathrm{Wishart}(T,\\,\\hat{\\mathbf{\\Sigma}}/T)``, and the element-wise quantiles of the draws are the bounds:
 
 ```math
 \\begin{align}
@@ -1036,25 +1048,27 @@ Simulates ``M`` matrices ``\\hat{\\mathbf{\\Sigma}}^{(m)} \\sim \\mathrm{Wishart
 
 Where:
 
-  - ``(\\mathbf{\\Sigma}_{l})_{ij}``, ``(\\mathbf{\\Sigma}_{u})_{ij}``: Element-wise lower/upper covariance bounds.
-  - ``Q_{q/2}``, ``Q_{1-q/2}``: Lower and upper quantile functions at level ``q/2``.
-  - ``\\hat{\\Sigma}^{(m)}_{ij}``: ``(i,j)``-element of the ``m``-th Wishart draw.
+  - ``(\\mathbf{\\Sigma}_{l})_{ij}``, ``(\\mathbf{\\Sigma}_{u})_{ij}``: Element-wise lower and upper bounds of the covariance.
+  - ``Q_{q/2}``, ``Q_{1-q/2}``: Quantile functions at the levels ``q/2`` and ``1 - q/2``.
+  - ``\\hat{\\Sigma}^{(m)}_{ij}``: Entry ``(i,j)`` of the ``m``-th Wishart draw.
+  - ``M``: Number of draws, `ue.n_sim`.
+  - $(math_dict[:Sigma_hat])
   - $(math_dict[:T])
   - ``q``: Significance level.
 
 # Algorithm
 
- 1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
- 2. Run [`normal_box_preamble`](@ref) on the prior result `pr` the set is calibrated on, giving `T`, `sigma_mu` and the halved `q`.
- 3. Build and return the covariance set with [`sigma_normal_box_set`](@ref) from `ue`, `pr`, `T`, `sigma_mu` and `q`.
- 4. Before the set leaves, write it back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
+ 1. Reduce the Prior Result `pr` to the Investable Mask with [`investable_ucs_reduction`](@ref) to get `prr`. Inside an optimiser, `pr` is already reduced, and the step changes nothing. Outside an optimiser, on a prior fitted on a point-in-time Asset Panel, the step makes the reduction that an optimiser makes.
+ 2. Run [`normal_box_preamble`](@ref) on `prr` to get `T`, `sigma_mu` and the halved `q`.
+ 3. Build the covariance set with [`sigma_normal_box_set`](@ref) from `ue`, `prr`, `T`, `sigma_mu` and `q`.
+ 4. Write the set back onto the full universe with [`expand_investable_ucs`](@ref), and return it. A set fitted outside an optimiser then covers the same assets as the prior. A view of the set at the mask gives the reduced fit again.
 
 # Arguments
 
   - `ue`: Normal uncertainty set estimator with no prior of its own.
-  - `pr`: Fitted prior result the set is calibrated on.
-  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `pr`: Prior Result that the set fits on.
+  - `rd`: Returns Result that the three-argument form gives beside the prior. The reduction takes a view of it, and the method does not use the view.
+  - `kwargs...`: More keyword arguments. The method ignores them.
 
 # Returns
 
@@ -1082,17 +1096,17 @@ end
                                  <:Any, <:Any, <:Any},
         pr::AbstractPriorResult; rd = nothing, kwargs...)
 
-Constructs ellipsoidal uncertainty sets for expected returns and covariance statistics under the assumption of normally distributed returns.
+Fits the ellipsoidal sets of the mean and the covariance under normal returns, with radii from simulated estimation errors.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result method of the verb, and only a set whose `pe` is `nothing` has it. Inside an optimiser, `pr` is the prior that the optimiser solves on. So the set and the objective have the same centre, and the set folds with that prior under the online step. Outside an optimiser, the caller gives `prior(pe, X)`. The returns-data method of the same verb fits the prior of the set through [`ucs_prior`](@ref), and then it calls this method. So the two routes use the same body.
 
-**The two samples are estimation errors, not levels.** [`k_ucs`](@ref) measures a Mahalanobis distance against the shape matrix, so step 5 draws from the sampling law of the estimator, ``\\mathcal{N}(\\hat{\\boldsymbol{\\mu}}, \\hat{\\mathbf{\\Sigma}}/T)``, and centres the draws on ``\\hat{\\boldsymbol{\\mu}}``. A draw from ``\\mathcal{N}(\\hat{\\boldsymbol{\\mu}}, \\hat{\\mathbf{\\Sigma}})`` in its place multiplies every deviation, and therefore the radius, by ``\\sqrt{T}``. Step 6 is on the matching scale for the same reason: the variance of an entry of a ``\\mathrm{Wishart}(T, \\hat{\\mathbf{\\Sigma}}/T)`` draw is the matching diagonal entry of ``\\mathbf{\\Sigma}_{\\mathbf{\\Sigma}}``.
+Each row of the two samples is an estimation error. [`k_ucs`](@ref) measures a Mahalanobis distance against the shape matrix. So step 6 draws from the sampling law of the estimator, ``\\mathcal{N}(\\hat{\\boldsymbol{\\mu}}, \\hat{\\mathbf{\\Sigma}}/T)``, and subtracts ``\\hat{\\boldsymbol{\\mu}}`` from each draw. A draw from ``\\mathcal{N}(\\hat{\\boldsymbol{\\mu}}, \\hat{\\mathbf{\\Sigma}})`` multiplies every deviation by ``\\sqrt{T}``, so it also multiplies the radius by ``\\sqrt{T}``. The sample of step 7 has the scale of its shape for the same reason. The variance of an entry of a ``\\mathrm{Wishart}(T, \\hat{\\mathbf{\\Sigma}}/T)`` draw is the matching diagonal entry of ``\\mathbf{\\Sigma}_{\\mathbf{\\Sigma}}``.
 
-**One generator serves both draws, so this method's covariance radius is not [`sigma_ucs`](@ref)'s.** Step 4 resolves the generator once, and step 5 consumes it before step 6 reaches it. [`sigma_ucs`](@ref) draws its Wishart matrices off a generator that nothing has advanced, so under one seed the two covariance radii differ. The mean radius agrees, because the mean sample is the first draw in both. The box route has no such split: [`sigma_normal_box_set`](@ref) resolves its own generator, so there the two entry points agree entry for entry.
+The two draws use one generator, so the covariance radius of this method differs from that of [`sigma_ucs`](@ref) under one seed. Step 5 resolves the generator once, and step 6 advances it before step 7 draws. [`sigma_ucs`](@ref) draws its Wishart matrices from the start of the stream. The two mean radii are equal, because the mean sample is the first draw in both methods. The box route does not have this difference. [`sigma_normal_box_set`](@ref) resolves its own generator, so the two box methods give the same covariance box.
 
 # Mathematical definition
 
-Ellipsoidal sets centred at the prior estimates with asymptotic covariances:
+The two ellipsoids have the prior estimates as centres, and the two asymptotic covariances as shapes:
 
 ```math
 \\begin{align}
@@ -1101,7 +1115,7 @@ Ellipsoidal sets centred at the prior estimates with asymptotic covariances:
 \\end{align}
 ```
 
-The radius of each ellipsoid is the one [`k_ucs`](@ref) returns for [`NormalKUncertaintyAlgorithm`](@ref), which states its own form. The significance level reaches it undivided, because an ellipsoid cuts only the upper tail of a distance that cannot be negative.
+[`k_ucs`](@ref) gives the radius of each ellipsoid for [`NormalKUncertaintyAlgorithm`](@ref), and the docstring of that algorithm states the form. The method gives the significance level to [`k_ucs`](@ref) with no division, because an ellipsoid cuts only the upper tail of a non-negative distance.
 
 ```math
 \\begin{align}
@@ -1130,30 +1144,30 @@ Where:
 
 # Algorithm
 
- 1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
- 2. Take the prior result `pr` the set is calibrated on, and read `mu`, `sigma` and `N = size(pr.X, 2)` from it. The asset count comes from the prior's own returns matrix, so a prior that changes the asset count is followed.
+ 1. Reduce the Prior Result `pr` to the Investable Mask with [`investable_ucs_reduction`](@ref) to get `prr`. Inside an optimiser, `pr` is already reduced, and the step changes nothing. Outside an optimiser, on a prior fitted on a point-in-time Asset Panel, the step makes the reduction that an optimiser makes.
+ 2. Read `mu`, `sigma` and `N = size(prr.X, 2)` from `prr`. The asset count comes from the returns matrix of the prior, so the method follows a prior that changes the asset count.
  3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref).
  4. Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
  5. Resolve the random number generator from `ue.rng` and `ue.seed` with [`resolve_rng`](@ref).
- 6. Draw the mean sample with [`normal_mu_error_sample`](@ref), giving `X_mu`, one mean estimation error per row.
- 7. Draw the covariance sample with [`normal_sigma_error_sample`](@ref), giving `X_sigma`, one vectorised covariance estimation error per row.
+ 6. Draw the mean sample `X_mu` with [`normal_mu_error_sample`](@ref). Each row holds one estimation error of the mean.
+ 7. Draw the covariance sample `X_sigma` with [`normal_sigma_error_sample`](@ref). Each row holds one vectorised estimation error of the covariance.
  8. Build the covariance shape `sigma_sigma` with [`normal_sigma_shape`](@ref).
- 9. Fit the mean ellipsoid with [`ellipsoidal_set`](@ref) on `X_mu` and `sigma_mu`, with `pr.mu` as the centre.
-10. Fit the covariance ellipsoid the same way on `X_sigma` and `sigma_sigma`, with `pr.sigma` as the centre.
-11. Return the two sets as a tuple, mean first.
-12. Before the two sets leave, write both back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
+ 9. Fit the mean ellipsoid with [`ellipsoidal_set`](@ref) on `X_mu` and `sigma_mu`, with `prr.mu` as the centre.
+10. Fit the covariance ellipsoid the same way on `X_sigma` and `sigma_sigma`, with `prr.sigma` as the centre.
+11. Write both sets back onto the full universe with [`expand_investable_ucs`](@ref). A set fitted outside an optimiser then covers the same assets as the prior. A view of the set at the mask gives the reduced fit again.
+12. Return the two sets as a tuple, mean first.
 
 # Arguments
 
   - `ue`: Normal uncertainty set estimator with no prior of its own.
-  - `pr`: Fitted prior result the set is calibrated on.
-  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `pr`: Prior Result that the set fits on.
+  - `rd`: Returns Result that the three-argument form gives beside the prior. The reduction takes a view of it, and the method does not use the view.
+  - `kwargs...`: More keyword arguments. The method ignores them.
 
 # Returns
 
   - `mu_ucs::EllipsoidalUncertaintySet`: Expected returns uncertainty set.
-  - `sigma_ucs::EllipsoidalUncertaintySet`: Covariance uncertainty sets.
+  - `sigma_ucs::EllipsoidalUncertaintySet`: Covariance uncertainty set.
 
 # Related
 
@@ -1189,15 +1203,15 @@ end
     ucs(ue::NormalUncertaintySet{Nothing, <:EllipsoidalUncertaintySetAlgorithm{<:Any, <:Any},
                                  <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
 
-Constructs ellipsoidal uncertainty sets for expected returns and covariance statistics under the assumption of normally distributed returns, using a generic ellipsoidal algorithm.
+Fits the ellipsoidal sets of the mean and the covariance under normal returns, with radii that read no sample.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result method of the verb, and only a set whose `pe` is `nothing` has it. Inside an optimiser, `pr` is the prior that the optimiser solves on. So the set and the objective have the same centre, and the set folds with that prior under the online step. Outside an optimiser, the caller gives `prior(pe, X)`. The returns-data method of the same verb fits the prior of the set through [`ucs_prior`](@ref), and then it calls this method. So the two routes use the same body.
 
-**This route runs no simulation, so it serves every radius algorithm that reads no sample.** That is [`ChiSqKUncertaintyAlgorithm`](@ref), [`GeneralKUncertaintyAlgorithm`](@ref), and a plain number. Its sibling on [`NormalKUncertaintyAlgorithm`](@ref) draws the sample that the empirical radius needs. The two routes build the same shapes, so they differ only in the radius.
+This method draws no sample. It is the method for each radius algorithm that reads no sample, which is [`ChiSqKUncertaintyAlgorithm`](@ref), [`GeneralKUncertaintyAlgorithm`](@ref) or a plain number. The method for [`NormalKUncertaintyAlgorithm`](@ref) draws the sample that the empirical radius needs. The two routes build the same shapes, so they differ only in the radius.
 
 # Mathematical definition
 
-Ellipsoidal sets centred at the prior estimates, whose shapes are the two asymptotic covariances:
+The two ellipsoids have the prior estimates as centres, and the two asymptotic covariances as shapes:
 
 ```math
 \\begin{align}
@@ -1216,31 +1230,31 @@ Where:
   - ``\\mathbf{K}``: Commutation matrix.
   - ``\\otimes``: Kronecker product.
 
-The radius of each ellipsoid is the one [`k_ucs`](@ref) returns for `ue.alg.method`, and that algorithm states its own closed form. The significance level reaches it undivided, because an ellipsoid cuts only the upper tail of a distance that cannot be negative.
+[`k_ucs`](@ref) gives the radius of each ellipsoid for `ue.alg.method`, and the docstring of that algorithm states the closed form. The method gives the significance level to [`k_ucs`](@ref) with no division, because an ellipsoid cuts only the upper tail of a non-negative distance.
 
 # Algorithm
 
- 1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
- 2. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma`.
+ 1. Reduce the Prior Result `pr` to the Investable Mask with [`investable_ucs_reduction`](@ref) to get `prr`. Inside an optimiser, `pr` is already reduced, and the step changes nothing. Outside an optimiser, on a prior fitted on a point-in-time Asset Panel, the step makes the reduction that an optimiser makes.
+ 2. Read `sigma = prr.sigma`.
  3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref).
  4. Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
  5. Build the covariance shape `sigma_sigma` with [`normal_sigma_shape`](@ref).
- 6. Fit the mean ellipsoid with [`ellipsoidal_set`](@ref) on `sigma_mu`, passing `nothing` in place of a sample and `pr.mu` as the centre.
- 7. Fit the covariance ellipsoid the same way on `sigma_sigma`, with `pr.sigma` as the centre.
- 8. Return the two sets as a tuple, mean first.
- 9. Before the two sets leave, write both back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
+ 6. Fit the mean ellipsoid with [`ellipsoidal_set`](@ref) on `sigma_mu`, with `nothing` in place of a sample and `prr.mu` as the centre.
+ 7. Fit the covariance ellipsoid the same way on `sigma_sigma`, with `prr.sigma` as the centre.
+ 8. Write both sets back onto the full universe with [`expand_investable_ucs`](@ref). A set fitted outside an optimiser then covers the same assets as the prior. A view of the set at the mask gives the reduced fit again.
+ 9. Return the two sets as a tuple, mean first.
 
 # Arguments
 
   - `ue`: Normal uncertainty set estimator with no prior of its own.
-  - `pr`: Fitted prior result the set is calibrated on.
-  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `pr`: Prior Result that the set fits on.
+  - `rd`: Returns Result that the three-argument form gives beside the prior. The reduction takes a view of it, and the method does not use the view.
+  - `kwargs...`: More keyword arguments. The method ignores them.
 
 # Returns
 
   - `mu_ucs::EllipsoidalUncertaintySet`: Expected returns uncertainty set.
-  - `sigma_ucs::EllipsoidalUncertaintySet`: Covariance uncertainty sets.
+  - `sigma_ucs::EllipsoidalUncertaintySet`: Covariance uncertainty set.
 
 # Related
 
@@ -1273,11 +1287,11 @@ end
                                     <:Any, <:Any, <:Any},
            pr::AbstractPriorResult; rd = nothing, kwargs...)
 
-Constructs an ellipsoidal uncertainty set for expected returns under the assumption of normally distributed returns, using a normal scaling algorithm.
+Fits the ellipsoidal set of the mean under normal returns, with a radius from simulated estimation errors.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result method of the verb, and only a set whose `pe` is `nothing` has it. Inside an optimiser, `pr` is the prior that the optimiser solves on. So the set and the objective have the same centre, and the set folds with that prior under the online step. Outside an optimiser, the caller gives `prior(pe, X)`. The returns-data method of the same verb fits the prior of the set through [`ucs_prior`](@ref), and then it calls this method. So the two routes use the same body.
 
-**The sample is the estimation error, not the level.** [`k_ucs`](@ref) measures a Mahalanobis distance against the shape matrix, so step 4 draws from the sampling law of the estimator, ``\\mathcal{N}(\\hat{\\boldsymbol{\\mu}}, \\hat{\\mathbf{\\Sigma}}/T)``, and centres the draws on ``\\hat{\\boldsymbol{\\mu}}``. A draw from ``\\mathcal{N}(\\hat{\\boldsymbol{\\mu}}, \\hat{\\mathbf{\\Sigma}})`` in its place multiplies every deviation, and therefore the radius, by ``\\sqrt{T}``.
+Each row of the sample is an estimation error. [`k_ucs`](@ref) measures a Mahalanobis distance against the shape matrix. So step 5 draws from the sampling law of the estimator, ``\\mathcal{N}(\\hat{\\boldsymbol{\\mu}}, \\hat{\\mathbf{\\Sigma}}/T)``, and subtracts ``\\hat{\\boldsymbol{\\mu}}`` from each draw. A draw from ``\\mathcal{N}(\\hat{\\boldsymbol{\\mu}}, \\hat{\\mathbf{\\Sigma}})`` multiplies every deviation by ``\\sqrt{T}``, so it also multiplies the radius by ``\\sqrt{T}``.
 
 # Mathematical definition
 
@@ -1290,26 +1304,26 @@ Where:
   - ``\\mathcal{E}_{\\boldsymbol{\\mu}}``: Ellipsoidal uncertainty set for expected returns.
   - ``\\mathbf{\\Sigma}_{\\boldsymbol{\\mu}}``: Asymptotic covariance of the mean estimator.
   - ``\\hat{\\boldsymbol{\\mu}}``: Estimated expected returns vector.
-  - ``k_{\\boldsymbol{\\mu}}``: Empirically fitted radius, the ``1 - q`` quantile of the sampled Mahalanobis distances.
+  - ``k_{\\boldsymbol{\\mu}}``: Radius fitted on the sample, the ``1 - q`` quantile of the sampled Mahalanobis distances.
   - $(math_dict[:Sigma_hat])
   - $(math_dict[:T])
 
 # Algorithm
 
- 1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
- 2. Take the prior result `pr` the set is calibrated on, and read `mu` and `sigma` from it.
+ 1. Reduce the Prior Result `pr` to the Investable Mask with [`investable_ucs_reduction`](@ref) to get `prr`. Inside an optimiser, `pr` is already reduced, and the step changes nothing. Outside an optimiser, on a prior fitted on a point-in-time Asset Panel, the step makes the reduction that an optimiser makes.
+ 2. Read `mu` and `sigma` from `prr`.
  3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref).
  4. Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
- 5. Resolve the random number generator with [`resolve_rng`](@ref), and draw the sample with [`normal_mu_error_sample`](@ref), giving `X_mu`, one estimation error per row.
- 6. Fit and return the ellipsoid with [`ellipsoidal_set`](@ref) on `X_mu` and `sigma_mu`, with `pr.mu` as the centre.
- 7. Before the set leaves, write it back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
+ 5. Resolve the random number generator with [`resolve_rng`](@ref). Draw the sample `X_mu` with [`normal_mu_error_sample`](@ref). Each row holds one estimation error.
+ 6. Fit the ellipsoid with [`ellipsoidal_set`](@ref) on `X_mu` and `sigma_mu`, with `prr.mu` as the centre.
+ 7. Write the set back onto the full universe with [`expand_investable_ucs`](@ref), and return it. A set fitted outside an optimiser then covers the same assets as the prior. A view of the set at the mask gives the reduced fit again.
 
 # Arguments
 
   - `ue`: Normal uncertainty set estimator with no prior of its own.
-  - `pr`: Fitted prior result the set is calibrated on.
-  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `pr`: Prior Result that the set fits on.
+  - `rd`: Returns Result that the three-argument form gives beside the prior. The reduction takes a view of it, and the method does not use the view.
+  - `kwargs...`: More keyword arguments. The method ignores them.
 
 # Returns
 
@@ -1342,11 +1356,11 @@ end
                                     <:Any, <:Any, <:Any},
            pr::AbstractPriorResult; rd = nothing, kwargs...)
 
-Constructs an ellipsoidal uncertainty set for expected returns under the assumption of normally distributed returns, using a generic ellipsoidal algorithm.
+Fits the ellipsoidal set of the mean under normal returns, with a radius that reads no sample.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result method of the verb, and only a set whose `pe` is `nothing` has it. Inside an optimiser, `pr` is the prior that the optimiser solves on. So the set and the objective have the same centre, and the set folds with that prior under the online step. Outside an optimiser, the caller gives `prior(pe, X)`. The returns-data method of the same verb fits the prior of the set through [`ucs_prior`](@ref), and then it calls this method. So the two routes use the same body.
 
-The shape matrix is ``\\hat{\\mathbf{\\Sigma}} / T`` of Equation 11.24. This method runs no simulation, so it serves every radius algorithm that reads none, which is [`ChiSqKUncertaintyAlgorithm`](@ref), [`GeneralKUncertaintyAlgorithm`](@ref) and a plain number. Its sibling on [`NormalKUncertaintyAlgorithm`](@ref) draws the sample that the empirical radius needs, and builds the same shape.
+The shape matrix is ``\\hat{\\mathbf{\\Sigma}} / T``, the asymptotic covariance of the mean that [`mu_asymptotic_cov`](@ref) builds. This method draws no sample. It is the method for each radius algorithm that reads no sample, which is [`ChiSqKUncertaintyAlgorithm`](@ref), [`GeneralKUncertaintyAlgorithm`](@ref) or a plain number. The method for [`NormalKUncertaintyAlgorithm`](@ref) draws the sample that the empirical radius needs, and it builds the same shape.
 
 # Mathematical definition
 
@@ -1363,23 +1377,23 @@ Where:
   - $(math_dict[:Sigma_hat])
   - $(math_dict[:T])
 
-The significance level reaches [`k_ucs`](@ref) undivided, because an ellipsoid cuts only the upper tail of a distance that cannot be negative.
+The method gives the significance level to [`k_ucs`](@ref) with no division, because an ellipsoid cuts only the upper tail of a non-negative distance.
 
 # Algorithm
 
- 1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
- 2. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma`.
+ 1. Reduce the Prior Result `pr` to the Investable Mask with [`investable_ucs_reduction`](@ref) to get `prr`. Inside an optimiser, `pr` is already reduced, and the step changes nothing. Outside an optimiser, on a prior fitted on a point-in-time Asset Panel, the step makes the reduction that an optimiser makes.
+ 2. Read `sigma = prr.sigma`.
  3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref).
  4. Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
- 5. Fit and return the ellipsoid with [`ellipsoidal_set`](@ref) on `sigma_mu`, passing `nothing` in place of a sample and `pr.mu` as the centre.
- 6. Before the set leaves, write it back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
+ 5. Fit the ellipsoid with [`ellipsoidal_set`](@ref) on `sigma_mu`, with `nothing` in place of a sample and `prr.mu` as the centre.
+ 6. Write the set back onto the full universe with [`expand_investable_ucs`](@ref), and return it. A set fitted outside an optimiser then covers the same assets as the prior. A view of the set at the mask gives the reduced fit again.
 
 # Arguments
 
   - `ue`: Normal uncertainty set estimator with no prior of its own.
-  - `pr`: Fitted prior result the set is calibrated on.
-  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `pr`: Prior Result that the set fits on.
+  - `rd`: Returns Result that the three-argument form gives beside the prior. The reduction takes a view of it, and the method does not use the view.
+  - `kwargs...`: More keyword arguments. The method ignores them.
 
 # Returns
 
@@ -1410,13 +1424,13 @@ end
                                        <:Any, <:Any, <:Any},
               pr::AbstractPriorResult; rd = nothing, kwargs...)
 
-Constructs an ellipsoidal uncertainty set for covariance under the assumption of normally distributed returns, using a normal scaling algorithm.
+Fits the ellipsoidal set of the covariance under normal returns, with a radius from simulated estimation errors.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result method of the verb, and only a set whose `pe` is `nothing` has it. Inside an optimiser, `pr` is the prior that the optimiser solves on. So the set and the objective have the same centre, and the set folds with that prior under the online step. Outside an optimiser, the caller gives `prior(pe, X)`. The returns-data method of the same verb fits the prior of the set through [`ucs_prior`](@ref), and then it calls this method. So the two routes use the same body.
 
-**The sample is the estimation error, not the level.** The draws of step 4 are subtracted from ``\\hat{\\mathbf{\\Sigma}}``, and the variance of an entry of a ``\\mathrm{Wishart}(T, \\hat{\\mathbf{\\Sigma}}/T)`` draw is the matching diagonal entry of ``\\mathbf{\\Sigma}_{\\mathbf{\\Sigma}}``, so the sample and the shape it is measured against are on one scale. `N` is read from `size(pr.X, 2)`, the same source [`ucs`](@ref) reads it from, so a prior that changes the asset count moves both, and the two shape matrices are equal.
+Each row of the sample is an estimation error. Step 5 subtracts ``\\hat{\\mathbf{\\Sigma}}`` from each Wishart draw. The variance of an entry of a ``\\mathrm{Wishart}(T, \\hat{\\mathbf{\\Sigma}}/T)`` draw is the matching diagonal entry of ``\\mathbf{\\Sigma}_{\\mathbf{\\Sigma}}``. So the sample and its shape matrix have the same scale. The method reads `N` from `size(prr.X, 2)`, and [`ucs`](@ref) reads it from the same source. So a prior that changes the asset count changes `N` in both methods, and the two shape matrices are equal.
 
-**The radius is not the one [`ucs`](@ref) fits, under the same seed.** This method draws its Wishart matrices off a generator that nothing has advanced. [`ucs`](@ref) resolves one generator and draws its mean sample off it first, so its Wishart draws differ from these. Both radii are valid fits of the same quantity, and only the box route makes the two entry points agree entry for entry.
+Under one seed, this radius differs from the covariance radius of [`ucs`](@ref). This method draws its Wishart matrices from the start of the stream. [`ucs`](@ref) resolves one generator and draws its mean sample first, so its Wishart draws differ from these. Both radii are valid fits of the same quantity. The two methods give the same covariance set only on the box route.
 
 # Mathematical definition
 
@@ -1432,27 +1446,27 @@ Where:
   - $(math_dict[:I_identity])
   - ``\\mathbf{K}``: Commutation matrix.
   - ``\\otimes``: Kronecker product.
-  - ``k_{\\mathbf{\\Sigma}}``: Empirically fitted radius, the ``1 - q`` quantile of the sampled Mahalanobis distances.
+  - ``k_{\\mathbf{\\Sigma}}``: Radius fitted on the sample, the ``1 - q`` quantile of the sampled Mahalanobis distances.
   - $(math_dict[:Sigma_hat])
   - $(math_dict[:T])
 
 # Algorithm
 
- 1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
- 2. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma` and `N = size(pr.X, 2)`.
+ 1. Reduce the Prior Result `pr` to the Investable Mask with [`investable_ucs_reduction`](@ref) to get `prr`. Inside an optimiser, `pr` is already reduced, and the step changes nothing. Outside an optimiser, on a prior fitted on a point-in-time Asset Panel, the step makes the reduction that an optimiser makes.
+ 2. Read `sigma = prr.sigma` and `N = size(prr.X, 2)`.
  3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref).
  4. Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
- 5. Resolve the random number generator with [`resolve_rng`](@ref), and draw the sample with [`normal_sigma_error_sample`](@ref), giving `X_sigma`, one vectorised estimation error per row.
+ 5. Resolve the random number generator with [`resolve_rng`](@ref). Draw the sample `X_sigma` with [`normal_sigma_error_sample`](@ref). Each row holds one vectorised estimation error.
  6. Build the covariance shape `sigma_sigma` with [`normal_sigma_shape`](@ref).
- 7. Fit and return the ellipsoid with [`ellipsoidal_set`](@ref) on `X_sigma` and `sigma_sigma`, with `pr.sigma` as the centre.
- 8. Before the set leaves, write it back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
+ 7. Fit the ellipsoid with [`ellipsoidal_set`](@ref) on `X_sigma` and `sigma_sigma`, with `prr.sigma` as the centre.
+ 8. Write the set back onto the full universe with [`expand_investable_ucs`](@ref), and return it. A set fitted outside an optimiser then covers the same assets as the prior. A view of the set at the mask gives the reduced fit again.
 
 # Arguments
 
   - `ue`: Normal uncertainty set estimator with no prior of its own.
-  - `pr`: Fitted prior result the set is calibrated on.
-  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `pr`: Prior Result that the set fits on.
+  - `rd`: Returns Result that the three-argument form gives beside the prior. The reduction takes a view of it, and the method does not use the view.
+  - `kwargs...`: More keyword arguments. The method ignores them.
 
 # Returns
 
@@ -1488,11 +1502,11 @@ end
                                        <:EllipsoidalUncertaintySetAlgorithm{<:Any, <:Any},
                                        <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
 
-Constructs an ellipsoidal uncertainty set for covariance under the assumption of normally distributed returns, using a generic ellipsoidal algorithm.
+Fits the ellipsoidal set of the covariance under normal returns, with a radius that reads no sample.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result method of the verb, and only a set whose `pe` is `nothing` has it. Inside an optimiser, `pr` is the prior that the optimiser solves on. So the set and the objective have the same centre, and the set folds with that prior under the online step. Outside an optimiser, the caller gives `prior(pe, X)`. The returns-data method of the same verb fits the prior of the set through [`ucs_prior`](@ref), and then it calls this method. So the two routes use the same body.
 
-**This route runs no simulation, so it serves every radius algorithm that reads no sample.** That is [`ChiSqKUncertaintyAlgorithm`](@ref), [`GeneralKUncertaintyAlgorithm`](@ref), and a plain number. Its sibling on [`NormalKUncertaintyAlgorithm`](@ref) draws the sample that the empirical radius needs. The two routes build the same shapes, so they differ only in the radius.
+This method draws no sample. It is the method for each radius algorithm that reads no sample, which is [`ChiSqKUncertaintyAlgorithm`](@ref), [`GeneralKUncertaintyAlgorithm`](@ref) or a plain number. The method for [`NormalKUncertaintyAlgorithm`](@ref) draws the sample that the empirical radius needs. The two routes build the same shapes, so they differ only in the radius.
 
 # Mathematical definition
 
@@ -1512,24 +1526,24 @@ Where:
   - $(math_dict[:Sigma_hat])
   - $(math_dict[:T])
 
-The significance level reaches [`k_ucs`](@ref) undivided, because an ellipsoid cuts only the upper tail of a distance that cannot be negative.
+The method gives the significance level to [`k_ucs`](@ref) with no division, because an ellipsoid cuts only the upper tail of a non-negative distance.
 
 # Algorithm
 
- 1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
- 2. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma`.
+ 1. Reduce the Prior Result `pr` to the Investable Mask with [`investable_ucs_reduction`](@ref) to get `prr`. Inside an optimiser, `pr` is already reduced, and the step changes nothing. Outside an optimiser, on a prior fitted on a point-in-time Asset Panel, the step makes the reduction that an optimiser makes.
+ 2. Read `sigma = prr.sigma`.
  3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref).
  4. Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
  5. Build the covariance shape `sigma_sigma` with [`normal_sigma_shape`](@ref).
- 6. Fit and return the ellipsoid with [`ellipsoidal_set`](@ref) on `sigma_sigma`, passing `nothing` in place of a sample and `pr.sigma` as the centre.
- 7. Before the set leaves, write it back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
+ 6. Fit the ellipsoid with [`ellipsoidal_set`](@ref) on `sigma_sigma`, with `nothing` in place of a sample and `prr.sigma` as the centre.
+ 7. Write the set back onto the full universe with [`expand_investable_ucs`](@ref), and return it. A set fitted outside an optimiser then covers the same assets as the prior. A view of the set at the mask gives the reduced fit again.
 
 # Arguments
 
   - `ue`: Normal uncertainty set estimator with no prior of its own.
-  - `pr`: Fitted prior result the set is calibrated on.
-  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `pr`: Prior Result that the set fits on.
+  - `rd`: Returns Result that the three-argument form gives beside the prior. The reduction takes a view of it, and the method does not use the view.
+  - `kwargs...`: More keyword arguments. The method ignores them.
 
 # Returns
 
@@ -1563,28 +1577,29 @@ end
                                  <:NormBallUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm, <:Any, <:Any},
                                  <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
 
-Constructs norm-ball uncertainty sets for expected returns and covariance statistics under the assumption of normally distributed returns, using a normal scaling algorithm.
+Fits the norm-ball sets of the mean and the covariance under normal returns, with radii from simulated estimation errors.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result method of the verb, and only a set whose `pe` is `nothing` has it. Inside an optimiser, `pr` is the prior that the optimiser solves on. So the set and the objective have the same centre, and the set folds with that prior under the online step. Outside an optimiser, the caller gives `prior(pe, X)`. The returns-data method of the same verb fits the prior of the set through [`ucs_prior`](@ref), and then it calls this method. So the two routes use the same body.
 
-The two sets are the two ellipsoids of the sibling route with their shape matrices factorised, so they name the same region and reach the same weights. The gain is on the consumer's side: a [`NormBallUncertaintySet`](@ref) carries the factor, so neither builder factorises anything at solve time. This route draws the sample the empirical radius reads, off one generator, so its Wishart draws follow its normal draws.
+The two sets are the two ellipsoids of the ellipsoidal route, with each shape matrix in factored form. So they are the same regions, and they give the same weights. A [`NormBallUncertaintySet`](@ref) holds the factor, so the consumer factorises nothing when it builds the model. This method draws the two samples from one generator, so the Wishart draws come after the normal draws in the stream.
 
 # Algorithm
 
- 1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
- 2. Take the prior result `pr` the set is calibrated on, and read `mu`, `sigma` and `N = size(pr.X, 2)`.
- 3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
- 4. Resolve one generator with [`resolve_rng`](@ref), and draw the two samples with [`normal_mu_error_sample`](@ref) and [`normal_sigma_error_sample`](@ref), mean first.
+ 1. Reduce the Prior Result `pr` to the Investable Mask with [`investable_ucs_reduction`](@ref) to get `prr`. Inside an optimiser, `pr` is already reduced, and the step changes nothing. Outside an optimiser, on a prior fitted on a point-in-time Asset Panel, the step makes the reduction that an optimiser makes.
+ 2. Read `mu`, `sigma` and `N = size(prr.X, 2)` from `prr`.
+ 3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref). Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
+ 4. Resolve one generator with [`resolve_rng`](@ref). Draw the two samples with [`normal_mu_error_sample`](@ref) and [`normal_sigma_error_sample`](@ref), mean first.
  5. Build the covariance shape `sigma_sigma` with [`normal_sigma_shape`](@ref).
- 6. Assemble the two sets with [`norm_ball_set`](@ref), on the mean shape and on the covariance shape, and return them as a tuple, mean first.
- 7. Before the two sets leave, write both back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
+ 6. Assemble the two sets with [`norm_ball_set`](@ref), on the mean shape and on the covariance shape.
+ 7. Write both sets back onto the full universe with [`expand_investable_ucs`](@ref). A set fitted outside an optimiser then covers the same assets as the prior. A view of the set at the mask gives the reduced fit again.
+ 8. Return the two sets as a tuple, mean first.
 
 # Arguments
 
   - `ue`: Normal uncertainty set estimator with no prior of its own.
-  - `pr`: Fitted prior result the set is calibrated on.
-  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `pr`: Prior Result that the set fits on.
+  - `rd`: Returns Result that the three-argument form gives beside the prior. The reduction takes a view of it, and the method does not use the view.
+  - `kwargs...`: More keyword arguments. The method ignores them.
 
 # Returns
 
@@ -1603,8 +1618,10 @@ The two sets are the two ellipsoids of the sibling route with their shape matric
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equations 11.16, 11.17 and 11.24.
-  - $(ref_dict[:bentalnemirovski1998]) Section 3, Equation 14.
+  - $(ref_dict[:magnus1979]) Section 4, Corollary 4.2.
+  - $(ref_dict[:cajas2025]) Section 11.3.2. $(ref_dict[:no_original_source])
+  - $(ref_dict[:bertsimas2011]) Section 2.2, Theorem 2. $(ref_dict[:no_original_source])
+  - $(ref_dict[:bertsimas2004])
 """
 function ucs(ue::NormalUncertaintySet{Nothing,
                                       <:NormBallUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm,
@@ -1631,27 +1648,28 @@ end
     ucs(ue::NormalUncertaintySet{Nothing, <:NormBallUncertaintySetAlgorithm{<:Any, <:Any, <:Any},
                                  <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
 
-Constructs norm-ball uncertainty sets for expected returns and covariance statistics under the assumption of normally distributed returns, using a generic radius algorithm.
+Fits the norm-ball sets of the mean and the covariance under normal returns, with radii that read no sample.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result method of the verb, and only a set whose `pe` is `nothing` has it. Inside an optimiser, `pr` is the prior that the optimiser solves on. So the set and the objective have the same centre, and the set folds with that prior under the online step. Outside an optimiser, the caller gives `prior(pe, X)`. The returns-data method of the same verb fits the prior of the set through [`ucs_prior`](@ref), and then it calls this method. So the two routes use the same body.
 
-**This route runs no simulation, so it serves every radius algorithm that reads no sample.** That is [`ChiSqKUncertaintyAlgorithm`](@ref), [`GeneralKUncertaintyAlgorithm`](@ref), and a plain number. Its sibling on [`NormalKUncertaintyAlgorithm`](@ref) draws the sample that the empirical radius needs. The two routes build the same maps, so they differ only in the radius.
+This method draws no sample. It is the method for each radius algorithm that reads no sample, which is [`ChiSqKUncertaintyAlgorithm`](@ref), [`GeneralKUncertaintyAlgorithm`](@ref) or a plain number. The method for [`NormalKUncertaintyAlgorithm`](@ref) draws the sample that the empirical radius needs. The two routes build the same maps, so they differ only in the radius.
 
 # Algorithm
 
- 1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
- 2. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma`.
- 3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
+ 1. Reduce the Prior Result `pr` to the Investable Mask with [`investable_ucs_reduction`](@ref) to get `prr`. Inside an optimiser, `pr` is already reduced, and the step changes nothing. Outside an optimiser, on a prior fitted on a point-in-time Asset Panel, the step makes the reduction that an optimiser makes.
+ 2. Read `sigma = prr.sigma`.
+ 3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref). Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
  4. Build the covariance shape `sigma_sigma` with [`normal_sigma_shape`](@ref).
- 5. Assemble the two sets with [`norm_ball_set`](@ref), passing `nothing` in place of a sample, and return them as a tuple, mean first.
- 6. Before the two sets leave, write both back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
+ 5. Assemble the two sets with [`norm_ball_set`](@ref), with `nothing` in place of a sample.
+ 6. Write both sets back onto the full universe with [`expand_investable_ucs`](@ref). A set fitted outside an optimiser then covers the same assets as the prior. A view of the set at the mask gives the reduced fit again.
+ 7. Return the two sets as a tuple, mean first.
 
 # Arguments
 
   - `ue`: Normal uncertainty set estimator with no prior of its own.
-  - `pr`: Fitted prior result the set is calibrated on.
-  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `pr`: Prior Result that the set fits on.
+  - `rd`: Returns Result that the three-argument form gives beside the prior. The reduction takes a view of it, and the method does not use the view.
+  - `kwargs...`: More keyword arguments. The method ignores them.
 
 # Returns
 
@@ -1670,8 +1688,11 @@ This is the prior-result arm of the verb, defined for a set whose `pe` is `nothi
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equations 11.16, 11.17 and 11.24.
-  - $(ref_dict[:goldfarbiyengar2003]) Section 5.
+  - $(ref_dict[:magnus1979]) Section 4, Corollary 4.2.
+  - $(ref_dict[:goldfarbiyengar2003]) Section 5, Equation 50.
+  - $(ref_dict[:elghaoui2003]) Theorem 1, Equation 8.
+  - $(ref_dict[:bertsimas2011]) Section 2.2, Theorem 2. $(ref_dict[:no_original_source])
+  - $(ref_dict[:bertsimas2004])
 """
 function ucs(ue::NormalUncertaintySet{Nothing,
                                       <:NormBallUncertaintySetAlgorithm{<:Any, <:Any,
@@ -1695,27 +1716,27 @@ end
                                     <:NormBallUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm, <:Any, <:Any},
                                     <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
 
-Constructs a norm-ball uncertainty set for expected returns under the assumption of normally distributed returns, using a normal scaling algorithm.
+Fits the norm-ball set of the mean under normal returns, with a radius from simulated estimation errors.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result method of the verb, and only a set whose `pe` is `nothing` has it. Inside an optimiser, `pr` is the prior that the optimiser solves on. So the set and the objective have the same centre, and the set folds with that prior under the online step. Outside an optimiser, the caller gives `prior(pe, X)`. The returns-data method of the same verb fits the prior of the set through [`ucs_prior`](@ref), and then it calls this method. So the two routes use the same body.
 
-The map is the factor of ``\\hat{\\mathbf{\\Sigma}} / T``, so the set is the mean ellipsoid of the sibling route with its shape factorised. This method draws its normal sample off a generator that nothing has advanced, which is the same stream position [`ucs`](@ref) draws its own mean sample from, so the two radii agree under one seed.
+The map is a factor of ``\\hat{\\mathbf{\\Sigma}} / T``. So the set is the mean ellipsoid of the ellipsoidal route, with its shape in factored form. This method draws its normal sample from the start of the stream. [`ucs`](@ref) also draws its mean sample first, so under one seed the two radii are equal.
 
 # Algorithm
 
- 1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
- 2. Take the prior result `pr` the set is calibrated on, and read `mu` and `sigma`.
- 3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
- 4. Resolve the generator with [`resolve_rng`](@ref), and draw the sample with [`normal_mu_error_sample`](@ref).
- 5. Assemble and return the set with [`norm_ball_set`](@ref), with `pr.mu` as the centre.
- 6. Before the set leaves, write it back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
+ 1. Reduce the Prior Result `pr` to the Investable Mask with [`investable_ucs_reduction`](@ref) to get `prr`. Inside an optimiser, `pr` is already reduced, and the step changes nothing. Outside an optimiser, on a prior fitted on a point-in-time Asset Panel, the step makes the reduction that an optimiser makes.
+ 2. Read `mu` and `sigma` from `prr`.
+ 3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref). Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
+ 4. Resolve the generator with [`resolve_rng`](@ref). Draw the sample with [`normal_mu_error_sample`](@ref).
+ 5. Assemble the set with [`norm_ball_set`](@ref), with `prr.mu` as the centre.
+ 6. Write the set back onto the full universe with [`expand_investable_ucs`](@ref), and return it. A set fitted outside an optimiser then covers the same assets as the prior. A view of the set at the mask gives the reduced fit again.
 
 # Arguments
 
   - `ue`: Normal uncertainty set estimator with no prior of its own.
-  - `pr`: Fitted prior result the set is calibrated on.
-  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `pr`: Prior Result that the set fits on.
+  - `rd`: Returns Result that the three-argument form gives beside the prior. The reduction takes a view of it, and the method does not use the view.
+  - `kwargs...`: More keyword arguments. The method ignores them.
 
 # Returns
 
@@ -1732,8 +1753,9 @@ The map is the factor of ``\\hat{\\mathbf{\\Sigma}} / T``, so the set is the mea
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equation 11.24.
-  - $(ref_dict[:bentalnemirovski1998]) Section 3, Equation 14.
+  - $(ref_dict[:cajas2025]) Section 11.3.2. $(ref_dict[:no_original_source])
+  - $(ref_dict[:bertsimas2011]) Section 2.2, Theorem 2. $(ref_dict[:no_original_source])
+  - $(ref_dict[:bertsimas2004])
 """
 function mu_ucs(ue::NormalUncertaintySet{Nothing,
                                          <:NormBallUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm,
@@ -1753,26 +1775,26 @@ end
     mu_ucs(ue::NormalUncertaintySet{Nothing, <:NormBallUncertaintySetAlgorithm{<:Any, <:Any, <:Any},
                                     <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
 
-Constructs a norm-ball uncertainty set for expected returns under the assumption of normally distributed returns, using a generic radius algorithm.
+Fits the norm-ball set of the mean under normal returns, with a radius that reads no sample.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result method of the verb, and only a set whose `pe` is `nothing` has it. Inside an optimiser, `pr` is the prior that the optimiser solves on. So the set and the objective have the same centre, and the set folds with that prior under the online step. Outside an optimiser, the caller gives `prior(pe, X)`. The returns-data method of the same verb fits the prior of the set through [`ucs_prior`](@ref), and then it calls this method. So the two routes use the same body.
 
-**This route runs no simulation, so it serves every radius algorithm that reads no sample.** That is [`ChiSqKUncertaintyAlgorithm`](@ref), [`GeneralKUncertaintyAlgorithm`](@ref), and a plain number. Its sibling on [`NormalKUncertaintyAlgorithm`](@ref) draws the sample that the empirical radius needs, and builds the same map.
+This method draws no sample. It is the method for each radius algorithm that reads no sample, which is [`ChiSqKUncertaintyAlgorithm`](@ref), [`GeneralKUncertaintyAlgorithm`](@ref) or a plain number. The method for [`NormalKUncertaintyAlgorithm`](@ref) draws the sample that the empirical radius needs, and builds the same map.
 
 # Algorithm
 
- 1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
- 2. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma`.
- 3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
- 4. Assemble and return the set with [`norm_ball_set`](@ref), passing `nothing` in place of a sample and `pr.mu` as the centre.
- 5. Before the set leaves, write it back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
+ 1. Reduce the Prior Result `pr` to the Investable Mask with [`investable_ucs_reduction`](@ref) to get `prr`. Inside an optimiser, `pr` is already reduced, and the step changes nothing. Outside an optimiser, on a prior fitted on a point-in-time Asset Panel, the step makes the reduction that an optimiser makes.
+ 2. Read `sigma = prr.sigma`.
+ 3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref). Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
+ 4. Assemble the set with [`norm_ball_set`](@ref), with `nothing` in place of a sample and `prr.mu` as the centre.
+ 5. Write the set back onto the full universe with [`expand_investable_ucs`](@ref), and return it. A set fitted outside an optimiser then covers the same assets as the prior. A view of the set at the mask gives the reduced fit again.
 
 # Arguments
 
   - `ue`: Normal uncertainty set estimator with no prior of its own.
-  - `pr`: Fitted prior result the set is calibrated on.
-  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `pr`: Prior Result that the set fits on.
+  - `rd`: Returns Result that the three-argument form gives beside the prior. The reduction takes a view of it, and the method does not use the view.
+  - `kwargs...`: More keyword arguments. The method ignores them.
 
 # Returns
 
@@ -1789,8 +1811,10 @@ This is the prior-result arm of the verb, defined for a set whose `pe` is `nothi
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equation 11.24.
-  - $(ref_dict[:goldfarbiyengar2003]) Section 5.
+  - $(ref_dict[:goldfarbiyengar2003]) Section 5, Equation 50.
+  - $(ref_dict[:elghaoui2003]) Theorem 1, Equation 8.
+  - $(ref_dict[:bertsimas2011]) Section 2.2, Theorem 2. $(ref_dict[:no_original_source])
+  - $(ref_dict[:bertsimas2004])
 """
 function mu_ucs(ue::NormalUncertaintySet{Nothing,
                                          <:NormBallUncertaintySetAlgorithm{<:Any, <:Any,
@@ -1809,28 +1833,28 @@ end
                                        <:NormBallUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm, <:Any, <:Any},
                                        <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
 
-Constructs a norm-ball uncertainty set for covariance under the assumption of normally distributed returns, using a normal scaling algorithm.
+Fits the norm-ball set of the covariance under normal returns, with a radius from simulated estimation errors.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result method of the verb, and only a set whose `pe` is `nothing` has it. Inside an optimiser, `pr` is the prior that the optimiser solves on. So the set and the objective have the same centre, and the set folds with that prior under the online step. Outside an optimiser, the caller gives `prior(pe, X)`. The returns-data method of the same verb fits the prior of the set through [`ucs_prior`](@ref), and then it calls this method. So the two routes use the same body.
 
-The map is the factor of the vectorised covariance's asymptotic covariance, so the set is the covariance ellipsoid of the sibling route with its shape factorised. **The radius is not the one [`ucs`](@ref) fits, under the same seed**, because this method draws its Wishart matrices off a generator that nothing has advanced while [`ucs`](@ref) draws its mean sample first. Both radii are valid fits of the same quantity.
+The map is a factor of the asymptotic covariance of the vectorised covariance. So the set is the covariance ellipsoid of the ellipsoidal route, with its shape in factored form. Under one seed, this radius differs from the covariance radius of [`ucs`](@ref). This method draws its Wishart matrices from the start of the stream, and [`ucs`](@ref) draws its mean sample first. Both radii are valid fits of the same quantity.
 
 # Algorithm
 
- 1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
- 2. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma` and `N = size(pr.X, 2)`.
- 3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
- 4. Resolve the generator with [`resolve_rng`](@ref), and draw the sample with [`normal_sigma_error_sample`](@ref).
+ 1. Reduce the Prior Result `pr` to the Investable Mask with [`investable_ucs_reduction`](@ref) to get `prr`. Inside an optimiser, `pr` is already reduced, and the step changes nothing. Outside an optimiser, on a prior fitted on a point-in-time Asset Panel, the step makes the reduction that an optimiser makes.
+ 2. Read `sigma = prr.sigma` and `N = size(prr.X, 2)`.
+ 3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref). Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
+ 4. Resolve the generator with [`resolve_rng`](@ref). Draw the sample with [`normal_sigma_error_sample`](@ref).
  5. Build the covariance shape `sigma_sigma` with [`normal_sigma_shape`](@ref).
- 6. Assemble and return the set with [`norm_ball_set`](@ref), with `pr.sigma` as the centre.
- 7. Before the set leaves, write it back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
+ 6. Assemble the set with [`norm_ball_set`](@ref), with `prr.sigma` as the centre.
+ 7. Write the set back onto the full universe with [`expand_investable_ucs`](@ref), and return it. A set fitted outside an optimiser then covers the same assets as the prior. A view of the set at the mask gives the reduced fit again.
 
 # Arguments
 
   - `ue`: Normal uncertainty set estimator with no prior of its own.
-  - `pr`: Fitted prior result the set is calibrated on.
-  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `pr`: Prior Result that the set fits on.
+  - `rd`: Returns Result that the three-argument form gives beside the prior. The reduction takes a view of it, and the method does not use the view.
+  - `kwargs...`: More keyword arguments. The method ignores them.
 
 # Returns
 
@@ -1847,8 +1871,10 @@ The map is the factor of the vectorised covariance's asymptotic covariance, so t
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equations 11.17 and 11.24.
-  - $(ref_dict[:bentalnemirovski1998]) Section 3, Equation 14.
+  - $(ref_dict[:magnus1979]) Section 4, Corollary 4.2.
+  - $(ref_dict[:cajas2025]) Section 11.3.2. $(ref_dict[:no_original_source])
+  - $(ref_dict[:bertsimas2011]) Section 2.2, Theorem 2. $(ref_dict[:no_original_source])
+  - $(ref_dict[:bertsimas2004])
 """
 function sigma_ucs(ue::NormalUncertaintySet{Nothing,
                                             <:NormBallUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm,
@@ -1871,27 +1897,27 @@ end
     sigma_ucs(ue::NormalUncertaintySet{Nothing, <:NormBallUncertaintySetAlgorithm{<:Any, <:Any, <:Any},
                                        <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
 
-Constructs a norm-ball uncertainty set for covariance under the assumption of normally distributed returns, using a generic radius algorithm.
+Fits the norm-ball set of the covariance under normal returns, with a radius that reads no sample.
 
-This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
+This is the prior-result method of the verb, and only a set whose `pe` is `nothing` has it. Inside an optimiser, `pr` is the prior that the optimiser solves on. So the set and the objective have the same centre, and the set folds with that prior under the online step. Outside an optimiser, the caller gives `prior(pe, X)`. The returns-data method of the same verb fits the prior of the set through [`ucs_prior`](@ref), and then it calls this method. So the two routes use the same body.
 
-**This route runs no simulation, so it serves every radius algorithm that reads no sample.** That is [`ChiSqKUncertaintyAlgorithm`](@ref), [`GeneralKUncertaintyAlgorithm`](@ref), and a plain number. Its sibling on [`NormalKUncertaintyAlgorithm`](@ref) draws the sample that the empirical radius needs, and builds the same map.
+This method draws no sample. It is the method for each radius algorithm that reads no sample, which is [`ChiSqKUncertaintyAlgorithm`](@ref), [`GeneralKUncertaintyAlgorithm`](@ref) or a plain number. The method for [`NormalKUncertaintyAlgorithm`](@ref) draws the sample that the empirical radius needs, and builds the same map.
 
 # Algorithm
 
- 1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
- 2. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma`.
- 3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
+ 1. Reduce the Prior Result `pr` to the Investable Mask with [`investable_ucs_reduction`](@ref) to get `prr`. Inside an optimiser, `pr` is already reduced, and the step changes nothing. Outside an optimiser, on a prior fitted on a point-in-time Asset Panel, the step makes the reduction that an optimiser makes.
+ 2. Read `sigma = prr.sigma`.
+ 3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref). Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
  4. Build the covariance shape `sigma_sigma` with [`normal_sigma_shape`](@ref).
- 5. Assemble and return the set with [`norm_ball_set`](@ref), passing `nothing` in place of a sample and `pr.sigma` as the centre.
- 6. Before the set leaves, write it back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
+ 5. Assemble the set with [`norm_ball_set`](@ref), with `nothing` in place of a sample and `prr.sigma` as the centre.
+ 6. Write the set back onto the full universe with [`expand_investable_ucs`](@ref), and return it. A set fitted outside an optimiser then covers the same assets as the prior. A view of the set at the mask gives the reduced fit again.
 
 # Arguments
 
   - `ue`: Normal uncertainty set estimator with no prior of its own.
-  - `pr`: Fitted prior result the set is calibrated on.
-  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `pr`: Prior Result that the set fits on.
+  - `rd`: Returns Result that the three-argument form gives beside the prior. The reduction takes a view of it, and the method does not use the view.
+  - `kwargs...`: More keyword arguments. The method ignores them.
 
 # Returns
 
@@ -1908,8 +1934,11 @@ This is the prior-result arm of the verb, defined for a set whose `pe` is `nothi
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equations 11.17 and 11.24.
-  - $(ref_dict[:goldfarbiyengar2003]) Section 5.
+  - $(ref_dict[:magnus1979]) Section 4, Corollary 4.2.
+  - $(ref_dict[:goldfarbiyengar2003]) Section 5, Equation 50.
+  - $(ref_dict[:elghaoui2003]) Theorem 1, Equation 8.
+  - $(ref_dict[:bertsimas2011]) Section 2.2, Theorem 2. $(ref_dict[:no_original_source])
+  - $(ref_dict[:bertsimas2004])
 """
 function sigma_ucs(ue::NormalUncertaintySet{Nothing,
                                             <:NormBallUncertaintySetAlgorithm{<:Any, <:Any,

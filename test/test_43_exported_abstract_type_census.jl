@@ -20,7 +20,7 @@
     accident. An export is public API: adding an entry was the maintainer's call, not a
     decision made in passing while landing a feature.
 
-    Issue #1489 (2026-10-05) changed who makes that call. `CLAUDE.md` § *Design rules* now
+    Issue #1489 (2026-10-05) changed who makes that call. `src/CLAUDE.md` now
     declares a name without approval when it is unambiguously user-facing: `public` when
     users extend it, exported when users use it directly. An abstract type is extended, so
     it is `public` and goes on `allowed_public` below. The census still names every entry,
@@ -97,7 +97,12 @@
     `# Interfaces` section the same day under the rule of #1489, after #1676 exported its two
     members. `AbstractLeverageOneMask`, the family of the Leverage-One Mask of the
     Cross-Sectional Factor Prior, joined with its `# Interfaces` section and its two members the
-    same day (issue #1720).
+    same day (issue #1720). `AbstractShrunkExpectedReturnsIntensity`, the family of the rule
+    that clamps the intensity of `JamesStein` and `BayesStein`, joined with its `# Interfaces`
+    section and its three members on 2026-10-21 (issue #1784, the maintainer's ruling).
+    `AbstractHighOrderPriorEstimator`, the fifth family that `AbstractPriorEstimator`'s own
+    section tells an author to subtype, joined with its `# Interfaces` section on 2026-10-22
+    (issue #531): `HighOrderPriorEstimator` subtypes it directly.
     They are held to their own list for the same reason — public is API too.
     =#
     #! format: off
@@ -145,6 +150,7 @@
         :AbstractGradientTransform,
         :AbstractHacFloor,
         :AbstractHacVolatilityTiming,
+        :AbstractHighOrderPriorEstimator,
         :AbstractHighOrderPriorEstimator_F,
         :AbstractIndefiniteBlockRule,
         :AbstractLastObservationAlgorithm,
@@ -210,6 +216,7 @@
         :AbstractSampleSelector,
         :AbstractSearchCrossValidationResult,
         :AbstractSelectionRule,
+        :AbstractShrunkExpectedReturnsIntensity,
         :AbstractSignificanceCalibrationAlgorithm,
         :AbstractSortingNetworkMerge,
         :AbstractSortingNetworkOrdering,
@@ -267,6 +274,7 @@
         :Scalariser,
         :SchurComplementAlgorithm,
         :SubPortfolioUniverse,
+        :SubsetSizeEstimator,
         :TimeDependentCallable,
         :TimeDependentConstraintCallable,
         :TimeDependentOptimiserCallable,

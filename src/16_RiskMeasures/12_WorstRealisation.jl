@@ -1,9 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Worst Realisation risk measure.
+Measures the Worst Realisation, the largest loss of the sample, which is the negated minimum return.
 
-`WorstRealisation` returns the maximum loss (i.e., the negative minimum return) over all observed scenarios. It is the most conservative risk measure, capturing the single worst outcome in the sample.
+It is the limit of [`ValueatRisk`](@ref) and of [`ConditionalValueatRisk`](@ref) as `alpha` falls to zero, and the [`OrderedWeightsArray`](@ref) with the weights of [`owa_wr`](@ref) gives the same value. When every return is positive, the measure is negative: the worst outcome is then the smallest gain. [`MaximumDrawdown`](@ref) is the Worst Realisation of the drawdown series.
 
 # Mathematical definition
 
@@ -52,16 +52,30 @@ WorstRealisation
            │     rke ┴ Bool: true
 ```
 
+On the path of [`AverageDrawdown`](@ref), the worst return is ``-0.25``.
+
+```jldoctest
+julia> WorstRealisation()([0.125, -0.25, 0.0625, -0.125, 0.375])
+0.25
+
+julia> WorstRealisation()([0.1, 0.2])
+-0.1
+```
+
 # Related
 
   - [`RiskMeasure`](@ref)
   - [`RiskMeasureSettings`](@ref)
   - [`Range`](@ref)
   - [`ValueatRisk`](@ref)
+  - [`ConditionalValueatRisk`](@ref)
+  - [`MaximumDrawdown`](@ref)
+  - [`owa_wr`](@ref)
 
 # References
 
   - $(ref_dict[:minimax])
+  - $(ref_dict[:cajas2025]) Section 7.2.2.8, Equation 7.71. $(ref_dict[:no_original_source])
 """
 @concrete struct WorstRealisation <: RiskMeasure
     """

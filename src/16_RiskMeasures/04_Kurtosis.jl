@@ -1,63 +1,42 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the square root kurtosis risk measure.
+Measures the fourth central moment of the portfolio returns, or its square root.
 
-Computes portfolio risk as the square root of the fourth central moment (kurtosis) of the return distribution, optionally using custom weights, expected returns, and a kurtosis (fourth moment) matrix. This risk measure can be evaluated using either the full or semi (downside) deviations, depending on the algorithm provided.
+The moment has the divisor ``T``. It is not divided by the square of the variance, so it is not the kurtosis coefficient, and it is not an excess kurtosis. `alg2` selects the quantity that the measure reports: [`SOCRiskExpr`](@ref) reports ``\\sqrt{m_4}``, and each of the [`QuadSecondMomentFormulations`](@ref) reports ``m_4``. `alg1` selects the full moment or the lower semi-moment of the functor.
+
+[`set_risk_constraints!`](@ref) states the model, and neither model is exact. When `N` is `nothing`, the model is problem 13 of [pkurt](@cite), which replaces ``\\boldsymbol{w} \\boldsymbol{w}^\\intercal`` with a lifted matrix and drops the condition that the lift has rank one. When `N` is an integer, the model is the sum of squared quadratic forms of [pkurtapprox](@cite), and a larger `N` is more accurate and more expensive. The library calls the first model the exact formulation and the second the approximate formulation, because only the second truncates the cokurtosis. The `## Relaxation` of each method states the gap.
+
+!!! warning
+
+    `alg1` acts on the functor alone. The functor gets only the weights and the returns, so it has no cokurtosis to read, and `alg1` tells it which moment to take. The model reads `kt`, or the cokurtosis of the prior, and does not read `alg1`. So under [`SemiMoment`](@ref) with a full cokurtosis, the functor reports the lower semi-moment and the model minimises the full moment. To give the model a semi-moment, name a **Deferred Quantity** in `kt`, such as `kt = Cokurtosis(; alg = SemiMoment())`. [`resolve_deferred_quantities`](@ref) fits it against the prior of the optimisation, as it fits a full `Cokurtosis()` or any other cokurtosis estimator. A lower semi-cokurtosis gives the heuristic of Section 3.1 of [pkurt](@cite). That model clips the deviations of each asset, not the deviations of the portfolio, so its value is not the semi-moment that the functor reports.
 
 # Mathematical definition
 
-Let ``\\boldsymbol{x} = \\mathbf{X} \\boldsymbol{w}`` be the ``T \\times 1`` vector of portfolio returns, and let ``\\mu`` be the chosen centre (mean, weighted mean, or user-supplied value). Define the centred deviations:
-
 ```math
 \\begin{align}
-\\delta_t &= x_t - \\mu\\,.
-\\end{align}
-```
-
-The fourth central moment (full moment) is:
-
-```math
-\\begin{align}
-m_4(\\boldsymbol{w}) &= \\frac{1}{T} \\sum_{t=1}^{T} \\delta_t^4\\,.
-\\end{align}
-```
-
-The same quantity in the ``N^2 \\times N^2`` cokurtosis matrix ``\\hat{\\mathbf{K}}``, with the Kronecker product ``\\otimes``, is:
-
-```math
-\\begin{align}
-m_4(\\boldsymbol{w}) &= (\\boldsymbol{w}^\\intercal \\otimes \\boldsymbol{w}^\\intercal)\\, \\hat{\\mathbf{K}}\\, (\\boldsymbol{w} \\otimes \\boldsymbol{w})\\,.
-\\end{align}
-```
-
-For the semi (downside) variant, only non-positive deviations contribute:
-
-```math
-\\begin{align}
-m_4^{-}(\\boldsymbol{w}) &= \\frac{1}{T} \\sum_{t=1}^{T} \\min(\\delta_t, 0)^4\\,.
-\\end{align}
-```
-
-The risk is the fourth moment itself under a quadratic formulation, and its square root under a second-order cone formulation. `alg2` selects between them, and `alg1` selects between the full and the semi moment:
-
-```math
-\\begin{align}
+\\delta_t &= x_t - \\mu\\,, \\\\
+m_4(\\boldsymbol{w}) &= \\frac{1}{T} \\sum_{t=1}^{T} \\delta_t^4\\,, \\\\
+m_4^{-}(\\boldsymbol{w}) &= \\frac{1}{T} \\sum_{t=1}^{T} \\min(\\delta_t, 0)^4\\,, \\\\
 \\mathrm{Kurt}(\\boldsymbol{w}) &= \\begin{cases}
-  \\sqrt{m_4(\\boldsymbol{w})} & \\text{(\\texttt{SOCRiskExpr})} \\\\
-  m_4(\\boldsymbol{w}) & \\text{(quadratic formulation)}
-\\end{cases}\\,.
+  \\sqrt{m_4(\\boldsymbol{w})} & \\text{under } \\texttt{SOCRiskExpr}\\,, \\\\
+  m_4(\\boldsymbol{w}) & \\text{under } \\texttt{QuadRiskExpr}\\,,\\ \\texttt{SquaredSOCRiskExpr}\\,,\\ \\texttt{RSOCRiskExpr}\\,.
+\\end{cases}
 \\end{align}
 ```
 
 Where:
 
-  - $(math_dict[:w_port])
-  - ``\\mathbf{X}``: ``T \\times N`` asset returns matrix.
+  - $(math_dict[:xret])
   - $(math_dict[:T])
-  - ``\\delta_t``: Centred portfolio return at period ``t``.
-  - ``\\hat{\\mathbf{K}}``: ``N^2 \\times N^2`` cokurtosis matrix.
-  - ``\\otimes``: Kronecker product.
+  - ``\\mu``: Centre of the moment. [`calc_moment_target`](@ref) states it for each type of `mu`.
+  - ``\\delta_t``: Centred portfolio return at observation ``t``.
+  - $(math_dict[:m4_port])
+  - ``m_4^{-}(\\boldsymbol{w})``: Lower semi-moment of order four, under [`SemiMoment`](@ref). It replaces ``m_4`` in the last line.
+  - $(math_dict[:K_cokurt])
+  - $(math_dict[:w_port])
+
+The two forms of ``m_4`` agree when ``\\mathbf{K}`` is the cokurtosis about the per-asset centres whose image under ``\\boldsymbol{w}`` is ``\\mu``. That is Equation 4 of [pkurt](@cite). When `w` holds observation weights, a weighted mean replaces each ``\\frac{1}{T} \\sum_{t}``.
 
 # Fields
 
@@ -105,17 +84,11 @@ Keywords correspond to the struct's fields.
 
 !!! info
 
-    `kt` also admits a [`CokurtosisEstimator`](@ref) or an [`AbstractPriorEstimator`](@ref), and `mu` an [`AbstractExpectedReturnsEstimator`](@ref) or an [`AbstractPriorEstimator`](@ref). Either is resolved against the optimisation's own prior — see [`resolve_deferred_quantities`](@ref). A cokurtosis estimator in `kt` also supplies `mu` from its own `me`, so that the tensor and the centre it was taken about come out of **one** object. A deferred slot wins over `pe`.
+    `kt` also admits a [`CokurtosisEstimator`](@ref) or an [`AbstractPriorEstimator`](@ref), and `mu` an [`AbstractExpectedReturnsEstimator`](@ref) or an [`AbstractPriorEstimator`](@ref). [`resolve_deferred_quantities`](@ref) resolves either against the prior of the optimisation. A cokurtosis estimator in `kt` also supplies `mu` from its own `me`, so that the tensor and its centre come out of **one** object. A deferred slot wins over `pe`.
 
-# `JuMP` Formulations
+!!! warning
 
-## Exact
-
-This formulation is used when `N` is `nothing`. It is the parametric model of [pkurt](@cite).
-
-## Approximate
-
-This formulation is used when `N` is an integer, the larger the value of `N`, the more accurate and expensive it becomes. It is the sum-of-squared-quadratic-forms model of [pkurtapprox](@cite).
+    A `Number` or a `VecScalar` `mu` beside a [`CokurtosisEstimator`](@ref) in `kt` gives the target of the measure only when the weights sum to one. The estimator takes the tensor about the per-asset centre that [`centring_target`](@ref) makes, and a scalar part ``s`` is spread to every asset. So the tensor centres the portfolio return on ``s \\sum_i w_i``, and the functor centres it on ``s``. Under any other budget, the `JuMP` model and the functor disagree. A budget of 0.5, a leveraged budget and a market-neutral budget are examples. A vector `mu`, or `mu = nothing`, agrees under every budget.
 
 # Examples
 
@@ -149,10 +122,12 @@ Kurtosis
   - [`NegativeSkewness`](@ref)
   - [`resolve_deferred_quantities`](@ref)
   - [`expected_risk`](@ref)
+  - [`calc_moment_target`](@ref)
+  - [`set_risk_constraints!`](@ref): states both models and their relaxations.
 
 # References
 
-  - $(ref_dict[:pkurt])
+  - $(ref_dict[:pkurt]) Section 2, Equation 4, and Section 3.1, Problem 13.
   - $(ref_dict[:pkurtapprox])
 """
 @concrete struct Kurtosis <: RiskMeasure
@@ -242,13 +217,13 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve every **Deferred Quantity** held by [`Kurtosis`](@ref) `r` against prior result `pr`.
 
-Three passes, in order.
+A deferred slot **wins over `pe`**, because `pe` fills only the slots that the first two steps leave `nothing`. `kt` lives on a [`HighOrderPrior`](@ref), so a prior estimator named in `kt` or `pe` must compute one. A measure that holds no **Deferred Quantity** and no `pe` returns unchanged.
 
- 1. A deferred `mu` resolves on its own.
- 2. A deferred `kt` resolves next, and it carries the centre with it. `kt` is a moment **about** a centre, so the two are one pair of quantities out of one object: when `mu` is still unstated, [`deferred_centre`](@ref) reads it off the cokurtosis estimator's own `me`, threads it into the fit as `mean =`, and it becomes the resolved `mu`. A stated `mu` wins and is threaded in its place. An [`AbstractPriorEstimator`](@ref) centres itself, so the centre is read back off the prior result it produced.
- 3. `pe` fans out into whatever both passes left `nothing`.
+# Algorithm
 
-A deferred slot therefore **wins over `pe`**, which is the map's precedence rule one level down. `kt` lives on a [`HighOrderPrior`](@ref), so a prior estimator named in `kt` or `pe` must compute one.
+ 1. Resolve a deferred `mu` on its own, giving `mu`.
+ 2. Resolve a deferred `kt` with its centre, giving `kt` and `mu`. `kt` is a moment **about** a centre, so the two come out of one object. When `mu` is still `nothing`, [`deferred_centre`](@ref) reads the centre off the `me` of the cokurtosis estimator, the fit takes it as `mean =`, and it becomes the resolved `mu`. A stated `mu` takes its place in the fit. An [`AbstractPriorEstimator`](@ref) centres itself, so the centre is read back off the prior result that it gives.
+ 3. Fan `pe` out into each slot that steps 1 and 2 left `nothing`, with [`fan_out_pe`](@ref), and return the rebuilt measure.
 
 # Related
 
@@ -282,9 +257,33 @@ deferred_slots(r::Kurtosis) = (; mu = r.mu, kt = r.kt, pe = r.pe)
     calc_moment_target(r::Kurtosis{<:Any, <:Any, <:VecScalar, ...}, w::VecNum, ::Any)
     calc_moment_target(r::Kurtosis{<:Any, <:Any, <:Number, ...}, ::Any, ::Any)
 
-Compute the target value for kurtosis moment calculations.
+Compute the centre ``\\mu`` about which [`Kurtosis`](@ref) takes its moment.
 
-Dispatches on the type of `r.w` and `r.mu` to select the appropriate centring target. Follows the same rules as [`calc_moment_target`](@ref).
+The method dispatches on the types of `r.w` and `r.mu`. After [`factory`](@ref) with a prior result, a `mu` that was `nothing` holds the mean of the prior, so the centre is the image of that mean under ``\\boldsymbol{w}``, and observation weights in `r.w` change the average but not the centre.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mu &= \\begin{cases}
+  \\frac{1}{T} \\sum_{t=1}^{T} x_t & \\texttt{mu} \\text{ and } \\texttt{w} \\text{ are } \\texttt{nothing}\\,, \\\\
+  \\sum_{t=1}^{T} \\omega_t x_t \\Big/ \\sum_{t=1}^{T} \\omega_t & \\texttt{mu} \\text{ is } \\texttt{nothing} \\text{ and } \\texttt{w} \\text{ holds weights}\\,, \\\\
+  \\boldsymbol{w}^\\intercal \\boldsymbol{\\mu} & \\texttt{mu} \\text{ is a vector}\\,, \\\\
+  \\boldsymbol{w}^\\intercal \\boldsymbol{v} + s & \\texttt{mu} \\text{ is a } \\texttt{VecScalar}\\,, \\\\
+  \\mu_0 & \\texttt{mu} \\text{ is a number}\\,.
+\\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:xret])
+  - $(math_dict[:T])
+  - ``\\omega_t``: Observation weight of observation ``t``, from `r.w`.
+  - $(math_dict[:w_port])
+  - ``\\boldsymbol{\\mu}``: Vector `mu`, one centre for each asset.
+  - ``\\boldsymbol{v}``, ``s``: The fields `v` and `s` of a [`VecScalar`](@ref) `mu`.
+  - ``\\mu_0``: Number `mu`.
 
 # Related
 
@@ -315,9 +314,13 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Compute the vector of deviations from the target value for [`Kurtosis`](@ref) risk measures.
+Compute the deviations ``\\delta_t`` of the net portfolio returns from the centre of [`Kurtosis`](@ref) `r`.
 
-See [`calc_deviations_vec`](@ref) for details.
+# Algorithm
+
+ 1. Compute `x`, the portfolio returns net of `fees`, with [`calc_net_returns`](@ref).
+ 2. Compute `tgt`, the centre of [`calc_moment_target`](@ref) less the mean fee per observation of [`moment_target_fees`](@ref). The fee is not zero only for a per-asset `mu`, which states a gross expected return.
+ 3. Return `x .- tgt`.
 
 # Related
 
@@ -334,9 +337,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Compute the vector of deviations from the target value for a precomputed returns series for [`Kurtosis`](@ref).
+Compute the deviations ``\\delta_t`` of a precomputed series of portfolio returns `x` from the centre of [`Kurtosis`](@ref) `r`.
 
-Single-argument form used by the precomputed-returns functor `r(x::VecNum)`.
+The precomputed-returns functor `r(x::VecNum)` calls this method. The series carries no weights, so the centre is one that [`supports_precomputed_returns`](@ref) accepts: the mean of `x`, its weighted mean, or a number.
 
 # Related
 
@@ -375,7 +378,13 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Create an instance of [`Kurtosis`](@ref) by selecting the cokurtosis matrix, expected returns, and weights from the risk-measure instance or falling back to a [`HighOrderPrior`](@ref) result.
+Create an instance of [`Kurtosis`](@ref) that holds its weights, its centre and its cokurtosis matrix, from the measure or from the [`HighOrderPrior`](@ref) result `pr`.
+
+# Algorithm
+
+ 1. Resolve each **Deferred Quantity** with [`resolve_deferred_quantities`](@ref), giving `r`.
+ 2. Select `w`, `mu` and `kt` field by field with [`nothing_scalar_array_selector`](@ref). A field that the measure states keeps its value, and a field that is `nothing` takes `pr.w`, `pr.mu` or `pr.kt`.
+ 3. Build a new `Kurtosis` from the three fields and from the `settings`, `N`, `alg1`, `alg2` and `mtx_sqrt` of `r`, with `pe = nothing`.
 
 # Related
 
@@ -395,7 +404,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Create an instance of [`Kurtosis`](@ref) from a [`LowOrderPrior`](@ref) result (cokurtosis matrix is not used).
+Create an instance of [`Kurtosis`](@ref) that holds its weights and its centre, from the measure or from the [`LowOrderPrior`](@ref) result `pr`.
+
+A [`LowOrderPrior`](@ref) holds no cokurtosis matrix, so `kt` keeps the matrix that the measure states, or the one that a **Deferred Quantity** resolves to. The functor reads only the returns, so a measure with `kt = nothing` evaluates. The model needs a matrix, and [`set_risk_constraints!`](@ref) refuses a measure that has none.
 
 # Related
 
@@ -417,7 +428,14 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a view of [`Kurtosis`](@ref) `r` sliced to asset indices `i`.
 
-Slices both the cokurtosis matrix `kt` and the expected returns `mu` for cluster-based optimisation.
+The view of a stated matrix agrees with the cokurtosis that a refit on the assets `i` gives. A **Deferred Quantity** passes through unsliced, and resolves on the subset.
+
+# Algorithm
+
+ 1. Read the number of assets `j`, from the length of a vector `mu`, else from the square root of the size of a matrix `kt`. It is `nothing` when neither is stated.
+ 2. When `j` and `kt` are both stated, compute `idx`, the rows and columns of `kt` that belong to the pairs of assets in `i`, with [`fourth_moment_index_generator`](@ref), and take the view of `kt` at `idx`.
+ 3. Take the view of `mu` at `i` with [`nothing_scalar_array_view`](@ref).
+ 4. Build a new `Kurtosis` from `mu`, `kt` and the other fields of `r`.
 
 # Related
 
@@ -451,8 +469,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return whether [`Kurtosis`](@ref) `r` supports precomputed-return evaluation.
 
-Delegates to [`weight_independent_target`](@ref) on `r.mu`: `true` iff the target is
-`Nothing`, a `Number`, or a [`MedianCenteringFunction`](@ref); `false` for per-asset targets.
+The answer is [`weight_independent_target`](@ref) of `r.mu`. It is `true` when `mu` is `nothing` or a number, because the centre is then a function of the series alone. It is `false` for a vector, a [`VecScalar`](@ref) and a **Deferred Quantity**, whose centre needs the weights.
 
 # Related
 

@@ -105,6 +105,13 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the comparators of Batcher's odd-even merge network for `T` values.
 
+# Algorithm
+
+ 1. Start with the empty comparator list `c` and the block half-size `p = 1`.
+ 2. While `p < T`, run the passes of the merge of the blocks of `2p` positions. For each distance `k` from `p` down to `1`, halved at each pass, append the comparators of the pass with [`odd_even_merge_pass!`](@ref).
+ 3. Double `p`, and repeat step 2.
+ 4. Return `c`.
+
 # Arguments
 
   - `alg`: The odd-even merge network.
@@ -155,6 +162,12 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Append to `c` the comparators of one pass of Batcher's odd-even merge network.
 
 The pass compares the positions that are `k` apart and that are in the same block of `2p` positions. A comparator that reads a position past `T` is omitted.
+
+# Algorithm
+
+ 1. For each start `j` from `k % p` up to `T - k - 1`, in steps of `2k`, and for each offset `i` from `0` while `i + j + k < T` and `i < k`:
+ 2. Append the comparator `(i + j + 1, i + j + k + 1)` when the two zero-based positions `i + j` and `i + j + k` are in the same block of `2p` positions.
+ 3. Return `c`.
 
 # Arguments
 
@@ -231,6 +244,14 @@ Append to `c` the comparators that sort the `m` positions from `lo` with a biton
 
 The first half is sorted in the opposite direction and the second half in the direction `up`, so the two halves make a bitonic sequence. [`bitonic_merge!`](@ref) then merges it.
 
+# Algorithm
+
+ 1. If `m <= 1`, return `c` unchanged.
+ 2. Set the half length `h = div(m, 2)`.
+ 3. Append the comparators that sort the first `h` positions in the direction `!up`, by recursion.
+ 4. Append the comparators that sort the last `m - h` positions in the direction `up`, by recursion.
+ 5. Append the comparators that merge the `m` positions in the direction `up`, with [`bitonic_merge!`](@ref).
+
 # Arguments
 
   - `c`: Comparator list, changed in place.
@@ -268,6 +289,13 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Append to `c` the comparators that merge the bitonic sequence of `m` positions from `lo`.
 
 The comparator span is the largest power of two below `m`, so the merge works for every length.
+
+# Algorithm
+
+ 1. If `m <= 1`, return `c` unchanged.
+ 2. Set the span `p = prevpow(2, m - 1)`, the largest power of two below `m`.
+ 3. For each position `i` from `lo` to `lo + m - p - 1`, append the comparator of `i` and `i + p`. It puts the smaller value at `i` when `up` is `true`, and at `i + p` otherwise.
+ 4. Merge the first `p` positions and the last `m - p` positions in the direction `up`, by recursion.
 
 # Arguments
 
@@ -429,6 +457,12 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Return the columns of the network values in the order of the positions they hold.
 
 A stable sort of the values by their position keeps the values of one position in the order that the network writes them.
+
+# Algorithm
+
+ 1. Build `wire`, the position of each network value. Comparator `k` writes value `2k - 1` to its first position and value `2k` to its second position.
+ 2. Sort the values by `wire` with a stable sort, which gives the permutation `sortperm(wire)`.
+ 3. Return its inverse, the column of each value.
 
 # Arguments
 
@@ -600,9 +634,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Ordered Weights Array Range (OWA Range) risk measure.
+Measures risk as the sum of a loss tail and a gain tail of the sorted portfolio returns, each an OWA risk.
 
-Computes portfolio risk as the difference between two OWA linear combinations of sorted portfolio returns, providing a range-based risk measure.
+The risk is the sorted returns weighted by the difference of two OWA weight vectors, `w1` for the loss tail and `w2` for the gain tail.
 
 The constructor reverses `w2` unless the caller declares that it is already reversed (see `rev`). That reversal is what makes the *difference* of the two weight vectors a *range*: `w1` addresses the lower tail of the sorted returns, and the reversed `w2` addresses the upper tail, so `w1 - w2` sums the two tails rather than cancelling them. It is the weight-space form of the convention [`ValueatRiskRange`](@ref) states on the returns themselves.
 
@@ -621,7 +655,7 @@ Where:
   - $(math_dict[:T])
   - ``\\boldsymbol{w}_{1}``: Lower-tail OWA weight vector ``T \\times 1``.
   - ``\\boldsymbol{w}_{2}``: Upper-tail OWA weight vector ``T \\times 1``, held reversed by the constructor.
-  - ``x_{(t)}``: ``t``-th smallest entry of ``\\boldsymbol{x}``, so ``x_{(1)} \\leq \\dots \\leq x_{(T)}``.
+  - $(math_dict[:x_t_asc])
 
 # Fields
 
@@ -641,9 +675,9 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `w1` is a `VecNum`: `!isempty(w1)`.
-  - If `w2` is a `VecNum`: `!isempty(w2)`.
-  - If both `w1` and `w2` are `VecNum`: `length(w1) == length(w2)`.
+  - If `w1` is a `VecNum`: `!isempty(w1)`. Raises an `IsEmptyError`.
+  - If `w2` is a `VecNum`: `!isempty(w2)`. Raises an `IsEmptyError`.
+  - If both `w1` and `w2` are `VecNum`: `length(w1) == length(w2)`. Raises a `DimensionMismatch`.
   - If both `w1` and `w2` are `VecNum` and `alg` is a [`SortingNetworkOrderedWeightsArray`](@ref): `issorted(w1 - w2)`, with `w2` reversed. Raises a `DomainError`. A callable is checked when the model is built.
 
 # Functor

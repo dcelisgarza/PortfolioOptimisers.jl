@@ -11,20 +11,22 @@
         pdm::Option{<:AbstractPosdefEstimator},
     ) -> PortfolioOptimisersCovariance
 
-Convenience constructor. Returns a [`PortfolioOptimisersCovariance`](@ref) configured to apply
-positive definite projection then detoning, in that order, via [`MatrixProcessing`](@ref).
+Returns a [`PortfolioOptimisersCovariance`](@ref) that projects the covariance matrix to the
+positive definite cone and then detones it. A [`MatrixProcessing`](@ref) applies the two steps in
+that order.
 
-[`detone!`](@ref) in `src/04_MatrixProcessing/03_Detone.jl` states the mathematics of the detoning step, and
-[`posdef!`](@ref) in `src/04_MatrixProcessing/01_PosdefMatrix.jl` that of the projection.
+[`detone!`](@ref) in `src/04_MatrixProcessing/03_Detone.jl` states the mathematics of the detoning
+step. [`posdef!`](@ref) in `src/04_MatrixProcessing/01_PosdefMatrix.jl` states the mathematics of
+the projection.
 
 # Algorithm
 
  1. Build a [`MatrixProcessing`](@ref) from `pdm` and `dt`, with `order = (:pdm, :dt)`.
- 2. Return a [`PortfolioOptimisersCovariance`](@ref) carrying `ce` and that estimator.
+ 2. Return a [`PortfolioOptimisersCovariance`](@ref) that holds `ce` and that estimator.
 
-`order` is what fixes the composition: `Statistics.cov` runs `ce` first, then projects the matrix
-onto the positive definite cone, and detones last. A caller who needs the reverse order builds the
-[`MatrixProcessing`](@ref) itself.
+The `order` field sets the composition. `Statistics.cov` runs `ce` first. Then it projects the
+matrix onto the positive definite cone, and it detones the matrix last. For the reverse order,
+build the [`MatrixProcessing`](@ref) directly.
 
 # Arguments
 
@@ -34,7 +36,7 @@ onto the positive definite cone, and detones last. A caller who needs the revers
 
 # Returns
 
-  - `ce::PortfolioOptimisersCovariance`: Composite estimator that detones the matrix `ce` computes.
+  - `ce::PortfolioOptimisersCovariance`: The composite estimator that detones the matrix that `ce` computes.
 
 # Examples
 

@@ -69,7 +69,7 @@
 }
 @article{gerber,
   title   = {The Gerber statistic: A robust co-movement measure for portfolio optimization},
-  author  = {Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Sargen, Paul and others},
+  author  = {Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Javid, Babak and Sargen, Paul},
   journal = {Available at SSRN 3880054},
   year    = {2021}
 }
@@ -122,13 +122,14 @@
   publisher = {Institute of Mathematical Statistics}
 }
 @article{markowitz1952,
-  title   = {Modern portfolio theory},
+  title   = {{Portfolio Selection}},
   author  = {Markowitz, Harry},
-  journal = {Journal of Finance},
+  journal = {The Journal of Finance},
   volume  = {7},
-  number  = {11},
+  number  = {1},
   pages   = {77--91},
-  year    = {1952}
+  year    = {1952},
+  doi     = {10.1111/j.1540-6261.1952.tb01525.x}
 }
 @book{mlp1,
   title     = {Machine learning for asset managers},
@@ -364,6 +365,16 @@
   year      = {2000},
   publisher = {Incisive Media}
 }
+@article{rockafellar2002,
+  title     = {Conditional value-at-risk for general loss distributions},
+  author    = {Rockafellar, R Tyrrell and Uryasev, Stanislav},
+  journal   = {Journal of Banking \& Finance},
+  volume    = {26},
+  number    = {7},
+  pages     = {1443--1471},
+  year      = {2002},
+  doi       = {10.1016/S0378-4266(02)00271-6}
+}
 @article{evar,
   title     = {Entropic value-at-risk: A new coherent risk measure},
   author    = {Ahmadi-Javid, Amir},
@@ -403,6 +414,23 @@
   year      = {2005},
   doi       = {10.1142/S0219024905002767},
   publisher = {World Scientific Pub Co Pte Lt}
+}
+@article{artzner1999,
+  title   = {Coherent measures of risk},
+  author  = {Artzner, Philippe and Delbaen, Freddy and Eber, Jean-Marc and Heath, David},
+  journal = {Mathematical Finance},
+  volume  = {9},
+  number  = {3},
+  pages   = {203--228},
+  year    = {1999},
+  doi     = {10.1111/1467-9965.00068}
+}
+@techreport{morgan1996,
+  title       = {{RiskMetrics} Technical Document},
+  author      = {{J.P. Morgan} and {Reuters}},
+  year        = {1996},
+  institution = {J.P. Morgan/Reuters},
+  type        = {Technical document, fourth edition}
 }
 @article{pnvar,
   title     = {Higher moment coherent risk measures},
@@ -476,17 +504,6 @@
   journal = {Available at SSRN 4540021},
   year    = {2023}
 }
-@article{robustaa,
-  title     = {Robust asset allocation},
-  author    = {T{\"u}t{\"u}nc{\"u}, Reha H. and Koenig, M.},
-  journal   = {Annals of Operations Research},
-  volume    = {132},
-  number    = {1},
-  pages     = {157--187},
-  year      = {2004},
-  doi       = {10.1023/B:ANOR.0000045281.41041.ed},
-  publisher = {Springer}
-}
 @book{palomar2025,
   title     = {Portfolio Optimization: Theory and Application},
   author    = {Palomar, Daniel P.},
@@ -556,6 +573,33 @@
   year      = {1999},
   doi       = {10.1016/S0378-4266(98)00076-4}
 }
+@article{roll1992,
+  title     = {A mean/variance analysis of tracking error},
+  author    = {Roll, Richard},
+  journal   = {The Journal of Portfolio Management},
+  volume    = {18},
+  number    = {4},
+  pages     = {13--22},
+  year      = {1992},
+  doi       = {10.3905/jpm.1992.701922}
+}
+@techreport{pogue1969,
+  title       = {An Extension of the {M}arkowitz Portfolio Selection Model to Include Variable Transactions' Costs, Short Sales, Leverage Policies and Taxes},
+  author      = {Pogue, G. A.},
+  year        = {1969},
+  institution = {Sloan School of Management, Massachusetts Institute of Technology},
+  type        = {Working paper},
+  number      = {388-69B},
+  url         = {https://dspace.mit.edu/handle/1721.1/47810}
+}
+@techreport{mertens2002,
+  title       = {Comments on Variance of the {IID} Estimator in {Lo} (2002)},
+  author      = {Mertens, Elmar},
+  year        = {2002},
+  institution = {University of Basel, Department of Finance},
+  type        = {Working paper},
+  url         = {https://www.elmarmertens.com/research/workingpapers}
+}
 @book{cajas2025,
   title     = {{Advanced Portfolio Optimization: A Cutting-edge Quantitative Approach}},
   author    = {Cajas, Dany},
@@ -619,6 +663,45 @@
   pages   = {279--292},
   year    = {1986},
   doi     = {10.2307/2331042}
+}
+@book{lehmanncasella1998,
+  title     = {Theory of Point Estimation},
+  author    = {Lehmann, E. L. and Casella, George},
+  edition   = {2},
+  publisher = {Springer},
+  series    = {Springer Texts in Statistics},
+  year      = {1998},
+  doi       = {10.1007/b98854}
+}
+@article{sharpe1974,
+  title   = {Imputing expected security returns from portfolio composition},
+  author  = {Sharpe, William F.},
+  journal = {The Journal of Financial and Quantitative Analysis},
+  volume  = {9},
+  number  = {3},
+  pages   = {463--472},
+  year    = {1974},
+  doi     = {10.2307/2329873}
+}
+@article{black1989universal,
+  title   = {Universal hedging: Optimizing currency risk and reward in international equity portfolios},
+  author  = {Black, Fischer},
+  journal = {Financial Analysts Journal},
+  volume  = {45},
+  number  = {4},
+  pages   = {16--22},
+  year    = {1989},
+  doi     = {10.2469/faj.v45.n4.16}
+}
+@article{de2004finding,
+  title   = {Finding a maximum skewness portfolio---a general solution to three-moments portfolio choice},
+  author  = {de Athayde, Gustavo M. and Fl{\^o}res, Jr., Renato G.},
+  journal = {Journal of Economic Dynamics and Control},
+  volume  = {28},
+  number  = {7},
+  pages   = {1335--1352},
+  year    = {2004},
+  doi     = {10.1016/S0165-1889(02)00084-2}
 }
 @article{bodnar2019,
   title   = {Optimal shrinkage estimator for high-dimensional mean vector},
@@ -744,10 +827,10 @@
   author  = {Hacine-Gharbi, Abdenour and Ravier, Philippe and Harba, Rachid and Mohamadi, Tayeb},
   journal = {Pattern Recognition Letters},
   volume  = {33},
-  number  = {16},
+  number  = {10},
   pages   = {1302--1308},
   year    = {2012},
-  doi     = {10.1016/j.patrec.2012.05.014}
+  doi     = {10.1016/j.patrec.2012.02.022}
 }
 
 @article{hacinegharbi2018,
@@ -758,6 +841,39 @@
   pages   = {21--28},
   year    = {2018},
   doi     = {10.1016/j.patrec.2017.11.007}
+}
+
+@article{hacinegharbi2013,
+  title   = {A new histogram-based estimation technique of entropy and mutual information using mean squared error minimization},
+  author  = {Hacine-Gharbi, Abdenour and Deriche, Mohamed and Ravier, Philippe and Harba, Rachid and Mohamadi, Tayeb},
+  journal = {Computers \& Electrical Engineering},
+  volume  = {39},
+  number  = {3},
+  pages   = {918--933},
+  year    = {2013},
+  doi     = {10.1016/j.compeleceng.2013.02.010}
+}
+
+@article{kendall1938,
+  title   = {A new measure of rank correlation},
+  author  = {Kendall, M. G.},
+  journal = {Biometrika},
+  volume  = {30},
+  number  = {1/2},
+  pages   = {81--93},
+  year    = {1938},
+  doi     = {10.1093/biomet/30.1-2.81}
+}
+
+@article{kendall1945,
+  title   = {The treatment of ties in ranking problems},
+  author  = {Kendall, M. G.},
+  journal = {Biometrika},
+  volume  = {33},
+  number  = {3},
+  pages   = {239--251},
+  year    = {1945},
+  doi     = {10.1093/biomet/33.3.239}
 }
 
 @inproceedings{charikar2002,
@@ -822,9 +938,10 @@
 
 @article{yue2008,
   title   = {Application of two-order difference to gap statistic},
-  author  = {Yue, Shihong and Wang, Xiuxiu and Wei, Mei},
+  author  = {Yue, Shihong and Wang, Xiuxiu and Wei, Miaomiao},
   journal = {Transactions of Tianjin University},
   volume  = {14},
+  number  = {3},
   pages   = {217--221},
   year    = {2008},
   doi     = {10.1007/s12209-008-0039-1}
@@ -868,6 +985,52 @@
   pages   = {129--137},
   year    = {1982},
   doi     = {10.1109/TIT.1982.1056489}
+}
+@inproceedings{macqueen1967,
+  title     = {Some methods for classification and analysis of multivariate observations},
+  author    = {MacQueen, James},
+  booktitle = {Proceedings of the Fifth Berkeley Symposium on Mathematical Statistics and Probability, Volume 1: Statistics},
+  pages     = {281--297},
+  year      = {1967}
+}
+@article{barjoseph2003,
+  title   = {{K}-ary clustering with optimal leaf ordering for gene expression data},
+  author  = {Bar-Joseph, Ziv and Demaine, Erik D. and Gifford, David K. and Srebro, Nathan and Hamel, Ang{\`e}le M. and Jaakkola, Tommi S.},
+  journal = {Bioinformatics},
+  volume  = {19},
+  number  = {9},
+  pages   = {1070--1078},
+  year    = {2003},
+  doi     = {10.1093/bioinformatics/btg030}
+}
+@article{dijkstra1959,
+  title   = {A note on two problems in connexion with graphs},
+  author  = {Dijkstra, Edsger W.},
+  journal = {Numerische Mathematik},
+  volume  = {1},
+  number  = {1},
+  pages   = {269--271},
+  year    = {1959},
+  doi     = {10.1007/BF01386390}
+}
+@article{nesetril2001,
+  title   = {Otakar {B}or{\r{u}}vka on minimum spanning tree problem: translation of both the 1926 papers, comments, history},
+  author  = {Ne{\v{s}}et{\v{r}}il, Jaroslav and Milkov{\'a}, Eva and Ne{\v{s}}et{\v{r}}ilov{\'a}, Helena},
+  journal = {Discrete Mathematics},
+  volume  = {233},
+  number  = {1--3},
+  pages   = {3--36},
+  year    = {2001},
+  doi     = {10.1016/S0012-365X(00)00224-7}
+}
+@article{pozzi2013,
+  title   = {Spread of risk across financial markets: better to invest in the peripheries},
+  author  = {Pozzi, Federico and Di Matteo, Tiziana and Aste, Tomaso},
+  journal = {Scientific Reports},
+  volume  = {3},
+  pages   = {1665},
+  year    = {2013},
+  doi     = {10.1038/srep01665}
 }
 @article{freeman1977,
   title     = {A set of measures of centrality based on betweenness},
@@ -1024,6 +1187,35 @@
   number    = {2},
   pages     = {700--717},
   year      = {2024},
+  publisher = {Elsevier}
+}
+@techreport{markowitz1955,
+  title       = {{The Optimization of Quadratic Functions Subject to Linear Constraints}},
+  author      = {Markowitz, Harry},
+  number      = {RM-1438},
+  institution = {RAND Corporation},
+  type        = {Research Memorandum},
+  year        = {1955},
+  url         = {https://www.rand.org/pubs/research_memoranda/RM1438.html}
+}
+@book{markowitz1959,
+  title     = {Portfolio Selection: Efficient Diversification of Investments},
+  author    = {Markowitz, Harry M.},
+  publisher = {John Wiley \& Sons},
+  address   = {New York},
+  series    = {Cowles Foundation Monograph},
+  number    = {16},
+  year      = {1959}
+}
+@article{chang2000,
+  title     = {{Heuristics for Cardinality Constrained Portfolio Optimisation}},
+  author    = {Chang, T.-J. and Meade, N. and Beasley, J. E. and Sharaiha, Y. M.},
+  journal   = {Computers \& Operations Research},
+  volume    = {27},
+  number    = {13},
+  pages     = {1271--1302},
+  year      = {2000},
+  doi       = {10.1016/S0305-0548(99)00074-X},
   publisher = {Elsevier}
 }
 
@@ -1249,7 +1441,7 @@
   volume  = {59},
   pages   = {14--26},
   year    = {2015},
-  doi     = {10.1016/j.jbankfin.2015.05.001}
+  doi     = {10.1016/j.jbankfin.2015.04.026}
 }
 @article{cheung2007,
   title   = {The augmented Black-Litterman model: a ranking-free approach to factor-based portfolio construction and beyond},
@@ -1280,6 +1472,30 @@
   pages   = {747--786},
   year    = {2017},
   doi     = {10.1007/s00355-017-1034-z}
+}
+@incollection{dietrichlist2016,
+  title     = {Probabilistic Opinion Pooling},
+  author    = {Dietrich, Franz and List, Christian},
+  editor    = {H{\'a}jek, Alan and Hitchcock, Christopher},
+  booktitle = {The Oxford Handbook of Probability and Philosophy},
+  publisher = {Oxford University Press},
+  year      = {2016}
+}
+@article{magnusneudecker1980,
+  title   = {The elimination matrix: some lemmas and applications},
+  author  = {Magnus, Jan R. and Neudecker, Heinz},
+  journal = {SIAM Journal on Algebraic Discrete Methods},
+  volume  = {1},
+  number  = {4},
+  pages   = {422--449},
+  year    = {1980},
+  doi     = {10.1137/0601049}
+}
+@techreport{helitterman1999,
+  title       = {The Intuition Behind Black-Litterman Model Portfolios},
+  author      = {He, Guangliang and Litterman, Robert},
+  institution = {Goldman Sachs Investment Management Research},
+  year        = {1999}
 }
 @incollection{martinisprenger2017,
   title     = {Opinion Aggregation and Individual Expertise},
@@ -1450,7 +1666,7 @@
 }
 @phdthesis{chares2009,
   title  = {{Cones and Interior-Point Algorithms for Structured Convex Optimization Involving Powers and Exponentials}},
-  author = {Chares, Robert},
+  author = {Chares, Peter Robert},
   school = {Universit{\'e} catholique de Louvain},
   address = {Louvain-la-Neuve, Belgium},
   year   = {2009}
@@ -1464,6 +1680,16 @@
   pages   = {425--442},
   year    = {1964},
   doi     = {10.1111/j.1540-6261.1964.tb02865.x}
+}
+@article{sharpe1966,
+  title   = {{Mutual Fund Performance}},
+  author  = {Sharpe, William F.},
+  journal = {The Journal of Business},
+  volume  = {39},
+  number  = {1},
+  pages   = {119--138},
+  year    = {1966},
+  doi     = {10.1086/294846}
 }
 @article{schaibleibaraki1983,
   title   = {{Fractional Programming}},
@@ -1546,12 +1772,15 @@
   year         = {2023},
   howpublished = {\url{https://docs.mosek.com/portfolio-cookbook/index.html}}
 }
-@misc{jump2026cones,
-  title        = {{Modeling with cones}},
-  author       = {{The JuMP Developers}},
-  year         = {2026},
-  note         = {Conic programming tutorial of the JuMP documentation},
-  howpublished = {\url{https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/}}
+@article{lobo1998,
+  title   = {{Applications of Second-Order Cone Programming}},
+  author  = {Lobo, Miguel Sousa and Vandenberghe, Lieven and Boyd, Stephen and Lebret, Herv{\'e}},
+  journal = {Linear Algebra and its Applications},
+  volume  = {284},
+  number  = {1--3},
+  pages   = {193--228},
+  year    = {1998},
+  doi     = {10.1016/S0024-3795(98)10032-0}
 }
 @article{cajas2019noc,
   title   = {{Robust Portfolio Selection with Near Optimal Centering}},
@@ -1710,6 +1939,86 @@
   booktitle = {Proceedings of the 29th International Conference on Machine Learning},
   year      = {2012}
 }
+@inproceedings{james1961,
+  title     = {Estimation with quadratic loss},
+  author    = {James, W. and Stein, Charles},
+  booktitle = {Proceedings of the Fourth Berkeley Symposium on Mathematical Statistics and Probability, Volume 1},
+  pages     = {361--379},
+  year      = {1961},
+  publisher = {University of California Press}
+}
+@article{bock1975,
+  title   = {Minimax estimators of the mean of a multivariate normal distribution},
+  author  = {Bock, M. E.},
+  journal = {The Annals of Statistics},
+  volume  = {3},
+  number  = {1},
+  pages   = {209--218},
+  year    = {1975},
+  doi     = {10.1214/aos/1176343009}
+}
+@techreport{black1991,
+  title       = {Global asset allocation with equities, bonds, and currencies},
+  author      = {Black, Fischer and Litterman, Robert},
+  institution = {Goldman, Sachs \& Co., Fixed Income Research},
+  year        = {1991},
+  month       = {October}
+}
+@techreport{jondeau2004,
+  title       = {Optimal portfolio allocation under higher moments},
+  author      = {Jondeau, Eric and Rockinger, Michael},
+  institution = {Banque de France},
+  type        = {Notes d'{\'E}tudes et de Recherche},
+  number      = {108},
+  year        = {2004}
+}
+@inproceedings{huang2013,
+  title     = {Robust median reversion strategy for on-line portfolio selection},
+  author    = {Huang, Dingjiang and Zhou, Junlong and Li, Bin and Hoi, Steven C. H. and Zhou, Shuigeng},
+  booktitle = {Proceedings of the Twenty-Third International Joint Conference on Artificial Intelligence},
+  pages     = {2006--2012},
+  year      = {2013}
+}
+@article{schmidt2006,
+  title   = {Non-parametric estimation of tail dependence},
+  author  = {Schmidt, Rafael and Stadtm{\"u}ller, Ulrich},
+  journal = {Scandinavian Journal of Statistics},
+  volume  = {33},
+  number  = {2},
+  pages   = {307--335},
+  year    = {2006},
+  doi     = {10.1111/j.1467-9469.2005.00483.x}
+}
+@article{spearman1904,
+  title   = {The proof and measurement of association between two things},
+  author  = {Spearman, C.},
+  journal = {The American Journal of Psychology},
+  volume  = {15},
+  number  = {1},
+  pages   = {72--101},
+  year    = {1904},
+  doi     = {10.2307/1412159}
+}
+@article{ledoitwolf2004,
+  title   = {A well-conditioned estimator for large-dimensional covariance matrices},
+  author  = {Ledoit, Olivier and Wolf, Michael},
+  journal = {Journal of Multivariate Analysis},
+  volume  = {88},
+  number  = {2},
+  pages   = {365--411},
+  year    = {2004},
+  doi     = {10.1016/S0047-259X(03)00096-4}
+}
+@article{ledoitwolf2004honey,
+  title   = {Honey, I shrunk the sample covariance matrix},
+  author  = {Ledoit, Olivier and Wolf, Michael},
+  journal = {The Journal of Portfolio Management},
+  volume  = {30},
+  number  = {4},
+  pages   = {110--119},
+  year    = {2004},
+  doi     = {10.3905/jpm.2004.110}
+}
 @article{huang2016,
   title     = {Robust median reversion strategy for online portfolio selection},
   author    = {Huang, Dingjiang and Zhou, Junlong and Li, Bin and Hoi, Steven C. H. and Zhou, Shuigeng},
@@ -1777,7 +2086,7 @@
 }
 @article{moon2019,
   title   = {Empirical investigation of state-of-the-art mean reversion strategies for equity markets},
-  author  = {Moon, Seung-Hyun},
+  author  = {Moon, Seung-Hyun and Kim, Yong-Hyuk and Moon, Byung-Ro},
   journal = {arXiv preprint arXiv:1909.04327},
   year    = {2019},
   doi     = {10.48550/arXiv.1909.04327}
@@ -2168,6 +2477,23 @@
   pages     = {12510--12520},
   year      = {2020}
 }
+@article{cesabianchi1997,
+  title     = {How to use expert advice},
+  author    = {Cesa-Bianchi, Nicol{\`o} and Freund, Yoav and Haussler, David and Helmbold, David P. and Schapire, Robert E. and Warmuth, Manfred K.},
+  journal   = {Journal of the ACM},
+  volume    = {44},
+  number    = {3},
+  pages     = {427--485},
+  year      = {1997},
+  doi       = {10.1145/258128.258179}
+}
+@inproceedings{kingma2015,
+  title     = {Adam: A method for stochastic optimization},
+  author    = {Kingma, Diederik P. and Ba, Jimmy},
+  booktitle = {3rd International Conference on Learning Representations},
+  year      = {2015},
+  note      = {arXiv:1412.6980}
+}
 @article{singer1997,
   title     = {Switching portfolios},
   author    = {Singer, Yoram},
@@ -2319,6 +2645,25 @@
   doi       = {10.2307/1913610}
 }
 
+@techreport{menchero2011,
+  title       = {The {Barra} {US} Equity Model ({USE4}): Methodology Notes},
+  author      = {Menchero, Jose and Orr, D. J. and Wang, Jun},
+  year        = {2011},
+  institution = {MSCI},
+  type        = {Model Insight}
+}
+
+@article{engle2002,
+  title     = {Dynamic conditional correlation: A simple class of multivariate generalized autoregressive conditional heteroskedasticity models},
+  author    = {Engle, Robert},
+  journal   = {Journal of Business \& Economic Statistics},
+  volume    = {20},
+  number    = {3},
+  pages     = {339--350},
+  year      = {2002},
+  doi       = {10.1198/073500102288618487}
+}
+
 @article{angchenxing2006,
   title     = {Downside Risk},
   author    = {Ang, Andrew and Chen, Joseph and Xing, Yuhang},
@@ -2339,4 +2684,98 @@
   pages     = {365--379},
   year      = {2002},
   doi       = {10.1016/S1566-0141(02)00042-0}
+}
+
+@article{elghaoui2003,
+  title     = {Worst-Case Value-At-Risk and Robust Portfolio Optimization: A Conic Programming Approach},
+  author    = {El Ghaoui, Laurent and Oks, Maksim and Oustry, Francois},
+  journal   = {Operations Research},
+  volume    = {51},
+  number    = {4},
+  pages     = {543--556},
+  year      = {2003},
+  doi       = {10.1287/opre.51.4.543.16101}
+}
+
+@article{tutuncu2004,
+  title     = {Robust Asset Allocation},
+  author    = {T{\"u}t{\"u}nc{\"u}, Reha H. and Koenig, M.},
+  journal   = {Annals of Operations Research},
+  volume    = {132},
+  number    = {1},
+  pages     = {157--187},
+  year      = {2004},
+  doi       = {10.1023/B:ANOR.0000045281.41041.ed}
+}
+
+@article{bertsimas2004,
+  title     = {Robust linear optimization under general norms},
+  author    = {Bertsimas, Dimitris and Pachamanova, Dessislava and Sim, Melvyn},
+  journal   = {Operations Research Letters},
+  volume    = {32},
+  number    = {6},
+  pages     = {510--516},
+  year      = {2004},
+  doi       = {10.1016/j.orl.2003.12.007}
+}
+
+@article{bertsimas2011,
+  title     = {Theory and Applications of Robust Optimization},
+  author    = {Bertsimas, Dimitris and Brown, David B. and Caramanis, Constantine},
+  journal   = {SIAM Review},
+  volume    = {53},
+  number    = {3},
+  pages     = {464--501},
+  year      = {2011},
+  doi       = {10.1137/080734510}
+}
+
+@techreport{saxena2010,
+  title       = {Finance, Statistics, Accounting, Optimization and some Alignment Problems},
+  author      = {Saxena, Anureet and Stubbs, Robert A.},
+  year        = {2010},
+  institution = {Axioma, Inc.},
+  type        = {Axioma Research Paper},
+  number      = {28}
+}
+
+@article{saxena2013,
+  title     = {Alpha alignment factor: A solution to the underestimation of risk for optimized active portfolios},
+  author    = {Saxena, Anureet and Stubbs, Robert A.},
+  journal   = {Journal of Risk},
+  volume    = {15},
+  number    = {3},
+  year      = {2013}
+}
+
+@article{magnus1979,
+  title     = {The Commutation Matrix: Some Properties and Applications},
+  author    = {Magnus, Jan R. and Neudecker, H.},
+  journal   = {The Annals of Statistics},
+  volume    = {7},
+  number    = {2},
+  pages     = {381--394},
+  year      = {1979},
+  doi       = {10.1214/aos/1176344621}
+}
+
+@article{tracy1969,
+  title     = {Multivariate Maxima and Minima with Matrix Derivatives},
+  author    = {Tracy, D. S. and Dwyer, P. S.},
+  journal   = {Journal of the American Statistical Association},
+  volume    = {64},
+  number    = {328},
+  pages     = {1576--1594},
+  year      = {1969}
+}
+
+@article{wishart1928,
+  title     = {The Generalised Product Moment Distribution in Samples from a Normal Multivariate Population},
+  author    = {Wishart, John},
+  journal   = {Biometrika},
+  volume    = {20A},
+  number    = {1/2},
+  pages     = {32--52},
+  year      = {1928},
+  doi       = {10.1093/biomet/20A.1-2.32}
 }

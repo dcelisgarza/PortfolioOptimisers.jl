@@ -1465,6 +1465,8 @@ The contributions are those of the target weights. Under a Weight Drift the retu
 
 The rows of ``\\tilde{\\mathbf{B}}`` are an orthonormal basis of the null space of ``\\mathbf{B}^\\intercal``. So ``\\mathbf{B} \\mathbf{B}^{+} + \\tilde{\\mathbf{B}}^\\intercal \\tilde{\\mathbf{B}}`` is the identity, the entries sum to ``\\boldsymbol{w}^\\intercal \\boldsymbol{g}``, and Euler's theorem gives the last line.
 
+This is the decomposition of Section 3 of [roncalliweisang2012](@cite), whose matrix ``\\mathbf{A}`` is ``\\mathbf{B}`` here. That work takes the completion by the null space from Section 4 and Appendix A.1 of [meucci2007](@cite). The factor exposures are ``\\mathbf{B}^\\intercal \\boldsymbol{w}``, and not the regression exposures of Section 5 of [meucci2007](@cite). The homogeneity correction and the finite-difference gradient are the library's own.
+
 Where:
 
   - ``\\mathrm{FRC}_j``: Risk contribution of factor ``j``, and of the off-factor part at ``j = K + 1``.
@@ -1522,9 +1524,8 @@ Where:
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 10.2.1.
-  - $(ref_dict[:roncalliweisang2012])
-  - $(ref_dict[:meucci2007])
+  - $(ref_dict[:roncalliweisang2012]) Section 3, Equations 2 and 3, and Theorems 1 and 2.
+  - $(ref_dict[:meucci2007]) Section 4, Equations 20 and 21, and Appendix A.1.
 """
 function factor_risk_contribution(r::BaseRM_VecBaseRM, w::VecNum, X::MatNum_Pr,
                                   fees::Option{<:Fees} = nothing;

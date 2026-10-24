@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Expected returns estimator that returns the asset standard deviations.
 
-`StandardDeviationExpectedReturns` computes "expected returns" as the standard deviation of each asset, as estimated by the underlying covariance estimator. The result is in the units of the returns. This can be useful in certain risk-based portfolio construction approaches where the expected return proxy is the asset's volatility.
+`StandardDeviationExpectedReturns` returns the standard deviation of each asset in the place of an expected return. The covariance estimator `ce` estimates it. The result is in the units of the returns. Use it where a per-asset characteristic need not be a mean, for example to rank the assets on volatility with an [`L1UncertaintySet`](@ref).
 
 # Fields
 
@@ -19,15 +19,15 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `ce`: Recursively updated via [`factory`](@ref).
+  - `ce`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `ce`: Recursively viewed via [`port_opt_view`](@ref).
+  - `ce`: Recursively viewed through [`port_opt_view`](@ref).
 
 # Examples
 
@@ -81,9 +81,9 @@ end
 
 Compute expected returns as the standard deviation of each asset.
 
-This method returns the standard deviation vector of `X` as estimated by the covariance estimator `me.ce`. The result is in the units of the returns in `X`. It is the elementwise square root of what [`mean(me::VarianceExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref) returns on the same data and the same `me.ce`.
+This method returns the standard deviation of each asset in `X`, which the covariance estimator `me.ce` estimates. The result is in the units of the returns in `X`. It is the elementwise square root of what [`mean(me::VarianceExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref) returns on the same data and the same `me.ce`.
 
-The method reads the diagonal of the matrix that `me.ce` returns, not a formula of its own. Every choice inside `me.ce` therefore reaches the result: the moment algorithm, the observation weights, and the matrix processing. It calls `me.ce` through [`library_covariance_estimator`](@ref), which wraps an estimator the library does not own, such as `StatsBase.SimpleCovariance()`, in a [`GeneralCovariance`](@ref). `StatsBase` defines no `std` for such an estimator.
+The method takes the square root of the diagonal of the matrix that `me.ce` returns. A choice inside `me.ce` that changes that diagonal, such as the observation weights, changes the result. The method calls `me.ce` through [`library_covariance_estimator`](@ref). That function wraps an estimator that the library does not own, such as `StatsBase.SimpleCovariance()`, in a [`GeneralCovariance`](@ref), because `StatsBase` defines no `std` for such an estimator.
 
 # Mathematical definition
 
@@ -95,17 +95,17 @@ The method reads the diagonal of the matrix that `me.ce` returns, not a formula 
 
 Where:
 
-  - ``\\hat{\\mu}_j``: Expected return proxy of asset ``j``.
-  - ``\\hat{\\sigma}_j``: Standard deviation of asset ``j``.
-  - ``\\hat{\\mathbf{\\Sigma}}``: Covariance matrix that `me.ce` estimates.
-  - ``\\hat{\\mathbf{\\Sigma}}_{jj}``: ``j``-th diagonal element of ``\\hat{\\mathbf{\\Sigma}}``.
+  - ``\\hat{\\mu}_j``: The value that takes the place of the expected return of asset ``j``.
+  - ``\\hat{\\sigma}_j``: The standard deviation of asset ``j``.
+  - ``\\hat{\\mathbf{\\Sigma}}``: The covariance matrix that `me.ce` estimates.
+  - ``\\hat{\\mathbf{\\Sigma}}_{jj}``: The ``j``-th diagonal element of ``\\hat{\\mathbf{\\Sigma}}``.
 
 # Arguments
 
-  - `me`: Standard deviation expected returns estimator.
-  - `X`: Data matrix of asset returns (observations × assets).
+  - `me`: The standard deviation expected returns estimator.
+  - `X`: The data matrix of asset returns, `observations × assets`.
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the covariance estimator.
+  - `kwargs...`: More keyword arguments, which the method passes to the covariance estimator.
 
 # Validation
 
@@ -113,7 +113,7 @@ Where:
 
 # Returns
 
-  - `mu::Matrix{<:Number}`: Standard deviation vector, shaped as `(1, N)` if `dims == 1` or `(N, 1)` if `dims == 2`.
+  - `mu::Matrix{<:Number}`: The standard deviations, a `(1, N)` matrix if `dims == 1` or an `(N, 1)` matrix if `dims == 2`.
 
 # Related
 
@@ -132,7 +132,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Expected returns estimator that returns the asset variances.
 
-`VarianceExpectedReturns` computes "expected returns" as the variance of each asset, as estimated by the underlying covariance estimator. The result is in the squared units of the returns. This can be useful in certain risk-based portfolio construction approaches where the expected return proxy is the asset's variance. The variance is the square of the standard deviation, so this type returns the elementwise square of what [`StandardDeviationExpectedReturns`](@ref) returns on the same data and the same `ce`.
+`VarianceExpectedReturns` returns the variance of each asset in the place of an expected return. The covariance estimator `ce` estimates it. The result is in the squared units of the returns. The variance is the square of the standard deviation, so this type returns the elementwise square of what [`StandardDeviationExpectedReturns`](@ref) returns on the same data and the same `ce`.
 
 # Fields
 
@@ -148,15 +148,15 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `ce`: Recursively updated via [`factory`](@ref).
+  - `ce`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `ce`: Recursively viewed via [`port_opt_view`](@ref).
+  - `ce`: Recursively viewed through [`port_opt_view`](@ref).
 
 # Examples
 
@@ -209,9 +209,9 @@ end
 
 Compute expected returns as the variance of each asset.
 
-This method returns the variance vector of `X` as estimated by the covariance estimator `me.ce`. The result is in the squared units of the returns in `X`. It is the elementwise square of what [`mean(me::StandardDeviationExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref) returns on the same data and the same `me.ce`.
+This method returns the variance of each asset in `X`, which the covariance estimator `me.ce` estimates. The result is in the squared units of the returns in `X`. It is the elementwise square of what [`mean(me::StandardDeviationExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref) returns on the same data and the same `me.ce`.
 
-The method reads the diagonal of the matrix that `me.ce` returns, not a formula of its own. Every choice inside `me.ce` therefore reaches the result: the moment algorithm, the observation weights, and the matrix processing. It calls `me.ce` through [`library_covariance_estimator`](@ref), which wraps an estimator the library does not own, such as `StatsBase.SimpleCovariance()`, in a [`GeneralCovariance`](@ref). `StatsBase` defines no `var` for such an estimator.
+The method reads the diagonal of the matrix that `me.ce` returns. A choice inside `me.ce` that changes that diagonal, such as the observation weights, changes the result. The method calls `me.ce` through [`library_covariance_estimator`](@ref). That function wraps an estimator that the library does not own, such as `StatsBase.SimpleCovariance()`, in a [`GeneralCovariance`](@ref), because `StatsBase` defines no `var` for such an estimator.
 
 # Mathematical definition
 
@@ -223,17 +223,17 @@ The method reads the diagonal of the matrix that `me.ce` returns, not a formula 
 
 Where:
 
-  - ``\\hat{\\mu}_j``: Expected return proxy of asset ``j``.
-  - ``\\hat{\\sigma}_j^2``: Variance of asset ``j``.
-  - ``\\hat{\\mathbf{\\Sigma}}``: Covariance matrix that `me.ce` estimates.
-  - ``\\hat{\\mathbf{\\Sigma}}_{jj}``: ``j``-th diagonal element of ``\\hat{\\mathbf{\\Sigma}}``.
+  - ``\\hat{\\mu}_j``: The value that takes the place of the expected return of asset ``j``.
+  - ``\\hat{\\sigma}_j^2``: The variance of asset ``j``.
+  - ``\\hat{\\mathbf{\\Sigma}}``: The covariance matrix that `me.ce` estimates.
+  - ``\\hat{\\mathbf{\\Sigma}}_{jj}``: The ``j``-th diagonal element of ``\\hat{\\mathbf{\\Sigma}}``.
 
 # Arguments
 
-  - `me`: Variance expected returns estimator.
-  - `X`: Data matrix of asset returns (observations × assets).
+  - `me`: The variance expected returns estimator.
+  - `X`: The data matrix of asset returns, `observations × assets`.
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the covariance estimator.
+  - `kwargs...`: More keyword arguments, which the method passes to the covariance estimator.
 
 # Validation
 
@@ -241,7 +241,7 @@ Where:
 
 # Returns
 
-  - `mu::Matrix{<:Number}`: Variance vector, shaped as `(1, N)` if `dims == 1` or `(N, 1)` if `dims == 2`.
+  - `mu::Matrix{<:Number}`: The variances, a `(1, N)` matrix if `dims == 1` or an `(N, 1)` matrix if `dims == 2`.
 
 # Related
 

@@ -9,13 +9,13 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :kmin => "`kmin`: Floor on the ratio problem's homogenisation variable `k`, or `nothing` to size it from the resolved characteristic. It keeps the solver off the degenerate ray `k = 0`, on which every homogeneous constraint holds vacuously.",#
                  :i_ret_term => "`i`: Index of the return term to maximise.",#
                  # Errors
-                 :msg => "`msg`: Error message describing the condition that triggered the exception.",#
+                 :msg => "`msg`: Error message that states the condition that caused the exception.",#
                  # Solver
-                 :name => "`name`: Symbol or string identifier. It is also the **key** under which [`optimise_JuMP_model!`](@ref) files this solver's failure in [`JuMPResult`](@ref)'s `trials`, so two solvers that share a name share one entry and the later failure overwrites the earlier one. Give each solver of a vector its own name, because the default `\"\"` is shared by all of them.",#
-                 :solver => "`solver`: The `optimizer_factory` in [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).",#
-                 :settings => "`settings`: Optional solver-specific settings used in [`set_attribute`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_attribute).",#
-                 :check_sol => "`check_sol`: Named tuple of keyword arguments splatted into [`assert_is_solved_and_feasible`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.assert_is_solved_and_feasible) after each solve. It decides which solver statuses count as a solved model. The default `(;)` accepts JuMP's own defaults, `allow_local = true` and `allow_almost = false`: the termination status must be `OPTIMAL` or `LOCALLY_SOLVED`, and the primal status must be `FEASIBLE_POINT`. The strictness is deliberate — a solution the solver itself flags as approximate is rejected rather than silently accepted, so a solver stage that fails this check falls through to the next solver in the vector. The common relaxation is `check_sol = (; allow_local = true, allow_almost = true)`, which also accepts `ALMOST_OPTIMAL`, `ALMOST_LOCALLY_SOLVED` and `NEARLY_FEASIBLE_POINT`; it is what the examples, the user guide and the test suite pass, because a first-order solver reaching its tolerance on a well-posed portfolio problem is usually good enough. Go the other way with `allow_local = false` to reject `LOCALLY_SOLVED` and demand a certified global optimum, and add `dual = true` to also require a feasible dual point.",#
-                 :add_bridges => "`add_bridges`: The `add_bridges` keyword argument in [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).",#
+                 :name => "`name`: The symbol or string that names the solver. [`optimise_JuMP_model!`](@ref) records a failure of the solver under this key in the `trials` of the [`JuMPResult`](@ref). Two solvers that share a name share one entry, and the later failure overwrites the earlier one. Give each solver of a vector its own name, because every solver has the default name `\"\"`.",#
+                 :solver => "`solver`: The `optimizer_factory` argument of [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).",#
+                 :settings => "`settings`: The solver attributes that [`set_solver_attributes`](@ref) sets with [`set_attribute`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_attribute) after `JuMP.set_optimizer` attaches the solver. `nothing` sets no attribute.",#
+                 :check_sol => "`check_sol`: The keyword arguments that [`assert_is_solved_and_feasible`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.assert_is_solved_and_feasible) takes after each solve. They decide which solver statuses count as a solved model. The default `(;)` keeps the JuMP defaults, `allow_local = true` and `allow_almost = false`. The termination status must then be `OPTIMAL` or `LOCALLY_SOLVED`, and the primal status must be `FEASIBLE_POINT`. So the check refuses a solution that the solver itself reports as approximate, and [`optimise_JuMP_model!`](@ref) tries the next solver of the vector. `check_sol = (; allow_local = true, allow_almost = true)` also accepts `ALMOST_OPTIMAL`, `ALMOST_LOCALLY_SOLVED` and `NEARLY_FEASIBLE_POINT`. The examples, the user guide and the tests pass it, because a first-order solver that reaches its tolerance on a well-posed portfolio problem gives a usable solution. Set `allow_local = false` to refuse `LOCALLY_SOLVED`, and add `dual = true` to also require a feasible dual point.",#
+                 :add_bridges => "`add_bridges`: The `add_bridges` keyword argument of [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer). With `false`, JuMP adds no bridges, and a constraint that the solver does not support raises at `JuMP.optimize!`.",#
                  # RNG
                  :rng => "`rng`: Random number generator.",#
                  :seed => "`seed`: Optional seed. If set, the draws come from a copy of `rng` seeded with it, so `rng` does not advance and every call draws the same values. If `nothing`, the draws come from `rng` itself.",
@@ -41,13 +41,13 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :b1_opt => "`b1::Option{<:MatNum} = nothing`: Basis of the decision vector of [`FactorRiskContribution`](@ref), which maps it to the asset weights: the pseudoinverse of the transposed loadings, followed by the off-factor basis when `flag = true`. `nothing` for all other optimisers.",
                  :optargs => "`args`: Additional positional arguments passed to the optimisation function.",
                  :optkwargs => "`kwargs`: Additional keyword arguments passed to the optimisation function.",
-                 :ignargs => "`args`: Additional positional arguments (ignored).",
-                 :ignkwargs => "`kwargs`: Additional keyword arguments (ignored).",
+                 :ignargs => "`args`: More positional arguments, which the method ignores.",
+                 :ignkwargs => "`kwargs`: More keyword arguments, which the method ignores.",
                  :rd => "`rd`: The returns result to use.",
                  :pnl_prior => "`pnl`: Optional [`AssetPanel`](@ref), the panel that the returns data held. A wrapping prior forwards it unchanged, so that it can compose an estimator that is fitted on a panel. An estimator that reads no panel ignores it.",
-                 :pnl_moment => "`pnl`: Optional [`AssetPanel`](@ref), whose active mask the Coverage Universe of the fit is derived from. `nothing` makes the rule finiteness alone.",
+                 :pnl_moment => "`pnl`: Optional [`AssetPanel`](@ref). The Coverage Universe of the fit comes from its active mask. If it is `nothing`, the rule reads only the finiteness of the returns.",
                  :window => "`window`: Observation window. An integer selects the last `window` observations, and a vector of indices selects those observations.",
-                 :window_rule => "`rule`: [`AbstractWindowRule`](@ref) that says which observations the window keeps on the online step. [`RollingWindow`](@ref) keeps the window at every fit, and [`SeedWindow`](@ref) keeps it at the first fit alone.",
+                 :window_rule => "`rule`: [`AbstractWindowRule`](@ref) that sets the observations that the window keeps on the online step. [`RollingWindow`](@ref) keeps the window at every fit, and [`SeedWindow`](@ref) keeps it at the first fit alone.",
                  # Frontier.
                  :N_fr => "`N`: Number of sweep points on the efficient frontier. The sweep solves the model `N` times, at `N` evenly spaced bound values.",#
                  :factor_fr => "`factor`: Multiplier applied to both ends of the sweep span after `bound` has transformed them. It carries a formulation's own correction factor, such as the `inv(1 / (T - ddof))` of a second-moment bound.",#
@@ -116,7 +116,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :x_src_cfer => "`x_src`: The source of the returns that the evaluation read, [`DataSource`](@ref) or [`ExcessSource`](@ref). An evaluation at `x_src = nothing` records `DataSource()`. The forecasts are forecasts of the returns in this frame, so [`covariance_forecast_portfolio`](@ref) reads its test rows in it.",#
                  :frame_x => "`x`: The value to walk: a reader of the returns, a value that holds readers, a vector of them, or any other value.",#
                  :frame_path => "`path`: The path of the value from the head, for example `\"pe\"`, `\"cle\"` or `\"r[2].pe\"`. A warning names a reader by its path.",#
-                 :frame_refit => "`refit`: Whether a regression reader at `x_src = nothing` in the group fits its regression on the raw returns data, see [`refits_regression`](@ref).",#
+                 :frame_refit => "`refit`: `true` when a regression reader at `x_src = nothing` in the group fits its regression on the raw returns data. [`refits_regression`](@ref) finds the value.",#
                  :frame_head => "`head`: The value whose group the walk reads: an optimiser, a `Pipeline` or an [`OnlinePortfolioSelection`](@ref).",#
                  :iv_x_src => "`iv`: Optional implied volatility matrix, `observations × assets`, read by an [`ImpliedVolatility`](@ref) estimator in the tree. The estimator receives the last rows of `iv`, one for each row of the picked `X`, through [`implied_volatility_picker`](@ref), so a prior that keeps fewer rows than the returns data still pairs each row of its `X` with the implied volatility of the same observation.",#
                  :wf => "`wf`: Weight finaliser.",#
@@ -214,7 +214,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  # Iterative solvers.
                  :tol => "`tol`: Convergence tolerance.",#
                  :lambda_sspo => "`lambda`: The weight of the ``L_1`` penalty of the short-term sparse portfolio.",#
-                 :gamma_sspo => "`gamma`: The soft-threshold width. The ratio `lambda / gamma` is the quadratic coupling of the iteration of [lai2018sspo](@cite).",#
+                 :gamma_sspo => "`gamma`: The soft-threshold width. The ratio `lambda / gamma` is twice the weight of the quadratic coupling in Equation 13 of [lai2018sspo](@cite).",#
                  :iter => "`iter`: Maximum number of iterations.",#
                  # Near optimal centering.
                  :w_opt_noc => "`w_opt`: Optimal portfolio weights.",#
@@ -222,7 +222,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :w_max_noc => "`w_max`: Maximum return portfolio weights.",#
                  :ucs_flag => "`ucs_flag`: Whether to use the uncertainty set.",#
                  # Optimiser config.
-                 :kwargs => "`kwargs`: Additional keyword arguments.",#
+                 :kwargs => "`kwargs`: More keyword arguments.",#
                  # Near optimal centering result fields.
                  :attrs_noc => "`attrs`: Processed JuMP optimiser attributes for the model-assembly pipeline.",#
                  :w_opt => "`w_opt`: Optimal portfolio weights (vector or vector of vectors).",#
@@ -264,19 +264,21 @@ unique_key_dict!(arg_dict, :arg_dict,
                  # Portfolio summary statistics.
                  :ps_n_periods => "`n_periods`: Number of observations in the return series.",#
                  :ps_ppy => "`ppy`: Periods per year, the annualisation factor. 252 for daily, 52 for weekly, 12 for monthly returns, and 1 states each figure per period.",#
-                 :ps_alpha => "`alpha`: Tail probability used for the CVaR, ``\\alpha \\in (0, 1)``.",#
-                 :ps_compound => "`compound`: Whether the wealth path behind the drawdown statistics was compounded.",#
+                 :ps_alpha => "`alpha`: Tail probability of the CVaR, ``\\alpha \\in (0, 1)``.",#
+                 :ps_compound => "`compound`: `true` when the drawdown statistics read a compounded wealth path, and `false` when they read the cumulative sum of the returns.",#
                  :ps_ann_return => "`ann_return`: Annualised arithmetic mean return.",#
                  :ps_ann_volatility => "`ann_volatility`: Annualised sample standard deviation.",#
-                 :ps_sharpe => "`sharpe`: Annualised Sharpe ratio at a zero risk-free rate. `NaN` if the volatility is zero.",#
-                 :ps_sharpe_stderr => "`sharpe_stderr`: Standard error of `sharpe`, corrected for the skewness and excess kurtosis of the returns, and **not** for their serial dependence. A series scored under a Weight Drift is serially dependent through the weights it held, so this figure understates the true standard error of such a series.",#
-                 :ps_sortino => "`sortino`: Annualised Sortino ratio, at a zero minimum acceptable return. `NaN` if the downside deviation is zero.",#
-                 :ps_calmar => "`calmar`: Annualised return divided by the absolute maximum drawdown. `NaN` if there is no drawdown.",#
-                 :ps_max_drawdown => "`max_drawdown`: Maximum drawdown, in return space, so it is non-positive.",#
+                 :ps_sharpe => "`sharpe`: Annualised Sharpe ratio at a zero risk-free rate. It is `NaN` when the volatility is zero.",#
+                 :ps_sharpe_stderr => "`sharpe_stderr`: Standard error of `sharpe`. It corrects for the skewness and the excess kurtosis of the returns, and **not** for their serial dependence. A series scored under a Weight Drift is serially dependent through the weights that it held, so on such a series this figure is less than the true standard error.",#
+                 :ps_sortino => "`sortino`: Annualised Sortino ratio, at a zero minimum acceptable return. It is `NaN` when the downside deviation is zero.",#
+                 :ps_calmar => "`calmar`: Annualised return divided by the absolute value of the maximum drawdown. It is `NaN` when the series has no drawdown.",#
+                 :ps_max_drawdown => "`max_drawdown`: Maximum drawdown, in return space, so it is not positive.",#
                  :ps_cvar => "`cvar`: Conditional Value-at-Risk at `alpha`, in return space, so a tail loss is negative.",#
                  # Inference on the Sharpe ratio of a return series.
                  :sr_x => "`x`: Periodic return series, or a matrix with one return series in each column. A `NaN` entry is an observation that is not available, and the function drops it.",#
                  :bsr => "`bsr`: Benchmark Sharpe ratio per period, in the frequency of `x`.",#
+                 # The value-level verbs that reduce a prior to the Investable Mask.
+                 :strict_inv => "`strict`: If `true`, weights that hold an asset outside the Investable Mask raise an `ArgumentError` that names the assets. If `false`, a warning names the assets, and the function drops their weights.",#
                  # The fold context of the online step.
                  :cache_opt => "`cache`: Optional [`ReturnsBufferState`](@ref), the fold context of the online step. It is `nothing` until [`partial_fit!`](@ref) writes one, and `optimise(opt)` with no returns reads it. The returns themselves are carried by the prior, which owns the rows once; this holds every other column of the returns data and the context pinned at the first step. [`factory`](@ref) carries it unchanged and [`port_opt_view`](@ref) slices it to the selected assets.",#
                  :cache_rows => "`cache`: Optional [`ReturnsBufferState`](@ref), the fold context of the online step. It is `nothing` until [`partial_fit!`](@ref) writes one, and `optimise(opt)` with no returns reads it. This head holds no prior, so it is the bottom of the chain and its state carries the returns themselves, beside every other column of the returns data and the context pinned at the first step. [`factory`](@ref) carries it unchanged and [`port_opt_view`](@ref) slices it to the selected assets.")

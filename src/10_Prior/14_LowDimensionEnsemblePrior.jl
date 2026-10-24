@@ -266,7 +266,7 @@ The fit reads the Coverage Universe of the rows, as every prior does. An asset w
 
 # References
 
-  - $(ref_dict[:xi2023oldem])
+  - $(ref_dict[:xi2023oldem]) Section 3, Equations 4 to 10.
 """
 function prior(pe::LowDimensionEnsemblePrior, X::MatNum, ::Option{<:MatNum} = nothing,
                pnl::Option{<:AssetPanel} = nothing; dims::Int = 1,

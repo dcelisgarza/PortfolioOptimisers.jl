@@ -176,3 +176,12 @@ in the commit that moved the Manifest, and no binding number rose, so no row nee
 `16_PanelDataFrame.jl` from 4 to 0 and `02_ConditionalXatRisk.jl` from 8 to 4. The other rows moved because sessions record only their own rows, so `dev`
 carried drift under the thresholds, and a refresh imports it. The coverage baseline's provenance
 line was moved by hand, for the reason the first amendment gives.
+
+## Amendment (2026-10-21)
+
+The push trigger of both workflows is `main`, `dev*` and `agents/**`. The `build` job of each
+skips on a pull request from `dev*` or `agents/**` in this repository, because the push to that
+branch already runs it (#1783). The flag of a new Rationale is the job `rationale` of
+`Complexity.yml`, which runs on every pull request.
+[ADR 0220](0220-a-pull-request-from-a-pushed-branch-skips-the-jobs-its-push-runs.md) records the
+decision and its cost.

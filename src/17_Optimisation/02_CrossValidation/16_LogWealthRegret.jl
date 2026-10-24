@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the log-wealth regret of a strategy against a comparator, and the test of its per-row difference.
 
-[`log_wealth_regret`](@ref) returns it, over one sequence of rows. The regret is the comparator's log terminal wealth less the strategy's, so it is positive when the comparator wins. The per-row difference carries a Newey–West test of equal expected log growth, in the shape of [`CovarianceForecastComparisonResult`](@ref). A negative regret is common and is not a defect: a causal strategy that reads the market's structure can beat a constant portfolio, and a Hindsight Comparator is best only over the class it was chosen from.
+[`log_wealth_regret`](@ref) returns it, over one sequence of rows. The regret is the comparator's log terminal wealth less the strategy's, so it is positive when the comparator wins. The per-row difference carries a Mean Test of equal expected log growth, in the shape of [`CovarianceForecastComparisonResult`](@ref). A negative regret is common and is not a defect: a causal strategy that reads the market's structure can beat a constant portfolio, and a Hindsight Comparator is best only over the class it was chosen from.
 
 Two fields state the comparator's side of a dynamic-regret bound. `path_length` is ``P_T``, the summed Euclidean distance between the comparator's consecutive targets: zero for a constant comparator, and larger with every switch that a [`HindsightSplit`](@ref) comparator makes. `cumulative` is the running regret.
 
@@ -14,8 +14,8 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     LogWealthRegretResult(
-        regret, regret_per_period, difference, cumulative, variance, z, p, lags,
-        n_periods, wealth_a, wealth_b, path_length
+        regret, regret_per_period, difference, cumulative, t_stat, p_value,
+        mean_ci_lower, mean_ci_upper, n_periods, wealth_a, wealth_b, path_length
     ) -> LogWealthRegretResult
 
 Arguments correspond to the struct's fields, in the order they are declared. The type is a Result: [`log_wealth_regret`](@ref) builds it and a caller reads it. It has no keyword constructor and validates nothing of its own.
@@ -46,21 +46,21 @@ Arguments correspond to the struct's fields, in the order they are declared. The
     """
     cumulative
     """
-    Newey–West long-run variance of `difference`, at `lags` lags.
+    t-statistic of the regret per period, the mean of `difference` over its long-run standard error.
     """
-    variance
+    t_stat
     """
-    Diebold–Mariano–West statistic of `difference`, asymptotically standard normal under equal expected log growth when the comparator did not read the rows.
+    Two-sided p-value of the t-statistic under equal expected log growth, against the law that the Mean Test reads. It is `NaN` when the two series coincide, because their difference has no variance.
     """
-    z
+    p_value
     """
-    Two-sided p-value of the statistic against the standard normal. It is `NaN` when the two series coincide, because their difference has no variance, and zero when the difference is a non-zero constant.
+    Lower bound of the confidence interval of the regret per period, at the level that the Mean Test sets.
     """
-    p
+    mean_ci_lower
     """
-    Number of lags of the Bartlett kernel.
+    Upper bound of the confidence interval of the regret per period, at the level that the Mean Test sets.
     """
-    lags
+    mean_ci_upper
     """
     Number of periods compared.
     """
@@ -320,8 +320,10 @@ function comparator_path_length(b::MultiPeriodPredictionResult, ::Type{Tf}) wher
     return sum(LinearAlgebra.norm(view(W, i, :) - view(W, i - 1, :)) for i in 2:F)
 end
 """
-    log_wealth_regret(a::PredRes_MultiPredRes, b::PredRes_MultiPredRes; lags::Integer = 0) -> LogWealthRegretResult
-    log_wealth_regret(a::PredRes_MultiPredRes; lags::Integer = 0) -> LogWealthRegretResult
+    log_wealth_regret(a::PredRes_MultiPredRes, b::PredRes_MultiPredRes;
+                      mt::AbstractMeanTestEstimator = WildBootstrapMeanTest()) -> LogWealthRegretResult
+    log_wealth_regret(a::PredRes_MultiPredRes;
+                      mt::AbstractMeanTestEstimator = WildBootstrapMeanTest()) -> LogWealthRegretResult
 
 The log-wealth regret of strategy `a` against comparator `b` over one and the same sequence of rows. With no `b`, the comparator is the benchmark of `a`'s own rows.
 
@@ -342,8 +344,7 @@ No scorer and no summary column ship for regret. A hyperparameter search ranks o
 \\begin{align}
 \\delta_t &= \\log\\left(1 + r_{b,t}\\right) - \\log\\left(1 + r_{a,t}\\right)\\,, \\\\
 R &= \\sum_{t=1}^{T} \\delta_t\\,, \\quad \\bar{\\delta} = \\frac{R}{T}\\,, \\\\
-\\hat{\\omega}^2 &= \\hat{\\gamma}_0 + 2 \\sum_{k=1}^{\\ell} \\left(1 - \\frac{k}{\\ell + 1}\\right) \\hat{\\gamma}_k\\,, \\\\
-z &= \\frac{\\sqrt{T}\\, \\bar{\\delta}}{\\sqrt{\\hat{\\omega}^2}}\\,, \\\\
+t_{\\delta} &= \\frac{\\bar{\\delta}}{s_{\\delta}}\\,, \\\\
 P_T &= \\sum_{t=2}^{T} \\lVert \\boldsymbol{u}_t - \\boldsymbol{u}_{t-1} \\rVert_2\\,.
 \\end{align}
 ```
@@ -355,22 +356,23 @@ Where:
   - ``R``: Log-wealth regret, positive when the comparator wins.
   - ``\\bar{\\delta}``: Regret per period.
   - ``T``: Number of periods.
-  - ``\\hat{\\omega}^2``: Long-run variance of ``\\delta_t``, the Bartlett-kernel estimate with ``\\ell`` lags.
-  - ``\\hat{\\gamma}_k``: Sample autocovariance of ``\\delta_t`` at lag ``k``, about ``\\bar{\\delta}`` and divided by ``T``.
-  - ``\\ell``: Number of lags, ``0`` by default because the rows of a walk-forward at `test_size = 1` do not overlap.
-  - ``z``: Diebold–Mariano–West statistic.
+  - ``s_{\\delta}``: Long-run standard error of ``\\bar{\\delta}``, which the Mean Test `mt` defines.
+  - ``t_{\\delta}``: t-statistic of the regret per period. The p-value and the interval of `mt` read it.
   - $(math_dict[:P_T_path])
   - ``\\boldsymbol{u}_t``: Comparator's target on fold ``t``, embedded by asset name on the union of the folds' universes.
 
-Under equal expected log growth, ``z`` is asymptotically standard normal, and the two-sided `p` reads it against that law. The test is exact only for a comparator that did not read the rows it is scored on. Against a Hindsight Comparator it is optimistic by construction: the comparator was chosen on the sequence that the difference is tested over, so `p` overstates the evidence that the comparator is better.
+``R`` is the logarithm of the ratio of the two wealths. Equation 1.7 of [cover1991](@cite) states it against the best constant rebalanced portfolio in hindsight, divided by the number of periods, and Equation 2 of [lihoi2014](@cite) names it the regret. ``t_{\\delta}`` is the statistic of the test of equal expected loss of Section 1.1 of [dieboldmariano1995](@cite), on the loss ``-\\log(1 + r_t)``. [`covariance_forecast_compare`](@ref) states why the default [`WildBootstrapMeanTest`](@ref) reads it, and not a fixed number of lags: the log growths of two strategies cluster with the volatility, so their difference can be correlated over many rows. Each row is one entry of the series, so the test reads a window of one, as [`loss_difference_test`](@ref) states. [`OverlapMeanTest`](@ref) gives the statistic of the rule of zero lags.
 
-Three degenerate series have a stated answer:
+Under equal expected log growth, the law that `mt` reads is the null law of ``t_{\\delta}`` when the estimates that the strategy reads do not move its variance. Theorem 4.1(a) of [west1996](@cite) states two such cases: the periods are few next to the rows of the first training window, or the expected gradient of the difference in the estimates is zero. Otherwise Theorem 4.1(b) of [west1996](@cite) adds terms to the variance, and ``s_{\\delta}`` omits them. The test is valid only for a comparator that did not read the rows it is scored on. Against a Hindsight Comparator it is optimistic by construction: the comparator was chosen on the sequence that the difference is tested over, so `p_value` overstates the evidence that the comparator is better.
 
-  - Two identical series have ``\\bar{\\delta} = 0`` and ``\\hat{\\omega}^2 = 0``, so ``z`` and `p` are `NaN`.
-  - A difference that is a non-zero constant has ``\\hat{\\omega}^2 = 0``, so ``z`` is infinite and `p` is zero. In floating point ``\\hat{\\omega}^2`` is round-off of about ``10^{-33}``, so ``z`` is a very large finite number.
-  - A return of ``-1`` is a total loss. Its log growth is ``-\\infty``, so ``R`` is infinite, and ``z`` and `p` are `NaN`.
+Four degenerate series have a stated answer:
 
-Dynamic regret is regret against a comparator that moves. Its bounds are stated in ``P_T``, so ``R`` and ``P_T`` are read together: a static comparator has ``P_T = 0`` and its regret is the static regret, and a moving comparator buys its lower regret with a path that the bound charges for. ``P_T`` is `NaN` when the comparator is one prediction result, which holds one target and no path, or the benchmark, which holds no weights. The literature states dynamic regret against three comparators, and each is the same estimator through its own scheme. On the three-row example ``\\boldsymbol{x}_1 = (1.2, 0.98)``, ``\\boldsymbol{x}_2 = (0.9, 1.1)``, ``\\boldsymbol{x}_3 = (1.3, 0.7)`` of price relatives:
+  - Two identical series have ``\\bar{\\delta} = 0`` and no long-run variance, so the t-statistic, the p-value and the interval are `NaN`.
+  - A difference that is a non-zero constant has no long-run variance. In exact arithmetic the test answers `NaN`. In floating point the round-off of the difference can be larger than the spread that the Mean Test reads as a constant series. Then the t-statistic is a very large finite number, and the p-value is the least that the test gives, `1 / (n_sim + 1)` under [`WildBootstrapMeanTest`](@ref).
+  - A return of ``-1`` is a total loss. Its log growth is ``-\\infty``, so ``R`` is infinite, and the test is `NaN`.
+  - A `NaN` return makes ``R`` and the test `NaN`.
+
+Dynamic regret is regret against a comparator that moves. Definition 7 of [zinkevich2003](@cite) states it, and Theorem 2 of [zinkevich2003](@cite) bounds it in the path length of Definition 6. Its bounds are stated in ``P_T``, so ``R`` and ``P_T`` are read together: a static comparator has ``P_T = 0`` and its regret is the static regret, and a moving comparator buys its lower regret with a path that the bound charges for. ``P_T`` is `NaN` when the comparator is one prediction result, which holds one target and no path, or the benchmark, which holds no weights. The literature states dynamic regret against three comparators, and each is the same estimator through its own scheme. On the three-row example ``\\boldsymbol{x}_1 = (1.2, 0.98)``, ``\\boldsymbol{x}_2 = (0.9, 1.1)``, ``\\boldsymbol{x}_3 = (1.3, 0.7)`` of price relatives:
 
   - **Static**: the best constant rebalanced portfolio over all three rows, `predict(optimise(est, rd), rd)`, is all-in on the first asset. Its wealth is ``1.2 \\cdot 0.9 \\cdot 1.3 = 1.404``, and ``P_T = 0``. `est` is [`BestConstantRebalancedPortfolio`](@ref), or [`MeanRisk`](@ref) under [`LogarithmicReturn`](@ref) and [`MaximumReturn`](@ref).
   - **Be-the-leader**: `cross_val_predict(est, rd, HindsightSplit())` plays on row ``t`` the best constant rebalanced portfolio over the rows through ``t``. The targets are ``\\boldsymbol{u}_1 = (1, 0)``, ``\\boldsymbol{u}_2 = (23/44, 21/44) \\approx (0.523, 0.477)`` and ``\\boldsymbol{u}_3 = (1, 0)``. The wealth is ``1.2 \\cdot 0.995 \\cdot 1.3 \\approx 1.553``, and ``P_T = 2 \\sqrt{2} \\cdot 21/44 \\approx 1.350``. The first fold trains on one row, so [`MeanRisk`](@ref) needs a prior that fits one row, which [`HindsightSplit`](@ref) states.
@@ -382,19 +384,18 @@ The bound also reads the other way. The regret at a given budget ``L`` is the ga
 
  1. Read the strategy's series and timestamps through [`regret_series`](@ref), giving `ra` and `tsa`.
  2. With `b`, read the comparator's series and timestamps the same way, giving `rb` and `tsb`, and check that the two series share their timestamps and their length. With no `b`, read the benchmark of `a` through [`regret_benchmark`](@ref), giving `rb`, and check that it exists.
- 3. Pass `ra`, `rb`, `lags` and the comparator to [`series_regret`](@ref), which forms the regret, its test and the comparator's path length.
+ 3. Pass `ra`, `rb`, `mt` and the comparator to [`series_regret`](@ref), which forms the regret, its test and the comparator's path length.
 
 # Arguments
 
   - `a`: The strategy's prediction result.
   - `b`: The comparator's prediction result. Leave it out to compare against the benchmark of `a`.
-  - `lags`: Number of lags of the Bartlett kernel.
+  - `mt`: The Mean Test of the per-row difference.
 
 # Validation
 
   - `a` and `b` carry the same timestamps and the same number of rows. An `ArgumentError` is thrown otherwise: two runs over different rows compare nothing.
   - With no `b`, `a` carries a benchmark. An `ArgumentError` is thrown otherwise, because there is no comparator.
-  - `0 <= lags < n_periods`. A `DomainError` is thrown otherwise.
   - No return of either series is below ``-1``. A `DomainError` is thrown otherwise, because a negative wealth has no log. A `NaN` return passes, and its `NaN` reaches the regret.
 
 # Returns
@@ -409,53 +410,59 @@ The bound also reads the other way. The regret at a given budget ``L`` is the ga
   - [`BudgetedHindsightPath`](@ref)
   - [`BestConstantRebalancedPortfolio`](@ref)
   - [`covariance_forecast_compare`](@ref)
-  - [`newey_west_variance`](@ref)
+  - [`loss_difference_test`](@ref)
+  - [`WildBootstrapMeanTest`](@ref)
   - [`performance_summary`](@ref)
   - [`cross_val_predict`](@ref)
 
 # References
 
-  - $(ref_dict[:lihoi2014])
+  - $(ref_dict[:cover1991]) Equations 1.2 and 1.7.
+  - $(ref_dict[:lihoi2014]) Section 3.1.3, Equation 2.
+  - $(ref_dict[:dieboldmariano1995]) Section 1.1.
+  - $(ref_dict[:west1996]) Section 2, Theorem 4.1.
+  - $(ref_dict[:demetrescu2026robust]) Section 3.1 and Section 4.
+  - $(ref_dict[:zinkevich2003]) Definitions 6 and 7, Theorem 2.
 """
 function log_wealth_regret(a::PredRes_MultiPredRes, b::PredRes_MultiPredRes;
-                           lags::Integer = 0)
+                           mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())
     ra, tsa = regret_series(a)
     rb, tsb = regret_series(b)
     @argcheck(isequal(tsa, tsb) && length(ra) == length(rb),
               ArgumentError("the two prediction results do not share their rows: regret is defined over one sequence, so both must be scored over the same rows, with the same timestamps. Run both through `cross_val_predict` with the same `rd` and `cv`, or fit the comparator on the rows the strategy was scored on and predict it over them."))
-    return series_regret(ra, rb, lags, b)
+    return series_regret(ra, rb, mt, b)
 end
-function log_wealth_regret(a::PredRes_MultiPredRes; lags::Integer = 0)
+function log_wealth_regret(a::PredRes_MultiPredRes;
+                           mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())
     ra, _ = regret_series(a)
     rb = regret_benchmark(a)
     @argcheck(!isnothing(rb),
               ArgumentError("the prediction result carries no benchmark, so there is no comparator: give the returns data a benchmark `B`, or pass a comparator's prediction result as the second argument."))
-    return series_regret(ra, rb, lags, nothing)
+    return series_regret(ra, rb, mt, nothing)
 end
 """
-    series_regret(ra::VecNum, rb::VecNum, lags::Integer, b::Union{Nothing, PredRes_MultiPredRes}) -> LogWealthRegretResult
+    series_regret(ra::VecNum, rb::VecNum, mt::AbstractMeanTestEstimator,
+                  b::Union{Nothing, PredRes_MultiPredRes}) -> LogWealthRegretResult
 
 The log-wealth regret of the return series `ra` against the return series `rb`, which share their rows. Both methods of [`log_wealth_regret`](@ref) read their series and pass them here, and that verb's docstring states the mathematics.
 
 # Algorithm
 
- 1. Check `lags` against the number of rows `T`, and check that no return is below ``-1``.
+ 1. Check that no return is below ``-1``.
  2. Take the log growth of each series, giving `la` and `lb`, and their difference `d`.
  3. Sum `d` cumulatively, giving `cumulative`. Its last entry is `regret`, and `regret / T` is `md`.
- 4. Estimate the long-run variance of `d` through [`newey_west_variance`](@ref), giving `v`.
- 5. Form the statistic `z` from `md` and `v`, and its two-sided p-value `p`.
- 6. Read the comparator's path length through [`comparator_path_length`](@ref).
+ 4. Test the mean of `d` against zero through [`loss_difference_test`](@ref) under `mt`, with every row scored.
+ 5. Read the comparator's path length through [`comparator_path_length`](@ref).
 
 # Arguments
 
   - `ra`: Realised return series of the strategy.
   - `rb`: Realised return series of the comparator, on the rows of `ra`.
-  - `lags`: Number of lags of the Bartlett kernel.
+  - `mt`: The Mean Test of the per-row difference.
   - `b`: The comparator's prediction result, or `nothing` for the benchmark.
 
 # Validation
 
-  - `0 <= lags < T`. A `DomainError` is thrown otherwise.
   - No return of either series is below ``-1``. A `DomainError` is thrown otherwise.
 
 # Returns
@@ -467,11 +474,11 @@ The log-wealth regret of the return series `ra` against the return series `rb`, 
   - [`log_wealth_regret`](@ref)
   - [`LogWealthRegretResult`](@ref)
   - [`comparator_path_length`](@ref)
+  - [`loss_difference_test`](@ref)
 """
-function series_regret(ra::VecNum, rb::VecNum, lags::Integer,
+function series_regret(ra::VecNum, rb::VecNum, mt::AbstractMeanTestEstimator,
                        b::Union{Nothing, PredRes_MultiPredRes})
     T = length(ra)
-    @argcheck(0 <= lags < T, DomainError(lags, "`lags` must lie in [0, n_periods)"))
     @argcheck(!any(<(-1), ra) && !any(<(-1), rb),
               DomainError(minimum(filter(<(-1), vcat(ra, rb))),
                           "a return below -1 leaves a negative wealth, whose log is not defined, so the log-wealth regret cannot read it"))
@@ -483,10 +490,9 @@ function series_regret(ra::VecNum, rb::VecNum, lags::Integer,
     cumulative = cumsum(d)
     regret = last(cumulative)
     md = regret / T
-    v = newey_west_variance(d, lags)
-    z = sqrt(T) * md / sqrt(v)
-    p = 2 * Distributions.ccdf(Distributions.Normal(), abs(z))
-    return LogWealthRegretResult(regret, md, d, cumulative, v, z, p, lags, T, exp(sum(la)),
+    res = loss_difference_test(mt, d, trues(T), mean_test_rng(mt))
+    return LogWealthRegretResult(regret, md, d, cumulative, res.t_stat, res.p_value,
+                                 res.mean_ci_lower, res.mean_ci_upper, T, exp(sum(la)),
                                  exp(sum(lb)), comparator_path_length(b, typeof(regret)))
 end
 
@@ -719,7 +725,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Fits the path of per-row allocations with the largest log wealth whose summed step length is at most `L`.
 
-Dynamic regret at a budget is the gap to this path. This path is the comparator of Definition 7 of [zinkevich2003](@cite). Neither per-row comparator that a [`HindsightSplit`](@ref) builds is this path: be-the-leader is one point at its own path length, and the per-period minimiser is the limit with no budget. The fit is one concave programme over the whole panel. The Lagrangian form, which puts a penalty on the path length in place of the budget, is the same programme with one term moved, and the library does not build it.
+Dynamic regret at a budget is the gap to this path. At `p = 2` this path is the comparator of Definition 7 of [zinkevich2003](@cite), at the cost ``c_t(\\boldsymbol{u}) = -\\log(\\boldsymbol{u} \\cdot \\boldsymbol{x}_t)``. Definition 6 of [zinkevich2003](@cite) measures the path in the Euclidean distance, so at any other `p` the budget bounds a different length. Neither per-row comparator that a [`HindsightSplit`](@ref) builds is this path: be-the-leader is one point at its own path length, and the per-period minimiser is the limit with no budget. The fit is one concave programme over the whole panel. The Lagrangian form, which puts a penalty on the path length in place of the budget, is the same programme with one term moved, and the library does not build it.
 
 The estimator follows the Hindsight Comparator rule of [`log_wealth_regret`](@ref), as every other comparator does. [`optimise`](@ref) returns a [`BudgetedHindsightPathResult`](@ref), which holds the path. [`predict`](@ref) over the same rows returns one fold per row, and it refuses any other rows. So `predict(optimise(est, rd_test), rd_test)` is a prediction result that the regret verb reads unchanged, and the verb reports its Euclidean path length beside the regret.
 
@@ -782,10 +788,10 @@ Keywords correspond to the struct's fields. `L` and `slv` are required: a budget
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `wb`: Recursively viewed via [`port_opt_view`](@ref).
-  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `wb`: Recursively viewed through [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices through [`port_opt_view`](@ref).
 
 # Examples
 
@@ -820,7 +826,7 @@ BudgetedHindsightPath
 
 # References
 
-  - $(ref_dict[:zinkevich2003])
+  - $(ref_dict[:zinkevich2003]) Definitions 6 and 7.
 """
 @propagatable @concrete struct BudgetedHindsightPath <: OptimisationEstimator
     """

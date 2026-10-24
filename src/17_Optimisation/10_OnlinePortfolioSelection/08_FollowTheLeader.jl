@@ -88,8 +88,7 @@ Prefix()
 
 # References
 
-  - $(ref_dict[:gaivoronski2000])
-  - $(ref_dict[:lihoi2014]) Section 3.2.3.
+  - $(ref_dict[:gaivoronski2000]) Section 2, Definition 2, Equations 5 and 6.
 """
 struct Prefix <: AbstractSampleSelector end
 function select_rows(::Prefix, X::AbstractMatrix)
@@ -103,7 +102,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Selects the last `W` periods, the sample of the successive variable rebalanced portfolio.
 
-Under the default log-optimal estimator the leader is the best constant rebalanced portfolio of a moving window. [gaivoronski2000](@citet) call the rule the successive variable rebalanced portfolio, and [lihoi2014](@citet) call it the variable rebalanced portfolio (VRP). Before `W` periods exist the sample is every period so far, as in [gaivoronski2000](@cite).
+Under the default log-optimal estimator the leader is the best constant rebalanced portfolio of a moving window. [gaivoronski2000](@citet) call the rule the successive variable rebalanced portfolio. Before `W` periods exist the sample is every period so far, as in [gaivoronski2000](@cite).
 
 # Mathematical definition
 
@@ -149,8 +148,7 @@ LastRows
 
 # References
 
-  - $(ref_dict[:gaivoronski2000])
-  - $(ref_dict[:lihoi2014]) Section 3.2.3.
+  - $(ref_dict[:gaivoronski2000]) Section 4, Definition 8, Equations 47 and 48.
 """
 @concrete struct LastRows <: AbstractSampleSelector
     """
@@ -314,7 +312,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Selects the periods whose preceding window falls in the same histogram cell as the latest window (BH).
 
-This is the histogram rule of [gyorfischafer2003](@citet). [gyorfischafer2003](@citet) quantise each price relative vector by a partition of the positive orthant, and a period matches when its window gives the same string of cell labels as the latest window. [gyorfischafer2003](@citet) leave the partition to the user. The consistency theorem of [gyorfischafer2003](@cite) asks for a nested sequence of partitions whose cells shrink. [gyorfischafer2003](@citet) mix the experts of that sequence by wealth. That mixture is an [`ExpertMixture`](@ref) over [`FollowTheLeader`](@ref) rules with one selector each.
+This is the partitioning portfolio of [gyorfischafer2003](@citet). [lihoi2014](@citet) state it as a similarity set and call the selector histogram-based, and they name its log-optimal rule BH. [gyorfischafer2003](@citet) quantise each price relative vector by a finite partition of the feature space, and a period matches when its window gives the same string of cell labels as the latest window. [gyorfischafer2003](@citet) leave the partition to the user. The consistency theorem of [gyorfischafer2003](@cite) asks for a nested sequence of partitions whose cells shrink. [gyorfischafer2003](@citet) mix the experts of that sequence by wealth. That mixture is an [`ExpertMixture`](@ref) over [`FollowTheLeader`](@ref) rules with one selector each.
 
 # Mathematical definition
 
@@ -371,8 +369,8 @@ HistogramMatch
 
 # References
 
-  - $(ref_dict[:gyorfischafer2003])
-  - $(ref_dict[:lihoi2014]) Section 3.4.1.
+  - $(ref_dict[:gyorfischafer2003]) Section 16.4, Theorem 2.
+  - $(ref_dict[:lihoi2014]) Sections 3.4.1 and 3.4.3.
 """
 @concrete struct HistogramMatch <: AbstractPatternMatchSelector
     """
@@ -426,7 +424,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Selects the periods whose preceding window lies within `radius` of the latest window (BK).
 
-This is the kernel rule of [gyorfi2006](@citet) under the uniform kernel, in the Euclidean norm of the flattened windows. The experts of [gyorfi2006](@cite) run over a grid of windows ``w`` and radii ``c / \\ell``, and [gyorfi2006](@citet) mix them by wealth. That mixture is an [`ExpertMixture`](@ref) over [`FollowTheLeader`](@ref) rules with one selector each, and each selector holds one radius.
+This is the kernel rule of [gyorfi2006](@citet) under the uniform kernel, in the Euclidean norm of the flattened windows. [lihoi2014](@citet) call its log-optimal rule BK. The experts of [gyorfi2006](@cite) run over a grid of windows ``w`` and radii ``c / \\ell``, and [gyorfi2006](@citet) mix them by wealth. That mixture is an [`ExpertMixture`](@ref) over [`FollowTheLeader`](@ref) rules with one selector each, and each selector holds one radius.
 
 Three later rules use this selector under another objective, which the held estimator on the rule's `opt` states. The semi-log-optimal rule of [gyorfi2007semilog](@citet) maximises the second-order expansion of the log at one. The Markowitz-type rule of [ottucsakvajda2007](@citet) maximises a mean-variance utility. The rule of [gyorfivajda2008](@citet) compares windows of one period and maximises the log return net of proportional costs.
 
@@ -479,10 +477,11 @@ KernelMatch
 
 # References
 
-  - $(ref_dict[:gyorfi2006])
-  - $(ref_dict[:gyorfi2007semilog])
-  - $(ref_dict[:ottucsakvajda2007])
-  - $(ref_dict[:gyorfivajda2008])
+  - $(ref_dict[:gyorfi2006]) Section 3, Equation 3.1 and Theorem 3.1.
+  - $(ref_dict[:gyorfi2007semilog]) Section 3 and Equations 4.1 to 4.3.
+  - $(ref_dict[:ottucsakvajda2007]) Sections 3.1 and 5, Equation 5.3.
+  - $(ref_dict[:gyorfivajda2008]) Section 2, Algorithms 1 and 2, Equations 6 and 7.
+  - $(ref_dict[:lihoi2014]) Sections 3.4.1 and 3.4.3.
 """
 @concrete struct KernelMatch <: AbstractPatternMatchSelector
     """
@@ -512,7 +511,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Selects the periods whose preceding windows are the `neighbours` nearest to the latest window (BNN).
 
-This is the nearest-neighbour rule of [gyorfi2008](@citet), in the Euclidean norm of the flattened windows. The rule of [gyorfi2008](@cite) invests at period ``n = t + 1`` with ``\\lfloor p\\, n \\rfloor`` neighbours, a count that grows with the history. So `neighbours` is an `Integer` count or a fraction in `(0, 1)`. The fraction applies to the ``t - w`` candidates and not to the period, so the count never exceeds the candidates. It is below the count of [gyorfi2008](@cite) by at most ``\\lceil p (w + 1) \\rceil``. A fraction that rounds down to zero gives the empty sample. [gyorfi2008](@citet) assume that ties have zero probability. Here the earlier period wins a tie at the boundary.
+This is the nearest-neighbour rule of [gyorfi2008](@citet), in the Euclidean norm of the flattened windows. [lihoi2014](@citet) call its log-optimal rule BNN. The rule of [gyorfi2008](@cite) invests at period ``n = t + 1`` with ``\\lfloor p\\, n \\rfloor`` neighbours, a count that grows with the history. So `neighbours` is an `Integer` count or a fraction in `(0, 1)`. The fraction applies to the ``t - w`` candidates and not to the period, so the count never exceeds the candidates. It is below the count of [gyorfi2008](@cite) by at most ``\\lceil p (w + 1) \\rceil``. A fraction that rounds down to zero gives the empty sample. [gyorfi2008](@citet) assume that ties have zero probability. Here the earlier period wins a tie at the boundary.
 
 # Mathematical definition
 
@@ -567,7 +566,8 @@ NearestNeighbourMatch
 
 # References
 
-  - $(ref_dict[:gyorfi2008])
+  - $(ref_dict[:gyorfi2008]) Section 3, Equations 3.1 to 3.3 and Theorem 3.1.
+  - $(ref_dict[:lihoi2014]) Sections 3.4.1 and 3.4.3.
 """
 @concrete struct NearestNeighbourMatch <: AbstractPatternMatchSelector
     """
@@ -694,7 +694,7 @@ CorrelationMatch
 # References
 
   - $(ref_dict[:li2011corn]) Equation 6, Algorithms 1 to 3 and Section 5.2.
-  - $(ref_dict[:wang2018racorn]) Equation 3.
+  - $(ref_dict[:wang2018racorn]) Section 3.2, Equation 3 and Section 4.2.
 """
 @concrete struct CorrelationMatch <: AbstractPatternMatchSelector
     """
@@ -789,7 +789,7 @@ julia> ClusterMatch(; clusterer = ClustersEstimator()).window
 
 # References
 
-  - $(ref_dict[:khedmatiazin2020])
+  - $(ref_dict[:khedmatiazin2020]) Page 113546. $(ref_dict[:no_original_source])
 """
 @concrete struct ClusterMatch <: AbstractPatternMatchSelector
     """
@@ -838,7 +838,7 @@ $(DocStringExtensions.FIELDS)
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, its fields are subset to the selected assets. `set` takes its own view, against the unreduced returns matrix of the head's rows when they exist, because the view of a tracking estimator asks for it. The view slices `w`, and `X` takes the view of the rows. The reduction of the held estimator to its Investable Mask views its `ccnt` with the rest of the optimiser. So the set stays in the reduced programme. A custom constraint with no view drops out of it.
+[`port_opt_view`](@ref) takes the view of its fields at the selected assets. `set` takes its own view, against the unreduced returns matrix of the head's rows when they exist, because the view of a tracking estimator asks for it. The view slices `w`, and `X` takes the view of the rows. The reduction of the held estimator to its Investable Mask views its `ccnt` with the rest of the optimiser. So the set stays in the reduced programme. A custom constraint with no view drops out of it.
 
 # Related
 
@@ -981,7 +981,7 @@ Keywords correspond to the struct's fields.
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, `opt` is viewed to the selected indices and `sel`, `gamma` and `proj` are carried unchanged.
+[`port_opt_view`](@ref) takes the view of `opt` at the selected indices and carries `sel`, `gamma` and `proj` unchanged.
 
 # Examples
 
@@ -1019,14 +1019,13 @@ FollowTheLeader
 
 # References
 
-  - $(ref_dict[:gaivoronski2000])
+  - $(ref_dict[:gaivoronski2000]) Section 2, Definitions 2 and 4, and Section 4, Definition 8.
   - $(ref_dict[:hazankale2012]) Section 2.2, Equation 1.
-  - $(ref_dict[:lihoi2014]) Sections 3.2.3 and 3.4.
-  - $(ref_dict[:gyorfischafer2003])
-  - $(ref_dict[:gyorfi2006])
-  - $(ref_dict[:gyorfi2008])
-  - $(ref_dict[:li2011corn])
-  - $(ref_dict[:khedmatiazin2020])
+  - $(ref_dict[:gyorfischafer2003]) Section 16.4.
+  - $(ref_dict[:gyorfi2006]) Section 3.
+  - $(ref_dict[:gyorfi2008]) Section 3.
+  - $(ref_dict[:li2011corn]) Section 4.3.
+  - $(ref_dict[:khedmatiazin2020]) Page 113546. $(ref_dict[:no_original_source])
 """
 @concrete struct FollowTheLeader <: AbstractOnlinePortfolioSelectionAlgorithm
     """
@@ -1178,7 +1177,7 @@ function leader_allocation(opt::BestConstantRebalancedPortfolio, rd::ReturnsResu
     fp = isa(res.retcode, OptimisationSuccess) ? res.retcode.res : nothing
     if isa(fp, NamedTuple) && !get(fp, :converged, true)
         @warn("the solver-free leader stopped at `iters = $(opt.iters)` on $(size(rd.X, 1)) selected rows, $(fp.gap) or less short of the optimal log wealth; later short steps are not reported. The exact leader is `MeanRisk` under `LogarithmicReturn` and `MaximumReturn` on a solver.",
-              maxlog = 1)
+              maxlog = log_limit(:warn, 1), _id = @log_id(opt.iters))
     end
     return res.w
 end
@@ -1187,7 +1186,7 @@ function leader_allocation(opt::JuMPOptimisationEstimator, rd::ReturnsResult,
                            X::Option{<:ReturnsResult})
     opt = factory(opt, w)
     ccnt = append_custom_constraint(opt.opt.ccnt, AllocationSetConstraint(set, w, X))
-    opt = Accessors.@set opt.opt.ccnt = ccnt
+    opt = rebuild_estimator(opt, (; opt = rebuild_estimator(opt.opt, (; ccnt = ccnt))))
     res = optimise(opt, rd)
     if isa(res.retcode, OptimisationSuccess)
         return res.w
@@ -1288,7 +1287,7 @@ julia> alg.opt.r[2].settings.scale
 
 # References
 
-  - $(ref_dict[:lai2020spolc]) Equation 51 and Section 4.2.1.
+  - $(ref_dict[:lai2020spolc]) Section 3.4, Equation 51 and Section 4.2.1.
 """
 function ShortTermLossControlPortfolio(; window::Integer = 5, gamma::Real = 0.025,
                                        slv::Slv_VecSlv,
@@ -1599,7 +1598,7 @@ Keywords correspond to the struct's fields.
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the base rule is viewed and the rest is carried unchanged.
+[`port_opt_view`](@ref) takes the view of the base rule and carries the rest unchanged.
 
 # Examples
 
@@ -1628,7 +1627,7 @@ FollowTheLeadingHistory
 
 # References
 
-  - $(ref_dict[:hazanseshadhri2009]) Algorithm 1, Lemmas 3.1 and 3.2, and Appendix A.
+  - $(ref_dict[:hazanseshadhri2009]) Algorithm 1, Property 3.1, Lemmas 3.1 and 3.2, Section 4 and Appendix A.
 """
 @concrete struct FollowTheLeadingHistory <: AbstractOnlinePortfolioSelectionAlgorithm
     """
@@ -1739,7 +1738,7 @@ Where:
 
 # References
 
-  - $(ref_dict[:hazanseshadhri2009]) Appendix A.
+  - $(ref_dict[:hazanseshadhri2009]) Section 3.1 and Appendix A.
 """
 function expert_alive(born::Integer, t::Integer)
     k = trailing_zeros(born)

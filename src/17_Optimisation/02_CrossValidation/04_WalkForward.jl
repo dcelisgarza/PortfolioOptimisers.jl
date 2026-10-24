@@ -760,6 +760,7 @@ function walk_forward_date_range(ts::AbstractVector, period::DatesUnionPeriod,
     po_flag = !isnothing(period_offset)
     if po_flag
         ti = min(ti, ti - period_offset)
+        tf = max(tf, tf - period_offset)
     end
     date_range = adjuster(ti:period:tf)
     if po_flag

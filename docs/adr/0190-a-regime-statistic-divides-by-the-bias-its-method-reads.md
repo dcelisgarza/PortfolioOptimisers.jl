@@ -540,3 +540,16 @@ and the portfolio target at `decay` too, with the limits below.
   `R = I`, and the damping has an exact model.
 - **A keyword on each target.** `DiagonalTarget` would carry a field that a geodesic shrinkage
   ignores, and the scalar estimator would need a keyword of its own anyway.
+
+## Amendment (2026-10-21)
+
+**The first-moment constant of `DiagonalTarget` is the expected root of a `χ²(n)` variate.** The
+constant was `√n`, the root of the mean of the sum and not the mean of its root, so by Jensen's
+inequality the raw statistic of `debias = RawStatistic()` read low at every correlation: at
+`n = 8` its squared multiplier was 6.0 % low on independent returns. `regime_denom` now takes the
+constant of `MahalanobisTarget`, `√2 Γ((n + 1)/2) / Γ(n/2)`, for both targets, which is exact for
+the diagonal sum at independent returns. `diagonal_law_factor` divides `S` by
+`(E[√S] / E[χ(n)])²`, so it is one at `μ = 1`, and it reads the constant, so the debiased statistic
+of the default `ExactDebias()` does not move: measured, a default fit is equal bit for bit. Only a
+raw fit moves, by `n / E[χ(n)]²` before the clip. The decision above keeps its law factor and its
+shrunk spectrum.

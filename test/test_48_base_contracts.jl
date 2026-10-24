@@ -441,18 +441,66 @@ end
     pe = PortfolioOptimisers
     # One function owns the policy: the same text throws under `strict` and warns otherwise,
     # and in both cases the offending term is dropped.
-    @test_throws ArgumentError pe.strict_diagnostic("term dropped", true)
+    # A macro resolves its module when the testset expands, before `pe` is bound.
+    id = PortfolioOptimisers.@log_id()
+    @test_throws ArgumentError pe.strict_diagnostic("term dropped", true; id = id)
     err = try
-        pe.strict_diagnostic("term dropped", true)
+        pe.strict_diagnostic("term dropped", true; id = id)
         nothing
     catch e
         e
     end
     @test err isa ArgumentError
     @test err.msg == "term dropped"
-    @test_logs (:warn, "term dropped") pe.strict_diagnostic("term dropped", false)
+    @test_logs (:warn, "term dropped") pe.strict_diagnostic("term dropped", false; id = id)
     @test isnothing(@test_logs (:warn, "term dropped") pe.strict_diagnostic("term dropped",
-                                                                            false))
+                                                                            false; id = id))
+    # The caller states the `_id`: the default would be the line inside the helper, which
+    # every caller shares, so a cap would hide the messages of every other caller.
+    @test_throws UndefKeywordError pe.strict_diagnostic("term dropped", false)
+    logs, = Test.collect_test_logs() do
+        return pe.strict_diagnostic("term dropped", false; id = id)
+    end
+    @test only(logs).id == id
+end
+@testset "Every log site of the library passes maxlog and _id (#1690)" begin
+    #=
+    A cross-validation, a walk-forward, an online selection and a meta-optimiser call the
+    same verb many times, and a log site repeats its message on each call. Each site passes
+    `maxlog = log_limit(level)`, so that the `max_warn`, `max_info` and `max_debug` caps of
+    `LOG_LIMITS` reach it, and an `_id` from `@log_id` over the stable parts of its message,
+    so that the cap counts each configuration on its own. The census reads the parsed
+    source, because a new site copies its neighbour.
+    =#
+    root = normpath(joinpath(@__DIR__, ".."))
+    levels = (Symbol("@warn"), Symbol("@info"), Symbol("@debug"), Symbol("@error"),
+              Symbol("@logmsg"))
+    sites = Tuple{String, Int, Bool, Bool}[]
+    function walk!(x::Expr, path::AbstractString, line::Ref{Int})
+        if x.head === :macrocall && x.args[1] in levels
+            if x.args[2] isa LineNumberNode
+                line[] = x.args[2].line
+            end
+            kws = [a.args[1] for a in x.args[3:end] if a isa Expr && a.head in (:(=), :kw)]
+            push!(sites, (relpath(path, root), line[], :maxlog in kws, :_id in kws))
+        end
+        for a in x.args
+            walk!(a, path, line)
+        end
+        return nothing
+    end
+    walk!(x::LineNumberNode, ::AbstractString, line::Ref{Int}) = (line[] = x.line; nothing)
+    walk!(::Any, ::AbstractString, ::Ref{Int}) = nothing
+    for dir in (joinpath(root, "src"), joinpath(root, "ext")), (dp, _, fns) in walkdir(dir)
+        for fn in fns
+            if endswith(fn, ".jl")
+                path = joinpath(dp, fn)
+                walk!(Meta.parseall(read(path, String); filename = path), path, Ref(0))
+            end
+        end
+    end
+    @test !isempty(sites)
+    @test filter(s -> !(s[3] && s[4]), sites) == Tuple{String, Int, Bool, Bool}[]
 end
 @testset "first_error_line truncates the content, not the line" begin
     pe = PortfolioOptimisers

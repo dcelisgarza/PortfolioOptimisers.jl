@@ -6,15 +6,19 @@ Compute the Relativistic Value-at-Risk of the returns `x` with a power-cone prog
 
 [`RelativisticValueatRisk`](@ref) states the measure, its Kaniadakis ball and its primal programme. Every call builds a new `JuMP` model. The primal and the dual programmes have the same optimal value, but a solver can stall on one of them and solve the other, so the dual programme is the fallback of the primal one.
 
+Both models hold the variables and the rows of the observations of positive weight only. An observation of weight zero has ``q_i = 0`` in the ball, so it does not change the optimum, but its rows make the programme harder to solve. The sample size ``T`` still counts every observation.
+
 # Algorithm
 
- 1. Check that `slv` is not empty when it is a vector.
- 2. When `w` is stated, divide it by its sum, giving `wi`.
- 3. Compute `ln_k`, the Kaniadakis logarithm of ``1/(\\alpha T)``.
- 4. Build the primal programme in a new model, and solve it with the solvers of `slv` in turn.
- 5. When a solver solves the primal programme, return its objective value.
- 6. Otherwise, build the dual programme in a new model, and solve it with the solvers of `slv` in turn.
- 7. When a solver solves the dual programme, return its objective value. Otherwise, return `NaN`.
+ 1. Check `w` against `x` with [`checked_observation_weights`](@ref).
+ 2. Check that `slv` is not empty when it is a vector.
+ 3. Find `rows`, the indices of the observations of positive weight, and `N`, their number. Without `w`, `rows` holds every observation.
+ 4. When `w` is stated, divide its entries in `rows` by the sum of `w`, giving `wi`.
+ 5. Compute `ln_k`, the Kaniadakis logarithm of ``1/(\\alpha T)``.
+ 6. Build the primal programme in a new model, and solve it with the solvers of `slv` in turn.
+ 7. When a solver solves the primal programme, return its objective value.
+ 8. Otherwise, build the dual programme in a new model, and solve it with the solvers of `slv` in turn.
+ 9. When a solver solves the dual programme, return its objective value. Otherwise, return `NaN`.
 
 # JuMP formulation
 
@@ -24,31 +28,31 @@ The primal model creates these variables:
 
   - `t`: free scalar ``t``.
   - `z`: scalar ``z``, bounded below by zero.
-  - `omega`, `psi`, `theta`, `epsilon`: free ``T \\times 1`` vectors ``\\boldsymbol{\\omega}``, ``\\boldsymbol{\\psi}``, ``\\boldsymbol{\\theta}`` and ``\\boldsymbol{\\epsilon}``.
+  - `omega`, `psi`, `theta`, `epsilon`: free ``N \\times 1`` vectors ``\\boldsymbol{\\omega}``, ``\\boldsymbol{\\psi}``, ``\\boldsymbol{\\theta}`` and ``\\boldsymbol{\\epsilon}``, with one entry for each observation in ``\\mathcal{I}``.
 
 The dual model creates these variables:
 
-  - `z`, `nu`, `tau`: free ``T \\times 1`` vectors ``\\boldsymbol{q}``, ``\\boldsymbol{\\nu}`` and ``\\boldsymbol{\\tau}``.
+  - `z`, `nu`, `tau`: free ``N \\times 1`` vectors ``\\boldsymbol{q}``, ``\\boldsymbol{\\nu}`` and ``\\boldsymbol{\\tau}``, with one entry for each observation in ``\\mathcal{I}``.
 
 ## Expressions
 
-  - `risk`, in the primal model: ``t + \\ln_{\\kappa}\\!\\left(\\tfrac{1}{\\alpha T}\\right) z + T \\sum_{i=1}^{T} p_i (\\psi_i + \\theta_i)``.
-  - `risk`, in the dual model: ``-\\boldsymbol{q}^\\intercal \\boldsymbol{x}``.
+  - `risk`, in the primal model: ``t + \\ln_{\\kappa}\\!\\left(\\tfrac{1}{\\alpha T}\\right) z + T \\sum_{i \\in \\mathcal{I}} p_i (\\psi_i + \\theta_i)``.
+  - `risk`, in the dual model: ``-\\sum_{i \\in \\mathcal{I}} q_i x_i``.
 
 ## Constraints
 
 No row carries a name. The primal model registers these rows:
 
-  - ``\\left(\\tfrac{z(1+\\kappa)}{2\\kappa},\\, \\tfrac{\\psi_i(1+\\kappa)}{\\kappa},\\, \\epsilon_i\\right) \\in \\mathcal{K}_{\\mathrm{pow}}\\!\\left(\\tfrac{1}{1+\\kappa}\\right)``, one row for each ``i``.
-  - ``\\left(\\tfrac{\\omega_i}{1-\\kappa},\\, \\tfrac{\\theta_i}{\\kappa},\\, -\\tfrac{z}{2\\kappa}\\right) \\in \\mathcal{K}_{\\mathrm{pow}}(1-\\kappa)``, one row for each ``i``.
-  - ``\\epsilon_i + \\omega_i - x_i - t \\leq 0``, one row for each ``i``.
+  - ``\\left(\\tfrac{z(1+\\kappa)}{2\\kappa},\\, \\tfrac{\\psi_i(1+\\kappa)}{\\kappa},\\, \\epsilon_i\\right) \\in \\mathcal{K}_{\\mathrm{pow}}\\!\\left(\\tfrac{1}{1+\\kappa}\\right)``, one row for each ``i \\in \\mathcal{I}``.
+  - ``\\left(\\tfrac{\\omega_i}{1-\\kappa},\\, \\tfrac{\\theta_i}{\\kappa},\\, -\\tfrac{z}{2\\kappa}\\right) \\in \\mathcal{K}_{\\mathrm{pow}}(1-\\kappa)``, one row for each ``i \\in \\mathcal{I}``.
+  - ``\\epsilon_i + \\omega_i - x_i - t \\leq 0``, one row for each ``i \\in \\mathcal{I}``.
 
 The dual model registers these rows:
 
-  - ``\\sum_{i=1}^{T} q_i - 1 = 0``.
-  - ``\\tfrac{1}{2\\kappa} \\sum_{i=1}^{T} (\\nu_i - \\tau_i) - \\ln_{\\kappa}\\!\\left(\\tfrac{1}{\\alpha T}\\right) \\leq 0``.
-  - ``(\\nu_i,\\, T p_i,\\, q_i) \\in \\mathcal{K}_{\\mathrm{pow}}\\!\\left(\\tfrac{1}{1+\\kappa}\\right)``, one row for each ``i``.
-  - ``(q_i,\\, T p_i,\\, \\tau_i) \\in \\mathcal{K}_{\\mathrm{pow}}(1-\\kappa)``, one row for each ``i``.
+  - ``\\sum_{i \\in \\mathcal{I}} q_i - 1 = 0``.
+  - ``\\tfrac{1}{2\\kappa} \\sum_{i \\in \\mathcal{I}} (\\nu_i - \\tau_i) - \\ln_{\\kappa}\\!\\left(\\tfrac{1}{\\alpha T}\\right) \\leq 0``.
+  - ``(\\nu_i,\\, T p_i,\\, q_i) \\in \\mathcal{K}_{\\mathrm{pow}}\\!\\left(\\tfrac{1}{1+\\kappa}\\right)``, one row for each ``i \\in \\mathcal{I}``.
+  - ``(q_i,\\, T p_i,\\, \\tau_i) \\in \\mathcal{K}_{\\mathrm{pow}}(1-\\kappa)``, one row for each ``i \\in \\mathcal{I}``.
 
 The two power-cone rows of the dual model give ``\\nu_i \\geq q_i^{1+\\kappa} (T p_i)^{-\\kappa}`` and ``\\tau_i \\leq q_i^{1-\\kappa} (T p_i)^{\\kappa}``. So the second row is the Kaniadakis ball of [`RelativisticValueatRisk`](@ref), ``\\sum_{i} q_i \\ln_{\\kappa}\\!\\left(\\tfrac{q_i}{p_i T}\\right) \\leq \\ln_{\\kappa}\\!\\left(\\tfrac{1}{\\alpha T}\\right)``.
 
@@ -64,10 +68,11 @@ Where:
   - $(math_dict[:kappa_rm])
   - $(math_dict[:ln_kappa])
   - $(math_dict[:p_i_obs])
+  - $(math_dict[:I_pos_obs])
   - $(math_dict[:rlvar_t])
   - $(math_dict[:rlvar_z_ge])
   - $(math_dict[:rlvar_aux])
-  - ``\\boldsymbol{q}``: ``T \\times 1`` probability vector of the dual programme, whose ``i``-th entry is ``q_i``.
+  - ``\\boldsymbol{q}``: ``N \\times 1`` probability vector of the dual programme, whose entry for observation ``i`` is ``q_i``.
   - ``\\nu_i``, ``\\tau_i``: Auxiliary variables of observation ``i`` in the dual programme.
   - $(math_dict[:K_pow])
 
@@ -81,6 +86,7 @@ Where:
 
 # Validation
 
+  - `w` passes [`checked_observation_weights`](@ref) against `x`. Otherwise that function raises its error.
   - If `slv` is a `VecSlv`: `!isempty(slv)`, else `IsEmptyError`.
 
 # Returns
@@ -90,6 +96,7 @@ Where:
 # Related
 
   - [`RelativisticValueatRisk`](@ref)
+  - [`ERM`](@ref)
   - [`kappa_log`](@ref)
   - [`optimise_JuMP_model!`](@ref)
   - [`Slv_VecSlv`](@ref)
@@ -107,32 +114,35 @@ function RRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0
     iomk = inv(omk)
     ik2 = inv(2 * kappa)
     T = length(x)
+    rows = positive_weight_rows(w, T)
+    N = length(rows)
+    xr = view(x, rows)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, false)
     JuMP.@variables(model, begin
                         t
                         z >= 0
-                        omega[1:T]
-                        psi[1:T]
-                        theta[1:T]
-                        epsilon[1:T]
+                        omega[1:N]
+                        psi[1:N]
+                        theta[1:N]
+                        epsilon[1:N]
                     end)
     ln_k = kappa_log(inv(alpha * T), kappa)
     if isnothing(w)
         JuMP.@expression(model, risk, t + ln_k * z + sum(psi + theta))
     else
-        wi = w / sum(w)
+        wi = view(w / sum(w), rows)
         JuMP.@expression(model, risk, t + ln_k * z + T * LinearAlgebra.dot(wi, psi + theta))
     end
     JuMP.@constraints(model,
                       begin
-                          [i = 1:T],
-                          [z * opk * ik2, psi[i] * opk * ik, epsilon[i]] in
+                          [k = 1:N],
+                          [z * opk * ik2, psi[k] * opk * ik, epsilon[k]] in
                           JuMP.MOI.PowerCone(iopk)
-                          [i = 1:T],
-                          [omega[i] * iomk, theta[i] * ik, -z * ik2] in
+                          [k = 1:N],
+                          [omega[k] * iomk, theta[k] * ik, -z * ik2] in
                           JuMP.MOI.PowerCone(omk)
-                          (epsilon + omega - x) .- t <= 0
+                          (epsilon + omega - xr) .- t <= 0
                       end)
     JuMP.@objective(model, Min, risk)
     return if optimise_JuMP_model!(model, slv).success
@@ -141,29 +151,29 @@ function RRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0
         model = JuMP.Model()
         JuMP.set_string_names_on_creation(model, false)
         JuMP.@variables(model, begin
-                            z[1:T]
-                            nu[1:T]
-                            tau[1:T]
+                            z[1:N]
+                            nu[1:N]
+                            tau[1:N]
                         end)
         JuMP.@constraints(model, begin
                               sum(z) - 1 == 0
                               sum(nu - tau) * ik2 - ln_k <= 0
                           end)
-        JuMP.@expression(model, risk, -LinearAlgebra.dot(z, x))
+        JuMP.@expression(model, risk, -LinearAlgebra.dot(z, xr))
         if isnothing(w)
             JuMP.@constraints(model,
                               begin
-                                  [i = 1:T], [nu[i], 1, z[i]] in JuMP.MOI.PowerCone(iopk)
-                                  [i = 1:T], [z[i], 1, tau[i]] in JuMP.MOI.PowerCone(omk)
+                                  [k = 1:N], [nu[k], 1, z[k]] in JuMP.MOI.PowerCone(iopk)
+                                  [k = 1:N], [z[k], 1, tau[k]] in JuMP.MOI.PowerCone(omk)
                               end)
         else
-            wi = w / sum(w)
+            wi = view(w / sum(w), rows)
             JuMP.@constraints(model,
                               begin
-                                  [i = 1:T],
-                                  [nu[i], wi[i] * T, z[i]] in JuMP.MOI.PowerCone(iopk)
-                                  [i = 1:T],
-                                  [z[i], wi[i] * T, tau[i]] in JuMP.MOI.PowerCone(omk)
+                                  [k = 1:N],
+                                  [nu[k], wi[k] * T, z[k]] in JuMP.MOI.PowerCone(iopk)
+                                  [k = 1:N],
+                                  [z[k], wi[k] * T, tau[k]] in JuMP.MOI.PowerCone(omk)
                               end)
         end
         JuMP.@objective(model, Max, risk)
@@ -229,6 +239,8 @@ Where:
   - $(math_dict[:K_pow])
 
 With equal observation weights, the sum in the objective is ``\\sum_{i=1}^{T} (\\psi_i + \\theta_i)``. The radius keeps the argument ``\\frac{1}{\\alpha T}`` when the weights are stated, because the Kaniadakis logarithm cannot absorb the weights into ``\\alpha T`` the way the natural logarithm does for [`EntropicValueatRisk`](@ref).
+
+Section 4.1 of [rlvar](@cite) states the measure and both programmes for the uniform sample distribution, Equations 12 to 15, and the consequences below, Equations 16 and 17. The weighted ball, with the factor ``p_t T`` in the programmes and in the cones, is the library's extension.
 
 The definition has these consequences:
 
@@ -307,8 +319,7 @@ RelativisticValueatRisk
 
 # References
 
-  - $(ref_dict[:rlvar])
-  - $(ref_dict[:cajas2025]) Section 7.2.2.7, Equations 7.65 to 7.69.
+  - $(ref_dict[:rlvar]) Section 4.1, Equations 12 to 17.
 """
 @propagatable @concrete struct RelativisticValueatRisk <: RiskMeasure
     """
@@ -419,6 +430,8 @@ $(math_dict[:negated_upper_tail])
 
 Each term is the worst expected loss over its own Kaniadakis ball about the sample distribution. The first ball has the deformation ``\\kappa_a`` and the level ``\\alpha``, and the second ball has the deformation ``\\kappa_b`` and the level ``\\beta``. [`RelativisticValueatRisk`](@ref) states the ball.
 
+Section 7.2.3.5 of [cajas2025](@cite) defines this range, and its Section 7.2.3 names [owa1](@cite) as the source of the range measures. No copy of that work was found. Equation 7.84 of [cajas2025](@cite) prints a difference of the two tails, but its bound, Equation 7.85, and its programme state the sum above.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -481,8 +494,9 @@ RelativisticValueatRiskRange
 
 # References
 
-  - $(ref_dict[:rlvar])
-  - $(ref_dict[:cajas2025]) Section 7.2.3.5, Equation 7.84.
+  - $(ref_dict[:rlvar]) Section 4.1, Equations 12 to 17.
+  - $(ref_dict[:cajas2025]) Section 7.2.3.5, Equations 7.84 and 7.85. $(ref_dict[:no_original_source])
+  - $(ref_dict[:owa1])
 """
 @propagatable @concrete struct RelativisticValueatRiskRange <: RiskMeasure
     """
@@ -650,6 +664,8 @@ Where:
   - ``\\mathrm{DaR}_{\\alpha}``, ``\\mathrm{CDaR}_{\\alpha}``, ``\\mathrm{EDaR}_{\\alpha}``: Drawdown-at-Risk, Conditional Drawdown-at-Risk and Entropic Drawdown-at-Risk at the same level ``\\alpha``.
   - ``\\mathrm{MDD}(\\boldsymbol{x}) = -\\min_{t} d_t``: Maximum drawdown.
 
+Equation 3.2 of [cdar](@cite) defines the drawdown, with the opposite sign. Section 4.3 of [rlvar](@cite) defines the RLDaR, Equation 23, and its Section 4.4 states the programmes.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -709,9 +725,8 @@ RelativisticDrawdownatRisk
 
 # References
 
-  - $(ref_dict[:cdar])
-  - $(ref_dict[:rlvar])
-  - $(ref_dict[:cajas2025]) Section 7.2.4.6, Equations 7.99 and 7.100.
+  - $(ref_dict[:cdar]) Section 3, Equation 3.2.
+  - $(ref_dict[:rlvar]) Sections 4.3 and 4.4, Equation 23.
 """
 @propagatable @concrete struct RelativisticDrawdownatRisk <: RiskMeasure
     """
@@ -841,6 +856,8 @@ Where:
 
 So the Relative RLDaR is the worst expected relative drawdown over a Kaniadakis ball about the sample distribution of ``\\boldsymbol{rd}(\\boldsymbol{x})``. [`RelativisticValueatRisk`](@ref) states the ball.
 
+Section 3 of [cdar](@cite) defines the drawdown of the uncompounded cumulative return only, and Equation 23 of [rlvar](@cite) defines the RLDaR on that series. Neither work defines a measure on the relative drawdown, so this measure is the library's extension of them.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -896,8 +913,8 @@ RelativeRelativisticDrawdownatRisk
 
 # References
 
-  - $(ref_dict[:cdar])
-  - $(ref_dict[:rlvar])
+  - $(ref_dict[:cdar]) Section 3, Equation 3.2.
+  - $(ref_dict[:rlvar]) Section 4.3, Equation 23.
 """
 @propagatable @concrete struct RelativeRelativisticDrawdownatRisk <: HierarchicalRiskMeasure
     """

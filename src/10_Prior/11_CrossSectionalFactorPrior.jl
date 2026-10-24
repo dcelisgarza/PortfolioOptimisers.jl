@@ -385,23 +385,25 @@ Keywords correspond to the struct's fields. `factors`, `neutralise` and `familie
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `cre`: Recursively updated via [`factory`](@ref).
-  - `wa`: Recursively updated via [`factory`](@ref).
-  - `pe`: Recursively updated via [`factory`](@ref).
-  - `ve`: Recursively updated via [`factory`](@ref).
-  - `ce`: Recursively updated via [`factory`](@ref).
-  - `f_mp`: Recursively updated via [`factory`](@ref).
-  - `mp`: Recursively updated via [`factory`](@ref).
-  - `rfe`: Recursively updated via [`factory`](@ref).
+  - `cre`: Recursively updated through [`factory`](@ref).
+  - `wa`: Recursively updated through [`factory`](@ref).
+  - `pe`: Recursively updated through [`factory`](@ref).
+  - `ve`: Recursively updated through [`factory`](@ref).
+  - `ce`: Recursively updated through [`factory`](@ref).
+  - `f_mp`: Recursively updated through [`factory`](@ref).
+  - `mp`: Recursively updated through [`factory`](@ref).
+  - `rfe`: Recursively updated through [`factory`](@ref).
+  - `cache`: Carried unchanged through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `ve`: Recursively viewed via [`port_opt_view`](@ref).
-  - `ce`: Recursively viewed via [`port_opt_view`](@ref).
+  - `ve`: Recursively viewed through [`port_opt_view`](@ref).
+  - `ce`: Recursively viewed through [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).
 
 # Examples
 

@@ -579,8 +579,8 @@ function descriptor_neutralised_scores(ds::DescriptorScores, P::NamedTuple,
 end
 function descriptor_carry(ds::DescriptorScores, rd::ReturnsResult, m::Integer)
     cs = map(de -> descriptor_carry(de, rd, m), ds.descriptors)
-    return (; xf = Accessors.@set(ds.descriptors = map(c -> c.xf, cs)),
-            xv = Accessors.@set(ds.descriptors = map(c -> c.xv, cs)))
+    return (; xf = rebuild_estimator(ds, (; descriptors = map(c -> c.xf, cs))),
+            xv = rebuild_estimator(ds, (; descriptors = map(c -> c.xv, cs))))
 end
 
 export DescriptorScores, descriptor_scores, EstimationMaskWeights, BlockRegressionWeights

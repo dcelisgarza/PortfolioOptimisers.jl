@@ -7,3 +7,10 @@ Description = "Range, public API of PortfolioOptimisers.jl: Range."
 ```@docs
 Range
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

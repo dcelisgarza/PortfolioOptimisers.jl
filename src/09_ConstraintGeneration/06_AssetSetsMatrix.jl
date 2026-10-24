@@ -1,9 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Names the group name key a binary asset-group membership matrix is built from.
+Names the Universe Sets key whose groups become the rows of a binary asset-group membership matrix.
 
-The key is read out of a [`UniverseSets`](@ref) by [`asset_sets_matrix`](@ref), which returns one row per distinct group value and one column per asset. A row of that matrix is the set indicator a group weight constraint sums the weights over.
+[`asset_sets_matrix`](@ref) reads the key from a [`UniverseSets`](@ref). It returns one row for each distinct group value and one column for each asset. A row is the indicator of one group, and a sub-group constraint sums over the assets that the row marks.
 
 # Fields
 
@@ -46,7 +46,8 @@ julia> asset_sets_matrix(est, sets)
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 9.1, Equations 9.2-9.4.
+  - $(ref_dict[:chang2000]) Section 2.6, Equation 15.
+  - $(ref_dict[:cajas2025]) Section 9.1, Equations 9.2 to 9.4. It adds the row of indicator coefficients and the equality over a group.
 """
 @concrete struct AssetSetsMatrixEstimator <: AbstractConstraintEstimator
     """
@@ -66,7 +67,7 @@ end
 
 Alias for an asset sets matrix estimator or a numeric matrix.
 
-Matches either an [`AssetSetsMatrixEstimator`](@ref) or a plain numeric matrix. Used internally in constraint generation that accepts a pre-computed membership matrix or an estimator.
+Matches an [`AssetSetsMatrixEstimator`](@ref) or a precomputed numeric membership matrix. A JuMP optimiser checks `smtx` and `sgmtx` against it when the sub-group cardinality or threshold that reads the matrix is a scalar.
 
 # Related
 
@@ -80,7 +81,7 @@ const MatNum_ASetMatE = Union{<:AssetSetsMatrixEstimator, <:MatNum}
 
 Alias for a vector of asset sets matrix estimators or numeric matrices.
 
-Represents a collection of [`MatNum_ASetMatE`](@ref) elements, enabling batch processing.
+Each entry is a [`MatNum_ASetMatE`](@ref). [`asset_sets_matrix`](@ref) and [`port_opt_view`](@ref) return one result for each entry, in the order of the vector.
 
 # Related
 
@@ -91,9 +92,9 @@ const VecMatNum_ASetMatE = AbstractVector{<:MatNum_ASetMatE}
 """
     const MatNum_ASetMatE_VecMatNum_ASetMatE = Union{<:MatNum_ASetMatE, <:VecMatNum_ASetMatE}
 
-Alias for a single or vector of asset sets matrix estimators or numeric matrices.
+Alias for one asset sets matrix estimator or numeric matrix, or a vector of them.
 
-Matches either a single [`MatNum_ASetMatE`](@ref) or a vector of them. Used for dispatch in asset set matrix operations that accept one or many estimators or matrices.
+Matches a [`MatNum_ASetMatE`](@ref) or a [`VecMatNum_ASetMatE`](@ref). The `smtx` and `sgmtx` fields of [`JuMPOptimiser`](@ref) and [`ProgrammeAllocationSet`](@ref) take it.
 
 # Related
 
@@ -104,25 +105,25 @@ const MatNum_ASetMatE_VecMatNum_ASetMatE = Union{<:MatNum_ASetMatE, <:VecMatNum_
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Read the taxonomy column `sets.dict[key]`, checking that the key exists.
+Read the taxonomy column `sets.dict[key]`, and check that the key exists.
 
-The sibling of [`factor_universe`](@ref) for a **group name key**, and written for the same reason: one shared helper whose message names the key and says what to do about it, so every consumer of a caller-supplied taxonomy key fails the same way. A bare `sets.dict[key]` raises a `KeyError` carrying the key alone, which says nothing about which of the two producers asked for it, and offers no help with a typo.
+It does for a group name key what [`factor_universe`](@ref) does for the factor universe key. [`asset_sets_matrix`](@ref) and [`panel_input`](@ref) read a Universe Sets key through it, so a missing key gives the same message in both. A bare `sets.dict[key]` raises a `KeyError` that holds the key alone. That error does not tell which function asked for the key, and it suggests no correction for a typo.
 
-`need` names the consumer. The suggestion comes from [`suggest_declared_key`](@ref), the looser configuration shared by every declaration-key suggestion: the candidates here are `sets.dict` keys the caller authored, not asset names, so the info-leak-safe boundary does not apply.
+`need` names the caller. [`suggest_declared_key`](@ref) gives the suggestion, with the configuration that admits more matches than the global default. The global default is strict so that a message does not show a real asset name. The candidates here are `sets.dict` keys that the caller wrote, so that risk does not apply.
 
 # Arguments
 
-  - `sets`: A [`UniverseSets`](@ref) object specifying the asset universe and groupings.
+  - `sets`: A [`UniverseSets`](@ref) that holds the asset universe and the groups.
   - `key`: The group name key to read.
-  - `need`: Names the consumer in the error message.
+  - `need`: The name of the caller, which the error message gives.
 
 # Validation
 
-  - `haskey(sets.dict, key)`. Raises a `KeyError` naming `key`, naming `need` as the consumer that asked for it, and carrying a [`suggest_declared_key`](@ref) suggestion. The exception stays a `KeyError`, as [`factor_universe`](@ref) does, because a missing key is what it is — only the message improves.
+  - `haskey(sets.dict, key)`. Raises a `KeyError`. The message names `key` and `need`, and ends with a [`suggest_declared_key`](@ref) suggestion. The exception stays a `KeyError`, as in [`factor_universe`](@ref), because the key is missing. The message is the only change.
 
 # Returns
 
-  - `col`: The value of `sets.dict[key]`, one group per asset.
+  - `col`: The value of `sets.dict[key]`, with one group for each asset.
 
 # Related
 
@@ -139,31 +140,31 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Construct a binary asset-group membership matrix from asset set groupings.
+Build a binary asset-group membership matrix from a Universe Sets key.
 
-`asset_sets_matrix` generates a binary (0/1) matrix indicating asset membership in groups or categories, based on the key or group name `smtx` in the provided [`UniverseSets`](@ref). Each row corresponds to a unique group value, and each column to an asset in the universe. This is used in constraint generation and portfolio construction workflows that require mapping assets to groups or categories.
+The key `smtx` names a column of `sets.dict` that holds one group value for each asset. The matrix has one row for each distinct group value and one column for each asset of the universe. The entry `[i, j]` is one when asset `j` is in group `i`.
 
 # Algorithm
 
  1. Read the taxonomy column `all_sets` from `sets.dict[smtx]`, through [`taxonomy_column`](@ref).
  2. Check that `all_sets` has the length of the asset universe.
- 3. Take `unique_sets = unique(all_sets)`, the distinct group values in order of first appearance. Each one defines a group, and the order of `unique_sets` is the order of the groups in the result.
- 4. For each group `val` of `unique_sets`, write the indicator `all_sets .== val` into column `i` of a `BitMatrix` `A`, giving an `assets × groups` matrix.
- 5. Return `transpose(A)`, which turns the groups into the rows and the assets into the columns.
+ 3. Take `unique_sets = unique(all_sets)`, the distinct group values in order of first appearance. Each value defines one group. The order of `unique_sets` is the order of the groups in the result.
+ 4. For each group `val` of `unique_sets`, write the indicator `all_sets .== val` into column `i` of a `BitMatrix` `A`. `A` is an `assets × groups` matrix.
+ 5. Return `transpose(A)`. Its rows are the groups and its columns are the assets.
 
 # Arguments
 
-  - `smtx`: The key or group name to extract from the asset sets.
-  - `sets`: A [`UniverseSets`](@ref) object specifying the asset universe and groupings.
+  - `smtx`: The group name key to read from `sets.dict`.
+  - `sets`: A [`UniverseSets`](@ref) that holds the asset universe and the groups.
 
 # Validation
 
-  - `haskey(sets.dict, smtx)`, via [`taxonomy_column`](@ref).
-  - Throws an `AssertionError` if the length of `sets.dict[smtx]` does not match the asset universe.
+  - `haskey(sets.dict, smtx)`, through [`taxonomy_column`](@ref).
+  - `length(sets.dict[smtx]) == length(sets.dict[sets.xkey])`. Raises an `AssertionError`.
 
 # Returns
 
-  - `A`: The `transpose` of a `BitMatrix`, of size (number of groups) × (number of assets), where `A[i, j] == 1` if asset `j` belongs to group `i`. The orientation is **`groups × assets`**. The row order is `unique(sets.dict[smtx])`, the distinct group values in order of first appearance.
+  - `A`: The `transpose` of a `BitMatrix`, of size (number of groups) × (number of assets), where `A[i, j] == 1` if asset `j` is in group `i`. The orientation is `groups × assets`. The row order is `unique(sets.dict[smtx])`, the distinct group values in order of first appearance.
 
 # Examples
 
@@ -197,14 +198,14 @@ end
 """
     asset_sets_matrix(smtx::Option{<:MatNum}, args...)
 
-No-op fallback for asset set membership matrix construction.
+Return a precomputed membership matrix, or `nothing`, unchanged.
 
-This method returns the input matrix `smtx` unchanged. It is used as a fallback when the asset set membership matrix is already provided as an `MatNum` or is `nothing`, enabling composability and uniform interface handling in constraint generation workflows.
+A caller can give the membership matrix itself in place of an [`AssetSetsMatrixEstimator`](@ref). With this method, one call to `asset_sets_matrix` takes an estimator, a matrix, or `nothing` when no matrix is set.
 
 # Arguments
 
-  - `smtx`: An existing asset set membership matrix (`MatNum`) or `nothing`.
-  - `args...`: Additional positional arguments (ignored).
+  - `smtx`: A precomputed membership matrix, or `nothing`.
+  - `args...`: More positional arguments, which the method ignores.
 
 # Returns
 
@@ -222,24 +223,22 @@ end
 """
     asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::UniverseSets)
 
-This method is a wrapper calling:
+Build the membership matrix from the group name key that `smtx` holds. The method calls:
 
     asset_sets_matrix(smtx.val, sets)
 
-It is used for type stability and to provide a uniform interface for processing constraint estimators, as well as simplifying the use of multiple estimators simulatneously.
-
 # Arguments
 
-  - `smtx`: An [`AssetSetsMatrixEstimator`](@ref) naming the group name key to read.
-  - `sets`: A [`UniverseSets`](@ref) object specifying the asset universe and groupings.
+  - `smtx`: An [`AssetSetsMatrixEstimator`](@ref) that holds the group name key to read.
+  - `sets`: A [`UniverseSets`](@ref) that holds the asset universe and the groups.
 
 # Validation
 
-  - Delegated to the group name key method, which validates `smtx.val` (see [`asset_sets_matrix`](@ref)).
+  - The group name key method of [`asset_sets_matrix`](@ref) checks `smtx.val`.
 
 # Returns
 
-  - `A`: The `transpose` of a `BitMatrix`, of size (number of groups) × (number of assets), exactly as the group name key method returns it.
+  - `A`: The `transpose` of a `BitMatrix`, of size (number of groups) × (number of assets), as the group name key method returns it.
 
 # Related
 
@@ -254,22 +253,22 @@ end
     asset_sets_matrix(smtx::VecMatNum_ASetMatE,
                       sets::UniverseSets)
 
-Broadcasts [`asset_sets_matrix`](@ref) over the vector.
+Apply [`asset_sets_matrix`](@ref) to each entry of the vector.
 
-Provides a uniform interface for processing multiple constraint estimators simulatneously.
+Each entry dispatches to its own method, so one vector can hold estimators and precomputed matrices together.
 
 # Arguments
 
-  - `smtx`: A vector whose entries are each an [`AssetSetsMatrixEstimator`](@ref) or an already-built numeric matrix.
-  - `sets`: A [`UniverseSets`](@ref) object specifying the asset universe and groupings.
+  - `smtx`: A vector whose entries are each an [`AssetSetsMatrixEstimator`](@ref) or a precomputed numeric matrix.
+  - `sets`: A [`UniverseSets`](@ref) that holds the asset universe and the groups.
 
 # Validation
 
-  - Delegated per entry to the method that entry dispatches to.
+  - The method of each entry checks that entry.
 
 # Returns
 
-  - `A`: One result per entry of `smtx`, in the order of `smtx`. Each entry keeps whatever its own method returns, so a `groups × assets` transpose and a passed-through matrix can sit side by side.
+  - `A`: One result for each entry of `smtx`, in the order of `smtx`. Each result is what the method of its entry returns. A `groups × assets` transpose and an unchanged precomputed matrix can be in the same vector.
 
 # Related
 
@@ -283,9 +282,9 @@ end
 """
     panel_input_name(sets::UniverseSets, key::AbstractString) -> String
 
-Name the Panel Field a [`UniverseSets`](@ref) key becomes: the key with the asset prefix stripped.
+Name the Panel Field that a [`UniverseSets`](@ref) key becomes, which is the key without its asset prefix.
 
-Every Panel Field of an [`AssetPanel`](@ref) is asset-parallel by construction, so the `xkey` prefix that marks a key as asset-length says nothing there and comes off, with its separating underscore: `"nx_sector"` becomes `"sector"`. A key that carries no prefix keeps its name.
+Every Panel Field of an [`AssetPanel`](@ref) is indexed by asset. The `xkey` prefix marks a Universe Sets key as asset-length, so it gives no information on a Panel Field. The function removes the prefix and the underscore after it, so `"nx_sector"` becomes `"sector"`. A key with no prefix keeps its name.
 
 # Algorithm
 
@@ -294,7 +293,7 @@ Every Panel Field of an [`AssetPanel`](@ref) is asset-parallel by construction, 
 
 # Arguments
 
-  - `sets`: The universe sets, read for `xkey`.
+  - `sets`: The [`UniverseSets`](@ref), which gives `xkey`.
   - `key`: The key to name.
 
 # Returns
@@ -322,50 +321,48 @@ end
                 alg = NoPanelFill())
     panel_input(sets::UniverseSets, keys::AbstractVector)
 
-Turn a [`UniverseSets`](@ref) key into the raw Panel Field input [`asset_panel`](@ref) reads.
+Convert a [`UniverseSets`](@ref) key into the raw Panel Field input that [`asset_panel`](@ref) reads.
 
-A key is one vector over the asset axis, which is the static raw form of one Panel Field. This is the **one bridge** between a taxonomy and the panel: a string-valued key becomes a [`CategoricalPanelInput`](@ref) and a number-valued key a [`NumericPanelInput`](@ref), by dispatch on the key's element type. A key of mixed element type is refused, because neither reading is right and guessing one is worse than saying so.
+A key is one vector over the asset axis, which is the static raw form of one Panel Field. A Universe Sets key enters an Asset Panel through this function. The values of the key select the input type. A key of strings becomes a [`CategoricalPanelInput`](@ref), and a key of numbers becomes a [`NumericPanelInput`](@ref). The function refuses a key that mixes the two, because it cannot know which reading the caller wants.
 
-An entry `key => InputType` **forces** the type, in both the scalar and the vector form: `"nx_rating" => CategoricalPanelInput` reads a numeric rating as a label rather than as a number. There is no `kind` keyword; the pair is the whole mechanism.
+An entry `key => InputType` forces the input type, in the scalar form and in the vector form. For example, `"nx_rating" => CategoricalPanelInput` reads a numeric rating as a label, not as a number. No keyword sets the type, and the pair is the only way to force it.
 
-The field is named by [`panel_input_name`](@ref). A nested taxonomy is several keys, so several fields, and the vector form maps the same rule over them.
+[`panel_input_name`](@ref) names the field. A nested taxonomy has many keys, so it gives many fields. The vector form applies the same rule to each key.
 
-The result is **static**: a taxonomy has no observation axis. It joins a time-varying panel by the lazy lift [`asset_panel`](@ref) applies, so a taxonomy sits beside a fundamentals table in one panel.
-
-# The vector form takes no per-field keyword
-
-`name`, `levels` and `alg` describe **one** field, so the vector form does not take them: a key that needs one of them goes through the scalar form, and the two results go into the same `asset_panel` call. This is why the vector form is a convenience rather than the primary route.
+The result is static, because a taxonomy has no observation axis. When [`asset_panel`](@ref) receives it with a time-varying input, it lifts the taxonomy to the observation axis as a field that is constant in time. One panel can thus hold a taxonomy and a table of fundamentals.
 
 # Algorithm
 
 The scalar form takes four steps:
 
- 1. Read the key's values off `sets.dict`, which raises a `KeyError` when the key is absent.
- 2. Choose the input type: the forced one from a `Pair`, and otherwise [`CategoricalPanelInput`](@ref) for a string element type and [`NumericPanelInput`](@ref) for a number element type. Refuse anything else.
+ 1. Read the values of the key from `sets.dict`, through [`taxonomy_column`](@ref).
+ 2. Choose the input type. A `Pair` gives the forced type. Otherwise [`panel_input_kind`](@ref) chooses it from the values.
  3. Name the field with [`panel_input_name`](@ref), unless `name` overrides it.
- 4. Build the input.
+ 4. Build the input with [`panel_input_build`](@ref).
 
 The vector form takes one step:
 
- 1. Map the scalar form over the entries.
+ 1. Apply the scalar form to each entry.
 
 # Arguments
 
-  - `sets`: The universe sets holding the key.
+  - `sets`: The [`UniverseSets`](@ref) that holds the key.
   - `key`: The key, or `key => InputType` to force the type.
-  - `keys`: A vector of either form.
-  - `name`: Panel Field name, or `nothing` to derive it from the key.
-  - `levels`: Category levels, or `nothing` to let the builder sort them. Categorical only.
-  - `alg`: Fill policy for the raw values.
+  - `keys`: A vector of either form. The vector form takes no `name`, `levels` or `alg`, because each of them describes one field. Give a key that needs one of them to the scalar form, and pass both results to the same [`asset_panel`](@ref) call.
+  - `name`: The Panel Field name, or `nothing` to derive it from the key.
+  - `levels`: The category levels, or `nothing` to let the builder sort them. Only the categorical form takes levels.
+  - `alg`: The fill policy for the raw values.
 
 # Validation
 
   - `haskey(sets.dict, key)`. Raises a `KeyError`.
-  - The key's element type is a string or a number throughout. Raises an `ArgumentError`.
+  - Every value of the key is a string, or every value is a number, unless a `Pair` forces the type. Raises an `ArgumentError`.
+  - `levels` is `nothing` when the input type is numeric. Raises an `ArgumentError`.
+  - `!isempty(keys)` on the vector form. Raises an `IsEmptyError`.
 
 # Returns
 
-  - From the scalar form, one `AbstractPanelFieldInput`. From the vector form, one per entry.
+  - The scalar form returns one `AbstractPanelFieldInput`. The vector form returns one input for each entry, in the order of `keys`.
 
 # Examples
 
@@ -420,20 +417,20 @@ end
 """
     panel_input_kind(vals::AbstractVector, key::AbstractString) -> Type
 
-Choose the raw Panel Field input type a [`UniverseSets`](@ref) key's values ask for.
+Choose the raw Panel Field input type from the values of a [`UniverseSets`](@ref) key.
 
-The element type is the whole rule: a string-valued key is a classification and a number-valued key is a quantity. A mixed element type is refused, because a taxonomy that carries both in one key describes two things.
+A key of strings is a classification, and a key of numbers is a quantity. The function refuses a key that holds both, because such a key describes two things.
 
 # Algorithm
 
  1. Return [`CategoricalPanelInput`](@ref) when every value is a string.
  2. Return [`NumericPanelInput`](@ref) when every value is a number.
- 3. Otherwise raise, naming the key and the two forms that resolve it.
+ 3. Otherwise raise an `ArgumentError`. The message names the key and the two `Pair` forms that force a type.
 
 # Arguments
 
-  - `vals`: The key's values.
-  - `key`: The key, named in the message.
+  - `vals`: The values of the key.
+  - `key`: The key, which the error message names.
 
 # Validation
 
@@ -462,21 +459,21 @@ end
     panel_input_build(::Type{CategoricalPanelInput}, sets, key, vals, name, levels, alg)
     panel_input_build(::Type{NumericPanelInput}, sets, key, vals, name, levels, alg)
 
-Build the raw Panel Field input [`panel_input`](@ref) resolved to.
+Build the raw Panel Field input of the type that [`panel_input`](@ref) chose.
 
 # Algorithm
 
-The method that Julia selects is the algorithm. Each builds its own input type from the key's values, named by [`panel_input_name`](@ref) unless `name` overrides it. `levels` reaches the categorical form alone; the numeric form has no levels to declare and refuses one rather than ignoring it.
+The method that Julia selects is the algorithm. Each method builds its own input type from the values of the key. [`panel_input_name`](@ref) names the input, unless `name` overrides it. Only the categorical method passes `levels` on. A numeric input has no levels, so the numeric method refuses `levels` and does not ignore it.
 
 # Arguments
 
-  - The first positional: the input type to build.
-  - `sets`: The universe sets, read for `xkey`.
-  - `key`: The key the values came from.
-  - `vals`: The key's values.
-  - `name`: Panel Field name, or `nothing` to derive it.
-  - `levels`: Category levels, or `nothing`.
-  - `alg`: Fill policy.
+  - The first positional argument: The input type to build.
+  - `sets`: The [`UniverseSets`](@ref), which gives `xkey`.
+  - `key`: The key that holds the values.
+  - `vals`: The values of the key.
+  - `name`: The Panel Field name, or `nothing` to derive it.
+  - `levels`: The category levels, or `nothing`.
+  - `alg`: The fill policy.
 
 # Validation
 
@@ -521,19 +518,19 @@ end
 
 Take an asset view of an asset-group membership matrix, or of a vector of matrices and estimators.
 
-The matrix method slices **columns**, so it expects the **`groups × assets`** matrix [`asset_sets_matrix`](@ref) returns, whose column axis is the assets. An estimator names a key rather than holding data, and the key is resolved after the view, so an estimator entry is carried through unchanged.
+The matrix method slices columns. It expects the `groups × assets` matrix that [`asset_sets_matrix`](@ref) returns, whose columns are the assets. An estimator holds a key and no data, and [`asset_sets_matrix`](@ref) reads the key after the view. The view of an estimator entry is thus the entry, unchanged.
 
 # Algorithm
 
  1. For a matrix, return `view(smtx, :, i)`, the columns of the selected assets.
- 2. For a vector, take the view of each entry through the method that entry dispatches to, then narrow the element type with [`concrete_typed_array_if_abstract`](@ref).
+ 2. For a vector, take the view of each entry through the method of that entry. Then narrow the element type with [`concrete_typed_array_if_abstract`](@ref).
 
 # Arguments
 
   - `smtx`: A `groups × assets` membership matrix, or a vector whose entries are each such a matrix or an [`AssetSetsMatrixEstimator`](@ref).
   - `i`: The asset index or range to slice.
-  - `args...`: Additional positional arguments (ignored).
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `args...`: More positional arguments, which the method ignores.
+  - `kwargs...`: More keyword arguments, which the method ignores.
 
 # Returns
 

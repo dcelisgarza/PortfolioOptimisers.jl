@@ -205,6 +205,8 @@ Models the cost of the bid-ask spread, of slippage, of a borrowing charge, or of
 fee. The cost is charged **against the budget**: the weights and their costs must together
 meet `bgt`, so a portfolio that trades more may hold less.
 
+The rows are Equations 1 to 3 of [pogue1969](@cite) with one linear segment on each side of the trade. Exhibit 3 of that work charges the cost against the cash of the revised portfolio, as the first row charges it against the budget.
+
 # Mathematical definition
 
 ```math
@@ -241,8 +243,8 @@ A pinned `bgt = 1.0` and a [`MaximumReturn`](@ref) objective reproduce the ident
     ``\\boldsymbol{1}^\\intercal \\boldsymbol{w}`` and so shrinks the risk, and the solver inflates
     both increments to their `up` and `un` caps. On the sample above, minimising the variance
     gives `sum(w) = 0.9514` with a charged cost of **0.0486** against a traded cost of
-    **0.0014**. Give the return term a lower bound through `settings.lb`, exactly as the source
-    formulation does, whenever the objective minimises a risk measure.
+    **0.0014**. Give the return term a lower bound through `settings.lb`, as Listing 9.8 of
+    [cajas2025](@cite) does, whenever the objective minimises a risk measure.
 
 # Fields
 
@@ -271,13 +273,13 @@ Keywords correspond to the struct's fields.
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `w`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `vp`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `vn`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `up`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `un`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `w`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `vp`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `vn`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `up`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `un`: Sliced to the selected indices through [`port_opt_view`](@ref).
 
 # Related
 
@@ -289,7 +291,8 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 9.1, equations 9.14 and 9.15.
+  - $(ref_dict[:pogue1969]) Pages 11 and 12, Equations 1 to 3, and page 29, Exhibit 3.
+  - $(ref_dict[:cajas2025]) Section 9.1, Equations 9.14 and 9.15, and Listing 9.8.
 """
 @propagatable @concrete struct BudgetCosts <: BudgetCostEstimator
     """
@@ -368,6 +371,8 @@ Extends [`BudgetCosts`](@ref) with a power cone, so the charge grows as the trad
 raised to ``1/\\mathrm{beta}``. Unlike a linear cost, the charge is **also subtracted from the
 return expression** of every term whose `settings.mic` is `true`.
 
+Section 6.3 of [mosek2023c](@cite) states this cost, charges it against the budget, and writes it as a power cone. That work names page 452 of [grinoldkahn1999](@cite) as the source of the power law. No copy of that work was found. [cajas2025](@cite) splits the trade into its two signs, as the rows below do.
+
 # Mathematical definition
 
 ```math
@@ -401,7 +406,9 @@ Every row is homogeneous in ``(\\boldsymbol{w}, k)``. Under [`MaximumRatio`](@re
 
     **`beta` is the reciprocal of the power law's exponent.** The cone gives
     ``\\iota_i \\geq w_i^{1/\\beta}``, so the default `beta = 2/3` charges the volume raised to
-    **3/2**, the value the empirical literature reports. The cone needs `0 < beta < 1`; the
+    **3/2**. Equation 1 of [toth2011](@cite) is the square-root law of the price impact, and
+    the cost is the impact times the traded volume, so it grows as the volume raised to 3/2.
+    The cone needs `0 < beta < 1`; the
     constructor refuses both endpoints, because a solver reports `SLOW_PROGRESS` on either.
 
 A pinned `bgt = 1.0` and a [`MaximumReturn`](@ref) objective reproduce the identity to
@@ -414,8 +421,8 @@ A pinned `bgt = 1.0` and a [`MaximumReturn`](@ref) objective reproduce the ident
     objective prefers a **larger** invested budget. Under [`MinimumRisk`](@ref) the solver
     treats them as riskless assets and concentrates the whole budget in them: on the sample
     above, minimising the variance gives `sum(w) = 0.0051`. Give the return term a lower bound
-    through `settings.lb`, exactly as the source formulation instructs, whenever the objective
-    minimises a risk measure.
+    through `settings.lb`, as Section 9.3 of [cajas2025](@cite) instructs, whenever the
+    objective minimises a risk measure.
 
 # Fields
 
@@ -446,13 +453,13 @@ Keywords correspond to the struct's fields.
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `w`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `vp`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `vn`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `up`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `un`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `w`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `vp`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `vn`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `up`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `un`: Sliced to the selected indices through [`port_opt_view`](@ref).
 
 # Related
 
@@ -464,9 +471,10 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 9.3, equations 9.22 and 9.23.
+  - $(ref_dict[:mosek2023c]) Section 6.3, Equations 6.4 to 6.6. $(ref_dict[:no_original_source])
   - $(ref_dict[:grinoldkahn1999])
-  - $(ref_dict[:toth2011])
+  - $(ref_dict[:toth2011]) Section 1, Equation 1.
+  - $(ref_dict[:cajas2025]) Section 9.3, Equations 9.22 and 9.23.
 """
 @propagatable @concrete struct BudgetMarketImpact <: BudgetCostEstimator
     """

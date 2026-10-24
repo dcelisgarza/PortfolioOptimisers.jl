@@ -1,32 +1,98 @@
-# https://github.com/oxfordcontrol/Clarabel.jl/blob/4915b83e0d900d978681d5e8f3a3a5b8e18086f0/warmstart_test/portfolioOpt/higherorderRiskMeansure.jl#L23
+# Clarabel.jl 4915b83e0d, `warmstart_test/portfolioOpt/higherorderRiskMeansure.jl`, L23
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    PRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, p::Number = 2.0,
+        w::Option{<:ObsWeights} = nothing) -> Number
 
-Compute the Power-Norm Risk Measure (PRM) for a vector of portfolio returns.
+Compute the Power Norm Value-at-Risk of the returns `x` with a power cone programme.
 
-Solves a convex optimisation problem to compute the PRM at confidence level `alpha` with Lp-norm parameter `p`, using the specified solver(s). The value equals the largest loss of `x` under the condition that [`PowerNormValueatRisk`](@ref) states in its mathematical definition.
+[`PowerNormValueatRisk`](@ref) states the measure, its programme and the condition under which it is the largest loss. Under that condition the function returns the largest loss and builds no model. Otherwise every call builds a new `JuMP` model. The model holds the rows of the observations of positive weight only. An observation of weight zero does not change the optimum, but the rows of a large loss can stop the solver away from the optimum.
+
+# Algorithm
+
+ 1. Check `w` against `x` with [`checked_observation_weights`](@ref).
+ 2. Check that `slv` is not empty when it is a vector.
+ 3. Find `rows`, the indices of the observations of positive weight, and `N`, their number. Without `w`, `rows` holds every observation.
+ 4. Find `l`, the largest loss among the observations of positive weight, with [`worst_positive_weight_loss`](@ref).
+ 5. Find `pl`, the probability of the observations at the loss `l`. It is their number divided by the number of observations without `w`, and their share of the sum of `w` with it.
+ 6. When `alpha` is at most `pl` to the power `1/p`, return `l`. This step builds no model.
+ 7. Build the programme below in a new model. Its objective reads `iaT`, which is the inverse of `alpha` times the number of observations to the power `1/p` without `w`, and the inverse of `alpha` times the sum of `w` to the power `1/p` with it. The rows read `xr`, the entries of `x` in `rows`.
+ 8. Solve the model with the solvers of `slv` in turn.
+ 9. When a solver solves the model, return its objective value. Otherwise, return `NaN`.
+
+# JuMP formulation
+
+## Variables
+
+  - `pvar_eta`: free scalar ``\\eta``.
+  - `pvar_t`: free scalar ``t``.
+  - `pvar_w`: ``N \\times 1`` vector ``\\boldsymbol{w}``, bounded below by zero, with one entry for each observation in ``\\mathcal{I}``.
+  - `pvar_v`: free ``N \\times 1`` vector ``\\boldsymbol{v}``, with one entry for each observation in ``\\mathcal{I}``.
+
+## Constraints
+
+No row carries a name. The model registers these rows:
+
+  - ``\\sum_{i \\in \\mathcal{I}} v_i - t \\leq 0`` without observation weights, and ``\\sum_{i \\in \\mathcal{I}} q_i v_i - t \\leq 0`` with them.
+  - ``x_i + w_i + \\eta \\geq 0``, one row for each ``i \\in \\mathcal{I}``.
+  - ``(v_i,\\, t,\\, w_i) \\in \\mathcal{K}_{\\mathrm{pow}}(1/p)``, one row for each ``i \\in \\mathcal{I}``.
+
+The cone rows give ``v_i \\geq w_i^{p} / t^{p-1}``, so the first row gives ``t \\geq \\left(\\sum_{i \\in \\mathcal{I}} w_i^{p}\\right)^{1/p}`` without observation weights. At the optimum ``w_i = \\max(L_i - \\eta, 0)``, so the objective is the minimum of [`PowerNormValueatRisk`](@ref) over ``\\eta``. An observation of weight zero has ``p_i = 0``, so it adds no term to that minimum.
+
+## Objective
+
+  - The model minimises ``\\eta + t / (\\alpha T^{1/p})`` without observation weights, and ``\\eta + t / (\\alpha W_{T}^{1/p})`` with them.
+
+Where:
+
+  - $(math_dict[:xret])
+  - $(math_dict[:T])
+  - $(math_dict[:alpha_rm])
+  - $(math_dict[:p_pnvar_order])
+  - ``L_i = -x_i``: Loss at observation ``i``.
+  - $(math_dict[:I_pos_obs])
+  - ``q_i``: Observation weight of observation ``i``.
+  - ``W_{T} = \\sum_{t=1}^{T} q_t``: Total observation weight.
+  - $(math_dict[:p_i_obs])
+  - $(math_dict[:pnvar_eta])
+  - $(math_dict[:pnvar_t])
+  - $(math_dict[:pnvar_w])
+  - $(math_dict[:pnvar_v])
+  - $(math_dict[:K_pow])
 
 # Arguments
 
   - `x`: Vector of portfolio returns.
-  - `slv`: Solver or vector of solvers.
-  - `alpha`: Confidence level (default `0.05`).
-  - `p`: Lp-norm parameter (default `2.0`).
-  - Additional parameters depending on the specific PRM formulation.
-  - `kwargs...`: Additional keyword arguments passed to the solver.
+  - $(arg_dict[:slv])
+  - `alpha`: Significance level, ``\\alpha \\in (0, 1)``.
+  - `p`: Order of the power norm, ``p > 1``.
+  - `w`: Observation weights, or `nothing` for equal weights.
+
+# Validation
+
+  - `w` passes [`checked_observation_weights`](@ref) against `x`. Otherwise that function raises its error.
+  - If `slv` is a `VecSlv`: `!isempty(slv)`, else `IsEmptyError`.
+
+The function does not check `alpha` or `p`. The constructors of the measures check them.
 
 # Returns
 
-  - PRM value (scalar), or `NaN` if no solver in `slv` succeeds.
+  - The Power Norm Value-at-Risk of `x`, or `NaN` when step 6 does not return and no solver of `slv` solves the programme.
 
 # Related
 
   - [`PowerNormValueatRisk`](@ref)
+  - [`ERM`](@ref)
+  - [`RRM`](@ref)
+  - [`worst_positive_weight_loss`](@ref)
+  - [`positive_weight_rows`](@ref)
+  - [`checked_observation_weights`](@ref)
+  - [`optimise_JuMP_model!`](@ref)
   - [`Slv_VecSlv`](@ref)
 
 # References
 
-  - $(ref_dict[:pnvar])
+  - $(ref_dict[:pnvar]) Equation 32.
+  - $(ref_dict[:chares2009]) Section 4.1, Equations 4.4 and 4.5.
 """
 function PRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, p::Number = 2.0,
              w::Option{<:ObsWeights} = nothing)
@@ -34,28 +100,40 @@ function PRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, p::Number = 2.0,
     if isa(slv, VecSlv)
         @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
     end
+    T = length(x)
+    rows = positive_weight_rows(w, T)
+    N = length(rows)
+    xr = view(x, rows)
+    ip = inv(p)
+    l = worst_positive_weight_loss(x, w)
+    pl = if isnothing(w)
+        count(v -> -v == l, x) / T
+    else
+        sum(w[t] for t in rows if -x[t] == l) / sum(w)
+    end
+    if alpha <= pl^ip
+        return l
+    end
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, false)
-    T = length(x)
-    ip = inv(p)
     JuMP.@variables(model, begin
                         pvar_eta
                         pvar_t
-                        pvar_w[1:T] >= 0
-                        pvar_v[1:T]
+                        pvar_w[1:N] >= 0
+                        pvar_v[1:N]
                     end)
     iaT = if isnothing(w)
         JuMP.@constraint(model, sum(pvar_v) - pvar_t <= 0)
         inv(alpha * T^ip)
     else
-        JuMP.@constraint(model, LinearAlgebra.dot(w, pvar_v) - pvar_t <= 0)
+        JuMP.@constraint(model, LinearAlgebra.dot(view(w, rows), pvar_v) - pvar_t <= 0)
         inv(alpha * sum(w)^ip)
     end
     JuMP.@constraints(model,
                       begin
-                          (x + pvar_w) .+ pvar_eta >= 0
-                          [i = 1:T],
-                          [pvar_v[i], pvar_t, pvar_w[i]] in JuMP.MOI.PowerCone(ip)
+                          (xr + pvar_w) .+ pvar_eta >= 0
+                          [k = 1:N],
+                          [pvar_v[k], pvar_t, pvar_w[k]] in JuMP.MOI.PowerCone(ip)
                       end)
     JuMP.@objective(model, Min, pvar_eta + iaT * pvar_t)
     return if optimise_JuMP_model!(model, slv).success
@@ -67,9 +145,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Power Norm Value-at-Risk (PNVaR) risk measure.
+Measures the Power Norm Value-at-Risk (PNVaR), a threshold plus the power norm of the losses above it, divided by the significance level.
 
-`PowerNormValueatRisk` is a coherent risk measure that generalises EVaR by replacing the exponential moment-generating function with a power-norm. It is parametrised by a power ``p \\geq 1`` and a significance level ``\\alpha``, and is solved via a conic programme. On a short sample it equals [`WorstRealisation`](@ref). At the defaults `alpha = 0.05` and `p = 2`, this holds on every series of at most 400 equally weighted observations.
+[pnvar](@cite) defines the measure as the higher moment coherent risk measure. As ``p`` falls to one it falls to the Conditional Value-at-Risk, and it rises with ``p`` to the largest loss. [`PRM`](@ref) computes it with a power cone programme. The constructor refuses ``p = 1``, because the power cone of that programme is then degenerate and a solver does not solve it. [`ConditionalValueatRisk`](@ref) measures that case. On a short sample it equals [`WorstRealisation`](@ref). At the defaults `alpha = 0.05` and `p = 2`, this holds on every series of at most 400 equally weighted observations.
 
 # Mathematical definition
 
@@ -77,7 +155,7 @@ The PNVaR at level ``\\alpha`` with power ``p`` is:
 
 ```math
 \\begin{align}
-\\mathrm{PNVaR}_{\\alpha,p}(\\boldsymbol{x}) &= \\underset{\\eta,\\, t,\\, \\boldsymbol{w},\\, \\boldsymbol{v}}{\\min} \\left\\{ \\eta + \\frac{t}{\\alpha T^{1/p}} \\;:\\; \\boldsymbol{w} \\geq \\boldsymbol{0},\\; \\sum_{i=1}^{T} v_i \\leq t,\\; (x_i + w_i) + \\eta \\geq 0,\\; (v_i, t, w_i) \\in \\mathcal{K}_{\\mathrm{pow}}(1/p)\\; \\forall i \\right\\}\\,.
+\\mathrm{PNVaR}_{\\alpha,p}(\\boldsymbol{x}) &= \\underset{\\eta}{\\min} \\left\\{ \\eta + \\frac{1}{\\alpha} \\left( \\sum_{i=1}^{T} p_i \\max(L_i - \\eta,\\, 0)^{p} \\right)^{1/p} \\right\\}\\,.
 \\end{align}
 ```
 
@@ -87,29 +165,53 @@ Where:
   - $(math_dict[:xret])
   - $(math_dict[:alpha_rm])
   - $(math_dict[:T])
-  - ``p \\geq 1``: Power parameter.
-  - ``\\eta``, ``t``, ``\\boldsymbol{w}``, ``\\boldsymbol{v}``: Conic optimisation variables.
-  - ``\\mathcal{K}_{\\mathrm{pow}}(p') = \\{(a,b,c) : a^{p'} b^{1-p'} \\geq |c|,\\, a \\geq 0,\\, b \\geq 0\\}``: Power cone.
+  - $(math_dict[:p_pnvar_order])
+  - ``L_i = -x_i``: Loss at observation ``i``.
+  - $(math_dict[:p_i_obs])
+  - $(math_dict[:pnvar_eta])
 
-The conic variable ``\\boldsymbol{w}`` is unrelated to the `w` field, which carries the observation weights. Write those weights ``\\boldsymbol{q}``. When they are present, the normalisation ``T^{1/p}`` becomes ``\\left(\\sum_{t=1}^{T} q_t\\right)^{1/p}`` and the budget constraint becomes ``\\sum_{i=1}^{T} q_i v_i \\leq t``.
-
-The minimisation over ``t``, ``\\boldsymbol{w}`` and ``\\boldsymbol{v}`` reduces the definition to one variable:
-
-```math
-\\begin{align}
-\\mathrm{PNVaR}_{\\alpha,p}(\\boldsymbol{x}) &= \\underset{\\eta}{\\min} \\left\\{ \\eta + \\frac{1}{\\alpha} \\left( \\frac{1}{T} \\sum_{i=1}^{T} \\max(-x_i - \\eta,\\, 0)^{p} \\right)^{1/p} \\right\\}\\,.
-\\end{align}
-```
-
-Let ``\\ell = \\max_i (-x_i)`` be the largest loss, and let ``\\pi_\\ell`` be the probability of the observations at ``\\ell``. For ``m`` equally weighted observations at ``\\ell``, ``\\pi_\\ell = m / T``. With observation weights, ``\\pi_\\ell`` is the share of ``\\sum_{t=1}^{T} q_t`` that those observations carry. The objective is convex in ``\\eta``, and its slope just below ``\\eta = \\ell`` is ``1 - \\pi_\\ell^{1/p} / \\alpha``. So the minimum is at ``\\eta = \\ell`` exactly when that slope is not positive:
+Equation 4 of [pnvar](@cite) states this definition with the confidence level ``1 - \\alpha`` in place of ``\\alpha``, for ``p \\geq 1``. For a sample, the minimum is that of a power cone programme:
 
 ```math
 \\begin{align}
-\\mathrm{PNVaR}_{\\alpha,p}(\\boldsymbol{x}) = \\ell &\\iff \\alpha\\, \\pi_\\ell^{-1/p} \\leq 1\\,.
+\\mathrm{PNVaR}_{\\alpha,p}(\\boldsymbol{x}) &= \\underset{\\eta,\\, t,\\, \\boldsymbol{w},\\, \\boldsymbol{v}}{\\min} \\left\\{ \\eta + \\frac{t}{\\alpha T^{1/p}} \\;:\\; \\boldsymbol{w} \\geq \\boldsymbol{0},\\; \\sum_{i=1}^{T} v_i \\leq t,\\; (x_i + w_i) + \\eta \\geq 0,\\; (v_i, t, w_i) \\in \\mathcal{K}_{\\mathrm{pow}}(1/p)\\; \\forall i \\right\\}\\,.
 \\end{align}
 ```
 
-With equal weights and no tie, the condition is ``\\alpha T^{1/p} \\leq 1``, that is ``T \\leq \\alpha^{-p}``. At ``\\alpha = 0.05`` and ``p = 2``, this is ``T \\leq 400``. A portfolio that minimises the measure can tie ``m`` of its losses at ``\\ell``. This raises ``\\pi_\\ell`` to ``m / T``, so at such a portfolio the measure can equal the largest loss for ``T`` up to ``m\\, \\alpha^{-p}``.
+Where:
+
+  - $(math_dict[:pnvar_t])
+  - $(math_dict[:pnvar_w])
+  - $(math_dict[:pnvar_v])
+  - $(math_dict[:K_pow])
+
+Equation 32 of [pnvar](@cite) states this programme for equally weighted observations. The cone rows give ``v_i \\geq w_i^{p} / t^{p-1}``, so the budget row gives ``t \\geq \\|\\boldsymbol{w}\\|_{p}``. Equations 4.4 and 4.5 of [chares2009](@cite) state that encoding of the power norm.
+
+The conic variable ``\\boldsymbol{w}`` is unrelated to the `w` field, which carries the observation weights. Write those weights ``\\boldsymbol{q}``. When they are present, the normalisation ``T^{1/p}`` becomes ``\\left(\\sum_{t=1}^{T} q_t\\right)^{1/p}`` and the budget constraint becomes ``\\sum_{i=1}^{T} q_i v_i \\leq t``. That weighted programme is the library's extension.
+
+The definition has these consequences:
+
+```math
+\\begin{align}
+\\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x}) = \\lim_{p \\to 1} \\mathrm{PNVaR}_{\\alpha,p}(\\boldsymbol{x}) \\leq \\mathrm{PNVaR}_{\\alpha,p}(\\boldsymbol{x}) &\\leq \\mathrm{PNVaR}_{\\alpha,p'}(\\boldsymbol{x}) \\leq \\max_{i} L_i\\,, \\quad 1 < p \\leq p'\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{CVaR}_{\\alpha}``: Conditional Value-at-Risk at the same level ``\\alpha``.
+
+Section 3 of [pnvar](@cite) states that ``p = 1`` gives the Conditional Value-at-Risk, and its Equation 5 states the order in ``p``. The objective is continuous in ``p``, so the measure tends to the Conditional Value-at-Risk as ``p`` tends to one. No order holds between the PNVaR and [`EntropicValueatRisk`](@ref). Either of the two can be the larger on a sample.
+
+Let ``\\ell = \\max_i L_i`` be the largest loss, and let ``\\pi_\\ell`` be the probability of the observations at ``\\ell``. For ``m`` equally weighted observations at ``\\ell``, ``\\pi_\\ell = m / T``. With observation weights, ``\\pi_\\ell`` is the share of ``\\sum_{t=1}^{T} q_t`` that those observations carry. The objective is convex in ``\\eta``, and its slope just below ``\\eta = \\ell`` is ``1 - \\pi_\\ell^{1/p} / \\alpha``. So the minimum is at ``\\eta = \\ell`` exactly when that slope is not positive:
+
+```math
+\\begin{align}
+\\mathrm{PNVaR}_{\\alpha,p}(\\boldsymbol{x}) = \\ell &\\iff \\alpha\\, \\pi_\\ell^{-1/p} \\leq 1 \\iff p \\geq \\frac{\\ln \\pi_\\ell}{\\ln \\alpha}\\,.
+\\end{align}
+```
+
+So the measure is the largest loss at every ``p`` above a finite value. With equal weights and no tie, the condition is ``\\alpha T^{1/p} \\leq 1``, that is ``T \\leq \\alpha^{-p}``. At ``\\alpha = 0.05`` and ``p = 2``, this is ``T \\leq 400``. A portfolio that minimises the measure can tie ``m`` of its losses at ``\\ell``. This raises ``\\pi_\\ell`` to ``m / T``, so at such a portfolio the measure can equal the largest loss for ``T`` up to ``m\\, \\alpha^{-p}``.
 
 # Fields
 
@@ -130,7 +232,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `alpha` is a number: `0 < alpha < 1`.
-  - `p >= 1`.
+  - `p > 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - $(val_dict[:oow_rm])
 
@@ -138,7 +240,7 @@ Keywords correspond to the struct's fields.
 
     (r::PowerNormValueatRisk)(x::VecNum)
 
-Computes the PNVaR of a portfolio returns vector `x`. The value equals the largest loss of `x` under the condition in the mathematical definition.
+Computes the PNVaR of a portfolio returns vector `x` with [`PRM`](@ref). The value equals the largest loss of `x` under the condition in the mathematical definition, and [`PRM`](@ref) then returns it without a solver. Otherwise it returns `NaN` when no solver of `slv` solves the programme. The functor needs a solver: with `slv = nothing` the call raises a `MethodError`. [`factory`](@ref) fills `slv` from the solver of the optimiser.
 
 ## Arguments
 
@@ -163,15 +265,19 @@ PowerNormValueatRisk
 
   - [`RiskMeasure`](@ref)
   - [`RiskMeasureSettings`](@ref)
+  - [`ConditionalValueatRisk`](@ref): the value of the measure at ``p = 1``.
   - [`EntropicValueatRisk`](@ref)
   - [`RelativisticValueatRisk`](@ref)
   - [`PowerNormValueatRiskRange`](@ref)
   - [`PowerNormDrawdownatRisk`](@ref)
   - [`WorstRealisation`](@ref): the value of the measure when the largest loss carries a probability of at least ``\\alpha^{p}``.
+  - [`PRM`](@ref)
+  - [`factory`](@ref)
 
 # References
 
-  - $(ref_dict[:pnvar])
+  - $(ref_dict[:pnvar]) Section 3, Equations 4, 5 and 32.
+  - $(ref_dict[:chares2009]) Section 4.1, Equations 4.4 and 4.5.
 """
 @propagatable @concrete struct PowerNormValueatRisk <: RiskMeasure
     """
@@ -187,7 +293,7 @@ PowerNormValueatRisk
     """
     alpha
     """
-    $(field_dict[:p_rm])
+    $(field_dict[:p_pnvar])
     """
     p
     """
@@ -201,7 +307,7 @@ PowerNormValueatRisk
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
         assert_unit_interval(alpha, :alpha)
-        @argcheck(p >= one(p), DomainError(p, "p must be >= 1"))
+        @argcheck(p > one(p), DomainError(p, "p must be > 1"))
         assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(p), typeof(w)}(settings,
                                                                                        slv,
@@ -224,9 +330,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Power Norm Value-at-Risk Range (PNVaRRange) risk measure.
+Measures the spread of the returns as the sum of the Power Norm Value-at-Risk of the losses and that of the gains.
 
-`PowerNormValueatRiskRange` computes the sum of the lower-tail PNVaR (at level `alpha` with power `pa`) and the upper-tail PNVaR (at level `beta` with power `pb`). Each tail equals its largest loss under the condition that [`PowerNormValueatRisk`](@ref) states.
+The loss tail has the level `alpha` and the order `pa`, and the gain tail has the level `beta` and the order `pb`. Each tail equals its largest loss under the condition that [`PowerNormValueatRisk`](@ref) states.
 
 # Mathematical definition
 
@@ -240,10 +346,12 @@ Where:
 
   - ``\\mathrm{PNVaRRange}_{\\alpha,p_a,\\beta,p_b}(\\boldsymbol{x})``: Power Norm VaR range.
   - $(math_dict[:xret])
-  - ``\\mathrm{PNVaR}_{\\alpha,p_a}(\\boldsymbol{x})``: Lower-tail PNVaR with parameters ``(\\alpha, p_a)``.
-  - ``\\mathrm{PNVaR}_{\\beta,p_b}(-\\boldsymbol{x})``: Upper-tail PNVaR with parameters ``(\\beta, p_b)``.
+  - ``\\mathrm{PNVaR}_{\\alpha,p_a}(\\boldsymbol{x})``: Power Norm Value-at-Risk of the losses at level ``\\alpha`` and order ``p_a``.
+  - ``\\mathrm{PNVaR}_{\\beta,p_b}(-\\boldsymbol{x})``: Power Norm Value-at-Risk of the gains at level ``\\beta`` and order ``p_b``.
 
 $(math_dict[:negated_upper_tail])
+
+[pnvar](@cite) defines one tail. The range of two tails is the library's extension.
 
 # Fields
 
@@ -274,7 +382,7 @@ Keywords correspond to the struct's fields.
 
     (r::PowerNormValueatRiskRange)(x::VecNum)
 
-Computes the PNVaR Range of a portfolio returns vector `x`.
+Computes the PNVaR Range of a portfolio returns vector `x` with two calls of [`PRM`](@ref). The functor needs a solver, as the functor of [`PowerNormValueatRisk`](@ref) does.
 
 ## Arguments
 
@@ -303,10 +411,13 @@ PowerNormValueatRiskRange
   - [`RiskMeasureSettings`](@ref)
   - [`PowerNormValueatRisk`](@ref)
   - [`EntropicValueatRiskRange`](@ref)
+  - [`GenericValueatRiskRange`](@ref): the same value, with two [`PowerNormValueatRisk`](@ref) tails.
+  - [`range_tails`](@ref)
+  - [`PRM`](@ref)
 
 # References
 
-  - $(ref_dict[:pnvar])
+  - $(ref_dict[:pnvar]) Equation 4.
 """
 @propagatable @concrete struct PowerNormValueatRiskRange <: RiskMeasure
     """
@@ -379,9 +490,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Power Norm Drawdown-at-Risk (PNDaR) risk measure.
+Measures the Power Norm Drawdown-at-Risk (PNDaR), the Power Norm Value-at-Risk of the absolute drawdown series of the portfolio.
 
-`PowerNormDrawdownatRisk` applies the Power Norm Value-at-Risk framework to the absolute drawdown series of portfolio returns. It equals the largest drawdown under the condition that [`PowerNormValueatRisk`](@ref) states, with the drawdowns in place of the losses.
+It equals the largest drawdown under the condition that [`PowerNormValueatRisk`](@ref) states, with the drawdowns in place of the losses.
 
 # Mathematical definition
 
@@ -413,8 +524,23 @@ Where:
   - ``\\mathrm{PNDaR}_{\\alpha,p}(\\boldsymbol{x})``: Power Norm Drawdown-at-Risk.
   - $(math_dict[:xret])
   - $(math_dict[:alpha_rm])
-  - ``p \\geq 1``: Power parameter.
+  - $(math_dict[:p_pnvar_order])
   - ``\\boldsymbol{d}(\\boldsymbol{x})``: Absolute drawdown series.
+
+The order of [`PowerNormValueatRisk`](@ref) holds for the drawdowns too:
+
+```math
+\\begin{align}
+\\mathrm{CDaR}_{\\alpha}(\\boldsymbol{x}) \\leq \\mathrm{PNDaR}_{\\alpha,p}(\\boldsymbol{x}) \\leq \\mathrm{PNDaR}_{\\alpha,p'}(\\boldsymbol{x}) \\leq \\mathrm{MDD}(\\boldsymbol{x})\\,, \\quad 1 < p \\leq p'\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{CDaR}_{\\alpha}``: Conditional Drawdown-at-Risk at the same level ``\\alpha``.
+  - ``\\mathrm{MDD}(\\boldsymbol{x}) = -\\min_{t} d_t``: Maximum drawdown.
+
+Equation 3.2 of [cdar](@cite) defines the drawdown, with the opposite sign. Neither that work nor [pnvar](@cite) defines a power norm measure of the drawdowns, so this measure is the library's extension of them.
 
 # Fields
 
@@ -435,7 +561,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `alpha` is a number: `0 < alpha < 1`.
-  - `p >= 1`.
+  - `p > 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - $(val_dict[:oow_rm])
 
@@ -443,7 +569,7 @@ Keywords correspond to the struct's fields.
 
     (r::PowerNormDrawdownatRisk)(x::VecNum)
 
-Computes the PNDaR of a portfolio returns vector `x`.
+Computes the PNDaR of a portfolio returns vector `x` with [`PRM`](@ref) on its drawdown series. The functor needs a solver, as the functor of [`PowerNormValueatRisk`](@ref) does.
 
 ## Arguments
 
@@ -472,11 +598,15 @@ PowerNormDrawdownatRisk
   - [`RelativisticDrawdownatRisk`](@ref)
   - [`EntropicDrawdownatRisk`](@ref)
   - [`RelativePowerNormDrawdownatRisk`](@ref)
+  - [`ConditionalDrawdownatRisk`](@ref)
+  - [`MaximumDrawdown`](@ref)
+  - [`absolute_drawdown_vec`](@ref)
+  - [`PRM`](@ref)
 
 # References
 
-  - $(ref_dict[:cdar])
-  - $(ref_dict[:pnvar])
+  - $(ref_dict[:cdar]) Section 3, Equation 3.2.
+  - $(ref_dict[:pnvar]) Equations 4 and 5.
 """
 @propagatable @concrete struct PowerNormDrawdownatRisk <: RiskMeasure
     """
@@ -492,7 +622,7 @@ PowerNormDrawdownatRisk
     """
     alpha
     """
-    $(field_dict[:p_rm])
+    $(field_dict[:p_pnvar])
     """
     p
     """
@@ -506,7 +636,7 @@ PowerNormDrawdownatRisk
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
         assert_unit_interval(alpha, :alpha)
-        @argcheck(p >= one(p), DomainError(p, "p must be >= 1"))
+        @argcheck(p > one(p), DomainError(p, "p must be > 1"))
         assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(p), typeof(w)}(settings,
                                                                                        slv,
@@ -529,9 +659,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Relative Power Norm Drawdown-at-Risk (Relative PNDaR) risk measure for hierarchical optimisation.
+Measures the Relative Power Norm Drawdown-at-Risk, the Power Norm Value-at-Risk of the compounded drawdown series, for hierarchical optimisation.
 
-`RelativePowerNormDrawdownatRisk` applies the Power Norm Value-at-Risk framework to the relative (compounded) drawdown series of portfolio returns. It equals the largest relative drawdown under the condition that [`PowerNormValueatRisk`](@ref) states, with the drawdowns in place of the losses.
+It equals the largest relative drawdown under the condition that [`PowerNormValueatRisk`](@ref) states, with the drawdowns in place of the losses.
 
 # Mathematical definition
 
@@ -563,8 +693,10 @@ Where:
   - ``\\mathrm{RPNDaR}_{\\alpha,p}(\\boldsymbol{x})``: Relative Power Norm Drawdown-at-Risk.
   - $(math_dict[:xret])
   - $(math_dict[:alpha_rm])
-  - ``p \\geq 1``: Power parameter.
+  - $(math_dict[:p_pnvar_order])
   - ``\\boldsymbol{rd}(\\boldsymbol{x})``: Relative drawdown series.
+
+Section 3 of [cdar](@cite) defines the drawdown of the uncompounded cumulative return only, and [pnvar](@cite) defines the measure on a loss. Neither work defines a measure on the relative drawdown, so this measure is the library's extension of them.
 
 # Fields
 
@@ -585,7 +717,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `alpha` is a number: `0 < alpha < 1`.
-  - `p >= 1`.
+  - `p > 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - $(val_dict[:oow_rm])
 
@@ -593,7 +725,7 @@ Keywords correspond to the struct's fields.
 
     (r::RelativePowerNormDrawdownatRisk)(x::VecNum)
 
-Computes the Relative PNDaR of a portfolio returns vector `x`.
+Computes the Relative PNDaR of a portfolio returns vector `x` with [`PRM`](@ref) on its relative drawdown series. The functor needs a solver, as the functor of [`PowerNormValueatRisk`](@ref) does.
 
 ## Arguments
 
@@ -619,11 +751,13 @@ RelativePowerNormDrawdownatRisk
   - [`PowerNormDrawdownatRisk`](@ref)
   - [`RelativeRelativisticDrawdownatRisk`](@ref)
   - [`RelativeEntropicDrawdownatRisk`](@ref)
+  - [`relative_drawdown_vec`](@ref)
+  - [`PRM`](@ref)
 
 # References
 
-  - $(ref_dict[:cdar])
-  - $(ref_dict[:pnvar])
+  - $(ref_dict[:cdar]) Section 3, Equation 3.2.
+  - $(ref_dict[:pnvar]) Equation 4.
 """
 @propagatable @concrete struct RelativePowerNormDrawdownatRisk <: HierarchicalRiskMeasure
     """
@@ -639,7 +773,7 @@ RelativePowerNormDrawdownatRisk
     """
     alpha
     """
-    $(field_dict[:p_rm])
+    $(field_dict[:p_pnvar])
     """
     p
     """
@@ -653,7 +787,7 @@ RelativePowerNormDrawdownatRisk
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
         assert_unit_interval(alpha, :alpha)
-        @argcheck(p >= one(p), DomainError(p, "p must be >= 1"))
+        @argcheck(p > one(p), DomainError(p, "p must be > 1"))
         assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(p), typeof(w)}(settings,
                                                                                        slv,

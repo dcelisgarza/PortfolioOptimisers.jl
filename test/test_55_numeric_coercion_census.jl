@@ -51,6 +51,14 @@
     by a square root, is not a repair, so the pattern reads a division of a bare `one`,
     `zero` or `oneunit` by another of them or by a literal only.
 
+    Issue #1808. `AngularDist` took its working type from
+    `promote_type(eltype(a), eltype(b), Float64)`, and its `Distances.result_type` from
+    `promote_type(a, b, Float64)`. A concrete float type as an argument of `promote_type`
+    sets a floor on the width: a `Float32` feature matrix gave a `Float64` distance matrix
+    under every collapse of the default `FeatureDistance`. No pattern above read that
+    spelling. `PROMOTE_FLOAT` reads it. A type parameter such as `Vector{Float64}` names a
+    container and sets no floor, so the lookbehind refuses a `{` as `NAMED_FLOAT` does.
+
     What the census does not read is what carries no `(`: `zeros(Float64, n)` and its
     siblings name a concrete type for an allocation, and `convert(Float64, x)` names one
     for a conversion. Neither spelling stands in `src/` or `ext/` today. Add the pattern
@@ -89,6 +97,9 @@
     # A working type read off a division of constants, which repairs an integer input by
     # deciding the type of every input.
     DIVISION_TYPE = r"\btypeof\(\s*(?:one|zero|oneunit)\(.*?\)\s*/\s*(?:(?:one|zero|oneunit)\(|\d)"
+    # A concrete float type as an argument of `promote_type`, which sets a floor on the
+    # width of every input. The argument list may hold two levels of nested calls.
+    PROMOTE_FLOAT = r"\bpromote_type\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*?(?<![\w.{])(?:Float16|Float32|Float64|BigFloat|ComplexF16|ComplexF32|ComplexF64)\b"
     # The one line that may call `float`: the guard that repairs an integer type and keeps
     # every other type.
     GUARD = ("src/02_Tools/03_TypeUtilities.jl",
@@ -110,6 +121,7 @@
     broadcast = String[]
     filled = String[]
     divided = String[]
+    promoted = String[]
     forgiven = String[]
     guarded = String[]
     for f in files
@@ -125,6 +137,9 @@
             end
             if occursin(DIVISION_TYPE, line)
                 push!(divided, "$rel:$i: $(strip(line))")
+            end
+            if occursin(PROMOTE_FLOAT, line)
+                push!(promoted, "$rel:$i: $(strip(line))")
             end
             if occursin(ROUND_THEN_CONVERT, line)
                 push!(rounded, "$rel:$i: $(strip(line))")
@@ -176,6 +191,17 @@
               join(divided, "\n")
     end
     @test isempty(divided)
+
+    if !isempty(promoted)
+        @info "Sites that promote with a concrete float type; derive the type off the operation that widens it, such as `typeof(acos(one(T)))`:\n" *
+              join(promoted, "\n")
+    end
+    @test isempty(promoted)
+    # The pattern reads the spelling that #1808 removed, and it lets a type parameter past.
+    @test occursin(PROMOTE_FLOAT, "T = promote_type(eltype(a), eltype(b), Float64)")
+    @test occursin(PROMOTE_FLOAT, "promote_type(a, b, Float64)")
+    @test !occursin(PROMOTE_FLOAT, "promote_type(Vector{Float64}, typeof(x))")
+    @test !occursin(PROMOTE_FLOAT, "typeof(acos(one(promote_type(a, b))))")
 
     # The guard is still where the census looks for it, so its one allowance is not stale.
     @test length(guarded) == 1

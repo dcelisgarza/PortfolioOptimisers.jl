@@ -56,7 +56,7 @@ function attribution_net_returns(w::VecNum, X::MatNum, fees::Option{<:Fees}, str
     if !isempty(held)
         assets = unique(last.(held))
         strict_diagnostic("a factor attribution cannot decompose a holding that earns no return. Assets $(assets) carry a non-finite return at $(length(held)) held (observation, asset) pair(s) outside their active span, the first at observation $(first(held)[1]). Those pairs contribute zero to the net series, so the total understates the portfolio by whatever they earned. A pair inside the active span is a holiday and fills zero with no message, which only returns that carry an active mask can show. Pass `strict = true` to refuse instead, zero the weights over the observations the asset is inactive, or pass a weight history.",
-                          strict)
+                          strict; id = @log_id())
     end
     Y = attribution_finite(X)
     return calc_net_returns(w, Y, fees)

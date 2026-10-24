@@ -1,7 +1,7 @@
 @windowed_estimator WindowedCokurtosis <: CokurtosisEstimator begin
     kte::CokurtosisEstimator = Cokurtosis()
     noun = "Cokurtosis"
-    forward = [cokurtosis(::MatNum; mean) => :kte]
+    forward = [cokurtosis(::MatNum; mean) => :ckurt]
     doctest = """
     julia> WindowedCokurtosis()
     WindowedCokurtosis

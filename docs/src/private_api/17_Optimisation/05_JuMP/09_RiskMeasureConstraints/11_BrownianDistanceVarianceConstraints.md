@@ -8,3 +8,10 @@ Description = "Brownian Distance Variance Constraints, private API of PortfolioO
 set_brownian_distance_variance_constraints!
 set_brownian_distance_risk_constraint!
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

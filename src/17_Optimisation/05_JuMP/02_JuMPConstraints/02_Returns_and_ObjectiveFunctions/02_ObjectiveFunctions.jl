@@ -20,6 +20,10 @@ The objective reads no return expression, so it admits a [`NoReturn`](@ref) term
 `:ret`. It sets no floor on the return, so without a `settings.lb` on a term the solution can
 have a negative expected return.
 
+Page 82 of [markowitz1952](@cite) states the objective for the variance, as the minimum
+variance for a given expected return. Equation 8.7 of [cajas2025](@cite) states it for a
+general risk measure.
+
 # Related
 
   - [`MaximumUtility`](@ref)
@@ -30,8 +34,8 @@ have a negative expected return.
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 8.2.1, equation 8.7.
-  - $(ref_dict[:markowitz1952])
+  - $(ref_dict[:markowitz1952]) Page 82.
+  - $(ref_dict[:cajas2025]) Section 8.2.1, Equation 8.7.
 """
 struct MinimumRisk <: ObjectiveFunction end
 """
@@ -80,8 +84,7 @@ Keywords correspond to the struct's fields.
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 8.2.3, equation 8.12.
-  - $(ref_dict[:markowitz1952])
+  - $(ref_dict[:cajas2025]) Section 8.2.3, Equation 8.12. $(ref_dict[:no_original_source])
 """
 @concrete struct MaximumUtility <: ObjectiveFunction
     """
@@ -101,7 +104,8 @@ $(DocStringExtensions.TYPEDEF)
 
 Objective function that maximises the risk-adjusted Sharpe-type ratio.
 
-The ratio reads the aggregate return. Its numerator is the model's one return expression,
+Pages 122 and 123 of [sharpe1966](@cite) state the ratio for the standard deviation, and name
+it the reward-to-variability ratio. The ratio reads the aggregate return. Its numerator is the model's one return expression,
 whatever number of terms built it, so `rf` is one rate on that expression. A term that is not
 in return units leaves the numerator through `settings.rte = false`, not through a rate of its
 own.
@@ -209,10 +213,10 @@ Keywords correspond to the struct's fields.
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 8.2.4, equations 8.13 to 8.16.
-  - $(ref_dict[:sharpe1964])
-  - $(ref_dict[:schaibleibaraki1983])
+  - $(ref_dict[:sharpe1966]) Pages 122-123.
   - $(ref_dict[:charnescooper1962])
+  - $(ref_dict[:schaibleibaraki1983])
+  - $(ref_dict[:cajas2025]) Section 8.2.4, Equations 8.13 to 8.16. $(ref_dict[:no_original_source])
 """
 @concrete struct MaximumRatio <: ObjectiveFunction
     """
@@ -263,7 +267,9 @@ The objective reads the aggregate expression, not ``\\boldsymbol{\\mu}^\\interca
 A [`LogarithmicReturn`](@ref) term contributes a mean logarithmic return, and several terms
 contribute their weighted sum. The objective sets no ceiling on the risk. Without a
 `settings.ub` on a risk measure, the solution puts the most weight that the other
-constraints let it put on the assets of the highest return.
+constraints let it put on the assets of the highest return. Pages 77 to 79 of
+[markowitz1952](@cite) state this rule, and reject it because it never gives a diversified
+portfolio.
 
 # Related
 
@@ -275,8 +281,7 @@ constraints let it put on the assets of the highest return.
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 8.2.2, equation 8.10.
-  - $(ref_dict[:markowitz1952])
+  - $(ref_dict[:markowitz1952]) Pages 77-79.
 """
 struct MaximumReturn <: ObjectiveFunction end
 """

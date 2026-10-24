@@ -57,7 +57,7 @@ update one estimator from fold to fold instead of refitting it on each fold, wit
 one with the best score on the test folds. The grid is a list of `"path" => values` pairs, and the
 cell passes a list that holds one such grid. The path is a string that names a field inside the
 estimator, and the library turns it into a lens of
-[Accessors.jl](https://github.com/JuliaObjects/Accessors.jl). A scoring measure, such as
+[Accessors.jl](https://juliaobjects.github.io/Accessors.jl/stable/). A scoring measure, such as
 [`MeanReturnRiskRatio`](@ref), ranks the candidates. [`search_cross_validation`](@ref) runs the
 search and returns the tuned estimator in its `opt` field. We tune the strength of the L1 penalty
 of our `MeanRisk`.

@@ -452,15 +452,15 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `pl`: Recursively updated via [`factory`](@ref).
+  - `pl`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `pl`: Recursively viewed via [`port_opt_view`](@ref).
+  - `pl`: Recursively viewed through [`port_opt_view`](@ref).
 
 # Why the diagonal includes self
 

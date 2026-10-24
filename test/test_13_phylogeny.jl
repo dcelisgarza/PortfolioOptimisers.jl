@@ -140,6 +140,25 @@
         @test isapprox(PortfolioOptimisers.distance_to_similarity(AngularSimilarity();
                                                                   D = Daf), cosf;
                        atol = 1e-14)
+        #=
+        The claims of the `/unslop` pass. `AngularSimilarity` is the one member that goes
+        negative at a distance in `[0, 1]`; `ComplementSimilarity` goes negative only above
+        `1`. A larger `coef` lowers the similarity at each positive distance, and a larger
+        `power` moves it towards `1` below `D = 1` and towards `0` above it.
+        =#
+        Dunit = collect(0:0.01:1)'
+        for sim in (MaximumDistanceSimilarity(), ExponentialSimilarity(),
+                    GeneralExponentialSimilarity(; coef = 3, power = 4), ComplementSimilarity())
+            @test all(>=(0), PortfolioOptimisers.distance_to_similarity(sim; D = Dunit))
+        end
+        @test minimum(PortfolioOptimisers.distance_to_similarity(AngularSimilarity();
+                                                                 D = Dunit)) < 0
+        Dtwo = [0.5 2.0]
+        d2s = PortfolioOptimisers.distance_to_similarity
+        gsim(; kwargs...) = d2s(GeneralExponentialSimilarity(; kwargs...); D = Dtwo)
+        @test all(gsim(; coef = 3) .< gsim(; coef = 1))
+        @test gsim(; power = 3)[1] > gsim(; power = 1)[1]
+        @test gsim(; power = 3)[2] < gsim(; power = 1)[2]
     end
     @testset "Non-negative similarity interface (#239)" begin
         nonneg = (MaximumDistanceSimilarity(), ExponentialSimilarity(),
@@ -423,6 +442,38 @@
             # A true metric, unlike `CosineDist`.
             @test AngularDist() isa DS.Metric
             @test DS.result_type(AngularDist(), Int, Int) === Float64
+        end
+        @testset "AngularDist keeps the float type of its input (#1808)" begin
+            #=
+            The metric took its type from `promote_type(..., Float64)`, so a `Float32`
+            feature matrix gave a `Float64` distance matrix under every collapse of the
+            default `FeatureDistance`. The type now comes from `acos`, which widens an
+            `Integer` or a `Rational` and keeps every float type.
+            =#
+            for (Ti, To) in ((Int, Float64), (Rational{Int}, Float64), (Float32, Float32),
+                             (BigFloat, BigFloat))
+                @test DS.result_type(AngularDist(), Ti, Ti) === To
+                a = Ti[1, 2, 0]
+                b = Ti[2, 1, 1]
+                @test typeof(AngularDist()(a, b)) === To
+                @test typeof(AngularDist()(zeros(Ti, 3), b)) === To
+                @test typeof(AngularDist()(zeros(Ti, 3), zeros(Ti, 3))) === To
+                @test eltype(DS.pairwise(AngularDist(), Ti[1 2; 2 1; 3 3; 0 0]; dims = 1)) ===
+                      To
+            end
+            # A mixed pair promotes first, and the wider float type wins.
+            @test DS.result_type(AngularDist(), Float32, Float64) === Float64
+            @test typeof(AngularDist()(Float32[1, 2], Int[2, 1])) === Float32
+            # The value does not change with the type, up to the precision of the type.
+            Z = randn(rng, 6, 4)
+            @test isapprox(DS.pairwise(AngularDist(), Float32.(Z); dims = 1),
+                           DS.pairwise(AngularDist(), Z; dims = 1); atol = 1e-5)
+            Z3 = rand(rng, Float32, 5, 4, 3)
+            @test eltype(distance(FeatureDistance(), Z3[end, :, :])) === Float32
+            for alg in (LastObservation(), AggregateFeatures(), AggregateDistances(),
+                        StackObservations(), AggregateFeatures(; alg = MedianCollapse()))
+                @test eltype(distance(FeatureDistance(; alg = alg), Z3)) === Float32
+            end
         end
         @testset "2-D feature matrices" begin
             Z = [1.0 0.0; 0.0 1.0; 1.0 1.0]
@@ -3106,8 +3157,8 @@ end
     using PortfolioOptimisers, Test, StableRNGs, StatsBase
     @testset "The two dispersion measures answer 6 and 4 on the named sample" begin
         # `SecondOrderDifference`'s docstring names this sample and these two numbers. The
-        # source takes the mean of a cluster's pairwise distances; the default standardises
-        # it, which is a different statistic and selects a different count.
+        # mean of a cluster's pairwise distances and the default, which standardises that
+        # mean, select different counts.
         X = randn(StableRNG(987654321), 400, 40)
         k(g) = clusterise(ClustersEstimator(;
                                             onc = OptimalNumberClusters(;
@@ -3118,6 +3169,31 @@ end
         @test k(StandardisedValue()) == 4
         # 6 is the ceiling itself, so the two differ inside the admissible range.
         @test floor(Int, sqrt(size(X, 2))) == 6
+        # `SilhouetteScore`'s docstring says that the mean and the standardised score can
+        # select different counts. They do on the same sample.
+        ks(g) = clusterise(ClustersEstimator(;
+                                             onc = OptimalNumberClusters(;
+                                                                         alg = SilhouetteScore(;
+                                                                                               alg = g))),
+                           X).k
+        @test ks(MeanValue()) == 6
+        @test ks(StandardisedValue()) == 4
+    end
+    @testset "A universe of two assets keeps the ceiling of one cluster" begin
+        # `floor(Int, sqrt(2)) == 1`. `SecondOrderDifference` builds `c1 = min(1 + 2, 2)`
+        # candidate counts, which leaves no second-order difference, and it returned `c1 = 2`
+        # above the ceiling. Both branches now return the ceiling, as `SilhouetteScore` and a
+        # stated `k` do.
+        X = randn(StableRNG(987654321), 200, 2)
+        for alg in (HClustAlgorithm(), KMeansAlgorithm(; rng = StableRNG(1), seed = 1)),
+            onc_alg in (SecondOrderDifference(), SilhouetteScore(), 2)
+
+            clr = clusterise(ClustersEstimator(; alg = alg,
+                                               onc = OptimalNumberClusters(; alg = onc_alg)),
+                             X)
+            @test clr.k == 1
+            @test all(isone, assignments(clr))
+        end
     end
     @testset "`linkage` is unchecked at construction and raises at use" begin
         # The set of criteria belongs to `Clustering.hclust`, so the constructor takes any
@@ -3230,6 +3306,13 @@ end
         @test [n.id for n in nds8] == collect(1:15)
         @test root === nds8[end]
         @test root.level == 8
+        # `level` is not a depth. The walk of `pre_order` holds at most `depth + 1` nodes,
+        # and `depth + 1 <= level`, so a stack of `2 * level` slots is enough.
+        function depth(n)
+            PortfolioOptimisers.is_leaf(n) && return 0
+            return 1 + max(depth(n.left), depth(n.right))
+        end
+        @test depth(root) == 3
         @test PortfolioOptimisers.pre_order(root) == collect(1:8)
         @test length(PortfolioOptimisers.pre_order(root)) == root.level
         @test PortfolioOptimisers.is_leaf(nds8[1])
@@ -3363,17 +3446,44 @@ end
         # the count; the k-means per-point costs fall with it.
         @test kh == 3
         @test kk == 2
+        # The two series that the docstring of the flat method quotes, at the counts 2 to 6.
+        ma = SecondOrderDifference().alg
+        function cluster_dispersion(idx)
+            m = length(idx)
+            m < 2 && return 0.0
+            dists = [Dg[idx[r], idx[q]] for q in 1:m for r in (q + 1):m]
+            return PortfolioOptimisers.vec_to_real_measure(ma, dists)
+        end
+        function cut_dispersion(c)
+            lvl = cutree(rg; k = c)
+            return sum(j -> cluster_dispersion(findall(lvl .== j)), 1:c)
+        end
+        function cost_dispersion(c)
+            costs = PortfolioOptimisers.get_k_clusters_from_alg(algk, Dg, c).costs
+            return PortfolioOptimisers.vec_to_real_measure(ma, costs)
+        end
+        @test round.(cut_dispersion.(2:6); digits = 2) ==
+              [11.27, 26.04, 47.89, 112.96, 114.11]
+        @test round.(cost_dispersion.(2:6); digits = 2) == [6.58, 2.83, 2.57, 2.17, 2.06]
+        # `Clustering.kmeans` refuses a `weights` vector of the wrong length when it runs, and
+        # `Clustering.hclust` refuses a branch order it does not know.
+        alg_w = KMeansAlgorithm(; kwargs = (; weights = ones(5)))
+        @test_throws DimensionMismatch PortfolioOptimisers.get_k_clusters_from_alg(alg_w,
+                                                                                   Dg, 3)
+        @test_throws ArgumentError PortfolioOptimisers.branch_ordered_hclust(Dg, :ward,
+                                                                             Val(:x))
         # The hierarchical method answers a bare `k`; the flat one answers `(res, k)`.
         @test kh isa Integer
         @test pk isa Clustering.ClusteringResult
 
-        # A universe too small to carry a second-order difference answers `c1` itself.
+        # A universe too small to carry a second-order difference answers the ceiling,
+        # `floor(Int, sqrt(2)) == 1`. It answered `c1 == 2` above the ceiling before #467.
         X2 = Xg[:, 1:2]
         _, D2 = cor_and_dist(Distance(), PortfolioOptimisersCovariance(), X2)
         r2 = hclust(D2; linkage = :ward, branchorder = :optimal)
         @test PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
                                                                                 alg = SecondOrderDifference()),
-                                                          r2, D2) == 2
+                                                          r2, D2) == 1
 
         # `resolve_rng` copies and seeds, so a seeded estimator never advances its own
         # generator and two calls partition alike.
@@ -3650,8 +3760,8 @@ end
 
     @testset "`DirectHb` sums signed mass, and no shipped route can reach one" begin
         #=
-        `PMFG_T2s`' docstring warns that a cancelling row manufactures a separating bubble
-        and that the failure is silent. Both halves are true, and the second is why the
+        `PMFG_T2s`' docstring warns that a negative weight can change the set of converging
+        bubbles and that the failure is silent. Both halves are true, and the second is why the
         first cannot arrive from a configuration this library ships.
 
         The reachability first: `PMFG_T2s` refuses a negative weight with a `DomainError`,
@@ -4326,10 +4436,14 @@ end
     #=
     Two assets give a one-edge tree, and no vertex lies on a shortest path between two
     others, so `BetweennessCentrality` and `StressCentrality` both give the zero vector.
-    The row such a constraint would build, `0' w <= B`, holds for every `w`, so
-    `centrality_constraints` drops it. Issue #516 measured the drop, and issue #527 chose
-    the diagnostic: the drop routes through `strict_diagnostic`, so `strict = true` raises
-    and the default warns. The drop happens either way. The NAME messages are NOT reused --
+    The row such a constraint would build, `0' w <= B`, does not depend on `w`, so
+    `centrality_constraints` drops it. Under `MinValue()` or `MaxValue()` the threshold is 0
+    and the row holds for every `w`. A negative number makes the row hold for NO `w`, so the
+    drop then removes an infeasible row, and the warning is the only sign of it (#516, the
+    /unslop pass). #1797 kept the drop: every linear constraint builder drops an all-zero
+    row at construction time. Issue #516 measured the drop, and issue #527 chose the
+    diagnostic: the drop routes through `strict_diagnostic`, so `strict = true` raises an
+    `IsZeroError` (#1797) and the default warns. The drop happens either way. The NAME messages are NOT reused --
     a zero centrality vector is a fact about the graph and not a typo -- which is what
     `zero_centrality_msg` exists for. The message carries the algorithm and the LENGTH of
     the vector, never its entries.
@@ -4345,8 +4459,14 @@ end
     lcm = @test_logs (:warn, r"BetweennessCentrality") centrality_constraints([zc, dc], X2)
     @test size(lcm.ineq.A) == (1, 2)
     @test isnothing(lcm.eq)
-    @test_throws ArgumentError centrality_constraints(zc, X2; strict = true)
-    @test_throws ArgumentError centrality_constraints([zc, dc], X2; strict = true)
+    @test_throws IsZeroError centrality_constraints(zc, X2; strict = true)
+    @test_throws IsZeroError centrality_constraints([zc, dc], X2; strict = true)
+    @test iszero(PortfolioOptimisers.vec_to_real_measure(MinValue(), zeros(2)))
+    @test iszero(PortfolioOptimisers.vec_to_real_measure(MaxValue(), zeros(2)))
+    zcn = CentralityConstraint(; A = CentralityEstimator(; ct = BetweennessCentrality()),
+                               B = -0.2)
+    @test isnothing(@test_logs (:warn, r"BetweennessCentrality") centrality_constraints(zcn,
+                                                                                        X2))
     msg = PortfolioOptimisers.zero_centrality_msg(BetweennessCentrality(), 2)
     @test occursin("BetweennessCentrality", msg)
     @test occursin("all 2 entries", msg)
@@ -4521,4 +4641,118 @@ end
         @test isapprox(res2, d2)
         @test isapprox(res1, d1)
     end
+end
+@testset "The DBHT and LoGo docstrings state what the code returns (#469)" begin
+    using PortfolioOptimisers, Test, StableRNGs, Statistics, SparseArrays
+    rng = StableRNG(469)
+    X469 = randn(rng, 400, 20)
+    sigma469 = cov(X469)
+    # `LoGo_dist_assert` reads the asset axis of `X` from `dims`. The transposed data of a
+    # variation of information estimator gives the same matrix, and a short asset axis
+    # raises on either orientation.
+    for de in (Distance(; alg = VariationInfoDistance()),
+               DistanceDistance(; alg = VariationInfoDistance()))
+        je = LoGo(; de = de)
+        @test isapprox(PortfolioOptimisers.logo(je, sigma469, X469),
+                       PortfolioOptimisers.logo(je, sigma469, permutedims(X469); dims = 2))
+        @test_throws DimensionMismatch PortfolioOptimisers.logo(je, sigma469, X469[:, 1:10])
+        @test_throws DimensionMismatch PortfolioOptimisers.logo(je, sigma469,
+                                                                permutedims(X469[:, 1:10]);
+                                                                dims = 2)
+    end
+    # A default `LoGo()` reads no axis of `X`, so a mismatched `X` passes.
+    @test PortfolioOptimisers.logo(LoGo(), sigma469, X469[:, 1:10]) isa Matrix
+    # The method returns `sigma`, as the interface of the family states.
+    s469 = copy(sigma469)
+    @test PortfolioOptimisers.matrix_processing_algorithm!(LoGo(), s469, X469) === s469
+    @test isapprox(s469, PortfolioOptimisers.logo(LoGo(), sigma469, X469))
+
+    # `DBHTs` returns `Z` after `turn_into_Hclust_merges`, in the convention of
+    # `Clustering.Hclust`. With no branch order, its columns are the merges and heights.
+    cle = ClustersEstimator(; alg = DBHT())
+    S469, D469 = cor_and_dist(cle.de, cle.ce, X469)
+    S469 = PortfolioOptimisers.distance_to_similarity(cle.alg.sim; S = S469, D = D469)
+    _, Rpm, _, _, Mv, Z, hcl = PortfolioOptimisers.DBHTs(D469, S469; branchorder = :default)
+    @test size(Z) == (19, 4)
+    @test hcl.merges == Int.(Z[:, 1:2])
+    @test hcl.heights == Z[:, 3]
+    @test Z[end, 4] == 20
+
+    # `clique3`: each candidate edge has its smaller vertex first, and each vertex of
+    # `K3[n]` closes a triangle on edge `n`.
+    A = Rpm .!= 0
+    K3, E, cl = PortfolioOptimisers.clique3(A)
+    @test all(E[:, 1] .< E[:, 2])
+    @test all(all(A[E[n, 1], k] && A[E[n, 2], k] for k in K3[n]) for n in eachindex(K3))
+    # `FindDisjoint` puts every vertex outside the clique in `IndxNot`.
+    @test PortfolioOptimisers.FindDisjoint(A, cl[1, :])[2] == setdiff(1:20, cl[1, :])
+    # The element types of the bubble tree and of the directed bubble tree.
+    _, H2, Mb, CliqList, _ = PortfolioOptimisers.CliqHierarchyTree2s(Rpm)
+    @test eltype(H2) == Bool
+    @test Mb isa Matrix{Int}
+    @test PortfolioOptimisers.DirectHb(Rpm, H2, Mb, Mv, CliqList)[1] isa
+          SparseMatrixCSC{Float64, Int}
+end
+@testset "The network and centrality docstrings state what the code returns (#471)" begin
+    using PortfolioOptimisers, Test, StableRNGs, LinearAlgebra
+    rng = StableRNG(471)
+    X471 = randn(rng, 200, 10)
+    # `graph_weight_matrix` floats an integer matrix before the repair, because an `Integer`
+    # has no smallest positive value. A matrix that needs no repair is not copied.
+    Di = [0 0 1; 0 0 1; 1 1 0]
+    Wi = PortfolioOptimisers.graph_weight_matrix(Di)
+    @test eltype(Wi) == Float64
+    @test Wi[1, 2] == Wi[2, 1] == nextfloat(0.0)
+    @test Wi[1, 3] == 1 && all(iszero, diag(Wi))
+    Df = [0.0 0.5; 0.5 0.0]
+    @test PortfolioOptimisers.graph_weight_matrix(Df) === Df
+    gi = PortfolioOptimisers.calc_weighted_adjacency_graph(KruskalTree(), Di)
+    @test PortfolioOptimisers.Graphs.ne(gi) == 2
+    # `phylogeny_matrix` of a clustering estimator has one row per asset under either `dims`.
+    cle = ClustersEstimator()
+    p1 = phylogeny_matrix(cle, X471)
+    @test p1 isa PhylogenyResult{Matrix{Int}}
+    @test size(p1.X) == (10, 10)
+    @test phylogeny_matrix(cle, permutedims(X471); dims = 2).X == p1.X
+    w471 = fill(0.1, 10)
+    @test asset_phylogeny(cle, w471, permutedims(X471); dims = 2) ≈
+          asset_phylogeny(cle, w471, X471)
+    # A weight vector of zeros has a zero denominator.
+    @test isnan(asset_phylogeny(zeros(3), [0 1 0; 1 0 1; 0 1 0]))
+    # Both `centrality_vector` queries return a `PhylogenyResult` of a vector.
+    @test centrality_vector(NetworkEstimator(), DegreeCentrality(), X471) isa
+          PhylogenyResult{<:AbstractVector}
+    @test centrality_vector(CentralityEstimator(), X471) isa
+          PhylogenyResult{<:AbstractVector}
+    # `HClE_HCl` has three members, a network clustering estimator among them.
+    @test NetworkClustersEstimator() isa PortfolioOptimisers.HClE_HCl
+    # `Graphs.katz_centrality` reads a `Bool` adjacency matrix, so a weighted graph raises.
+    ntp = NetworkEstimator(; alg = MaximumDistanceSimilarity())
+    gw = PortfolioOptimisers.calc_weighted_adjacency_graph(ntp, X471)
+    @test_throws InexactError PortfolioOptimisers.calc_centrality(KatzCentrality(), gw)
+    # The three `kind` values agree on an undirected graph.
+    gt = PortfolioOptimisers.Graphs.SimpleGraph(phylogeny_matrix(NetworkEstimator(), X471).X)
+    dc = [PortfolioOptimisers.calc_centrality(DegreeCentrality(; kind = k), gt)
+          for k in 0:2]
+    @test dc[1] == dc[2] == dc[3]
+    # A radiality score is at most one on an unweighted graph, and can exceed one on a
+    # weighted graph, where a length can be less than one.
+    rt = PortfolioOptimisers.calc_centrality(RadialityCentrality(), gt)
+    @test maximum(rt) <= 1
+    rw = PortfolioOptimisers.calc_centrality(RadialityCentrality(),
+                                             PortfolioOptimisers.centrality_graph(ntp,
+                                                                                  RadialityCentrality(),
+                                                                                  X471))
+    @test maximum(rw) > 1
+    # The constructor message names a phylogeny matrix, and the validation renders.
+    err = try
+        PhylogenyResult(; X = [0 1; 2 0])
+    catch e
+        e
+    end
+    @test err isa ArgumentError
+    @test occursin("a phylogeny matrix must be symmetric", err.msg)
+    doc471 = string(@doc PhylogenyResult)
+    @test !occursin("`..", doc471)
+    @test occursin("If `X` is a `MatNum`, `LinearAlgebra.issymmetric(X)`", doc471)
 end

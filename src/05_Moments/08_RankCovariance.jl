@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all rank-based covariance estimators.
 
-All concrete and/or abstract types implementing rank-based covariance estimation algorithms should be subtypes of `RankCovarianceEstimator`.
+A subtype computes its correlation matrix from the ranks of the returns. [`KendallCovariance`](@ref) and [`SpearmanCovariance`](@ref) are its two subtypes, and no method of the library dispatches on this type.
 
 # Related
 
@@ -15,9 +15,11 @@ abstract type RankCovarianceEstimator <: AbstractCovarianceEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Measures monotonic association with Kendall's tau, counting concordant against discordant pairs.
+Measures monotonic association with Kendall's tau, which counts concordant pairs against discordant pairs.
 
-The rank statistic is robust to outliers and to non-Gaussian data. The covariance follows from the generic fallback, which rescales the correlation matrix by the marginal standard deviations of `ve`.
+Kendall's tau reads only the ranks of the returns. An outlier changes it only through its rank, and the statistic does not assume Gaussian data. The generic covariance fallback rescales the correlation matrix by the marginal standard deviations of `ve`. Entry ``(i, j)`` of the covariance is ``\\hat{\\tau}^b_{ij}\\,\\hat{\\sigma}_i\\,\\hat{\\sigma}_j``, and the diagonal is the variance.
+
+Equation 1 of [kendall1938](@cite) states the coefficient as the difference of the counts of concordant and discordant pairs, divided by the number of pairs. Section 6.1.3 of [cajas2025](@cite) states it again. The library computes the tie-corrected form of Equations 10 and 12 of [kendall1945](@cite). The two forms differ when the data have ties.
 
 # Fields
 
@@ -34,17 +36,17 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `ve`: Recursively updated via [`factory`](@ref).
-  - `cache`: Carried unchanged via [`factory`](@ref).
+  - `ve`: Recursively updated through [`factory`](@ref).
+  - `cache`: Carried unchanged through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `ve`: Recursively viewed via [`port_opt_view`](@ref).
-  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
+  - `ve`: Recursively viewed through [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).
 
 # Examples
 
@@ -69,7 +71,9 @@ KendallCovariance
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 6.1.3, equation 6.3.
+  - $(ref_dict[:kendall1938]) Section 2, Equation 1.
+  - $(ref_dict[:kendall1945]) Sections 10 to 11, Equations 10 and 12.
+  - $(ref_dict[:cajas2025]) Section 6.1.3, Equation 6.3.
 """
 @propagatable @concrete struct KendallCovariance <: RankCovarianceEstimator
     """
@@ -92,9 +96,9 @@ end
 """
     Statistics.cor(::KendallCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
-Compute the Kendall's tau rank correlation matrix using a [`KendallCovariance`](@ref) estimator.
+Compute the Kendall's tau rank correlation matrix with a [`KendallCovariance`](@ref) estimator.
 
-This method computes the pairwise Kendall's tau rank correlation matrix for the input data matrix `X`. Kendall's tau measures the monotonic association between pairs of asset returns and is robust to outliers and non-Gaussian data.
+Entry ``(i, j)`` is the Kendall's tau of the returns of assets ``i`` and ``j``, which measures their monotonic association.
 
 # Mathematical definition
 
@@ -109,26 +113,27 @@ n_0 &= \\binom{T}{2}\\,, \\quad n_x = \\sum_{g} \\binom{t_g}{2}\\,, \\quad n_y =
 
 Where:
 
-  - ``\\hat{\\tau}^b_{ij}``: Kendall's ``\\tau_b`` rank correlation between assets ``i`` and ``j``.
-  - ``C``: Number of concordant pairs; a pair ``(t, s)`` is concordant if ``(x_t - x_s)(y_t - y_s) > 0``.
-  - ``D``: Number of discordant pairs; a pair ``(t, s)`` is discordant if ``(x_t - x_s)(y_t - y_s) < 0``.
-  - ``n_0``: Total number of pairs.
-  - ``t_g``, ``u_h``: Sizes of the ``g``-th group of tied ``x`` values and the ``h``-th group of tied ``y`` values.
+  - ``\\hat{\\tau}^b_{ij}``: The Kendall's ``\\tau_b`` rank correlation of assets ``i`` and ``j``.
+  - ``C``: The number of concordant pairs. A pair ``(t, s)`` is concordant if ``(x_t - x_s)(y_t - y_s) > 0``.
+  - ``D``: The number of discordant pairs. A pair ``(t, s)`` is discordant if ``(x_t - x_s)(y_t - y_s) < 0``.
+  - ``n_0``: The total number of pairs.
+  - ``t_g``, ``u_h``: The sizes of the ``g``-th group of tied ``x`` values and of the ``h``-th group of tied ``y`` values.
   - $(math_dict[:T])
 
-Without ties, ``n_x = n_y = 0`` and ``\\hat{\\tau}^b`` reduces to ``\\tau_a = (C - D) / \\binom{T}{2}``, which is equation 6.3 of the source. **The two differ when ties are present**, because the tie counts shrink the denominator.
+Without ties, ``n_x = n_y = 0`` and ``\\hat{\\tau}^b`` reduces to ``\\tau_a = (C - D) / \\binom{T}{2}``, which is Equation 1 of [kendall1938](@cite). With ties, the two differ, because the tie counts make the denominator smaller. Equation 10 of [kendall1945](@cite) gives a tied pair the score zero, and Equation 12 then gives the denominator of the formula above. On the ten ranks of Example 3 of that work, the library returns ``33 / \\sqrt{41 \\cdot 36} \\approx 0.85896``. The work truncates this value to 0.8589.
 
 # Algorithm
 
  1. Orient `X` with [`dims_oriented`](@ref), which transposes it when `dims` is `2` and refuses any other value.
- 2. Return `StatsBase.corkendall(X)`, the tie-corrected ``\\tau_b`` of every pair of columns. The diagonal is exactly `1`, and no scaling or clamping is applied to the result.
+ 2. Refuse a gapped sample with [`assert_finite_sample`](@ref).
+ 3. Return `StatsBase.corkendall(X)`, the tie-corrected ``\\tau_b`` of each pair of columns. The method does not scale or clamp the result. The diagonal is exactly `1`, also for a constant column, and the other entries of a constant column are `NaN`.
 
 # Arguments
 
-  - `ce`: Kendall's tau-based covariance estimator.
-  - `X`: Data matrix of asset returns (observations × assets).
+  - `ce`: The Kendall's tau covariance estimator.
+  - `X`: The data matrix of asset returns, `observations × assets`.
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments (currently unused).
+  - `kwargs...`: More keyword arguments, which the method ignores.
 
 # Validation
 
@@ -136,7 +141,7 @@ Without ties, ``n_x = n_y = 0`` and ``\\hat{\\tau}^b`` reduces to ``\\tau_a = (C
 
 # Returns
 
-  - `rho::Matrix{<:Number}`: Symmetric matrix of Kendall's tau rank correlation coefficients.
+  - `rho::Matrix{<:Number}`: The symmetric matrix of Kendall's tau rank correlation coefficients.
 
 # Examples
 
@@ -164,7 +169,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Measures monotonic association with Spearman's rho, the Pearson correlation of the rank-transformed returns.
 
-The rank transform is robust to outliers and to non-Gaussian data. The covariance follows from the generic fallback, which rescales the correlation matrix by the marginal standard deviations of `ve`.
+Spearman's rho reads only the ranks of the returns. An outlier changes it only through its rank, and the statistic does not assume Gaussian data. The generic covariance fallback rescales the correlation matrix by the marginal standard deviations of `ve`. Entry ``(i, j)`` of the covariance is ``\\hat{\\rho}^S_{ij}\\,\\hat{\\sigma}_i\\,\\hat{\\sigma}_j``, and the diagonal is the variance.
+
+Part I, Section 3 of [spearman1904](@cite) computes the correlation of the ranks by the method of product moments. It gives the reason for the ranks. A rank does not depend on the form of the marginal distributions, and an extreme value changes it little. Section 4(d) of that part gives a different statistic, ``R = 1 - 3 S_d / (n^{2} - 1)``, from the sum of absolute rank differences ``S_d``. This estimator does not compute that statistic.
 
 # Fields
 
@@ -181,17 +188,17 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `ve`: Recursively updated via [`factory`](@ref).
-  - `cache`: Carried unchanged via [`factory`](@ref).
+  - `ve`: Recursively updated through [`factory`](@ref).
+  - `cache`: Carried unchanged through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `ve`: Recursively viewed via [`port_opt_view`](@ref).
-  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
+  - `ve`: Recursively viewed through [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).
 
 # Examples
 
@@ -216,7 +223,7 @@ SpearmanCovariance
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 6.1.2, equation 6.2.
+  - $(ref_dict[:spearman1904]) Part I, Sections 3 and 4(d), pages 79 to 87.
 """
 @propagatable @concrete struct SpearmanCovariance <: RankCovarianceEstimator
     """
@@ -241,15 +248,15 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Renders every field of a [`KendallCovariance`](@ref) or a [`SpearmanCovariance`](@ref) except `cache`.
 
-The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:KendallCovariance, true)` to render it.
+A `cache` holds the state of an incremental fit. That state is not part of the configuration, and it prints under the estimator at each site that renders the estimator. Set `set_show_nothing_fields!(:KendallCovariance, true)` or `set_show_nothing_fields!(:SpearmanCovariance, true)` to render it for that type.
 
 # Arguments
 
-  - `::Union{<:KendallCovariance, <:SpearmanCovariance}`: Rank covariance estimator, read for its type alone.
+  - `::Union{<:KendallCovariance, <:SpearmanCovariance}`: The rank covariance estimator. The method reads only its type.
 
 # Returns
 
-  - `fields::Tuple`: The field names to render, which is `(:ve,)`.
+  - `fields::Tuple`: The names of the fields to render, `(:ve,)`.
 
 # Related
 
@@ -262,13 +269,13 @@ show_fields(::Union{<:KendallCovariance, <:SpearmanCovariance}) = (:ve,)
 """
     Statistics.cor(::SpearmanCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
-Compute the Spearman's rho rank correlation matrix using a [`SpearmanCovariance`](@ref) estimator.
+Compute the Spearman's rho rank correlation matrix with a [`SpearmanCovariance`](@ref) estimator.
 
-This method computes the pairwise Spearman's rho rank correlation matrix for the input data matrix `X`. Spearman's rho measures the monotonic association between pairs of asset returns and is robust to outliers and non-Gaussian data.
+Entry ``(i, j)`` is the Spearman's rho of the returns of assets ``i`` and ``j``, which measures their monotonic association.
 
 # Mathematical definition
 
-Spearman's ``\\rho`` is the Pearson correlation of the rank-transformed data. Let ``\\mathrm{rk}(x_t)`` denote the mid-rank of observation ``x_t`` among ``x_1, \\ldots, x_T``, so that a group of tied values shares their average rank:
+Spearman's ``\\rho`` is the Pearson correlation of the ranks of the data. Let ``\\mathrm{rk}(x_t)`` be the mid-rank of observation ``x_t`` among ``x_1, \\ldots, x_T``. Each value of a group of tied values gets the average rank of the group:
 
 ```math
 \\begin{align}
@@ -278,25 +285,26 @@ Spearman's ``\\rho`` is the Pearson correlation of the rank-transformed data. Le
 
 Where:
 
-  - ``\\hat{\\rho}^S_{ij}``: Spearman's ``\\rho`` rank correlation between assets ``i`` and ``j``.
+  - ``\\hat{\\rho}^S_{ij}``: The Spearman's ``\\rho`` rank correlation of assets ``i`` and ``j``.
   - $(math_dict[:T])
-  - ``x_{ti}``: Return of asset ``i`` at time ``t``.
-  - ``\\mathrm{rk}(\\cdot)``: Mid-rank function.
-  - ``\\sigma_{\\mathrm{rk}(\\cdot)}``: Standard deviation of the rank variable.
+  - ``x_{ti}``: The return of asset ``i`` at time ``t``.
+  - ``\\mathrm{rk}(\\cdot)``: The mid-rank function.
+  - ``\\sigma_{\\mathrm{rk}(\\cdot)}``: The standard deviation of the ranks.
 
-Without ties this equals the closed form ``1 - 6 \\sum_t d_t^2 / (T(T^2 - 1))``, with ``d_t = \\mathrm{rk}(x_{ti}) - \\mathrm{rk}(x_{tj})``. **The two differ when ties are present.**
+Without ties, this is equal to the closed form ``1 - 6 \\sum_t d_t^2 / (T(T^2 - 1))``, with ``d_t = \\mathrm{rk}(x_{ti}) - \\mathrm{rk}(x_{tj})``. With ties, the two differ.
 
 # Algorithm
 
  1. Orient `X` with [`dims_oriented`](@ref), which transposes it when `dims` is `2` and refuses any other value.
- 2. Return `StatsBase.corspearman(X)`, the Pearson correlation of the mid-ranked columns. The diagonal is exactly `1`, and no scaling or clamping is applied to the result.
+ 2. Refuse a gapped sample with [`assert_finite_sample`](@ref).
+ 3. Return `StatsBase.corspearman(X)`, the Pearson correlation of the mid-ranked columns. The method does not scale or clamp the result. The diagonal is exactly `1`, also for a constant column, and the other entries of a constant column are `NaN`.
 
 # Arguments
 
-  - `ce`: Spearman's rho-based covariance estimator.
-  - `X`: Data matrix of asset returns (observations × assets).
+  - `ce`: The Spearman's rho covariance estimator.
+  - `X`: The data matrix of asset returns, `observations × assets`.
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments (currently unused).
+  - `kwargs...`: More keyword arguments, which the method ignores.
 
 # Validation
 
@@ -304,7 +312,7 @@ Without ties this equals the closed form ``1 - 6 \\sum_t d_t^2 / (T(T^2 - 1))``,
 
 # Returns
 
-  - `rho::Matrix{<:Number}`: Symmetric matrix of Spearman's rho rank correlation coefficients.
+  - `rho::Matrix{<:Number}`: The symmetric matrix of Spearman's rho rank correlation coefficients.
 
 # Examples
 

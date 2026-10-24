@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Measures the Conditional Value-at-Risk (CVaR), the average loss over the worst `alpha` fraction of the portfolio returns.
 
-The measure is also called Expected Shortfall. It is a coherent risk measure, and it is never below the [`ValueatRisk`](@ref) at the same level.
+The measure is also called Expected Shortfall. It is a coherent risk measure, and it is never below the [`ValueatRisk`](@ref) at the same level. Corollaries 7 and 12 of [rockafellar2002](@cite) state both properties.
 
 # Mathematical definition
 
@@ -22,7 +22,7 @@ The minimum has a closed form on the sorted returns. The tail holds the ``k^{\\s
 \\end{align}
 ```
 
-The second line holds because ``\\nu = x_{(k^{\\star})} = -\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x})`` is a minimiser. ``\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x})`` is the [`ValueatRisk`](@ref) at the same level, the smallest loss of the minimisers, as Rockafellar and Uryasev define it. The functor reads ``k^{\\star}`` off the computed ``\\alpha W_{T}``, so where a rounding error puts that product under a cumulative weight, it reads the position before the one of [`ValueatRisk`](@ref), whose slack absorbs the error. That position is the other end of the minimisers, so the value does not change.
+The second line holds because ``\\nu = x_{(k^{\\star})} = -\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x})`` is a minimiser. ``\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x})`` is the [`ValueatRisk`](@ref) at the same level, the smallest loss of the minimisers, as Equation 7 of [cvar](@cite) defines it. Theorem 1 of [cvar](@cite) states the minimum, and Proposition 8 of [rockafellar2002](@cite) states the closed form for finitely many scenarios with their probabilities, which are the observation weights here. Both works write the level as a confidence, which is ``1 - \\alpha`` here. The functor reads ``k^{\\star}`` off the computed ``\\alpha W_{T}``, so where a rounding error puts that product under a cumulative weight, it reads the position before the one of [`ValueatRisk`](@ref), whose slack absorbs the error. That position is the other end of the minimisers, so the value does not change.
 
 Where:
 
@@ -113,8 +113,8 @@ ConditionalValueatRisk
 
 # References
 
-  - $(ref_dict[:cvar])
-  - $(ref_dict[:cajas2025]) Section 7.2.2.4.
+  - $(ref_dict[:cvar]) Theorem 1, Equations 5 and 7.
+  - $(ref_dict[:rockafellar2002]) Corollaries 7 and 12, and Proposition 8, Equation 25.
 """
 @propagatable @concrete struct ConditionalValueatRisk <: RiskMeasure
     """
@@ -172,7 +172,9 @@ The loss is the larger of two affine pieces ``b_{i} \\tau + a_{i} \\boldsymbol{w
 \\end{align}
 ```
 
-This is Equation 27 of [drcvar](@cite). Corollary 5.1 of [drcvar](@cite) gives it for the support ``C \\boldsymbol{\\xi} \\leq \\boldsymbol{d}`` with ``C = -I`` and ``\\boldsymbol{d} = \\boldsymbol{1}``. The infinity norm is the dual of the 1-norm of the transport cost.
+This is Equation 27 of [drcvar](@cite). Corollary 5.1 of [drcvar](@cite) gives it for the support ``C \\boldsymbol{\\xi} \\leq \\boldsymbol{d}`` with ``C = -I`` and ``\\boldsymbol{d} = \\boldsymbol{1}``. The infinity norm is the dual of the 1-norm of the transport cost. That work puts the weight ``1/T`` on each scenario, so the observation weights ``w_{t} / W_{T}`` are the library's extension. The CVaR inside the loss is the minimum of Theorem 1 of [cvar](@cite).
+
+The radius ``r`` is in the units of the returns. A distribution ``\\mathbb{Q}`` is in the ball when it moves the scenarios of ``\\hat{\\mathbb{P}}`` by a mean 1-norm distance of at most ``r``. The 1-norm adds the moves of the ``N`` assets. For example, the default ``r = 0.02`` lets the worst case move one asset by 0.02 in every scenario, or each of the ``N`` assets by ``0.02 / N``. The scale of a radius rule is in the same units.
 
 Where:
 
@@ -195,7 +197,7 @@ Three consequences follow. The first two contradict a reading of the measure as 
 
   - The robustness premium ``r \\lambda`` is not a constant. ``\\lambda`` depends on ``\\boldsymbol{w}``, so ``r`` cannot be factored out of the optimisation.
   - The loss carries a mean term that ``l`` does not scale. As ``r \\to 0`` the ball collapses to ``\\hat{\\mathbb{P}}``, and the measure goes to ``-\\mathbb{E}_{\\hat{\\mathbb{P}}}[\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi}] + l \\, \\mathrm{CVaR}_{\\alpha}(\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi})``, not to ``\\mathrm{CVaR}_{\\alpha}`` alone.
-  - As ``r`` grows, the long-only portfolio of minimum measure goes to the equally weighted portfolio. This is Proposition 7.2 of [drcvar](@cite), for this support.
+  - As ``r`` grows, the long-only, fully invested portfolio of minimum measure goes to the equally weighted portfolio. This is Proposition 7.2 of [drcvar](@cite), for this support.
 
 # Fields
 
@@ -257,7 +259,7 @@ DistributionallyRobustConditionalValueatRisk
 
 # References
 
-  - $(ref_dict[:cvar])
+  - $(ref_dict[:cvar]) Theorem 1, Equation 5.
   - $(ref_dict[:drcvar]) Section 7.1, Equation 27, Corollary 5.1 and Proposition 7.2.
 """
 @propagatable @concrete struct DistributionallyRobustConditionalValueatRisk <: RiskMeasure
@@ -427,6 +429,8 @@ Where:
 
 $(math_dict[:negated_upper_tail]) Both tails read the same observation weights.
 
+Section 7.2.3.2 of [cajas2025](@cite) defines this range and names [owa1](@cite) as the source of the range measures. No copy of that work was found. Its Equation 7.75 prints a difference of the two tails, but its programme, Equation 7.77, minimises the sum above.
+
 # Algorithm
 
 The functor has one method for each kind of `w`. Each tail follows the steps of the matching method of [`ConditionalValueatRisk`](@ref).
@@ -499,8 +503,10 @@ ConditionalValueatRiskRange
 
 # References
 
-  - $(ref_dict[:cvar])
-  - $(ref_dict[:cajas2025]) Section 7.2.3.
+  - $(ref_dict[:cvar]) Theorem 1, Equation 5.
+  - $(ref_dict[:rockafellar2002]) Proposition 8, Equation 25.
+  - $(ref_dict[:cajas2025]) Section 7.2.3.2, Equations 7.75 and 7.77. $(ref_dict[:no_original_source])
+  - $(ref_dict[:owa1])
 """
 @propagatable @concrete struct ConditionalValueatRiskRange <: RiskMeasure
     """
@@ -566,6 +572,8 @@ Where:
   - ``\\mathrm{DR\\text{-}CVaR}_{\\beta, l_b, r_b}(\\boldsymbol{w};\\, -\\boldsymbol{\\xi})``: Upper-tail DR-CVaR on the negated scenarios ``-\\boldsymbol{\\xi}_{t}``. Its support ``-\\boldsymbol{\\xi} \\geq -\\boldsymbol{1}`` says that no asset gains more than all of its value.
 
 $(math_dict[:negated_upper_tail]) The two tails have separate Wasserstein balls, and both read the same observation weights.
+
+Each radius is in the units of the returns, as the radius of [`DistributionallyRobustConditionalValueatRisk`](@ref) is. ``r_a`` bounds the mean 1-norm move of the scenarios that the lower tail reads, and ``r_b`` bounds the move of the negated scenarios that the upper tail reads.
 
 As both radii go to zero, the two mean terms cancel, and the measure goes to ``l_a \\, \\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x}) + l_b \\, \\mathrm{CVaR}_{\\beta}(-\\boldsymbol{x})``, with ``\\boldsymbol{x}`` the portfolio returns of the scenarios.
 
@@ -634,7 +642,7 @@ DistributionallyRobustConditionalValueatRiskRange
 
 # References
 
-  - $(ref_dict[:cvar])
+  - $(ref_dict[:cvar]) Theorem 1, Equation 5.
   - $(ref_dict[:drcvar]) Section 7.1, Equation 27.
 """
 @propagatable @concrete struct DistributionallyRobustConditionalValueatRiskRange <:
@@ -891,6 +899,8 @@ Where:
 
 The running peak starts at ``c_0 = 0``, so a series that falls from its first period is in drawdown from the start. The minimum has the sorted closed form that [`conditional_drawdown_at_risk`](@ref) states.
 
+Definition 3.4 of [cdar](@cite) defines the measure on one sample path, and Proposition 3.1 of that work states the convexity and the positive homogeneity of the drawdown. That work weighs each drawdown equally, so the observation weights follow Proposition 8 of [rockafellar2002](@cite).
+
 # Algorithm
 
  1. Compute the drawdown series with [`absolute_drawdown_vec`](@ref).
@@ -950,8 +960,8 @@ ConditionalDrawdownatRisk
 
 # References
 
-  - $(ref_dict[:cdar])
-  - $(ref_dict[:cvar])
+  - $(ref_dict[:cdar]) Section 3, Definition 3.4, Equation 3.11, and Proposition 3.1.
+  - $(ref_dict[:rockafellar2002]) Proposition 8, Equation 25.
 """
 @propagatable @concrete struct ConditionalDrawdownatRisk <: RiskMeasure
     """
@@ -1001,6 +1011,8 @@ The measure ``\\mathrm{DR\\text{-}CDaR}_{\\alpha, l, r}(\\boldsymbol{w})`` is th
 
   - The rows read the portfolio drawdown, so ``-d_{t}(\\boldsymbol{w})`` takes the place of ``\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi}_{t}``.
   - The transport cost reads the asset drawdowns, so ``\\mathbf{D}_{t}`` takes the place of ``\\boldsymbol{\\xi}_{t}``, so the support constraint is ``\\mathbf{D} \\geq -\\boldsymbol{1}``.
+
+The radius ``r`` is in the units of the uncompounded drawdowns, which are cumulative returns. The ball moves the asset drawdowns ``\\mathbf{D}_{t}`` by a mean 1-norm distance of at most ``r``, and the 1-norm adds the moves of the ``N`` assets. A drawdown adds many returns, so it is often larger than one return, and a radius that suits the returns can be small for the drawdowns.
 
 Where:
 
@@ -1080,9 +1092,8 @@ DistributionallyRobustConditionalDrawdownatRisk
 
 # References
 
-  - $(ref_dict[:cdar])
-  - $(ref_dict[:cvar])
-  - $(ref_dict[:drcvar]) Section 7.1, Equation 27.
+  - $(ref_dict[:cdar]) Section 3, Definition 3.4, Equation 3.11.
+  - $(ref_dict[:drcvar]) Section 7.1, Equation 27, and Corollary 5.1.
 """
 @propagatable @concrete struct DistributionallyRobustConditionalDrawdownatRisk <:
                                RiskMeasure
@@ -1331,6 +1342,8 @@ Where:
 
 The running peak starts at ``C_0 = 1``, the initial wealth. The minimum has the sorted closed form that [`conditional_drawdown_at_risk`](@ref) states.
 
+Section 3 of [cdar](@cite) defines the drawdown of the uncompounded cumulative return only. It names the relative drawdown and states that it lacks the properties of the absolute drawdown, but it defines no measure on it. The relative drawdown series above, and the measure of Definition 3.4 of that work on it, are the library's extension.
+
 # Algorithm
 
  1. Compute the relative drawdown series with [`relative_drawdown_vec`](@ref).
@@ -1387,8 +1400,8 @@ RelativeConditionalDrawdownatRisk
 
 # References
 
-  - $(ref_dict[:cdar])
-  - $(ref_dict[:cvar])
+  - $(ref_dict[:cdar]) Section 3, Definition 3.4, Equation 3.11.
+  - $(ref_dict[:rockafellar2002]) Proposition 8, Equation 25.
 """
 @propagatable @concrete struct RelativeConditionalDrawdownatRisk <: HierarchicalRiskMeasure
     """

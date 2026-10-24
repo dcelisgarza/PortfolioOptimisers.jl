@@ -50,7 +50,7 @@ const ArrNum = AbstractArray{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}
 
 Alias for an abstract 3-dimensional array of numeric types or JuMP scalar types.
 
-Rank-restricted counterpart of [`ArrNum`](@ref), for the data that is a stack of matrices rather than a single one — a window of time-varying features, whose observation axis leads. Dispatching on this alias keeps the 2-D and 3-D entry points apart without a runtime `ndims` branch.
+It is [`ArrNum`](@ref) with the rank fixed at three, for data that is a stack of matrices and not one matrix. A window of time-varying features is such data, and its first axis holds the observations. A method that dispatches on this alias keeps the 2-D and 3-D entry points apart with no `ndims` branch at run time.
 
 # Related
 
@@ -62,7 +62,7 @@ const Arr3Num = AbstractArray{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}, 3}
 """
     const VecNum_MatNum = Union{<:VecNum, <:MatNum}
 
-Alias for a union of a numeric type or an abstract matrix of numeric types.
+Alias for a union of an abstract vector of numeric types and an abstract matrix of numeric types.
 
 # Related
 
@@ -75,7 +75,7 @@ const VecNum_MatNum = Union{<:VecNum, <:MatNum}
 
 Alias for a union of an abstract matrix and an abstract 3-dimensional array of numeric types.
 
-The two admissible shapes of a feature matrix: a static `assets × features` matrix, and a window of time-varying features whose observation axis leads, `observations × assets × features`. Both shapes are carried by [`PricesResult`](@ref) and [`ReturnsResult`](@ref) and consumed by [`FeatureDistance`](@ref), which distinguishes them by dispatch rather than by an `ndims` branch.
+A Feature Matrix has one of two shapes. It is a static `assets × features` matrix, or a window of time-varying features, `observations × assets × features`, whose first axis holds the observations. [`PricesResult`](@ref) and [`ReturnsResult`](@ref) hold both shapes. [`FeatureDistance`](@ref) reads both, and it tells them apart by dispatch and not by an `ndims` branch.
 
 # Related
 
@@ -86,7 +86,7 @@ const MatNum_Arr3Num = Union{<:MatNum, <:Arr3Num}
 """
     const Num_VecNum = Union{<:Number, <:VecNum}
 
-Alias for a union of a numeric type or an abstract vector of numeric types.
+Alias for a union of a numeric type and an abstract vector of numeric types.
 
 # Related
 
@@ -108,7 +108,7 @@ const Func_VecNum = Union{<:Function, <:VecNum}
 """
     const Func_Num_VecNum = Union{<:Number, <:Func_VecNum}
 
-Alias for a union of a function type or a numeric type or an abstract vector of numeric types.
+Alias for a union of a function type, a numeric type and an abstract vector of numeric types.
 
 # Related
 
@@ -118,9 +118,9 @@ const Func_Num_VecNum = Union{<:Number, <:Func_VecNum}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for custom value algorithms. These are user defined algorithms that return a custom value for an estimator.
+Abstract supertype for custom value algorithms. A user writes a custom value algorithm to give an estimator a value that the library does not compute.
 
-The interfaces users must implement depend on the estimator type.
+The methods that a subtype must implement depend on the estimator that reads it.
 
 # Related
 
@@ -132,9 +132,9 @@ abstract type AbstractCustomValue <: AbstractAlgorithm end
 """
     const CVal_Func_Num_VecNum = Union{<:AbstractCustomValue, <:Func_Num_VecNum}
 
-Alias for the two ways a caller supplies a custom value: an [`AbstractCustomValue`](@ref) algorithm, or the plain forms that [`Func_Num_VecNum`](@ref) already groups.
+Alias for the two ways in which a caller gives a custom value. The caller gives an [`AbstractCustomValue`](@ref) algorithm, or one of the plain forms of [`Func_Num_VecNum`](@ref).
 
-The group exists because the `val` field of [`CustomValueExpectedReturns`](@ref) accepts both, and one bound on that field is what keeps the two routes from drifting apart.
+The `val` field of [`CustomValueExpectedReturns`](@ref) accepts both ways. One bound on that field keeps the two ways in agreement, so the alias exists.
 
 # Related
 
@@ -146,7 +146,7 @@ const CVal_Func_Num_VecNum = Union{<:AbstractCustomValue, <:Func_Num_VecNum}
 """
     const Num_ArrNum = Union{<:Number, <:ArrNum}
 
-Alias for a union of a numeric type or an abstract array of numeric types.
+Alias for a union of a numeric type and an abstract array of numeric types.
 
 # Related
 
@@ -157,7 +157,7 @@ const Num_ArrNum = Union{<:Number, <:ArrNum}
 """
     const PairStrNum = Pair{<:AbstractString, <:Number}
 
-Alias for a pair consisting of an abstract string and a numeric type.
+Alias for a pair of an abstract string and a numeric type.
 
 # Related
 
@@ -169,7 +169,7 @@ const PairStrNum = Pair{<:AbstractString, <:Number}
     const GSCVKey = Union{<:AbstractString, Expr, Symbol, <:ComposedFunction,
                           <:Accessors.PropertyLens, <:Accessors.IndexLens, <:Integer}
 
-Alias for a key type used in grid search cross-validation, which can be an abstract string, an expression, a symbol, a composed function, an accessor lens, or an integer (a step position when tuning a `Pipeline`).
+Alias for the type of a key of a grid search cross-validation. A key is an abstract string, an expression, a symbol, a composed function, an accessor lens, or an integer. An integer is the position of a step when the search tunes a `Pipeline`.
 
 # Related
 
@@ -182,7 +182,7 @@ const GSCVKey = Union{<:AbstractString, Expr, Symbol, <:ComposedFunction,
 """
     const RSCVVal = Union{<:AbstractVector, <:Distributions.Distribution}
 
-Alias for a value type used in randomised search cross-validation, which can be an abstract vector or a distribution.
+Alias for the type of a value of a randomised search cross-validation. A value is an abstract vector or a distribution.
 
 # Related
 
@@ -194,7 +194,7 @@ const RSCVVal = Union{<:AbstractVector, <:Distributions.Distribution}
 """
     const PairGSCV = Pair{<:GSCVKey, <:AbstractVector}
 
-Alias for a pair consisting of an abstract string and an abstract vector.
+Alias for a pair of a [`GSCVKey`](@ref) and an abstract vector.
 
 # Related
 
@@ -216,7 +216,7 @@ const DictStrNum = AbstractDict{<:AbstractString, <:Number}
 """
     const DictGSCV = AbstractDict{<:GSCVKey, <:AbstractVector}
 
-Alias for an abstract dictionary with string keys and abstract vector values.
+Alias for an abstract dictionary with [`GSCVKey`](@ref) keys and abstract vector values.
 
 # Related
 
@@ -227,7 +227,7 @@ const DictGSCV = AbstractDict{<:GSCVKey, <:AbstractVector}
 """
     const MultiEstValType = Union{<:DictStrNum, <:AbstractVector{<:PairStrNum}}
 
-Alias for a union of a dictionary with string keys and numeric values, or a vector of string-number pairs.
+Alias for a union of a dictionary with string keys and numeric values, and a vector of string-number pairs.
 
 # Related
 
@@ -239,7 +239,7 @@ const MultiEstValType = Union{<:DictStrNum, <:AbstractVector{<:PairStrNum}}
 """
     const MultiGSCVValType = Union{<:DictGSCV, <:AbstractVector{<:PairGSCV}}
 
-Alias for a union of an abstract dictionary with string keys and abstract vector values, or a vector of string-vector pairs.
+Alias for a union of a [`DictGSCV`](@ref) and a vector of [`PairGSCV`](@ref) pairs.
 
 # Related
 
@@ -266,7 +266,7 @@ const VecMultiGSCVValType = AbstractVector{<:MultiGSCVValType}
     const MultiGSCVValType_VecMultiGSCVValType = Union{<:MultiGSCVValType,
                                                        <:VecMultiGSCVValType}
 
-Alias for a union of `MultiGSCVValType` and `VecMultiGSCVValType` elements.
+Alias for a union of a `MultiGSCVValType` and a `VecMultiGSCVValType`.
 
 # Related
 
@@ -282,21 +282,21 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all estimator value algorithm types.
 
-Subtypes of `AbstractEstimatorValueAlgorithm` implement algorithms for computing constraint result values. These are used to extend or modify the behavior of estimators in a composable and modular fashion.
+A subtype of `AbstractEstimatorValueAlgorithm` computes the value of a constraint or a bound over the universe, from the asset sets. An estimator slot that accepts a value can hold such an algorithm in the place of the value.
 
-The family is split by the shape of the value the algorithm returns, because a slot admits one shape and refuses the others. [`VectorAbstractEstimatorValueAlgorithm`](@ref) is the branch that returns a `Num_VecNum`, and [`EstValType`](@ref) takes the branch a slot admits as its type parameter. A slot that parses equations, such as [`LinearConstraintEstimator`](@ref)'s `val`, takes an [`EqnType`](@ref), and no branch of this family is an `EqnType`.
+The family has branches by the shape of the value that the algorithm returns, because a slot accepts one shape and refuses the others. [`VectorAbstractEstimatorValueAlgorithm`](@ref) is the branch that returns a `Num_VecNum`, and [`VectorEstValType`](@ref) is the bound of a slot that accepts that branch. [`EstValType`](@ref) takes the branch as its type parameter. A slot that parses equations, such as the `val` of [`LinearConstraintEstimator`](@ref), takes an [`EqnType`](@ref), and no branch of this family is an `EqnType`.
 
 # Interfaces
 
-In order to implement a new estimator value algorithm which will work seamlessly with the library, subtype the branch of `AbstractEstimatorValueAlgorithm` whose value shape the algorithm returns with all necessary parameters struct, and implement the following method:
+To implement a new estimator value algorithm, subtype the branch of `AbstractEstimatorValueAlgorithm` for the shape of the value that it returns, with a struct that holds its parameters. Then implement the method below.
 
-  - `estimator_to_val(alg::AbstractEstimatorValueAlgorithm, sets::UniverseSets, val::Option{<:Number} = nothing, key::Option{<:AbstractString} = nothing; datatype::DataType = Float64, strict::Bool = false) -> Num_VecNum`: Converts an estimator value dictionary to a numeric or vector of numeric value. Usually this should compute some version of:
-      + `val = ifelse(isnothing(val), <default value use with datatype element type>, val)`: Computes the default value to use if `val` is `nothing`.
-      + `nx = sets.dict[ifelse(isnothing(key), sets.xkey, key)]`: Gets the universe to use for mapping values to assets.
+  - `estimator_to_val(alg::AbstractEstimatorValueAlgorithm, sets::UniverseSets, val::Option{<:Number} = nothing, key::Option{<:AbstractString} = nothing; datatype::DataType = Float64, strict::Bool = false) -> Num_VecNum`: Computes a number, or a vector of numbers, over the universe. A usual method does these two steps:
+      + `val = ifelse(isnothing(val), <default value use with datatype element type>, val)`: Computes the default value when `val` is `nothing`.
+      + `nx = sets.dict[ifelse(isnothing(key), sets.xkey, key)]`: Gets the universe whose assets the values map to.
 
 ## Arguments
 
-  - `alg`: Concrete subtype of a branch of `AbstractEstimatorValueAlgorithm`.
+  - `alg`: A concrete subtype of a branch of `AbstractEstimatorValueAlgorithm`.
   - $(arg_dict[:sets])
   - $(arg_dict[:val])
   - $(arg_dict[:ekey])
@@ -305,11 +305,11 @@ In order to implement a new estimator value algorithm which will work seamlessly
 
 ## Returns
 
-  - `val::Num_VecNum`: The numeric or vector of numeric value.
+  - `val::Num_VecNum`: The number, or the vector of numbers.
 
 # Examples
 
-We can create a dummy estimator value algorithm as follows:
+A minimal estimator value algorithm:
 
 ```jldoctest
 julia> struct MyIncreasingValue <: PortfolioOptimisers.VectorAbstractEstimatorValueAlgorithm end
@@ -343,6 +343,7 @@ julia> estimator_to_val(MyIncreasingValue(), sets)
 # Related
 
   - [`VectorAbstractEstimatorValueAlgorithm`](@ref)
+  - [`VectorEstValType`](@ref)
   - [`EstValType`](@ref)
   - [`estimator_to_val`](@ref)
 """
@@ -352,7 +353,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the estimator value algorithms that return a numeric or a vector of numeric value.
 
-A slot that holds a number, or a vector of numbers, over the universe admits this branch of [`AbstractEstimatorValueAlgorithm`](@ref) and no other. The slot writes that bound as `EstValType{<:VectorAbstractEstimatorValueAlgorithm}`, so the branch a slot admits is part of the slot's type, not a check made when the value is resolved.
+A slot that holds a number, or a vector of numbers, over the universe accepts this branch of [`AbstractEstimatorValueAlgorithm`](@ref) and no other. The slot writes that bound as [`VectorEstValType`](@ref), which also refuses a matrix. The branch and the shape that a slot accepts are thus part of the type of the slot, and not a check at the time when the library resolves the value.
 
 # Interfaces
 
@@ -361,7 +362,7 @@ Subtype `VectorAbstractEstimatorValueAlgorithm`, and implement the `estimator_to
 # Related
 
   - [`AbstractEstimatorValueAlgorithm`](@ref)
-  - [`EstValType`](@ref)
+  - [`VectorEstValType`](@ref)
   - [`estimator_to_val`](@ref)
   - [`UniformValues`](@ref)
 """
@@ -371,15 +372,19 @@ abstract type VectorAbstractEstimatorValueAlgorithm <: AbstractEstimatorValueAlg
                                                                    <:PairStrNum,
                                                                    <:MultiEstValType, T}
 
-Alias for a union of numeric, vector of numeric, matrix of numeric, string-number pair, or multi-estimator value types, and the branch `T` of [`AbstractEstimatorValueAlgorithm`](@ref) that computes such a value.
+Alias for a union of a number, a vector of numbers, a matrix of numbers, a string-number pair, a multi-estimator value, and the branch `T` of [`AbstractEstimatorValueAlgorithm`](@ref) that computes such a value.
 
-`T` names the branch the slot admits, so a slot states in its own type which algorithms it can resolve. A slot that holds a number, or a vector of numbers, writes `EstValType{<:VectorAbstractEstimatorValueAlgorithm}`. The alias written without a parameter admits every branch, which is the widest bound the family gives.
+`T` names the branch that the slot accepts, so the type of a slot states which algorithms the slot can resolve. The alias with no parameter accepts every branch, and it is the widest bound of the family.
+
+`T` does not change the shape of the plain value: every `EstValType` accepts a matrix. A slot that holds a number, or a vector of numbers, over the universe resolves no matrix, so it writes [`VectorEstValType`](@ref) instead.
 
 # Related
 
   - [`Num_VecNum`](@ref)
+  - [`MatNum`](@ref)
   - [`PairStrNum`](@ref)
   - [`MultiEstValType`](@ref)
+  - [`VectorEstValType`](@ref)
   - [`AbstractEstimatorValueAlgorithm`](@ref)
   - [`VectorAbstractEstimatorValueAlgorithm`](@ref)
 """
@@ -387,9 +392,27 @@ const EstValType{T <: AbstractEstimatorValueAlgorithm} = Union{<:Num_VecNum, <:M
                                                                <:PairStrNum,
                                                                <:MultiEstValType, T}
 """
+    const VectorEstValType = Union{<:Num_VecNum, <:PairStrNum, <:MultiEstValType,
+                                   <:VectorAbstractEstimatorValueAlgorithm}
+
+Alias for a union of a number, a vector of numbers, a string-number pair, a multi-estimator value, and a [`VectorAbstractEstimatorValueAlgorithm`](@ref).
+
+A slot that holds a number, or a vector of numbers, over the universe takes this alias as its bound. Each shape that the alias accepts resolves to a `Num_VecNum` through [`estimator_to_val`](@ref). The alias refuses a matrix, which [`EstValType`](@ref) accepts, because the result of such a slot holds a `Num_VecNum` only. The constructor of the estimator thus refuses a matrix, and not the resolver.
+
+# Related
+
+  - [`Num_VecNum`](@ref)
+  - [`PairStrNum`](@ref)
+  - [`MultiEstValType`](@ref)
+  - [`EstValType`](@ref)
+  - [`VectorAbstractEstimatorValueAlgorithm`](@ref)
+"""
+const VectorEstValType = Union{<:Num_VecNum, <:PairStrNum, <:MultiEstValType,
+                               <:VectorAbstractEstimatorValueAlgorithm}
+"""
     const Str_Expr = Union{<:AbstractString, Expr}
 
-Alias for a union of abstract string or Julia expression.
+Alias for a union of an abstract string and a Julia expression.
 
 # Related
 
@@ -411,9 +434,9 @@ const VecStr_Expr = AbstractVector{<:Str_Expr}
 """
     const EqnType = Union{<:AbstractString, Expr, <:VecStr_Expr}
 
-Alias for a union of string, Julia expression, or vector of strings/expressions.
+Alias for a union of a string, a Julia expression, and a vector of strings and expressions.
 
-Every consumer of this alias parses the value with [`parse_equation`](@ref), so the alias holds equation text and nothing else. No branch of [`AbstractEstimatorValueAlgorithm`](@ref) is an `EqnType`: an algorithm computes a value over the universe, and a value carries neither a comparison operator nor a side, so no constraint row can be assembled from it. A slot that admits an algorithm is an [`EstValType`](@ref).
+Every consumer of this alias parses the value with [`parse_equation`](@ref), so the alias holds equation text and nothing more. No branch of [`AbstractEstimatorValueAlgorithm`](@ref) is an `EqnType`. An algorithm computes a value over the universe. A value has no comparison operator and no side, so the library cannot build a constraint row from it. A slot that accepts an algorithm is an [`EstValType`](@ref).
 
 # Related
 
@@ -447,7 +470,7 @@ const VecVecInt = AbstractVector{<:VecInt}
 """
     const VecInt_VecVecInt = Union{<:VecInt, <:VecVecInt}
 
-Alias for a union of an abstract vector of integers or an abstract vector of integer vectors.
+Alias for a union of an abstract vector of integers and an abstract vector of integer vectors.
 
 # Related
 
@@ -458,7 +481,7 @@ const VecInt_VecVecInt = Union{<:VecInt, <:VecVecInt}
 """
     const VecVecVecInt = AbstractVector{<:VecVecInt}
 
-Alias for an abstract vector of abstract vector of integer vectors.
+Alias for an abstract vector of abstract vectors of integer vectors.
 
 # Related
 
@@ -510,7 +533,7 @@ const VecJuMPScalar = Union{<:AbstractVector{<:JuMP.AbstractJuMPScalar}}
 """
     const Option{T} = Union{Nothing, T}
 
-Alias for an optional value of type `T`, which may be `nothing`.
+Alias for an optional value of type `T`, which can be `nothing`.
 
 # Related
 
@@ -520,7 +543,7 @@ const Option{T} = Union{Nothing, T}
 """
     const MatNum_VecMatNum = Union{<:MatNum, <:VecMatNum}
 
-Alias for a union of a numeric matrix or a vector of numeric matrices.
+Alias for a union of a numeric matrix and a vector of numeric matrices.
 
 # Related
 
@@ -531,7 +554,7 @@ const MatNum_VecMatNum = Union{<:MatNum, <:VecMatNum}
 """
     const Int_VecInt = Union{<:Integer, <:VecInt}
 
-Alias for a union of an integer or a vector of integers.
+Alias for a union of an integer and a vector of integers.
 
 # Related
 
@@ -541,7 +564,7 @@ const Int_VecInt = Union{<:Integer, <:VecInt}
 """
     const VecNum_VecVecNum = Union{<:VecNum, <:VecVecNum}
 
-Alias for a union of a numeric vector or a vector of numeric vectors.
+Alias for a union of a numeric vector and a vector of numeric vectors.
 
 # Related
 
@@ -563,7 +586,7 @@ const VecDate = AbstractVector{<:Dates.AbstractTime}
 """
     const Dict_Vec = Union{<:AbstractDict, <:AbstractVector}
 
-Alias for a union of an abstract dictionary or an abstract vector.
+Alias for a union of an abstract dictionary and an abstract vector.
 
 # Related
 
@@ -574,7 +597,7 @@ const Dict_Vec = Union{<:AbstractDict, <:AbstractVector}
 """
     const Sym_Str = Union{Symbol, <:AbstractString}
 
-Alias for a union of a symbol or an abstract string.
+Alias for a union of a symbol and an abstract string.
 
 # Related
 
@@ -584,7 +607,7 @@ const Sym_Str = Union{Symbol, <:AbstractString}
 """
     const Str_Vec = Union{<:AbstractString, <:AbstractVector}
 
-Alias for a union of an abstract string or an abstract vector.
+Alias for a union of an abstract string and an abstract vector.
 
 # Related
 

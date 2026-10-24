@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for estimators that turn continuous portfolio weights into share counts.
 
-A finite allocation estimator buys share counts with a stated cash budget at stated prices. The library has two. [`DiscreteAllocation`](@ref) solves a mixed-integer programme, and [`GreedyAllocation`](@ref) buys in two greedy passes. [`optimise`](@ref) takes either one with a [`FiniteAllocationInput`](@ref) as its second argument, and allocates the long and the short side of the portfolio as two separate sub-problems.
+A finite allocation estimator buys share counts with a stated cash budget at stated prices. The library has two. [`DiscreteAllocation`](@ref) solves a mixed-integer programme, and [`GreedyAllocation`](@ref) buys in two greedy passes. [martin2021](@cite) states only that the package it describes converts optimal weights into a discrete allocation, in its Methods on page 3. It states neither algorithm. [`optimise`](@ref) takes either one with a [`FiniteAllocationInput`](@ref) as its second argument, and allocates the long and the short side of the portfolio as two separate sub-problems.
 
 # Related
 
@@ -15,7 +15,7 @@ A finite allocation estimator buys share counts with a stated cash budget at sta
 
 # References
 
-  - $(ref_dict[:martin2021])
+  - $(ref_dict[:martin2021]) Methods, page 3. $(ref_dict[:no_original_source])
 """
 abstract type FiniteAllocationOptimisationEstimator <: OptimisationEstimator end
 """

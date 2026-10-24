@@ -1,31 +1,30 @@
 function no_bounds_risk_measure(r::RiskMeasure, ::Any = nothing)
     settings = r.settings
-    return Accessors.@set r.settings = RiskMeasureSettings(; rke = settings.rke,
-                                                           scale = settings.scale)
+    s = RiskMeasureSettings(; rke = settings.rke, scale = settings.scale)
+    return s === settings ? r : rebuild_estimator(r, (; settings = s))
 end
 function no_bounds_no_risk_expr_risk_measure(r::RiskMeasure, ::Any = nothing)
-    return Accessors.@set r.settings = RiskMeasureSettings(; rke = false, scale = 1)
+    s = RiskMeasureSettings(; rke = false, scale = 1)
+    return s === r.settings ? r : rebuild_estimator(r, (; settings = s))
 end
 function no_risk_expr_risk_measure(r::RiskMeasure)
     settings = r.settings
-    return Accessors.@set r.settings = RiskMeasureSettings(; rke = false, ub = settings.ub,
-                                                           scale = settings.scale)
+    s = RiskMeasureSettings(; rke = false, ub = settings.ub, scale = settings.scale)
+    return s === settings ? r : rebuild_estimator(r, (; settings = s))
 end
 function unit_scale_risk_measure(r::RiskMeasure)
     settings = r.settings
     scale = settings.scale
-    return if isone(scale)
-        r
-    else
-        Accessors.@set r.settings = RiskMeasureSettings(; scale = one(scale),
-                                                        ub = settings.ub,
-                                                        rke = settings.rke)
+    if isone(scale)
+        return r
     end
+    s = RiskMeasureSettings(; scale = one(scale), ub = settings.ub, rke = settings.rke)
+    return rebuild_estimator(r, (; settings = s))
 end
 function bounds_risk_measure(r::RiskMeasure, ub::Number)
     settings = r.settings
-    return Accessors.@set r.settings = RiskMeasureSettings(; ub = ub, rke = settings.rke,
-                                                           scale = settings.scale)
+    s = RiskMeasureSettings(; ub = ub, rke = settings.rke, scale = settings.scale)
+    return s === settings ? r : rebuild_estimator(r, (; settings = s))
 end
 function no_bounds_risk_measure(r::HierarchicalRiskMeasure, ::Any = nothing)
     return r

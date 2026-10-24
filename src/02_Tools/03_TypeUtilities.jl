@@ -1,25 +1,25 @@
 """
     traverse_concrete_subtypes(t, ctarr::Option{<:AbstractVector} = nothing) -> AbstractVector
 
-Recursively traverse all subtypes of the given abstract type `t` and collect all struct types into `ctarr`.
+Collect every struct type below the abstract type `t` into `ctarr`, through a recursion over the subtypes of `t`.
 
-A **struct type** is not the same as a concrete type. `InteractiveUtils.subtypes` reports a parametric struct as its `UnionAll`, and a `UnionAll` is not concrete, so a parametric struct is collected under its bare name and `isconcretetype` is `false` for it. What every entry does satisfy is `isstructtype`. A caller that needs concrete types must instantiate the parameters itself.
+A **struct type** is not the same as a concrete type. `InteractiveUtils.subtypes` gives a parametric struct as its `UnionAll`, and a `UnionAll` is not concrete. The function collects a parametric struct under its bare name, and `isconcretetype` is `false` for it. Every entry satisfies `isstructtype`. A caller that needs concrete types must set the parameters.
 
 # Algorithm
 
- 1. When `ctarr` is `nothing`, make it an empty `Vector{Any}`. The accumulator is threaded through the recursion, so one array collects every branch.
+ 1. When `ctarr` is `nothing`, make it an empty `Vector{Any}`. The recursion passes the same array down, so one array collects every branch.
  2. Read `sts`, the direct subtypes of `t`, with `InteractiveUtils.subtypes`.
  3. For each subtype `st` of `sts`, take one of two branches:
      1. `st` is not a struct type, so it is a further abstract type: call this function again on `st` with the same `ctarr`.
-     2. `st` is a struct type: push `st` onto `ctarr`. The test is `isstructtype` and not `isconcretetype`, which is why a parametric struct is collected.
+     2. `st` is a struct type: push `st` onto `ctarr`. The test is `isstructtype` and not `isconcretetype`, so the function collects a parametric struct.
  4. Return `ctarr`.
 
-The recursion descends the whole tree below `t`, so an abstract type at any depth is opened and never collected. The order of `ctarr` is the depth-first order of the tree, which follows the order that `InteractiveUtils.subtypes` reports.
+The recursion goes through the whole tree below `t`. It opens an abstract type at any depth and never collects it. The order of `ctarr` is the depth-first order of the tree, which follows the order that `InteractiveUtils.subtypes` gives.
 
 # Arguments
 
-  - `t`: An abstract type whose subtypes will be traversed.
-  - `ctarr`: Optional. An array to collect the struct types into. If not provided, a new empty array is created.
+  - `t`: The abstract type whose subtypes the function reads.
+  - `ctarr`: Array that collects the struct types. If `nothing`, the function makes a new empty array.
 
 # Returns
 
@@ -62,18 +62,18 @@ end
 """
     concrete_typed_array(A::AbstractArray) -> Array{Union{...}}
 
-Convert an `AbstractArray` `A` to a concrete typed array, where each element is of the same type as the elements of `A`.
+Copy of `A` whose element type is the union of the types of its elements.
 
-This is useful for converting arrays with abstract element types to arrays with concrete element types, which can improve performance in some cases.
+An array with an abstract element type, such as `Any`, costs a dynamic dispatch at each use of an element. The compiler can split a small union, so the copy can make later code faster.
 
 # Algorithm
 
  1. Read the concrete type of every element of `A` with `typeof.(A)`.
- 2. Build the element type `Union{typeof.(A)...}`, the union of exactly those types. An element type that no element carries is absent from the union.
+ 2. Build the element type `Union{typeof.(A)...}`, the union of only those types. A type that no element has is not in the union.
  3. Splat `A` into a vector of that element type, which flattens `A` to one dimension.
- 4. Reshape the vector back to `size(A)`, and return it.
+ 4. Reshape the vector to `size(A)`, and return it.
 
-The elements are copied into a new array, and each keeps its own type. The union is built from the values, so the result is only as narrow as the array's contents allow: an `Any` array holding one `Int64` comes back as a `Vector{Int64}`.
+The function copies the elements into a new array, and each element keeps its type. The union comes from the values, so it is only as narrow as the contents of the array. For example, an `Any` array whose elements are all `Int64` becomes an array of `Int64`.
 
 # Arguments
 
@@ -81,7 +81,7 @@ The elements are copied into a new array, and each keeps its own type. The union
 
 # Returns
 
-  - `A_new::Vector{Union{...}}`: A new array with the same shape as `A`, but with a concrete element type inferred from the elements of `A`.
+  - `A_new::Array{Union{...}}`: A new array with the shape of `A`. Its element type is the union of the types of the elements of `A`.
 
 # Examples
 
@@ -107,13 +107,13 @@ end
 
 Narrow the element type of `A` with [`concrete_typed_array`](@ref), but only when that element type is abstract.
 
-The generic vector methods of [`factory`](@ref) and [`port_opt_view`](@ref) rebuild a vector field element by element. A comprehension over a heterogeneous vector infers an abstract element type, which costs a dynamic dispatch at every later use. This is the opt-in narrowing step for the families that want the concrete element type back.
+The generic vector methods of [`factory`](@ref) and [`port_opt_view`](@ref) rebuild a vector field one element at a time. A comprehension over a vector whose elements have different types can infer an abstract element type. Then each later use of an element costs a dynamic dispatch. A family that needs a narrow element type calls this function on the rebuilt vector.
 
 # Algorithm
 
  1. Test `eltype(A)` with `isabstracttype`.
  2. The element type is abstract: return [`concrete_typed_array`](@ref) of `A`, which copies.
- 3. The element type is concrete: return `A` itself, which copies nothing.
+ 3. The element type is not abstract: return `A`, which copies nothing. A concrete type, a `Union` and a `UnionAll` such as `Vector` all take this branch, because `isabstracttype` is `false` for each of them.
 
 # Arguments
 
@@ -121,7 +121,7 @@ The generic vector methods of [`factory`](@ref) and [`port_opt_view`](@ref) rebu
 
 # Returns
 
-  - `A`: Unchanged if `eltype(A)` is concrete, else [`concrete_typed_array`](@ref) of `A`.
+  - `A`: With no change if `eltype(A)` is not abstract, else [`concrete_typed_array`](@ref) of `A`.
 
 # Examples
 
@@ -150,18 +150,18 @@ end
 """
     float_if_integer(::Type{T}) -> Type
 
-Return the numeric type that a computation over data of element type `T` holds its values in: `T` itself, or the floating-point type that Base `float` gives for `T` when `T` is an `Integer`.
+Numeric type that holds the values of a computation over data of element type `T`. It is the floating-point type that Base `float` gives for `T` when `T` is an `Integer`, and `T` for every other type.
 
-This is the one place where the library turns a derived numeric type into a floating-point type. An integer type cannot hold a mean, a variance, a weight or a `NaN`, so an integer sample must take a floating-point working type, or the first fractional write raises an `InexactError`. Every other type is kept. A `Float32` sample stays in `Float32`, a `Rational` sample stays exact, and an automatic-differentiation dual or a number type from another package is not converted to whatever `float` says. A bare call of `float` on `T` does not make that distinction, and neither does the type of a division such as `one(T) / one(T)`, which a number type is free to define in a different type. So a site that must repair an integer input calls this function on the type of its data, and never calls `float` itself.
+This function is the one place where the library changes a derived numeric type to a floating-point type. An integer type cannot hold a mean, a variance, a weight or a `NaN`. So an integer sample must use a floating-point working type, or the first write of a fraction raises an `InexactError`. The function keeps every other type. A `Float32` sample stays in `Float32`, and a `Rational` sample stays exact. The function does not convert an automatic-differentiation dual, or a number type from another package, to the type that `float` gives. A call of `float` on `T` does not make that distinction. The type of a division such as `one(T) / one(T)` does not make it either, because a number type can define the division in a different type. A site that must repair an integer input calls this function on the type of its data, and never calls `float`.
 
-A site whose operation leaves every type, for example a square root of a `Rational`, derives its type from that operation on the result of this function.
+Some operations change the type, for example the square root of a `Rational`. A site with such an operation takes its type from that operation, applied to the result of this function.
 
 # Algorithm
 
  1. `T` is a subtype of `Integer`, which includes `Bool`: return the floating-point type that Base `float` gives for `T`, for example `Float64` for `Int` and `BigFloat` for `BigInt`.
  2. `T` is any other type: return `T`.
 
-The choice is made by dispatch on `Type{T}`, so it costs nothing at run time and inference reads the returned type as a constant.
+Dispatch on `Type{T}` makes the choice, which costs nothing at run time. Inference reads the returned type as a constant.
 
 # Arguments
 

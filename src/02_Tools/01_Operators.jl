@@ -1,7 +1,7 @@
 """
     ⊗(A::ArrNum, B::ArrNum) -> Matrix{promote_type(eltype(A), eltype(B))}
 
-Tensor product of two arrays. Returns a matrix of size `(length(A), length(B))` where each element is the product of elements from `A` and `B`.
+Tensor product of two arrays. The result is a matrix of size `(length(A), length(B))`, and its entry `(i, j)` is `A[i] * B[j]`.
 
 # Mathematical definition
 
@@ -17,7 +17,7 @@ Where:
   - ``\\boldsymbol{b}``: Vectorised second array `B`, of length ``m``.
   - ``a_{i}``, ``b_{j}``: Entries of ``\\boldsymbol{a}`` and ``\\boldsymbol{b}`` in linear index order.
 
-The result is the outer product ``\\boldsymbol{a} \\boldsymbol{b}^\\intercal``, an ``n \\times m`` matrix. `A` and `B` may carry any shape, because both are read in linear index order.
+The result is the outer product ``\\boldsymbol{a} \\boldsymbol{b}^\\intercal``, an ``n \\times m`` matrix. `A` and `B` can have any shape, because the operator reads both in linear index order.
 
 # Arguments
 
@@ -40,9 +40,9 @@ julia> PortfolioOptimisers.:⊗([1, 2], [3, 4])
 """
 ⊗(A::ArrNum, B::ArrNum) = reshape(kron(B, A), (length(A), length(B)))
 """
-    ⊙(A::ArrNum, B::ArrNum) -> Matrix{promote_type(eltype(A), eltype(B))}
-    ⊙(A::ArrNum, B) -> Vector{promote_type(eltype(A), eltype(B))}
-    ⊙(A, B::ArrNum) -> Vector{promote_type(eltype(A), eltype(B))}
+    ⊙(A::ArrNum, B::ArrNum) -> AbstractArray
+    ⊙(A::ArrNum, B) -> AbstractArray
+    ⊙(A, B::ArrNum) -> AbstractArray
     ⊙(A, B) -> promote_type(eltype(A), eltype(B))
 
 Elementwise (Hadamard) multiplication.
@@ -64,7 +64,7 @@ Where:
   - $(math_dict[:alpha_beta_scalars])
   - $(math_dict[:i_linear])
 
-Both array operands must carry the same length. A scalar operand multiplies every entry of the array operand.
+Both array operands must have the same length. A scalar operand multiplies every entry of the array operand. An array result has the shape of the array operand.
 
 # Arguments
 
@@ -106,9 +106,9 @@ julia> PortfolioOptimisers.:⊙(2, 3)
 ⊙(A, B::ArrNum) = A * B
 ⊙(A, B) = A * B
 """
-    ⊘(A::ArrNum, B::ArrNum) -> Matrix{promote_type(eltype(A), eltype(B))}
-    ⊘(A::ArrNum, B) -> Vector{promote_type(eltype(A), eltype(B))}
-    ⊘(A, B::ArrNum) -> Vector{promote_type(eltype(A), eltype(B))}
+    ⊘(A::ArrNum, B::ArrNum) -> AbstractArray
+    ⊘(A::ArrNum, B) -> AbstractArray
+    ⊘(A, B::ArrNum) -> AbstractArray
     ⊘(A, B) -> promote_type(eltype(A), eltype(B))
 
 Elementwise (Hadamard) division.
@@ -130,7 +130,7 @@ Where:
   - $(math_dict[:alpha_beta_scalars])
   - $(math_dict[:i_linear])
 
-Both array operands must carry the same length. The division is not guarded, so a zero divisor gives an infinity or a `NaN`.
+Both array operands must have the same length. An array result has the shape of the array operand. The operator does not check the divisor, so a zero divisor gives an infinity or a `NaN`.
 
 # Arguments
 
@@ -172,9 +172,9 @@ julia> PortfolioOptimisers.:⊘(8, 2)
 ⊘(A, B::ArrNum) = A ./ B
 ⊘(A, B) = A / B
 """
-    ⊕(A::ArrNum, B::ArrNum) -> Matrix{promote_type(eltype(A), eltype(B))}
-    ⊕(A::ArrNum, B) -> Vector{promote_type(eltype(A), eltype(B))}
-    ⊕(A, B::ArrNum) -> Vector{promote_type(eltype(A), eltype(B))}
+    ⊕(A::ArrNum, B::ArrNum) -> AbstractArray
+    ⊕(A::ArrNum, B) -> AbstractArray
+    ⊕(A, B::ArrNum) -> AbstractArray
     ⊕(A, B) -> promote_type(eltype(A), eltype(B))
 
 Elementwise (Hadamard) addition.
@@ -196,7 +196,7 @@ Where:
   - $(math_dict[:alpha_beta_scalars])
   - $(math_dict[:i_linear])
 
-Both array operands must carry the same length. A scalar operand is added to every entry of the array operand, which the built-in `+` refuses.
+Both array operands must have the same length. The operator adds a scalar operand to every entry of the array operand. The built-in `+` refuses an array and a scalar. An array result has the shape of the array operand.
 
 # Arguments
 
@@ -238,9 +238,9 @@ julia> PortfolioOptimisers.:⊕(2, 3)
 ⊕(A, B::ArrNum) = A .+ B
 ⊕(A, B) = A + B
 """
-    ⊖(A::ArrNum, B::ArrNum) -> Matrix{promote_type(eltype(A), eltype(B))}
-    ⊖(A::ArrNum, B) -> Vector{promote_type(eltype(A), eltype(B))}
-    ⊖(A, B::ArrNum) -> Vector{promote_type(eltype(A), eltype(B))}
+    ⊖(A::ArrNum, B::ArrNum) -> AbstractArray
+    ⊖(A::ArrNum, B) -> AbstractArray
+    ⊖(A, B::ArrNum) -> AbstractArray
     ⊖(A, B) -> promote_type(eltype(A), eltype(B))
 
 Elementwise (Hadamard) subtraction.
@@ -262,7 +262,7 @@ Where:
   - $(math_dict[:alpha_beta_scalars])
   - $(math_dict[:i_linear])
 
-Both array operands must carry the same length. A scalar operand is subtracted from every entry of the array operand, which the built-in `-` refuses.
+Both array operands must have the same length. The operator subtracts a scalar `B` from every entry of `A`, and it subtracts every entry of `B` from a scalar `A`. The built-in `-` refuses an array and a scalar. An array result has the shape of the array operand.
 
 # Arguments
 
@@ -304,14 +304,14 @@ julia> PortfolioOptimisers.:⊖(8, 2)
 ⊖(A, B::ArrNum) = A .- B
 ⊖(A, B) = A - B
 """
-    dot_scalar(a::Union{<:Number, <:JuMP.AbstractJuMPScalar}, b::VecNum) -> Number
-    dot_scalar(a::VecNum, b::Union{<:Number, <:JuMP.AbstractJuMPScalar}) -> Number
+    dot_scalar(a::Union{<:Number, <:JuMP.AbstractJuMPScalar}, b::VecNum) -> Union{<:Number, <:JuMP.AbstractJuMPScalar}
+    dot_scalar(a::VecNum, b::Union{<:Number, <:JuMP.AbstractJuMPScalar}) -> Union{<:Number, <:JuMP.AbstractJuMPScalar}
     dot_scalar(a::VecNum, b::VecNum) -> Number
 
-Efficient scalar and vector dot product utility.
+Dot product of two operands, where one operand can be a scalar.
 
-  - If one argument is a `Union{<:Number, <:JuMP.AbstractJuMPScalar}` and the other an `VecNum`, returns the scalar times the sum of the vector.
-  - If both arguments are `VecNum`s, returns their `dot` product.
+  - If one argument is a `Union{<:Number, <:JuMP.AbstractJuMPScalar}` and the other is a `VecNum`, the function returns the product of the scalar and the sum of the vector.
+  - If both arguments are `VecNum`s, the function returns their `dot` product.
 
 # Mathematical definition
 
@@ -328,7 +328,7 @@ Where:
   - ``\\alpha``, ``\\beta``: Scalar operand, a number or a `JuMP` scalar.
   - ``\\boldsymbol{a}``, ``\\boldsymbol{b}``: Vector operand of length ``n``.
 
-The first two forms are the dot product of the vector with a constant vector of value ``\\alpha``, so the scalar stands for a uniform vector. The sum replaces that constant vector, so no ``n``-length array is built.
+The first two forms equal the dot product of the vector with a constant vector whose entries all equal the scalar. The function takes the sum of the vector, so it builds no constant vector of length ``n``.
 
 # Arguments
 
@@ -337,7 +337,7 @@ The first two forms are the dot product of the vector with a constant vector of 
 
 # Returns
 
-  - `res::Number`: The resulting scalar.
+  - `res`: The scalar result. It is a `JuMP` expression when the scalar operand is a `JuMP` scalar.
 
 # Examples
 
@@ -372,7 +372,7 @@ end
 
 Product of matrices that reads the right operand only where a row of `A` has a coefficient that is not zero.
 
-The plain product `A * B` multiplies each coefficient of a row of `A` by each entry of a column of `B`, and `0 * NaN` is `NaN`. So one non-finite entry of `B` makes `NaN` every entry of its column of `A * B`, also where the row of `A` has a zero coefficient at it. This product is `NaN` exactly where the support of the row meets a non-finite entry of the column, and is the plain product everywhere else. When every entry of `B` is finite, the result is `A * B` itself. The method over three matrices states the quadratic form `A * S * transpose(C)` in the same way.
+The plain product `A * B` multiplies each coefficient of a row of `A` by each entry of a column of `B`. Because `0 * NaN` is `NaN`, one non-finite entry of `B` makes every entry in its column of `A * B` a `NaN`, also in a row of `A` that has a zero coefficient at that position. This product gives `NaN` only where the support of a row meets a non-finite entry of the column. At all other entries, it gives the plain product. When every entry of `B` is finite, the result is `A * B`. The method with three matrices does the same for the quadratic form `A * S * transpose(C)`.
 
 # Mathematical definition
 
@@ -397,13 +397,13 @@ Where:
   - ``b_{kj}``, ``s_{kl}``: Entries of the right operand `B` and of the middle operand `S`.
   - ``\\odot``: The product over the support.
 
-A term outside the support is zero, so the sum over the support equals the plain sum wherever the plain sum is finite. A non-finite coefficient of `A` or `C` is in its support, so it makes its own entries non-finite, as in the plain product.
+A term outside the support is zero, so the sum over the support equals the plain sum wherever the plain sum is finite. A non-finite coefficient of `A` is in the support of its row, so it makes that row of the result non-finite, as in the plain product. A non-finite coefficient of `C` does the same to a column of the result.
 
 # Algorithm
 
  1. Return the plain product when every entry of `B`, or of `S`, is finite.
  2. Replace each non-finite entry of `B`, or of `S`, by zero, and take the plain product.
- 3. For each entry, count the non-finite entries of `B`, or of `S`, that its supports meet, as the product of the support indicators and the indicator of the non-finite entries.
+ 3. For each entry of the result, count the non-finite entries of `B`, or of `S`, that its supports meet. The count is the product of the indicator matrices of the supports and the indicator matrix of the non-finite entries.
  4. Write `NaN` at each entry whose count is positive.
 
 # Arguments

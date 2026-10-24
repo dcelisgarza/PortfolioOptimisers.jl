@@ -907,6 +907,17 @@ end
             @test all(lb .<= ub)
             @test all(lb .<= sum(sims) / length(sims) .<= ub)
         end
+        @testset "A skewed sample puts its mean outside both quantile bounds" begin
+            # Ninety-nine zeros and one outlier: both quantiles are zero and the mean is ten,
+            # so the two builders bracket the mean of a near-normal sample only.
+            s = [zeros(99); 1000.0]
+            lb, ub = PortfolioOptimisers.vec_quantile_bounds(reshape(s, 1, 100), 0.025, (;))
+            @test lb == ub == [0.0]
+            @test Statistics.mean(s) == 10.0
+            blb, bub = PortfolioOptimisers.box_quantile_bounds(Float64, (i, j) -> s, 1,
+                                                               0.025, (;))
+            @test blb == bub == fill(0.0, 1, 1)
+        end
         @testset "A view carries k through, so it is not the subset's own fit" begin
             # The restricted shape matrix equals the one fitted on the subset alone, but
             # the radius does not: only the general route, which reads neither the data nor
@@ -2490,6 +2501,13 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
                all(isfinite, set.L) &&
                set.val === prp.sigma
     end
+    # An l1 set is the norm ball with the map diag(sd), so its scale is geometry and carries
+    # zero, and its centre `mu` is the prior's own mean. A `nothing` scale passes through.
+    function frame_is_right(set::Union{<:L1UncertaintySet, <:SignedL1UncertaintySet})
+        return (isnothing(set.sd) ||
+                (length(set.sd) == N && all(iszero, view(set.sd, .!msk)))) &&
+               set.mu === prp.mu
+    end
     # One builder per family and algorithm, taking the prior estimator, so the same
     # configuration is fitted on the prior route (`pe = nothing`) and on the returns route.
     # `seed` pins the draws, so the two fits on the same reduced inputs are identical.
@@ -2540,6 +2558,54 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
             @test size(mu_x.val, 1) == N
             @test isequal(mu_x.val, prp.mu)
         end
+    end
+    # Issue #1812. The characteristic family is mean-only, so it takes `mu_ucs` alone. Before
+    # the fix its calibration ranked the full `pr.mu`, read `NaN` rungs, and blamed a tie.
+    l1_families = ["l1" => L1UncertaintySetAlgorithm(),
+                   "l1, scaled" => L1UncertaintySetAlgorithm(; scaled = true),
+                   "l1, scaled, paired" =>
+                       L1UncertaintySetAlgorithm(; scaled = true, paired = true),
+                   "signed l1" => SignedL1UncertaintySetAlgorithm(; scaled = false),
+                   "signed l1, scaled" => SignedL1UncertaintySetAlgorithm()]
+    for (name, alg) in l1_families
+        @testset "Characteristic $(name)" begin
+            ue = CharacteristicUncertaintySet(; pe = nothing, alg = alg)
+            mu_f = mu_ucs(ue, prp)
+            @test frame_is_right(mu_f)
+            @test isnothing(mu_f.sd) == !alg.scaled
+            mu_r = mu_ucs(ue, prr)
+            @test view_recovers(mu_f, mu_r)
+            # The radii are scalar budgets, so they pass through the expansion unchanged.
+            for n in (:eps, :ep, :en)
+                hasproperty(mu_r, n) && @test getproperty(mu_f, n) == getproperty(mu_r, n)
+            end
+            mu_x = mu_ucs(CharacteristicUncertaintySet(; alg = alg), rdp)
+            @test view_recovers(mu_x, mu_r)
+            @test isequal(mu_x.mu, prp.mu)
+        end
+    end
+    @testset "Characteristic l1 checks" begin
+        # A zero scale fixes its entry at the estimate, and a `NaN` centre marks an asset
+        # outside the mask; an infinite entry of either is never a frame.
+        @test L1UncertaintySet(; eps = 0.1, sd = [0.0, 1.0], mu = [NaN, 0.1]).sd ==
+              [0.0, 1.0]
+        @test SignedL1UncertaintySet(; ep = 0.1, en = 0.2, sd = [0.0, 1.0],
+                                     mu = [NaN, 0.1]).sd == [0.0, 1.0]
+        @test_throws PO.IsNonFiniteError L1UncertaintySet(; eps = 0.1, sd = [Inf, 1.0])
+        @test_throws PO.IsNonFiniteError L1UncertaintySet(; eps = 0.1, sd = [NaN, 1.0])
+        @test_throws PO.IsNonFiniteError SignedL1UncertaintySet(; ep = 0.1, en = 0.2,
+                                                                sd = [Inf, 1.0])
+        @test_throws PO.IsNonFiniteError SignedL1UncertaintySet(; ep = 0.1, en = 0.2,
+                                                                mu = [-Inf, 1.0])
+        @test_throws DomainError SignedL1UncertaintySet(; ep = 0.1, en = 0.2,
+                                                        sd = [1.0, -1.0])
+        # The calibration names the real cause of a `NaN` rung, and refuses a scale that it
+        # divides by.
+        alg = ActiveAssetsUncertaintyAlgorithm(; active = 1)
+        @test_throws PO.IsNonFiniteError PO.l1_resolve_eps(alg, [0.2, NaN, 0.1], nothing,
+                                                           false)
+        @test_throws DomainError PO.l1_resolve_eps(alg, [0.2, 0.15, 0.1], [1.0, 0.0, 1.0],
+                                                   false)
     end
     @testset "A reduced prior is a passthrough" begin
         # On a result whose mask is `nothing`, the reduction and the expansion touch

@@ -1,34 +1,37 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all moment-based risk measure algorithms.
+Selects the reduction that turns the moment deviations of a portfolio into one risk value.
 
-Defines the interface for algorithms that compute portfolio risk using statistical moments (e.g., mean, variance, skewness, kurtosis) of the return distribution. All concrete moment risk measure algorithms should subtype `MomentMeasureAlgorithm` to ensure consistency and composability within the risk measure framework.
+A [`LowOrderMoment`](@ref) holds a [`LowOrderMomentMeasureAlgorithm`](@ref), and a [`HighOrderMoment`](@ref) holds a [`HighOrderMomentMeasureAlgorithm`](@ref). The measure computes the deviations of the net portfolio returns from its Moment Target, and the algorithm states how [`moment_risk`](@ref) reduces them. Each concrete algorithm states its reduction under `# Mathematical definition`.
 
 # Related
 
   - [`LowOrderMomentMeasureAlgorithm`](@ref)
   - [`HighOrderMomentMeasureAlgorithm`](@ref)
+  - [`moment_risk`](@ref)
 """
 abstract type MomentMeasureAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all low-order moment-based risk measure algorithms.
+Selects a moment of order one or two, or the root of an even moment, for a low-order moment risk measure.
 
-Defines the interface for algorithms that compute portfolio risk using low-order statistical moments (e.g., mean, variance, mean absolute deviation) of the return distribution. All concrete low-order moment risk measure algorithms should subtype `LowOrderMomentMeasureAlgorithm` to ensure consistency and composability within the risk measure framework.
+[`LowOrderMoment`](@ref) holds it. The reduction of each member is homogeneous in the deviations, of degree one or two, so the model of each member is a linear, second-order cone or power cone programme. [`SecondMoment`](@ref) subtypes this type directly, and [`UnstandardisedLowOrderMomentMeasureAlgorithm`](@ref) holds the other members.
 
 # Related
 
   - [`UnstandardisedLowOrderMomentMeasureAlgorithm`](@ref)
+  - [`SecondMoment`](@ref)
+  - [`LowOrderMoment`](@ref)
 """
 abstract type LowOrderMomentMeasureAlgorithm <: MomentMeasureAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for low-order moment risk measure algorithms that are not standardised by the variance.
+Groups the low-order moments that hold no variance estimator.
 
-Defines the interface for algorithms that compute portfolio risk using low-order statistical moments without normalising by the variance. All concrete unstandardised low-order moment risk measure algorithms should subtype `UnstandardisedLowOrderMomentMeasureAlgorithm` to ensure consistency and composability within the risk measure framework.
+The members are [`FirstLowerMoment`](@ref), [`MeanAbsoluteDeviation`](@ref) and [`EvenMoment`](@ref). Each reads only the deviations and the observation weights of the measure. No method of the library dispatches on the group. It is the low-order mirror of [`UnstandardisedHighOrderMomentMeasureAlgorithm`](@ref), and the library has no standardised low-order moment.
 
 # Related
 
@@ -42,7 +45,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the moment measure algorithm `alg` unchanged.
 
-Identity pass-through used when a moment measure algorithm is provided in a context that calls [`factory`](@ref).
+A member that holds no variance estimator has nothing that a prior or observation weights can replace. [`factory`](@ref) on [`LowOrderMoment`](@ref) and [`HighOrderMoment`](@ref) calls this method for such a member. [`SecondMoment`](@ref) and [`StandardisedHighOrderMoment`](@ref) have methods of their own, which pass the weights to `ve`.
 
 # Related
 
@@ -55,45 +58,106 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the first lower moment risk measure algorithm.
+Measures the mean shortfall of the net portfolio returns below the Moment Target.
 
-Computes portfolio risk using the first lower moment, which is the negative mean of the deviations of the returns series below a target value.
+It is the lower partial moment of order one. Equation 7.45 of [cajas2025](@cite) states the lower partial moment, and it names [lpm](@cite) as the source. No copy of that work was found. A number in `mu` is a minimum acceptable return, and `mu = nothing` gives the mean shortfall below the mean, the semi-deviation of order one.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+R(\\boldsymbol{w}) &= \\mathbb{E}\\left[\\max(\\tau - \\hat{r}_t,\\, 0)\\right] = -\\mathbb{E}\\left[d_t^{-}\\right]\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:R_w])
+  - $(math_dict[:E_obs_mean])
+  - $(math_dict[:rhat_t_net])
+  - $(math_dict[:tau_moment])
+  - $(math_dict[:d_t_lower])
 
 # Related
 
   - [`UnstandardisedLowOrderMomentMeasureAlgorithm`](@ref)
-  - [`LowOrderMomentMeasureAlgorithm`](@ref)
+  - [`MeanAbsoluteDeviation`](@ref): the two-sided deviation from the same target.
   - [`LowOrderMoment`](@ref)
 
 # References
 
+  - $(ref_dict[:cajas2025]) Section 7.2.2.2, Equation 7.45 with ``q = 1``. $(ref_dict[:no_original_source])
   - $(ref_dict[:lpm])
 """
 struct FirstLowerMoment <: UnstandardisedLowOrderMomentMeasureAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the mean absolute deviation risk measure algorithm.
+Measures the mean absolute deviation of the net portfolio returns from the Moment Target.
 
-Computes portfolio risk as the mean of the absolute deviations of the returns series from a target value.
+Equation 7.31 of [cajas2025](@cite) states it with the mean as the target, and it names [mad](@cite) as the source. No copy of that work was found. The library adds the other targets of the `mu` slot.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+R(\\boldsymbol{w}) &= \\mathbb{E}\\left[\\left\\lvert d_t \\right\\rvert\\right] = 2\\, \\mathbb{E}\\left[\\max(\\tau - \\hat{r}_t,\\, 0)\\right] + \\mathbb{E}\\left[\\hat{r}_t\\right] - \\tau\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:R_w])
+  - $(math_dict[:E_obs_mean])
+  - $(math_dict[:d_t_moment])
+  - $(math_dict[:rhat_t_net])
+  - $(math_dict[:tau_moment])
+
+The second form follows from ``\\lvert d \\rvert = 2 \\max(-d, 0) + d``. When ``\\tau`` is the observation mean of the net returns, the last two terms cancel, and the measure is twice the [`FirstLowerMoment`](@ref) of the same data. Against any other target, the measure differs from twice the first lower moment by ``\\mathbb{E}[\\hat{r}_t] - \\tau``.
 
 # Related
 
   - [`UnstandardisedLowOrderMomentMeasureAlgorithm`](@ref)
-  - [`LowOrderMomentMeasureAlgorithm`](@ref)
+  - [`FirstLowerMoment`](@ref): the one-sided deviation from the same target.
   - [`LowOrderMoment`](@ref)
+  - [`MedianAbsoluteDeviation`](@ref): a different risk measure, which centres at the median.
 
 # References
 
+  - $(ref_dict[:cajas2025]) Section 7.2.1.3, Equation 7.31. $(ref_dict[:no_original_source])
   - $(ref_dict[:mad])
 """
 struct MeanAbsoluteDeviation <: UnstandardisedLowOrderMomentMeasureAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents a second moment (variance or standard deviation) risk measure algorithm.
+Measures the second moment of the net portfolio returns about the Moment Target, or its square root.
 
-Computes portfolio risk using the second central (full) or lower (semi) moment of the return distribution, supporting both full and semi (downside) formulations. The specific formulation is determined by the `alg1` and `alg2` fields, enabling flexible representation of variance, semi-variance, standard deviation, or semi-standard deviation.
+`alg1` selects the deviations. [`FullMoment`](@ref) reads all of them, and [`SemiMoment`](@ref) reads the deviations below the target alone. `alg2` selects the units. [`SOCRiskExpr`](@ref) reports the square root, a standard deviation, and the three other formulations report the second moment itself.
+
+With `mu = nothing` the measure is the variance or the semi-variance of the net portfolio returns. Against a stated target it is the second moment about that target, not a variance. `ve` reads the deviations at a mean of zero. So it supplies only its divisor and its observation weights, and its `me` has no effect. Page 81 of [markowitz1952](@cite) states the variance. Pages 188 and 189 of [markowitz1959](@cite) state the semi-variance about a target ``b`` and about the mean ``E``, with the divisor ``T``.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+R(\\boldsymbol{w}) &= f \\sum_{t=1}^{T} w_t\\, d_t^{2}\\,, \\\\
+R(\\boldsymbol{w}) &= f \\sum_{t=1}^{T} w_t \\left(d_t^{-}\\right)^{2}\\,.
+\\end{align}
+```
+
+The first line is the full moment and the second line is the semi moment. [`SOCRiskExpr`](@ref) reports ``\\sqrt{R(\\boldsymbol{w})}``.
+
+Where:
+
+  - $(math_dict[:R_w])
+  - $(math_dict[:f_ve_div])
+  - $(math_dict[:w_t_obs]) It is ``1`` for every ``t`` when the measure holds no observation weights.
+  - $(math_dict[:d_t_moment])
+  - $(math_dict[:d_t_lower])
+  - $(math_dict[:T])
+
+The default `ve` sets `corrected = true`, so the default divisor is ``1/(T-1)``. Set `ve = SimpleVariance(; me = nothing, corrected = false)` for the divisor ``1/T`` of [markowitz1959](@cite).
 
 # Fields
 
@@ -111,9 +175,9 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `ve`: Recursively updated via [`factory`](@ref).
+  - `ve`: Recursively updated through [`factory`](@ref).
 
 # Examples
 
@@ -133,12 +197,13 @@ SecondMoment
   - [`LowOrderMomentMeasureAlgorithm`](@ref)
   - [`AbstractVarianceEstimator`](@ref)
   - [`AbstractMomentAlgorithm`](@ref)
-  - [`SecondMomentFormulation`](@ref)
+  - [`SecondMomentFormulation`](@ref): each formulation states the cone or the quadratic form that the model builds on the deviations.
   - [`factory`](@ref)
 
 # References
 
-  - $(ref_dict[:markowitz1952])
+  - $(ref_dict[:markowitz1952]) Page 81.
+  - $(ref_dict[:markowitz1959]) Chapter IX, pages 188 and 189.
 """
 @propagatable @concrete struct SecondMoment <: LowOrderMomentMeasureAlgorithm
     """
@@ -166,9 +231,34 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents an even-order moment risk measure algorithm.
+Measures the ``p``-th root of the even moment of order ``2p`` of the net portfolio returns about the Moment Target.
 
-Computes portfolio risk using the ``p``-th root of the ``2p``-th central (full) or lower (semi) even moment of the return distribution. Despite the potentially high moment order, even moments admit an exact power cone reformulation, keeping the optimisation formulation affine.
+The order is ``2p``, and `p` is an integer of at least ``2``, so the order is always even and at least ``4``. An odd order cannot be stated. `alg` selects all the deviations, [`FullMoment`](@ref), or the deviations below the target alone, [`SemiMoment`](@ref). The ``p``-th root is homogeneous of degree two in the weights, the degree of a variance. Equations 3 and 4 of [emom](@cite) state the full and the lower moment about the mean, with the divisor ``T``, and Formulations 5 and 8 state their power cone programmes. The divisor ``T_d``, the observation weights and the other targets are the library's own.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+R(\\boldsymbol{w}) &= \\left(\\frac{1}{T_d} \\sum_{t=1}^{T} w_t\\, d_t^{2p}\\right)^{1/p}\\,, \\\\
+R(\\boldsymbol{w}) &= \\left(\\frac{1}{T_d} \\sum_{t=1}^{T} w_t \\left(d_t^{-}\\right)^{2p}\\right)^{1/p}\\,, \\\\
+T_d &= \\frac{T - \\mathrm{ddof}}{T} \\sum_{t=1}^{T} w_t\\,.
+\\end{align}
+```
+
+The first line is the full moment and the second line is the semi moment.
+
+Where:
+
+  - $(math_dict[:R_w])
+  - ``p``: Order parameter `p`. The moment order is ``2p``.
+  - ``T_d``: Effective sample size. It is ``T - \\mathrm{ddof}`` when the measure holds no observation weights.
+  - ``\\mathrm{ddof}``: Degrees of freedom `ddof` that the divisor subtracts.
+  - $(math_dict[:w_t_obs]) It is ``1`` for every ``t`` when the measure holds no observation weights.
+  - $(math_dict[:d_t_moment])
+  - $(math_dict[:d_t_lower])
+  - $(math_dict[:T])
+
+``T_d`` is zero at ``\\mathrm{ddof} = T``, and the value is then `Inf`. A larger `ddof` makes ``T_d`` negative, and the root raises a `DomainError`.
 
 # Fields
 
@@ -186,8 +276,8 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `p >= 2`.
-  - `ddof >= 0` and `isfinite(ddof)`.
+  - `p >= 2`, else a `DomainError`.
+  - `ddof >= 0`, else a `DomainError`.
 
 # Examples
 
@@ -205,10 +295,11 @@ EvenMoment
   - [`LowOrderMoment`](@ref)
   - [`FullMoment`](@ref)
   - [`SemiMoment`](@ref)
+  - [`FourthMoment`](@ref): the fourth moment itself, with no root, on a hierarchical measure.
 
 # References
 
-  - $(ref_dict[:emom])
+  - $(ref_dict[:emom]) Equations 3 and 4, Formulations 5 and 8.
 """
 @concrete struct EvenMoment <: UnstandardisedLowOrderMomentMeasureAlgorithm
     """
@@ -226,7 +317,7 @@ EvenMoment
     function EvenMoment(p::Integer, ddof::Integer, alg::AbstractMomentAlgorithm)
         @argcheck(p >= 2,
                   DomainError(p,
-                              "`EvenMoment.p` is $p, and the measure raises the centred returns to the power `p`, so it needs at least the second order. State an integer greater than or equal to `2`."))
+                              "`EvenMoment.p` is $p, and the measure raises the deviations to the power `2p`, so the order `2p` must be at least `4`. State an integer greater than or equal to `2`."))
         assert_nonempty_nonneg_finite_val(ddof, :ddof)
         return new{typeof(p), typeof(ddof), typeof(alg)}(p, ddof, alg)
     end
@@ -238,54 +329,91 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all high-order moment-based risk measure algorithms.
+Selects a moment of order three or four for a high-order moment risk measure.
 
-Defines the interface for algorithms that compute portfolio risk using high-order statistical moments (e.g., skewness, kurtosis) of the return distribution. All concrete high-order moment risk measure algorithms should subtype `HighOrderMomentMeasureAlgorithm` to ensure consistency and composability within the risk measure framework.
+[`HighOrderMoment`](@ref) holds it. [`HighOrderMoment`](@ref) is a hierarchical risk measure, and the library builds no `JuMP` model for it. [`StandardisedHighOrderMoment`](@ref) subtypes this type directly, and [`UnstandardisedHighOrderMomentMeasureAlgorithm`](@ref) holds the other members.
 
 # Related
 
   - [`UnstandardisedHighOrderMomentMeasureAlgorithm`](@ref)
   - [`StandardisedHighOrderMoment`](@ref)
+  - [`HighOrderMoment`](@ref)
 """
 abstract type HighOrderMomentMeasureAlgorithm <: MomentMeasureAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for high-order moment risk measure algorithms that are not standardised by the variance.
+Groups the high-order moments that the measure reports with no division by a variance.
 
-Defines the interface for algorithms that compute portfolio risk using high-order statistical moments (such as skewness, kurtosis) without normalising by the variance. All concrete unstandardised high-order moment risk measure algorithms should subtype `UnstandardisedHighOrderMomentMeasureAlgorithm` to ensure consistency and composability within the risk measure framework.
+The members are [`ThirdLowerMoment`](@ref) and [`FourthMoment`](@ref). The group is the type bound of the field `alg` of [`StandardisedHighOrderMoment`](@ref), which divides a member by a power of a variance. So a standardised moment cannot hold a second standardised moment.
 
 # Related
 
   - [`ThirdLowerMoment`](@ref)
   - [`FourthMoment`](@ref)
+  - [`StandardisedHighOrderMoment`](@ref)
 """
 abstract type UnstandardisedHighOrderMomentMeasureAlgorithm <:
               HighOrderMomentMeasureAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the unstandardised semi-skewness risk measure algorithm.
+Measures the negated third moment of the deviations below the Moment Target.
 
-Computes portfolio risk using the third lower moment (unstandardised semi-skewness), which quantifies downside asymmetry by considering only the cubed deviations below a target value. The measure negates the mean cubed lower deviation, so a larger value is more downside asymmetry. This algorithm is unstandardised and operates directly on the return distribution.
+The cube of a deviation below the target is negative, so the measure negates the mean, and a larger value is more downside asymmetry. It is the lower partial moment of order three. Equation 7.45 of [cajas2025](@cite) states the lower partial moment, and it names [lpm](@cite) as the source. No copy of that work was found.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+R(\\boldsymbol{w}) &= -\\mathbb{E}\\left[\\left(d_t^{-}\\right)^{3}\\right] = \\mathbb{E}\\left[\\max(\\tau - \\hat{r}_t,\\, 0)^{3}\\right]\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:R_w])
+  - $(math_dict[:E_obs_mean])
+  - $(math_dict[:d_t_lower])
+  - $(math_dict[:rhat_t_net])
+  - $(math_dict[:tau_moment])
 
 # Related
 
   - [`UnstandardisedHighOrderMomentMeasureAlgorithm`](@ref)
-  - [`HighOrderMomentMeasureAlgorithm`](@ref)
   - [`HighOrderMoment`](@ref)
+  - [`StandardisedHighOrderMoment`](@ref): divides the measure by the cube of the lower standard deviation.
 
 # References
 
+  - $(ref_dict[:cajas2025]) Section 7.2.2.2, Equation 7.45 with ``q = 3``. $(ref_dict[:no_original_source])
   - $(ref_dict[:lpm])
 """
 struct ThirdLowerMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the unstandardised fourth moment (kurtosis or semi-kurtosis) risk measure algorithm.
+Measures the fourth moment of the net portfolio returns about the Moment Target.
 
-Computes portfolio risk using the fourth central (full) or lower (semi) moment of the return distribution, depending on the provided moment algorithm. This algorithm quantifies the "tailedness" of the return distribution without normalising by the variance.
+`alg` selects all the deviations, [`FullMoment`](@ref), or the deviations below the target alone, [`SemiMoment`](@ref). The value has no root and no division by a variance, so it is in the units of a return to the fourth power. The semi moment is the lower partial moment of order four. Equation 7.45 of [cajas2025](@cite) states the lower partial moment, and it names [lpm](@cite) as the source. No copy of that work was found.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+R(\\boldsymbol{w}) &= \\mathbb{E}\\left[d_t^{4}\\right]\\,, \\\\
+R(\\boldsymbol{w}) &= \\mathbb{E}\\left[\\left(d_t^{-}\\right)^{4}\\right]\\,.
+\\end{align}
+```
+
+The first line is the full moment and the second line is the semi moment.
+
+Where:
+
+  - $(math_dict[:R_w])
+  - $(math_dict[:E_obs_mean])
+  - $(math_dict[:d_t_moment])
+  - $(math_dict[:d_t_lower])
 
 # Fields
 
@@ -311,9 +439,12 @@ FourthMoment
 
   - [`UnstandardisedHighOrderMomentMeasureAlgorithm`](@ref)
   - [`AbstractMomentAlgorithm`](@ref)
+  - [`EvenMoment`](@ref): at `p = 2` and `ddof = 0`, the square root of the same moment, on a measure that the optimiser can model.
+  - [`Kurtosis`](@ref)
 
 # References
 
+  - $(ref_dict[:cajas2025]) Section 7.2.2.2, Equation 7.45 with ``q = 4``. $(ref_dict[:no_original_source])
   - $(ref_dict[:lpm])
 """
 @concrete struct FourthMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm
@@ -331,9 +462,33 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents a standardised high-order moment risk measure algorithm.
+Divides a high-order moment of the net portfolio returns by the matching power of their second moment.
 
-Computes portfolio risk using a high-order moment algorithm (such as semi-skewness or semi-kurtosis), divided by `ve`'s variance raised to half the moment order. `ve` runs on the same deviations as `alg`, so a lower-moment `alg` is standardised by a semi-variance.
+`alg` selects the moment of order ``n``, three for [`ThirdLowerMoment`](@ref) and four for [`FourthMoment`](@ref). `ve` computes the second moment on the same deviations as `alg`, so a lower moment is divided by a lower second moment, and a full moment by a full one. The result has no units.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+R(\\boldsymbol{w}) &= \\frac{R_{n}(\\boldsymbol{w})}{\\left(\\sigma^{2}\\right)^{n/2}}\\,, \\\\
+\\sigma^{2} &= f \\sum_{t=1}^{T} w_t\\, \\delta_t^{2}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:R_w])
+  - ``R_{n}(\\boldsymbol{w})``: The value of `alg`, the moment of order ``n``.
+  - ``n``: Order of the moment, ``3`` or ``4``.
+  - ``\\sigma^{2}``: Second moment of the deviations that `alg` reads.
+  - ``\\delta_t``: The deviation that `alg` reads, ``d_t^{-}`` for a lower moment and ``d_t`` for a full moment.
+  - $(math_dict[:f_ve_div])
+  - $(math_dict[:w_t_obs]) It is ``1`` for every ``t`` when the measure holds no observation weights.
+  - $(math_dict[:d_t_moment])
+  - $(math_dict[:d_t_lower])
+  - $(math_dict[:T])
+
+The numerator is an observation mean, and the denominator takes the divisor of `ve`. The default `ve` sets `corrected = true`, so the default denominator divides by ``T - 1`` and the numerator by ``T``. Set `ve = SimpleVariance(; me = nothing, corrected = false)` for the ratio of two observation means.
 
 # Fields
 
@@ -365,6 +520,8 @@ StandardisedHighOrderMoment
   - [`HighOrderMomentMeasureAlgorithm`](@ref)
   - [`AbstractVarianceEstimator`](@ref)
   - [`UnstandardisedHighOrderMomentMeasureAlgorithm`](@ref)
+  - [`Skewness`](@ref)
+  - [`Kurtosis`](@ref)
   - [`factory`](@ref)
 """
 @concrete struct StandardisedHighOrderMoment <: HighOrderMomentMeasureAlgorithm
@@ -390,7 +547,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return a new [`StandardisedHighOrderMoment`](@ref) with observation weights `w` applied to the underlying variance estimator.
+Return a new [`StandardisedHighOrderMoment`](@ref) whose `ve` holds the observation weights `w`.
+
+The keyword constructors of [`HighOrderMoment`](@ref) and [`factory`](@ref) against a prior call it, so the second moment of the denominator reads the same weights as the measure. `alg` holds no weights and passes through unchanged.
 
 # Related
 
@@ -404,118 +563,31 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents a low-order moment risk measure.
+Measures a low-order moment of the deviations of the net portfolio returns from the Moment Target.
 
-Computes portfolio risk using a low-order moment algorithm (such as first lower moment, mean absolute deviation, or second moment), optionally with custom weights and target values. This type is used for risk measures based on mean, variance, or related statistics.
+`alg` selects the moment: [`FirstLowerMoment`](@ref), the default, [`MeanAbsoluteDeviation`](@ref), [`SecondMoment`](@ref) or [`EvenMoment`](@ref). Each states its closed form. `mu` selects the target, and the target alone. A stated target shifts every deviation by one constant, and `alg` reduces the shifted deviations with the same formula. The measure is an optimisation risk measure, and [`set_risk_constraints!`](@ref) builds its model. Pages 188 and 189 of [markowitz1959](@cite) measure a downside deviation from a target ``b`` or from the mean ``E``.
 
 # Mathematical definition
 
-Depending on the `alg` field, the risk measure computes one of the following quantities.
-
-## `FirstLowerMoment`
-
-The first lower moment is computed as:
-
 ```math
 \\begin{align}
-\\mathrm{FirstLowerMoment}(\\boldsymbol{X}) &= \\mathbb{E}\\left[\\max \\circ \\left(\\mathbb{E}\\left[\\boldsymbol{X}\\right] - \\boldsymbol{X},\\, 0\\right)\\right]\\,.
+d_t &= \\hat{r}_t - \\tau\\,,\\quad t = 1, \\ldots, T\\,, \\\\
+R(\\boldsymbol{w}) &= \\rho\\left(d_1, \\ldots, d_T\\right)\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{X}``: `T × 1` vector of portfolio returns.
-  - ``\\mathbb{E}[\\cdot]``: Expected value operator, supports weighted averages.
-  - ``\\circ``: Element-wise function application.
+  - $(math_dict[:d_t_moment])
+  - $(math_dict[:rhat_t_net])
+  - $(math_dict[:tau_moment])
+  - $(math_dict[:Fbar_fee_mean])
+  - $(math_dict[:E_obs_mean])
+  - $(math_dict[:T])
+  - $(math_dict[:R_w])
+  - ``\\rho``: The reduction that `alg` states.
 
-## `MeanAbsoluteDeviation`
-
-The mean absolute deviation is computed as:
-
-```math
-\\begin{align}
-\\mathrm{MeanAbsoluteDeviation}(\\boldsymbol{X}) &= \\mathbb{E}\\left[\\left\\lvert \\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right] \\right\\rvert\\right]\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{X}``: `T × 1` vector of portfolio returns.
-  - ``\\mathbb{E}[\\cdot]``: Expected value operator, supports weighted averages.
-
-## `SecondMoment`
-
-Depending on the `alg1` field the risk measure can either compute the second central moment or second lower moment.
-
-Both central and lower moments can be formulated as quadratic moments (variance or semi-variance) or their square roots (standard deviation or semi-standard deviation). Regardless of whether they are central or lower moments, they can be formulated in a variety of ways.
-
-Depending on the `alg2` field, it can represent the variance (using different formulations in `JuMP`) or standard deviation.
-
-The (semi-)variance formulations are:
-
-  - [`SquaredSOCRiskExpr`](@ref),
-  - [`RSOCRiskExpr`](@ref),
-  - [`QuadRiskExpr`](@ref).
-
-It is computed as:
-
-```math
-\\begin{align}
-\\mathrm{Variance}(\\boldsymbol{X}) &= \\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^2\\right] \\,, \\\\
-\\mathrm{SemiMoment\\text{-}Variance}(\\boldsymbol{X}) &= \\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\,0\\right)^2\\right] \\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{X}``: `T × 1` vector of portfolio returns.
-  - ``\\mathbb{E}[\\cdot]``: Expected value operator, supports weighted averages.
-
-The (semi-)standard deviation formulation is:
-
-  - [`SOCRiskExpr`](@ref).
-
-It is computed as:
-
-```math
-\\begin{align}
-\\mathrm{StandardDeviation}(\\boldsymbol{X}) &= \\sqrt{\\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^2\\right]} \\,, \\\\
-\\mathrm{SemiMoment\\text{-}StandardDeviation}(\\boldsymbol{X}) &= \\sqrt{\\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\,0\\right)^2\\right]} \\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{X}``: `T × 1` vector of portfolio returns.
-  - ``\\mathbb{E}[\\cdot]``: Expected value operator, supports weighted averages.
-
-## `EvenMoment`
-
-[`EvenMoment`](@ref) computes the ``2p``-th central (full) or lower (semi) moment of the return distribution. Although the moment order ``2p \\geq 4`` can be arbitrarily high, `EvenMoment` is not a low-order moment in the classical sense. However, because the exponent is always even, the moment can be expressed as an iterated power of squared deviations, admitting an exact reformulation using power cone constraints. This makes the optimisation problem affine and solvable by standard conic solvers.
-
-The full (central) even moment is computed as:
-
-```math
-\\begin{align}
-\\mathrm{EvenMoment}_{p}(\\boldsymbol{X}) &= \\left(\\frac{1}{T_d}\\sum_{t=1}^{T}\\left(\\boldsymbol{X}_t - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^{2p}\\right)^{1/p}\\,.
-\\end{align}
-```
-
-The semi (lower) even moment is computed as:
-
-```math
-\\begin{align}
-\\mathrm{SemiMoment\\text{-}EvenMoment}_{p}(\\boldsymbol{X}) &= \\left(\\frac{1}{T_d}\\sum_{t=1}^{T}\\min \\circ \\left(\\boldsymbol{X}_t - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\, 0\\right)^{2p}\\right)^{1/p}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{X}``: `T × 1` vector of portfolio returns.
-  - ``\\mathbb{E}[\\cdot]``: Expected value operator, supports weighted averages.
-  - ``T_d = T - \\mathrm{ddof}``: Effective sample size after degrees-of-freedom correction.
-  - ``p \\geq 2``: Order parameter; the moment order is ``2p``.
-  - ``\\circ``: Element-wise function application.
+A number in `mu` is a threshold on the net series, so it takes no fee. A per-asset target is net of the mean fee per period, so a fee that every period pays in full cancels from every deviation.
 
 # Fields
 
@@ -530,322 +602,31 @@ $(DocStringExtensions.FIELDS)
         alg::LowOrderMomentMeasureAlgorithm = FirstLowerMoment(),
     ) -> LowOrderMoment
 
-Keywords correspond to the struct's fields. A `w` that is not `nothing` is passed to `alg` with [`factory`](@ref), so a variance estimator inside `alg` reads the same weights as the measure.
+Keywords correspond to the struct's fields. The keyword constructor passes a `w` that is not `nothing` to `alg` with [`factory`](@ref), so a variance estimator inside `alg` reads the same weights as the measure.
 
 ## Validation
 
-  - If `mu` is not `nothing`:
-
-      + `::Number`: `isfinite(mu)`.
-      + `::AbstractVector`: `!isempty(mu)` and `all(isfinite, mu)`.
-
+  - If `mu` is a number, `isfinite(mu)`, else an [`IsNonFiniteError`](@ref).
+  - If `mu` is a vector, `!isempty(mu)`, else an [`IsEmptyError`](@ref), and `all(isfinite, mu)`, else an [`IsNonFiniteError`](@ref).
   - $(val_dict[:oow_rm])
 
 !!! warning
 
-    A stated `mu` is pinned: it crosses a Cross-Validation fold or a subset view as the whole universe's answer, so it does not follow the refit the optimisation runs on. A caller who wants it to follow the fit names a **Deferred Quantity** in `mu`, or leaves the slot `nothing` and lets the prior supply it.
-
-# `JuMP` Formulations
-
-Depending on the `alg` field, the risk measure is formulated in `JuMP` as follows. Every formulation measures the deviations against the target returned by [`calc_risk_constraint_target`](@ref), which is `mu` when the slot holds a value and the prior's expected returns otherwise. A per-asset target is net of the mean fee per period, so a per period fee cancels from every deviation, and the model agrees with the functor.
-
-## `FirstLowerMoment`
-
-As an optimisation problem, it can be formulated as:
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & \\mathbb{E}\\left[\\boldsymbol{d}\\right] \\\\
-\\mathrm{s.t.} \\quad & \\boldsymbol{d} \\geq \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] - \\mathrm{X} \\boldsymbol{w}\\\\
-               \\quad & \\boldsymbol{d} \\geq 0 \\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
-  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations below the target.
-  - ``\\mathrm{X}``: `T × N` return matrix.
-  - ``\\mathbb{E}[\\cdot]``: Expected value operator, supports weighted averages.
-
-## `MeanAbsoluteDeviation`
-
-As an optimisation problem, it can be formulated as:
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & 2 \\mathbb{E}\\left[\\boldsymbol{d}\\right]\\\\
-\\mathrm{s.t.} \\quad & \\boldsymbol{d} \\geq \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] - \\mathrm{X} \\boldsymbol{w}\\\\
-               \\quad & \\boldsymbol{d} \\geq 0 \\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
-  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations below the target.
-  - ``\\mathrm{X}``: `T × N` return matrix.
-  - ``\\mathbb{E}[\\cdot]``: Expected value operator, supports weighted averages.
-
-## `SecondMoment`
-
-!!! info
-
-    Regardless of the formulation used, an auxiliary variable representing the square root of the central/lower moment is needed in order to constrain the risk or maximise the risk-adjusted return ratio. This is because quadratic constraints are not strictly convex, and the transformation needed to maximise the risk-adjusted return ratio requires affine variables in the numerator and denominator.
-
-### `SquaredSOCRiskExpr`
-
-Represents the (semi-)variance using the square of a second order cone constrained variable.
-
-The variance is formulated as.
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & f \\cdot \\sigma^2\\\\
-\\mathrm{s.t.} \\quad & \\boldsymbol{d} = \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
-               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
-               \\quad & \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
-  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations from the target.
-  - ``\\sigma``: Standard deviation of the portfolio returns.
-  - ``\\boldsymbol{d}_s``: `T × 1` vector of scaled deviations according to observation weights.
-  - ``\\mathrm{X}``: `T × N` return matrix.
-  - ``\\boldsymbol{\\lambda}``: `T × 1` vector of observation weights.
-  - ``f``: Variance correction factor from `StatsBase.varcorrection`. It corrects for the sample size without observation weights, and for ``\\boldsymbol{\\lambda}`` with them. `ve.corrected` selects the divisor.
-  - ``K_{soc}``: Second order cone.
-  - ``\\odot``: Element-wise (Hadamard) product.
-
-The semi-variance is formulated as.
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & f \\cdot \\sigma^2\\\\
-\\mathrm{s.t.} \\quad & \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\geq -\\boldsymbol{d} \\\\
-               \\quad & \\boldsymbol{d} \\geq 0 \\\\
-               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
-               \\quad & \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
-  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations from the target.
-  - ``\\sigma``: Standard deviation of the portfolio returns.
-  - ``\\boldsymbol{d}_s``: `T × 1` vector of scaled deviations according to observation weights.
-  - ``\\mathrm{X}``: `T × N` return matrix.
-  - ``\\boldsymbol{\\lambda}``: `T × 1` vector of observation weights.
-  - ``f``: Variance correction factor from `StatsBase.varcorrection`. It corrects for the sample size without observation weights, and for ``\\boldsymbol{\\lambda}`` with them. `ve.corrected` selects the divisor.
-  - ``K_{soc}``: Second order cone.
-  - ``\\odot``: Element-wise (Hadamard) product.
-
-### `RSOCRiskExpr`
-
-Represents the (semi-)variance using a sum of squares formulation via a rotated second order cone.
-
-The variance is formulated as.
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & f \\cdot t\\\\
-\\mathrm{s.t.} \\quad & \\boldsymbol{d} = \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
-               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
-               \\quad & \\left(t,\\, 0.5,\\,\\boldsymbol{d}_s\\right) \\in K_{rsoc}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
-  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations from the target.
-  - ``t``: Variance of the portfolio returns.
-  - ``\\boldsymbol{d}_s``: `T × 1` vector of scaled deviations according to observation weights.
-  - ``\\mathrm{X}``: `T × N` return matrix.
-  - ``\\boldsymbol{\\lambda}``: `T × 1` vector of observation weights.
-  - ``f``: Variance correction factor from `StatsBase.varcorrection`. It corrects for the sample size without observation weights, and for ``\\boldsymbol{\\lambda}`` with them. `ve.corrected` selects the divisor.
-  - ``K_{rsoc}``: Rotated second order cone.
-  - ``\\odot``: Element-wise (Hadamard) product.
-
-The semi-variance is formulated as.
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & f \\cdot t\\\\
-\\mathrm{s.t.} \\quad & \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\geq -\\boldsymbol{d} \\\\
-               \\quad & \\boldsymbol{d} \\geq 0 \\\\
-               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
-               \\quad & \\left(t,\\, 0.5,\\,\\boldsymbol{d}_s\\right) \\in K_{rsoc}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
-  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations from the target.
-  - ``t``: Variance of the portfolio returns.
-  - ``\\boldsymbol{d}_s``: `T × 1` vector of scaled deviations according to observation weights.
-  - ``\\mathrm{X}``: `T × N` return matrix.
-  - ``\\boldsymbol{\\lambda}``: `T × 1` vector of observation weights.
-  - ``f``: Variance correction factor from `StatsBase.varcorrection`. It corrects for the sample size without observation weights, and for ``\\boldsymbol{\\lambda}`` with them. `ve.corrected` selects the divisor.
-  - ``K_{rsoc}``: Rotated second order cone.
-  - ``\\odot``: Element-wise (Hadamard) product.
-
-### `QuadRiskExpr`
-
-Represents the (semi-)variance using the deviations vector dotted with itself.
-
-The variance is formulated as.
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & f \\cdot \\boldsymbol{d}_s \\cdot \\boldsymbol{d}_s\\\\
-\\mathrm{s.t.} \\quad & \\boldsymbol{d} = \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
-               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
-  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations from the target.
-  - ``\\boldsymbol{d}_s``: `T × 1` vector of scaled deviations according to observation weights.
-  - ``\\mathrm{X}``: `T × N` return matrix.
-  - ``\\boldsymbol{\\lambda}``: `T × 1` vector of observation weights.
-  - ``f``: Variance correction factor from `StatsBase.varcorrection`. It corrects for the sample size without observation weights, and for ``\\boldsymbol{\\lambda}`` with them. `ve.corrected` selects the divisor.
-  - ``\\odot``: Element-wise (Hadamard) product.
-
-The semi-variance is formulated as.
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & f \\cdot \\boldsymbol{d}_s \\cdot \\boldsymbol{d}_s\\\\
-\\mathrm{s.t.} \\quad & \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\geq -\\boldsymbol{d} \\\\
-               \\quad & \\boldsymbol{d} \\geq 0 \\\\
-               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
-  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations from the target.
-  - ``\\boldsymbol{d}_s``: `T × 1` vector of scaled deviations according to observation weights.
-  - ``\\mathrm{X}``: `T × N` return matrix.
-  - ``\\mu``: Minimum acceptable return.
-  - ``\\boldsymbol{\\lambda}``: `T × 1` vector of observation weights.
-  - ``f``: Variance correction factor from `StatsBase.varcorrection`. It corrects for the sample size without observation weights, and for ``\\boldsymbol{\\lambda}`` with them. `ve.corrected` selects the divisor.
-  - ``\\odot``: Element-wise (Hadamard) product.
-
-### `SOCRiskExpr`
-
-Represents the (semi-)standard deviation using a second order cone constrained variable.
-
-The standard deviation is formulated as.
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & \\sqrt{f} \\cdot \\sigma\\\\
-\\mathrm{s.t.} \\quad & \\boldsymbol{d} = \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
-               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
-               \\quad & \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
-  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations from the target.
-  - ``\\sigma``: Standard deviation of the portfolio returns.
-  - ``\\boldsymbol{d}_s``: `T × 1` vector of scaled deviations according to observation weights.
-  - ``\\mathrm{X}``: `T × N` return matrix.
-  - ``\\boldsymbol{\\lambda}``: `T × 1` vector of observation weights.
-  - ``f``: Variance correction factor from `StatsBase.varcorrection`. It corrects for the sample size without observation weights, and for ``\\boldsymbol{\\lambda}`` with them. `ve.corrected` selects the divisor.
-  - ``K_{soc}``: Second order cone.
-  - ``\\odot``: Element-wise (Hadamard) product.
-
-The semi-standard deviation is formulated as.
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & \\sqrt{f} \\cdot \\sigma\\\\
-\\mathrm{s.t.} \\quad & \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\geq -\\boldsymbol{d} \\\\
-               \\quad & \\boldsymbol{d} \\geq 0 \\\\
-               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
-               \\quad & \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
-  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations from the target.
-  - ``\\sigma``: Standard deviation of the portfolio returns.
-  - ``\\boldsymbol{d}_s``: `T × 1` vector of scaled deviations according to observation weights.
-  - ``\\mathrm{X}``: `T × N` return matrix.
-  - ``\\mu``: Minimum acceptable return.
-  - ``\\boldsymbol{\\lambda}``: `T × 1` vector of observation weights.
-  - ``f``: Variance correction factor from `StatsBase.varcorrection`. It corrects for the sample size without observation weights, and for ``\\boldsymbol{\\lambda}`` with them. `ve.corrected` selects the divisor.
-  - ``\\odot``: Element-wise (Hadamard) product.
-  - ``K_{soc}``: Second order cone.
-
-## `EvenMoment`
-
-As an optimisation problem, the full even moment is formulated using a chain of power cone constraints:
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{u},\\,\\boldsymbol{s},\\,r}{\\mathrm{opt}} \\quad & r \\\\
-\\mathrm{s.t.} \\quad & \\sum_{t=1}^{T} u_t \\leq r \\\\
-               \\quad & \\left(u_t \\cdot T_d,\\, r,\\, s_t\\right) \\in \\mathcal{K}_{\\mathrm{pow}}\\!\\left(\\tfrac{1}{p}\\right),\\quad t = 1,\\ldots,T \\\\
-               \\quad & \\left(s_t,\\, k,\\, \\hat{r}_t - \\mu\\right) \\in \\mathcal{K}_{\\mathrm{pow}}\\!\\left(\\tfrac{1}{2}\\right),\\quad t = 1,\\ldots,T\\,.
-\\end{align}
-```
-
-The semi even moment is formulated as:
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{u},\\,\\boldsymbol{s},\\,\\boldsymbol{d},\\,r}{\\mathrm{opt}} \\quad & r \\\\
-\\mathrm{s.t.} \\quad & \\sum_{t=1}^{T} u_t \\leq r \\\\
-               \\quad & \\left(u_t \\cdot T_d,\\, r,\\, s_t\\right) \\in \\mathcal{K}_{\\mathrm{pow}}\\!\\left(\\tfrac{1}{p}\\right),\\quad t = 1,\\ldots,T \\\\
-               \\quad & \\left(s_t,\\, k,\\, d_t\\right) \\in \\mathcal{K}_{\\mathrm{pow}}\\!\\left(\\tfrac{1}{2}\\right),\\quad t = 1,\\ldots,T \\\\
-               \\quad & \\hat{r}_t - \\mu + d_t \\geq 0,\\quad t = 1,\\ldots,T \\\\
-               \\quad & d_t \\geq 0,\\quad t = 1,\\ldots,T\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
-  - ``r``: Even-moment risk variable.
-  - ``\\boldsymbol{u}``: `T × 1` auxiliary variable vector.
-  - ``\\boldsymbol{s}``: `T × 1` auxiliary variable vector.
-  - ``\\boldsymbol{d}``: `T × 1` lower-deviation auxiliary variables, capturing returns below the target.
-  - ``T_d``: Effective sample size.
-  - ``k``: Budget-scaling / homogenisation variable.
-  - ``p``: Order parameter; the moment order is ``2p``.
-  - ``\\mathrm{X}``: `T × N` return matrix.
-  - ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal\\boldsymbol{w}``: Portfolio return at time ``t``.
-  - ``\\mu``: Target return.
-  - ``\\mathcal{K}_{\\mathrm{pow}}(\\alpha)``: Power cone ``\\{(a, b, c) : a^{\\alpha}\\,b^{1-\\alpha} \\geq |c|,\\; a, b \\geq 0\\}``.
+    A stated `mu` is fixed. It crosses a Cross-Validation fold or a subset view as the answer for the whole universe, so it does not follow the refit that the optimisation runs on. To make the target follow the fit, name a **Deferred Quantity** in `mu`, or leave the slot `nothing` and let the prior supply it.
 
 # Functor
 
-    (r::LowOrderMoment)(w::VecNum, X::MatNum;
-                        fees::Option{<:Fees} = nothing)
+    (r::LowOrderMoment)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
+    (r::LowOrderMoment)(x::VecNum)
 
-Computes the low-order moment risk measure as defined in `r` using portfolio weights `w`, return matrix `X`, and optional fees `fees`.
+Computes the risk of the portfolio `w` on the returns `X` net of `fees`, or the risk of the net portfolio returns `x`. A [`DynamicAbstractWeights`](@ref) in `w` first resolves against the data with [`resolve_observation_weights`](@ref). [`calc_deviations_vec`](@ref) then gives the deviations from the Moment Target, and [`moment_risk`](@ref) reduces them. The second form reads `x` as a net series and charges no fee. It needs a target that does not read the asset weights, which [`supports_precomputed_returns`](@ref) reports. A `mu` that is `nothing` reads the observation mean of the series. So a measure that [`factory`](@ref) did not build against a prior measures the deviations from the mean of the data, not from the expected returns of a prior.
 
-## Details
+## Arguments
 
-  - `r.alg` defines what low-order moment to compute.
-  - The values of `r.mu` and `r.w` are optionally used to compute the moment target via [`calc_moment_target`](@ref), which is used in [`calc_deviations_vec`](@ref) to compute the deviation vector.
-  - A [`DynamicAbstractWeights`](@ref) in `r.w` resolves against `X` first, with [`resolve_observation_weights`](@ref).
+  - `w::VecNum`: Asset weights.
+  - `X::MatNum`: Returns matrix `observations × assets`.
+  - `fees::Option{<:Fees}`: Fees that the net returns pay, or `nothing`.
+  - `x::VecNum`: Net portfolio returns `observations × 1`.
 
 # Examples
 
@@ -859,7 +640,20 @@ LowOrderMoment
          w ┼ nothing
         mu ┼ nothing
        alg ┴ FirstLowerMoment()
+
+julia> x = [0.02, -0.01, 0.03, -0.04, 0.01];
+
+julia> LowOrderMoment(; alg = FirstLowerMoment())(x)
+0.0108
+
+julia> LowOrderMoment(; alg = MeanAbsoluteDeviation())(x)
+0.0216
+
+julia> LowOrderMoment(; mu = 0.0, alg = MeanAbsoluteDeviation())(x)
+0.022
 ```
+
+The mean of `x` is `0.002`. Against the mean, the mean absolute deviation is twice the first lower moment. Against the target `0.0`, it is `0.0216 + 0.002 - 0.0`.
 
 # Related
 
@@ -868,18 +662,15 @@ LowOrderMoment
   - [`FirstLowerMoment`](@ref)
   - [`MeanAbsoluteDeviation`](@ref)
   - [`SecondMoment`](@ref)
-  - [`SquaredSOCRiskExpr`](@ref)
-  - [`RSOCRiskExpr`](@ref)
-  - [`QuadRiskExpr`](@ref)
-  - [`SOCRiskExpr`](@ref)
   - [`EvenMoment`](@ref)
+  - [`calc_moment_target`](@ref): selects the Moment Target from `mu`.
+  - [`moment_risk`](@ref)
+  - [`set_risk_constraints!`](@ref): builds the model of each `alg`.
+  - [`HighOrderMoment`](@ref): the hierarchical measure of the moments of order three and four.
 
 # References
 
-  - $(ref_dict[:emom])
-  - $(ref_dict[:lpm])
-  - $(ref_dict[:mad])
-  - $(ref_dict[:markowitz1952])
+  - $(ref_dict[:markowitz1959]) Chapter IX, pages 188 and 189.
 """
 @concrete struct LowOrderMoment <: RiskMeasure
     """
@@ -919,90 +710,31 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents a high-order moment risk measure.
+Measures a moment of order three or four of the deviations of the net portfolio returns from the Moment Target.
 
-Computes portfolio risk using a high-order moment algorithm (such as semi-skewness, semi-kurtosis, or kurtosis), optionally with custom weights and target values. This type is used for risk measures based on third or fourth moments of the return distribution.
+`alg` selects the moment: [`ThirdLowerMoment`](@ref), the default, [`FourthMoment`](@ref), or [`StandardisedHighOrderMoment`](@ref), which divides one of the two by a power of a second moment. Each states its closed form. `mu` selects the target, as it does for [`LowOrderMoment`](@ref). The measure is a hierarchical risk measure. The hierarchical optimisers and the value level read it, and the library builds no `JuMP` model for it.
+
+A larger value is always more risk. The odd moment is the negated mean of negative cubes, and the even moments are non-negative.
 
 # Mathematical definition
 
-Depending on the `alg` field, the risk measure computes the third lower moment, fourth lower (semi) moment, or fourth central (full) moment. Each can be standardised or unstandardised.
-
-The unstandardised formulations are:
-
-  - [`ThirdLowerMoment`](@ref),
-  - [`FourthMoment`](@ref),
-
-The standardised formulations are:
-
-  - [`StandardisedHighOrderMoment`](@ref), which uses a variance estimator and an unstandardised high-order moment algorithm.
-
-An odd moment order makes a lower moment negative, so the risk measure returns ``(-1)^n \\mu_n``. A larger value is therefore always more risk. The third lower moment is negated; the fourth moment is already non-negative and is returned unchanged.
-
-## Unstandardised Moments
-
-All unstandardised central moments have the following formula.
-
 ```math
 \\begin{align}
-\\mu_n &= \\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^n\\right]\\,.
+d_t &= \\hat{r}_t - \\tau\\,,\\quad t = 1, \\ldots, T\\,, \\\\
+R(\\boldsymbol{w}) &= \\rho\\left(d_1, \\ldots, d_T\\right)\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\mu_n``: ``n``-th central moment.
-  - ``\\boldsymbol{X}``: `T × 1` vector of portfolio returns.
-  - ``\\mathbb{E}[\\cdot]``: Expected value operator, supports weighted averages.
-  - ``n``: Moment order.
-
-All unstandardised lower moments have the following formula.
-
-```math
-\\begin{align}
-\\mu_n &= \\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\, 0\\right)^n\\right]\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\mu_n``: ``n``-th lower moment.
-  - ``\\boldsymbol{X}``: `T × 1` vector of portfolio returns.
-  - ``\\mathbb{E}[\\cdot]``: Expected value operator, supports weighted averages.
-  - ``\\circ``: Element-wise function application.
-  - ``n``: Moment order.
-
-## Standardised Moments
-
-All standardised central moments have the following formula.
-
-```math
-\\begin{align}
-\\mu_n &= \\dfrac{\\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^n\\right]}{\\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^2\\right]^{n/2}}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\mu_n``: ``n``-th standardised central moment.
-  - ``\\boldsymbol{X}``: `T × 1` vector of portfolio returns.
-  - ``\\mathbb{E}[\\cdot]``: Expected value operator, supports weighted averages.
-  - ``n``: Moment order.
-
-All standardised lower moments have the following formula.
-
-```math
-\\begin{align}
-\\mu_n &= \\dfrac{\\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\, 0\\right)^n\\right]}{\\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\, 0\\right)^2\\right]^{n/2}}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\mu_n``: ``n``-th standardised lower moment.
-  - ``\\boldsymbol{X}``: `T × 1` vector of portfolio returns.
-  - ``\\mathbb{E}[\\cdot]``: Expected value operator, supports weighted averages.
-  - ``\\circ``: Element-wise function application.
-  - ``n``: Moment order.
+  - $(math_dict[:d_t_moment])
+  - $(math_dict[:rhat_t_net])
+  - $(math_dict[:tau_moment])
+  - $(math_dict[:Fbar_fee_mean])
+  - $(math_dict[:E_obs_mean])
+  - $(math_dict[:T])
+  - $(math_dict[:R_w])
+  - ``\\rho``: The reduction that `alg` states.
 
 # Fields
 
@@ -1017,33 +749,31 @@ $(DocStringExtensions.FIELDS)
         alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment(),
     ) -> HighOrderMoment
 
-Keywords correspond to the struct's fields. A `w` that is not `nothing` is passed to `alg` with [`factory`](@ref), so a variance estimator inside `alg` reads the same weights as the measure.
+Keywords correspond to the struct's fields. The keyword constructor passes a `w` that is not `nothing` to `alg` with [`factory`](@ref), so a variance estimator inside `alg` reads the same weights as the measure.
 
 ## Validation
 
-  - If `mu` is not `nothing`:
-
-      + `::Number`: `isfinite(mu)`.
-      + `::AbstractVector`: `!isempty(mu)` and `all(isfinite, mu)`.
-
+  - If `mu` is a number, `isfinite(mu)`, else an [`IsNonFiniteError`](@ref).
+  - If `mu` is a vector, `!isempty(mu)`, else an [`IsEmptyError`](@ref), and `all(isfinite, mu)`, else an [`IsNonFiniteError`](@ref).
   - $(val_dict[:oow_rm])
 
 !!! warning
 
-    A stated `mu` is pinned: it crosses a Cross-Validation fold or a subset view as the whole universe's answer, so it does not follow the refit the optimisation runs on. A caller who wants it to follow the fit names a **Deferred Quantity** in `mu`, or leaves the slot `nothing` and lets the prior supply it.
+    A stated `mu` is fixed. It crosses a Cross-Validation fold or a subset view as the answer for the whole universe, so it does not follow the refit that the optimisation runs on. To make the target follow the fit, name a **Deferred Quantity** in `mu`, or leave the slot `nothing` and let the prior supply it.
 
 # Functor
 
-    (r::HighOrderMoment)(w::VecNum, X::MatNum;
-                        fees::Option{<:Fees} = nothing)
+    (r::HighOrderMoment)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
+    (r::HighOrderMoment)(x::VecNum)
 
-Computes the high-order moment risk measure as defined in `r` using portfolio weights `w`, return matrix `X`, and optional fees `fees`.
+Computes the risk of the portfolio `w` on the returns `X` net of `fees`, or the risk of the net portfolio returns `x`, as the functor of [`LowOrderMoment`](@ref) does. A [`DynamicAbstractWeights`](@ref) in `w` first resolves against the data with [`resolve_observation_weights`](@ref). [`calc_deviations_vec`](@ref) then gives the deviations from the Moment Target, and [`moment_risk`](@ref) reduces them. The second form needs a target that does not read the asset weights, which [`supports_precomputed_returns`](@ref) reports.
 
-## Details
+## Arguments
 
-  - `r.alg` defines what high-order moment to compute.
-  - The values of `r.mu` and `r.w` are optionally used to compute the moment target via [`calc_moment_target`](@ref), which is used in [`calc_deviations_vec`](@ref) to compute the deviation vector.
-  - A [`DynamicAbstractWeights`](@ref) in `r.w` resolves against `X` first, with [`resolve_observation_weights`](@ref).
+  - `w::VecNum`: Asset weights.
+  - `X::MatNum`: Returns matrix `observations × assets`.
+  - `fees::Option{<:Fees}`: Fees that the net returns pay, or `nothing`.
+  - `x::VecNum`: Net portfolio returns `observations × 1`.
 
 # Examples
 
@@ -1057,7 +787,20 @@ HighOrderMoment
          w ┼ nothing
         mu ┼ nothing
        alg ┴ ThirdLowerMoment()
+
+julia> x = [0.02, -0.01, 0.03, -0.04, 0.01];
+
+julia> HighOrderMoment(; alg = StandardisedHighOrderMoment())(x)
+1.4555036361053537
+
+julia> HighOrderMoment(;
+                       alg = StandardisedHighOrderMoment(;
+                                                         ve = SimpleVariance(; me = nothing,
+                                                                             corrected = false)))(x)
+2.034128169893555
 ```
+
+The two values differ in the divisor of the lower second moment alone, ``T - 1`` under the default `ve` and ``T`` with `corrected = false`.
 
 # Related
 
@@ -1066,10 +809,9 @@ HighOrderMoment
   - [`ThirdLowerMoment`](@ref)
   - [`FourthMoment`](@ref)
   - [`StandardisedHighOrderMoment`](@ref)
-
-# References
-
-  - $(ref_dict[:lpm])
+  - [`calc_moment_target`](@ref): selects the Moment Target from `mu`.
+  - [`moment_risk`](@ref)
+  - [`LowOrderMoment`](@ref): the optimisation measure of the moments of order one and two.
 """
 @concrete struct HighOrderMoment <: HierarchicalRiskMeasure
     """
@@ -1107,17 +849,19 @@ function HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings()
     return HighOrderMoment(settings, w, mu, factory(alg, w))
 end
 """
-    const LoHiOrderMoment{T1, T2, T3, T4} = Union{...}
+    const LoHiOrderMoment{T1, T2, T3, T4} = Union{<:LowOrderMoment{T1, T2, T3, T4},
+                                                  <:HighOrderMoment{T1, T2, T3, T4}}
 
-Parameterised union of [`LowOrderMoment`](@ref) and [`HighOrderMoment`](@ref) sharing the same type parameters.
+Groups [`LowOrderMoment`](@ref) and [`HighOrderMoment`](@ref) under the same four type parameters.
 
-Used for unified dispatch on moment-target calculation methods.
+The two measures have the same fields in the same order, `settings`, `w`, `mu` and `alg`, and they select the Moment Target and the deviations in the same way. So [`calc_moment_target`](@ref) dispatches on the second and the third parameter, the types of `w` and `mu`, once for both measures. [`calc_deviations_vec`](@ref) and [`supports_precomputed_returns`](@ref) also take the group.
 
 # Related
 
   - [`LowOrderMoment`](@ref)
   - [`HighOrderMoment`](@ref)
   - [`calc_moment_target`](@ref)
+  - [`calc_deviations_vec`](@ref)
 """
 const LoHiOrderMoment{T1, T2, T3, T4} = Union{<:LowOrderMoment{T1, T2, T3, T4},
                                               <:HighOrderMoment{T1, T2, T3, T4}}
@@ -1125,17 +869,17 @@ const LoHiOrderMoment{T1, T2, T3, T4} = Union{<:LowOrderMoment{T1, T2, T3, T4},
     calc_moment_target(::LoHiOrderMoment{<:Any, Nothing, Nothing, <:Any},
                        ::Any, x::VecNum)
 
-Compute the target value for moment calculations when neither a target value (`mu`) nor observation weights are provided in the risk measure.
+Return the Moment Target of a measure whose `w` and `mu` are both `nothing`, the mean of `x`.
 
 # Arguments
 
-  - `r`: A `LowOrderMoment` or `HighOrderMoment` risk measure with both `w` and `mu` fields set to `nothing`.
-  - `_`: Unused argument (typically asset weights, ignored in this method).
-  - `x`: Returns vector.
+  - `r`: A [`LowOrderMoment`](@ref) or a [`HighOrderMoment`](@ref) whose `w` and `mu` are `nothing`.
+  - `::Any`: The asset weights. The method does not read them.
+  - `x::VecNum`: Net portfolio returns.
 
 # Returns
 
-  - `tgt::eltype(x)`: The mean of the returns vector.
+  - `tgt::Number`: `Statistics.mean(x)`.
 
 # Related
 
@@ -1151,17 +895,17 @@ end
     calc_moment_target(r::LoHiOrderMoment{<:Any, <:StatsBase.AbstractWeights, Nothing, <:Any},
                        ::Any, x::VecNum)
 
-Compute the target value for moment calculations when the risk measure provides an observation weights vector but no explicit target value (`mu`).
+Return the Moment Target of a measure that holds observation weights and no `mu`, the weighted mean of `x`.
 
 # Arguments
 
-  - `r`: A `LowOrderMoment` or `HighOrderMoment` risk measure with `w` set to an observation weights vector and `mu` set to `nothing`.
-  - `_`: Unused argument (typically asset weights, ignored in this method).
-  - `x`: Returns vector.
+  - `r`: A [`LowOrderMoment`](@ref) or a [`HighOrderMoment`](@ref) whose `w` is a `StatsBase.AbstractWeights` and whose `mu` is `nothing`.
+  - `::Any`: The asset weights. The method does not read them.
+  - `x::VecNum`: Net portfolio returns.
 
 # Returns
 
-  - `tgt::eltype(x)`: The weighted mean of the returns vector, using the observation weights from `r.w`.
+  - `tgt::Number`: `Statistics.mean(x, r.w)`.
 
 # Related
 
@@ -1177,17 +921,19 @@ end
     calc_moment_target(r::LoHiOrderMoment{<:Any, <:Any, <:VecNum, <:Any},
                        w::VecNum, ::Any)
 
-Compute the target value for moment calculations when the risk measure provides an explicit expected returns vector (`mu`).
+Return the gross Moment Target of a measure whose `mu` holds expected asset returns, the expected portfolio return.
+
+[`calc_deviations_vec`](@ref) subtracts the mean fee per period from it, so the target that the deviations read is net.
 
 # Arguments
 
-  - `r`: A `LowOrderMoment` or `HighOrderMoment` risk measure with `mu` set to an expected returns vector.
-  - `w`: Asset weights vector.
-  - `::Any`: Unused argument (typically the returns vector, ignored in this method).
+  - `r`: A [`LowOrderMoment`](@ref) or a [`HighOrderMoment`](@ref) whose `mu` is a vector.
+  - `w::VecNum`: Asset weights.
+  - `::Any`: The net portfolio returns. The method does not read them.
 
 # Returns
 
-  - `tgt::eltype(w)`: The dot product of the asset weights and the expected returns vector.
+  - `tgt::Number`: `LinearAlgebra.dot(w, r.mu)`.
 
 # Related
 
@@ -1203,17 +949,19 @@ end
     calc_moment_target(r::LoHiOrderMoment{<:Any, <:Any, <:VecScalar, <:Any},
                        w::VecNum, ::Any)
 
-Compute the target value for moment calculations when the risk measure provides a `VecScalar` as the expected returns (`mu`).
+Return the gross Moment Target of a measure whose `mu` is a [`VecScalar`](@ref), the expected portfolio return of `mu.v` plus the offset `mu.s`.
+
+[`calc_deviations_vec`](@ref) subtracts the mean fee per period from it, so the target that the deviations read is net.
 
 # Arguments
 
-  - `r`: A `LowOrderMoment` or `HighOrderMoment` risk measure with `mu` set to a `VecScalar` (an object with fields `v` for the expected returns vector and `s` for a scalar offset).
-  - `w`: Asset weights vector.
-  - `::Any`: Unused argument (typically the returns vector, ignored in this method).
+  - `r`: A [`LowOrderMoment`](@ref) or a [`HighOrderMoment`](@ref) whose `mu` is a [`VecScalar`](@ref).
+  - `w::VecNum`: Asset weights.
+  - `::Any`: The net portfolio returns. The method does not read them.
 
 # Returns
 
-  - `tgt::promote_type(eltype(w), eltype(r.mu.v), typeof(r.mu.s))`: The sum of the dot product of the asset weights and the expected returns vector plus the scalar offset, `LinearAlgebra.dot(w, r.mu.v) + r.mu.s`.
+  - `tgt::Number`: `LinearAlgebra.dot(w, r.mu.v) + r.mu.s`.
 
 # Related
 
@@ -1230,17 +978,19 @@ end
     calc_moment_target(r::LoHiOrderMoment{<:Any, <:Any, <:Number, <:Any},
                        ::Any, ::Any)
 
-Compute the target value for moment calculations when the risk measure provides a scalar value for the expected returns (`mu`).
+Return the Moment Target of a measure whose `mu` is a number, the number itself.
+
+The number is a minimum acceptable return on the net series, so no fee applies to it.
 
 # Arguments
 
-  - `r`: A `LowOrderMoment` or `HighOrderMoment` risk measure with `mu` set to a scalar value.
-  - `::Any`: Unused argument (typically asset weights, ignored in this method).
-  - `::Any`: Unused argument (typically the returns vector, ignored in this method).
+  - `r`: A [`LowOrderMoment`](@ref) or a [`HighOrderMoment`](@ref) whose `mu` is a number.
+  - `::Any`: The asset weights. The method does not read them.
+  - `::Any`: The net portfolio returns. The method does not read them.
 
 # Returns
 
-  - `tgt::Number`: The scalar value of `r.mu`.
+  - `tgt::Number`: `r.mu`.
 
 # Related
 
@@ -1252,27 +1002,30 @@ function calc_moment_target(r::LoHiOrderMoment{<:Any, <:Any, <:Number, <:Any}, :
     return r.mu
 end
 """
-    calc_deviations_vec(r::LoHiOrderMoment, w::VecNum,
-                    X::MatNum; fees::Option{<:Fees} = nothing)
+    calc_deviations_vec(r::LoHiOrderMoment, w::VecNum, X::MatNum,
+                        fees::Option{<:Fees} = nothing)
 
-Compute the vector of deviations from the target value for moment-based risk measures.
+Return the deviations of the net portfolio returns from the net Moment Target of `r`.
+
+A per-asset target is gross, and the series is net of the fee. So the method subtracts the mean fee per period from such a target, and a fee that every period pays in full cancels from every deviation. A target that is the mean of the series, or a number, takes no fee.
+
+# Algorithm
+
+ 1. Compute the net portfolio returns `x` with [`calc_net_returns`](@ref).
+ 2. Compute the gross Moment Target with [`calc_moment_target`](@ref) from `r`, `w` and `x`.
+ 3. Subtract [`moment_target_fees`](@ref) from it, giving the net target `tgt`.
+ 4. Return `x .- tgt`.
 
 # Arguments
 
-  - `r`: A `LowOrderMoment` or `HighOrderMoment` risk measure specifying the moment calculation algorithm and target.
-  - `w`: Asset weights vector.
-  - `X`: Return matrix.
-  - `fees`: Optional fees object to adjust net returns.
+  - `r::LoHiOrderMoment`: The moment risk measure.
+  - `w::VecNum`: Asset weights.
+  - `X::MatNum`: Returns matrix `observations × assets`.
+  - `fees::Option{<:Fees}`: Fees that the net returns pay, or `nothing`.
 
 # Returns
 
-  - `val::AbstractVector`: The vector of deviations between net portfolio returns and the computed moment target.
-
-# Details
-
-  - Computes net portfolio returns using the provided weights, return matrix, and optional fees.
-  - Computes the target value for the moment calculation using [`calc_moment_target`](@ref), and subtracts [`moment_target_fees`](@ref) from it, so that a per-asset target is the net mean of the net series.
-  - Returns the element-wise difference between net returns and the target value.
+  - `val::VecNum`: The deviations, `observations × 1`.
 
 # Related
 
@@ -1280,6 +1033,8 @@ Compute the vector of deviations from the target value for moment-based risk mea
   - [`HighOrderMoment`](@ref)
   - [`calc_moment_target`](@ref)
   - [`calc_net_returns`](@ref)
+  - [`moment_target_fees`](@ref)
+  - [`moment_risk`](@ref): reduces the deviations to the risk value.
 """
 function calc_deviations_vec(r::LoHiOrderMoment, w::VecNum, X::MatNum,
                              fees::Option{<:Fees} = nothing)
@@ -1290,9 +1045,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Compute the vector of deviations from the target value for a precomputed returns series.
+Return the deviations of the net portfolio returns `x` from the Moment Target of `r`.
 
-Single-argument form of [`calc_deviations_vec`](@ref) used by the precomputed-returns functor `r(x::VecNum)`.
+The functor `r(x)` calls this form. It reads `x` as a net series, so no fee applies. It passes no asset weights to [`calc_moment_target`](@ref), so it needs a target that does not read them, a `mu` that is `nothing` or a number. A per-asset `mu` raises a `MethodError`. [`supports_precomputed_returns`](@ref) reports the condition before the call.
 
 # Related
 
@@ -1310,21 +1065,30 @@ end
     moment_risk(r::MedianAbsoluteDeviation, val::VecNum)
     moment_risk(r::ThirdCentralMoment, val::VecNum)
 
-Shared post-deviation kernel for the moment-family risk measures. Given the vector of
-deviations `val` (net portfolio returns minus the measure's target, from
-[`calc_deviations_vec`](@ref)), compute the measure's scalar value. Dispatch selects the
-per-algorithm reduction (lower/full, the power, the standardisation, the formulation).
+Reduce the moment deviations `val` of a moment risk measure to its risk value.
 
-Both functor arities call this kernel: `r(w, X, fees)` calls
-`moment_risk(r, calc_deviations_vec(r, w, X, fees))`, and the single-argument
-precomputed-returns form `r(x::VecNum)` calls `moment_risk(r, calc_deviations_vec(r, x))`,
-so the two share one definition of the math.
+`val` is the output of [`calc_deviations_vec`](@ref). Both forms of the functor call this function, so the value of `r(w, X, fees)` and of `r(x)` comes from one definition. Dispatch on `r.alg` selects the reduction, and the docstring of each algorithm states its closed form. The methods for a full [`FourthMoment`](@ref) overwrite `val` in place.
+
+# Algorithm
+
+The steps for [`LowOrderMoment`](@ref) and [`HighOrderMoment`](@ref):
+
+ 1. For a lower moment, replace `val` with `min.(val, 0)`. [`FirstLowerMoment`](@ref), [`ThirdLowerMoment`](@ref) and a [`SemiMoment`](@ref) are lower moments.
+ 2. For [`SecondMoment`](@ref), return `Statistics.var(r.alg.ve, val; mean = 0)`, or `Statistics.std` under [`SOCRiskExpr`](@ref). Stop.
+ 3. For [`StandardisedHighOrderMoment`](@ref), compute `sigma = Statistics.var(r.alg.ve, val; mean = 0)` before the power.
+ 4. Raise each entry of `val` to the power of the moment: `abs` for [`MeanAbsoluteDeviation`](@ref), the cube or the fourth power for a high-order moment.
+ 5. Take the mean of `val`, weighted by `r.w` when it is not `nothing`, giving `res`.
+ 6. Negate `res` for [`FirstLowerMoment`](@ref) and [`ThirdLowerMoment`](@ref), so that a larger value is more risk.
+ 7. For [`StandardisedHighOrderMoment`](@ref), divide `res` by `sigma^(n / 2)`, with `n` the order of `r.alg.alg`.
+
+[`EvenMoment`](@ref) takes the place of steps 4 and 5. It computes the norm of order `2p` of `val`, each entry scaled by `w_t^(1 / 2p)` when `r.w` is not `nothing`, and returns its square divided by `T^(1 / p)`, with `T` the effective sample size.
 
 # Related
 
   - [`calc_deviations_vec`](@ref)
   - [`LowOrderMoment`](@ref)
   - [`HighOrderMoment`](@ref)
+  - [`MomentRiskMeasures`](@ref): the measures whose functor calls this function.
 """
 function moment_risk(r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
                                        <:FirstLowerMoment}, val::VecNum)
@@ -1435,7 +1199,17 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Create an instance of [`LowOrderMoment`](@ref) by selecting observation weights, expected returns, and algorithm from the risk-measure instance or falling back to the prior result.
+Create a [`LowOrderMoment`](@ref) whose observation weights and `mu` come from the measure, or from the prior result `pr` where the measure states none.
+
+A measure whose `mu` is `nothing` takes `pr.mu`, so after this method its Moment Target is the expected portfolio return of the prior, net of the mean fee per period. Before it, the target is the mean of the data that the functor reads. The two agree when `pr.mu` is the observation mean of `pr.X` under the same weights.
+
+# Algorithm
+
+ 1. Resolve a **Deferred Quantity** in `mu` with [`resolve_deferred_quantities`](@ref), giving `r`.
+ 2. Select `w`, the weights of `r` or else `pr.w`, with [`nothing_scalar_array_selector`](@ref).
+ 3. Select `mu`, the target of `r` or else `pr.mu`, with [`nothing_scalar_array_selector`](@ref).
+ 4. Pass `w` to `r.alg` with [`factory`](@ref), giving `alg`.
+ 5. Build a new `LowOrderMoment` from `r.settings`, `w`, `mu` and `alg`.
 
 # Related
 
@@ -1454,7 +1228,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Resolve a **Deferred Quantity** in [`LowOrderMoment`](@ref)'s `mu` slot against prior result `pr`. The measure carries one prior-derived slot, so the slot itself admits the estimator and there is no fan-out to make.
+Resolve a **Deferred Quantity** in the `mu` slot of a [`LowOrderMoment`](@ref) against the prior result `pr`.
+
+`mu` is the one slot of the measure that a prior can supply, so the slot holds the estimator itself, and no other slot reads its fit. A measure whose `mu` is not a **Deferred Quantity** returns unchanged.
 
 # Related
 
@@ -1476,9 +1252,9 @@ deferred_slots(r::LowOrderMoment) = (; mu = r.mu)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return a view of [`LowOrderMoment`](@ref) `r` sliced to asset indices `i`.
+Return a [`LowOrderMoment`](@ref) restricted to the assets `i`.
 
-Slices the expected returns `mu` for cluster-based optimisation.
+The method slices a per-asset `mu` to the assets `i` with [`nothing_scalar_array_view`](@ref). A number and `nothing` pass through unchanged, and so does a **Deferred Quantity**, which resolves on the subset. `w` weighs observations, not assets, so it passes through unchanged, and so do `settings` and `alg`.
 
 # Related
 
@@ -1493,7 +1269,17 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Create an instance of [`HighOrderMoment`](@ref) by selecting observation weights, expected returns, and algorithm from the risk-measure instance or falling back to the prior result.
+Create a [`HighOrderMoment`](@ref) whose observation weights and `mu` come from the measure, or from the prior result `pr` where the measure states none.
+
+A measure whose `mu` is `nothing` takes `pr.mu`, so after this method its Moment Target is the expected portfolio return of the prior, net of the mean fee per period.
+
+# Algorithm
+
+ 1. Resolve a **Deferred Quantity** in `mu` with [`resolve_deferred_quantities`](@ref), giving `r`.
+ 2. Select `w`, the weights of `r` or else `pr.w`, with [`nothing_scalar_array_selector`](@ref).
+ 3. Select `mu`, the target of `r` or else `pr.mu`, with [`nothing_scalar_array_selector`](@ref).
+ 4. Pass `w` to `r.alg` with [`factory`](@ref), giving `alg`.
+ 5. Build a new `HighOrderMoment` from `r.settings`, `w`, `mu` and `alg`.
 
 # Related
 
@@ -1512,7 +1298,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Resolve a **Deferred Quantity** in [`HighOrderMoment`](@ref)'s `mu` slot against prior result `pr`. The measure carries one prior-derived slot, so the slot itself admits the estimator and there is no fan-out to make.
+Resolve a **Deferred Quantity** in the `mu` slot of a [`HighOrderMoment`](@ref) against the prior result `pr`.
+
+`mu` is the one slot of the measure that a prior can supply, so the slot holds the estimator itself, and no other slot reads its fit. A measure whose `mu` is not a **Deferred Quantity** returns unchanged.
 
 # Related
 
@@ -1533,9 +1321,9 @@ deferred_slots(r::HighOrderMoment) = (; mu = r.mu)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return a view of [`HighOrderMoment`](@ref) `r` sliced to asset indices `i`.
+Return a [`HighOrderMoment`](@ref) restricted to the assets `i`.
 
-Slices the expected returns `mu` for cluster-based optimisation.
+The method slices a per-asset `mu` to the assets `i` with [`nothing_scalar_array_view`](@ref). A number and `nothing` pass through unchanged, and so does a **Deferred Quantity**, which resolves on the subset. `w` weighs observations, not assets, so it passes through unchanged, and so do `settings` and `alg`.
 
 # Related
 
@@ -1553,10 +1341,9 @@ risk_input_kind(::LoHiOrderMoment) = WeightsReturnsFeesInput()
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return whether [`LoHiOrderMoment`](@ref) `r` supports precomputed-return evaluation.
+Return whether the functor `r(x)` of a [`LoHiOrderMoment`](@ref) can evaluate the net portfolio returns `x` alone.
 
-Delegates to [`weight_independent_target`](@ref) on `r.mu`: `true` iff the target is
-`Nothing`, a `Number`, or a [`MedianCenteringFunction`](@ref); `false` for per-asset targets.
+The answer is [`weight_independent_target`](@ref) of `r.mu`. It is `true` when `mu` is `nothing` or a number, because such a target does not read the asset weights. It is `false` for a vector, a [`VecScalar`](@ref) and an unresolved **Deferred Quantity**.
 
 # Related
 

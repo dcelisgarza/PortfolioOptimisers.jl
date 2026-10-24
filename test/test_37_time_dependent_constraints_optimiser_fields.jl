@@ -364,7 +364,9 @@ end
             @test PortfolioOptimisers.inner_fold_fields(NestedClustered(; opti = mr0,
                                                                         opto = mr0)) ==
                   (:opti,)
-            @test PortfolioOptimisers.inner_fold_fields(SubsetResampling(; opt = mr0)) == ()
+            @test PortfolioOptimisers.inner_fold_fields(SubsetResampling(;
+                                                                         subset_size = 0.8,
+                                                                         opt = mr0)) == ()
         end
         @testset "Per-field entitlement: the scan leaves :nearest opti for the inner CV" begin
             ncoX = NestedClustered(;
@@ -512,7 +514,7 @@ end
                                    seed = 11)
             @test length(cross_val_predict(srs, rd, cvw).pred) == 2
             srr = PortfolioOptimisers.reset_time_dependent_estimator(srs)
-            @test srr.subset_size == 0.8
+            @test srr.subset_size === PowerSubsetSize()
             @test srr.n_subsets == 2
             @test_throws TypeError SubsetResampling(; opt = mr0,
                                                     subset_size = TimeDependent([3, "a"]))
@@ -637,7 +639,8 @@ end
             # The always-carrying fields stay `TD`, not `TD_Option`.
             @test_throws TypeError NestedClustered(; opti = mr0, opto = mr0, pe = nothing)
             @test_throws TypeError Stacking(; opti = [mr0], opto = mr0, wf = nothing)
-            @test_throws TypeError SubsetResampling(; opt = ew, pe = nothing)
+            @test_throws TypeError SubsetResampling(; subset_size = 0.8, opt = ew,
+                                                    pe = nothing)
             # Entry substitution rejects a wrongly-typed entry at construction.
             @test_throws TypeError NestedClustered(; opti = mr0, opto = mr0,
                                                    pe = TimeDependent([EmpiricalPrior(),

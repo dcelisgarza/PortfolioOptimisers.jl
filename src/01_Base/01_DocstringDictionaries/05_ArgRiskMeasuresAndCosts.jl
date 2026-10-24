@@ -86,19 +86,22 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :ddof => "`ddof`: Degrees-of-freedom correction, an integer that the library subtracts from the number of observations itself.",#
                  :flag => "`flag`: Algorithm selection flag.",#
                  # Turnover.
-                 :w_tn => "`w`: Reference portfolio weight vector. Deviations are measured against it, and it is never the candidate weight vector an optimiser solves for.",#
+                 :w_tn => "`w`: Reference portfolio weight vector. The deviation of each asset is the difference between the candidate weight and this weight. It is never the candidate weight vector that an optimiser solves for.",#
+                 :val_tn => "`val`: Turnover bound. A number is one bound for every asset, and a vector holds one bound per asset. A [`TurnoverEstimator`](@ref) can also name the bounds by asset or by group, and [`turnover_constraints`](@ref) resolves the names to one bound per asset. A [`Fees`](@ref) reads the `val` of its [`Turnover`](@ref) as a fee rate per asset, not as a bound.",#
                  :w_ref => "`w`: Reference portfolio weights vector.",#
-                 :w_bm_ret => "`w`: Benchmark portfolio returns vector. It holds `T` returns, one per observation, and **not** `N` weights, so its length must match the number of rows of the return matrix the model is built on.",#
-                 :B_data_tr => "`B`: Benchmark returns of the rows that a reader holds, the `B` field of their [`ReturnsResult`](@ref). A vector `T × 1` is the benchmark series. A matrix `T × N` holds one benchmark per asset, and its series is `B * w`. Every reader that holds the returns data replaces it with the `B` of its own rows through [`bind_data_benchmark`](@ref). It is `nothing` until a reader binds it.",#
-                 :fixed => "`fixed`: Whether the estimator is fixed and does not update with new weights.",#
+                 :w_bm_ret => "`w`: Benchmark return series. It holds `T` returns, one for each observation, not `N` weights. Its length must equal the number of rows of the return matrix of the model.",#
+                 :B_data_tr => "`B`: Benchmark returns of the rows that a reader holds, from the `B` field of the [`ReturnsResult`](@ref) of the reader. A vector `T × 1` is the benchmark series. A matrix `T × N` holds one benchmark for each asset, and its series is `B * w`. Every reader that holds the returns data replaces it with the `B` of its own rows through [`bind_data_benchmark`](@ref). It is `nothing` until a reader binds it.",#
+                 :fixed => "`fixed`: If `true`, [`factory`](@ref) keeps the reference weights `w` and ignores the new weights. If `false`, `factory` replaces `w` with the new weights.",#
                  # Tracking specification.
                  :tr_spec => "`tr`: Benchmark tracking specification.",#
-                 # Power norm parameters.
-                 :pa_rm => "`pa`: Power norm parameter for the lower tail.",#
-                 :pb_rm => "`pb`: Power norm parameter for the upper tail.",#
+                 # Power norm parameters. `PowerNormValueatRisk` and its two drawdown
+                 # siblings share `p_pnvar`.
+                 :p_pnvar => "`p`: Order of the power norm of the tail, `p > 1`. As `p` falls to one, the measure falls to the Conditional Value-at-Risk of the same series at the same level. The value does not fall as `p` rises, and it is the largest loss of the series once `p` is large enough.",#
+                 :pa_rm => "`pa`: Order of the power norm of the loss tail, `pa > 1`.",#
+                 :pb_rm => "`pb`: Order of the power norm of the gain tail, `pb > 1`.",#
                  # Generic Value-at-Risk range components.
-                 :loss_rm => "`loss`: Loss-side XatRisk risk measure applied to the portfolio returns.",#
-                 :gain_rm => "`gain`: Gain-side XatRisk risk measure applied to the negated portfolio returns.",#
+                 :loss_rm => "`loss`: Tail measure of the losses, a member of [`ValueatRiskRMs`](@ref). The range applies it to the portfolio returns.",#
+                 :gain_rm => "`gain`: Tail measure of the gains, a member of [`ValueatRiskRMs`](@ref). The range applies it to the negated portfolio returns.",#
                  # Fees.
                  :tn_fees => "`tn`: Turnover estimator or result.",#
                  :l_fees => "`l`: Long proportional fees.",#
@@ -118,7 +121,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :err => "`err`: Tracking error tolerance.",#
                  :tralg => "`alg`: Tracking formulation algorithm.",#
                  # The risk measures of a ratio, and the scalarisers that combine them.
-                 :rt => "`rt`: Returns estimator, or a vector of them. A vector is summed at its terms' `settings.scale` weights, skipping any term whose `settings.rte` is `false`. There is no scalariser on the return axis.",#
+                 :rt => "`rt`: Return estimator, or a vector of them. The measure sums a vector at the `settings.scale` weights of its terms, and it skips a term whose `settings.rte` is `false`. The return axis has no scalariser.",#
                  :rk => "`rk`: Risk measure for ratio computation, or a vector of them scalarised by `sca`.",#
                  :r1 => "`r1`: First risk measure.",#
                  :r2 => "`r2`: Second risk measure.",#
@@ -130,7 +133,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  # Risk measure.
                  :r => "`r`: Risk measure or vector of risk measures.",#
                  # Tracking.
-                 :tr => "`tr`: Tracking error constraint estimator.",#
+                 :tr => "`tr`: Tracking algorithm that gives the benchmark return series.",#
                  # Fees.
                  :fees => "`fees`: Fees estimator or result.",#
                  :fees_res => "`fees`: The resolved [`Fees`](@ref) the head was charged with, on the universe it solved on, or `nothing`. A walk-forward fold charges it through [`extract_fees`](@ref).",#

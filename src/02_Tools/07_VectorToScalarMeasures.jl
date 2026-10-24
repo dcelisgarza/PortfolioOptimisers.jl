@@ -1,13 +1,13 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for algorithms mapping a vector of real values to a single real value.
+Abstract supertype for algorithms that reduce a vector of real values to one real value.
 
-`VectorToScalarMeasure` provides a unified interface for algorithms that reduce a vector of real numbers to a scalar, such as minimum, mean, median, or maximum. These are used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics.
+A `VectorToScalarMeasure` reduces a vector of real numbers to a scalar, for example its minimum, mean, median or maximum. The constraint generation and the centrality constraints use these measures to reduce a metric of each asset to one value.
 
 # Interfaces
 
-In order to implement a new vector-to-scalar measure that works seamlessly with the library, subtype `VectorToScalarMeasure` and implement the following method:
+To implement a new vector-to-scalar measure, subtype `VectorToScalarMeasure` and implement this method:
 
 ## Reduction method
 
@@ -15,12 +15,12 @@ In order to implement a new vector-to-scalar measure that works seamlessly with 
 
 ### Arguments
 
-  - `measure`: Concrete subtype instance.
+  - `measure`: An instance of the concrete subtype.
   - `val`: Vector of real values to reduce.
 
 ### Returns
 
-  - `score::Number`: Computed scalar.
+  - `score::Number`: The scalar result.
 
 # Related
 
@@ -42,9 +42,9 @@ abstract type VectorToScalarMeasure <: AbstractAlgorithm end
 """
     const Num_VecToScaM = Union{<:Number, <:VectorToScalarMeasure, <:Function}
 
-Union type representing a numeric value, a `VectorToScalarMeasure`, or a `Function`.
+Union of a number, a `VectorToScalarMeasure` and a `Function`.
 
-This type lets functions and fields accept all three, so a caller can give a fixed number, an object that implements the `VectorToScalarMeasure` interface, or a plain reduction function. [`vec_to_real_measure`](@ref) returns a `Number` unchanged, dispatches a `VectorToScalarMeasure` to its reduction, and applies a `Function` to the vector.
+A function or a field with this type accepts all three. A caller can give a fixed number, an object that implements the `VectorToScalarMeasure` interface, or a plain reduction function. [`vec_to_real_measure`](@ref) returns a `Number` with no change, sends a `VectorToScalarMeasure` to its reduction, and applies a `Function` to the vector.
 
 # Related
 
@@ -55,7 +55,7 @@ const Num_VecToScaM = Union{<:Number, <:VectorToScalarMeasure, <:Function}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Algorithm for reducing a vector of real values to its minimum.
+Algorithm that reduces a vector of real values to its minimum.
 
 # Mathematical definition
 
@@ -70,7 +70,7 @@ Where:
   - $(math_dict[:v_reduce])
   - $(math_dict[:v_i_entry])
 
-The reduction carries no weights, so a weighted call gives the same value as an unweighted one.
+The reduction reads no weights. A call of [`factory`](@ref) with observation weights returns it with no change.
 
 # Constructors
 
@@ -95,7 +95,7 @@ struct MinValue <: VectorToScalarMeasure end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Algorithm for reducing a vector of real values to its optionally weighted mean.
+Algorithm that reduces a vector of real values to its mean, with or without weights.
 
 # Mathematical definition
 
@@ -114,7 +114,7 @@ Where:
   - $(math_dict[:v_i_entry])
   - ``w_{i}``: The ``i``-th observation weight, from the field `w`.
 
-The weighted form normalises by the total weight, so a weight vector scaled by a positive constant gives the same value. `w` must carry one entry per entry of ``\\boldsymbol{v}``.
+The weighted form divides by the total weight, so a weight vector multiplied by a positive constant gives the same value. `w` must have one entry for each entry of ``\\boldsymbol{v}``.
 
 # Fields
 
@@ -134,15 +134,15 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@wprop`-tagged field is automatically propagated:
+[`factory`](@ref) passes its arguments on to this `@wprop` field:
 
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
 
 ## Observation weight parameters
 
-When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
 
-  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
 
 # Examples
 
@@ -177,7 +177,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Algorithm for reducing a vector of real values to its optionally weighted median.
+Algorithm that reduces a vector of real values to its median, with or without weights.
 
 # Mathematical definition
 
@@ -195,7 +195,7 @@ Where:
   - ``Q_{\\boldsymbol{v}}(p)``: The ``p``-quantile of ``\\boldsymbol{v}``.
   - ``Q_{\\boldsymbol{v}, \\boldsymbol{w}}(p)``: The weighted ``p``-quantile of ``\\boldsymbol{v}``, as `StatsBase` defines it.
 
-**Both forms are quantiles, and both interpolate.** Neither is an order statistic, so the result need not be an entry of ``\\boldsymbol{v}``. On a vector of even length the unweighted form averages the two middle entries, and the weighted form interpolates between the two entries that bracket half the weight mass.
+**Both forms are quantiles, and both interpolate.** Neither is an order statistic, so the result is not always an entry of ``\\boldsymbol{v}``. On a vector of even length, the unweighted form takes the average of the two middle entries. The weighted form interpolates between the two entries on each side of half the total weight.
 
 # Fields
 
@@ -215,15 +215,15 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@wprop`-tagged field is automatically propagated:
+[`factory`](@ref) passes its arguments on to this `@wprop` field:
 
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
 
 ## Observation weight parameters
 
-When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
 
-  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
 
 # Examples
 
@@ -258,7 +258,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Algorithm for reducing a vector of real values to its maximum.
+Algorithm that reduces a vector of real values to its maximum.
 
 # Mathematical definition
 
@@ -273,7 +273,7 @@ Where:
   - $(math_dict[:v_reduce])
   - $(math_dict[:v_i_entry])
 
-The reduction carries no weights, so a weighted call gives the same value as an unweighted one.
+The reduction reads no weights. A call of [`factory`](@ref) with observation weights returns it with no change.
 
 # Constructors
 
@@ -298,7 +298,7 @@ struct MaxValue <: VectorToScalarMeasure end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Algorithm for reducing a vector of real values to its optionally weighted standard deviation. The unweighted default is safe and the weighted default is not: `corrected = true` under a plain `StatsBase.Weights` raises an `ArgumentError`, because that type declares no bias correction. Pass an `AnalyticWeights`, a `FrequencyWeights` or a `ProbabilityWeights`, or set `corrected = false`.
+Algorithm that reduces a vector of real values to its standard deviation, with or without weights. The default `corrected = true` works without weights. With a plain `StatsBase.Weights`, it raises an `ArgumentError`, because that type declares no bias correction. Pass an `AnalyticWeights`, a `FrequencyWeights` or a `ProbabilityWeights`, or set `corrected = false`.
 
 # Mathematical definition
 
@@ -313,7 +313,7 @@ Where:
   - $(math_dict[:v_reduce])
   - ``\\mathrm{VarValue}(\\boldsymbol{v})``: The variance under the same `w` and the same `corrected`, whose four denominators [`VarValue`](@ref) states.
 
-`corrected` selects the denominator of the variance, and the square root carries that choice through. The unweighted default `corrected = true` divides by ``n - 1``.
+`corrected` selects the denominator of the variance, and the square root keeps that choice. Without weights, the default `corrected = true` divides by ``n - 1``.
 
 # Fields
 
@@ -334,15 +334,15 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@wprop`-tagged field is automatically propagated:
+[`factory`](@ref) passes its arguments on to this `@wprop` field:
 
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
 
 ## Observation weight parameters
 
-When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
 
-  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
 
 # Examples
 
@@ -356,7 +356,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(StdValue(), [1.2, 3.4, 0.7])
   - [`VectorToScalarMeasure`](@ref)
   - [`MeanValue`](@ref)
   - [`VarValue`](@ref): the four denominators that `corrected` and the type of `w` select.
-  - [`StandardisedValue`](@ref): reaches `Statistics.std` with a `mean` keyword, which is how it makes the deviation be taken about the mean that its `mv` produced.
+  - [`StandardisedValue`](@ref): calls `Statistics.std` with a `mean` keyword, so the deviation is about the mean that its `mv` gives.
   - [`vec_to_real_measure`](@ref)
   - [`factory`](@ref)
   - [`obs_weights_view`](@ref)
@@ -381,7 +381,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Algorithm for reducing a vector of real values to its optionally weighted variance. The weighted default raises: a plain `StatsBase.Weights` declares no bias correction, so `corrected = true` under it raises an `ArgumentError` rather than returning a value. Pass one of the three corrected weight types below, or set `corrected = false`.
+Algorithm that reduces a vector of real values to its variance, with or without weights. A plain `StatsBase.Weights` declares no bias correction, so the default `corrected = true` with it raises an `ArgumentError` and returns no value. Pass one of the three weight types below that have a correction, or set `corrected = false`.
 
 # Mathematical definition
 
@@ -406,9 +406,9 @@ Where:
   - `w::FrequencyWeights`: ``d = \\sum w_{i} - 1`` when `corrected` is `true`.
   - `w::ProbabilityWeights`: ``d = \\left(\\sum w_{i}\\right)(m - 1) / m`` when `corrected` is `true`, where ``m`` is the count of non-zero weights.
 
-With `corrected = false` every weighted case takes ``d = \\sum w_{i}``.
+With `corrected = false`, every weighted case takes ``d = \\sum w_{i}``.
 
-``d`` is selected by the **type** of ``\\boldsymbol{w}`` and not by its values, so two numerically identical weight vectors of different types give different variances.
+The **type** of ``\\boldsymbol{w}`` selects ``d``, not its values. So two weight vectors with the same values and different types give different variances.
 
 # Fields
 
@@ -429,15 +429,15 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@wprop`-tagged field is automatically propagated:
+[`factory`](@ref) passes its arguments on to this `@wprop` field:
 
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
 
 ## Observation weight parameters
 
-When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
 
-  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
 
 # Examples
 
@@ -476,7 +476,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Algorithm for reducing a vector of real values to its sum.
+Algorithm that reduces a vector of real values to its sum.
 
 # Mathematical definition
 
@@ -491,7 +491,7 @@ Where:
   - $(math_dict[:v_reduce])
   - $(math_dict[:v_i_entry])
 
-The reduction carries no weights. [`MeanValue`](@ref) is the weighted sum normalised by the total weight, so a weighted sum is that value multiplied by the total weight.
+The reduction reads no weights. The weighted form of [`MeanValue`](@ref) is the weighted sum divided by the total weight, and a weighted sum is that value multiplied by the total weight.
 
 # Constructors
 
@@ -515,7 +515,7 @@ struct SumValue <: VectorToScalarMeasure end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Algorithm for reducing a vector of real values to its product.
+Algorithm that reduces a vector of real values to its product.
 
 # Mathematical definition
 
@@ -530,7 +530,7 @@ Where:
   - $(math_dict[:v_reduce])
   - $(math_dict[:v_i_entry])
 
-The reduction carries no weights. One zero entry gives zero, and the product of many entries below one underflows, so this reduction is for a short vector of values near one.
+The reduction reads no weights. One zero entry gives zero. The product of many entries below one underflows to zero, and the product of many entries above one overflows. So this reduction is for a short vector of values near one.
 
 # Constructors
 
@@ -554,7 +554,7 @@ struct ProdValue <: VectorToScalarMeasure end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Algorithm for reducing a vector of real values to its mode.
+Algorithm that reduces a vector of real values to its mode.
 
 # Mathematical definition
 
@@ -567,10 +567,10 @@ Algorithm for reducing a vector of real values to its mode.
 Where:
 
   - $(math_dict[:v_reduce])
-  - ``u``: A value that ``\\boldsymbol{v}`` carries.
-  - ``\\left| \\cdot \\right|``: The count of a set.
+  - ``u``: A value of ``\\boldsymbol{v}``.
+  - ``\\left| \\cdot \\right|``: The number of elements of a set.
 
-`StatsBase.mode` breaks a tie by the **first** value that reaches the highest count, so the result is a value of the input and never an average of two. The comparison is exact equality, so this reduction is for a vector of repeated exact values and not for a continuous one.
+When two values have the highest count, `StatsBase.mode` returns the **first** value that reaches that count. The result is a value of the input and never an average of two values. For example, `[3.0, 1.0, 1.0, 3.0]` gives `1.0`. The comparison is exact equality, so this reduction is for a vector of repeated exact values, not for continuous values.
 
 # Constructors
 
@@ -594,7 +594,7 @@ struct ModeValue <: VectorToScalarMeasure end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Algorithm for reducing a vector of real values to its optionally weighted mean divided by its optionally weighted standard deviation. A weighted [`factory`](@ref) call can make the reduction raise: `factory` replaces the `w` field of both `mv` and `sv` with the incoming [`ObsWeights`](@ref), and `sv` keeps its default `corrected = true`, which raises an `ArgumentError` under a plain `StatsBase.Weights`. Thread an `AnalyticWeights`, a `FrequencyWeights` or a `ProbabilityWeights`, or declare `sv = StdValue(; corrected = false)`.
+Algorithm that reduces a vector of real values to its mean divided by its standard deviation, with or without weights. After a call of [`factory`](@ref) with weights, the reduction can raise an error. `factory` replaces the `w` field of both `mv` and `sv` with the incoming [`ObsWeights`](@ref), and `sv` keeps its default `corrected = true`. With a plain `StatsBase.Weights`, that default raises an `ArgumentError`. Thread an `AnalyticWeights`, a `FrequencyWeights` or a `ProbabilityWeights`, or declare `sv = StdValue(; corrected = false)`.
 
 # Mathematical definition
 
@@ -608,20 +608,20 @@ z &= \\frac{\\hat{\\mu}}{\\tilde{\\sigma}}\\,, \\\\
 Where:
 
   - ``z``: Standardised value.
-  - ``\\hat{\\mu}``: The value computed by `mv`.
-  - ``\\hat{\\sigma}``: The value computed by `sv`, taken about ``\\hat{\\mu}``.
-  - ``\\tilde{\\sigma}``: The guarded denominator.
+  - ``\\hat{\\mu}``: The value that `mv` gives.
+  - ``\\hat{\\sigma}``: The value that `sv` gives, about ``\\hat{\\mu}``.
+  - ``\\tilde{\\sigma}``: The denominator after the guard.
   - ``\\varepsilon``: Machine epsilon of the element type of ``\\hat{\\sigma}``.
 
-``\\hat{\\sigma}`` is undefined on a vector of one entry, because a corrected standard deviation needs two. The first case then gives ``\\tilde{\\sigma} = 1`` and ``z = \\hat{\\mu}``, so the reduction is defined on every non-empty vector.
+``\\hat{\\sigma}`` is undefined on a vector of one entry, because a corrected standard deviation needs two entries. The first case then gives ``\\tilde{\\sigma} = 1`` and ``z = \\hat{\\mu}``, so the reduction has a value on every non-empty vector.
 
 # Algorithm
 
- 1. Reduce `val` with `mv`, giving `m`.
- 2. Reduce `val` with `sv`, and pass `m` as the `mean` keyword, giving `s`. The deviation is therefore always taken about the mean that step 1 produced, so weighting `mv` without weighting `sv` changes the denominator too.
+ 1. Reduce `val` with `mv`, which gives `m`.
+ 2. Reduce `val` with `sv`, and pass `m` as the `mean` keyword, which gives `s`. So the deviation is always about the mean of step 1. Weights on `mv` and no weights on `sv` also change the denominator.
  3. Guard `s`:
      1. `s` is `NaN`: replace it with `one(s)`.
-     2. `s` is an exact zero: replace it with `sqrt(eps(eltype(s)))`. The test is an equality, so a small `s` is not guarded: on the constant vector `[2.0, 2.0, 2.0]` the result is `1.342e8`, which is `2 / sqrt(eps(Float64))`.
+     2. `s` is an exact zero: replace it with `sqrt(eps(eltype(s)))`. On the constant vector `[2.0, 2.0, 2.0]`, `s` is an exact zero, and the result is `1.342e8`, which is `2 / sqrt(eps(Float64))`. The test is an equality, so the step keeps a small positive `s`, and the result can be larger than this.
      3. Otherwise: keep `s`.
  4. Return `m / s`.
 
@@ -640,10 +640,10 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `mv`: Recursively updated via [`factory`](@ref).
-  - `sv`: Recursively updated via [`factory`](@ref).
+  - `mv`: Updated through a recursive call of [`factory`](@ref).
+  - `sv`: Updated through a recursive call of [`factory`](@ref).
 
 # Examples
 
@@ -666,11 +666,11 @@ julia> PortfolioOptimisers.vec_to_real_measure(StandardisedValue(), [0.37])
 """
 @propagatable @concrete struct StandardisedValue <: VectorToScalarMeasure
     """
-    The mean value measure used for the numerator.
+    The mean measure of the numerator.
     """
     @fprop mv
     """
-    The standard deviation measure used for the denominator.
+    The standard deviation measure of the denominator.
     """
     @fprop sv
     function StandardisedValue(mv::MeanValue, sv::StdValue)
@@ -687,39 +687,39 @@ end
         kwargs...
     ) -> Number
 
-Reduce a vector of real values to a single real value using a specified measure.
+Reduce a vector of real values to one real value with a measure.
 
-`vec_to_real_measure` applies a reduction algorithm (such as minimum, mean, median, or maximum) to a vector of real numbers, as specified by the concrete subtype of [`VectorToScalarMeasure`](@ref). This is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics.
+`vec_to_real_measure` applies the reduction of the concrete subtype of [`VectorToScalarMeasure`](@ref), such as the minimum, the mean, the median or the maximum, to a vector of real numbers. The constraint generation and the centrality constraints use it to reduce a metric of each asset to one value.
 
 # Algorithm
 
-The method that Julia selects is the algorithm. `measure` names the reduction, and the type parameter of a weighted measure names the branch, `MeanValue{Nothing}` against `MeanValue{<:ObsWeights}`, so the branch is chosen at compile time and the field is never tested at run time.
+The method that Julia selects is the algorithm. `measure` names the reduction. The type parameter of a weighted measure names the branch, for example `MeanValue{Nothing}` or `MeanValue{<:ObsWeights}`. So the compiler selects the branch, and no code tests the field at run time.
 
  1. `measure` is a `Number`: return it, and read nothing of `val`.
  2. `measure` is a `Function`: return `measure(val)`.
  3. `measure` is a [`MinValue`](@ref), a [`MaxValue`](@ref), a [`SumValue`](@ref) or a [`ProdValue`](@ref): return `minimum`, `maximum`, `sum` or `prod` of `val`.
  4. `measure` is a [`ModeValue`](@ref): return `StatsBase.mode` of `val`.
- 5. `measure` is a [`MeanValue`](@ref) or a [`MedianValue`](@ref): return `Statistics.mean` or `Statistics.median` of `val`, with the weights `measure.w` when the measure carries them. A tuple is `collect`ed first on the weighted branch.
- 6. `measure` is a [`StdValue`](@ref) or a [`VarValue`](@ref): return `Statistics.std` or `Statistics.var` of `val`, with `corrected = measure.corrected`, with the weights `measure.w` when the measure carries them, and with `kwargs...` forwarded. A tuple is `collect`ed first on the weighted branch.
- 7. `measure` is a [`StandardisedValue`](@ref): follow that type's own algorithm, which reduces twice and guards the denominator.
+ 5. `measure` is a [`MeanValue`](@ref) or a [`MedianValue`](@ref): return `Statistics.mean` or `Statistics.median` of `val`, with the weights `measure.w` when the measure holds them. On the weighted branch, `collect` a tuple first.
+ 6. `measure` is a [`StdValue`](@ref) or a [`VarValue`](@ref): return `Statistics.std` or `Statistics.var` of `val`, with `corrected = measure.corrected`, with the weights `measure.w` when the measure holds them, and with `kwargs...`. On the weighted branch, `collect` a tuple first.
+ 7. `measure` is a [`StandardisedValue`](@ref): follow the algorithm of that type, which reduces two times and guards the denominator.
 
-Step 1 is the case that makes a plain number a legal `measure`: a caller that already holds the value writes it where a reduction goes, and `vec_to_real_measure` needs no second signature.
+Because of step 1, a plain number is a valid `measure`. A caller that already has the value writes it where a reduction goes, and `vec_to_real_measure` needs no second signature.
 
 # Arguments
 
-  - `measure`: One of three things.
+  - `measure`: One of three values.
 
       + `::VectorToScalarMeasure`: The reduction to apply to `val`.
       + `::Number`: The value to return, whatever `val` holds.
-      + `::Function`: Applied to `val` directly, as `measure(val)`.
+      + `::Function`: The function to apply to `val`, as `measure(val)`.
 
-  - `val`: A vector or tuple of real values to be reduced. A tuple is accepted wherever a vector is, and the weighted reductions `collect` it first, because `Statistics` needs an `AbstractVector` beside its weights. It is ignored when `measure` is a `Number`.
+  - `val`: A vector or a tuple of real values to reduce. Every reduction accepts a tuple, and the weighted reductions `collect` it first, because `Statistics` needs an `AbstractVector` with its weights. The function ignores `val` when `measure` is a `Number`.
 
-  - `kwargs...`: Forwarded to the underlying reduction. Only the [`StdValue`](@ref) and [`VarValue`](@ref) reductions read them.
+  - `kwargs...`: Keyword arguments for the reduction. Only the [`StdValue`](@ref) and [`VarValue`](@ref) reductions read them.
 
 # Returns
 
-  - `score::Number`: Computed value according to `measure`.
+  - `score::Number`: The value that `measure` gives.
 
 # Examples
 

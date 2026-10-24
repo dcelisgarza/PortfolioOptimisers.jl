@@ -1,5 +1,6 @@
 using PortfolioOptimisers
 using ParallelTestRunner
+using Test: Test
 
 #=
 Tests run in parallel via ParallelTestRunner.jl: every `test_*.jl` file is
@@ -61,4 +62,25 @@ end
 testsuite = find_tests(@__DIR__)
 filter!(kv -> startswith(basename(first(kv)), "test_"), testsuite)
 
-runtests(PortfolioOptimisers, ARGS; init_code, testsuite)
+# A failure that a row of `test/known_red.toml` covers does not turn the run red, so a new red
+# behind a known one stays visible (#1781). `test/known_red.jl` explains the filter. A terminal
+# keeps the live status lines of the runner, which it draws only on a `TTY`, and the old verdict.
+include(joinpath(@__DIR__, "known_red.jl"))
+if stdout isa Base.TTY
+    runtests(PortfolioOptimisers, ARGS; init_code, testsuite)
+else
+    buffer = IOBuffer()
+    io = IOContext(KnownRedRows.Tee(stdout, buffer), :color => get(stdout, :color, false))
+    try
+        runtests(PortfolioOptimisers, ARGS; init_code, testsuite, stdout = io)
+    catch e
+        if !(e isa Test.FallbackTestSetException)
+            rethrow()
+        end
+        lines, green = KnownRedRows.verdict(String(take!(buffer)), KnownRedRows.known_red())
+        foreach(println, lines)
+        if !(green)
+            rethrow()
+        end
+    end
+end

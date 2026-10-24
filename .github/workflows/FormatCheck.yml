@@ -8,7 +8,7 @@ on:
     branches:
       - main
       - dev*
-      - agents/*
+      - agents/**
     tags: ["*"]
   pull_request:
 
@@ -20,18 +20,35 @@ concurrency:
 
 jobs:
   build:
+    # A pull request from `dev*` or `agents/**` in this repository skips this job. The push to that
+    # branch runs it, and its check shows on the head commit of the pull request. ADR 0220.
+    if: >-
+      github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository || !((startsWith(github.head_ref, 'dev') && !contains(github.head_ref, '/')) || startsWith(github.head_ref, 'agents/'))
     runs-on: ubuntu-latest
     steps:
       - uses: julia-actions/setup-julia@latest
         with:
           version: '1'
       - uses: actions/checkout@v7
+      - name: Use Julia cache
+        uses: julia-actions/cache@v3
       - name: Format check
         shell: julia --color=yes {0}
         run: |
           using Pkg
-          # If you update the version, also update the style guide docs.
-          Pkg.add(PackageSpec(name="JuliaFormatter", version="2"))
+          # If you update the version, also update the style guide docs. A failed download of the
+          # registry (a TLS error, 2026-10-20) turned this check red with no formatting fault, so
+          # the download is tried three times.
+          for attempt in 1:3
+              try
+                  Pkg.add(PackageSpec(name="JuliaFormatter", version="2"))
+                  break
+              catch err
+                  attempt == 3 && rethrow()
+                  @warn "Pkg.add failed, attempt $attempt of 3" err
+                  sleep(20 * attempt)
+              end
+          end
           using JuliaFormatter
           # `verbose` names every file it visits, which was 374 of this job's 594 log lines
           # and says nothing a reader needs: the check reports by its exit code, and the

@@ -2001,6 +2001,10 @@ struct UnimplementedRedundancy <: PortfolioOptimisers.AbstractRedundancyAlgorith
         end
         @test occursin("does not implement redundancy_keep", e2.msg)
         @test occursin("requires_score", e2.msg)
+        # the generic `requires_score` already answers `true`, so an implementer adds it
+        # only to answer `false`, and the message says that (#550)
+        @test occursin("returning false when it can pick a survivor without a score",
+                       e2.msg)
     end
 
     @testset "correlation_components partitions the universe" begin
@@ -2481,7 +2485,8 @@ end
                         NestedClustered(; opti = EqualWeighted(), opto = EqualWeighted()),
                     "Stacking" =>
                         Stacking(; opti = [EqualWeighted()], opto = EqualWeighted()),
-                    "SubsetResampling" => SubsetResampling(; opt = EqualWeighted()),
+                    "SubsetResampling" =>
+                        SubsetResampling(; subset_size = 0.8, opt = EqualWeighted()),
                     "EqualWeighted" => EqualWeighted(),
                     "InverseVolatility" => InverseVolatility(),
                     "RandomWeighted" => RandomWeighted())
@@ -2540,7 +2545,7 @@ end
         rather than a configuration. Declaring rather than probing for `:opt` is what keeps
         that name collision from being mistaken for a configuration to route through.
         =#
-        sr = SubsetResampling(; opt = EqualWeighted())
+        sr = SubsetResampling(; subset_size = 0.8, opt = EqualWeighted())
         @test hasfield(typeof(sr), :opt)
         @test PO.pipe_config_field(sr) === nothing
     end

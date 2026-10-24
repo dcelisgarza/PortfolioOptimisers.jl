@@ -1103,7 +1103,7 @@ function attribution_investable_diagnostic(held::AbstractVector{<:Integer},
         return nothing
     end
     strict_diagnostic("a factor attribution cannot decompose a holding in an asset the prior could not estimate. Assets $(held) are not investable, and $(holder). $(note). Pass `strict = true` to refuse instead, reduce the weights to the investable universe, or refit the prior over a history that covers these assets.",
-                      strict)
+                      strict; id = @log_id(holder, note))
     return nothing
 end
 """

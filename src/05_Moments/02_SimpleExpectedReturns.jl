@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Computes the expected returns as the sample mean of the asset returns.
 
-`w` carries optional observation weights. If `w` is `nothing`, the mean is unweighted. This is the default expected returns estimator throughout the library.
+`w` holds the optional observation weights. If `w` is `nothing`, the mean is unweighted. The library uses this estimator as its default expected returns estimator.
 
 # Fields
 
@@ -25,23 +25,23 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
-  - `cache`: Carried unchanged via [`factory`](@ref).
+  - `cache`: Carried unchanged through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).
 
 ## Observation weight parameters
 
-When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
 
-  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
-  - `cache`: Dropped via [`obs_weights_view`](@ref), because no slice of a state exists on the observation axis.
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
+  - `cache`: Removed by [`obs_weights_view`](@ref), because a state has no slice on the observation axis.
 
 # Examples
 
@@ -95,11 +95,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Renders every field of a [`SimpleExpectedReturns`](@ref) except `cache`, and `cvg` only where a policy is set.
 
-The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:SimpleExpectedReturns, true)` to render it. `cvg` is read from the instance rather than from the type, because an opt-in that a caller has not taken is not part of the configuration they chose: an estimator whose `cvg` is `nothing` renders exactly as it did before the field existed, and one that carries a [`CoveragePolicy`](@ref) renders it.
+A `cache` holds the state of an incremental fit. That state is not part of the configuration, and it prints under the estimator at each site that renders the estimator. Set `set_show_nothing_fields!(:SimpleExpectedReturns, true)` to render it. The method reads `cvg` from the instance and not from the type, because an option that the caller did not set is not part of the configuration that the caller chose. An estimator whose `cvg` is `nothing` renders as it did before the field existed. An estimator that holds a [`CoveragePolicy`](@ref) renders it.
 
 # Arguments
 
-  - `me`: Expected returns estimator, read for its `cvg` field.
+  - `me`: The expected returns estimator. The method reads only its `cvg` field.
 
 # Returns
 
@@ -121,9 +121,9 @@ show_fields(me::SimpleExpectedReturns) = isnothing(me.cvg) ? (:w,) : (:w, :cvg)
         kwargs...
     ) -> ArrNum
 
-Compute the mean of asset returns using a [`SimpleExpectedReturns`](@ref) estimator.
+Compute the mean of the asset returns with a [`SimpleExpectedReturns`](@ref) estimator.
 
-This method computes the expected returns as the sample mean of the input data `X` according to `me`.
+The method computes the expected returns as the sample mean of `X`, as `me` configures it.
 
 # Mathematical definition
 
@@ -145,7 +145,7 @@ Weighted:
 
 Where:
 
-  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` vector of estimated expected returns, whose ``j``-th entry is ``\\hat{\\mu}_j``.
+  - ``\\hat{\\boldsymbol{\\mu}}``: The ``N \\times 1`` vector of estimated expected returns. Its ``j``-th entry is ``\\hat{\\mu}_j``.
   - $(math_dict[:mu_hat_j])
   - $(math_dict[:r_tj])
   - $(math_dict[:T])
@@ -154,7 +154,7 @@ Where:
 # Algorithm
 
  1. Check that `dims` is `1` or `2`.
- 2. Resolve the observation weights from `me.w` against `X`, giving `w`.
+ 2. Get the observation weights `w` from `me.w` and `X`.
  3. When `w` is `nothing`, take the unweighted mean of `X` along `dims`.
  4. Otherwise take the mean of `X` weighted by `w` along `dims`.
 
@@ -163,7 +163,7 @@ Where:
   - $(arg_dict[:me])
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to [`Statistics.mean`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.mean).
+  - `kwargs...`: More keyword arguments for [`get_observation_weights`](@ref), where a [`DynamicAbstractWeights`](@ref) can read them. The method does not pass them to `Statistics.mean`.
 
 # Validation
 
@@ -211,16 +211,16 @@ end
 
 Routes a sample-mean fit to the Coverage Universe arm or to the available-case arm.
 
-The `cvg` field of the estimator is passed as the second argument, so the arm is chosen by **dispatch on the policy** rather than by a branch on its value. An estimator that carries no policy therefore pays nothing for the field: the `Nothing` method is the body [`mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref) has always had, and it is statically resolved because the field's type is concrete.
+The `cvg` field of the estimator is the second argument, so dispatch on the policy selects the arm, not a branch on its value. The field costs nothing for an estimator that holds no policy. The `Nothing` method is the body that [`mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref) had before the field existed. The compiler resolves it statically, because the type of the field is concrete.
 
 # Arguments
 
   - $(arg_dict[:me])
-  - `cvg`: The policy the estimator carries, which selects the arm.
+  - `cvg`: The policy that the estimator holds. It selects the arm.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - `active_mask`: The active mask of the Asset Panel, `observations × assets`, or `nothing`. The Coverage Universe arm refuses an inactive cell, as it refuses a non-finite return.
-  - `kwargs...`: Additional keyword arguments passed to [`Statistics.mean`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.mean).
+  - `active_mask`: The active mask of the Asset Panel, `observations × assets`, or `nothing`. The Coverage Universe arm refuses an inactive cell, as it refuses a return that is not finite.
+  - `kwargs...`: More keyword arguments. The `Nothing` method passes them to [`get_observation_weights`](@ref). The [`CoveragePolicy`](@ref) method ignores them.
 
 # Returns
 
@@ -236,7 +236,7 @@ function coverage_mean end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of [`coverage_mean`](@ref). The Coverage Universe arm, which is the sample mean of a window every asset covers, and the answer [`mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref) gave before the `cvg` field existed. It refuses a gapped sample with [`assert_finite_sample`](@ref). A cell is a gap when its return is non-finite or when `active_mask` is `false` there, so the arm refuses an inactive cell too. An estimator with no policy reads the universe through [`coverage_reduction`](@ref), which gives it a block with no gap.
+The `Nothing` method of [`coverage_mean`](@ref) is the Coverage Universe arm. It returns the sample mean of a window that every asset covers. This is the result that [`mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref) gave before the `cvg` field existed. It refuses a gapped sample with [`assert_finite_sample`](@ref). A cell is a gap when its return is not finite or when `active_mask` is `false` at that cell, so the arm refuses an inactive cell too. An estimator with no policy reads the universe through [`coverage_reduction`](@ref), which gives it a block with no gap.
 
 # Related
 
@@ -258,15 +258,15 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`CoveragePolicy`](@ref) method of [`coverage_mean`](@ref). The available-case arm: each asset's mean is fitted on that asset's own finite and active observations, and the batch answer **is** the incremental one, because the arm folds the block through [`partial_fit!`](@ref) and reads the state out.
+The [`CoveragePolicy`](@ref) method of [`coverage_mean`](@ref) is the available-case arm. It fits the mean of each asset on the finite and active observations of that asset. The batch result is the incremental result, because the arm folds the block through [`partial_fit!`](@ref) and then reads the state.
 
-Writing the batch arm as the fold is what makes the map's oracle hold to the last bit rather than to a tolerance: there is one recursion, and a caller who hands the same rows over one at a time reaches the same floating-point number.
+Because the batch arm is the fold, the batch result and the incremental result agree to the last bit, not only to a tolerance. There is one recursion, so a caller who gives the same rows one at a time gets the same floating-point number.
 
 # Algorithm
 
- 1. Fold every row of `X` into a fresh state with [`partial_fit!`](@ref), carrying the active mask.
- 2. Read the state out with [`mean(me::SimpleExpectedReturns, state::SimpleExpectedReturnsState)`](@ref).
- 3. Orient the answer as the caller's `dims` asks.
+ 1. Fold each row of `X` into a new state with [`partial_fit!`](@ref), together with its row of the active mask.
+ 2. Read the state with [`mean(me::SimpleExpectedReturns, state::SimpleExpectedReturnsState)`](@ref).
+ 3. Orient the result as the `dims` of the caller sets.
 
 # Related
 
@@ -286,9 +286,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Carries the running observation count and mean of an incremental sample-mean fit.
+Holds the observation count and the running mean of an incremental sample-mean fit.
 
-The state of [`SimpleExpectedReturns`](@ref) under [`partial_fit!`](@ref). It holds no second-moment accumulator, because a mean is the whole estimate, so [`merge_states`](@ref) folds the two counts and the two means and discards the accumulator [`chan_merge`](@ref) returns.
+It is the state of [`SimpleExpectedReturns`](@ref) under [`partial_fit!`](@ref). It holds no second-moment accumulator, because the mean is the whole estimate. [`merge_states`](@ref) folds the two counts and the two means, and it discards the accumulator that [`chan_merge`](@ref) returns.
 
 # Fields
 
@@ -312,9 +312,9 @@ Keywords correspond to the struct's fields. A state seeded for `N` assets is `Si
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, its fields are subset to the selected assets:
+[`port_opt_view`](@ref) takes the view of its fields at the selected assets:
 
-  - `mu`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `mu`: Sliced to the selected indices through [`port_opt_view`](@ref).
 
 # Examples
 
@@ -360,7 +360,8 @@ Folds two [`SimpleExpectedReturnsState`](@ref) fitted on disjoint blocks into th
 # Algorithm
 
  1. Refuse the pair with [`assert_mergeable_states`](@ref).
- 2. Fold the counts and the means with [`chan_merge`](@ref), whose accumulator argument is `false`, the zero of a state that carries no accumulator. The accumulator it returns is discarded.
+ 2. If one of the two states holds no coverage counts, fold the counts and the means with [`chan_merge`](@ref). Its accumulator argument is `false`, which is the zero of a state that has no accumulator. Discard the accumulator that it returns.
+ 3. Otherwise, fold the mean of each asset with the per-asset counts `nu` of the two states. An asset with no observation in the two blocks keeps a mean of zero. Merge the coverage counts too.
 
 # Arguments
 
@@ -373,7 +374,7 @@ Folds two [`SimpleExpectedReturnsState`](@ref) fitted on disjoint blocks into th
 
 # Returns
 
-  - `state::SimpleExpectedReturnsState`: The state the two blocks give when they are fitted as one block.
+  - `state::SimpleExpectedReturnsState`: The state of the two blocks, as if one fit read them as one block.
 
 # Related
 
@@ -406,7 +407,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Copies a [`SimpleExpectedReturnsState`](@ref), so the copy shares no array with the original.
 
-The `copy` method of the [`AbstractPartialFitState`](@ref) interface, which [`partial_fit`](@ref) calls before it folds. The count is a scalar and passes through, and the running mean is copied.
+This method is the `copy` method of the [`AbstractPartialFitState`](@ref) interface, which [`partial_fit`](@ref) calls before it folds. The count is a scalar, and the method uses it without change. The method copies the running mean and the coverage counts.
 
 # Arguments
 
@@ -414,7 +415,7 @@ The `copy` method of the [`AbstractPartialFitState`](@ref) interface, which [`pa
 
 # Returns
 
-  - `state::SimpleExpectedReturnsState`: A fresh state, equal to `x`, whose `mu` is a fresh vector.
+  - `state::SimpleExpectedReturnsState`: A new state, equal to `x`, whose `mu` is a new vector.
 
 # Related
 
@@ -431,13 +432,13 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Slices a [`SimpleExpectedReturnsState`](@ref) to the selected assets.
 
-The Welford mean of one asset reads that asset's observations alone, so the slice of the state is the state of the sliced universe, entry for entry, and the count is shared by every asset and passes through. The slice copies by index and does not `view`: a later [`partial_fit!`](@ref) on the viewed estimator would otherwise write through into the arrays of the estimator the view was taken from.
+The Welford mean of one asset reads only the observations of that asset, so the slice of the state is the state of the sliced universe, entry for entry. All the assets share the count, so the method uses it without change. The slice copies by index and does not use a `view`. With a `view`, a later [`partial_fit!`](@ref) on the viewed estimator writes into the arrays of the original estimator.
 
 # Arguments
 
   - `x`: The state to slice.
-  - `i`: Index or indices of the assets to keep.
-  - `args...`: Additional positional arguments (ignored).
+  - `i`: The index or the indices of the assets to keep.
+  - `args...`: More positional arguments, which the method ignores.
 
 # Returns
 
@@ -455,7 +456,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`SimpleExpectedReturnsState`](@ref) method of [`partial_fit!`](@ref). Folds one observation into the running count and mean.
+The [`SimpleExpectedReturnsState`](@ref) method of [`partial_fit!`](@ref) folds one observation into the count and the running mean.
 
 # Mathematical definition
 
@@ -469,29 +470,29 @@ n &\\leftarrow n + 1\\\\
 
 Where:
 
-  - ``n``: observation count.
-  - ``\\boldsymbol{x}``: the observation.
-  - ``\\boldsymbol{\\mu}``: the running mean.
-  - ``\\boldsymbol{d}``: deviation of the observation from the mean before the fold.
+  - ``n``: The observation count.
+  - ``\\boldsymbol{x}``: The observation.
+  - ``\\boldsymbol{\\mu}``: The running mean.
+  - ``\\boldsymbol{d}``: The deviation of the observation from the mean before the fold.
 
 # Algorithm
 
- 1. Refuse an observation whose length is not the number of assets the state describes.
+ 1. Refuse an observation whose length is not the number of assets that the state describes.
  2. Add one to the count.
- 3. Move `mu` in place along the deviation, by the reciprocal of the new count.
- 4. Rebind the count with `Accessors.@reset`, and return the state.
+ 3. Add the deviation, divided by the new count, to `mu` in place.
+ 4. Build the state with the new count through its positional constructor, and return it.
 """
 function partial_fit!(state::SimpleExpectedReturnsState, x::VecNum)
     @argcheck(length(x) == length(state.mu),
               DimensionMismatch("the observation must have one entry per asset, but the state describes $(length(state.mu)) assets and `x` has $(length(x)) entries."))
     n = state.n + 1
     state.mu .+= (x .- state.mu) ./ n
-    return Accessors.@reset state.n = n
+    return SimpleExpectedReturnsState(n, state.mu, state.cvg)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of the coverage arm of [`partial_fit!`](@ref). An estimator that carries no [`CoveragePolicy`](@ref) folds through [`partial_fit!(state::SimpleExpectedReturnsState, x::VecNum)`](@ref). A plain state carries one count for every asset, so it cannot skip an inactive cell. [`inactive_as_nonfinite`](@ref) writes `NaN` there, and the asset then answers `NaN`, as the Asset Panel method answers an asset outside the Coverage Universe of the same rows.
+This is the `Nothing` method of the coverage arm of [`partial_fit!`](@ref). An estimator that holds no [`CoveragePolicy`](@ref) folds through [`partial_fit!(state::SimpleExpectedReturnsState, x::VecNum)`](@ref). A plain state holds one count for all the assets, so it cannot skip an inactive cell. [`inactive_as_nonfinite`](@ref) writes `NaN` in that cell, and the mean of the asset is then `NaN`. The Asset Panel method gives the same `NaN` for an asset outside the Coverage Universe of the same rows.
 
 # Related
 
@@ -506,7 +507,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`CoveragePolicy`](@ref) method of the coverage arm of [`partial_fit!`](@ref). Folds one observation into the running per-asset count and mean, reading each asset's own observations alone.
+This is the [`CoveragePolicy`](@ref) method of the coverage arm of [`partial_fit!`](@ref). It folds one observation into the count and the running mean of each asset. Each asset reads only its own observations.
 
 # Mathematical definition
 
@@ -517,32 +518,32 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 \\end{align}
 ```
 
-for every asset ``j`` that is finite and active at observation ``t``, and neither line for an asset that is not. Where:
+for each asset ``j`` that is finite and active at observation ``t``. The method applies neither line to an asset that is not finite and active. Where:
 
-  - ``\\nu_j``: the number of observations at which asset ``j`` was finite and active.
+  - ``\\nu_j``: The number of observations at which asset ``j`` is finite and active.
   - $(math_dict[:r_tj])
-  - ``\\mu_j``: the running mean of asset ``j``.
+  - ``\\mu_j``: The running mean of asset ``j``.
 
-An asset with no observation keeps ``\\mu_j = 0`` and ``\\nu_j = 0``, and `mean(me)` with no data answers `NaN` for it, so the zero is never read as an estimate. This is Welford's recursion per asset, so a mean folded observation by observation is the mean of the same rows fitted as a block.
+An asset with no observation keeps ``\\mu_j = 0`` and ``\\nu_j = 0``. `mean(me)` with no data returns `NaN` for it, so no caller reads the zero as an estimate. This is the Welford recursion for each asset. A mean that folds one observation at a time is the mean of the same rows in one block fit.
 
 # Algorithm
 
- 1. Refuse an observation whose length is not the number of assets the state describes.
- 2. Read the valid assets and the newly inactive ones with [`coverage_valid`](@ref).
- 3. Apply the algorithm's fold-time rule with [`fold_inactive!`](@ref).
- 4. Fold each valid asset's return into its own count and mean.
- 5. Move the per-asset bookkeeping on with [`coverage_step!`](@ref), add one to the observation count, and return the state.
+ 1. Refuse an observation whose length is not the number of assets that the state describes.
+ 2. Read the valid assets, and the assets that became inactive at this observation, with [`coverage_valid`](@ref).
+ 3. Apply the fold-time rule of the coverage algorithm with [`fold_inactive!`](@ref).
+ 4. Fold the return of each valid asset into the count and the mean of that asset.
+ 5. Update the per-asset records with [`coverage_step!`](@ref). Add one to the observation count, and return the state.
 
 # Arguments
 
-  - `state`: The state to fold into, mutated in place.
-  - `x`: One observation, one entry per asset.
-  - `cvg`: The policy the estimator carries.
+  - `state`: The state to fold into. The method changes it in place.
+  - `x`: One observation, with one entry for each asset.
+  - `cvg`: The policy that the estimator holds.
   - `active_mask`: The active mask of the Asset Panel at this observation, or `nothing`.
 
 # Validation
 
-  - `length(x)` is the number of assets the state describes. A `DimensionMismatch` is thrown otherwise.
+  - `length(x)` is the number of assets that the state describes. A `DimensionMismatch` is thrown otherwise.
 
 # Returns
 
@@ -572,12 +573,12 @@ function partial_fit!(state::SimpleExpectedReturnsState, x::VecNum, cvg::Coverag
         end
     end
     coverage_step!(counts, valid, active_mask)
-    return Accessors.@reset state.n = state.n + 1
+    return SimpleExpectedReturnsState(state.n + 1, state.mu, counts)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`SimpleExpectedReturnsState`](@ref) method of [`fold_inactive!`](@ref) under [`ResetCoverage`](@ref). Zeroes the count, the centre and the running mean of every asset that has just gone inactive, so that a relisting starts the asset cold. The centre of a per-asset state is `nothing`, because its `mu` is already the cell's centre, and [`coverage_reset!`](@ref) passes that through.
+This is the [`SimpleExpectedReturnsState`](@ref) method of [`fold_inactive!`](@ref) under [`ResetCoverage`](@ref). It sets to zero the count, the centre and the running mean of each asset that became inactive at this observation. A relisted asset then starts cold. The centre of a per-asset state is `nothing`, because its `mu` is already the centre of the cell. [`coverage_reset!`](@ref) does nothing to a `nothing`.
 
 # Related
 
@@ -597,26 +598,28 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Folds every observation of a block into the partial-fit state of a [`SimpleExpectedReturns`](@ref) estimator.
 
-The block arm of the [`partial_fit!`](@ref) interface. Welford's update reads one observation at a time, so the block is folded row by row and the answer is the answer of the same rows handed over one at a time.
+This method is the block arm of the [`partial_fit!`](@ref) interface. The Welford update reads one observation at a time, so the method folds the block one row at a time. The result equals the result of the same rows given one at a time.
 
 # Algorithm
 
- 1. Orient `X` to `observations × assets`, transposing it when `dims == 2`.
- 2. Fold each row in turn with the single-observation arm of [`partial_fit!`](@ref), rebinding the estimator each time.
+ 1. Orient `X` and `active_mask` to `observations × assets`. Transpose them when `dims == 2`.
+ 2. Fold each row in order with the single-observation arm of [`partial_fit!`](@ref), together with its row of the active mask. Rebind the estimator after each row.
 
 # Arguments
 
-  - `me`: Expected returns estimator.
+  - `me`: The expected returns estimator.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
+  - `active_mask`: The active mask of the Asset Panel, with the same size as `X`, or `nothing`.
 
 # Validation
 
   - $(val_dict[:dims])
+  - If `active_mask` is not `nothing`, its size is the size of `X` after the orientation. A `DimensionMismatch` is thrown otherwise.
 
 # Returns
 
-  - `me::SimpleExpectedReturns`: The estimator carrying the state after the last row.
+  - `me::SimpleExpectedReturns`: The estimator that holds the state after the last row.
 
 # Related
 
@@ -642,38 +645,41 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`SimpleExpectedReturns`](@ref) method of [`partial_fit!`](@ref). Folds one observation into the state the `cache` field carries, seeding it on the first call.
+The [`SimpleExpectedReturns`](@ref) method of [`partial_fit!`](@ref) folds one observation into the state of the `cache` field. On the first call, it seeds that state.
 
 # Algorithm
 
- 1. Refuse a configuration no incremental fit reproduces, with [`assert_partial_fittable`](@ref).
+ 1. Refuse a configuration that no incremental fit can reproduce, with [`assert_partial_fittable`](@ref).
  2. Seed a [`SimpleExpectedReturnsState`](@ref) of zeros over `length(x)` assets when `me.cache` holds `nothing`, with [`expected_returns_state_seed`](@ref).
- 3. Fold `x` into the state.
- 4. Rebind `me.cache` with `Accessors.@reset`, and return the estimator.
+ 3. Fold `x` into the state, with the policy `me.cvg` and the active mask.
+ 4. Rebuild the estimator with the new state in `cache` through [`rebuild_estimator`](@ref), and return it.
 """
 function partial_fit!(me::SimpleExpectedReturns{<:Any, <:Any,
                                                 <:Option{<:SimpleExpectedReturnsState}},
                       x::VecNum; active_mask::Option{<:AbstractVector{<:Bool}} = nothing)
     assert_partial_fittable(me, me.w, "SimpleExpectedReturns")
     state = expected_returns_state_seed(me.cache, x, me.cvg)
-    return Accessors.@reset me.cache = partial_fit!(state, x, me.cvg, active_mask)
+    return rebuild_estimator(me, (; cache = partial_fit!(state, x, me.cvg, active_mask)))
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    expected_returns_state_seed(cache::Nothing, x::VecNum,
+                                cvg::Option{<:CoveragePolicy} = nothing) -> SimpleExpectedReturnsState
+    expected_returns_state_seed(cache::SimpleExpectedReturnsState, x::VecNum,
+                                cvg::Option{<:CoveragePolicy} = nothing) -> SimpleExpectedReturnsState
 
-Returns the [`SimpleExpectedReturnsState`](@ref) an incremental mean fit folds into, seeding one of zeros when the estimator carries none.
+Returns the [`SimpleExpectedReturnsState`](@ref) that an incremental mean fit folds into. If the estimator holds no state, the function seeds a state of zeros.
 
-The seed is written here rather than inside [`partial_fit!`](@ref), so the fold reads as one line and the branch that reads the `cache` field has one home.
+The seed is in this function and not in [`partial_fit!`](@ref), so the fold is one line, and the dispatch on the type of the `cache` field is in one place.
 
 # Arguments
 
-  - `cache`: The state the estimator carries, or `nothing`.
-  - `x`: One observation, `assets × 1`, read for its length and its element type.
-  - `cvg`: The policy the estimator carries, which decides whether the seed carries per-asset counts.
+  - `cache`: The state that the estimator holds, or `nothing`.
+  - `x`: One observation, `assets × 1`. The function reads only its length and its element type.
+  - `cvg`: The policy that the estimator holds. It decides if the seed holds per-asset counts.
 
 # Returns
 
-  - `state::SimpleExpectedReturnsState`: The state `cache` holds, or a state of zeros over `length(x)` assets.
+  - `state::SimpleExpectedReturnsState`: The state that `cache` holds, or a state of zeros over `length(x)` assets.
 
 # Related
 
@@ -682,15 +688,21 @@ The seed is written here rather than inside [`partial_fit!`](@ref), so the fold 
   - [`coverage_counts_seed`](@ref)
   - [`partial_fit!`](@ref)
 """
-function expected_returns_state_seed(cache::Option{<:SimpleExpectedReturnsState}, x::VecNum,
+function expected_returns_state_seed(::Nothing, x::VecNum,
                                      cvg::Option{<:CoveragePolicy} = nothing)
     N = length(x)
     Tf = float_if_integer(eltype(x))
-    return if isnothing(cache)
-        SimpleExpectedReturnsState(0, zeros(Tf, N),
-                                   coverage_counts_seed(cvg, nothing, N, Tf, false))
+    return SimpleExpectedReturnsState(0, zeros(Tf, N),
+                                      coverage_counts_seed(cvg, nothing, N, Tf, false))
+end
+function expected_returns_state_seed(cache::SimpleExpectedReturnsState, x::VecNum,
+                                     cvg::Option{<:CoveragePolicy} = nothing)
+    counts = coverage_counts_seed(cvg, cache.cvg, length(x), float_if_integer(eltype(x)),
+                                  false)
+    return if counts === cache.cvg
+        cache
     else
-        Accessors.@reset cache.cvg = coverage_counts_seed(cvg, cache.cvg, N, Tf, false)
+        SimpleExpectedReturnsState(cache.n, cache.mu, counts)
     end
 end
 """
@@ -702,14 +714,14 @@ end
         me::SimpleExpectedReturns
     ) -> VecNum
 
-Read the mean of an incremental fit out of a [`SimpleExpectedReturnsState`](@ref).
+Read the mean of an incremental fit from a [`SimpleExpectedReturnsState`](@ref).
 
-The two-argument method reads a state the caller holds, and the one-argument method reads the state the `cache` field of `me` carries. Both return the running mean as a vector, `assets × 1`, where the batch method over a matrix returns a row when `dims = 1`.
+The two-argument method reads a state that the caller holds. The one-argument method reads the state in the `cache` field of `me`. Both methods return the running mean as a vector, `assets × 1`. The batch method over a matrix returns a row when `dims = 1`.
 
 # Algorithm
 
- 1. Refuse a configuration no incremental fit reproduces, with [`assert_partial_fittable`](@ref).
- 2. Return a vector of `NaN` when the state holds no observation, in the way `min_obs` reads an asset with too few observations.
+ 1. Refuse a configuration that no incremental fit can reproduce, with [`assert_partial_fittable`](@ref).
+ 2. Return a vector of `NaN` when the state holds no observation. `min_obs` reads an asset with too few observations in the same way.
  3. Otherwise return the running mean.
 
 # Arguments
@@ -719,12 +731,12 @@ The two-argument method reads a state the caller holds, and the one-argument met
 
 # Validation
 
-  - `me` carries no observation weights. An `ArgumentError` is thrown otherwise.
+  - `me` holds no observation weights. An `ArgumentError` is thrown otherwise.
   - `me.cache` is not `nothing`, for the one-argument method. An `ArgumentError` is thrown otherwise.
 
 # Returns
 
-  - `mu::VecNum`: Running mean of the fit, `assets × 1`, or `NaN` where the state holds no observation.
+  - `mu::VecNum`: The running mean of the fit, `assets × 1`, with `NaN` where the state holds no observation.
 
 # Examples
 
@@ -751,9 +763,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of [`coverage_mean`](@ref) for a state, which `mean(me)` with no data calls. Every asset shares one count, so the whole answer is `NaN` before the first observation and the running mean afterwards.
+This is the `Nothing` method of [`coverage_mean`](@ref) for a state. `mean(me)` with no data calls it. All the assets share one count, so the result is all `NaN` before the first observation, and the running mean after it.
 
-The running mean is **copied** rather than handed out. `partial_fit!` writes the Welford recursion into `state.mu` in place, so a `mean(me)` that returned the accumulator itself would hand the caller a vector that the next fold silently rewrites — and a prior that read its `mu` out and carried it into a Result would find the Result changed under it at the next observation. The [`CoveragePolicy`](@ref) method beside this one copies for the same reason, through [`coverage_frame`](@ref).
+The method returns a copy of the running mean, not the vector in the state. `partial_fit!` writes the Welford recursion into `state.mu` in place. A returned reference to that vector changes at the next fold, with no message to the caller. A prior that puts that `mu` into a Result then has a Result that changes after the next observation. The [`CoveragePolicy`](@ref) method of this file copies for the same reason, through [`coverage_frame`](@ref).
 
 # Related
 
@@ -772,12 +784,12 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`CoveragePolicy`](@ref) method of [`coverage_mean`](@ref) for a state, which `mean(me)` with no data calls. Each asset's mean is read out against that asset's own count, and an asset the policy refuses is `NaN`.
+This is the [`CoveragePolicy`](@ref) method of [`coverage_mean`](@ref) for a state. `mean(me)` with no data calls it. The method reads the mean of each asset with the count of that asset. An asset that the policy refuses is `NaN`.
 
 # Algorithm
 
  1. Read the admitted assets with [`coverage_admission`](@ref).
- 2. Frame the running mean with [`coverage_frame`](@ref), which copies it where its asset has an observation. A running per-asset mean is already the ratio, so it is never divided again.
+ 2. Put the running mean in a frame with [`coverage_frame`](@ref), which copies the mean of each asset that has an observation. A running per-asset mean is already the ratio, so the method does not divide it again.
 
 # Related
 

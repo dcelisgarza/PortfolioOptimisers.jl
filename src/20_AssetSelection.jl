@@ -1,28 +1,28 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the rules that turn per-asset scores into a keep-mask.
+Abstract supertype for the rules that turn the scores of the assets into a keep-mask.
 
-A selection rule is an [`AbstractAlgorithm`](@ref): it is consumed through [`ScoreSelector`](@ref) and never used on its own. Rules split into two kinds.
+A selection rule is an [`AbstractAlgorithm`](@ref). A [`ScoreSelector`](@ref) uses it, and it has no use on its own. There are two kinds of rule.
 
-  - **Literal**: [`ThresholdRule`](@ref) compares a score against absolute bounds and ignores [`bigger_is_better`](@ref). A threshold on a variance means what it says; reinterpreting it as "keep the better ones" would invert the intent of a zero-variance filter.
-  - **Ordinal**: [`RankRule`](@ref) and [`QuantileRule`](@ref) sort assets from best to worst — consulting [`bigger_is_better`](@ref), so `:best` is lowest risk for a risk measure and highest value for a return measure — and take counts or fractions from each tail.
+  - **Literal.** [`ThresholdRule`](@ref) compares a score with absolute bounds, and it ignores [`bigger_is_better`](@ref). A threshold on a variance is the variance that it states. The rule does not read it as "keep the better assets". That change inverts the purpose of a [`ZeroVarianceFilter`](@ref).
+  - **Ordinal.** [`RankRule`](@ref) and [`QuantileRule`](@ref) sort the assets from the best to the worst, and take a count or a fraction from each end. [`bigger_is_better`](@ref) sets the order, so `:best` is the lowest risk for a risk measure and the highest value for a return measure.
 
 # Interfaces
 
-In order to implement a new selection rule that works seamlessly with the library, subtype `AbstractSelectionRule` with all necessary parameters as part of the struct, and implement the following method:
+To add a selection rule, subtype `AbstractSelectionRule`, put every parameter of the rule in the struct, and add this method:
 
-  - `rule_keep(rule::AbstractSelectionRule, scores::VecNum, bib::Bool) -> BitVector`: Turn the per-asset scores into a keep-mask.
+  - `rule_keep(rule::AbstractSelectionRule, scores::VecNum, bib::Bool) -> BitVector`: Turn the scores of the assets into a keep-mask.
 
 ## Arguments
 
-  - `rule`: The concrete selection rule instance.
-  - `scores`: Per-asset score vector `assets × 1`.
-  - `bib`: [`bigger_is_better`](@ref) flag of the risk measure that produced `scores`. A literal rule ignores it.
+  - `rule`: The concrete selection rule.
+  - `scores`: The score vector `assets × 1`, with one score for each asset.
+  - `bib`: The [`bigger_is_better`](@ref) flag of the risk measure that gave `scores`. A literal rule ignores it.
 
 ## Returns
 
-  - `keep::BitVector`: Mask `assets × 1` that is `true` for every admitted asset.
+  - `keep::BitVector`: The mask `assets × 1`. It is `true` for every asset that the rule admits.
 
 # Related
 
@@ -35,9 +35,9 @@ abstract type AbstractSelectionRule <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Keep assets whose score falls strictly inside the band `(lo, hi)`.
+Keep the assets whose score is strictly inside the band `(lo, hi)`.
 
-Both bounds are optional and **literal**: `lo` and `hi` are compared against the raw score, never reinterpreted through [`bigger_is_better`](@ref). Omitting a bound leaves that side unbounded.
+Both bounds are optional, and both are literal. The rule compares `lo` and `hi` with the raw score, and [`bigger_is_better`](@ref) does not change them. A bound that the caller omits sets no limit on that side.
 
 # Mathematical definition
 
@@ -54,7 +54,7 @@ Where:
   - ``l``: `lo`, the lower bound. An omitted bound is ``-\\infty``.
   - ``u``: `hi`, the upper bound. An omitted bound is ``+\\infty``.
 
-Both comparisons are **strict**, so the band is open: an asset whose score equals ``l`` or ``u`` is dropped.
+Both comparisons are **strict**, so the band is open. The rule drops an asset whose score is equal to ``l`` or to ``u``.
 
 # Fields
 
@@ -90,11 +90,11 @@ ThresholdRule
 """
 @concrete struct ThresholdRule <: AbstractSelectionRule
     """
-    Exclusive lower bound on the score; `nothing` leaves the lower side unbounded.
+    The exclusive lower bound on the score. `nothing` sets no lower bound.
     """
     lo
     """
-    Exclusive upper bound on the score; `nothing` leaves the upper side unbounded.
+    The exclusive upper bound on the score. `nothing` sets no upper bound.
     """
     hi
     function ThresholdRule(lo::Option{<:Number}, hi::Option{<:Number})
@@ -115,15 +115,17 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Take `best` and/or `worst` assets from the tails of the score ordering, then keep or drop them.
+Take a number of assets from each end of the order of the scores, then keep them or drop them.
 
-`best` and `worst` are **counts taken from each end**, not positions: `best = 20` means twenty assets, not rank twenty. Which end is "best" comes from [`bigger_is_better`](@ref) on the score, so `RankRule(; best = 20)` keeps the twenty lowest-risk assets for a risk measure and the twenty highest-return assets for `MeanReturn`. Giving both takes both tails. `action = :drop` complements the whole selection, which is how "drop the five worst" is said without knowing the universe size.
+`best` and `worst` are **counts that the rule takes from each end**, not positions. `best = 20` means twenty assets, not the asset at rank twenty. [`bigger_is_better`](@ref) of the score sets which end is the best. For a risk measure, `RankRule(; best = 20)` keeps the twenty assets with the lowest risk. For `MeanReturn`, it keeps the twenty with the highest return. A rule with both counts takes both ends. `action = :drop` takes the complement of the selection. With it, a rule can drop the five worst assets with no knowledge of the size of the universe.
 
-Counts **saturate** at the number of assets: `best = 50` on a 30-asset window keeps all 30 rather than throwing, so a hyperparameter search over `best` is never killed by its largest point.
+A count **saturates** at the number of assets. On a window of 30 assets, `best = 50` keeps all 30 and does not throw. A hyperparameter search over `best` then does not fail at its largest value.
 
 !!! warning
 
-    Ties at the cut are **excluded entirely**, so a rule may return *fewer* assets than asked. If the 20th and 21st assets have equal scores, `RankRule(; best = 20)` keeps 19 — the tied block is dropped rather than split arbitrarily. This is the library's "if we cannot tell them apart, trust neither" tie policy, shared with `find_uncorrelated_indices`, which removes both assets of an exactly-tied correlated pair. A window whose scores are all equal therefore selects nothing, and [`fit_preprocessing`](@ref) throws.
+    The rule **excludes every asset** of a tied block at the cut, so it can return *fewer* assets than the count. If the 20th and the 21st assets have equal scores, `RankRule(; best = 20)` keeps 19. The rule drops the tied block, and it does not split the block arbitrarily.
+
+    This is the tie policy of the library: if the library cannot tell two assets apart, it keeps neither of them. `find_uncorrelated_indices` has the same policy. It removes both assets of a correlated pair whose drop scores are equal. A window whose scores are all equal selects no asset, and [`fit_preprocessing`](@ref) throws.
 
 # Mathematical definition
 
@@ -144,13 +146,13 @@ Where:
   - $(math_dict[:s_i_score])
   - $(math_dict[:N])
   - $(math_dict[:k_tail_count])
-  - ``\\mathcal{T}(k)``: Tail of size ``k``, taken at the end the subscript names.
-  - ``a_{i}``: Number of assets whose score is strictly better than ``s_{i}``. At the `best` end a larger score is better when [`bigger_is_better`](@ref) is `true` and a smaller score is better when it is `false`; the `worst` end reverses that.
-  - ``e_{i}``: Number of assets whose score equals ``s_{i}``, asset ``i`` included, so ``e_{i} \\geq 1``.
-  - ``k_{b}``, ``k_{w}``: `best` and `worst`, each saturated to ``[0,\\, N]``. An omitted count is ``0``.
-  - ``\\mathcal{S}``: Union of the two tails, before `action` is applied.
+  - ``\\mathcal{T}(k)``: The tail of size ``k``, at the end that the subscript names.
+  - ``a_{i}``: The number of assets whose score is strictly better than ``s_{i}``. At the `best` end, a larger score is better when [`bigger_is_better`](@ref) is `true`, and a smaller score is better when it is `false`. The `worst` end reverses this order.
+  - ``e_{i}``: The number of assets whose score is equal to ``s_{i}``. The number includes asset ``i``, so ``e_{i} \\geq 1``.
+  - ``k_{b}``, ``k_{w}``: The counts `best` and `worst`, each saturated to ``[0,\\, N]``. An omitted count is ``0``.
+  - ``\\mathcal{S}``: The union of the two tails, before the rule applies `action`.
 
-Two consequences follow. A tail admits asset ``i`` only when the whole tied block of ``i`` fits within ``k``, so a block that straddles the cut is excluded and ``\\left| \\mathcal{T}(k) \\right| \\leq k``. A universe whose scores are all equal gives ``a_{i} + e_{i} = N`` for every asset, so every tail of size ``k < N`` is empty.
+Two facts follow from this definition. A tail admits asset ``i`` only when the whole tied block of ``i`` fits in ``k``. A tail excludes a block that crosses the cut, so ``\\left| \\mathcal{T}(k) \\right| \\leq k``. If all the scores are equal, ``a_{i} + e_{i} = N`` for every asset, so every tail of size ``k < N`` is empty.
 
 # Fields
 
@@ -169,7 +171,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - At least one of `best`, `worst` is not `nothing`.
-  - Any given count is `>= 0`, and at least one is `> 0`.
+  - Every given count is `>= 0`, and at least one count is `> 0`.
   - `action in (:keep, :drop)`.
 
 # Examples
@@ -190,11 +192,11 @@ RankRule
 """
 @concrete struct RankRule <: AbstractSelectionRule
     """
-    Number of assets to take from the best end; `nothing` takes none.
+    The number of assets to take from the best end. `nothing` takes no asset.
     """
     best
     """
-    Number of assets to take from the worst end; `nothing` takes none.
+    The number of assets to take from the worst end. `nothing` takes no asset.
     """
     worst
     """
@@ -214,11 +216,13 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-[`RankRule`](@ref) with the tail sizes given as *fractions* of the asset universe.
+A [`RankRule`](@ref) whose tail sizes are *fractions* of the asset universe.
 
-`best` and `worst` are fractions in `(0, 1)`, converted to counts as `round(Int, fraction * n, RoundNearestTiesUp)` on the window being fitted. An exact half rounds **up**, so `best = 0.625` on a 4-asset window takes 3 assets, not the 2 that Julia's default banker's rounding would give. Everything else — orientation via [`bigger_is_better`](@ref), the `action` complement, count saturation, and the tie policy that excludes a straddling tied block — is identical to [`RankRule`](@ref).
+`best` and `worst` are fractions in `(0, 1)`. The rule converts each fraction to a count with `round(Int, fraction * n, RoundNearestTiesUp)` on the window that it fits. An exact half rounds **up**. For example, `best = 0.625` on a window of 4 assets takes 3 assets, and not the 2 that the default `RoundNearest` of Julia gives.
 
-Fractions and counts are separate types on purpose: `best = 1` (one asset) and `best = 1.0` (the whole universe) would otherwise differ only by a literal's type.
+The other behaviour is the same as for [`RankRule`](@ref). [`bigger_is_better`](@ref) sets the order, `action = :drop` takes the complement, a count saturates, and the rule excludes a tied block that crosses the cut.
+
+Fractions and counts have separate types on purpose. If one rule took both, `best = 1` is one asset and `best = 1.0` is the whole universe. Only the type of the literal tells the two apart.
 
 # Mathematical definition
 
@@ -232,9 +236,9 @@ Where:
 
   - $(math_dict[:k_tail_count])
   - $(math_dict[:N])
-  - ``f``: `best` or `worst`, a fraction in ``(0,\\, 1)``.
+  - ``f``: The fraction `best` or `worst`, in ``(0,\\, 1)``.
 
-The floor of ``f N + 1/2`` is `RoundNearestTiesUp`: an exact half rounds **up**, and not to the even neighbour that Julia's default `RoundNearest` picks. The two counts are then the ``k_{b}`` and ``k_{w}`` of [`RankRule`](@ref), which states the admitted set.
+The floor of ``f N + 1/2`` is the rounding mode `RoundNearestTiesUp`. An exact half rounds **up**, and not to the even neighbour that the default `RoundNearest` of Julia selects. The two counts are then the ``k_{b}`` and the ``k_{w}`` of [`RankRule`](@ref), which states the admitted set.
 
 # Fields
 
@@ -253,7 +257,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - At least one of `best`, `worst` is not `nothing`.
-  - Any given fraction lies in `(0, 1)`.
+  - Every given fraction is in `(0, 1)`.
   - `action in (:keep, :drop)`.
 
 # Examples
@@ -273,11 +277,11 @@ QuantileRule
 """
 @concrete struct QuantileRule <: AbstractSelectionRule
     """
-    Fraction of the universe to take from the best end; `nothing` takes none.
+    The fraction of the universe to take from the best end. `nothing` takes no asset.
     """
     best
     """
-    Fraction of the universe to take from the worst end; `nothing` takes none.
+    The fraction of the universe to take from the worst end. `nothing` takes no asset.
     """
     worst
     """
@@ -305,7 +309,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Validate the `action` field shared by the ordinal selection rules.
+Check the `action` field that the ordinal selection rules share.
 
 # Arguments
 
@@ -313,7 +317,7 @@ Validate the `action` field shared by the ordinal selection rules.
 
 # Validation
 
-  - `action in (:keep, :drop)`, else an `ArgumentError` is thrown naming the value it got.
+  - `action in (:keep, :drop)`. Otherwise the function throws an `ArgumentError` that names the value of `action`.
 
 # Returns
 
@@ -332,19 +336,21 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Validate the `best`/`worst` tail sizes shared by the ordinal selection rules.
+Check the tail counts `best` and `worst` of a [`RankRule`](@ref).
+
+[`QuantileRule`](@ref) takes fractions, and its constructor checks them itself.
 
 # Arguments
 
-  - `best`: Number of assets to take from the best end, or `nothing`.
-  - `worst`: Number of assets to take from the worst end, or `nothing`.
-  - `name`: Name of the rule being constructed, written into every exception message.
+  - `best`: The number of assets to take from the best end, or `nothing`.
+  - `worst`: The number of assets to take from the worst end, or `nothing`.
+  - `name`: The name of the rule that the caller constructs. Every exception message names it.
 
 # Validation
 
-  - At least one of `best`, `worst` is not `nothing`, else an `IsNothingError` is thrown.
-  - Every count that is given is `>= 0`, else a `DomainError` is thrown.
-  - The larger of the two counts is `> 0`, else a `DomainError` is thrown. A rule that takes no asset is rejected.
+  - At least one of `best` and `worst` is not `nothing`. Otherwise the function throws an `IsNothingError`.
+  - Every given count is `>= 0`. Otherwise the function throws a `DomainError`.
+  - The larger of the two counts is `> 0`. Otherwise the function throws a `DomainError`, because the rule takes no asset.
 
 # Returns
 
@@ -371,31 +377,31 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return the mask of the `k` assets furthest into the `tail` end of the score ordering.
+Return the mask of the `k` assets that are furthest into the `tail` end of the order of the scores.
 
-`tail` is `:best` or `:worst`; which raw direction that is comes from `bib`, the [`bigger_is_better`](@ref) flag of the score. The count saturates at `length(scores)`.
+`tail` is `:best` or `:worst`. `bib`, the [`bigger_is_better`](@ref) flag of the score, sets which raw direction each end is. The count saturates at `length(scores)`.
 
-Assets tied with the `k`-th score are included only when the whole tied block fits within `k`. Otherwise the block straddles the cut and is excluded — the "trust neither" tie policy, which is why the returned mask may hold fewer than `k` assets. [`RankRule`](@ref) states the admitted set in closed form.
+The mask includes the assets tied with the score at position `k` only when the whole tied block fits in `k`. Otherwise the block crosses the cut, and the mask excludes it. This is the tie policy of the library, and it is the reason that the mask can hold fewer than `k` assets. [`RankRule`](@ref) states the admitted set in closed form.
 
 # Algorithm
 
  1. Read `n`, the number of scores. Return `n` falses when `k` is not positive, and `n` trues when `k` is at least `n`. The second case is the saturation of the count.
- 2. Choose the comparison `ahead`. It is `>` when `tail` and `bib` agree that a larger score lies further into the tail, and `<` otherwise.
- 3. Sort the scores under `ahead` with `sortperm`, giving `perm`, and read `cut`, the score at position `k` of that order.
- 4. Count the scores strictly `ahead` of `cut`, giving `n_ahead`, and the scores equal to `cut`, giving `n_eq`.
- 5. Set `keep_ties` to `n_ahead + n_eq == k`. The tied block at the cut fits inside `k` only then, because `cut` sits at position `k` and so `n_ahead + n_eq >= k` always holds.
+ 2. Select the comparison `ahead`. It is `>` when `tail` and `bib` agree that a larger score is further into the tail, and `<` otherwise.
+ 3. Sort the scores under `ahead` with `sortperm` into `perm`. Read `cut`, the score at position `k` of that order.
+ 4. Count the scores strictly `ahead` of `cut` into `n_ahead`, and the scores equal to `cut` into `n_eq`.
+ 5. Set `keep_ties` to `n_ahead + n_eq == k`. The tied block at the cut fits in `k` only then. `cut` is at position `k`, so `n_ahead + n_eq >= k` is always true.
  6. Return the mask that is `true` for every score strictly `ahead` of `cut`, and for a score equal to `cut` when `keep_ties` is `true`.
 
 # Arguments
 
-  - `scores`: Per-asset score vector `assets × 1`.
-  - `k`: Number of assets to take from the `tail` end.
-  - `bib`: [`bigger_is_better`](@ref) flag of the score.
-  - `tail`: `:best` or `:worst`, the end to take from.
+  - `scores`: The score vector `assets × 1`, with one score for each asset.
+  - `k`: The number of assets to take from the `tail` end.
+  - `bib`: The [`bigger_is_better`](@ref) flag of the score.
+  - `tail`: The end to take from, `:best` or `:worst`.
 
 # Returns
 
-  - `keep::BitVector`: Mask `assets × 1` that is `true` for every asset in the tail. It holds at most `k` assets, and fewer when a tied block straddles the cut.
+  - `keep::BitVector`: The mask `assets × 1`. It is `true` for every asset in the tail. It holds `k` assets or fewer, and fewer when a tied block crosses the cut.
 
 # Related
 
@@ -421,21 +427,21 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Turn per-asset `scores` into a keep-mask under a selection rule.
+Turn the `scores` of the assets into a keep-mask under a selection rule.
 
-`bib` is the [`bigger_is_better`](@ref) flag of the score that produced them; [`ThresholdRule`](@ref) ignores it.
+`bib` is the [`bigger_is_better`](@ref) flag of the score that gave `scores`. [`ThresholdRule`](@ref) ignores it.
 
-One method per rule. The [`ThresholdRule`](@ref) method compares each score against the open band and returns the mask directly. The [`RankRule`](@ref) method hands its two counts to [`tail_action_mask`](@ref). The [`QuantileRule`](@ref) method converts each fraction to a count with `round(Int, f * n, RoundNearestTiesUp)` first, then hands those counts to the same function.
+There is one method for each rule. The [`ThresholdRule`](@ref) method compares each score with the open band, and returns the mask. The [`RankRule`](@ref) method gives its two counts to [`tail_action_mask`](@ref). The [`QuantileRule`](@ref) method first converts each fraction to a count with `round(Int, f * n, RoundNearestTiesUp)`. Then it gives the two counts to the same function.
 
 # Arguments
 
   - `rule`: The selection rule.
-  - `scores`: Per-asset score vector `assets × 1`.
-  - `bib`: [`bigger_is_better`](@ref) flag of the score that produced `scores`.
+  - `scores`: The score vector `assets × 1`, with one score for each asset.
+  - `bib`: The [`bigger_is_better`](@ref) flag of the score that gave `scores`.
 
 # Returns
 
-  - `keep::BitVector`: Mask `assets × 1` that is `true` for every asset the rule admits.
+  - `keep::BitVector`: The mask `assets × 1`. It is `true` for every asset that the rule admits.
 
 # Related
 
@@ -459,26 +465,26 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Union the two tail masks and apply the rule's `action`.
+Make the union of the two tail masks, and apply the `action` of the rule.
 
 # Algorithm
 
  1. Start from a mask of `length(scores)` falses.
- 2. When `best` is not `nothing`, take the `:best` tail of size `best` with [`tail_mask`](@ref) and union it into the mask.
- 3. When `worst` is not `nothing`, take the `:worst` tail of size `worst` with [`tail_mask`](@ref) and union it into the mask.
+ 2. When `best` is not `nothing`, take the `:best` tail of size `best` with [`tail_mask`](@ref), and add it to the mask with a union.
+ 3. When `worst` is not `nothing`, take the `:worst` tail of size `worst` with [`tail_mask`](@ref), and add it to the mask with a union.
  4. Return the mask when `action` is `:keep`, and its complement when `action` is `:drop`.
 
 # Arguments
 
-  - `best`: Number of assets to take from the best end, or `nothing`.
-  - `worst`: Number of assets to take from the worst end, or `nothing`.
-  - `action`: `:keep` returns the union, `:drop` returns its complement.
-  - `scores`: Per-asset score vector `assets × 1`.
-  - `bib`: [`bigger_is_better`](@ref) flag of the score.
+  - `best`: The number of assets to take from the best end, or `nothing`.
+  - `worst`: The number of assets to take from the worst end, or `nothing`.
+  - `action`: `:keep` returns the union, and `:drop` returns its complement.
+  - `scores`: The score vector `assets × 1`, with one score for each asset.
+  - `bib`: The [`bigger_is_better`](@ref) flag of the score.
 
 # Returns
 
-  - `keep::BitVector`: Mask `assets × 1` that is `true` for every asset the rule admits.
+  - `keep::BitVector`: The mask `assets × 1`. It is `true` for every asset that the rule admits.
 
 # Related
 
@@ -499,17 +505,17 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Validate that `score` can be evaluated on a single asset's return series.
+Check that `score` can take the return series of one asset.
 
-Scoring asset `i` is `score(X[:, i])`, which is exactly the precomputed-returns path [`supports_precomputed_returns`](@ref) governs. A [`WeightsInput`](@ref) measure — [`Variance`](@ref) and [`StandardDeviation`](@ref) among them — consumes portfolio weights instead, and cannot score an asset.
+The score of asset `i` is `score(X[:, i])`. This is the route of a precomputed return vector, and [`supports_precomputed_returns`](@ref) controls it. A [`WeightsInput`](@ref) measure, such as [`Variance`](@ref) or [`StandardDeviation`](@ref), takes portfolio weights in place of a return vector. It cannot score an asset.
 
 # Arguments
 
-  - `score`: The risk measure a selector scores its assets with.
+  - `score`: The risk measure that a selector uses to score its assets.
 
 # Validation
 
-  - `supports_precomputed_returns(score)`, else an `ArgumentError` is thrown. The message names the measure, and adds a pointer to `SCM()` when the measure is a [`Variance`](@ref) or a [`StandardDeviation`](@ref).
+  - `supports_precomputed_returns(score)`. Otherwise the function throws an `ArgumentError` that names the measure. When the measure is a [`Variance`](@ref) or a [`StandardDeviation`](@ref), the message also names `SCM()`, which computes the same quantity from a return series.
 
 # Returns
 
@@ -536,11 +542,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Evaluate `score` on every asset column of `X`.
 
-Columns are passed as views: a risk-measure functor reads its argument and never writes to it.
+The function gives each column to `score` as a view. The functor of a risk measure reads its argument, and does not write to it.
 
 # Algorithm
 
- 1. Evaluate `score` on a view of each asset column of `X` in turn, giving `scores`.
+ 1. Evaluate `score` on a view of each asset column of `X`, one column after the other, into `scores`.
  2. Check that every entry of `scores` is finite.
  3. Return `scores`.
 
@@ -551,11 +557,11 @@ Columns are passed as views: a risk-measure functor reads its argument and never
 
 # Validation
 
-  - Every score is finite, else a `DomainError` is thrown naming the offending columns. A `NaN` score ([`Skewness`](@ref) on a constant series, say, which divides by a zero standard deviation) would make the ordering meaningless, so it throws rather than sorting arbitrarily.
+  - Every score is finite. Otherwise the function throws a `DomainError` that names the columns with a non-finite score. [`Skewness`](@ref) on a constant series, for example, divides by a zero standard deviation and gives `NaN`. A `NaN` score has no place in an order, so the function throws and does not sort the scores arbitrarily.
 
 # Returns
 
-  - `scores::VecNum`: Score vector `assets × 1`, one entry per asset column of `X`.
+  - `scores::VecNum`: The score vector `assets × 1`, with one entry for each asset column of `X`.
 
 # Related
 
@@ -572,13 +578,13 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Asset selector that scores every asset with a risk measure and keeps the assets a rule admits.
+Asset selector that scores every asset with a risk measure, and keeps the assets that a rule admits.
 
-`score` is any [`AbstractBaseRiskMeasure`](@ref) that can be evaluated on a bare return series — asset `i`'s score is `score(X[:, i])`. That reuses the whole risk-measure family: [`ConditionalValueatRisk`](@ref) and the drawdown measures score risk, `SCM()` scores variance, [`MeanReturn`](@ref) scores mean return. [`bigger_is_better`](@ref) tells the ordinal rules which end is "best".
+`score` is an [`AbstractBaseRiskMeasure`](@ref) that can take the return series of one asset. The score of asset `i` is `score(X[:, i])`. The selector has no score type of its own, and it uses the risk measures of the library. [`ConditionalValueatRisk`](@ref) and the drawdown measures score risk, `SCM()` scores variance, and [`MeanReturn`](@ref) scores the mean return. [`bigger_is_better`](@ref) tells the ordinal rules which end is the best.
 
-`rule` decides what to do with the scores: an absolute band ([`ThresholdRule`](@ref)) or a count/fraction taken from the tails ([`RankRule`](@ref), [`QuantileRule`](@ref)).
+`rule` sets what the selector does with the scores. A [`ThresholdRule`](@ref) keeps an absolute band. A [`RankRule`](@ref) or a [`QuantileRule`](@ref) takes a count or a fraction from the tails.
 
-The selected universe is fitted state, so a `ScoreSelector` is safe inside cross-validation: assets are chosen on the training window and the same universe is replayed on test windows.
+A `ScoreSelector` is safe in cross-validation. It fits its universe on the training window, and every test window uses that universe.
 
 # Fields
 
@@ -595,7 +601,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `supports_precomputed_returns(score)`. [`Variance`](@ref) and [`StandardDeviation`](@ref) are [`WeightsInput`](@ref) measures and are rejected with a pointer to `SCM()`.
+  - `supports_precomputed_returns(score)`. [`Variance`](@ref) and [`StandardDeviation`](@ref) are [`WeightsInput`](@ref) measures. The constructor refuses them, and its message names `SCM()`.
 
 # Examples
 
@@ -619,11 +625,11 @@ julia> PortfolioOptimisers.fit_preprocessing(sel, rd).nx
 """
 @concrete struct ScoreSelector <: AbstractAssetSelector
     """
-    Risk measure scoring each asset's return series ([`AbstractBaseRiskMeasure`](@ref)).
+    The [`AbstractBaseRiskMeasure`](@ref) that scores the return series of each asset.
     """
     score
     """
-    Rule mapping the scores to a keep-mask ([`AbstractSelectionRule`](@ref)).
+    The [`AbstractSelectionRule`](@ref) that turns the scores into a keep-mask.
     """
     rule
     function ScoreSelector(score::AbstractBaseRiskMeasure, rule::AbstractSelectionRule)
@@ -638,15 +644,15 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Select the assets a [`ScoreSelector`](@ref) keeps: score every asset, then apply the rule.
+Select the assets that a [`ScoreSelector`](@ref) keeps. The method scores every asset, then it applies the rule.
 
-[`fit_preprocessing`](@ref) reduces the training window to its Coverage Universe first, so the ranking is among live assets alone and a dead column never takes a place in it. [`asset_scores`](@ref) keeps its refusal: a non-finite score computed from a live column is a defect of the measure, not a gap in the data.
+[`fit_preprocessing`](@ref) first reduces the training window to its Coverage Universe. The method ranks only the live assets, and a dead column has no place in the order. [`asset_scores`](@ref) still refuses a non-finite score. A non-finite score from a live column is a defect of the measure, not a gap in the data.
 
 # Algorithm
 
- 1. Score every asset column of `rd.X` with the selector's `score`, using [`asset_scores`](@ref).
+ 1. Score every asset column of `rd.X` with the `score` of the selector, through [`asset_scores`](@ref).
  2. Read the orientation of the score with [`bigger_is_better`](@ref).
- 3. Return the keep-mask [`rule_keep`](@ref) admits for those scores under the selector's `rule`.
+ 3. Return the keep-mask that [`rule_keep`](@ref) gives for those scores under the `rule` of the selector.
 
 # Arguments
 
@@ -655,7 +661,7 @@ Select the assets a [`ScoreSelector`](@ref) keeps: score every asset, then apply
 
 # Returns
 
-  - `keep::BitVector`: Mask `assets × 1` that is `true` for every asset the rule admits.
+  - `keep::BitVector`: The mask `assets × 1`. It is `true` for every asset that the rule admits.
 
 # Related
 
@@ -672,11 +678,11 @@ $(DocStringExtensions.TYPEDEF)
 
 Asset selector that keeps the Coverage Universe of the training window, and drops every other asset column.
 
-The returns-level counterpart of [`MissingDataFilter`](@ref)'s column threshold, for pipelines fed returns data directly (where the price stages never run). It has no observation-dropping mode: a fitted selector cannot decide which rows of an unseen window to drop without breaking the weights/returns alignment.
+It does at the returns level what the column threshold of [`MissingDataFilter`](@ref) does at the price level. A pipeline that starts from returns data, and so runs no price stage, uses it. It cannot drop observations. A fitted selector cannot select the rows of a new window to drop, because the weights and the returns then no longer align.
 
-Every selector of the family is fitted on the Coverage Universe, so this one is the **identity** on the window it receives, and it is the explicit step that asks for the reduction and for nothing else. It drops an asset whose return is non-finite at any row of the window, and an asset the [`AssetPanel`](@ref) reports inactive at any row of it.
+The library fits every selector of the family on the Coverage Universe. This selector is then the **identity** on the window that it gets. It is the explicit step that asks for the reduction, and for nothing more. The reduction drops an asset whose return is non-finite at a row of the window. It also drops an asset that the [`AssetPanel`](@ref) marks inactive at a row of the window.
 
-A [`ReturnsResult`](@ref) binds `X` to a matrix of numbers, so a `missing` never reaches this selector: its constructor rejects a `Matrix{Union{Missing, Float64}}` at construction. [`MissingDataFilter`](@ref) removes a `missing` from the price data upstream.
+A [`ReturnsResult`](@ref) bounds the type of `X` to a matrix of numbers, so a `missing` never gets to this selector. The constructor of the [`ReturnsResult`](@ref) refuses a `Matrix{Union{Missing, Float64}}`. [`MissingDataFilter`](@ref) removes a `missing` from the price data at an earlier stage.
 
 # Constructors
 
@@ -701,11 +707,11 @@ struct CompleteAssetSelector <: AbstractAssetSelector end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Select the assets a [`CompleteAssetSelector`](@ref) keeps: **every** asset column of the reduced window.
+Select the assets that a [`CompleteAssetSelector`](@ref) keeps. These are **all** the asset columns of the reduced window.
 
-This selector is the identity on the Coverage Universe. [`fit_preprocessing`](@ref) reduces the training window before it calls this method, so the columns that reach here are already the ones that are finite at every row and active at every row of the [`AssetPanel`](@ref). `fit_preprocessing` does the dropping, and this selector is the explicit step that asks for it and for nothing else.
+This selector is the identity on the Coverage Universe. [`fit_preprocessing`](@ref) reduces the training window before it calls this method. Each column that this method gets is finite at every row, and active at every row of the [`AssetPanel`](@ref). `fit_preprocessing` drops the other columns, and this selector is the explicit step that asks for the drop.
 
-Reading the panel's active mask is what the reduction adds: a stale finite price during an inactive spell leaves the asset out, where the released selector, which read finiteness alone, kept it.
+The reduction also reads the active mask of the panel. An asset with an old finite price in an inactive period is out of the universe. The released versions of this selector read only the finiteness, and kept that asset.
 
 # Algorithm
 
@@ -713,12 +719,12 @@ Reading the panel's active mask is what the reduction adds: a stale finite price
 
 # Arguments
 
-  - The selector is taken by type alone. It carries no field, so nothing is read from it.
+  - The method takes the selector by type alone. The selector has no field, so the method reads nothing from it.
   - $(arg_dict[:rd])
 
 # Returns
 
-  - `keep::BitVector`: Mask `assets × 1` that is `true` at every column of the reduced window.
+  - `keep::BitVector`: The mask `assets × 1`. It is `true` at every column of the reduced window.
 
 # Related
 
@@ -732,32 +738,32 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the algorithms that decide which assets a [`RedundancySelector`](@ref) discards as redundant.
+Abstract supertype for the algorithms that select which assets a [`RedundancySelector`](@ref) drops as redundant.
 
-Each algorithm answers the same question — *given the data and, optionally, a per-asset score, which columns survive?* — and returns a keep-mask. The keep-mask, not a partition into groups, is what the interface returns: [`PairwiseCorrelation`](@ref) drops one asset at a time and may keep two members of the same correlated blob, which "partition, then keep the best of each group" cannot express.
+Each algorithm takes the data, and a score for each asset when the selector has one. It returns a keep-mask of the columns that survive. The interface returns a keep-mask, not a partition into groups. [`PairwiseCorrelation`](@ref) drops one asset at a time, and it can keep two members of one correlated group. A partition with one survivor for each group cannot show that selection.
 
-Two algorithms do partition, and share [`groups_argbest`](@ref):
+Two algorithms do make a partition, and both use [`groups_argbest`](@ref):
 
-  - [`CorrelationComponents`](@ref) groups by connected component of the over-threshold correlation graph.
-  - [`ClusterGroups`](@ref) groups by [`clusterise`](@ref) assignment.
+  - [`CorrelationComponents`](@ref) makes a group of each connected component of the graph whose edges are the correlations at or above the threshold.
+  - [`ClusterGroups`](@ref) makes a group of each cluster that [`clusterise`](@ref) assigns.
 
 # Interfaces
 
-Concrete redundancy algorithms must implement:
+To add a redundancy algorithm, subtype `AbstractRedundancyAlgorithm` and add these methods:
 
   - `redundancy_keep(alg::MyAlgorithm, rd, scores, bib) -> BitVector`.
-  - `requires_score(::MyAlgorithm) -> Bool`, if the algorithm cannot pick a survivor without one.
+  - `requires_score(::MyAlgorithm) -> Bool`, only when the algorithm can select a survivor with no score. The generic method returns `true`, so this method returns `false`.
 
 ## Arguments
 
-  - `alg`: The concrete redundancy algorithm instance.
+  - `alg`: The concrete redundancy algorithm.
   - $(arg_dict[:rd])
-  - `scores`: Per-asset score vector `assets × 1`, or `nothing` when the selector carries no `score`.
-  - `bib`: [`bigger_is_better`](@ref) flag of the score. It is `false` when `scores` is `nothing`.
+  - `scores`: The score vector `assets × 1`, with one score for each asset. It is `nothing` when the selector has no `score`.
+  - `bib`: The [`bigger_is_better`](@ref) flag of the score. It is `false` when `scores` is `nothing`.
 
 ## Returns
 
-  - `keep::BitVector`: Mask `assets × 1` that is `true` for every surviving asset.
+  - `keep::BitVector`: The mask `assets × 1`. It is `true` for every asset that survives.
 
 # Related
 
@@ -770,19 +776,19 @@ abstract type AbstractRedundancyAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return whether a redundancy algorithm needs a `score` to pick the survivor of a redundancy group.
+Return whether a redundancy algorithm needs a `score` to select the survivor of a redundancy group.
 
-Correlation-based algorithms fall back on each asset's summary correlation to the rest of the universe when no score is given, so they return `false`. [`ClusterGroups`](@ref) has no such fallback and returns `true`.
+The correlation algorithms return `false`. With no score, they use a summary of the correlation of each asset with the rest of the universe. [`ClusterGroups`](@ref) has no such fallback, and it returns `true`.
 
-The generic method answers `true`, so a new algorithm is asked for a score until it says otherwise. That is the safe default: an algorithm that silently accepted `nothing` and had no fallback would pick a survivor from a `nothing` score vector.
+The generic method returns `true`, so a [`RedundancySelector`](@ref) asks a new algorithm for a score until the algorithm declares otherwise. This is the safe default. Without it, an algorithm with no fallback can get `nothing` in place of a score vector. It then has no data to select a survivor from.
 
 # Arguments
 
-  - The algorithm is taken by type alone. No field of it is read.
+  - The method takes the algorithm by type alone. It reads no field of it.
 
 # Returns
 
-  - `req::Bool`: `true` when the algorithm cannot pick the survivor of a group without a score.
+  - `req::Bool`: `true` when the algorithm cannot select the survivor of a group without a score.
 
 # Related
 
@@ -793,26 +799,26 @@ requires_score(::AbstractRedundancyAlgorithm)::Bool = true
 """
     redundancy_keep(alg::AbstractRedundancyAlgorithm, rd, scores, bib) -> BitVector
 
-Return the keep-mask a redundancy algorithm admits.
+Return the keep-mask that a redundancy algorithm admits.
 
-`scores` is `nothing` when the [`RedundancySelector`](@ref) carries no `score`; otherwise it is the per-asset score vector and `bib` is the score's [`bigger_is_better`](@ref) flag.
+`scores` is `nothing` when the [`RedundancySelector`](@ref) has no `score`. Otherwise `scores` holds one score for each asset, and `bib` is the [`bigger_is_better`](@ref) flag of the score.
 
-The method shown here is the family's fallback. It runs only for an algorithm that implements none of its own, and it always throws.
+This method is the fallback of the family. It runs only for an algorithm that has no method of its own, and it always throws.
 
 # Arguments
 
   - `alg`: The redundancy algorithm.
   - $(arg_dict[:rd])
-  - `scores`: Per-asset score vector `assets × 1`, or `nothing`.
-  - `bib`: [`bigger_is_better`](@ref) flag of the score.
+  - `scores`: The score vector `assets × 1`, or `nothing`.
+  - `bib`: The [`bigger_is_better`](@ref) flag of the score.
 
 # Validation
 
-  - The concrete algorithm implements `redundancy_keep`, else an `ArgumentError` is thrown naming the two methods an extension author must define.
+  - The concrete algorithm implements `redundancy_keep`. Otherwise this method throws an `ArgumentError` that names the two methods of the interface.
 
 # Returns
 
-  - `keep::BitVector`: Mask `assets × 1` that is `true` for every surviving asset.
+  - `keep::BitVector`: The mask `assets × 1`. It is `true` for every asset that survives.
 
 # Related
 
@@ -821,14 +827,14 @@ The method shown here is the family's fallback. It runs only for an algorithm th
 """
 function redundancy_keep(alg::AbstractRedundancyAlgorithm, ::AbstractReturnsResult,
                          ::Option{<:VecNum}, ::Bool)
-    return throw(ArgumentError("$(typeof(alg)) subtypes AbstractRedundancyAlgorithm but does not implement redundancy_keep. Extension authors: a redundancy algorithm must implement redundancy_keep(alg, rd, scores, bib) -> BitVector returning the keep-mask, and requires_score(alg) -> Bool when it cannot pick a survivor without a score."))
+    return throw(ArgumentError("$(typeof(alg)) subtypes AbstractRedundancyAlgorithm but does not implement redundancy_keep. Extension authors: a redundancy algorithm must implement redundancy_keep(alg, rd, scores, bib) -> BitVector returning the keep-mask, and requires_score(alg) -> Bool returning false when it can pick a survivor without a score."))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Convert per-asset scores into *drop scores*, where higher means "discard me first".
+Convert the scores of the assets into *drop scores*. Of two assets, the algorithm drops the one with the higher drop score.
 
-A risk measure with `bigger_is_better == false` (lower risk is better) already reads as a drop score; one with `bigger_is_better == true` is negated. Downstream of this call a **lower** number is always better, whatever the measure's own orientation was.
+When `bib` is `false`, a lower score is better, and the score is already a drop score. When `bib` is `true`, the function negates the score. After this call a **lower** number is always better, whatever the orientation of the measure.
 
 # Mathematical definition
 
@@ -843,19 +849,19 @@ d_{i} &= \\begin{cases}
 
 Where:
 
-  - ``d_{i}``: Drop score of asset ``i``. The asset with the higher drop score is discarded first.
+  - ``d_{i}``: The drop score of asset ``i``. Of two assets, the algorithm drops the one with the higher drop score.
   - $(math_dict[:s_i_score])
 
-The map is order-reversing in the first case and order-preserving in the second, so it never changes which of two assets is preferred. It changes only the direction that carries that preference.
+The map reverses the order in the first case, and keeps it in the second. It never changes which of two assets is better. It changes only the direction of the order.
 
 # Arguments
 
-  - `scores`: Per-asset score vector `assets × 1`.
-  - `bib`: [`bigger_is_better`](@ref) flag of the score that produced `scores`.
+  - `scores`: The score vector `assets × 1`, with one score for each asset.
+  - `bib`: The [`bigger_is_better`](@ref) flag of the score that gave `scores`.
 
 # Returns
 
-  - `d::VecNum`: Drop score vector `assets × 1`, in which a higher number means "discard me first".
+  - `d::VecNum`: The drop score vector `assets × 1`. Of two assets, the algorithm drops the one with the higher number.
 
 # Related
 
@@ -867,28 +873,28 @@ drop_scores(scores::VecNum, bib::Bool) = bib ? -scores : scores
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Keep the single best-scoring member of each redundancy group.
+Keep the member with the best score in each redundancy group.
 
-A group whose best score is *tied* keeps nobody: under the library's "if we cannot tell them apart, trust neither" policy, two indistinguishable assets are both discarded — the same stance [`find_uncorrelated_indices`](@ref) takes on an exactly-tied correlated pair. A singleton group is trivially unambiguous and always survives.
+A group whose best score is *tied* keeps no asset. This is the tie policy of the library: if the library cannot tell two assets apart, it keeps neither of them. [`find_uncorrelated_indices`](@ref) does the same with a correlated pair whose drop scores are equal. A group with one member has no tie, so its member always survives.
 
 # Algorithm
 
  1. Start from a keep-mask of `length(scores)` falses.
- 2. Choose the comparison `better`. It is `>` when `bib` is `true`, and `<` otherwise.
- 3. Take the next group `g` of `groups`, and skip it when it is empty.
- 4. Walk the members of `g` from the first, holding in `best` the index whose score no later member beats under `better`.
- 5. Count the members of `g` whose score equals `scores[best]`. Set the mask at `best` only when that count is one, so a group with a tied best keeps nobody.
- 6. Repeat steps 3 to 5 over the remaining groups, then return the mask.
+ 2. Select the comparison `better`. It is `>` when `bib` is `true`, and `<` otherwise.
+ 3. Take the next group `g` of `groups`. Skip it when it is empty.
+ 4. Read the members of `g` in order from the first. Keep in `best` the index whose score no later member beats under `better`.
+ 5. Count the members of `g` whose score is equal to `scores[best]`. Set the mask at `best` only when that count is one, so a group with a tied best keeps no asset.
+ 6. Do steps 3 to 5 for each of the other groups, then return the mask.
 
 # Arguments
 
-  - `groups`: Vector of index vectors partitioning the assets.
-  - `scores`: Per-asset scores.
-  - `bib`: Whether a larger score is better.
+  - `groups`: The vector of index vectors that partition the assets.
+  - `scores`: The score vector, with one score for each asset.
+  - `bib`: `true` when a larger score is better.
 
 # Returns
 
-  - `keep::BitVector`: One survivor per unambiguous group.
+  - `keep::BitVector`: The keep-mask, with one survivor for each group whose best score is not tied.
 
 # Related
 
@@ -917,15 +923,15 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Greedy pairwise correlation pruning: drop assets until no surviving pair exceeds `t`.
+Greedy removal of correlated assets. The algorithm drops assets until no pair of the kept assets has a correlation of `t` or more.
 
-Correlated pairs are visited from most to least correlated, and the worse asset of each pair is removed. "Worse" means the higher drop score: the `RedundancySelector`'s `score` when it has one, otherwise each asset's summary correlation to the rest of the universe — so the asset that is redundant with *most* of the universe goes first.
+The algorithm reads the correlated pairs from the most to the least correlated, and it removes the worse asset of each pair. The worse asset has the higher drop score. The drop score comes from the `score` of the [`RedundancySelector`](@ref) when it has one. Otherwise it is the summary of the correlation of each asset with the rest of the universe. Then the asset that is redundant with *most* of the universe goes first.
 
-This algorithm never **chains**. At `t = 0.7`, a universe with `ρ(A, B) = 0.80`, `ρ(B, C) = 0.81` and `ρ(A, C) = 0.32` loses `B` and keeps both `A` and `C`, honouring the literal promise that no surviving pair exceeds `t`. [`CorrelationComponents`](@ref) reads the same three correlations transitively and keeps only `A`.
+This algorithm does not **chain**. Take `t = 0.7`, and a universe with `ρ(A, B) = 0.80`, `ρ(B, C) = 0.81` and `ρ(A, C) = 0.32`. With the default drop score, the algorithm removes `B` and keeps both `A` and `C`, because their correlation is below `t`. [`CorrelationComponents`](@ref) reads the same three correlations as one chain, and keeps only `A`.
 
-How loose the middle correlation can be is bounded by the other two: two edges at `ρ` force the third above `ρ² - (1 - ρ²)`, so a chain of two `0.97` edges cannot have a third correlation below `0.88`. A weakly-connected chain therefore needs weak edges, and the two algorithms diverge most where `t` sits just under them.
+The two edges of a chain set a lower bound on the correlation of its end points. Two edges at `ρ` give the end points a correlation of `ρ² - (1 - ρ²)` or more. Thus a chain of two edges at `0.97` cannot have end points with a correlation below `0.88`. A chain whose end points have a low correlation needs weak edges, and the two algorithms differ most when `t` is just below those edges.
 
-Delegates to [`find_uncorrelated_indices`](@ref).
+The algorithm calls [`find_uncorrelated_indices`](@ref).
 
 # Mathematical definition
 
@@ -937,11 +943,11 @@ Delegates to [`find_uncorrelated_indices`](@ref).
 
 Where:
 
-  - $(math_dict[:rho_ij]) The absolute value ``\\left| \\rho_{i,\\,j} \\right|`` is read instead when `absolute` is `true`.
+  - $(math_dict[:rho_ij]) The algorithm reads the absolute value ``\\left| \\rho_{i,\\,j} \\right|`` when `absolute` is `true`.
   - $(math_dict[:t_corr_threshold])
   - $(math_dict[:K_keep_set])
 
-That is a promise about surviving **pairs** and about nothing else. It does not say that ``\\mathcal{K}`` is the largest such set, and it does not close under transitivity: a chain of two over-threshold edges whose end points are under the threshold satisfies it with both end points kept.
+The condition is about the **pairs** of kept assets, and about nothing else. It does not say that ``\\mathcal{K}`` is the largest such set. It is also not transitive. A chain of two edges at or above the threshold, whose end points are below the threshold, meets the condition with both end points kept.
 
 # Fields
 
@@ -960,7 +966,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `-1 <= t <= 1`, checked by [`assert_correlation_threshold`](@ref).
+  - `-1 <= t <= 1`. [`assert_correlation_threshold`](@ref) checks it.
 
 # Related
 
@@ -1003,25 +1009,27 @@ requires_score(::PairwiseCorrelation)::Bool = false
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Keep a maximally uncorrelated subset under [`PairwiseCorrelation`](@ref), by delegating to [`find_uncorrelated_indices`](@ref).
+Keep the assets that survive [`PairwiseCorrelation`](@ref). No pair of them has a correlation of `t` or more.
+
+The method calls [`find_uncorrelated_indices`](@ref). A greedy search gives the set of kept assets, so it is not always the largest such set.
 
 # Algorithm
 
  1. Start from a keep-mask of `size(rd.X, 2)` falses.
- 2. Turn `scores` into drop scores with [`drop_scores`](@ref), so that downstream a **lower** number is better. Pass `nothing` when `scores` is `nothing`, which leaves [`find_uncorrelated_indices`](@ref) to build its own drop score by collapsing each column of the correlation matrix with `measure`.
- 3. Call [`find_uncorrelated_indices`](@ref) on `rd.X` with the algorithm's `ce`, `t`, `absolute` and `measure`, giving `idx`, the surviving asset indices.
+ 2. Turn `scores` into drop scores with [`drop_scores`](@ref), so that after this step a **lower** number is better. When `scores` is `nothing`, pass `nothing`. [`find_uncorrelated_indices`](@ref) then collapses each column of the correlation matrix with `measure` into its own drop score.
+ 3. Call [`find_uncorrelated_indices`](@ref) on `rd.X` with the `ce`, `t`, `absolute` and `measure` of the algorithm. It returns `idx`, the indices of the assets that survive.
  4. Set the mask at `idx`, and return it.
 
 # Arguments
 
   - `alg`: The pairwise correlation algorithm.
   - $(arg_dict[:rd])
-  - `scores`: Per-asset score vector `assets × 1`, or `nothing`.
-  - `bib`: [`bigger_is_better`](@ref) flag of the score.
+  - `scores`: The score vector `assets × 1`, or `nothing`.
+  - `bib`: The [`bigger_is_better`](@ref) flag of the score.
 
 # Returns
 
-  - `keep::BitVector`: Mask `assets × 1` that is `true` for every surviving asset.
+  - `keep::BitVector`: The mask `assets × 1`. It is `true` for every asset that survives.
 
 # Related
 
@@ -1045,11 +1053,11 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Group assets by connected component of the over-threshold correlation graph, and keep the best-scoring member of each.
+Group the assets by the connected components of a correlation graph, and keep the member of each group with the best score.
 
-Two assets share an edge when their (absolute) correlation is at or above `t`. Components are transitive, so this reads a chain `A ~ B ~ C` as one redundant blob even when `A` and `C` are uncorrelated, and keeps a single asset from it. That is a stronger claim than [`PairwiseCorrelation`](@ref)'s, and a stronger reduction; choose it when you want one representative per correlated blob rather than a guarantee about surviving pairs.
+Two assets share an edge when their correlation is at or above `t`. When `absolute` is `true`, the algorithm compares the absolute value of the correlation. A component is transitive, so the algorithm reads a chain `A ~ B ~ C` as one redundant group, also when `A` and `C` are not correlated. It keeps one asset of the group. This claim is stronger than that of [`PairwiseCorrelation`](@ref), and it removes more assets. Use it to keep one representative of each correlated group, and not to bound the correlation of the pairs that survive.
 
-A component whose best score is tied keeps nobody (see [`groups_argbest`](@ref)).
+A component whose best score is tied keeps no asset. [`groups_argbest`](@ref) states the tie policy.
 
 # Mathematical definition
 
@@ -1061,11 +1069,11 @@ A component whose best score is tied keeps nobody (see [`groups_argbest`](@ref))
 
 Where:
 
-  - ``\\mathcal{E}``: Edge set of the redundancy graph, whose vertices are the assets.
-  - $(math_dict[:rho_ij]) The absolute value ``\\left| \\rho_{i,\\,j} \\right|`` is read instead when `absolute` is `true`.
+  - ``\\mathcal{E}``: The edge set of the redundancy graph, whose vertices are the assets.
+  - $(math_dict[:rho_ij]) The algorithm reads the absolute value ``\\left| \\rho_{i,\\,j} \\right|`` when `absolute` is `true`.
   - $(math_dict[:t_corr_threshold])
 
-The groups are the connected components of that graph, so every asset lies in exactly one of them and an asset with no over-threshold partner forms a singleton. A component is closed under transitivity even though the edge relation is not, which is the whole difference from [`PairwiseCorrelation`](@ref): a chain ``i \\sim j \\sim k`` is one component whatever ``\\rho_{i,\\,k}`` is.
+The groups are the connected components of that graph, and every asset is in exactly one group. An asset with no partner at or above the threshold is a group of one. A component is transitive, but the edge relation is not. This is the difference from [`PairwiseCorrelation`](@ref). A chain ``i \\sim j \\sim k`` is one component, whatever the value of ``\\rho_{i,\\,k}``.
 
 # Fields
 
@@ -1084,7 +1092,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `-1 <= t <= 1`, checked by [`assert_correlation_threshold`](@ref).
+  - `-1 <= t <= 1`. [`assert_correlation_threshold`](@ref) checks it.
 
 # Related
 
@@ -1106,7 +1114,7 @@ Keywords correspond to the struct's fields.
     """
     absolute
     """
-    $(field_dict[:pre_measure]) Lower is better, so the surviving representative is the least redundant member of its component.
+    $(field_dict[:pre_measure]) A lower value is better, so the representative that survives is the least redundant member of its component.
     """
     measure
     function CorrelationComponents(ce::StatsBase.CovarianceEstimator, t::Number,
@@ -1127,26 +1135,26 @@ requires_score(::CorrelationComponents)::Bool = false
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Keep one representative of each correlated blob under [`CorrelationComponents`](@ref).
+Keep one representative of each correlated group under [`CorrelationComponents`](@ref).
 
 # Algorithm
 
- 1. Compute the correlation matrix `rho` of `rd.X` with the algorithm's `ce`.
- 2. When `absolute` is `true`, replace `rho` with its entrywise absolute value. This happens **before** the threshold is applied, so a strongly negative correlation is an edge.
- 3. When `scores` is `nothing`, collapse each column of `rho` with `measure` into the fallback score `s`, and force `sbib` to `false`. A lower summary correlation is then better, so the surviving representative is the asset least correlated with the rest of the universe. Otherwise take `s` from `scores` and `sbib` from `bib`.
+ 1. Compute the correlation matrix `rho` of `rd.X` with the `ce` of the algorithm.
+ 2. When `absolute` is `true`, replace each entry of `rho` with its absolute value. This step comes **before** the threshold, so a strongly negative correlation is an edge.
+ 3. When `scores` is `nothing`, collapse each column of `rho` with `measure` into the fallback score `s`, and set `sbib` to `false`. A lower summary correlation is then better, so the representative that survives is the asset least correlated with the rest of the universe. Otherwise take `s` from `scores` and `sbib` from `bib`.
  4. Group the assets with [`correlation_components`](@ref) on `rho` and `t`.
- 5. Return the mask [`groups_argbest`](@ref) admits for those groups under `s` and `sbib`.
+ 5. Return the mask that [`groups_argbest`](@ref) admits for those groups under `s` and `sbib`.
 
 # Arguments
 
   - `alg`: The correlation components algorithm.
   - $(arg_dict[:rd])
-  - `scores`: Per-asset score vector `assets × 1`, or `nothing`.
-  - `bib`: [`bigger_is_better`](@ref) flag of the score.
+  - `scores`: The score vector `assets × 1`, or `nothing`.
+  - `bib`: The [`bigger_is_better`](@ref) flag of the score.
 
 # Returns
 
-  - `keep::BitVector`: Mask `assets × 1` that is `true` for one asset of every component whose best score is not tied.
+  - `keep::BitVector`: The mask `assets × 1`. It is `true` for one asset of each component whose best score is not tied.
 
 # Related
 
@@ -1172,27 +1180,27 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the connected components of the graph whose edges are the pairs of `rho` at or above `t`.
 
-A union-find pass over the strict lower triangle, so components are transitive and every asset lands in exactly one of them (a singleton when it has no over-threshold partner).
+The function does one union-find pass over the strict lower triangle. The components are transitive, and every asset is in exactly one of them. An asset with no partner at or above `t` is a component of one.
 
 # Algorithm
 
  1. Read `n`, the number of rows of `rho`, and set `parent[i]` to `i` for every asset. Each asset starts as its own component.
- 2. Take the next entry of the strict lower triangle of `rho`, which holds each pair once.
- 3. When that entry is at least `t`, find the root of each member of the pair with `find`, and point the larger root at the smaller one. `find` compresses the path it walks, so a later lookup on that chain is one step.
- 4. Repeat steps 2 and 3 over the remaining pairs.
- 5. Group the assets by their final root into `groups`, keyed by that root.
+ 2. Take the next entry of the strict lower triangle of `rho`, which holds each pair one time.
+ 3. When that entry is at least `t`, find the root of each member of the pair with `find`. Point the larger root at the smaller one. `find` compresses the path that it reads, so a later lookup on that chain takes one step.
+ 4. Do steps 2 and 3 for each of the other pairs.
+ 5. Group the assets by their last root into `groups`, with that root as the key.
  6. Return the values of `groups`.
 
-The threshold is compared against `rho` as it is given, so a caller that wants the absolute value takes it before this call.
+The function compares the threshold with `rho` as the caller gives it. A caller that wants the absolute value takes it before this call.
 
 # Arguments
 
-  - `rho`: Correlation matrix `assets × assets`.
+  - `rho`: The correlation matrix `assets × assets`.
   - $(arg_dict[:t])
 
 # Returns
 
-  - `groups::Vector{Vector{Int}}`: The components, each a vector of asset indices in ascending order. The components themselves come out of a `Dict`, so their order is not defined. [`groups_argbest`](@ref) reads them as a set and does not depend on it.
+  - `groups::Vector{Vector{Int}}`: The components. Each is a vector of asset indices in ascending order. The components come from a `Dict`, so their order is not defined. [`groups_argbest`](@ref) reads them as a set, and does not depend on the order.
 
 # Related
 
@@ -1219,21 +1227,23 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Group assets by clustering them, and keep the best-scoring member of each cluster.
+Group the assets into clusters, and keep the member of each cluster with the best score.
 
-Clusters come from [`clusterise`](@ref), so the whole clustering family — hierarchical linkage, DBHT, the non-hierarchical algorithms, and the optimal-number-of-clusters estimators — is available for deciding what "redundant" means. Unlike the correlation algorithms there is no natural fallback survivor rule, so a [`RedundancySelector`](@ref) using `ClusterGroups` must carry a `score`.
+[`clusterise`](@ref) makes the clusters, so every clustering estimator of the library can set what "redundant" means. This includes hierarchical linkage, DBHT, the non-hierarchical algorithms and the estimators of the optimal number of clusters. The correlation algorithms have a fallback rule for the survivor, but this algorithm has none. A [`RedundancySelector`](@ref) with `ClusterGroups` must have a `score`.
 
-A cluster whose best score is tied keeps nobody (see [`groups_argbest`](@ref)).
+A cluster whose best score is tied keeps no asset. [`groups_argbest`](@ref) states the tie policy.
 
-## Clustering on a feature matrix
+## Clusters on a Feature Matrix
 
-A [`FeatureDistance`](@ref) in the `cle`'s distance slot measures a Feature Matrix rather than the returns, and it derives that matrix from the [`AssetPanel`](@ref) on `rd` — the returns data the selector is fitted on. Preselection is a *pre-prior* site, so it passes `rd` alone: a selector is fitted by [`fit_preprocessing`](@ref) from the returns data alone and never sees a prior result, and in a [`Pipeline`](@ref) it writes `:returns`, which invalidates any `:prior` already computed. A producer that needs a prior therefore raises here, and it names the site. Supply an [`AssetPanel`](@ref) on the [`ReturnsResult`](@ref) — for instance from [`asset_panel`](@ref) — or the clustering throws (see [`asset_panel`](@ref)).
+A [`FeatureDistance`](@ref) in the distance field of `cle` measures a Feature Matrix in place of the returns. It makes that matrix from the [`AssetPanel`](@ref) on `rd`, the returns data that the selector fits on.
 
-The `cle` reads `rd.X`, the returns as they arrived, because a selector fits before any prior or benchmark frame exists. So the `cle` states no source, and the constructor refuses a `cle` whose `x_src` is not `nothing`.
+Preselection runs before the prior, so it gives `rd` alone. [`fit_preprocessing`](@ref) fits a selector from the returns data alone, and the selector never gets a prior result. In a [`Pipeline`](@ref), the selector writes `:returns`, and this invalidates a `:prior` that an earlier step computed. Thus a panel producer that needs a prior raises an error here, and the error names this site. Put an [`AssetPanel`](@ref) on the [`ReturnsResult`](@ref), for example from [`asset_panel`](@ref). Otherwise [`clusterise`](@ref) throws.
 
-The selection is decided on the *full* universe and the surviving columns are sliced only afterwards, so `Z` is measured over every asset before any is dropped.
+The `cle` reads `rd.X`, the returns as the selector gets them, because a selector fits before a prior or a benchmark frame exists. For this reason, the `cle` states no source, and the constructor refuses a `cle` whose `x_src` is not `nothing`.
 
-The names come off the same panel as the values, so a [`FeatureDistance`](@ref) carrying a `sel` names its feature columns here exactly as it does anywhere else. That matters most at this site: a panel presents every slice as a feature, the observed masks and the one-hot levels included, and a redundancy selector that measured all of them would drop assets on a distance the caller never asked for.
+The algorithm selects on the *full* universe, and the library slices the columns that survive after the selection. The library measures the Feature Matrix `Z` over every asset, before the selector drops one.
+
+The Feature Matrix takes its column names from the same panel as its values. Thus a [`FeatureDistance`](@ref) with a `sel` selects the same feature columns here as at every other site. Without a `sel`, the Feature Matrix holds the value columns of every Panel Field, with one column for each level of a categorical field. A redundancy selector on all of these columns can drop assets on a distance that the caller did not intend.
 
 # Fields
 
@@ -1258,7 +1268,7 @@ Keywords correspond to the struct's fields.
 """
 @concrete struct ClusterGroups <: AbstractRedundancyAlgorithm
     """
-    Clustering estimator partitioning the assets ([`AbstractClustersEstimator`](@ref)).
+    The [`AbstractClustersEstimator`](@ref) that partitions the assets.
     """
     cle
     function ClusterGroups(cle::AbstractClustersEstimator)
@@ -1277,23 +1287,23 @@ Keep one representative of each cluster under [`ClusterGroups`](@ref).
 
 # Algorithm
 
- 1. Cluster the assets with [`clusterise`](@ref) on `rd.X`, passing `rd` so that a [`FeatureDistance`](@ref) resolves its panel off `rd`, giving the clustering result `clr`.
+ 1. Cluster the assets with [`clusterise`](@ref) on `rd.X` into the clustering result `clr`. Give `rd` too, so that a [`FeatureDistance`](@ref) reads its panel from `rd`.
  2. Read the cluster assignment of every asset into `idx`.
  3. Collect the asset indices of each of the `clr.k` clusters into `groups`.
- 4. Return the mask [`groups_argbest`](@ref) admits for those groups under `scores` and `bib`.
+ 4. Return the mask that [`groups_argbest`](@ref) admits for those groups under `scores` and `bib`.
 
-Only `rd` is passed, because preselection runs before any prior exists, so `rd` is the only reachable source of a Feature Matrix. [`ClusterGroups`](@ref) states why the type carries no source selector.
+The method gives `rd` alone, because preselection runs before a prior exists. At this site, `rd` is the only source of a Feature Matrix. [`ClusterGroups`](@ref) states why the type has no source field.
 
 # Arguments
 
   - `alg`: The cluster groups algorithm.
   - $(arg_dict[:rd])
-  - `scores`: Per-asset score vector `assets × 1`. [`RedundancySelector`](@ref) rejects a `nothing` score for this algorithm at construction, so it is never `nothing` here.
-  - `bib`: [`bigger_is_better`](@ref) flag of the score.
+  - `scores`: The score vector `assets × 1`. The constructor of [`RedundancySelector`](@ref) refuses a `nothing` score for this algorithm, so `scores` is never `nothing` here.
+  - `bib`: The [`bigger_is_better`](@ref) flag of the score.
 
 # Returns
 
-  - `keep::BitVector`: Mask `assets × 1` that is `true` for one asset of every cluster whose best score is not tied.
+  - `keep::BitVector`: The mask `assets × 1`. It is `true` for one asset of each cluster whose best score is not tied.
 
 # Related
 
@@ -1311,7 +1321,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Validate a correlation threshold.
+Check a correlation threshold.
 
 # Arguments
 
@@ -1319,7 +1329,7 @@ Validate a correlation threshold.
 
 # Validation
 
-  - `-1 <= t <= 1`, else a `DomainError` is thrown. The bound is the range of a correlation coefficient, so a threshold outside it can never be met or can never be missed.
+  - `-1 <= t <= 1`. Otherwise the function throws a `DomainError`. The bound is the range of a correlation coefficient. A correlation never gets to a threshold above the range, and it is always at or above a threshold below the range.
 
 # Returns
 
@@ -1338,11 +1348,11 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Asset selector that discards assets which duplicate information already carried by others.
+Asset selector that drops the assets whose information other assets already carry.
 
-`alg` decides what "redundant" means and returns the keep-mask: greedy pairwise correlation pruning ([`PairwiseCorrelation`](@ref)), one representative per correlated blob ([`CorrelationComponents`](@ref)), or one representative per cluster ([`ClusterGroups`](@ref)).
+`alg` sets what "redundant" means, and it returns the keep-mask. [`PairwiseCorrelation`](@ref) prunes correlated pairs greedily. [`CorrelationComponents`](@ref) keeps one representative of each correlated group. [`ClusterGroups`](@ref) keeps one representative of each cluster.
 
-`score` decides *which* asset survives a redundancy group — a risk measure evaluated on each asset's own return series, oriented by [`bigger_is_better`](@ref), exactly as in [`ScoreSelector`](@ref). Leaving it `nothing` falls back to the correlation algorithms' own rule: the asset with the lowest summary correlation to the rest of the universe survives. [`ClusterGroups`](@ref) has no such fallback and requires a `score`.
+`score` sets *which* asset of a redundancy group survives. It is a risk measure on the return series of each asset, and [`bigger_is_better`](@ref) sets its order, as in [`ScoreSelector`](@ref). When `score` is `nothing`, a correlation algorithm uses its own rule. The asset with the lower summary correlation with the rest of the universe survives. [`ClusterGroups`](@ref) has no such rule, and it needs a `score`.
 
 # Fields
 
@@ -1376,7 +1386,7 @@ julia> PortfolioOptimisers.fit_preprocessing(sel, rd).nx
  "C"
 ```
 
-`A` and `B` are identical, so neither survives — the tie policy discards both.
+`A` and `B` are identical, so the tie policy drops both of them.
 
 # Related
 
@@ -1386,11 +1396,11 @@ julia> PortfolioOptimisers.fit_preprocessing(sel, rd).nx
 """
 @concrete struct RedundancySelector <: AbstractAssetSelector
     """
-    Algorithm deciding which assets are redundant ([`AbstractRedundancyAlgorithm`](@ref)).
+    The [`AbstractRedundancyAlgorithm`](@ref) that selects the redundant assets.
     """
     alg
     """
-    Risk measure choosing the survivor of each redundancy group; `nothing` uses the algorithm's own rule ([`AbstractBaseRiskMeasure`](@ref)).
+    The [`AbstractBaseRiskMeasure`](@ref) that selects the survivor of each redundancy group. `nothing` uses the rule of the algorithm.
     """
     score
     function RedundancySelector(alg::AbstractRedundancyAlgorithm,
@@ -1411,15 +1421,15 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Select the assets a [`RedundancySelector`](@ref) keeps: score every asset when a score is given, then apply the redundancy algorithm.
+Select the assets that a [`RedundancySelector`](@ref) keeps. The method scores every asset when the selector has a score, then it applies the redundancy algorithm.
 
-[`fit_preprocessing`](@ref) reduces the training window to its Coverage Universe first, so the correlation, the clustering and the survivor rule all read live columns alone, and a dead column never joins a group nor wins one.
+[`fit_preprocessing`](@ref) first reduces the training window to its Coverage Universe. The correlation, the clusters and the survivor rule then read only the live columns. A dead column is never in a group, and it never survives one.
 
 # Algorithm
 
- 1. When the selector carries no `score`, set `scores` to `nothing` and `bib` to `false`. The algorithm then uses its own survivor rule.
+ 1. When the selector has no `score`, set `scores` to `nothing` and `bib` to `false`. The algorithm then uses its own survivor rule.
  2. Otherwise score every asset column of `rd.X` with [`asset_scores`](@ref), and read `bib` from [`bigger_is_better`](@ref) of that score.
- 3. Return the keep-mask [`redundancy_keep`](@ref) admits for the selector's `alg`.
+ 3. Return the keep-mask that [`redundancy_keep`](@ref) admits for the `alg` of the selector.
 
 # Arguments
 
@@ -1428,7 +1438,7 @@ Select the assets a [`RedundancySelector`](@ref) keeps: score every asset when a
 
 # Returns
 
-  - `keep::BitVector`: Mask `assets × 1` that is `true` for every surviving asset.
+  - `keep::BitVector`: The mask `assets × 1`. It is `true` for every asset that survives.
 
 # Related
 

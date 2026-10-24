@@ -1,15 +1,15 @@
 """
     ep_var_views!(var_views::Nothing, args...; kwargs...)
 
-Do nothing when a problem states no **value at risk** view.
+Do nothing when a problem states no value at risk view.
 
-`ep_var_views!` is the verb that turns a group of value at risk views into rows of the entropy pooling constraint dictionary. This method is the absent-view branch: it registers no row, so a higher-level routine can call the verb without special-casing `var_views = nothing`.
+`ep_var_views!` is the verb that turns a group of value at risk views into rows of the entropy pooling constraint dictionary. This method is the branch for an absent view. It registers no row, so a caller can call the verb with `var_views = nothing` and needs no special case.
 
 # Arguments
 
-  - `var_views::Nothing`: Indicates that no value at risk (VaR) view constraints are specified.
-  - `args...`: Additional positional arguments (ignored).
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `var_views::Nothing`: Shows that the problem states no value at risk view.
+  - `args...`: More positional arguments, which the method does not read.
+  - `kwargs...`: More keyword arguments, which the method does not read.
 
 # Returns
 
@@ -26,20 +26,22 @@ end
 """
     ep_var_views!(var_views::ValueatRiskView, epc::AbstractDict,
                   pr::AbstractPriorResult, sets::UniverseSets,
-                  w::Option{<:ObsWeights} = nothing; strict::Bool = false)
+                  w::Option{<:ObsWeights} = nothing; strict::Bool = false,
+                  ledger::Option{<:AbstractVector} = nothing)
     ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
                   pr::AbstractPriorResult, sets::UniverseSets, alpha::Number,
-                  w::Option{<:ObsWeights} = nothing; strict::Bool = false)
+                  w::Option{<:ObsWeights} = nothing; strict::Bool = false,
+                  ledger::Option{<:AbstractVector} = nothing)
 
-Add the **value at risk** views of a group to the entropy pooling constraint dictionary.
+Add the value at risk views of a group to the entropy pooling constraint dictionary.
 
-The first method unpacks a [`ValueatRiskView`](@ref) into its equations and its significance level, and hands both to the second. The second carries the body: it parses the view equations, replaces any prior references with their actual values, and constructs the corresponding linear constraints for entropy pooling. The statistic is the value at risk of the posterior distribution, not the variance, which the `sigma_views` family holds.
+The first method gives the equations and the significance level of a [`ValueatRiskView`](@ref) to the second method. The second method parses the view equations, replaces each prior reference with its value, and makes the linear constraints of the views. The statistic is the value at risk of the posterior distribution, not the variance, which the `sigma_views` family holds.
 
-A value at risk view is linear in the posterior probabilities: it constrains the probability mass at or beyond the target loss, so it needs no auxiliary variable and no moment is fixed on its account.
+A value at risk view is linear in the posterior probabilities, because it constrains the probability mass at or beyond the target loss. So it needs no auxiliary variable and fixes no moment.
 
 # Mathematical definition
 
-The value at risk at level ``\\alpha`` is the smallest loss the posterior leaves at most ``\\alpha`` of its mass beyond, so a view on it is a statement about the tail mass of the sample:
+The value at risk at the level ``\\alpha`` is the smallest loss beyond which the posterior has at most ``\\alpha`` of its mass. So a view on it is a statement about the tail mass of the sample:
 
 ```math
 \\begin{align}
@@ -49,7 +51,7 @@ The value at risk at level ``\\alpha`` is the smallest loss the posterior leaves
 \\end{align}
 ```
 
-Both are linear in ``\\boldsymbol{p}``, which is why this view reaches [`OptimEntropyPooling`](@ref) as readily as [`JuMPEntropyPooling`](@ref).
+Both are linear in ``\\boldsymbol{p}``, so both [`OptimEntropyPooling`](@ref) and [`JuMPEntropyPooling`](@ref) accept this view.
 
 Where:
 
@@ -61,47 +63,50 @@ Where:
 
 !!! note "The view is met to one observation"
 
-    The constraint fixes the posterior mass of ``\\mathcal{T}_{i}(\\bar{v})``, and the posterior value at risk of that mass is a sample order statistic: [`ValueatRisk`](@ref) reads the first observation whose cumulative weight exceeds ``\\alpha``. A mass of exactly ``\\alpha`` does not exceed it, so the reading passes every observation of ``\\mathcal{T}_{i}(\\bar{v})`` and takes the largest loss under ``\\bar{v}``. A mass above ``\\alpha`` by more than the slack of [`ValueatRisk`](@ref) reads the smallest loss in ``\\mathcal{T}_{i}(\\bar{v})``, which is at or above ``\\bar{v}``. An entropy pooling solve meets its constraints to its own tolerance, about `1e-8`, so the sign of its residual selects one of the two. No tolerance on the solve removes this, because the reading is a step function of the mass. The view is met to the resolution the sample has, which is one observation. Read a posterior value at risk against the two observations that bracket the target, and read the tail mass where an exact statement is needed.
+    The constraint fixes the posterior mass of ``\\mathcal{T}_{i}(\\bar{v})``, and the posterior value at risk is a sample order statistic. [`ValueatRisk`](@ref) reads the first observation whose cumulative weight is larger than ``\\alpha``. A mass of exactly ``\\alpha`` is not larger, so [`ValueatRisk`](@ref) passes every observation of ``\\mathcal{T}_{i}(\\bar{v})`` and returns the largest loss below ``\\bar{v}``. A mass above ``\\alpha`` by more than the slack of [`ValueatRisk`](@ref) gives the smallest loss in ``\\mathcal{T}_{i}(\\bar{v})``, which is at or above ``\\bar{v}``. An entropy pooling solve meets its constraints to its own tolerance, about `1e-8`, so the sign of its residual selects one of the two results.
+
+    No tolerance on the solve removes this, because the posterior value at risk is a step function of the mass. The resolution of the view is the resolution of the sample, which is one observation. Compare a posterior value at risk with the two observations on each side of the target. Read the tail mass when an exact statement is necessary.
 
 # Algorithm
 
- 1. Parse the view equations of `var_views.val`, accepting `==` and `>=` alone.
+ 1. Parse the view equations of `var_views.val`. The parser accepts only `==` and `>=`.
  2. Replace every group name by the assets it spans.
- 3. Replace every `prior(...)` reference by the prior value at risk at `alpha`, read under `w`, through [`replace_prior_views`](@ref).
- 4. Turn the parsed views into the linear constraint blocks `lcs`, one for `:ineq` and one for `:eq`. Under `strict = false` every row of the group can drop, and `lcs` is then `nothing`: the group states no view, and the call returns without adding a row.
+ 3. Replace every `prior(...)` reference by the prior value at risk at `alpha` under `w`, through [`replace_prior_views`](@ref).
+ 4. Turn the parsed views into the linear constraint blocks `lcs`, one for `:ineq` and one for `:eq`. Under `strict = false`, every row of the group can drop, and `lcs` is then `nothing`. The group then states no view, and the call returns with no row added.
  5. Check the three preconditions of the section below.
- 6. For each block present, and each row `i` of it, read the asset the row names into `j`, and the observations of `view(X, :, j)` at or below `-abs(B[i])` into `idx`.
+ 6. For each block that `lcs` holds, and each row `i` of it, read the asset that the row names into `j`. Read the observations of `view(X, :, j)` at or below `-abs(B[i])` into `idx`.
  7. Raise when `idx` names no observation.
- 8. Read the sense the row takes into `sign`: it is one for an equality row and for a non-negative right-hand side, and minus one otherwise.
- 9. Build the row `Ai` that carries `sign` at `idx` and zero elsewhere, and add it against `sign * alpha` with [`add_ep_constraint!`](@ref).
+ 8. Read the sense of the row into `sign`. It is one for an equality row and for a positive right-hand side, and minus one otherwise. So an `:ineq` row with a target of zero takes minus one, as a row with a positive target does.
+ 9. Build the row `Ai` that has `sign` at `idx` and zero at the other observations, and add it against `sign * alpha` with [`add_ep_constraint!`](@ref).
 
 # Arguments
 
-  - `var_views`: VaR view constraints.
-  - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
-  - `pr`: Prior result containing asset return information.
-  - `sets`: Asset set mapping asset names to indices.
-  - `alpha`: Confidence level for VaR.
+  - `var_views`: Value at risk view constraints.
+  - `epc`: Dictionary of entropy pooling constraints, which maps each key to an `(lhs, rhs)` pair.
+  - `pr`: Prior result that holds the asset returns.
+  - `sets`: Universe sets that map the asset names to indices.
+  - `alpha`: Significance level of the value at risk.
   - $(arg_dict[:oow])
-  - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
+  - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn.
+  - $(arg_dict[:ledger]) [`replace_group_by_assets`](@ref) and [`get_linear_constraints`](@ref) fill it.
 
 # Validation
 
-  - Every coefficient has magnitude zero or one. Any other coefficient raises an `ArgumentError`. The check reads the magnitude because the parser normalises a `>=` row to `<=` by negation, which carries a coefficient of one into the block as minus one.
+  - Every coefficient has magnitude zero or one. Any other coefficient raises an `ArgumentError`. The check reads the magnitude because the parser normalises a `>=` row to `<=` by negation, so a coefficient of one goes into the block as minus one.
   - Every view names one asset. A view over more than one asset raises an `ArgumentError`.
   - Every target is non-negative. A negative target raises a `DomainError`.
-  - The sample must hold at least one observation whose loss reaches the target. A view more extreme than the worst realisation raises a `DomainError` naming the largest target the asset admits.
+  - The sample must hold at least one observation whose loss reaches the target. A view more extreme than the worst realisation raises a `DomainError` that names the largest target that the asset admits.
 
 # Returns
 
-  - `nothing`: The function mutates `epc` in-place.
+  - `nothing`: The function mutates `epc` in place.
 
 # Related
 
   - [`ValueatRiskView`](@ref)
   - [`add_ep_constraint!`](@ref)
   - [`replace_prior_views`](@ref)
-  - [`get_pr_value`](@ref): reads the prior value at risk a `prior(...)` reference resolves to.
+  - [`get_pr_value`](@ref): reads the prior value at risk that a `prior(...)` reference resolves to.
   - [`MeucciEntropyPoolingPrior`](@ref)
 """
 function ep_var_views!(var_views::ValueatRiskView, epc::AbstractDict,
@@ -112,24 +117,24 @@ end
 """
     ep_var_views!(var_views::AbstractVector{<:ValueatRiskView}, args...; kwargs...)
 
-Add each group of **value at risk** views under its own significance level.
+Add each group of value at risk views under its own significance level.
 
-Every [`ValueatRiskView`](@ref) in the vector is added in turn, so the groups accumulate into the same constraint set and one entropy pooling solve answers all of them.
+The method adds each [`ValueatRiskView`](@ref) of the vector in turn. So all the groups go into the same constraint set, and one entropy pooling solve meets all of them.
 
 # Algorithm
 
- 1. Add each [`ValueatRiskView`](@ref) of `var_views` in turn, forwarding `args...` and `kwargs...` to each call.
- 2. Return `nothing`. Each call has already written its rows into `epc`.
+ 1. Add each [`ValueatRiskView`](@ref) of `var_views` in turn, with `args...` and `kwargs...`.
+ 2. Return `nothing`. Each call already wrote its rows into `epc`.
 
 # Arguments
 
-  - `var_views`: Groups of VaR views.
-  - `args...`: Additional positional arguments forwarded to [`ep_var_views!`](@ref).
-  - `kwargs...`: Additional keyword arguments forwarded to [`ep_var_views!`](@ref).
+  - `var_views`: Groups of value at risk views.
+  - `args...`: The positional arguments that the method passes to [`ep_var_views!`](@ref).
+  - `kwargs...`: The keyword arguments that the method passes to [`ep_var_views!`](@ref).
 
 # Returns
 
-  - `nothing`: The function mutates `epc` in-place.
+  - `nothing`: The function mutates `epc` in place.
 
 # Related
 
@@ -209,33 +214,33 @@ end
     ep_prior_probabilities(w::Nothing, pr::AbstractPriorResult, Ti::Int)
     ep_prior_probabilities(w::ScenarioProbabilities, T::Integer, Ti::Integer)
 
-Return the prior probabilities an entropy pooling fit starts from.
+Return the prior probabilities from which an entropy pooling fit starts.
 
-A prior that reweights observations works on the observation axis its nested prior **answered**, not on the axis it was handed. A nested prior may drop rows: a [`CrossSectionalFactorPrior`](@ref) drops the observations its Descriptors warm up over and the observations its exposure lag consumes, so its scenarios are the window the fit is defined on. So the prior probabilities are read on the rows of the nested result, and [`ep_wrapped_prior`](@ref) finds the count `T` of those rows.
+A prior that reweights observations works on the observation axis of the result of its nested prior, not on the axis of its input data. A nested prior can drop rows. A [`CrossSectionalFactorPrior`](@ref) drops the warm-up observations of its Descriptors and the observations of its exposure lag, so its scenarios are the window of the fit. So the method reads the prior probabilities on the rows of the nested result, and [`ep_wrapped_prior`](@ref) finds the count `T` of those rows.
 
-The three sources are read in order. A caller's `pe.w` wins, because it is the one tilt no fit can state. The nested result's own `w` comes next, because a nested pooling prior already tilted the scenarios it answered, and uniform is then not the prior. Uniform over the rows of `pr.X` is the last. The method for a caller's `pe.w` runs before the refit under it, so it reads the count `T` and not a result. When that refit answers its own `pr.w`, the nested prior solved its views from `pe.w`, and [`ep_wrapped_prior`](@ref) reads its posterior `pr.w` instead.
+The method reads three sources in order. The `pe.w` of the caller comes first, because no fit can state that weighting. The `w` of the nested result comes next, because a nested pooling prior already changed the weights of its scenarios, and the uniform weights are then not the prior. The uniform weights over the rows of `pr.X` are the last. The method for the `pe.w` of the caller runs before the refit with those weights, so it reads the count `T` and not a result. When that refit returns its own `pr.w`, the nested prior solved its views from `pe.w`, and [`ep_wrapped_prior`](@ref) reads its posterior `pr.w` instead.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. A `nothing` `w`: when `pr.w` is not `nothing`, return it through [`scenario_probabilities`](@ref), which keeps the kind of a [`ScenarioProbabilities`](@ref) and makes any other vector `StatsBase.AnalyticWeights`. Otherwise return the uniform `1/T` over the `T = size(pr.X, 1)` rows of `pr.X` as `StatsBase.AnalyticWeights`. Their bias correction is the one of reliability weights, see [`ScenarioProbabilities`](@ref).
- 2. A caller's `w`: check its length against `T`, and return it.
+ 1. A `nothing` `w`: when `pr.w` is not `nothing`, return it through [`scenario_probabilities`](@ref). That function keeps the kind of a [`ScenarioProbabilities`](@ref), and makes any other vector `StatsBase.AnalyticWeights`. Otherwise, return the uniform `1/T` over the `T = size(pr.X, 1)` rows of `pr.X` as `StatsBase.AnalyticWeights`. [`ScenarioProbabilities`](@ref) states their bias correction.
+ 2. A `w` of the caller: check its length against `T`, and return it.
 
 # Arguments
 
-  - `w`: A caller's prior probabilities, the `w` field of the pooling estimator, or `nothing`.
+  - `w`: The prior probabilities of the caller, from the `w` field of the pooling estimator, or `nothing`.
   - `pr`: Prior result of the nested estimator.
-  - `T`: Observations the nested prior answers.
-  - `Ti`: Observations the pooling estimator was handed. It is read only by the refusal message.
+  - `T`: Number of observations of the result of the nested prior.
+  - `Ti`: Number of observations of the input data of the pooling estimator. Only the error message reads it.
 
 # Validation
 
-  - `length(w) == T`. A length that does not match raises a `DimensionMismatch` naming both counts and the count the estimator was handed.
+  - `length(w) == T`. A length that does not match raises a `DimensionMismatch` that names both counts and the number of observations of the input data.
 
 # Returns
 
-  - `w0::ScenarioProbabilities`: Prior probabilities, on the rows that the nested prior answers.
+  - `w0::ScenarioProbabilities`: Prior probabilities, on the rows of the result of the nested prior.
 
 # Related
 
@@ -262,21 +267,27 @@ end
 """
     entropy_pooling(w::VecNum, epc::AbstractDict, opt::OptimEntropyPooling)
 
-Solve the dual of the entropy pooling problem using Optim.jl.
+Solve the dual of the entropy pooling problem with Optim.jl.
 
-`entropy_pooling` computes posterior probabilities by minimising the Kullback-Leibler divergence of the posterior weights from the prior ones, subject to moment and view constraints. The optimisation is performed using [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl). This method is used internally by [`MeucciEntropyPoolingPrior`](@ref) and [`EntropyPoolingPrior`](@ref) when the optimiser is an [`OptimEntropyPooling`](@ref).
+`entropy_pooling` finds the posterior probabilities that minimise the Kullback-Leibler divergence from the prior probabilities, subject to the moment and view constraints. It uses [`Optim.jl`](https://julianlsolvers.github.io/Optim.jl/stable/). [`MeucciEntropyPoolingPrior`](@ref) and [`EntropyPoolingPrior`](@ref) call this method when the optimiser is an [`OptimEntropyPooling`](@ref).
 
-The two optimisation algorithms minimise the same objective and reach the same posterior. They differ only in the arithmetic that evaluates it.
+The two optimisation algorithms minimise the same objective and return the same posterior. They differ only in the arithmetic of the evaluation.
 
-The dual carries one variable per row rather than one per observation, and it has no room for an auxiliary variable, so it expresses no tail view. It also has no slack variable: the fixed equality rows of the `:feq` key are relaxed by holding their dual variables in the box ``[-s_{c2},\\, s_{c2}]``, which is the dual of a penalty of weight ``s_{c2}`` on the norm of the slack the primal would carry.
+The dual problem has one variable for each row, not one for each observation. It cannot hold an auxiliary variable, so it expresses no tail view. It also has no slack variable. The method relaxes the fixed equality rows of the `:feq` key with the box ``[-s_{c2},\\, s_{c2}]`` on their dual variables. This box is the dual of a penalty of weight ``s_{c2}`` on the norm of the slack of the primal problem.
 
 !!! warning
 
-    An infeasible view set answers without a raise. The dual of such a set is unbounded below, so the minimiser runs away rather than settling. The iterate stops moving once the exponential underflows, `Optim` reports `x_converged` or `f_converged`, and `Optim.converged` accepts it. The posterior it returns is degenerate: the probability collapses onto the observation with the largest coefficient, and the view the caller wrote is missed by any margin. Read the answer rather than the flag. The effective number of scenarios falls to a handful out of ``T`` and one weight sits near one, the Kullback-Leibler divergence is large, and the posterior statistic the view named is far from its target. Views that pull one asset in two directions at once are the common way to reach it: a variance view that shrinks an asset, written beside a conditional value at risk view that fattens the same asset's tail, asks for a thin body and a fat tail at once. The same pair on two different assets is feasible and solves normally, so it is the direction and not the pairing. The gradient of this dual is ``\\boldsymbol{B} - \\mathbf{A} \\boldsymbol{y}``, the primal residual of the view set, so `Optim.g_converged` and `Optim.g_residual` do separate the two outcomes. Neither is read: `Optim.g_converged` also refuses a solve that is correct and merely loose, so acting on it needs a tolerance on the residual, and that tolerance is a policy this library does not set.
+    An infeasible view set raises no error. The dual of such a set is unbounded below, so the minimiser does not converge to a point. The iterate stops when the exponential underflows, `Optim` reports `x_converged` or `f_converged`, and `Optim.converged` accepts it. The posterior that the method returns is degenerate. Almost all of the probability goes to the observation with the largest coefficient, and the posterior can miss the view of the caller by an arbitrary amount.
+
+    Read the result, not the flag. Three signs show an infeasible view set. The effective number of scenarios falls to a few out of ``T``, and one weight is near one. The Kullback-Leibler divergence is large. The posterior statistic that the view names is far from its target.
+
+    The usual cause is two views that move one asset in opposite directions. For example, a variance view that makes the distribution of an asset narrower, and a conditional value at risk view that makes the tail of the same asset heavier, ask for a thin body and a heavy tail together. The same two views on two different assets are feasible and solve normally. So the cause is the opposite directions, not the pair of views.
+
+    The gradient of this dual is ``\\boldsymbol{B} - \\mathbf{A} \\boldsymbol{y}``, the primal residual of the view set, so `Optim.g_converged` and `Optim.g_residual` can tell the two outcomes apart. The method reads neither. `Optim.g_converged` also refuses a solve that is correct but has a loose tolerance. So a check on it needs a tolerance on the residual, and this library sets no such tolerance.
 
 # Mathematical definition
 
-The primal minimises the Kullback-Leibler divergence of the posterior from the prior, over the probabilities that meet every row. Its dual carries one Lagrange multiplier per row, and is unconstrained apart from the box the sense of each row imposes:
+The primal problem minimises the Kullback-Leibler divergence of the posterior from the prior, over the probabilities that meet every row. Its dual has one Lagrange multiplier for each row, and has no constraint other than the box that the sense of each row sets:
 
 ```math
 \\begin{align}
@@ -284,7 +295,7 @@ The primal minimises the Kullback-Leibler divergence of the posterior from the p
 \\end{align}
 ```
 
-The optimal posterior probabilities recover from the minimiser as:
+The objective is the negative of the dual function of Equation 91 of [meucci2008](@cite), so the library minimises where [meucci2008](@citet) maximises. The method gets the optimal posterior probabilities from the minimiser as:
 
 ```math
 \\begin{align}
@@ -302,26 +313,26 @@ Where:
   - $(math_dict[:ep_sc1])
   - $(math_dict[:ep_sc2])
   - ``\\boldsymbol{x}``: Lagrange multipliers of the rows, the variable of the dual.
-  - ``\\mathbf{A}_{\\cdot t}``: ``t``-th column of ``\\mathbf{A}``, the coefficient every row gives observation ``t``.
+  - ``\\mathbf{A}_{\\cdot t}``: ``t``-th column of ``\\mathbf{A}``, the coefficient that each row gives observation ``t``.
   - ``q_{t}``, ``p_{t}^{*}``: Prior and optimal posterior probability of observation ``t``.
 
 # Algorithm
 
- 1. Return `w` when `epc` holds no row. An empty view set states nothing, so the posterior is the prior, and it is answered exactly rather than solved for.
- 2. Open `A` and `B` with the row that pins the posterior to sum to one, both sides divided by ``\\sqrt{T}``.
- 3. Stack the block of every key of `epc` onto `A` and `B`, in the sorted order of the keys, and set the box `wb` of that block's dual variables from the key: free for `:eq` and `:cvar_eq`, non-negative for `:ineq`, and ``[-s_{c2},\\, s_{c2}]`` for `:feq`. Raise on any other key. A `:feq` block is left out when ``s_{c2}`` is zero, because that box pins its dual variables to zero and the fixed rows then carry no weight.
- 4. Start every dual variable at ``1/\\sqrt{T}``, clamped into its own box. A `:feq` box is ``[-s_{c2},\\, s_{c2}]``, so an `s_{c2}` below ``1/\\sqrt{T}`` would otherwise place the start outside it.
- 5. Minimise the dual objective over that box with `Optim.optimize`, through the branch `alg` selects. Both the objective and its gradient are multiplied by ``s_{c1}``.
+ 1. Return `w` when `epc` holds no row. An empty view set states nothing, so the posterior is the prior, and the method returns it exactly with no solve.
+ 2. Start `A` and `B` with the row that holds the sum of the posterior at one, with both sides divided by ``\\sqrt{T}``.
+ 3. Stack the block of every key of `epc` onto `A` and `B`, in the sorted order of the keys. Set the box `wb` of the dual variables of that block from the key. The box is free for `:eq` and `:cvar_eq`, non-negative for `:ineq`, and ``[-s_{c2},\\, s_{c2}]`` for `:feq`. Raise on any other key. Leave out a `:feq` block when ``s_{c2}`` is zero, because that box holds its dual variables at zero and the fixed rows then have no weight.
+ 4. Start every dual variable at ``1/\\sqrt{T}``, clamped into its own box. A `:feq` box is ``[-s_{c2},\\, s_{c2}]``, so with no clamp, an ``s_{c2}`` below ``1/\\sqrt{T}`` puts the start outside the box.
+ 5. Minimise the dual objective over that box with `Optim.optimize`, through the branch that `alg` selects. The method multiplies both the objective and its gradient by ``s_{c1}``.
  6. Raise when `Optim.converged` reports that the solve failed.
- 7. Recover the posterior probabilities from the minimiser, and return them through [`scenario_probabilities`](@ref), in the kind of `w`.
+ 7. Get the posterior probabilities from the minimiser, and return them through [`scenario_probabilities`](@ref), in the kind of `w`.
 
 # Arguments
 
-  - `w`: Prior weights (length = number of observations).
+  - `w`: Prior probabilities, one for each observation.
 
-  - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
+  - `epc`: Dictionary of entropy pooling constraints, which maps each key to an `(lhs, rhs)` pair.
 
-  - `opt`: Optim.jl-based entropy pooling optimiser.
+  - `opt`: Entropy pooling optimiser that uses Optim.jl.
 
       + `::OptimEntropyPooling{<:Any, <:Any, <:Any, <:Any, <:ExpEntropyPooling}`: Evaluate the objective through the exponential of the dual variables.
       + `::OptimEntropyPooling{<:Any, <:Any, <:Any, <:Any, <:LogEntropyPooling}`: Evaluate the objective in log space.
@@ -330,11 +341,11 @@ Where:
 
   - Every key of `epc` is one of `:eq`, `:ineq`, `:cvar_eq` and `:feq`. Any other key raises a `KeyError`.
   - The solve must converge. A solve that `Optim.converged` reports as failed raises an `ErrorException`.
-  - An infeasible view set is **not** caught. `Optim.converged` is true on `x_converged` or `f_converged` alone, and the dual of an infeasible set stops on one of those. The summary paragraph states the shape of that answer and how to recognise it.
+  - The method does not catch an infeasible view set. `Optim.converged` is true on `x_converged` or `f_converged` only, and the dual of an infeasible set stops on one of those. The warning above states the shape of that result and the signs that show it.
 
 # Returns
 
-  - `pw::ScenarioProbabilities`: Posterior probability weights satisfying the constraints, in the kind of `w`.
+  - `pw::ScenarioProbabilities`: Posterior probabilities that meet the constraints, in the kind of `w`.
 
 # Related
 
@@ -347,7 +358,7 @@ Where:
 
 # References
 
-  - $(ref_dict[:meucci2008])
+  - $(ref_dict[:meucci2008]) Appendix A.3, Equations 90 to 93.
 """
 function entropy_pooling(w::VecNum, epc::AbstractDict,
                          opt::OptimEntropyPooling{<:Any, <:Any, <:Any, <:Any,
@@ -536,44 +547,44 @@ end
 """
     entropy_pooling(w::VecNum, epc::AbstractDict, opt::JuMPEntropyPooling)
 
-Solve the primal of the entropy pooling problem using JuMP.jl.
+Solve the primal of the entropy pooling problem with JuMP.jl.
 
-`entropy_pooling` computes posterior probabilities by minimising the Kullback-Leibler divergence of the posterior weights from the prior ones, subject to moment and view constraints. The optimisation is performed using [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl). This method is used internally by [`MeucciEntropyPoolingPrior`](@ref) and [`EntropyPoolingPrior`](@ref) when the optimiser is a [`JuMPEntropyPooling`](@ref).
+`entropy_pooling` finds the posterior probabilities that minimise the Kullback-Leibler divergence from the prior probabilities, subject to the moment and view constraints. It uses [`JuMP.jl`](https://jump.dev/JuMP.jl/stable/). [`MeucciEntropyPoolingPrior`](@ref) and [`EntropyPoolingPrior`](@ref) call this method when the optimiser is a [`JuMPEntropyPooling`](@ref).
 
-This method registers no model entry of its own. It is the three-argument shape of a problem that states no tail view, and the four-argument method carries the model, its `# JuMP formulation` and its `# Algorithm`.
+This method registers no model entry of its own. It is the three-argument form for a problem that states no tail view. The four-argument method builds the model, and its docstring holds the `# JuMP formulation` and the `# Algorithm`.
 
 # Algorithm
 
- 1. Call the four-argument method with an empty `AbstractEntropyPoolingTailView` vector, and return what it answers.
+ 1. Call the four-argument method with an empty `AbstractEntropyPoolingTailView` vector, and return its result.
 
 # Arguments
 
-  - `w`: Prior weights (length = number of observations).
+  - `w`: Prior probabilities, one for each observation.
 
-  - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
+  - `epc`: Dictionary of entropy pooling constraints, which maps each key to an `(lhs, rhs)` pair.
 
-  - `opt`: JuMP.jl-based entropy pooling optimiser.
+  - `opt`: Entropy pooling optimiser that uses JuMP.jl.
 
-      + `::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any, <:ExpEntropyPooling}`: Write the divergence against the prior probabilities directly.
-      + `::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any, <:LogEntropyPooling}`: Write the divergence against a unit reference and subtract the prior log-probabilities in the objective.
+      + `::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any, <:ExpEntropyPooling}`: Write the divergence with the prior probabilities as the reference.
+      + `::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any, <:LogEntropyPooling}`: Write the divergence with a unit reference, and subtract the logarithms of the prior probabilities in the objective.
 
 # Returns
 
-  - `pw::ScenarioProbabilities`: Posterior probability weights satisfying the constraints, in the kind of `w`.
+  - `pw::ScenarioProbabilities`: Posterior probabilities that meet the constraints, in the kind of `w`.
 
 # Related
 
   - [`JuMPEntropyPooling`](@ref)
   - [`ExpEntropyPooling`](@ref)
   - [`LogEntropyPooling`](@ref)
-  - [`ep_jump_views!`](@ref): registers the rows of `epc`, and the slack that relaxes the fixed equalities.
+  - [`ep_jump_views!`](@ref): registers the rows of `epc`, and the slack that relaxes the fixed equality rows.
   - [`MeucciEntropyPoolingPrior`](@ref)
   - [`EntropyPoolingPrior`](@ref)
   - [`OptimEntropyPooling`](@ref)
 
 # References
 
-  - $(ref_dict[:meucci2008])
+  - $(ref_dict[:meucci2008]) Section 4, Equations 26 and 27.
 """
 function entropy_pooling(w::VecNum, epc::AbstractDict, opt::JuMPEntropyPooling)
     return entropy_pooling(w, epc, AbstractEntropyPoolingTailView[], opt)

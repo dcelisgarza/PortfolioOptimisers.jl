@@ -116,7 +116,8 @@ function get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_re
     return if isempty(msg)
         OptimisationSuccess()
     else
-        @warn("Failed to solve optimisation problem. Check `retcode.res` for details.")
+        @warn("Failed to solve optimisation problem. Check `retcode.res` for details.",
+              maxlog = log_limit(:warn), _id = @log_id())
         OptimisationFailure(;
                             res = (; msg = msg, w_min = w_min_retcode,
                                    w_opt = w_opt_retcode, w_max = w_max_retcode,

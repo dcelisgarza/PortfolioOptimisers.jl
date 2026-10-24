@@ -189,7 +189,7 @@ EuclideanProjection()
 
 # References
 
-  - $(ref_dict[:duchi2008])
+  - $(ref_dict[:duchi2008]) Section 3, Equations 3 to 6 and Figure 1.
 """
 struct EuclideanProjection <: AbstractProjectionGeometry end
 """
@@ -235,7 +235,7 @@ EntropicProjection()
 
 # References
 
-  - $(ref_dict[:helmbold1998])
+  - $(ref_dict[:helmbold1998]) Section 3, Equations 3.2 and 3.3.
 """
 struct EntropicProjection <: AbstractProjectionGeometry end
 """
@@ -305,7 +305,7 @@ GramProjection
 
 # References
 
-  - $(ref_dict[:agarwal2006])
+  - $(ref_dict[:agarwal2006]) Section 3, Figure 1 and Theorem 1.
 """
 @concrete struct GramProjection <: AbstractProjectionGeometry
     """
@@ -389,10 +389,10 @@ Keywords correspond to the struct's fields.
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `wb`: Recursively viewed via [`port_opt_view`](@ref).
-  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `wb`: Recursively viewed through [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices through [`port_opt_view`](@ref).
 
 # Examples
 
@@ -414,7 +414,7 @@ BoundedAllocationSet
 
 # References
 
-  - $(ref_dict[:duchi2008])
+  - $(ref_dict[:duchi2008]) Section 3, Figure 1.
 """
 @propagatable @concrete struct BoundedAllocationSet <: AbstractAllocationSet
     """
@@ -1014,7 +1014,7 @@ The exact projection of such a vector lifts every zero entry by ``(1 - s) / N`` 
 
 # References
 
-  - $(ref_dict[:duchi2008])
+  - $(ref_dict[:duchi2008]) Section 3, Equations 3 to 6 and Figure 1.
 """
 function project_simplex(v::AbstractVector)
     s = sum(v)
@@ -1430,7 +1430,8 @@ Records a Held Step on the current [`ProjectionStep`](@ref). Outside a step, it 
 function record_held_step!(reason::AbstractString, trials)
     step = PROJECTION_STEP[]
     if isnothing(step)
-        @warn("Held Step outside an Online Update: $reason")
+        @warn("Held Step outside an Online Update: $reason", maxlog = log_limit(:warn),
+              _id = @log_id())
         return nothing
     end
     push!(step.held, HeldStep(step.ts, reason, trials))

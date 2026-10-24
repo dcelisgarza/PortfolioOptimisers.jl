@@ -69,7 +69,7 @@ slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
 We tune a [`Stacking`](@ref) estimator, and the search works the same way for the other
 optimisation estimators, such as [`NestedClustered`](@ref). A key of the grid is a string with
 the property path to the parameter, such as `"opti[1].opt.l2.val"`. The search parses the
-string into an [`Accessors.jl`](https://github.com/JuliaObjects/Accessors.jl) lens, an object
+string into an [`Accessors.jl`](https://juliaobjects.github.io/Accessors.jl/stable/) lens, an object
 that returns a copy of the estimator with that one field changed.
 
 A search needs a risk measure, `r`, to score every fold, and a cross-validation scheme, `cv`,
@@ -177,7 +177,7 @@ grids works as it does for [`GridSearchCrossValidation`](@ref).
 The search draws from one random number generator, `rng`, grid by grid and parameter by
 parameter. The order of the grids and of the parameters therefore changes the samples. To repeat a
 search, keep that order fixed. Use an `OrderedDict` from
-[`OrderedCollections`](https://github.com/JuliaCollections/OrderedCollections.jl) or a vector
+[`OrderedCollections`](https://juliacollections.github.io/OrderedCollections.jl/stable/) or a vector
 for each grid.
 
 #### 2.2.1 Sampling from a predefined parameter space

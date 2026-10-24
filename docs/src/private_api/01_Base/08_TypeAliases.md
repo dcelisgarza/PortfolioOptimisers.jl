@@ -24,6 +24,7 @@ PairStrNum
 DictStrNum
 MultiEstValType
 EstValType
+VectorEstValType
 PairGSCV
 DictGSCV
 GSCVKey

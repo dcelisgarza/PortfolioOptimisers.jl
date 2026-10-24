@@ -1532,6 +1532,25 @@ end
               for pp in (1.0, 10.0, 100.0, 1000.0)]
     @test issorted(masses)
     @test isapprox(masses[end], 1)
+
+    # The linear pool is a mixture, so its entropy is at least the opinion-weighted mean of
+    # the entropies of the opinions, and it can be less than the largest one. A uniform
+    # opinion and a point mass pool to an entropy below the uniform's `log(5)`.
+    Pu = hcat(fill(0.2, 5), [1.0, 0.0, 0.0, 0.0, 0.0])
+    au = [0.5, 0.5]
+    Hu = [StatsBase.entropy(view(Pu, :, k)) for k in 1:2]
+    Hlin = StatsBase.entropy(PortfolioOptimisers.compute_pooling(LinearOpinionPooling(), au,
+                                                                 Pu))
+    @test Hlin >= sum(au .* Hu)
+    @test Hlin < maximum(Hu)
+
+    # The logarithmic pool minimises the opinion-weighted divergence from the pool to each
+    # opinion, so no other distribution on the simplex scores lower.
+    obj(q) = sum(a[k] * StatsBase.kldivergence(q, view(P, :, k)) for k in 1:3)
+    rng = StableRNG(542)
+    @test all(obj(collect(lg)) <= obj(normalize(rand(rng, 5), 1)) for _ in 1:200)
+    @test all(obj(collect(lg)) <= obj(normalize(abs.(lg .+ 1e-3 * randn(rng, 5)), 1))
+              for _ in 1:200)
 end
 
 @testset "OpinionPoolingPrior constructor guards" begin
@@ -1549,6 +1568,9 @@ end
     # The sum guard is an inequality: weights summing to less than one are legal, and the
     # remainder becomes a uniform-prior opinion in `prior`.
     @test isa(OpinionPoolingPrior(; pes = [ep, ep], w = [0.3, 0.3]), OpinionPoolingPrior)
+    # Every field but `cache` renders, as the docstring of `show_fields` lists them.
+    @test PortfolioOptimisers.show_fields(OpinionPoolingPrior(; pes = [ep])) ==
+          (:pes, :pe1, :pe2, :p, :w, :alg, :ex, :x_src)
 end
 
 @testset "Factor block guard on wrapped priors" begin
@@ -1930,7 +1952,9 @@ end
     ivc[1:(T - n), :] .= NaN
     rdc = ReturnsResult(; nx = rdi.nx, X = Xi, iv = ivc, ivpa = 1.1)
     @test clusterise(clp, pr; rd = rdc, iv = rdc.iv, ivpa = 1.1).res.order == clt.res.order
-    @test_throws IsNonFiniteError clusterise(cle, Xi[1:n, :]; iv = ivc[1:n, :], ivpa = 1.1)
+    # A gap in `iv` raises a `DomainError` since `58bf93a4b1`, through
+    # `assert_nonempty_nonneg_finite_val`, which refuses a negative entry with the gap.
+    @test_throws DomainError clusterise(cle, Xi[1:n, :]; iv = ivc[1:n, :], ivpa = 1.1)
     @test phylogeny_matrix(clp, pr; rd = rdi, iv = rdi.iv, ivpa = rdi.ivpa).X ==
           phylogeny_matrix(cle, tail.X; iv = tail.iv, ivpa = tail.ivpa).X
     ct = CentralityEstimator(; pl = NetworkEstimator(; ce = ImpliedVolatility(; ppy = 252)),
@@ -2268,10 +2292,22 @@ no name, and the two guards that stand between a view and the wrong axis. Sweep 
     @test_throws DimensionMismatch BlackLittermanViews(; P = ones(2, 3), Q = [0.01])
     @test_throws IsEmptyError BlackLittermanViews(; P = ones(2, 3), Q = [0.01, 0.02],
                                                   excl = Int[])
-    @test_throws DimensionMismatch BlackLittermanViews(; P = ones(2, 3), Q = [0.01, 0.02],
-                                                       excl = [1, 2, 3])
+    #=
+    `excl` indexes the views the caller wrote, the kept rows and the dropped ones, so two rows
+    with three dropped views are five views and `excl` is longer than `Q`. The guard counted
+    `excl` against `Q` alone, and three views of which two resolved no name raised a
+    `DimensionMismatch` instead of the documented drop (#535).
+    =#
     @test isa(BlackLittermanViews(; P = ones(2, 3), Q = [0.01, 0.02], excl = [1, 2]),
               BlackLittermanViews)
+    @test BlackLittermanViews(; P = ones(2, 3), Q = [0.01, 0.02], excl = [1, 2, 3]).excl ==
+          [1, 2, 3]
+    @test_throws ArgumentError BlackLittermanViews(; P = ones(2, 3), Q = [0.01, 0.02],
+                                                   excl = [1, 1])
+    @test_throws DomainError BlackLittermanViews(; P = ones(2, 3), Q = [0.01, 0.02],
+                                                 excl = [4])
+    @test_throws DomainError BlackLittermanViews(; P = ones(2, 3), Q = [0.01, 0.02],
+                                                 excl = [0])
 
     bsets = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["A", "B", "C"]))
     #=
@@ -2289,6 +2325,30 @@ no name, and the two guards that stand between a view and the wrong axis. Sweep 
     @test blv.excl == [2]
     @test collect(PortfolioOptimisers.remove_excl_views([0.1, 0.2, 0.3], blv.excl)) ==
           [0.1, 0.3]
+    # More dropped views than kept rows is still a drop.
+    blv2 = @test_logs((:warn,), match_mode = :any,
+                      PortfolioOptimisers.get_black_litterman_views(parse_equation(["A == 0.01",
+                                                                                    "ZZZ == 0.02",
+                                                                                    "YYY == 0.03"]),
+                                                                    bsets))
+    @test collect(blv2.P) == [1.0 0.0 0.0]
+    @test blv2.Q == [0.01]
+    @test blv2.excl == [2, 3]
+
+    #=
+    A precomputed pair with `excl` takes one confidence for each view the caller wrote, as the
+    equation-shaped routes do. Counted against `Q` alone, `[0.3, 0.6]` over two kept rows lost
+    its second entry to `remove_excl_views`, `calc_omega` broadcast `0.3` over both rows, and
+    the posterior equalled the one of the scalar `0.3` with no error (#535).
+    =#
+    Xe = randn(StableRNG(987654321), 200, 3) .* 0.01
+    kept = BlackLittermanViews(; P = [1.0 0.0 0.0; 0.0 1.0 0.0], Q = [0.01, 0.02])
+    dropped = BlackLittermanViews(; P = [1.0 0.0 0.0; 0.0 1.0 0.0], Q = [0.01, 0.02],
+                                  excl = [2])
+    @test prior(BlackLittermanPrior(; views = dropped, views_conf = [0.3, 0.5, 0.6]), Xe).mu ==
+          prior(BlackLittermanPrior(; views = kept, views_conf = [0.3, 0.6]), Xe).mu
+    @test_throws DimensionMismatch BlackLittermanPrior(; views = dropped,
+                                                       views_conf = [0.3, 0.6])
     # `strict = true` refuses the same input rather than dropping it.
     @test_throws ArgumentError PortfolioOptimisers.get_black_litterman_views(parse_equation(["ZZZ == 0.02"]),
                                                                              bsets;
@@ -3267,6 +3327,12 @@ independent causes that open the augmented member's gap. Sweep ticket #536.
     # the identity cannot be formed at all.
     @test isnothing(prl.fpr)
     @test isnothing(prl.rr)
+    # Over a factor prior it forwards the prior factor block, so the right-hand side exists
+    # and the gap is open. The docstring quotes `1.7e-3`.
+    prlf = prior(BlackLittermanPrior(; pe = FactorPrior(), sets = afs, views = av),
+                 BL536_Xr, F)
+    @test !isnothing(prlf.fpr)
+    @test 1e-3 < bl536_gap(prlf) < 1e-2
 
     # The intercept is no longer a cause, on either branch (#570). It goes into the prior
     # stack, where the update is affine in it, so on an exact factor model the identity
@@ -3279,6 +3345,13 @@ independent causes that open the augmented member's gap. Sweep ticket #536.
     @test bl536_gap(prior(abl, BL536_Xe0, F)) < 1e-13
     # Cause one: idiosyncratic variance. It survives a fitted intercept of `2.4e-4`.
     @test 1e-4 < bl536_gap(prior(abl, BL536_Xr0, F)) < 1e-3
+    # With a residual the intercept changes the size of cause one, because the gain moves
+    # the two halves by different amounts. The docstring quotes `7.1e-5` with the intercept
+    # and `1.2e-4` with the intercept removed from `X`.
+    g_b = bl536_gap(prior(abl, BL536_Xr, F))
+    g_nob = bl536_gap(prior(abl, BL536_Xr .- transpose(BL536_b), F))
+    @test 5e-5 < g_b < 1e-4
+    @test 1e-4 < g_nob < 2e-4
 
     # Setting `l` changes neither statement. This also covers the `!isempty(w)` guard of
     # the constructor, which no other test reaches.
@@ -3293,8 +3366,9 @@ independent causes that open the augmented member's gap. Sweep ticket #536.
     # Cause two: a non-zero `rf` with `l` set. The equilibrium branch adds the rate to the
     # whole stack, so the asset half gains `rf` and the factor half gains `rf` as well. The
     # identity carries the factor half through the loadings, so the two agree only where an
-    # asset's loadings sum to one, and the gap is `rf * (1 - s)` exactly. It is zero at the
-    # default `rf = 0.0`, and it is the only way the rate reaches this identity.
+    # asset's loadings sum to one. On this exact factor model the gap is `rf * (1 - s)`. It
+    # is zero at the default `rf = 0.0`, and it is the only way the rate reaches this
+    # identity.
     ablr = AugmentedBlackLittermanPrior(; sets = afs, a_views = av, f_views = fv, l = 2.0,
                                         rf = 0.03)
     prr = prior(ablr, BL536_Xe, F)
@@ -3302,6 +3376,14 @@ independent causes that open the augmented member's gap. Sweep ticket #536.
     @test isapprox(prr.mu .- (prr.rr.M * prr.fpr.mu .+ prr.rr.b), 0.03 .* (1 .- s536);
                    atol = 1e-13)
     @test !isapprox(s536, ones(N))
+    # With a residual the rate also goes through cause one, so the part of the gap that the
+    # rate adds is not `rf * (1 - s)`. The docstring quotes a difference of `5.9e-4`.
+    gv(pr) = pr.mu .- (pr.rr.M * pr.fpr.mu .+ pr.rr.b)
+    prr_r = prior(ablr, BL536_Xr, F)
+    prr_r0 = prior(AugmentedBlackLittermanPrior(; sets = afs, a_views = av, f_views = fv,
+                                                l = 2.0), BL536_Xr, F)
+    sr = vec(sum(prr_r.rr.M; dims = 2))
+    @test 1e-4 < maximum(abs.(gv(prr_r) .- gv(prr_r0) .- 0.03 .* (1 .- sr))) < 1e-3
 
     # Muting both view sets with views that repeat the prior makes the update null, so the
     # posterior is the prior and the identity holds exactly. Before #570 the gap here was
@@ -3555,6 +3637,23 @@ Sweep ticket #536.
     @test pr.fpr.w === fp.w
     @test isnothing(pr.chol)
     @test isnothing(pr.fpr.chol)
+    # Under the default `EmpiricalPrior` the five fields above are `nothing`, which passes for
+    # any code. Two entropy pooling priors carry real and different weightings.
+    aep = EntropyPoolingPrior(; sets = UniverseSets(; dict = Dict("nx" => afs.dict["nx"])),
+                              mu_views = LinearConstraintEstimator(; val = ["A1 == 0.002"]))
+    fep = EntropyPoolingPrior(; sets = UniverseSets(; dict = Dict("nx" => afs.dict["nf"])),
+                              mu_views = LinearConstraintEstimator(; val = ["F1 == 0.001"]))
+    apE = prior(aep, BL536_Xr)
+    fpE = prior(fep, F)
+    prE = prior(AugmentedBlackLittermanPrior(; sets = afs, a_pe = aep, f_pe = fep,
+                                             a_views = av, f_views = fv), BL536_Xr, F)
+    @test !isnothing(apE.w)
+    @test prE.w == apE.w
+    @test prE.ens == apE.ens
+    @test prE.kld == apE.kld
+    @test prE.ow == apE.ow
+    @test prE.fpr.w == fpE.w
+    @test prE.fpr.w != prE.w
 
     # The rate goes on the whole equilibrium stack, so both halves move by the same gain
     # applied to a vector of ones. Where `l` is `nothing` the two wrapped means are total
@@ -3664,7 +3763,7 @@ end
               () -> HierarchicalOptimiser(; brt = true), () -> InverseVolatility(; brt = true),
               () -> NestedClustered(; opti = mr, opto = mr, brt = true),
               () -> Stacking(; opti = [mr], opto = mr, brt = true),
-              () -> SubsetResampling(; opt = mr, brt = true),
+              () -> SubsetResampling(; subset_size = 0.8, opt = mr, brt = true),
               () -> OnlinePortfolioSelection(; brt = true), () -> PO.RiskLoss(; brt = true),
               () -> ProgrammeAllocationSet(; slv = s1, brt = true),
               () -> ShortTermLossControlPortfolio(; slv = s1, brt = true),
@@ -3686,4 +3785,35 @@ end
     # The keywords that the library forwards still reach the graph verbs.
     @test isa(clusterise(ClustersEstimator(), pr; rd = rds, dims = 1,
                          branchorder = :optimal), PO.AbstractClusteringResult)
+end
+
+@testset "The claims that the /unslop pass of the base prior corrected (#531)" begin
+    PO = PortfolioOptimisers
+    # `AbstractPriorEstimator` names five families. `HighOrderPriorEstimator` subtypes the high
+    # order root directly, with an optional `F`, so the root is a public family too.
+    @test Base.ispublic(PO, :AbstractHighOrderPriorEstimator)
+    @test HighOrderPriorEstimator <: PO.AbstractHighOrderPriorEstimator
+    @test !(HighOrderPriorEstimator <: PO.AbstractHighOrderPriorEstimator_F)
+    @test HighOrderFactorPriorEstimator <: PO.AbstractHighOrderPriorEstimator_F
+    @test hasmethod(prior, Tuple{HighOrderPriorEstimator, Matrix{Float64}})
+    # `forward_prior` says that a hand-written constructor call names fourteen fields, and
+    # `LowOrderPrior` says that its six flat names cover fourteen fields.
+    @test fieldcount(LowOrderPrior) == 14
+    # The pool holds field names only, so no computed property is in it.
+    pool = PO.prior_result_property_pool()
+    for k in (:f_mu, :f_sigma, :f_kt, :f_V, :original_X)
+        @test k ∉ pool
+    end
+    # The view of a `LowOrderPrior` forwards `ss_gaps` and drops `pc`.
+    X = [0.01 0.02 0.03; 0.04 0.05 0.06; 0.07 0.08 0.09; 0.10 0.11 0.12]
+    ss_gaps = [true, false, false, false, false]
+    lo = LowOrderPrior(; X = X, mu = [0.02, 0.03, 0.04],
+                       sigma = [0.001 0.0 0.0; 0.0 0.001 0.0; 0.0 0.0 0.001],
+                       ss_gaps = ss_gaps,
+                       pc = (; X = nothing, w = fill(0.25, 4), pe2 = nothing))
+    v = PO.port_opt_view(lo, [1, 3])
+    @test v.ss_gaps === ss_gaps
+    @test isnothing(v.pc)
+    @test isnothing(v.o_X)
+    @test v.mu == [0.02, 0.04]
 end

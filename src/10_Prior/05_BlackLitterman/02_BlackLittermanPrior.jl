@@ -3,7 +3,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Black-Litterman prior estimator for asset returns.
 
-`BlackLittermanPrior` is a low order prior estimator that computes the mean and covariance of asset returns using the Black-Litterman model. It combines a prior estimator, matrix post-processing, user or algorithmic views, asset sets, view confidences, risk-free rate, and a blending parameter `tau`. The estimator supports both direct and constraint-based views, and allows for flexible confidence specification and matrix processing.
+`BlackLittermanPrior` is a low order prior estimator. It fits the wrapped prior `pe`, and it updates the asset mean and covariance of that prior with views on the assets. The views are view equations in a [`LinearConstraintEstimator`](@ref), or a precomputed [`BlackLittermanViews`](@ref). `views_conf` sets the confidence of the views, `tau` scales the uncertainty of the prior mean, and `rf` shifts the posterior mean. `mp` processes the posterior covariance.
+
+[black1991](@citet) state the posterior mean as the precision-weighted blend of the prior and the views. The library computes the equivalent update form of [walters2011](@citet). [black1991](@citet) give no posterior covariance. The library returns the prior covariance plus the posterior covariance of the mean, which is the convention of [walters2011](@citet). [helitterman1999](@citet) set the view uncertainty to ``\\tau\\,\\mathrm{Diag}(\\mathbf{P}\\mathbf{\\Sigma}\\mathbf{P}^\\intercal)``. The library does the same when `views_conf` is `nothing`. [cajas2025](@citet) sets `tau` to `1/T`, which is the library default. A confidence `v` in `views_conf` scales that uncertainty by `1/v - 1`. This is the closed form of [walters2011](@citet) for the method of [idzorek2007](@citet), which finds the uncertainty of each view by a numerical search for the weight tilt that the confidence asks for. [idzorek2007](@citet) also gives the meaning of the confidence: the fraction of the full tilt towards the view.
 
 # Fields
 
@@ -28,38 +30,38 @@ Keywords correspond to the struct's fields.
 
 ## Composition: what this estimator forwards
 
-The views are applied to the **assets**. The wrapped prior is forwarded whole and only the deviations are spelled out: `mu` and `sigma` become the posterior, and `chol` is **dropped** because the posterior covariance supersedes the one it factorises. Everything else forwards — Black-Litterman leaves the observation axis untouched, so `w`, `ens`, `kld`, `ow` and `Z` all still describe the axis they were computed over, and `rr` and the factor block `fpr` are structural, over data the views do not modify.
+The views update the **assets**. The estimator forwards the full result of the wrapped prior, with three changes. `mu` and `sigma` become the posterior. The estimator **drops** `chol`, because the posterior covariance replaces the covariance that `chol` factorises. Black-Litterman does not change the observation axis, so `w`, `ens`, `kld` and `ow` still describe the axis that the wrapped prior fitted them over. `rr` and the factor block `fpr` are structural: they come from data that the views do not change.
 
 !!! warning
 
-    The returned `mu` and `sigma` are the Black-Litterman posterior, but `w` is the **wrapped prior's** observation weighting, forwarded unchanged. Black-Litterman produces no observation-level posterior, so there is no Black-Litterman-consistent alternative to forward — and dropping `w` would substitute the unweighted empirical distribution, which is further from the caller's intent than the weights they computed. A caller reading `pr.w`, `pr.ens`, `pr.kld` or `pr.ow` is therefore reading a property of the prior, not of the posterior.
+    `mu` and `sigma` of the result are the Black-Litterman posterior, but `w` holds the observation weights of the **wrapped prior**, with no change. Black-Litterman makes no posterior over the observations, so no other weights agree with the update. Without `w`, a reader uses the unweighted empirical distribution, which is further from the intent of the caller than the weights that the caller computed. Thus `pr.w`, `pr.ens`, `pr.kld` and `pr.ow` describe the prior, not the posterior.
 
 !!! warning
 
-    When the wrapped prior carries a factor block, `pr.fpr` describes the **prior** factor distribution while `pr.mu` is a **posterior** asset mean, so `pr.mu != pr.rr.M * pr.fpr.mu + pr.rr.b`. The block stays *structurally* true — the regression is over data Black-Litterman does not modify — while becoming *distributionally* inconsistent with the asset block. There is nothing better to report: the views land on the assets, so this estimator never computes a posterior factor distribution at all.
+    When the wrapped prior has a factor block, `pr.fpr` describes the **prior** factor distribution, but `pr.mu` is a **posterior** asset mean, so `pr.mu != pr.rr.M * pr.fpr.mu + pr.rr.b`. The block is still true as a *structure*, because the regression uses data that Black-Litterman does not change. But as a *distribution* it does not agree with the asset block. The estimator has no better block to report: the views update the assets, so the estimator does not compute a posterior factor distribution.
 
-    Its siblings differ, and the difference is worth knowing. [`FactorBlackLittermanPrior`](@ref) and [`BayesianBlackLittermanPrior`](@ref) apply their views to the factors and report the resulting posterior block, so both satisfy `mu == rr.M * fpr.mu + rr.b` exactly. [`AugmentedBlackLittermanPrior`](@ref) reports a posterior factor block too, but stays inconsistent for a different reason — see its own warning.
+    The other members are different. [`FactorBlackLittermanPrior`](@ref) and [`BayesianBlackLittermanPrior`](@ref) apply their views to the factors and report the posterior factor block, so `mu == rr.M * fpr.mu + rr.b` holds exactly for both. [`AugmentedBlackLittermanPrior`](@ref) also reports a posterior factor block, but its blocks do not agree, for a different reason that its own warning states.
 
 ## Validation
 
   - If `views` is a [`LinearConstraintEstimator`](@ref), `!isnothing(sets)`.
-  - If `views_conf` is not `nothing`, `views_conf` is validated with [`assert_bl_views_conf`](@ref).
+  - If `views_conf` is not `nothing`, [`assert_bl_views_conf`](@ref) checks it.
   - If `tau` is not `nothing`, `tau > 0`.
   - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref).
   - The `x_src` of `pe` is `nothing`, because the prior picks the returns that it reads, see [`assert_inner_reader`](@ref).
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `pe`: Recursively updated via [`factory`](@ref).
+  - `pe`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `pe`: Recursively viewed via [`port_opt_view`](@ref).
-  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `pe`: Recursively viewed through [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices through [`port_opt_view`](@ref).
 
 # Examples
 
@@ -150,10 +152,11 @@ BlackLittermanPrior
 
 # References
 
-  - $(ref_dict[:black1992])
-  - $(ref_dict[:cajas2025]) Section 5.1, Equations 5.13 to 5.15.
-  - $(ref_dict[:walters2011])
-  - $(ref_dict[:idzorek2007]) For the `views_conf` branch of [`calc_omega`](@ref).
+  - $(ref_dict[:black1991]) Appendix, items 7 and 8. $(ref_dict[:no_original_source])
+  - $(ref_dict[:helitterman1999]) Footnote 6.
+  - $(ref_dict[:walters2011]) Equations 25 to 27, 41 and 44. $(ref_dict[:no_original_source])
+  - $(ref_dict[:idzorek2007]) Section 3.2.
+  - $(ref_dict[:cajas2025]) Section 5.1.3, Equation 5.6, and Section 5.1.2, footnote 1.
 """
 @propagatable @concrete struct BlackLittermanPrior <: AbstractLowOrderPriorEstimator_AF
     """
@@ -220,15 +223,15 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Assert that the Black-Litterman prior's views, sets, view confidences, and blending parameter are valid.
+Check the views, the sets, the view confidences and `tau` of a Black-Litterman prior estimator.
 
-This is the one guard every Black-Litterman constructor calls, so the four families refuse the same input. It does not look at the returns matrix, which the constructor never sees; [`prior`](@ref) checks the universe against `X` and [`bl_preroll`](@ref) checks the width of `P` against the covariance.
+Each Black-Litterman constructor calls this guard, so the four members refuse the same input. The guard does not read the returns matrix, because the constructor does not have it. [`assert_bl_views_axis`](@ref) checks the universe against `X` in [`prior`](@ref), and [`bl_preroll`](@ref) checks the width of `P` against the covariance.
 
 # Validation
 
-  - When `views` is a [`LinearConstraintEstimator`](@ref), `!isnothing(sets)`, because the names of such a view resolve against a universe.
-  - `views_conf` is checked by [`assert_bl_views_conf`](@ref), against the shape of `views`.
-  - When `tau` is given, `tau > 0`. A `nothing` is admitted, and [`bl_preroll`](@ref) resolves it to `1/T`.
+  - When `views` is a [`LinearConstraintEstimator`](@ref), `!isnothing(sets)`, because the names of such a view resolve against a universe. Raises an [`IsNothingError`](@ref).
+  - [`assert_bl_views_conf`](@ref) checks `views_conf` against the shape of `views`.
+  - When `tau` is not `nothing`, `tau > 0`. Raises a `DomainError`. The guard accepts `nothing`, and [`bl_preroll`](@ref) changes it to `1/T`.
 
 # Related
 
@@ -251,64 +254,68 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Pre-compute shared Black-Litterman inputs from views, prior covariance, and blending parameters.
+Assemble the views, `tau` and the view uncertainty that the Black-Litterman members share.
 
-Extracts the view matrix `P`, view returns vector `Q`, and excluded indices from `views` and `sets` via [`black_litterman_views`](@ref), resolves `tau`, filters excluded rows from `views_conf` via [`remove_excl_views`](@ref), and computes the scaled uncertainty matrix `omega = tau * Ω` via [`calc_omega`](@ref).
+`axis` names the declared axis of the distribution that the views update. Each caller knows it from its own type, not from the views. [`BlackLittermanPrior`](@ref) uses the default `:xkey`, the asset axis. A member whose views update the **factor** distribution passes `:tfkey` or `:cfkey`. `axis` is the last positional argument, because a caller on the asset axis never gives it.
 
-`axis` names the declared axis of the distribution the views land on, and every caller knows it from its own type rather than from the views: [`BlackLittermanPrior`](@ref) takes the default `:xkey` (the asset axis), while a member whose views update the **factor** distribution passes `:tfkey` or `:cfkey`. It is the last argument because it is the only one an asset-space caller never supplies.
+[`UniverseSets`](@ref) declares two factor axes, so the function accepts three symbols. Each member of the library that updates a factor distribution reads the columns of `F`, and passes `:tfkey`. The function accepts `:cfkey` because the axis exists and a view can update it. No member passes `:cfkey` now.
 
-[`UniverseSets`](@ref) declares two factor axes, so the accepted set is three symbols wide. Every member in the library today updates a factor distribution whose columns are the columns of `F`, so every one of them passes `:tfkey`; `:cfkey` is accepted because the axis exists and a view can land on it, not because a member reaches it yet.
+`axis` is the name of a *field of* [`UniverseSets`](@ref), not a key, so a caller states its axis and nothing more. This function reads the key, and only when `sets` is not `nothing`. To read `sets.tfkey` when there is no universe is the same error as to read the universe. A precomputed [`BlackLittermanViews`](@ref) is the one shape of views that can come with no `sets`. It resolves no names, and it ignores the sets and the axis.
 
-The selector is a *field of* [`UniverseSets`](@ref) rather than a key resolved from one, so a caller states its axis and nothing else. Resolving the key is this function's work, and it happens only when there is a `sets` to read it from — reading `sets.tfkey` to describe a universe that does not exist is the same error as reading the universe itself. Views supplied as a [`BlackLittermanViews`](@ref) result are the one shape that arrives with no `sets` at all: they resolve no names and ignore both the sets and the axis.
+This function is also where `P` meets the distribution that it updates, so it checks that their widths agree. A `P` assembled from names has the correct width. A **precomputed** [`BlackLittermanViews`](@ref) resolves no names, and no other site checks its width.
 
-This is also where `P` meets the distribution it updates, so it is where their widths are reconciled. A `P` assembled from names is the right width by construction; a **precomputed** [`BlackLittermanViews`](@ref) resolves no names and is checked nowhere else.
+**When no view is left, the function returns `nothing`, for each cause.** [`get_black_litterman_views`](@ref) drops a row that it cannot assemble, and it does not fit the row without the term. Thus a set of views can lose all its rows for different causes:
 
-**No view left answers `nothing`, whatever emptied the set.** A row a builder cannot assemble is dropped whole rather than fitted without its term, so a view set can end with no row for several reasons: a departure took the last one, the universe this fit was handed is a *sub-universe* — a cluster of a nested optimisation, a subset of a resampling — in which the names sit outside, or the caller mistyped. None of them changes what is left to condition on, so none of them changes the answer: the fit carries on as though no view had been stated, and each estimator spells what that means for it through [`bl_posteriors`](@ref) or [`bl_view_block`](@ref).
+  - A departure removed the last row.
+  - The fit uses a *sub-universe* that does not hold the names, such as a cluster of a nested optimisation or a subset of a resampling.
+  - The caller wrote a typo.
 
-The unresolved name is still reported where it is met, by [`strict_diagnostic`](@ref) — an `ArgumentError` under `strict = true`, a warning otherwise, naming the name and the universe it failed against. That report names the cause; a refusal here could only name the symptom, and could not tell a typo from a name that is legitimately outside a sub-universe. The ledger still separates the two *for the announcement*: only a departed name writes into it, and [`announce_bl_departures`](@ref) reads it to say which of the two happened.
+No cause changes the data that is left for the update, so no cause changes the result. The fit continues as if the caller stated no view. Each member states what that means for it through [`bl_posteriors`](@ref) or [`bl_view_block`](@ref).
 
-The returned `omega` already carries ``\\tau``, so a caller passes it to [`vanilla_posteriors`](@ref) as it stands. That scaling has a consequence worth knowing: [`calc_omega`](@ref) is homogeneous of degree one in the covariance it reads, so ``\\tau`` multiplies both ``\\mathbf{P}\\tau\\mathbf{\\Sigma}\\mathbf{P}^\\intercal`` and ``\\mathbf{\\Omega}``, and cancels out of the posterior **mean** on every confidence branch. It does not cancel out of the posterior covariance. [`vanilla_posteriors`](@ref) states the measurement.
+[`strict_diagnostic`](@ref) still reports each name that resolves against neither axis, at the site where the assembly reads it. It raises an `ArgumentError` under `strict = true` and warns otherwise, and the message names the name and the universe that it failed against. That report names the cause. A refusal here can only name the result, and it cannot tell a typo from a correct name that is outside a sub-universe. The ledger keeps the two cases apart *for the report*: only a departed name writes into it, and [`announce_bl_departures`](@ref) reads it to say which case happened.
+
+The returned `omega` includes ``\\tau``, so a caller passes it to [`vanilla_posteriors`](@ref) with no change. [`calc_omega`](@ref) is homogeneous of degree one in the covariance that it reads. Thus ``\\tau`` multiplies ``\\mathbf{P}\\tau\\mathbf{\\Sigma}\\mathbf{P}^\\intercal`` and ``\\mathbf{\\Omega}``, and it cancels from the posterior **mean** on each confidence branch. It does not cancel from the posterior covariance. [`vanilla_posteriors`](@ref) gives the measurement.
 
 # Algorithm
 
- 1. Check that `axis` names a declared axis a view can land on.
- 2. Resolve `axis` to a universe key. When `sets` is `nothing` the key is `nothing` too, because a precomputed views object resolves no name and needs none.
- 3. Assemble the views with [`black_litterman_views`](@ref) under that key, giving `blv`.
- 4. When no view survived, answer `nothing`. The caller decides what a view-free fit is.
- 5. Read `P`, `Q` and `excl` off `blv`.
- 6. Check that `P` is as wide as `prior_sigma` is tall.
- 7. Resolve `tau`, which is `pe_tau` when the estimator carries one and `1/T` otherwise.
- 8. Drop the confidences of the views that step 3 excluded, with [`remove_excl_views`](@ref).
- 9. Build the view uncertainty matrix from the surviving confidences with [`calc_omega`](@ref), scale it by `tau`, and return it as `omega` alongside `P`, `Q` and `tau`.
+ 1. Check that `axis` names a declared axis that a view can update.
+ 2. Read the universe key from the field `axis` of `sets`. When `sets` is `nothing`, the key is `nothing`, because a precomputed views object resolves no name.
+ 3. Assemble the views with [`black_litterman_views`](@ref) under that key. The result is `blv`.
+ 4. When no view is left, return `nothing`. The caller decides what a fit with no view gives.
+ 5. Read `P`, `Q` and `excl` from `blv`.
+ 6. Check that the number of columns of `P` is equal to the number of rows of `prior_sigma`.
+ 7. Set `tau` to `pe_tau` when it is not `nothing`, and to `1/T` otherwise.
+ 8. Remove the confidences of the views that step 3 dropped, with [`remove_excl_views`](@ref).
+ 9. Make the view uncertainty matrix from the remaining confidences with [`calc_omega`](@ref), and multiply it by `tau`. Return it as `omega`, with `P`, `Q` and `tau`.
 
 # Validation
 
-  - `axis in (:xkey, :tfkey, :cfkey)`.
-  - `size(P, 2) == size(prior_sigma, 1)`, when a view survived.
+  - `axis in (:xkey, :tfkey, :cfkey)`. Raises a `DomainError`.
+  - `size(P, 2) == size(prior_sigma, 1)`, when a view is left. Raises a `DimensionMismatch`.
 
 # Arguments
 
   - $(arg_dict[:views])
   - $(arg_dict[:sets])
   - $(arg_dict[:views_conf])
-  - `prior_sigma::MatNum`: Prior covariance matrix of the distribution the views update, `n × n` over that axis.
-  - `pe_tau::Option{<:Number}`: Optional user-specified blending parameter. If `nothing`, defaults to `1/T`.
-  - `T::Integer`: Number of observations used to compute the default `tau = 1/T`.
+  - `prior_sigma::MatNum`: The prior covariance matrix of the distribution that the views update, `n × n` over that axis.
+  - `pe_tau::Option{<:Number}`: The `tau` of the estimator, or `nothing`. If `nothing`, the function uses `1/T`.
+  - `T::Integer`: The number of observations, for the default `tau = 1/T`.
   - $(arg_dict[:datatype])
   - $(arg_dict[:strict])
   - $(arg_dict[:bl_axis])
-  - `ledger`: The Departure Ledger of the caller that derived the Investable Mask, or `nothing` when nobody is collecting. It is threaded into [`black_litterman_views`](@ref), and it is what tells a view set emptied by a departure from one emptied any other way — a distinction the *announcement* makes, not the answer.
+  - $(arg_dict[:ledger]) The function passes it to [`black_litterman_views`](@ref). The ledger tells a set of views that a departure emptied from a set that another cause emptied. Only the *report* uses this difference, and the result does not.
 
 # Returns
 
-  - `(; P, Q, tau, omega)`: Named tuple where:
+  - `(; P, Q, tau, omega)`: A named tuple of:
 
-      + `P::MatNum`: View matrix `views × assets`.
-      + `Q::VecNum`: View returns vector `views × 1`.
-      + `tau::Number`: Resolved blending parameter.
-      + `omega::LinearAlgebra.Diagonal`: Scaled view uncertainty matrix `tau * Ω`.
+      + `P::MatNum`: The view matrix, `views × n`.
+      + `Q::VecNum`: The view returns, `views × 1`.
+      + `tau::Number`: The value of `tau` that the function used.
+      + `omega::LinearAlgebra.Diagonal`: The view uncertainty matrix, multiplied by `tau`.
 
-  - `nothing`: Every view was dropped, so the fit proceeds view-free.
+  - `nothing`: The function dropped every view, so the fit continues with no view.
 
 # Related
 
@@ -363,19 +370,24 @@ end
 """
     announce_bl_departures(ni::VecStr, ledger::VecStr, viewless::Bool) -> Nothing
 
-Report, once per Black-Litterman fit, who left the investable universe and what their leaving cost the view set.
+Report, once for each Black-Litterman fit, the assets that left the investable universe and the views that they removed.
 
-This is the family's call of [`announce_non_investable`](@ref), written once so the four `prior` methods each spend one line on it and none of them can word it differently. It names the process a Black-Litterman fit, because the default message names an optimisation and would tell a standalone `prior(pe, X)` call that it is inside an optimisation it is not.
+This is the call of [`announce_non_investable`](@ref) for the Black-Litterman members. It is written once, so each of the four `prior` methods calls it in one line, and the four use the same words. It names the process "Black-Litterman fit". The default message names an optimisation, which is wrong for a call of `prior(pe, X)` outside an optimisation.
 
-The sentence is one sentence for all four members, and it is exactly true of each. Two of them write their views on the **factor** axis, where no asset name ever appears, so the view clause simply does not bite for them; what does bite for every member is the first clause, because all four estimate their posterior over the assets that remain.
+The message is one sentence for the four members, and it is true for each. Two members write their views on the **factor** axis, where no asset name occurs, so the clause about view rows does not apply to them. The first clause applies to each member, because the four estimate their posterior over the assets that remain.
 
-`viewless` says the fit ended with no view at all, and it is reported two ways because it happens two ways. When the **ledger** is non-empty a departure took the last surviving view: the message is raised to a warning and says so in the departure's own words. When the ledger is empty nobody departed, so [`announce_non_investable`](@ref) is silent — it has no name to report — and the view-free fit gets a warning of its own instead. That is the sub-universe case: a cluster of a nested optimisation or a subset of a resampling holds none of the names the caller wrote, every row is dropped whole, and the caller is handed an unconditioned answer with nothing else to tell them. Every drop that only *trims* the view set stays `@info`.
+`viewless` is `true` when the fit has no view left. The function reports this in two ways, because it has two causes.
+
+  - When the **ledger** is not empty, a departure removed the last view. The function raises the message to a warning, and the message states the departure.
+  - When the ledger is empty, no departure removed a view, and the departure message cannot explain the empty set. [`announce_non_investable`](@ref) says nothing about the views, so the function gives its own warning for the fit with no view. This is the case of a sub-universe: a cluster of a nested optimisation or a subset of a resampling holds none of the names that the caller wrote. The fit drops each row, and the caller receives a result with no update and no other report.
+
+A drop that removes only some of the views stays at the `@info` level.
 
 # Arguments
 
-  - `ni`: The names the Investable Mask left out, from [`investable_views`](@ref).
-  - `ledger`: What the departures cost, as the view builder recorded it. Non-empty is what makes a view-free fit a *departure's* doing.
-  - `viewless`: Whether the fit ended up with no view at all.
+  - `ni`: The names that the Investable Mask leaves out, from [`investable_views`](@ref).
+  - `ledger`: The views that the departures removed, as the view assembly recorded them. When it is not empty and `viewless` is `true`, a *departure* removed the last view.
+  - `viewless`: `true` when the fit has no view left.
 
 # Returns
 
@@ -407,7 +419,8 @@ function announce_bl_departures(ni::VecStr, ledger::VecStr, viewless::Bool)::Not
         # silent when nobody departed, which is exactly the sub-universe case. Handing back
         # an unconditioned answer where the caller asked for views changes the answer rather
         # than trimming it, and this is the caller's only way to learn it.
-        @warn("No Black-Litterman view resolved against the universe this fit was handed, so it proceeds with no view at all and its posterior is the unconditioned one. A view row is dropped whole when a name in it does not resolve, so a universe narrowed to a sub-problem — a cluster, a resampled subset — can empty a view set that is correct over the universe the caller stated it against.")
+        @warn("No Black-Litterman view resolved against the universe this fit was handed, so it proceeds with no view at all and its posterior is the unconditioned one. A view row is dropped whole when a name in it does not resolve, so a universe narrowed to a sub-problem — a cluster, a resampled subset — can empty a view set that is correct over the universe the caller stated it against.",
+              maxlog = log_limit(:warn), _id = @log_id())
     end
     return nothing
 end
@@ -415,21 +428,21 @@ end
     bl_posteriors(::Nothing, prior_mu::VecNum, prior_sigma::MatNum) -> Tuple
     bl_posteriors(blp::NamedTuple, prior_mu::VecNum, prior_sigma::MatNum) -> Tuple
 
-Run the master equations, or hand back the prior pair when nothing is left to run them with.
+Run the master equations, or return the prior pair when no view is left.
 
-[`bl_preroll`](@ref) answers `nothing` whenever no view row survived — a departure took the last one, the universe this fit was handed holds none of the names, or the caller mistyped. The fit proceeds rather than refusing, and a Black-Litterman posterior with no view **is** the distribution it was going to update — so that is what this returns.
+[`bl_preroll`](@ref) returns `nothing` when no view row is left. The fit continues and does not refuse. A Black-Litterman posterior with no view **is** the distribution that the views were to update, so this function returns that distribution.
 
-It is the prior pair itself and not the empty-view algebra, and the difference is not rounding. [`vanilla_posteriors`](@ref) adds the estimation-error term ``[(\\tau\\mathbf{\\Sigma})^{-1}]^{-1} = \\tau\\mathbf{\\Sigma}`` to the covariance, so an empty ``\\mathbf{P}`` would answer ``(1 + \\tau)\\mathbf{\\Sigma}`` — a *wider* covariance than the prior, produced by views that are not there. Forwarding the prior pair is what makes the missing view cost the caller the view and nothing else.
+The function returns the prior pair, not the result of the master equations with an empty ``\\mathbf{P}``. The difference is not a rounding error. [`vanilla_posteriors`](@ref) adds the term of estimation error ``[(\\tau\\mathbf{\\Sigma})^{-1}]^{-1} = \\tau\\mathbf{\\Sigma}`` to the covariance. With an empty ``\\mathbf{P}`` it gives ``(1 + \\tau)\\mathbf{\\Sigma}``, a covariance *wider* than the prior, from views that do not exist. With the prior pair, the caller loses the views and nothing more.
 
-[`BayesianBlackLittermanPrior`](@ref) is the member this verb does **not** serve, and the reason is worth stating: its update is a precision sum, ``\\hat{\\mathbf{\\Sigma}}^{-1} = \\mathbf{\\Sigma}_f^{-1} + \\mathbf{P}^\\intercal\\mathbf{\\Omega}^{-1}\\mathbf{P}``, so an empty ``\\mathbf{P}`` contributes exactly zero and carries no ``\\tau\\mathbf{\\Sigma}`` term to inflate anything. Its no-view answer is therefore the empty-block algebra of [`bl_view_block`](@ref) — which is *not* its wrapped prior: it collapses by Woodbury to ``\\mathbf{\\Sigma}_a + \\mathbf{M}\\mathbf{\\Sigma}_f\\mathbf{M}^\\intercal`` and ``\\mathbf{M}\\boldsymbol{\\mu}_f + \\mathbf{b}``, the moments the factor model implies. That member has no unadjusted prior to hand back, because it transforms its wrapped prior whether or not a view is stated.
+[`BayesianBlackLittermanPrior`](@ref) does **not** use this function. Its update is a sum of precisions, ``\\hat{\\mathbf{\\Sigma}}^{-1} = \\mathbf{\\Sigma}_f^{-1} + \\mathbf{P}^\\intercal\\mathbf{\\Omega}^{-1}\\mathbf{P}``, so an empty ``\\mathbf{P}`` adds zero, and there is no ``\\tau\\mathbf{\\Sigma}`` term to widen the covariance. Its result with no view is thus the algebra of an empty block from [`bl_view_block`](@ref). That result is *not* its wrapped prior. By Woodbury, it is ``\\mathbf{\\Sigma}_a + \\mathbf{M}\\mathbf{\\Sigma}_f\\mathbf{M}^\\intercal`` and ``\\mathbf{M}\\boldsymbol{\\mu}_f + \\mathbf{b}``, the moments that the factor model gives. That member has no unchanged prior to return, because it changes its wrapped prior with or without views.
 
-The covariance is copied, because every caller of this passes what it gets to [`matrix_processing!`](@ref), which writes in place, and the prior result must not be mutated under a caller still holding it.
+The function copies the covariance. Each caller passes the result to [`matrix_processing!`](@ref), which writes in place, and the function must not change a prior result that a caller still holds.
 
-The split is dispatch: [`bl_preroll`](@ref) answers a concrete `NamedTuple` or a literal `nothing` at each call site, so the method pair is resolved statically.
+The two methods split by dispatch. The result of [`bl_preroll`](@ref) is `nothing` or one concrete `NamedTuple`, so the compiler splits that small union at the call.
 
 # Arguments
 
-  - `blp`: What [`bl_preroll`](@ref) answered, or `nothing`.
+  - `blp`: The result of [`bl_preroll`](@ref), or `nothing`.
   - `prior_mu`: The prior mean of the distribution the views update.
   - `prior_sigma`: The prior covariance of that distribution.
 
@@ -453,23 +466,23 @@ end
     bl_view_block(::Nothing, n::Integer, datatype::DataType) -> Tuple
     bl_view_block(blp::NamedTuple, ::Integer, ::DataType) -> Tuple
 
-Read the `P`, `Q` and `omega` of a view system, as a block with no row when it has no view left.
+Return the `P`, `Q` and `omega` of a view system, or a block with no row when the system has no view left.
 
-Two members need this rather than [`bl_posteriors`](@ref), and for two different reasons.
+Two members use this function and not [`bl_posteriors`](@ref), for two different reasons.
 
-[`AugmentedBlackLittermanPrior`](@ref) stacks an asset-side view block above a factor-side one, and **either half can empty on its own**. An empty half contributes no row rather than collapsing the stack to the prior, because the *joint* posterior is still conditioned by whatever the other half kept: handing back the prior stack there would throw away views the caller stated and that still resolve. Only when both halves empty is there nothing left, and that member reads the pair itself to take the prior stack. The block is `0 × n` rather than a zero row, so the stack carries no phantom view and `aug_Q` is one entry shorter rather than one entry of zero.
+[`AugmentedBlackLittermanPrior`](@ref) puts a block of asset views above a block of factor views, and **each half can become empty alone**. An empty half adds no row, and the stack does not change to the prior. The other half still holds views that the caller stated and that resolve, so the *joint* posterior still uses them. The prior stack discards those views. Only when both halves are empty is no view left, and that member then reads the two results itself and takes the prior stack. The empty block is `0 × n` and not a row of zeros, so the stack holds no false view, and `aug_Q` has one entry less, not an entry of zero.
 
-[`BayesianBlackLittermanPrior`](@ref) has one view system and no stack, and takes an empty block because for it the empty-block algebra **is** the no-view answer. Its update is a precision sum, ``\\hat{\\mathbf{\\Sigma}}^{-1} = \\mathbf{\\Sigma}_f^{-1} + \\mathbf{P}^\\intercal\\mathbf{\\Omega}^{-1}\\mathbf{P}``, so a `0 × n` ``\\mathbf{P}`` adds exactly zero and there is no ``\\tau\\mathbf{\\Sigma}`` estimation-error term for it to inflate — which is precisely what stops [`bl_posteriors`](@ref) from serving the members that run [`vanilla_posteriors`](@ref). What comes out is not that member's wrapped prior but ``\\mathbf{\\Sigma}_a + \\mathbf{M}\\mathbf{\\Sigma}_f\\mathbf{M}^\\intercal``, the moments its factor model implies, and it has no unadjusted prior to offer instead.
+[`BayesianBlackLittermanPrior`](@ref) has one view system and no stack. It uses an empty block because, for it, the algebra of an empty block **is** the result with no view. Its update is a sum of precisions, ``\\hat{\\mathbf{\\Sigma}}^{-1} = \\mathbf{\\Sigma}_f^{-1} + \\mathbf{P}^\\intercal\\mathbf{\\Omega}^{-1}\\mathbf{P}``, so a `0 × n` ``\\mathbf{P}`` adds zero, and there is no term of estimation error ``\\tau\\mathbf{\\Sigma}`` to widen the covariance. The members that run [`vanilla_posteriors`](@ref) have that term, and that is why they use [`bl_posteriors`](@ref). The result is not the wrapped prior of that member but ``\\mathbf{\\Sigma}_a + \\mathbf{M}\\mathbf{\\Sigma}_f\\mathbf{M}^\\intercal``, the moments that its factor model gives, and the member has no unchanged prior to return.
 
 # Arguments
 
-  - `blp`: What [`bl_preroll`](@ref) answered for this system, or `nothing`.
-  - `n`: The width of this system's axis, for the empty `P`.
+  - `blp`: The result of [`bl_preroll`](@ref) for this system, or `nothing`.
+  - `n`: The width of the axis of this system, for the empty `P`.
   - `datatype`: The numeric type of the block.
 
 # Returns
 
-  - `(P, Q, omega)::Tuple`: The view matrix, view returns and uncertainty, with no row when the system was emptied.
+  - `(P, Q, omega)::Tuple`: The view matrix, the view returns and the view uncertainty, with no row when the system has no view left.
 
 # Related
 
@@ -489,13 +502,13 @@ end
     assert_bl_precomputed_universe(sets::UniverseSets, pr::AbstractPriorResult) -> Nothing
     assert_bl_precomputed_universe(sets::Nothing, pr::AbstractPriorResult) -> Nothing
 
-Refuse the one configuration in which an asset-side Black-Litterman view cannot be reduced: a **precomputed** view matrix over a universe an asset has left.
+Refuse a **precomputed** view matrix over a universe that an asset left. This is the one configuration where the estimator cannot reduce the asset views.
 
-The reduction works by resolving the caller's view *names* against the universe that survives, which is what lets a row naming a departed asset be dropped whole and every other row be rebuilt over the investable columns. A [`BlackLittermanViews`](@ref) passed in ready-made resolves no name — [`black_litterman_views`](@ref) hands it straight back, and its docstring says why: it was assembled against whatever universe the caller held, and nothing downstream can re-check it. So its `P` cannot be reduced, and there is nothing to reduce it *by*: an estimator whose views are precomputed is permitted to carry no `sets` at all.
+The reduction resolves the view *names* of the caller against the universe that remains. With the names, the estimator can drop a row that names a departed asset, and build each other row again over the investable columns. A precomputed [`BlackLittermanViews`](@ref) resolves no name. [`black_litterman_views`](@ref) returns it unchanged, because the caller assembled it over its own universe and no later step can check it. Thus the estimator cannot reduce its `P`, and it has no names to reduce it *with*: an estimator with precomputed views can have no `sets`.
 
-Left alone, this is the defect the whole ticket is about, unfixed for one configuration and **silent**: `calc_omega` forms `P * sigma * transpose(P)` over the full universe, `0 * NaN` is `NaN`, and the posterior comes back all `NaN`. Under the default `mp` that surfaces one layer later as `ArgumentError: matrix contains Infs or NaNs` from `posdef!`, which names the wrong cause; under a matrix processing estimator that does nothing, the fit *succeeds* and hands the caller an empty universe. This is the map's rule applied where it has to be: handle it, or throw an error that names it.
+Without this check, the configuration fails with no clear report. [`calc_omega`](@ref) forms `P * sigma * transpose(P)` over the full universe, `0 * NaN` is `NaN`, and each entry of the posterior is `NaN`. Under the default `mp`, `posdef!` then raises `ArgumentError: matrix contains Infs or NaNs`, which names the wrong cause. Under a matrix processing estimator that does nothing, the fit *gives no error*, and the next layer finds no investable asset. This function refuses the configuration with an error that names it.
 
-The split is dispatch on the type of `sets`, which is a field of a `@concrete` estimator and so a type fact. The `UniverseSets` method is the whole of the ordinary path and costs a dispatch; only the sets-less path derives the mask, and only to refuse.
+The two methods split by dispatch on the type of `sets`. `sets` is a field of a `@concrete` estimator, so its type is known when the method compiles. The `UniverseSets` method is the usual path, and it does nothing. Only the method for `nothing` derives the mask, and only to refuse.
 
 # Arguments
 
@@ -504,7 +517,7 @@ The split is dispatch on the type of `sets`, which is a field of a `@concrete` e
 
 # Validation
 
-  - When `sets` is `nothing`, every asset of `pr` must be investable.
+  - When `sets` is `nothing`, each asset of `pr` is investable. Raises an `ArgumentError`.
 
 # Returns
 
@@ -534,7 +547,7 @@ end
 
 Compute the Black-Litterman view uncertainty matrix `Ω`.
 
-Each method selects one shape of `views_conf` and computes the branch of the closed form below that the shape names: `::Nothing` the unscaled diagonal, `::Number` the same diagonal under one shared scale, and `::VecNum` the same diagonal under one scale per view.
+Each method selects one shape of `views_conf` and computes one branch of the closed forms below. `::Nothing` gives the diagonal with no scale, `::Number` gives the same diagonal with one scale for all the views, and `::VecNum` gives the same diagonal with one scale for each view.
 
 # Mathematical definition
 
@@ -567,21 +580,21 @@ Where:
   - ``\\boldsymbol{v}``: ``K \\times 1`` vector of view confidence levels.
   - ``\\odot``: Element-wise multiplication.
 
-The no-confidence branch is the diagonal uncertainty of the view creation model. [`bl_preroll`](@ref) scales the result by ``\\tau``, so the pair returns ``\\mathrm{Diag}(\\mathbf{P}(\\tau\\mathbf{\\Sigma})\\mathbf{P}^\\intercal)``.
+The branch with no confidence is the diagonal uncertainty of the view creation model. [`bl_preroll`](@ref) multiplies the result by ``\\tau``, so the two functions together return ``\\mathrm{Diag}(\\mathbf{P}(\\tau\\mathbf{\\Sigma})\\mathbf{P}^\\intercal)``.
 
-A confidence ``v`` rescales that diagonal by ``1/v - 1``, which is Idzorek's method in Walters' closed form. A high confidence therefore shrinks the view uncertainty and a low one widens it. The scale is negative for every ``v`` outside ``(0, 1)``, which is why [`assert_bl_views_conf`](@ref) refuses such a value.
+A confidence ``v`` scales that diagonal by ``1/v - 1``. This is the method of Idzorek in the closed form of Walters. A high confidence makes the view uncertainty smaller, and a low confidence makes it larger. The scale is negative for each ``v`` outside ``(0, 1)``, and [`assert_bl_views_conf`](@ref) refuses such a value.
 
-The scalar branch and the vector branch agree where they overlap: a scalar ``v`` gives the same ``\\mathbf{\\Omega}`` as the constant vector of ``v``, to the last bit. So the two shapes are two ways of writing one input, and [`assert_bl_views_conf`](@ref) counts only the vector against the views.
+A scalar ``v`` gives the same ``\\mathbf{\\Omega}`` as the constant vector of ``v``, to the last bit. The two shapes are two forms of one input, and [`assert_bl_views_conf`](@ref) counts only the vector against the views.
 
-Both endpoints are refused too, and the bound is strict on purpose. ``v = 1`` gives ``\\mathbf{\\Omega} = \\mathbf{0}``, a view held with no uncertainty at all, which makes ``\\mathbf{P}\\tau\\mathbf{\\Sigma}\\mathbf{P}^\\intercal + \\mathbf{\\Omega}`` singular whenever ``\\mathbf{P}`` is rank-deficient. Two identical views over a three-asset sample give a rank-one ``\\mathbf{P}``; at ``v = 1`` the sum is the constant matrix `1.0021e-6`, whose determinant is `0.0` and whose rank is 1, and the solve raises `SingularException`. Just inside the bound it is merely ill-conditioned: at ``v = 1 - 10^{-8}`` the condition number is `2.0e8`, and at ``v = 0.99`` it is `199`. ``v = 0`` gives an infinite uncertainty, which is the same thing as omitting the view.
+The bound is strict, and it also refuses the two endpoints. ``v = 1`` gives ``\\mathbf{\\Omega} = \\mathbf{0}``, a view with no uncertainty. Then ``\\mathbf{P}\\tau\\mathbf{\\Sigma}\\mathbf{P}^\\intercal + \\mathbf{\\Omega}`` is singular when ``\\mathbf{P}`` is rank-deficient. Two identical views over a sample of three assets give a ``\\mathbf{P}`` of rank one. At ``v = 1`` the sum is the constant matrix `1.0021e-6`, its determinant is `0.0` and its rank is 1, and the solve raises `SingularException`. Near the bound the sum is ill-conditioned but not singular: at ``v = 1 - 10^{-8}`` the condition number is `2.0e8`, and at ``v = 0.99`` it is `199`. ``v = 0`` gives an infinite uncertainty, which has the same effect as no view.
 
 # Arguments
 
   - `views_conf`:
 
-      + `::Nothing`: No confidence specified; `Ω = Diag(P * sigma * P')`.
-      + `::Number`: Scalar confidence `v`; `Ω = (1/v - 1) * Diag(P * sigma * P')`.
-      + `::VecNum`: Per-view confidences `v`; `Ω = Diag((1 ./ v .- 1) .* diag(P * sigma * P'))`.
+      + `::Nothing`: No confidence. `Ω = Diag(P * sigma * P')`.
+      + `::Number`: One confidence `v` for all the views. `Ω = (1/v - 1) * Diag(P * sigma * P')`.
+      + `::VecNum`: One confidence for each view, the vector `v`. `Ω = Diag((1 ./ v .- 1) .* diag(P * sigma * P'))`.
 
   - $(arg_dict[:P])
 
@@ -612,13 +625,11 @@ end
     vanilla_posteriors(tau::Number, prior_mu::VecNum, prior_sigma::MatNum,
                        omega::MatNum, P::MatNum, Q::VecNum)
 
-Compute the Black-Litterman posterior mean and covariance for asset returns.
+Compute the Black-Litterman posterior mean and covariance.
 
-`vanilla_posteriors` implements the standard Black-Litterman update equations, combining the prior mean and covariance with user or algorithmic views. The function returns the posterior mean and covariance matrix, incorporating the blending parameter `tau`, view uncertainty matrix `omega`, view matrix `P`, and view returns vector `Q`.
+The function does not add a risk-free rate. Each Black-Litterman prior estimator adds its own `rf` once, through [`apply_rf`](@ref), which states where each member adds it.
 
-The kernel carries no risk-free rate. Each Black-Litterman prior estimator adds its own `rf` once, through [`apply_rf`](@ref), which owns the site each member adds it at.
-
-The two equations below are the **inverse-free** form of the master equations. They are algebraically the same object as the form stated on [`prior`](@ref): the covariance term is the Woodbury expansion of ``\\left[(\\tau\\mathbf{\\Sigma})^{-1} + \\mathbf{P}^\\intercal\\mathbf{\\Omega}^{-1}\\mathbf{P}\\right]^{-1}``. This form is used because it inverts one ``K \\times K`` matrix rather than three ``N \\times N`` ones.
+The two equations below are the **inverse-free** form of the master equations. They are algebraically equal to the form on [`prior`](@ref): the covariance term is the Woodbury expansion of ``\\left[(\\tau\\mathbf{\\Sigma})^{-1} + \\mathbf{P}^\\intercal\\mathbf{\\Omega}^{-1}\\mathbf{P}\\right]^{-1}``. The function uses this form because it solves against one ``K \\times K`` matrix, and the other form inverts three ``N \\times N`` matrices.
 
 # Mathematical definition
 
@@ -647,31 +658,31 @@ Where:
   - ``\\boldsymbol{q}``: ``K \\times 1`` views vector.
   - ``\\mathbf{\\Omega}``: ``K \\times K`` view uncertainty matrix.
 
-``\\tau`` stands in both equations, but it does **not** move the posterior mean when ``\\mathbf{\\Omega}`` comes from the [`bl_preroll`](@ref) pair. [`calc_omega`](@ref) is homogeneous of degree one in the covariance it reads, and `bl_preroll` scales its answer by ``\\tau``, so the gain ``\\tau\\mathbf{\\Sigma}\\mathbf{P}^\\intercal(\\mathbf{P}\\tau\\mathbf{\\Sigma}\\mathbf{P}^\\intercal + \\mathbf{\\Omega})^{-1}`` has one ``\\tau`` above and one below, and they cancel. Over ``\\tau \\in \\{1/200, 0.05, 0.5\\}`` on a ``200 \\times 3`` sample with two views the posterior mean moves by at most `3.3e-19` on every confidence branch — no confidence, the scalar `0.4`, and the vector `[0.25, 0.75]`. The posterior **covariance** does move, because ``\\mathbf{\\Sigma} + \\tau\\mathbf{\\Sigma} - \\ldots`` carries a bare ``\\tau``: its excess over ``\\mathbf{\\Sigma}`` has trace `2.013e-7`, `2.013e-6` and `2.013e-5` at ``\\tau = 0.001``, `0.01` and `0.1`, which is linear in ``\\tau`` to three figures.
+``\\tau`` occurs in both equations, but it does **not** move the posterior mean when ``\\mathbf{\\Omega}`` comes from [`bl_preroll`](@ref). [`calc_omega`](@ref) is homogeneous of degree one in the covariance that it reads, and `bl_preroll` multiplies its result by ``\\tau``. Thus the gain ``\\tau\\mathbf{\\Sigma}\\mathbf{P}^\\intercal(\\mathbf{P}\\tau\\mathbf{\\Sigma}\\mathbf{P}^\\intercal + \\mathbf{\\Omega})^{-1}`` has one ``\\tau`` outside the inverse and one inside it, and the two cancel. On a ``200 \\times 3`` sample with two views, over ``\\tau \\in \\{1/200, 0.05, 0.5\\}``, the posterior mean moves by at most `3.3e-19` on each confidence branch: no confidence, the scalar `0.4`, and the vector `[0.25, 0.75]`. The posterior **covariance** does move, because ``\\mathbf{\\Sigma} + \\tau\\mathbf{\\Sigma} - \\ldots`` holds a ``\\tau`` that does not cancel. Its excess over ``\\mathbf{\\Sigma}`` has trace `2.013e-7`, `2.013e-6` and `2.013e-5` at ``\\tau = 0.001``, `0.01` and `0.1`, which is linear in ``\\tau`` to three figures.
 
-A view that repeats the prior is a null update. With ``\\boldsymbol{q} = \\mathbf{P}\\boldsymbol{\\Pi}`` the residual ``\\boldsymbol{q} - \\mathbf{P}\\boldsymbol{\\Pi}`` is zero, so the posterior mean equals the prior mean exactly — measured at `0.0` on the same sample.
+A view that repeats the prior changes nothing. With ``\\boldsymbol{q} = \\mathbf{P}\\boldsymbol{\\Pi}`` the residual ``\\boldsymbol{q} - \\mathbf{P}\\boldsymbol{\\Pi}`` is zero, so the posterior mean is equal to the prior mean. On the same sample the difference is `0.0`.
 
 # Algorithm
 
- 1. Scale the prior covariance by `tau` and carry it through the views, giving `v1`, the ``N \\times K`` matrix ``\\tau\\mathbf{\\Sigma}\\mathbf{P}^\\intercal``.
- 2. Close `v1` under the views and add the view uncertainty, giving `v2`, the ``K \\times K`` matrix ``\\mathbf{P}\\tau\\mathbf{\\Sigma}\\mathbf{P}^\\intercal + \\mathbf{\\Omega}``. This is the only matrix the body inverts.
- 3. Take the view residual `v3`, which is ``\\boldsymbol{q}`` less the prior's own answer to the views.
- 4. Solve `v2` against `v3`, carry the solution through `v1`, and add it to `prior_mu`, giving `posterior_mu`.
- 5. Solve `v2` against the transpose of `v1`, carry that through `v1`, and subtract it from `prior_sigma + tau * prior_sigma`, giving `posterior_sigma`.
+ 1. Multiply the prior covariance by `tau` and by the transpose of `P`. The result is `v1`, the ``N \\times K`` matrix ``\\tau\\mathbf{\\Sigma}\\mathbf{P}^\\intercal``.
+ 2. Multiply `P` by `v1`, and add the view uncertainty. The result is `v2`, the ``K \\times K`` matrix ``\\mathbf{P}\\tau\\mathbf{\\Sigma}\\mathbf{P}^\\intercal + \\mathbf{\\Omega}``. This is the only matrix that the function solves against.
+ 3. Subtract `P * prior_mu` from `Q`. The result is the view residual `v3`.
+ 4. Solve `v2` against `v3`, multiply the solution by `v1`, and add it to `prior_mu`. The result is `posterior_mu`.
+ 5. Solve `v2` against the transpose of `v1`, multiply the solution by `v1`, and subtract it from `prior_sigma + tau * prior_sigma`. The result is `posterior_sigma`.
 
 # Arguments
 
-  - `tau`: Scalar blending parameter for prior and views.
-  - `prior_mu`: Prior mean vector of asset returns.
-  - `prior_sigma`: Prior covariance matrix of asset returns.
-  - `omega`: View uncertainty matrix.
-  - `P`: View matrix (views × assets).
-  - `Q`: Vector of view returns (views).
+  - `tau`: The scale of the uncertainty of the prior mean.
+  - `prior_mu`: The prior mean of the distribution that the views update.
+  - `prior_sigma`: The prior covariance of that distribution.
+  - `omega`: The view uncertainty matrix, multiplied by `tau`.
+  - `P`: The view matrix, `views × n`.
+  - `Q`: The view returns, one for each view.
 
 # Returns
 
-  - `posterior_mu::VecNum`: Posterior mean vector of asset returns.
-  - `posterior_sigma::Matrix{<:Number}`: Posterior covariance matrix of asset returns.
+  - `posterior_mu::VecNum`: The posterior mean.
+  - `posterior_sigma::Matrix{<:Number}`: The posterior covariance matrix.
 
 # Related
 
@@ -691,22 +702,22 @@ end
 """
     apply_rf(rf::Number, mu::VecNum)
 
-Shift a Black-Litterman mean by the risk-free rate.
+Add the risk-free rate to a Black-Litterman mean.
 
-`apply_rf` is the **single site that reads** the `rf` field of a Black-Litterman prior estimator. The four families -- [`BlackLittermanPrior`](@ref), [`BayesianBlackLittermanPrior`](@ref), [`FactorBlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) -- each call it once, and nowhere else. Nothing subtracts the rate.
+`apply_rf` is the **one site that reads** the `rf` field of a Black-Litterman prior estimator. Each of the four members, [`BlackLittermanPrior`](@ref), [`BayesianBlackLittermanPrior`](@ref), [`FactorBlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref), calls it once. No function subtracts the rate.
 
-Three properties follow, and all three are contracts of the family:
+The four members keep three rules:
 
-  - **The rate is added once.** No body adds it twice.
-  - **The update runs on the scale the views are written on.** A Black-Litterman update blends the prior mean against the view returns in `Q` by forming the residual `Q - P * mu`, so the prior mean must be on the scale of `Q`, which is a total return. A mean taken from a wrapped prior estimator is one already and reaches the update untouched. The equilibrium mean of [`equilibrium_mu`](@ref) is a bare risk premium, so the two members that can build one add the rate to it **before** the update, on the axis that mean lives on. A level that is missing from the prior mean is a level the views are blended against wrongly, which is why the rate goes on first rather than last.
-  - **A prior is isolated.** A wrapped prior estimator is never re-fitted and its mean is never rescaled, so a risk-free rate one of them applied internally stays where it is.
+  - **The estimator adds the rate once.** No method adds it twice.
+  - **The update uses the scale of the views.** The update forms the residual `Q - P * mu`, so the prior mean must have the scale of `Q`, which is a total return. A mean from a wrapped prior estimator has that scale, and it goes to the update with no change. The equilibrium mean of [`equilibrium_mu`](@ref) is only a risk premium. Thus the two members that can make one add the rate to it **before** the update, on the axis of that mean. If the prior mean has no rate, the update compares the views with the wrong level, so these members add the rate first and not last.
+  - **The wrapped prior does not change.** The estimator does not fit a wrapped prior again and does not scale its mean, so a risk-free rate that a wrapped prior applied stays in its mean.
 
-Where each member calls it, and what the field therefore does:
+Each member calls it at one site:
 
-  - [`BlackLittermanPrior`](@ref) and [`BayesianBlackLittermanPrior`](@ref) have no equilibrium branch and so have nothing to convert. They add the rate to the posterior asset mean, last, and the field is a plain shift of the answer.
-  - [`FactorBlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) call it on the equilibrium mean, and only where `l` is set. Where `l` is `nothing` neither reads the field at all, so it does not reach the answer.
+  - [`BlackLittermanPrior`](@ref) and [`BayesianBlackLittermanPrior`](@ref) have no equilibrium branch, so they have no mean to convert. They add the rate to the posterior asset mean as the last step, and `rf` shifts the result.
+  - [`FactorBlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) call it on the equilibrium mean, and only when `l` is not `nothing`. When `l` is `nothing`, they do not read `rf`, and it has no effect on the result.
 
-"Once" is measured, not asserted. Two [`BlackLittermanPrior`](@ref) fits over one ``200 \\times 3`` sample, differing only in `rf`, give posterior means whose difference is `rf` in every entry to the last bit: at `rf = 0.03` the difference is `[0.03, 0.03, 0.03]` and `max|diff - rf|` is `0.0`.
+A measurement shows that the estimator adds the rate once. Two [`BlackLittermanPrior`](@ref) fits over one ``200 \\times 3`` sample, with different `rf` and no other difference, give posterior means whose difference is `rf` in each entry, to the last bit. At `rf = 0.03` the difference is `[0.03, 0.03, 0.03]`, and `max|diff - rf|` is `0.0`.
 
 # Algorithm
 
@@ -715,7 +726,7 @@ Where each member calls it, and what the field therefore does:
 # Arguments
 
   - `rf`: Risk-free rate.
-  - `mu`: Expected returns vector. It is a posterior asset mean for the two members with no equilibrium branch, and a prior equilibrium mean for the two with one.
+  - `mu`: Expected returns vector. It is a posterior asset mean for the two members with no equilibrium branch, and a prior equilibrium mean for the two members that have one.
 
 # Returns
 
@@ -738,7 +749,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Remove excluded views from `views_conf`.
 
-This is the method for a confidence that is `nothing` or a scalar. Neither is indexed by view — a scalar is one confidence for every view — so dropping a view changes nothing, and every argument after the first is ignored.
+This method is for a confidence that is `nothing` or a scalar. Neither has one entry for each view, because a scalar is one confidence for all the views. A dropped view changes nothing for them, and the method ignores each argument after the first.
 
 # Algorithm
 
@@ -746,8 +757,8 @@ This is the method for a confidence that is `nothing` or a scalar. Neither is in
 
 # Arguments
 
-  - `views_conf`: `nothing`, or one confidence shared by every view.
-  - `args...`: The excluded indices, ignored.
+  - `views_conf`: `nothing`, or one confidence for all the views.
+  - `args...`: The indices of the dropped views. The method ignores them.
 
 # Returns
 
@@ -767,7 +778,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Remove excluded views from `views_conf`.
 
-This is the method for a per-view confidence vector when no view was excluded. [`get_black_litterman_views`](@ref) passes `nothing` rather than an empty vector when every view resolved, so this method carries the common case.
+This method is for a vector of confidences when no view was dropped. When [`get_black_litterman_views`](@ref) drops no view, it writes `excl = nothing` and not an empty vector, so this method is the usual case.
 
 # Algorithm
 
@@ -775,8 +786,8 @@ This is the method for a per-view confidence vector when no view was excluded. [
 
 # Arguments
 
-  - `views_conf`: One confidence per view.
-  - `::Nothing`: No view was excluded.
+  - `views_conf`: One confidence for each view.
+  - `::Nothing`: No view was dropped.
 
 # Returns
 
@@ -796,21 +807,21 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Remove excluded views from `views_conf`.
 
-This is the method that does the work: a per-view confidence vector, and the indices of the views that [`get_black_litterman_views`](@ref) dropped. The surviving entries keep the order the caller wrote them in, so entry `k` of the answer still belongs to row `k` of the `P` the same call assembled. Excluding every view leaves an empty vector.
+This method removes entries. It takes a vector with one confidence for each view that the caller wrote, and the indices of the views that [`get_black_litterman_views`](@ref) dropped. The remaining entries keep the order of the caller, so entry `k` of the result belongs to row `k` of the `P` of the same assembly. When `excl` holds every view, the result is an empty vector.
 
 # Algorithm
 
- 1. Take the indices of `views_conf` that are not members of `excl`, in ascending order.
- 2. Return the corresponding entries as a lazy view, with [`nothing_scalar_array_view`](@ref).
+ 1. Take the indices of `views_conf` that are not in `excl`, in ascending order.
+ 2. Return the entries at those indices as a lazy view, with [`nothing_scalar_array_view`](@ref).
 
 # Arguments
 
-  - `views_conf`: One confidence per view, over the views the caller wrote.
-  - `excl`: The indices of the views that resolved no name.
+  - `views_conf`: One confidence for each view that the caller wrote.
+  - `excl`: The indices of the dropped views, over the views that the caller wrote.
 
 # Returns
 
-  - `views_conf::VecNum`: A view of the input, holding one confidence per surviving view.
+  - `views_conf::VecNum`: A view of the input, with one confidence for each kept view.
 
 # Related
 
@@ -827,15 +838,13 @@ end
           pnl::Option{<:AssetPanel} = nothing;
           dims::Int = 1, strict::Bool = false, kwargs...)
 
-Compute the Black-Litterman prior moments for asset returns.
+Fit the Black-Litterman posterior of the asset returns.
 
-`prior` estimates the mean and covariance of asset returns using the Black-Litterman model, combining a prior estimator, matrix post-processing, user or algorithmic views, asset sets, view confidences, risk-free rate, and blending parameter `tau`. The method supports both direct and constraint-based views, flexible confidence specification, and matrix processing.
-
-When `pe.tau` is `nothing` the blending parameter is `1/T`, where `T` is the number of observations of the oriented `X`. `pe.rf` reaches the answer once, on the posterior asset expected returns; [`apply_rf`](@ref) owns that contract.
+When `pe.tau` is `nothing`, `tau` is `1/T`, where `T` is the number of rows of `X` in the result of the wrapped prior. `pe.rf` changes the result once, on the posterior asset expected returns. [`apply_rf`](@ref) states that rule.
 
 # Mathematical definition
 
-The Black-Litterman posterior distribution combines the prior ``(\\boldsymbol{\\Pi}, \\tau \\mathbf{\\Sigma})`` with investor views ``(\\mathbf{P}, \\boldsymbol{q}, \\mathbf{\\Omega})``. [`vanilla_posteriors`](@ref) computes the algebraically equivalent inverse-free form:
+The Black-Litterman posterior combines the prior ``(\\boldsymbol{\\Pi}, \\tau \\mathbf{\\Sigma})`` with the views ``(\\mathbf{P}, \\boldsymbol{q}, \\mathbf{\\Omega})``. The equations below are the precision form. [`vanilla_posteriors`](@ref) computes the inverse-free form, which is algebraically equal:
 
 ```math
 \\begin{align}
@@ -861,15 +870,15 @@ Where:
 # Algorithm
 
  1. Orient `X` and `F` with [`dims_oriented`](@ref), to `observations × assets` and `observations × factors`.
- 2. When `pe.views` resolves names, check that the asset universe is as long as `X` is wide. A precomputed [`BlackLittermanViews`](@ref) resolves no name, so it is not checked here; step 4 checks its width instead.
- 3. Fit the wrapped prior `pe.pe` on `(X, F)`, giving `prior_model`.
- 4. Derive the Investable Mask and the reduced view universe with [`investable_views`](@ref), and refuse a precomputed view matrix over a gapped universe with [`assert_bl_precomputed_universe`](@ref).
- 5. View the fitted prior at the mask with [`investable_prior`](@ref), and read `posterior_X`, `prior_mu` and `prior_sigma` off *that*.
- 6. Assemble the views and their uncertainty with [`bl_preroll`](@ref), over the reduced `prior_sigma` and `size(X, 1)` observations, giving `P`, `Q`, `tau` and `omega`, or `nothing` when a departure took the last view. The axis is left at its default, `:xkey`, because these views land on the assets.
- 7. Run the master equations with [`bl_posteriors`](@ref), giving `posterior_mu` and `posterior_sigma` over the investable assets.
+ 2. When `pe.views` resolves names, check that the length of the asset universe is equal to the number of columns of `X`, with [`assert_bl_views_axis`](@ref). A precomputed [`BlackLittermanViews`](@ref) resolves no name, so this step does not check it. [`bl_preroll`](@ref) checks its width in step 6.
+ 3. Fit the wrapped prior `pe.pe` on `(X, F)`. The result is `prior_model`.
+ 4. Derive the Investable Mask and the reduced view universe with [`investable_views`](@ref). Refuse a precomputed view matrix over a universe with a departed asset, with [`assert_bl_precomputed_universe`](@ref).
+ 5. View the fitted prior at the mask with [`investable_prior`](@ref), and read `posterior_X`, `prior_mu` and `prior_sigma` from *that* result.
+ 6. Assemble the views and their uncertainty with [`bl_preroll`](@ref), over the reduced `prior_sigma`, with `T` equal to the number of rows of `prior_model.X`. The result is `P`, `Q`, `tau` and `omega`, or `nothing` when no view is left. The axis keeps its default, `:xkey`, because these views update the assets.
+ 7. Run the master equations with [`bl_posteriors`](@ref). The result is `posterior_mu` and `posterior_sigma` over the investable assets.
  8. Add `pe.rf` to `posterior_mu` with [`apply_rf`](@ref). This is the one site that adds it.
- 9. Process `posterior_sigma` in place with [`matrix_processing!`](@ref), under `pe.mp` and `posterior_X`, while it is still the reduced block a factorisation exists for.
-10. Announce the departures once with [`announce_bl_departures`](@ref).
+ 9. Process `posterior_sigma` in place with [`matrix_processing!`](@ref), under `pe.mp` and `posterior_X`. Do this before the expansion, because a factorisation exists only for the reduced block.
+10. Report the departures once with [`announce_bl_departures`](@ref).
 11. Write both posteriors back onto the full asset universe with [`expand_moment`](@ref), so a non-investable asset carries `NaN` in `mu` and on the diagonal of `sigma`.
 12. Forward the whole of `prior_model` with [`forward_prior`](@ref), replacing `mu` and `sigma` by the expanded pair and dropping `chol`.
 
@@ -880,17 +889,19 @@ Where:
   - `F`: Optional factor matrix.
   - $(arg_dict[:pnl_prior])
   - $(arg_dict[:dims])
-  - `strict`: If `true`, enforce strict validation of views and sets. Default is `false`.
-  - `kwargs...`: Additional keyword arguments passed to underlying estimators and matrix processing.
+  - `strict`: If `true`, a view name that does not resolve raises an error. If `false`, it warns. The method also passes `strict` to the wrapped prior.
+  - `kwargs...`: More keyword arguments, for the wrapped prior and for the matrix processing.
 
 # Validation
 
   - `dims in (1, 2)`.
-  - If `pe.views` is a [`LinearConstraintEstimator`](@ref), `length(pe.sets.dict[pe.sets.xkey]) == size(X, 2)`.
+  - If `pe.views` is a [`LinearConstraintEstimator`](@ref), `length(pe.sets.dict[pe.sets.xkey]) == size(X, 2)`. Raises a `DimensionMismatch`.
+  - If `pe.sets` is `nothing`, each asset of the result of the wrapped prior is investable, see [`assert_bl_precomputed_universe`](@ref).
+  - The number of columns of a precomputed `P` is equal to the number of investable assets, see [`bl_preroll`](@ref).
 
 # Returns
 
-  - `pr::LowOrderPrior`: Result object containing asset returns, posterior mean vector, and posterior covariance matrix.
+  - `pr::LowOrderPrior`: The result of the wrapped prior, with the posterior mean in `mu`, the posterior covariance in `sigma`, and `chol = nothing`.
 
 # Related
 
@@ -914,9 +925,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Refuses a [`BlackLittermanPrior`](@ref) whose asset universe does not describe the returns matrix.
+Refuse a [`BlackLittermanPrior`](@ref) whose asset universe does not match the returns matrix.
 
-The axis is checked only by the views that resolve names against it. A [`BlackLittermanViews`](@ref) result carries its own `P` and never touches `sets`, so demanding a universe for it would reject the legitimate precomputed-views configuration, which [`assert_bl`](@ref) deliberately permits to supply no `sets` at all.
+The function checks the axis only for views that resolve names against it. A precomputed [`BlackLittermanViews`](@ref) holds its own `P` and does not read `sets`. A check of the universe would refuse that valid configuration, which [`assert_bl`](@ref) lets have no `sets`.
 
 # Arguments
 
@@ -925,7 +936,7 @@ The axis is checked only by the views that resolve names against it. A [`BlackLi
 
 # Validation
 
-  - `length(pe.sets.dict[pe.sets.xkey]) == size(X, 2)` where the views resolve names. A `DimensionMismatch` is thrown otherwise.
+  - `length(pe.sets.dict[pe.sets.xkey]) == size(X, 2)` when the views resolve names. Raises a `DimensionMismatch`.
 
 # Returns
 
@@ -946,29 +957,32 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Blends the views of a [`BlackLittermanPrior`](@ref) into the result its embedded prior answered.
+Update the result of the wrapped prior of a [`BlackLittermanPrior`](@ref) with the views of the estimator.
 
-Everything the estimator does after the embedded prior has answered, written once. The batch method reaches it with the result of a fit over the caller's matrix, and `prior(pe)` with no data reaches it with the result of the embedded prior's own fold. Nothing here reads a returns matrix that the result does not already carry — `T`, the axis and the matrix the processing runs over all come off `prior_model` — which is why the two routes are one body and cannot drift.
+This function holds each step of the estimator after the wrapped prior gives its result. The batch method calls it with the result of a fit over the matrix of the caller. `prior(pe)` with no data calls it with the result of the fold of the wrapped prior. The function reads no returns matrix that the result does not hold: `T`, the axis and the matrix for the processing all come from `prior_model`. Both routes use this one body, so they cannot become different.
 
 # Algorithm
 
- 1. Reduce to the investable columns with [`investable_views`](@ref), because a view is a dense linear form over the asset axis and one departed asset would poison `omega`.
- 2. Assemble `P`, `Q`, `tau` and `omega` with [`bl_preroll`](@ref), whose `T` is the number of observations the result carries.
- 3. Blend with [`bl_posteriors`](@ref), and apply `pe.rf` once, here, with [`apply_rf`](@ref).
- 4. Process the reduced covariance, before the expansion, because a `NaN` frame has no factorisation.
- 5. Expand both moments back onto the caller's universe with [`expand_moment`](@ref).
- 6. Forward everything the embedded result carried, dropping `chol` alone, with [`forward_prior`](@ref).
+ 1. Derive the Investable Mask and the reduced view universe with [`investable_views`](@ref). A view is a dense linear form over the asset axis, so one departed asset makes each entry of `omega` `NaN`.
+ 2. Refuse a precomputed view matrix over a universe with a departed asset, with [`assert_bl_precomputed_universe`](@ref).
+ 3. View the prior result at the mask with [`investable_prior`](@ref), and read `posterior_X`, `prior_mu` and `prior_sigma` from it.
+ 4. Assemble `P`, `Q`, `tau` and `omega` with [`bl_preroll`](@ref). Its `T` is the number of rows of `prior_model.X`.
+ 5. Run the update with [`bl_posteriors`](@ref), and add `pe.rf` once with [`apply_rf`](@ref).
+ 6. Process the reduced covariance with [`matrix_processing!`](@ref), before the expansion, because a frame with `NaN` entries has no factorisation.
+ 7. Report the departures once with [`announce_bl_departures`](@ref).
+ 8. Expand both moments to the universe of the caller with [`expand_moment`](@ref).
+ 9. Forward each field of the wrapped result with [`forward_prior`](@ref), and drop only `chol`.
 
 # Arguments
 
   - `pe`: Black-Litterman prior estimator.
-  - `prior_model`: The result the embedded prior answered.
-  - `strict`: Whether an unresolved view raises rather than warns.
-  - `kwargs...`: Additional keyword arguments, forwarded to the matrix processing.
+  - `prior_model`: The result of the wrapped prior.
+  - `strict`: If `true`, a view name that does not resolve raises an error. If `false`, it warns.
+  - `kwargs...`: More keyword arguments, for the matrix processing.
 
 # Returns
 
-  - `pr::AbstractPriorResult`: The embedded result with its two moments replaced by the posteriors.
+  - `pr::AbstractPriorResult`: The wrapped result, with the posteriors in place of its two moments.
 
 # Related
 
@@ -992,7 +1006,8 @@ function bl_posterior(pe::BlackLittermanPrior, prior_model::AbstractPriorResult,
     ledger = String[]
     blp = bl_preroll(pe.views, vsets, pe.views_conf, prior_sigma, pe.tau,
                      size(prior_model.X, 1), eltype(posterior_X), strict; ledger = ledger)
-    # `nothing` is the view set a departure emptied, and the pair is then the prior's own.
+    # `nothing` is a view set with no row left, whatever emptied it, and the pair is then the
+    # prior's own.
     posterior_mu, posterior_sigma = bl_posteriors(blp, prior_mu, prior_sigma)
     # `pe.rf` is applied here and only here (see [`apply_rf`](@ref)): once, on the asset
     # expected returns this estimator returns. `prior_model.mu` is the wrapped prior's own
@@ -1030,9 +1045,9 @@ end
     fold_prior_step(pe::BlackLittermanPrior, rd::ReturnsResult,
                     gaps::Option{<:AbstractVector{Bool}})
 
-Folds the observations of a [`ReturnsResult`](@ref) into a [`BlackLittermanPrior`](@ref), by forwarding `rd` and its marks to the prior that it embeds.
+Fold the observations of a [`ReturnsResult`](@ref) into a [`BlackLittermanPrior`](@ref). The function forwards `rd` and its marks to the wrapped prior.
 
-This is the forwarding form of [`fold_prior_step`](@ref), the fold of every prior that [`partial_fit!`](@ref) over a `ReturnsResult` takes. The outer prior keeps no rows. Its embedded prior keeps them, so the route of the embedded prior decides what the step honours: the estimation mask and the Panel Fields reach it unchanged, and it refuses what its route cannot honour.
+This is the forwarding form of [`fold_prior_step`](@ref), the fold that [`partial_fit!`](@ref) uses for each prior over a `ReturnsResult`. The outer prior keeps no rows. The wrapped prior keeps them, so the route of the wrapped prior decides what the step uses. The estimation mask and the Panel Fields reach it with no change, and it refuses what its route cannot use.
 
 # Arguments
 
@@ -1042,11 +1057,11 @@ This is the forwarding form of [`fold_prior_step`](@ref), the fold of every prio
 
 # Validation
 
-  - Every condition that the fold of `pe.pe` over `rd` checks.
+  - Each condition that the fold of `pe.pe` over `rd` checks.
 
 # Returns
 
-  - `pe`: The estimator, with its embedded prior folded.
+  - `pe`: A new estimator, with the folded wrapped prior.
 
 # Related
 

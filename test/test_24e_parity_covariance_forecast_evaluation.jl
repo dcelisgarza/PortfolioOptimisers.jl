@@ -153,12 +153,17 @@ using Dates
                                                                  min_obs = 10,
                                                                  centring = PreCentred()),
                                            rd, cv; target = HorizonReturn())
-        c = covariance_forecast_compare(a, b; lags = 0)
+        mt = WildBootstrapMeanTest(; seed = 1787)
+        c = covariance_forecast_compare(a, b; mt = mt)
         k = (a.n_valid .> 0) .& (b.n_valid .> 0)
         @test count(!, k) == 1
         @test c.n_steps == count(k)
         @test c.mean_difference[1] ≈ sum(a.qlike[k] .- b.qlike[k]) / count(k)
-        @test all(isfinite, c.z)
+        @test all(isfinite, c.t_stat)
+        # The unscored step keeps its position in the series that the test reads (#1787).
+        d = ifelse.(k, a.qlike .- b.qlike, NaN)
+        @test c.p_value[1] ==
+              PortfolioOptimisers.mean_test(mt, d, 1, PortfolioOptimisers.mean_test_rng(mt)).p_value
     end
 end
 

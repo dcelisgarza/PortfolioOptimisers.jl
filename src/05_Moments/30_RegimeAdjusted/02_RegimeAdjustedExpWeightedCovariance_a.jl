@@ -1,37 +1,66 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all regime-adjustment target structures used in
-[`RegimeAdjustedExpWeightedCovariance`](@ref).
+Names the regime statistic that [`RegimeAdjustedExpWeightedCovariance`](@ref) reads from one observation.
 
-A target defines how the regime-adjusted covariance update is structured (e.g., which
-baseline covariance form is shrunk toward).
+The statistic compares the realised risk of the observation with the risk that the covariance
+before it predicts, so the target names which part of the covariance the regime multiplier
+calibrates. The cross-sectional bias statistic of [menchero2011](@cite) reads the volatilities
+alone, and it is [`DiagonalTarget`](@ref).
 
 # Interfaces
 
-In order to implement a new regime-adjustment target, subtype `RegimeAdjustedTarget`
-and optionally implement [`min_active_assets`](@ref).
+To implement a new regime-adjustment target, subtype `RegimeAdjustedTarget` and implement
+`regime_statistic`. Implement `min_active_assets` where the statistic needs more than one
+scored asset. Implement `regime_denom` to use the target with
+[`FirstMomentRegimeAdjusted`](@ref), and `regime_kappa` to use it with
+[`LogRegimeAdjusted`](@ref). A new target takes no bias correction, under every `debias` rule.
 
-## `min_active_assets` interface
+## `regime_statistic`
 
-  - `min_active_assets(target::RegimeAdjustedTarget) -> Int`: Returns the minimum number
-    of active assets required to use this target. Defaults to `1`.
+  - `regime_statistic(target::MyTarget, X::VecNum, C::MatNum, idx::AbstractVector{<:Integer}, min_val::Number) -> Option{<:VecNum}`:
+    One statistic for each direction that the target reads, from the deviations `X` of the scored
+    assets, their bias-corrected covariance block `C` before the observation, and their index
+    `idx` in the universe. Under correct calibration the statistic has the mean `length(X)`.
+    `nothing` skips the observation.
 
-### Arguments
+## `min_active_assets`
 
-  - `target`: The concrete target instance.
+  - `min_active_assets(target::MyTarget) -> Int`: The smallest count of scored assets at which
+    the target gives a statistic. It is one by default.
 
-### Returns
+## `regime_denom`
 
-  - `n::Int`: Minimum required active assets.
+  - `regime_denom(method::FirstMomentRegimeAdjusted, target::MyTarget, n::Integer) -> Number`:
+    The expectation of the root of the statistic of `n` scored assets under correct calibration.
+
+## `regime_kappa`
+
+  - `regime_kappa(method::LogRegimeAdjusted, target::MyTarget, n::Integer) -> Number`: The
+    expectation of the log of the statistic of `n` scored assets under correct calibration.
 
 ### Examples
 
 ```jldoctest
 julia> struct MyTarget <: PortfolioOptimisers.RegimeAdjustedTarget end
 
+julia> function PortfolioOptimisers.regime_statistic(::MyTarget, X::AbstractVector,
+                                                     C::AbstractMatrix,
+                                                     ::AbstractVector{<:Integer}, min_val::Number)
+           return [sum(abs2, X ./ sqrt.(max.(LinearAlgebra.diag(C), min_val)))]
+       end;
+
 julia> PortfolioOptimisers.min_active_assets(MyTarget())
 1
+
+julia> X = [0.01 -0.02; -0.015 0.03; 0.02 -0.01; -0.005 0.012; 0.008 -0.02; -0.02 0.03];
+
+julia> kw = (; decay = 0.9, min_obs = 2, regime_min_obs = 1, debias = RawStatistic(),
+             regime_method = RootMeanSquaredAdjusted());
+
+julia> cov(RegimeAdjustedExpWeightedCovariance(; regime_target = MyTarget(), kw...), X) ≈
+       cov(RegimeAdjustedExpWeightedCovariance(; regime_target = DiagonalTarget(), kw...), X)
+true
 ```
 
 # Related
@@ -40,6 +69,11 @@ julia> PortfolioOptimisers.min_active_assets(MyTarget())
   - [`DiagonalTarget`](@ref)
   - [`PortfolioTarget`](@ref)
   - [`RegimeAdjustedExpWeightedCovariance`](@ref)
+  - [`RegimeAdjustedMethod`](@ref)
+
+# References
+
+  - $(ref_dict[:menchero2011]) Section 4.3, Equation 4.3.
 """
 abstract type RegimeAdjustedTarget <: AbstractAlgorithm end
 """
@@ -66,8 +100,11 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Regime-adjustment target that uses a Mahalanobis-distance-based baseline covariance
-structure. Requires at least two active assets.
+Scores an observation by its squared Mahalanobis distance against the covariance that stands before it.
+
+The distance reads every eigen-direction of the block of the scored assets, so the target
+calibrates the whole covariance structure. A direction with a small estimated variance takes as
+much weight as the market direction. The target needs two scored assets.
 
 The statistic reads the inverse of an estimated block, and the inverse of an estimate is too
 large on average (Jensen's inequality): at 12 assets and a half-life of 10 the squared distance
@@ -197,9 +234,31 @@ $(DocStringExtensions.TYPEDEF)
 
 Targets the diagonal of a covariance matrix, in a regime adjustment and in a geodesic shrinkage.
 
-In a regime adjustment, the baseline covariance structure is diagonal, so the regime statistic reads the variances alone. In a [`GeodesicShrinkageCovariance`](@ref), the target matrix is the diagonal of the matrix being shrunk, which keeps the variances and removes every correlation.
+In a regime adjustment, the statistic divides each return by its own volatility and sums the squares, so it calibrates the volatilities and reads no correlation. This is the cross-sectional bias statistic of Equation 4.3 of [menchero2011](@cite), times the count of the assets. In a [`GeodesicShrinkageCovariance`](@ref), the target matrix is the diagonal of the matrix being shrunk, which keeps the variances and removes every correlation.
 
 Each term of the regime statistic reads one estimated variance, and the inverse of an estimate is too large on average. Where the estimator has `debias = ExactDebias()`, [`regime_target_statistic`](@ref) divides each term by the mean of that inverse at the count of its asset, so the statistic has the mean ``n`` at every correlation. The root and the log of the statistic read its law, which the correlation of the assets and the noise of each estimate set, so for the first-moment and the log methods it then divides the sum by [`diagonal_law_factor`](@ref).
+
+# Mathematical definition
+
+```math
+\\begin{align}
+d_{t}^{2} &= \\frac{1}{\\gamma} \\sum_{i \\in \\mathcal{A}_{t}} \\frac{u_{i,t}^{2}}{f_{i}\\, \\hat{C}_{ii}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``d_{t}^{2}``: Regime statistic of observation ``t``.
+  - $(math_dict[:A_t_regime])
+  - ``u_{i,t}``: Deviation of the return of asset ``i`` at observation ``t``.
+  - ``\\hat{C}_{ii}``: Bias-corrected variance of asset ``i`` before observation ``t``.
+  - ``f_{i}``: Mean of the inverse of that estimated variance, from [`regime_bias_table`](@ref), or
+    one under [`RawStatistic`](@ref).
+  - ``\\gamma``: Factor of [`diagonal_law_factor`](@ref) for the first-moment and the log methods,
+    and one for every other method and under [`RawStatistic`](@ref).
+
+With ``f_{i} = \\gamma = 1``, the root-mean-squared method reads ``d_{t}^{2} / n_{t}``, the
+square of the bias statistic of [menchero2011](@cite).
 
 # Related
 
@@ -209,12 +268,20 @@ Each term of the regime statistic reads one estimated variance, and the inverse 
   - [`RegimeAdjustedExpWeightedCovariance`](@ref)
   - [`GeodesicShrinkageCovariance`](@ref)
   - [`AbstractCovarianceShrinkageTarget`](@ref): the other target rules of a geodesic shrinkage.
+
+# References
+
+  - $(ref_dict[:menchero2011]) Section 4.3, Equation 4.3.
 """
 struct DiagonalTarget <: RegimeAdjustedTarget end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Regime-adjustment target that uses a portfolio-weighted baseline covariance structure.
+Scores an observation by its squared return along each portfolio direction over the variance of that direction.
+
+The target calibrates the covariance along the directions that a portfolio holds, and reads no
+other direction. Each direction gives one statistic, and the regime method averages the
+transformed statistics.
 
 Each direction reads one estimated variance, and the inverse of an estimate is too large on
 average. Where the estimator has `debias = ExactDebias()`, [`regime_target_statistic`](@ref) divides each
@@ -228,6 +295,31 @@ variance on it scores a large statistic: at 8 assets, a half-life of 10 and two 
 a block whose smallest eigenvalue is ``-0.31`` had ``r^{2} = 0.51`` against a direction variance
 of 0.0057, and it set the regime state to 51. The
 `indefinite` field names what the statistic does with such a block.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+d_{k,t}^{2} &= \\frac{n_{t}\\, (\\boldsymbol{p}_{k}^{\\intercal} \\boldsymbol{u}_{t})^{2}}
+{f_{k}\\, \\boldsymbol{p}_{k}^{\\intercal} \\hat{\\mathbf{C}} \\boldsymbol{p}_{k}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``d_{k,t}^{2}``: Regime statistic of direction ``k`` at observation ``t``.
+  - $(math_dict[:A_t_regime])
+  - ``\\boldsymbol{u}_{t}``: Deviations of the returns of the assets of ``\\mathcal{A}_{t}``.
+  - ``\\boldsymbol{p}_{k}``: Direction ``k``. Each row of `w` with a positive sum over
+    ``\\mathcal{A}_{t}`` gives one direction, its entries on ``\\mathcal{A}_{t}`` divided by
+    that sum. Where `w` is `nothing`, the one direction is ``p_{i} \\propto 1 / \\sqrt{\\hat{C}_{ii}}``,
+    with a unit sum.
+  - ``\\hat{\\mathbf{C}}``: Bias-corrected covariance block of ``\\mathcal{A}_{t}`` before
+    observation ``t``.
+  - ``f_{k}``: Bias factor of direction ``k``, which [`regime_target_statistic`](@ref) states, or
+    one under [`RawStatistic`](@ref).
+
+An observation whose direction has a variance at or below `min_val` is not scored.
 
 # Fields
 
@@ -298,6 +390,12 @@ The estimator is the covariance twin of [`RegimeAdjustedExpWeightedVariance`](@r
 that type's [`RegimeAdjustedMethod`](@ref) family, and it adds a [`RegimeAdjustedTarget`](@ref),
 which states what the statistic measures: one portfolio direction, the marginal volatilities
 alone, or the whole covariance structure.
+
+The regime adjustment is the Volatility Regime Adjustment of factor risk of
+[menchero2011](@cite), which scales the whole matrix by the square of one multiplier, so it does
+not change a correlation. The separate correlation path is the exponential smoother of
+[engle2002](@cite). The HAC adjustment is the estimator of [neweywest1987](@cite), applied to each
+term of the recursion.
 
 This estimator is mask-aware, so a prior fitted with it keeps a young asset investable and
 zero-fills the rows the asset was missing through [`scenario_fill`](@ref): every consumer of a
@@ -376,6 +474,36 @@ Where:
   - ``\\rho_{ij,t}``: Correlation, the weighted mean of the standardised product over the
     common observations of the pair, over the root of the two weighted means of the squares.
 
+Each observation scores the assets of ``\\mathcal{A}_{t}`` against the covariance that stands
+before it. The target gives one statistic ``d_{k,t}^{2}`` for each of its ``D_{t}`` directions,
+the method transforms each one, and the regime state smooths their mean:
+
+```math
+\\begin{align}
+g_{t} &= \\frac{1}{D_{t}} \\sum_{k=1}^{D_{t}} \\phi(d_{k,t}^{2})\\,, \\\\
+s_{t} &= \\lambda_{r} s_{t-1} + (1 - \\lambda_{r})\\, g_{t}\\,, \\quad s_{t_{0}} = g_{t_{0}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:A_t_regime]) An asset is scored where its return is valid, where it is in the
+    estimation mask, and where its count of observations is at least `min_obs`. Under
+    [`ExactDebias`](@ref) and [`LawDebias`](@ref) an estimate too young for a finite variance of
+    its statistic is not scored, as each target states.
+  - ``d_{k,t}^{2}``, ``D_{t}``: The statistic of direction ``k``, and the count of the
+    directions, which the [`RegimeAdjustedTarget`](@ref) states.
+  - ``\\phi``: Transform of the [`RegimeAdjustedMethod`](@ref): ``d^{2} / n_{t}`` for
+    [`RootMeanSquaredAdjusted`](@ref), ``\\sqrt{d^{2}} / c_{n}`` for
+    [`FirstMomentRegimeAdjusted`](@ref), and ``\\ln \\max(d^{2}, \\varepsilon) - \\kappa_{n}``
+    for [`LogRegimeAdjusted`](@ref). ``c_{n}`` and ``\\kappa_{n}`` are the expectations of the root
+    and of the log of the statistic of the target under correct calibration, from
+    [`regime_denom`](@ref) and [`regime_kappa`](@ref), and ``\\varepsilon`` is `min_val`.
+  - $(math_dict[:g_t_regime]) An observation that the target does not score leaves the state as
+    it is.
+  - $(math_dict[:s_t_regime]) ``t_{0}`` is the first observation that the target scores.
+  - $(math_dict[:lambda_r_regime])
+
 A zero seed damps the state, so [`bias_corrected_covariance`](@ref) divides each pair by its
 weight before it reports:
 
@@ -391,15 +519,18 @@ Where:
   - ``\\mathrm{mult}(s_T)^{2}\\, S_{ij,T} / W_{ij,T}``: The entry where `cor_decay` is
     `nothing`. On the separate path it is ``\\mathrm{mult}(s_T)^{2}\\, \\rho_{ij,T} \\sqrt{\\hat{v}_{i} \\hat{v}_{j}}``, with ``\\hat{v}_{i} = v_{i,T} / (1 - \\lambda^{K_i})`` and ``K_i`` the count of the terms of asset ``i``.
   - ``\\mathrm{mult}(s_T)``: Regime multiplier of the smoothed regime state ``s_T``, clamped to
-    `regime_lohi_mult` where that field is not `nothing`.
+    `regime_lohi_mult` where that field is not `nothing`. It is one while fewer than
+    `regime_min_obs` observations have been scored, and where `regime_method` is `nothing`.
+  - $(math_dict[:mult_regime])
 
 Each entry reads its own common observations, so where the assets do not share one history, a
 holiday or a late listing, the matrix need not be positive semidefinite. Where the smallest
 eigenvalue of its correlation is below ``-n\\,\\varepsilon`` times its largest, the report clips
 the negative eigenvalues to zero, restores the unit diagonal and keeps the variances. Where every
 pair shares one history, the division is a congruence of a sum of outer products, so the matrix
-is positive semidefinite and the repair changes nothing. A congruence on different histories
-would shrink each correlation of the pair towards zero, and a simulation measured the cost.
+is positive semidefinite and the repair changes nothing. On different histories a congruence
+shrinks each correlation of the pair towards zero, so the report divides each pair by its own
+weight instead.
 
 # Fields
 
@@ -433,9 +564,11 @@ Keywords correspond to the struct's fields. Where `cor_decay` is not `nothing`, 
 
   - $(val_dict[:decay])
   - If `cor_decay` is not `nothing`, `0 < cor_decay < 1`.
-  - `min_obs > 0` and `regime_min_obs > 0`.
+  - $(val_dict[:min_obs])
   - $(val_dict[:hac_lags])
-  - If `regime_lohi_mult` is not `nothing`, `0 < regime_lohi_mult[1] < regime_lohi_mult[2]`.
+  - $(val_dict[:regime_decay])
+  - $(val_dict[:regime_min_obs])
+  - $(val_dict[:regime_lohi_mult])
 
 # Examples
 
@@ -459,6 +592,12 @@ true
   - [`partial_fit!`](@ref)
   - [`scenario_fill`](@ref)
   - [`EmpiricalPrior`](@ref)
+
+# References
+
+  - $(ref_dict[:menchero2011]) Section 4.3, Equations 4.3 to 4.5.
+  - $(ref_dict[:neweywest1987]) Equation 5.
+  - $(ref_dict[:engle2002]) Equation 17.
 """
 @concrete struct RegimeAdjustedExpWeightedCovariance <: AbstractCovarianceEstimator
     """
@@ -545,6 +684,8 @@ true
         if !isnothing(cor_decay)
             assert_unit_interval(cor_decay, :cor_decay)
         end
+        assert_unit_interval(regime_decay, :regime_decay)
+        assert_regime_debias(regime_method, debias, :RegimeAdjustedExpWeightedCovariance)
         assert_nonempty_gt0_finite_val(min_obs, :min_obs)
         assert_nonempty_gt0_finite_val(regime_min_obs, :regime_min_obs)
         if !isnothing(regime_lohi_mult)
@@ -611,9 +752,13 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Internal mutable cache for the online covariance update in [`RegimeAdjustedExpWeightedCovariance`](@ref).
+Holds the running state of an incremental fit of a [`RegimeAdjustedExpWeightedCovariance`](@ref).
 
-This type is an implementation detail and is not intended for direct use.
+[`partial_fit!`](@ref) builds it and keeps it in the `cache` field of the estimator, and
+`cov(ce, state)` reads it. A caller can hold a state outside the estimator, but only the forward
+pass of the estimator writes it. The fold mutates the arrays in place, and it builds a new state
+with the two new scalar fields, `regime_state` and `n_regime_obs`, through the positional
+constructor.
 
 The three fields that carry the separate correlation recursion are `nothing` where `cor_decay`
 is `nothing`, because one decay then carries the whole matrix and no correlation state exists.
@@ -815,17 +960,27 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Computes the first-moment normalisation of the regime statistic for the Mahalanobis target.
+Computes the first-moment normalisation of the regime statistic for a target that reads the
+whole active block.
 
-The statistic is a ``\\chi^2(n)`` variate, so the root has expectation
+[`MahalanobisTarget`](@ref) and [`DiagonalTarget`](@ref) both sum `n` standardised squares. The
+Mahalanobis statistic is a ``\\chi^2(n)`` variate, so the root has expectation
 ``\\sqrt{2}\\,\\Gamma((n+1)/2)/\\Gamma(n/2)``. The expression is evaluated through the log
 gamma function, which stays finite for a wide universe. At `n = 1` it is ``\\sqrt{2/\\pi}``,
 which is the constant the scalar case of [`RegimeAdjustedExpWeightedVariance`](@ref) carries.
 
+The squares of the diagonal target are correlated, so its sum is a ``\\chi^2(n)`` variate only
+at independent returns. There the constant is exact, where the root of `n`, the root of the
+mean of the statistic, is too large at every correlation. The raw statistic of
+`debias = RawStatistic()` divides by this constant. The debiased statistic is first divided by
+[`diagonal_law_factor`](@ref), which makes this constant hold at the correlation of the assets
+and the noise of each estimate, to the second order in that noise. That factor reads the
+constant, so the debiased statistic does not depend on it.
+
 # Arguments
 
   - `::FirstMomentRegimeAdjusted`: First-moment regime adjustment method (unused).
-  - `::MahalanobisTarget`: Mahalanobis regime-adjustment target.
+  - `::Union{MahalanobisTarget, DiagonalTarget}`: Regime-adjustment target.
   - `n::Integer`: Count of assets that contribute to the statistic.
 
 # Returns
@@ -838,39 +993,10 @@ which is the constant the scalar case of [`RegimeAdjustedExpWeightedVariance`](@
   - [`get_regime_state`](@ref)
   - [`RegimeAdjustedExpWeightedCovariance`](@ref)
 """
-function regime_denom(::FirstMomentRegimeAdjusted, ::MahalanobisTarget, n::Integer)
+function regime_denom(::FirstMomentRegimeAdjusted,
+                      ::Union{<:MahalanobisTarget, <:DiagonalTarget}, n::Integer)
     return sqrt(2.0) * exp(SpecialFunctions.loggamma(0.5 * (n + 1)) -
                            SpecialFunctions.loggamma(0.5 * n))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Computes the first-moment normalisation of the regime statistic for the diagonal target.
-
-The root of `n` is the root of the mean of the statistic, not the mean of its root, so it is not
-the expectation of the root at any correlation. The raw statistic of `debias = RawStatistic()` divides by
-it. The debiased statistic is first divided by [`diagonal_law_factor`](@ref), which makes this
-constant hold at the correlation of the assets and the noise of each estimate, to the second order
-in that noise.
-
-# Arguments
-
-  - `::FirstMomentRegimeAdjusted`: First-moment regime adjustment method (unused).
-  - `::DiagonalTarget`: Diagonal regime-adjustment target.
-  - `n::Integer`: Count of assets that contribute to the statistic.
-
-# Returns
-
-  - `denom::Number`: `sqrt(n)`.
-
-# Related
-
-  - [`FirstMomentRegimeAdjusted`](@ref)
-  - [`get_regime_state`](@ref)
-  - [`RegimeAdjustedExpWeightedCovariance`](@ref)
-"""
-function regime_denom(::FirstMomentRegimeAdjusted, ::DiagonalTarget, n::Integer)
-    return sqrt(n)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1035,7 +1161,7 @@ the transformed values.
  1. Build the directions over the contributing assets with [`portfolio_directions`](@ref).
     Return `nothing` where no row keeps a positive weight.
  2. Return `nothing` where the variance of a direction is not above `min_val`. A HAC block in
-    the warm-up need not be positive definite, and a floor would score the row at about
+    the warm-up need not be positive definite, and a floor at `min_val` scores the row at about
     ``r^{2} / 10^{-12}``.
  3. Return the count of contributing assets times the squared portfolio return, divided by the
     portfolio variance, for each row.
@@ -1223,7 +1349,7 @@ Where `cor_decay` is `nothing`, each entry of the covariance state is divided by
 [`pair_weighted_block`](@ref). Where `cor_decay` opens the separate path, the variance is
 corrected at `decay`, and each pair of the correlation state is divided by its weight with
 [`pair_weighted_correlation`](@ref). A holiday or a late listing leaves a pair less weight than a
-congruence assumes, so the division is exact where a congruence would shrink the correlation.
+congruence assumes, so the division is exact where a congruence shrinks the correlation.
 The division can break positive semidefiniteness. [`regime_adjusted_covariance`](@ref) restores
 it on the block of the ready assets, so an asset in its warm-up moves nothing.
 
@@ -1298,8 +1424,8 @@ is scored against a block at its zero seed. A `regime_method` of `nothing` advan
 # Returns
 
   - `cache::RegimeAdjustedCovarianceState`: The cache to read on and to pass to the next
-    observation. `regime_state` and `n_regime_obs` are immutable fields that `Accessors.@reset`
-    replaces, so the caller must rebind the cache to this return value.
+    observation. `regime_state` and `n_regime_obs` are immutable fields that a new state holds,
+    so the caller must rebind the cache to this return value.
 
 # Related
 
@@ -1331,17 +1457,13 @@ function update_regime!(cache::RegimeAdjustedCovarianceState,
     end
     transformed = Statistics.mean(get_regime_state(ce.regime_method, ce.regime_target,
                                                    stats, n, ce.min_val))
-
-    Accessors.@reset cache.regime_state = if isnothing(cache.regime_state)
-        transformed
-    else
-        ce.regime_decay * cache.regime_state +
-        (one(ce.regime_decay) - ce.regime_decay) * transformed
-    end
-
-    Accessors.@reset cache.n_regime_obs += 1
-
-    return cache
+    c = cache
+    rs = blend_regime_state(c.regime_state, transformed, ce.regime_decay)
+    return RegimeAdjustedCovarianceState(c.ret_buffer, c.covariance, c.weight, c.variance,
+                                         c.cor_state, c.cor_weight, c.XXt, c.Xi, c.X_old_i,
+                                         c.location, c.obs_count, c.active, rs,
+                                         c.n_regime_obs + 1, c.bias, c.overlap,
+                                         c.lag_records)
 end
 function update_regime!(cache::RegimeAdjustedCovarianceState,
                         ::RegimeAdjustedExpWeightedCovariance{<:Any, <:Any, <:Any, <:Any,
@@ -1792,4 +1914,4 @@ end
 
 export RegimeAdjustedTarget, MahalanobisTarget, DiagonalTarget, PortfolioTarget,
        RegimeAdjustedExpWeightedCovariance
-public min_active_assets
+public min_active_assets, regime_statistic, regime_denom, regime_kappa

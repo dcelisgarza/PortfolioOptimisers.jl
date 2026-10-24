@@ -92,16 +92,18 @@ Mean absolute deviation:
 
 ```math
 \\begin{align}
-\\mathrm{MAD}(\\boldsymbol{w}) &= \\frac{1}{T}\\sum_{t=1}^T z_t\\,, \\\\
-z_t &\\geq |\\hat{r}_t - \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} + \\bar{F}(\\boldsymbol{w})|,\\quad z_t \\geq 0\\,.
+\\mathrm{MAD}(\\boldsymbol{w}) &= \\frac{2}{T}\\sum_{t=1}^T z_t + \\frac{1}{T}\\sum_{t=1}^T \\hat{r}_t - \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} + \\bar{F}(\\boldsymbol{w})\\,, \\\\
+z_t &\\geq \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\bar{F}(\\boldsymbol{w}) - \\hat{r}_t,\\quad z_t \\geq 0\\,.
 \\end{align}
 ```
+
+The row is one-sided, and the identity ``\\lvert d \\rvert = 2 \\max(-d, 0) + d`` gives the absolute deviation from it. The mean of the second term is the gap between the mean net return and the target, so the expression is exact for every target, not only for the mean.
 
 Where:
 
   - ``\\mathrm{MAD}(\\boldsymbol{w})``: Mean absolute deviation.
   - $(math_dict[:T])
-  - ``z_t \\geq 0``: Auxiliary variables capturing absolute deviations.
+  - ``z_t \\geq 0``: Auxiliary variables capturing the deviations below the target.
   - ``\\boldsymbol{\\mu}``: Expected returns vector.
   - ``\\bar{F}(\\boldsymbol{w})``: Mean fee per period, subtracted by [`calc_risk_constraint_target`](@ref) so that the target is the net mean. Zero without a fee.
   - ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}``: Portfolio return at time ``t``.
@@ -193,10 +195,13 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     mad = state_set!(model, prefix, :mad_, i, JuMP.@variable(model, [1:T], lower_bound = 0))
     wi = nothing_scalar_array_selector(r.w, pr.w)
     wi = checked_observation_weights(wi, net_X)
+    # |x - tgt| = 2 max(tgt - x, 0) + (x - tgt), so the mean of the second term restores the
+    # deviation that the one-sided row leaves out when `tgt` is not the mean of `net_X`.
     mad_risk = if isnothing(wi)
-        JuMP.@expression(model, 2 * Statistics.mean(mad))
+        JuMP.@expression(model, 2 * Statistics.mean(mad) + Statistics.mean(net_X) - tgt)
     else
-        JuMP.@expression(model, 2 * Statistics.mean(mad, wi))
+        JuMP.@expression(model,
+                         2 * Statistics.mean(mad, wi) + Statistics.mean(net_X, wi) - tgt)
     end
     state_set!(model, prefix, :mad_risk_, i, mad_risk)
     state_set!(model, prefix, :cmar_mad_, i,

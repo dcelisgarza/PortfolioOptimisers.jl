@@ -7,6 +7,12 @@ Run the named test files the way `test/runtests.jl` runs them, without the full 
     julia -t 1 --project=test test/run_files.jl --coverage=<absolute dir> test_04_owa.jl
     julia -t 1 --project=test test/run_files.jl --testset='^OWA l-moments$' test_04_owa.jl
     julia -t 1 --project=test test/run_files.jl --time-depth=2 --timeout=900 test_04_owa.jl
+    julia -t 1 --project=test test/run_files.jl --ci test_78
+    julia -t 1 --project=test test/run_files.jl --case='^bl_' test_78
+    julia -t 1 --project=test test/run_files.jl --resume=<done path> --done=<path> test_04 test_26
+
+A file is named as `test_X.jl`, `test/test_X.jl`, a path, or a unique prefix such as `test_78`.
+A name that matches no file, or several, is an error that lists the candidates.
 
 Each file runs in a module of its own, after the `init_code` preamble that `test/runtests.jl`
 declares, so a file sees what it sees in the suite. A red file does not stop the run. The driver
@@ -64,7 +70,9 @@ own:
     RESULT test_04_owa.jl pass=50 fail=1 error=0 broken=0 seconds=315.6 known red, #1709: ...
 
 A failure that no row covers is named after the rows, as `red outside known_red.toml: <path>`. The
-verdict does not change: a known red is still red. When a row's file or test set runs and passes,
+verdict does not change: a known red is still red. (CI is different: `test/runtests.jl` passes a run
+whose every failure a row covers. `test/known_red.jl` holds the rows for both.) When a row's file
+or test set runs and passes,
 the driver prints a `STALE` line that asks for the row to be deleted. Under `--testset`, only the
 rows whose test set ran are judged.
 
@@ -73,8 +81,24 @@ because Julia writes the counters only when a process exits. The parent then pri
 `COVERAGE` line per source file under `<dir>`, with the lines that no test reached, and deletes the
 counter files of the child. The other options are passed to the child.
 
+`--ci` runs the files in a child process under the flags of `Pkg.test` on CI,
+`--check-bounds=yes --code-coverage=user`. A test that pins solver output can pass locally and fail
+on CI only, because the two flags change the compiled code. The coverage goes to one scratch
+tracefile, which the parent deletes, so no `.cov` file lands next to a source file.
+
+`--case=<regex>` sets `ENV["RUN_FILES_CASE"]` for the run. A file whose test sets come from one
+`for` loop over named cases, whose one interpolated name `--testset` cannot select, filters its
+cases by it (`test/test_78_brt_pinned_outputs.jl` does).
+
+`--resume=<path>` skips each named file that already has a `RESULT` line in `<path>`, the `--done`
+file or the log of an earlier run that stopped halfway, for example when its session ended.
+
 Each file also records a gate stamp through `code_health/gate_stamp.sh`, which the push guard of
-`.pre-commit-config.yaml` reads. A file run under `--testset` records none: it ran only a part.
+`.pre-commit-config.yaml` reads. A file run under `--testset` or `--case` records none: it ran only
+a part.
+
+A run from the command line holds a slot of `code_health/julia_slot.jl` while it runs, so it waits
+for free memory rather than being killed for the lack of it. A `SLOT wait` line names the holders.
 
 From a REPL, `include` this file and call `RunFiles.main(["test_04_owa.jl"])`. It returns the
 exit code. Pass `--done` there too: a REPL that strips `println` still writes the file.
@@ -83,11 +107,15 @@ This file is not a test: `test/runtests.jl` discovers only `test_*.jl`.
 =#
 module RunFiles
 
-using Test, LinearAlgebra, TOML
+using Test, LinearAlgebra
 
 const TEST_DIR = @__DIR__
 const REPO_ROOT = dirname(TEST_DIR)
-const KNOWN_RED = joinpath(TEST_DIR, "known_red.toml")
+
+include(joinpath(REPO_ROOT, "code_health", "julia_slot.jl"))
+# `test/runtests.jl` reads the same rows, to filter the failures of CI (#1781).
+include(joinpath(TEST_DIR, "known_red.jl"))
+using .KnownRedRows: KNOWN_RED, KnownRed, known_red, covers, row_name
 
 """
 Where [`Collect`](@ref) prints a failure and a `TIME` line. A test of the driver points it at
@@ -230,15 +258,25 @@ end
 """
     resolve(name) -> String
 
-The absolute path of a test file named as `test_X.jl`, `test/test_X.jl` or a path.
+The absolute path of a test file named as `test_X.jl`, `test/test_X.jl`, a path, or a prefix of
+the name of exactly one test file, such as `test_78`. A miss lists the files that share the number
+of the name.
 """
-function resolve(name::AbstractString)
-    for p in (joinpath(TEST_DIR, basename(name)), abspath(name))
+function resolve(name::AbstractString; dir::AbstractString = TEST_DIR)
+    for p in (joinpath(dir, basename(name)), abspath(name))
         if isfile(p)
             return p
         end
     end
-    return error("No test file `$name` under `$TEST_DIR`.")
+    files = filter(f -> startswith(f, "test_") && endswith(f, ".jl"), readdir(dir))
+    hits = filter(f -> startswith(f, basename(name)), files)
+    if length(hits) == 1
+        return joinpath(dir, only(hits))
+    end
+    m = match(r"^(test_\d+)", basename(name))
+    near = isempty(hits) && m !== nothing ? filter(f -> startswith(f, m[1]), files) : hits
+    hint = isempty(near) ? "" : " Candidates: $(join(near, ", "))."
+    return error("No single test file `$name` under `$dir`.$hint")
 end
 
 # ---------------------------------------------------------------------------------------------
@@ -444,56 +482,6 @@ end
 # ---------------------------------------------------------------------------------------------
 
 """
-    KnownRed
-
-One row of `test/known_red.toml`: a test file, or one of its test sets, that is red for a reason
-an open issue records.
-"""
-struct KnownRed
-    file::String
-    testset::Union{Nothing, String}
-    issue::Int
-    reason::String
-    host::Union{Nothing, String}
-end
-
-const KNOWN_RED_KEYS = ("file", "testset", "issue", "reason", "host")
-
-"""
-    known_red(path = KNOWN_RED) -> Vector{KnownRed}
-
-The rows of `path`, each a `[[red]]` table. A row with a key the driver does not read, or without
-`file`, `issue` or `reason`, is an error, so a typo does not silently disable a row.
-"""
-function known_red(path::AbstractString = KNOWN_RED)
-    if !(isfile(path))
-        return KnownRed[]
-    end
-    rows = get(TOML.parsefile(path), "red", Any[])
-    return map(rows) do r
-        extra = setdiff(keys(r), KNOWN_RED_KEYS)
-        if !(isempty(extra))
-            error("`$path`: a row has the unknown key(s) $(join(sort(collect(extra)), ", ")).")
-        end
-        for k in ("file", "issue", "reason")
-            if !(haskey(r, k))
-                error("`$path`: a row has no `$k`.")
-            end
-        end
-        return KnownRed(r["file"], get(r, "testset", nothing), r["issue"], r["reason"],
-                        get(r, "host", nothing))
-    end
-end
-
-function covers(r::KnownRed, path::AbstractString)
-    return r.testset === nothing || occursin(r.testset, path)
-end
-
-function row_name(r::KnownRed)
-    return r.testset === nothing ? r.file : "$(r.file) \"$(r.testset)\""
-end
-
-"""
     known_red_notes(ts, rows; filtered = false) -> (note, stale)
 
 The note that the `RESULT` line of `ts` ends with, and one `STALE` line for each row of the file
@@ -643,8 +631,9 @@ function run_coverage(dir::AbstractString, rest::Vector{String})
     return success(p) ? 0 : max(p.exitcode, 1)
 end
 
-const USAGE = "usage: run_files.jl [--done=<path>] [--coverage=<absolute dir>] " *
-              "[--testset=<regex>] [--time-depth=<N>] [--timeout=<seconds>] test_X.jl..."
+const USAGE = "usage: run_files.jl [--done=<path>] [--coverage=<absolute dir>] [--ci] " *
+              "[--testset=<regex>] [--case=<regex>] [--resume=<path>] [--time-depth=<N>] " *
+              "[--timeout=<seconds>] test_X.jl..."
 
 """
     parse_args(args) -> NamedTuple
@@ -654,6 +643,7 @@ prints [`USAGE`](@ref).
 """
 function parse_args(args::Vector{String})
     done, coverage, testset, time_depth, timeout = nothing, nothing, nothing, 0, nothing
+    ci, case, resume = false, nothing, nothing
     names = String[]
     value(a, key) = a[(length(key) + 1):end]
     for a in args
@@ -663,6 +653,14 @@ function parse_args(args::Vector{String})
             coverage = value(a, "--coverage=")
         elseif startswith(a, "--testset=")
             testset = Regex(value(a, "--testset="))
+        elseif startswith(a, "--case=")
+            case = value(a, "--case=")
+            # A malformed pattern fails here, before a file loads.
+            Regex(case)
+        elseif startswith(a, "--resume=")
+            resume = value(a, "--resume=")
+        elseif a == "--ci"
+            ci = true
         elseif startswith(a, "--time-depth=")
             time_depth = something(tryparse(Int, value(a, "--time-depth=")), -1)
             if time_depth < 0
@@ -682,15 +680,62 @@ function parse_args(args::Vector{String})
     if isempty(names)
         error(USAGE)
     end
-    return (; done, coverage, testset, time_depth, timeout, names)
+    return (; done, coverage, testset, time_depth, timeout, names, ci, case, resume)
+end
+
+"""
+    finished_files(path) -> Set{String}
+
+The files that have a `RESULT` line in the log or `--done` file `path`.
+"""
+function finished_files(path::AbstractString)
+    out = Set{String}()
+    if !(isfile(path))
+        return out
+    end
+    for line in eachline(path)
+        m = match(r"^RESULT (\S+) ", line)
+        m === nothing || push!(out, m[1])
+    end
+    return out
+end
+
+"""
+    run_ci(rest) -> Int
+
+Run the driver again in a child process under `--check-bounds=yes --code-coverage=user`, the
+flags of `Pkg.test` on CI, with the coverage sent to a scratch tracefile that is deleted after.
+"""
+function run_ci(rest::Vector{String})
+    dir = mktempdir()
+    try
+        cmd = `$(Base.julia_cmd()) -t 1 --project=$(Base.active_project()) --check-bounds=yes --code-coverage=user --code-coverage=$(joinpath(dir, "trace-%p.info")) $(@__FILE__) $rest`
+        p = run(ignorestatus(cmd))
+        return success(p) ? 0 : max(p.exitcode, 1)
+    finally
+        rm(dir; recursive = true, force = true)
+    end
 end
 
 function main(args::Vector{String})
-    (; done, coverage, testset, time_depth, timeout, names) = parse_args(args)
+    (; done, coverage, testset, time_depth, timeout, names, ci, case, resume) = parse_args(args)
     if coverage !== nothing
         rest = filter(a -> !startswith(a, "--coverage="), args)
         return run_coverage(coverage, rest)
     end
+    if ci
+        return run_ci(filter(!=("--ci"), args))
+    end
+    if !(OWNS_PROCESS[])
+        return run_files(; done, testset, time_depth, timeout, names, case, resume)
+    end
+    return JuliaSlot.with_slot("run_files.jl $(join(names, ' '))") do
+        return run_files(; done, testset, time_depth, timeout, names, case, resume)
+    end
+end
+
+function run_files(; done, testset, time_depth, timeout, names, case = nothing,
+                   resume = nothing)
     if timeout !== nothing && !(OWNS_PROCESS[])
         error("`--timeout` kills the process that runs the driver, so it runs only from the " *
               "command line, never from a REPL.")
@@ -699,8 +744,19 @@ function main(args::Vector{String})
     lines = String[]
     sets = Collect[]
     status = 1
+    old_case = get(ENV, "RUN_FILES_CASE", nothing)
+    if case !== nothing
+        ENV["RUN_FILES_CASE"] = case
+    end
     try
         paths = resolve.(names)
+        if resume !== nothing
+            skip = finished_files(resume)
+            for p in filter(p -> basename(p) in skip, paths)
+                println("SKIP $(basename(p)): it has a RESULT line in $resume")
+            end
+            filter!(p -> !(basename(p) in skip), paths)
+        end
         rows = known_red()
         code = init_code()
         for p in paths
@@ -717,7 +773,7 @@ function main(args::Vector{String})
                     stop_watchdog(dog, done)
                 end
             end
-            if select === nothing
+            if select === nothing && case === nothing
                 record_gate(p)
             end
             note, stale = known_red_notes(ts, rows; filtered = select !== nothing)
@@ -735,6 +791,11 @@ function main(args::Vector{String})
         println(last(lines))
         status = all(green, sets) ? 0 : 1
     finally
+        if case !== nothing && old_case === nothing
+            delete!(ENV, "RUN_FILES_CASE")
+        elseif case !== nothing
+            ENV["RUN_FILES_CASE"] = old_case
+        end
         if done !== nothing
             if status == 1 && !(any(startswith("DONE"), lines))
                 push!(lines, "DONE files=$(length(sets)) status=crashed")

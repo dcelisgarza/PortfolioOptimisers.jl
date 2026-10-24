@@ -51,13 +51,15 @@ julia> cov(ce, [1.0 2.0; 2.0 1.0; 0.0 0.5])
 
 # References
 
-  - $(ref_dict[:schaferstrimmer2005])
+  - $(ref_dict[:schaferstrimmer2005]) Table 2.
 """
 abstract type AbstractCovarianceShrinkageTarget <: AbstractMomentAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
 Targets the identity matrix, which ignores the scale of the matrix being shrunk.
+
+Table 2 of [schaferstrimmer2005](@cite) lists it as target A, "diagonal, unit variance".
 
 # Mathematical definition
 
@@ -114,6 +116,8 @@ Where:
 
 The target has the trace of ``\\hat{\\mathbf{\\Sigma}}``. It commutes with every matrix, so a geodesic towards it keeps the eigenvectors of ``\\hat{\\mathbf{\\Sigma}}`` and changes only the eigenvalues.
 
+Table 2 of [schaferstrimmer2005](@cite) lists it as target B, "diagonal, common variance". It is the target ``m \\mathbf{I}`` of [ledoitwolf2004](@citet), where ``m`` is the inner product of the matrix with the identity, which is its average eigenvalue and so its average variance (Section 2.1).
+
 # Examples
 
 ```jldoctest
@@ -129,6 +133,7 @@ ScaledIdentityTarget()
 
 # References
 
+  - $(ref_dict[:ledoitwolf2004]) Section 2.1, Theorem 2.1.
   - $(ref_dict[:schaferstrimmer2005]) Table 2, target B.
 """
 struct ScaledIdentityTarget <: AbstractCovarianceShrinkageTarget end
@@ -157,6 +162,8 @@ Where:
   - $(math_dict[:N])
 
 The target has the eigenvalue ``\\bar{v} - \\bar{c}`` with multiplicity ``N - 1`` and the eigenvalue ``\\bar{v} + (N - 1) \\bar{c}`` once. So it is positive definite when ``-\\bar{v} / (N - 1) < \\bar{c} < \\bar{v}``. A positive definite ``\\hat{\\mathbf{\\Sigma}}`` meets both bounds. A singular ``\\hat{\\mathbf{\\Sigma}}`` fails the lower bound when the portfolio that holds every asset equally has zero variance. It fails the upper bound when every variance is equal and every pair has correlation one.
+
+Table 2 of [schaferstrimmer2005](@cite) lists it as target C, "common (co)variance", with the two estimated parameters ``\\bar{v}`` and ``\\bar{c}``.
 
 # Examples
 
@@ -200,6 +207,8 @@ Where:
 
 The correlation matrix of the target has the eigenvalue ``1 - \\bar{r}`` with multiplicity ``N - 1`` and the eigenvalue ``1 + (N - 1) \\bar{r}`` once. So the target is positive definite when every variance is positive and ``-1 / (N - 1) < \\bar{r} < 1``. A positive definite ``\\hat{\\mathbf{\\Sigma}}`` meets both conditions.
 
+[ledoitwolf2004honey](@citet) define this target as the constant correlation model, with the sample variances and the average sample correlation (Section 3.2 and Equation 3). Table 2 of [schaferstrimmer2005](@cite) lists it as target F.
+
 # Examples
 
 ```jldoctest
@@ -215,6 +224,7 @@ ConstantCorrelationTarget()
 
 # References
 
+  - $(ref_dict[:ledoitwolf2004honey]) Section 3.2, Appendix A, Equation 3.
   - $(ref_dict[:schaferstrimmer2005]) Table 2, target F.
 """
 struct ConstantCorrelationTarget <: AbstractCovarianceShrinkageTarget end
@@ -345,6 +355,8 @@ Shrinks a covariance matrix towards a target along the geodesic of the positive 
 
 Linear shrinkage averages the matrix and its target entry by entry. This estimator follows the shortest path between them under the affine-invariant metric instead. So the estimate is positive definite at every intensity when both ends are positive definite.
 
+Equation 2.3 of [musolas2021](@cite) gives the geodesic from ``\\mathbf{A}_1`` to ``\\mathbf{A}_2`` as ``\\mathbf{A}_1^{1/2} (\\mathbf{A}_1^{-1/2} \\mathbf{A}_2 \\mathbf{A}_1^{-1/2})^{t} \\mathbf{A}_1^{1/2}``, and Equation 2.5 gives its distance from ``\\mathbf{A}_1`` as ``\\lvert t \\rvert`` times the distance between the two. Here ``\\mathbf{A}_1 = \\hat{\\mathbf{\\Sigma}}``, ``\\mathbf{A}_2 = \\mathbf{T}`` and ``t = \\alpha``. Section 2.2 of that work states that the curve from ``\\mathbf{A}_2`` at ``1 - t`` is the same curve, which is the second form below. The code evaluates the second form with the Cholesky factor of ``\\mathbf{T}`` in place of its square root, and the two agree. Chapter 6 of [bhatia2007](@cite) proves that this curve is the unique shortest path under the affine-invariant metric. Shrinking a covariance estimate towards a target along it is this library's use of the curve.
+
 A zero eigenvalue of the start stays zero at every intensity below one, so the shrinkage does not repair a singular matrix. The `pdm` field repairs the matrix that `ce` computes, before the shrinkage runs. `cor` returns the correlation matrix of the shrunk covariance.
 
 # Mathematical definition
@@ -404,10 +416,10 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `ce`: Recursively updated via [`factory`](@ref).
-  - `cache`: Carried unchanged via [`factory`](@ref).
+  - `ce`: Recursively updated through [`factory`](@ref).
+  - `cache`: Carried unchanged through [`factory`](@ref).
 
 ## View parameters
 
@@ -415,7 +427,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
   - `ce` recurses through [`port_opt_view`](@ref) with every argument.
   - The view slices a matrix `tgt` on both axes, because it is an asset-by-asset matrix. It keeps a target rule unchanged, because [`shrinkage_target`](@ref) builds the target of a rule from the viewed matrix.
-  - `cache` is sliced to the selected assets via [`port_opt_view`](@ref).
+  - `cache` is sliced to the selected assets through [`port_opt_view`](@ref).
 
 # Examples
 
@@ -453,8 +465,8 @@ true
 
 # References
 
+  - $(ref_dict[:musolas2021]) Section 2.1, Equations 2.3 and 2.5, and Section 2.2.
   - $(ref_dict[:bhatia2007]) Chapter 6.
-  - $(ref_dict[:musolas2021]) Section 2.
 """
 @propagatable @concrete struct GeodesicShrinkageCovariance <: AbstractCovarianceEstimator
     """
@@ -902,7 +914,7 @@ The method takes an estimator whose `cache` holds `nothing`. An estimator whose 
 
 # Algorithm
 
- 1. Build a copy of `ce` whose `ce.ce` is the estimator that [`partial_fit!`](@ref) returns, with `Accessors.@reset`.
+ 1. Rebuild `ce` with the estimator that [`partial_fit!`](@ref) returns in `ce.ce`, through [`rebuild_estimator`](@ref).
 
 # Arguments
 
@@ -923,11 +935,13 @@ The method takes an estimator whose `cache` holds `nothing`. An estimator whose 
 """
 function partial_fit!(ce::GeodesicShrinkageCovariance{<:Any, <:Any, <:Any, <:Any, Nothing},
                       X::MatNum; dims::Int = 1, kwargs...)
-    return Accessors.@reset ce.ce = partial_fit!(ce.ce, X; dims = dims, kwargs...)
+    inner = partial_fit!(ce.ce, X; dims = dims, kwargs...)
+    return inner === ce.ce ? ce : rebuild_estimator(ce, (; ce = inner))
 end
 function partial_fit!(ce::GeodesicShrinkageCovariance{<:Any, <:Any, <:Any, <:Any, Nothing},
                       x::VecNum; kwargs...)
-    return Accessors.@reset ce.ce = partial_fit!(ce.ce, x; kwargs...)
+    inner = partial_fit!(ce.ce, x; kwargs...)
+    return inner === ce.ce ? ce : rebuild_estimator(ce, (; ce = inner))
 end
 """
     Statistics.cov(ce::GeodesicShrinkageCovariance{<:Any, <:Any, <:Any, <:Any, Nothing};

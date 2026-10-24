@@ -542,8 +542,7 @@ function partial_fit!(me::ExpWeightedExpectedReturns{<:Any, <:Any,
                       X::MatNum; dims::Int = 1,
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     cache = exp_weighted_pass!(me, X, dims, active_mask, me.cache)
-    Accessors.@reset me.cache = cache
-    return me
+    return cache === me.cache ? me : rebuild_estimator(me, (; cache = cache))
 end
 """
     partial_fit!(

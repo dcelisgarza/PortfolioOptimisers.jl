@@ -59,7 +59,7 @@ To implement a new price-level statistic, subtype `AbstractPriceLevelStatistic` 
 # References
 
   - $(ref_dict[:lihoi2012])
-  - $(ref_dict[:huang2016])
+  - $(ref_dict[:huang2013])
   - $(ref_dict[:lai2018ppt])
 """
 abstract type AbstractPriceLevelStatistic <: AbstractExpectedReturnsAlgorithm end
@@ -68,7 +68,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Averages the last `window` price levels, which is the forecast of the on-line moving average reversion, OLMAR.
 
-The forecast is that of [lihoi2012](@citet). The journal version of [lihoi2012](@cite) is [li2015olmar](@cite). It allows `window >= 2` and runs its experiments at `window = 5`, the default.
+The forecast is Equation (1) of [lihoi2012](@cite), which runs its experiments at `window = 5`, the default. The journal version of [lihoi2012](@cite) is [li2015olmar](@cite). It allows `window >= 2`.
 
 # Mathematical definition
 
@@ -114,7 +114,7 @@ MovingAverage
 
 # References
 
-  - $(ref_dict[:lihoi2012])
+  - $(ref_dict[:lihoi2012]) Equation (1).
   - $(ref_dict[:li2015olmar]) Equation (1).
 """
 @concrete struct MovingAverage <: AbstractPriceLevelStatistic
@@ -135,7 +135,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Averages the price levels with weights that fall exponentially with age, which is the forecast of the second form of the on-line moving average reversion, OLMAR-2.
 
-The forecast is Equation (2) of [li2015olmar](@cite). It is a folding statistic. The recursion is exact in relative terms, so the statistic reads no rows and carries one vector. [li2015olmar](@citet) admit ``\\alpha \\in (0, 1)`` and state no default. The sensitivity study of [li2015olmar](@cite) finds high wealth over a wide range of ``\\alpha`` and poor wealth at the two endpoints. The default `alpha = 0.5` is the value of the example in the toolbox of [li2016olps](@cite). The library also admits `alpha = 1`, where the forecast is one in every asset.
+The forecast is Equation (2) of [li2015olmar](@cite). It is a folding statistic. The recursion is exact in relative terms, so the statistic reads no rows and carries one vector. [li2015olmar](@citet) admit ``\\alpha \\in (0, 1)`` and state no default. The sensitivity study of [li2015olmar](@cite) finds high wealth over a wide range of ``\\alpha`` and poor wealth at the two endpoints. The default `alpha = 0.5` is the value that [lai2018aictr](@cite) and [guanan2019](@cite) set for this forecast. The conference version [lihoi2012](@cite) states the simple moving average alone, so [li2015olmar](@cite) is the first work that states this forecast. No copy of that work was found, so the recursion and its seed at the first level follow Equations (6a) and (6b) of [guanan2019](@cite). The library also admits `alpha = 1`, where the forecast is one in every asset.
 
 # Mathematical definition
 
@@ -188,7 +188,8 @@ ExponentialMovingAverage
 # References
 
   - $(ref_dict[:li2015olmar]) Equation (2).
-  - $(ref_dict[:li2016olps])
+  - $(ref_dict[:lai2018aictr]) Equation (6) and Section IV-A.
+  - $(ref_dict[:guanan2019]) Equations (6a) and (6b) and Section 5.1.4. $(ref_dict[:no_original_source])
 """
 @concrete struct ExponentialMovingAverage <: AbstractPriceLevelStatistic
     """
@@ -209,7 +210,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Takes the spatial (``L_1``) median of the last `window` price levels, which is the forecast of the robust median reversion, RMR.
 
-It is the forecast of [huang2016](@citet). [`spatial_median`](@ref) finds the median with the modified Weiszfeld iteration of [vardizhang2000](@citet), after it tests each level as the median.
+It is the forecast of [huang2013](@citet), Equations (1) and (2), which [huang2016](@cite) extends. [`spatial_median`](@ref) finds the median with the modified Weiszfeld iteration of [vardizhang2000](@citet), after it tests each level as the median. No copy of [vardizhang2000](@cite) was found, so the modified map follows Proposition 1 of [huang2013](@cite).
 
 The distances couple the assets, so the median changes when each asset is scaled by its own price. The library reads it on the reconstructed path, with every asset's last level at one. [huang2016](@citet) take the median of the raw prices. The code that accompanies [huang2016](@cite) takes it of prices rebased to one on the first day of the series. On the test fixture, the library's forecast differs from the rebased one by up to 0.003. It differs from the raw one by up to 0.08 when one asset trades at a hundred times the price of the others. The normalised median is scale-free, so no asset dominates the distances through its quotation.
 
@@ -268,6 +269,7 @@ SpatialMedian
 
 # References
 
+  - $(ref_dict[:huang2013]) Section 4.2, Equations (1) and (2), Proposition 1. $(ref_dict[:no_original_source])
   - $(ref_dict[:huang2016]) Equations (2) and (5), Algorithm 1.
   - $(ref_dict[:vardizhang2000])
 """
@@ -300,7 +302,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Takes the highest of the last `window` price levels, which is the forecast of the peak price tracking, PPT.
 
-It is the forecast of [lai2018ppt](@citet), which is not open access. Equation (5) of [liluoxu2023](@cite) restates the peak, and Equation (10) of the short-term sparse portfolio of [lai2018sspo](@citet) uses the same peak. That portfolio does not read the ratio itself. It reads ``1.1 \\log \\hat{x}_{t+1, i} + 1`` (eq. 11), a transform that [`ShortTermSparsePortfolio`](@ref) applies.
+It is Equation (8) of [lai2018ppt](@cite), which sets `window = 5`, the default. Equation (10) of the short-term sparse portfolio of [lai2018sspo](@citet) uses the same peak. That portfolio does not read the ratio itself. It reads ``1.1 \\log \\hat{x}_{t+1, i} + 1`` (eq. 11), a transform that [`ShortTermSparsePortfolio`](@ref) applies.
 
 # Mathematical definition
 
@@ -349,9 +351,8 @@ WindowPeak
 
 # References
 
-  - $(ref_dict[:lai2018ppt])
+  - $(ref_dict[:lai2018ppt]) Equation (8).
   - $(ref_dict[:lai2018sspo]) Equations (10) and (11).
-  - $(ref_dict[:liluoxu2023]) Equation (5).
 """
 @concrete struct WindowPeak <: AbstractPriceLevelStatistic
     """
@@ -371,7 +372,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Takes the price level `lag` observations ago, which is the forecast of the first form of the transaction-cost optimisation, TCO.
 
-It is the forecast of [li2018tco](@citet). The forecast bets that the moves of the last `lag` periods revert. The first form, Algorithm 2 of [li2018tco](@cite), reads `lag = 1`. At `lag = 0` the forecast is one in every asset, which is the hold branch of a switched statistic. Over fewer than `lag` rows the statistic reads the first level it has.
+It is the forecast of [li2018tco](@citet). The forecast bets that the moves of the last `lag` periods revert. The first form, Algorithm 2 of [li2018tco](@cite), reads `lag = 1`. Section 3.1 of [lihoi2012](@cite) states that forecast as the single-period reversion, where the next price returns to the price one period back. The general `lag` is the library's own choice. At `lag = 0` the forecast is one in every asset, which is the hold branch of a switched statistic. Over fewer than `lag` rows the statistic reads the first level it has.
 
 # Mathematical definition
 
@@ -420,6 +421,7 @@ LaggedPrice
 # References
 
   - $(ref_dict[:li2018tco]) Algorithm 2.
+  - $(ref_dict[:lihoi2012]) Section 3.1.
 """
 @concrete struct LaggedPrice <: AbstractPriceLevelStatistic
     """
@@ -439,7 +441,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Averages the price levels with a weight per asset that depends on the data, which is the forecast of the reweighted price relative tracking, RPRT.
 
-It is the forecast of [lai2018rprt](@citet), which is not open access. It is a folding statistic. Equations (8) and (11) of [liluoxu2023](@cite) restate the recursion, and the MATLAB code that accompanies [lai2018rprt](@cite) runs the same recursion. The seed ``\\hat{\\boldsymbol{\\varphi}}_{1} = \\boldsymbol{x}_{1}`` is that of the restatement, so the forecast after the first row is one. The MATLAB code seeds the forecast at one instead. On the test fixture at `theta = 0.8`, the two forecasts differ by 0.024 after the first row and by less than ``10^{-4}`` after ten rows. The default `theta = 0.8` is the value of the MATLAB code. [liluoxu2023](@citet) set 0.7 for their own rule.
+It is the forecast of [lai2018rprt](@citet). It is a folding statistic. Equations (8) and (11) of [liluoxu2023](@cite) restate the recursion, and the MATLAB code that accompanies [lai2018rprt](@cite) runs the same recursion. No copy of either work was found, so the recursion is checked against that MATLAB code alone. The seed ``\\hat{\\boldsymbol{\\varphi}}_{1} = \\boldsymbol{x}_{1}`` is that of the restatement, so the forecast after the first row is one. The MATLAB code seeds the forecast at one instead. On the test fixture at `theta = 0.8`, the two forecasts differ by 0.024 after the first row and by less than ``10^{-4}`` after ten rows. The default `theta = 0.8` is the value of the MATLAB code. [liluoxu2023](@citet) set 0.7 for their own rule.
 
 # Mathematical definition
 
@@ -493,7 +495,7 @@ ReweightedPriceRelative
 # References
 
   - $(ref_dict[:lai2018rprt])
-  - $(ref_dict[:liluoxu2023]) Equations (8) and (11).
+  - $(ref_dict[:liluoxu2023]) Equations (8) and (11). $(ref_dict[:no_original_source])
 """
 @concrete struct ReweightedPriceRelative <: AbstractPriceLevelStatistic
     """
@@ -1195,7 +1197,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 The spatial median of the rows of `P`, by the modified Weiszfeld iteration.
 
-The iteration is that of [vardizhang2000](@citet). The plain Weiszfeld iteration converges slowly when the median is one of the points, and it cannot step from an iterate that equals a point. The function first tests every point with the optimality condition of [vardizhang2000](@cite), so a median that is one of the points is found exactly. The iteration then uses the modified map, which stays defined on a point.
+The iteration is that of [vardizhang2000](@citet). The plain Weiszfeld iteration converges slowly when the median is one of the points, and it cannot step from an iterate that equals a point. The function first tests every point with the optimality condition of [vardizhang2000](@cite), so a median that is one of the points is found exactly. The iteration then uses the modified map, which stays defined on a point. No copy of [vardizhang2000](@cite) was found, so the map follows Proposition 1 of [huang2013](@cite).
 
 # Mathematical definition
 
@@ -1240,6 +1242,7 @@ Where:
 # References
 
   - $(ref_dict[:vardizhang2000])
+  - $(ref_dict[:huang2013]) Proposition 1. $(ref_dict[:no_original_source])
 """
 function spatial_median(P::AbstractMatrix, iters::Integer, tol::Real)
     for k in axes(P, 1)
@@ -1491,10 +1494,9 @@ function partial_fit!(me::PriceLevelExpectedReturns{<:Any,
     prev = isnothing(state) ? cold : ifelse.(active .& .!iszero.(nu), state.stat, cold)
     stat = fold_active(me.alg, prev, hist, xr, active)
     n = isnothing(state) ? 0 : state.n
-    return Accessors.@reset me.cache = PriceLevelForecastState(n + 1,
-                                                               ifelse.(active, nu .+ valid,
-                                                                       zero(eltype(nu))),
-                                                               stat, hist)
+    state = PriceLevelForecastState(n + 1, ifelse.(active, nu .+ valid, zero(eltype(nu))),
+                                    stat, hist)
+    return rebuild_estimator(me, (; cache = state))
 end
 function partial_fit!(me::PriceLevelExpectedReturns{<:Any,
                                                     <:Option{<:PriceLevelForecastState}},

@@ -571,7 +571,7 @@ Each different mismatch logs one time. The message names the type of the head an
 function warn_raw_readers(head, fr::ReturnsFrames = group_frames(head))::Nothing
     if fr.excess && !isempty(fr.raw)
         msg = "`$(nameof(typeof(head)))` holds a reader that states `x_src = ExcessSource()`, and these readers state no source and read the raw returns data: $(join(map(p -> "`$p`", fr.raw), ", ")). State `x_src = DataSource()` on each one to keep the raw returns, or `x_src = ExcessSource()` to read the returns in excess of the benchmark."
-        @warn(msg, maxlog = 1, _id = hash(msg))
+        @warn(msg, maxlog = log_limit(:warn, 1), _id = hash(msg))
     end
     return nothing
 end

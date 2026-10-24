@@ -937,8 +937,6 @@ Refuse a non-finite sample in a plain moment estimator, and name the two ways ou
 
 A plain moment estimator has no correct value for an asset whose window has a gap. So it refuses the whole sample, and does not return a number that looks like an estimate. The message names the two paths that a caller has. The caller can fit through a prior, which reduces the sample to the Coverage Universe and expands the result. Or the caller can use a mask-aware estimator, which takes the whole window and writes its own frame.
 
-A second per-asset series beside the returns follows the same rule. [`ImpliedVolatility`](@ref) refuses a gap in its implied volatility surface through this function, because its panel method excludes such an asset from the Coverage Universe, and a plain call that read past the gap would answer for it.
-
 This is [`assert_all_finite`](@ref) with a message for this refusal. The message of [`assert_all_finite`](@ref) names the count and the position of the non-finite entries alone. It tells a caller what is wrong, and not what to do.
 
 # Arguments

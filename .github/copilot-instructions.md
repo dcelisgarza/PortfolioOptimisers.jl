@@ -2,106 +2,106 @@
 
 ## Project Overview
 
-PortfolioOptimisers.jl is a modular, extensible Julia package for advanced portfolio optimization, risk management, and financial analytics. The codebase is organized around composable estimators, algorithms, and result types, supporting a wide range of statistical, econometric, and optimization techniques.
+PortfolioOptimisers.jl is a Julia package for portfolio optimization and risk management. Its code composes three kinds of type: estimators, algorithms and results. The estimators cover statistical, econometric and optimization methods.
 
 ## Architecture & Key Patterns
 
-- **Modular Design:** The main module (`src/PortfolioOptimisers.jl`) includes a large set of submodules, each focused on a specific aspect (moments, risk, priors, constraints, optimisation, etc.). Each submodule is further split into fine-grained files (e.g., different covariance estimators, risk measures, etc.).
-- **Abstract Types:** All estimators, algorithms, and results are built on a hierarchy of abstract types (e.g., `AbstractEstimator`, `AbstractAlgorithm`, `AbstractResult`). New functionality should extend these types for consistency and dispatch.
-- **Composability:** Estimators and algorithms are designed to be composed. For example, a covariance estimator can be wrapped with a matrix post-processing estimator, or a mean estimator can be combined with a shrinkage algorithm.
-- **Validation:** The codebase validates input with `@argcheck` (from ArgCheck.jl) and shared assertion helpers. [`julia-source-code.instructions.md`](instructions/julia-source-code.instructions.md) § *Input Validation* owns the rule.
-- **Documentation:** All public types and methods are documented with docstrings, including usage examples and references to related types.
+- **Modular design.** The main module, `src/PortfolioOptimisers.jl`, includes one submodule for each subject, such as moments, risk, priors, constraints and optimisation. Each submodule is split into small files, for example one file for each covariance estimator or risk measure.
+- **Abstract types.** Every estimator, algorithm and result descends from an abstract type, such as `AbstractEstimator`, `AbstractAlgorithm` or `AbstractResult`. New functionality should subtype these types, so that it dispatches like the rest of the library.
+- **Composability.** An estimator or an algorithm can hold another one. For example, a matrix post-processing estimator can wrap a covariance estimator, and a mean estimator can hold a shrinkage algorithm.
+- **Validation.** The code validates input with `@argcheck`, from ArgCheck.jl, and with shared assertion helpers. [`julia-source-code.instructions.md`](instructions/julia-source-code.instructions.md) § *Input Validation* owns the rule.
+- **Documentation.** Every public type and method has a docstring, with usage examples and references to related types.
 
 ## Developer Workflows
 
-- **Contributing and development:**
+- **Contributing and development.**
 
   - Follow the guidelines in [`1-contributing.md`](../docs/src/contribute/1-contributing.md) and [`2-developer.md`](../docs/src/contribute/2-developer.md).
 
-- **Examples:**
+- **Examples.**
 
-  - Example scripts and notebooks are in `examples/`. Use these as references for end-to-end workflows.
+  - The example scripts and notebooks are in `examples/`. Read them for end-to-end workflows.
 
 ### Required Before Each Commit
 
-- **Linting and Formatting:**
+- **Linting and formatting.**
 
-  - Run `pre-commit run -a` before committing changes.
-  - The repository uses pre-commit hooks for linting and formatting.
-  - Julia code is formatted using JuliaFormatter.jl.
-  - **Commits will be rejected if pre-commit tests fail.**
-  - Install pre-commit hooks once: `pre-commit install` (requires `pre-commit` via pipx).
+  - Run `pre-commit run -a` before you commit.
+  - The pre-commit hooks lint and format the repository.
+  - JuliaFormatter.jl formats the Julia code.
+  - **A commit fails when a pre-commit check fails.**
+  - Install the pre-commit hooks once with `pre-commit install`. It needs `pre-commit`, installed through pipx.
 
-- **Testing:**
+- **Testing.**
 
-  - Run the tests for the area you changed before committing. [`CLAUDE.md`](../CLAUDE.md) § *Running Julia* owns how to run them.
+  - Run the tests for the area you changed before you commit. [`CLAUDE.md`](../CLAUDE.md) § *Running Julia* owns how to run them.
 
-  - Add new tests as `test_*.jl` in `test/`.
-  - Tests must pass before creating a pull request.
+  - Add a new test as a `test_*.jl` file in `test/`.
+  - The tests must pass before you open a pull request.
 
 ### Build and Development Commands
 
-- **Formatting:**
+- **Formatting.**
 
-  - Run linters and formatters: `pre-commit run -a`
-  - Manual Julia formatting: Install JuliaFormatter.jl globally, then format as needed.
+  - Run the linters and formatters with `pre-commit run -a`.
+  - To format Julia code by hand, install JuliaFormatter.jl globally and run it.
 
-- **Testing:**
+- **Testing.**
 
-  - Run all tests: From Julia REPL, activate environment (`] activate .`) then run tests (`] test`).
-- **Documentation:**
+  - To run all tests, activate the environment in the Julia REPL with `] activate .`, then run `] test`.
+- **Documentation.**
 
-  - Build docs locally:
+  - To build the docs locally, run these steps:
 
          1. `julia --project=docs`
          2. `using LiveServer`
          3. `servedocs()`
 
-     `docs/Project.toml` points `PortfolioOptimisers` at this checkout through `[sources]`, so do not run `] dev .`: `Pkg.develop` rewrites that entry.
+     `docs/Project.toml` points `PortfolioOptimisers` at this checkout through `[sources]`. Do not run `] dev .`, because `Pkg.develop` rewrites that entry.
 
 ## Project-Specific Conventions
 
-- **Naming:**
+- **Naming.**
 
-  - Abstract types are always prefixed with `Abstract` (e.g., `AbstractCovarianceEstimator`).
-  - Concrete types are descriptive and often parameterized (e.g., `SimpleExpectedReturns{T1}`).
-  - Algorithms are suffixed with `Algorithm` or named after the method (e.g., `SpectralDenoise`, `PCA`).
+  - The name of an abstract type always starts with `Abstract`, for example `AbstractCovarianceEstimator`.
+  - A concrete type has a descriptive name, and it is often parameterized, for example `SimpleExpectedReturns{T1}`.
+  - The name of an algorithm ends in `Algorithm` or names the method, for example `SpectralDenoise` or `PCA`.
 
-- **File Naming:**
+- **File naming.**
 
-  - Source files are prefixed numerically to indicate load order and logical grouping.
-- **Extensibility:**
+  - The name of a source file starts with a number, which gives its load order and its group.
+- **Extensibility.**
 
-  - To add a new result, estimator or algorithm type, subtype the relevant abstract type and provide the necessary interfaces.
-  - For new matrix processing or post-processing steps, implement the appropriate interface and document usage.
-- **Validation:**
+  - To add a new result, estimator or algorithm type, subtype the relevant abstract type and implement the interfaces that it needs.
+  - For a new matrix processing or post-processing step, implement its interface and document how to use it.
+- **Validation.**
 
-  - Validate input as [`julia-source-code.instructions.md`](instructions/julia-source-code.instructions.md) § *Input Validation* states: prefer a shared assertion helper over an inline `@argcheck`.
-- **Dispatch:**
+  - Validate input as [`julia-source-code.instructions.md`](instructions/julia-source-code.instructions.md) § *Input Validation* states. Prefer a shared assertion helper over an inline `@argcheck`.
+- **Dispatch.**
 
-  - Prefer multiple dispatch over conditionals for algorithm selection and extension.
-- **Commit/PR Practices:**
+  - Prefer multiple dispatch over conditionals to select and extend an algorithm.
+- **Commits and pull requests.**
 
-  - Use imperative, informative commit messages.
-  - Keep commits atomic.
+  - Write each commit message in the imperative mood, and say what the commit changes.
+  - Keep each commit atomic.
   - A session in this checkout rebases onto `dev` and pushes `dev`, as [`CLAUDE.md`](../CLAUDE.md) § *Parallel sessions* states.
   - An outside contributor who works from a fork rebases onto `upstream/main` before a PR, as [`docs/src/contribute/2-developer.md`](../docs/src/contribute/2-developer.md) states.
-- **Releases:**
+- **Releases.**
 
   - Use a `release-x.y.z` branch, update `Project.toml`, and follow the release checklist in `2-developer.md`.
 
 ## Integration & Dependencies
 
-- **Julia dependencies:**
+- **Julia dependencies.**
 
-  - Managed in `Project.toml` and loaded in the main module.
+  - `Project.toml` declares them, and the main module loads them.
 
-- **Package extensions:**
+- **Package extensions.**
 
-  - via extensions in `ext/`.
-- **Cross-Component Patterns:**
+  - The package extensions are in `ext/`.
+- **Cross-component patterns.**
 
-  - Estimators and algorithms are passed as arguments to higher-level routines (e.g., an optimizer receives a covariance estimator, which itself may wrap a denoiser or detoner).
+  - A higher-level routine takes estimators and algorithms as arguments. For example, an optimizer receives a covariance estimator, and that estimator can wrap a denoiser or a detoner.
   - Matrix processing and post-processing are always explicit and composable.
 
 ## Examples
@@ -121,10 +121,10 @@ PortfolioOptimisers.jl is a modular, extensible Julia package for advanced portf
 
 ## Notable Patterns
 
-- All estimators, algorithms, and results are composable and validated.
-- Tests are isolated per file and auto-discovered.
-- Defensive programming is enforced via `@argcheck`.
-- Documentation is tightly integrated with code and examples.
+- Every estimator, algorithm and result is composable and validated.
+- Each test file runs in isolation, and the test runner finds the files.
+- The code checks its inputs with `@argcheck`.
+- The docs build renders the docstrings and the examples into the documentation.
 
 ## References
 
@@ -140,15 +140,15 @@ PortfolioOptimisers.jl is a modular, extensible Julia package for advanced portf
 
 ## Before Finalizing Work
 
-Before completing any task or creating a pull request:
+Before you finish a task or open a pull request:
 
- 1. **Run pre-commit checks**: `pre-commit run -a` - All checks must pass.
- 2. **Run tests**: Run the tests for the area you changed, as `CLAUDE.md` § *Running Julia* states - All of them must pass.
- 3. **Run doctests**: Doctests are separate from `] test`. The `run-doctests` skill owns the exact command.
- 4. **Update documentation**: If adding new features, update relevant docstrings and docs.
- 5. **Update the Capability Catalogue**: Any new type on the Choice Surface, and any new exported function, must be placed in `docs/capability_catalogue.jl` (or listed in `NOT_A_FEATURE`, for a function, or `NOT_A_CHOICE`, for a type the library constructs for itself, with a reason). The surface is every concrete type the package declares that is a leaf `AbstractEstimator`, a leaf `AbstractAlgorithm`, a leaf `AbstractCovarianceEstimator`, or an export under its own name, less the Results and the errors. Do not write a description — it comes from the first sentence of the docstring. `test/test_26_docs.jl` fails if you skip this. See ADR 0040.
- 6. **Conform an addition to the sweep**: A file added or changed under `src/` or `ext/` owes the four steps of `CLAUDE.md` § *Functionality you add*. Run `julia --project=code_health code_health/sweep_check.jl --fetch`, which reports every one of them and prints the manifest line to paste. See ADR 0084.
+ 1. **Run the pre-commit checks.** Run `pre-commit run -a`. Every check must pass.
+ 2. **Run the tests.** Run the tests for the area you changed, as `CLAUDE.md` § *Running Julia* states. All of them must pass.
+ 3. **Run the doctests.** `] test` does not run the doctests. The `run-doctests` skill owns the exact command.
+ 4. **Update the documentation.** When you add a feature, update the docstrings and the docs that it reaches.
+ 5. **Update the Capability Catalogue.** Every new type on the Choice Surface, and every new exported function, must have a place in `docs/capability_catalogue.jl`. Instead, a function can go in `NOT_A_FEATURE`, and a type that the library constructs for itself can go in `NOT_A_CHOICE`, each with a reason. The Choice Surface is every concrete type the package declares that is a leaf `AbstractEstimator`, a leaf `AbstractAlgorithm`, a leaf `AbstractCovarianceEstimator`, or an export under its own name, less the Results and the errors. Do not write a description. The catalogue takes it from the first sentence of the docstring. `test/test_26_docs.jl` fails if you skip this step. See ADR 0040.
+ 6. **Conform an addition to the sweep.** A file added or changed under `src/` or `ext/` owes the four steps of `CLAUDE.md` § *Functionality you add*. Run `julia --project=code_health code_health/sweep_check.jl --fetch`. It reports each of the four steps, and it prints the manifest line to paste. See ADR 0084.
 
 * * *
 
-For further details, see the [README.md](../README.md), [`developer`](../docs/src/contribute/2-developer.md) and in-code documentation.
+For more detail, read the [README.md](../README.md), the [`developer`](../docs/src/contribute/2-developer.md) guide and the documentation in the code.

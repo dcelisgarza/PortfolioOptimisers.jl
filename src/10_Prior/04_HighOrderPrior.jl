@@ -3,11 +3,11 @@
 
 Block vectorisation operator.
 
-`block_vec_pq` transforms a matrix `A` into a block vectorised form, partitioning `A` into blocks of size `(p, q)` and writing each vectorised block as one row. This is useful for higher-order moment computations and tensor manipulations in portfolio analytics.
+`block_vec_pq` cuts `A` into blocks of size `(p, q)`, and writes the vectorisation of each block as one row of the result. [`get_kt_Akt_pm`](@ref) applies it to the square cokurtosis `kt` with `p = q = N`, and takes the eigendecomposition of the result for the kurtosis risk constraints.
 
 # Mathematical definition
 
-Partition ``\\mathbf{A}`` into ``m \\times n`` blocks ``\\mathbf{A}_{ij}`` of size ``p \\times q``. The block vectorisation writes each block as one row, in block-column order:
+Cut ``\\mathbf{A}`` into ``m \\times n`` blocks ``\\mathbf{A}_{ij}`` of size ``p \\times q``. The block vectorisation writes each block as one row, in the order of the block columns:
 
 ```math
 \\mathcal{V}_{p,q}(\\mathbf{A}) = \\begin{bmatrix}
@@ -22,18 +22,18 @@ Partition ``\\mathbf{A}`` into ``m \\times n`` blocks ``\\mathbf{A}_{ij}`` of si
 
 Where:
 
-  - ``\\mathbf{A}_{ij}``: block ``(i, j)`` of ``\\mathbf{A}``, holding rows ``(i-1)p+1`` to ``ip`` and columns ``(j-1)q+1`` to ``jq``.
-  - ``\\mathrm{vec}``: column-major vectorisation.
-  - ``m = \\mathrm{size}(\\mathbf{A}, 1) / p``, ``n = \\mathrm{size}(\\mathbf{A}, 2) / q``: the block counts.
+  - ``\\mathbf{A}_{ij}``: Block ``(i, j)`` of ``\\mathbf{A}``. It holds rows ``(i-1)p+1`` to ``ip`` and columns ``(j-1)q+1`` to ``jq``.
+  - ``\\mathrm{vec}``: Column-major vectorisation.
+  - ``m = \\mathrm{size}(\\mathbf{A}, 1) / p``, ``n = \\mathrm{size}(\\mathbf{A}, 2) / q``: The counts of blocks.
 
-Row ``(j-1)m + i`` of the result is ``\\mathrm{vec}(\\mathbf{A}_{ij})^\\intercal``, so the block **column** index runs slowest. A square partition, ``m = n`` and ``p = q``, cannot separate this order from the one that runs the block row index slowest, because the two differ by a permutation that is the identity there.
+Row ``(j-1)m + i`` of the result is ``\\mathrm{vec}(\\mathbf{A}_{ij})^\\intercal``, so the index of the block column changes slowest. The order that changes the index of the block row slowest puts ``\\mathrm{vec}(\\mathbf{A}_{12})^\\intercal`` in row 2 of the example below, where this order puts ``\\mathrm{vec}(\\mathbf{A}_{21})^\\intercal``. The two orders agree when every block ``\\mathbf{A}_{ij}`` equals ``\\mathbf{A}_{ji}``. The square cokurtosis is such a matrix up to rounding, because its entry ``\\mathbb{E}[r_i r_k r_j r_l]`` does not change when ``i`` and ``j`` change places.
 
 # Algorithm
 
  1. Read `size(A)` into `mp` and `nq`, and check both divisibility conditions.
  2. Take the block counts `m = mp ÷ p` and `n = nq ÷ q`.
  3. Allocate `A_vec`, of size `(m * n, p * q)`.
- 4. For each block column `j`, build `Aj`, whose `i`-th row is the vectorisation of block `(i, j)` of `A`.
+ 4. For each block column `j` from `0` to `n - 1`, build `Aj`. Row `i + 1` of `Aj` is the vectorisation of the block in block row `i` and block column `j` of `A`.
  5. Write `Aj` into rows `j * m + 1` to `(j + 1) * m` of `A_vec`.
 
 # Arguments
@@ -70,7 +70,7 @@ julia> PortfolioOptimisers.block_vec_pq(A, 2, 2)
 
 # References
 
-  - $(ref_dict[:cajas2025]) Appendix A.1, Equation A.14.
+  - $(ref_dict[:cajas2025]) Appendix A.1, Equation A.14. $(ref_dict[:no_original_source])
 """
 function block_vec_pq(A::MatNum, p::Integer, q::Integer)
     mp, nq = size(A)
@@ -98,17 +98,17 @@ end
 
 Construct the duplication matrix for a symmetric matrix of size `n × n`.
 
-The duplication matrix `D` maps the vech (half-vectorisation) of a symmetric matrix to its full vec. Used internally in coskewness and cokurtosis computation.
+The duplication matrix `D` maps the half-vectorisation of a symmetric matrix to its full vectorisation. A [`HighOrderPrior`](@ref) holds it as `D2` beside the coskewness `sk`.
 
 # Mathematical definition
 
-``\\mathbf{D}_n`` is defined by the identity it restores, for every symmetric ``\\mathbf{A}`` of size ``n \\times n``:
+This identity defines ``\\mathbf{D}_n``, for every symmetric ``\\mathbf{A}`` of size ``n \\times n``:
 
 ```math
 \\mathbf{D}_n \\mathrm{vech}(\\mathbf{A}) = \\mathrm{vec}(\\mathbf{A})\\,.
 ```
 
-With `diag = false` the half-vectorisation drops the diagonal, and the identity restores the hollow matrix:
+With `diag = false`, the half-vectorisation drops the diagonal, and the identity gives the matrix with a zero diagonal. The source defines the matrix with the diagonal. The library adds the form without it.
 
 ```math
 \\mathbf{D}_n^{-} \\mathrm{vech}^{-}(\\mathbf{A}) = \\mathrm{vec}(\\mathbf{A} - \\mathrm{diag}(\\mathbf{A}))\\,.
@@ -116,27 +116,27 @@ With `diag = false` the half-vectorisation drops the diagonal, and the identity 
 
 Where:
 
-  - ``\\mathrm{vec}``: column-major vectorisation, of length ``n^2``.
-  - ``\\mathrm{vech}``: half-vectorisation, the lower triangle read column by column, of length ``n(n+1)/2``.
-  - ``\\mathrm{vech}^{-}``: the strictly lower triangle read the same way, of length ``n(n-1)/2``.
-  - ``\\mathrm{diag}(\\mathbf{A})``: the diagonal of ``\\mathbf{A}`` held as a matrix.
+  - ``\\mathrm{vec}``: Column-major vectorisation, of length ``n^2``.
+  - ``\\mathrm{vech}``: Half-vectorisation, which reads the lower triangle column by column, of length ``n(n+1)/2``.
+  - ``\\mathrm{vech}^{-}``: The strictly lower triangle, read in the same order, of length ``n(n-1)/2``.
+  - ``\\mathrm{diag}(\\mathbf{A})``: The diagonal of ``\\mathbf{A}``, as a diagonal matrix.
 
-Each row of ``\\mathbf{D}_n`` carries exactly one entry, so the matrix selects rather than sums. A diagonal entry of ``\\mathbf{A}`` is selected once and an off-diagonal entry twice, which is what makes ``\\mathbf{D}_n^\\intercal \\mathbf{D}_n`` the weight matrix that [`summation_matrix`](@ref) applies.
+Each row of ``\\mathbf{D}_n`` holds one entry, so the matrix copies entries and adds none. It copies a diagonal entry of ``\\mathbf{A}`` to one place and an off-diagonal entry to two. The product ``\\mathbf{D}_n^\\intercal \\mathbf{D}_n`` is the diagonal matrix of these counts, and [`summation_matrix`](@ref) applies it as a weight.
 
 # Algorithm
 
  1. Take `m = n(n+1)/2` and `nsq = n^2`.
- 2. Fill `v`, whose `r`-th entry is the position in ``\\mathrm{vech}(\\mathbf{A})`` of the entry that row `r` of ``\\mathrm{vec}(\\mathbf{A})`` holds. The inner loops walk the strictly upper part of a column first, then its lower part.
- 3. When `diag` is `true`, return the sparse matrix carrying a one at each `(r, v[r])`, of size `nsq × m`.
- 4. When `diag` is `false`, count how often each position occurs in `v`, giving `counts`.
- 5. Keep the positions that occur more than once — the off-diagonal ones — and renumber them from one, giving `cols`.
- 6. Keep every row of ``\\mathrm{vec}(\\mathbf{A})`` whose position survives step 5, giving `filtered_rows` and `filtered_cols`.
- 7. Return the sparse matrix carrying a one at each kept pair, of size `nsq × n(n-1)/2`.
+ 2. Fill `v`. Entry `r` of `v` is the position in ``\\mathrm{vech}(\\mathbf{A})`` of the entry in row `r` of ``\\mathrm{vec}(\\mathbf{A})``. For each column, the inner loops read the strictly upper part first, and then the lower part.
+ 3. When `diag` is `true`, return the sparse matrix of size `nsq × m` that holds a one at each `(r, v[r])`.
+ 4. When `diag` is `false`, count how many times each position occurs in `v`, and put the counts in `counts`.
+ 5. Keep the positions that occur more than once. These are the off-diagonal positions. Number them again from one, and put the numbers in `cols`.
+ 6. Keep every row of ``\\mathrm{vec}(\\mathbf{A})`` whose position step 5 kept, and put the pairs in `filtered_rows` and `filtered_cols`.
+ 7. Return the sparse matrix of size `nsq × n(n-1)/2` that holds a one at each kept pair.
 
 # Arguments
 
   - `n`: Size of the symmetric matrix.
-  - `diag`: Whether to include the diagonal elements.
+  - `diag`: `true` to include the diagonal entries, `false` to drop them.
 
 # Returns
 
@@ -146,11 +146,11 @@ Each row of ``\\mathbf{D}_n`` carries exactly one entry, so the matrix selects r
 
   - [`elimination_matrix`](@ref)
   - [`summation_matrix`](@ref)
-  - [`dup_elim_sum_matrices`](@ref): builds this matrix and its two siblings in one walk.
+  - [`dup_elim_sum_matrices`](@ref): builds this matrix and the other two in one loop.
 
 # References
 
-  - $(ref_dict[:cajas2025]) Appendix A.2, Equation A.25.
+  - $(ref_dict[:magnusneudecker1980]) Section 3, Definition 3.2a.
 """
 function duplication_matrix(n::Int, diag::Bool = true)
     m = div(n * (n + 1), 2)
@@ -213,17 +213,17 @@ end
 
 Construct the elimination matrix for a symmetric matrix of size `n × n`.
 
-The elimination matrix `L` extracts the unique (lower triangular) elements of a symmetric matrix. Used internally in coskewness and cokurtosis computation.
+The elimination matrix `L` keeps the lower triangle of a matrix, which holds every distinct entry of a symmetric matrix. A [`HighOrderPrior`](@ref) holds it as `L2` beside the square cokurtosis `kt`.
 
 # Mathematical definition
 
-``\\mathbf{L}_n`` is defined by the identity it applies, for every ``\\mathbf{A}`` of size ``n \\times n``:
+This identity defines ``\\mathbf{L}_n``, for every ``\\mathbf{A}`` of size ``n \\times n``:
 
 ```math
 \\mathbf{L}_n \\mathrm{vec}(\\mathbf{A}) = \\mathrm{vech}(\\mathbf{A})\\,.
 ```
 
-With `diag = false` it drops the diagonal as well:
+With `diag = false`, the matrix also drops the diagonal. The source defines the matrix with the diagonal. The library adds the form without it.
 
 ```math
 \\mathbf{L}_n^{-} \\mathrm{vec}(\\mathbf{A}) = \\mathrm{vech}^{-}(\\mathbf{A})\\,.
@@ -231,23 +231,23 @@ With `diag = false` it drops the diagonal as well:
 
 Where:
 
-  - ``\\mathrm{vec}``: column-major vectorisation, of length ``n^2``.
-  - ``\\mathrm{vech}``: half-vectorisation, the lower triangle read column by column, of length ``n(n+1)/2``.
-  - ``\\mathrm{vech}^{-}``: the strictly lower triangle read the same way, of length ``n(n-1)/2``.
+  - ``\\mathrm{vec}``: Column-major vectorisation, of length ``n^2``.
+  - ``\\mathrm{vech}``: Half-vectorisation, which reads the lower triangle column by column, of length ``n(n+1)/2``.
+  - ``\\mathrm{vech}^{-}``: The strictly lower triangle, read in the same order, of length ``n(n-1)/2``.
 
-The identity holds for any square ``\\mathbf{A}``, symmetric or not, because ``\\mathbf{L}_n`` only reads the lower triangle. Dropping the diagonal removes the ``n`` rows that read it, so the row count falls from ``n(n+1)/2`` to ``n(n-1)/2`` while the column count stays ``n^2``.
+The identity holds for every square ``\\mathbf{A}``, symmetric or not, because ``\\mathbf{L}_n`` reads the lower triangle alone. `diag = false` removes the ``n`` rows that read the diagonal. The row count falls from ``n(n+1)/2`` to ``n(n-1)/2``, and the column count stays ``n^2``.
 
 # Algorithm
 
  1. Take `nsq = n^2`.
- 2. Read `diag`, and set the row count `m`, the column range `rg` and the offset `b` from it: `m = n(n+1)/2`, `rg = 1:n` and `b = 0` when `diag` is `true`, and `m = n(n-1)/2`, `rg = 2:n` and `b = 1` otherwise.
- 3. Fill `v`, whose `r`-th entry is the position in ``\\mathrm{vec}(\\mathbf{A})`` of the `r`-th entry of the half-vectorisation. `b` carries the offset that skips the entries above the diagonal, and — under `diag = false` — the diagonal entry too.
- 4. Return the sparse matrix carrying a one at each `(r, v[r])`, of size `m × nsq`.
+ 2. Set the row count `m`, the column range `rg` and the offset `b` from `diag`. When `diag` is `true`, they are `m = n(n+1)/2`, `rg = 1:n` and `b = 0`. Otherwise they are `m = n(n-1)/2`, `rg = 2:n` and `b = 1`.
+ 3. Fill `v`. Entry `r` of `v` is the position in ``\\mathrm{vec}(\\mathbf{A})`` of entry `r` of the half-vectorisation. The offset `b` skips the entries above the diagonal. Under `diag = false`, it also skips the diagonal entry.
+ 4. Return the sparse matrix of size `m × nsq` that holds a one at each `(r, v[r])`.
 
 # Arguments
 
   - `n`: Size of the symmetric matrix.
-  - `diag`: Whether to include the diagonal elements.
+  - `diag`: `true` to include the diagonal entries, `false` to drop them.
 
 # Returns
 
@@ -257,11 +257,11 @@ The identity holds for any square ``\\mathbf{A}``, symmetric or not, because ``\
 
   - [`duplication_matrix`](@ref)
   - [`summation_matrix`](@ref)
-  - [`dup_elim_sum_matrices`](@ref): builds this matrix and its two siblings in one walk.
+  - [`dup_elim_sum_matrices`](@ref): builds this matrix and the other two in one loop.
 
 # References
 
-  - $(ref_dict[:cajas2025]) Appendix A.2, Equation A.26.
+  - $(ref_dict[:magnusneudecker1980]) Section 3, Definition 3.1a.
 """
 function elimination_matrix(n::Int, diag::Bool = true)
     nsq = n^2
@@ -295,17 +295,17 @@ end
 
 Construct the summation matrix for a symmetric matrix of size `n × n`.
 
-The summation matrix `S` adds up contributions from both triangular halves of a symmetric matrix. Used internally in coskewness and cokurtosis computation.
+The summation matrix `S` reads the lower triangle of a symmetric matrix, and adds each off-diagonal entry once for each of its two places. A [`HighOrderPrior`](@ref) holds it as `S2` beside the square cokurtosis `kt`, and the kurtosis risk constraints read `S2 * kt * transpose(S2)`.
 
 # Mathematical definition
 
-``\\mathbf{S}_n`` is the elimination matrix reweighted by the multiplicity that ``\\mathbf{D}_n`` restores:
+``\\mathbf{S}_n`` is the elimination matrix, with each row multiplied by the number of places that ``\\mathbf{D}_n`` copies its entry to:
 
 ```math
 \\mathbf{S}_n = \\mathbf{D}_n^\\intercal \\mathbf{D}_n \\mathbf{L}_n\\,,
 ```
 
-so that, for every ``\\mathbf{A}`` of size ``n \\times n``,
+so that, for every symmetric ``\\mathbf{A}`` of size ``n \\times n``,
 
 ```math
 \\boldsymbol{1}^\\intercal \\mathbf{S}_n \\mathrm{vec}(\\mathbf{A}) = \\boldsymbol{1}^\\intercal \\mathrm{vec}(\\mathbf{A})\\,.
@@ -313,28 +313,28 @@ so that, for every ``\\mathbf{A}`` of size ``n \\times n``,
 
 Where:
 
-  - ``\\mathbf{D}_n``: the duplication matrix of [`duplication_matrix`](@ref).
-  - ``\\mathbf{L}_n``: the elimination matrix of [`elimination_matrix`](@ref).
-  - ``\\boldsymbol{1}``: vector of ones of the length its neighbour needs.
+  - ``\\mathbf{D}_n``: The duplication matrix of [`duplication_matrix`](@ref).
+  - ``\\mathbf{L}_n``: The elimination matrix of [`elimination_matrix`](@ref).
+  - ``\\boldsymbol{1}``: Vector of ones, of the length that the product next to it needs.
 
-``\\mathbf{S}_n`` reads the lower triangle and weights each entry by the number of places it occupies in ``\\mathrm{vec}(\\mathbf{A})``: one for a diagonal entry and two for an off-diagonal one. The sum identity above follows, and it holds for any square ``\\mathbf{A}``, symmetric or not.
+``\\mathbf{S}_n`` reads the lower triangle. It multiplies each entry by the number of places that the entry has in ``\\mathrm{vec}(\\mathbf{A})``, which is one for a diagonal entry and two for an off-diagonal entry. The sum identity above follows from this. It holds for a symmetric ``\\mathbf{A}`` alone, because ``\\mathbf{S}_n`` counts each lower entry in place of the upper entry that mirrors it.
 
-The same construction with `diag = false` gives ``\\mathbf{S}_n^{-} = (\\mathbf{D}_n^{-})^\\intercal \\mathbf{D}_n^{-} \\mathbf{L}_n^{-}``, which weights every one of its ``n(n-1)/2`` rows by two. Its sum identity therefore reaches the off-diagonal entries alone, ``\\boldsymbol{1}^\\intercal \\mathbf{S}_n^{-} \\mathrm{vec}(\\mathbf{A}) = \\boldsymbol{1}^\\intercal \\mathrm{vec}(\\mathbf{A} - \\mathrm{diag}(\\mathbf{A}))``.
+The same construction with `diag = false` gives ``\\mathbf{S}_n^{-} = (\\mathbf{D}_n^{-})^\\intercal \\mathbf{D}_n^{-} \\mathbf{L}_n^{-}``. It multiplies each of its ``n(n-1)/2`` rows by two. For a symmetric ``\\mathbf{A}``, its sum identity thus adds the off-diagonal entries alone, ``\\boldsymbol{1}^\\intercal \\mathbf{S}_n^{-} \\mathrm{vec}(\\mathbf{A}) = \\boldsymbol{1}^\\intercal \\mathrm{vec}(\\mathbf{A} - \\mathrm{diag}(\\mathbf{A}))``. The source defines the matrix with the diagonal. The library adds the form without it.
 
 # Algorithm
 
-The body builds the product of the definition directly, without forming ``\\mathbf{D}_n``.
+The function builds the product of the definition, and it does not build ``\\mathbf{D}_n``.
 
- 1. Take `nsq = n^2`. Read `diag`, and set the row count `m`, the column range `rg` and the offset `b` from it, exactly as [`elimination_matrix`](@ref) does.
- 2. Walk the columns in `rg`. Write into `v1` the ``\\mathrm{vec}`` position of every entry of the half-vectorisation, and into `v2` and `rows2` the ``\\mathrm{vec}`` position and the half-vectorisation row of each **strictly** lower entry.
- 3. Drop the zero entries of `v1`, `v2` and `rows2`, which are the slots the walk never filled.
- 4. When `diag` is `true`, return the sum of two sparse matrices: one carrying a one at each `(r, v1[r])`, which is ``\\mathbf{L}_n``, and one carrying a one at each `(rows2[k], v2[k])`, which adds the second unit to every off-diagonal row.
- 5. When `diag` is `false`, every row is off-diagonal, so return the sparse matrix carrying a **two** at each `(r, v1[r])`. `v2` and `rows2` go unread on this branch.
+ 1. Take `nsq = n^2`. Set the row count `m`, the column range `rg` and the offset `b` from `diag`, as [`elimination_matrix`](@ref) does.
+ 2. Read the columns in `rg`. Write the ``\\mathrm{vec}`` position of each entry of the half-vectorisation into `v1`. For each **strictly** lower entry, write its ``\\mathrm{vec}`` position into `v2` and its row of the half-vectorisation into `rows2`.
+ 3. Remove the zero entries of `v1`, `v2` and `rows2`. Step 2 did not write to these positions.
+ 4. When `diag` is `true`, return the sum of two sparse matrices. The first holds a one at each `(r, v1[r])`, and it is ``\\mathbf{L}_n``. The second holds a one at each `(rows2[k], v2[k])`, and it adds a second one to each off-diagonal row.
+ 5. When `diag` is `false`, every row is off-diagonal. Return the sparse matrix that holds a **two** at each `(r, v1[r])`. This branch does not read `v2` and `rows2`.
 
 # Arguments
 
   - `n`: Size of the symmetric matrix.
-  - `diag`: Whether to include the diagonal elements.
+  - `diag`: `true` to include the diagonal entries, `false` to drop them.
 
 # Returns
 
@@ -344,12 +344,11 @@ The body builds the product of the definition directly, without forming ``\\math
 
   - [`duplication_matrix`](@ref)
   - [`elimination_matrix`](@ref)
-  - [`dup_elim_sum_matrices`](@ref): builds this matrix and its two siblings in one walk, through the product of the definition rather than by the construction above.
+  - [`dup_elim_sum_matrices`](@ref): builds this matrix and the other two in one loop. It computes this matrix as the product of the definition, not by the construction above.
 
 # References
 
-  - $(ref_dict[:cajas2025]) Appendix A.2, Equation A.27.
-  - $(ref_dict[:pkurt])
+  - $(ref_dict[:pkurt]) Section 2, footnote 5.
 """
 function summation_matrix(n::Int, diag::Bool = true)
     nsq = n^2
@@ -398,15 +397,15 @@ end
 """
     dup_elim_sum_matrices(n::Int)
 
-Construct duplication, elimination, and summation matrices for symmetric matrix vectorisation.
+Construct the duplication, elimination and summation matrices for a symmetric matrix of size `n × n`.
 
-`dup_elim_sum_matrices` returns the duplication matrix `D`, elimination matrix `L`, and summation matrix `S` for symmetric matrices of size `N × N`. These matrices are used in higher-order moment computations, tensor manipulations, and efficient vectorisation of symmetric matrices in portfolio analytics.
+`dup_elim_sum_matrices` returns the duplication matrix `D`, the elimination matrix `L` and the summation matrix `S`. The high order priors store them as `D2`, `L2` and `S2` of a [`HighOrderPrior`](@ref).
 
-The three are the `diag = true` matrices of [`duplication_matrix`](@ref), [`elimination_matrix`](@ref) and [`summation_matrix`](@ref), built in one walk of the columns rather than in three.
+The three are the `diag = true` matrices of [`duplication_matrix`](@ref), [`elimination_matrix`](@ref) and [`summation_matrix`](@ref). This function builds them in one loop over the columns, not in three.
 
 # Mathematical definition
 
-For every ``\\mathbf{A}`` of size ``n \\times n``:
+For every symmetric ``\\mathbf{A}`` of size ``n \\times n``:
 
 ```math
 \\begin{align}
@@ -418,23 +417,23 @@ For every ``\\mathbf{A}`` of size ``n \\times n``:
 
 Where:
 
-  - ``\\mathrm{vec}``: column-major vectorisation, of length ``n^2``.
-  - ``\\mathrm{vech}``: half-vectorisation, the lower triangle read column by column, of length ``n(n+1)/2``.
+  - ``\\mathrm{vec}``: Column-major vectorisation, of length ``n^2``.
+  - ``\\mathrm{vech}``: Half-vectorisation, which reads the lower triangle column by column, of length ``n(n+1)/2``.
 
-The third line makes ``\\boldsymbol{1}^\\intercal \\mathbf{S}_n \\mathrm{vec}(\\mathbf{A}) = \\boldsymbol{1}^\\intercal \\mathrm{vec}(\\mathbf{A})``: ``\\mathbf{S}_n`` reads the lower triangle and weights each off-diagonal entry by the two places it occupies in ``\\mathrm{vec}(\\mathbf{A})``.
+The third line gives ``\\boldsymbol{1}^\\intercal \\mathbf{S}_n \\mathrm{vec}(\\mathbf{A}) = \\boldsymbol{1}^\\intercal \\mathrm{vec}(\\mathbf{A})``. ``\\mathbf{S}_n`` reads the lower triangle, and it multiplies each off-diagonal entry by two, the number of its places in ``\\mathrm{vec}(\\mathbf{A})``.
 
 # Algorithm
 
  1. Check that `n` is positive.
  2. Take `m = n(n+1)/2` and `nsq = n^2`.
- 3. Walk the columns once, filling `v1` and `v2` together. `v1` is the column index vector of [`duplication_matrix`](@ref) and `v2` is that of [`elimination_matrix`](@ref).
- 4. Build `d`, the sparse matrix carrying a one at each `(r, v1[r])`, of size `nsq × m`.
- 5. Build `l`, the sparse matrix carrying a one at each `(r, v2[r])`, of size `m × nsq`.
- 6. Build `s` as the product `transpose(d) * d * l` of the definition above, rather than by the direct construction of [`summation_matrix`](@ref).
+ 3. Read the columns once, and fill `v1` and `v2` in the same loop. `v1` is the vector of column indices of [`duplication_matrix`](@ref), and `v2` is the vector of column indices of [`elimination_matrix`](@ref).
+ 4. Build `d`, the sparse matrix of size `nsq × m` that holds a one at each `(r, v1[r])`.
+ 5. Build `l`, the sparse matrix of size `m × nsq` that holds a one at each `(r, v2[r])`.
+ 6. Build `s` as the product `transpose(d) * d * l` of the definition above. This is not the construction of [`summation_matrix`](@ref).
 
 # Arguments
 
-  - `n`: Size of the symmetric matrix (integer).
+  - `n`: Size of the symmetric matrix.
 
 # Validation
 
@@ -491,7 +490,8 @@ julia> S
 
 # References
 
-  - $(ref_dict[:cajas2025]) Appendix A.2, Equations A.25 to A.27.
+  - $(ref_dict[:magnusneudecker1980]) Section 3, Definitions 3.1a and 3.2a.
+  - $(ref_dict[:pkurt]) Section 2, footnote 5.
 """
 function dup_elim_sum_matrices(n::Int)
     assert_gt0(n, :n)
@@ -530,17 +530,17 @@ end
 """
     dup_elim_sum_view(args...)
 
-Answer with three `nothing`s when the first argument is not a matrix.
+Return three `nothing` values when the first argument is not a matrix.
 
-The fallback of [`dup_elim_sum_view`](@ref). It builds nothing and reads none of its arguments; the matrix method is the one that calls [`dup_elim_sum_matrices`](@ref).
+This is the fallback of [`dup_elim_sum_view`](@ref). It builds no matrix and reads no argument. The matrix method calls [`dup_elim_sum_matrices`](@ref).
 
-Its two call sites are in [`port_opt_view`](@ref) on a [`HighOrderPrior`](@ref), which passes `pr.kt` as the first argument. No estimator in the library builds a `HighOrderPrior` that reaches this method: `sk` and `V` travel together, and `kt`, `L2` and `S2` do too, so a `HighOrderPrior` holding any of them holds `kt`. A hand-built `HighOrderPrior` can — `D2` is the one moment field the constructor accepts on its own — and it is the case this method answers.
+[`port_opt_view`](@ref) on a [`HighOrderPrior`](@ref) calls `dup_elim_sum_view` at two sites, with `pr.kt` as the first argument. It calls it only when `pr` holds `D2` or `S2`. The constructor of `HighOrderPrior` refuses `S2` without `kt`, and the estimators of the library set `D2` only together with `kt` and `sk`. So no estimator of the library makes a `HighOrderPrior` that reaches this method. A `HighOrderPrior` that a caller builds by hand with `D2` and no `kt` reaches it, because `D2` is the one moment field that the constructor accepts alone.
 
-This is a varargs fallback, so it also answers any call whose argument count the matrix method does not take. `dup_elim_sum_view(M, n)` reaches the matrix method for a matrix `M`; `dup_elim_sum_view(M, n, extra)` reaches this one.
+This method takes a variable number of arguments, so it also answers each call whose count of arguments the matrix method does not take. For a matrix `M`, `dup_elim_sum_view(M, n)` reaches the matrix method, and `dup_elim_sum_view(M, n, extra)` reaches this method.
 
 # Algorithm
 
- 1. Return `(nothing, nothing, nothing)`, reading no argument.
+ 1. Return `(nothing, nothing, nothing)`, and read no argument.
 
 # Arguments
 
@@ -562,18 +562,18 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Compute duplication, elimination, and summation matrices at the dimension the caller names.
+Compute the duplication, elimination and summation matrices at the dimension that the caller gives.
 
-Overload of [`dup_elim_sum_view`](@ref) for a matrix first argument. **The matrix is read for dispatch alone**, and the dimension is the second argument `n`, not `size` of the matrix. [`port_opt_view`](@ref) on a [`HighOrderPrior`](@ref) relies on that: it passes the full `N^2 × N^2` cokurtosis of the prior result and the asset count of the **subproblem**, so the three matrices come back rebuilt at the smaller dimension rather than cut from the larger ones.
+This is the method of [`dup_elim_sum_view`](@ref) for a matrix as the first argument. **The method uses the matrix for dispatch alone.** The dimension is the second argument `n`, not a size of the matrix. [`port_opt_view`](@ref) on a [`HighOrderPrior`](@ref) needs this. It passes the full `N^2 × N^2` cokurtosis of the prior result and the asset count of the **subproblem**. The method then builds the three matrices again at the smaller dimension, and does not cut them from the larger ones.
 
 # Algorithm
 
- 1. Forward `n` to [`dup_elim_sum_matrices`](@ref), and return its three matrices.
+ 1. Pass `n` to [`dup_elim_sum_matrices`](@ref), and return its three matrices.
 
 # Arguments
 
-  - The first argument: any matrix. It selects this method and is not read.
-  - `n`: Size of the symmetric matrix the three matrices are built for.
+  - The first argument: Any matrix. It selects this method, and the method does not read it.
+  - `n`: Size of the symmetric matrix for which the method builds the three matrices.
 
 # Returns
 
@@ -593,7 +593,7 @@ $(DocStringExtensions.TYPEDEF)
 
 High order prior estimator for asset returns.
 
-`HighOrderPriorEstimator` is a composite estimator that computes high order moments (coskewness and cokurtosis) for asset returns, in addition to low order moments (mean and covariance). It combines a low order prior estimator, a cokurtosis estimator, and a coskewness estimator to produce a [`HighOrderPrior`](@ref) result containing all relevant moments for advanced portfolio analytics.
+`HighOrderPriorEstimator` holds a low order prior estimator, a cokurtosis estimator and a coskewness estimator. Its [`prior`](@ref) fits the mean and the covariance with the low order prior estimator. It then fits the square cokurtosis and the coskewness of the same returns, and returns all of them in a [`HighOrderPrior`](@ref).
 
 # Fields
 
@@ -621,19 +621,19 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `pe`: Recursively updated via [`factory`](@ref).
-  - `kte`: Recursively updated via [`factory`](@ref).
-  - `ske`: Recursively updated via [`factory`](@ref).
+  - `pe`: Recursively updated through [`factory`](@ref).
+  - `kte`: Recursively updated through [`factory`](@ref).
+  - `ske`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `pe`: Recursively viewed via [`port_opt_view`](@ref).
-  - `kte`: Recursively viewed via [`port_opt_view`](@ref).
-  - `ske`: Recursively viewed via [`port_opt_view`](@ref).
+  - `pe`: Recursively viewed through [`port_opt_view`](@ref).
+  - `kte`: Recursively viewed through [`port_opt_view`](@ref).
+  - `ske`: Recursively viewed through [`port_opt_view`](@ref).
 
 # Examples
 
@@ -710,8 +710,8 @@ HighOrderPriorEstimator
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 3.1.4, Equations 3.6 and 3.7.
-  - $(ref_dict[:pkurt])
+  - $(ref_dict[:jondeau2004]) Section 2.3.
+  - $(ref_dict[:pkurt]) Appendix A.
 """
 @propagatable @concrete struct HighOrderPriorEstimator <: AbstractHighOrderPriorEstimator
     """
@@ -756,13 +756,13 @@ end
 """
     prior(pe::HighOrderPriorEstimator, X::MatNum, F::Option{<:MatNum} = nothing, pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, kwargs...)
 
-Compute high order prior moments for asset returns using a composite estimator.
+Compute the high order prior of the asset returns.
 
-`prior` estimates the mean, covariance, coskewness, and cokurtosis of asset returns using the specified high order prior estimator. It first computes low order moments (mean and covariance) using the embedded prior estimator, then computes coskewness and cokurtosis tensors using the provided coskewness and cokurtosis estimators. Optionally, factor returns `F` can be provided for factor-based estimation. The result is returned as a [`HighOrderPrior`](@ref) object.
+`prior` fits the mean and the covariance with the embedded prior estimator `pe.pe`. It then fits the square cokurtosis with `pe.kte` and the coskewness with `pe.ske`, and returns all of them in a [`HighOrderPrior`](@ref). The method passes the factor returns `F` to `pe.pe` alone, and the co-moments read the asset returns.
 
 # Mathematical definition
 
-In addition to the first and second moments, the high order estimator computes the coskewness matrix ``\\mathbf{M}_3`` and the **square** cokurtosis matrix ``\\mathbf{\\Sigma}_4``:
+The estimator computes the first and the second moments, the coskewness matrix ``\\mathbf{M}_3`` and the **square** cokurtosis matrix ``\\mathbf{\\Sigma}_4``:
 
 ```math
 \\begin{align}
@@ -774,8 +774,8 @@ In addition to the first and second moments, the high order estimator computes t
 
 Where:
 
-  - ``\\mathbf{Z}``: ``T \\times N`` matrix of returns with each column's mean removed.
-  - ``\\mathbf{W}``: ``T \\times N^2`` matrix of pairwise products of the centred returns.
+  - ``\\mathbf{Z}``: ``T \\times N`` matrix of returns, with the mean of each column removed.
+  - ``\\mathbf{W}``: ``T \\times N^2`` matrix of the products of each pair of centred returns.
   - ``\\mathbf{M}_3``: ``N \\times N^2`` coskewness matrix, `sk`.
   - ``\\mathbf{\\Sigma}_4``: ``N^2 \\times N^2`` square cokurtosis matrix, `kt`.
   - ``\\boldsymbol{1}_N``: ``N \\times 1`` vector of ones.
@@ -783,21 +783,22 @@ Where:
   - ``\\otimes``: Kronecker product.
   - ``\\odot``: Hadamard product.
 
-``\\mathbf{\\Sigma}_4`` is the square form and is ``N^2 \\times N^2``. It is not the ``N \\times N^3`` cokurtosis matrix ``\\mathbf{M}_4`` of the same source, which the library never builds.
+``\\mathbf{\\Sigma}_4`` is the square form, of size ``N^2 \\times N^2``. It is not the ``N \\times N^3`` cokurtosis matrix ``\\mathbf{M}_4`` of the same source. The library does not build ``\\mathbf{M}_4``.
 
-`pe.kte` computes `kt` and `pe.ske` computes `sk`, so a non-default `alg` — a semi-comoment, an exponentially weighted one — replaces the displays above rather than refining them. `V` is the negative spectral coskewness of `sk`, and either estimator set to `nothing` drops its moment from the result.
+`pe.kte` computes `kt`, and `pe.ske` computes `sk`. A different `alg`, such as a semi-moment or an exponentially weighted moment, gives a different formula in place of the displays above. `V` is the negative spectral coskewness of `sk`. When an estimator is `nothing`, the result holds `nothing` for its moment.
 
-The low order block can answer the probabilities ``\\mathbf{w}`` of its scenarios, as an entropy pooling prior and an opinion pooling prior do. Then the co-moments are those of the same distribution: ``\\mathbf{Z}`` is centred on the mean under ``\\mathbf{w}``, and each ``\\frac{1}{T}`` above becomes ``\\frac{1}{\\boldsymbol{1}^\\intercal \\mathbf{w}} \\mathrm{diag}(\\mathbf{w})`` inside the product. ``\\mathbf{w}`` replaces the observation weights of `pe.kte` and `pe.ske`. A low order block that answers no ``\\mathbf{w}`` leaves them as they are.
+The low order block can give the probabilities ``\\mathbf{w}`` of its scenarios. An entropy pooling prior and an opinion pooling prior do this. Then the co-moments are those of the same distribution. ``\\mathbf{Z}`` is centred on the mean under ``\\mathbf{w}``, and each ``\\frac{1}{T}`` above becomes ``\\frac{1}{\\boldsymbol{1}^\\intercal \\mathbf{w}} \\mathrm{diag}(\\mathbf{w})`` inside the product. ``\\mathbf{w}`` replaces the observation weights of `pe.kte` and `pe.ske`. When the low order block gives no ``\\mathbf{w}``, the observation weights do not change.
 
 # Algorithm
 
  1. Orient `X` and `F` to `observations × variables` with [`dims_oriented`](@ref).
- 2. Compute the low order block `pr` with `pe.pe`, passing `F` through.
- 3. Read the probabilities `w = pr.w` of its scenarios, and cut `X` and `pnl` to the rows that they weigh with [`scenario_rows`](@ref).
+ 2. Compute the low order block `pr` with `pe.pe`, and pass `F` to it.
+ 3. Read the probabilities `w = pr.w` of its scenarios. Cut `X` and `pnl` to the rows that `w` weighs, with [`scenario_rows`](@ref).
  4. Compute the square cokurtosis `kt` with `factory(pe.kte, w)`. A `nothing` estimator gives a `nothing` moment.
  5. Compute the coskewness `sk` and its negative spectral form `V` with `factory(pe.ske, w)`. A `nothing` estimator gives `nothing` for both.
- 6. Build the structure matrices at the asset count `size(pr.X, 2)` with [`dup_elim_sum_matrices`](@ref). Take all three when steps 4 and 5 both produced a moment, take `L2` and `S2` alone when step 4 produced one and step 5 did not, and take none otherwise. `D2` serves `sk` and the pair `L2`, `S2` serves `kt`, which is why the second case leaves `D2` as `nothing`.
- 7. Assemble the [`HighOrderPrior`](@ref) through its keyword constructor, carrying the processor of `pe.ske` from [`coskewness_processor`](@ref) as `skmp` when step 5 produced an `sk`. Every `@argcheck` of the constructor runs on the shapes steps 4 to 6 produced.
+ 6. Build the structure matrices at the asset count `size(pr.X, 2)` with [`dup_elim_sum_matrices`](@ref). Take all three when steps 4 and 5 both gave a moment. Take `L2` and `S2` alone when step 4 gave a moment and step 5 did not. Take none in the other cases. `D2` goes with `sk`, and `L2` and `S2` go with `kt`. The second case has no `sk`, and its `D2` is `nothing`.
+ 7. Build the [`HighOrderPrior`](@ref) with its keyword constructor. When step 5 gave an `sk`, set `skmp` to the processor of `pe.ske`, from [`coskewness_processor`](@ref). Each `@argcheck` of the constructor checks the shapes that steps 4 to 6 gave.
+ 8. Warn with [`assert_matched_coverage`](@ref) when the co-moments hold fewer assets than the low order block. Steps 6 to 8 are [`assemble_high_order_prior`](@ref).
 
 # Arguments
 
@@ -806,16 +807,16 @@ The low order block can answer the probabilities ``\\mathbf{w}`` of its scenario
   - `F`: Optional factor returns matrix (observations × factors).
   - $(arg_dict[:pnl_prior])
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to underlying estimators.
+  - `kwargs...`: Additional keyword arguments, passed to the estimators that `pe` holds.
 
 # Validation
 
   - `dims in (1, 2)`.
-  - Everything [`scenario_rows`](@ref) refuses.
+  - Each condition that [`scenario_rows`](@ref) refuses.
 
 # Returns
 
-  - `pr::HighOrderPrior`: Result object containing asset returns, mean vector, covariance matrix, coskewness tensor, cokurtosis tensor, and related quantities.
+  - `pr::HighOrderPrior`: Result that holds the low order prior result, the square cokurtosis, the coskewness, its negative spectral form and the structure matrices.
 
 # Related
 
@@ -844,33 +845,34 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Assembles a [`HighOrderPrior`](@ref) from a low order result and the co-moments fitted beside it.
+Build a [`HighOrderPrior`](@ref) from a low order prior result and the co-moments of the same fit.
 
-The tail of every [`HighOrderPriorEstimator`](@ref) fit, written once: the batch method reaches it after running the two co-moment verbs over the caller's matrix, and `prior(pe)` with no data reaches it after reading the same two off their states. The duplication-elimination matrices a consumer needs depend on which co-moments are present and on nothing else, so the rule lives here rather than in each caller.
+Each fit of a [`HighOrderPriorEstimator`](@ref) ends here. The batch method calls this function after it computes the two co-moments over the returns of the caller. `prior(pe)` with no data calls it after it reads the two co-moments from their states. The structure matrices that a consumer needs depend only on which co-moments are present, so this one function holds the rule for both callers.
 
-`D2`, `L2` and `S2` are sized from the **full** width of `pr.X`, which is what the expanded tensors carry.
+The function sizes `D2`, `L2` and `S2` from the **full** width of `pr.X`, which is the width of the expanded co-moments.
 
 # Algorithm
 
- 1. Build `D2`, `L2` and `S2` where both co-moments are present, and `L2` and `S2` alone where only the cokurtosis is.
- 2. Assemble the [`HighOrderPrior`](@ref), carrying the processor of `pe.ske` from [`coskewness_processor`](@ref) where a coskewness tensor was fitted.
- 3. Refuse a prior result whose blocks do not agree on the Coverage Universe, with [`assert_matched_coverage`](@ref).
+ 1. Build `D2`, `L2` and `S2` when both co-moments are present. Build `L2` and `S2` alone when only the cokurtosis is present.
+ 2. Build the [`HighOrderPrior`](@ref). When the coskewness is present, set `skmp` to the processor of `pe.ske`, from [`coskewness_processor`](@ref).
+ 3. Warn with [`assert_matched_coverage`](@ref) when the co-moments hold fewer assets than the low order block.
 
 # Arguments
 
   - `pe`: High order prior estimator.
-  - `pr`: The low order prior result the embedded estimator answered.
+  - `pr`: The low order prior result of the embedded estimator.
   - `kt`: The square cokurtosis matrix, or `nothing`.
-  - `sk`: The coskewness tensor, or `nothing`.
-  - `V`: The coskewness view matrix, or `nothing`.
+  - `sk`: The coskewness matrix, or `nothing`.
+  - `V`: The negative spectral coskewness of `sk`, or `nothing`.
 
 # Validation
 
-  - Every block of the prior result agrees on the Coverage Universe. An error is thrown otherwise.
+  - Every check of the constructor of [`HighOrderPrior`](@ref).
+  - [`assert_matched_coverage`](@ref) warns when the co-moments hold fewer assets than the low order block. It does not throw.
 
 # Returns
 
-  - `hop::HighOrderPrior`: The assembled result.
+  - `hop::HighOrderPrior`: The high order prior result.
 
 # Related
 
@@ -898,16 +900,16 @@ end
     scenario_rows(w::Nothing, X::MatNum, pnl::Option{<:AssetPanel})
     scenario_rows(w::ObsWeights, X::MatNum, pnl::Option{<:AssetPanel})
 
-Cuts the rows of `X` and of its Asset Panel to the scenarios that the probabilities `w` of a prior result weigh.
+Cut the rows of `X` and of its Asset Panel to the scenarios that the probabilities `w` of a prior result weigh.
 
-A prior result answers `w` on the rows of its own `X`, and these can be fewer than the rows that the caller passed. A Scenario Cap keeps the last rows, and a [`CrossSectionalFactorPrior`](@ref) drops the rows that its Descriptors warm up over. Both keep the last rows, so `w` weighs the last `length(w)` rows of `X`. A high order estimator fits its co-moments on the caller's `X` under `w`, so it needs these rows. A prior result that answers no `w` weighs every row the same, and the co-moments read every row.
+A prior result gives `w` on the rows of its own `X`, and it can hold fewer rows than the caller passed. A Scenario Cap keeps the last rows. A [`CrossSectionalFactorPrior`](@ref) drops the first rows, over which its Descriptors warm up. In both cases, `w` weighs the last `length(w)` rows of `X`. A high order estimator fits its co-moments on the `X` of the caller under `w`, so it needs these rows. When a prior result gives no `w`, it weighs every row the same, and the co-moments read every row.
 
 # Algorithm
 
- 1. A `nothing` `w` returns `X` and `pnl` unchanged.
+ 1. When `w` is `nothing`, return `X` and `pnl` with no change.
  2. Otherwise take `t = size(X, 1)` and `s = length(w)`, and refuse `s > t`.
- 3. When `s == t`, return `X` and `pnl` unchanged.
- 4. Otherwise take the rows `(t - s + 1):t`, and return the view of `X` and the view of `pnl` with [`asset_panel_view`](@ref) over them.
+ 3. When `s == t`, return `X` and `pnl` with no change.
+ 4. Otherwise take the rows `(t - s + 1):t`. Return the view of `X` over them, and the view of `pnl` over them from [`asset_panel_view`](@ref).
 
 # Arguments
 
@@ -949,15 +951,15 @@ end
     read_comoment(f, est, w::Nothing, X::MatNum, pnl::Option{<:AssetPanel}; kwargs...)
     read_comoment(f, est, w::ObsWeights, X::MatNum, pnl::Option{<:AssetPanel}; kwargs...)
 
-Reads a co-moment of a [`HighOrderPriorEstimator`](@ref) out of its fold, under the probabilities of the scenarios of the embedded prior result.
+Read a co-moment of a [`HighOrderPriorEstimator`](@ref) out of its fold, under the probabilities of the scenarios of the embedded prior result.
 
-A prior result that answers no `w` weighs every row the same, so the member answers as [`read_member`](@ref) answers it: from its state where it folded, or by a refit over the rows of the buffer. A prior result that answers a `w`, such as an entropy pooling prior or an opinion pooling prior, weighs its scenarios with it. A state folds the rows under equal weights, and it cannot read `w`, so the member is refitted under `w` in every case, as the batch fit does.
+When the prior result gives no `w`, it weighs every row the same. Then the function reads the member as [`read_member`](@ref) does: from its state when the member folded, or by a refit over the rows of the buffer. A prior result that gives a `w`, such as an entropy pooling prior or an opinion pooling prior, weighs its scenarios with it. A state folds the rows under equal weights, and it cannot read `w`. So the function refits the member under `w` in every case, as the batch fit does.
 
 # Algorithm
 
- 1. A `nothing` `w` reads the member with [`read_member`](@ref).
- 2. Otherwise cut `X` and `pnl` to the rows that `w` weighs with [`scenario_rows`](@ref).
- 3. Give `w` to the member with [`factory`](@ref), and call `f` on it over the cut rows. The batch verb does not read the state of the member.
+ 1. When `w` is `nothing`, read the member with [`read_member`](@ref).
+ 2. Otherwise cut `X` and `pnl` to the rows that `w` weighs, with [`scenario_rows`](@ref).
+ 3. Give `w` to the member with [`factory`](@ref), and call `f` on the result over the cut rows. The batch verb does not read the state of the member.
 
 # Arguments
 
@@ -970,7 +972,7 @@ A prior result that answers no `w` weighs every row the same, so the member answ
 
 # Validation
 
-  - Everything [`scenario_rows`](@ref) refuses.
+  - Each condition that [`scenario_rows`](@ref) refuses.
 
 # Returns
 
@@ -994,19 +996,19 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Reads the per-asset diagonal of every co-moment a [`HighOrderPrior`](@ref) holds, and answers where all of them are finite.
+Read the diagonal entry of each asset in every co-moment that a [`HighOrderPrior`](@ref) holds, and return `true` at each asset where all of them are finite.
 
-The higher-order half of the Investable Mask. A coskewness tensor's per-asset diagonal is `sk[i, (i - 1) * N + i]`, which is asset `i`'s third central moment, and a cokurtosis matrix's is `kt[j, j]` at the pair column `j = (i - 1) * N + i`, which is its fourth. Both are finite exactly where the fit answered for that asset, which is the same rule [`investable_mask`](@ref) reads off the diagonal of `sigma`. A moment the prior result does not hold constrains nothing, so a `nothing` reads as every asset admitted.
+This is the high order part of the Investable Mask. For asset `i`, take the pair column `j = (i - 1) * N + i`. The entry `sk[i, j]` is the third central moment of asset `i`, and the entry `kt[j, j]` is its fourth central moment. Each is finite when the fit gave a value for that asset. [`investable_mask`](@ref) applies the same rule to the diagonal of `sigma`. A moment that the prior result does not hold removes no asset, so for a `nothing` moment every asset is `true`.
 
 # Arguments
 
-  - `sk`: The coskewness tensor, `assets × assets²`, or `nothing`.
+  - `sk`: The coskewness matrix, `assets × assets²`, or `nothing`.
   - `kt`: The square cokurtosis matrix, `assets² × assets²`, or `nothing`.
   - `N`: Number of assets.
 
 # Returns
 
-  - `msk::BitVector`: `true` at every asset whose higher-order moments are finite.
+  - `msk::BitVector`: `true` at each asset whose high order moments are finite.
 
 # Related
 
@@ -1030,11 +1032,11 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Derive the Investable Mask of a [`HighOrderPrior`](@ref), which reads every order the prior result holds.
+Derive the Investable Mask of a [`HighOrderPrior`](@ref) from every order of moment that the prior result holds.
 
-The [`AbstractPriorResult`](@ref) method reads `mu` and the diagonal of `sigma`, which under a [`CoveragePolicy`](@ref) no longer implies that the higher-order tensors are finite where it admits: the policy is set per estimator, so `pe.pe` may carry one while `pe.ske` and `pe.kte` do not. This method therefore ANDs the per-asset diagonals of `sk` and `kt` into it with [`comoment_investable`](@ref), so an asset the higher orders could not estimate leaves the problem rather than reaching a spectral step that throws.
+The [`AbstractPriorResult`](@ref) method reads `mu` and the diagonal of `sigma`. Under a [`CoveragePolicy`](@ref), an asset with a finite `mu` and a finite variance can have a co-moment that is not finite. Each estimator holds its own policy, so `pe.pe` can hold one while `pe.ske` and `pe.kte` do not. This method also reads the diagonal entry of each asset in `sk` and `kt`, with [`comoment_investable`](@ref). An asset that the co-moments did not estimate leaves the problem. Without this, the asset gets to a spectral step that throws.
 
-The narrowing is silent here, because a mask is derived at every optimiser entry and a derivation owes no side effect. The one warning belongs to the fit, and [`assert_matched_coverage`](@ref) raises it there.
+This method does not warn when the mask removes such an asset. Each entry to an optimiser derives the mask again, and the derivation must have no side effect. [`assert_matched_coverage`](@ref) warns once, at the fit.
 
 # Arguments
 
@@ -1065,11 +1067,11 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Says so, once, when the higher orders of a fitted [`HighOrderPrior`](@ref) cover fewer assets than its low order block does.
+Warn once when the co-moments of a fitted [`HighOrderPrior`](@ref) hold fewer assets than its low order block.
 
-A [`CoveragePolicy`](@ref) is a field of one estimator, so a caller may set one on `pe.pe`'s mean and covariance and leave `pe.ske` and `pe.kte` on the Coverage Universe. That configuration is legal and well defined — the low orders answer an asset that lists inside the window and the higher orders do not — but the Investable Mask then narrows back to the Coverage Universe, and the caller has bought nothing where the panel is gappiest. It is only the silence that is refused, exactly as [`scenario_fill`](@ref) refuses it for a zero-filled scenario.
+A [`CoveragePolicy`](@ref) is a field of one estimator. A caller can set one on the mean and the covariance of `pe.pe`, and leave `pe.ske` and `pe.kte` on the Coverage Universe. The library accepts this configuration. The low order moments then give a value for an asset that starts to list inside the window, and the co-moments do not. But the Investable Mask then removes these assets again, and the policy has no effect on the problem. The function does not refuse the configuration. It names the assets in a warning, as [`scenario_fill`](@ref) names the assets whose returns it fills with zeros.
 
-The check runs once, at the fit, rather than in [`investable_mask`](@ref), which a fold loop calls at every optimiser entry.
+The check runs once, at the fit. It does not run in [`investable_mask`](@ref), which a fold loop calls at each entry to an optimiser.
 
 # Arguments
 
@@ -1077,7 +1079,7 @@ The check runs once, at the fit, rather than in [`investable_mask`](@ref), which
 
 # Validation
 
-  - Every asset the low order block holds is held by the higher orders too. A warning naming the assets is emitted otherwise.
+  - The co-moments hold every asset that the low order block holds. The function emits a warning that names the assets otherwise.
 
 # Returns
 
@@ -1094,7 +1096,8 @@ function assert_matched_coverage(pr::HighOrderPrior)::Nothing
     lo = isfinite.(pr.mu) .& isfinite.(LinearAlgebra.diag(pr.sigma))
     dropped = findall(lo .& .!comoment_investable(pr.sk, pr.kt, length(pr.mu)))
     if !isempty(dropped)
-        @warn("the low order block of this high order prior holds $(length(dropped)) asset(s) that its higher orders do not, so the Investable Mask narrows back to the assets the higher orders could estimate. Assets $(dropped) carry a finite `mu` and a finite diagonal of `sigma`, and a non-finite per-asset diagonal of `sk` or `kt`. A `CoveragePolicy` is a field of one estimator, so set the same one on `ske` and `kte` as on the low order estimators — `HighOrderPriorEstimator(; ske = Coskewness(; cvg = ...), kte = Cokurtosis(; cvg = ...))` — or clear it everywhere to fit the whole prior on the Coverage Universe.")
+        @warn("the low order block of this high order prior holds $(length(dropped)) asset(s) that its higher orders do not, so the Investable Mask narrows back to the assets the higher orders could estimate. Assets $(dropped) carry a finite `mu` and a finite diagonal of `sigma`, and a non-finite per-asset diagonal of `sk` or `kt`. A `CoveragePolicy` is a field of one estimator, so set the same one on `ske` and `kte` as on the low order estimators — `HighOrderPriorEstimator(; ske = Coskewness(; cvg = ...), kte = Cokurtosis(; cvg = ...))` — or clear it everywhere to fit the whole prior on the Coverage Universe.",
+              maxlog = log_limit(:warn), _id = @log_id())
     end
     return nothing
 end
@@ -1108,18 +1111,18 @@ end
 """
     partial_fit!(pe::HighOrderPriorEstimator, X, F = nothing; kwargs...)
 
-Folds observations into a [`HighOrderPriorEstimator`](@ref) by forwarding them to its members.
+Fold observations into a [`HighOrderPriorEstimator`](@ref), and pass them to its members.
 
-The estimator keeps no buffer. It builds `HighOrderPrior(; pr = pr, ...)` around the result of its embedded prior, so the rows it needs in `prior(pe)` with no data are the rows that prior carries. A buffer here would be a second copy of the sample.
+The estimator keeps no buffer. It builds `HighOrderPrior(; pr = pr, ...)` around the result of its embedded prior. The rows that `prior(pe)` with no data needs are the rows that the embedded prior holds. A buffer in this estimator is a second copy of the sample.
 
-The estimator forwards the fold to `pe.pe` in every case, because that member carries the rows. An embedded prior that cannot fold refuses here, and names the wrapper that gives it a buffer. The refusal is correct, because the estimator has no rows of its own to give it. The factor observations go with the rows, as the batch verb passes `F` to the embedded prior, and the tree of the embedded prior decides what happens to them. `pe.kte` and `pe.ske` go through [`fold_member`](@ref) instead, because the estimator has rows for them in `prior(pe)` with no data, and that call refits a co-moment that cannot fold. So `HighOrderPriorEstimator(; ske = Coskewness(; alg = SemiMoment()))` needs no wrapper and keeps one copy of the sample.
+The estimator always passes the fold to `pe.pe`, because that member holds the rows. An embedded prior that cannot fold refuses here, and names the wrapper that gives it a buffer. This refusal is correct, because the estimator has no rows of its own to give it. The factor observations go with the rows, as the batch verb passes `F` to the embedded prior. The tree of the embedded prior decides what to do with them. `pe.kte` and `pe.ske` go through [`fold_member`](@ref). `prior(pe)` with no data has rows for them, and it refits a co-moment that cannot fold. So `HighOrderPriorEstimator(; ske = Coskewness(; alg = SemiMoment()))` needs no wrapper, and it keeps one copy of the sample.
 
 # Algorithm
 
- 1. At the first step, when `pe.pe` holds no state, refuse a member that holds one with [`assert_cold_carry_entry`](@ref).
- 2. Fold `pe.pe` with the observations and `F` through [`partial_fit!`](@ref).
- 3. Fold `pe.kte` and `pe.ske` with the observations through [`fold_member`](@ref).
- 4. Rebuild the estimator with the three folded members with `Accessors.setproperties`, and return it.
+ 1. At the first step, when `pe.pe` holds no state, refuse a member that holds one, with [`assert_cold_carry_entry`](@ref).
+ 2. Fold the observations and `F` into `pe.pe` with [`partial_fit!`](@ref).
+ 3. Fold the observations into `pe.kte` and `pe.ske` with [`fold_member`](@ref).
+ 4. Rebuild the estimator with the three folded members through [`rebuild_estimator`](@ref), and return it.
 
 # Arguments
 
@@ -1130,8 +1133,8 @@ The estimator forwards the fold to `pe.pe` in every case, because that member ca
 
 # Validation
 
-  - `pe.pe` folds. The embedded prior refuses the fold otherwise, with an error that names the wrapper that gives it a buffer.
-  - At the first step, no member holds a partial-fit state. The embedded prior carries the rows and starts with none, so a warm co-moment would read rows that it does not carry. An `ArgumentError` that names the path of the state is thrown otherwise, see [`assert_cold_carry_entry`](@ref).
+  - `pe.pe` folds. Otherwise the embedded prior refuses the fold, with an error that names the wrapper that gives it a buffer.
+  - At the first step, no member holds a partial-fit state. The embedded prior holds the rows, and it starts with no rows. So a co-moment that holds a state at this step reads rows that the embedded prior does not hold. An `ArgumentError` that names the path of the state is thrown otherwise, see [`assert_cold_carry_entry`](@ref).
 
 # Returns
 
@@ -1148,25 +1151,25 @@ The estimator forwards the fold to `pe.pe` in every case, because that member ca
 function partial_fit!(pe::HighOrderPriorEstimator, X::VecNum_MatNum,
                       F::Option{<:VecNum_MatNum} = nothing; kwargs...)
     assert_cold_carry_entry(pe, online_entry_state(pe.pe), "HighOrderPriorEstimator")
-    return Accessors.setproperties(pe,
-                                   (; pe = partial_fit!(pe.pe, X, F; kwargs...),
-                                    kte = fold_member(pe.kte, X; kwargs...),
-                                    ske = fold_member(pe.ske, X; kwargs...)))
+    return rebuild_estimator(pe,
+                             (; pe = partial_fit!(pe.pe, X, F; kwargs...),
+                              kte = fold_member(pe.kte, X; kwargs...),
+                              ske = fold_member(pe.ske, X; kwargs...)))
 end
 """
     fold_prior_step(pe::HighOrderPriorEstimator, rd::ReturnsResult,
                     gaps::Option{<:AbstractVector{Bool}})
 
-Folds the observations of a [`ReturnsResult`](@ref) into a [`HighOrderPriorEstimator`](@ref), by forwarding `rd` and its marks to the prior that it embeds.
+Fold the observations of a [`ReturnsResult`](@ref) into a [`HighOrderPriorEstimator`](@ref). The method passes `rd` and its marks to the embedded prior.
 
-This is the forwarding form of [`fold_prior_step`](@ref), the fold of every prior that [`partial_fit!`](@ref) over a `ReturnsResult` takes. The outer prior keeps no rows. Its embedded prior keeps them, so the route of the embedded prior decides what the step honours: the estimation mask and the Panel Fields reach it unchanged, and it refuses what its route cannot honour. The estimator also folds `pe.kte` and `pe.ske` through [`fold_member`](@ref). Those folds are exact, and they take the active mask alone, which [`step_active_kwargs`](@ref) reads. They fold the observations that `gaps` does not mark, as the members of a carry do, see [`shared_series_member_rows`](@ref).
+This is the method of [`fold_prior_step`](@ref) for an estimator that passes the fold on. [`partial_fit!`](@ref) over a `ReturnsResult` calls `fold_prior_step` for each prior. The outer prior keeps no rows, and its embedded prior keeps them. The route of the embedded prior decides which inputs of the step it accepts. The estimation mask and the Panel Fields get to it with no change, and it refuses each input that its route cannot accept. The estimator also folds `pe.kte` and `pe.ske` with [`fold_member`](@ref). These folds are exact, and they read the active mask alone, which [`step_active_kwargs`](@ref) gives. They fold the observations that `gaps` does not mark, as the members of a carry do, see [`shared_series_member_rows`](@ref).
 
 # Algorithm
 
- 1. At the first step, when `pe.pe` holds no state, refuse a member that holds one with [`assert_cold_carry_entry`](@ref).
- 2. Fold `pe.pe` with `rd` and `gaps` through [`fold_prior_step`](@ref).
- 3. Take the unmarked rows of `rd.X` and of the active mask of `rd.pnl` with [`shared_series_member_rows`](@ref), and fold `pe.kte` and `pe.ske` with them through [`fold_member`](@ref).
- 4. Rebuild the estimator with its folded members with `rebuild_estimator`, and return it.
+ 1. At the first step, when `pe.pe` holds no state, refuse a member that holds one, with [`assert_cold_carry_entry`](@ref).
+ 2. Fold `rd` and `gaps` into `pe.pe` with [`fold_prior_step`](@ref).
+ 3. Take the rows of `rd.X` that `gaps` does not mark, and the same rows of the active mask of `rd.pnl`, with [`shared_series_member_rows`](@ref). Fold them into `pe.kte` and `pe.ske` with [`fold_member`](@ref).
+ 4. Rebuild the estimator with its folded members, with `rebuild_estimator`, and return it.
 
 # Arguments
 
@@ -1202,11 +1205,11 @@ end
 """
     prior(pe::HighOrderPriorEstimator; kwargs...)
 
-Reads a [`HighOrderPriorEstimator`](@ref) out of its fold, with no data matrix.
+Read a [`HighOrderPriorEstimator`](@ref) out of its fold, with no data matrix.
 
-The embedded prior answers first. A co-moment that folded answers from its state. The method refits a co-moment that did not fold over the rows that the embedded prior folded, which [`prior_returns_buffer`](@ref) reads. When the embedded result answers the probabilities `w` of its scenarios, the method refits both co-moments under `w`, folded or not, because a state cannot read them. [`assemble_high_order_prior`](@ref) then builds the result as the batch method does.
+The method reads the embedded prior first. A co-moment that folded gives its value from its state. The method refits a co-moment that did not fold, over the rows that the embedded prior folded, which [`prior_returns_buffer`](@ref) reads. When the embedded result gives the probabilities `w` of its scenarios, the method refits both co-moments under `w`, folded or not, because a state cannot read `w`. [`assemble_high_order_prior`](@ref) then builds the result, as in the batch method.
 
-The refit reads the folded rows and not `pr.X`, because `pr.X` holds the scenarios of the embedded prior's result, and these are not always the folded rows. A Scenario Cap on the embedded prior keeps only the last rows, and the scenario fill writes zeros into the early rows of an asset that lists late. The batch method fits both co-moments over every row that the caller passes, `NaN` entries included, or over the last `length(pr.w)` of them with [`scenario_rows`](@ref) when the embedded result answers `w`, so a refit over `pr.X` differs from it in both cases. Under an [`Online`](@ref) window the buffer holds the last `max_history` rows, which is the window that the batch equal of that route fits over. The estimator keeps no copy of the rows, because the embedded prior already holds them.
+The refit reads the folded rows, and not `pr.X`. `pr.X` holds the scenarios of the result of the embedded prior, and these are not always the folded rows. A Scenario Cap on the embedded prior keeps only the last rows. The scenario fill writes zeros into the first rows of an asset that starts to list late. The batch method fits both co-moments over every row that the caller passes, with the `NaN` entries. When the embedded result gives `w`, it fits them over the last `length(pr.w)` rows, with [`scenario_rows`](@ref). So in both cases a refit over `pr.X` gives a different value. Under an [`Online`](@ref) window, the buffer holds the last `max_history` rows, and the equal batch fit of that route uses the same window. The estimator keeps no copy of the rows, because the embedded prior holds them.
 
 # Mathematical definition
 
@@ -1222,31 +1225,32 @@ Where:
   - $(math_dict[:P_batch_prior])
   - $(math_dict[:X_returns])
 
-The equality holds for the embedded result and for every co-moment, the ones that fold and the ones that the method refits. In floating point, each co-moment differs from the batch co-moment by rounding.
+The equality holds for the embedded result and for every co-moment, both the co-moments that fold and the co-moments that the method refits. In floating point, each co-moment differs from the batch co-moment by rounding.
 
 # Algorithm
 
  1. Read the embedded result `pr` out of `pe.pe` with [`prior`](@ref).
- 2. Read the rows that the embedded prior folded with [`prior_returns_buffer`](@ref), drop the rows of a Shared Series gap with [`shared_series_buffer`](@ref), as the embedded prior and the members that fold drop them, and read the rows that remain with [`sample_buffer`](@ref), giving `X`.
- 3. Rebuild the Asset Panel of the rows from the same buffer with [`buffer_asset_panel`](@ref), giving `pnl`, as the batch method gives `rd.pnl` to both co-moments.
- 4. Read `kt` out of `pe.kte` through [`read_comoment`](@ref) under `pr.w`. It refits the member over `X` and `pnl` where it did not fold, and under `pr.w` where `pr.w` is not `nothing`.
- 5. Read `sk` and `V` out of `pe.ske` through [`read_comoment`](@ref), on the same terms.
- 6. Build the result with [`assemble_high_order_prior`](@ref), and return it.
+ 2. Read the rows that the embedded prior folded, with [`prior_returns_buffer`](@ref). Drop the rows of a Shared Series gap with [`shared_series_buffer`](@ref), as the embedded prior and the members that fold drop them. Read the rows that remain with [`sample_buffer`](@ref), and call them `X`.
+ 3. Rebuild the Asset Panel of the rows from the same buffer with [`buffer_asset_panel`](@ref), and call it `pnl`. The batch method gives `rd.pnl` to both co-moments in the same way.
+ 4. Read `kt` out of `pe.kte` with [`read_comoment`](@ref) under `pr.w`. It refits the member over `X` and `pnl` when the member did not fold, and under `pr.w` when `pr.w` is not `nothing`.
+ 5. Read `sk` and `V` out of `pe.ske` with [`read_comoment`](@ref), in the same way.
+ 6. Build the result with [`assemble_high_order_prior`](@ref).
+ 7. Record in the result the returns source that `pe` states, with [`stamp_returns_source`](@ref), and return it.
 
 # Arguments
 
-  - `pe`: High order prior estimator whose members carry states.
-  - `kwargs...`: Additional keyword arguments, forwarded to the members.
+  - `pe`: High order prior estimator whose members hold states.
+  - `kwargs...`: Additional keyword arguments, passed to the members.
 
 # Validation
 
-  - Every condition that `prior(pe.pe)` with no data checks.
-  - Everything [`prior_returns_buffer`](@ref) refuses.
-  - Everything [`scenario_rows`](@ref) refuses.
+  - Each condition that `prior(pe.pe)` with no data checks.
+  - Each condition that [`prior_returns_buffer`](@ref) refuses.
+  - Each condition that [`scenario_rows`](@ref) refuses.
 
 # Returns
 
-  - `hop::HighOrderPrior`: Result object carrying the low order result and the co-moments.
+  - `hop::HighOrderPrior`: Result that holds the low order prior result and the co-moments.
 
 # Related
 

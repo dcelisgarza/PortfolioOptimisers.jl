@@ -1667,6 +1667,47 @@ stored type and the two policies.
         @test_throws InexactError panel_field_values(rp, "r"; inactive = NaN)
         @test panel_field_values(rp, "r"; inactive = 0) == [1//2 0//1; 1//4 1//5]
         @test eltype(panel_field_values(rp, "r"; inactive = 0)) === Rational{Int}
+        # An integer policy keeps the integer type, so the type must hold the value.
+        up = AssetPanel(; pf = [NumericPanelField(; name = "u", vals = UInt[1 2; 3 4])],
+                        amsk = [true false; true true], emsk = [true false; true true])
+        @test_throws InexactError panel_field_values(up, "u"; inactive = -1,
+                                                     unobserved = nothing)
+        @test eltype(panel_field_values(up, "u"; inactive = 0, unobserved = nothing)) ===
+              UInt
+        # A float type converts every integer, and one past its range reads as an infinity.
+        hp = AssetPanel(; pf = [NumericPanelField(; name = "h", vals = Float16[1 2; 3 4])],
+                        amsk = [true false; true true], emsk = [true false; true true])
+        @test isequal(panel_field_values(hp, "h"; inactive = 100000, unobserved = nothing),
+                      Float16[1 Inf; 3 4])
+    end
+    @testset "A placeholder is unobserved, so the unobserved policy writes it" begin
+        # Asset 1 has a leading blank, which the forward fill resolves to its placeholder.
+        pp = asset_panel([NumericPanelInput(; name = "m",
+                                            vals = [NaN 2.0; 3.0 NaN; 5.0 6.0],
+                                            alg = ForwardPanelFill(; val = -7.0))])
+        f = panel_field(pp, "m")
+        @test f.pmsk == [true false; false false; false false]
+        @test isequal(panel_field_values(pp, "m"), [NaN 2.0; 3.0 NaN; 5.0 6.0])
+        @test panel_field_values(pp, "m"; unobserved = nothing) ==
+              [-7.0 2.0; 3.0 2.0; 5.0 6.0]
+    end
+    @testset "The type comes from the policies, not from the cells they write" begin
+        # The sector field holds no blank, and the default NaN policy still floats its codes.
+        @test isnothing(panel_field(pnl, "sector").omsk)
+        @test eltype(panel_field_values(pnl, "sector")) === Float64
+        @test panel_field_values(pnl, "sector") == [1.0 2.0; 2.0 2.0; 1.0 1.0]
+    end
+    @testset "A tensor field takes the unobserved policy on one label" begin
+        om = trues(3, 2, 2)
+        om[3, 1, 2] = false
+        tp = AssetPanel(;
+                        pf = [TensorPanelField(; name = "b", axis = "factor",
+                                               labels = ["x", "y"],
+                                               vals = reshape(collect(1.0:12.0), 3, 2, 2),
+                                               omsk = om)], amsk = amsk, emsk = amsk)
+        B = panel_field_values(tp, "b"; inactive = 0)
+        @test B[:, :, 1] == [1.0 0.0; 2.0 5.0; 3.0 6.0]
+        @test isequal(B[:, :, 2], [7.0 0.0; 8.0 11.0; NaN 12.0])
     end
 end
 
@@ -2093,4 +2134,57 @@ end
     @test_throws "holds the integer codes" asset_panel(df,
                                                        panel_manifest(static; nx,
                                                                       decode = false))
+end
+@testset "The docstrings of 22_PanelRoundTrip.jl against numbers" begin
+    PO = PortfolioOptimisers
+    amsk = Bool[1 0; 1 1; 0 1]
+    pnl = AssetPanel(;
+                     pf = [NumericPanelField(; name = "mcap",
+                                             vals = [1.0 2.0; 3.0 4.0; 5.0 6.0]),
+                           CategoricalPanelField(; name = "sector", levels = ["T", "E"],
+                                                 codes = [1 2; 1 2; 2 2])], amsk = amsk,
+                     emsk = amsk)
+    df = panel_dataframe(pnl; layout = :long)
+    mf = panel_manifest(pnl)
+    p2 = asset_panel(df, mf)
+    # A read that masks the cells outside the universe agrees across a long round trip, and the
+    # default read, which keeps them, does not.
+    @test isequal(panel_field_values(pnl, "mcap"; inactive = NaN),
+                  panel_field_values(p2, "mcap"; inactive = NaN))
+    @test panel_field_values(pnl, "mcap") == [1.0 2.0; 3.0 4.0; 5.0 6.0]
+    @test panel_field_values(p2, "mcap") == [1.0 0.0; 3.0 4.0; 0.0 6.0]
+    # The linear index of each long row, in an `observations × assets` array.
+    @test PO.panel_long_cells(df, PO.panel_manifest_axes(mf)) == [1, 2, 5, 6]
+    # A categorical entry holds one empty group per level, and a numeric entry holds none.
+    specs = PO.panel_manifest_fields(mf)
+    @test specs[1].labels == String[] && specs[1].groups == String[]
+    @test specs[2].labels == ["T", "E"] && specs[2].groups == ["", ""]
+    @test specs[2].axis == "" && !specs[2].grouped && specs[2].decode
+    # A static panel has no observation axis, so its labels are the positions of its assets.
+    sp = AssetPanel(; pf = [NumericPanelField(; name = "m", vals = [1.0, 2.0, 3.0])])
+    @test PO.panel_frame_axes(sp, nothing, nothing) == (["1", "2", "3"], 1:3)
+    @test PO.panel_long_cells(panel_dataframe(sp),
+                              PO.panel_manifest_axes(panel_manifest(sp))) == [1, 2, 3]
+    @test DataFrames.nrow(panel_dataframe(sp; layout = :wide)) == 1
+    # An integer column and a floating-point column of one tensor field give the float type.
+    tab = (; df = DataFrame("b=u" => [1, 2], "b=v" => [1.5, 2.0]), nx = ["A", "B"])
+    @test PO.panel_table_eltype([1, 2], tab, ["b=u", "b=v"]) === Float64
+    # A cell outside the universe of a long table comes back with a false placeholder mask.
+    fp = asset_panel([NumericPanelInput(; name = "m", vals = [NaN 1.0; 2.0 NaN; 3.0 4.0],
+                                        alg = ForwardPanelFill())];
+                     amsk = Bool[1 1; 1 0; 1 1])
+    @test panel_field(fp, "m").pmsk == Bool[1 0; 0 1; 0 0]
+    fp2 = asset_panel(panel_dataframe(fp; layout = :long), panel_manifest(fp))
+    @test panel_field(fp2, "m").pmsk == Bool[1 0; 0 0; 0 0]
+    @test panel_field(fp2, "m").omsk == Bool[0 1; 1 0; 1 1]
+    # A Panel Field holds a finite value in every cell, so a table cell is never NaN.
+    @test_throws PO.IsNonFiniteError NumericPanelField(; name = "x", vals = [NaN, 1.0])
+    # The selections refuse a repeated asset, an unknown asset, and a code that `T` cannot hold.
+    @test_throws ArgumentError panel_manifest(sp; assets = ["1", "1"])
+    @test_throws KeyError panel_manifest(sp; assets = ["9"])
+    @test_throws ArgumentError PO.panel_code_reader((; name = "c", decode = false,
+                                                     labels = ["a", "b"]), Int8)("300")
+    # An entry of `fields` can be a `Symbol`.
+    @test [f.name for f in asset_panel(df, mf; fields = [:sector, "mcap"]).pf] ==
+          ["sector", "mcap"]
 end

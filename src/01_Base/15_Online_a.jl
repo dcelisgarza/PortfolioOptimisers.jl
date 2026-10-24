@@ -62,14 +62,14 @@ Keywords correspond to the struct's fields. The default is the empty seed that [
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, its fields are subset to the selected assets:
+[`port_opt_view`](@ref) takes the view of its fields at the selected assets:
 
-  - `X`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `A`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `M`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `X`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `A`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `M`: Sliced to the selected indices through [`port_opt_view`](@ref).
   - `F`: Copied unchanged, because the selection indexes assets and this backing describes factors.
   - `ne`, `E`: Copied unchanged, because the selection indexes assets and the Exogenous Series belongs to no asset.
-  - `iv`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `iv`: Sliced to the selected indices through [`port_opt_view`](@ref).
   - `ivpa`: Sliced to the selected indices when it is a vector, and kept when it is one number or `nothing`.
   - `P`: Each Panel Field viewed over the selected assets with [`panel_fields_view`](@ref).
   - `G`: Copied unchanged, because the selection indexes assets and a Shared Series gap belongs to the observation.
@@ -864,10 +864,10 @@ The marks `gaps` of the Shared Series gaps are one entry for each observation wh
  3. Return the state unchanged when the block is empty.
  4. Refuse Panel Fields that do not make a time-varying Asset Panel with the masks of the block, over the observations and the assets of the block.
  5. When a cap is set, truncate the incoming rows, their masks, their implied volatilities, their factor rows, their series, their Panel Fields and their marks to the last `max_history` of them.
- 6. When the buffer holds no observations, seed it from the block with [`seed_sample_buffer`](@ref), seed `iv` with [`seed_buffer_array`](@ref), seed `G` with [`seed_buffer_gaps`](@ref), pin `ivpa`, and return it. The seed fixes the width, the element type, the masks, the implied volatilities with `ivpa`, the factor rows, the series with its names, and the Panel Fields.
+ 6. When the buffer holds no observations, seed it from the block with [`seed_sample_buffer`](@ref), and return it. The seed fixes the width, the element type, the masks, the implied volatilities with `ivpa`, the factor rows, the series with its names, and the Panel Fields.
  7. Refuse a block whose width is not the fixed width. Refuse masks, implied volatilities, factor rows, a series or Panel Fields that are absent where the buffer records them or present where it does not, factor rows of a different width, a series under other names with [`assert_buffer_series_names`](@ref), and an `ivpa` that is not the pinned one with [`assert_pinned_value`](@ref).
  8. Make room for the block with [`reserve_sample_buffer`](@ref), which drops the rows that the cap pushes out and grows the backing matrices.
- 9. Copy the block, its masks, its implied volatilities, its factor rows and its series after the valid region, and write its marks with [`append_buffer_gaps`](@ref). Join the Panel Fields that the buffer keeps to the Panel Fields of the block with [`panel_fields_append`](@ref), and rebind `P` and `n` with `Accessors.@reset`.
+ 9. Copy the block, its masks, its implied volatilities, its factor rows and its series after the valid region, and write its marks with [`append_buffer_gaps`](@ref). Join the Panel Fields that the buffer keeps to the Panel Fields of the block with [`panel_fields_append`](@ref), and build the buffer with the joined `P` and the new `n` through the positional constructor.
 
 # Arguments
 
@@ -944,10 +944,7 @@ function partial_fit!(state::SampleBufferState, X::MatNum, F::Option{<:MatNum} =
         t = w
     end
     if iszero(state.n)
-        state = seed_sample_buffer(state, Xo, Ao, Mo, Fo, ne, Eo, Po)
-        state = Accessors.@reset state.iv = seed_buffer_array(Vo)
-        state = Accessors.@reset state.G = seed_buffer_gaps(Go)
-        return Accessors.@reset state.ivpa = ivpa
+        return seed_sample_buffer(state, Xo, Ao, Mo, Fo, ne, Eo, Vo, ivpa, Po, Go)
     end
     N = size(Xo, 2)
     B = state.X
@@ -971,8 +968,10 @@ function partial_fit!(state::SampleBufferState, X::MatNum, F::Option{<:MatNum} =
     copy_buffer_rows!(state.E, rows, Eo)
     copy_buffer_rows!(state.iv, rows, Vo)
     state = append_buffer_gaps(state, rows, Go)
-    state = Accessors.@reset state.P = panel_fields_append(state.P, Po, state.n + t)
-    return Accessors.@reset state.n = state.n + t
+    return SampleBufferState(state.n + t, state.off, state.X, state.A, state.M, state.F,
+                             state.ne, state.E, state.iv, state.ivpa,
+                             panel_fields_append(state.P, Po, state.n + t), state.G,
+                             state.max_history)
 end
 """
     assert_buffer_factor_width(B::Nothing, Fo) -> Nothing
@@ -1082,15 +1081,14 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Fills a buffer that holds no observations from a block, which fixes the width, the element type, the masks, the factor rows, the Exogenous Series and the Panel Fields.
+Fills a buffer that holds no observations from a block, which fixes the width, the element type, the masks, the implied volatilities with `ivpa`, the factor rows, the Exogenous Series, the Panel Fields and the marks of the Shared Series gaps.
 
 [`partial_fit!`](@ref) calls it for the first append, and for each append to a buffer that holds no observations. Each backing matrix is an exact fit for the block, so a buffer that is folded once and read once allocates no spare row. Each array comes from `similar` on the argument that it holds, so the function chooses no element type. The Panel Fields are not copied, because nothing writes into the arrays of a panel.
 
 # Algorithm
 
- 1. Replace `X`, `A`, `M`, `F` and `E` with copies of the block, its masks, its factor rows and its series, made by [`seed_buffer_array`](@ref).
- 2. Replace `ne` with the names of the series, and `P` with the Panel Fields of the block.
- 3. Set `off` to zero and `n` to the row count of the block.
+ 1. Copy the block, its masks, its implied volatilities, its factor rows and its series with [`seed_buffer_array`](@ref), and the marks with [`seed_buffer_gaps`](@ref).
+ 2. Build the buffer through the positional constructor with these copies, the names of the series, `ivpa`, the Panel Fields of the block, `off` set to zero, `n` set to the row count of the block, and the cap of `state`.
 
 # Arguments
 
@@ -1101,32 +1099,33 @@ Fills a buffer that holds no observations from a block, which fixes the width, t
   - `Fo`: The oriented factor rows of the block, or `nothing`.
   - `ne`: The names of the series of the block, or `nothing`.
   - `Eo`: The oriented Exogenous Series of the block, or `nothing`.
+  - `Vo`: The oriented implied volatilities of the block, or `nothing`.
+  - `ivpa`: The implied volatility risk premium adjustment, or `nothing`.
   - `Po`: The Panel Fields of the block, or `nothing`.
+  - `Go`: One mark for each observation of the block, or `nothing`.
 
 # Returns
 
-  - `state::SampleBufferState`: The buffer holding the block, its masks, its factor rows, its series and its Panel Fields.
+  - `state::SampleBufferState`: The buffer holding the block, its masks, its implied volatilities, its factor rows, its series, its Panel Fields and its marks.
 
 # Related
 
   - [`SampleBufferState`](@ref)
   - [`partial_fit!`](@ref)
   - [`seed_buffer_array`](@ref)
+  - [`seed_buffer_gaps`](@ref)
 """
 function seed_sample_buffer(state::SampleBufferState, Xo::MatNum,
                             Ao::Option{<:AbstractMatrix{<:Bool}},
                             Mo::Option{<:AbstractMatrix{<:Bool}}, Fo::Option{<:MatNum},
                             ne::Option{<:VecStr}, Eo::Option{<:MatNum},
-                            Po::Option{<:AbstractVector})
-    state = Accessors.@reset state.X = seed_buffer_array(Xo)
-    state = Accessors.@reset state.A = seed_buffer_array(Ao)
-    state = Accessors.@reset state.M = seed_buffer_array(Mo)
-    state = Accessors.@reset state.F = seed_buffer_array(Fo)
-    state = Accessors.@reset state.ne = ne
-    state = Accessors.@reset state.E = seed_buffer_array(Eo)
-    state = Accessors.@reset state.P = Po
-    state = Accessors.@reset state.off = 0
-    return Accessors.@reset state.n = size(Xo, 1)
+                            Vo::Option{<:MatNum}, ivpa::Option{<:Num_VecNum},
+                            Po::Option{<:AbstractVector},
+                            Go::Option{<:AbstractVector{Bool}})
+    return SampleBufferState(size(Xo, 1), 0, seed_buffer_array(Xo), seed_buffer_array(Ao),
+                             seed_buffer_array(Mo), seed_buffer_array(Fo), ne,
+                             seed_buffer_array(Eo), seed_buffer_array(Vo), ivpa, Po,
+                             seed_buffer_gaps(Go), state.max_history)
 end
 """
     seed_buffer_array(Mo::Nothing) -> Nothing
@@ -1248,7 +1247,9 @@ function append_buffer_gaps(state::SampleBufferState, rows, Go::AbstractVector{B
     end
     G = isnothing(state.G) ? fill(false, size(state.X, 1)) : state.G
     copyto!(view(G, rows), Go)
-    return Accessors.@reset state.G = G
+    return SampleBufferState(state.n, state.off, state.X, state.A, state.M, state.F,
+                             state.ne, state.E, state.iv, state.ivpa, state.P, G,
+                             state.max_history)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1289,8 +1290,8 @@ function reserve_sample_buffer(state::SampleBufferState, t::Integer)
         drop = n + t - w
         off += drop
         n -= drop
-        state = Accessors.@reset state.n = n
-        state = Accessors.@reset state.off = off
+        state = SampleBufferState(n, off, state.X, state.A, state.M, state.F, state.ne,
+                                  state.E, state.iv, state.ivpa, state.P, state.G, w)
     end
     B = state.X
     cap = size(B, 1)
@@ -1304,14 +1305,13 @@ function reserve_sample_buffer(state::SampleBufferState, t::Integer)
             newcap = min(newcap, 2 * w)
         end
     end
-    state = Accessors.@reset state.X = compact_buffer_array(B, off, n, newcap)
-    state = Accessors.@reset state.A = compact_buffer_array(state.A, off, n, newcap)
-    state = Accessors.@reset state.M = compact_buffer_array(state.M, off, n, newcap)
-    state = Accessors.@reset state.F = compact_buffer_array(state.F, off, n, newcap)
-    state = Accessors.@reset state.E = compact_buffer_array(state.E, off, n, newcap)
-    state = Accessors.@reset state.iv = compact_buffer_array(state.iv, off, n, newcap)
-    state = Accessors.@reset state.G = compact_buffer_array(state.G, off, n, newcap)
-    return Accessors.@reset state.off = 0
+    return SampleBufferState(n, 0, compact_buffer_array(B, off, n, newcap),
+                             compact_buffer_array(state.A, off, n, newcap),
+                             compact_buffer_array(state.M, off, n, newcap),
+                             compact_buffer_array(state.F, off, n, newcap), state.ne,
+                             compact_buffer_array(state.E, off, n, newcap),
+                             compact_buffer_array(state.iv, off, n, newcap), state.ivpa,
+                             state.P, compact_buffer_array(state.G, off, n, newcap), w)
 end
 """
     compact_buffer_array(B::Nothing, off, n, newcap) -> Nothing
@@ -1744,7 +1744,7 @@ A buffer carries the per-observation masks beside the observations. So a [`Cover
 
  1. Read the buffer out of the `cache` field with [`assert_sample_buffer`](@ref), which refuses an estimator that was never wrapped in [`Online`](@ref).
  2. Fold a matrix, its masks and its implied volatilities through the block arm of [`partial_fit!`](@ref), and a vector, its masks and its implied volatilities through the single-observation arm.
- 3. Rebind `est.cache` with `Accessors.@reset`, and return the estimator.
+ 3. Rebuild the estimator with the new buffer in `cache` through [`rebuild_estimator`](@ref), and return it.
 
 # Arguments
 
@@ -1787,5 +1787,5 @@ function partial_fit!(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEsti
         partial_fit!(state, X; active_mask = active_mask, estimation_mask = estimation_mask,
                      iv = iv, ivpa = ivpa)
     end
-    return Accessors.@set est.cache = state
+    return state === est.cache ? est : rebuild_estimator(est, (; cache = state))
 end

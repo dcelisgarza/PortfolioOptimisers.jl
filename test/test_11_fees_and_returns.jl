@@ -220,6 +220,56 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         @test collect(ve.w) == w0[[1, 3]]
         @test ve.val === tnf.val
     end
+    # Issue #545, the `/unslop` pass: the statements of `src/12_Turnover.jl` that the pass
+    # corrected, checked against the code.
+    @testset "Turnover statements corrected by the prose pass" begin
+        u0 = [0.2, 0.3, 0.5]
+        usets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"]))
+        ud = Dict("C" => 0.3, "A" => 0.1)
+
+        # A vector or a number `val` of the estimator is held to the same rules as a dictionary.
+        @test_throws DomainError TurnoverEstimator(; w = u0, val = [0.1, NaN, 0.2])
+        @test_throws DomainError TurnoverEstimator(; w = u0, val = [0.1, -0.1, 0.2])
+        @test_throws PortfolioOptimisers.IsEmptyError TurnoverEstimator(; w = u0,
+                                                                        val = Float64[])
+        @test_throws DomainError TurnoverEstimator(; w = u0, val = -1.0)
+        @test_throws DomainError TurnoverEstimator(; w = u0, val = Inf)
+        @test isa(TurnoverEstimator(; w = u0, val = UniformValues()), TurnoverEstimator)
+
+        # `dval = +Inf` is admitted, and the result holds it. `Turnover` admits `+Inf` too.
+        @test turnover_constraints(TurnoverEstimator(; w = u0, val = ud, dval = Inf),
+                                   usets).val == [0.1, Inf, 0.3]
+        @test Turnover(; w = u0, val = [0.1, Inf, 0.2]).val[2] == Inf
+        @test_throws DomainError Turnover(; w = u0, val = -Inf)
+
+        # `datatype` sets the element type only when `dval` is `nothing`.
+        @test eltype(turnover_constraints(TurnoverEstimator(; w = u0, val = ud), usets;
+                                          datatype = Float32).val) == Float32
+        @test eltype(turnover_constraints(TurnoverEstimator(; w = u0, val = ud,
+                                                            dval = 0.05), usets;
+                                          datatype = Float32).val) == Float64
+
+        # Both owners refuse a vector that holds an estimator when they have no universe.
+        umix = PortfolioOptimisers.concrete_typed_array([Turnover(; w = u0, val = 0.1),
+                                                         TurnoverEstimator(; w = u0,
+                                                                           val = ud)])
+        @test_throws PortfolioOptimisers.IsNothingError JuMPOptimiser(; slv = slv,
+                                                                      tn = umix)
+        @test_throws PortfolioOptimisers.IsNothingError ProgrammeAllocationSet(; slv = slv,
+                                                                               tn = umix)
+
+        # The JuMP rows are one `NormOneCone` per asset and one linear bound on the auxiliary
+        # variable, and the solution keeps every weight change inside the bound.
+        ures = optimise(MeanRisk(;
+                                 opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                                     tn = Turnover(; w = w, val = 0.05))))
+        um = ures.jr.model
+        @test length(um[:ctn_noc_1]) == length(w)
+        @test all(c -> isa(JuMP.constraint_object(c).set, JuMP.MOI.NormOneCone),
+                  um[:ctn_noc_1])
+        @test isa(JuMP.constraint_object(um[:ctn_1]).set, JuMP.MOI.Nonpositives)
+        @test maximum(abs.(ures.w - w)) <= 0.05 + 1e-6
+    end
     # Issue #546, condition 2: the fee arithmetic of `src/13_Fees.jl`, checked with
     # numbers rather than read.
     @testset "Fee terms, the per-asset identity and name resolution" begin

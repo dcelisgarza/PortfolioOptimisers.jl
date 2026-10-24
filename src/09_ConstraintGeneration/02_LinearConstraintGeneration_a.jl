@@ -40,7 +40,7 @@ PartialLinearConstraint
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 9.1, Equation 9.1.
+  - $(ref_dict[:markowitz1955]) Section 0.1, Equations 1 and 2.
 """
 @concrete struct PartialLinearConstraint <: AbstractConstraintResult
     """
@@ -142,7 +142,8 @@ LinearConstraint
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 9.1, Equation 9.1.
+  - $(ref_dict[:markowitz1955]) Section 0.1, Equations 1 and 2. It writes the inequality rows in the ``\\geq`` sense.
+  - $(ref_dict[:cajas2025]) Section 9.1, Equation 9.1. It writes the inequality rows in the ``\\leq`` sense, as this library does.
 """
 @concrete struct LinearConstraint <: AbstractConstraintResult
     """
@@ -891,7 +892,7 @@ A `nothing` ledger collects nothing, and it is the default everywhere. A caller 
 
 # Arguments
 
-  - `ledger`: The Departure Ledger of the entry of the fit, or `nothing` when nobody is collecting.
+  - $(arg_dict[:ledger])
   - `what`: A noun phrase naming what was dropped, for example ``"the view row `a + c == 0.05`"``.
 
 # Returns
@@ -926,7 +927,7 @@ A shed of nothing records nothing, so the all-investable path costs one comparis
 
 # Arguments
 
-  - `ledger`: The Departure Ledger of the entry of the fit, or `nothing` when nobody is collecting.
+  - $(arg_dict[:ledger])
   - `group`: The group name as the caller wrote it, or the pair `"(a, b)"` for a correlation view.
   - `shed`: How many members the group lost.
   - `kept`: How many members survived.
@@ -969,6 +970,8 @@ Only the entry of the fit knows that a departure happened. After the entry of th
 
 The message is an `@info` by default, not a warning and not a [`strict_diagnostic`](@ref). Nothing is wrong. The data changed, and the work runs correctly over the assets that are left. A raise under `strict` refuses the departure, and the reduction to the Investable Mask exists to remove that refusal. `warn = true` gives a `@warn` for the one case that is not routine, a departure that removed the last of something the caller asked for, such as the last view of a view set. The result is then the unconditioned answer, and the caller has no other way to learn it.
 
+The log passes `maxlog = log_limit(level)` and an `_id` from [`@log_id`](@ref) over `process`, so each kind of entry of a fit counts its repeats on its own.
+
 An empty `ni` logs nothing. This is the path when every asset is investable and when the data has no names. An empty `drops` gives a message that names the departed assets and no drops, which is what the entry of a fit logs before it resolves anything over them.
 
 # Arguments
@@ -1002,9 +1005,9 @@ function announce_non_investable(ni::VecStr, drops::VecStr = String[],
         msg *= " Dropped over them: $(join(drops, "; "))."
     end
     if warn
-        @warn(msg)
+        @warn(msg, maxlog = log_limit(:warn), _id = @log_id(process))
     else
-        @info(msg)
+        @info(msg, maxlog = log_limit(:info), _id = @log_id(process))
     end
     return nothing
 end
@@ -1155,7 +1158,7 @@ The record is written here and not at the four call sites, so each branch of [`r
 
   - `members` / `members1`, `members2`: The group's member names, as `sets.dict` holds them.
   - `other`: The counterpart axis, read with [`counterpart_axis_names`](@ref). Usually the Non-Investable Axis.
-  - `ledger`: The Departure Ledger of the entry of the fit, or `nothing` when nobody is collecting.
+  - $(arg_dict[:ledger])
   - `group`: The group name as the caller wrote it, for the ledger.
   - `eqn`: The row the group appears in, for the ledger.
 
@@ -1264,7 +1267,7 @@ function name_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number, ar
         return strict_diagnostic(unknown_variable_msg(key, nx, nxkey;
                                                       candidates = [nx;
                                                                     collect(keys(sdict))]),
-                                 strict)
+                                 strict; id = @log_id(key, nxkey))
     end
     idx = axis_name_indices(members, nx,
                             function (m)
@@ -1274,7 +1277,7 @@ function name_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number, ar
                                 else
                                     strict_diagnostic(missing_group_assets_msg(key, m, nx,
                                                                                nxkey),
-                                                      strict)
+                                                      strict; id = @log_id(key, nxkey))
                                 end
                             end)
     arr[idx] .= val

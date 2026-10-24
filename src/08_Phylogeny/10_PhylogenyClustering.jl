@@ -1,29 +1,29 @@
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Internal dispatch helper for constructing a [`Clusters`](@ref) result within a network-based clustering workflow.
+Cluster a matrix of pseudo-distances with `alg`, and return a [`Clusters`](@ref) result.
 
-Selects the appropriate clustering routine based on `alg`, determines the optimal number of clusters, and returns a [`Clusters`](@ref) result encapsulating all relevant outputs.
+The type of `alg` selects the clustering routine, and `onc` selects the number of clusters. Both [`clusterise`](@ref) methods of a [`NetworkClustersEstimator`](@ref) call this function.
 
 # Algorithm
 
- 1. Cluster `P`, through the branch that `alg` selects, giving `res`.
+ 1. Cluster `P` into `res`, through the branch that `alg` selects.
 
       + [`HClustAlgorithm`](@ref): [`branch_ordered_hclust`](@ref) under `alg.linkage` on `Val(branchorder)`.
-      + [`DBHT`](@ref): [`DBHTs`](@ref) over `P` and `S`, whose last returned value is the clustering.
-      + [`AbstractNonHierarchicalClusteringAlgorithm`](@ref): [`optimal_number_clusters`](@ref), which answers with the clustering and the count together.
+      + [`DBHT`](@ref): [`DBHTs`](@ref) over `P` and `S`. The last value that it returns is the clustering.
+      + [`AbstractNonHierarchicalClusteringAlgorithm`](@ref): [`optimal_number_clusters`](@ref), which returns the clustering and the number of clusters together.
 
- 2. Select the number of clusters `k` with [`optimal_number_clusters`](@ref) over `onc`, `res` and `P`. The third branch holds `k` from step 1 already.
+ 2. Select the number of clusters `k` with [`optimal_number_clusters`](@ref) over `onc`, `res` and `P`. The third branch already has `k` from step 1.
 
- 3. Assemble the [`Clusters`](@ref) result from `res`, `S`, `D`, `P` and `k`.
+ 3. Return the [`Clusters`](@ref) result of `res`, `S`, `D`, `P` and `k`.
 
 # Arguments
 
   - `alg`: Clustering algorithm.
 
-      + `alg::HClustAlgorithm`: Applies hierarchical clustering via `Clustering.hclust` on the pseudo-distance matrix `P`.
-      + `alg::DBHT`: Applies Direct Bubble Hierarchical Tree clustering via [`DBHTs`](@ref) on `P` and `S`.
-      + `alg::AbstractNonHierarchicalClusteringAlgorithm`: Applies non-hierarchical clustering via [`optimal_number_clusters`](@ref) on `P`.
+      + `alg::HClustAlgorithm`: Hierarchical clustering of `P` with [`branch_ordered_hclust`](@ref).
+      + `alg::DBHT`: Direct Bubble Hierarchical Tree clustering of `P` and `S` with [`DBHTs`](@ref).
+      + `alg::AbstractNonHierarchicalClusteringAlgorithm`: Non-hierarchical clustering of `P` with [`optimal_number_clusters`](@ref).
 
   - $(arg_dict[:onc])
 
@@ -31,13 +31,13 @@ Selects the appropriate clustering routine based on `alg`, determines the optima
 
   - $(arg_dict[:D])
 
-  - `P::MatNum`: Symmetric pseudo-distance matrix derived from the network or similarity structure.
+  - `P::MatNum`: Symmetric matrix of pseudo-distances from the network.
 
-  - `branchorder`: Branch ordering strategy for hierarchical clustering.
+  - `branchorder`: Order method for the dendrogram branches, `:optimal` by default. [`branch_ordered_hclust`](@ref) and [`DBHTs`](@ref) state what each value does.
 
 # Returns
 
-  - `clr::Clusters`: Clustering result containing the clustering object, similarity matrix, distance matrix, pseudo-distance matrix, and optimal number of clusters.
+  - `clr::Clusters`: Clustering result. It holds the clustering, the similarity matrix, the distance matrix, the matrix of pseudo-distances and the number of clusters.
 
 # Related
 
@@ -72,35 +72,39 @@ end
                                                                 <:HopCount}},
                X::MatNum; dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
 
-Cluster assets using a minimum spanning tree (MST) network structure and return a [`Clusters`](@ref) result.
+Cluster the assets over a minimum spanning tree, and return a [`Clusters`](@ref) result.
 
-Builds the MST from the distance matrix, accumulates a symmetric pseudo-distance matrix `P` over the configured network depth `n` as ``\\sum_{i=0}^{n}(\\mathbf{D}^i - \\mathbf{A}^i)``, and dispatches to `_clusterise` to perform the actual clustering and select the optimal number of clusters.
+The method builds the tree from the distance matrix. It adds up the symmetric matrix of pseudo-distances `P` as ``\\sum_{i=0}^{n}(\\mathbf{D}^i - \\mathbf{A}^i)`` over the hop count `n`. [`_clusterise`](@ref) then clusters `P` and selects the number of clusters.
 
-``\\mathbf{A}`` is [`calc_weighted_adjacency`](@ref)'s matrix, read off [`calc_weighted_adjacency_graph`](@ref)'s graph through its one-argument form, so this method reads the same structure as every other consumer of a network and carries **weights**, not `0`/`1` — the tree branch's polarity is the distance, which is what ``\\mathbf{D}^i - \\mathbf{A}^i`` subtracts a like quantity from. The two-argument entry point is the one used, because `D` is already in hand, and the graph is kept rather than discarded so that a budget **rule** is answered over it instead of re-deriving the distance.
+``\\mathbf{A}`` is the matrix of [`calc_weighted_adjacency`](@ref), read from the graph of [`calc_weighted_adjacency_graph`](@ref) through the method that takes `G`. This method reads the same structure as every other consumer of a network. ``\\mathbf{A}`` carries weights, and not `0` and `1`. The polarity of the tree branch is the distance, so ``\\mathbf{D}^i - \\mathbf{A}^i`` subtracts a quantity of the same kind. The method uses the entry point that takes `alg`, because it already holds `D`. It keeps the graph, so that a budget rule resolves over it and the distance is not computed again.
 
-# Only a hop count is admitted
+# The method admits only a hop count
 
-The fourth type parameter is narrowed to [`HopCount`](@ref), so a [`PathLength`](@ref) separation fails at **dispatch**. The power sum is indexed by `nte.nte.sep.n`, and a matrix power counts edges: there is no radius analogue of ``\\mathbf{D}^i - \\mathbf{A}^i``, so the refusal is the honest answer rather than a gap. [`phylogeny_matrix`](@ref) does have a radius method, so the two consumers of a network differ here on purpose.
+The fourth type parameter is bound to [`HopCount`](@ref), so a [`PathLength`](@ref) separation fails at dispatch. `nte.nte.sep.n` indexes the sum of powers, and a matrix power counts edges. A radius has no equivalent of ``\\mathbf{D}^i - \\mathbf{A}^i``, so the refusal is correct, and it is not a missing method. [`phylogeny_matrix`](@ref) has a method for a radius, so the two consumers of a network are different here on purpose.
 
 # Algorithm
 
- 1. Derive the correlation matrix `S` and the distance matrix `D` from `X` with `nte.nte.de` and `nte.nte.ce`.
- 2. Build the tree over `D` with [`calc_weighted_adjacency_graph`](@ref)'s two-argument entry point, giving the structure `G`, and read its weighted adjacency matrix `A` with [`calc_weighted_adjacency`](@ref).
- 3. Resolve `nte.nte.sep` against `G` with [`resolve_separation`](@ref), and read the hop count `n` off the resolved separation.
- 4. Accumulate the pseudo-distance matrix `P` as the sum of `D^i - A^i` over `i in 0:n`.
- 5. Clear the diagonal of `P`, and hand the symmetric matrix to [`_clusterise`](@ref) together with `S` and `D`.
+ 1. Compute the correlation matrix `S` and the distance matrix `D` from `X` with `nte.nte.de` and `nte.nte.ce`.
+ 2. Build the tree `G` over `D` with the entry point of [`calc_weighted_adjacency_graph`](@ref) that takes `alg`. Read its weighted adjacency matrix `A` with [`calc_weighted_adjacency`](@ref).
+ 3. Resolve `nte.nte.sep` with [`resolve_separation`](@ref), against the structure that [`separation_graph`](@ref) makes from `G`. Read the hop count `n` from the resolved separation.
+ 4. Add up the matrix of pseudo-distances `P` as the sum of `D^i - A^i` over `i in 0:n`.
+ 5. Set the diagonal of `P` to zero. Give the symmetric matrix, `S` and `D` to [`_clusterise`](@ref).
 
 # Arguments
 
-  - `nte`: Network clustering estimator configured with an MST-based [`NetworkEstimator`](@ref).
+  - `nte`: Network clustering estimator, whose [`NetworkEstimator`](@ref) builds a minimum spanning tree.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - `branchorder`: Branch ordering strategy for hierarchical clustering.
-  - `kwargs...`: Additional keyword arguments passed to the underlying estimators.
+  - `branchorder`: Order method for the dendrogram branches, `:optimal` by default. [`branch_ordered_hclust`](@ref) and [`DBHTs`](@ref) state what each value does.
+  - `kwargs...`: Keyword arguments for the estimators of `nte`.
+
+# Validation
+
+  - Throws a `DomainError` if an off-diagonal entry of `D` is negative or `NaN`, through [`graph_weight_matrix`](@ref).
 
 # Returns
 
-  - `clr::Clusters`: Clustering result containing the clustering object, similarity matrix, distance matrix, pseudo-distance matrix, and optimal number of clusters.
+  - `clr::Clusters`: Clustering result. It holds the clustering, the similarity matrix, the distance matrix, the matrix of pseudo-distances and the number of clusters.
 
 # Related
 
@@ -146,40 +150,41 @@ end
                                                                 <:HopCount}},
                X::MatNum; dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
 
-Cluster assets using a Planar Maximally Filtered Graph (PMFG) network structure and return a [`Clusters`](@ref) result.
+Cluster the assets over a planar maximally filtered graph (PMFG), and return a [`Clusters`](@ref) result.
 
-Builds the PMFG from the similarity matrix via [`PMFG_T2s`](@ref), accumulates a symmetric pseudo-distance matrix `P` over the configured network depth `n` as ``\\sum_{i=0}^{n}(\\mathbf{S}^i - \\mathbf{A}^i)``, and dispatches to `_clusterise` to perform the actual clustering and select the optimal number of clusters.
+The method builds the PMFG from the similarity matrix with [`PMFG_T2s`](@ref). It adds up the symmetric matrix of pseudo-distances `P` as ``\\sum_{i=0}^{n}(\\mathbf{S}^i - \\mathbf{A}^i)`` over the hop count `n`. [`_clusterise`](@ref) then clusters `P` and selects the number of clusters.
 
-``\\mathbf{A}`` is [`calc_weighted_adjacency`](@ref)'s matrix, read off the graph as on the tree method, and this branch's polarity is the **similarity** — so ``\\mathbf{S}^i - \\mathbf{A}^i`` again subtracts a like quantity. The two-argument entry point is the one used, because `S` is already in hand, and the graph is kept for the same reason.
+``\\mathbf{A}`` is the matrix of [`calc_weighted_adjacency`](@ref), read from the graph as in the tree method. The polarity of this branch is the similarity, so ``\\mathbf{S}^i - \\mathbf{A}^i`` also subtracts a quantity of the same kind. The method uses the entry point that takes `alg`, because it already holds `S`, and it keeps the graph for the same reason as the tree method.
 
-# Only a hop count is admitted
+# The method admits only a hop count
 
-The fourth type parameter is narrowed to [`HopCount`](@ref), so a [`PathLength`](@ref) separation fails at **dispatch**. See the tree method: a matrix power counts edges, and there is no radius analogue of the power sum.
+The fourth type parameter is bound to [`HopCount`](@ref), so a [`PathLength`](@ref) separation fails at dispatch. A matrix power counts edges, and a radius has no equivalent of the sum of powers, as in the tree method.
 
 # Algorithm
 
- 1. Derive the correlation matrix and the distance matrix `D` from `X` with `nte.nte.de` and `nte.nte.ce`, and check `D` against `nte.nte.alg`'s domain with [`assert_similarity_domain`](@ref).
+ 1. Compute the correlation matrix and the distance matrix `D` from `X` with `nte.nte.de` and `nte.nte.ce`. Check `D` against the domain of `nte.nte.alg` with [`assert_similarity_domain`](@ref).
  2. Convert the pair to the similarity matrix `S` with [`distance_to_similarity`](@ref).
- 3. Build the triangulated maximally filtered graph over `S` with [`calc_weighted_adjacency_graph`](@ref)'s two-argument entry point, giving the structure `G`, and read its weighted adjacency matrix `Rpm` with [`calc_weighted_adjacency`](@ref).
- 4. Resolve `nte.nte.sep` against `G` with [`resolve_separation`](@ref), and read the hop count `n` off the resolved separation.
- 5. Accumulate the pseudo-distance matrix `P` as the sum of `S^i - Rpm^i` over `i in 0:n`.
- 6. Clear the diagonal of `P`, and hand the symmetric matrix to [`_clusterise`](@ref) together with `S` and `D`.
+ 3. Build the triangulated maximally filtered graph `G` over `S` with the entry point of [`calc_weighted_adjacency_graph`](@ref) that takes `alg`. Read its weighted adjacency matrix `Rpm` with [`calc_weighted_adjacency`](@ref).
+ 4. Resolve `nte.nte.sep` with [`resolve_separation`](@ref), against the structure that [`separation_graph`](@ref) makes from `G`. Read the hop count `n` from the resolved separation.
+ 5. Add up the matrix of pseudo-distances `P` as the sum of `S^i - Rpm^i` over `i in 0:n`.
+ 6. Set the diagonal of `P` to zero. Give the symmetric matrix, `S` and `D` to [`_clusterise`](@ref).
 
 # Arguments
 
-  - `nte`: Network clustering estimator configured with a similarity-matrix-based [`NetworkEstimator`](@ref).
+  - `nte`: Network clustering estimator, whose [`NetworkEstimator`](@ref) builds a PMFG from a similarity matrix.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - `branchorder`: Branch ordering strategy for hierarchical clustering.
-  - `kwargs...`: Additional keyword arguments passed to the underlying estimators.
+  - `branchorder`: Order method for the dendrogram branches, `:optimal` by default. [`branch_ordered_hclust`](@ref) and [`DBHTs`](@ref) state what each value does.
+  - `kwargs...`: Keyword arguments for the estimators of `nte`.
 
 # Validation
 
   - Throws a `DomainError` if `D` leaves the domain of `nte.nte.alg`, through [`assert_similarity_domain`](@ref).
+  - Throws a `DomainError` if a zero weight removes an edge of the triangulated maximally filtered graph, through [`assert_pmfg_weights`](@ref).
 
 # Returns
 
-  - `clr::Clusters`: Clustering result containing the clustering object, similarity matrix, distance matrix, pseudo-distance matrix, and optimal number of clusters.
+  - `clr::Clusters`: Clustering result. It holds the clustering, the similarity matrix, the distance matrix, the matrix of pseudo-distances and the number of clusters.
 
 # Related
 
@@ -222,9 +227,15 @@ end
                            <:NetworkClustersEstimator{<:Any,
                                                   <:AbstractHierarchicalClusteringAlgorithm}}
 
-Alias for a hierarchical clustering estimator or result.
+Union of the hierarchical clustering estimators and results.
 
-Matches either a [`ClustersEstimator`](@ref) parameterised with a hierarchical clustering algorithm, or a [`Clusters`](@ref) result wrapping a `Clustering.Hclust`. Used internally for dispatch in hierarchical clustering workflows.
+It matches three types:
+
+  - a [`ClustersEstimator`](@ref) with a hierarchical clustering algorithm,
+  - a [`NetworkClustersEstimator`](@ref) with a hierarchical clustering algorithm,
+  - a [`Clusters`](@ref) result that holds a `Clustering.Hclust`.
+
+It is the bound of the `cle` argument of [`plot_dendrogram`](@ref) and [`plot_clusters`](@ref), which need a dendrogram.
 
 # Related
 

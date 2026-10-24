@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Empirical prior estimator for asset returns.
 
-`EmpiricalPrior` is a low order prior estimator that computes the mean and covariance of asset returns using empirical (sample-based) statistics. It supports custom expected returns and covariance estimators, as well as an optional investment horizon for log-normalisation and scaling.
+`EmpiricalPrior` is a low order prior estimator. It fits the mean of the asset returns with `me` and their covariance with `ce`. With a `horizon`, it fits both moments on the log-returns, scales them to the horizon, and converts them back to arithmetic returns.
 
 # Fields
 
@@ -26,38 +26,38 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `horizon` is not `nothing`, `horizon > 0`.
-  - If `fill_limit` is not `nothing`, `0 < fill_limit <= 1`. Zero is not a value, because `nothing` already means that no fill passes in silence. The fit refuses a value looser than `1 - min_coverage` over the arms that state a coverage floor, because such a value could never fire.
+  - If `fill_limit` is not `nothing`, `0 < fill_limit <= 1`. The constructor refuses zero. Where no arm states a coverage floor, `nothing` already names every fill. The fit refuses a value above `1 - min_coverage` of the binding floor of the arms, because such a value can never fire.
   - If `max_scenarios` is not `nothing`, `max_scenarios > 0`.
   - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref).
 
 ## The incremental fit
 
-The empirical prior **folds and carries**. [`partial_fit!`](@ref) forwards each observation to `me` and to `ce`, both of which fold exactly, and appends the row to a [`PriorCarryState`](@ref) of its own; the one-argument [`prior`](@ref) reads `mu` and `sigma` off the two folded arms and `X` off the carried rows. The step is therefore quadratic in the number of assets and independent of the number of observations folded, and the buffer is memory rather than arithmetic: it exists because [`LowOrderPrior`](@ref) carries `X` for the scenario risk measures, not because anything needs refitting.
+The empirical prior folds its moments and carries its rows. [`partial_fit!`](@ref) folds each observation into each member of `me` and `ce` that folds, and appends the row to a [`PriorCarryState`](@ref) of its own. The one-argument [`prior`](@ref) reads `mu` and `sigma` off the state of a folded member, and `X` off the carried rows. A member that does not fold runs its batch verb over the carried rows, see [`read_member`](@ref). When both members fold, the cost of a step grows with the square of the number of assets, and not with the number of observations folded. The prior carries the rows because [`LowOrderPrior`](@ref) holds `X` for the scenario risk measures.
 
 ## Two caps, two names
 
-`max_scenarios` and [`Online`](@ref)'s `max_history` are different knobs, and both are wanted.
+`max_scenarios` and the `max_history` of [`Online`](@ref) are two different caps.
 
-  - `EmpiricalPrior(; max_scenarios = w)` fits `mu` and `sigma` over **every** observation and carries the last `w` rows as `X`. It is a property of the result, so it reads the same in batch and online, and it has no batch equal to assert: the moments and the scenarios come from different windows by construction.
-  - `Online(EmpiricalPrior(); max_history = w)` windows the **whole** fit: the estimator refits from the buffer, so it equals `prior(pe, X[end - w + 1:end, :])` exactly.
+  - `EmpiricalPrior(; max_scenarios = w)` fits `mu` and `sigma` over every observation, and carries the last `w` rows as `X`. The cap is a property of the result, so it cuts the same rows in batch and online. No batch fit gives the same result, because the moments and the scenarios come from different windows.
+  - `Online(EmpiricalPrior(); max_history = w)` cuts the whole fit to the last `w` observations. The estimator refits from the buffer, so the result equals `prior(pe, X[end - w + 1:end, :])`.
 
-Both set, they nest: the moments come from the last `max_history` observations and `X` from the last `max_scenarios` of those. A `max_scenarios` at or above the number of observations carried is a no-op.
+When both caps are set, the moments come from the last `max_history` observations, and `X` comes from the last `max_scenarios` of those. A `max_scenarios` at or above the number of carried observations changes nothing.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `ce`: Recursively updated via [`factory`](@ref).
-  - `me`: Recursively updated via [`factory`](@ref).
-  - `cache`: Carried unchanged via [`factory`](@ref).
+  - `ce`: Recursively updated through [`factory`](@ref).
+  - `me`: Recursively updated through [`factory`](@ref).
+  - `cache`: Carried unchanged through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `ce`: Recursively viewed via [`port_opt_view`](@ref).
-  - `me`: Recursively viewed via [`port_opt_view`](@ref).
-  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
+  - `ce`: Recursively viewed through [`port_opt_view`](@ref).
+  - `me`: Recursively viewed through [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).
 
 # Examples
 
@@ -104,8 +104,7 @@ EmpiricalPrior
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 3.1.
-  - $(ref_dict[:meucci2005]) Chapter 3.
+  - $(ref_dict[:meucci2005]) Section 2.6.5, Equations 2.219 and 2.220, Section 3.2, Equation 3.64, and Section 3.3.1, Equation 3.80.
 """
 @propagatable @concrete struct EmpiricalPrior <: AbstractLowOrderPriorEstimator_A
     """
@@ -177,7 +176,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Renders every field of an [`EmpiricalPrior`](@ref) except `cache`, and `max_scenarios` only where it is set.
 
-The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. `max_scenarios` is a cap most callers never set, and a `nothing` row for it would move every rendering of every estimator that holds a prior; it appears exactly where a caller chose one. Set `set_show_nothing_fields!(:EmpiricalPrior, true)` to render both.
+The state in `cache` belongs to an incremental fit and is not part of the configuration, and it would print under the estimator at every site that renders one. Most callers leave `max_scenarios` at `nothing`, and a `nothing` row would change the rendering of every estimator that holds a prior. The row appears only when a caller sets a cap. Set `set_show_nothing_fields!(:EmpiricalPrior, true)` to render both.
 
 # Arguments
 
@@ -205,7 +204,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 [`EmpiricalPrior`](@ref) method of [`coverage_floor`](@ref), the binding floor of its two arms.
 
-`pe.me` and `pe.ce` may each carry a [`CoveragePolicy`](@ref), and either bounds every investable column on its own, because the Investable Mask is the conjunction of the two admissions and both read the same per-asset observation count. The binding floor is therefore the **maximum** of the floors the arms state, and a mixed configuration needs no rule of its own.
+`pe.me` and `pe.ce` can each carry a [`CoveragePolicy`](@ref). The Investable Mask is the conjunction of the two admissions, and both admissions read the same count of observations per asset. So each floor bounds every investable column, and the binding floor is the maximum of the floors that the arms state. A configuration where only one arm states a floor needs no rule of its own.
 
 # Arguments
 
@@ -230,7 +229,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Scales a pair of log-return moments to an investment horizon and converts them to arithmetic returns, in place.
 
-The horizon algebra of [`EmpiricalPrior`](@ref), written once. The batch method reaches it after fitting `pe.me` and `pe.ce` on `log1p.(X)`, and `prior(pe)` with no data reaches it after reading the same two moments off their states, so the two answer identically by construction rather than by a test over two copies of the arithmetic.
+This is the one copy of the horizon conversion of [`EmpiricalPrior`](@ref). The batch method calls it after it fits `pe.me` and `pe.ce` on `log1p.(X)`. `prior(pe)` with no data calls it after it reads the same two moments off their states. The two routes then run the same arithmetic.
 
 # Mathematical definition
 
@@ -251,11 +250,11 @@ Where:
 
 # Algorithm
 
-The order of steps 3 and 4 is **not free**. Step 4 reads the `mu` step 3 left, which is ``\\hat{\\mu}_i + 1`` and not ``\\hat{\\mu}_i``, because step 5 has not yet subtracted the one, and the second closed form asks for exactly that factor. Moving step 5 in front of step 4 replaces each ``\\hat{\\mu}_i + 1`` by ``\\hat{\\mu}_i``, and on a daily return series that collapses the covariance to a small fraction of its value.
+Steps 3 to 5 must run in this order. Step 4 reads the `mu` that step 3 left, which is ``\\hat{\\mu}_i + 1``, because step 5 has not yet subtracted the one. The second closed form needs that factor. If step 5 runs before step 4, each ``\\hat{\\mu}_i + 1`` becomes ``\\hat{\\mu}_i``, and on a daily return series the covariance falls by about three orders of magnitude.
 
  1. Scale `mu` by `horizon`.
  2. Scale `sigma` by `horizon`.
- 3. Overwrite `mu` with the exponential of the first closed form, which is the arithmetic mean **plus one**.
+ 3. Overwrite `mu` with the exponential term of the first closed form. This is the arithmetic mean plus one.
  4. Overwrite `sigma` with the second closed form, whose ``\\hat{\\mu}_i + 1`` factors are the `mu` of step 3.
  5. Subtract one from `mu`.
 
@@ -267,7 +266,7 @@ The order of steps 3 and 4 is **not free**. Step 4 reads the `mu` step 3 left, w
 
 # Returns
 
-  - `nothing`. Both arguments are modified in place.
+  - `nothing`. The function changes both arguments in place.
 
 # Related
 
@@ -287,13 +286,13 @@ end
           F::Option{<:MatNum} = nothing, pnl::Option{<:AssetPanel} = nothing;
           dims::Int = 1, strict::Bool = false, kwargs...)
 
-Compute empirical prior moments for asset returns (no horizon adjustment).
+Compute the empirical prior moments of asset returns with no horizon conversion.
 
-`prior` estimates the mean and covariance of asset returns using the specified empirical prior estimator, without log-normalisation or scaling for investment horizon. The mean and covariance are computed using the estimators stored in `pe`, and returned in a [`LowOrderPrior`](@ref) result.
+`pe.me` fits the mean and `pe.ce` fits the covariance on `X` itself, with no log transform and no horizon scale. The method returns them in a [`LowOrderPrior`](@ref).
 
 # Mathematical definition
 
-`pe.me` computes the mean and `pe.ce` computes the covariance, so both moments are whatever those estimators return. Under the default pair — [`SimpleExpectedReturns`](@ref) and [`PortfolioOptimisersCovariance`](@ref) with no observation weights — they reduce to the sample moments:
+The two moments are what `pe.me` and `pe.ce` return. The default pair, [`SimpleExpectedReturns`](@ref) and [`PortfolioOptimisersCovariance`](@ref) with no observation weights, gives the sample moments:
 
 ```math
 \\begin{align}
@@ -309,17 +308,28 @@ Where:
   - ``\\boldsymbol{x}_t``: ``N \\times 1`` vector of asset returns at time ``t``.
   - $(math_dict[:T])
 
-Every choice inside `pe.me` and `pe.ce` reaches the result. A shrunk mean and a denoised covariance move both away from the display above rather than refining it.
+Any other configuration of `pe.me` or `pe.ce` changes the result. For example, a shrunk mean or a denoised covariance differs from the display above.
 
-This method takes the **arithmetic** moments of `X` directly. It applies no log transform, so it is not the ``h = 1`` case of the horizon method: that one still passes through ``\\log(1 + x_t)`` and back, and the round trip is an identity only in the limit of small returns.
+This method takes the arithmetic moments of `X`. It applies no log transform, so it is not the ``h = 1`` case of the horizon method. The horizon method converts the returns to ``\\log(1 + x_t)`` and back, and that round trip leaves the moments unchanged only in the limit of small returns.
 
 # The scenario cap
 
-`pe.max_scenarios` cuts the returns matrix the result carries down to its last `max_scenarios` rows, through [`scenario_window`](@ref), and leaves `mu` and `sigma` fitted over every observation. The cut is taken **before** the fill, so the share the fill measures is the share of the window a consumer actually reads. A `max_scenarios` of `nothing`, the default, carries every row, and a cap at or above the number of observations is a `view` that copies nothing. When the cap cuts, the result states the number of observations the moments were fitted over in `ens`, through [`scenario_ens`](@ref), so a consumer that prices a sample size reads that count and not the rows carried; otherwise `ens` stays `nothing`.
+`pe.max_scenarios` cuts the returns matrix of the result to its last `max_scenarios` rows, through [`scenario_window`](@ref). `mu` and `sigma` stay fitted over every observation. The cut runs before the fill, so the fill measures its share over the rows that a consumer reads. The default, `nothing`, carries every row. A cap at or above the number of observations returns `X` itself, and a smaller cap returns a `view`, so the cut copies nothing.
+
+When the cap cuts, [`scenario_ens`](@ref) writes into `ens` the number of observations that the moments read. A consumer that prices a sample size reads that count and not the number of carried rows. Otherwise `ens` stays `nothing`.
 
 # The scenario fill
 
-Under a **mask-aware** `pe.me` and `pe.ce` — the exponentially weighted family, and the plain family wherever a [`CoveragePolicy`](@ref) is set — an asset that lists inside the window is answered from the observations it has, so it is investable and its column of `X` still carries a `NaN` at every earlier row. [`scenario_fill`](@ref) writes `0` at those entries once, so that every consumer of the result reads a finite investable column; a non-investable asset keeps its whole `NaN` column, and `mu` and `sigma` are untouched. The fill costs accuracy at four consumers, and the message names all four: a scenario-based measure understates that asset's risk over the filled rows, a hierarchical optimiser may branch the asset alone and overweight it, an entropy pooling view on it is calibrated on the filled column, and a meta-optimiser carries the fill into the outer problem. It is silent while the **worst investable column's own** filled share stays at or below the limit [`resolve_fill_limit`](@ref) derives, warns above it, and refuses any fill under `strict`. `pe.fill_limit` defaults to `nothing`, which derives `1 - min_coverage` from the arms' coverage floor and never fires, and which names every fill where no arm states a floor. Under a **plain** estimator with no policy the fill never fires, because an asset the estimator could not cover leaves the Coverage Universe and is not investable.
+A mask-aware `pe.me` and `pe.ce` fit an asset that lists inside the window from the observations it has. The exponentially weighted family is mask-aware, and so is the plain family wherever a [`CoveragePolicy`](@ref) is set. Such an asset is investable, and its column of `X` still carries a `NaN` at every earlier row. [`scenario_fill`](@ref) writes `0` at those entries once, so that every consumer of the result reads a finite investable column. A non-investable asset keeps its whole `NaN` column, and the fill does not change `mu` or `sigma`.
+
+The fill costs accuracy at four consumers, and the message names all four:
+
+  - A scenario-based risk measure understates the risk of the asset over the filled rows.
+  - A hierarchical optimiser can put the asset in a branch of its own and overweight it.
+  - An entropy pooling view on the asset is calibrated on the filled column.
+  - A meta-optimiser carries the fill into the outer problem.
+
+The fill is silent while the filled share of the worst investable column stays at or below the limit that [`resolve_fill_limit`](@ref) derives. Above the limit it warns, and under `strict` it refuses any fill. `pe.fill_limit` defaults to `nothing`. Where an arm states a coverage floor, `nothing` derives `1 - min_coverage`, which never fires. Where no arm states a floor, `nothing` names every fill. Under a plain estimator with no policy the fill never fires, because an asset that the estimator cannot cover leaves the Coverage Universe and is not investable.
 
 # Arguments
 
@@ -328,19 +338,19 @@ Under a **mask-aware** `pe.me` and `pe.ce` — the exponentially weighted family
   - `F`: Factor returns matrix (ignored).
   - $(arg_dict[:pnl_moment])
   - $(arg_dict[:dims])
-  - `strict`: Whether a zero-filled scenario raises rather than warns. Any fill raises under `strict`; otherwise a column filled above the limit [`resolve_fill_limit`](@ref) derives warns, and every fill warns while that limit is `nothing`. It also reaches the covariance, where a peel of a [`CoveragePolicy`](@ref) refuses under `strict` and warns otherwise.
-  - `kwargs...`: Additional keyword arguments passed to mean and covariance estimators.
+  - `strict`: Whether a zero-filled scenario raises an error instead of a warning. Under `strict`, any fill raises. Otherwise a column filled above the limit that [`resolve_fill_limit`](@ref) derives warns, and every fill warns while that limit is `nothing`. `strict` also reaches the covariance, where a peel of a [`CoveragePolicy`](@ref) raises under `strict` and warns otherwise.
+  - `kwargs...`: Additional keyword arguments, passed to the mean estimator and the covariance estimator.
 
 # Validation
 
   - `dims in (1, 2)`.
   - At least one asset must be in the Coverage Universe.
-  - `pe.fill_limit` is at most `1 - min_coverage` over the arms that state a coverage floor, else a `DomainError` is thrown at the fit, because a looser limit is dead by construction.
-  - The zero-filled share of the worst investable column of `X` is at or below the limit [`resolve_fill_limit`](@ref) derives, else a warning naming the assets is emitted, or an `ArgumentError` naming them is raised under `strict`, which any fill raises. A limit of `nothing` — no arm states a floor and `pe.fill_limit` is `nothing` — is at or below no share, so any fill is named.
+  - `pe.fill_limit` is at most `1 - min_coverage` of the binding floor of the arms, see [`coverage_floor`](@ref). Otherwise the fit raises a `DomainError`, because a looser limit can never fire.
+  - The zero-filled share of the worst investable column of `X` is at or below the limit that [`resolve_fill_limit`](@ref) derives. Otherwise the fit warns and names the assets. Under `strict`, any fill raises an `ArgumentError` that names them. The limit is `nothing` when no arm states a floor and `pe.fill_limit` is `nothing`, and no share passes a limit of `nothing`, so the fit names every fill.
 
 # Returns
 
-  - `pr::LowOrderPrior`: Result object containing asset returns, mean vector, and covariance matrix.
+  - `pr::LowOrderPrior`: The prior result, which holds the asset returns, the mean vector and the covariance matrix.
 
 # Related
 
@@ -377,13 +387,13 @@ end
           F::Option{<:MatNum} = nothing, pnl::Option{<:AssetPanel} = nothing;
           dims::Int = 1, strict::Bool = false, kwargs...)
 
-Compute empirical prior moments for asset returns with investment horizon adjustment.
+Compute the empirical prior moments of asset returns at an investment horizon.
 
-`prior` estimates the mean and covariance of asset returns using the specified empirical prior estimator, applying log-normalisation and scaling for the investment horizon. The asset returns are log-transformed, moments are computed using the estimators stored in `pe`, and then rescaled according to the investment horizon. The final mean and covariance are transformed back to arithmetic returns and returned in a [`LowOrderPrior`](@ref) result.
+`pe.me` and `pe.ce` fit the mean and the covariance of the log-returns. [`horizon_moments!`](@ref) scales both moments to the horizon and converts them back to arithmetic returns. The method returns them in a [`LowOrderPrior`](@ref).
 
 # Mathematical definition
 
-`pe.me` and `pe.ce` are applied to the **log-returns** ``\\log(1 + x_t)`` rather than to `X` itself. The two log-moments are scaled by the investment horizon ``h``, then converted back to arithmetic returns:
+`pe.me` and `pe.ce` fit the log-returns ``\\log(1 + x_t)``, not `X`. The method scales the two log-moments by the investment horizon ``h``, and then converts them back to arithmetic returns:
 
 ```math
 \\begin{align}
@@ -407,28 +417,32 @@ Where:
   - ``\\hat{\\mu}_i``: Arithmetic mean return for asset ``i``.
   - ``\\hat{\\sigma}_{ij}``: Arithmetic covariance between assets ``i`` and ``j``.
 
-`X` in the returned [`LowOrderPrior`](@ref) is the arithmetic returns matrix the caller supplied. Only the moments are computed in log space.
+The `X` of the returned [`LowOrderPrior`](@ref) is the arithmetic returns matrix that the caller gave. Only the moments come from the log-returns.
 
 # Algorithm
 
-The order of steps 5 to 7 is **not free**. Step 6 reads the `mu` that step 5 left, which is ``\\hat{\\mu}_i + 1`` and not ``\\hat{\\mu}_i``, because step 7 has not yet subtracted the one. The second closed form asks for exactly that factor, so the body meets it by ordering rather than by recomputing. Moving step 7 in front of step 6 replaces each ``\\hat{\\mu}_i + 1`` by ``\\hat{\\mu}_i``, and on a daily return series that collapses the covariance to a small fraction of its value.
+Steps 5 to 7 must run in this order. Step 6 reads the `mu` that step 5 left, which is ``\\hat{\\mu}_i + 1``, because step 7 has not yet subtracted the one. The second closed form needs that factor, so the order supplies it with no second computation. If step 7 runs before step 6, each ``\\hat{\\mu}_i + 1`` becomes ``\\hat{\\mu}_i``, and on a daily return series the covariance falls by about three orders of magnitude. Steps 4 to 7 are [`horizon_moments!`](@ref).
 
  1. Orient `X` to `observations × assets` with [`dims_oriented`](@ref).
  2. Take the log-returns `X_log`, as `log1p.(X)`.
- 3. Compute the log-return mean `mu` on `X_log`, under `pe.me`, and the log-return covariance `sigma` on `X_log`, under `pe.ce`.
- 4. Scale both by `pe.horizon`, giving ``\\tilde{\\boldsymbol{\\mu}}`` and ``\\tilde{\\mathbf{\\Sigma}}``.
- 5. Overwrite `mu` with the exponential of the first closed form. This is the arithmetic mean **plus one**, because the subtraction is still to come.
+ 3. Fit the log-return mean `mu` on `X_log` with `pe.me`, and the log-return covariance `sigma` on `X_log` with `pe.ce`.
+ 4. Scale both by `pe.horizon` to get ``\\tilde{\\boldsymbol{\\mu}}`` and ``\\tilde{\\mathbf{\\Sigma}}``.
+ 5. Overwrite `mu` with the exponential term of the first closed form. This is the arithmetic mean plus one, because step 7 has not run yet.
  6. Overwrite `sigma` with the second closed form, whose ``\\hat{\\mu}_i + 1`` factors are the `mu` of step 5.
- 7. Subtract one from `mu`, giving ``\\hat{\\boldsymbol{\\mu}}``.
- 8. Return a [`LowOrderPrior`](@ref) carrying the arithmetic `X` of step 1 under [`scenario_fill`](@ref), `mu`, `sigma`, and the `ens` of [`scenario_ens`](@ref).
+ 7. Subtract one from `mu` to get ``\\hat{\\boldsymbol{\\mu}}``.
+ 8. Cut the arithmetic `X` of step 1 with [`scenario_window`](@ref), and fill it with [`scenario_fill`](@ref). Return a [`LowOrderPrior`](@ref) that holds this `X`, `mu`, `sigma` and the `ens` of [`scenario_ens`](@ref).
 
 # The scenario cap
 
-`pe.max_scenarios` cuts the returns matrix the result carries down to its last `max_scenarios` rows, through [`scenario_window`](@ref), and leaves `mu` and `sigma` fitted over every observation. The cut is taken **before** the fill, so the share the fill measures is the share of the window a consumer actually reads. A `max_scenarios` of `nothing`, the default, carries every row, and a cap at or above the number of observations is a `view` that copies nothing. When the cap cuts, the result states the number of observations the moments were fitted over in `ens`, through [`scenario_ens`](@ref), so a consumer that prices a sample size reads that count and not the rows carried; otherwise `ens` stays `nothing`.
+`pe.max_scenarios` cuts the returns matrix of the result to its last `max_scenarios` rows, through [`scenario_window`](@ref). `mu` and `sigma` stay fitted over every observation. The cut runs before the fill, so the fill measures its share over the rows that a consumer reads. The default, `nothing`, carries every row. A cap at or above the number of observations returns `X` itself, and a smaller cap returns a `view`, so the cut copies nothing.
+
+When the cap cuts, [`scenario_ens`](@ref) writes into `ens` the number of observations that the moments read. A consumer that prices a sample size reads that count and not the number of carried rows. Otherwise `ens` stays `nothing`.
 
 # The scenario fill
 
-Step 8 takes the same fill the no-horizon method takes, on the **arithmetic** `X` the caller handed in and against the arithmetic moments the result carries. Under a mask-aware `pe.me` and `pe.ce` an asset that lists inside the window is investable and its column still carries a `NaN` at every earlier row; [`scenario_fill`](@ref) writes `0` there once, silently while the worst investable column's own filled share stays at or below the limit [`resolve_fill_limit`](@ref) derives, with a warning above it, and refuses any fill under `strict`. `pe.fill_limit` defaults to `nothing`, which derives `1 - min_coverage` from the arms' coverage floor and names every fill where no arm states one. A scenario-based measure then understates that asset's risk over the filled rows, and `mu` and `sigma` are untouched.
+Step 8 applies the fill of the method with no horizon. It fills the arithmetic `X` that the caller gave, and it reads the Investable Mask off the arithmetic moments that the result carries. Under a mask-aware `pe.me` and `pe.ce`, an asset that lists inside the window is investable, and its column still carries a `NaN` at every earlier row. [`scenario_fill`](@ref) writes `0` at those entries once. The fill is silent while the filled share of the worst investable column stays at or below the limit that [`resolve_fill_limit`](@ref) derives. Above the limit it warns, and under `strict` it refuses any fill.
+
+`pe.fill_limit` defaults to `nothing`. Where an arm states a coverage floor, `nothing` derives `1 - min_coverage`. Where no arm states a floor, `nothing` names every fill. A scenario-based risk measure understates the risk of a filled asset over the filled rows. The fill does not change `mu` or `sigma`.
 
 # Arguments
 
@@ -437,19 +451,19 @@ Step 8 takes the same fill the no-horizon method takes, on the **arithmetic** `X
   - `F`: Factor returns matrix (ignored).
   - $(arg_dict[:pnl_moment])
   - $(arg_dict[:dims])
-  - `strict`: Whether a zero-filled scenario raises rather than warns. Any fill raises under `strict`; otherwise a column filled above the limit [`resolve_fill_limit`](@ref) derives warns, and every fill warns while that limit is `nothing`. It also reaches the covariance, where a peel of a [`CoveragePolicy`](@ref) refuses under `strict` and warns otherwise.
-  - `kwargs...`: Additional keyword arguments passed to mean and covariance estimators.
+  - `strict`: Whether a zero-filled scenario raises an error instead of a warning. Under `strict`, any fill raises. Otherwise a column filled above the limit that [`resolve_fill_limit`](@ref) derives warns, and every fill warns while that limit is `nothing`. `strict` also reaches the covariance, where a peel of a [`CoveragePolicy`](@ref) raises under `strict` and warns otherwise.
+  - `kwargs...`: Additional keyword arguments, passed to the mean estimator and the covariance estimator.
 
 # Validation
 
   - `dims in (1, 2)`.
   - At least one asset must be in the Coverage Universe.
-  - `pe.fill_limit` is at most `1 - min_coverage` over the arms that state a coverage floor, else a `DomainError` is thrown at the fit, because a looser limit is dead by construction.
-  - The zero-filled share of the worst investable column of `X` is at or below the limit [`resolve_fill_limit`](@ref) derives, else a warning naming the assets is emitted, or an `ArgumentError` naming them is raised under `strict`, which any fill raises. A limit of `nothing` — no arm states a floor and `pe.fill_limit` is `nothing` — is at or below no share, so any fill is named.
+  - `pe.fill_limit` is at most `1 - min_coverage` of the binding floor of the arms, see [`coverage_floor`](@ref). Otherwise the fit raises a `DomainError`, because a looser limit can never fire.
+  - The zero-filled share of the worst investable column of `X` is at or below the limit that [`resolve_fill_limit`](@ref) derives. Otherwise the fit warns and names the assets. Under `strict`, any fill raises an `ArgumentError` that names them. The limit is `nothing` when no arm states a floor and `pe.fill_limit` is `nothing`, and no share passes a limit of `nothing`, so the fit names every fill.
 
 # Returns
 
-  - `pr::LowOrderPrior`: Result object containing asset returns, mean vector, and covariance matrix.
+  - `pr::LowOrderPrior`: The prior result, which holds the asset returns, the mean vector and the covariance matrix.
 
 # Related
 

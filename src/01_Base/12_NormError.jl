@@ -3,15 +3,15 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all norm-based error algorithms.
 
-All concrete and/or abstract types representing norm-based error algorithms (such as second-order cone or norm-one error) should be subtypes of `NormError`.
+All concrete and abstract types of norm-based error algorithms, such as the second-order cone error or the norm-one error, must subtype `NormError`.
 
 # Interfaces
 
-In order to implement a new norm-based error algorithm which will work seamlessly with the library, subtype `NormError` with all necessary parameters struct, and implement the following method:
+To implement a new norm-based error algorithm, subtype `NormError` with a struct that holds its parameters, and implement the method below.
 
-  - `norm_factor(f::NormError, T::Number) -> Number`: Returns the divisor that scales the norm. The `T === nothing` case is already covered by a generic method that returns `1`.
+  - `norm_factor(f::NormError, T::Number) -> Number`: Returns the divisor that scales the norm. A generic method already returns `1` for `T === nothing`.
 
-The functor side is `norm_error`, and the model side is `set_risk_constraints!` for [`TrackingRiskMeasure`](@ref) and `set_tracking_error_constraints!` for [`TrackingError`](@ref). All three read `norm_factor`, so a new norm declares its factor once.
+`norm_error` computes the error for a value. In the JuMP model, `set_risk_constraints!` for [`TrackingRiskMeasure`](@ref) and `set_tracking_error_constraints!` for [`TrackingError`](@ref) build the error. All three read `norm_factor`, so a new norm declares its factor once.
 
 # Related
 
@@ -29,7 +29,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Second-order cone (SOC) norm-based error formulation.
 
-`L2Norm` implements a norm-based error formulation using the Euclidean (L2) norm of the difference between the portfolio and the benchmark returns, scaled by the square root of the number of observations minus the degrees of freedom (`ddof`). This is commonly used for error constraints and objectives in portfolio optimisation.
+`L2Norm` takes the Euclidean norm of the difference between the portfolio returns and the benchmark returns. It divides the norm by the square root of the number of observations minus the degrees of freedom `ddof`.
 
 # Mathematical definition
 
@@ -47,7 +47,7 @@ Where:
   - $(math_dict[:T])
   - $(math_dict[:d_ddof])
 
-[rudolf1999](@cite) minimises the sum of the squared differences, ``(\\boldsymbol{a} - \\boldsymbol{b})^{\\intercal} (\\boldsymbol{a} - \\boldsymbol{b})``, and does not centre them. [beasley2003](@cite) takes the ``\\alpha``-th root of the sum of the ``\\alpha``-th powers, divides it by ``T``, and names the case ``\\alpha = 2`` the root mean squared error. The root mean square divides by ``\\sqrt{T}`` instead, as [cajas2025](@cite) does, and so does this error. The two values differ by the factor ``\\sqrt{T}`` and have the same minimiser, but a bound on the error must be stated with the denominator here. The default `ddof = 1` gives the sample denominator ``\\sqrt{T-1}``. Set `ddof = 0` to recover the root mean square.
+[rudolf1999](@cite) minimises the sum of the squared differences, ``(\\boldsymbol{a} - \\boldsymbol{b})^{\\intercal} (\\boldsymbol{a} - \\boldsymbol{b})``, and does not centre them. [beasley2003](@cite) takes the ``\\alpha``-th root of the sum of the ``\\alpha``-th powers, divides it by ``T``, and names the case ``\\alpha = 2`` the root mean squared error. The root mean square divides by ``\\sqrt{T}``, as [cajas2025](@cite) does, and this error also does. The two values differ by the factor ``\\sqrt{T}`` and have the same minimiser, but a bound on the error must use the denominator of this error. The default `ddof = 1` gives the sample denominator ``\\sqrt{T-1}``. Set `ddof = 0` to recover the root mean square.
 
 # Fields
 
@@ -106,9 +106,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Second-order cone (SOC) squared norm-based error formulation.
 
-`SquaredL2Norm` implements a norm-based error formulation using the squared Euclidean (L2) norm of the difference between the portfolio and the benchmark returns, scaled by the number of observations minus the degrees of freedom (`ddof`). This is commonly used for norm error constraints and objectives in portfolio optimisation where squared error is preferred.
+`SquaredL2Norm` takes the squared Euclidean norm of the difference between the portfolio returns and the benchmark returns. It divides the squared norm by the number of observations minus the degrees of freedom `ddof`.
 
-The value is the square of the [`L2Norm`](@ref) error, so a `settings.ub` on a [`TrackingRiskMeasure`](@ref) carries squared units. The JuMP model converts the bound with a square root, so the two encodings accept the same bound.
+The value is the square of the [`L2Norm`](@ref) error, so a `settings.ub` on a [`TrackingRiskMeasure`](@ref) has squared units. The JuMP model converts the bound with a square root, so the two encodings accept the same bound.
 
 [rudolf1999](@cite) minimises the sum of the squared differences, which is this error times ``T - d``, and does not centre the differences. The division by ``T - d`` squares the root mean square of [cajas2025](@cite).
 
@@ -184,7 +184,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Norm-one (NOC) error formulation.
 
-`L1Norm` implements a norm-based error formulation using the L1 (norm-one) distance between the portfolio and the benchmark returns, scaled by the number of observations minus the degrees of freedom (`ddof`). This is commonly used for error constraints and objectives in portfolio optimisation where sparsity or absolute deviations are preferred.
+`L1Norm` takes the L1 distance between the portfolio returns and the benchmark returns. It divides the distance by the number of observations minus the degrees of freedom `ddof`.
 
 # Mathematical definition
 
@@ -260,7 +260,7 @@ $(DocStringExtensions.TYPEDEF)
 
 L-p norm error estimator.
 
-`LpNorm` takes the Lp-norm of the difference between the portfolio and the benchmark returns, and divides it by ``(T - d)^{1/p}``. It generalises [`L1Norm`](@ref) and [`L2Norm`](@ref) to a free norm order.
+`LpNorm` takes the Lp-norm of the difference between the portfolio returns and the benchmark returns, and divides it by ``(T - d)^{1/p}``. It extends [`L1Norm`](@ref) and [`L2Norm`](@ref) to any norm order.
 
 [beasley2003](@cite) states this family with the divisor ``T`` outside the root, ``\\lVert \\boldsymbol{a} - \\boldsymbol{b} \\rVert_p / T``. The divisor here is ``(T - d)^{1/p}``, so the error is the ``p``-th root of a mean and keeps the scale of one period as ``T`` changes. At a fixed ``T`` the two values differ by a constant factor and have the same minimiser.
 
@@ -295,7 +295,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 <= ddof`. The constructor does not bound `p`. The JuMP model does: both `set_risk_constraints!` and `set_tracking_error_constraints!` need `1 < p` for the power cone, and raise a `DomainError` otherwise. The functor accepts any `p` that `LinearAlgebra.norm` accepts.
+  - `0 <= ddof`. The constructor does not bound `p`, and the JuMP model does. Both `set_risk_constraints!` and `set_tracking_error_constraints!` need `1 < p` for the power cone, and raise a `DomainError` for each other `p`. `norm_error` accepts each `p` that `LinearAlgebra.norm` accepts.
 
 # Examples
 
@@ -340,9 +340,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-L-infinity norm (maximum absolute deviation) error estimator.
+L-infinity norm error estimator, which is the maximum absolute deviation.
 
-`LInfNorm` takes the largest absolute deviation between the portfolio and the benchmark returns, and does not scale it. The factor of [`LpNorm`](@ref) is ``(T - d)^{1/p}``, which goes to ``1`` as ``p`` grows, so the error is the largest single-period difference and carries no degrees of freedom. It is the MinMax tracking error of [rudolf1999](@cite).
+`LInfNorm` takes the largest absolute deviation between the portfolio returns and the benchmark returns, and does not scale it. The factor of [`LpNorm`](@ref) is ``(T - d)^{1/p}``, which goes to ``1`` as ``p`` increases. The error is thus the largest difference in one period, and it has no degrees of freedom. It is the MinMax tracking error of [rudolf1999](@cite).
 
 # Mathematical definition
 
@@ -392,9 +392,9 @@ struct LInfNorm <: NormError end
     norm_error(f::LInfNorm, a, b, T::Option{<:Number} = nothing)
     norm_error(f::Option{<:NormError}, a, T::Option{<:Number} = nothing)
 
-Compute the norm-based tracking error between portfolio and benchmark weights.
+Compute the norm-based tracking error between a portfolio vector and a benchmark vector, of weights or of returns.
 
-`norm_error` takes the norm that `f` selects, and divides it by the [`norm_factor`](@ref) that the same `f` declares. Each [`NormError`](@ref) subtype names one pair. The three-argument form takes the norm of `a - b`. The two-argument form takes the norm of `a` alone, for a caller that already holds the deviation vector; `f = nothing` there means an unweighted L2 norm.
+`norm_error` takes the norm that `f` selects, and divides it by the [`norm_factor`](@ref) that the same `f` declares. Each [`NormError`](@ref) subtype names one pair of a norm and a factor. The three-argument form takes the norm of `a - b`. The two-argument form takes the norm of `a` alone, for a caller that already holds the deviation vector. In that form, `f = nothing` means an unweighted L2 norm.
 
 # Mathematical definition
 
@@ -423,21 +423,21 @@ Where:
 
 # Algorithm
 
-The method Julia selects on the type of `f` is the algorithm, and every method runs the same two steps.
+The method that Julia selects on the type of `f` is the algorithm, and every method does the same two steps.
 
- 1. Take the norm that `f` names, of `a - b` in the three-argument form and of `a` alone in the two-argument form.
+ 1. Take the norm that `f` names. It is the norm of `a - b` in the three-argument form, and the norm of `a` alone in the two-argument form.
  2. Divide the norm of step 1 by [`norm_factor`](@ref) of the same `f` and `T`, which is `1` when `T` is `nothing`.
 
 # Arguments
 
-  - `f`: Norm-based error algorithm, a [`NormError`](@ref) subtype.
-  - `a`: Portfolio weights, or the deviation vector in the two-argument form.
-  - `b`: Benchmark weights.
-  - `T`: Optional number of observations.
+  - `f`: The norm-based error algorithm, a [`NormError`](@ref) subtype.
+  - `a`: The portfolio vector, or the deviation vector in the two-argument form.
+  - `b`: The benchmark vector.
+  - `T`: The optional number of observations.
 
 # Returns
 
-  - `err::Number`: Norm-based tracking error.
+  - `err::Number`: The norm-based tracking error.
 
 # Examples
 
@@ -466,27 +466,27 @@ function norm_error end
 
 Compute the denominator that scales a norm in [`norm_error`](@ref).
 
-The factor is the single place where the optional observation count `T` is turned into a divisor. [`norm_error`](@ref) and both JuMP models read it. Each [`NormError`](@ref) declares its own factor, and the `T === nothing` case is a method, not a branch inside one. A branch is what let `ifelse` evaluate `T - f.ddof` on the `nothing` path.
+This function is the one place that turns the optional observation count `T` into a divisor. [`norm_error`](@ref) and both JuMP models read it. Each [`NormError`](@ref) declares its own factor. The case `T === nothing` is a method, and not a branch inside a method. An earlier branch let `ifelse` evaluate `T - f.ddof` when `T` was `nothing`.
 
 # Algorithm
 
-The method Julia selects on the types of `f` and `T` is the algorithm. A `T` of `nothing` selects the method that returns `1`, so the `nothing` case is a method and never a branch inside one.
+The method that Julia selects on the types of `f` and `T` is the algorithm. A `T` of `nothing` selects the method that returns `1`.
 
  1. `f === nothing` gives `sqrt(T)`, the unweighted L2 factor.
  2. [`L2Norm`](@ref) gives `sqrt(T - f.ddof)`.
  3. [`SquaredL2Norm`](@ref) gives `T - f.ddof`.
  4. [`L1Norm`](@ref) gives `T - f.ddof`.
- 5. [`LpNorm`](@ref) gives `(T - f.ddof)^(1/f.p)`, taken with `cbrt` when `f.p` is `3`, the default.
- 6. [`LInfNorm`](@ref) gives `1`, the limit of the [`LpNorm`](@ref) factor as `f.p` grows.
+ 5. [`LpNorm`](@ref) gives `(T - f.ddof)^(1/f.p)`. The method uses `cbrt` when `f.p` is `3`, the default.
+ 6. [`LInfNorm`](@ref) gives `1`, the limit of the [`LpNorm`](@ref) factor as `f.p` increases.
 
 # Arguments
 
-  - `f`: Norm-based error algorithm, a [`NormError`](@ref) subtype. `nothing` means an unweighted L2 norm.
-  - `T`: Optional number of observations.
+  - `f`: The norm-based error algorithm, a [`NormError`](@ref) subtype. `nothing` means an unweighted L2 norm.
+  - `T`: The optional number of observations.
 
 # Returns
 
-  - `factor::Number`: Divisor for the norm. It is `1` when `T` is `nothing`.
+  - `factor::Number`: The divisor of the norm. It is `1` when `T` is `nothing`.
 
 # Examples
 

@@ -175,7 +175,9 @@
                 5e-4
             elseif i == 36
                 5e-3
-            elseif i in (49, 58)
+            elseif i in (49, 52, 58)
+                # The power norm measures at alpha = 1e-6 are the largest loss, which `PRM`
+                # returns exactly. The pinned values come from a solver, 5e-6 away from it.
                 5e-6
             elseif i in (45, 48)
                 1e-3
@@ -428,13 +430,74 @@
              EntropicValueatRiskRange(; slv = slv),
              RelativisticValueatRiskRange(; slv = slv), Range(),
              PowerNormValueatRiskRange(; slv = slv)]
+        # The generic range with the two tails of a specific range has the value of that
+        # range. The loop computed this and never asserted it.
         for (i, (r1, r2)) in enumerate(zip(rs1, rs2))
             res = isapprox(expected_risk(r1, w, rd.X), expected_risk(r2, w, rd.X))
             if !res
                 println("Iteration $i fails")
                 find_tol(expected_risk(r1, w, rd.X), expected_risk(r2, w, rd.X))
             end
+            @test res
         end
+        # Two different tails: the range is the sum of the loss tail on the returns and the
+        # gain tail on the negated returns.
+        x = rd.X * w
+        g = GenericValueatRiskRange(; loss = ConditionalValueatRisk(; alpha = 0.03),
+                                    gain = PowerNormValueatRisk(; alpha = 0.2, p = 3.0,
+                                                                slv = slv))
+        @test isapprox(g(x),
+                       ConditionalValueatRisk(; alpha = 0.03)(x) +
+                       PowerNormValueatRisk(; alpha = 0.2, p = 3.0, slv = slv)(-x))
+        # A tail that reads the weights is refused on a returns vector, at every length. With
+        # as many observations as assets, the functor used to return a wrong value with no
+        # error.
+        gd = GenericValueatRiskRange(;
+                                     loss = ValueatRisk(; alg = DistributionValueatRisk()),
+                                     gain = ConditionalValueatRisk())
+        @test_throws ArgumentError gd(x)
+        @test_throws ArgumentError gd(x[1:length(w)])
+        # #1821: each tail reads its own input. A `DistributionValueatRisk` tail reads `w`
+        # for the loss and `-w` for the gain, and a returns tail reads `x` and `-x`.
+        vdist = ValueatRisk(; alg = DistributionValueatRisk())
+        gdd = GenericValueatRiskRange(; loss = vdist, gain = vdist)
+        @test PortfolioOptimisers.risk_input_kind(gdd) ===
+              PortfolioOptimisers.WeightsReturnsFeesInput()
+        @test PortfolioOptimisers.risk_input_kind(gd) ===
+              PortfolioOptimisers.WeightsReturnsFeesInput()
+        @test PortfolioOptimisers.risk_input_kind(GenericValueatRiskRange(;
+                                                                          loss = ConditionalValueatRisk(),
+                                                                          gain = vdist)) ===
+              PortfolioOptimisers.WeightsReturnsFeesInput()
+        @test !PortfolioOptimisers.supports_precomputed_returns(gd)
+        @test PortfolioOptimisers.supports_precomputed_returns(g)
+        @test isapprox(expected_risk(gdd, w, pr),
+                       expected_risk(ValueatRiskRange(; alg = DistributionValueatRisk()), w,
+                                     pr))
+        # As many observations as assets: the value is the same as with every observation,
+        # because a `DistributionValueatRisk` tail reads only the moments of the prior.
+        N = length(w)
+        rN = factory(gdd, pr)
+        @test isapprox(rN(w, rd.X[1:N, :]), expected_risk(gdd, w, pr))
+        # A mixed range, with a fee. The gain tail of the returns measure reads the negated
+        # net returns of `w`, not the net returns of `-w`.
+        gm = factory(GenericValueatRiskRange(; loss = vdist,
+                                             gain = ConditionalValueatRisk(; alpha = 0.1)),
+                     pr)
+        fees = Fees(; l = 0.001)
+        xf = calc_net_returns(w, pr.X, fees)
+        vd = factory(vdist, pr)
+        @test isapprox(expected_risk(gm, w, pr, fees),
+                       vd(w) + ConditionalValueatRisk(; alpha = 0.1)(-xf))
+        @test isapprox(gm(w, pr.X, fees), expected_risk(gm, w, pr, fees))
+        # The gain tail of a `DistributionValueatRisk` is `dot(mu, w) + z * sigma(w)`.
+        gg = factory(GenericValueatRiskRange(; loss = ConditionalValueatRisk(),
+                                             gain = vdist), pr)
+        z = PortfolioOptimisers.compute_value_at_risk_z(vdist.alg.dist, vdist.alpha)
+        @test isapprox(gg(w, pr.X),
+                       ConditionalValueatRisk()(pr.X * w) +
+                       dot(pr.mu, w) +
+                       z * sqrt(dot(w, pr.sigma, w)))
     end
     @testset "Weighted range functors do not mutate their inputs (#330)" begin
         # The weighted `*Range` functors used to `reverse!` **views** into the caller's
@@ -816,6 +879,15 @@ const _VAR_MIP = typeof(ValueatRisk(; alg = MIPValueatRisk()))
 const _VAR_RANGE_MIP = typeof(ValueatRiskRange(; alg = MIPValueatRisk()))
 const _VAR_DIST = typeof(ValueatRisk(; alg = DistributionValueatRisk()))
 const _VAR_RANGE_DIST = typeof(ValueatRiskRange(; alg = DistributionValueatRisk()))
+# `GenericValueatRiskRange` takes its kind from its tails (#1821). Two returns tails read the
+# net returns. A `DistributionValueatRisk` tail on either side reads the weights.
+const _GEN_RANGE_RET = typeof(GenericValueatRiskRange())
+const _GEN_RANGE_DIST_LOSS = typeof(GenericValueatRiskRange(;
+                                                            loss = ValueatRisk(;
+                                                                               alg = DistributionValueatRisk())))
+const _GEN_RANGE_DIST_GAIN = typeof(GenericValueatRiskRange(;
+                                                            gain = ValueatRisk(;
+                                                                               alg = DistributionValueatRisk())))
 
 const _OLD_NETRETURNS = Any[WorstRealisation, _VAR_MIP, _VAR_RANGE_MIP,
                             ConditionalValueatRisk,
@@ -834,11 +906,13 @@ const _OLD_NETRETURNS = Any[WorstRealisation, _VAR_MIP, _VAR_RANGE_MIP,
                             ConditionalValueatRiskRange, OrderedWeightsArray,
                             OrderedWeightsArrayRange, BrownianDistanceVariance, MeanReturn,
                             PowerNormValueatRisk, PowerNormValueatRiskRange,
-                            PowerNormDrawdownatRisk, RelativePowerNormDrawdownatRisk]
+                            PowerNormDrawdownatRisk, RelativePowerNormDrawdownatRisk,
+                            _GEN_RANGE_RET]
 const _OLD_WEIGHTSRETURNSFEES = Any[LowOrderMoment, HighOrderMoment, TrackingRiskMeasure,
                                     RiskTrackingRiskMeasure, Kurtosis, ThirdCentralMoment,
                                     Skewness, MedianAbsoluteDeviation, VarianceSkewKurtosis,
-                                    _VAR_DIST, _VAR_RANGE_DIST]
+                                    _VAR_DIST, _VAR_RANGE_DIST, _GEN_RANGE_DIST_LOSS,
+                                    _GEN_RANGE_DIST_GAIN]
 const _OLD_WEIGHTS = Any[StandardDeviation, NegativeSkewness, TurnoverRiskMeasure, Variance,
                          UncertaintySetVariance, EqualRisk]
 
@@ -1812,12 +1886,14 @@ function rl_eta(L, c, k, lam)
 end
 # sup_q q'L subject to sum(q) = 1 and sum(q ln_k(q / (p T))) <= ln_k(1 / (alpha T)). The
 # multiplier `lam` of the ball is found by bisection on its logarithm, because the
-# divergence of the maximiser falls as `lam` rises.
+# divergence of the maximiser falls as `lam` rises. An observation of weight zero has
+# q = 0 and adds nothing to either sum, so it is dropped, and T keeps every observation.
 function rl_reference(x, alpha, k, w = nothing)
     T = length(x)
-    L = -x
     p = isnothing(w) ? fill(1 / T, T) : w ./ sum(w)
-    c = p .* T
+    keep = p .> 0
+    L = -x[keep]
+    c = p[keep] .* T
     r = rl_lnk(1 / (alpha * T), k)
     divergence(lam) = (q = rl_q(L, c, k, lam, rl_eta(L, c, k, lam));
                        sum(q .* rl_lnk.(q ./ c, k)))
@@ -1918,6 +1994,288 @@ end
                         ConditionalDrawdownatRisk(; alpha = a)(x),
                         EntropicDrawdownatRisk(; alpha = a, slv = slv)(x), rldar,
                         MaximumDrawdown()(x)])
+    end
+
+    @testset "A zero-weight loss does not stall RRM" begin
+        # The worst loss sits on an observation of weight zero. Its rows have no effect on
+        # the optimum, but a solver stalled on them, 3e-4 away from it.
+        xz = copy(x)
+        xz[1] = -0.5
+        wz = [0.0; ones(199)]
+        for (a, k) in ((0.2, 0.3), (0.05, 0.7))
+            @test isapprox(PortfolioOptimisers.RRM(xz, slv, a, k, pweights(wz)),
+                           rl_reference(xz, a, k, wz); rtol = 1e-5)
+        end
+    end
+end
+
+# The entropic risk measures of `src/16_RiskMeasures/06_XatRisk/03_EntropicXatRisk.jl`,
+# checked against the definition their docstrings state. The reference minimises
+# z ln(sum(p .* exp.(L ./ z)) / alpha) over z by a golden-section search on ln z, so it
+# shares no code with the exponential cone programme of `ERM`.
+function ev_reference(x, alpha, w = nothing)
+    p = isnothing(w) ? fill(1 / length(x), length(x)) : w ./ sum(w)
+    keep = p .> 0
+    L = -x[keep]
+    lp = log.(p[keep])
+    function f(z)
+        v = L ./ z .+ lp
+        m = maximum(v)
+        return z * (m + log(sum(exp.(v .- m))) - log(alpha))
+    end
+    lo, hi = -25.0, 10.0
+    g = (sqrt(5) - 1) / 2
+    for _ in 1:300
+        c = hi - g * (hi - lo)
+        d = lo + g * (hi - lo)
+        f(exp(c)) < f(exp(d)) ? (hi = d) : (lo = c)
+    end
+    # The infimum at z -> 0 is the largest loss.
+    return min(f(exp((lo + hi) / 2)), maximum(L))
+end
+
+@testset "Entropic risk measures" begin
+    rng = StableRNG(123)
+    x = 0.01 .* randn(rng, 200) .+ 0.0005
+    wt = rand(rng, 200) .+ 0.5
+    W = pweights(wt)
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 settings = Dict("verbose" => false),
+                 check_sol = (; allow_local = true, allow_almost = true))
+    dead = Solver(; name = :dead, solver = () -> error("no solver"))
+    erm(args...) = PortfolioOptimisers.ERM(args...)
+
+    @testset "ERM solves the Chernoff bound" begin
+        for a in (0.01, 0.05, 0.2, 0.5, 0.9)
+            @test isapprox(erm(x, slv, a), ev_reference(x, a); rtol = 1e-5)
+            @test isapprox(erm(x, slv, a, W), ev_reference(x, a, wt); rtol = 2e-5)
+        end
+        # Equal weights are the unweighted measure.
+        @test isapprox(erm(x, slv, 0.2, pweights(fill(3.0, 200))), erm(x, slv, 0.2);
+                       rtol = 1e-5)
+        # A zero-weight loss sets no risk. Before its rows were dropped, the solver stopped
+        # 48 % above the optimum.
+        xz = copy(x)
+        xz[1] = -0.5
+        wz = [0.0; ones(199)]
+        @test isapprox(erm(xz, slv, 0.2, pweights(wz)), ev_reference(xz, 0.2, wz);
+                       rtol = 1e-5)
+        @test isapprox(erm(xz, slv, 0.2, pweights(wz)), erm(xz[2:end], slv, 0.2);
+                       rtol = 1e-5)
+    end
+
+    @testset "The ends of the significance level" begin
+        # With equal weights and alpha T <= 1, the EVaR is the largest loss.
+        @test isapprox(erm(x, slv, 1 / 200), -minimum(x); rtol = 1e-5)
+        @test isapprox(erm(x, slv, 1e-3), -minimum(x); rtol = 1e-5)
+        # Level zero is the largest loss too, and builds no model.
+        @test erm(x, dead, 0) == -minimum(x)
+        # As alpha rises to one the EVaR falls to the mean loss, which it never reaches.
+        evs = [erm(x, slv, a) for a in (0.01, 0.05, 0.2, 0.5, 0.9, 0.999, 0.9999)]
+        @test issorted(evs; rev = true)
+        @test evs[end] > -mean(x)
+        @test isapprox(evs[end], -mean(x); atol = 2e-4)
+        @test_throws DomainError EntropicValueatRisk(; alpha = 1)
+    end
+
+    @testset "EVaR bounds the conditional value at risk" begin
+        a = 0.05
+        @test issorted([ValueatRisk(; alpha = a)(x), ConditionalValueatRisk(; alpha = a)(x),
+                        EntropicValueatRisk(; alpha = a, slv = slv)(x), -minimum(x)])
+    end
+
+    @testset "ERM tries each solver, and returns NaN when none solves" begin
+        @test isnan(erm(x, dead, 0.05))
+        @test isnan(erm(x, dead, 0.05, W))
+        @test isnan(erm(x, [dead, dead], 0.05))
+        @test isapprox(erm(x, [dead, slv], 0.05), ev_reference(x, 0.05); rtol = 1e-5)
+        @test_throws IsEmptyError erm(x, Solver[], 0.05)
+        @test_throws DimensionMismatch erm(x, slv, 0.05, pweights(ones(10)))
+        for T in (EntropicValueatRisk, EntropicValueatRiskRange, EntropicDrawdownatRisk,
+                  RelativeEntropicDrawdownatRisk)
+            @test_throws IsEmptyError T(; slv = Solver[])
+        end
+        # The functor needs a solver, and `factory` fills it.
+        @test_throws MethodError EntropicValueatRisk()(x)
+        pr = prior(EmpiricalPrior(), hcat(x, 0.01 .* randn(StableRNG(7), 200)))
+        @test factory(EntropicValueatRisk(), pr, slv).slv === slv
+    end
+
+    @testset "The range and the drawdown measures read their series" begin
+        r = EntropicValueatRiskRange(; slv = slv, alpha = 0.2, beta = 0.1)
+        @test isapprox(r(x), ev_reference(x, 0.2) + ev_reference(-x, 0.1); rtol = 1e-5)
+        dd = cumsum(x) .- accumulate(max, cumsum(x); init = 0.0)
+        rdd = cumprod(1 .+ x) ./ accumulate(max, cumprod(1 .+ x); init = 1.0) .- 1
+        @test isapprox(EntropicDrawdownatRisk(; slv = slv, alpha = 0.2)(x),
+                       ev_reference(dd, 0.2); rtol = 1e-5)
+        @test isapprox(RelativeEntropicDrawdownatRisk(; slv = slv, alpha = 0.2)(x),
+                       ev_reference(rdd, 0.2); rtol = 1e-5)
+    end
+end
+
+# The power norm risk measures of `src/16_RiskMeasures/06_XatRisk/05_PowerNormXatRisk.jl`,
+# checked against the definition their docstrings state. The reference minimises
+# eta + (sum(q .* max.(L .- eta, 0) .^ p))^(1 / p) / alpha over eta by a golden-section search,
+# because the objective is convex in eta, so it shares no code with the power cone programme
+# of `PRM`.
+function pn_reference(x, alpha, p, w = nothing)
+    q = isnothing(w) ? fill(1 / length(x), length(x)) : w ./ sum(w)
+    keep = q .> 0
+    L = -x[keep]
+    q = q[keep]
+    f(eta) = eta + (sum(q .* max.(L .- eta, 0) .^ p))^(1 / p) / alpha
+    lo, hi = minimum(L), maximum(L)
+    g = (sqrt(5) - 1) / 2
+    for _ in 1:400
+        c = hi - g * (hi - lo)
+        d = lo + g * (hi - lo)
+        f(c) < f(d) ? (hi = d) : (lo = c)
+    end
+    return min(f((lo + hi) / 2), maximum(L))
+end
+
+@testset "Power norm risk measures" begin
+    rng = StableRNG(603)
+    x = 0.01 .* randn(rng, 1000) .+ 0.0005
+    wt = rand(rng, 1000) .+ 0.5
+    W = pweights(wt)
+    # Clarabel can stall on a power cone programme, so the measures take a list of solvers,
+    # each with a smaller step. None of them loosens the tolerances.
+    slv = [Solver(; name = Symbol(:clarabel, k), solver = Clarabel.Optimizer,
+                  settings = Dict("verbose" => false, "max_step_fraction" => f),
+                  check_sol = (; allow_local = true, allow_almost = true))
+           for (k, f) in enumerate((0.99, 0.9, 0.8, 0.7))]
+    dead = Solver(; name = :dead, solver = () -> error("no solver"))
+    prm(args...) = PortfolioOptimisers.PRM(args...)
+
+    @testset "PRM solves the power norm minimum" begin
+        for (a, p) in ((0.2, 2.0), (0.5, 3.0), (0.9, 2.0), (0.2, 1.1))
+            @test isapprox(prm(x, slv, a, p), pn_reference(x, a, p); rtol = 1e-5)
+            @test isapprox(prm(x, slv, a, p, W), pn_reference(x, a, p, wt); rtol = 1e-5)
+        end
+        # Equal weights are the unweighted measure.
+        @test isapprox(prm(x, slv, 0.2, 2.0, pweights(fill(3.0, 1000))),
+                       prm(x, slv, 0.2, 2.0); rtol = 1e-5)
+        # A zero-weight loss sets no risk, and the model holds no row for it.
+        xz = copy(x)
+        xz[1] = -0.5
+        wz = [0.0; ones(999)]
+        @test isapprox(prm(xz, slv, 0.2, 2.0, pweights(wz)), pn_reference(xz, 0.2, 2.0, wz);
+                       rtol = 1e-5)
+        @test isapprox(prm(xz, slv, 0.2, 2.0, pweights(wz)), prm(xz[2:end], slv, 0.2, 2.0);
+                       rtol = 1e-5)
+    end
+
+    @testset "The largest loss, without a model" begin
+        # alpha * pi^(-1/p) <= 1: the value is the largest loss, and no solver is called.
+        # 0.05 * 1000^(1/3) = 0.5.
+        @test prm(x, dead, 0.05, 3.0) == -minimum(x)
+        # 0.05 * 1000^(1/2) = 1.58 > 1: the model is built, and the dead solver fails.
+        @test isnan(prm(x, dead, 0.05, 2.0))
+        # p >= ln(pi) / ln(alpha) is the condition. At alpha = 0.2 the bound is 4.29.
+        @test PowerNormValueatRisk(; alpha = 0.2, p = 4.3, slv = dead)(x) ==
+              WorstRealisation()(x)
+        @test pn_reference(x, 0.2, 4.2) < -minimum(x)
+        # A tie of 25 observations raises pi to 0.025, and 0.05 * 0.025^(-1/2) = 0.32.
+        xt = copy(x)
+        xt[1:25] .= minimum(x) - 0.01
+        @test prm(xt, dead, 0.05, 2.0) == -minimum(xt)
+        # A weight carries the same share. Without it, the share is 1 / 1000.
+        k = ones(Int, 1000)
+        k[argmin(x)] = 25
+        @test prm(x, dead, 0.05, 2.0, fweights(k)) == -minimum(x)
+        # The largest loss on a zero-weight observation does not count.
+        xz = copy(x)
+        xz[1] = -0.5
+        wz = [0.0; ones(999)]
+        @test prm(xz, dead, 0.05, 3.0, pweights(wz)) == -minimum(xz[2:end])
+    end
+
+    @testset "The order of the power norm" begin
+        # p = 1 is the Conditional Value-at-Risk of the definition, but the power cone of
+        # order one is degenerate, so every constructor refuses it.
+        @test isapprox(pn_reference(x, 0.2, 1.0), ConditionalValueatRisk(; alpha = 0.2)(x);
+                       rtol = 1e-10)
+        for T in (PowerNormValueatRisk, PowerNormDrawdownatRisk,
+                  RelativePowerNormDrawdownatRisk)
+            @test_throws DomainError T(; p = 1.0)
+            @test_throws DomainError T(; p = 0.5)
+        end
+        @test_throws DomainError PowerNormValueatRiskRange(; pa = 1.0)
+        @test_throws DomainError PowerNormValueatRiskRange(; pb = 1.0)
+        # As p falls to one, the measure falls to the Conditional Value-at-Risk.
+        cv = ConditionalValueatRisk(; alpha = 0.2)(x)
+        vs = [prm(x, slv, 0.2, p) for p in (3.0, 2.0, 1.5, 1.1, 1.01, 1.001)]
+        @test issorted(vs; rev = true)
+        @test all(>(cv), vs)
+        @test isapprox(vs[end], cv; rtol = 2e-3)
+        # The order of the docstring, with the largest loss on top.
+        @test issorted([cv, prm(x, slv, 0.2, 1.5), prm(x, slv, 0.2, 2.0),
+                        prm(x, slv, 0.2, 3.0), -minimum(x)])
+    end
+
+    @testset "No order holds against the Entropic Value-at-Risk" begin
+        ev(y) = EntropicValueatRisk(; alpha = 0.05, slv = slv)(y)
+        # On a short sample the power norm measure is the largest loss, above the EVaR.
+        xa = 0.01 .* randn(StableRNG(21), 200)
+        @test ev(xa) < PowerNormValueatRisk(; alpha = 0.05, slv = slv)(xa) == -minimum(xa)
+        # With a heavy tail and a small order, the EVaR is the larger.
+        xb = 0.01 .* randn(StableRNG(22), 2000)
+        xb[1:20] .= -0.2
+        pb = prm(xb, slv, 0.05, 1.2)
+        @test isapprox(pb, pn_reference(xb, 0.05, 1.2); rtol = 1e-5)
+        @test pb < ev(xb)
+    end
+
+    @testset "PRM tries each solver, and returns NaN when none solves" begin
+        @test isnan(prm(x, dead, 0.2, 2.0))
+        @test isnan(prm(x, dead, 0.2, 2.0, W))
+        @test isnan(prm(x, [dead, dead], 0.2, 2.0))
+        @test isapprox(prm(x, [dead, slv[1]], 0.2, 2.0), pn_reference(x, 0.2, 2.0);
+                       rtol = 1e-5)
+        @test_throws IsEmptyError prm(x, Solver[], 0.2, 2.0)
+        @test_throws DimensionMismatch prm(x, slv, 0.2, 2.0, pweights(ones(10)))
+        for T in (PowerNormValueatRisk, PowerNormValueatRiskRange, PowerNormDrawdownatRisk,
+                  RelativePowerNormDrawdownatRisk)
+            @test_throws IsEmptyError T(; slv = Solver[])
+        end
+        # The functor needs a solver, and `factory` fills it.
+        @test_throws MethodError PowerNormValueatRisk()(x)
+        pr = prior(EmpiricalPrior(), hcat(x, 0.01 .* randn(StableRNG(7), 1000)))
+        @test factory(PowerNormValueatRisk(), pr, slv).slv === slv
+    end
+
+    @testset "The range and the drawdown measures read their series" begin
+        r = PowerNormValueatRiskRange(; slv = slv, alpha = 0.2, pa = 2.0, beta = 0.5,
+                                      pb = 3.0)
+        @test isapprox(r(x), pn_reference(x, 0.2, 2.0) + pn_reference(-x, 0.5, 3.0);
+                       rtol = 2e-5)
+        y = x[1:200]
+        dd = cumsum(y) .- accumulate(max, cumsum(y); init = 0.0)
+        rdd = cumprod(1 .+ y) ./ accumulate(max, cumprod(1 .+ y); init = 1.0) .- 1
+        pd = PowerNormDrawdownatRisk(; slv = slv, alpha = 0.2)(y)
+        @test isapprox(pd, pn_reference(dd, 0.2, 2.0); rtol = 1e-5)
+        @test isapprox(RelativePowerNormDrawdownatRisk(; slv = slv, alpha = 0.2)(y),
+                       pn_reference(rdd, 0.2, 2.0); rtol = 1e-5)
+        @test issorted([ConditionalDrawdownatRisk(; alpha = 0.2)(y), pd,
+                        MaximumDrawdown()(y)])
+    end
+
+    @testset "A zero-weight loss does not move the portfolio" begin
+        # The crash row of weight zero has no rows in the model, so the optimum is the
+        # optimum without the row. Before, the weights moved by 6e-4 at alpha = 0.1, p = 3.
+        Xp = 0.01 .* randn(StableRNG(7), 200, 5) .+ 0.0005
+        Xc = vcat([-0.5 -0.4 -0.45 -0.5 -0.3], Xp)
+        wc = pweights([0.0; ones(200)])
+        for (a, p) in ((0.2, 2.0), (0.1, 3.0))
+            wA = optimise(MeanRisk(; r = PowerNormValueatRisk(; alpha = a, p = p, w = wc),
+                                   opt = JuMPOptimiser(; pe = prior(EmpiricalPrior(), Xc),
+                                                       slv = slv))).w
+            wB = optimise(MeanRisk(; r = PowerNormValueatRisk(; alpha = a, p = p),
+                                   opt = JuMPOptimiser(; pe = prior(EmpiricalPrior(), Xp),
+                                                       slv = slv))).w
+            @test isapprox(wA, wB; atol = 1e-6)
+        end
     end
 end
 
@@ -2141,6 +2499,58 @@ end
             @test PortfolioOptimisers.resolve_deferred_quantities(r, pr) === r
         end
     end
+
+    @testset "The radius is in the units of the series (#601)" begin
+        # Scale the scenarios and every radius by c. While the support constraint is slack,
+        # the dual program scales tau, s and the risk by c and keeps lambda and the weights, so
+        # a radius read in any other units breaks the identity. At c = 10 the support binds on
+        # this sample and the identity fails, because the support is in absolute returns.
+        risk_w(X, r) = (sol = optimise(MeanRisk(; r = r, obj = MinimumRisk(),
+                                                opt = JuMPOptimiser(;
+                                                                    pe = prior(EmpiricalPrior(),
+                                                                               X),
+                                                                    slv = slv)));
+                        (JuMP.value(sol.model[:risk]), sol.w))
+        for c in (0.5, 2.0), (alpha, l, r) in ((0.05, 1.0, 1e-4), (0.05, 1.0, 0.02))
+            for R in
+                (rd -> DistributionallyRobustConditionalValueatRisk(; alpha = alpha, l = l,
+                                                                    r = rd),
+                 rd -> DistributionallyRobustConditionalDrawdownatRisk(; alpha = alpha,
+                                                                       l = l, r = rd),
+                 rd -> DistributionallyRobustConditionalValueatRiskRange(; alpha = alpha,
+                                                                         l_a = l, r_a = rd,
+                                                                         beta = 0.1,
+                                                                         l_b = 2.0,
+                                                                         r_b = 2 * rd))
+                v, w = risk_w(X, R(r))
+                vc, wc = risk_w(c .* X, R(c * r))
+                @test isapprox(vc, c * v; rtol = 1e-6)
+                @test isapprox(wc, w; atol = 1e-6)
+            end
+        end
+        # A drawdown adds many returns, so on this sample the mean absolute drawdown of every
+        # asset is larger than its mean absolute return.
+        D = PortfolioOptimisers.absolute_drawdown_arr(X)
+        @test all(vec(mean(abs, D; dims = 1)) .> vec(mean(abs, X; dims = 1)))
+    end
+
+    @testset "The tail means by hand at a fractional alpha T (#601)" begin
+        # T = 10. At alpha = 0.2 the two largest losses, 0.04 and 0.03, form the tail. At
+        # alpha = 0.25, alpha T = 2.5, so the third largest loss, 0.02, enters at half weight.
+        x = [0.03, -0.01, 0.02, -0.04, 0.05, 0.0, -0.02, 0.01, -0.03, 0.04]
+        @test ConditionalValueatRisk(; alpha = 0.2)(x) ≈ (0.04 + 0.03) / 2
+        @test ConditionalValueatRisk(; alpha = 0.25)(x) ≈ (0.04 + 0.03 + 0.5 * 0.02) / 2.5
+        # The path of the exact drawdown test of #600: the absolute drawdowns are
+        # (0, 1/5, 3/20, 1/20, 3/20) and the relative ones (0, 1/5, 4/25, 19/250, 421/2500).
+        # The deepest drawdown is 1/5 on both paths, and the second deepest differs.
+        y = [0.1, -0.2, 0.05, 0.1, -0.1]
+        for (alpha, cd, rcd) in
+            ((0.2, 0.2, 0.2), (0.4, (0.2 + 0.15) / 2, (0.2 + 0.1684) / 2),
+             (0.3, (0.2 + 0.5 * 0.15) / 1.5, (0.2 + 0.5 * 0.1684) / 1.5))
+            @test ConditionalDrawdownatRisk(; alpha = alpha)(y) ≈ cd
+            @test RelativeConditionalDrawdownatRisk(; alpha = alpha)(y) ≈ rcd
+        end
+    end
 end
 
 # A per-asset moment target centres a net series on its net mean (#1320). The series a moment
@@ -2316,6 +2726,30 @@ end
             optimize!(m)
             @test isapprox(PO.ucs_variance(box, S, v), objective_value(m); rtol = 1e-10)
         end
+        # The box value omits the condition that the matrix is positive semidefinite, as the
+        # ellipsoid does. Corners that are not semidefinite put it above the worst case of the
+        # set, and the model reaches that worst case through the slack of its lifted matrix.
+        boxn = BoxUncertaintySet(; lb = [0.01 -0.9; -0.9 0.02], ub = [0.5 0.9; 0.9 0.5])
+        wn = [0.5, 0.5]
+        m = tight_clarabel()
+        @variable(m, Sg[1:2, 1:2], PSD)
+        @constraint(m, boxn.lb .<= Sg)
+        @constraint(m, Sg .<= boxn.ub)
+        @objective(m, Max, dot(wn * transpose(wn), Sg))
+        optimize!(m)
+        @test PO.ucs_variance(boxn, S[1:2, 1:2], wn) ≈ 0.7
+        @test isapprox(objective_value(m), 0.5; rtol = 1e-8)
+        slvn = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                      settings = Dict("verbose" => false, "max_iter" => 500,
+                                      "tol_gap_abs" => 1e-10, "tol_gap_rel" => 1e-10,
+                                      "tol_feas" => 1e-10),
+                      check_sol = (; allow_local = true, allow_almost = true))
+        resn = optimise(MeanRisk(; r = UncertaintySetVariance(; ucs = boxn),
+                                 obj = MinimumRisk(),
+                                 opt = JuMPOptimiser(; slv = slvn,
+                                                     wb = WeightBounds(; lb = wn, ub = wn))),
+                        ReturnsResult(; X = X[:, 1:2], nx = ["A1", "A2"]))
+        @test isapprox(value(resn.model[:risk]), 0.5; rtol = 1e-6)
         # Ellipsoid: the value is the worst case without the condition that the matrix is
         # positive semidefinite, and it lies above the worst case with that condition.
         L = cholesky(Om).L
@@ -2708,6 +3142,19 @@ end
         @test solved_risk(ConditionalValueatRisk(; alpha = 0))[1] ≈ 0.2 atol = 1e-6
         @test solved_risk(ConditionalValueatRisk(; alpha = 0, w = wo0))[1] < 0.1
         @test solved_risk(EntropicValueatRisk(; alpha = 0, w = wo0))[1] < 0.1
+        # At a positive level the zero-weight loss sets no risk either. Its cone rows have no
+        # effect on the optimum, but the solver stalled on them before they were dropped.
+        for r in (EntropicValueatRisk(; alpha = 0.2, w = wo0),
+                  EntropicDrawdownatRisk(; alpha = 0.2, w = wo0),
+                  RelativisticValueatRisk(; alpha = 0.2, w = wo0),
+                  RelativisticDrawdownatRisk(; alpha = 0.2, w = wo0))
+            model_risk, functor_risk = solved_risk(r)
+            @test isapprox(model_risk, functor_risk; rtol = 1e-5)
+        end
+        res = optimise(MeanRisk(; r = EntropicValueatRisk(; alpha = 0.2, w = wo0),
+                                obj = MinimumRisk(), opt = opt), rd)
+        @test isapprox(JuMP.value(res.model[:risk]),
+                       PortfolioOptimisers.ERM(X[2:end, :] * res.w, slv, 0.2); rtol = 1e-5)
         # Two Ulcer Index measures with different weights build two expressions.
         res = optimise(MeanRisk(;
                                 r = [UlcerIndex(; w = wo),

@@ -232,7 +232,7 @@ end
                                                                                      val = 0.01)]))
         # Meta hosts accept schedules in their own wb/fees.
         mr0 = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
-        sr = SubsetResampling(; opt = mr0,
+        sr = SubsetResampling(; subset_size = 0.8, opt = mr0,
                               wb = TimeDependent([WeightBounds(), WeightBounds()]))
         @test PortfolioOptimisers.is_time_dependent(sr)
         @test PortfolioOptimisers.time_dependent_fields(sr) == (:wb,)
@@ -292,7 +292,7 @@ end
               0.01
         # Meta-optimisers resolve their own fields and forward the per-fold update to
         # their inner estimators.
-        sr = SubsetResampling(; opt = mr,
+        sr = SubsetResampling(; subset_size = 0.8, opt = mr,
                               wb = TimeDependent([WeightBounds(; lb = 0.0, ub = 0.9),
                                                   WeightBounds(; lb = 0.0, ub = 0.8)]))
         @test PortfolioOptimisers.is_time_dependent(sr)

@@ -3,14 +3,14 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all positive definite matrix estimator types.
 
-All concrete and/or abstract types that implement positive definite matrix projection or estimation should be subtypes of `AbstractPosdefEstimator`.
+A type that projects a matrix to a positive definite matrix is a subtype of `AbstractPosdefEstimator`.
 
 # Interfaces
 
-In order to implement a new positive definite matrix estimator which will work seamlessly with the library, subtype `AbstractPosdefEstimator` with all necessary parameters as part of the struct, and implement the following methods:
+To add a positive definite matrix estimator, subtype `AbstractPosdefEstimator`, keep its parameters in the fields of the struct, and add these methods:
 
-  - `posdef!(pdm::AbstractPosdefEstimator, X::MatNum) -> MatNum`: In-place projection of a matrix to the nearest positive definite matrix.
-  - `posdef(pdm::AbstractPosdefEstimator, X::MatNum) -> MatNum`: Optional out-of-place projection of a matrix to the nearest positive definite matrix. A fallback method copies `X` and calls `posdef!`, so it is only needed if the copy can be avoided.
+  - `posdef!(pdm::AbstractPosdefEstimator, X::MatNum) -> MatNum`: Projects `X` in place to the nearest positive definite matrix.
+  - `posdef(pdm::AbstractPosdefEstimator, X::MatNum) -> MatNum`: Optional. Returns the projection of `X` in a new matrix. A fallback method copies `X` and calls `posdef!`, so add this method only when it avoids the copy.
 
 ## Arguments
 
@@ -23,7 +23,7 @@ In order to implement a new positive definite matrix estimator which will work s
 
 # Examples
 
-We can create a dummy positive definite estimator as follows:
+The example below defines a minimal positive definite estimator.
 
 ```jldoctest
 julia> struct MyPosdefEstimator <: PortfolioOptimisers.AbstractPosdefEstimator end
@@ -68,13 +68,13 @@ $(DocStringExtensions.TYPEDEF)
 
 Repairs a covariance matrix by a clip of the eigenvalues of its correlation matrix, and keeps its variances. It is an algorithm that [`Posdef`](@ref) takes, beside the algorithms of `NearestCorrelationMatrix.jl`.
 
-The algorithm owns its acceptance test. A matrix that passes the Cholesky factorisation, whose covariance eigenvalues are positive, and whose smallest correlation eigenvalue is at least `tau / 2` is returned unchanged. Any other matrix is repaired: the correlation eigenvalues are clipped at `tau`, the diagonal is scaled back to one, and the variances are restored. When the result fails the same test, the clip runs once more at `10 * tau`.
+The algorithm has its own acceptance test. It returns a matrix unchanged when the matrix passes the Cholesky factorisation, its covariance eigenvalues are positive, and its smallest correlation eigenvalue is at least `tau / 2`. It repairs any other matrix. It clips the correlation eigenvalues at `tau`, scales the diagonal back to one, and restores the variances. When the result fails the same test, the clip runs once more at `10 * tau`.
 
 `Newton`, the default of [`Posdef`](@ref), finds the nearest correlation matrix in the Frobenius norm. The clip is a spectral repair with a floor on the eigenvalues, so it is not the nearest matrix, but its smallest eigenvalue is bounded away from zero.
 
 # Mathematical definition
 
-The covariance ``\\mathbf{\\Sigma}`` is standardised, and the eigenvalues of the correlation matrix ``\\mathbf{C}`` are clipped at ``\\tau``:
+The algorithm standardises the covariance ``\\mathbf{\\Sigma}`` into the correlation matrix ``\\mathbf{C}``, and clips the eigenvalues of ``\\mathbf{C}`` at ``\\tau``:
 
 ```math
 \\begin{align}
@@ -87,7 +87,7 @@ The covariance ``\\mathbf{\\Sigma}`` is standardised, and the eigenvalues of the
 
 Section 3 of [rousseeuw1993transformation](@cite) first states the clip and the scaling of the diagonal. It replaces the negative eigenvalues by zero, or by a small positive number ``\\Delta`` when the result must be positive definite, and it then scales the diagonal back to one. That work replaces only the negative eigenvalues, and this algorithm lifts every eigenvalue below ``\\tau``. At ``\\tau = 0.05`` this algorithm reproduces its Equation 3.3, the repair of the matrix of its Equation 2.5. Equations 8 to 13 of [rebonato2000](@cite) state the clip again with a floor of zero, for the correlation matrices of risk management. The standardisation of a covariance, the restored variances, the acceptance test and the retry are this library's.
 
-The repair is accepted when ``\\hat{\\mathbf{\\Sigma}}`` has a Cholesky factor, ``\\lambda_{\\min}(\\hat{\\mathbf{\\Sigma}}) > 0`` and ``\\lambda_{\\min}(\\hat{\\mathbf{C}}) \\geq \\tau / 2``. The half floor absorbs the round-off of the scaling, so a matrix that was repaired once is not repaired again. After the retry at ``10 \\tau``, the repair is also accepted when the Cholesky factor exists and ``\\lambda_{\\min}(\\hat{\\mathbf{\\Sigma}}) \\geq -n\\, \\varepsilon \\max_i |\\lambda_i(\\hat{\\mathbf{\\Sigma}})|``.
+The algorithm accepts the repair when ``\\hat{\\mathbf{\\Sigma}}`` has a Cholesky factor, ``\\lambda_{\\min}(\\hat{\\mathbf{\\Sigma}}) > 0`` and ``\\lambda_{\\min}(\\hat{\\mathbf{C}}) \\geq \\tau / 2``. The half floor absorbs the round-off of the scaling, so the algorithm does not repair a matrix a second time. After the retry at ``10 \\tau``, the algorithm also accepts the repair when the Cholesky factor exists and ``\\lambda_{\\min}(\\hat{\\mathbf{\\Sigma}}) \\geq -n\\, \\varepsilon \\max_i |\\lambda_i(\\hat{\\mathbf{\\Sigma}})|``.
 
 With `higham = true`, Higham's alternating projections with Dykstra's correction replace ``\\mathbf{C}`` before the clip. Each iteration projects onto the positive semidefinite cone with an eigenvalue floor of ``5 \\varepsilon``, and then onto the matrices of unit diagonal:
 
@@ -100,26 +100,26 @@ With `higham = true`, Higham's alternating projections with Dykstra's correction
 \\end{align}
 ```
 
-The iterations start at ``\\mathbf{Y}_0 = \\mathbf{C}`` and ``\\Delta\\mathbf{S}_0 = \\mathbf{0}``. They stop when ``\\lambda_{\\min}(\\mathbf{Y}_k) \\geq -n\\, \\varepsilon \\max_i |\\lambda_i(\\mathbf{Y}_k)|``, or after `iter` iterations. The clip then runs on the last ``\\mathbf{Y}_k``, so a sequence that has not converged still gives a repaired matrix, and the call is never refused for it.
+The iterations start at ``\\mathbf{Y}_0 = \\mathbf{C}`` and ``\\Delta\\mathbf{S}_0 = \\mathbf{0}``. They stop when ``\\lambda_{\\min}(\\mathbf{Y}_k) \\geq -n\\, \\varepsilon \\max_i |\\lambda_i(\\mathbf{Y}_k)|``, or after `iter` iterations. The clip then runs on the last ``\\mathbf{Y}_k``, so a sequence that has not converged still gives a repaired matrix, and the algorithm never refuses the call for that reason.
 
 This is Algorithm 3.3 of [higham2002](@cite) with the unweighted Frobenius norm. That algorithm projects onto the positive semidefinite cone with a floor of zero, and it states no stop test. Section 4 of that work stops on the relative change of the iterates, Equation 4.1. The floor of ``5 \\varepsilon`` and the stop test above are this library's changes.
 
 Where:
 
-  - ``\\mathbf{\\Sigma}``: Input covariance matrix.
-  - ``\\mathbf{D} = \\mathrm{Diag}(\\boldsymbol{\\sigma})``: Diagonal matrix of the standard deviations ``\\sigma_i = \\sqrt{\\mathbf{\\Sigma}_{ii}}``.
-  - ``\\mathbf{C}``: Correlation matrix of ``\\mathbf{\\Sigma}``, or the last iterate of the alternating projections.
-  - ``\\mathbf{V}``, ``\\boldsymbol{\\lambda}``: Eigenvectors and eigenvalues of ``\\mathbf{C}``.
-  - ``\\tau``: Floor of the correlation eigenvalues, the field `tau`.
-  - ``\\mathbf{Y}``: Correlation matrix with the clipped spectrum, before the scaling of its diagonal.
-  - ``\\hat{\\mathbf{C}}``: Repaired correlation matrix.
-  - ``\\hat{\\mathbf{\\Sigma}}``: Repaired covariance matrix.
-  - ``\\lambda_{\\min}(\\cdot)``: Smallest eigenvalue of a matrix.
-  - ``n``: Number of rows of ``\\mathbf{\\Sigma}``.
+  - ``\\mathbf{\\Sigma}``: The input covariance matrix.
+  - ``\\mathbf{D} = \\mathrm{Diag}(\\boldsymbol{\\sigma})``: The diagonal matrix of the standard deviations ``\\sigma_i = \\sqrt{\\mathbf{\\Sigma}_{ii}}``.
+  - ``\\mathbf{C}``: The correlation matrix of ``\\mathbf{\\Sigma}``, or the last iterate of the alternating projections.
+  - ``\\mathbf{V}``, ``\\boldsymbol{\\lambda}``: The eigenvectors and the eigenvalues of ``\\mathbf{C}``.
+  - ``\\tau``: The floor of the correlation eigenvalues, the field `tau`.
+  - ``\\mathbf{Y}``: The correlation matrix with the clipped spectrum, before the scaling of its diagonal.
+  - ``\\hat{\\mathbf{C}}``: The repaired correlation matrix.
+  - ``\\hat{\\mathbf{\\Sigma}}``: The repaired covariance matrix.
+  - ``\\lambda_{\\min}(\\cdot)``: The smallest eigenvalue of a matrix.
+  - ``n``: The number of rows of ``\\mathbf{\\Sigma}``.
   - $(math_dict[:eps_machine])
-  - ``\\mathbf{R}_k``, ``\\mathbf{X}_k``, ``\\mathbf{Y}_k``: Corrected input, positive semidefinite projection and unit-diagonal projection of iteration ``k``.
-  - ``\\mathbf{V}_k``: Eigenvectors of ``\\mathbf{R}_k``.
-  - ``\\Delta\\mathbf{S}_k``: Dykstra's correction of iteration ``k``.
+  - ``\\mathbf{R}_k``, ``\\mathbf{X}_k``, ``\\mathbf{Y}_k``: The corrected input, the positive semidefinite projection and the unit-diagonal projection of iteration ``k``.
+  - ``\\mathbf{V}_k``: The eigenvectors of ``\\mathbf{R}_k``.
+  - ``\\Delta\\mathbf{S}_k``: The correction of Dykstra at iteration ``k``.
 
 # Algorithm
 
@@ -131,7 +131,7 @@ Where:
  4. When `higham` is `true`, replace `C` with the last iterate of [`higham_alternating_projections`](@ref).
  5. Take the eigen decomposition of `C` once.
  6. For `tau` and then `10 * tau`: clip the eigenvalues, rebuild `Y`, scale its diagonal to one, scale it back to a covariance, symmetrise it, restore the variances, and return it when [`clipped_repair_holds`](@ref) accepts it.
- 7. Return the last result when its smallest eigenvalue is at least `-n * eps * max|λ|`, and refuse it with a [`PosdefRepairError`](@ref) otherwise, as [`assert_posdef_repair`](@ref) states. A last result with no Cholesky factor is returned with no message when it passes this test.
+ 7. Return the last result when its smallest eigenvalue is at least `-n * eps * max|λ|`, and refuse it with a [`PosdefRepairError`](@ref) otherwise, as [`assert_posdef_repair`](@ref) states. When a last result with no Cholesky factor passes this test, the algorithm returns it with no message.
 
 # Fields
 
@@ -204,7 +204,7 @@ true
     """
     higham
     """
-    Largest number of iterations of the alternating projections. It is read only when `higham` is `true`.
+    Largest number of iterations of the alternating projections. The algorithm reads it only when `higham` is `true`.
     """
     iter
     function ClippedNearestCorrelation(tau::Number, higham::Bool, iter::Integer)
@@ -220,9 +220,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Projects a matrix to the nearest positive definite matrix, typically used for co-moment matrices.
+Projects a co-moment matrix to the nearest positive definite matrix.
 
-`Posdef` encapsulates all parameters required for positive definite matrix projection in [`posdef!`](@ref) and [`posdef`](@ref) to perform the nearest positive definite projection according to the estimator.
+`Posdef` holds the algorithm and the keyword arguments that [`posdef!`](@ref) and [`posdef`](@ref) use for the projection.
 
 The algorithm `alg` is one of the algorithms of `NearestCorrelationMatrix.jl`, with `NearestCorrelationMatrix.Newton` as the default, or [`ClippedNearestCorrelation`](@ref), a clip of the correlation eigenvalues that keeps the variances. Each algorithm decides with [`posdef_accepts`](@ref) which matrix it leaves unchanged.
 
@@ -241,7 +241,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `kwargs` is empty when `alg` is a [`ClippedNearestCorrelation`](@ref). That algorithm reads its own fields, so a keyword would be ignored.
+  - `kwargs` is empty when `alg` is a [`ClippedNearestCorrelation`](@ref). That algorithm reads only its own fields, so it ignores every keyword.
 
 # Examples
 
@@ -258,7 +258,7 @@ Posdef
   - [`ClippedNearestCorrelation`](@ref)
   - [`posdef!`](@ref)
   - [`posdef`](@ref)
-  - [`NearestCorrelationMatrix.jl`](https://github.com/adknudson/NearestCorrelationMatrix.jl)
+  - [`NearestCorrelationMatrix.jl`](https://docs.juliahub.com/General/NearestCorrelationMatrix/stable/)
 
 # References
 
@@ -267,11 +267,11 @@ Posdef
 """
 @concrete struct Posdef <: AbstractPosdefEstimator
     """
-    The algorithm used for the nearest correlation matrix projection.
+    The algorithm of the projection to the nearest correlation matrix.
     """
     alg
     """
-    A named tuple of keyword arguments to be passed to the algorithm.
+    A named tuple of keyword arguments that `posdef!` passes to the algorithm.
     """
     kwargs
     function Posdef(alg::Any, kwargs::NamedTuple)::Posdef
@@ -287,13 +287,13 @@ end
 """
     posdef!(pdm::Option{<:AbstractPosdefEstimator}, X::MatNum) -> MatNum
 
-In-place projection of a matrix to the nearest positive definite matrix using the specified estimator.
+Projects a matrix in place to the nearest positive definite matrix under the estimator `pdm`.
 
-For matrices without unit diagonal, the function converts them into correlation matrices i.e. matrices with unit diagonal, applies the algorithm, and rescales them back.
+When the diagonal of `X` is not all ones, the function converts `X` to a correlation matrix, applies the algorithm, and scales the result back to a covariance.
 
-A variance that is exactly zero belongs to a constant variable, and it keeps a zero row and column. The repair runs on the block of positive variances, so the result is positive semidefinite and not positive definite. No message comes for the zero rows, because they are the correct answer.
+A variance that is exactly zero belongs to a constant variable, and it keeps a zero row and column. The repair runs on the block of positive variances, so the result is positive semidefinite and not positive definite. The function gives no message for the zero rows, because they are the correct answer.
 
-A repair whose result is positive semidefinite to round-off returns it with no message, singular or not. A repair whose result is not raises a [`PosdefRepairError`](@ref), as [`assert_posdef_repair`](@ref) states, so no consumer reads a matrix with a negative variance in some direction.
+When the repaired matrix is positive semidefinite to round-off, the function returns it with no message, singular or not. When it is not, the function raises a [`PosdefRepairError`](@ref), as [`assert_posdef_repair`](@ref) states. So no consumer reads a matrix with a negative variance in some direction.
 
 # Mathematical definition
 
@@ -307,19 +307,19 @@ Solves the nearest correlation matrix problem:
 
 Where:
 
-  - ``\\hat{\\mathbf{C}}``: Nearest positive semidefinite correlation matrix.
-  - ``\\mathbf{C}``: Input correlation matrix.
-  - ``\\mathbf{Y}``: Feasible correlation matrix (positive semidefinite, unit diagonal).
-  - ``\\lVert \\cdot \\rVert_F``: Frobenius norm.
+  - ``\\hat{\\mathbf{C}}``: The nearest positive semidefinite correlation matrix.
+  - ``\\mathbf{C}``: The input correlation matrix.
+  - ``\\mathbf{Y}``: A feasible correlation matrix, which is positive semidefinite and has a unit diagonal.
+  - ``\\lVert \\cdot \\rVert_F``: The Frobenius norm.
 
-For covariance matrices, first standardise ``\\mathbf{C} = \\mathrm{diag}(\\mathbf{\\Sigma})^{-1/2} \\mathbf{\\Sigma}\\, \\mathrm{diag}(\\mathbf{\\Sigma})^{-1/2}``, project, then rescale back.
+The function first standardises a covariance matrix to ``\\mathbf{C} = \\mathrm{diag}(\\mathbf{\\Sigma})^{-1/2} \\mathbf{\\Sigma}\\, \\mathrm{diag}(\\mathbf{\\Sigma})^{-1/2}``. Then it projects ``\\mathbf{C}`` and scales the result back.
 
 A zero variance has no correlation, so it cannot be standardised. The projection keeps the diagonal, and a positive semidefinite matrix with a zero diagonal entry has a zero row and column, as [`zero_variance_rows!`](@ref) states. The projection above then runs on the block of positive variances alone.
 
 # Algorithm
 
  1. Check that `X` is square.
- 2. Return `X` unchanged when [`posdef_accepts`](@ref) accepts it under `pdm.alg`. For an algorithm of `NearestCorrelationMatrix.jl` the test is `isposdef`, and [`ClippedNearestCorrelation`](@ref) brings its own test and its refusals.
+ 2. Return `X` unchanged when [`posdef_accepts`](@ref) accepts it under `pdm.alg`. For an algorithm of `NearestCorrelationMatrix.jl` the test is `isposdef`, and [`ClippedNearestCorrelation`](@ref) has its own test and its own refusals.
  3. Set the zero-variance rows and columns of `X` to zero with [`zero_variance_block!`](@ref). When there is such a row, repair the block of positive variances with a recursive call, write the block back, and return `X`. The recursive call refuses only a repaired block that is not positive semidefinite to round-off. A matrix with a zero variance never passes the test of step 2, so this step is always reached for it.
  4. Repair `X` with [`posdef_repair!`](@ref) under `pdm.alg` and the keyword arguments `pdm.kwargs`, and return `X`.
 
@@ -327,20 +327,20 @@ A zero variance has no correlation, so it cannot be standardised. The projection
 
   - $(arg_dict[:opdm])
 
-      + `::Posdef`: The algorithm specified in `pdm.alg` is used to project `X` to the nearest PD matrix. If `X` is already positive definite, it is left unchanged.
-      + `::Nothing`: No-op.
+      + `::Posdef`: Projects `X` to the nearest positive definite matrix under `pdm.alg`. A matrix that [`posdef_accepts`](@ref) accepts stays unchanged.
+      + `::Nothing`: Returns `X` unchanged.
 
   - $(arg_dict[:sigrhoX])
 
 # Validation
 
-  - `X` is validated with [`assert_matrix_issquare`](@ref) before any other step.
+  - [`assert_matrix_issquare`](@ref) checks `X` before any other step.
   - [`ClippedNearestCorrelation`](@ref) refuses a non-finite entry, a negative variance and a matrix that is not symmetric, as [`posdef_accepts`](@ref) states.
   - A repaired matrix is positive semidefinite to round-off, which raises a [`PosdefRepairError`](@ref) through [`posdef_repair!`](@ref).
 
 # Returns
 
-  - `X::MatNum`: The input matrix `X` modified in-place.
+  - `X::MatNum`: The input matrix `X`, modified in place.
 
 # Examples
 
@@ -402,7 +402,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Sets the rows and columns of the zero variances of a co-moment matrix to zero, and returns the mask of the positive variances.
 
-A variance that is exactly zero belongs to a constant variable. A positive semidefinite matrix with a zero diagonal entry has a zero row and column, so a repair that keeps the diagonal has no other answer for that row, and no correlation exists to standardise it. The test is `iszero`, with no tolerance: a variance of `1e-34` is positive and stays in the block.
+A variance that is exactly zero belongs to a constant variable. A positive semidefinite matrix with a zero diagonal entry has a zero row and column, so a repair that keeps the diagonal has no other answer for that row, and no correlation exists to standardise it. The test is `iszero`, with no tolerance. A variance of `1e-34` is positive and stays in the block.
 
 # Mathematical definition
 
@@ -496,7 +496,7 @@ end
 
 Return `true` when the algorithm `alg` of [`Posdef`](@ref) leaves `X` unchanged, so [`posdef!`](@ref) returns before any repair.
 
-Each algorithm owns its test. An algorithm of `NearestCorrelationMatrix.jl` accepts a matrix that passes `isposdef`, which is the test [`posdef!`](@ref) always ran. [`ClippedNearestCorrelation`](@ref) accepts only a matrix whose smallest correlation eigenvalue is at least `tau / 2` as well, so it repairs a matrix that is positive definite but nearly singular.
+Each algorithm has its own test. An algorithm of `NearestCorrelationMatrix.jl` accepts a matrix that passes `isposdef`. [`ClippedNearestCorrelation`](@ref) accepts a matrix only when its smallest correlation eigenvalue is also at least `tau / 2`, so it repairs a matrix that is positive definite but almost singular.
 
 # Algorithm
 
@@ -541,14 +541,14 @@ end
 """
     posdef_repair!(alg, X::MatNum; kwargs...) -> MatNum
 
-Repair `X` in place under the algorithm `alg` of [`Posdef`](@ref). [`posdef!`](@ref) calls it after [`posdef_accepts`](@ref) has refused `X` and after the zero variances are set aside, so every variance that reaches it is not zero.
+Repair `X` in place under the algorithm `alg` of [`Posdef`](@ref). [`posdef!`](@ref) calls it after [`posdef_accepts`](@ref) refuses `X` and after [`posdef!`](@ref) sets the zero variances aside, so no variance that reaches it is zero.
 
 # Algorithm
 
 The method Julia selects on the type of `alg` is the algorithm.
 
  1. Any algorithm but [`ClippedNearestCorrelation`](@ref), which is an algorithm of `NearestCorrelationMatrix.jl`:
-     1. Read the diagonal of `X` into `s`. When any entry of `s` is not one, `X` is a covariance matrix: replace `s` with its square roots and convert `X` to a correlation matrix with `StatsBase.cov2cor!`. The test is `any(!isone, s)`, so it is the value of the diagonal that decides, never the type of `X`.
+     1. Read the diagonal of `X` into `s`. When any entry of `s` is not one, `X` is a covariance matrix. Then replace `s` with its square roots and convert `X` to a correlation matrix with `StatsBase.cov2cor!`. The test is `any(!isone, s)`, so it is the value of the diagonal that decides, never the type of `X`.
      2. Project `X` onto the nearest correlation matrix with `NearestCorrelationMatrix.nearest_cor!`, under `alg` and `kwargs`.
      3. When step 1 converted a covariance matrix, convert `X` back with `StatsBase.cor2cov!`. The standard deviations are the ones read in step 1, so the original diagonal returns up to rounding.
      4. Check `X` with [`assert_posdef_repair`](@ref), and return it.
@@ -571,7 +571,7 @@ The method Julia selects on the type of `alg` is the algorithm.
 
 # Returns
 
-  - `X::MatNum`: The input matrix `X` modified in-place.
+  - `X::MatNum`: The input matrix `X`, modified in place.
 
 # Related
 
@@ -622,7 +622,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Standardise a covariance matrix into its correlation matrix, and refuse the inputs that [`ClippedNearestCorrelation`](@ref) cannot read.
 
-The entry ``C_{ij} = \\Sigma_{ij} / (\\sigma_i \\sigma_j)`` divides by the product of the standard deviations, and the diagonal is set to one exactly. The symmetry is tested on `C` and not on `X`, so the test does not move with the units of `X`: a covariance in units a thousand times smaller passes or fails exactly as the original does.
+The entry ``C_{ij} = \\Sigma_{ij} / (\\sigma_i \\sigma_j)`` divides by the product of the standard deviations, and the diagonal is set to one exactly. The function tests the symmetry of `C` and not of `X`, so the test does not change with the units of `X`. A covariance in units a thousand times smaller passes or fails as the original does.
 
 # Algorithm
 
@@ -669,7 +669,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return `true` when [`ClippedNearestCorrelation`](@ref) accepts the covariance `X` with the correlation matrix `C`.
 
-The test is the acceptance test of the clip, and the same test decides whether an input is left unchanged. Each factorisation reads the lower triangle alone.
+This is the acceptance test of the clip. The same test decides whether [`posdef_accepts`](@ref) leaves an input unchanged. Each factorisation reads the lower triangle alone.
 
 # Algorithm
 
@@ -763,9 +763,9 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Run Higham's alternating projections with Dykstra's correction on a correlation matrix, and return the last iterate. [`ClippedNearestCorrelation`](@ref) states the iteration under `# Mathematical definition`.
 
-This is Algorithm 3.3 of [higham2002](@cite) with the unweighted Frobenius norm. The floor of `5 * eps` in step 2.2 and the stop test of step 2.5 are this library's changes: the algorithm projects with a floor of zero and states no stop test, and Section 4 of that work stops on the relative change of the iterates, Equation 4.1.
+This is Algorithm 3.3 of [higham2002](@cite) with the unweighted Frobenius norm. The floor of `5 * eps` in step 2.2 and the stop test of step 2.5 are this library's changes. The original algorithm projects with a floor of zero and states no stop test. Section 4 of that work stops on the relative change of the iterates, Equation 4.1.
 
-The iterations stop at the first iterate that is positive semidefinite to round-off, or after `iter` iterations. The last iterate is returned in both cases, and the clip that follows repairs the rest. An iterate that has not converged has a unit diagonal and a spectrum that is nearly positive semidefinite, so its clip is a valid correlation matrix, and it is nearer the input than the clip of the input alone.
+The iterations stop at the first iterate that is positive semidefinite to round-off, or after `iter` iterations. The function returns the last iterate in both cases, and the clip that follows repairs the rest. An iterate that has not converged has a unit diagonal and a spectrum that is nearly positive semidefinite, so its clip is a valid correlation matrix, and it is nearer the input than the clip of the input alone.
 
 # Algorithm
 
@@ -821,7 +821,7 @@ Out-of-place version of [`posdef!`](@ref).
 # Algorithm
 
  1. Copy `X`.
- 2. Apply [`posdef!`](@ref) to the copy, and return it. The input is never modified.
+ 2. Apply [`posdef!`](@ref) to the copy, and return it. The function never changes the input.
 
 # Arguments
 

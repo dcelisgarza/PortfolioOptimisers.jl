@@ -647,7 +647,8 @@ function warn_ruined_members(::Nothing, ::Nothing, ::Integer)::Nothing
 end
 function warn_ruined_members(::Nothing, ruined::VecInt, n::Integer)::Nothing
     if !isempty(ruined)
-        @warn "the drifted wealth of $(length(ruined)) of $(n) population member(s) is not positive, so their held weights are `NaN` and their members are dropped: $(ruined)"
+        @warn("the drifted wealth of $(length(ruined)) of $(n) population member(s) is not positive, so their held weights are `NaN` and their members are dropped: $(ruined)",
+              maxlog = log_limit(:warn), _id = @log_id())
     end
     return nothing
 end

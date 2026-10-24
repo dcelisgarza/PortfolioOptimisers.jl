@@ -1,26 +1,22 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all network estimator types.
+Abstract supertype for the estimators that build a network of assets.
 
-All concrete and/or abstract types implementing network-based estimation algorithms should be subtypes of `AbstractNetworkEstimator`.
+Every concrete or abstract type that builds a network of assets from data must subtype `AbstractNetworkEstimator`. [`phylogeny_matrix`](@ref), [`centrality_graph`](@ref) and the separation kernels dispatch on it.
 
 # Related
 
   - [`NetworkEstimator`](@ref)
   - [`AbstractCentralityEstimator`](@ref)
-
-# References
-
-  - $(ref_dict[:cajas2025]) Section 13.1.
 """
 abstract type AbstractNetworkEstimator <: AbstractPhylogenyEstimator end
 """
     const NwE_Pl_ClE_Cl = Union{<:AbstractNetworkEstimator, <:PhylogenyResult, <:ClE_Cl}
 
-Alias for a network estimator, phylogeny result, or clustering estimator/result.
+Union of a network estimator, a phylogeny result, a clustering estimator and a clustering result.
 
-Used internally for dispatch in phylogeny and network estimation workflows that accept any of these forms.
+It is the bound of the `pl` argument of [`average_centrality`](@ref), which takes a precomputed [`PhylogenyResult`](@ref) as well as the estimators.
 
 # Related
 
@@ -32,13 +28,13 @@ const NwE_Pl_ClE_Cl = Union{<:AbstractNetworkEstimator, <:PhylogenyResult, <:ClE
 """
     const NwE_ClE = Union{<:AbstractNetworkEstimator, <:AbstractClustersEstimator}
 
-Alias for a phylogeny **source**: a network estimator or a clustering estimator, and nothing precomputed.
+Union of a network estimator and a clustering estimator, with no precomputed result.
 
-This is the bound of the `pl` slot on [`SemiDefinitePhylogenyEstimator`](@ref) and [`IntegerPhylogenyEstimator`](@ref), and the exclusion is the point. A constraint *estimator* answers "how do I build this constraint for whatever universe I am given"; a precomputed `PhylogenyResult` or `Clusters` in that slot answers a different question — "here is the answer for the universe I was built on" — and the two are only interchangeable while the universe never changes.
+It is the bound of the `pl` field of [`SemiDefinitePhylogenyEstimator`](@ref), [`IntegerPhylogenyEstimator`](@ref), [`CentralityEstimator`](@ref) and [`PhylogenyPanel`](@ref). The union leaves out a precomputed result on purpose. A constraint estimator builds its constraint for the set of assets of each call. A precomputed `PhylogenyResult` or `Clusters` holds the answer for the set of assets that made it. The two give the same constraint only while the set of assets does not change.
 
-They stopped being interchangeable the moment a meta-optimiser handed a subproblem a subset of the assets. `phylogeny_matrix` returns a precomputed result unchanged, so the estimator emitted a full-universe constraint matrix for a three-asset subproblem, and every guard aimed at precomputed constraints missed it because the object presented as an estimator. The exclusion therefore lives in the **type**: the shape is not constructible, so there is no runtime check to write, to forget, or to route around. The only runtime guard left on this path is [`assert_external_optimiser`](@ref), which now has just one remaining case to catch — a precomputed constraint *result*.
+A meta-optimiser changes the set of assets, because it gives each subproblem a subset of them. [`phylogeny_matrix`](@ref) returns a precomputed result unchanged. A precomputed result in this field therefore gave a subproblem of three assets a constraint matrix over all the assets. The guards for precomputed constraints did not find it, because the object was an estimator. Now the type refuses the shape, so no runtime check is necessary. [`assert_external_optimiser`](@ref) is the one runtime guard on this path, and it catches a precomputed constraint result.
 
-Precomputed structure has a home already: build the constraint once and pass the **result** — [`SemiDefinitePhylogeny`](@ref) or [`IntegerPhylogeny`](@ref), whose `A` field takes a `PhylogenyResult` or a bare matrix — which is exactly what `phylogeny_constraints(est, X)` returns. Nothing is lost, and the guards that exist for results then apply.
+To use a precomputed structure, build the constraint one time and pass the result. `phylogeny_constraints(est, X)` returns a [`SemiDefinitePhylogeny`](@ref) or an [`IntegerPhylogeny`](@ref). The `A` field of each takes a `PhylogenyResult` or a matrix, and the guards for results apply to it.
 
 # Related
 
@@ -46,14 +42,16 @@ Precomputed structure has a home already: build the constraint once and pass the
   - [`AbstractClustersEstimator`](@ref)
   - [`SemiDefinitePhylogenyEstimator`](@ref)
   - [`IntegerPhylogenyEstimator`](@ref)
+  - [`CentralityEstimator`](@ref)
+  - [`PhylogenyPanel`](@ref)
 """
 const NwE_ClE = Union{<:AbstractNetworkEstimator, <:AbstractClustersEstimator}
 """
     const NwE_ClE_Cl = Union{<:AbstractNetworkEstimator, <:ClE_Cl}
 
-Alias for a network estimator or clustering estimator/result.
+Union of a network estimator, a clustering estimator and a clustering result.
 
-Used for dispatch in phylogeny workflows that accept either a network estimator or a clustering estimator/result.
+It is the bound of the `pl` argument of [`centrality_vector`](@ref), of [`asset_phylogeny`](@ref), of [`plot_network`](@ref), and of [`phylogeny_matrix`](@ref) on a Prior Result. A precomputed [`PhylogenyResult`](@ref) goes to a separate method of each function that takes one.
 
 # Related
 
@@ -66,7 +64,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Builds an asset network from a covariance estimate, and says which pairs of assets it relates.
 
-`NetworkEstimator` encapsulates the configuration for constructing a network from asset data, including the covariance estimator, distance estimator, tree or similarity algorithm, and the separation algorithm that says how far apart two assets sit in the resulting graph.
+`ce` and `de` give the distance matrix of the assets. `alg` selects a minimum spanning tree or a PMFG over that matrix. `sep` measures how far apart two assets are in the graph, and it states the budget beyond which two assets count as unrelated.
 
 # Fields
 
@@ -86,24 +84,24 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `x_src in ALL_RETURNS_SOURCES`, see [`assert_returns_source`](@ref). An `ArgumentError` is thrown otherwise.
+  - `x_src in ALL_RETURNS_SOURCES`, see [`assert_returns_source`](@ref). The constructor throws an `ArgumentError` otherwise.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `ce`: Recursively updated via [`factory`](@ref).
-  - `de`: Recursively updated via [`factory`](@ref).
+  - `ce`: Recursively updated through [`factory`](@ref).
+  - `de`: Recursively updated through [`factory`](@ref).
 
 # The separation lives here, not on the consumer
 
-`sep` says which pairs the network relates, and every consumer that reads a *closure* of this graph needs that answer: [`phylogeny_matrix`](@ref) and the phylogeny constraint families, both [`clusterise`](@ref) methods, and [`Proximity`](@ref). It therefore sits on the estimator that builds the graph rather than on any one of them — a rule visible only to the feature producer would be structurally invisible to the constraint path, which receives nothing but this estimator.
+`sep` states which pairs the network relates. Every consumer that reads a closure of this graph needs that answer. These consumers are [`phylogeny_matrix`](@ref) and the phylogeny constraint families, both [`clusterise`](@ref) methods, and [`Proximity`](@ref). `sep` is therefore a field of the estimator that builds the graph, and not of one consumer. The constraint path receives only this estimator, so it cannot read a rule that a different consumer holds.
 
-The one exception is a consumer that reads the **structure** rather than a closure of it, and `sep` is **inert** there: the weighted routes of [`centrality_graph`](@ref) take the weighted graph itself, because a closure is a sum of matrix powers and a power of a weighted matrix sums *products* of distances. So a [`HopCount`](@ref) of `n = 2` moves a [`DegreeCentrality`](@ref) and leaves a [`ClosenessCentrality`](@ref) where it was. At the default `HopCount(; n = 1)` nothing is visible, since the closure of a graph at one hop is the graph.
+A consumer that reads the structure, and not a closure of it, does not read `sep`. The weighted routes of [`centrality_graph`](@ref) take the weighted graph. A closure is a sum of matrix powers, and a power of a weighted matrix sums products of distances. For example, a [`HopCount`](@ref) of `n = 2` changes a [`DegreeCentrality`](@ref) and does not change a [`ClosenessCentrality`](@ref). At the default `HopCount(; n = 1)` the two routes agree, because the closure of a graph at one hop is the graph.
 
-The budget is a field of the member: `HopCount(; n = 2)` rather than a bare `n = 2` beside `sep`. A budget stated apart from the rule that measures it has no statable unit, and becomes a dead field the moment a member measures something other than hops — which [`PathLength`](@ref) does, budgeting in the distance estimator's units instead.
+The budget is a field of the member, as in `HopCount(; n = 2)`, and not a separate field of this estimator. A budget apart from the rule that measures it has no unit. Such a field has no use for a member that does not count hops. [`PathLength`](@ref) is such a member, and it states its budget in the units of the distance estimator.
 
-Only [`HopCount`](@ref) is admitted by every consumer, and the split falls on whether the consumer walks a **matrix power**. Both [`clusterise`](@ref) methods accumulate ``\\sum_{i=0}^{n}(\\mathbf{D}^i - \\mathbf{A}^i)``, so they read `sep.n` as a power count and refuse [`PathLength`](@ref) at dispatch: a radius has no analogue of a matrix power. [`phylogeny_matrix`](@ref) and [`Proximity`](@ref) take either, each through a method of its own — a hop ball is a clamped power sum, a radius ball is a threshold on [`separation_matrix`](@ref).
+Every consumer accepts a [`HopCount`](@ref). A consumer that sums matrix powers does not accept a [`PathLength`](@ref). Both [`clusterise`](@ref) methods add up ``\\sum_{i=0}^{n}(\\mathbf{D}^i - \\mathbf{A}^i)``, so they read `sep.n` as a count of powers. They refuse a [`PathLength`](@ref) at dispatch, because a radius has no equivalent of a matrix power. [`phylogeny_matrix`](@ref) and [`Proximity`](@ref) take either member, each through a method of its own. A hop ball is a clamped sum of powers, and a radius ball is a threshold on [`separation_matrix`](@ref).
 
 # Examples
 
@@ -148,10 +146,9 @@ NetworkEstimator
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 13.1.4.
-  - $(ref_dict[:mantegna1999])
-  - $(ref_dict[:tumminello2005])
-  - $(ref_dict[:PMFG])
+  - $(ref_dict[:mantegna1999]) Page 194, for the minimum spanning tree of a tree `alg`.
+  - $(ref_dict[:PMFG]) Section III.A, Algorithm 1, for the graph of a similarity `alg`.
+  - $(ref_dict[:graphpo1]) Sections 3.1 and 3.2, for the two networks of a portfolio.
 """
 @propagatable @concrete struct NetworkEstimator <: AbstractNetworkEstimator
     """
@@ -199,7 +196,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Clusters assets by the pseudo-distances that a network's structure induces.
 
-`NetworkClustersEstimator` encapsulates the configuration for clustering assets from a network, pairing the [`NetworkEstimator`](@ref) that builds the graph with the clustering algorithm and the optimal-number-of-clusters estimator applied to the pseudo-distance matrix it induces.
+`nte` builds the network. [`clusterise`](@ref) turns the network into a matrix of pseudo-distances, `alg` clusters that matrix, and `onc` selects the number of clusters.
 
 # Fields
 
@@ -218,16 +215,16 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `x_src in ALL_RETURNS_SOURCES`, see [`assert_returns_source`](@ref). An `ArgumentError` is thrown otherwise.
-  - `returns_source(nte) === nothing`: the network estimator reads the matrix that this estimator picks, so it states no source of its own, see [`assert_inner_reader`](@ref). An `ArgumentError` is thrown otherwise.
+  - `x_src in ALL_RETURNS_SOURCES`, see [`assert_returns_source`](@ref). The constructor throws an `ArgumentError` otherwise.
+  - `returns_source(nte) === nothing`. The network estimator reads the matrix that this estimator selects, so it states no source of its own, see [`assert_inner_reader`](@ref). The constructor throws an `ArgumentError` otherwise.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `nte`: Recursively updated via [`factory`](@ref).
+  - `nte`: Recursively updated through [`factory`](@ref).
 
-The power sums both [`clusterise`](@ref) methods accumulate are indexed by `nte.sep.n`, so the separation budget reaches this estimator through its network estimator rather than being restated here. That also fixes which separations this estimator accepts: `nte.sep` must be a [`HopCount`](@ref), since a power count is what the sums are indexed by. A [`PathLength`](@ref) is constructible here but has no [`clusterise`](@ref) method.
+Both [`clusterise`](@ref) methods index their sums of powers by `nte.sep.n`. The separation budget comes from the network estimator, and this estimator does not state it again. For the same reason, `nte.sep` must be a [`HopCount`](@ref). The constructor accepts a [`PathLength`](@ref), but no [`clusterise`](@ref) method takes it.
 
 # Examples
 

@@ -3,11 +3,11 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for opinion pooling algorithms.
 
-`OpinionPoolingAlgorithm` is the base type for all algorithms that combine multiple prior estimations into a consensus prior using opinion pooling. All concrete opinion pooling algorithms should subtype this type to ensure a consistent interface for consensus formation in portfolio optimisation workflows.
+A subtype of `OpinionPoolingAlgorithm` is the rule by which an [`OpinionPoolingPrior`](@ref) pools the scenario weights of its opinions into one consensus weight vector. [`compute_pooling`](@ref) dispatches on it.
 
 # Interfaces
 
-In order to implement a new concrete type that works seamlessly with the library, subtype `OpinionPoolingAlgorithm` and implement the following method:
+To add a pooling rule, subtype `OpinionPoolingAlgorithm` and implement the following method:
 
 ## Required method name
 
@@ -21,7 +21,7 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ### Returns
 
-  - `w::StatsBase.AnalyticWeights`: ``T \\times 1`` consensus scenario weights, summing to 1. The kind fixes the bias correction of the covariance of the refit, see [`ScenarioProbabilities`](@ref).
+  - `w::StatsBase.AnalyticWeights`: ``T \\times 1`` consensus scenario weights, summing to 1. The type of the weights sets the bias correction of the covariance of the refit, see [`ScenarioProbabilities`](@ref).
 
 ### Examples
 
@@ -41,12 +41,6 @@ julia> PortfolioOptimisers.compute_pooling(MedianOpinionPooling(), [0.5, 0.5],
  0.375
 ```
 
-## The incremental fit
-
-This prior has no exact incremental recursion, so it takes the online step by **refitting from a sample buffer**: [`Online`](@ref) seeds `cache`, [`partial_fit!`](@ref) appends each observation to it verbatim, and the one-argument [`prior`](@ref) runs this estimator's own batch verb over the rows the buffer kept. The answer is therefore exactly a batch fit over those rows, and a `max_history` on the wrapper windows the whole fit.
-
-`cache` travels the three propagation channels as every partial-fit state does: [`factory`](@ref) carries it unchanged, [`port_opt_view`](@ref) slices it to the selected assets, and [`obs_weights_view`](@ref) drops it, because no slice of a state exists on the observation axis. It is not rendered, because a running buffer is not the configuration a reader looks the type up for.
-
 # Related
 
   - [`LinearOpinionPooling`](@ref)
@@ -56,8 +50,9 @@ This prior has no exact incremental recursion, so it takes the online step by **
 
 # References
 
-  - $(ref_dict[:dietrichlist2017])
-  - $(ref_dict[:martinisprenger2017])
+  - $(ref_dict[:dietrichlist2017]) Section 2. $(ref_dict[:no_original_source])
+  - $(ref_dict[:dietrichlist2016]) Section 6. $(ref_dict[:no_original_source])
+  - $(ref_dict[:martinisprenger2017]) Section 3, Theorem 2.
 """
 abstract type OpinionPoolingAlgorithm <: AbstractAlgorithm end
 """
@@ -65,7 +60,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Pools the opinions as a weighted arithmetic mean of their scenario weights.
 
-Each scenario's consensus weight is the opinion-weighted average of what the experts assign to it, so the pooled distribution keeps every scenario any one expert believes in. It suits opinions that are independent and additive.
+The consensus weight of a scenario is the opinion-weighted average of the weights that the experts give it. So the pool keeps every scenario to which one expert gives a positive weight. The rule suits opinions that are independent and additive.
 
 # Mathematical definition
 
@@ -82,18 +77,18 @@ Where:
   - ``p_{tk}``: Scenario weight for scenario ``t`` from expert ``k``.
   - ``K``: Number of opinions.
 
-A sum of non-negative terms vanishes only when every term does, so ``p_t^{*} = 0`` requires that **every** opinion assigns scenario ``t`` zero probability. The pooled distribution is a mixture of the opinions, so it is at least as dispersed as the most dispersed one.
+A sum of non-negative terms is zero only when every term is zero. So ``p_t^{*} = 0`` only when **every** opinion of positive probability gives scenario ``t`` a zero weight. The pool is a mixture of the opinions, and the entropy is concave, so the entropy of the pool is at least the opinion-weighted mean of the entropies of the opinions. It can be less than the entropy of the most dispersed opinion.
 
 # Related
 
   - [`OpinionPoolingAlgorithm`](@ref)
-  - [`LogarithmicOpinionPooling`](@ref): the sibling rule, under which one zero opinion is enough to zero a scenario.
+  - [`LogarithmicOpinionPooling`](@ref): the sibling rule, under which one opinion that gives a scenario a zero weight sets its pooled weight to zero.
   - [`OpinionPoolingPrior`](@ref)
   - [`compute_pooling`](@ref)
 
 # References
 
-  - $(ref_dict[:dietrichlist2017])
+  - $(ref_dict[:dietrichlist2017]) Section 2. $(ref_dict[:no_original_source])
 """
 struct LinearOpinionPooling <: OpinionPoolingAlgorithm end
 """
@@ -101,7 +96,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Pools the opinions as a weighted geometric mean of their scenario weights, renormalised.
 
-The result is the distribution that minimises the opinion-weighted Kullback-Leibler divergence to the individual opinions, which makes it the information-theoretic consensus. It is robust to extremes, because it down-weights a scenario that any one opinion doubts.
+The result is the distribution ``\\boldsymbol{q}`` that minimises ``\\sum_{k} \\alpha_k \\mathrm{KL}(\\boldsymbol{q} \\,\\|\\, \\boldsymbol{p}_k)``, the opinion-weighted Kullback-Leibler divergence from the pool to each opinion. The first-order condition of that problem gives the formula below. One opinion that gives a scenario a small weight makes the pooled weight of that scenario small, whatever weight the other opinions give it.
 
 # Mathematical definition
 
@@ -119,19 +114,19 @@ Where:
   - ``K``: Number of opinions.
   - $(math_dict[:T])
 
-A single ``\\log 0`` sends the exponent to ``-\\infty``, so ``p_t^{*} = 0`` as soon as **one** opinion assigns scenario ``t`` zero probability. The product ``\\alpha_k \\log p_{tk}`` is undefined when both factors vanish, which is the one case the form above does not cover.
+One ``\\log 0`` makes the exponent ``-\\infty``. So ``p_t^{*} = 0`` when **one** opinion of positive probability gives scenario ``t`` a zero weight. The product ``\\alpha_k \\log p_{tk}`` has no value when both factors are zero, and the form above does not cover that case. The source defines the pool only for opinions that give every scenario a positive weight. The library also accepts a zero weight, with the result above.
 
 # Related
 
   - [`OpinionPoolingAlgorithm`](@ref)
-  - [`LinearOpinionPooling`](@ref): the sibling rule, under which every opinion must agree before a scenario reaches zero.
+  - [`LinearOpinionPooling`](@ref): the sibling rule, under which the pooled weight of a scenario is zero only when every opinion gives it a zero weight.
   - [`OpinionPoolingPrior`](@ref)
-  - [`compute_pooling`](@ref): its `# Validation` section states what the code does at the undefined product.
+  - [`compute_pooling`](@ref): its `# Validation` section states what the code does when both factors of the product are zero.
 
 # References
 
+  - $(ref_dict[:dietrichlist2016]) Section 6. $(ref_dict[:no_original_source])
   - $(ref_dict[:good1952])
-  - $(ref_dict[:dietrichlist2017])
 """
 struct LogarithmicOpinionPooling <: OpinionPoolingAlgorithm end
 """
@@ -139,9 +134,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Opinion pooling prior estimator for asset returns.
 
-`OpinionPoolingPrior` is a low order prior estimator that computes the mean and covariance of asset returns by combining multiple prior estimations into a consensus prior using opinion pooling algorithms. It supports both linear and logarithmic pooling, flexible weighting of opinions, and optional pre- and post-processing estimators.
+`OpinionPoolingPrior` is a low order prior estimator. Each estimator in `pes` is one opinion, and each opinion gives a vector of observation weights. The estimator pools these vectors into one consensus vector under `alg`, and fits `pe2` under it.
 
-The opinions contribute **observation weights** alone. Every moment of the result comes from refitting `pe2` under the pooled weights, which is why `pes` is typed to the entropy-pooling estimators — they are the ones whose result carries a `w`. A `w` of `nothing` weights every opinion equally at `1/length(pes)`, and a `p` of `nothing` uses the opinion probabilities as given rather than adjusting them through [`robust_probabilities`](@ref).
+The opinions contribute **observation weights** alone. Every moment of the result comes from the refit of `pe2` under the pooled weights. So `pes` holds entropy pooling estimators, because their results carry a `w`. A `w` of `nothing` gives every opinion the probability `1/length(pes)`. A `p` of `nothing` pools the opinion probabilities as given, and [`robust_probabilities`](@ref) does not penalise them.
 
 # Fields
 
@@ -167,26 +162,28 @@ Keywords correspond to the struct's fields. All arguments are validated for type
 
   - `pes` must be a non-empty vector of prior estimators.
   - If `w` is not `nothing`, `!isempty(w)`, `length(w) == length(pes)`, `all(x -> 0 <= x <= 1, w)`, and `sum(w) <= 1`.
-  - The last is an inequality on purpose. When `sum(w) < 1`, [`prior`](@ref) gives the remaining weight to a uniform prior over the observations, which becomes an opinion in its own right: it takes a column of `pw`, and it is pooled and penalised alongside the others.
-  - If `p` is not `nothing`, `p > 0`. The bound is strict, so `p = 0` raises; `p = nothing` is how one asks for no penalty.
+  - The last is an inequality on purpose. When `sum(w) < 1`, [`prior`](@ref) gives the remaining weight to a uniform prior over the observations. That prior is one more opinion. It takes a column of `pw`, and the pool penalises and pools it with the other opinions.
+  - If `p` is not `nothing`, `p > 0`. The bound is strict, so `p = 0` raises an error. Set `p = nothing` for no penalty.
   - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref).
   - The `x_src` of `pes`, `pe1`, `pe2` is `nothing`, because the prior picks the returns that it reads, see [`assert_inner_reader`](@ref).
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `pes`: Recursively updated via [`factory`](@ref).
-  - `pe1`: Recursively updated via [`factory`](@ref).
-  - `pe2`: Recursively updated via [`factory`](@ref).
+  - `pes`: Recursively updated through [`factory`](@ref).
+  - `pe1`: Recursively updated through [`factory`](@ref).
+  - `pe2`: Recursively updated through [`factory`](@ref).
+  - `cache`: Carried unchanged through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `pes`: Recursively viewed via [`port_opt_view`](@ref).
-  - `pe1`: Recursively viewed via [`port_opt_view`](@ref).
-  - `pe2`: Recursively viewed via [`port_opt_view`](@ref).
+  - `pes`: Recursively viewed through [`port_opt_view`](@ref).
+  - `pe1`: Recursively viewed through [`port_opt_view`](@ref).
+  - `pe2`: Recursively viewed through [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).
 
 # Examples
 
@@ -237,6 +234,12 @@ OpinionPoolingPrior
   x_src ┴ nothing
 ```
 
+## The incremental fit
+
+This prior has no exact incremental recursion, so it takes the online step by **refitting from a sample buffer**: [`Online`](@ref) seeds `cache`, [`partial_fit!`](@ref) appends each observation to it verbatim, and the one-argument [`prior`](@ref) runs this estimator's own batch verb over the rows the buffer kept. The answer is therefore exactly a batch fit over those rows, and a `max_history` on the wrapper windows the whole fit.
+
+`cache` travels the three propagation channels as every partial-fit state does: [`factory`](@ref) carries it unchanged, [`port_opt_view`](@ref) slices it to the selected assets, and [`obs_weights_view`](@ref) drops it, because no slice of a state exists on the observation axis. It is not rendered, because a running buffer is not the configuration a reader looks the type up for.
+
 # Related
 
   - [`OpinionPoolingAlgorithm`](@ref)
@@ -247,11 +250,13 @@ OpinionPoolingPrior
   - [`compute_pooling`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
-  - $(ref_dict[:dietrichlist2017])
-  - $(ref_dict[:martinisprenger2017])
+  - $(ref_dict[:dietrichlist2017]) Section 2. $(ref_dict[:no_original_source])
+  - $(ref_dict[:dietrichlist2016]) Section 6. $(ref_dict[:no_original_source])
+  - $(ref_dict[:martinisprenger2017]) Section 3, Theorem 2.
 """
 @propagatable @concrete struct OpinionPoolingPrior <: AbstractLowOrderPriorEstimator_AF
     """
@@ -271,7 +276,7 @@ OpinionPoolingPrior
     """
     p
     """
-    $(field_dict[:op_w])
+    $(field_dict[:op_w_pe])
     """
     w
     """
@@ -346,7 +351,7 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
 
 # Returns
 
-  - `fields::Tuple`: The field names to render, which is `(:pes, :pe1, :pe2, :p, :w, :alg, :ex)`.
+  - `fields::Tuple`: The field names to render, which is `(:pes, :pe1, :pe2, :p, :w, :alg, :ex, :x_src)`.
 
 # Related
 
@@ -359,9 +364,9 @@ show_fields(::OpinionPoolingPrior) = (:pes, :pe1, :pe2, :p, :w, :alg, :ex, :x_sr
     robust_probabilities(ow::VecNum, args...)
     robust_probabilities(ow::VecNum, pw::MatNum, p::Number)
 
-Compute robust opinion probabilities for consensus formation in opinion pooling.
+Penalise each opinion probability by the divergence of its opinion from the consensus.
 
-`robust_probabilities` adjusts the vector of opinion probabilities (`ow`) used in opinion pooling algorithms to account for robustness against outlier or extreme opinions. If a penalty parameter `p` is not `nothing`, the method penalises opinions that diverge from the consensus by down-weighting them according to their Kullback-Leibler divergence from the pooled distribution. If no penalty parameter is set, the original opinion probabilities are returned unchanged.
+The three-argument method multiplies the probability of each opinion by ``\\exp(-\\rho D_k)``, where ``D_k`` is the Kullback-Leibler divergence of the opinion from the linear pool, and renormalises. An opinion far from the consensus loses probability. When `p` is `nothing`, the `args...` method returns `ow` as it is.
 
 # Mathematical definition
 
@@ -381,32 +386,32 @@ Where:
   - ``\\rho``: Penalty parameter, the argument `p`.
   - $(math_dict[:T])
 
-The consensus ``\\boldsymbol{c}`` is always the **linear** pool, whatever [`OpinionPoolingAlgorithm`](@ref) the caller selected. The divergence is also directed: it reads ``D_k = \\mathrm{KL}(\\boldsymbol{p}_k \\,\\|\\, \\boldsymbol{c})``, from each opinion to the consensus. The `kld` field of the result runs the other way, from the consensus to each opinion, so the two are different numbers and neither is the other's mirror.
+The consensus ``\\boldsymbol{c}`` is always the **linear** pool, whatever [`OpinionPoolingAlgorithm`](@ref) the caller selected. The divergence has a direction. It is ``D_k = \\mathrm{KL}(\\boldsymbol{p}_k \\,\\|\\, \\boldsymbol{c})``, from each opinion to the consensus. The `kld` field of the result of [`prior`](@ref) has the other direction, from the consensus to each opinion, so the two vectors hold different numbers.
 
-``\\exp(-\\rho D_k)`` decreases in ``D_k``, so a larger ``\\rho`` concentrates the mass on the opinions nearest the consensus. As ``\\rho`` grows without bound the pool tends to the single opinion of smallest divergence.
+``\\exp(-\\rho D_k)`` decreases in ``D_k``, so a larger ``\\rho`` moves the mass to the opinions nearest the consensus. As ``\\rho`` increases without bound, all the mass goes to the opinion of smallest divergence.
 
 # Algorithm
 
 The steps below are those of the three-argument method. The `args...` method takes no step and returns `ow`.
 
- 1. Pool the opinions linearly, giving the consensus `c`.
- 2. Read the Kullback-Leibler divergence of each column of `pw` against `c`, giving `kldivs`.
- 3. Scale each entry of `ow` by `exp(-p * kldivs)`, into a **new** vector.
- 4. Divide that vector by its sum, giving the penalised opinion probabilities.
+ 1. Pool the opinions linearly into the consensus `c`.
+ 2. Compute `kldivs`, the Kullback-Leibler divergence of each column of `pw` from `c`.
+ 3. Multiply each entry of `ow` by `exp(-p * kldivs)`, into a **new** vector.
+ 4. Divide that vector by its sum, and return it.
 
 # Arguments
 
-  - `ow`: Vector of opinion probabilities (length = number of opinions).
-  - `pw`: Matrix of prior weights for each opinion (observations × opinions).
-  - `p`: Robustness penalty parameter.
+  - `ow`: Opinion probabilities, one entry per opinion.
+  - `pw`: Scenario weights of the opinions, `observations × opinions`, one column per opinion.
+  - `p`: Penalty, above zero.
 
 # Returns
 
-  - `ow::VecNum`: The opinion probabilities for pooling, summing to 1. The three-argument method returns a **new** vector, and the `args...` method returns the argument itself. The argument is never modified either way, because it may be the estimator's own `w` field, or the immutable `range` that the uniform-weight branch of [`prior`](@ref) builds.
+  - `ow::VecNum`: The opinion probabilities to pool with, summing to 1. The three-argument method returns a **new** vector, and the `args...` method returns the argument itself. Neither method writes to the argument, because it can be the estimator's own `w` field, or the immutable `range` that [`opinion_pooling_weights`](@ref) makes when `w` is `nothing`.
 
 # Related
 
-  - [`OpinionPoolingPrior`](@ref): the estimator that calls this to make its aggregation of opinions robust.
+  - [`OpinionPoolingPrior`](@ref): the estimator that calls this function, through [`opinion_pooling_weights`](@ref).
   - [`compute_pooling`](@ref)
 """
 function robust_probabilities(ow::VecNum, args...)
@@ -428,13 +433,13 @@ end
     compute_pooling(::LinearOpinionPooling, ow::VecNum, pw::MatNum)
     compute_pooling(::LogarithmicOpinionPooling, ow::VecNum, pw::MatNum)
 
-Compute the consensus posterior return distribution from individual prior distributions using opinion pooling.
+Pool the scenario weights of several opinions into one consensus weight vector.
 
-`compute_pooling` aggregates multiple prior probability distributions (`pw`) into a single consensus posterior distribution according to the specified opinion pooling algorithm and opinion probabilities (`ow`). Supports both linear and logarithmic pooling.
+Each column of `pw` holds the scenario weights of one opinion, and `ow` holds the probability of each opinion. The type of the first argument selects the pooling rule.
 
 # Mathematical definition
 
-Let ``\\boldsymbol{\\alpha}`` be the opinion probabilities and ``\\mathbf{P}`` the ``T \\times K`` matrix of scenario weights for ``K`` experts:
+Let ``\\boldsymbol{\\alpha}`` be the opinion probabilities and ``\\mathbf{P}`` the ``T \\times K`` matrix of scenario weights for ``K`` experts.
 
 Linear (weighted arithmetic mean):
 
@@ -456,7 +461,7 @@ Where:
 
   - ``\\boldsymbol{p}^*``: ``T \\times 1`` pooled posterior weight vector.
   - ``\\mathbf{P}``: ``T \\times K`` matrix of scenario weights for ``K`` experts.
-  - ``\\boldsymbol{\\alpha}``: ``K \\times 1`` opinion probability vector (weights summing to 1).
+  - ``\\boldsymbol{\\alpha}``: ``K \\times 1`` opinion probability vector, summing to 1.
   - ``p_{tk}``: Scenario weight for scenario ``t`` from expert ``k``.
   - $(math_dict[:T])
 
@@ -464,31 +469,31 @@ Where:
 
 Under [`LinearOpinionPooling`](@ref):
 
- 1. Multiply `pw` by `ow`, giving the consensus weights `w`.
+ 1. Multiply `pw` by `ow` to get the consensus weights `w`.
 
 Under [`LogarithmicOpinionPooling`](@ref):
 
- 1. Multiply the elementwise logarithm of `pw` by `ow`, giving the exponent vector `u`.
- 2. Read `LogExpFunctions.logsumexp(u)` into `lse`. This shifts `u` by its own maximum before exponentiating it, so a very negative exponent does not underflow to a vector of zeros.
- 3. Exponentiate `u .- lse`, giving the consensus weights `w`.
+ 1. Multiply the elementwise logarithm of `pw` by `ow` to get the exponent vector `u`.
+ 2. Compute `lse = LogExpFunctions.logsumexp(u)`. The function subtracts the maximum of `u` before it exponentiates, so a very negative exponent does not underflow to a vector of zeros.
+ 3. Exponentiate `u .- lse` to get the consensus weights `w`.
 
 # Arguments
 
-  - `alg`: Opinion pooling algorithm (`LinearOpinionPooling` or `LogarithmicOpinionPooling`).
-  - `ow`: Vector of opinion probabilities (length = number of opinions).
-  - `pw`: Matrix of prior weights for each opinion (observations × opinions).
+  - `alg`: Opinion pooling algorithm, [`LinearOpinionPooling`](@ref) or [`LogarithmicOpinionPooling`](@ref).
+  - `ow`: Opinion probabilities, one entry per opinion.
+  - `pw`: Scenario weights of the opinions, `observations × opinions`, one column per opinion.
 
 # Validation
 
-  - The result carries no `Inf` and no `NaN`, checked by `StatsBase.aweights`. Under [`LogarithmicOpinionPooling`](@ref) an opinion probability of exactly `0` against a scenario weight of exactly `0` makes the product `0 * log(0)`, which is `NaN`, and the call raises `ArgumentError`. A zero scenario weight alone is safe: it gives `-Inf`, which exponentiates to a consensus weight of `0`.
+  - `StatsBase.aweights` checks that the result carries no `Inf` and no `NaN`. Under [`LogarithmicOpinionPooling`](@ref), an opinion probability of exactly `0` against a scenario weight of exactly `0` makes the product `0 * log(0)`, which is `NaN`, and the call raises `ArgumentError`. A zero scenario weight alone is safe. It gives `-Inf`, which exponentiates to a consensus weight of `0`.
 
 # Returns
 
-  - `w::StatsBase.AnalyticWeights`: Consensus posterior probability weights. Their bias correction is the one of reliability weights, see [`ScenarioProbabilities`](@ref).
+  - `w::StatsBase.AnalyticWeights`: Consensus scenario weights. The logarithmic rule renormalises them to sum to 1, and the linear rule gives a sum of 1 when `ow` and every column of `pw` sum to 1. Their bias correction is the one of reliability weights, see [`ScenarioProbabilities`](@ref).
 
 # Related
 
-  - [`OpinionPoolingPrior`](@ref): the estimator that calls this to form its consensus prior distribution.
+  - [`OpinionPoolingPrior`](@ref): the estimator that calls this function, through [`opinion_pooling_weights`](@ref).
   - [`LinearOpinionPooling`](@ref)
   - [`LogarithmicOpinionPooling`](@ref)
 """
@@ -507,40 +512,42 @@ end
 
 Compute opinion pooling prior moments for asset returns.
 
-`prior` estimates the mean and covariance of asset returns by combining multiple prior estimations into a consensus prior using opinion pooling algorithms. Supports both linear and logarithmic pooling, robust opinion probability adjustment, and optional pre- and post-processing estimators.
+`prior` fits every opinion of `pe.pes`, pools their observation weights into one consensus vector, and fits `pe.pe2` under that vector.
 
-No field of `pe` is modified, so calling `prior` twice on one estimator gives the same answer twice. Every moment of the result is `pe.pe2`'s; the opinions contribute observation weights alone.
+`prior` changes no field of `pe`, so two calls on one estimator give the same answer. Every moment of the result comes from `pe.pe2`. The opinions contribute observation weights alone.
 
 # Algorithm
 
  1. Orient `X` and `F` by `dims`.
  2. When `pe.pe1` is not `nothing`, replace `X` with the returns of that estimator's prior.
- 3. Pool the opinions of `pe.pes` over `X` with [`opinion_pooling_weights`](@ref), giving the consensus weights `w`, the penalised opinion probabilities `ow` and the weights `pw` of each opinion.
- 4. Refit `pe.pe2` under `w` through [`factory`](@ref), giving the moments of the result. Check that the refit answered on the pool's observation axis, per `# Validation`.
- 5. Read `ens` as `exp` of the entropy of `w`, and `kld` as the divergence from `w` to each column of `pw`.
- 6. When `cache_reg` is `true`, store in `pc` the rows that the opinions read, or `nothing` when they read `X`, with `w`. The fit of `pe.pe2` receives `cache_reg` too, so a prior there stores its own cache. The refit of an entropy pooling prior around the pool reads both, and runs no opinion and no `pe.pe1`.
+ 3. Pool the opinions of `pe.pes` over `X` with [`opinion_pooling_weights`](@ref), which returns the consensus weights `w`, the penalised opinion probabilities `ow` and the weights `pw` of each opinion.
+ 4. Refit `pe.pe2` under `w` through [`factory`](@ref). The moments of the result come from this refit. Check that the refit answered on the observation axis of the pool, see `# Validation`.
+ 5. Compute `ens` as `exp` of the entropy of `w`, and `kld` as the divergence from `w` to each column of `pw`.
+ 6. When `cache_reg` is `true`, store `pc = (; X, w, pe2)`. `X` holds the rows that the opinions read, or `nothing` when they read the `X` argument. `pe2` holds the cache of the result of `pe.pe2`. When `cache_reg` is `false`, `pc` is `nothing`.
+
+The fit of `pe.pe2` receives `cache_reg` too, so a prior there stores its own cache. The refit of an entropy pooling prior around the pool reads both caches, and runs no opinion and no `pe.pe1`.
 
 # Arguments
 
   - `pe`: Opinion pooling prior estimator.
-  - `X`: Asset returns matrix (observations × assets).
-  - `F`: Optional factor matrix.
-  - $(arg_dict[:pnl_prior]) It reaches `pe.pe1`, every opinion in `pe.pes`, and the refit `pe.pe2`.
+  - `X`: Asset returns matrix, `observations × assets`.
+  - `F`: Optional factor returns matrix.
+  - $(arg_dict[:pnl_prior]) It goes to `pe.pe1`, to every opinion in `pe.pes`, and to the refit `pe.pe2`.
   - $(arg_dict[:dims])
-  - `strict`: If `true`, throws error for missing assets; otherwise, issues warnings. Default is `false`.
+  - `strict`: Passed to `pe.pe1`, to every opinion and to `pe.pe2`. If `true`, an opinion with a view that names an asset that its `sets` does not hold raises an error. If `false`, the opinion drops that view with a warning. Default is `false`.
   - $(arg_dict[:cache_reg])
-  - `kwargs...`: Additional keyword arguments passed to underlying estimators and solvers.
+  - `kwargs...`: More keyword arguments, passed to `pe.pe1`, to every opinion and to `pe.pe2`.
 
 # Validation
 
   - `dims in (1, 2)`.
-  - Every opinion answers on the pool's observation axis, which is `pe.pe1`'s result when `pe.pe1` is set and `X` when it is `nothing`. An opinion whose own wrapped estimator drops rows answers on a shorter axis, and its probabilities are then over other scenarios. [`opinion_pooling_weights`](@ref) then raises a `DimensionMismatch` naming the opinion, both counts, and the fix: move the estimator that drops rows into `pe1`.
-  - The refit `pe.pe2` answers on the pool's observation axis too, because the pooled weights are over that axis. A `pe2` that drops rows, such as one that holds a Scenario Cap, answers on a shorter axis. A `DimensionMismatch` naming `pe2`, both counts, and the same fix is then thrown.
+  - Every opinion answers on the observation axis of the pool. That axis is the rows of the result of `pe.pe1` when `pe.pe1` is set, and `X` when it is `nothing`. An opinion whose own wrapped estimator drops rows answers on a shorter axis, so its probabilities are over other scenarios. [`opinion_pooling_weights`](@ref) then raises a `DimensionMismatch`. The message names the opinion, both counts and the fix, which is to move the estimator that drops rows into `pe1`.
+  - The refit `pe.pe2` answers on the observation axis of the pool too, because the pooled weights are over that axis. A `pe2` that drops rows, such as one that holds a Scenario Cap, answers on a shorter axis. `prior` then raises a `DimensionMismatch` that names `pe2`, both counts and the same fix.
 
 # Returns
 
-  - `pr::LowOrderPrior`: Result object containing asset returns, posterior mean vector, posterior covariance matrix, consensus weights, entropy, Kullback-Leibler divergence, opinion probabilities, and optional factor moments.
-  - `pr.ens`: `exp` of the entropy of the consensus weights, so it runs from 1 (all mass on one observation) to `T` (uniform).
+  - `pr::LowOrderPrior`: The moments of the refit `pe.pe2`, with the consensus weights `w`, their diagnostics `ens`, `kld` and `ow`, and the cache `pc`.
+  - `pr.ens`: `exp` of the entropy of the consensus weights. It is 1 when all the mass is on one observation, and `T` when the weights are uniform.
   - `pr.kld[i]`: ``\\mathrm{KL}(\\boldsymbol{w} \\,\\|\\, \\boldsymbol{p}_i)``, from the **consensus to** opinion `i`. [`robust_probabilities`](@ref) reads the divergence in the other direction, so the two vectors are different numbers.
   - `pr.ow`: The penalised opinion probabilities, one entry per column of `pw`. It is one entry longer than `pe.w` when the uniform-prior remainder took a column.
 
@@ -565,8 +572,6 @@ function prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing
     X = something(X1, X)
     w, ow, pw = opinion_pooling_weights(pe, X, F, pnl; strict = strict, kwargs...)
     pe2 = factory(pe.pe2, w)
-    # Opinion pooling reweights observations without touching either axis of `Z`, so the
-    # pooled prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
     # The factor block is the refit prior's, forwarded whole rather than stamped with the
     # pooled weights — see the note at the same step in `03_EntropyPoolingPrior_c.jl`.
     pr2 = prior(pe2, X, F, pnl; strict = strict, kwargs..., cache_reg = cache_reg)
@@ -626,23 +631,23 @@ Pools the opinions of an [`OpinionPoolingPrior`](@ref) into the consensus weight
 # Algorithm
 
  1. Read the opinion probabilities `ow`, from `pe.w` when it is set and from a uniform `range` over `length(pe.pes)` when it is `nothing`.
- 2. Take the remainder `rw` of `ow` against one. When `rw` exceeds `eps`, append it to `ow` and give `pw` a last column of `1/T`, the uniform prior over the observations.
- 3. Fit every estimator of `pe.pes` over the executor `pe.ex`. Check that each answered on the pool's own observation axis, and write its weights into a column of `pw`.
- 4. Penalise `ow` through [`robust_probabilities`](@ref), which is the identity when `pe.p` is `nothing`.
- 5. Pool the columns of `pw` under `pe.alg` through [`compute_pooling`](@ref), giving the consensus weights `w`.
+ 2. Compute the remainder `rw = 1 - sum(ow)`. When `rw` is more than `eps`, append it to `ow`, and fill a last column of `pw` with `1/T`, the uniform prior over the observations.
+ 3. Fit every estimator of `pe.pes` with the executor `pe.ex`. Check that each one answered on the observation axis of the pool, and write its weights into a column of `pw`.
+ 4. Penalise `ow` through [`robust_probabilities`](@ref), which returns `ow` as it is when `pe.p` is `nothing`.
+ 5. Pool the columns of `pw` under `pe.alg` through [`compute_pooling`](@ref) into the consensus weights `w`.
 
 # Arguments
 
   - `pe`: Opinion pooling prior estimator.
   - `X`: The returns that the opinions read, `observations × assets`. These are the returns of `pe.pe1` when it is set.
-  - `F`: Optional factor matrix.
+  - `F`: Optional factor returns matrix.
   - $(arg_dict[:pnl_prior])
-  - `strict`: If `true`, throws error for missing assets; otherwise, issues warnings. Default is `false`.
-  - `kwargs...`: Additional keyword arguments passed to the opinions.
+  - `strict`: Passed to every opinion. If `true`, an opinion with a view that names an asset that its `sets` does not hold raises an error. If `false`, the opinion drops that view with a warning. Default is `false`.
+  - `kwargs...`: More keyword arguments, passed to every opinion.
 
 # Validation
 
-  - Every opinion answers on the observation axis of `X`. A `DimensionMismatch` that names the opinion is thrown otherwise.
+  - Every opinion answers on the observation axis of `X`. If an opinion does not, the function raises a `DimensionMismatch` that names the opinion.
 
 # Returns
 
@@ -738,8 +743,8 @@ The refit of [`scenario_prior`](@ref) and [`scenario_factory`](@ref) fits `pe.pe
 
 The method that Julia selects is the algorithm.
 
- 1. No cache: take the rows of `pe.pe1` when it is set, and `X` otherwise, as the fit of the pool does. Pool the opinions on those rows with [`opinion_pooling_weights`](@ref).
- 2. A cache: take `pc.X`, or `X` when it is `nothing`, and `pc.w`.
+ 1. When `pc` is `nothing`, take the rows of `pe.pe1` when it is set, and `X` when it is not, as the fit of the pool does. Pool the opinions on those rows with [`opinion_pooling_weights`](@ref).
+ 2. When `pc` is a cache, take `pc.X`, or `X` when `pc.X` is `nothing`, and take `pc.w`.
 
 # Arguments
 
@@ -748,7 +753,7 @@ The method that Julia selects is the algorithm.
   - $(arg_dict[:X])
   - `F`: Optional factor returns matrix.
   - $(arg_dict[:pnl_prior])
-  - `kwargs...`: Additional keyword arguments of the fit of the pool.
+  - `kwargs...`: More keyword arguments, passed to `pe.pe1` and to the opinions when no cache is given.
 
 # Returns
 
@@ -777,14 +782,14 @@ end
 
 Keep the cache of a pool on the result of its refit, so an entropy pooling prior around a nested one reads it too.
 
-The refit answers the result of `pe2`, which carries no cache of the pool.
+The refit returns the result of `pe2`, which carries no cache of the pool.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. No cache, or a result of a type with no field `pc`: return `res`.
- 2. A [`LowOrderPrior`](@ref) and a cache: forward `res` with `pc` through [`forward_prior`](@ref).
+ 1. When there is no cache, or the type of the result has no field `pc`, return `res`.
+ 2. When `res` is a [`LowOrderPrior`](@ref) and there is a cache, forward `res` with `pc` through [`forward_prior`](@ref).
 
 # Arguments
 
@@ -818,8 +823,8 @@ The result of a pool carries the fields of the result of `pe2`, and its own cach
 
 The method that Julia selects is the algorithm.
 
- 1. No cache, or a result of a type with no field `pc`: return `pr`.
- 2. A [`LowOrderPrior`](@ref) and a cache: forward `pr` with `pc.pe2` through [`forward_prior`](@ref).
+ 1. When there is no cache, or the type of the result has no field `pc`, return `pr`.
+ 2. When `pr` is a [`LowOrderPrior`](@ref) and there is a cache, forward `pr` with `pc.pe2` through [`forward_prior`](@ref).
 
 # Arguments
 

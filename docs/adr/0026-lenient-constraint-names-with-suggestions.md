@@ -33,7 +33,7 @@ typo is obvious while a legitimately-absent asset stays quiet.**
 
 - The "variable not in asset universe" message (both the `@warn` and the `strict` `ArgumentError`)
   gains a fuzzy `" (did you mean \`AAPL\`?)"` suggestion, produced by `did_you_mean`using
-  [`StringDistances.jl`](<https://github.com/matthieugomez/StringDistances.jl>).
+  [`StringDistances.jl`](<https://docs.juliahub.com/General/StringDistances/stable/>).
 - The suggestion is **threshold-gated**: it only appears when the nearest candidate clears a
   normalised-similarity cutoff (`findnearest(...; min_score)`). A typo (`APL` vs `AAPL`, score 0.75)
   fires; an asset that is simply absent from this subset has no close neighbour and draws *no*

@@ -662,7 +662,7 @@ $(val_dict[:relax])
 
 # References
 
-  - $(ref_dict[:sdprp])
+  - $(ref_dict[:sdprp]) Formulations 9, 10 and 16.
 """
 function rc_variance_constraints!(args...; kwargs...)
     return nothing
@@ -865,6 +865,19 @@ Build the worst-case variance of an uncertainty set over the covariance matrix.
 
 The box, the ellipsoid and the norm ball bound the covariance matrix, so each lifts the weights into ``\\mathbf{W}`` with [`set_sdp_constraints!`](@ref) and states the dual of its worst case over ``\\mathbf{W}``. A caller can pass another lifted matrix in the keyword `W`. [`set_risk_constraints!`](@ref) passes ``\\mathbf{W}_c`` of [`set_sdp_objective_lift!`](@ref) for the objective term under [`MaximumRatio`](@ref), with the namespace `lift_` after `prefix`, so the dual variables of that term have names of their own. The compact set bounds a quadratic form in the weights, so it lifts nothing and leaves the programme a second-order cone programme. It takes the square root of its centre under the `mtx_sqrt` of the [`UncertaintySetVariance`](@ref), so under the default it accepts a singular centre, as [`Variance`](@ref) does.
 
+Equation 7 of [sousalobo2000](@cite) first states the dual of the box. Its constraint
+``\\mathbf{Z} + \\mathbf{\\Lambda}_u - \\mathbf{\\Lambda}_l = -\\boldsymbol{w} \\boldsymbol{w}^\\intercal``
+has the wrong sign: the dual of the worst case needs
+``\\mathbf{\\Lambda}_u - \\mathbf{\\Lambda}_l \\succeq \\boldsymbol{w} \\boldsymbol{w}^\\intercal``,
+as Equation 6.11 of [fengpalomar2016](@cite) states. Equation 6.15 of [fengpalomar2016](@cite)
+first states the dual of the ellipsoid. That dual equals the worst case when
+``\\mathbf{K} \\mathbf{\\Omega} \\mathbf{K} = \\mathbf{\\Omega}`` for the
+[`commutation_matrix`](@ref) ``\\mathbf{K}``, so that the transpose of each matrix of the set is
+in the set. For another ``\\mathbf{\\Omega}`` it lies at or above the worst case. Equations 11.21
+and 11.27 of [cajas2025](@cite) add the homogenisation ``k`` that [`MaximumRatio`](@ref) needs.
+The worst case of the compact set is this library's own construction, as
+[`OrthogonalUncertaintySet`](@ref) states.
+
 # Mathematical definition
 
 ```math
@@ -878,7 +891,7 @@ R_{\\mathrm{cpt}} &= \\lVert \\mathbf{G} \\boldsymbol{w} \\rVert_{2}^{2} + \\kap
 
 Where:
 
-  - ``R_{\\mathrm{box}}``, ``R_{\\mathrm{ell}}``, ``R_{\\mathrm{nb}}``, ``R_{\\mathrm{cpt}}``: Worst-case variance of the box, the ellipsoid, the norm ball and the compact set. The first three state the worst case over ``\\mathbf{W}``, and they give the worst case of ``\\boldsymbol{w}`` at ``\\mathbf{W} = \\boldsymbol{w} \\boldsymbol{w}^\\intercal / k``.
+  - ``R_{\\mathrm{box}}``, ``R_{\\mathrm{ell}}``, ``R_{\\mathrm{nb}}``, ``R_{\\mathrm{cpt}}``: Worst-case variance of the box, the ellipsoid, the norm ball and the compact set. The first three state the worst case over ``\\mathbf{W}``. The ellipsoid and the norm ball give the worst case of ``\\boldsymbol{w}`` at ``\\mathbf{W} = \\boldsymbol{w} \\boldsymbol{w}^\\intercal / k``. At that matrix the box gives the worst case over a box that drops the condition ``\\mathbf{\\Sigma} \\succeq 0``, which can be larger. The part of ``\\mathbf{W}`` above ``\\boldsymbol{w} \\boldsymbol{w}^\\intercal / k`` takes the place of the dual matrix of that condition, so the minimum over ``\\mathbf{W}`` is the worst case with it.
   - ``\\mathbf{\\Sigma}_l``, ``\\mathbf{\\Sigma}_u``: Lower and upper bounds of the box, `lb` and `ub`.
   - ``\\mathbf{A}_l``, ``\\mathbf{A}_u``: Dual matrices of the two sides of the box.
   - ``\\hat{\\mathbf{\\Sigma}}``: Centre of the set, the set's `val` when it states one and `sigma` otherwise.
@@ -963,14 +976,15 @@ $(val_dict[:relax])
   - [`ucs_variance_risk_bounds!`](@ref)
   - [`set_sdp_constraints!`](@ref)
   - [`UncertaintySetVariance`](@ref)
-  - [`ucs_variance`](@ref): The value-level worst case, which omits ``\\mathbf{E}`` and so lies at or above the model's value.
+  - [`ucs_variance`](@ref): The value-level worst case, which omits ``\\mathbf{E}`` for the ellipsoid and the norm ball and fixes ``\\mathbf{W} = \\boldsymbol{w} \\boldsymbol{w}^\\intercal`` for the box, and so lies at or above the model's value.
   - [`norm_ball_dual_norm_epigraph!`](@ref)
 
 # References
 
-  - $(ref_dict[:robustaa])
-  - $(ref_dict[:fengpalomar2016])
-  - $(ref_dict[:cajas2025]) Section 11.3.
+  - $(ref_dict[:sousalobo2000]) Sections 4 and 5.2.6, Equation 7.
+  - $(ref_dict[:fengpalomar2016]) Section 6.1.3, Equations 6.10 to 6.15.
+  - $(ref_dict[:bertsimas2011]) Section 2.2, Theorem 2. $(ref_dict[:no_original_source])
+  - $(ref_dict[:cajas2025]) Sections 11.3.1 and 11.3.2, Equations 11.21 and 11.27.
 """
 function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::BoxUncertaintySet, args...;
                                 prefix::Symbol = Symbol(""),

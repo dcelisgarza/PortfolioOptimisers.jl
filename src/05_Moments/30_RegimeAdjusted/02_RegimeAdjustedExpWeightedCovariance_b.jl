@@ -123,8 +123,8 @@ Each term of the diagonal statistic ``S = \\sum_{i} a_{i} z_{i}^{2}`` is the squ
 with the correlation ``R``, times the noise ``a_{i}`` of its estimated variance. Without the noise,
 the law of the sum is ``\\sum_{k} \\mu_{k} \\chi^{2}_{k}(1)`` on the eigenvalues ``\\mu_{k}`` of
 ``R``, which the constants of [`regime_denom`](@ref) and [`regime_kappa`](@ref) do not read. At 12
-assets and a half-life of 10 the squared multiplier on iid Normal returns is 0.93 for the first
-moment and 0.94 for the log at a correlation of 0.3, and 0.72 and 0.54 at 0.9.
+assets without the noise, the squared multiplier on Normal returns is 0.97 for the first moment
+and 0.95 for the log at a correlation of 0.3, and 0.76 and 0.55 at 0.9.
 
 The noise has the mean one, but the root and the log see it through their own moment, and the
 correlation of the assets correlates the noise of their estimates, so the mean's factor of each
@@ -1561,7 +1561,7 @@ end
 
 Answer `NaN`, so a gapped sample reaches the recursion with its gaps intact.
 
-The recursion updates only the sub-block of the assets that are valid at each observation, and the regime weight is taken from that sub-block alone, so a fill would both decay a frozen block and move the regime it is weighted by. The consumer therefore hands the sample as it stands, together with the active mask that explains the gap.
+The recursion updates only the sub-block of the assets that are valid at each observation, and the regime weight is taken from that sub-block alone, so a fill decays a frozen block and moves the regime that the block weighs. The consumer therefore hands the sample as it stands, together with the active mask that explains the gap.
 
 # Arguments
 
@@ -1715,9 +1715,7 @@ function partial_fit!(ce::RegimeAdjustedExpWeightedCovariance{<:Any, <:Any, <:An
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     cache = regime_adjusted_covariance_pass!(ce, X, dims, estimation_mask, active_mask,
                                              ce.cache)
-    Accessors.@reset ce.cache = cache
-
-    return ce
+    return cache === ce.cache ? ce : rebuild_estimator(ce, (; cache = cache))
 end
 """
     partial_fit!(
@@ -1989,7 +1987,8 @@ Refuses a pair of regime-adjusted covariance states, because this family does no
 
 A block fitted from a cold start is not what the same block contributes after another one. The
 regime statistic scores each observation against the state that stands before it, so a cold
-block loses every comparison its first `min_obs` observations would have made, and a correlation
+block does not score its first `min_obs` observations, which the same block after another one
+scores. A correlation
 state that is normalised by a running variance carries that variance with it.
 
 Fold the second block into the first with [`partial_fit!`](@ref) instead. A sequential fit is

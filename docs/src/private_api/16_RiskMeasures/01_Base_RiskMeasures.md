@@ -59,6 +59,7 @@ assert_observation_weights
 checked_observation_weights
 assert_half_open_unit_interval
 worst_positive_weight_loss
+positive_weight_rows
 weight_independent_target(::Nothing)
 weight_independent_target(::Number)
 weight_independent_target(::Any)

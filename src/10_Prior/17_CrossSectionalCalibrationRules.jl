@@ -437,7 +437,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Shrinks the factor mean towards the spanned part of a Return Forecast by the intensity of a shrunk expected-returns estimator.
 
-The rule computes the shrinkage intensity of the algorithm in `alg`, with the spanned coefficients ``\\boldsymbol{g}`` as the target, and returns the weight of the factor mean. [`ShrunkExpectedReturns`](@ref) shrinks a sample mean towards a target that its own field `tgt` computes. This rule reads the same intensity with ``\\boldsymbol{g}`` in place of that target, so it ignores the `tgt` of the algorithm. With no Return Forecast Estimator, ``\\boldsymbol{g}`` is zero.
+The rule computes the shrinkage intensity of the algorithm in `alg`, with the spanned coefficients ``\\boldsymbol{g}`` as the target, and returns the weight of the factor mean. [`ShrunkExpectedReturns`](@ref) shrinks a sample mean towards a target that its own field `tgt` computes. This rule reads the same intensity with ``\\boldsymbol{g}`` in place of that target, so it ignores the `tgt` of the algorithm. It also ignores the `intensity` of [`JamesStein`](@ref) and of [`BayesStein`](@ref): the Spanned Shrinkage is a weight in `[0, 1]`, so the rule clips the intensity into that interval under every member of [`AbstractShrunkExpectedReturnsIntensity`](@ref). With no Return Forecast Estimator, ``\\boldsymbol{g}`` is zero.
 
 Each intensity is read off the factor mean and the factor covariance of the nested factor prior, over the estimated factors, and off the effective sample size. The factor covariance enters through its pseudo-inverse and its rank, as [`spanned_shrinkage_moments`](@ref) states. [`BayesStein`](@ref) gives a weight in `[0, 1)` with no clip, as in [jorion1986](@cite). [`JamesStein`](@ref) can give an intensity outside `[0, 1]`, and the rule clips it, which is the positive-part form of [meucci2005](@cite). At two factors or fewer its intensity is not positive, so the rule keeps the factor mean. [`BodnarOkhrinParolya`](@ref) gives the weight of the sample mean and a separate scale of the target, as in [bodnar2019](@cite). The blend of the prior gives the target the weight that the sample mean leaves, so the rule returns the clipped weight of the sample mean and reads no scale of the target.
 
@@ -499,7 +499,7 @@ true
 """
 @concrete struct SteinShrinkage <: AbstractSpannedShrinkageCalibrationAlgorithm
     """
-    The algorithm whose shrinkage intensity the rule reads, a member of [`AbstractShrunkExpectedReturnsAlgorithm`](@ref). Its target `tgt` is not read: the target is the spanned part of the Return Forecast.
+    The algorithm whose shrinkage intensity the rule reads, a member of [`AbstractShrunkExpectedReturnsAlgorithm`](@ref). Its target `tgt` is not read: the target is the spanned part of the Return Forecast. Its `intensity` is not read either: the rule clips the intensity into `[0, 1]`.
     """
     alg
     function SteinShrinkage(alg::AbstractShrunkExpectedReturnsAlgorithm)

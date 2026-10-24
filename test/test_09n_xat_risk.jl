@@ -2,7 +2,9 @@
 # forms their docstrings state: every empirical functor against the definition of Cajas,
 # Equation 7.50, and against an independent solve of the mixed-integer programme of Equation
 # 7.51 with its slack added, the parametric z-scores against the quantiles of the unit-variance
-# distributions, the models against the functors, and the validation of the constructors.
+# distributions, the models against the functors, and the validation of the constructors. The
+# checks of #600 add the parametric quantile against the empirical one, the two drawdown paths
+# in exact arithmetic, and the range as the sum of its tails when the two levels overlap.
 using Clarabel, Distributions, HiGHS, JuMP
 
 # The minimum of the mixed-integer programme over a loss series `l`, with a big-M constant that
@@ -119,6 +121,13 @@ rel_dd(x) = cumprod(1 .+ x) ./ accumulate(max, cumprod(1 .+ x); init = one(eltyp
             vd = DrawdownatRisk(; alpha = alpha)(x)
             @test ConditionalDrawdownatRisk(; alpha = alpha)(x) ≈
                   vd + sum(max.(-abs_dd(x) .- vd, 0)) / (alpha * T)
+            # The mean excess is never negative, so the tail mean is never below the
+            # quantile at the same level (#601).
+            @test v <= ConditionalValueatRisk(; alpha = alpha)(x)
+            @test vw <= ConditionalValueatRisk(; alpha = alpha, w = pw)(x)
+            @test vd <= ConditionalDrawdownatRisk(; alpha = alpha)(x)
+            @test RelativeDrawdownatRisk(; alpha = alpha)(x) <=
+                  RelativeConditionalDrawdownatRisk(; alpha = alpha)(x)
             if isinteger(round(alpha * T; digits = 8))
                 @test ConditionalValueatRisk(; alpha = alpha)(x) ≈ mean(-x[-x .> v])
             end
@@ -342,5 +351,88 @@ rel_dd(x) = cumprod(1 .+ x) ./ accumulate(max, cumprod(1 .+ x); init = one(eltyp
         @test !PortfolioOptimisers.supports_precomputed_returns(factory(ValueatRisk(;
                                                                                     alg = DistributionValueatRisk()),
                                                                         pr))
+    end
+    @testset "The parametric quantile against the empirical one" begin
+        # The parametric functor of one asset at unit weight, with the sample moments.
+        function par(x, alpha)
+            r = ValueatRisk(; alpha = alpha, alg = DistributionValueatRisk())
+            return factory(r, prior(EmpiricalPrior(), reshape(x, :, 1)))([1.0])
+        end
+        emp(x, alpha) = ValueatRisk(; alpha = alpha)(x)
+        rng = StableRNG(600)
+        T = 200_000
+        # On a normal sample the two estimands agree to the sampling error.
+        xn = 0.01 .* randn(rng, T) .+ 0.0005
+        for alpha in (0.01, 0.05, 0.1, 0.3)
+            @test isapprox(par(xn, alpha), emp(xn, alpha); rtol = 2e-2)
+        end
+        # An exponential loss tail is heavier than the normal one, so at a small alpha the
+        # parametric quantile understates the loss. The mirrored sample has a light loss tail,
+        # so the parametric quantile overstates it.
+        xl = 0.01 .* (1 .- rand(rng, Exponential(1.0), T))
+        for alpha in (0.01, 0.05)
+            @test par(xl, alpha) < 0.9 * emp(xl, alpha)
+            @test par(-xl, alpha) > 1.5 * emp(-xl, alpha)
+        end
+        # At a larger alpha the order reverses.
+        @test par(xl, 0.3) > emp(xl, 0.3)
+    end
+    @testset "The two drawdown paths in exact arithmetic" begin
+        PO = PortfolioOptimisers
+        # c = (1/10, -1/10, -1/20, 1/20, -1/20) with the peak 1/10 from the first period, and
+        # C = (11/10, 22/25, 231/250, 2541/2500, 22869/25000) with the peak 11/10.
+        x = [1 // 10, -2 // 10, 1 // 20, 1 // 10, -1 // 10]
+        @test PO.absolute_drawdown_vec(x) == [0, -1 // 5, -3 // 20, -1 // 20, -3 // 20]
+        @test PO.relative_drawdown_vec(x) ==
+              [0, -1 // 5, -4 // 25, -19 // 250, -421 // 2500]
+        @test eltype(PO.relative_drawdown_vec(x)) == Rational{Int}
+        # At alpha = 0.2 and T = 5 the index is 2, the second deepest drawdown.
+        @test DrawdownatRisk(; alpha = 0.2)(Float64.(x)) ≈ 0.15
+        @test RelativeDrawdownatRisk(; alpha = 0.2)(Float64.(x)) ≈ 0.1684
+        # A path that never falls has no drawdown on either path.
+        up = [1 // 100, 0 // 1, 2 // 100]
+        @test PO.absolute_drawdown_vec(up) == zeros(Rational{Int}, 3)
+        @test PO.relative_drawdown_vec(up) == zeros(Rational{Int}, 3)
+        @test iszero(DrawdownatRisk()(Float64.(up)))
+        @test iszero(RelativeDrawdownatRisk()(Float64.(up)))
+        # The peaks start at c_0 = 0 and C_0 = 1, so a fall in the first period is a drawdown.
+        down = [-1 // 10, 1 // 20]
+        @test PO.absolute_drawdown_vec(down) == [-1 // 10, -1 // 20]
+        @test PO.relative_drawdown_vec(down) == [-1 // 10, -11 // 200]
+    end
+    @testset "The range is the sum of its two tails, and overlapping levels make it negative" begin
+        PO = PortfolioOptimisers
+        x = [0.03, -0.01, 0.02, -0.04, 0.05, 0.0, -0.02, 0.01, -0.03, 0.04]
+        xs = sort(x)
+        pw = pweights(collect(1.0:10.0))
+        sum_of_tails(r, x) = (t = PO.range_tails(r); t.loss(x) + t.gain(-x))
+        # Without weights the range is x_(T + 1 - k_beta) - x_(k_alpha), with T = 10.
+        for (alpha, beta, v) in
+            ((0.05, 0.2, xs[8] - xs[1]), (0.45, 0.45, xs[6] - xs[5]), (0.5, 0.45, 0.0),
+             (0.5, 0.5, xs[5] - xs[6]), (0.6, 0.6, xs[4] - xs[7]))
+            r = ValueatRiskRange(; alpha = alpha, beta = beta)
+            rw = ValueatRiskRange(; alpha = alpha, beta = beta, w = pw)
+            @test r(x) == v
+            @test r(x) == sum_of_tails(r, x)
+            @test rw(x) == sum_of_tails(rw, x)
+        end
+        # With weights k_alpha = 5 and k_beta = 6 at alpha = beta = 0.5, so k_alpha + k_beta
+        # is T + 1 and the two tails select the same return.
+        @test ValueatRiskRange(; alpha = 0.5, w = pw)(x) == 0.0
+        # The model of overlapping levels is still the order statistic of the functor.
+        rng = StableRNG(600)
+        X = 0.01 .* randn(rng, 20, 3) .+ 0.0005
+        pr = prior(EmpiricalPrior(), X)
+        slv = Solver(; name = :highs, solver = HiGHS.Optimizer,
+                     settings = Dict("log_to_console" => false, "mip_rel_gap" => 0.0,
+                                     "mip_feasibility_tolerance" => 1e-9))
+        for (alpha, beta) in ((0.6, 0.6), (0.3, 0.8))
+            r = ValueatRiskRange(; alpha = alpha, beta = beta)
+            sol = optimise(MeanRisk(; r = r, obj = MinimumRisk(),
+                                    opt = JuMPOptimiser(; pe = pr, slv = slv)))
+            @test JuMP.value(sol.model[:risk]) < 0
+            @test isapprox(JuMP.value(sol.model[:risk]), expected_risk(r, sol.w, X);
+                           atol = 1e-12)
+        end
     end
 end

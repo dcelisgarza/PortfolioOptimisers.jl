@@ -234,8 +234,7 @@ Keywords correspond to the struct's fields.
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 8.1.1.
-  - $(ref_dict[:markowitz1952])
+  - $(ref_dict[:markowitz1952]) Page 81.
 """
 @concrete struct ArithmeticReturn <: JuMPReturnsEstimator
     """
@@ -459,15 +458,12 @@ own expression, and the term still charges the same fees. This is the return-sid
 function unit_scale_returns_estimator(r::JuMPReturnsEstimator)
     settings = r.settings
     scale = settings.scale
-    return if isone(scale)
-        r
-    else
-        Accessors.@set r.settings = JuMPReturnsSettings(; scale = one(scale),
-                                                        lb = settings.lb,
-                                                        rte = settings.rte,
-                                                        fee = settings.fee,
-                                                        mic = settings.mic)
+    if isone(scale)
+        return r
     end
+    s = JuMPReturnsSettings(; scale = one(scale), lb = settings.lb, rte = settings.rte,
+                            fee = settings.fee, mic = settings.mic)
+    return rebuild_estimator(r, (; settings = s))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -478,7 +474,9 @@ The term takes optional observation weights. Unlike [`ArithmeticReturn`](@ref), 
 per-asset quantity, which is why this family is named for the return term and not for the
 characteristic. [`expected_return`](@ref) computes the same quantity in closed form, and the
 model's `:ret` agrees with it when the objective raises the return. The formulation is on
-[`set_return_constraints!`](@ref).
+[`set_return_constraints!`](@ref). Page 919 of [kelly1956](@cite) states the criterion for
+the bets of a gambler, and Section 7 of [thorp2008](@cite) states it for a portfolio of
+securities.
 
 # Mathematical definition
 
@@ -531,10 +529,8 @@ Keywords correspond to the struct's fields.
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 8.1.2, equations 8.2 and 8.5.
-  - $(ref_dict[:kelly1956])
-  - $(ref_dict[:thorp2008])
-  - $(ref_dict[:chares2009])
+  - $(ref_dict[:kelly1956]) Page 919.
+  - $(ref_dict[:thorp2008]) Section 7, page 406.
 """
 @concrete struct LogarithmicReturn <: JuMPReturnsEstimator
     """
@@ -682,7 +678,12 @@ whether one number has the same meaning for all of the terms.
   - [`LogarithmicReturn`](@ref)
 """
 function bounds_returns_estimator(r::JuMPReturnsEstimator, lb::Option{<:RkRtBounds})
-    return Accessors.@set r.settings.lb = lb
+    settings = r.settings
+    return if lb === settings.lb
+        r
+    else
+        rebuild_estimator(r, (; settings = rebuild_estimator(settings, (; lb = lb))))
+    end
 end
 function bounds_returns_estimator(r::VecJRE, lb::Nothing)
     return [bounds_returns_estimator(ri, nothing) for ri in r]

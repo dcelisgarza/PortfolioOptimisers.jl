@@ -75,7 +75,7 @@ Where:
 
 # References
 
-  - $(ref_dict[:jump2026cones])
+  - $(ref_dict[:lobo1998]) Section 1.1.
 """
 function set_weight_norm_2_constraints!(args...)
     return nothing
@@ -172,7 +172,7 @@ Where:
 
 # References
 
-  - $(ref_dict[:jump2026cones])
+  - $(ref_dict[:chares2009]) Section 4.1.2, Equations 4.4 and 4.5.
 """
 function set_weight_norm_p_constraints!(args...)
     return nothing
@@ -360,7 +360,8 @@ Where:
 
 # References
 
-  - $(ref_dict[:jump2026cones])
+  - $(ref_dict[:lobo1998]) Section 1.1.
+  - $(ref_dict[:chares2009]) Section 4.1.2, Equations 4.4 and 4.5.
 """
 function norm_ball_dual_norm_epigraph!(model::JuMP.Model, prefix::Symbol, i, x, p::Number)
     sc = get_constraint_scale(model)

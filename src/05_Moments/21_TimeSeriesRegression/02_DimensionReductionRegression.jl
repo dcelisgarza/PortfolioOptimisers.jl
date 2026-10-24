@@ -1,11 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all dimension reduction regression algorithm targets.
+Abstract supertype for all dimension reduction target types.
 
-All concrete and/or abstract types implementing dimension reduction algorithms for regression (such as PCA or PPCA) should be subtypes of `DimensionReductionTarget`.
-
-These types are used to specify the dimension reduction method when constructing a [`DimensionReductionRegression`](@ref) estimator. A target must answer `StatsAPI.fit(tgt, X)` with a model that `StatsAPI.predict` and [`dimension_reduction_map`](@ref) both accept. The generic method of [`dimension_reduction_map`](@ref) reads `MultivariateStats.projection`, which is correct for a model whose `predict` applies the transpose of that projection.
+A subtype sets the method that reduces the factors of a [`DimensionReductionRegression`](@ref), for example [`PCA`](@ref) or [`PPCA`](@ref). A target must answer `StatsAPI.fit(tgt, X)` with a model that `StatsAPI.predict` and [`dimension_reduction_map`](@ref) both accept. The generic method of [`dimension_reduction_map`](@ref) reads `MultivariateStats.projection`. That matrix is correct for a model whose `predict` applies the transpose of that projection.
 
 # Related
 
@@ -20,15 +18,15 @@ abstract type DimensionReductionTarget <: AbstractRegressionAlgorithm end
 """
     factory(drtgt::DimensionReductionTarget, args...; kwargs...) -> DimensionReductionTarget
 
-No-op factory for [`DimensionReductionTarget`](@ref) subtypes. Returns the target unchanged.
+Returns a [`DimensionReductionTarget`](@ref) unchanged.
 
-Dimension reduction targets (such as [`PCA`](@ref) and [`PPCA`](@ref)) do not depend on observation weights, so this method returns `drtgt` unchanged. This allows generic code to call `factory` on dimension reduction targets without special-casing. The weights reach the reduction through [`DimensionReductionRegression`](@ref)'s `ve` instead, which standardises the factors before the target ever sees them.
+A dimension reduction target, for example [`PCA`](@ref) or [`PPCA`](@ref), does not read observation weights. So this method returns `drtgt` unchanged, and generic code can call `factory` on a target with no special case. The weights reach the reduction through the `ve` field of [`DimensionReductionRegression`](@ref), which standardises the factors before the target sees them.
 
 # Arguments
 
   - `drtgt`: Dimension reduction target.
-  - `args...`: Additional arguments (ignored).
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - $(arg_dict[:ignargs])
+  - $(arg_dict[:ignkwargs])
 
 # Returns
 
@@ -49,7 +47,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Replaces the factors with the principal components of their standardised covariance.
 
-The `kwargs` field is forwarded to `MultivariateStats.fit(MultivariateStats.PCA, X; kwargs...)`, and it is the only place the retained width is set: `pratio` caps the share of variance the retained components must explain and `maxoutdim` caps their number. The default `kwargs = (;)` takes that library's own defaults, which on a factor matrix of full rank retain every component and reduce nothing: on five factors of full rank `PCA()` retained five components, while `PCA(; kwargs = (; pratio = 0.8))` retained four and `PCA(; kwargs = (; maxoutdim = 2))` retained two.
+The principal components are those of [pearson1901](@cite) and [hotelling1933](@cite). No copy of either work was found, so the components of the standardised factors follow Equation 34 of [fekedulegn2002](@cite).
+
+The fit passes the `kwargs` field to `MultivariateStats.fit(MultivariateStats.PCA, X; kwargs...)`, and only this field sets the retained width. `pratio` sets the share of the variance that the retained components must explain, and `maxoutdim` caps their number. The default `kwargs = (;)` takes the defaults of that library. On a factor matrix of full rank, these defaults retain every component and reduce nothing. On a sample of five factors of full rank, `PCA()` retained five components, `PCA(; kwargs = (; pratio = 0.8))` retained four, and `PCA(; kwargs = (; maxoutdim = 2))` retained two.
 
 # Fields
 
@@ -81,10 +81,11 @@ PCA
 
   - $(ref_dict[:pearson1901])
   - $(ref_dict[:hotelling1933])
+  - $(ref_dict[:fekedulegn2002]) Equation 34. $(ref_dict[:no_original_source])
 """
 @concrete struct PCA <: DimensionReductionTarget
     """
-    Keyword arguments passed to `fit(MultivariateStats.PCA, X; kwargs...)`
+    Keyword arguments that the fit passes to `fit(MultivariateStats.PCA, X; kwargs...)`.
     """
     kwargs
     function PCA(kwargs::NamedTuple)
@@ -97,23 +98,21 @@ end
 """
     StatsAPI.fit(drtgt::PCA, X::MatNum)
 
-Fit a Principal Component Analysis (PCA) model to the data matrix `X` using the configuration in `drtgt`.
-
-This method applies PCA as a dimension reduction technique for regression-based moment estimation.
+Fits a principal component analysis model of `MultivariateStats` to the data matrix `X`, with the keyword arguments of `drtgt`.
 
 # Algorithm
 
- 1. Read `drtgt.kwargs`, which carries the retained width through `pratio` and `maxoutdim`.
- 2. Call [`MultivariateStats.fit`](https://juliastats.org/MultivariateStats.jl/stable/pca/#StatsAPI.fit) on `MultivariateStats.PCA` with `X` and those keyword arguments, giving the fitted model.
+ 1. Read `drtgt.kwargs`, which sets the retained width through `pratio` and `maxoutdim`.
+ 2. Call [`MultivariateStats.fit`](https://juliastats.org/MultivariateStats.jl/stable/pca/#StatsAPI.fit) on `MultivariateStats.PCA` with `X` and those keyword arguments, and return the fitted model.
 
 # Arguments
 
-  - `drtgt`: A [`PCA`](@ref) dimension reduction target, specifying keyword arguments for PCA.
-  - `X`: Data matrix `factors × observations`, standardised by the caller.
+  - `drtgt`: [`PCA`](@ref) target that holds the keyword arguments of the fit.
+  - `X`: Data matrix `factors × observations`, which the caller standardises.
 
 # Returns
 
-  - `model::PCA`: A fitted PCA model object from `MultivariateStats.jl`.
+  - `model::MultivariateStats.PCA`: The fitted model.
 
 # Related
 
@@ -130,7 +129,13 @@ $(DocStringExtensions.TYPEDEF)
 
 Replaces the factors with the latent components of a Gaussian latent-variable model.
 
-The model is the maximum-likelihood factor analyser with an isotropic noise variance; its latent directions span the same subspace as the principal components of [`PCA`](@ref), and they coincide with them in the zero-noise limit. The `kwargs` field is forwarded to `MultivariateStats.fit(MultivariateStats.PPCA, X; kwargs...)`. Its default width is one fewer than [`PCA`](@ref)'s, because that library caps a latent-variable model at one less than the number of input dimensions: on five factors of full rank `PCA()` retained five components and `PPCA()` retained four. `maxoutdim` lowers that width and **must not raise it to the factor count**: at the full width the third-party fit succeeds and `MultivariateStats.projection` then raises an `ArgumentError` out of its singular value decomposition, so the failure would surface inside [`prep_dim_red_reg`](@ref) rather than at construction. The latent components are the posterior means that `StatsAPI.predict` gives, so the regression maps its coefficients back through the matrix that [`dimension_reduction_map`](@ref) reads off that prediction, not through `MultivariateStats.projection`. [`StatsAPI.fit(::PPCA, ::MatNum)`](@ref) checks the cap before it calls that library, and raises a `DomainError` naming `maxoutdim` instead. The constructor cannot hold the check, because it never sees the factor matrix.
+The model is the maximum-likelihood factor analyser with an isotropic noise variance. Its latent directions span the same subspace as the principal components of [`PCA`](@ref), and they are equal to them in the limit of zero noise. The fit is the maximum-likelihood estimate of Section 3.2 of [tipping1999](@cite). The weights are those of Equation 7 with the rotation set to the identity. The noise variance is that of Equation 8, the mean of the discarded eigenvalues. `MultivariateStats` takes the eigenvalues from the sample covariance with divisor ``N - 1``, where Equation 5 divides by ``N``. The subspace is the same, and the eigenvalues, the weights and the noise variance carry that divisor.
+
+The fit passes the `kwargs` field to `MultivariateStats.fit(MultivariateStats.PPCA, X; kwargs...)`. The default width is one fewer than the width of [`PCA`](@ref), because that library caps a latent-variable model at one less than the number of input dimensions. On five factors of full rank, `PCA()` retained five components and `PPCA()` retained four. `maxoutdim` can lower that width, and it must stay below the factor count.
+
+[`StatsAPI.fit(::PPCA, ::MatNum)`](@ref) checks that bound before it calls `MultivariateStats`, and it raises a `DomainError` that names `maxoutdim`. Without the check, the fit of that library accepts the full width and returns weights of `NaN`. `StatsAPI.predict` in [`prep_dim_red_reg`](@ref) then raises an `ArgumentError` that names neither the cause nor the keyword. The constructor cannot make the check, because it does not see the factor matrix.
+
+The latent components are the posterior means that `StatsAPI.predict` gives. So the regression maps its coefficients back through the matrix that [`dimension_reduction_map`](@ref) reads off that prediction, not through `MultivariateStats.projection`.
 
 # Fields
 
@@ -160,11 +165,11 @@ PPCA
 
 # References
 
-  - $(ref_dict[:tipping1999])
+  - $(ref_dict[:tipping1999]) Section 3.2, Equations 7-8.
 """
 @concrete struct PPCA <: DimensionReductionTarget
     """
-    Keyword arguments passed to `fit(MultivariateStats.PPCA, X; kwargs...)`
+    Keyword arguments that the fit passes to `fit(MultivariateStats.PPCA, X; kwargs...)`.
     """
     kwargs
     function PPCA(kwargs::NamedTuple)
@@ -177,28 +182,26 @@ end
 """
     StatsAPI.fit(drtgt::PPCA, X::MatNum)
 
-Fit a Probabilistic Principal Component Analysis (PPCA) model to the data matrix `X` using the configuration in `drtgt`.
-
-This method applies PPCA as a dimension reduction technique for regression-based moment estimation.
+Fits a probabilistic principal component analysis model of `MultivariateStats` to the data matrix `X`, with the keyword arguments of `drtgt`.
 
 # Algorithm
 
- 1. Read `drtgt.kwargs`, which carries the retained width through `maxoutdim`.
+ 1. Read `drtgt.kwargs`, which sets the retained width through `maxoutdim`.
  2. If `maxoutdim` is present, check it against the number of factors, `size(X, 1)`.
- 3. Call [`MultivariateStats.fit`](https://juliastats.org/MultivariateStats.jl/stable/pca/#StatsAPI.fit) on `MultivariateStats.PPCA` with `X` and those keyword arguments, giving the fitted model.
+ 3. Call [`MultivariateStats.fit`](https://juliastats.org/MultivariateStats.jl/stable/pca/#StatsAPI.fit) on `MultivariateStats.PPCA` with `X` and those keyword arguments, and return the fitted model.
 
 # Arguments
 
-  - `drtgt`: A [`PPCA`](@ref) dimension reduction target, specifying keyword arguments for PPCA.
-  - `X`: Data matrix `factors × observations`, standardised by the caller.
+  - `drtgt`: [`PPCA`](@ref) target that holds the keyword arguments of the fit.
+  - `X`: Data matrix `factors × observations`, which the caller standardises.
 
 # Validation
 
-  - If `drtgt.kwargs` carries a `maxoutdim` entry, `0 < drtgt.kwargs.maxoutdim < size(X, 1)` must hold. `MultivariateStats` caps a probabilistic PCA at one latent dimension fewer than the number of factors, and its own fit accepts the full width and returns a model whose weights are `NaN`. Without this check the weights of the model are `NaN`, and the failure reaches the caller inside [`prep_dim_red_reg`](@ref), with a message that names neither the cause nor the keyword.
+  - If `drtgt.kwargs` holds a `maxoutdim` entry, `0 < drtgt.kwargs.maxoutdim < size(X, 1)` must hold. `MultivariateStats` caps a probabilistic PCA at one latent dimension fewer than the number of factors. Its own fit accepts the full width and returns a model whose weights are `NaN`. Without this check, the failure reaches the caller later, inside [`prep_dim_red_reg`](@ref), with a message that names neither the cause nor the keyword.
 
 # Returns
 
-  - `model::PPCA`: A fitted PPCA model object from `MultivariateStats.jl`.
+  - `model::MultivariateStats.PPCA`: The fitted model.
 
 # Related
 
@@ -221,7 +224,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Estimates a loadings matrix by regressing each asset on the leading components of the factors.
 
-`drtgt` reduces the standardised factors to a smaller orthogonal basis, `retgt` fits each asset in that basis, and the coefficients are then mapped back to the original factors. `ve` supplies the mean and the standard deviation that mapping divides by; the expected returns estimator it reads is `ve.me`, and a `nothing` there falls back to `SimpleExpectedReturns()`. Unlike [`StepwiseRegression`](@ref), every asset keeps every factor. **The standardisation and the recovery read the same statistics**: [`prep_dim_red_reg`](@ref) computes them from `ve`, and `_regression` recovers the coefficients with the pair it returned, so a weighted `ve` — the one [`factory`](@ref) builds from the incoming observation weights — is honoured end to end, as Equations 4.13, 4.15 and 4.20 of $(ref_dict[:cajas2025]) require.
+`drtgt` maps the standardised factors to a basis of orthogonal components, and `retgt` fits each asset in that basis. The basis is smaller than the factor set only when `drtgt` retains fewer components than factors. The method then maps the coefficients back to the original factors. `ve` gives the mean, and the standard deviation by which that map divides. The mean comes from the expected returns estimator `ve.me`, or from `SimpleExpectedReturns()` when `ve.me` is `nothing`. Every asset keeps every factor, which is not true of [`StepwiseRegression`](@ref).
+
+The standardisation and the recovery read the same statistics. [`prep_dim_red_reg`](@ref) computes them from `ve`, and `_regression` recovers the coefficients with the pair that it returns. So a weighted `ve`, which [`factory`](@ref) builds from the observation weights, gives its weights to both steps. Equations 8, 11, 12, 35 and 36 of [fekedulegn2002](@cite) need this. That work fits the regression on the principal components of the standardised factors, with the eigenvectors of their correlation matrix. A probabilistic target puts the matrix of Equation 9 of [tipping1999](@cite) in place of the eigenvectors, and neither source states this composition.
 
 The reduction reads every observation, so a fit over more observations can reduce to other components. `proj` fixes the components as linear combinations of the original factors, and the fit then makes no reduction. `choice` states whether the online step of a prior that fits this regression writes the components of the first fit into `proj`. A batch fit gives the same answer under both rules.
 
@@ -244,24 +249,24 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `retgt` states its observation weights through [`regression_target_weights`](@ref), which returns `retgt.kwargs.weights` for a [`LinearModel`](@ref) or a [`GeneralisedLinearModel`](@ref). A caller's own target without that method is refused with an `ArgumentError`.
+  - `retgt` states its observation weights through [`regression_target_weights`](@ref), which returns `retgt.kwargs.weights` for a [`LinearModel`](@ref) or a [`GeneralisedLinearModel`](@ref). The constructor raises an `ArgumentError` for a target of the caller that has no such method.
   - If `regression_target_weights(retgt)` is not `nothing`, it must be an `ObsWeights` and, when it is a vector, not empty.
   - If `proj` is not `nothing`, `!isempty(proj)`, and every entry of `proj` is finite, as [`assert_nonempty_finite_val`](@ref) checks.
   - `x_src in ALL_RETURNS_SOURCES`, as [`assert_returns_source`](@ref) checks. A regression reader admits every source.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `ve`: Recursively updated via [`factory`](@ref).
-  - `drtgt`: Recursively updated via [`factory`](@ref).
-  - `retgt`: Recursively updated via [`factory`](@ref).
+  - `ve`: Recursively updated through [`factory`](@ref).
+  - `drtgt`: Recursively updated through [`factory`](@ref).
+  - `retgt`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `ve`: Recursively viewed via [`port_opt_view`](@ref).
+  - `ve`: Recursively viewed through [`port_opt_view`](@ref).
 
 # Examples
 
@@ -299,8 +304,8 @@ DimensionReductionRegression
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 4.3.1, Equations 4.12-4.20.
-  - $(ref_dict[:fekedulegn2002])
+  - $(ref_dict[:fekedulegn2002]) Pages 4-7 and 21-22, Equations 8, 11-12, 20-23 and 34-36.
+  - $(ref_dict[:tipping1999]) Section 3.4, Equation 9.
 """
 @propagatable @concrete struct DimensionReductionRegression <:
                                AbstractTimeSeriesRegressionEstimator
@@ -317,11 +322,11 @@ DimensionReductionRegression
     """
     @fprop retgt
     """
-    Choice Rule of the components. Under [`BatchChoice`](@ref), the default, each fit reduces the factors again over every observation. Under [`PinnedChoice`](@ref), the online step of a prior that fits this regression writes the components of the first fit into `proj` of the estimator that it returns. The two agree in a batch fit. An entropy pooling prior refits the prior under the posterior weights and holds this regression of the fit that its views read, so its refits agree too.
+    Choice Rule of the components. Under [`BatchChoice`](@ref), the default, each fit reduces the factors again over every observation. Under [`PinnedChoice`](@ref), the online step of a prior that fits this regression writes the components of the first fit into `proj` of the estimator that it returns. The two agree in a batch fit. An entropy pooling prior refits the prior under the posterior weights. It holds the regression of the fit that its views read, so its refits agree too.
     """
     choice
     """
-    Components as linear combinations of the original factors, `factors × components`, or `nothing`. Column `k` holds the weight of each factor in component `k`, after the mean of the factors is subtracted. A matrix makes the fit regress each asset on these components and make no reduction. `nothing` makes the fit reduce the factors with `drtgt`.
+    Components as linear combinations of the original factors, `factors × components`, or `nothing`. Column `k` holds the weight of each factor in component `k`, after the fit subtracts the mean of the factors. A matrix makes the fit regress each asset on these components and make no reduction. `nothing` makes the fit reduce the factors with `drtgt`.
     """
     proj
     """
@@ -364,42 +369,42 @@ end
 
 Standardises the factors, fits the dimension reduction model, and projects the factors into the reduced basis.
 
-It returns the two statistics that did the standardisation along with the projection, because the caller must undo that same scale. Equations 4.13, 4.15 and 4.20 of $(ref_dict[:cajas2025]) hold only when the two are the same statistic.
+It returns the two statistics of the standardisation with the projection, because the caller must undo that same scale. Equations 11 and 12 of [fekedulegn2002](@cite) hold only when the standardisation and the recovery use the same statistics.
 
-When `re.proj` holds the components, the method makes no reduction. It centres the factors at their mean and multiplies them by `re.proj`. It returns `re.proj` as the projection and a scale of ones, so the caller recovers the coefficients with the same formula. A constant shift of the components changes only the intercept of the fit in the reduced basis, which `_regression` discards, so the components need no centre of their own.
+When `re.proj` holds the components, the method makes no reduction. It centres the factors at their mean and multiplies them by `re.proj`. It returns `re.proj` as the projection and a scale of ones, so the caller recovers the coefficients with the same formula. A constant shift of the components changes only the intercept of the fit in the reduced basis, and `_regression` discards that intercept. So the components need no centre of their own.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. Read the expected returns estimator from `re.ve.me`, giving `me`. Fall back to `SimpleExpectedReturns()` when it is `nothing`.
- 2. Take the mean of each column of `X` under `me`, giving `mu`.
+ 1. Read the expected returns estimator from `re.ve.me`, and call it `me`. Use `SimpleExpectedReturns()` when it is `nothing`.
+ 2. Take the mean of each column of `X` under `me`, and call it `mu`.
  3. `re.proj` is `nothing`:
-     1. Take the standard deviation of each column of `X` under `re.ve`, giving `sigma`, and raise every entry to at least `eps(eltype(sigma))`, so a constant factor cannot divide by zero.
-     2. Centre `X` with [`demean_returns`](@ref) at `mu`, divide each column by its entry of `sigma`, and transpose, giving `X_std`.
-     3. Fit `re.drtgt` to `X_std`, giving `model`.
-     4. Project `X_std` through `model` and transpose, giving `Xp`, the factors in the reduced basis.
-     5. Read the matrix of the projection of `model` with [`dimension_reduction_map`](@ref), giving `Vp`.
+     1. Take the standard deviation of each column of `X` under `re.ve`, and call it `sigma`. Raise every entry to at least `eps(eltype(sigma))`, so that a constant factor does not cause a division by zero.
+     2. Centre `X` with [`demean_returns`](@ref) at `mu`, divide each column by its entry of `sigma`, and transpose. Call the result `X_std`.
+     3. Fit `re.drtgt` to `X_std`, and call the fit `model`.
+     4. Project `X_std` through `model` and transpose. Call the result `Xp`, the factors in the reduced basis.
+     5. Read the matrix of the projection of `model` with [`dimension_reduction_map`](@ref), and call it `Vp`.
  4. `re.proj` is a matrix:
-     1. Centre `X` with [`demean_returns`](@ref) at `mu`, and multiply it by `re.proj`, giving `Xp`.
+     1. Centre `X` with [`demean_returns`](@ref) at `mu`, and multiply it by `re.proj`. Call the result `Xp`.
      2. Take `Vp = re.proj`, and a vector of ones as `sigma`.
- 5. Prepend a column of ones to `Xp`, giving `x1`.
+ 5. Prepend a column of ones to `Xp`, and call the result `x1`.
 
 # Arguments
 
-  - `re`: Dimension reduction regression estimator. Its `ve` supplies the standard deviation, and its `ve.me` the mean. A `nothing` in `ve.me` falls back to `SimpleExpectedReturns()`.
-  - `X`: Factor matrix `observations × factors`, to be reduced.
+  - `re`: Dimension reduction regression estimator. Its `ve` gives the standard deviation, and its `ve.me` gives the mean. When `ve.me` is `nothing`, the method uses `SimpleExpectedReturns()`.
+  - `X`: Factor matrix `observations × factors`, which the method reduces.
 
 # Validation
 
-  - If `re.proj` is a matrix, `size(re.proj, 1) == size(X, 2)`. A `DimensionMismatch` is thrown otherwise.
+  - If `re.proj` is a matrix, `size(re.proj, 1) == size(X, 2)`. The method raises a `DimensionMismatch` otherwise.
 
 # Returns
 
   - `x1::MatNum`: Projected factor matrix `observations × components`, with an intercept column prepended.
   - `Vp::MatNum`: Projection matrix `factors × components`. Its transpose maps one standardised observation to its components.
-  - `mu::VecNum`: Factor means used to centre `X`.
-  - `sigma::VecNum`: Factor standard deviations used to scale `X`, or ones when `re.proj` holds the components.
+  - `mu::VecNum`: Factor means that centre `X`.
+  - `sigma::VecNum`: Factor standard deviations that scale `X`, or ones when `re.proj` holds the components.
 
 # Related
 
@@ -412,8 +417,7 @@ The method that Julia selects is the algorithm.
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 4.3.1, Equations 4.13, 4.16-4.17.
-  - $(ref_dict[:fekedulegn2002])
+  - $(ref_dict[:fekedulegn2002]) Pages 4-5 and 21, Equations 8, 13-17 and 34.
 """
 function prep_dim_red_reg(re::DimensionReductionRegression{<:Any, <:Any, <:Any, <:Any,
                                                            Nothing}, X::MatNum)
@@ -449,12 +453,12 @@ Returns the matrix whose transpose maps one centred, standardised observation of
 
 # Mathematical definition
 
-The prediction of a probabilistic PCA is the posterior mean of its latent components:
+The prediction of a probabilistic PCA is the posterior mean of its latent components, Equation 9 of [tipping1999](@cite):
 
 ```math
 \\begin{align}
-\\mathbb{E}[\\mathbf{z} \\mid \\mathbf{x}] &= \\mathbf{C}^{-1} \\mathbf{W}^{\\intercal} (\\mathbf{x} - \\boldsymbol{\\mu}_{\\mathrm{pp}})\\,, \\\\
-\\mathbf{C} &= \\mathbf{W}^{\\intercal} \\mathbf{W} + \\sigma^2 \\mathbf{I}\\,.
+\\mathbb{E}[\\mathbf{z} \\mid \\mathbf{x}] &= \\mathbf{M}^{-1} \\mathbf{W}^{\\intercal} (\\mathbf{x} - \\boldsymbol{\\mu}_{\\mathrm{pp}})\\,, \\\\
+\\mathbf{M} &= \\mathbf{W}^{\\intercal} \\mathbf{W} + \\sigma^2 \\mathbf{I}\\,.
 \\end{align}
 ```
 
@@ -465,17 +469,17 @@ Where:
   - ``\\mathbf{W}``: Weights of the model, `factors × components`.
   - ``\\sigma^2``: Noise variance of the model.
   - ``\\boldsymbol{\\mu}_{\\mathrm{pp}}``: Mean of the model.
-  - ``\\mathbf{C}``: The matrix that `Statistics.cov` of the model gives.
+  - ``\\mathbf{M}``: The ``q \\times q`` matrix that `Statistics.cov` of the model gives, with ``q`` the number of components.
   - $(math_dict[:I_identity])
 
-So the matrix is ``\\mathbf{W} \\mathbf{C}^{-1}``, which differs from `MultivariateStats.projection`, the left singular vectors of ``\\mathbf{W}``.
+So the matrix is ``\\mathbf{W} \\mathbf{M}^{-1}``, which differs from `MultivariateStats.projection`, the left singular vectors of ``\\mathbf{W}``.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
  1. Any model: return `MultivariateStats.projection(model)`. For a PCA this is the matrix that the prediction applies.
- 2. A probabilistic PCA: return ``\\mathbf{W} \\mathbf{C}^{-1}``, computed as `model.W / Statistics.cov(model)`.
+ 2. A probabilistic PCA: return ``\\mathbf{W} \\mathbf{M}^{-1}``, computed as `model.W / Statistics.cov(model)`.
 
 # Arguments
 
@@ -494,7 +498,7 @@ The method that Julia selects is the algorithm.
 
 # References
 
-  - $(ref_dict[:tipping1999])
+  - $(ref_dict[:tipping1999]) Section 3.4, Equation 9.
 """
 function dimension_reduction_map(model)
     return MultivariateStats.projection(model)
@@ -508,7 +512,7 @@ end
 
 Fits one asset in the reduced basis and maps its coefficients back to the original factors.
 
-The reduced-space intercept is discarded and rebuilt from the response mean, so a fit and its recovery agree only while `mu` is the mean under the weights that fit used. Matched, the two paths predict the same values, weighted and unweighted alike; standardise with an unweighted mean and fit with weights, and they part.
+The method discards the intercept of the reduced space and builds a new one from the mean of the response. So a fit and its recovery agree only while `mu` is the mean under the weights that the fit used. When the weights match, the two paths predict the same values, with or without weights. When the standardisation uses an unweighted mean and the fit uses weights, the predictions of the two paths are different.
 
 # Mathematical definition
 
@@ -524,11 +528,11 @@ Where:
 
   - ``\\hat{y}``: Fitted response.
   - ``\\hat{\\beta}_{0,\\mathrm{pc}}``: Intercept of the fit in the reduced space, which this method discards.
-  - ``\\hat{\\boldsymbol{\\beta}}_{\\mathrm{pc}}``: Regression coefficients in the reduced (PC) space.
+  - ``\\hat{\\boldsymbol{\\beta}}_{\\mathrm{pc}}``: Regression coefficients in the reduced space.
   - ``\\hat{\\boldsymbol{\\beta}}``: Regression coefficients in the original factor space.
-  - ``\\hat{\\beta}_0``: Intercept adjusted to the original space.
+  - ``\\hat{\\beta}_0``: Intercept in the original factor space.
   - ``\\mathbf{X}_1``: Projected factor matrix in the reduced space, with its leading column of ones.
-  - ``\\mathbf{V}_p``: PCA/PPCA projection matrix.
+  - ``\\mathbf{V}_p``: Projection matrix of the dimension reduction model.
   - ``\\boldsymbol{\\sigma}``: Factor standard deviations.
   - ``\\boldsymbol{\\mu}``: Factor means.
   - ``\\bar{y}``: Mean of the response.
@@ -536,20 +540,20 @@ Where:
 
 # Algorithm
 
- 1. Read the weights of `re.retgt` with [`regression_target_weights`](@ref), giving `w`. Take the mean of `y`, weighted by `w` when it is not `nothing`, giving `mean_y`.
- 2. Fit `re.retgt` to `x1` and `y`, and drop the leading coefficient, giving `beta_pc`.
- 3. Map `beta_pc` through `Vp` and divide by `sigma`, giving `beta`, the coefficients in the original factor space.
- 4. Subtract the `mu`-weighted sum of `beta` from `mean_y`, giving `beta0`.
+ 1. Read the weights of `re.retgt` with [`regression_target_weights`](@ref), and call them `w`. Take the mean of `y`, weighted by `w` when it is not `nothing`, and call it `mean_y`.
+ 2. Fit `re.retgt` to `x1` and `y`, and drop the leading coefficient. Call the rest `beta_pc`.
+ 3. Map `beta_pc` through `Vp` and divide by `sigma`. Call the result `beta`, the coefficients in the original factor space.
+ 4. Subtract the `mu`-weighted sum of `beta` from `mean_y`, and call the result `beta0`.
  5. Prepend `beta0` to `beta`.
 
 # Arguments
 
   - `re`: Dimension reduction regression.
   - `y`: Response vector `observations × 1`.
-  - `mu`: Mean vector of the original factors. It must be the mean that standardised them, which is why [`prep_dim_red_reg`](@ref) returns it.
+  - `mu`: Mean vector of the original factors. It must be the mean that standardised them. That is why [`prep_dim_red_reg`](@ref) returns it.
   - `sigma`: Standard deviation vector of the original factors. It must be the scale that standardised them, for the same reason.
-  - `x1`: Projected factor matrix with intercept column, from [`prep_dim_red_reg`](@ref).
-  - `Vp`: Projection matrix from the fitted dimension reduction model.
+  - `x1`: Projected factor matrix with an intercept column, from [`prep_dim_red_reg`](@ref).
+  - `Vp`: Projection matrix of the fitted dimension reduction model.
 
 # Returns
 
@@ -563,8 +567,7 @@ Where:
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 4.3.1, Equations 4.18-4.20.
-  - $(ref_dict[:fekedulegn2002])
+  - $(ref_dict[:fekedulegn2002]) Pages 7 and 21-22, Equations 20-23 and 34-36.
 """
 function _regression(re::DimensionReductionRegression, y::VecNum, mu::VecNum, sigma::VecNum,
                      x1::MatNum, Vp::MatNum)
@@ -582,22 +585,22 @@ end
 
 Reduces the factors once and regresses every asset on the same reduced basis.
 
-The reduction is fitted on `F` alone, so it does not depend on the assets and one asset's response cannot move another's loadings.
+The method fits the reduction on `F` alone. So the reduction does not depend on the assets, and the response of one asset cannot change the loadings of another.
 
 # Algorithm
 
  1. Allocate `rr`, a dense `assets × (factors + 1)` buffer of zeros.
- 2. Reduce `F` with [`prep_dim_red_reg`](@ref), giving `f1`, `Vp`, `mu` and `sigma`.
- 3. For each asset `i`, fit that column of `X` in the reduced basis and map the coefficients back, and write the result into row `i` of `rr`.
+ 2. Reduce `F` with [`prep_dim_red_reg`](@ref), and call the results `f1`, `Vp`, `mu` and `sigma`.
+ 3. For each asset `i`, fit that column of `X` in the reduced basis, map the coefficients back, and write the result into row `i` of `rr`.
  4. Take the first column of `rr` as `b` and its remaining columns as `M`.
- 5. Undo the rescaling and the projection of `M` in turn, giving `L`, the coefficients in the reduced basis.
- 6. Negate each column of `L` whose sum is negative. The sign of a component is arbitrary, and a build flag such as `--check-bounds=yes` can flip it. So each component points where the equal-weight portfolio has a non-negative exposure to it. `M` does not change, because a component and its coefficient change sign together.
- 7. Take `edof`, the degrees of freedom of the residuals, as the number of rows of `f1` less its number of columns, for every asset.
+ 5. Undo the rescaling and the projection of `M` in turn. Call the result `L`, the coefficients in the reduced basis.
+ 6. Negate each column of `L` whose sum is negative. The sign of a component is arbitrary, and a build flag such as `--check-bounds=yes` can flip it. After this step, the equal-weight portfolio has a non-negative exposure to each component. `M` does not change, because a component and its coefficient change sign together.
+ 7. Set `edof`, the degrees of freedom of the residuals, to the number of rows of `f1` less its number of columns, for every asset.
  8. Build a [`Regression`](@ref) from `b`, `M`, `L` and `edof`.
 
 # Arguments
 
-  - `re`: Dimension reduction regression estimator that supplies the variance estimator, the dimension reduction target and the regression target.
+  - `re`: Dimension reduction regression estimator that gives the variance estimator, the dimension reduction target and the regression target.
   - $(arg_dict[:X])
   - $(arg_dict[:F])
 
@@ -607,12 +610,12 @@ The reduction is fitted on `F` alone, so it does not depend on the assets and on
 
 # Returns
 
-  - `reg::Regression`: Regression result carrying:
+  - `reg::Regression`: Regression result that holds:
 
       + `b`: Intercept of each asset, a view of the first column of `rr`.
-      + `M`: Coefficient of each asset and factor in the original factor space, a view of the remaining columns of `rr`. Every asset keeps every factor, so `M` carries no structural zero.
-      + `L`: Coefficient of each asset and retained component, ``(\\mathbf{M} \\odot \\boldsymbol{\\sigma}^{\\intercal}) \\mathbf{V}_p^{+\\intercal}``. It reproduces the reduced-space coefficients the fits of step 3 produced, up to the sign of each component that step 6 fixes, checked at `2.2e-16` against them on a 200×5 sample, and `size(L, 2)` is the number of retained components, which is the width risk is decomposed in.
-      + `edof`: Degrees of freedom of the residuals of each asset, the number of observations less the intercept and the retained components. Every asset spends the same count.
+      + `M`: Coefficient of each asset and factor in the original factor space, a view of the remaining columns of `rr`. Every asset keeps every factor, so `M` has no structural zero.
+      + `L`: Coefficient of each asset and retained component, ``(\\mathbf{M} \\odot \\boldsymbol{\\sigma}^{\\intercal}) \\mathbf{V}_p^{+\\intercal}``. It reproduces the coefficients of the fits of step 3 in the reduced space, up to the sign of each component that step 6 sets. On a 200×5 sample the two agreed to `2.2e-16`. `size(L, 2)` is the number of retained components, which is the width of a risk decomposition.
+      + `edof`: Degrees of freedom of the residuals of each asset, the number of observations less the intercept and the retained components. The count is the same for every asset.
 
 # Related
 
@@ -622,8 +625,7 @@ The reduction is fitted on `F` alone, so it does not depend on the assets and on
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 4.3.1, Equations 4.12-4.22.
-  - $(ref_dict[:fekedulegn2002])
+  - $(ref_dict[:fekedulegn2002]) Pages 4-7 and 21-22, Equations 8, 11-12, 20-23 and 34-36.
 """
 function regression(re::DimensionReductionRegression, X::MatNum, F::MatNum)
     assert_finite_factor_rows(F)
@@ -649,12 +651,14 @@ end
 
 Writes the components of the first fit into `proj` of a dimension reduction regression under a [`PinnedChoice`](@ref).
 
-The online step of a prior calls it after the fold, over the rows of the buffer of the prior. The reduction reads `F` alone, so the components that it writes are the components that the fit over the same rows uses. A prior that refits the regression under observation weights, as [`OpinionPoolingPrior`](@ref) refits `pe2`, gives those weights as `w`, and the reduction reads them as that fit does. The method writes them in the units of the original factors: the matrix of the projection divided, row by row, by the scale that standardised each factor. A later fit centres the factors at their mean over its own rows and multiplies them by `proj`. So the components keep the weights of the first fit, and the intercept of each asset is still its mean less the part that the factors explain. A regression whose `proj` is a matrix, and a regression under [`BatchChoice`](@ref), get the generic method, which returns `re` unchanged.
+The online step of a prior calls it after the fold, over the rows of the buffer of the prior. The reduction reads `F` alone, so the components that it writes are the components that the fit over the same rows uses. A prior that refits the regression under observation weights, as [`OpinionPoolingPrior`](@ref) refits `pe2`, gives those weights as `w`, and the reduction reads them as that fit does.
+
+The method writes the components in the units of the original factors. That is the matrix of the projection, with each row divided by the scale that standardised its factor. A later fit centres the factors at their mean over its own rows and multiplies them by `proj`. So the components keep the weights of the first fit, and the intercept of each asset is still its mean less the part that the factors explain. A regression whose `proj` is a matrix, and a regression under [`BatchChoice`](@ref), get the generic method, which returns `re` unchanged.
 
 # Algorithm
 
- 1. Return `re` when `F` holds fewer than two rows. The regression refuses one row, so no fit is made yet.
- 2. Reduce `F` with [`prep_dim_red_reg`](@ref), giving `Vp` and `sigma`. When `w` is not `nothing`, the reduction is that of `factory(re, w)`.
+ 1. Return `re` when `F` holds fewer than two rows. The regression refuses one row, so no fit happens yet.
+ 2. Reduce `F` with [`prep_dim_red_reg`](@ref), and keep `Vp` and `sigma`. When `w` is not `nothing`, the reduction is the reduction of `factory(re, w)`.
  3. Return `re` rebuilt with `proj = Vp ./ sigma`.
 
 # Arguments
@@ -696,9 +700,9 @@ end
 """
     returns_source(re::Union{<:StepwiseRegression, <:DimensionReductionRegression})
 
-Return the source that a regression reader states, its `x_src` field.
+Returns the source that a regression reader states, which is its `x_src` field.
 
-A prior that holds a regression reads the returns data and gives the regression a matrix. So the prior refuses a regression whose source is not `nothing`, through [`assert_inner_reader`](@ref), which reads the source with this method.
+A prior that holds a regression reads the returns data and gives the regression a matrix. So the prior refuses a regression whose source is not `nothing`. [`assert_inner_reader`](@ref) makes that check, and it reads the source with this method.
 
 # Arguments
 
@@ -721,9 +725,9 @@ end
     reader_frames(re::Union{<:StepwiseRegression, <:DimensionReductionRegression},
                   path::AbstractString, refit::Bool)
 
-Return the frames that a regression reader adds to the group of the optimiser that holds it.
+Returns the frames that a regression reader adds to the group of the optimiser that holds it.
 
-A regression reader at `x_src = nothing` takes the loadings of the Prior Result when it holds them, and then it reads the frame of the prior. It fits on the raw returns `rd.X` only when the Prior Result holds none. So it counts as a raw reader only when `refit` is `true`, which [`refits_regression`](@ref) answers from the prior estimator of the optimiser. A regression reader is outermost when it sits in a constraint space or in a factor risk optimiser. A regression inside a prior keeps `nothing`, and the prior counts for it.
+A regression reader at `x_src = nothing` takes the loadings of the Prior Result when it holds them, and then it reads the frame of the prior. It fits on the raw returns `rd.X` only when the Prior Result holds none. So it counts as a raw reader only when `refit` is `true`. [`refits_regression`](@ref) finds `refit` from the prior estimator of the optimiser. A regression reader is outermost when it is in a constraint space or in a factor risk optimiser. A regression inside a prior keeps `x_src = nothing`, and the prior counts for it.
 
 # Arguments
 

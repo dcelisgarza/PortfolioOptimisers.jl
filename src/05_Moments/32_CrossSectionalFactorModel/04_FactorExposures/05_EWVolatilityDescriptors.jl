@@ -898,7 +898,7 @@ function descriptor_step(de::Union{EWVolatility{<:RegimeAdjustedExpWeightedVaria
                                                         <:RegimeAdjustedExpWeightedVariance}},
                          rd::ReturnsResult)
     (; st, D) = ew_volatility_fold(de, rd, de.cache)
-    return (; de = Accessors.@set(de.cache = st), D = D)
+    return (; de = rebuild_estimator(de, (; cache = st)), D = D)
 end
 """
     partial_fit!(de::Union{EWVolatility{<:RegimeAdjustedExpWeightedVariance},

@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the optimisers that solve an entropy pooling problem.
 
-A subtype names the numerical route to the posterior probabilities: which package drives the solve, and whether it solves the dual or the primal.
+A subtype selects the package that finds the posterior probabilities, and whether that package solves the dual problem or the primal problem.
 
 # Related
 
@@ -18,9 +18,9 @@ abstract type AbstractEntropyPoolingOptimiser <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the algorithms that decide how the views of an entropy pooling problem reach the optimiser.
+Abstract supertype for the algorithms that give the views of an entropy pooling problem to the optimiser.
 
-A subtype states whether every view is enforced in one optimisation or in stages, from the lower moments to the higher ones, and which probabilities each stage starts from.
+A subtype states whether the optimiser enforces every view in one optimisation or in stages, from the lower moments to the higher ones. It also states the probabilities from which each stage starts.
 
 # Related
 
@@ -33,8 +33,8 @@ A subtype states whether every view is enforced in one optimisation or in stages
 
 # References
 
-  - $(ref_dict[:meucci2008])
-  - $(ref_dict[:vorobets2021])
+  - $(ref_dict[:meucci2008]) Section 4, Equations 26 and 27.
+  - $(ref_dict[:vorobets2021]) Section 3, Algorithms 1 and 2.
 """
 abstract type AbstractEntropyPoolingAlgorithm <: AbstractAlgorithm end
 """
@@ -42,7 +42,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Enforces every view in a single entropy pooling optimisation.
 
-This is the original formulation. It solves once, so it is the cheapest of the three algorithms, and it pins nothing: a higher moment view is free to move a lower moment of the same asset.
+This is the original formulation. It solves one problem, so it is the cheapest of the three algorithms. It fixes no moment, so a view on a higher moment can move a lower moment of the same asset. A variance view reads the prior mean, as [meucci2008](@cite) does. The library gives the name `H0`, and [vorobets2021](@citet) defines only H1 and H2.
 
 # Related
 
@@ -52,7 +52,8 @@ This is the original formulation. It solves once, so it is the cheapest of the t
 
 # References
 
-  - $(ref_dict[:meucci2008])
+  - $(ref_dict[:meucci2008]) Section 4, Equations 26 and 27.
+  - $(ref_dict[:vorobets2021]) Section 3.
 """
 struct H0_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
 """
@@ -60,7 +61,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Enforces the views in stages, and starts every stage from the prior probabilities.
 
-Each stage carries the constraints of the stages before it, so the posterior is the projection of the *prior* onto the whole view set. This is the first of the two sequential heuristics.
+Each stage keeps the constraints of the stages before it, so the posterior is the projection of the prior onto the set that all the views define. This is the first of the two sequential heuristics. [vorobets2021](@citet) takes one stage for each class of parameter: means, variances, skewness and kurtosis, correlations, and then the rest. The library takes three stages: the mean and value at risk views, the variance and covariance views, and then the correlation, skewness and kurtosis views.
 
 # Related
 
@@ -71,7 +72,7 @@ Each stage carries the constraints of the stages before it, so the posterior is 
 
 # References
 
-  - $(ref_dict[:vorobets2021])
+  - $(ref_dict[:vorobets2021]) Section 3, Algorithm 1.
 """
 struct H1_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
 """
@@ -79,7 +80,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Enforces the views in stages, and starts every stage from the previous stage's probabilities.
 
-Each stage carries the constraints of the stages before it, so the view set is the same as [`H1_EntropyPooling`](@ref)'s. What differs is the reference distribution: each stage projects the stage before it rather than the prior. This is the second of the two sequential heuristics.
+Each stage keeps the constraints of the stages before it, so the set of views is the same as the set of [`H1_EntropyPooling`](@ref). The difference is the reference distribution. Each stage projects the probabilities of the stage before it, not the prior probabilities. This is the second of the two sequential heuristics. The library puts the views in the same stages as [`H1_EntropyPooling`](@ref).
 
 # Related
 
@@ -90,13 +91,13 @@ Each stage carries the constraints of the stages before it, so the view set is t
 
 # References
 
-  - $(ref_dict[:vorobets2021])
+  - $(ref_dict[:vorobets2021]) Section 3, Algorithm 2.
 """
 struct H2_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
 """
     const StagedEP = Union{<:H1_EntropyPooling, <:H2_EntropyPooling}
 
-Alias for a union of staged entropy pooling algorithm types.
+Alias for the union of the two entropy pooling algorithms that enforce the views in stages.
 
 # Related
 
@@ -107,9 +108,9 @@ const StagedEP = Union{<:H1_EntropyPooling, <:H2_EntropyPooling}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the algorithms that decide how an entropy pooling optimiser evaluates its objective.
+Abstract supertype for the algorithms that set how an entropy pooling optimiser evaluates its objective.
 
-Every subtype minimises the same Kullback-Leibler divergence of the posterior probabilities from the prior ones. They differ only in the arithmetic that evaluates it, so they answer the same problem with the same posterior.
+Every subtype minimises the same Kullback-Leibler divergence of the posterior probabilities from the prior probabilities. The subtypes differ only in the arithmetic of the evaluation, so they return the same posterior for the same problem.
 
 # Related
 
@@ -121,7 +122,7 @@ Every subtype minimises the same Kullback-Leibler divergence of the posterior pr
 
 # References
 
-  - $(ref_dict[:meucci2008])
+  - $(ref_dict[:meucci2008]) Section 4, Equations 26 and 27.
 """
 abstract type AbstractEntropyPoolingOptAlgorithm <: AbstractAlgorithm end
 """
@@ -129,7 +130,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Evaluates the entropy pooling objective in log space.
 
-It carries the logarithms of the probabilities throughout, so it never exponentiates an intermediate quantity. Prefer it when a prior probability is small enough that the exponential form loses precision. It minimises the same Kullback-Leibler divergence as [`ExpEntropyPooling`](@ref) and reaches the same posterior.
+With [`OptimEntropyPooling`](@ref), it adds the logarithm of each prior probability to the exponent, and then takes one exponential of the sum. It does not multiply a prior probability by a separate exponential, which can overflow when the exponent is large and the prior probability is small. With [`JuMPEntropyPooling`](@ref), the relative entropy cone reads a unit reference, and the objective subtracts the inner product of the posterior probabilities with the logarithms of the prior probabilities. Use it when a prior probability is so small that the exponential form can overflow or lose precision. It minimises the same Kullback-Leibler divergence as [`ExpEntropyPooling`](@ref) and returns the same posterior.
 
 # Related
 
@@ -140,7 +141,7 @@ It carries the logarithms of the probabilities throughout, so it never exponenti
 
 # References
 
-  - $(ref_dict[:meucci2008])
+  - $(ref_dict[:meucci2008]) Appendix A.3, Equations 90 and 93.
 """
 struct LogEntropyPooling <: AbstractEntropyPoolingOptAlgorithm end
 """
@@ -148,7 +149,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Evaluates the entropy pooling objective through the exponential of the dual variables.
 
-It recovers each posterior probability from the prior one and the dual variables directly, without carrying logarithms. It minimises the same Kullback-Leibler divergence as [`LogEntropyPooling`](@ref) and reaches the same posterior.
+With [`OptimEntropyPooling`](@ref), it calculates each posterior probability as the product of the prior probability and the exponential of the dual term. With [`JuMPEntropyPooling`](@ref), the relative entropy cone reads the prior probabilities as its reference. It minimises the same Kullback-Leibler divergence as [`LogEntropyPooling`](@ref) and returns the same posterior.
 
 # Related
 
@@ -159,15 +160,15 @@ It recovers each posterior probability from the prior one and the dual variables
 
 # References
 
-  - $(ref_dict[:meucci2008])
+  - $(ref_dict[:meucci2008]) Appendix A.3, Equations 90 and 93.
 """
 struct ExpEntropyPooling <: AbstractEntropyPoolingOptAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Root-finds the value at risk level that meets a single conditional value-at-risk view.
+Finds with a root finder the value at risk level that meets one conditional value-at-risk view.
 
-The recursive route of [`MeucciEntropyPoolingPrior`](@ref) writes no CVaR constraint. It hunts the level instead: for each candidate it rebuilds the positive-part rows, re-solves the whole entropy pooling problem, and reads the tail mass off the posterior. This type holds the arguments of the [`Roots.jl`](https://github.com/JuliaMath/Roots.jl) call that drives the hunt. Where a group carries more than one view, [`OptimEntropyPooling`](@ref) takes over through the `dm_opt` field.
+With this optimiser, [`MeucciEntropyPoolingPrior`](@ref) writes no CVaR constraint. It searches for the level instead. For each candidate level, it makes the positive-part rows again, solves the full entropy pooling problem again, and reads the tail mass of the posterior. This type holds the arguments of the [`Roots.jl`](https://juliamath.github.io/Roots.jl/stable/) call that does the search. A group of more than one CVaR view uses the [`OptimEntropyPooling`](@ref) of the `dm_opt` field instead.
 
 # Fields
 
@@ -197,11 +198,11 @@ ConditionalValueatRiskEntropyPooling
   - [`OptimEntropyPooling`](@ref)
   - [`JuMPEntropyPooling`](@ref)
   - [`MeucciEntropyPoolingPrior`](@ref)
-  - [`Roots.jl`](https://github.com/JuliaMath/Roots.jl)
+  - [`Roots.jl`](https://juliamath.github.io/Roots.jl/stable/)
 
 # References
 
-  - $(ref_dict[:meucciardiakeel2011])
+  - $(ref_dict[:meucciardiakeel2011]) Pages 39–49. $(ref_dict[:no_original_source])
 """
 @concrete struct ConditionalValueatRiskEntropyPooling <: AbstractEntropyPoolingOptimiser
     """
@@ -225,15 +226,19 @@ $(DocStringExtensions.TYPEDEF)
 
 Solves the dual of the entropy pooling problem with Optim.jl.
 
-The dual has one variable per constraint rather than one per observation, and it is box constrained, so it is the cheaper route wherever the views reduce to rows of the constraint set. It has no room for an auxiliary variable, so it cannot express a tail view: use [`JuMPEntropyPooling`](@ref) there. It drives [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl) and takes either optimisation algorithm.
+The dual problem has one variable for each constraint, not one for each observation, and it has box constraints. So it costs less than the primal problem when every view is a row of the constraint set. The dual problem cannot hold an auxiliary variable, so it cannot express a tail view. Use [`JuMPEntropyPooling`](@ref) for a tail view.
 
-This route does not raise on an infeasible view set. [`entropy_pooling`](@ref) states the mechanism and the three signs that name that answer.
+This optimiser uses [`Optim.jl`](https://julianlsolvers.github.io/Optim.jl/stable/) and accepts both optimisation algorithms. [meucci2008](@citet) maximises the dual function. The library minimises the negative of the dual function, and adds a box on the dual variables of the fixed equality rows, which [meucci2008](@citet) does not have.
 
-!!! tip "The default stopping rule leaves the dual short of its optimum"
+This optimiser raises no error for an infeasible view set. [`entropy_pooling`](@ref) states the cause, and the three signs that show an infeasible view set.
 
-    An empty `args` runs `Optim` under its own default `Options`, which stops on the step in `x`, on the change in the objective, or on the gradient, whichever comes first. The first two arrive before the dual reaches stationarity, so the posterior meets its views closely rather than exactly. Over the twelve single-view CVaR cases of `test/test_12a_entropy_pooling.jl` the default holds a posterior conditional value at risk to about `1e-7` of its target, and an `Optim.Options` with `g_abstol = 1e-12` and `outer_iterations = 50` holds it to about `1e-11`. The default is the right trade for a view read once, and the tighter rule costs about 9% more time over that file.
+!!! tip "The default stopping rule stops before the optimum of the dual problem"
 
-    Two readers magnify the shortfall. A staged chain refits the wrapped estimator between stages, so stage two projects a reference that already carries the error of stage one. The recursive CVaR route of [`MeucciEntropyPoolingPrior`](@ref) re-solves the whole problem at each candidate value at risk, so a solve that stops early moves the root the search returns. That route reports success on the outer variable alone, so the shortfall it carries is not bounded by the `1e-7` above: the same case has been measured at `3.1e-4` after other solves ran in the same process, and its own warning states that mode. Where the answer has to be repeatable, pass a tighter `Optim.Options` in `args`:
+    With an empty `args`, `Optim` uses its default `Options`. These stop the solve at the first of three tests: the step in `x`, the change in the objective, or the gradient. The first two tests stop the solve before the dual problem reaches stationarity, so the posterior meets its views approximately, not exactly. In the twelve CVaR cases with one view of `test/test_12a_entropy_pooling.jl`, the default puts the posterior conditional value at risk within about `1e-7` of its target. An `Optim.Options` with `g_abstol = 1e-12` and `outer_iterations = 50` puts it within about `1e-11`, and increases the time of that file by about 9%. The default is enough for a view that a caller reads once.
+
+    Two callers make the error larger. A staged algorithm fits the wrapped estimator again between stages, so stage two projects a reference that already has the error of stage one. The recursive CVaR search of [`MeucciEntropyPoolingPrior`](@ref) solves the full problem again at each candidate value at risk. So a solve that stops early moves the root that the search returns.
+
+    The recursive CVaR search reports success on the outer variable only, so the `1e-7` above is not a bound on its error. One measurement of the same case gave `3.1e-4` after other solves ran in the same process, and the warning of the search states this case. If the result must be repeatable, pass a tighter `Optim.Options` in `args`:
 
     ```julia
     using PortfolioOptimisers: Optim
@@ -245,7 +250,7 @@ This route does not raise on an infeasible view set. [`entropy_pooling`](@ref) s
                                               iterations = 10_000, outer_iterations = 50)))
     ```
 
-    `Optim` reaches this package as an internal binding, so the block names it through `PortfolioOptimisers`. A non-empty `args` replaces the `Optim.Fminbox(; mu0 = 1e-5)` that [`entropy_pooling`](@ref) supplies, so carry it yourself.
+    This package does not export `Optim`, so the block gets it from `PortfolioOptimisers`. A non-empty `args` replaces the `Optim.Fminbox(; mu0 = 1e-5)` that [`entropy_pooling`](@ref) gives, so put an `Optim.Fminbox` in `args` too.
 
 # Fields
 
@@ -291,12 +296,12 @@ OptimEntropyPooling
   - [`ConditionalValueatRiskEntropyPooling`](@ref)
   - [`MeucciEntropyPoolingPrior`](@ref)
   - [`EntropyPoolingPrior`](@ref)
-  - [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl)
+  - [`Optim.jl`](https://julianlsolvers.github.io/Optim.jl/stable/)
   - [`NormError`](@ref)
 
 # References
 
-  - $(ref_dict[:meucci2008])
+  - $(ref_dict[:meucci2008]) Appendix A.3, Equations 91 to 93.
 """
 @concrete struct OptimEntropyPooling <: AbstractEntropyPoolingOptimiser
     """
@@ -308,11 +313,11 @@ OptimEntropyPooling
     """
     kwargs
     """
-    $(field_dict[:sc1]) It multiplies the dual objective and its gradient alike, so it leaves the minimiser unchanged and tightens the residual `Optim` stops at.
+    $(field_dict[:sc1]) It multiplies the dual objective and its gradient, so it does not change the minimiser. A larger value makes the residual smaller at the point where `Optim` stops.
     """
     sc1
     """
-    `sc2`: Half-width of the box the dual variables of the fixed equality rows are held in. It is the dual of a penalty of weight `sc2` on the norm of the slack the primal carries, so a larger value holds those rows tighter.
+    `sc2`: Half-width of the box that holds the dual variables of the fixed equality rows. The box is the dual of a penalty of weight `sc2` on the norm of the slack of the primal problem, so a larger value makes that slack smaller.
     """
     sc2
     """
@@ -320,7 +325,7 @@ OptimEntropyPooling
     """
     alg
     """
-    $(field_dict[:err]) Only used when there are multiple cvar views. If `nothing`, the L2 norm is used.
+    $(field_dict[:err]) The recursive CVaR search of [`MeucciEntropyPoolingPrior`](@ref) reads it only for a group of more than one CVaR view. If `nothing`, the search uses the L2 norm.
     """
     err
     function OptimEntropyPooling(args::Tuple, kwargs::NamedTuple, sc1::Number, sc2::Number,
@@ -343,7 +348,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Solves the primal of the entropy pooling problem with JuMP.jl.
 
-The primal carries one variable per observation and writes the divergence as a relative entropy cone. It is the only route that expresses a tail view, because a tail view needs auxiliary variables that the dual has no room for. It drives [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl) and takes either optimisation algorithm.
+The primal problem has one variable for each observation, and it writes the divergence as a relative entropy cone. It is the only optimiser that can express a tail view, because a tail view needs auxiliary variables that the dual problem cannot hold. This optimiser uses [`JuMP.jl`](https://jump.dev/JuMP.jl/stable/) and accepts both optimisation algorithms. [meucci2008](@citet) states this primal problem and solves its dual. The library solves the primal problem with a conic solver, and adds the slack that relaxes the fixed equality rows.
 
 # Fields
 
@@ -394,11 +399,11 @@ JuMPEntropyPooling
   - [`ConditionalValueatRiskEntropyPooling`](@ref)
   - [`MeucciEntropyPoolingPrior`](@ref)
   - [`EntropyPoolingPrior`](@ref)
-  - [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl)
+  - [`JuMP.jl`](https://jump.dev/JuMP.jl/stable/)
 
 # References
 
-  - $(ref_dict[:meucci2008])
+  - $(ref_dict[:meucci2008]) Section 4, Equations 26 and 27.
 """
 @concrete struct JuMPEntropyPooling <: AbstractEntropyPoolingOptimiser
     """
@@ -406,11 +411,11 @@ JuMPEntropyPooling
     """
     slv
     """
-    `sc1`: Scale of every row the model registers. It multiplies both sides of a row, so a positive value leaves the feasible set unchanged.
+    `sc1`: Scale of every row that the model registers. It multiplies both sides of a row, so a positive value does not change the feasible set.
     """
     sc1
     """
-    $(field_dict[:sc2]) It weights the norm of the fixed equality slack in the objective, so a larger value holds those rows tighter.
+    $(field_dict[:sc2]) A larger value makes that slack smaller.
     """
     sc2
     """
@@ -442,7 +447,7 @@ end
 """
     const NonCVaREP = Union{<:OptimEntropyPooling, <:JuMPEntropyPooling}
 
-Alias for a union of non-CVaR entropy pooling algorithm types.
+Alias for the union of the two entropy pooling optimisers that solve the problem with no root finder.
 
 # Related
 

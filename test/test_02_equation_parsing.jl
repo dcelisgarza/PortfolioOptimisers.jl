@@ -502,6 +502,99 @@ end
     pe.set_equation_limits!(max_length = 4096, max_depth = 256)
     pe.set_string_distance!(dist = pe.StringDistances.Levenshtein(), min_score = 0.7)
 end
+@testset "Log limits cap the repeats of one log site (#1690)" begin
+    using PortfolioOptimisers, Test
+    pe = PortfolioOptimisers
+    # The shipped default sets no cap, so each site keeps the limit it states.
+    @test pe.LOG_LIMITS[] == pe.LogLimits(nothing, nothing, nothing)
+    @test pe.LogLimits() == pe.LogLimits(nothing, nothing, nothing)
+    @test pe.LogLimits(; max_info = 3).max_info == 3
+    @test pe.log_limit(:warn) === nothing
+    @test pe.log_limit(:warn, 1) == 1
+    # A cap is at least one, so it never hides the first message of a site.
+    @test_throws ArgumentError pe.LogLimits(; max_warn = 0)
+    @test_throws ArgumentError pe.LogLimits(; max_debug = -1)
+    @test_throws ArgumentError pe.LogLimits(; max_info = true)
+    @test_throws ArgumentError pe.set_log_limits!(max_warn = 0)
+    @test_throws ArgumentError pe.with_log_limits(() -> nothing; max_info = 0)
+    @test_throws ArgumentError pe.log_limit(:error)
+    # A set cap replaces the limit of every site of its level, a site limit included.
+    pe.with_log_limits(; max_warn = 2, max_info = 3, max_debug = 4) do
+        @test pe.log_limit(:warn) == 2
+        @test pe.log_limit(:warn, 1) == 2
+        @test pe.log_limit(:info) == 3
+        @test pe.log_limit(:debug, 1) == 4
+        # Nested overrides inherit the keywords they omit.
+        pe.with_log_limits(; max_warn = nothing) do
+            @test pe.log_limit(:warn, 1) == 1
+            @test pe.log_limit(:info) == 3
+        end
+    end
+    @test pe.LOG_LIMITS[] == pe.LogLimits()  # the scoped override is restored
+    pe.set_log_limits!(max_info = 5)
+    @test pe.LOG_LIMITS[] == pe.LogLimits(; max_info = 5)
+    pe.set_log_limits!(max_info = nothing)
+    @test pe.LOG_LIMITS[] == pe.LogLimits()
+    # The `_id` of `@log_id` keys on the site and on the parts, so a different part or a
+    # different site counts on its own, and the same part at the same site repeats.
+    # A macro resolves its module when the testset expands, before `pe` is bound.
+    id(k) = PortfolioOptimisers.@log_id(k)
+    @test id("a") == id("a")
+    @test id("a") != id("b")
+    @test PortfolioOptimisers.@log_id("a") != id("a")
+    # A site under the cap logs the cap and no more, once per `_id`.
+    diag(k) = pe.strict_diagnostic("unknown name `$k` at $(rand())", false; id = id(k))
+    logs, = Test.collect_test_logs() do
+        return pe.with_log_limits(; max_warn = 2) do
+            for _ in 1:4, k in ("a", "b")
+                diag(k)
+            end
+        end
+    end
+    @test length(logs) == 4
+    @test count(r -> occursin("`a`", r.message), logs) == 2
+    logs, = Test.collect_test_logs() do
+        for _ in 1:4
+            diag("a")
+        end
+    end
+    @test length(logs) == 4  # no cap, no limit
+    # The preferences seed the global default. A valid value is silent: a cap widens no
+    # guard, so it records nothing for the announcement.
+    logs, = Test.collect_test_logs() do
+        return pe.apply_preferences!(Dict{String, Any}("max_warn" => 1, "max_debug" => 7))
+    end
+    @test isempty(logs)
+    @test pe.LOG_LIMITS[] == pe.LogLimits(; max_warn = 1, max_debug = 7)
+    pe.apply_preferences!(Dict{String, Any}("max_info" => 2))
+    @test pe.LOG_LIMITS[] == pe.LogLimits(1, 2, 7)  # an unset key keeps its value
+    # The announcement of a widened guard runs under the cap the same load set. Each pass
+    # restores the shipped cap first, so each pass widens the guard again.
+    logs, = Test.collect_test_logs() do
+        for _ in 1:3
+            pe.set_resource_limits!(max_bins = 10_000)
+            pe.apply_preferences!(Dict{String, Any}("max_bins" => 50_000))
+        end
+    end
+    @test length(logs) == 1
+    pe.with_log_limits(; max_warn = nothing) do
+        logs, = Test.collect_test_logs() do
+            for _ in 1:3
+                pe.set_resource_limits!(max_bins = 10_000)
+                pe.apply_preferences!(Dict{String, Any}("max_bins" => 50_000))
+            end
+        end
+        @test length(logs) == 3
+    end
+    for (key, val) in
+        (("max_warn", 0), ("max_info", -1), ("max_debug", true), ("max_warn", "1"),
+         ("max_info", 1.5))
+        @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}(key => val))
+    end
+    pe.set_log_limits!(max_warn = nothing, max_info = nothing, max_debug = nothing)
+    pe.set_resource_limits!(max_bins = 10_000)  # restore
+    @test pe.LOG_LIMITS[] == pe.LogLimits()
+end
 @testset "Canonicalisation invariants (issue #513)" begin
     using PortfolioOptimisers, Test, Logging
     with_logger(SimpleLogger(stderr, Logging.Error)) do
@@ -1372,7 +1465,7 @@ end
         @test_throws ArgumentError Stacking(; opti = [jopt(oece)], opto = jopt(pinned))
         # `SubsetResampling` asserts the *internal* contract, because it slices. A stated
         # basis is therefore legal under it, and correct: the view follows the subset.
-        @test SubsetResampling(; opt = jopt(pinned)) isa SubsetResampling
+        @test SubsetResampling(; subset_size = 0.8, opt = jopt(pinned)) isa SubsetResampling
     end
 end
 
@@ -1409,4 +1502,46 @@ end
     # The re-based row is asset-length whatever the row was written in.
     @test PortfolioOptimisers.constraint_row_length(nothing, ["F1", "F2"]) == 2
     @test PortfolioOptimisers.constraint_row_length(rr, ["F1", "F2"]) == 3
+end
+
+@testset "Both re-basis routes drop an all-zero row at construction (issue #1797)" begin
+    using PortfolioOptimisers, Test, Logging
+    # No asset loads on F2, so a row that weights F2 alone re-bases to the zero row. The
+    # row does not depend on the weights, so every linear builder drops it: `strict = true`
+    # raises an `IsZeroError`, and the default warns.
+    M = [0.5 0.0; 0.1 0.0; 0.3 0.0]
+    rr = Regression(; M = M)
+    sets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"], "nf" => ["F1", "F2"]))
+    fs = FactorSpace()
+    # The precomputed route.
+    lc = LinearConstraint(;
+                          ineq = PartialLinearConstraint(; A = [1.0 0.0; 0.0 1.0],
+                                                         B = [1.0, 2.0]),
+                          eq = PartialLinearConstraint(; A = [0.0 3.0], B = [0.5]))
+    ece = ExposureConstraintEstimator(; lce = lc, space = fs)
+    whole = @test_logs (:warn, r"all-zero row") (:warn, r"all-zero row") match_mode = :any linear_constraints(ece,
+                                                                                                              sets;
+                                                                                                              rr = rr)
+    @test whole.ineq.A == transpose(reshape(M[:, 1], :, 1))
+    @test whole.ineq.B == [1.0]
+    @test isnothing(whole.eq)
+    @test_throws IsZeroError linear_constraints(ece, sets; rr = rr, strict = true)
+    # A constraint that loses every row is `nothing`, as the estimator route gives.
+    lc0 = LinearConstraint(; ineq = PartialLinearConstraint(; A = [0.0 1.0], B = [2.0]))
+    @test isnothing(@test_logs (:warn, r"all-zero row") PortfolioOptimisers.project_linear_constraint(lc0,
+                                                                                                      M))
+    # The estimator route drops the same row with the same error type.
+    lce = LinearConstraintEstimator(; val = ["F1 <= 1", "F2 <= 2"])
+    step = @test_logs (:warn, r"all-zero row") linear_constraints(ExposureConstraintEstimator(;
+                                                                                              lce = lce,
+                                                                                              space = fs),
+                                                                  sets; rr = rr)
+    @test step.ineq.A == whole.ineq.A
+    @test step.ineq.B == whole.ineq.B
+    @test_throws IsZeroError linear_constraints(ExposureConstraintEstimator(; lce = lce,
+                                                                            space = fs),
+                                                sets; rr = rr, strict = true)
+    # An asset-space row whose coefficients cancel raises the same type.
+    asets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"]))
+    @test_throws IsZeroError linear_constraints("A - A <= 0.1", asets; strict = true)
 end

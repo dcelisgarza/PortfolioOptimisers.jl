@@ -172,7 +172,8 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
     retcode = if success
         OptimisationSuccess(; res = trials)
     else
-        @warn("Failed to solve optimisation problem.\nCheck `result.retcode.res` on the returned result for per-solver diagnostics.")
+        @warn("Failed to solve optimisation problem.\nCheck `result.retcode.res` on the returned result for per-solver diagnostics.",
+              maxlog = log_limit(:warn), _id = @log_id(Set(keys(trials))))
         OptimisationFailure(; res = trials)
     end
     return retcode, process_model(model, retcode)

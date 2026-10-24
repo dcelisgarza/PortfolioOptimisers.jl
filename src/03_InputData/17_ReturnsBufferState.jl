@@ -40,7 +40,7 @@ Keywords correspond to the struct's fields. The defaults give the empty seed tha
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, its fields are subset to the selected assets:
+[`port_opt_view`](@ref) takes the view of its fields at the selected assets:
 
   - `nx`, `X`, `pnl`: Sliced to the selected assets.
   - `nb`, `B`: Sliced when the benchmark is a matrix over the assets, and copied unchanged when it is a single column.

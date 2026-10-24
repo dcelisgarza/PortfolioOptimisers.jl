@@ -1,12 +1,15 @@
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-No-op fallback for getting the view of a covariance estimator.
+Returns the asset view of a covariance estimator, which is the estimator unchanged.
+
+This is the fallback of [`port_opt_view`](@ref) for a covariance estimator that defines no method of its own. A covariance estimator of `StatsBase` holds no field that is indexed by asset, so its view is the estimator itself.
 
 # Arguments
 
   - $(arg_dict[:ce])
-  - `args...`: Optional arguments (ignored).
+  - `::Any`: The asset indices. The method ignores them.
+  - `args...`: More arguments. The method ignores them.
 
 # Returns
 
@@ -28,13 +31,15 @@ end
         kwargs...
     ) -> StatsBase.CovarianceEstimator
 
-Fallback for covariance estimator factory methods.
+Returns a covariance estimator unchanged when a factory call gives it new observation weights.
+
+This is the fallback of [`factory`](@ref) for a covariance estimator that defines no method of its own. A covariance estimator of `StatsBase` holds no observation weights, so a factory call has nothing to replace.
 
 # Arguments
 
   - $(arg_dict[:ce])
-  - `args...`: Optional arguments (ignored).
-  - `kwargs...`: Optional keyword arguments (ignored).
+  - `args...`: More arguments. The method ignores them.
+  - `kwargs...`: More keyword arguments. The method ignores them.
 
 # Returns
 
@@ -55,22 +60,22 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all covariance estimator types.
 
-All concrete and/or abstract types that implement covariance estimation should be subtypes of `AbstractCovarianceEstimator`.
+Every concrete or abstract type that estimates a covariance matrix must subtype `AbstractCovarianceEstimator`.
 
 # Interfaces
 
-In order to implement a new covariance estimator which will work seamlessly with the library, subtype `AbstractCovarianceEstimator` with all necessary parameters---including observation weights---as part of the struct, and implement the following methods:
+To implement a new covariance estimator, subtype `AbstractCovarianceEstimator`. Keep every parameter in a field of the struct, the observation weights among them. Then implement these methods:
 
 ## Covariance and correlation
 
-  - `Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum; kwargs...) -> MatNum`: Covariance matrix estimation.
-  - `Statistics.cor(ce::AbstractCovarianceEstimator, X::MatNum; kwargs...) -> MatNum`: Correlation matrix estimation.
+  - `Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum; kwargs...) -> MatNum`: Estimates the covariance matrix.
+  - `Statistics.cor(ce::AbstractCovarianceEstimator, X::MatNum; kwargs...) -> MatNum`: Estimates the correlation matrix.
 
 ### Arguments
 
   - $(arg_dict[:ce])
   - $(arg_dict[:X])
-  - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator.
+  - `kwargs...`: More keyword arguments, passed to the inner covariance estimator.
 
 ### Returns
 
@@ -78,7 +83,7 @@ In order to implement a new covariance estimator which will work seamlessly with
 
 ## Factory
 
-  - `PortfolioOptimisers.factory(ce::AbstractCovarianceEstimator, w::PortfolioOptimisers.ObsWeights) -> AbstractCovarianceEstimator`: Factory method for creating instances of the estimator with new observation weights.
+  - `PortfolioOptimisers.factory(ce::AbstractCovarianceEstimator, w::PortfolioOptimisers.ObsWeights) -> AbstractCovarianceEstimator`: Builds a copy of the estimator that holds the new observation weights.
 
 ### Arguments
 
@@ -91,7 +96,7 @@ In order to implement a new covariance estimator which will work seamlessly with
 
 # Examples
 
-We can create a dummy covariance estimator as follows:
+This example defines a minimal covariance estimator.
 
 ```jldoctest
 julia> struct MyCovarianceEstimator{T1} <: PortfolioOptimisers.AbstractCovarianceEstimator
@@ -159,18 +164,18 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all variance estimator types.
 
-All concrete and/or abstract types that implement variance estimation should be subtypes of `AbstractVarianceEstimator`.
+Every concrete or abstract type that estimates a variance must subtype `AbstractVarianceEstimator`.
 
 # Interfaces
 
-In order to implement a new covariance estimator which will work seamlessly with the library, subtype `AbstractVarianceEstimator` with all necessary parameters---including observation weights---as part of the struct, and implement the following methods:
+To implement a new variance estimator, subtype `AbstractVarianceEstimator`. Keep every parameter in a field of the struct, the observation weights among them. Then implement these methods:
 
 ## Variance and standard deviation
 
-  - `Statistics.var(ve::AbstractVarianceEstimator, X::MatNum; kwargs...) -> ArrNum`: Variance estimation.
-  - `Statistics.std(ve::AbstractVarianceEstimator, X::MatNum; kwargs...) -> ArrNum`: Standard deviation estimation.
-  - `Statistics.var(ve::AbstractVarianceEstimator, X::VecNum; kwargs...) -> Number`: Variance estimation.
-  - `Statistics.std(ve::AbstractVarianceEstimator, X::VecNum; kwargs...) -> Number`: Standard deviation estimation.
+  - `Statistics.var(ve::AbstractVarianceEstimator, X::MatNum; kwargs...) -> ArrNum`: Estimates the variance of each asset.
+  - `Statistics.std(ve::AbstractVarianceEstimator, X::MatNum; kwargs...) -> ArrNum`: Estimates the standard deviation of each asset.
+  - `Statistics.var(ve::AbstractVarianceEstimator, X::VecNum; kwargs...) -> Number`: Estimates the variance of the vector.
+  - `Statistics.std(ve::AbstractVarianceEstimator, X::VecNum; kwargs...) -> Number`: Estimates the standard deviation of the vector.
 
 ### Arguments
 
@@ -181,7 +186,7 @@ In order to implement a new covariance estimator which will work seamlessly with
       + $(arg_dict[:X])
       + $(arg_dict[:Xv])
 
-  - `kwargs...`: Additional keyword arguments passed to the mean estimator.
+  - `kwargs...`: More keyword arguments, passed to the expected returns estimator.
 
 ### Returns
 
@@ -195,11 +200,11 @@ In order to implement a new covariance estimator which will work seamlessly with
 
 ## Covariance and correlation
 
-`Statistics.cov(ve::AbstractVarianceEstimator, X::MatNum; kwargs...)` and `Statistics.cor(ve::AbstractVarianceEstimator, X::MatNum; kwargs...)` always throw a `MethodError`. A variance estimator resolves one marginal variance per asset and holds no cross-asset structure, so it cannot answer either verb.
+`Statistics.cov(ve::AbstractVarianceEstimator, X::MatNum; kwargs...)` and `Statistics.cor(ve::AbstractVarianceEstimator, X::MatNum; kwargs...)` always throw a `MethodError`. A variance estimator computes one marginal variance for each asset and no relation between two assets, so it cannot compute either matrix.
 
 ## Factory
 
-  - `PortfolioOptimisers.factory(ve::AbstractVarianceEstimator, w::PortfolioOptimisers.ObsWeights) -> AbstractVarianceEstimator`: Factory method for creating instances of the estimator with new observation weights.
+  - `PortfolioOptimisers.factory(ve::AbstractVarianceEstimator, w::PortfolioOptimisers.ObsWeights) -> AbstractVarianceEstimator`: Builds a copy of the estimator that holds the new observation weights.
 
 ### Arguments
 
@@ -212,7 +217,7 @@ In order to implement a new covariance estimator which will work seamlessly with
 
 # Examples
 
-We can create a dummy variance estimator as follows:
+This example defines a minimal variance estimator.
 
 ```jldoctest
 julia> struct MyVarianceEstimator{T1} <: PortfolioOptimisers.AbstractVarianceEstimator
@@ -302,15 +307,19 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Reads a covariance matrix out of a [`SampleBufferState`](@ref), by running the batch verb over the observations the buffer holds.
+Computes a covariance matrix from the observations of a [`SampleBufferState`](@ref) with the batch verb.
 
-The method of `Statistics.cov` that makes the estimate from a Sample Buffer. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them. The buffer also holds the per-observation masks it was folded with, so the batch verb is given the mask that explains the rows and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers. It holds the implied volatilities and `ivpa` that it was folded with too, so a wrapped [`ImpliedVolatility`](@ref) reads its surface over the same rows.
+An estimator in an [`Online`](@ref) wrapper holds a refit Sample Buffer and not a family state, so it has no exact fold. Its estimate is the batch fit over the rows of the buffer. An uncapped buffer holds every observation folded so far, and a capped buffer holds the last `max_history` of them.
+
+The method does no [`assert_partial_fittable`](@ref) check of its own. The batch verb accepts configurations that an incremental fold refuses, and the wrapper gives a caller access to them.
+
+The buffer also keeps the masks of each observation that it folded. The method gives them to the batch verb, so a wrapped estimator under a [`CoveragePolicy`](@ref) returns the same value as an unwrapped one. The buffer keeps the implied volatilities and the `ivpa` of each fold too, so a wrapped [`ImpliedVolatility`](@ref) reads its surface over the same rows.
 
 # Arguments
 
   - $(arg_dict[:ce])
   - `state`: The buffer to read.
-  - `kwargs...`: Additional keyword arguments passed to the batch verb, `strict` among them.
+  - `kwargs...`: More keyword arguments, passed to the batch verb. `strict` is one of them.
 
 # Returns
 
@@ -331,15 +340,19 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Reads a correlation matrix out of a [`SampleBufferState`](@ref), by running the batch verb over the observations the buffer holds.
+Computes a correlation matrix from the observations of a [`SampleBufferState`](@ref) with the batch verb.
 
-The method of `Statistics.cor` that makes the estimate from a Sample Buffer. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them. The buffer also holds the per-observation masks it was folded with, so the batch verb is given the mask that explains the rows and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers. It holds the implied volatilities and `ivpa` that it was folded with too, so a wrapped [`ImpliedVolatility`](@ref) reads its surface over the same rows.
+An estimator in an [`Online`](@ref) wrapper holds a refit Sample Buffer and not a family state, so it has no exact fold. Its estimate is the batch fit over the rows of the buffer. An uncapped buffer holds every observation folded so far, and a capped buffer holds the last `max_history` of them.
+
+The method does no [`assert_partial_fittable`](@ref) check of its own. The batch verb accepts configurations that an incremental fold refuses, and the wrapper gives a caller access to them.
+
+The buffer also keeps the masks of each observation that it folded. The method gives them to the batch verb, so a wrapped estimator under a [`CoveragePolicy`](@ref) returns the same value as an unwrapped one. The buffer keeps the implied volatilities and the `ivpa` of each fold too, so a wrapped [`ImpliedVolatility`](@ref) reads its surface over the same rows.
 
 # Arguments
 
   - $(arg_dict[:ce])
   - `state`: The buffer to read.
-  - `kwargs...`: Additional keyword arguments passed to the batch verb, `strict` among them.
+  - `kwargs...`: More keyword arguments, passed to the batch verb. `strict` is one of them.
 
 # Returns
 
@@ -360,9 +373,13 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Reads a variance out of a [`SampleBufferState`](@ref), by running the batch verb over the observations the buffer holds.
+Computes the variance of each asset from the observations of a [`SampleBufferState`](@ref) with the batch verb.
 
-The method of `Statistics.var` that makes the estimate from a Sample Buffer. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them. The buffer also holds the per-observation masks it was folded with, so the batch verb is given the mask that explains the rows and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers.
+An estimator in an [`Online`](@ref) wrapper holds a refit Sample Buffer and not a family state, so it has no exact fold. Its estimate is the batch fit over the rows of the buffer. An uncapped buffer holds every observation folded so far, and a capped buffer holds the last `max_history` of them.
+
+The method does no [`assert_partial_fittable`](@ref) check of its own. The batch verb accepts configurations that an incremental fold refuses, and the wrapper gives a caller access to them.
+
+The buffer also keeps the masks of each observation that it folded. The method gives them to the batch verb, so a wrapped estimator under a [`CoveragePolicy`](@ref) returns the same value as an unwrapped one.
 
 # Arguments
 
@@ -386,9 +403,13 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Reads a standard deviation out of a [`SampleBufferState`](@ref), by running the batch verb over the observations the buffer holds.
+Computes the standard deviation of each asset from the observations of a [`SampleBufferState`](@ref) with the batch verb.
 
-The method of `Statistics.std` that makes the estimate from a Sample Buffer. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them. The buffer also holds the per-observation masks it was folded with, so the batch verb is given the mask that explains the rows and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers.
+An estimator in an [`Online`](@ref) wrapper holds a refit Sample Buffer and not a family state, so it has no exact fold. Its estimate is the batch fit over the rows of the buffer. An uncapped buffer holds every observation folded so far, and a capped buffer holds the last `max_history` of them.
+
+The method does no [`assert_partial_fittable`](@ref) check of its own. The batch verb accepts configurations that an incremental fold refuses, and the wrapper gives a caller access to them.
+
+The buffer also keeps the masks of each observation that it folded. The method gives them to the batch verb, so a wrapped estimator under a [`CoveragePolicy`](@ref) returns the same value as an unwrapped one.
 
 # Arguments
 
@@ -414,21 +435,21 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all expected returns estimator types.
 
-All concrete and/or abstract types that implement expected returns estimation should be subtypes of `AbstractExpectedReturnsEstimator`.
+Every concrete or abstract type that estimates expected returns must subtype `AbstractExpectedReturnsEstimator`.
 
 # Interfaces
 
-In order to implement a new expected returns estimator which will work seamlessly with the library, subtype `AbstractExpectedReturnsEstimator` with all necessary parameters---including observation weights---as part of the struct, and implement the following methods:
+To implement a new expected returns estimator, subtype `AbstractExpectedReturnsEstimator`. Keep every parameter in a field of the struct, the observation weights among them. Then implement these methods:
 
 ## Expected returns
 
-  - `Statistics.mean(me::AbstractExpectedReturnsEstimator, X::MatNum; kwargs...) -> ArrNum`: Expected returns estimation.
+  - `Statistics.mean(me::AbstractExpectedReturnsEstimator, X::MatNum; kwargs...) -> ArrNum`: Estimates the expected returns.
 
 ### Arguments
 
   - $(arg_dict[:me])
   - $(arg_dict[:X])
-  - `kwargs...`: Additional keyword arguments passed to the mean estimator.
+  - `kwargs...`: More keyword arguments for the estimator.
 
 ### Returns
 
@@ -436,7 +457,7 @@ In order to implement a new expected returns estimator which will work seamlessl
 
 ## Factory
 
-  - `PortfolioOptimisers.factory(me::AbstractExpectedReturnsEstimator, w::PortfolioOptimisers.ObsWeights) -> AbstractExpectedReturnsEstimator`: Factory method for creating instances of the estimator with new observation weights.
+  - `PortfolioOptimisers.factory(me::AbstractExpectedReturnsEstimator, w::PortfolioOptimisers.ObsWeights) -> AbstractExpectedReturnsEstimator`: Builds a copy of the estimator that holds the new observation weights.
 
 ### Arguments
 
@@ -499,9 +520,13 @@ abstract type AbstractExpectedReturnsEstimator <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Reads an expected returns vector out of a [`SampleBufferState`](@ref), by running the batch verb over the observations the buffer holds.
+Computes the expected returns from the observations of a [`SampleBufferState`](@ref) with the batch verb.
 
-The method of `Statistics.mean` that makes the estimate from a Sample Buffer. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them. The buffer also holds the per-observation masks it was folded with, so the batch verb is given the mask that explains the rows and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers.
+An estimator in an [`Online`](@ref) wrapper holds a refit Sample Buffer and not a family state, so it has no exact fold. Its estimate is the batch fit over the rows of the buffer. An uncapped buffer holds every observation folded so far, and a capped buffer holds the last `max_history` of them.
+
+The method does no [`assert_partial_fittable`](@ref) check of its own. The batch verb accepts configurations that an incremental fold refuses, and the wrapper gives a caller access to them.
+
+The buffer also keeps the masks of each observation that it folded. The method gives them to the batch verb, so a wrapped estimator under a [`CoveragePolicy`](@ref) returns the same value as an unwrapped one.
 
 # Arguments
 
@@ -525,12 +550,15 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-No-op fallback for getting the view of an expected returns estimator.
+Returns the asset view of an expected returns estimator, which is the estimator unchanged.
+
+This is the fallback of [`port_opt_view`](@ref) for an expected returns estimator that defines no method of its own. An estimator that holds a field indexed by asset needs a method of its own.
 
 # Arguments
 
   - $(arg_dict[:me])
-  - `args...`: Optional arguments (ignored).
+  - `::Any`: The asset indices. The method ignores them.
+  - `args...`: More arguments. The method ignores them.
 
 # Returns
 
@@ -549,17 +577,19 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all Return Forecast Estimator types.
 
-A Return Forecast Estimator produces a Return Forecast: the part of an asset's expected return the caller states or fits from Descriptors, over and above the factor mean. It reads an Asset Panel and a fitted [`CrossSectionalFactorModel`](@ref), so it answers [`return_forecast`](@ref) and never `mean(me, X)`: a Return Forecast is not an expected returns estimator, and the two families are kept apart so that no `me` slot admits one.
+A Return Forecast Estimator makes a Return Forecast. A Return Forecast is the part of the expected return of an asset that the factor mean does not hold. The caller gives it, or the estimator fits it from Descriptors.
 
-All concrete types producing a Return Forecast should be subtypes of `AbstractReturnForecastEstimator`.
+The estimator reads an Asset Panel and a fitted [`CrossSectionalFactorModel`](@ref). It implements [`return_forecast`](@ref) and never `mean(me, X)`. A Return Forecast Estimator is not an expected returns estimator. The two families have separate roots, so no `me` field accepts a Return Forecast Estimator.
+
+Every concrete type that makes a Return Forecast must subtype `AbstractReturnForecastEstimator`.
 
 # Interfaces
 
-In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractReturnForecastEstimator` and implement the following methods:
+To implement a new concrete type, subtype `AbstractReturnForecastEstimator` and implement these methods:
 
 ## `return_forecast`
 
-  - [`return_forecast(rfe::AbstractReturnForecastEstimator, rd::ReturnsResult, csfm::CrossSectionalFactorModel)`](@ref): Computes the Return Forecast of `rd` and a factor-model block.
+  - [`return_forecast(rfe::AbstractReturnForecastEstimator, rd::ReturnsResult, csfm::CrossSectionalFactorModel)`](@ref): Computes the Return Forecast from `rd` and the fitted factor model.
 
 ### Arguments
 
@@ -586,12 +616,12 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all Return Forecast Result types.
 
-Each member of the Return Forecast family carries its own fitted state, so each answers its own Result type. This root states the two reads every one of them answers:
+Each member of the Return Forecast family has its own fitted state, so each returns its own Result type. Every one of these Result types has these two fields:
 
-  - `mu`: The latest Return Forecast, in return units, one entry per asset of the coverage universe. It is `NaN` for an asset the member forecasts nothing for.
-  - `hist`: The Return Forecast history, `observations × assets` and in return units, or `nothing` for a member that computes none.
+  - `mu`: The latest Return Forecast in return units, with one entry for each asset of the Coverage Universe. It is `NaN` for an asset that the member gives no forecast for.
+  - `hist`: The history of the Return Forecast in return units, `observations × assets`. It is `nothing` for a member that computes no history.
 
-A consumer reads those two fields off any member, and reads the member's own fields only when it knows which member it holds.
+A consumer can read these two fields from any member. It reads the other fields of a member only when it knows the type of that member.
 
 # Related
 
@@ -607,11 +637,11 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all expected returns algorithm types.
 
-All concrete and/or abstract types that implement a specific algorithm used by an expected returns estimator should be subtypes of `AbstractExpectedReturnsAlgorithm`.
+Every concrete or abstract type that is an algorithm of an expected returns estimator must subtype `AbstractExpectedReturnsAlgorithm`.
 
 # Interfaces
 
-Given that these are meant to be used by expected returns estimators, there are no specific methods that need to be implemented for this abstract type. However, it serves as a marker for dispatching and organising different expected returns algorithms within the library. The interfaces should be defined at the level of the expected returns estimator that utilises these algorithms.
+A subtype needs no method of its own. An expected returns estimator holds the algorithm in a field and dispatches on its type. Define the methods on the expected returns estimator that uses the algorithm.
 
 # Related
 
@@ -624,12 +654,15 @@ abstract type AbstractExpectedReturnsAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-No-op fallback for getting the view of an expected returns algorithm.
+Returns the asset view of an expected returns algorithm, which is the algorithm unchanged.
+
+This is the fallback of [`port_opt_view`](@ref) for an expected returns algorithm that defines no method of its own.
 
 # Arguments
 
   - `alg`: The expected returns algorithm.
-  - `args...`: Optional arguments (ignored).
+  - `::Any`: The asset indices. The method ignores them.
+  - `args...`: More arguments. The method ignores them.
 
 # Returns
 
@@ -648,11 +681,11 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all moment algorithm types.
 
-All concrete and/or abstract types that implement a specific algorithm for moment estimation should be subtypes of `AbstractMomentAlgorithm`.
+Every concrete or abstract type that is an algorithm of a moment estimator must subtype `AbstractMomentAlgorithm`.
 
 # Interfaces
 
-Given that these are meant to be used by covariance estimators, there are no specific methods that need to be implemented for this abstract type. However, it serves as a marker for dispatching and organising different moment algorithms within the library. The interfaces should be defined at the level of the covariance estimator that utilises these algorithms.
+A subtype needs no method of its own. A moment estimator holds the algorithm in a field and dispatches on its type. Define the methods on the moment estimator that uses the algorithm.
 
 # Related
 
@@ -698,7 +731,7 @@ struct FullMoment <: AbstractMomentAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Clips every deviation above the target to zero, so the moment reads the downside alone.
+Clips every deviation above the target to zero, so the moment measures only the downside.
 
 # Mathematical definition
 
@@ -734,9 +767,9 @@ struct SemiMoment <: AbstractMomentAlgorithm end
     coverage_comoment_deviations(alg::FullMoment, Xo::MatNum, mu::VecNum) -> MatNum
     coverage_comoment_deviations(alg::SemiMoment, Xo::MatNum, mu::VecNum) -> MatNum
 
-Centres an available-case block on each asset's own mean, and clips the deviations where the moment algorithm asks for it.
+Centres an available-case block on the mean of each asset, and clips the deviations when the moment algorithm is a semi-moment.
 
-The one line the two arms of a higher-order available-case fit differ in, taken out so that [`coverage_comoment_block`](@ref) is one body. [`FullMoment`](@ref) keeps the deviations whole and [`SemiMoment`](@ref) clips every positive one to zero, which is the same asymmetry the plain path already has.
+The two moment algorithms change only this step of a higher-order available-case fit, so [`coverage_comoment_block`](@ref) has one body for both. [`FullMoment`](@ref) keeps every deviation, and [`SemiMoment`](@ref) clips every positive deviation to zero. The plain path without a Coverage Policy does the same.
 
 # Arguments
 
@@ -765,9 +798,9 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Builds the pairwise expansions and the admission mask a higher-order available-case fit reads.
 
-The block half of the available-case arm, shared by [`coverage_coskewness`](@ref) and [`coverage_cokurtosis`](@ref). A third and a fourth co-moment differ in which pair of expansions they multiply, and in nothing else, so this returns both expansions and lets each order take its own product. Neither order folds, so the block is seen whole and there is no state.
+[`coverage_coskewness`](@ref) and [`coverage_cokurtosis`](@ref) both call this function. The third and the fourth co-moment differ only in the pair of expansions that they multiply. This function returns both expansions, and each order takes its own product. Neither order folds, so the function reads the whole block and keeps no state.
 
-The deviations are centred on each asset's **own** available-case mean and the invalid entries are then zeroed, so an observation at which an asset has no quote contributes to neither the numerator nor the denominator of any cell that asset appears in. The mask expansion `zc` is the same product over the mask, so the denominator of a cell is the count of observations at which every asset of that cell is valid.
+The function centres the deviations on the available-case mean of each asset, and then sets the invalid entries to zero. After this step, an observation at which an asset has no quote adds nothing to the numerator or to the denominator of a cell of that asset. The mask expansion `zc` is the same product over the mask, so the denominator of a cell is the number of observations at which every asset of that cell is valid.
 
 # Algorithm
 
@@ -813,9 +846,9 @@ end
 """
     Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
-Generic covariance fallback assembling the covariance matrix from the estimator's correlation matrix and the marginal standard deviations of its variance estimator `ce.ve`.
+Computes the covariance matrix from the correlation matrix of the estimator and the standard deviations of its variance estimator `ce.ve`.
 
-This fallback lets a correlation-style covariance estimator define only its [`Statistics.cor`](https://juliastats.org/StatsBase.jl/stable/cov/) method; the covariance is then recovered by rescaling the correlation matrix with the standard deviations obtained from `std(ce.ve, X)`. Estimators whose covariance is not a plain rescaling of their correlation (for example [`ImpliedVolatility`](@ref)) override this method.
+With this fallback, a covariance estimator that computes a correlation needs only its own [`Statistics.cor`](https://juliastats.org/StatsBase.jl/stable/cov/) method. The fallback scales the correlation matrix by the standard deviations from `std(ce.ve, X)`. An estimator whose covariance is not a scaled correlation defines its own method. [`ImpliedVolatility`](@ref) is one such estimator.
 
 # Mathematical definition
 
@@ -835,14 +868,14 @@ Where:
 
  1. Estimate the correlation matrix with `Statistics.cor(ce, X)`.
  2. Estimate the marginal standard deviations with `Statistics.std(ce.ve, X)`.
- 3. Rescale the correlation matrix into a covariance matrix with `StatsBase.cor2cov!`. The call is in place, so it consumes the matrix that step 1 returned.
+ 3. Scale the correlation matrix into a covariance matrix with `StatsBase.cor2cov!`. The call writes in place, over the matrix that step 1 returned.
 
 # Arguments
 
   - $(arg_dict[:ce])
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to `cor` and to the variance estimator.
+  - `kwargs...`: More keyword arguments, passed to `cor` and to the variance estimator.
 
 # Returns
 
@@ -862,15 +895,19 @@ end
 """
     gap_fill_value(ce::StatsBase.CovarianceEstimator) -> Number
 
-Return the value that stands in for a gapped cell of a sample handed to `ce`.
+Return the value that replaces a gapped cell of a sample before the sample goes to `ce`.
 
-A gapped sample carries a non-finite cell because the asset was not there, not because a number went wrong. A consumer that holds such a sample and an arbitrary covariance estimator cannot know which of the two the estimator wants of it, so it asks the estimator, and the answer is a property of the estimator alone.
+A gapped sample has a non-finite cell because the asset was absent at that observation, and not because a computation failed. A consumer that holds such a sample and a covariance estimator cannot know which value the estimator needs. The consumer calls this function, and the value depends on the estimator alone.
 
-A **finite** answer is written over every gapped cell before the sample is handed over, so the estimator sees a complete sample and no mask. A **non-finite** answer leaves the gap where it is, and the consumer hands the active mask that explains it to `Statistics.cov(ce, X; dims, active_mask)`, which an estimator answering a non-finite value owns.
+When the value is finite, the consumer writes it over every gapped cell before it gives the sample to the estimator. The estimator then gets a complete sample and no mask. When the value is not finite, the consumer keeps the gaps. It gives the active mask that explains them to `Statistics.cov(ce, X; dims, active_mask)`, and an estimator that returns a non-finite value must implement that method.
 
-The fallback is zero: a plain moment estimator refuses a gapped sample outright, and zero is the neutral value of a standardised series. A gap-aware estimator answers `NaN` instead, and that one method is the whole cost of adding one.
+The fallback value is zero. A plain moment estimator refuses a gapped sample, and zero is the neutral value of a standardised series. An estimator that accepts gaps returns `NaN`. That one method is all that such an estimator adds to this function.
 
-A covariance estimator nests, so the answer recurses. An estimator that wraps another and forwards the sample and its keywords untouched — [`PortfolioOptimisersCovariance`](@ref) and [`CorrelationCovariance`](@ref) — answers what the estimator it wraps answers, so wrapping a gap-aware estimator keeps the gap. One that reads the sample itself before it delegates, as [`Covariance`](@ref) does through its own expected-returns estimator, keeps the fallback: it refuses the gap on its own account, and no answer of its inner estimator changes that. A [`Covariance`](@ref) with a [`CoveragePolicy`](@ref) reads the gap itself, on the observations of each pair, so it answers `NaN`, and a wrapper around it keeps the gap.
+A covariance estimator can hold another covariance estimator, so the value is recursive:
+
+  - An estimator that gives the sample and its keywords to its inner estimator with no change returns the value of its inner estimator. [`PortfolioOptimisersCovariance`](@ref) and [`CorrelationCovariance`](@ref) are two of them. So a wrapper around an estimator that accepts gaps keeps the gaps.
+  - An estimator that reads the sample before it calls its inner estimator keeps the fallback. [`Covariance`](@ref) is one of them, because its expected returns estimator reads the sample. It refuses the gap itself, whatever its inner estimator returns.
+  - A [`Covariance`](@ref) with a [`CoveragePolicy`](@ref) reads the gaps itself, over the observations of each pair, so it returns `NaN`. A wrapper around it keeps the gaps.
 
 # Arguments
 
@@ -878,7 +915,7 @@ A covariance estimator nests, so the answer recurses. An estimator that wraps an
 
 # Returns
 
-  - `fv::Number`: The value a gapped cell takes, zero for a plain estimator and `NaN` for a gap-aware one.
+  - `fv::Number`: The value of a gapped cell. It is zero for a plain estimator and `NaN` for an estimator that accepts gaps.
 
 # Related
 
@@ -894,7 +931,7 @@ end
 
 Materialise a lazy or sparse observation matrix as a dense `Matrix`.
 
-`StatsBase`'s weighted moment API is typed on `DenseMatrix`. A `Transpose`, an `Adjoint`, a `SubArray` or a sparse matrix does not match it. Without a `mean` the call raises a `MethodError`, which is recoverable. With a `mean` it is not: `cov(::SimpleCovariance, X, w; mean = mu)` forwards four positional arguments as `covm(X, mu, w, dims)`, and when the `DenseMatrix` method does not match, that call resolves to `Statistics.covm(x, xmean, y, ymean, vardim)` — the **cross-covariance of `X` against the weight vector**. It returns an `N × 1` matrix in place of an `N × N` one and raises nothing. [`robust_cov`](@ref) and [`robust_cor`](@ref) densify before every weighted call so that neither outcome is reachable.
+The weighted moment methods of `StatsBase` take a `DenseMatrix`. A `Transpose`, an `Adjoint`, a `SubArray` or a sparse matrix does not match them. Without a `mean`, the call raises a `MethodError`, and the caller can recover from it. With a `mean`, the caller cannot recover. `cov(::SimpleCovariance, X, w; mean = mu)` forwards four positional arguments as `covm(X, mu, w, dims)`. When the `DenseMatrix` method does not match, that call resolves to `Statistics.covm(x, xmean, y, ymean, vardim)`, which is the cross-covariance of `X` and the weight vector. It returns an `N × 1` matrix in place of an `N × N` matrix, and raises no error. [`robust_cov`](@ref) and [`robust_cor`](@ref) densify `X` before every weighted call, so neither failure can happen.
 
 # Algorithm
 
@@ -931,7 +968,7 @@ end
         kwargs...
     ) -> MatNum
 
-Compute the covariance matrix robustly using the specified covariance estimator `ce`, data matrix `X`, and optional weights vector `w`.
+Compute the covariance matrix with the estimator `ce`, and pass the extra keyword arguments only when the method of `ce` accepts them.
 
 # Algorithm
 
@@ -946,7 +983,7 @@ Compute the covariance matrix robustly using the specified covariance estimator 
   - $(arg_dict[:oow])
   - $(arg_dict[:dims])
   - $(arg_dict[:omean])
-  - `kwargs...`: Additional keyword arguments passed to `cov`.
+  - `kwargs...`: More keyword arguments for `cov`.
 
 # Returns
 
@@ -955,7 +992,8 @@ Compute the covariance matrix robustly using the specified covariance estimator 
 # Related
 
   - [`MatNum`](@ref)
-  - [`robust_cor`](@ref)
+  - [`robust_cov`](@ref)
+  - [`compat_cor`](@ref)
   - [`Statistics.cov`](https://juliastats.org/StatsBase.jl/stable/cov/)
 """
 function compat_cov(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix, args...;
@@ -985,12 +1023,12 @@ end
         kwargs...
     ) -> MatNum
 
-Computes the optionally weighted covariance with [`compat_cov`](@ref) on dense observations. The unweighted method retries once with a densified `Matrix` after a `MethodError`. The weighted method calls [`densify`](@ref) before the estimator.
+Computes the weighted or unweighted covariance with [`compat_cov`](@ref) on dense observations. The unweighted method retries once with a densified `Matrix` after a `MethodError`. The weighted method calls [`densify`](@ref) before the estimator.
 
 # Algorithm
 
  1. Without `w`, call [`compat_cov`](@ref) on `X` as the caller gave it. When that call raises a `MethodError`, call [`compat_cov`](@ref) once more on `Matrix(X)`. Any other error propagates to the caller.
- 2. With `w`, densify `X` with [`densify`](@ref), then call [`compat_cov`](@ref) once. There is no retry, because the densification already removes the only failure the retry answers.
+ 2. With `w`, densify `X` with [`densify`](@ref), then call [`compat_cov`](@ref) once. The method does no retry, because [`densify`](@ref) already removes the only failure that the retry handles.
  3. Return the matrix that [`compat_cov`](@ref) returned.
 
 # Arguments
@@ -1000,7 +1038,7 @@ Computes the optionally weighted covariance with [`compat_cov`](@ref) on dense o
   - $(arg_dict[:oow])
   - $(arg_dict[:dims])
   - $(arg_dict[:omean])
-  - `kwargs...`: Additional keyword arguments passed to `compat_cov`.
+  - `kwargs...`: More keyword arguments for `compat_cov`.
 
 # Validation
 
@@ -1044,14 +1082,14 @@ end
         kwargs...
     ) -> MatNum
 
-Compute the correlation matrix robustly using the specified covariance estimator `ce`, data matrix `X`, and optional weights vector `w`.
+Compute the correlation matrix with the estimator `ce`, and fall back to its covariance matrix when `ce` has no `cor` method for these arguments.
 
 # Algorithm
 
  1. When `hasmethod` reports that `Statistics.cor` takes `dims` and `mean` for this estimator and these arguments, take steps 2 and 3. Otherwise take step 4.
  2. When the caller passed extra keyword arguments, and `hasmethod` reports that `Statistics.cor` takes those keys too, call `Statistics.cor` with all of them and return the result. When that call raises a `MethodError`, drop the extra keyword arguments and continue. A method whose signature ends in a `kwargs...` slurp satisfies `hasmethod` and can still reject a key further down its call chain.
  3. Call `Statistics.cor(ce, X, args...; dims = dims, mean = mean)`, and return the result. When that call raises a `MethodError`, continue to step 4. Any other error propagates to the caller.
- 4. The estimator answers no `cor` call, so compute the covariance matrix `sigma` with [`robust_cov`](@ref) instead.
+ 4. The estimator has no `cor` method for these arguments, so compute the covariance matrix `sigma` with [`robust_cov`](@ref).
  5. When `sigma` is mutable, convert it to a correlation matrix in place with `StatsBase.cov2cor!` and the square roots of its own diagonal. Otherwise convert a dense copy with `StatsBase.cov2cor`.
  6. Return `sigma`.
 
@@ -1062,7 +1100,7 @@ Compute the correlation matrix robustly using the specified covariance estimator
   - $(arg_dict[:oow])
   - $(arg_dict[:dims])
   - $(arg_dict[:omean])
-  - `kwargs...`: Additional keyword arguments passed to `cor`.
+  - `kwargs...`: More keyword arguments for `cor`.
 
 # Returns
 
@@ -1117,12 +1155,12 @@ end
         kwargs...
     ) -> MatNum
 
-Computes the optionally weighted correlation with [`compat_cor`](@ref) on dense observations. The unweighted method retries once with a densified `Matrix` after a `MethodError`. The weighted method calls [`densify`](@ref) before the estimator.
+Computes the weighted or unweighted correlation with [`compat_cor`](@ref) on dense observations. The unweighted method retries once with a densified `Matrix` after a `MethodError`. The weighted method calls [`densify`](@ref) before the estimator.
 
 # Algorithm
 
  1. Without `w`, call [`compat_cor`](@ref) on `X` as the caller gave it. When that call raises a `MethodError`, call [`compat_cor`](@ref) once more on `Matrix(X)`. Any other error propagates to the caller.
- 2. With `w`, densify `X` with [`densify`](@ref), then call [`compat_cor`](@ref) once. There is no retry, because the densification already removes the only failure the retry answers.
+ 2. With `w`, densify `X` with [`densify`](@ref), then call [`compat_cor`](@ref) once. The method does no retry, because [`densify`](@ref) already removes the only failure that the retry handles.
  3. Return the matrix that [`compat_cor`](@ref) returned.
 
 # Arguments
@@ -1132,7 +1170,7 @@ Computes the optionally weighted correlation with [`compat_cor`](@ref) on dense 
   - $(arg_dict[:oow])
   - $(arg_dict[:dims])
   - $(arg_dict[:omean])
-  - `kwargs...`: Additional keyword arguments passed to `compat_cor`.
+  - `kwargs...`: More keyword arguments for `compat_cor`.
 
 # Validation
 
@@ -1147,7 +1185,7 @@ Computes the optionally weighted correlation with [`compat_cor`](@ref) on dense 
   - [`MatNum`](@ref)
   - [`densify`](@ref)
   - [`compat_cor`](@ref)
-  - [`Statistics.cor`](https://juliastats.org/StatsBase.jl/stable/cor/)
+  - [`Statistics.cor`](https://juliastats.org/StatsBase.jl/stable/cov/)
 """
 function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
@@ -1182,9 +1220,9 @@ end
         kwargs...
     ) -> (VecNum_MatNum, Option{<:StatsBase.AbstractWeights})
 
-Apply the observation window and resolve weights for moment estimation.
+Apply the observation window to the data, and resolve the observation weights over the windowed data.
 
-Takes the view of `X` over the observations that `window` indexes, and resolves the observation weights over that same view. The caller resolves `window` first with [`get_window`](@ref), so an `Int` window has already become a range by the time it reaches this function.
+The function takes the view of `X` over the observations that `window` indexes, and resolves the observation weights over that view. The caller resolves `window` with [`get_window`](@ref) before the call, so an `Int` window is already a range here.
 
 # Algorithm
 
@@ -1200,13 +1238,13 @@ Takes the view of `X` over the observations that `window` indexes, and resolves 
   - Either:
       + $(arg_dict[:ignargs])
       + $(arg_dict[:window])
-  - $(arg_dict[:dims]) Ignored if `X` is a vector.
+  - $(arg_dict[:dims]) The function ignores it when `X` is a vector.
   - $(arg_dict[:ignkwargs])
 
 # Returns
 
-  - `X::VecNum_MatNum`: Appropriately windowed data matrix.
-  - `w::Option{<:StatsBase.AbstractWeights}`: Resolved and appropriately windowed weights.
+  - `X::VecNum_MatNum`: The data over the window, or all of the data when there is no window.
+  - `w::Option{<:StatsBase.AbstractWeights}`: The resolved observation weights over the same observations.
 
 # Related
 
@@ -1242,17 +1280,17 @@ end
                     w::Option{<:ObsWeights}; dims::Int = 1, mean = nothing,
                     kwargs...) -> Union{<:Number, <:ArrNum}
 
-Resolve the centre that a moment estimator's own observation weights weight.
+Resolve the centre of a moment estimator with the same observation weights as its deviations.
 
-A moment estimator's observation weights weight its centre, and not its deviations alone. This verb is the one place that rule lives, so [`SimpleVariance`](@ref), [`Covariance`](@ref), [`Coskewness`](@ref) and [`Cokurtosis`](@ref) reach their centre by one rule.
+The observation weights of a moment estimator apply to its centre, and not only to its deviations. This function holds that rule, so [`SimpleVariance`](@ref), [`Covariance`](@ref), [`Coskewness`](@ref) and [`Cokurtosis`](@ref) compute their centre in the same way.
 
 # Algorithm
 
- 1. `mean` is not `nothing`: return it unchanged. The keyword is the escape hatch for a centre that `w` does not describe.
- 2. `w` is `nothing`: return `Statistics.mean(me, X; dims = dims, kwargs...)`.
- 3. `w` is not `nothing`: send `me` through [`factory`](@ref) with `w`, so the centre carries the weights of the deviations, and return the mean of the rebuilt estimator.
+ 1. When `mean` is not `nothing`, return it unchanged. Use the keyword for a centre that `w` does not describe.
+ 2. When `w` is `nothing`, return `Statistics.mean(me, X; dims = dims, kwargs...)`.
+ 3. Otherwise, rebuild `me` with `w` through [`factory`](@ref), so that the centre has the weights of the deviations. Return the mean of the rebuilt estimator.
 
-Step 2 is a performance guard and not a second contract. `w` reaches this verb from a field, so its type decides the branch, and the guard keeps a windowed loop from rebuilding the estimator tree of `me` once per window.
+Step 2 makes the function faster and does not change the value. `w` comes from a field, so its type selects the branch. Without step 2, a windowed loop rebuilds the estimator tree of `me` once for each window.
 
 # Arguments
 
@@ -1261,11 +1299,11 @@ Step 2 is a performance guard and not a second contract. `w` reaches this verb f
   - $(arg_dict[:oow])
   - $(arg_dict[:dims])
   - $(arg_dict[:omean])
-  - `kwargs...`: Additional keyword arguments for the expected returns estimator.
+  - `kwargs...`: More keyword arguments for the expected returns estimator.
 
 # Returns
 
-  - `mu::Union{<:Number, <:ArrNum}`: Centring vector, weighted by `w` when `w` is not `nothing`.
+  - `mu::Union{<:Number, <:ArrNum}`: The centre, weighted by `w` when `w` is not `nothing`.
 
 # Related
 
@@ -1288,12 +1326,14 @@ end
     demean_returns(X::MatNum, me::AbstractExpectedReturnsEstimator; dims::Int = 1, mean = nothing,
                    kwargs...) -> MatNum
 
-Demeans the returns in `X` using the expected returns estimator `me` or if provided, a `mean` array.
+Subtracts the mean of each asset from the returns in `X`.
+
+The expected returns estimator `me` computes the mean, unless the caller gives `mean`.
 
 # Algorithm
 
- 1. Resolve the centre `mu` with [`weighted_centre`](@ref). When `mean` is `nothing`, the estimator computes it; otherwise `mu` is `mean`. `me` carries whatever weights it holds, and this verb adds none of its own.
- 2. Subtract `mu` from `X` by broadcast, and return the result. `dims` names the observation axis, and the estimator shapes `mu` along the other one, so the broadcast subtracts one value per asset from every observation of that asset.
+ 1. Resolve the centre `mu` with [`weighted_centre`](@ref). When `mean` is `nothing`, the estimator computes `mu`. Otherwise `mu` is `mean`. The estimator uses its own weights, and this function adds no weights.
+ 2. Subtract `mu` from `X` by broadcast, and return the result. `dims` is the axis of the observations, and the estimator shapes `mu` along the other axis. The broadcast then subtracts one value for each asset from every observation of that asset.
 
 # Arguments
 
@@ -1301,11 +1341,11 @@ Demeans the returns in `X` using the expected returns estimator `me` or if provi
   - $(arg_dict[:me])
   - $(arg_dict[:dims])
   - $(arg_dict[:omean])
-  - `kwargs...`: Additional keyword arguments for the expected returns estimator.
+  - `kwargs...`: More keyword arguments for the expected returns estimator.
 
 # Returns
 
-  - `MatNum`: The demeaned returns matrix.
+  - `X::MatNum`: The demeaned returns matrix.
 
 # Related
 
@@ -1322,10 +1362,10 @@ end
 """
     WINDOWED_ESTIMATOR_KEYS
 
-Assignment keys recognised in a [`@windowed_estimator`](@ref) body, besides the single
-`field::Type = default` declaration. Anything else is rejected at macro-expansion time with
-a [`did_you_mean`](@ref) suggestion, so a mistyped key cannot silently produce a malformed
-docstring or a missing forwarding method.
+The assignment keys that a [`@windowed_estimator`](@ref) body accepts, in addition to the one
+`field::Type = default` line. The macro refuses every other key at macro-expansion time, with a
+[`did_you_mean`](@ref) suggestion. So a mistyped key raises an error, and cannot make a wrong
+docstring or omit a forwarding method.
 
 # Related
 
@@ -1335,9 +1375,10 @@ const WINDOWED_ESTIMATOR_KEYS = (:noun, :forward, :doctest)
 """
     WINDOWED_ESTIMATOR_INPUTS
 
-Input types a [`@windowed_estimator`](@ref) `forward` entry may declare. `MatNum` generates
-the matrix forwarder (threading `dims` and `iv` through [`windowed_preamble`](@ref)) and the
-Asset Panel forwarder of the same generic, `VecNum` the vector forwarder.
+The input types that a `forward` entry of [`@windowed_estimator`](@ref) can declare.
+`MatNum` makes the matrix forwarding method and the Asset Panel forwarding method of the same
+generic. The matrix method passes `dims` and `iv` to [`windowed_preamble`](@ref). `VecNum`
+makes the vector forwarding method.
 
 # Related
 
@@ -1347,11 +1388,11 @@ const WINDOWED_ESTIMATOR_INPUTS = (:MatNum, :VecNum)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Throw a uniform, expansion-time [`ArgumentError`](https://docs.julialang.org/en/v1/base/base/#Core.ArgumentError) for a malformed [`@windowed_estimator`](@ref) declaration.
+Throw an [`ArgumentError`](https://docs.julialang.org/en/v1/base/base/#Core.ArgumentError) at macro-expansion time for a wrong [`@windowed_estimator`](@ref) declaration.
 
 # Arguments
 
-  - `msg::AbstractString`: Body of the message. The function prefixes it with `@windowed_estimator: `, so every message of the macro reads alike.
+  - `msg::AbstractString`: The body of the message. The function puts `@windowed_estimator: ` before it, so every message of the macro starts with the same prefix.
 
 # Validation
 
@@ -1367,22 +1408,22 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Validate that `key` names an entry of `dict`, appending a [`did_you_mean`](@ref) suggestion
-to the error when it does not. `what` names the table in the message.
+Check that `key` names an entry of `dict`. When it does not, raise an error that ends with a
+[`did_you_mean`](@ref) suggestion. The message names the table `what`.
 
 # Arguments
 
   - `key::Symbol`: The key the declaration wrote.
   - `dict::AbstractDict`: The table the key must name an entry of.
-  - `what::AbstractString`: Name of that table, written into the message.
+  - `what::AbstractString`: The name of that table. The message contains it.
 
 # Validation
 
-  - `haskey(dict, key)`. A key that names no entry raises through [`windowed_estimator_error`](@ref), with a [`windowed_estimator_suggest`](@ref) suffix appended.
+  - `haskey(dict, key)`. For a key that names no entry, the function raises through [`windowed_estimator_error`](@ref), and the message ends with the suffix from [`windowed_estimator_suggest`](@ref).
 
 # Returns
 
-  - `key::Symbol`: The key, unchanged, so a caller can check and bind in one expression.
+  - `key::Symbol`: The key, unchanged, so a caller can check the key and bind it in one expression.
 
 # Related
 
@@ -1402,19 +1443,21 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Suggest the nearest `candidates` entry to a mistyped [`@windowed_estimator`](@ref) key.
 
-Delegates to [`suggest_declared_key`](@ref), which holds the looser scoped configuration every
-declaration-key suggestion shares: Damerau-Levenshtein at `min_score = 0.5`, because the
-candidates here are compile-time constants — block keys and `field_dict`/`ret_dict` names —
-with nothing to leak.
+The function calls [`suggest_declared_key`](@ref), which every suggestion for a declaration key
+uses. That function scores the candidates with the Damerau-Levenshtein distance at
+`min_score = 0.5`, which accepts more matches than the global default. This is safe here,
+because the candidates are constants of the source code: the block keys and the keys of
+`field_dict` and `ret_dict`. A suggestion cannot show the name of a real asset to a caller who
+guesses.
 
 # Arguments
 
   - `key`: The mistyped key.
-  - `candidates`: The keys the declaration accepts.
+  - `candidates`: The keys that the declaration accepts.
 
 # Returns
 
-  - `msg::String`: The suggestion suffix, ready to append to a message, and empty when no candidate scores high enough.
+  - `msg::String`: The suffix of the suggestion, to put at the end of a message. It is empty when no candidate gets a score that is high enough.
 
 # Related
 
@@ -1429,11 +1472,11 @@ end
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Parse the `field::Type = default` line of a [`@windowed_estimator`](@ref) body into the
-inner estimator's field name, its declared type, and its keyword-constructor default.
+field name of the inner estimator, its declared type, and its default in the keyword constructor.
 
-The field name doubles as the [`field_dict`](@ref) key for the generated field docstring and
-as the argument name of every generated forwarding method, so it must follow the library's
-naming convention (`me`, `ce`, `ve`, `ske`, `kte`).
+The field name is also the [`field_dict`](@ref) key of the generated field docstring, and the
+argument name of every generated forwarding method. So it must follow the naming convention of
+the library, which uses `me`, `ce`, `ve`, `ske` and `kte`.
 
 # Algorithm
 
@@ -1475,19 +1518,20 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Parse one `forward` entry of a [`@windowed_estimator`](@ref) body — `generic(::MatNum; mean) => :ret_key` — into the generic being forwarded, its input type, whether it names a
-`mean` keyword, and the [`ret_dict`](@ref) keys documenting its return values.
+Parse one `forward` entry of a [`@windowed_estimator`](@ref) body, such as
+`generic(::MatNum; mean) => :ret_key`. The parts are the forwarded generic, its input type, a
+flag for a `mean` keyword, and the [`ret_dict`](@ref) keys of its return values.
 
-Naming `mean` in the mini-signature is what keeps it out of the forwarded `kwargs...`, where
-it would otherwise leak into [`windowed_preamble`](@ref).
+A `mean` in the mini-signature keeps `mean` out of the forwarded `kwargs...`. Without it,
+`mean` goes into `kwargs...` and from there to [`windowed_preamble`](@ref).
 
 # Algorithm
 
  1. Split `ex` at the `=>`, giving the mini-signature `sig` and the return keys `rets`.
  2. Read the forwarded generic from the head of `sig`, giving `gen`.
- 3. Walk the arguments of `sig`. A `mean` keyword sets `has_mean`. The one positional argument type sets `input`.
+ 3. Read each argument of `sig`. A `mean` keyword sets `has_mean`. The one positional argument type sets `input`.
  4. Check `input` against [`WINDOWED_ESTIMATOR_INPUTS`](@ref).
- 5. Check every entry of `rets` against [`ret_dict`](@ref) with [`windowed_estimator_check_key`](@ref), collecting them into `keys_`.
+ 5. Check every entry of `rets` against [`ret_dict`](@ref) with [`windowed_estimator_check_key`](@ref), and collect the entries into `keys_`.
  6. Return `gen`, `input`, `has_mean` and `keys_`.
 
 # Arguments
@@ -1498,7 +1542,7 @@ it would otherwise leak into [`windowed_preamble`](@ref).
 
   - `ex` reads `generic(::Input[; mean]) => :ret_key`, or `=> (:k1, :k2)` for a tuple return. Any other shape raises.
   - The left of the `=>` is a call.
-  - `mean` is the only keyword the mini-signature may name.
+  - `mean` is the only keyword that the mini-signature can name.
   - The mini-signature declares exactly one positional argument type.
   - That type names an entry of [`WINDOWED_ESTIMATOR_INPUTS`](@ref).
   - Every return key is a quoted symbol, and names an entry of [`ret_dict`](@ref).
@@ -1554,12 +1598,12 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Render the `generic(field::Name, X::Input)` reference used to cross-link one generated
-forwarding method from the type's and its siblings' `# Related` sections.
+Render the `generic(field::Name, X::Input)` reference to one generated forwarding method. The
+`# Related` sections of the type and of the other generated methods use it.
 
-Keyword arguments are deliberately omitted: Documenter resolves an `@ref` by positional
-method signature, and the positional types already identify the method uniquely. The panel
-method carries a third positional argument, `pnl::Option{<:AssetPanel}`, after `X::MatNum`.
+The reference leaves out the keyword arguments. Documenter resolves an `@ref` by the positional
+signature of the method, and the positional types are enough to find one method. The panel
+method has a third positional argument, `pnl::Option{<:AssetPanel}`, after `X::MatNum`.
 
 # Arguments
 
@@ -1596,7 +1640,7 @@ Render the signature line of the docstring of one generated forwarding method.
   - `field::Symbol`: Name of the inner estimator's field, which is also the argument name of the generated method.
   - `name::Symbol`: Name of the windowed estimator type.
   - `input::Symbol`: Input kind of the generated method, `:MatNum`, `:VecNum` or `:AssetPanel`.
-  - `has_mean::Bool`: Whether the method declares a `mean` keyword.
+  - `has_mean::Bool`: `true` when the method declares a `mean` keyword.
 
 # Returns
 
@@ -1627,14 +1671,14 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Build the docstring for one generated forwarding method as an interpolation AST.
 
-Returning `Expr(:string, ...)` rather than a `String` is load-bearing: it keeps
-[`arg_dict`](@ref) and [`ret_dict`](@ref) lookups as live parts of the `DocStr`, exactly as
-a hand-written `\$(arg_dict[:dims])` would be.
+The function returns an `Expr(:string, ...)` and not a `String`, so each lookup of
+[`arg_dict`](@ref) and [`ret_dict`](@ref) stays a live part of the `DocStr`, as a hand-written
+`\$(arg_dict[:dims])` does.
 
 # Algorithm
 
- 1. Build the signature line `sig` with [`windowed_method_sig`](@ref). The matrix signature carries `dims`, `iv` and `kwargs...`; the vector signature carries neither. The panel signature carries `pnl` after `X`, and takes `iv` in `kwargs...`. `mean` joins any of them when `has_mean` is set.
- 2. Open `parts` with `sig`, the summary sentences, the steps of the generated method's own algorithm, and the arguments heading with its two prose bullets. The panel method has one more step, the cut of the panel. The summary names the generic and not the type's noun, because `std` on a `WindowedVariance` computes a standard deviation and not a variance.
+ 1. Build the signature line `sig` with [`windowed_method_sig`](@ref). The matrix signature has `dims`, `iv` and `kwargs...`, and the vector signature has none of them. The panel signature has `pnl` after `X`, and takes `iv` in `kwargs...`. Each signature also has `mean` when `has_mean` is set.
+ 2. Start `parts` with `sig`, the summary sentences, the steps of the algorithm of the generated method, and the arguments heading with its two prose bullets. The panel method has one more step, the cut of the panel. The summary names the generic and not the noun of the type, because `std` on a `WindowedVariance` computes a standard deviation and not a variance.
  3. For the panel input, push the `arg_dict[:pnl_moment]` lookup as a live expression.
  4. For the matrix and panel inputs, push the `arg_dict[:dims]` lookup.
  5. When `has_mean` is set, push the `mean` bullet.
@@ -1649,10 +1693,10 @@ a hand-written `\$(arg_dict[:dims])` would be.
   - `field::Symbol`: Name of the inner estimator's field, which is also the argument name of the generated method.
   - `name::Symbol`: Name of the windowed estimator type.
   - `input::Symbol`: Input kind of the generated method, `:MatNum`, `:VecNum` or `:AssetPanel`.
-  - `has_mean::Bool`: Whether the method declares a `mean` keyword.
+  - `has_mean::Bool`: `true` when the method declares a `mean` keyword.
   - `ret_keys::Vector{Symbol}`: The [`ret_dict`](@ref) keys documenting the return values.
-  - `noun::AbstractString`: Capitalised noun phrase naming the moment, which drives the generated prose.
-  - `siblings::Vector{String}`: Cross-references to the type's other generated methods, from [`windowed_method_ref`](@ref).
+  - `noun::AbstractString`: The capitalised noun phrase of the moment. The generated prose uses it.
+  - `siblings::Vector{String}`: Cross-references to the other generated methods of the type, from [`windowed_method_ref`](@ref).
 
 # Returns
 
@@ -1673,7 +1717,7 @@ function windowed_method_doc(gen, field::Symbol, name::Symbol, input::Symbol,
     # The summary names the *generic*, not the type's noun: `std` on a WindowedVariance
     # computes a standard deviation, not a variance.
     parts = Any["\n", sig,
-                "\n\nCompute `$(gen)` over a rolling or indexed observation window ($(is_pnl ? "Asset Panel" : is_mat ? "matrix" : "vector") input).\n\nThis method selects a window of observations from `X` (and applies observation weights if specified), then delegates to the underlying $(lc) estimator.$(is_pnl ? " It cuts the Asset Panel to the same observations and passes it on, so a mask-aware inner estimator reads the active mask of the window, and a plain one reduces to the Coverage Universe of the window." : "")\n\n# Algorithm\n\n$(is_pnl ? " 1. Cut `pnl` to the observations of the window with [`windowed_panel`](@ref).\n" : "") $(1 + n0). Resolve the window and the observation weights with [`windowed_preamble`](@ref), giving `inner`, a copy of `$(field).$(field)` that carries the windowed weights, together with the windowed `X`$(is_mat ? ", the windowed `iv`, and the `active_mask` and `estimation_mask` keywords cut to the window" : "").\n $(2 + n0). Call `$(gen)` on `inner` and the windowed `X`$(is_pnl ? " and `pnl`" : ""), and return its result. The inner estimator alone decides the value, so the window and the weights are the whole of this method's contribution.\n\n# Arguments\n\n  - `$(field)`: Windowed $(lc) estimator.\n  - `X`: Data $(is_mat ? "matrix of asset returns (observations × assets)" : "vector of returns").\n"]
+                "\n\nCompute `$(gen)` over a rolling or indexed window of observations, for $(is_pnl ? "an Asset Panel" : is_mat ? "a matrix" : "a vector") input.\n\nThe method selects a window of observations from `X`, and applies the observation weights when the estimator holds them. Then it calls the inner $(lc) estimator.$(is_pnl ? " It cuts the Asset Panel to the same observations and gives it to the inner estimator. A mask-aware inner estimator then reads the active mask of the window, and a plain one reduces to the Coverage Universe of the window." : "")\n\n# Algorithm\n\n$(is_pnl ? " 1. Cut `pnl` to the observations of the window with [`windowed_panel`](@ref).\n" : "") $(1 + n0). Resolve the window and the observation weights with [`windowed_preamble`](@ref). It returns `inner`, a copy of `$(field).$(field)` that holds the windowed weights, and the windowed `X`$(is_mat ? ", the windowed `iv`, and the `active_mask` and `estimation_mask` keywords cut to the window" : "").\n $(2 + n0). Call `$(gen)` on `inner` and the windowed `X`$(is_pnl ? " and `pnl`" : ""), and return its result. The inner estimator alone computes the value. This method changes only the observations and the weights that the inner estimator gets.\n\n# Arguments\n\n  - `$(field)`: Windowed $(lc) estimator.\n  - `X`: Data $(is_mat ? "matrix of asset returns, `observations × assets`" : "vector of returns").\n"]
     if is_pnl
         push!(parts, "  - ", :(arg_dict[:pnl_moment]), "\n")
     end
@@ -1682,14 +1726,14 @@ function windowed_method_doc(gen, field::Symbol, name::Symbol, input::Symbol,
     end
     if has_mean
         push!(parts,
-              "  - `mean`: Optional pre-computed mean passed to the underlying estimator.\n")
+              "  - `mean`: Optional precomputed mean, passed to the inner estimator.\n")
     end
     if is_pnl
         push!(parts,
-              "  - `kwargs...`: Additional keyword arguments passed to the underlying estimator. The `iv`, `active_mask` and `estimation_mask` keywords are cut to the window.\n")
+              "  - `kwargs...`: More keyword arguments, passed to the inner estimator. The method cuts the `iv`, `active_mask` and `estimation_mask` keywords to the window.\n")
     elseif is_mat
         push!(parts, "  - ", :(arg_dict[:oiv]),
-              "\n  - `kwargs...`: Additional keyword arguments passed to the underlying estimator. The `active_mask` and `estimation_mask` keywords are cut to the window.\n")
+              "\n  - `kwargs...`: More keyword arguments, passed to the inner estimator. The method cuts the `active_mask` and `estimation_mask` keywords to the window.\n")
     end
     push!(parts, "\n# Returns\n")
     for k in ret_keys
@@ -1705,15 +1749,15 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Build one generated forwarding method: resolve the window via [`windowed_preamble`](@ref),
-then delegate to the inner estimator's own method.
+Build one generated forwarding method. The method resolves the window with
+[`windowed_preamble`](@ref), and then calls the method of the inner estimator.
 
 # Algorithm
 
- 1. Build the three field accesses the body reads: `field.field`, the inner estimator; `field.w`, the observation weights; and `field.window`, the window specification.
- 2. For the vector input, build a method that takes `mean` alone, and only when `has_mean` is set. Its body binds `inner` and the windowed `X` with [`windowed_preamble`](@ref), and returns `gen` of the two. Return it.
- 3. Build the keyword list of the signature: `dims`, then `mean` when `has_mean` is set, then `iv` and `kwargs...`. The panel method names no `iv`: it arrives in `kwargs...`, as in the panel methods of the moment verbs, and the preamble binds it there.
- 4. Build the matching keyword list of the delegated call. It carries the same names, each forwarded by value. The `iv` it forwards is the windowed one, and the keywords are `kw`, with the two universe masks cut to the window.
+ 1. Build the three field accesses that the body reads. `field.field` is the inner estimator, `field.w` holds the observation weights, and `field.window` holds the window.
+ 2. For the vector input, build a method whose only keyword is `mean`, and only when `has_mean` is set. Its body binds `inner` and the windowed `X` with [`windowed_preamble`](@ref), and returns `gen` of the two. Return this method.
+ 3. Build the keyword list of the signature. It holds `dims`, then `mean` when `has_mean` is set, then `iv` and `kwargs...`. The panel method names no `iv`. As in the panel methods of the moment verbs, `iv` comes in `kwargs...`, and the preamble binds it from there.
+ 4. Build the matching keyword list of the inner call. It has the same names, and passes each value on. It passes the windowed `iv`, and the keywords `kw`, in which the two universe masks are cut to the window.
  5. For the panel input, the positional arguments are `field`, `X` and `pnl`, and the body opens with the cut of `pnl` to the window by [`windowed_panel`](@ref). For the matrix input, they are `field` and `X`.
  6. Build the body: one call to [`windowed_preamble`](@ref) that binds `inner`, the windowed `X`, `iv` and `kw`, then a `return` of `gen` applied to `inner`, that `X`, and the cut `pnl` for the panel input.
  7. Return the whole `Expr(:function, ...)`.
@@ -1724,7 +1768,7 @@ then delegate to the inner estimator's own method.
   - `field::Symbol`: Name of the inner estimator's field, which is also the argument name of the generated method.
   - `name::Symbol`: Name of the windowed estimator type.
   - `input::Symbol`: Input kind of the generated method, `:MatNum`, `:VecNum` or `:AssetPanel`.
-  - `has_mean::Bool`: Whether the method declares a `mean` keyword.
+  - `has_mean::Bool`: `true` when the method declares a `mean` keyword.
 
 # Returns
 
@@ -1779,18 +1823,19 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Build the type docstring of a generated windowed estimator as an interpolation AST, keeping
-`DocStringExtensions` abbreviations and dictionary lookups live (see
-[`windowed_method_doc`](@ref)).
+Build the type docstring of a generated windowed estimator as an interpolation AST.
+
+The `DocStringExtensions` abbreviations and the dictionary lookups stay live, as in
+[`windowed_method_doc`](@ref).
 
 # Algorithm
 
- 1. Read the inner estimator's own name out of `default`, giving `inner_ref`. A call such as `SimpleVariance()` contributes its head; a bare name contributes itself.
- 2. Open `parts` with the live `DocStringExtensions.TYPEDEF` abbreviation, the two summary sentences, the `# Fields` heading, and the live `DocStringExtensions.FIELDS` abbreviation.
- 3. Push the `# Constructors` section, the keyword signature built from `name`, `field`, `ftype` and `default`, and the `## Validation` subsection carrying the live `val_dict[:oow]` lookup and the window rule.
- 4. Push the three propagation subsections, `## Propagated parameters`, `## View parameters` and `## Observation weight parameters`, each naming `field`, `w` and `cache` as the tags on the generated struct declare them.
+ 1. Read the name of the inner estimator from `default` into `inner_ref`. For a call such as `SimpleVariance()`, the name is the head of the call. For a bare name, it is the name itself.
+ 2. Start `parts` with the live `DocStringExtensions.TYPEDEF` abbreviation, the two summary sentences, the `# Fields` heading, and the live `DocStringExtensions.FIELDS` abbreviation.
+ 3. Push the `# Constructors` section and the keyword signature built from `name`, `field`, `ftype` and `default`. Then push the `## Validation` subsection, with the live `val_dict[:oow]` lookup and the window rule.
+ 4. Push the three propagation subsections, `## Propagated parameters`, `## View parameters` and `## Observation weight parameters`. Each one names `field`, `w` and `cache` as the tags of the generated struct declare them.
  5. Push the `# Examples` section, fencing `doctest` as a `jldoctest` block.
- 6. Push the `# Related` heading, the supertype, `inner_ref`, every entry of `methods`, the two window rules, and the four shared functions the type answers: `factory`, `port_opt_view`, `obs_weights_view` and `windowed_preamble`.
+ 6. Push the `# Related` heading, the supertype, `inner_ref`, every entry of `methods`, the two window rules, and the four shared functions that the type implements: `factory`, `port_opt_view`, `obs_weights_view` and `windowed_preamble`.
  7. Return `parts` wrapped in `Expr(:string, ...)`, so every lookup stays live.
 
 # Arguments
@@ -1800,9 +1845,9 @@ Build the type docstring of a generated windowed estimator as an interpolation A
   - `field::Symbol`: Name of the inner estimator's field.
   - `ftype`: Declared type of that field.
   - `default`: Its keyword-constructor default.
-  - `noun::AbstractString`: Capitalised noun phrase naming the moment, which drives the generated prose.
-  - `doctest::AbstractString`: Body of the `jldoctest` block of the `# Examples` section, without its fences.
-  - `methods::Vector{String}`: Cross-references to the type's generated methods, from [`windowed_method_ref`](@ref).
+  - `noun::AbstractString`: The capitalised noun phrase of the moment. The generated prose uses it.
+  - `doctest::AbstractString`: The body of the `jldoctest` block of the `# Examples` section, without its fences.
+  - `methods::Vector{String}`: Cross-references to the generated methods of the type, from [`windowed_method_ref`](@ref).
 
 # Returns
 
@@ -1818,11 +1863,11 @@ function windowed_type_doc(name::Symbol, super, field::Symbol, ftype, default,
     lc = lowercasefirst(noun)
     inner_ref = Meta.isexpr(default, :call) ? default.args[1] : default
     parts = Any["\n", :(DocStringExtensions.TYPEDEF),
-                "\n\n$(noun) estimator that restricts computation to a rolling or indexed observation window.\n\n`$(name)` wraps another $(lc) estimator and applies it to a subset of observations defined by a window and/or custom observation weights. This enables time-varying or recency-weighted $(lc) estimation.\n\n# Fields\n\n",
+                "\n\nFits an inner $(lc) estimator on a rolling or indexed window of observations.\n\n`$(name)` holds another $(lc) estimator, and applies it to the observations of a window, with optional observation weights. So the estimate can follow the most recent observations, or give them more weight.\n\n# Fields\n\n",
                 :(DocStringExtensions.FIELDS),
-                "\n\n# Constructors\n\n    $(name)(;\n        $(field)::$(ftype) = $(default),\n        w::Option{<:ObsWeights} = nothing,\n        window::Option{<:Int_VecInt} = nothing,\n        rule::AbstractWindowRule = RollingWindow(),\n        cache::Option{<:AbstractPartialFitState} = nothing\n    ) -> $(name)\n\nKeywords correspond to the struct's fields.\n\n## Validation\n\n  - ",
+                "\n\n# Constructors\n\n    $(name)(;\n        $(field)::$(ftype) = $(default),\n        w::Option{<:ObsWeights} = nothing,\n        window::Option{<:Int_VecInt} = nothing,\n        rule::AbstractWindowRule = RollingWindow(),\n        cache::Option{<:AbstractPartialFitState} = nothing\n    ) -> $(name)\n\nEach keyword sets the struct field of the same name.\n\n## Validation\n\n  - ",
                 :(val_dict[:oow]),
-                "\n  - If `window` is provided, it must be nonempty, nonnegative, and finite.\n\n## Propagated parameters\n\nWhen [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:\n\n  - `$(field)`: Recursively updated via [`factory`](@ref).\n  - `w`: Replaced with the incoming [`ObsWeights`](@ref).\n  - `cache`: Carried unchanged via [`factory`](@ref).\n\n## View parameters\n\nWhen [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:\n\n  - `$(field)`: Recursively viewed via [`port_opt_view`](@ref).\n  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).\n\n## Observation weight parameters\n\nWhen [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:\n\n  - `$(field)`: Recursively indexed via [`obs_weights_view`](@ref).\n  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).\n\n# Examples\n\n```jldoctest\n$(strip(doctest))\n```\n\n# Related\n\n  - [`$(super)`](@ref)\n  - [`$(inner_ref)`](@ref)\n"]
+                "\n  - If `window` is not `nothing`, it must be nonempty, nonnegative and finite.\n\n## Propagated parameters\n\n[`factory`](@ref) passes its arguments on to these `@fprop` fields:\n\n  - `$(field)`: Recursively updated through [`factory`](@ref).\n  - `w`: Replaced with the incoming [`ObsWeights`](@ref).\n  - `cache`: Carried unchanged through [`factory`](@ref).\n\n## View parameters\n\n[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:\n\n  - `$(field)`: Recursively viewed through [`port_opt_view`](@ref).\n  - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).\n\n## Observation weight parameters\n\n[`obs_weights_view`](@ref) indexes these fields to the selected observations:\n\n  - `$(field)`: Recursively indexed through [`obs_weights_view`](@ref).\n  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).\n\n# Examples\n\n```jldoctest\n$(strip(doctest))\n```\n\n# Related\n\n  - [`$(super)`](@ref)\n  - [`$(inner_ref)`](@ref)\n"]
     for m in methods
         push!(parts, "  - ", m, "\n")
     end
@@ -1838,42 +1883,50 @@ end
         doctest = \"\"\"...\"\"\"
     end
 
-Declare a windowed moment estimator: a wrapper that restricts an inner moment estimator to a
-sub-window of observations and rebinds observation weights to that window, leaving the inner
-estimator's semantics untouched.
+Declare a windowed moment estimator, which applies an inner moment estimator to a window of
+observations.
 
-One invocation emits the whole family member — the [`@propagatable`](@ref) `@concrete`
-struct (inner estimator tagged `@fprop @vprop`, `w` tagged `@wprop`, plus `window` and `rule`, and a `cache` tagged `@fprop @vprop` that holds a partial-fit state), both
-constructors with their validation, one forwarding method per `forward` entry, one Asset
-Panel method beside each matrix entry, the `export`, and every docstring.
+The windowed estimator binds the observation weights to the window. The inner estimator
+computes the moment in the same way as without a window.
 
-Five nominal types exist rather than one parametric `Windowed{E}` because each answers a
-different generic and must subtype a different abstract estimator — `AbstractCovarianceEstimator`,
-`CoskewnessEstimator`, and the rest are load-bearing for dispatch across the library, and a
-Julia struct's supertype cannot depend on a type parameter. This macro is what keeps the five
-in sync.
+One call of the macro declares all the parts of the windowed estimator:
+
+  - The [`@propagatable`](@ref) `@concrete` struct. Its fields are the inner estimator tagged
+    `@fprop @vprop`, `w` tagged `@wprop`, `window`, `rule`, and a `cache` tagged
+    `@fprop @vprop` that holds a partial-fit state.
+  - The two constructors with their validation.
+  - One forwarding method for each `forward` entry, and one Asset Panel method for each matrix
+    entry.
+  - The `export` of the type, and every docstring.
+
+The library has five nominal types and not one parametric `Windowed{E}`. Each type implements a
+different generic, and must subtype a different abstract estimator, such as
+`AbstractCovarianceEstimator` or `CoskewnessEstimator`. Dispatch across the library reads these
+supertypes, and a Julia struct cannot take its supertype from a type parameter. This macro keeps
+the five types the same in every other part.
 
 # Body
 
-  - `field::FieldType = Default()`: the inner estimator. The field name is also its
-    [`field_dict`](@ref) key and the argument name of every generated method, so it must
-    follow the library convention (`me`, `ce`, `ve`, `ske`, `kte`).
-  - `noun`: capitalised noun phrase naming the moment, e.g. `"Expected returns"`. Drives all
-    generated prose.
-  - `forward`: one mini-signature per generic to forward, paired with the
-    [`ret_dict`](@ref) key(s) documenting its return values. Naming `mean` in the
-    mini-signature emits it as a named keyword instead of letting it pass in `kwargs...`,
-    where it would leak into [`windowed_preamble`](@ref).
-  - `doctest`: the body of the `jldoctest` block for the `# Examples` section, without its
+  - `field::FieldType = Default()`: The inner estimator. The field name is also its
+    [`field_dict`](@ref) key and the argument name of every generated method. So it must
+    follow the naming convention of the library, which uses `me`, `ce`, `ve`, `ske` and `kte`.
+  - `noun`: The capitalised noun phrase of the moment, for example `"Expected returns"`. All
+    the generated prose uses it.
+  - `forward`: One mini-signature for each generic to forward, with the [`ret_dict`](@ref)
+    keys of its return values. A `mean` in the mini-signature makes `mean` a named keyword of
+    the generated method. Without it, `mean` goes into `kwargs...` and from there to
+    [`windowed_preamble`](@ref).
+  - `doctest`: The body of the `jldoctest` block of the `# Examples` section, without its
     fences.
 
-Unknown keys, malformed `forward` entries, and unknown `field_dict`/`ret_dict` keys are
-rejected at macro-expansion time with a [`did_you_mean`](@ref) suggestion.
+At macro-expansion time, the macro refuses an unknown key, a wrong `forward` entry, and an
+unknown key of `field_dict` or `ret_dict`. The error for an unknown key ends with a
+[`did_you_mean`](@ref) suggestion.
 
 # Algorithm
 
  1. Read `name` and `super` from the header.
- 2. Walk the body once. The one `field::Type = default` line goes to [`windowed_parse_field`](@ref), which returns `field`, `ftype` and `default`. The `noun`, `forward` and `doctest` lines bind their values. Any other key raises.
+ 2. Read the body once. [`windowed_parse_field`](@ref) parses the one `field::Type = default` line, and returns `field`, `ftype` and `default`. The `noun`, `forward` and `doctest` lines bind their values. Any other key raises an error.
  3. Parse every entry of `forward` with [`windowed_parse_forward`](@ref), giving `specs`. Append one `:AssetPanel` copy of each `MatNum` entry, so every matrix generic also gets its Asset Panel method.
  4. Render one cross-reference per entry of `specs` with [`windowed_method_ref`](@ref), giving `refs`.
  5. For each entry of `specs`, build one documented forwarding method: [`windowed_method_doc`](@ref) writes its docstring, and [`windowed_method_def`](@ref) writes its body. Each method's `# Related` section lists the `refs` of its siblings and not its own.

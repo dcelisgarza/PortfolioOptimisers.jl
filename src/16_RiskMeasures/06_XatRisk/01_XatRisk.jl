@@ -219,6 +219,8 @@ The minimum is the ``k``-th largest loss, the order statistic that [`ValueatRisk
 
 The programme is exact when ``b`` is at least the largest loss minus the minimum, which the derived default is. The slack must stay small. When ``s W_{T}`` reaches the gap from ``\\alpha W_{T}`` up to the next cumulative weight, the programme exempts one more observation.
 
+The order statistic is the upper quantile of Definition 3.3 of [artzner1999](@cite). Equation 7.51 of [cajas2025](@cite) subtracts its slack, so when ``\\alpha W_{T}`` is an integer it selects the next larger loss, and not the order statistic of its own Equation 7.50. This programme adds the slack, so that it selects the order statistic of the definition. Section 7.2.2.3 of [cajas2025](@cite) builds its programme on an older mixed-integer formulation of the Value-at-Risk. No copy of the work that first states that formulation was found.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -257,7 +259,8 @@ MIPValueatRisk
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 7.2.2.3, Equations 7.50 and 7.51. The programme of Equation 7.51 subtracts its slack. This one adds it, so that it selects the order statistic of the definition, Equation 7.50.
+  - $(ref_dict[:artzner1999]) Section 3.3, Definition 3.3.
+  - $(ref_dict[:cajas2025]) Section 7.2.2.3, Equations 7.50 and 7.51. $(ref_dict[:no_original_source])
 """
 @concrete struct MIPValueatRisk <: ValueatRiskFormulation
     """
@@ -345,6 +348,10 @@ Where:
 
 The range is the Value-at-Risk of the returns plus the Value-at-Risk of the negated returns, and the two mean terms cancel.
 
+The two estimands agree only when the returns follow `dist`. On a large sample drawn from `dist`, the parametric quantile of the sample moments is close to the empirical quantile. On a sample whose loss tail is heavier than that of `dist`, the parametric quantile at a small ``\\alpha`` is below the empirical quantile, so it understates the loss. On a sample whose loss tail is lighter, it is above the empirical quantile. At a larger ``\\alpha`` the order can reverse.
+
+Sections 1.2 and 4.5.2.2 of [morgan1996](@cite) state the Value-at-Risk of normal returns. Section 2.6 of [lobo1998](@cite) states its bound as a second-order cone for a confidence of at least one half, which is the condition ``\\alpha \\leq 1/2`` above. Equation 11.5 of [cajas2025](@cite) states the quantiles of the Student-t law, scaled to unit variance, and of the Laplace law. No copy of the work that first states those two forms was found. Equation 7.52 of [cajas2025](@cite) calls ``z_{\\alpha}`` the ``\\alpha`` quantile of the normal law, but the definition needs the ``1 - \\alpha`` quantile, which its Equation 11.5 states.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -407,7 +414,9 @@ DistributionValueatRisk
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 7.2.2.3, Equations 7.52 and 7.53, and Section 11.2, Equation 11.5.
+  - $(ref_dict[:morgan1996]) Section 1.2, Equation 1.5, and Section 4.5.2.2, Equation 4.43.
+  - $(ref_dict[:lobo1998]) Section 2.6, Equation 13.
+  - $(ref_dict[:cajas2025]) Section 11.2, Equation 11.5. $(ref_dict[:no_original_source])
 """
 @propagatable @concrete struct DistributionValueatRisk <: ValueatRiskFormulation
     """
@@ -576,7 +585,7 @@ Where:
 
 ``-x_{(k)}`` is the minimum of the programme of [`MIPValueatRisk`](@ref) over the losses ``-x_{t}``. Without observation weights ``k = \\lfloor (\\alpha + s) T \\rfloor + 1``. This is ``\\lfloor \\alpha T \\rfloor + 1``, the index of the upper ``\\alpha``-quantile, while ``s T`` is smaller than ``\\lfloor \\alpha T \\rfloor + 1 - \\alpha T``. The slack absorbs the rounding error of ``\\alpha T``. For example, at ``\\alpha = 0.29`` and ``T = 100`` the product rounds to 28.999999999999996, and ``k`` is 30.
 
-``-x_{(k)}`` is the definition ``-\\inf\\{x : F(x) > \\alpha\\}`` of the reference, Equation 7.50, with ``F`` the weighted distribution function of the returns. It is the smallest loss that the portfolio exceeds with a probability of ``\\alpha`` or less. The programme of the same reference, Equation 7.51, subtracts its slack, and it selects ``\\lceil \\alpha T \\rceil``, which is one position higher when ``\\alpha T`` is an integer. At ``\\alpha T = 1`` that position is the largest loss.
+``-x_{(k)}`` is the definition ``-\\inf\\{x : F(x) > \\alpha\\}`` of Definition 3.3 of [artzner1999](@cite), with ``F`` the weighted distribution function of the returns. Equation 7.50 of [cajas2025](@cite) states it too. It is the smallest loss that the portfolio exceeds with a probability of ``\\alpha`` or less. Equation 7.51 of [cajas2025](@cite), the programme, subtracts its slack, and it selects ``\\lceil \\alpha T \\rceil``, which is one position higher when ``\\alpha T`` is an integer. At ``\\alpha T = 1`` that position is the largest loss.
 
 # Algorithm
 
@@ -608,15 +617,15 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `alg`: Recursively updated via [`factory`](@ref).
+  - `alg`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `alg`: Recursively viewed via [`port_opt_view`](@ref).
+  - `alg`: Recursively viewed through [`port_opt_view`](@ref).
 
 # Functor
 
@@ -659,6 +668,7 @@ ValueatRisk
 
 # References
 
+  - $(ref_dict[:artzner1999]) Section 3.3, Definition 3.3.
   - $(ref_dict[:cajas2025]) Section 7.2.2.3, Equations 7.50 and 7.51.
 """
 @propagatable @concrete struct ValueatRisk <: RiskMeasure
@@ -771,6 +781,10 @@ $(math_dict[:negated_upper_tail])
 
 The two tails select their order statistics with the same slack ``s``. The gain tail is the ``k``-th largest return, with ``k`` the index of [`ValueatRisk`](@ref) at ``\\beta``.
 
+Let ``k_{\\alpha}`` be the index of the loss tail and ``k_{\\beta}`` the index of the gain tail, so that the range is ``x_{(T + 1 - k_{\\beta})} - x_{(k_{\\alpha})}``. The range is not negative when ``k_{\\alpha} + k_{\\beta} \\leq T + 1``. Without observation weights this holds when ``\\lfloor (\\alpha + s) T \\rfloor + \\lfloor (\\beta + s) T \\rfloor \\leq T - 1``, which is about ``\\alpha + \\beta < 1``. When the two levels overlap past that point, the loss order statistic is above the gain order statistic, and the range is zero or negative. For example, at ``T = 10`` and ``\\alpha = \\beta = 0.5`` the range is ``x_{(5)} - x_{(6)}``. The constructor does not refuse such levels, and the model and the functor report the same number.
+
+Section 7.2.3 of [cajas2025](@cite) defines the ranges of the Conditional Value-at-Risk and of other tail measures, and names [owa1](@cite) as their source. No copy of that work was found. [cajas2025](@cite) defines no range of the Value-at-Risk, so this measure is the library's analogue of that family.
+
 # Algorithm
 
 The functor of the empirical estimand:
@@ -805,15 +819,15 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `alg`: Recursively updated via [`factory`](@ref).
+  - `alg`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `alg`: Recursively viewed via [`port_opt_view`](@ref).
+  - `alg`: Recursively viewed through [`port_opt_view`](@ref).
 
 # Functor
 
@@ -855,7 +869,9 @@ ValueatRiskRange
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 7.2.2.3.
+  - $(ref_dict[:artzner1999]) Section 3.3, Definition 3.3.
+  - $(ref_dict[:cajas2025]) Section 7.2.3. $(ref_dict[:no_original_source])
+  - $(ref_dict[:owa1])
 """
 @propagatable @concrete struct ValueatRiskRange <: RiskMeasure
     """
@@ -1002,6 +1018,8 @@ Where:
 
 The running peak starts at ``c_0 = 0``, so a series that falls from its first period is in drawdown from the start. ``-d_{(k)}`` is the minimum of the programme of [`MIPValueatRisk`](@ref) over the losses ``-d_{t}``, and ``k`` follows the rules that [`ValueatRisk`](@ref) states.
 
+Equation 3.2 of [cdar](@cite) defines the drawdown of the uncompounded cumulative return, with the peak taken from ``c_0``. Its Equations 3.6 and 3.8 take the quantile of the drawdowns as the threshold of its conditional measure, and do not name it as a measure. Equation 7.90 of [cajas2025](@cite) names that quantile the Drawdown-at-Risk.
+
 # Algorithm
 
  1. Read the slack `s` with [`mip_var_bounds`](@ref), which gives the default when the `s` field is `nothing`.
@@ -1069,8 +1087,8 @@ DrawdownatRisk
 
 # References
 
-  - $(ref_dict[:cdar])
-  - $(ref_dict[:cajas2025]) Section 7.2.4.3, Equations 7.90 and 7.91.
+  - $(ref_dict[:cdar]) Section 3, Equations 3.2, 3.6 and 3.8.
+  - $(ref_dict[:cajas2025]) Section 7.2.4.3, Equation 7.90.
 """
 @propagatable @concrete struct DrawdownatRisk <: RiskMeasure
     """
@@ -1287,7 +1305,9 @@ Where:
   - $(math_dict[:alpha_rm])
   - $(math_dict[:T])
 
-The running peak starts at ``C_0 = 1``, so each drawdown is relative to the initial portfolio value. The index ``k`` is the one of [`DrawdownatRisk`](@ref), so the two measures select the same position in their series.
+The running peak starts at ``C_0 = 1``, so the peak is never below the initial portfolio value. The index ``k`` is the one of [`DrawdownatRisk`](@ref), so the two measures select the same position in their series.
+
+Section 3 of [cdar](@cite) defines the drawdown of the uncompounded cumulative return only. It names the relative drawdown and states that it lacks the properties of the absolute drawdown, but it defines no measure on it. The relative drawdown series above, and its quantile, are the library's extension of that work.
 
 # Algorithm
 
@@ -1346,7 +1366,7 @@ RelativeDrawdownatRisk
 
 # References
 
-  - $(ref_dict[:cdar])
+  - $(ref_dict[:cdar]) Section 3, Equation 3.2.
 """
 @propagatable @concrete struct RelativeDrawdownatRisk <: HierarchicalRiskMeasure
     """

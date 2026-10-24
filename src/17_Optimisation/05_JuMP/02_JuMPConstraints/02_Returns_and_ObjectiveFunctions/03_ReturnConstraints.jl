@@ -504,7 +504,7 @@ Where:
   - $(math_dict[:w_t_obs]) Every ``w_{t}`` is ``1`` when the term and the prior carry no weights.
   - $(math_dict[:x_t_obs])
   - $(math_dict[:sc_scale])
-  - ``\\mathcal{K}_{\\exp} = \\{(x, y, z) : y e^{x / y} \\leq z,\\ y > 0\\}``: Exponential cone, with its closure.
+  - ``\\mathcal{K}_{\\exp} = \\{(x, y, z) : y e^{x / y} \\leq z,\\ y > 0\\}``: Exponential cone, with its closure. Section 4.2 of [chares2009](@cite) defines it with the last two entries in the other order.
 
 ## Relaxation
 
@@ -537,6 +537,11 @@ $(val_dict[:relax])
   - [`scalarise_return_expression!`](@ref)
   - [`set_return_bounds!`](@ref)
   - [`add_fees_to_ret!`](@ref)
+
+# References
+
+  - $(ref_dict[:chares2009]) Section 4.2.
+  - $(ref_dict[:cajas2025]) Section 8.1.2, Equations 8.5 and 8.6. $(ref_dict[:no_original_source])
 """
 function set_return_constraints!(model::JuMP.Model, pret::JuMPReturnsEstimator,
                                  obj::ObjectiveFunction, pr::AbstractPriorResult; kwargs...)
@@ -852,7 +857,9 @@ Build one term's signed-``\\ell_1``-robust return expression.
 The rows are linear, and the term forces the risk form of [`MaximumRatio`](@ref), as the
 ``\\ell_1`` set does. The worst case keeps the long-short problem as one problem. Thus it does not need the two
 separate problems of equations (27) and (28) of [quintile](@cite). It also does not need the
-condition on complementary supports that Remark 12 of that source sets to join the two parts.
+condition on disjoint supports that Remark 12 of [quintile](@cite) sets to join the two parts.
+The closed form below is this library's own. It applies the argument of Lemma 8 of
+[quintile](@cite), which states the worst case over the joint ``\\ell_1`` set, to each sign.
 
 # Mathematical definition
 

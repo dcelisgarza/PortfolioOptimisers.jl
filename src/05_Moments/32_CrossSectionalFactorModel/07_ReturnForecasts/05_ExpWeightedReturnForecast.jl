@@ -272,6 +272,8 @@ The member turns its Descriptors into scores with the recipe in `scores`. It reg
 
 The Forecast Unit chooses the pair of target and weights. In the return unit the target is the forward return and the weights are the inverse idiosyncratic variance, which is a generalised least squares. In the Sharpe unit the target is the forward return divided by the idiosyncratic volatility and the weights are the estimation mask. That is the same estimator written as an ordinary least squares, and the member multiplies the forecast by the idiosyncratic volatility at the end.
 
+[grinoldkahn1999](@citet) states the forecast as the volatility of the asset times a coefficient times its score, and Chapter 10 of that work refines a raw score into a forecast of the return by regression. The exponential accumulation of the normal equations, the ridge and the two Forecast Units are this library's own, and no earlier source for them was found.
+
 # Mathematical definition
 
 ```math
@@ -379,7 +381,7 @@ ExpWeightedReturnForecast
 
 # References
 
-  - $(ref_dict[:grinoldkahn1999])
+  - $(ref_dict[:grinoldkahn1999]) Chapter 10. $(ref_dict[:no_original_source])
 """
 @concrete struct ExpWeightedReturnForecast <: AbstractReturnForecastEstimator
     """
