@@ -394,7 +394,7 @@ end
 
 Return the largest loss of `x` among the observations with positive weight.
 
-This is the value of a tail measure at significance level zero. [`ConditionalValueatRisk`](@ref) and [`EntropicValueatRisk`](@ref) read it on the returns, and [`ConditionalDrawdownatRisk`](@ref) and [`EntropicDrawdownatRisk`](@ref) read it on the drawdowns. An observation with zero weight has no probability, so it cannot be the worst outcome. [`WorstRealisation`](@ref) and [`MaximumDrawdown`](@ref) read every observation instead.
+This is the value of a tail measure at significance level zero. [`ConditionalValueatRisk`](@ref) and [`EntropicValueatRisk`](@ref) read it on the returns, [`PRM`](@ref) reads it as the value of [`PowerNormValueatRisk`](@ref) under the condition of that measure, and [`ConditionalDrawdownatRisk`](@ref) and [`EntropicDrawdownatRisk`](@ref) read it on the drawdowns. An observation with zero weight has no probability, so it cannot be the worst outcome. [`WorstRealisation`](@ref) and [`MaximumDrawdown`](@ref) read every observation instead.
 
 # Arguments
 
@@ -422,7 +422,7 @@ end
 
 Return the indices of the observations with positive weight.
 
-A programme with one row for each observation builds its rows on these indices. An observation with zero weight has no probability, so its row does not change the optimum. But the row of a large loss makes a cone programme harder to solve, and an exponential cone row can stop the solver far from the optimum. [`ERM`](@ref), [`RRM`](@ref) and the JuMP constraint layer of their measures read it.
+A programme with one row for each observation builds its rows on these indices. An observation with zero weight has no probability, so its row does not change the optimum. But the row of a large loss makes a cone programme harder to solve, and an exponential cone row can stop the solver far from the optimum. [`ERM`](@ref), [`RRM`](@ref), [`PRM`](@ref) and the JuMP constraint layer of their measures read it.
 
 # Arguments
 

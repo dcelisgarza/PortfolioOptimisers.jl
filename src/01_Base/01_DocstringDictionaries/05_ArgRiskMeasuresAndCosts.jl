@@ -94,12 +94,14 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :fixed => "`fixed`: If `true`, [`factory`](@ref) keeps the reference weights `w` and ignores the new weights. If `false`, `factory` replaces `w` with the new weights.",#
                  # Tracking specification.
                  :tr_spec => "`tr`: Benchmark tracking specification.",#
-                 # Power norm parameters.
-                 :pa_rm => "`pa`: Power norm parameter for the lower tail.",#
-                 :pb_rm => "`pb`: Power norm parameter for the upper tail.",#
+                 # Power norm parameters. `PowerNormValueatRisk` and its two drawdown
+                 # siblings share `p_pnvar`.
+                 :p_pnvar => "`p`: Order of the power norm of the tail, `p > 1`. As `p` falls to one, the measure falls to the Conditional Value-at-Risk of the same series at the same level. The value does not fall as `p` rises, and it is the largest loss of the series once `p` is large enough.",#
+                 :pa_rm => "`pa`: Order of the power norm of the loss tail, `pa > 1`.",#
+                 :pb_rm => "`pb`: Order of the power norm of the gain tail, `pb > 1`.",#
                  # Generic Value-at-Risk range components.
-                 :loss_rm => "`loss`: Loss-side XatRisk risk measure applied to the portfolio returns.",#
-                 :gain_rm => "`gain`: Gain-side XatRisk risk measure applied to the negated portfolio returns.",#
+                 :loss_rm => "`loss`: Tail measure of the losses, a member of [`ValueatRiskRMs`](@ref). The range applies it to the portfolio returns.",#
+                 :gain_rm => "`gain`: Tail measure of the gains, a member of [`ValueatRiskRMs`](@ref). The range applies it to the negated portfolio returns.",#
                  # Fees.
                  :tn_fees => "`tn`: Turnover estimator or result.",#
                  :l_fees => "`l`: Long proportional fees.",#

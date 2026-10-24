@@ -282,7 +282,7 @@ commit = "ec0805d376"
 "src/16_RiskMeasures/06_XatRisk/02_ConditionalXatRisk.jl" = { cyc = 3, cog = 4, arg = 8, cyc_sum = 54, cog_sum = 23, arg_sum = 69, macros = ["@propagatable"] }
 "src/16_RiskMeasures/06_XatRisk/03_EntropicXatRisk.jl" = { cyc = 5, cog = 6, arg = 5, cyc_sum = 30, cog_sum = 14, arg_sum = 34, macros = ["@propagatable"] }
 "src/16_RiskMeasures/06_XatRisk/04_RelativisticXatRisk.jl" = { cyc = 6, cog = 11, arg = 7, cyc_sum = 37, cog_sum = 19, arg_sum = 54, macros = ["@propagatable"] }
-"src/16_RiskMeasures/06_XatRisk/05_PowerNormXatRisk.jl" = { cyc = 4, cog = 5, arg = 7, cyc_sum = 29, cog_sum = 13, arg_sum = 40, macros = ["@propagatable"] }
+"src/16_RiskMeasures/06_XatRisk/05_PowerNormXatRisk.jl" = { cyc = 6, cog = 8, arg = 7, cyc_sum = 31, cog_sum = 16, arg_sum = 40, macros = ["@propagatable"] }
 "src/16_RiskMeasures/07_OWARiskMeasures_a.jl" = { cyc = 3, cog = 4, arg = 7, cyc_sum = 78, cog_sum = 35, arg_sum = 123, macros = [] }
 "src/16_RiskMeasures/07_OWARiskMeasures_b.jl" = { cyc = 7, cog = 9, arg = 5, cyc_sum = 42, cog_sum = 42, arg_sum = 50, macros = [] }
 "src/16_RiskMeasures/08_AverageDrawdown.jl" = { cyc = 1, cog = 1, arg = 2, cyc_sum = 10, cog_sum = 2, arg_sum = 12, macros = ["@propagatable"] }
@@ -295,7 +295,7 @@ commit = "ec0805d376"
 "src/16_RiskMeasures/15_TurnoverRiskMeasure.jl" = { cyc = 2, cog = 2, arg = 3, cyc_sum = 8, cog_sum = 4, arg_sum = 6, macros = ["@propagatable"] }
 "src/16_RiskMeasures/16_TrackingRiskMeasure.jl" = { cyc = 3, cog = 3, arg = 7, cyc_sum = 36, cog_sum = 25, arg_sum = 63, macros = ["@propagatable"] }
 "src/16_RiskMeasures/17_VarianceSkewKurtosis.jl" = { cyc = 6, cog = 6, arg = 6, cyc_sum = 36, cog_sum = 19, arg_sum = 54, macros = ["@propagatable"] }
-"src/16_RiskMeasures/18_GenericValueatRiskRange.jl" = { cyc = 1, cog = 1, arg = 3, cyc_sum = 7, cog_sum = 1, arg_sum = 8, macros = ["@propagatable"] }
+"src/16_RiskMeasures/18_GenericValueatRiskRange.jl" = { cyc = 2, cog = 1, arg = 3, cyc_sum = 10, cog_sum = 3, arg_sum = 12, macros = ["@propagatable"] }
 "src/16_RiskMeasures/19_RatioRiskMeasure.jl" = { cyc = 3, cog = 2, arg = 5, cyc_sum = 8, cog_sum = 4, arg_sum = 9, macros = ["@propagatable"] }
 "src/16_RiskMeasures/20_EqualRiskMeasure.jl" = { cyc = 1, cog = 1, arg = 1, cyc_sum = 4, cog_sum = 1, arg_sum = 3, macros = [] }
 "src/16_RiskMeasures/21_MedianAbsoluteDeviationRisk.jl" = { cyc = 3, cog = 2, arg = 4, cyc_sum = 23, cog_sum = 3, arg_sum = 49, macros = ["@propagatable"] }

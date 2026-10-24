@@ -35,6 +35,14 @@ unique_key_dict!(math_dict, :math_dict,
                  # The primal power-cone programme of `RelativisticValueatRisk`, which
                  # `RRM` builds and solves. The measure states it and `RRM` registers it.
                  :K_pow => "``\\mathcal{K}_{\\mathrm{pow}}(p) = \\{(a,b,c) : a^{p} b^{1-p} \\geq |c|,\\, a \\geq 0,\\, b \\geq 0\\}``: Power cone.",#
+                 # The power cone programme of `PowerNormValueatRisk`, which `PRM` builds
+                 # and solves. The measure states it and `PRM` registers it, and the two
+                 # drawdown measures read the order.
+                 :p_pnvar_order => "``p > 1``: Order of the power norm.",#
+                 :pnvar_eta => "``\\eta``: Threshold of the losses.",#
+                 :pnvar_t => "``t``: Power norm bound on ``\\boldsymbol{w}``.",#
+                 :pnvar_w => "``w_i``: Excess loss of observation ``i`` above the threshold ``\\eta``.",#
+                 :pnvar_v => "``v_i``: Power term bound of observation ``i``, a bound on ``w_i^{p} / t^{p-1}``.",#
                  # The exponential cone programme of `EntropicValueatRisk`, which `ERM`
                  # and the JuMP constraint layer build.
                  :K_exp => "``\\mathcal{K}_{\\exp} = \\mathrm{cl}\\,\\{(a,b,c) : b\\, e^{a/b} \\leq c,\\, b > 0\\}``: Exponential cone.",#

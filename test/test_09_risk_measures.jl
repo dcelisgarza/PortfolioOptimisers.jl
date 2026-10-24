@@ -175,7 +175,9 @@
                 5e-4
             elseif i == 36
                 5e-3
-            elseif i in (49, 58)
+            elseif i in (49, 52, 58)
+                # The power norm measures at alpha = 1e-6 are the largest loss, which `PRM`
+                # returns exactly. The pinned values come from a solver, 5e-6 away from it.
                 5e-6
             elseif i in (45, 48)
                 1e-3
@@ -428,13 +430,33 @@
              EntropicValueatRiskRange(; slv = slv),
              RelativisticValueatRiskRange(; slv = slv), Range(),
              PowerNormValueatRiskRange(; slv = slv)]
+        # The generic range with the two tails of a specific range has the value of that
+        # range. The loop computed this and never asserted it.
         for (i, (r1, r2)) in enumerate(zip(rs1, rs2))
             res = isapprox(expected_risk(r1, w, rd.X), expected_risk(r2, w, rd.X))
             if !res
                 println("Iteration $i fails")
                 find_tol(expected_risk(r1, w, rd.X), expected_risk(r2, w, rd.X))
             end
+            @test res
         end
+        # Two different tails: the range is the sum of the loss tail on the returns and the
+        # gain tail on the negated returns.
+        x = rd.X * w
+        g = GenericValueatRiskRange(; loss = ConditionalValueatRisk(; alpha = 0.03),
+                                    gain = PowerNormValueatRisk(; alpha = 0.2, p = 3.0,
+                                                                slv = slv))
+        @test isapprox(g(x),
+                       ConditionalValueatRisk(; alpha = 0.03)(x) +
+                       PowerNormValueatRisk(; alpha = 0.2, p = 3.0, slv = slv)(-x))
+        # A tail that reads the weights is refused on a returns vector, at every length. With
+        # as many observations as assets, the functor used to return a wrong value with no
+        # error.
+        gd = GenericValueatRiskRange(;
+                                     loss = ValueatRisk(; alg = DistributionValueatRisk()),
+                                     gain = ConditionalValueatRisk())
+        @test_throws ArgumentError gd(x)
+        @test_throws ArgumentError gd(x[1:length(w)])
     end
     @testset "Weighted range functors do not mutate their inputs (#330)" begin
         # The weighted `*Range` functors used to `reverse!` **views** into the caller's
@@ -2036,6 +2058,172 @@ end
                        ev_reference(dd, 0.2); rtol = 1e-5)
         @test isapprox(RelativeEntropicDrawdownatRisk(; slv = slv, alpha = 0.2)(x),
                        ev_reference(rdd, 0.2); rtol = 1e-5)
+    end
+end
+
+# The power norm risk measures of `src/16_RiskMeasures/06_XatRisk/05_PowerNormXatRisk.jl`,
+# checked against the definition their docstrings state. The reference minimises
+# eta + (sum(q .* max.(L .- eta, 0) .^ p))^(1 / p) / alpha over eta by a golden-section search,
+# because the objective is convex in eta, so it shares no code with the power cone programme
+# of `PRM`.
+function pn_reference(x, alpha, p, w = nothing)
+    q = isnothing(w) ? fill(1 / length(x), length(x)) : w ./ sum(w)
+    keep = q .> 0
+    L = -x[keep]
+    q = q[keep]
+    f(eta) = eta + (sum(q .* max.(L .- eta, 0) .^ p))^(1 / p) / alpha
+    lo, hi = minimum(L), maximum(L)
+    g = (sqrt(5) - 1) / 2
+    for _ in 1:400
+        c = hi - g * (hi - lo)
+        d = lo + g * (hi - lo)
+        f(c) < f(d) ? (hi = d) : (lo = c)
+    end
+    return min(f((lo + hi) / 2), maximum(L))
+end
+
+@testset "Power norm risk measures" begin
+    rng = StableRNG(603)
+    x = 0.01 .* randn(rng, 1000) .+ 0.0005
+    wt = rand(rng, 1000) .+ 0.5
+    W = pweights(wt)
+    # Clarabel can stall on a power cone programme, so the measures take a list of solvers,
+    # each with a smaller step. None of them loosens the tolerances.
+    slv = [Solver(; name = Symbol(:clarabel, k), solver = Clarabel.Optimizer,
+                  settings = Dict("verbose" => false, "max_step_fraction" => f),
+                  check_sol = (; allow_local = true, allow_almost = true))
+           for (k, f) in enumerate((0.99, 0.9, 0.8, 0.7))]
+    dead = Solver(; name = :dead, solver = () -> error("no solver"))
+    prm(args...) = PortfolioOptimisers.PRM(args...)
+
+    @testset "PRM solves the power norm minimum" begin
+        for (a, p) in ((0.2, 2.0), (0.5, 3.0), (0.9, 2.0), (0.2, 1.1))
+            @test isapprox(prm(x, slv, a, p), pn_reference(x, a, p); rtol = 1e-5)
+            @test isapprox(prm(x, slv, a, p, W), pn_reference(x, a, p, wt); rtol = 1e-5)
+        end
+        # Equal weights are the unweighted measure.
+        @test isapprox(prm(x, slv, 0.2, 2.0, pweights(fill(3.0, 1000))),
+                       prm(x, slv, 0.2, 2.0); rtol = 1e-5)
+        # A zero-weight loss sets no risk, and the model holds no row for it.
+        xz = copy(x)
+        xz[1] = -0.5
+        wz = [0.0; ones(999)]
+        @test isapprox(prm(xz, slv, 0.2, 2.0, pweights(wz)), pn_reference(xz, 0.2, 2.0, wz);
+                       rtol = 1e-5)
+        @test isapprox(prm(xz, slv, 0.2, 2.0, pweights(wz)), prm(xz[2:end], slv, 0.2, 2.0);
+                       rtol = 1e-5)
+    end
+
+    @testset "The largest loss, without a model" begin
+        # alpha * pi^(-1/p) <= 1: the value is the largest loss, and no solver is called.
+        # 0.05 * 1000^(1/3) = 0.5.
+        @test prm(x, dead, 0.05, 3.0) == -minimum(x)
+        # 0.05 * 1000^(1/2) = 1.58 > 1: the model is built, and the dead solver fails.
+        @test isnan(prm(x, dead, 0.05, 2.0))
+        # p >= ln(pi) / ln(alpha) is the condition. At alpha = 0.2 the bound is 4.29.
+        @test PowerNormValueatRisk(; alpha = 0.2, p = 4.3, slv = dead)(x) ==
+              WorstRealisation()(x)
+        @test pn_reference(x, 0.2, 4.2) < -minimum(x)
+        # A tie of 25 observations raises pi to 0.025, and 0.05 * 0.025^(-1/2) = 0.32.
+        xt = copy(x)
+        xt[1:25] .= minimum(x) - 0.01
+        @test prm(xt, dead, 0.05, 2.0) == -minimum(xt)
+        # A weight carries the same share. Without it, the share is 1 / 1000.
+        k = ones(Int, 1000)
+        k[argmin(x)] = 25
+        @test prm(x, dead, 0.05, 2.0, fweights(k)) == -minimum(x)
+        # The largest loss on a zero-weight observation does not count.
+        xz = copy(x)
+        xz[1] = -0.5
+        wz = [0.0; ones(999)]
+        @test prm(xz, dead, 0.05, 3.0, pweights(wz)) == -minimum(xz[2:end])
+    end
+
+    @testset "The order of the power norm" begin
+        # p = 1 is the Conditional Value-at-Risk of the definition, but the power cone of
+        # order one is degenerate, so every constructor refuses it.
+        @test isapprox(pn_reference(x, 0.2, 1.0), ConditionalValueatRisk(; alpha = 0.2)(x);
+                       rtol = 1e-10)
+        for T in (PowerNormValueatRisk, PowerNormDrawdownatRisk,
+                  RelativePowerNormDrawdownatRisk)
+            @test_throws DomainError T(; p = 1.0)
+            @test_throws DomainError T(; p = 0.5)
+        end
+        @test_throws DomainError PowerNormValueatRiskRange(; pa = 1.0)
+        @test_throws DomainError PowerNormValueatRiskRange(; pb = 1.0)
+        # As p falls to one, the measure falls to the Conditional Value-at-Risk.
+        cv = ConditionalValueatRisk(; alpha = 0.2)(x)
+        vs = [prm(x, slv, 0.2, p) for p in (3.0, 2.0, 1.5, 1.1, 1.01, 1.001)]
+        @test issorted(vs; rev = true)
+        @test all(>(cv), vs)
+        @test isapprox(vs[end], cv; rtol = 2e-3)
+        # The order of the docstring, with the largest loss on top.
+        @test issorted([cv, prm(x, slv, 0.2, 1.5), prm(x, slv, 0.2, 2.0),
+                        prm(x, slv, 0.2, 3.0), -minimum(x)])
+    end
+
+    @testset "No order holds against the Entropic Value-at-Risk" begin
+        ev(y) = EntropicValueatRisk(; alpha = 0.05, slv = slv)(y)
+        # On a short sample the power norm measure is the largest loss, above the EVaR.
+        xa = 0.01 .* randn(StableRNG(21), 200)
+        @test ev(xa) < PowerNormValueatRisk(; alpha = 0.05, slv = slv)(xa) == -minimum(xa)
+        # With a heavy tail and a small order, the EVaR is the larger.
+        xb = 0.01 .* randn(StableRNG(22), 2000)
+        xb[1:20] .= -0.2
+        pb = prm(xb, slv, 0.05, 1.2)
+        @test isapprox(pb, pn_reference(xb, 0.05, 1.2); rtol = 1e-5)
+        @test pb < ev(xb)
+    end
+
+    @testset "PRM tries each solver, and returns NaN when none solves" begin
+        @test isnan(prm(x, dead, 0.2, 2.0))
+        @test isnan(prm(x, dead, 0.2, 2.0, W))
+        @test isnan(prm(x, [dead, dead], 0.2, 2.0))
+        @test isapprox(prm(x, [dead, slv[1]], 0.2, 2.0), pn_reference(x, 0.2, 2.0);
+                       rtol = 1e-5)
+        @test_throws IsEmptyError prm(x, Solver[], 0.2, 2.0)
+        @test_throws DimensionMismatch prm(x, slv, 0.2, 2.0, pweights(ones(10)))
+        for T in (PowerNormValueatRisk, PowerNormValueatRiskRange, PowerNormDrawdownatRisk,
+                  RelativePowerNormDrawdownatRisk)
+            @test_throws IsEmptyError T(; slv = Solver[])
+        end
+        # The functor needs a solver, and `factory` fills it.
+        @test_throws MethodError PowerNormValueatRisk()(x)
+        pr = prior(EmpiricalPrior(), hcat(x, 0.01 .* randn(StableRNG(7), 1000)))
+        @test factory(PowerNormValueatRisk(), pr, slv).slv === slv
+    end
+
+    @testset "The range and the drawdown measures read their series" begin
+        r = PowerNormValueatRiskRange(; slv = slv, alpha = 0.2, pa = 2.0, beta = 0.5,
+                                      pb = 3.0)
+        @test isapprox(r(x), pn_reference(x, 0.2, 2.0) + pn_reference(-x, 0.5, 3.0);
+                       rtol = 2e-5)
+        y = x[1:200]
+        dd = cumsum(y) .- accumulate(max, cumsum(y); init = 0.0)
+        rdd = cumprod(1 .+ y) ./ accumulate(max, cumprod(1 .+ y); init = 1.0) .- 1
+        pd = PowerNormDrawdownatRisk(; slv = slv, alpha = 0.2)(y)
+        @test isapprox(pd, pn_reference(dd, 0.2, 2.0); rtol = 1e-5)
+        @test isapprox(RelativePowerNormDrawdownatRisk(; slv = slv, alpha = 0.2)(y),
+                       pn_reference(rdd, 0.2, 2.0); rtol = 1e-5)
+        @test issorted([ConditionalDrawdownatRisk(; alpha = 0.2)(y), pd,
+                        MaximumDrawdown()(y)])
+    end
+
+    @testset "A zero-weight loss does not move the portfolio" begin
+        # The crash row of weight zero has no rows in the model, so the optimum is the
+        # optimum without the row. Before, the weights moved by 6e-4 at alpha = 0.1, p = 3.
+        Xp = 0.01 .* randn(StableRNG(7), 200, 5) .+ 0.0005
+        Xc = vcat([-0.5 -0.4 -0.45 -0.5 -0.3], Xp)
+        wc = pweights([0.0; ones(200)])
+        for (a, p) in ((0.2, 2.0), (0.1, 3.0))
+            wA = optimise(MeanRisk(; r = PowerNormValueatRisk(; alpha = a, p = p, w = wc),
+                                   opt = JuMPOptimiser(; pe = prior(EmpiricalPrior(), Xc),
+                                                       slv = slv))).w
+            wB = optimise(MeanRisk(; r = PowerNormValueatRisk(; alpha = a, p = p),
+                                   opt = JuMPOptimiser(; pe = prior(EmpiricalPrior(), Xp),
+                                                       slv = slv))).w
+            @test isapprox(wA, wB; atol = 1e-6)
+        end
     end
 end
 

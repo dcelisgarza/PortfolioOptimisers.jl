@@ -4,7 +4,20 @@
                              <:EntropicValueatRisk, <:WorstRealisation,
                              <:RelativisticValueatRisk, <:PowerNormValueatRisk}
 
-Alias for the union of all XatRisk-type risk measures that can be used in the `GenericValueatRiskRange` risk measure.
+Union of the tail measures of the returns that [`GenericValueatRiskRange`](@ref) accepts as its loss tail and as its gain tail.
+
+Each member measures one tail of a return series, so the range can apply it to the returns for the losses and to the negated returns for the gains. A range measure, a drawdown measure and a dispersion measure are not members, because none of them measures one tail of the returns.
+
+# Related
+
+  - [`ValueatRisk`](@ref)
+  - [`ConditionalValueatRisk`](@ref)
+  - [`DistributionallyRobustConditionalValueatRisk`](@ref)
+  - [`EntropicValueatRisk`](@ref)
+  - [`WorstRealisation`](@ref)
+  - [`RelativisticValueatRisk`](@ref)
+  - [`PowerNormValueatRisk`](@ref)
+  - [`GenericValueatRiskRange`](@ref)
 """
 const ValueatRiskRMs = Union{<:ValueatRisk, <:ConditionalValueatRisk,
                              <:DistributionallyRobustConditionalValueatRisk,
@@ -13,12 +26,9 @@ const ValueatRiskRMs = Union{<:ValueatRisk, <:ConditionalValueatRisk,
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents a generic Value-at-Risk range risk measure that combines any pair of XatRisk-type
-measures applied to the loss and gain sides of the return distribution.
+Measures the spread of the returns as the sum of a tail measure of the losses and a tail measure of the gains, two measures that the caller states.
 
-`GenericValueatRiskRange` evaluates a loss-side XatRisk measure on the portfolio returns and
-a gain-side XatRisk measure on the negated portfolio returns, then sums the two to produce a
-symmetric tail-spread risk measure.
+The two tails can be of different kinds and can have different parameters. Each tail is a member of [`ValueatRiskRMs`](@ref). A range measure, a drawdown measure and a dispersion measure are not members, so the constructor does not accept them as a tail. With the two tails that a specific range measure builds, such as two [`ConditionalValueatRisk`](@ref) tails at the levels of a [`ConditionalValueatRiskRange`](@ref), the range has the value of that specific measure. The construction is the library's own.
 
 # Mathematical definition
 
@@ -31,8 +41,8 @@ symmetric tail-spread risk measure.
 Where:
 
   - ``\\mathrm{GenVaRRange}(\\boldsymbol{x})``: Generic Value-at-Risk range.
-  - ``\\rho_{\\mathrm{loss}}``: Loss-side XatRisk risk measure.
-  - ``\\rho_{\\mathrm{gain}}``: Gain-side XatRisk risk measure.
+  - ``\\rho_{\\mathrm{loss}}``: Tail measure of the losses, the field `loss`.
+  - ``\\rho_{\\mathrm{gain}}``: Tail measure of the gains, the field `gain`.
   - $(math_dict[:xret])
 
 $(math_dict[:negated_upper_tail])
@@ -73,7 +83,13 @@ outer `settings`-controlled expression.
 
     (r::GenericValueatRiskRange)(x::VecNum)
 
-Computes the GenericValueatRiskRange of a portfolio returns vector `x`.
+Computes the range of a portfolio returns vector `x` as `loss(x) + gain(-x)`. A tail that needs a solver, such as [`EntropicValueatRisk`](@ref), needs its own `slv`, which [`factory`](@ref) fills from the solver of the optimiser.
+
+A [`ValueatRisk`](@ref) tail with [`DistributionValueatRisk`](@ref) reads the portfolio weights and the moments of the prior, not a returns vector. The optimisation model reads such a tail correctly, but the functor cannot evaluate it, so the functor and [`expected_risk`](@ref) raise an `ArgumentError` for it. Use [`ValueatRiskRange`](@ref) with [`DistributionValueatRisk`](@ref) to evaluate that range.
+
+## Validation
+
+  - Neither `loss` nor `gain` is a [`ValueatRisk`](@ref) with [`DistributionValueatRisk`](@ref), else `ArgumentError`.
 
 ## Arguments
 
@@ -114,6 +130,10 @@ GenericValueatRiskRange
   - [`EntropicValueatRisk`](@ref)
   - [`RelativisticValueatRisk`](@ref)
   - [`PowerNormValueatRisk`](@ref)
+  - [`ValueatRiskRMs`](@ref)
+  - [`ConditionalValueatRiskRange`](@ref): the same value, with two [`ConditionalValueatRisk`](@ref) tails.
+  - [`PowerNormValueatRiskRange`](@ref): the same value, with two [`PowerNormValueatRisk`](@ref) tails.
+  - [`range_tails`](@ref)
   - [`no_risk_expr_risk_measure`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
@@ -175,6 +195,9 @@ function no_bounds_no_risk_expr_risk_measure(r::GenericValueatRiskRange,
                                    gain = no_bounds_risk_measure(r.gain, flag))
 end
 function (r::GenericValueatRiskRange)(x::VecNum)
+    @argcheck(!isa(r.loss, ValueatRisk{<:Any, <:Any, <:Any, <:DistributionValueatRisk}) &&
+              !isa(r.gain, ValueatRisk{<:Any, <:Any, <:Any, <:DistributionValueatRisk}),
+              ArgumentError("a ValueatRisk tail with DistributionValueatRisk reads the portfolio weights, not a returns vector, so GenericValueatRiskRange cannot evaluate it on a returns vector. Use ValueatRiskRange with DistributionValueatRisk."))
     loss = r.loss(x)
     gain = r.gain(-x)
     return loss + gain
