@@ -1138,7 +1138,10 @@ function partial_fit_corrected(ce::StatsBase.CovarianceEstimator)
     return throw(ArgumentError("an incremental covariance fit folds one observation into a Welford accumulator, which reproduces the full-moment sample covariance of `StatsBase.SimpleCovariance` and no other estimator. `$(typeof(ce))` is not one, so use the batch method."))
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    covariance_state_seed(cache::Nothing, x::VecNum,
+                          cvg::Option{<:CoveragePolicy} = nothing) -> CovarianceState
+    covariance_state_seed(cache::CovarianceState, x::VecNum,
+                          cvg::Option{<:CoveragePolicy} = nothing) -> CovarianceState
 
 Returns the [`CovarianceState`](@ref) that an incremental covariance fit folds into. If the estimator holds no state, the function seeds a state of zeros.
 
@@ -1159,15 +1162,17 @@ The two covariance estimators, [`GeneralCovariance`](@ref) and [`Covariance`](@r
   - [`CovarianceState`](@ref)
   - [`partial_fit!`](@ref)
 """
-function covariance_state_seed(cache::Option{<:CovarianceState}, x::VecNum,
+function covariance_state_seed(::Nothing, x::VecNum,
                                cvg::Option{<:CoveragePolicy} = nothing)
     N = length(x)
     Tf = float_if_integer(eltype(x))
-    if isnothing(cache)
-        return CovarianceState(0, zeros(Tf, N), zeros(Tf, N, N),
-                               coverage_counts_seed(cvg, nothing, N, Tf, true))
-    end
-    counts = coverage_counts_seed(cvg, cache.cvg, N, Tf, true)
+    return CovarianceState(0, zeros(Tf, N), zeros(Tf, N, N),
+                           coverage_counts_seed(cvg, nothing, N, Tf, true))
+end
+function covariance_state_seed(cache::CovarianceState, x::VecNum,
+                               cvg::Option{<:CoveragePolicy} = nothing)
+    counts = coverage_counts_seed(cvg, cache.cvg, length(x), float_if_integer(eltype(x)),
+                                  true)
     return if counts === cache.cvg
         cache
     else

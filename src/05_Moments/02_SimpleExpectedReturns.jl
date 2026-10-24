@@ -662,11 +662,14 @@ function partial_fit!(me::SimpleExpectedReturns{<:Any, <:Any,
     return rebuild_estimator(me, (; cache = partial_fit!(state, x, me.cvg, active_mask)))
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    expected_returns_state_seed(cache::Nothing, x::VecNum,
+                                cvg::Option{<:CoveragePolicy} = nothing) -> SimpleExpectedReturnsState
+    expected_returns_state_seed(cache::SimpleExpectedReturnsState, x::VecNum,
+                                cvg::Option{<:CoveragePolicy} = nothing) -> SimpleExpectedReturnsState
 
 Returns the [`SimpleExpectedReturnsState`](@ref) that an incremental mean fit folds into. If the estimator holds no state, the function seeds a state of zeros.
 
-The seed is in this function and not in [`partial_fit!`](@ref), so the fold is one line, and the branch that reads the `cache` field is in one place.
+The seed is in this function and not in [`partial_fit!`](@ref), so the fold is one line, and the dispatch on the type of the `cache` field is in one place.
 
 # Arguments
 
@@ -685,15 +688,17 @@ The seed is in this function and not in [`partial_fit!`](@ref), so the fold is o
   - [`coverage_counts_seed`](@ref)
   - [`partial_fit!`](@ref)
 """
-function expected_returns_state_seed(cache::Option{<:SimpleExpectedReturnsState}, x::VecNum,
+function expected_returns_state_seed(::Nothing, x::VecNum,
                                      cvg::Option{<:CoveragePolicy} = nothing)
     N = length(x)
     Tf = float_if_integer(eltype(x))
-    if isnothing(cache)
-        return SimpleExpectedReturnsState(0, zeros(Tf, N),
-                                          coverage_counts_seed(cvg, nothing, N, Tf, false))
-    end
-    counts = coverage_counts_seed(cvg, cache.cvg, N, Tf, false)
+    return SimpleExpectedReturnsState(0, zeros(Tf, N),
+                                      coverage_counts_seed(cvg, nothing, N, Tf, false))
+end
+function expected_returns_state_seed(cache::SimpleExpectedReturnsState, x::VecNum,
+                                     cvg::Option{<:CoveragePolicy} = nothing)
+    counts = coverage_counts_seed(cvg, cache.cvg, length(x), float_if_integer(eltype(x)),
+                                  false)
     return if counts === cache.cvg
         cache
     else

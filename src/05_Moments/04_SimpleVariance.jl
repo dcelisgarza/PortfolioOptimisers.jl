@@ -1140,11 +1140,14 @@ function partial_fit!(ve::SimpleVariance{<:Any, <:Any, <:Any, <:Any,
     return rebuild_estimator(ve, (; cache = partial_fit!(state, x, ve.cvg, active_mask)))
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    variance_state_seed(cache::Nothing, x::VecNum,
+                        cvg::Option{<:CoveragePolicy} = nothing) -> SimpleVarianceState
+    variance_state_seed(cache::SimpleVarianceState, x::VecNum,
+                        cvg::Option{<:CoveragePolicy} = nothing) -> SimpleVarianceState
 
 Returns the [`SimpleVarianceState`](@ref) that an incremental variance fit folds into. If the estimator holds no state, the function seeds a state of zeros.
 
-The seed is in this function and not in [`partial_fit!`](@ref), so the fold is one line, and the branch that reads the `cache` field is in one place.
+The seed is in this function and not in [`partial_fit!`](@ref), so the fold is one line, and the dispatch on the type of the `cache` field is in one place.
 
 # Arguments
 
@@ -1161,15 +1164,16 @@ The seed is in this function and not in [`partial_fit!`](@ref), so the fold is o
   - [`SimpleVarianceState`](@ref)
   - [`partial_fit!`](@ref)
 """
-function variance_state_seed(cache::Option{<:SimpleVarianceState}, x::VecNum,
-                             cvg::Option{<:CoveragePolicy} = nothing)
+function variance_state_seed(::Nothing, x::VecNum, cvg::Option{<:CoveragePolicy} = nothing)
     N = length(x)
     Tf = float_if_integer(eltype(x))
-    if isnothing(cache)
-        return SimpleVarianceState(0, zeros(Tf, N), zeros(Tf, N),
-                                   coverage_counts_seed(cvg, nothing, N, Tf, false))
-    end
-    counts = coverage_counts_seed(cvg, cache.cvg, N, Tf, false)
+    return SimpleVarianceState(0, zeros(Tf, N), zeros(Tf, N),
+                               coverage_counts_seed(cvg, nothing, N, Tf, false))
+end
+function variance_state_seed(cache::SimpleVarianceState, x::VecNum,
+                             cvg::Option{<:CoveragePolicy} = nothing)
+    counts = coverage_counts_seed(cvg, cache.cvg, length(x), float_if_integer(eltype(x)),
+                                  false)
     return if counts === cache.cvg
         cache
     else
