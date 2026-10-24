@@ -428,6 +428,9 @@ end
 @testset "Generic X at Range" begin
     mr_block6()
 end
+@testset "Generic X at Range evaluates a DistributionValueatRisk tail on the weights" begin
+    mr_block6_distribution_tails()
+end
 @testset "Range measures equal their two tails when the tails differ" begin
     mr_block6_asymmetric()
 end

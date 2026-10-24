@@ -196,7 +196,9 @@ to `model`.
 
 Uses the closed-form z-score from `compute_value_at_risk_z` and adds a second-order cone
 constraint to bound the portfolio standard deviation. The VaR expression is
-`-mu'w + z * g_var`.
+`-mu'w + z * g_var`. The gain tail is the same expression for the negated portfolio, `-w`,
+which is `mu'w + z * g_var`, because the cone is symmetric in `w`. The bound of the measure
+applies to the value of the tail on both sides.
 
 # Arguments
 
@@ -207,9 +209,16 @@ constraint to bound the portfolio standard deviation. The VaR expression is
   - $(arg_dict[:opt_rjumpe])
   - $(arg_dict[:pr])
 
+# Keyword arguments
+
+  - `loss::Bool`: If `true` (default), the measure is applied to the portfolio `w`; if
+    `false`, to the negated portfolio `-w`. [`set_range_risk_constraints!`](@ref) sets it to
+    `false` to build the gain tail of [`GenericValueatRiskRange`](@ref).
+  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
+
 # Returns
 
-  - `nothing`.
+  - `var_risk`: The value of the tail, the risk expression added to the model.
 
 # Related
 
@@ -228,19 +237,19 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     G = chol_sigma_selector(model, pr, r.alg)
     w = get_w(model, prefix)
     sc = get_constraint_scale(model)
-    z = if loss
-        compute_value_at_risk_z(r.alg.dist, r.alpha)
-    else
-        compute_value_at_risk_cz(r.alg.dist, r.alpha)
-    end
+    z = compute_value_at_risk_z(r.alg.dist, r.alpha)
+    # The gain tail is the loss tail of the negated portfolio, `-w`. The cone is symmetric in
+    # `w`, so only the sign of the mean term changes. The bound and the returned expression
+    # are the value of the tail, as the functor reports it on `-w`.
+    mu_w = loss ? -LinearAlgebra.dot(mu, w) : LinearAlgebra.dot(mu, w)
     g_var = state_set!(model, prefix, :g_var_, i, JuMP.@variable(model))
     var_risk = state_set!(model, prefix, :var_risk_, i,
-                          JuMP.@expression(model, -LinearAlgebra.dot(mu, w) + z * g_var))
+                          JuMP.@expression(model, mu_w + z * g_var))
     state_set!(model, prefix, :cvar_soc_, i,
                JuMP.@constraint(model, [sc * g_var; sc * G * w] in JuMP.SecondOrderCone()))
     set_risk_bounds_and_expression!(model, opt, var_risk, r.settings, :var_risk_, i;
                                     prefix = prefix)
-    return loss ? var_risk : -var_risk
+    return var_risk
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

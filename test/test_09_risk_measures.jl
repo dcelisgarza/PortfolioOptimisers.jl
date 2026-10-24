@@ -457,6 +457,47 @@
                                      gain = ConditionalValueatRisk())
         @test_throws ArgumentError gd(x)
         @test_throws ArgumentError gd(x[1:length(w)])
+        # #1821: each tail reads its own input. A `DistributionValueatRisk` tail reads `w`
+        # for the loss and `-w` for the gain, and a returns tail reads `x` and `-x`.
+        vdist = ValueatRisk(; alg = DistributionValueatRisk())
+        gdd = GenericValueatRiskRange(; loss = vdist, gain = vdist)
+        @test PortfolioOptimisers.risk_input_kind(gdd) ===
+              PortfolioOptimisers.WeightsReturnsFeesInput()
+        @test PortfolioOptimisers.risk_input_kind(gd) ===
+              PortfolioOptimisers.WeightsReturnsFeesInput()
+        @test PortfolioOptimisers.risk_input_kind(GenericValueatRiskRange(;
+                                                                          loss = ConditionalValueatRisk(),
+                                                                          gain = vdist)) ===
+              PortfolioOptimisers.WeightsReturnsFeesInput()
+        @test !PortfolioOptimisers.supports_precomputed_returns(gd)
+        @test PortfolioOptimisers.supports_precomputed_returns(g)
+        @test isapprox(expected_risk(gdd, w, pr),
+                       expected_risk(ValueatRiskRange(; alg = DistributionValueatRisk()), w,
+                                     pr))
+        # As many observations as assets: the value is the same as with every observation,
+        # because a `DistributionValueatRisk` tail reads only the moments of the prior.
+        N = length(w)
+        rN = factory(gdd, pr)
+        @test isapprox(rN(w, rd.X[1:N, :]), expected_risk(gdd, w, pr))
+        # A mixed range, with a fee. The gain tail of the returns measure reads the negated
+        # net returns of `w`, not the net returns of `-w`.
+        gm = factory(GenericValueatRiskRange(; loss = vdist,
+                                             gain = ConditionalValueatRisk(; alpha = 0.1)),
+                     pr)
+        fees = Fees(; l = 0.001)
+        xf = calc_net_returns(w, pr.X, fees)
+        vd = factory(vdist, pr)
+        @test isapprox(expected_risk(gm, w, pr, fees),
+                       vd(w) + ConditionalValueatRisk(; alpha = 0.1)(-xf))
+        @test isapprox(gm(w, pr.X, fees), expected_risk(gm, w, pr, fees))
+        # The gain tail of a `DistributionValueatRisk` is `dot(mu, w) + z * sigma(w)`.
+        gg = factory(GenericValueatRiskRange(; loss = ConditionalValueatRisk(),
+                                             gain = vdist), pr)
+        z = PortfolioOptimisers.compute_value_at_risk_z(vdist.alg.dist, vdist.alpha)
+        @test isapprox(gg(w, pr.X),
+                       ConditionalValueatRisk()(pr.X * w) +
+                       dot(pr.mu, w) +
+                       z * sqrt(dot(w, pr.sigma, w)))
     end
     @testset "Weighted range functors do not mutate their inputs (#330)" begin
         # The weighted `*Range` functors used to `reverse!` **views** into the caller's
@@ -838,6 +879,15 @@ const _VAR_MIP = typeof(ValueatRisk(; alg = MIPValueatRisk()))
 const _VAR_RANGE_MIP = typeof(ValueatRiskRange(; alg = MIPValueatRisk()))
 const _VAR_DIST = typeof(ValueatRisk(; alg = DistributionValueatRisk()))
 const _VAR_RANGE_DIST = typeof(ValueatRiskRange(; alg = DistributionValueatRisk()))
+# `GenericValueatRiskRange` takes its kind from its tails (#1821). Two returns tails read the
+# net returns. A `DistributionValueatRisk` tail on either side reads the weights.
+const _GEN_RANGE_RET = typeof(GenericValueatRiskRange())
+const _GEN_RANGE_DIST_LOSS = typeof(GenericValueatRiskRange(;
+                                                            loss = ValueatRisk(;
+                                                                               alg = DistributionValueatRisk())))
+const _GEN_RANGE_DIST_GAIN = typeof(GenericValueatRiskRange(;
+                                                            gain = ValueatRisk(;
+                                                                               alg = DistributionValueatRisk())))
 
 const _OLD_NETRETURNS = Any[WorstRealisation, _VAR_MIP, _VAR_RANGE_MIP,
                             ConditionalValueatRisk,
@@ -856,11 +906,13 @@ const _OLD_NETRETURNS = Any[WorstRealisation, _VAR_MIP, _VAR_RANGE_MIP,
                             ConditionalValueatRiskRange, OrderedWeightsArray,
                             OrderedWeightsArrayRange, BrownianDistanceVariance, MeanReturn,
                             PowerNormValueatRisk, PowerNormValueatRiskRange,
-                            PowerNormDrawdownatRisk, RelativePowerNormDrawdownatRisk]
+                            PowerNormDrawdownatRisk, RelativePowerNormDrawdownatRisk,
+                            _GEN_RANGE_RET]
 const _OLD_WEIGHTSRETURNSFEES = Any[LowOrderMoment, HighOrderMoment, TrackingRiskMeasure,
                                     RiskTrackingRiskMeasure, Kurtosis, ThirdCentralMoment,
                                     Skewness, MedianAbsoluteDeviation, VarianceSkewKurtosis,
-                                    _VAR_DIST, _VAR_RANGE_DIST]
+                                    _VAR_DIST, _VAR_RANGE_DIST, _GEN_RANGE_DIST_LOSS,
+                                    _GEN_RANGE_DIST_GAIN]
 const _OLD_WEIGHTS = Any[StandardDeviation, NegativeSkewness, TurnoverRiskMeasure, Variance,
                          UncertaintySetVariance, EqualRisk]
 

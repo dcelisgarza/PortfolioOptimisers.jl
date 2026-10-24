@@ -82,18 +82,22 @@ outer `settings`-controlled expression.
 # Functor
 
     (r::GenericValueatRiskRange)(x::VecNum)
+    (r::GenericValueatRiskRange)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
 
-Computes the range of a portfolio returns vector `x` as `loss(x) + gain(-x)`. A tail that needs a solver, such as [`EntropicValueatRisk`](@ref), needs its own `slv`, which [`factory`](@ref) fills from the solver of the optimiser.
+The first method computes the range of a portfolio returns vector `x` as `loss(x) + gain(-x)`. A tail that needs a solver, such as [`EntropicValueatRisk`](@ref), needs its own `slv`, which [`factory`](@ref) fills from the solver of the optimiser.
 
-A [`ValueatRisk`](@ref) tail with [`DistributionValueatRisk`](@ref) reads the portfolio weights and the moments of the prior, not a returns vector. The optimisation model reads such a tail correctly, but the functor cannot evaluate it, so the functor and [`expected_risk`](@ref) raise an `ArgumentError` for it. Use [`ValueatRiskRange`](@ref) with [`DistributionValueatRisk`](@ref) to evaluate that range.
+A [`ValueatRisk`](@ref) tail with [`DistributionValueatRisk`](@ref) reads the portfolio weights and the moments of the prior, not a returns vector. The second method evaluates each tail on its own input through [`range_tail_risk`](@ref). It computes the net returns `x` of `w`, then evaluates the loss tail on `w` and `x`, and the gain tail on `-w` and `-x`. The gain tail of such a [`ValueatRisk`](@ref) is then `dot(mu, w) + z * sqrt(dot(w, sigma, w))`, which is the gain tail that the optimisation model builds. [`risk_input_kind`](@ref) of the range is [`WeightsReturnsFeesInput`](@ref) when a tail is such a [`ValueatRisk`](@ref), so [`expected_risk`](@ref) calls the second method. Otherwise it is [`NetReturnsInput`](@ref), and [`expected_risk`](@ref) calls the first method.
 
 ## Validation
 
-  - Neither `loss` nor `gain` is a [`ValueatRisk`](@ref) with [`DistributionValueatRisk`](@ref), else `ArgumentError`.
+  - First method: neither `loss` nor `gain` is a [`ValueatRisk`](@ref) with [`DistributionValueatRisk`](@ref), else `ArgumentError`.
 
 ## Arguments
 
   - `x::VecNum`: Portfolio returns vector.
+  - `w::VecNum`: Portfolio weights vector `assets × 1`.
+  - `X::MatNum`: Returns matrix `observations × assets`.
+  - `fees::Option{<:Fees}`: Optional [`Fees`](@ref) structure.
 
 # Examples
 
@@ -134,6 +138,7 @@ GenericValueatRiskRange
   - [`ConditionalValueatRiskRange`](@ref): the same value, with two [`ConditionalValueatRisk`](@ref) tails.
   - [`PowerNormValueatRiskRange`](@ref): the same value, with two [`PowerNormValueatRisk`](@ref) tails.
   - [`range_tails`](@ref)
+  - [`range_tail_risk`](@ref)
   - [`no_risk_expr_risk_measure`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
@@ -197,11 +202,73 @@ end
 function (r::GenericValueatRiskRange)(x::VecNum)
     @argcheck(!isa(r.loss, ValueatRisk{<:Any, <:Any, <:Any, <:DistributionValueatRisk}) &&
               !isa(r.gain, ValueatRisk{<:Any, <:Any, <:Any, <:DistributionValueatRisk}),
-              ArgumentError("a ValueatRisk tail with DistributionValueatRisk reads the portfolio weights, not a returns vector, so GenericValueatRiskRange cannot evaluate it on a returns vector. Use ValueatRiskRange with DistributionValueatRisk."))
+              ArgumentError("a ValueatRisk tail with DistributionValueatRisk reads the portfolio weights, not a returns vector, so GenericValueatRiskRange cannot evaluate it on a returns vector. Call the range on the weights, `r(w, X, fees)`, or use `expected_risk`."))
     loss = r.loss(x)
     gain = r.gain(-x)
     return loss + gain
 end
+"""
+    range_tail_risk(r::ValueatRiskRMs, w::VecNum, x::VecNum)
+    range_tail_risk(r::ValueatRisk{<:Any, <:Any, <:Any, <:DistributionValueatRisk},
+                    w::VecNum, x::VecNum)
+
+Evaluate one tail of a [`GenericValueatRiskRange`](@ref) on the input that the tail reads.
+
+The functor of the range on the weights calls this function once for each tail. It passes `w` and the net returns `x` for the loss tail, and `-w` and `-x` for the gain tail.
+
+  - A tail that reads a return series, [`NetReturnsInput`](@ref), returns `r(x)`.
+  - A [`ValueatRisk`](@ref) tail with [`DistributionValueatRisk`](@ref), [`WeightsReturnsFeesInput`](@ref), returns `r(w)`. It reads the moments of the prior against the weights.
+
+The gain tail of a returns measure reads `-x`, not the net returns of `-w`. A fee does not change sign with the weights, so the two series are different when the portfolio pays a fee.
+
+# Arguments
+
+  - `r`: Tail measure.
+  - `w::VecNum`: Portfolio weights vector `assets × 1`, negated for the gain tail.
+  - `x::VecNum`: Net portfolio returns vector `observations × 1`, negated for the gain tail.
+
+# Returns
+
+  - `rk::Number`: The value of the tail.
+
+# Related
+
+  - [`GenericValueatRiskRange`](@ref)
+  - [`ValueatRiskRMs`](@ref)
+  - [`risk_input_kind`](@ref)
+  - [`DistributionValueatRisk`](@ref)
+"""
+range_tail_risk(r::ValueatRiskRMs, ::VecNum, x::VecNum) = r(x)
+function range_tail_risk(r::ValueatRisk{<:Any, <:Any, <:Any, <:DistributionValueatRisk},
+                         w::VecNum, ::VecNum)
+    return r(w)
+end
+# A range with a tail that reads the weights reads the weights, the returns and the fees. The
+# loss tail reads `w` and `x`, and the gain tail reads `-w` and `-x`, as the model builds them.
+function (r::GenericValueatRiskRange)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
+    x = calc_net_returns(w, X, fees)
+    loss = range_tail_risk(r.loss, w, x)
+    gain = range_tail_risk(r.gain, -w, -x)
+    return loss + gain
+end
+# Expected-risk input kind — see `risk_input_kind`. The kind follows the tails: a range whose
+# tails both read a return series reads the net returns, and a range with a `ValueatRisk` tail
+# with `DistributionValueatRisk` reads the weights, the returns and the fees.
 risk_input_kind(::GenericValueatRiskRange) = NetReturnsInput()
+function risk_input_kind(::Union{<:GenericValueatRiskRange{<:Any,
+                                                           <:ValueatRisk{<:Any, <:Any,
+                                                                         <:Any,
+                                                                         <:DistributionValueatRisk},
+                                                           <:Any},
+                                 <:GenericValueatRiskRange{<:Any, <:Any,
+                                                           <:ValueatRisk{<:Any, <:Any,
+                                                                         <:Any,
+                                                                         <:DistributionValueatRisk}}})
+    return WeightsReturnsFeesInput()
+end
+# The range reads a precomputed return series only when both tails do.
+function supports_precomputed_returns(r::GenericValueatRiskRange)
+    return all(supports_precomputed_returns, (r.loss, r.gain))
+end
 
 export GenericValueatRiskRange
