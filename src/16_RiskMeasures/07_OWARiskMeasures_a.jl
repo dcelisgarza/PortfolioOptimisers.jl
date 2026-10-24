@@ -1,15 +1,16 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all Ordered Weights Array (OWA) estimator types.
+Abstract supertype for the estimators of the risk aversion coefficients of an L-moment OWA weight vector.
 
-All concrete and/or abstract types implementing OWA estimation algorithms should be subtypes of `AbstractOrderedWeightsArrayEstimator`.
+[`owa_l_moment_crm`](@ref) dispatches on the subtype. [`NormalisedConstantRelativeRiskAversion`](@ref) states the coefficients in closed form, and [`OWAJuMP`](@ref) solves a programme for them.
 
 # Related
 
   - [`AbstractOrderedWeightsArrayAlgorithm`](@ref)
   - [`OWAJuMP`](@ref)
   - [`NormalisedConstantRelativeRiskAversion`](@ref)
+  - [`owa_l_moment_crm`](@ref)
 
 # References
 
@@ -19,17 +20,17 @@ abstract type AbstractOrderedWeightsArrayEstimator <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for callable OWA weight function estimators.
+Abstract supertype for the callable builders of an OWA weight vector.
 
-All concrete subtypes implementing callable OWA weight functions should subtype `AbstractOrderedWeightsArrayFunction`.
+A builder holds the parameters of one weight vector, such as a CVaR level, and computes the vector for a sample size when it is called. [`OrderedWeightsArray`](@ref) and [`OrderedWeightsArrayRange`](@ref) call it at the number of observations of the sample, so one builder serves a sample of any length.
 
 # Interfaces
 
-In order to implement a new callable OWA weight function that works seamlessly with the library, subtype `AbstractOrderedWeightsArrayFunction`, ensuring that the structure contains all necessary parameters, and implement the following method:
+To implement a new weight builder, subtype `AbstractOrderedWeightsArrayFunction`. Put every parameter of the weight vector in a field, and implement the following method:
 
 ## Callable interface
 
-  - `(r::ConcreteType)(T::Integer) -> VecNum`: Computes and returns the OWA weight vector for `T` observations.
+  - `(r::MyOWAFunction)(T::Integer) -> VecNum`: Computes the OWA weight vector for `T` observations. A nondecreasing vector gives a convex risk measure, and [`SortingNetworkOrderedWeightsArray`](@ref) refuses any other vector.
 
 ### Arguments
 
@@ -74,9 +75,9 @@ abstract type AbstractOrderedWeightsArrayFunction <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all Ordered Weights Array (OWA) algorithm types.
+Abstract supertype for the objectives of the programme that [`OWAJuMP`](@ref) solves for an L-moment OWA weight vector.
 
-All concrete and/or abstract types implementing specific OWA algorithms should be subtypes of `AbstractOrderedWeightsArrayAlgorithm`.
+Every subtype solves over the same feasible set, which [`owa_l_moment_crm`](@ref) states. The subtype selects the objective alone.
 
 # Related
 
@@ -92,7 +93,9 @@ abstract type AbstractOrderedWeightsArrayAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for entropy formulations used in the [`MaximumEntropy`](@ref) OWA algorithm.
+Abstract supertype for the conic encodings of the entropy objective of [`MaximumEntropy`](@ref).
+
+The encoding changes the cones of the model, not the problem. [`owa_l_moment_crm_entropy`](@ref) states the rows of each encoding.
 
 # Related
 
@@ -108,7 +111,9 @@ abstract type EntropyFormulation <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Entropy formulation for [`MaximumEntropy`](@ref) OWA that uses the exponential cone entropy constraint in JuMP.
+Encodes the entropy objective of [`MaximumEntropy`](@ref) with one exponential cone for each observation.
+
+It selects the branch of [`owa_l_moment_crm_entropy`](@ref) that writes `T` exponential cones.
 
 # Related
 
@@ -124,7 +129,9 @@ struct ExponentialConeEntropy <: EntropyFormulation end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Entropy formulation for [`MaximumEntropy`](@ref) OWA that uses the relative entropy cone constraint in JuMP. This is the default entropy formulation.
+Encodes the entropy objective of [`MaximumEntropy`](@ref) with one relative entropy cone.
+
+It selects the branch of [`owa_l_moment_crm_entropy`](@ref) that writes one cone of dimension `2T + 1`. It is the default encoding.
 
 # Related
 
@@ -140,36 +147,39 @@ struct RelativeEntropy <: EntropyFormulation end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Maximum Entropy algorithm for Ordered Weights Array (OWA) estimation.
+Selects the OWA weights of maximum entropy in the L-moment programme of [`OWAJuMP`](@ref).
 
-The Maximum Entropy algorithm seeks the OWA weights that maximize entropy, resulting in the most "uninformative" or uniform distribution of weights subject to the imposed constraints.
+The objective is the Shannon entropy of a probability vector that bounds the absolute OWA weights from above, entry by entry. So the solution spreads its mass over the order statistics.
+
+`alg` selects the conic encoding of the entropy, not the problem. [`RelativeEntropy`](@ref) writes one [`JuMP.MOI.RelativeEntropyCone`](https://jump.dev/JuMP.jl/stable/moi/reference/standard_form/#MathOptInterface.RelativeEntropyCone) of dimension `2T + 1`, and [`ExponentialConeEntropy`](@ref) writes `T` [`JuMP.MOI.ExponentialCone`](https://jump.dev/JuMP.jl/stable/moi/reference/standard_form/#MathOptInterface.ExponentialCone) rows. Both give the same OWA weights to solver tolerance.
+
+Equation 13 of [owa2](@cite) maximises ``\\sum_{t} \\ln \\psi_{t}`` subject to ``\\psi_{t} \\geq \\lvert \\theta_{t} \\rvert`` alone, and that objective has no maximum. The library puts ``\\boldsymbol{\\psi}`` on the unit simplex and maximises its Shannon entropy.
+
+# Mathematical definition
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{\\phi},\\, \\boldsymbol{\\psi}}{\\max} -\\sum\\limits_{t=1}^{T}\\psi_{t} \\log\\left(\\psi_{t}\\right)\\\\
-\\text{s.t.} \\quad & \\left(\\psi_{i},\\,\\theta_{i}\\right) \\in \\mathcal{K}_{noc} \\quad \\forall i = 1, \\ldots,\\, T \\\\
- & \\sum\\limits_{t=1}^T \\psi_{t} = 1 \\\\
- & \\sum\\limits_{k=1}^K \\phi_{k} = 1 \\\\
- & \\boldsymbol{\\phi} \\leq \\phi_{\\text{max}} \\\\
- & \\boldsymbol{\\phi} \\geq 0 \\\\
- & \\phi_{k+1} \\leq \\phi_{k} \\quad \\forall k = 1, \\ldots,\\, K-1 \\\\
- & \\boldsymbol{w}_{k} = \\dfrac{1}{k} \\binom{T}{k}^{-1} \\sum\\limits_{i=0}^{k-1} (-1)^{i} \\binom{k-1}{i} \\binom{t-1}{k-1-i} \\binom{T-t}{i}  \\quad \\forall t = 1,\\ldots,\\, T \\\\
- & \\mathbf{w} = \\left[(-1)^k\\boldsymbol{w}_{k} \\quad \\forall k = 2,\\ldots,\\, K\\right] \\\\
- & \\boldsymbol{\\theta} = \\mathbf{w} \\boldsymbol{\\phi} \\\\
- & \\theta_{t+1} \\geq \\theta_{t} \\quad \\forall t = 1, \\ldots,\\, T-1 \\\\
+\\underset{\\boldsymbol{\\phi},\\, \\boldsymbol{\\theta},\\, \\boldsymbol{\\psi}}{\\max} \\quad & -\\sum\\limits_{t=1}^{T} \\psi_{t} \\log \\psi_{t}\\\\
+\\text{s.t.} \\quad & \\boldsymbol{\\theta} = \\mathbf{W} \\boldsymbol{\\phi}\\\\
+ & \\sum\\limits_{k=2}^{K} \\phi_{k} = 1\\\\
+ & 0 \\leq \\phi_{k} \\leq \\phi_{\\max} \\quad \\forall k = 2,\\, \\ldots,\\, K\\\\
+ & \\phi_{k+1} \\leq \\phi_{k} \\quad \\forall k = 2,\\, \\ldots,\\, K - 1\\\\
+ & \\theta_{t+1} \\geq \\theta_{t} \\quad \\forall t = 1,\\, \\ldots,\\, T - 1\\\\
+ & \\sum\\limits_{t=1}^{T} \\psi_{t} = 1\\\\
+ & \\psi_{t} \\geq \\lvert \\theta_{t} \\rvert \\quad \\forall t = 1,\\, \\ldots,\\, T\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\mathcal{K}_{\\text{noc}} \\coloneqq \\left\\{\\left(t,\\,x\\right) \\in \\mathbb{R}^n : t \\geq \\lVert x \\rVert_{1} = \\sum\\limits_{i} \\lvert x_{i} \\rvert\\right\\}``: Is the norm one cone, which bounds each entry of ``\\boldsymbol{\\psi}`` from below by the absolute value of the matching entry of ``\\boldsymbol{\\theta}``.
-  - ``\\boldsymbol{\\psi}``: Is the `T × 1` entropy variable. It lies on the unit simplex, so the objective is the Shannon entropy of a probability vector that dominates ``\\lvert \\boldsymbol{\\theta} \\rvert`` entry by entry.
-  - ``\\phi_{k}``: Is the risk aversion coefficient for the `k`-th order moment.
-  - ``\\phi_{\\text{max}}``: Is the maximum risk aversion coefficient.
-  - ``T``: Is the total number of observations.
-  - ``\\boldsymbol{w}_{k}``: Is the `T × 1` OWA weights vector for the `k`-th order moment.
-  - ``\\mathbf{w}``: Is the `T × K` matrix of OWA weights for all order moments where each column `k` corresponds to weights of the `k`-th order moment, each row corresponds to the weights for the `t`-th observation.
-  - ``\\boldsymbol{\\theta}``: Is the final `T × 1` OWA weights vector after enforcing non-decreasing monotonicity and incorporating the user-defined risk aversion.
+  - $(math_dict[:psi_owa_ent])
+  - $(math_dict[:theta_owa])
+  - $(math_dict[:W_lmom])
+  - $(math_dict[:omega_ik_lmom])
+  - $(math_dict[:phi_k_lmom])
+  - $(math_dict[:phi_max_owa])
+  - $(math_dict[:K_lmom])
+  - $(math_dict[:T])
 
 # Fields
 
@@ -183,12 +193,6 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
-# Details
-
-The `MaximumEntropy` algorithm can be configured to use different entropy formulations via the `alg` field. The default is `RelativeEntropy`, but other formulations such as `ExponentialConeEntropy` can also be used.
-
-`alg` selects the conic encoding of the entropy term, not the problem that is solved. `RelativeEntropy` writes it as one [`JuMP.MOI.RelativeEntropyCone`](https://jump.dev/JuMP.jl/stable/moi/reference/standard_form/#MathOptInterface.RelativeEntropyCone) of dimension `2T + 1`, and `ExponentialConeEntropy` writes it as `T` separate [`JuMP.MOI.ExponentialCone`](https://jump.dev/JuMP.jl/stable/moi/reference/standard_form/#MathOptInterface.ExponentialCone) constraints. Both attain the same OWA weights to solver tolerance.
-
 # Examples
 
 ```jldoctest
@@ -201,10 +205,12 @@ MaximumEntropy
 
   - [`AbstractOrderedWeightsArrayAlgorithm`](@ref)
   - [`OWAJuMP`](@ref)
+  - [`owa_l_moment_crm`](@ref)
+  - [`owa_l_moment_crm_entropy`](@ref)
 
 # References
 
-  - $(ref_dict[:owa2])
+  - $(ref_dict[:owa2]) Section 3.2, Equation 13.
 """
 @concrete struct MaximumEntropy <: AbstractOrderedWeightsArrayAlgorithm
     """
@@ -221,9 +227,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for squared OWA weight optimisation algorithms.
+Abstract supertype for the quadratic objectives of the L-moment programme of [`OWAJuMP`](@ref).
 
-Subtypes find OWA weights by minimising a squared-distance or squared-sum objective subject to OWA constraints, and are parameterised by the optimisation algorithm type `T`.
+Each subtype minimises a sum of squares of the OWA weights. The parameter `T` is the type of the conic encoding of that sum, a second-order cone risk expression. [`owa_l_moment_crm_sumsq_obj`](@ref) dispatches on it.
 
 # Related
 
@@ -239,7 +245,9 @@ abstract type SquaredOrderedWeightsArrayAlgorithm{T} <: AbstractOrderedWeightsAr
 """
     const UnionAllSOCRiskExpr = Union{<:SquaredSOCRiskExpr, <:RSOCRiskExpr, <:SOCRiskExpr}
 
-Union of all second-order cone risk expression formulation types.
+The three conic encodings of the objective of a [`SquaredOrderedWeightsArrayAlgorithm`](@ref).
+
+[`MinimumSquaredDistance`](@ref) and [`MinimumSumSquares`](@ref) accept each of them in `alg`. The three encodings give one minimiser, so the choice changes the model and not the OWA weights.
 
 # Related
 
@@ -253,7 +261,9 @@ const UnionAllSOCRiskExpr = Union{<:SquaredSOCRiskExpr, <:RSOCRiskExpr, <:SOCRis
 """
     const UnionSOCRiskExpr = Union{<:SquaredSOCRiskExpr, <:SOCRiskExpr}
 
-Union of squared and plain SOC risk expression formulation types (excludes RSOC).
+The encodings that bound the objective norm with one second-order cone.
+
+The methods of [`owa_l_moment_crm`](@ref) for these encodings write the row `t ≥ ‖v‖₂`. [`RSOCRiskExpr`](@ref) is not a member, because it writes a rotated cone.
 
 # Related
 
@@ -265,7 +275,9 @@ const UnionSOCRiskExpr = Union{<:SquaredSOCRiskExpr, <:SOCRiskExpr}
 """
     const UnionRSOCSOCRiskExpr = Union{<:RSOCRiskExpr, <:SOCRiskExpr}
 
-Union of RSOC and plain SOC risk expression formulation types (excludes squared SOC).
+The encodings whose objective is linear in the cone variable `t`.
+
+[`owa_l_moment_crm_sumsq_obj`](@ref) minimises `so * t` for these encodings. [`SquaredSOCRiskExpr`](@ref) is not a member, because it minimises `so * t^2`.
 
 # Related
 
@@ -277,32 +289,36 @@ const UnionRSOCSOCRiskExpr = Union{<:RSOCRiskExpr, <:SOCRiskExpr}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Minimum Squared Distance algorithm for Ordered Weights Array (OWA) estimation.
+Selects the smoothest OWA weights in the L-moment programme of [`OWAJuMP`](@ref).
 
-The Minimum Squared Distance algorithm finds OWA weights that minimize the squared distance between adjacent entries in the array, subject to the OWA constraints. This approach promotes smoothness in the resulting weights.
+The objective is the sum of the squared differences of adjacent OWA weights, so the weights change little from one order statistic to the next. Use [`MinimumSumSquares`](@ref) to keep the weights small instead.
+
+`alg` selects the conic encoding of the objective, not the problem. [`SOCRiskExpr`](@ref) minimises ``\\lVert \\boldsymbol{\\theta}_{2:T} - \\boldsymbol{\\theta}_{1:T-1} \\rVert_{2}``, and [`SquaredSOCRiskExpr`](@ref) and [`RSOCRiskExpr`](@ref) minimise its square. The square root is strictly increasing, so the three encodings give one minimiser and return the same OWA weights to solver tolerance. In [`SecondMomentFormulation`](@ref), `alg` changes the units of the reported risk instead.
+
+Equation 15 of [owa2](@cite) prints a maximum of this sum. The library minimises it, which is the convex problem that the name of the type states.
+
+# Mathematical definition
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{\\theta}}{\\min} \\sum\\limits_{t=1}^{T-1}\\left(\\boldsymbol{\\theta}_{t+1} - \\boldsymbol{\\theta}_{t} \\right)^2 \\\\
-\\text{s.t.} \\quad & \\sum\\limits_{k=1}^K \\phi_{k} = 1 \\\\
- & \\boldsymbol{\\phi} \\leq \\phi_{\\text{max}} \\\\
- & \\boldsymbol{\\phi} \\geq 0 \\\\
- & \\phi_{k+1} \\leq \\phi_{k} \\quad \\forall k = 1, \\ldots,\\, K-1 \\\\
- & \\boldsymbol{w}_{k} = \\dfrac{1}{k} \\binom{T}{k}^{-1} \\sum\\limits_{i=0}^{k-1} (-1)^{i} \\binom{k-1}{i} \\binom{t-1}{k-1-i} \\binom{T-t}{i}  \\quad \\forall t = 1,\\ldots,\\, T \\\\
- & \\mathbf{w} = \\left[(-1)^k\\boldsymbol{w}_{k} \\quad \\forall k = 2,\\ldots,\\, K\\right] \\\\
- & \\boldsymbol{\\theta} = \\mathbf{w} \\boldsymbol{\\phi} \\\\
- & \\theta_{t+1} \\geq \\theta_{t} \\quad \\forall t = 1, \\ldots,\\, T-1 \\\\
+\\underset{\\boldsymbol{\\phi},\\, \\boldsymbol{\\theta}}{\\min} \\quad & \\sum\\limits_{t=1}^{T-1} \\left(\\theta_{t+1} - \\theta_{t}\\right)^{2}\\\\
+\\text{s.t.} \\quad & \\boldsymbol{\\theta} = \\mathbf{W} \\boldsymbol{\\phi}\\\\
+ & \\sum\\limits_{k=2}^{K} \\phi_{k} = 1\\\\
+ & 0 \\leq \\phi_{k} \\leq \\phi_{\\max} \\quad \\forall k = 2,\\, \\ldots,\\, K\\\\
+ & \\phi_{k+1} \\leq \\phi_{k} \\quad \\forall k = 2,\\, \\ldots,\\, K - 1\\\\
+ & \\theta_{t+1} \\geq \\theta_{t} \\quad \\forall t = 1,\\, \\ldots,\\, T - 1\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\phi_{k}``: Is the risk aversion coefficient for the `k`-th order moment.
-  - ``\\phi_{\\text{max}}``: Is the maximum risk aversion coefficient.
-  - ``T``: Is the total number of observations.
-  - ``\\boldsymbol{w}_{k}``: Is the `T × 1` OWA weights vector for the `k`-th order moment.
-  - ``\\mathbf{w}``: Is the `T × K` matrix of OWA weights for all order moments where each column `k` corresponds to weights of the `k`-th order moment, each row corresponds to the weights for the `t`-th observation.
-  - ``\\boldsymbol{\\theta}``: Is the final `T × 1` OWA weights vector after enforcing non-decreasing monotonicity and incorporating the user-defined risk aversion.
+  - $(math_dict[:theta_owa])
+  - $(math_dict[:W_lmom])
+  - $(math_dict[:omega_ik_lmom])
+  - $(math_dict[:phi_k_lmom])
+  - $(math_dict[:phi_max_owa])
+  - $(math_dict[:K_lmom])
+  - $(math_dict[:T])
 
 # Fields
 
@@ -324,20 +340,16 @@ MinimumSquaredDistance
   alg ┴ SOCRiskExpr()
 ```
 
-# Details
-
-The `MinimumSquaredDistance` algorithm can be configured to use different second-order cone risk expressions via the `alg` field. The default is `SOCRiskExpr`, but other formulations such as `SquaredSOCRiskExpr` or `RSOCRiskExpr` can also be used.
-
-`alg` selects the conic encoding of the objective, not the problem that is solved. `SOCRiskExpr` minimises ``\\lVert \\boldsymbol{\\theta}_{2:T} - \\boldsymbol{\\theta}_{1:T-1} \\rVert_{2}``, while `SquaredSOCRiskExpr` and `RSOCRiskExpr` minimise its square. The square root is strictly increasing, so all three share the same minimiser and return the same OWA weights to solver tolerance. This differs from [`SecondMomentFormulation`](@ref), where `alg` changes the units of the reported risk.
-
 # Related
 
-  - [`AbstractOrderedWeightsArrayAlgorithm`](@ref)
+  - [`SquaredOrderedWeightsArrayAlgorithm`](@ref)
   - [`OWAJuMP`](@ref)
+  - [`owa_l_moment_crm`](@ref)
+  - [`owa_l_moment_crm_sumsq_obj`](@ref)
 
 # References
 
-  - $(ref_dict[:owa2])
+  - $(ref_dict[:owa2]) Section 3.2, Equation 15.
 """
 struct MinimumSquaredDistance{__T_alg} <: SquaredOrderedWeightsArrayAlgorithm{__T_alg}
     """
@@ -355,32 +367,34 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Minimum Sum of Squares algorithm for Ordered Weights Array (OWA) estimation.
+Selects the OWA weights of least sum of squares in the L-moment programme of [`OWAJuMP`](@ref).
 
-The Minimum Sum of Squares algorithm minimizes the sum of squared OWA weights, subject to the OWA constraints. This is a ridge penalty on the weight vector, so it spreads the weight mass rather than concentrating it. Use it when the OWA weights should stay small in magnitude, and use [`MinimumSquaredDistance`](@ref) when they should instead vary smoothly from one order statistic to the next.
+The objective is a ridge penalty on the OWA weights, so the solution spreads the weight mass over the order statistics and does not concentrate it. Use [`MinimumSquaredDistance`](@ref) to make the weights change smoothly instead.
+
+`alg` selects the conic encoding of the objective, not the problem. [`SOCRiskExpr`](@ref) minimises ``\\lVert \\boldsymbol{\\theta} \\rVert_{2}``, and [`SquaredSOCRiskExpr`](@ref) and [`RSOCRiskExpr`](@ref) minimise its square. The square root is strictly increasing, so the three encodings give one minimiser and return the same OWA weights to solver tolerance. In [`SecondMomentFormulation`](@ref), `alg` changes the units of the reported risk instead.
+
+# Mathematical definition
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{\\theta}}{\\min} \\sum\\limits_{t=1}^{T} \\boldsymbol{\\theta}_{t}^2 \\\\
-\\text{s.t.} \\quad & \\sum\\limits_{k=1}^K \\phi_{k} = 1 \\\\
- & \\boldsymbol{\\phi} \\leq \\phi_{\\text{max}} \\\\
- & \\boldsymbol{\\phi} \\geq 0 \\\\
- & \\phi_{k+1} \\leq \\phi_{k} \\quad \\forall k = 1, \\ldots,\\, K-1 \\\\
- & \\boldsymbol{w}_{k} = \\dfrac{1}{k} \\binom{T}{k}^{-1} \\sum\\limits_{i=0}^{k-1} (-1)^{i} \\binom{k-1}{i} \\binom{t-1}{k-1-i} \\binom{T-t}{i}  \\quad \\forall t = 1,\\ldots,\\, T \\\\
- & \\mathbf{w} = \\left[(-1)^k\\boldsymbol{w}_{k} \\quad \\forall k = 2,\\ldots,\\, K\\right] \\\\
- & \\boldsymbol{\\theta} = \\mathbf{w} \\boldsymbol{\\phi} \\\\
- & \\theta_{t+1} \\geq \\theta_{t} \\quad \\forall t = 1, \\ldots,\\, T-1 \\\\
+\\underset{\\boldsymbol{\\phi},\\, \\boldsymbol{\\theta}}{\\min} \\quad & \\sum\\limits_{t=1}^{T} \\theta_{t}^{2}\\\\
+\\text{s.t.} \\quad & \\boldsymbol{\\theta} = \\mathbf{W} \\boldsymbol{\\phi}\\\\
+ & \\sum\\limits_{k=2}^{K} \\phi_{k} = 1\\\\
+ & 0 \\leq \\phi_{k} \\leq \\phi_{\\max} \\quad \\forall k = 2,\\, \\ldots,\\, K\\\\
+ & \\phi_{k+1} \\leq \\phi_{k} \\quad \\forall k = 2,\\, \\ldots,\\, K - 1\\\\
+ & \\theta_{t+1} \\geq \\theta_{t} \\quad \\forall t = 1,\\, \\ldots,\\, T - 1\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\phi_{k}``: Is the risk aversion coefficient for the `k`-th order moment.
-  - ``\\phi_{\\text{max}}``: Is the maximum risk aversion coefficient.
-  - ``T``: Is the total number of observations.
-  - ``\\boldsymbol{w}_{k}``: Is the `T × 1` OWA weights vector for the `k`-th order moment.
-  - ``\\mathbf{w}``: Is the `T × K` matrix of OWA weights for all order moments where each column `k` corresponds to weights of the `k`-th order moment, each row corresponds to the weights for the `t`-th observation.
-  - ``\\boldsymbol{\\theta}``: Is the final `T × 1` OWA weights vector after enforcing non-decreasing monotonicity and incorporating the user-defined risk aversion.
+  - $(math_dict[:theta_owa])
+  - $(math_dict[:W_lmom])
+  - $(math_dict[:omega_ik_lmom])
+  - $(math_dict[:phi_k_lmom])
+  - $(math_dict[:phi_max_owa])
+  - $(math_dict[:K_lmom])
+  - $(math_dict[:T])
 
 # Fields
 
@@ -402,20 +416,16 @@ MinimumSumSquares
   alg ┴ SOCRiskExpr()
 ```
 
-# Details
-
-The `MinimumSumSquares` algorithm can be configured to use different second-order cone risk expressions via the `alg` field. The default is `SOCRiskExpr`, but other formulations such as `SquaredSOCRiskExpr` or `RSOCRiskExpr` can also be used.
-
-`alg` selects the conic encoding of the objective, not the problem that is solved. `SOCRiskExpr` minimises ``\\lVert \\boldsymbol{\\theta} \\rVert_{2}``, while `SquaredSOCRiskExpr` and `RSOCRiskExpr` minimise its square. The square root is strictly increasing, so all three share the same minimiser and return the same OWA weights to solver tolerance. This differs from [`SecondMomentFormulation`](@ref), where `alg` changes the units of the reported risk.
-
 # Related
 
   - [`SquaredOrderedWeightsArrayAlgorithm`](@ref)
   - [`OWAJuMP`](@ref)
+  - [`owa_l_moment_crm`](@ref)
+  - [`owa_l_moment_crm_sumsq_obj`](@ref)
 
 # References
 
-  - $(ref_dict[:owa2])
+  - $(ref_dict[:owa2]) Section 3.2, Equation 14.
 """
 struct MinimumSumSquares{__T_alg} <: SquaredOrderedWeightsArrayAlgorithm{__T_alg}
     """
@@ -432,31 +442,34 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Estimator type for normalised constant relative risk aversion (CRRA) OWA weights.
+Sets the risk aversion coefficients of an L-moment OWA weight vector to the normalised constant relative risk aversion coefficients of `g`.
 
-This struct represents an estimator for Ordered Weights Array (OWA) weights based on a normalised constant relative risk aversion parameter `g`. The CRRA approach generates OWA weights that interpolate between risk-neutral and risk-averse profiles, controlled by the parameter `g`.
+Equation 12 of [owa2](@cite) states the coefficients. The library divides them by their sum, which that equation suggests. It also replaces each OWA weight by the largest weight up to its position, so the vector is nondecreasing and the risk measure is convex. [`ncrra_weights`](@ref) computes the vector, and [`OWAJuMP`](@ref) falls back to it with `g = 0.5` when its programme fails.
+
+# Mathematical definition
 
 ```math
 \\begin{align}
-\\phi_{1} &\\coloneqq 1 \\\\
-\\boldsymbol{\\phi} &= \\phi_{k-1} \\dfrac{\\gamma + k - 2}{k!} (k-1)! \\quad \\forall k = 2,\\ldots,\\, K \\\\
-\\sum\\limits_{k=2}^K \\phi_{k} &= 1 \\\\
-\\boldsymbol{w}_{k} &= \\dfrac{1}{k} \\binom{T}{k}^{-1} \\sum\\limits_{i=0}^{k-1} (-1)^{i} \\binom{k-1}{i} \\binom{t-1}{k-1-i} \\binom{T-t}{i}  \\quad \\forall t = 1,\\ldots,\\, T \\\\
-\\mathbf{w} &= \\left[(-1)^k\\boldsymbol{w}_{k} \\quad \\forall k = 2,\\ldots,\\, K\\right] \\\\
-\\boldsymbol{\\vartheta} &= \\mathbf{w} \\boldsymbol{\\phi} \\\\
-\\theta_{i} &= \\max \\left(\\vartheta_{j} \\quad \\forall j = 1, \\ldots,\\, i\\right) \\quad \\forall i = 1,\\ldots,\\, T
+\\tilde{\\phi}_{k} &= \\dfrac{1}{k!} \\prod\\limits_{j=0}^{k-2} \\left(\\gamma + j\\right) \\quad \\forall k = 2,\\, \\ldots,\\, K\\\\
+\\phi_{k} &= \\dfrac{\\tilde{\\phi}_{k}}{\\sum_{j=2}^{K} \\tilde{\\phi}_{j}}\\\\
+\\boldsymbol{\\vartheta} &= \\mathbf{W} \\boldsymbol{\\phi}\\\\
+\\eta_{t} &= \\max\\limits_{s \\leq t} \\vartheta_{s} \\quad \\forall t = 1,\\, \\ldots,\\, T\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\phi_{k}``: Is the risk aversion coefficient for the `k`-th order moment.
-  - ``\\gamma``: Is the risk aversion parameter `g`.
-  - ``T``: Is the total number of observations.
-  - ``\\boldsymbol{w}_{k}``: Is the `T × 1` OWA weights vector for the `k`-th order moment.
-  - ``\\mathbf{w}``: Is the `T × K` matrix of OWA weights for all order moments where each column `k` corresponds to weights of the `k`-th order moment, each row corresponds to the weights for the `t`-th observation.
-  - ``\\boldsymbol{\\vartheta}``: Is the intermediate `T × 1` OWA weights vector incorporating the user-defined risk aversion before enforcing non-decreasing monotonicity.
-  - ``\\boldsymbol{\\theta}``: Is the final `T × 1` OWA weights vector incorporating the user-defined risk aversion after enforcing non-decreasing monotonicity.
+  - $(math_dict[:gamma_crra])
+  - ``\\tilde{\\phi}_{k}``: Coefficient of the ``k``-th L-moment before the normalisation.
+  - $(math_dict[:phi_k_lmom])
+  - $(math_dict[:W_lmom])
+  - $(math_dict[:omega_ik_lmom])
+  - ``\\boldsymbol{\\vartheta}``: Combination of the signed L-moment weights, ``T \\times 1``. It need not be nondecreasing.
+  - $(math_dict[:eta_owa])
+  - $(math_dict[:K_lmom])
+  - $(math_dict[:T])
+
+The coefficients sum to one, and the OWA weights do not. Each L-moment weight vector of order two or more sums to zero, so ``\\boldsymbol{\\vartheta}`` sums to zero, and the running maximum can only raise that sum.
 
 # Fields
 
@@ -485,11 +498,12 @@ NormalisedConstantRelativeRiskAversion
 # Related
 
   - [`AbstractOrderedWeightsArrayEstimator`](@ref)
+  - [`ncrra_weights`](@ref)
   - [`owa_l_moment_crm`](@ref)
 
 # References
 
-  - $(ref_dict[:owa2])
+  - $(ref_dict[:owa2]) Section 3.2, Equation 12.
 """
 @concrete struct NormalisedConstantRelativeRiskAversion <:
                  AbstractOrderedWeightsArrayEstimator
@@ -509,9 +523,11 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Estimator type for OWA weights using JuMP-based optimization.
+Solves a programme for the risk aversion coefficients of an L-moment OWA weight vector.
 
-`OWAJuMP` encapsulates all configuration required to estimate OWA weights via mathematical programming using JuMP. It supports multiple algorithms and solver backends, and allows fine control over constraints and scaling.
+`alg` selects the objective, and every objective solves over the same feasible set. [`owa_l_moment_crm`](@ref) states the programme. `sc` scales the rows and `so` scales the objective, and neither changes the solution.
+
+When the solver fails, [`owa_model_solve`](@ref) warns and returns the weights of `NormalisedConstantRelativeRiskAversion(; g = 0.5)`. The programme is infeasible for some `max_phi` and some orders: the coefficients sum to one and each is at most `max_phi`, and the OWA weights must be nondecreasing. At `k = 2` it is always infeasible, because its one coefficient must equal one. The fallback then returns the weights of the second L-moment, which is the only feasible answer.
 
 # Fields
 
@@ -559,12 +575,14 @@ OWAJuMP
   - [`AbstractOrderedWeightsArrayEstimator`](@ref)
   - [`AbstractOrderedWeightsArrayAlgorithm`](@ref)
   - [`owa_l_moment_crm`](@ref)
+  - [`owa_model_setup`](@ref)
+  - [`owa_model_solve`](@ref)
   - [`Solver`](@ref)
   - [`Slv_VecSlv`](@ref)
 
 # References
 
-  - $(ref_dict[:owa2])
+  - $(ref_dict[:owa2]) Section 3.2, Equations 13 to 15.
 """
 @concrete struct OWAJuMP <: AbstractOrderedWeightsArrayEstimator
     """
@@ -610,37 +628,44 @@ end
 """
     ncrra_weights(weights::MatNum, g::Number = 0.5)
 
-Compute normalised constant relative risk aversion (CRRA) Ordered Weights Array (OWA) weights.
+Compute the OWA weight vector of the normalised constant relative risk aversion coefficients of `g`.
 
-This function generates OWA weights using a normalised CRRA scheme, parameterised by `g`. The CRRA approach interpolates between risk-neutral and risk-averse weighting profiles, controlled by the risk aversion parameter `g`.
+Column `j` of `weights` takes the coefficient of the L-moment of order `j + 1`, so the columns of the signed L-moment weight matrix give the vector that [`NormalisedConstantRelativeRiskAversion`](@ref) states. The coefficients sum to one, and the returned weights do not. The returned vector is the running maximum of a combination of the columns, so its sum is at least the same combination of the column sums.
 
-It is the risk aversion coefficients that are normalised to sum to one, not the returned OWA weights. The returned vector is a combination of the columns of `weights`, so its sum is the same combination of their column sums.
+# Mathematical definition
+
+```math
+\\begin{align}
+\\tilde{\\phi}_{j} &= \\dfrac{1}{(j + 1)!} \\prod\\limits_{i=0}^{j-1} \\left(\\gamma + i\\right) \\quad \\forall j = 1,\\, \\ldots,\\, M\\\\
+\\phi_{j} &= \\dfrac{\\tilde{\\phi}_{j}}{\\sum_{i=1}^{M} \\tilde{\\phi}_{i}}\\\\
+\\boldsymbol{\\vartheta} &= \\mathbf{V} \\boldsymbol{\\phi}\\\\
+\\eta_{t} &= \\max\\limits_{s \\leq t} \\vartheta_{s} \\quad \\forall t = 1,\\, \\ldots,\\, T\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:gamma_crra])
+  - ``\\mathbf{V}``: The matrix `weights`, ``T \\times M``.
+  - ``\\tilde{\\phi}_{j}``, ``\\phi_{j}``: Coefficient of column ``j`` before and after the normalisation.
+  - ``\\boldsymbol{\\vartheta}``: Combination of the columns of ``\\mathbf{V}``, ``T \\times 1``.
+  - $(math_dict[:eta_owa])
+
+# Algorithm
+
+ 1. Set the running product `e = 1`. For each column `i` of `weights`, multiply `e` by `g + i - 1`, and set `phis[i] = e / factorial(i + 1)`.
+ 2. Divide `phis` by its sum.
+ 3. Compute the combination `a = weights * phis`.
+ 4. Set `w[i]` to the largest entry of `a[1:i]`, for each `i`.
 
 # Arguments
 
-  - `weights`: Matrix of weights (typically order statistics or moment weights).
-  - `g`: Risk aversion parameter.
-
-# Validation
-
-  - `0 < g < 1`.
+  - `weights`: Matrix ``T \\times M`` of signed L-moment weights, one column for each order from two up.
+  - `g`: Relative risk aversion.
 
 # Returns
 
-  - `w::VecNum`: Vector of OWA weights of length `size(weights, 1)`.
-
-# Details
-
-The function computes the OWA weights as follows:
-
- 1. For each order statistic, recursively compute the CRRA weight using the formula:
-
-    e *= g + i - 1
-    phis[i] = e / factorial(i + 1)
-
- 2. The vector `phis` is normalised to sum to one.
-
- 3. The final OWA weights are computed as a weighted sum of the input `weights` and `phis`, with monotonicity enforced by taking the maximum up to each index.
+  - `w::VecNum`: Nondecreasing vector of OWA weights of length `size(weights, 1)`.
 
 # Examples
 
@@ -664,7 +689,7 @@ julia> PortfolioOptimisers.ncrra_weights(w, 0.5)
 
 # References
 
-  - $(ref_dict[:owa2])
+  - $(ref_dict[:owa2]) Section 3.2, Equation 12.
 """
 function ncrra_weights(weights::MatNum, g::Number = 0.5)
     N = size(weights, 2)
@@ -686,35 +711,58 @@ end
 """
     owa_model_setup(method::OWAJuMP, weights::MatNum)
 
-Construct a JuMP model for Ordered Weights Array (OWA) weight estimation.
+Build the feasible set of the L-moment programme of [`OWAJuMP`](@ref) in a new JuMP model.
 
-This function sets up a JuMP optimization model for OWA weights, given an `OWAJuMP` estimator and a matrix of weights (e.g., order statistics or moment weights). The model includes variables for the OWA weights (`phi`) and auxiliary variables (`theta`), and enforces constraints for non-negativity, upper bounds, sum-to-one, monotonicity, and consistency with the input weights.
+The model holds the risk aversion coefficients `phi` and the OWA weights `theta`, and the rows that every objective of [`AbstractOrderedWeightsArrayAlgorithm`](@ref) shares. It has no objective and no optimiser. [`owa_l_moment_crm`](@ref) adds the objective, and [`owa_model_solve`](@ref) solves the model.
+
+# JuMP formulation
+
+## Variables
+
+  - `theta`: Created, the OWA weights ``\\boldsymbol{\\theta}``, ``T \\times 1``.
+  - `phi`: Created, the risk aversion coefficients ``\\boldsymbol{\\phi}``, ``(K - 1) \\times 1``.
+
+## Constraints
+
+Every row is registered under no name.
+
+  - ``s_c \\boldsymbol{\\phi} \\geq 0``.
+  - ``s_c (\\boldsymbol{\\phi} - \\phi_{\\max}) \\leq 0``.
+  - ``s_c \\left(\\sum_{k=2}^{K} \\phi_{k} - 1\\right) = 0``.
+  - ``s_c (\\boldsymbol{\\theta} - \\mathbf{W} \\boldsymbol{\\phi}) = 0``.
+  - ``s_c (\\phi_{k+1} - \\phi_{k}) \\leq 0`` for ``k = 2, \\ldots, K - 1``.
+  - ``s_c (\\theta_{t+1} - \\theta_{t}) \\geq 0`` for ``t = 1, \\ldots, T - 1``.
+
+Where:
+
+  - $(math_dict[:sc_scale]) It is the `sc` field of `method`.
+  - $(math_dict[:theta_owa])
+  - $(math_dict[:phi_k_lmom])
+  - $(math_dict[:phi_max_owa])
+  - $(math_dict[:W_lmom]) It is the matrix `weights`.
+  - $(math_dict[:omega_ik_lmom])
+  - $(math_dict[:K_lmom])
+  - $(math_dict[:T])
 
 # Arguments
 
-  - `method`: OWA estimator containing solver, scaling, and algorithm configuration.
-  - `weights`: Matrix of weights (typically order statistics or moment weights).
+  - `method`: Programme of the coefficients. The function reads `max_phi` and `sc`.
+  - `weights`: Signed L-moment weight matrix ``T \\times (K - 1)``.
 
 # Returns
 
-  - `model::JuMP.Model`: Configured JuMP model with variables and constraints for OWA weight estimation.
-
-# Constraints
-
-  - `phi` (OWA weights) are non-negative and bounded above by `max_phi`.
-  - The sum of `phi` is 1.
-  - `theta` is constrained to be equal to the weighted sum of the input weights and `phi`.
-  - Monotonicity is enforced on `phi` and `theta`.
+  - `model::JuMP.Model`: The model of the feasible set.
 
 # Related
 
   - [`OWAJuMP`](@ref)
   - [`MatNum`](@ref)
   - [`owa_l_moment_crm`](@ref)
+  - [`owa_model_solve`](@ref)
 
 # References
 
-  - $(ref_dict[:owa2])
+  - $(ref_dict[:owa2]) Section 3.2, Equations 13 to 15.
 """
 function owa_model_setup(method::OWAJuMP, weights::MatNum)
     T, N = size(weights)
@@ -738,24 +786,27 @@ end
 """
     owa_model_solve(model::JuMP.Model, method::OWAJuMP, weights::MatNum)
 
-Solve a JuMP model for OWA weight estimation and extract the resulting OWA weights.
+Solve the L-moment programme in `model`, and return its OWA weights.
 
-This function solves the provided JuMP model using the solver(s) specified in the `OWAJuMP` estimator. If the optimization is successful, it reads the OWA weights off the model's `theta` variable, which [`owa_model_setup`](@ref) has already constrained to equal `weights * phi`. If the optimization fails, a warning is issued and a fallback to `ncrra_weights` is used.
+The returned weights are the value of the variable `theta`, which [`owa_model_setup`](@ref) holds equal to `weights * phi`. The model holds the coefficients `phi` to a sum of one, not `theta`.
+
+The programme is infeasible for some combinations of the sample size, the highest order and `max_phi`, and the function then returns the fallback. Measured on 100 observations with the default `max_phi = 0.5`, it is infeasible at the highest orders `3` and `4`, and feasible from `5` to `8`. At the highest order `4` it is feasible on 1000 observations. At the highest order `2` it is always infeasible, because the one coefficient must equal one, and `max_phi < 1`.
+
+# Algorithm
+
+ 1. Optimise `model` with the solvers of `method.slv`, through [`optimise_JuMP_model!`](@ref).
+ 2. If the solve succeeds, return `w`, the value of `model[:theta]`.
+ 3. Otherwise, warn, and return `w = ncrra_weights(weights, 0.5)`.
 
 # Arguments
 
-  - `model`: JuMP model for OWA weight estimation.
-  - `method`: OWA estimator containing solver configuration.
-  - `weights`: Matrix of weights (typically order statistics or moment weights).
+  - `model`: Model of the programme, with its objective set.
+  - `method`: Programme of the coefficients. The function reads `slv`.
+  - `weights`: Signed L-moment weight matrix ``T \\times (K - 1)``, for the fallback.
 
 # Returns
 
   - `w::VecNum`: Vector of OWA weights of length `size(weights, 1)`.
-
-# Details
-
-  - If the solver succeeds, the solution is the value of the model's `theta` variable. It is the risk aversion coefficients `phi` that the model constrains to sum to one, not `theta`.
-  - If the solver fails, a warning is issued and the fallback `ncrra_weights(weights, 0.5)` is returned. The model is infeasible when `T` is too small for the monotonicity constraint on `theta`, so this fallback is the ordinary path for a short sample.
 
 # Related
 
@@ -781,17 +832,51 @@ end
 """
     owa_l_moment_crm(method::AbstractOrderedWeightsArrayEstimator, weights::MatNum)
 
-Compute Ordered Weights Array (OWA) linear moment convex risk measure (CRM) weights using various estimation methods.
+Combine the columns of a signed L-moment weight matrix into one OWA weight vector, with the risk aversion coefficients that `method` finds.
 
-This function dispatches on the estimator `method` to compute OWA weights from a matrix of moment or order-statistic weights. It supports several OWA estimation approaches, including normalised constant relative risk aversion (CRRA) and JuMP-based optimization with different algorithms.
+[`NormalisedConstantRelativeRiskAversion`](@ref) states the coefficients in closed form, through [`ncrra_weights`](@ref). [`OWAJuMP`](@ref) builds the feasible set with [`owa_model_setup`](@ref), adds the rows and the objective of its `alg`, and solves the model with [`owa_model_solve`](@ref). The docstrings of [`MaximumEntropy`](@ref), [`MinimumSquaredDistance`](@ref) and [`MinimumSumSquares`](@ref) state the three programmes.
+
+# Algorithm
+
+For an [`OWAJuMP`](@ref) `method`:
+
+ 1. Build `model`, the feasible set, with [`owa_model_setup`](@ref).
+ 2. Add the variables and the rows of the objective of `method.alg`, as `# JuMP formulation` states.
+ 3. Set the objective, with [`owa_l_moment_crm_entropy`](@ref) for [`MaximumEntropy`](@ref) and with [`owa_l_moment_crm_sumsq_obj`](@ref) otherwise.
+ 4. Solve `model` and return its OWA weights, with [`owa_model_solve`](@ref).
+
+# JuMP formulation
+
+## Variables
+
+  - `theta`: Read, the OWA weights that [`owa_model_setup`](@ref) creates.
+  - `x`: Created under [`MaximumEntropy`](@ref), the entropy variable ``\\boldsymbol{\\psi}``, ``T \\times 1``.
+  - `t`: Created under [`MinimumSquaredDistance`](@ref) and [`MinimumSumSquares`](@ref), the scalar that the cone bounds.
+
+## Constraints
+
+Every row is registered under no name.
+
+  - Under [`MaximumEntropy`](@ref): ``s_c \\left(\\sum_{t=1}^{T} \\psi_{t} - 1\\right) = 0``, and ``(s_c \\psi_{t},\\, s_c \\theta_{t}) \\in \\mathcal{K}_{1}`` for each ``t``, which states ``\\psi_{t} \\geq \\lvert \\theta_{t} \\rvert``.
+  - Under [`MinimumSquaredDistance`](@ref) with [`SOCRiskExpr`](@ref) or [`SquaredSOCRiskExpr`](@ref): ``(s_c t,\\, s_c \\boldsymbol{d}) \\in \\mathcal{K}_{2}``, which states ``t \\geq \\lVert \\boldsymbol{d} \\rVert_{2}``.
+  - Under [`MinimumSquaredDistance`](@ref) with [`RSOCRiskExpr`](@ref): ``(s_c t,\\, s_c / 2,\\, s_c \\boldsymbol{d}) \\in \\mathcal{Q}_{r}``, which states ``t \\geq \\lVert \\boldsymbol{d} \\rVert_{2}^{2}``.
+  - Under [`MinimumSumSquares`](@ref) with [`SOCRiskExpr`](@ref) or [`SquaredSOCRiskExpr`](@ref): ``(s_c t,\\, s_c \\boldsymbol{\\theta}) \\in \\mathcal{K}_{2}``, which states ``t \\geq \\lVert \\boldsymbol{\\theta} \\rVert_{2}``.
+  - Under [`MinimumSumSquares`](@ref) with [`RSOCRiskExpr`](@ref): ``(s_c t,\\, s_c / 2,\\, s_c \\boldsymbol{\\theta}) \\in \\mathcal{Q}_{r}``, which states ``t \\geq \\lVert \\boldsymbol{\\theta} \\rVert_{2}^{2}``.
+
+Where:
+
+  - $(math_dict[:sc_scale]) It is the `sc` field of `method`.
+  - $(math_dict[:theta_owa])
+  - $(math_dict[:psi_owa_ent])
+  - ``\\boldsymbol{d}``: Differences of adjacent OWA weights, ``d_{t} = \\theta_{t+1} - \\theta_{t}`` for ``t = 1, \\ldots, T - 1``.
+  - $(math_dict[:K_q_norm])
+  - ``\\mathcal{Q}_{r} = \\{(u, v, \\boldsymbol{z}) : 2 u v \\geq \\lVert \\boldsymbol{z} \\rVert_{2}^{2},\\, u, v \\geq 0\\}``: Rotated second-order cone.
+  - $(math_dict[:T])
 
 # Arguments
 
-  - `method::NormalisedConstantRelativeRiskAversion`: Computes OWA weights using the normalised CRRA scheme, parameterised by the risk aversion parameter `g` in `method`. The resulting weights interpolate between risk-neutral and risk-averse profiles.
-  - `method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MaximumEntropy}`: Computes OWA weights by solving a maximum entropy optimization problem using JuMP. This yields the most "uninformative" or uniform OWA weights subject to the imposed constraints.
-  - `method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MinimumSquaredDistance}`: Computes OWA weights by minimizing the sum of squared differences between adjacent OWA weights. There is no target vector; the objective is a smoothness penalty over the order statistics.
-  - `method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MinimumSumSquares}`: Computes OWA weights by minimizing the sum of squared OWA weights. This is a ridge penalty, so it spreads the weight mass rather than concentrating it.
-  - `weights`: Matrix of weights (e.g., order statistics or moment weights).
+  - `method`: Estimator of the risk aversion coefficients.
+  - `weights`: Signed L-moment weight matrix ``T \\times (K - 1)``. Column `k - 1` holds the weights of the L-moment of order `k`, times ``(-1)^{k}``.
 
 # Returns
 
@@ -806,10 +891,12 @@ This function dispatches on the estimator `method` to compute OWA weights from a
   - [`MinimumSumSquares`](@ref)
   - [`MatNum`](@ref)
   - [`ncrra_weights`](@ref)
+  - [`owa_model_setup`](@ref)
+  - [`owa_model_solve`](@ref)
 
 # References
 
-  - $(ref_dict[:owa2])
+  - $(ref_dict[:owa2]) Section 3.2, Equations 11 to 15.
 """
 function owa_l_moment_crm(method::NormalisedConstantRelativeRiskAversion, weights::MatNum)
     return ncrra_weights(weights, method.g)
@@ -818,24 +905,48 @@ end
     owa_l_moment_crm_entropy(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MaximumEntropy},
                              model::JuMP.Model)
 
-Add the entropy objective of the [`MaximumEntropy`](@ref) OWA problem to `model`.
+Add the entropy objective of the [`MaximumEntropy`](@ref) programme to `model`.
 
-The method dispatches on the [`EntropyFormulation`](@ref) held in `method.alg.alg`. It reads the model's `x` variable, adds the auxiliary variables and cone constraints that encode ``-\\sum_{t} x_{t} \\log(x_{t})``, and sets the maximisation objective. It does not solve the model.
+The method dispatches on the [`EntropyFormulation`](@ref) in `method.alg.alg`. It reads the entropy variable `x`, adds the variable and the cone rows that bound the entropy, and sets the objective. It does not solve the model.
+
+The two encodings give one maximiser. Under [`ExponentialConeEntropy`](@ref) the objective is the entropy less ``\\log s_c``, because the cones hold ``s_c \\psi_{t}`` and the entries of ``\\boldsymbol{\\psi}`` sum to one. So the objective values differ when ``s_c \\neq 1``, and the OWA weights do not.
+
+# JuMP formulation
+
+## Variables
+
+  - `x`: Read, the entropy variable ``\\boldsymbol{\\psi}``.
+  - `t`: Created. Under [`RelativeEntropy`](@ref) it is a scalar, and under [`ExponentialConeEntropy`](@ref) it is a vector ``T \\times 1``.
+
+## Constraints
+
+Every row is registered under no name.
+
+  - Under [`RelativeEntropy`](@ref): ``(s_c t,\\, s_c \\boldsymbol{1},\\, s_c \\boldsymbol{\\psi}) \\in \\mathcal{K}_{\\mathrm{rel}}``, which states ``t \\geq \\sum_{t=1}^{T} \\psi_{t} \\log \\psi_{t}``.
+  - Under [`ExponentialConeEntropy`](@ref): ``(s_c t_{i},\\, s_c \\psi_{i},\\, 1) \\in \\mathcal{K}_{\\exp}`` for each ``i``, which states ``t_{i} \\leq -\\psi_{i} \\log(s_c \\psi_{i})``.
+
+## Objective
+
+  - Under [`RelativeEntropy`](@ref): `Max` of ``-s_o t``.
+  - Under [`ExponentialConeEntropy`](@ref): `Max` of ``s_o \\sum_{i=1}^{T} t_{i}``.
+
+Where:
+
+  - $(math_dict[:psi_owa_ent])
+  - $(math_dict[:sc_scale]) It is the `sc` field of `method`.
+  - $(math_dict[:so_scale]) It is the `so` field of `method`.
+  - ``\\mathcal{K}_{\\mathrm{rel}} = \\{(u, \\boldsymbol{v}, \\boldsymbol{z}) : u \\geq \\sum_{i} z_{i} \\log(z_{i} / v_{i}),\\, \\boldsymbol{v}, \\boldsymbol{z} \\geq 0\\}``: Relative entropy cone.
+  - $(math_dict[:K_exp])
+  - $(math_dict[:T])
 
 # Arguments
 
-  - `method`: OWA estimator whose `alg` is a [`MaximumEntropy`](@ref). Its `sc` and `so` fields scale the constraints and the objective.
-  - `model::JuMP.Model`: Model built by [`owa_model_setup`](@ref), already carrying the `x` variable.
+  - `method`: Programme of the coefficients, whose `alg` is a [`MaximumEntropy`](@ref).
+  - `model::JuMP.Model`: Model of [`owa_l_moment_crm`](@ref), which holds the variable `x`.
 
 # Returns
 
-  - `nothing`. The model is modified in place.
-
-# Details
-
-  - Under [`RelativeEntropy`](@ref), one `JuMP.MOI.RelativeEntropyCone` of dimension `2T + 1` bounds a scalar `t` below by ``\\sum_{t} x_{t} \\log(x_{t})``, and the objective maximises `-t`.
-  - Under [`ExponentialConeEntropy`](@ref), `T` separate `JuMP.MOI.ExponentialCone` constraints bound each `t[i]` above by ``-x_{i} \\log(x_{i})``, and the objective maximises `sum(t)`.
-  - Both formulations attain the same OWA weights to solver tolerance.
+  - `nothing`. The function changes `model` in place.
 
 # Related
 
@@ -896,24 +1007,33 @@ end
                                                <:SquaredOrderedWeightsArrayAlgorithm},
                                model::JuMP.Model)
 
-Set the minimisation objective of a [`SquaredOrderedWeightsArrayAlgorithm`](@ref) OWA problem on `model`.
+Set the objective of a [`SquaredOrderedWeightsArrayAlgorithm`](@ref) programme on `model`.
 
-The caller adds the cone constraint that relates the scalar variable `t` to the quantity being minimised. This method only sets the objective, and it dispatches on the [`SecondMomentFormulation`](@ref) that parameterises `method.alg`. It does not solve the model.
+[`owa_l_moment_crm`](@ref) adds the cone row that bounds the variable `t`. This method sets the objective alone, and it dispatches on the [`SecondMomentFormulation`](@ref) that parameterises `method.alg`. It does not solve the model. The three encodings give one minimiser, so they return the same OWA weights to solver tolerance.
+
+# JuMP formulation
+
+## Variables
+
+  - `t`: Read, the scalar that the cone row of the caller bounds.
+
+## Objective
+
+  - Under [`SOCRiskExpr`](@ref) or [`RSOCRiskExpr`](@ref): `Min` of ``s_o t``.
+  - Under [`SquaredSOCRiskExpr`](@ref): `Min` of ``s_o t^{2}``, because the cone row of the caller bounds ``t`` by a norm, not by its square.
+
+Where:
+
+  - $(math_dict[:so_scale]) It is the `so` field of `method`.
 
 # Arguments
 
-  - `method`: OWA estimator whose `alg` is a [`MinimumSquaredDistance`](@ref) or a [`MinimumSumSquares`](@ref). Its `so` field scales the objective.
-  - `model::JuMP.Model`: Model built by [`owa_model_setup`](@ref), already carrying the `t` variable and its cone constraint.
+  - `method`: Programme of the coefficients, whose `alg` is a [`MinimumSquaredDistance`](@ref) or a [`MinimumSumSquares`](@ref).
+  - `model::JuMP.Model`: Model of [`owa_l_moment_crm`](@ref), which holds the variable `t` and its cone row.
 
 # Returns
 
-  - The objective function set on `model`. The model is modified in place.
-
-# Details
-
-  - Under [`SOCRiskExpr`](@ref) or [`RSOCRiskExpr`](@ref) the objective is `so * t`.
-  - Under [`SquaredSOCRiskExpr`](@ref) the objective is `so * t^2`, because the caller's cone bounds `t` below by a norm rather than by its square.
-  - All three encodings share the same minimiser, so they return the same OWA weights to solver tolerance.
+  - The objective function that the method sets on `model`. The function changes `model` in place.
 
 # Related
 
@@ -994,15 +1114,33 @@ end
 """
     owa_gmd(T::Integer)
 
-Compute the Ordered Weights Array (OWA) of the Gini Mean Difference (GMD) risk measure.
+Compute the OWA weight vector of the Gini mean difference.
+
+The weights rise linearly with the rank and sum to zero, so the risk is a dispersion and does not depend on the mean of the returns. [gmd](@citet) states the Gini mean difference, and Section 2.1 of [owa3](@cite) states its OWA weights.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\eta_{t} &= \\dfrac{2 \\left(2 t - 1 - T\\right)}{T \\left(T - 1\\right)} \\quad \\forall t = 1,\\, \\ldots,\\, T\\\\
+\\sum\\limits_{t=1}^{T} \\eta_{t} x_{(t)} &= \\dfrac{1}{T \\left(T - 1\\right)} \\sum\\limits_{i=1}^{T} \\sum\\limits_{j=1}^{T} \\left\\lvert x_{i} - x_{j} \\right\\rvert\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:eta_owa])
+  - $(math_dict[:x_t_asc])
+  - $(math_dict[:xret])
+  - $(math_dict[:T])
 
 # Arguments
 
-  - `T`: Number of observations.
+  - `T`: Number of observations, `T >= 2`.
 
 # Returns
 
-  - `w::VecNum`: Vector of OWA weights of length `T`. It is returned lazily as a range, and its entries sum to zero.
+  - `w::VecNum`: Vector of OWA weights of length `T`. It is a lazy range, and its entries sum to zero.
 
 # Related
 
@@ -1024,12 +1162,37 @@ end
 """
     owa_cvar(T::Integer, alpha::Number = 0.05)
 
-Compute the Ordered Weights Array (OWA) weights for the Conditional Value at Risk.
+Compute the OWA weight vector of the conditional value at risk.
+
+The weights put the mass ``-1`` on the ``\\alpha T`` smallest returns, so the risk is the mean loss of the worst ``\\alpha`` share of the sample. When ``\\alpha T`` is not an integer, the order statistic at the boundary takes the remaining fraction. The vector is nondecreasing and sums to ``-1``, and it gives the value of [`ConditionalValueatRisk`](@ref) with no observation weights.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+k &= \\lfloor \\alpha T \\rfloor\\\\
+\\eta_{t} &= \\begin{cases}
+-\\dfrac{1}{\\alpha T} & t \\leq k\\\\
+-1 + \\dfrac{k}{\\alpha T} & t = k + 1\\\\
+0 & t > k + 1
+\\end{cases}\\\\
+\\sum\\limits_{t=1}^{T} \\eta_{t} x_{(t)} &= -\\dfrac{1}{\\alpha T} \\left(\\sum\\limits_{t=1}^{k} x_{(t)} + \\left(\\alpha T - k\\right) x_{(k+1)}\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:alpha_rm])
+  - ``k``: Number of order statistics that the tail holds in full.
+  - $(math_dict[:eta_owa])
+  - $(math_dict[:x_t_asc])
+  - $(math_dict[:xret])
+  - $(math_dict[:T])
 
 # Arguments
 
   - `T`: Number of observations.
-  - `alpha`: Confidence level for CVaR.
+  - `alpha`: Significance level, the share of the sample in the tail.
 
 # Validation
 
@@ -1062,9 +1225,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Callable OWA weight estimator for the Conditional Value at Risk (CVaR) risk measure.
+Builds the OWA weight vector of the conditional value at risk at level `alpha`.
 
-When called as `r(T)`, returns the OWA weight vector for CVaR at confidence level `alpha` for `T` observations.
+Called as `r(T)`, it returns [`owa_cvar`](@ref)`(T, alpha)`, whose docstring states the closed form. A Calibration Rule in `alpha` resolves against the prior before the call.
 
 # Fields
 
@@ -1124,13 +1287,35 @@ end
 """
     owa_wcvar(T::Integer, alphas::VecNum, weights::VecNum)
 
-Compute the Ordered Weights Array (OWA) weights for a weighted combination of Conditional Value at Risk measures.
+Compute the OWA weight vector of a weighted sum of conditional values at risk.
+
+The vector sums to minus the sum of `weights`. Section 2.1 of [owa3](@cite) states it with weights that sum to one, and the function does not check that sum. A negative weight can make the vector decrease, and the risk measure is then not convex.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{\\eta} &= \\sum\\limits_{j=1}^{J} p_{j} \\boldsymbol{\\eta}^{\\mathrm{CVaR}}(\\alpha_{j})\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:eta_owa])
+  - $(math_dict[:eta_cvar])
+  - ``\\alpha_{j}``, ``p_{j}``: The ``j``-th entries of `alphas` and `weights`.
+  - ``J``: Number of levels, `length(alphas)`.
 
 # Arguments
 
   - `T`: Number of observations.
-  - `alphas`: Vector of confidence levels.
-  - `weights`: Vector of weights.
+  - `alphas`: Vector of significance levels, each in ``(0, 1)``.
+  - `weights`: Vector of the weight of each level.
+
+# Validation
+
+  - `length(alphas) == length(weights)`. Raises a `DimensionMismatch`.
+  - Each entry of `alphas` satisfies `0 < alpha < 1`, through [`owa_cvar`](@ref).
 
 # Returns
 
@@ -1141,8 +1326,14 @@ Compute the Ordered Weights Array (OWA) weights for a weighted combination of Co
   - [`owa_cvar`](@ref)
   - [`owa_tg`](@ref)
   - [`VecNum`](@ref)
+
+# References
+
+  - $(ref_dict[:owa3]) Section 2.1.
 """
 function owa_wcvar(T::Integer, alphas::VecNum, weights::VecNum)
+    @argcheck(length(alphas) == length(weights),
+              DimensionMismatch("`alphas` has $(length(alphas)) levels and `weights` has $(length(weights)) entries. Each level needs one weight."))
     w = zeros(promote_type(eltype(alphas), eltype(weights)), T)
     for (i, j) in zip(alphas, weights)
         w .+= owa_cvar(T, i) * j
@@ -1152,21 +1343,41 @@ end
 """
     owa_tg(T::Integer; alpha_i::Number = 1e-4, alpha::Number = 0.05, a_sim::Integer = 100)
 
-Compute the Ordered Weights Array (OWA) weights for the tail Gini risk measure.
+Compute the OWA weight vector of the tail Gini, as a weighted sum of conditional values at risk.
 
-This function approximates the tail Gini risk measure by integrating over a range of CVaR levels from `alpha_i` to `alpha`, using `a_sim` points. The resulting weights are suitable for tail risk assessment.
+Section 2.1 of [owa3](@cite) states the tail Gini weights as this weighted sum, over a grid of levels from zero to `alpha`. The library starts the grid at `alpha_i > 0`, because the conditional value at risk has no level zero. The quadrature weights sum to one, so the vector sums to ``-1``.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\alpha_{j} &= \\alpha_{i} + \\dfrac{j - 1}{m - 1} \\left(\\alpha - \\alpha_{i}\\right) \\quad \\forall j = 1,\\, \\ldots,\\, m\\\\
+p_{1} &= \\dfrac{\\alpha_{1} \\alpha_{2}}{\\alpha_{m}^{2}}\\\\
+p_{j} &= \\dfrac{\\left(\\alpha_{j+1} - \\alpha_{j-1}\\right) \\alpha_{j}}{\\alpha_{m}^{2}} \\quad \\forall j = 2,\\, \\ldots,\\, m - 1\\\\
+p_{m} &= \\dfrac{\\alpha_{m} - \\alpha_{m-1}}{\\alpha_{m}}\\\\
+\\boldsymbol{\\eta} &= \\sum\\limits_{j=1}^{m} p_{j} \\boldsymbol{\\eta}^{\\mathrm{CVaR}}(\\alpha_{j})\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\alpha_{i}``, ``\\alpha``: The levels `alpha_i` and `alpha`, the two ends of the grid.
+  - ``m``: Number of grid points, `a_sim`.
+  - ``\\alpha_{j}``, ``p_{j}``: The ``j``-th level of the grid and its quadrature weight.
+  - $(math_dict[:eta_owa])
+  - $(math_dict[:eta_cvar])
 
 # Arguments
 
   - `T`: Number of observations.
-  - `alpha_i`: Lower bound for CVaR integration.
-  - `alpha`: Upper bound for CVaR integration.
-  - `a_sim`: Number of integration points.
+  - `alpha_i`: Inner level, the first point of the grid.
+  - `alpha`: Outer level, the last point of the grid.
+  - `a_sim`: Number of grid points.
 
 # Validation
 
-  - `0 < alpha_i < alpha < 1`.
-  - `a_sim > 0`.
+  - `0 < alpha_i < alpha < 1`. Raises a `DomainError`.
+  - `a_sim >= 2`. Raises a `DomainError`.
 
 # Returns
 
@@ -1182,7 +1393,7 @@ This function approximates the tail Gini risk measure by integrating over a rang
 
   - $(ref_dict[:tgini])
   - $(ref_dict[:owa1])
-  - $(ref_dict[:owa3])
+  - $(ref_dict[:owa3]) Section 2.1.
   - $(ref_dict[:cajas2025]) Section 7.2.2.5.
 """
 function owa_tg(T::Integer; alpha_i::Number = 1e-4, alpha::Number = 0.05,
@@ -1190,7 +1401,8 @@ function owa_tg(T::Integer; alpha_i::Number = 1e-4, alpha::Number = 0.05,
     @argcheck(zero(alpha) < alpha_i < alpha < one(alpha),
               DomainError((alpha_i, alpha),
                           "`alpha_i` is $alpha_i and `alpha` is $alpha. The tail Gini integrates the CVaR from the inner level `alpha_i` to the outer level `alpha`, so `0 < alpha_i < alpha < 1` must hold."))
-    assert_gt0(a_sim, :a_sim)
+    @argcheck(2 <= a_sim,
+              DomainError(a_sim, "`a_sim` is $a_sim, and the grid needs `a_sim >= 2`."))
     alphas = range(alpha_i, alpha; length = a_sim)
     n = length(alphas)
     w = Vector{typeof(alpha)}(undef, n)
@@ -1204,9 +1416,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Callable OWA weight estimator for the tail Gini risk measure.
+Builds the OWA weight vector of the tail Gini at level `alpha`.
 
-When called as `r(T)`, returns the OWA weight vector approximating the tail Gini measure by integrating over CVaR levels from `alpha_i` to `alpha` using `a_sim` points.
+Called as `r(T)`, it returns [`owa_tg`](@ref)`(T; alpha_i, alpha, a_sim)`, whose docstring states the quadrature over the conditional values at risk. A Calibration Rule in `alpha` resolves against the prior before the call.
 
 # Fields
 
@@ -1225,7 +1437,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - $(val_dict[:alpha_i_alpha])
-  - $(val_dict[:a_sim_pos])
+  - $(val_dict[:a_sim_ge2])
 
 # Examples
 
@@ -1275,7 +1487,8 @@ OrderedWeightsArrayTailGini
         else
             assert_unit_interval(alpha_i, :alpha_i)
         end
-        assert_gt0(a_sim, :a_sim)
+        @argcheck(2 <= a_sim,
+                  DomainError(a_sim, "`a_sim` is $a_sim, and the grid needs `a_sim >= 2`."))
         return new{typeof(alpha_i), typeof(alpha), typeof(a_sim)}(alpha_i, alpha, a_sim)
     end
 end
@@ -1292,9 +1505,28 @@ end
 """
     owa_wr(T::Integer)
 
-Compute the Ordered Weights Array (OWA) weights for the worst realisation risk measure.
+Compute the OWA weight vector of the worst realisation.
 
-This function returns a vector of OWA weights that select the minimum (worst) value among `T` observations.
+The vector selects the smallest return with the weight ``-1``, so the risk is the largest loss of the sample. It gives the value of [`WorstRealisation`](@ref).
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\eta_{t} &= \\begin{cases}
+-1 & t = 1\\\\
+0 & t > 1
+\\end{cases}\\\\
+\\sum\\limits_{t=1}^{T} \\eta_{t} x_{(t)} &= -x_{(1)}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:eta_owa])
+  - $(math_dict[:x_t_asc])
+  - $(math_dict[:xret])
+  - $(math_dict[:T])
 
 # Arguments
 
@@ -1307,7 +1539,12 @@ This function returns a vector of OWA weights that select the minimum (worst) va
 # Related
 
   - [`owa_rg`](@ref)
+  - [`WorstRealisation`](@ref)
   - [`VecNum`](@ref)
+
+# References
+
+  - $(ref_dict[:owa3]) Section 2.1.
 """
 function owa_wr(T::Integer)
     w = zeros(typeof(inv(T)), T)
@@ -1317,9 +1554,29 @@ end
 """
     owa_rg(T::Integer)
 
-Compute the Ordered Weights Array (OWA) weights for the range risk measure.
+Compute the OWA weight vector of the range of the returns.
 
-This function returns a vector of OWA weights corresponding to the range (difference between maximum and minimum) returns among `T` observations.
+The vector weights the largest return by ``1`` and the smallest by ``-1``, so the risk is the largest return less the smallest. It gives the value of [`Range`](@ref). A sample of one observation has a range of zero, and its vector is ``(0)``.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\eta_{t} &= \\begin{cases}
+-1 & t = 1\\\\
+1 & t = T\\\\
+0 & 1 < t < T
+\\end{cases}\\\\
+\\sum\\limits_{t=1}^{T} \\eta_{t} x_{(t)} &= x_{(T)} - x_{(1)}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:eta_owa])
+  - $(math_dict[:x_t_asc])
+  - $(math_dict[:xret])
+  - $(math_dict[:T])
 
 # Arguments
 
@@ -1332,7 +1589,12 @@ This function returns a vector of OWA weights corresponding to the range (differ
 # Related
 
   - [`owa_wr`](@ref)
+  - [`Range`](@ref)
   - [`VecNum`](@ref)
+
+# References
+
+  - $(ref_dict[:owa3]) Section 2.1.
 """
 function owa_rg(T::Integer)
     w = zeros(typeof(inv(T)), T)
@@ -1344,15 +1606,34 @@ end
 """
     owa_cvarrg(T::Integer; alpha::Number = 0.05, beta::Number = alpha)
 
-Compute the Ordered Weights Array (OWA) weights for the Conditional Value at Risk Range risk measure.
+Compute the OWA weight vector of the conditional value at risk range.
 
-This function returns a vector of OWA weights corresponding to the difference between CVaR at level `alpha` (lower tail) and the reversed CVaR at level `beta` (upper tail).
+The vector is the loss-tail vector at level `alpha` less the reversed loss-tail vector at level `beta`. The reversal moves the second tail to the largest returns, and the subtraction makes its weights positive. So the risk is the conditional value at risk of the losses plus the mean of the `beta` share of the largest returns, a sum of the two tails. The vector sums to zero.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{\\eta} &= \\boldsymbol{\\eta}^{\\mathrm{CVaR}}(\\alpha) - \\mathbf{A} \\boldsymbol{\\eta}^{\\mathrm{CVaR}}(\\beta)\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:eta_owa])
+  - $(math_dict[:eta_cvar])
+  - $(math_dict[:A_rev])
+  - ``\\alpha``, ``\\beta``: Significance levels of the loss tail and of the gain tail.
 
 # Arguments
 
   - `T`: Number of observations.
-  - `alpha`: CVaR confidence level for the lower tail.
-  - `beta`: CVaR confidence level for the upper tail.
+  - `alpha`: Significance level of the loss tail.
+  - `beta`: Significance level of the gain tail.
+
+# Validation
+
+  - `0 < alpha < 1` and `0 < beta < 1`, through [`owa_cvar`](@ref).
 
 # Returns
 
@@ -1363,6 +1644,10 @@ This function returns a vector of OWA weights corresponding to the difference be
   - [`owa_cvar`](@ref)
   - [`owa_rg`](@ref)
   - [`VecNum`](@ref)
+
+# References
+
+  - $(ref_dict[:owa3]) Section 2.1.
 """
 function owa_cvarrg(T::Integer; alpha::Number = 0.05, beta::Number = alpha)
     return owa_cvar(T, alpha) - reverse!(owa_cvar(T, beta))
@@ -1370,9 +1655,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Callable OWA weight estimator for the Conditional Value at Risk Range risk measure.
+Builds the OWA weight vector of the conditional value at risk range at the levels `alpha` and `beta`.
 
-When called as `r(T)`, returns the OWA weight vector for the CVaR range at lower confidence level `alpha` and upper confidence level `beta` for `T` observations.
+Called as `r(T)`, it returns [`owa_cvarrg`](@ref)`(T; alpha, beta)`, whose docstring states the closed form. `alpha` is the level of the loss tail and `beta` the level of the gain tail. A Calibration Rule in either slot resolves against the prior before the call.
 
 # Fields
 
@@ -1446,17 +1731,38 @@ end
                 betas::VecNum = alphas,
                 weights_b::VecNum = weights_a)
 
-Compute the Ordered Weights Array (OWA) weights for the weighted Conditional Value at Risk Range risk measure.
+Compute the OWA weight vector of the range of two weighted sums of conditional values at risk.
 
-This function returns a vector of OWA weights corresponding to the difference between a weighted sum of CVaR measures at levels `alphas` with weights `weights_a` and the reversed weighted sum of CVaR measures at levels `betas` with weights `weights_b`.
+The vector is the loss-tail vector of [`owa_wcvar`](@ref) at `alphas` and `weights_a`, less the reversed vector at `betas` and `weights_b`. As in [`owa_cvarrg`](@ref), the reversal and the subtraction make the risk a sum of the two tails.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{\\eta} &= \\sum\\limits_{j=1}^{J} p_{j} \\boldsymbol{\\eta}^{\\mathrm{CVaR}}(\\alpha_{j}) - \\mathbf{A} \\sum\\limits_{l=1}^{L} q_{l} \\boldsymbol{\\eta}^{\\mathrm{CVaR}}(\\beta_{l})\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:eta_owa])
+  - $(math_dict[:eta_cvar])
+  - $(math_dict[:A_rev])
+  - ``\\alpha_{j}``, ``p_{j}``: The ``j``-th entries of `alphas` and `weights_a`, and ``J`` their length.
+  - ``\\beta_{l}``, ``q_{l}``: The ``l``-th entries of `betas` and `weights_b`, and ``L`` their length.
 
 # Arguments
 
   - `T`: Number of observations.
-  - `alphas`: Vector of lower tail CVaR confidence levels.
-  - `weights_a`: Vector of weights for lower tail CVaR.
-  - `betas`: Vector of upper tail CVaR confidence levels.
-  - `weights_b`: Vector of weights for upper tail CVaR.
+  - `alphas`: Vector of significance levels of the loss tail.
+  - `weights_a`: Vector of the weight of each level of the loss tail.
+  - `betas`: Vector of significance levels of the gain tail.
+  - `weights_b`: Vector of the weight of each level of the gain tail.
+
+# Validation
+
+  - `length(alphas) == length(weights_a)` and `length(betas) == length(weights_b)`, through [`owa_wcvar`](@ref). Raises a `DimensionMismatch`.
+  - Each level is in ``(0, 1)``, through [`owa_cvar`](@ref).
 
 # Returns
 
@@ -1467,6 +1773,10 @@ This function returns a vector of OWA weights corresponding to the difference be
   - [`owa_wcvar`](@ref)
   - [`owa_cvarrg`](@ref)
   - [`VecNum`](@ref)
+
+# References
+
+  - $(ref_dict[:owa3]) Section 2.1.
 """
 function owa_wcvarrg(T::Integer, alphas::VecNum, weights_a::VecNum, betas::VecNum = alphas,
                      weights_b::VecNum = weights_a)
@@ -1477,19 +1787,40 @@ end
     owa_tgrg(T::Integer; alpha_i::Number = 0.0001, alpha::Number = 0.05, a_sim::Integer = 100,
              beta_i::Number = alpha_i, beta::Number = alpha, b_sim::Integer = a_sim)
 
-Compute the Ordered Weights Array (OWA) weights for the tail Gini range risk measure.
+Compute the OWA weight vector of the tail Gini range.
 
-This function returns a vector of OWA weights corresponding to the difference between tail Gini measures for the lower and upper tails, each approximated by integrating over a range of CVaR levels.
+The vector is the tail Gini vector of [`owa_tg`](@ref) at `alpha_i`, `alpha` and `a_sim`, less the reversed tail Gini vector at `beta_i`, `beta` and `b_sim`. As in [`owa_cvarrg`](@ref), the reversal and the subtraction make the risk a sum of the two tails. The vector sums to zero.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{\\eta} &= \\boldsymbol{\\eta}^{\\mathrm{TG}}(\\alpha_{i}, \\alpha, m_{a}) - \\mathbf{A} \\boldsymbol{\\eta}^{\\mathrm{TG}}(\\beta_{i}, \\beta, m_{b})\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:eta_owa])
+  - ``\\boldsymbol{\\eta}^{\\mathrm{TG}}(\\alpha_{i}, \\alpha, m)``: Tail Gini OWA weight vector, the value of [`owa_tg`](@ref)`(T; alpha_i, alpha, a_sim = m)`.
+  - $(math_dict[:A_rev])
+  - ``\\alpha_{i}``, ``\\alpha``, ``m_{a}``: Inner level, outer level and grid size of the loss tail.
+  - ``\\beta_{i}``, ``\\beta``, ``m_{b}``: Inner level, outer level and grid size of the gain tail.
 
 # Arguments
 
   - `T`: Number of observations.
-  - `alpha_i`: Lower bound for lower tail CVaR integration.
-  - `alpha`: Upper bound for lower tail CVaR integration.
-  - `a_sim`: Number of integration points for lower tail.
-  - `beta_i`: Lower bound for upper tail CVaR integration.
-  - `beta`: Upper bound for upper tail CVaR integration.
-  - `b_sim`: Number of integration points for upper tail.
+  - `alpha_i`: Inner level of the loss tail.
+  - `alpha`: Outer level of the loss tail.
+  - `a_sim`: Number of grid points of the loss tail.
+  - `beta_i`: Inner level of the gain tail.
+  - `beta`: Outer level of the gain tail.
+  - `b_sim`: Number of grid points of the gain tail.
+
+# Validation
+
+  - `0 < alpha_i < alpha < 1` and `0 < beta_i < beta < 1`, through [`owa_tg`](@ref). Raises a `DomainError`.
+  - `a_sim >= 2` and `b_sim >= 2`, through [`owa_tg`](@ref). Raises a `DomainError`.
 
 # Returns
 
@@ -1500,6 +1831,10 @@ This function returns a vector of OWA weights corresponding to the difference be
   - [`owa_tg`](@ref)
   - [`owa_rg`](@ref)
   - [`VecNum`](@ref)
+
+# References
+
+  - $(ref_dict[:owa3]) Section 2.1.
 """
 function owa_tgrg(T::Integer; alpha_i::Number = 0.0001, alpha::Number = 0.05,
                   a_sim::Integer = 100, beta_i::Number = alpha_i, beta::Number = alpha,
@@ -1512,9 +1847,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Callable OWA weight estimator for the tail Gini range risk measure.
+Builds the OWA weight vector of the tail Gini range.
 
-When called as `r(T)`, returns the OWA weight vector for the difference between the lower and upper tail Gini measures, each approximated by integrating over CVaR levels.
+Called as `r(T)`, it returns [`owa_tgrg`](@ref)`(T; alpha_i, alpha, a_sim, beta_i, beta, b_sim)`, whose docstring states the closed form. The `alpha` fields set the loss tail and the `beta` fields the gain tail. A Calibration Rule in `alpha` or `beta` resolves against the prior before the call.
 
 # Fields
 
@@ -1536,9 +1871,9 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - $(val_dict[:alpha_i_alpha])
-  - $(val_dict[:a_sim_pos])
+  - $(val_dict[:a_sim_ge2])
   - $(val_dict[:beta_i_beta])
-  - $(val_dict[:b_sim_pos])
+  - $(val_dict[:b_sim_ge2])
 
 # Examples
 
@@ -1604,7 +1939,8 @@ OrderedWeightsArrayTailGiniRange
         else
             assert_unit_interval(alpha_i, :alpha_i)
         end
-        assert_gt0(a_sim, :a_sim)
+        @argcheck(2 <= a_sim,
+                  DomainError(a_sim, "`a_sim` is $a_sim, and the grid needs `a_sim >= 2`."))
         if isa(beta, Number)
             @argcheck(0 < beta_i < beta < 1,
                       DomainError((beta_i, beta),
@@ -1612,7 +1948,8 @@ OrderedWeightsArrayTailGiniRange
         else
             assert_unit_interval(beta_i, :beta_i)
         end
-        assert_gt0(b_sim, :b_sim)
+        @argcheck(2 <= b_sim,
+                  DomainError(b_sim, "`b_sim` is $b_sim, and the grid needs `b_sim >= 2`."))
         return new{typeof(alpha_i), typeof(alpha), typeof(a_sim), typeof(beta_i),
                    typeof(beta), typeof(b_sim)}(alpha_i, alpha, a_sim, beta_i, beta, b_sim)
     end
@@ -1633,9 +1970,9 @@ end
 """
     owa_l_moment(T::Integer, k::Integer = 2)
 
-Compute the linear moment weights for the linear moments convex risk measure (CRM).
+Compute the OWA weight vector of the sample L-moment of order `k`.
 
-This function returns the vector of weights for the OWA linear moment of order `k` for `T` observations. The `k`-th sample L-moment is the weighted sum of the order statistics of the sample, so an L-moment is an OWA operator and this function returns its weight vector.
+The `k`-th sample L-moment is a weighted sum of the order statistics of the sample, so it is an OWA operator, and this function returns its weights. For `k >= 2` the weights sum to zero, and for `k = 1` they are ``1/T``, the weights of the mean.
 
 # Mathematical definition
 
@@ -1648,16 +1985,16 @@ This function returns the vector of weights for the OWA linear moment of order `
 
 Where:
 
-  - ``\\omega_{i}^{k}``: Is the weight of the `i`-th order statistic in the `k`-th L-moment.
-  - ``\\lambda_{k}``: Is the `k`-th sample L-moment.
-  - ``y_{[i]}``: Is the `i`-th order statistic of the sample, in ascending order.
-  - ``T``: Is the total number of observations.
-  - ``k``: Is the moment order.
+  - $(math_dict[:omega_ik_lmom])
+  - ``\\lambda_{k}``: The ``k``-th sample L-moment.
+  - ``y_{[i]}``: The ``i``-th order statistic of the sample, in ascending order.
+  - $(math_dict[:T])
+  - ``k``: The order of the L-moment.
 
 # Arguments
 
   - `T`: Number of observations.
-  - `k`: Moment order.
+  - `k`: Order of the L-moment, `k >= 1`.
 
 # Returns
 
@@ -1695,29 +2032,9 @@ end
                      method::AbstractOrderedWeightsArrayEstimator = NormalisedConstantRelativeRiskAversion();
                      k::Integer = 2)
 
-Compute the ordered weights array (OWA) linear moments convex risk measure (CRM) weights for a given number of observations and moment order.
+Compute the OWA weight vector of the L-moment convex risk measure of the orders `2` to `k`.
 
-This function constructs the OWA linear moment CRM weights matrix for order statistics of size `T` and moment orders from 2 up to `k`, and then applies the specified OWA estimation method to produce the final OWA weights.
-
-# Arguments
-
-  - `T`: Number of observations.
-  - `k`: Highest moment order to include.
-  - `method`: OWA estimator.
-
-# Validation
-
-  - `k >= 2`.
-
-# Returns
-
-  - `w::VecNum`: Vector of OWA weights of length `T`.
-
-# Details
-
-  - Constructs a matrix of OWA moment weights for each moment order from 2 to `k`. Column `i - 1` holds ``\\left(-1\\right)^{i}`` times the weight vector of [`owa_l_moment`](@ref)`(T, i)`, which is the alternating sign of the convex risk measure.
-  - Each L-moment weight vector of order `k >= 2` sums to zero, so the returned OWA weight vector does not sum to one. It is the risk aversion coefficients that are normalised.
-  - Applies the specified OWA estimation method to aggregate the moment weights into a single OWA weight vector.
+The risk measure is a signed combination of the L-moments of the portfolio returns, with the risk aversion coefficients that `method` finds. The coefficients sum to one, and the OWA weights do not, because each L-moment weight vector of order two or more sums to zero.
 
 # Mathematical definition
 
@@ -1731,12 +2048,34 @@ This function constructs the OWA linear moment CRM weights matrix for order stat
 
 Where:
 
-  - ``\\rho(\\boldsymbol{w})``: Is the L-moment convex risk measure of the portfolio.
-  - ``\\phi_{k}``: Is the risk aversion coefficient of the `k`-th L-moment, which `method` finds.
-  - ``\\omega_{i}^{k}``: Is the weight of the `i`-th order statistic in the `k`-th L-moment.
-  - ``\\boldsymbol{\\eta}``: Is the returned OWA weight vector.
-  - ``K``: Is the highest moment order, `k`.
-  - ``T``: Is the total number of observations.
+  - ``\\rho(\\boldsymbol{w})``: L-moment convex risk measure of the portfolio.
+  - ``\\lambda_{k}(\\hat{\\boldsymbol{r}})``: The ``k``-th sample L-moment of the net portfolio returns.
+  - $(math_dict[:rhat_net_vec]) ``\\hat{r}_{[i]}`` is its ``i``-th smallest entry.
+  - $(math_dict[:phi_k_lmom])
+  - $(math_dict[:omega_ik_lmom])
+  - $(math_dict[:eta_owa])
+  - $(math_dict[:K_lmom])
+  - $(math_dict[:T])
+
+# Algorithm
+
+ 1. Check that `k >= 2`.
+ 2. Build `weights`, the signed L-moment weight matrix ``T \\times (k - 1)``. Its column `i - 1` is ``(-1)^{i}`` times [`owa_l_moment`](@ref)`(T, i)`, for `i` from `2` to `k`.
+ 3. Return `owa_l_moment_crm(method, weights)`, which finds the coefficients and combines the columns.
+
+# Arguments
+
+  - `T`: Number of observations.
+  - `method`: Estimator of the risk aversion coefficients.
+  - `k`: Highest L-moment order.
+
+# Validation
+
+  - `k >= 2`. Raises a `DomainError`.
+
+# Returns
+
+  - `w::VecNum`: Vector of OWA weights of length `T`.
 
 # Related
 
@@ -1767,9 +2106,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Callable estimator that generates OWA linear moment convex risk measure (CRM) weights for a given number of observations.
+Builds the OWA weight vector of the L-moment convex risk measure of the orders `2` to `k`.
 
-When called as `lm(T)`, returns the OWA weight vector produced by [`owa_l_moment_crm`](@ref) using the configured `method` and moment order `k`.
+Called as `lm(T)`, it returns [`owa_l_moment_crm`](@ref)`(T, method; k)`, whose docstring states the measure. `method` finds the risk aversion coefficients of the L-moments.
 
 # Fields
 
@@ -1838,7 +2177,9 @@ end
 """
     const OWA_Func_VecNum = Union{<:Func_VecNum, <:AbstractOrderedWeightsArrayFunction}
 
-Union type for OWA weight specifications: a function, a numeric vector, or an [`AbstractOrderedWeightsArrayFunction`](@ref) callable.
+The values that a weight slot of [`OrderedWeightsArray`](@ref) or [`OrderedWeightsArrayRange`](@ref) accepts.
+
+A weight vector fixes the sample size. A function or an [`AbstractOrderedWeightsArrayFunction`](@ref) is called at the sample size, so one measure serves a sample of any length. Only a builder can hold a Calibration Rule.
 
 # Related
 
@@ -1851,9 +2192,9 @@ const OWA_Func_VecNum = Union{<:Func_VecNum, <:AbstractOrderedWeightsArrayFuncti
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for ordered weights array (OWA) formulation types.
+Abstract supertype for the JuMP encodings of an OWA risk measure.
 
-Determines whether OWA weights are computed exactly or approximately.
+The OWA risk sorts the returns, and a convex programme cannot sort its variables. [`ExactOrderedWeightsArray`](@ref) and [`SortingNetworkOrderedWeightsArray`](@ref) encode the sort exactly, at two different costs. [`ApproxOrderedWeightsArray`](@ref) drops the sort and gives an upper bound. The functor of the measure sorts the returns itself and does not read the formulation.
 
 # Related
 
@@ -1874,9 +2215,9 @@ abstract type OrderedWeightsArrayFormulation <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-OWA formulation that computes the exact OWA risk by solving a linear programme.
+Encodes the exact OWA risk with the linear programme that sorts the sample.
 
-It adds two vector variables `a` and `b` of length `T` and the `T × T` block of constraints ``y_{i} w_{j} \\leq a_{j} + b_{i}``, and the risk is ``\\sum_{t} (a_{t} + b_{t})``. This is the dual of the assignment problem that orders the sample. It costs `T^2` constraints. For a long sample, [`SortingNetworkOrderedWeightsArray`](@ref) gives the same exact risk at ``O(T \\log^{2} T)`` rows, and [`ApproxOrderedWeightsArray`](@ref) gives an upper bound at a lower cost.
+The programme is the dual of the assignment problem that pairs each weight with an order statistic. So it sorts the sample inside the model, and the sort costs `T^2` rows. It adds two vector variables `a` and `b` of length `T` and the `T × T` block of rows ``y_{i} w_{j} \\leq a_{j} + b_{i}``, and the risk is ``\\sum_{t} (a_{t} + b_{t})``. The method of [`set_risk_constraints!`](@ref) for this formulation states the model. For a long sample, [`SortingNetworkOrderedWeightsArray`](@ref) gives the same exact risk at ``O(T \\log^{2} T)`` rows, and [`ApproxOrderedWeightsArray`](@ref) gives an upper bound at a lower cost.
 
 The programme pairs the largest weight with the largest sorted return, so it attains ``\\mathrm{sort}(\\boldsymbol{\\omega})^{\\intercal} \\mathrm{sort}(\\hat{\\boldsymbol{r}})``. This is the OWA risk when, and only when, the weight vector is monotonic non-decreasing, which is also the condition for the risk measure to be convex. Every weight builder in this package returns such a vector. A weight vector supplied out of order is sorted by the programme, so the model and the functor then disagree.
 
@@ -1886,6 +2227,7 @@ The programme pairs the largest weight with the largest sorted return, so it att
   - [`SortingNetworkOrderedWeightsArray`](@ref)
   - [`ApproxOrderedWeightsArray`](@ref)
   - [`OrderedWeightsArray`](@ref)
+  - [`set_risk_constraints!`](@ref)
 
 # References
 
@@ -1897,11 +2239,11 @@ struct ExactOrderedWeightsArray <: OrderedWeightsArrayFormulation end
 """
 $(DocStringExtensions.TYPEDEF)
 
-OWA formulation that approximates the OWA risk using a set of p-norm parameters.
+Encodes an upper bound on the OWA risk with one power cone block for each p-norm order in `p`.
 
-It relaxes the dual representation of the OWA risk, replacing the `T × T` constraint block of [`ExactOrderedWeightsArray`](@ref) by one p-norm constraint for each entry of `p`. It keeps only the properties of the weight vector that a reordering leaves unchanged: the minimum, the maximum, the sum, and one p-norm for each entry of `p`. Every reordering of the weight vector meets those properties, so the risk is an upper bound on the exact OWA risk, and the gap closes as the weight vector approaches a line.
+It relaxes the dual representation of the OWA risk, and does not sort. It replaces the `T × T` block of [`ExactOrderedWeightsArray`](@ref) by one p-norm row for each entry of `p`. It keeps only the properties of the weight vector that a reordering leaves unchanged: the minimum, the maximum, the sum, and one p-norm for each entry of `p`. Every reordering of the weight vector meets those properties, so the model risk lies at or above the exact OWA risk of the same portfolio. The method of [`set_risk_constraints!`](@ref) for this formulation states the model and its `## Relaxation`.
 
-[owa3](@citet) studies the linear case. For the Gini mean difference and the tail Gini over samples of 500 to 10,000 observations, [owa3](@cite) reports the same objective value as the exact formulation, to the printed precision. Measured against the functor at `T = 100`, `N = 8` with the default `p`, the Gini mean difference is 0.06 % high, the tail Gini is 1.7e-5 % high, and the tail Gini range is 0.37 % high. A fourth-order L-moment weight vector, which is not linear, is 4.5 % high. This formulation is the fastest of the three. For a weight vector that is far from a line, prefer an exact formulation: [`SortingNetworkOrderedWeightsArray`](@ref) for a long sample, and [`ExactOrderedWeightsArray`](@ref) for a short one.
+The bound is exact when the weight vector takes two values only, its minimum and its maximum, as the vectors of [`owa_wr`](@ref) and of [`owa_cvar`](@ref) at an integer ``\\alpha T`` do. The box and the sum then describe the convex hull of the reorderings. For other vectors the gap closes as the weight vector approaches a line. [owa3](@citet) studies the linear case. For the Gini mean difference and the tail Gini over samples of 500 to 10,000 observations, [owa3](@cite) reports the same objective value as the exact formulation, to the printed precision. Measured against the functor at `T = 100`, `N = 8` with the default `p`, the Gini mean difference is 0.06 % high, the tail Gini is 1.7e-5 % high, and the tail Gini range is 0.37 % high. A fourth-order L-moment weight vector, which is not linear, is 4.5 % high. This formulation is the fastest of the three. For a weight vector that is far from a line, prefer an exact formulation: [`SortingNetworkOrderedWeightsArray`](@ref) for a long sample, and [`ExactOrderedWeightsArray`](@ref) for a short one.
 
 # Fields
 
@@ -1933,10 +2275,11 @@ ApproxOrderedWeightsArray
   - [`ExactOrderedWeightsArray`](@ref)
   - [`SortingNetworkOrderedWeightsArray`](@ref)
   - [`OrderedWeightsArray`](@ref)
+  - [`set_risk_constraints!`](@ref)
 
 # References
 
-  - $(ref_dict[:owa3])
+  - $(ref_dict[:owa3]) Sections 2.3 and 2.4, Equations 4 and 5.
   - $(ref_dict[:owa1])
   - $(ref_dict[:cajas2025]) Section 7.1.5.
 """
@@ -1980,9 +2323,9 @@ assert_owa_formulation_weights(::OrderedWeightsArrayFormulation, ::VecNum) = not
 """
 $(DocStringExtensions.TYPEDEF)
 
-Ordered Weights Array (OWA) risk measure.
+Measures risk as a weighted sum of the sorted portfolio returns, the ordered weights array (OWA) risk.
 
-Computes portfolio risk as a linear combination of sorted portfolio returns using OWA weights. The OWA weights can be provided directly or computed from an OWA algorithm.
+`w` holds the OWA weights, as a vector, a function of the sample size or a weight builder. The weight builders of this library give the Gini mean difference, the conditional value at risk, the tail Gini, the worst realisation and the L-moment convex risk measure. A nondecreasing weight vector gives a convex risk measure. `alg` selects the JuMP encoding, and the functor does not read it.
 
 # Mathematical definition
 
@@ -1997,8 +2340,8 @@ Where:
   - ``\\mathrm{OWA}_{\\boldsymbol{w}}(\\boldsymbol{x})``: Ordered weights array risk.
   - $(math_dict[:xret])
   - $(math_dict[:T])
-  - ``\\boldsymbol{w}``: OWA weight vector ``T \\times 1``.
-  - ``x_{(t)}``: ``t``-th smallest entry of ``\\boldsymbol{x}``, so ``x_{(1)} \\leq \\dots \\leq x_{(T)}``.
+  - ``\\boldsymbol{w}``: OWA weight vector ``T \\times 1``, the field `w` or its value at ``T``.
+  - $(math_dict[:x_t_asc])
 
 # Fields
 
@@ -2016,7 +2359,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `w` is a `VecNum`: `!isempty(w)`.
+  - If `w` is a `VecNum`: `!isempty(w)`. Raises an `IsEmptyError`.
   - If `w` is a `VecNum` and `alg` is a [`SortingNetworkOrderedWeightsArray`](@ref): `issorted(w)`. Raises a `DomainError`. A callable `w` is checked when the model is built.
 
 # Functor

@@ -189,6 +189,21 @@ unique_key_dict!(math_dict, :math_dict,
                  :F_fee_series => "``F(\\boldsymbol{w})``: Fee series ``T \\times 1`` of the portfolio, zero when `fees` is `nothing`. See [`calc_net_returns`](@ref).",#
                  # The Range convention (ADR 0057).
                  :negated_upper_tail => "The upper tail is the base measure applied to the negated returns ``-\\boldsymbol{x}``, so both tails are reported on the same sign convention and the range is their sum, not their difference.",#
+                 # The ordered weights array family of `07_OWARiskMeasures_a.jl`: the
+                 # weight builders, the L-moment weights and the programme that
+                 # `OWAJuMP` solves for their risk aversion coefficients.
+                 :eta_owa => "``\\boldsymbol{\\eta}``: OWA weight vector ``T \\times 1``. Its ``t``-th entry ``\\eta_{t}`` multiplies the ``t``-th smallest return.",#
+                 :x_t_asc => "``x_{(t)}``: ``t``-th smallest entry of ``\\boldsymbol{x}``, so ``x_{(1)} \\leq \\dots \\leq x_{(T)}``.",#
+                 :eta_cvar => "``\\boldsymbol{\\eta}^{\\mathrm{CVaR}}(\\alpha)``: CVaR OWA weight vector at level ``\\alpha``, the value of [`owa_cvar`](@ref)`(T, α)`.",#
+                 :A_rev => "``\\mathbf{A}``: Reversal matrix ``T \\times T``, with ones on the anti-diagonal and zeros elsewhere, so ``(\\mathbf{A} \\boldsymbol{v})_{t} = v_{T + 1 - t}``.",#
+                 :omega_ik_lmom => "``\\omega_{i}^{k}``: L-moment weight of the ``i``-th smallest observation in the ``k``-th sample L-moment, the ``i``-th entry of [`owa_l_moment`](@ref)`(T, k)`.",#
+                 :K_lmom => "``K``: Highest L-moment order, the `k` of [`owa_l_moment_crm`](@ref).",#
+                 :phi_k_lmom => "``\\phi_{k}``: Risk aversion coefficient of the ``k``-th L-moment, for ``k = 2, \\ldots, K``.",#
+                 :W_lmom => "``\\mathbf{W}``: Signed L-moment weight matrix ``T \\times (K - 1)``. Its column ``k - 1`` is ``(-1)^{k} \\boldsymbol{\\omega}^{k}`` for ``k = 2, \\ldots, K``.",#
+                 :phi_max_owa => "``\\phi_{\\max}``: Ceiling on each risk aversion coefficient, the `max_phi` field of [`OWAJuMP`](@ref).",#
+                 :theta_owa => "``\\boldsymbol{\\theta}``: Solved OWA weight vector ``T \\times 1``, the model variable `theta`.",#
+                 :psi_owa_ent => "``\\boldsymbol{\\psi}``: Entropy variable ``T \\times 1``, the model variable `x`. It is a probability vector, and it bounds ``\\lvert \\boldsymbol{\\theta} \\rvert`` from above, entry by entry.",#
+                 :gamma_crra => "``\\gamma``: Relative risk aversion `g` of the normalised constant relative risk aversion coefficients, ``\\gamma \\in (0, 1)``.",#
                  # A meta-optimiser's sub-portfolios, the synthetic assets of its outer
                  # problem, and the combination of the two solves.
                  :K_sub => "``K``: Sub-portfolio count of a meta-optimiser, which is also the number of synthetic assets of its outer problem.",#

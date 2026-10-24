@@ -32,9 +32,9 @@ unique_key_dict!(val_dict, :val_dict, :oow => "If `w` is not `nothing`, `!isempt
                  :ck => "`k >= 1`.",#
                  :lm_k => "`k >= 2`.",#
                  :alpha_i_alpha => "`0 < alpha_i < alpha < 1`, checked when `alpha` is a number. When `alpha` holds a Calibration Rule only `0 < alpha_i < 1` is checked here, and the joint bound is checked when the rebuild runs at fold time. A rule that returns a value at or below the stated `alpha_i` is refused there, and this joint bound is the whole of the ordering validation.",#
-                 :a_sim_pos => "`a_sim > 0`.",#
+                 :a_sim_ge2 => "`a_sim >= 2`. The quadrature grid needs its two ends.",#
                  :beta_i_beta => "`0 < beta_i < beta < 1`, checked when `beta` is a number. When `beta` holds a Calibration Rule only `0 < beta_i < 1` is checked here, and the joint bound is checked when the rebuild runs at fold time, on the terms the lower tail states.",#
-                 :b_sim_pos => "`b_sim > 0`.",#
+                 :b_sim_ge2 => "`b_sim >= 2`. The quadrature grid needs its two ends.",#
                  :S_D => "`size(S) == size(D)`.",#
                  :S_P => "If `P` is not `nothing`, `!isempty(P)` and `size(S) == size(P)`.",#
                  :max_k => "If `max_k` is not `nothing`, `max_k >= 1`.",#

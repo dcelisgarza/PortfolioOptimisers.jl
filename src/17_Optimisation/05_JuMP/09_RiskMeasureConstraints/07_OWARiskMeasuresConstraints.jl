@@ -272,6 +272,40 @@ Where:
   - ``T``: Is the total number of observations.
   - ``M``: Is the number of p-norm orders, `length(r.alg.p)`.
 
+# JuMP formulation
+
+## Variables
+
+  - The net portfolio returns ``\\hat{\\boldsymbol{r}}``: Read, through [`set_net_portfolio_returns!`](@ref).
+  - `owa_t_`, `owa_nu_`, `owa_eta_`, `owa_epsilon_`, `owa_psi_`, `owa_z_`, `owa_y_`: Created under no name, and stored under these keys with the index `i`. They are ``t``, ``\\boldsymbol{\\nu} \\geq 0``, ``\\boldsymbol{\\eta} \\geq 0``, ``\\boldsymbol{\\varepsilon}``, ``\\boldsymbol{\\psi}``, ``\\boldsymbol{\\zeta}`` and ``\\boldsymbol{y} \\geq 0``.
+
+## Expressions
+
+  - `aowa_risk_`: ``c_{1} t - c_{2} \\boldsymbol{1}^{\\intercal} \\boldsymbol{\\nu} + c_{3} \\boldsymbol{1}^{\\intercal} \\boldsymbol{\\eta} + \\sum_{k \\in S} d_{k} y_{k}``, the risk.
+  - `neg_owa_z_owa_p_`: ``-k \\zeta_{k}`` for each ``k \\in S``.
+  - `owa_p_o_owa_pm1_`: ``k / (k - 1)`` for each ``k \\in S``.
+
+## Constraints
+
+Every row is registered under no name, and stored under its key with the index `i`.
+
+  - `ca1_owa_`: ``s_c \\left(\\hat{\\boldsymbol{r}} - \\boldsymbol{\\nu} + \\boldsymbol{\\eta} - \\sum_{k \\in S} \\boldsymbol{\\varepsilon}_{k} + t \\boldsymbol{1}\\right) = \\boldsymbol{0}``.
+  - `ca2_owa_`: ``s_c \\left(\\zeta_{k} + y_{k} - \\boldsymbol{1}^{\\intercal} \\boldsymbol{\\psi}_{k}\\right) = 0`` for each ``k \\in S``.
+  - `ca_owa_pcone_`: ``\\left(-s_c k \\zeta_{k},\\, s_c \\tfrac{k}{k-1} \\psi_{k,\\, t},\\, s_c \\varepsilon_{k,\\, t}\\right) \\in \\mathcal{P}_{3}^{1/k,\\, 1-1/k}`` for each ``k \\in S`` and each ``t``.
+
+Where:
+
+  - $(math_dict[:sc_scale])
+  - The other symbols are those of the `Where:` list of `# Mathematical definition`.
+
+## Relaxation
+
+$(val_dict[:relax])
+
+  - The bounded quantity is `aowa_risk_`. At its minimum over the auxiliary variables, it lies at or **above** the exact OWA risk of the same portfolio, ``\\boldsymbol{\\omega}^{\\intercal} \\mathrm{sort}(\\hat{\\boldsymbol{r}})``. The dual of the programme maximises over every vector with the minimum, the maximum, the sum and the p-norms of ``-\\boldsymbol{\\omega}``, and every reordering of ``-\\boldsymbol{\\omega}`` is such a vector.
+  - The bound is exact when the weight vector takes two values only, its minimum and its maximum, as the vectors of [`owa_wr`](@ref) and of [`owa_cvar`](@ref) at an integer ``\\alpha T`` do. The box and the sum then describe the convex hull of the reorderings. For other vectors the gap closes as the vector approaches a line, and the gaps above give its size.
+  - The bound holds while the objective or a bound pulls `aowa_risk_` down, as a minimum-risk objective does. Under [`MaximumReturn`](@ref) with no risk bound, nothing pulls, and the value of `aowa_risk_` can lie further above. Read the exact figure back with [`expected_risk`](@ref).
+
 # Arguments
 
   - $(arg_dict[:model])

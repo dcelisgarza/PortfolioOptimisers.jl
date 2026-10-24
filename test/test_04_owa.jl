@@ -226,5 +226,36 @@
             @test cached == cached_before
             @test r3.w2(8) == reverse(cached_before)
         end
+        @testset "OWA weight builders: closed forms and edge cases" begin
+            x = [0.02, -0.01, 0.03, -0.04, 0.01, 0.005, -0.02]
+            T = length(x)
+            # The Gini mean difference over the ordered pairs, and its weights sum to zero.
+            gmd = sum(abs(a - b) for a in x, b in x) / (T * (T - 1))
+            @test isapprox(dot(owa_gmd(T), sort(x)), gmd)
+            @test isapprox(sum(owa_gmd(T)), 0; atol = 1e-15)
+            # The CVaR weights sum to -1 and give the value of the measure.
+            @test isapprox(sum(owa_cvar(T, 0.3)), -1)
+            @test isapprox(dot(owa_cvar(T, 0.3), sort(x)),
+                           ConditionalValueatRisk(; alpha = 0.3)(x))
+            # The quadrature weights of the tail Gini sum to one, and the range sums to zero.
+            @test isapprox(sum(owa_tg(T; alpha_i = 0.01, alpha = 0.4, a_sim = 7)), -1)
+            @test isapprox(sum(owa_cvarrg(T; alpha = 0.2, beta = 0.3)), 0; atol = 1e-15)
+            @test isapprox(dot(owa_wr(T), sort(x)), -minimum(x))
+            @test isapprox(dot(owa_rg(T), sort(x)), maximum(x) - minimum(x))
+            # One observation has a range of zero.
+            @test owa_rg(1) == [0.0]
+            @test owa_rg(2) == [-1.0, 1.0]
+            # The quadrature needs the two ends of its grid. One point raised an
+            # ArgumentError from `range` at the call, after the constructor accepted it.
+            @test_throws DomainError owa_tg(T; a_sim = 1)
+            @test_throws DomainError OrderedWeightsArrayTailGini(; a_sim = 1)
+            @test_throws DomainError OrderedWeightsArrayTailGiniRange(; a_sim = 1)
+            @test_throws DomainError OrderedWeightsArrayTailGiniRange(; b_sim = 1)
+            @test isapprox(OrderedWeightsArrayTailGini(; a_sim = 2)(T),
+                           owa_tg(T; a_sim = 2))
+            # Each level needs one weight. `zip` dropped the extra levels with no error.
+            @test_throws DimensionMismatch owa_wcvar(T, [0.05, 0.1], [1.0])
+            @test_throws DimensionMismatch owa_wcvarrg(T, [0.05], [1.0], [0.05, 0.1], [1.0])
+        end
     end
 end
