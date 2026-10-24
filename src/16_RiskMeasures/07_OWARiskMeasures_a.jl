@@ -1337,7 +1337,8 @@ This function returns a vector of OWA weights corresponding to the range (differ
 function owa_rg(T::Integer)
     w = zeros(typeof(inv(T)), T)
     w[1] = -1
-    w[T] = 1
+    # Add, so that one observation gives a zero weight and a zero range.
+    w[T] += 1
     return w
 end
 """

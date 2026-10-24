@@ -334,13 +334,13 @@
 "src/16_RiskMeasures/06_XatRisk/05_PowerNormXatRisk.jl" = { map = 9, units = 5, swept = false }
 "src/16_RiskMeasures/07_OWARiskMeasures_a.jl" = { map = 9, units = 46, swept = false }
 "src/16_RiskMeasures/07_OWARiskMeasures_b.jl" = { map = 9, units = 18, swept = false }
-"src/16_RiskMeasures/08_AverageDrawdown.jl" = { map = 9, units = 3, swept = false }
-"src/16_RiskMeasures/09_UlcerIndex.jl" = { map = 9, units = 3, swept = false }
-"src/16_RiskMeasures/10_MaximumDrawdown.jl" = { map = 9, units = 2, swept = false }
+"src/16_RiskMeasures/08_AverageDrawdown.jl" = { map = 9, units = 3, algorithm = 2, swept = true, bindings = ["AverageDrawdown", "RelativeAverageDrawdown", "average_drawdown"] }
+"src/16_RiskMeasures/09_UlcerIndex.jl" = { map = 9, units = 3, algorithm = 2, swept = true, bindings = ["RelativeUlcerIndex", "UlcerIndex", "ulcer_index"] }
+"src/16_RiskMeasures/10_MaximumDrawdown.jl" = { map = 9, units = 2, algorithm = 2, swept = true, bindings = ["MaximumDrawdown", "RelativeMaximumDrawdown"] }
 "src/16_RiskMeasures/11_BrownianDistanceVariance.jl" = { map = 9, units = 5, algorithm = 0, swept = true, bindings = ["BDVarRkFormulations", "BrownianDistanceVariance", "BrownianDistanceVarianceFormulation", "IneqBrownianDistanceVariance", "NormOneConeBrownianDistanceVariance"] }
-"src/16_RiskMeasures/12_WorstRealisation.jl" = { map = 9, units = 1, swept = false }
+"src/16_RiskMeasures/12_WorstRealisation.jl" = { map = 9, units = 1, algorithm = 0, swept = true, bindings = ["WorstRealisation"] }
 "src/16_RiskMeasures/13_NoRisk.jl" = { map = 9, units = 6, swept = false }
-"src/16_RiskMeasures/14_Range.jl" = { map = 9, units = 1, swept = false }
+"src/16_RiskMeasures/14_Range.jl" = { map = 9, units = 1, algorithm = 0, swept = true, bindings = ["Range"] }
 "src/16_RiskMeasures/15_TurnoverRiskMeasure.jl" = { map = 9, units = 4, swept = false }
 "src/16_RiskMeasures/16_TrackingRiskMeasure.jl" = { map = 9, units = 20, algorithm = 6, swept = true, bindings = ["RiskTrackingError", "RiskTrackingRiskMeasure", "TrackingRiskMeasure", "bind_data_benchmark", "factory", "factory", "factory", "factory", "factory", "factory", "needs_previous_weights", "needs_previous_weights", "needs_previous_weights", "port_opt_view", "port_opt_view", "reader_frames", "supports_precomputed_returns", "supports_precomputed_returns", "supports_precomputed_returns", "supports_precomputed_returns"] }
 "src/16_RiskMeasures/17_VarianceSkewKurtosis.jl" = { map = 9, units = 19, algorithm = 5, swept = true, bindings = ["MaxRiskMeasureSettings", "Skewness", "VarianceSkewKurtosis", "bigger_is_better", "bounds_risk_measure", "factory", "factory", "factory", "no_bounds_no_risk_expr_risk_measure", "no_bounds_no_risk_expr_risk_measure", "no_bounds_risk_measure", "no_bounds_risk_measure", "no_risk_expr_risk_measure", "port_opt_view", "port_opt_view", "resolve_deferred_quantities", "resolve_deferred_quantities", "supports_precomputed_returns", "supports_precomputed_returns"] }
