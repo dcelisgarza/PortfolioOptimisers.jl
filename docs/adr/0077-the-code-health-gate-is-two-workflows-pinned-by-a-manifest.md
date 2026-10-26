@@ -185,3 +185,19 @@ branch already runs it (#1783). The flag of a new Rationale is the job `rational
 `Complexity.yml`, which runs on every pull request.
 [ADR 0220](0220-a-pull-request-from-a-pushed-branch-skips-the-jobs-its-push-runs.md) records the
 decision and its cost.
+
+## Amendment (2026-10-26)
+
+The pin is **Julia 1.13.3**, and JET is **0.13.1**. The juliaup `release` channel moved from
+1.13.2 to 1.13.3 and deleted the 1.13.2 binary. The maintainer also updated JET.
+`code_health/Manifest.toml` took `Pkg.update("JET")` under 1.13.3, with Pkg loaded from the
+default environment. Only `julia_version`, JET (0.12.3 to 0.13.1) and two stdlib jlls
+(`MozillaCACerts_jll`, `PCRE2_jll`) moved. CodeComplexity and JuliaSyntax keep their versions.
+
+The size, complexity, expansion, performance, prose and JET baselines were refreshed under 1.13.3
+in the commit that moved the Manifest. That commit changes no file under `src/` or `ext/`. No
+binding number of the first five rose, and three complexity rows fell. JET needed `--accept-rise`
+for ten rows. Seven rose in the `main` run, among them `20_Base_Regression.jl` from 9 to 22, and
+three rose in the `plots_ext` run, among them `02_DimensionReductionRegression.jl` from 1 to 27.
+Eight rows fell. With no source change in the commit, every rise is the analyser's. The coverage
+baseline's provenance line was moved by hand, for the reason the first amendment gives.

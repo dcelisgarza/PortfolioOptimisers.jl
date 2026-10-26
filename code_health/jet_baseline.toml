@@ -3,12 +3,12 @@
 # number is ever summed. The ratchet binds on `reviewed`; `raw` is context.
 
 [provenance]
-julia = "1.13.2"
-jet = "0.12.3"
+julia = "1.13.3"
+jet = "0.13.1"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "StatsPlots"]
-commit = "05bfda8c73"
+commit = "c68dd196ed"
 
 [run.main]
 load_set = ["GraphRecipes", "StatsPlots"]
@@ -45,7 +45,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/01_Base/03_PrettyShow.jl" = { raw = 2, reviewed = 2 }
 "src/01_Base/04_ScopedConfig.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/05_Preferences.jl" = { raw = 0, reviewed = 0 }
-"src/01_Base/06_Messages.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/06_Messages.jl" = { raw = 4, reviewed = 4 }
 "src/01_Base/07_Errors.jl" = { raw = 1, reviewed = 1 }
 "src/01_Base/08_TypeAliases.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/09_ObservationWeights.jl" = { raw = 0, reviewed = 0 }
@@ -67,7 +67,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/02_Tools/07_VectorToScalarMeasures.jl" = { raw = 2, reviewed = 2 }
 "src/02_Tools/08_MeanTest.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools/09_MeanTestDraws.jl" = { raw = 0, reviewed = 0 }
-"src/03_InputData/01_AssetPanel.jl" = { raw = 1, reviewed = 1 }
+"src/03_InputData/01_AssetPanel.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/03_ListingSpan.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/04_Preprocessing.jl" = { raw = 0, reviewed = 0 }
@@ -85,11 +85,11 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/03_InputData/16_PanelDataFrame.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/17_ReturnsBufferState.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/18_PreprocessingPartialFit.jl" = { raw = 0, reviewed = 0 }
-"src/03_InputData/19_AssetPanelConcat.jl" = { raw = 5, reviewed = 5 }
+"src/03_InputData/19_AssetPanelConcat.jl" = { raw = 6, reviewed = 6 }
 "src/03_InputData/20_PanelFieldValues.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/21_AssetPanelSummary.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/22_PanelRoundTrip.jl" = { raw = 0, reviewed = 0 }
-"src/04_MatrixProcessing/01_PosdefMatrix.jl" = { raw = 4, reviewed = 4 }
+"src/04_MatrixProcessing/01_PosdefMatrix.jl" = { raw = 2, reviewed = 2 }
 "src/04_MatrixProcessing/02_Denoise.jl" = { raw = 1, reviewed = 1 }
 "src/04_MatrixProcessing/03_Detone.jl" = { raw = 0, reviewed = 0 }
 "src/04_MatrixProcessing/04_MatrixProcessing.jl" = { raw = 0, reviewed = 0 }
@@ -116,9 +116,9 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/17_ExcessExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/18_Coskewness.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/19_Cokurtosis.jl" = { raw = 0, reviewed = 0 }
-"src/05_Moments/20_Base_Regression.jl" = { raw = 9, reviewed = 9 }
-"src/05_Moments/21_TimeSeriesRegression/01_StepwiseRegression.jl" = { raw = 3, reviewed = 3 }
-"src/05_Moments/21_TimeSeriesRegression/02_DimensionReductionRegression.jl" = { raw = 2, reviewed = 2 }
+"src/05_Moments/20_Base_Regression.jl" = { raw = 22, reviewed = 22 }
+"src/05_Moments/21_TimeSeriesRegression/01_StepwiseRegression.jl" = { raw = 2, reviewed = 2 }
+"src/05_Moments/21_TimeSeriesRegression/02_DimensionReductionRegression.jl" = { raw = 15, reviewed = 15 }
 "src/05_Moments/22_ImpliedVolatility.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/23_CorrelationCovariance.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/24_AbstractCovarianceVariance.jl" = { raw = 0, reviewed = 0 }
@@ -138,7 +138,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/30_RegimeAdjusted/01_RegimeAdjustedExpWeightedVariance.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_a.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_b.jl" = { raw = 0, reviewed = 0 }
-"src/05_Moments/30_RegimeAdjusted/03_MahalanobisRegimeBias.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/30_RegimeAdjusted/03_MahalanobisRegimeBias.jl" = { raw = 1, reviewed = 1 }
 "src/05_Moments/30_RegimeAdjusted/04_HacRowKernel.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/30_RegimeAdjusted/05_RegimeSwitches.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/30_RegimeAdjusted/06_EstimatedRegimeBias.jl" = { raw = 0, reviewed = 0 }
@@ -146,7 +146,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/30_RegimeAdjusted/08_SeparatePortfolioBias.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/30_RegimeAdjusted/09_MahalanobisLevelClosure.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/31_HigherMomentPartialFit.jl" = { raw = 0, reviewed = 0 }
-"src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl" = { raw = 1, reviewed = 1 }
+"src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl" = { raw = 2, reviewed = 2 }
 "src/05_Moments/32_CrossSectionalFactorModel/02_CrossSectionalWeights.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/03_CrossSectionalFactorModel.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/01_Base_Descriptor.jl" = { raw = 0, reviewed = 0 }
@@ -187,7 +187,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/32_CrossSectionalFactorModel/11_CrossSectionalIdiosyncraticDiagnostics.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/12_CrossSectionalExposureIC.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/33_CoverageUniverse.jl" = { raw = 0, reviewed = 0 }
-"src/05_Moments/34_PriceLevelExpectedReturns.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/34_PriceLevelExpectedReturns.jl" = { raw = 1, reviewed = 1 }
 "src/05_Moments/35_CompositePriceLevelStatistics.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/36_RankOneCovariance.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/37_GeodesicShrinkageCovariance.jl" = { raw = 0, reviewed = 0 }
@@ -204,7 +204,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/08_Phylogeny/04_NonHierarchicalClustering.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/05_Phylogeny.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/06_DBHT/01_DBHT.jl" = { raw = 0, reviewed = 0 }
-"src/08_Phylogeny/06_DBHT/02_PMFG.jl" = { raw = 1, reviewed = 1 }
+"src/08_Phylogeny/06_DBHT/02_PMFG.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/06_DBHT/03_GraphTraversal.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/06_DBHT/04_CliqueHierarchy.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/06_DBHT/05_BubbleTree.jl" = { raw = 0, reviewed = 0 }
@@ -288,7 +288,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/16_RiskMeasures/06_XatRisk/02_ConditionalXatRisk.jl" = { raw = 4, reviewed = 4 }
 "src/16_RiskMeasures/06_XatRisk/03_EntropicXatRisk.jl" = { raw = 2, reviewed = 2 }
 "src/16_RiskMeasures/06_XatRisk/04_RelativisticXatRisk.jl" = { raw = 21, reviewed = 21 }
-"src/16_RiskMeasures/06_XatRisk/05_PowerNormXatRisk.jl" = { raw = 5, reviewed = 5 }
+"src/16_RiskMeasures/06_XatRisk/05_PowerNormXatRisk.jl" = { raw = 4, reviewed = 4 }
 "src/16_RiskMeasures/07_OWARiskMeasures_a.jl" = { raw = 4, reviewed = 4 }
 "src/16_RiskMeasures/07_OWARiskMeasures_b.jl" = { raw = 0, reviewed = 0 }
 "src/16_RiskMeasures/08_AverageDrawdown.jl" = { raw = 0, reviewed = 0 }
@@ -369,7 +369,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/01_BaseRiskConstraints.jl" = { raw = 3, reviewed = 3 }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/02_VarianceConstraints.jl" = { raw = 2, reviewed = 2 }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/03_MomentRiskMeasureConstraints.jl" = { raw = 6, reviewed = 6 }
-"src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/04_KurtosisConstraints.jl" = { raw = 3, reviewed = 3 }
+"src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/04_KurtosisConstraints.jl" = { raw = 2, reviewed = 2 }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/05_NegativeSkewnessConstraints.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/01_XatRiskConstraints.jl" = { raw = 1, reviewed = 1 }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/02_ConditionalXatRiskConstraints.jl" = { raw = 2, reviewed = 2 }
@@ -461,11 +461,11 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/01_Base/03_PrettyShow.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/04_ScopedConfig.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/05_Preferences.jl" = { raw = 0, reviewed = 0 }
-"src/01_Base/06_Messages.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/06_Messages.jl" = { raw = 3, reviewed = 3 }
 "src/01_Base/07_Errors.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/08_TypeAliases.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/09_ObservationWeights.jl" = { raw = 0, reviewed = 0 }
-"src/01_Base/10_Assertions.jl" = { raw = 4, reviewed = 4 }
+"src/01_Base/10_Assertions.jl" = { raw = 3, reviewed = 3 }
 "src/01_Base/11_VecScalar.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/12_NormError.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/13_KappaLog.jl" = { raw = 0, reviewed = 0 }
@@ -534,7 +534,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/19_Cokurtosis.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/20_Base_Regression.jl" = { raw = 4, reviewed = 4 }
 "src/05_Moments/21_TimeSeriesRegression/01_StepwiseRegression.jl" = { raw = 0, reviewed = 0 }
-"src/05_Moments/21_TimeSeriesRegression/02_DimensionReductionRegression.jl" = { raw = 1, reviewed = 1 }
+"src/05_Moments/21_TimeSeriesRegression/02_DimensionReductionRegression.jl" = { raw = 27, reviewed = 27 }
 "src/05_Moments/22_ImpliedVolatility.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/23_CorrelationCovariance.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/24_AbstractCovarianceVariance.jl" = { raw = 0, reviewed = 0 }
@@ -621,7 +621,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/08_Phylogeny/05_Phylogeny.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/06_DBHT/01_DBHT.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/06_DBHT/02_PMFG.jl" = { raw = 0, reviewed = 0 }
-"src/08_Phylogeny/06_DBHT/03_GraphTraversal.jl" = { raw = 2, reviewed = 2 }
+"src/08_Phylogeny/06_DBHT/03_GraphTraversal.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/06_DBHT/04_CliqueHierarchy.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/06_DBHT/05_BubbleTree.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/06_DBHT/06_DBHTDendrogram.jl" = { raw = 0, reviewed = 0 }
@@ -693,7 +693,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/11_UncertaintySets/10_CompactRadiusRules.jl" = { raw = 0, reviewed = 0 }
 "src/12_Turnover.jl" = { raw = 0, reviewed = 0 }
 "src/13_Fees.jl" = { raw = 0, reviewed = 0 }
-"src/14_NetReturnsDrawdowns.jl" = { raw = 2, reviewed = 2 }
+"src/14_NetReturnsDrawdowns.jl" = { raw = 3, reviewed = 3 }
 "src/15_Tracking.jl" = { raw = 0, reviewed = 0 }
 "src/16_RiskMeasures/01_Base_RiskMeasures.jl" = { raw = 0, reviewed = 0 }
 "src/16_RiskMeasures/02_Variance.jl" = { raw = 0, reviewed = 0 }
