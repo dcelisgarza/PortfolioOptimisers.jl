@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.3"
 julia_syntax = "1.0.2"
-commit = "c68dd196ed"
+commit = "89e09f3534"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { code = 287, doc = 0, comment = 12, blank = 2, total = 301 }
@@ -304,6 +304,7 @@ commit = "c68dd196ed"
 "src/16_RiskMeasures/23_AdjustRiskContributions.jl" = { code = 55, doc = 46, comment = 0, blank = 13, total = 114 }
 "src/16_RiskMeasures/24_ExpectedRisk.jl" = { code = 445, doc = 880, comment = 58, blank = 385, total = 1768 }
 "src/16_RiskMeasures/25_RiskMeasureTools.jl" = { code = 111, doc = 112, comment = 0, blank = 61, total = 284 }
+"src/16_RiskMeasures/26_WorstCaseDistribution.jl" = { code = 150, doc = 183, comment = 6, blank = 83, total = 422 }
 "src/17_Optimisation/01_Base_Optimisation/01_OptimisationTypes.jl" = { code = 104, doc = 357, comment = 3, blank = 195, total = 659 }
 "src/17_Optimisation/01_Base_Optimisation/02_PipeRouting.jl" = { code = 64, doc = 99, comment = 4, blank = 57, total = 224 }
 "src/17_Optimisation/01_Base_Optimisation/03_TimeDependent.jl" = { code = 460, doc = 738, comment = 6, blank = 348, total = 1552 }

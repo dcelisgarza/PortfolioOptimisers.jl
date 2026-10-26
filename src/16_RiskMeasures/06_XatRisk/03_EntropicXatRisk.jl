@@ -11,10 +11,125 @@ Compute the Entropic Value-at-Risk of the returns `x` with an exponential cone p
  1. Check `w` against `x` with [`checked_observation_weights`](@ref).
  2. Check that `slv` is not empty when it is a vector.
  3. When `alpha` is zero, return the largest loss among the observations of positive weight, with [`worst_positive_weight_loss`](@ref). This step builds no model.
- 4. Find `rows`, the indices of the observations of positive weight, and `N`, their number. Without `w`, `rows` holds every observation.
- 5. Build the programme below in a new model. Its radius term reads `aT`, which is `alpha` times the number of observations without `w`, and `alpha` times the sum of `w` with it. The cone rows read `xr` and `ur`, the entries of `x` and of `u` in `rows`.
- 6. Solve the model with the solvers of `slv` in turn.
- 7. When a solver solves the model, return its objective value. Otherwise, return `NaN`.
+ 4. Build and solve the exponential cone programme that [`ERM_model`](@ref) states.
+ 5. When a solver solves the model, return its objective value. Otherwise, return `NaN`.
+
+# Arguments
+
+  - `x`: Vector of portfolio returns.
+  - $(arg_dict[:slv])
+  - `alpha`: Significance level, ``\\alpha \\in [0, 1)``.
+  - `w`: Observation weights, or `nothing` for equal weights.
+
+# Validation
+
+  - `w` passes [`checked_observation_weights`](@ref) against `x`. Otherwise that function raises its error.
+  - If `slv` is a `VecSlv`: `!isempty(slv)`, else `IsEmptyError`.
+
+The function does not check `alpha`. The constructors of the measures check it.
+
+# Returns
+
+  - The Entropic Value-at-Risk of `x`, or `NaN` when no solver of `slv` solves the programme.
+
+# Related
+
+  - [`EntropicValueatRisk`](@ref)
+  - [`ERM_model`](@ref)
+  - [`ERM_worst_case`](@ref)
+  - [`RRM`](@ref)
+  - [`worst_positive_weight_loss`](@ref)
+  - [`checked_observation_weights`](@ref)
+  - [`optimise_JuMP_model!`](@ref)
+  - [`Slv_VecSlv`](@ref)
+"""
+function ERM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05,
+             w::Option{<:ObsWeights} = nothing)
+    w = checked_observation_weights(w, x)
+    if isa(slv, VecSlv)
+        @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
+    end
+    if iszero(alpha)
+        return worst_positive_weight_loss(x, w)
+    end
+    model = ERM_model(x, slv, alpha, w)
+    return if isnothing(model)
+        NaN
+    else
+        JuMP.objective_value(model)
+    end
+end
+"""
+    ERM_worst_case(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05,
+                   w::Option{<:ObsWeights} = nothing) -> Option{<:VecNum}
+
+Compute the Worst-Case Distribution of the Entropic Value-at-Risk of the returns `x`, from the dual of the programme of [`ERM_model`](@ref).
+
+The Entropic Value-at-Risk is the largest expected loss over a Kullback-Leibler ball, and the Worst-Case Distribution ``\\boldsymbol{q}`` is the distribution in the ball that reaches it. So the expected loss under ``\\boldsymbol{q}`` equals the value of [`ERM`](@ref), to the tolerance of the solver, and ``-\\boldsymbol{q}`` is the gradient of that value with respect to `x`. [`risk_contribution`](@ref) and [`risk_gradient`](@ref) read it through [`worst_case_distribution`](@ref), so that their finite difference does not difference two solves. [`ERM`](@ref) does not compute it, so a call of [`expected_risk`](@ref) does not pay for it.
+
+# Algorithm
+
+ 1. Check `w` against `x` with [`checked_observation_weights`](@ref).
+ 2. Check that `slv` is not empty when it is a vector.
+ 3. When `alpha` is zero, return the distribution of the largest loss, with [`worst_loss_distribution`](@ref). This step builds no model.
+ 4. Build and solve the programme with [`ERM_model`](@ref).
+ 5. When no solver solves the model, or the solver gives no dual, return `nothing`.
+ 6. Otherwise, negate the first entry of the dual of each row of `erm_cone`, and expand it to `T` entries with [`expand_positive_weight_rows`](@ref).
+
+# Arguments
+
+  - `x`: Vector of portfolio returns.
+  - $(arg_dict[:slv])
+  - `alpha`: Significance level, ``\\alpha \\in [0, 1)``.
+  - `w`: Observation weights, or `nothing` for equal weights.
+
+# Validation
+
+  - `w` passes [`checked_observation_weights`](@ref) against `x`. Otherwise that function raises its error.
+  - If `slv` is a `VecSlv`: `!isempty(slv)`, else `IsEmptyError`.
+
+# Returns
+
+  - `q::VecNum`: The Worst-Case Distribution, one entry for each observation. An observation of weight zero has the entry zero.
+  - `nothing`: When no solver of `slv` solves the programme, or the solver gives no dual.
+
+# Related
+
+  - [`ERM`](@ref)
+  - [`ERM_model`](@ref)
+  - [`RRM_worst_case`](@ref)
+  - [`worst_case_distribution`](@ref)
+"""
+function ERM_worst_case(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05,
+                        w::Option{<:ObsWeights} = nothing)
+    w = checked_observation_weights(w, x)
+    if isa(slv, VecSlv)
+        @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
+    end
+    if iszero(alpha)
+        return worst_loss_distribution(x, w)
+    end
+    model = ERM_model(x, slv, alpha, w)
+    if isnothing(model) || !JuMP.has_duals(model)
+        return nothing
+    end
+    qr = .-first.(JuMP.dual.(model[:erm_cone]))
+    return expand_positive_weight_rows(qr, positive_weight_rows(w, length(x)), length(x))
+end
+"""
+    ERM_model(x::VecNum, slv::Slv_VecSlv, alpha::Number, w::Option{<:VecNum})
+        -> Option{JuMP.Model}
+
+Build the exponential cone programme of [`ERM`](@ref) in a new model, and solve it.
+
+[`ERM`](@ref) reads the objective value of the solved model, and [`ERM_worst_case`](@ref) reads the dual of its cone rows. The callers check `w` and `slv` first, and they answer `alpha = 0` without a model.
+
+# Algorithm
+
+ 1. Find `rows`, the indices of the observations of positive weight, and `N`, their number. Without `w`, `rows` holds every observation.
+ 2. Build the programme below in a new model. Its radius term reads `aT`, which is `alpha` times the number of observations without `w`, and `alpha` times the sum of `w` with it. The cone rows read `xr` and `ur`, the entries of `x` and of `u` in `rows`.
+ 3. Solve the model with the solvers of `slv` in turn.
+ 4. When a solver solves the model, return the model. Otherwise, return `nothing`.
 
 # JuMP formulation
 
@@ -30,12 +145,14 @@ Compute the Entropic Value-at-Risk of the returns `x` with an exponential cone p
 
 ## Constraints
 
-No row carries a name. The model registers these rows:
+No row carries a string name. The model registers these rows:
 
   - ``\\sum_{i=1}^{T} u_i - z \\leq 0`` without observation weights, and ``\\sum_{i=1}^{T} w_i u_i - z \\leq 0`` with them.
-  - ``(-x_i - t,\\, z,\\, u_i) \\in \\mathcal{K}_{\\exp}``, one row for each ``i \\in \\mathcal{I}``.
+  - `erm_cone`: ``(-x_i - t,\\, z,\\, u_i) \\in \\mathcal{K}_{\\exp}``, one row for each ``i \\in \\mathcal{I}``.
 
 The cone rows give ``u_i \\geq z\\, e^{(L_i - t)/z}``. So at the optimum, `risk` is the minimum over ``z`` of ``z \\ln\\!\\left(\\tfrac{1}{\\alpha} \\sum_{i \\in \\mathcal{I}} p_i e^{L_i / z}\\right)``, the Chernoff bound of [`EntropicValueatRisk`](@ref). An observation of weight zero has ``p_i = 0``, so it adds no term to that sum.
+
+The first entry of the dual of the cone row of observation ``i`` is ``-q_i``, where ``\\boldsymbol{q}`` is the Worst-Case Distribution of the Kullback-Leibler ball. [`ERM_worst_case`](@ref) reads it.
 
 ## Objective
 
@@ -59,38 +176,22 @@ Where:
 
   - `x`: Vector of portfolio returns.
   - $(arg_dict[:slv])
-  - `alpha`: Significance level, ``\\alpha \\in [0, 1)``.
-  - `w`: Observation weights, or `nothing` for equal weights.
-
-# Validation
-
-  - `w` passes [`checked_observation_weights`](@ref) against `x`. Otherwise that function raises its error.
-  - If `slv` is a `VecSlv`: `!isempty(slv)`, else `IsEmptyError`.
-
-The function does not check `alpha`. The constructors of the measures check it.
+  - `alpha`: Significance level, ``\\alpha \\in (0, 1)``.
+  - `w`: Checked observation weights, or `nothing` for equal weights.
 
 # Returns
 
-  - The Entropic Value-at-Risk of `x`, or `NaN` when no solver of `slv` solves the programme.
+  - `model::JuMP.Model`: The solved model.
+  - `nothing`: When no solver of `slv` solves the programme.
 
 # Related
 
-  - [`EntropicValueatRisk`](@ref)
-  - [`RRM`](@ref)
-  - [`worst_positive_weight_loss`](@ref)
-  - [`checked_observation_weights`](@ref)
+  - [`ERM`](@ref)
+  - [`ERM_worst_case`](@ref)
+  - [`positive_weight_rows`](@ref)
   - [`optimise_JuMP_model!`](@ref)
-  - [`Slv_VecSlv`](@ref)
 """
-function ERM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05,
-             w::Option{<:ObsWeights} = nothing)
-    w = checked_observation_weights(w, x)
-    if isa(slv, VecSlv)
-        @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
-    end
-    if iszero(alpha)
-        return worst_positive_weight_loss(x, w)
-    end
+function ERM_model(x::VecNum, slv::Slv_VecSlv, alpha::Number, w::Option{<:VecNum})
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, false)
     T = length(x)
@@ -110,13 +211,14 @@ function ERM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05,
         alpha * sum(w)
     end
     ur = view(u, rows)
-    JuMP.@constraint(model, [k = 1:N], [-xr[k] - t, z, ur[k]] in JuMP.MOI.ExponentialCone())
+    JuMP.@constraint(model, erm_cone[k = 1:N],
+                     [-xr[k] - t, z, ur[k]] in JuMP.MOI.ExponentialCone())
     JuMP.@expression(model, risk, t - z * log(aT))
     JuMP.@objective(model, Min, risk)
     return if optimise_JuMP_model!(model, slv).success
-        JuMP.objective_value(model)
+        model
     else
-        NaN
+        nothing
     end
 end
 """
@@ -750,6 +852,26 @@ risk_input_kind(::EntropicValueatRisk) = NetReturnsInput()
 risk_input_kind(::EntropicValueatRiskRange) = NetReturnsInput()
 risk_input_kind(::EntropicDrawdownatRisk) = NetReturnsInput()
 risk_input_kind(::RelativeEntropicDrawdownatRisk) = NetReturnsInput()
+# Worst-Case Distribution — see `worst_case_distribution` and `worst_case_risk`.
+function worst_case_distribution(r::EntropicValueatRisk, x::VecNum)
+    return ERM_worst_case(x, r.slv, r.alpha, r.w)
+end
+function worst_case_distribution(r::EntropicValueatRiskRange, x::VecNum)
+    return worst_case_pair(ERM_worst_case(x, r.slv, r.alpha, r.w),
+                           ERM_worst_case(-x, r.slv, r.beta, r.w))
+end
+function worst_case_distribution(r::EntropicDrawdownatRisk, x::VecNum)
+    return ERM_worst_case(absolute_drawdown_vec(x), r.slv, r.alpha, r.w)
+end
+function worst_case_distribution(r::RelativeEntropicDrawdownatRisk, x::VecNum)
+    return ERM_worst_case(relative_drawdown_vec(x), r.slv, r.alpha, r.w)
+end
+function worst_case_risk(::EntropicDrawdownatRisk, x::VecNum, q::VecNum)
+    return -LinearAlgebra.dot(q, absolute_drawdown_vec(x))
+end
+function worst_case_risk(::RelativeEntropicDrawdownatRisk, x::VecNum, q::VecNum)
+    return -LinearAlgebra.dot(q, relative_drawdown_vec(x))
+end
 
 export EntropicValueatRisk, EntropicValueatRiskRange, EntropicDrawdownatRisk,
        RelativeEntropicDrawdownatRisk

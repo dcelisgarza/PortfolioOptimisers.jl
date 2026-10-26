@@ -11,13 +11,176 @@ Compute the Power Norm Value-at-Risk of the returns `x` with a power cone progra
 
  1. Check `w` against `x` with [`checked_observation_weights`](@ref).
  2. Check that `slv` is not empty when it is a vector.
- 3. Find `rows`, the indices of the observations of positive weight, and `N`, their number. Without `w`, `rows` holds every observation.
- 4. Find `l`, the largest loss among the observations of positive weight, with [`worst_positive_weight_loss`](@ref).
- 5. Find `pl`, the probability of the observations at the loss `l`. It is their number divided by the number of observations without `w`, and their share of the sum of `w` with it.
- 6. When `alpha` is at most `pl` to the power `1/p`, return `l`. This step builds no model.
- 7. Build the programme below in a new model. Its objective reads `iaT`, which is the inverse of `alpha` times the number of observations to the power `1/p` without `w`, and the inverse of `alpha` times the sum of `w` to the power `1/p` with it. The rows read `xr`, the entries of `x` in `rows`.
- 8. Solve the model with the solvers of `slv` in turn.
- 9. When a solver solves the model, return its objective value. Otherwise, return `NaN`.
+ 3. When [`power_norm_is_worst_loss`](@ref) holds, return the largest loss among the observations of positive weight, with [`worst_positive_weight_loss`](@ref). This step builds no model.
+ 4. Build and solve the power cone programme that [`PRM_model`](@ref) states.
+ 5. When a solver solves the model, return its objective value. Otherwise, return `NaN`.
+
+# Arguments
+
+  - `x`: Vector of portfolio returns.
+  - $(arg_dict[:slv])
+  - `alpha`: Significance level, ``\\alpha \\in (0, 1)``.
+  - `p`: Order of the power norm, ``p > 1``.
+  - `w`: Observation weights, or `nothing` for equal weights.
+
+# Validation
+
+  - `w` passes [`checked_observation_weights`](@ref) against `x`. Otherwise that function raises its error.
+  - If `slv` is a `VecSlv`: `!isempty(slv)`, else `IsEmptyError`.
+
+The function does not check `alpha` or `p`. The constructors of the measures check them.
+
+# Returns
+
+  - The Power Norm Value-at-Risk of `x`, or `NaN` when step 6 does not return and no solver of `slv` solves the programme.
+
+# Related
+
+  - [`PowerNormValueatRisk`](@ref)
+  - [`PRM_model`](@ref)
+  - [`PRM_worst_case`](@ref)
+  - [`ERM`](@ref)
+  - [`RRM`](@ref)
+  - [`power_norm_is_worst_loss`](@ref)
+  - [`worst_positive_weight_loss`](@ref)
+  - [`positive_weight_rows`](@ref)
+  - [`checked_observation_weights`](@ref)
+  - [`optimise_JuMP_model!`](@ref)
+  - [`Slv_VecSlv`](@ref)
+
+# References
+
+  - $(ref_dict[:pnvar]) Equation 32.
+  - $(ref_dict[:chares2009]) Section 4.1, Equations 4.4 and 4.5.
+"""
+function PRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, p::Number = 2.0,
+             w::Option{<:ObsWeights} = nothing)
+    w = checked_observation_weights(w, x)
+    if isa(slv, VecSlv)
+        @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
+    end
+    if power_norm_is_worst_loss(x, alpha, p, w)
+        return worst_positive_weight_loss(x, w)
+    end
+    model = PRM_model(x, slv, alpha, p, w)
+    return if isnothing(model)
+        NaN
+    else
+        JuMP.objective_value(model)
+    end
+end
+"""
+    PRM_worst_case(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, p::Number = 2.0,
+                   w::Option{<:ObsWeights} = nothing) -> Option{<:VecNum}
+
+Compute the Worst-Case Distribution of the Power Norm Value-at-Risk of the returns `x`, from the dual of the programme of [`PRM_model`](@ref).
+
+The Power Norm Value-at-Risk is a coherent measure, so it is the largest expected loss over a set of distributions, and the Worst-Case Distribution ``\\boldsymbol{q}`` is the distribution in the set that reaches it. So the expected loss under ``\\boldsymbol{q}`` equals the value of [`PRM`](@ref), to the tolerance of the solver, and ``-\\boldsymbol{q}`` is the gradient of that value with respect to `x`. [`risk_contribution`](@ref) and [`risk_gradient`](@ref) read it through [`worst_case_distribution`](@ref). [`PRM`](@ref) does not compute it, so a call of [`expected_risk`](@ref) does not pay for it.
+
+# Algorithm
+
+ 1. Check `w` against `x` with [`checked_observation_weights`](@ref).
+ 2. Check that `slv` is not empty when it is a vector.
+ 3. When [`power_norm_is_worst_loss`](@ref) holds, return the distribution of the largest loss, with [`worst_loss_distribution`](@ref). This step builds no model.
+ 4. Build and solve the programme with [`PRM_model`](@ref).
+ 5. When no solver solves the model, or the solver gives no dual, return `nothing`.
+ 6. Otherwise, take the dual of each row of `prm_loss`, and expand it to `T` entries with [`expand_positive_weight_rows`](@ref).
+
+# Arguments
+
+  - `x`: Vector of portfolio returns.
+  - $(arg_dict[:slv])
+  - `alpha`: Significance level, ``\\alpha \\in (0, 1)``.
+  - `p`: Order of the power norm, ``p > 1``.
+  - `w`: Observation weights, or `nothing` for equal weights.
+
+# Validation
+
+  - `w` passes [`checked_observation_weights`](@ref) against `x`. Otherwise that function raises its error.
+  - If `slv` is a `VecSlv`: `!isempty(slv)`, else `IsEmptyError`.
+
+# Returns
+
+  - `q::VecNum`: The Worst-Case Distribution, one entry for each observation. An observation of weight zero has the entry zero.
+  - `nothing`: When no solver of `slv` solves the programme, or the solver gives no dual.
+
+# Related
+
+  - [`PRM`](@ref)
+  - [`PRM_model`](@ref)
+  - [`ERM_worst_case`](@ref)
+  - [`worst_case_distribution`](@ref)
+"""
+function PRM_worst_case(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, p::Number = 2.0,
+                        w::Option{<:ObsWeights} = nothing)
+    w = checked_observation_weights(w, x)
+    if isa(slv, VecSlv)
+        @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
+    end
+    if power_norm_is_worst_loss(x, alpha, p, w)
+        return worst_loss_distribution(x, w)
+    end
+    model = PRM_model(x, slv, alpha, p, w)
+    if isnothing(model) || !JuMP.has_duals(model)
+        return nothing
+    end
+    qr = JuMP.dual.(model[:prm_loss])
+    return expand_positive_weight_rows(qr, positive_weight_rows(w, length(x)), length(x))
+end
+"""
+    power_norm_is_worst_loss(x::VecNum, alpha::Number, p::Number, w::Option{<:VecNum})
+        -> Bool
+
+Return whether the Power Norm Value-at-Risk of `x` is the largest loss among the observations of positive weight.
+
+[`PowerNormValueatRisk`](@ref) states the condition: `alpha` is at most the probability of the largest loss to the power `1/p`. [`PRM`](@ref) and [`PRM_worst_case`](@ref) read it, and build no model when it holds.
+
+# Algorithm
+
+ 1. Find `l`, the largest loss among the observations of positive weight, with [`worst_positive_weight_loss`](@ref).
+ 2. Find `pl`, the probability of the observations at the loss `l`. It is their number divided by the number of observations without `w`, and their share of the sum of `w` with it.
+ 3. Return whether `alpha` is at most `pl` to the power `1/p`.
+
+# Arguments
+
+  - `x`: Vector of portfolio returns.
+  - `alpha`: Significance level, ``\\alpha \\in (0, 1)``.
+  - `p`: Order of the power norm, ``p > 1``.
+  - `w`: Checked observation weights, or `nothing` for equal weights.
+
+# Returns
+
+  - `Bool`: Whether the measure is the largest loss.
+
+# Related
+
+  - [`PRM`](@ref)
+  - [`PRM_worst_case`](@ref)
+  - [`worst_positive_weight_loss`](@ref)
+"""
+function power_norm_is_worst_loss(x::VecNum, alpha::Number, p::Number, w::Option{<:VecNum})
+    l = worst_positive_weight_loss(x, w)
+    pl = if isnothing(w)
+        count(v -> -v == l, x) / length(x)
+    else
+        sum(w[t] for t in positive_weight_rows(w, length(x)) if -x[t] == l) / sum(w)
+    end
+    return alpha <= pl^inv(p)
+end
+"""
+    PRM_model(x::VecNum, slv::Slv_VecSlv, alpha::Number, p::Number, w::Option{<:VecNum})
+        -> Option{JuMP.Model}
+
+Build the power cone programme of [`PRM`](@ref) in a new model, and solve it.
+
+[`PRM`](@ref) reads the objective value of the solved model, and [`PRM_worst_case`](@ref) reads the dual of its rows `prm_loss`. The callers check `w` and `slv` first, and they answer the case of [`power_norm_is_worst_loss`](@ref) without a model.
+
+# Algorithm
+
+ 1. Find `rows`, the indices of the observations of positive weight, and `N`, their number. Without `w`, `rows` holds every observation.
+ 2. Build the programme below in a new model. Its objective reads `iaT`, which is the inverse of `alpha` times the number of observations to the power `1/p` without `w`, and the inverse of `alpha` times the sum of `w` to the power `1/p` with it. The rows read `xr`, the entries of `x` in `rows`.
+ 3. Solve the model with the solvers of `slv` in turn.
+ 4. When a solver solves the model, return the model. Otherwise, return `nothing`.
 
 # JuMP formulation
 
@@ -30,13 +193,15 @@ Compute the Power Norm Value-at-Risk of the returns `x` with a power cone progra
 
 ## Constraints
 
-No row carries a name. The model registers these rows:
+No row carries a string name. The model registers these rows:
 
   - ``\\sum_{i \\in \\mathcal{I}} v_i - t \\leq 0`` without observation weights, and ``\\sum_{i \\in \\mathcal{I}} q_i v_i - t \\leq 0`` with them.
-  - ``x_i + w_i + \\eta \\geq 0``, one row for each ``i \\in \\mathcal{I}``.
+  - `prm_loss`: ``x_i + w_i + \\eta \\geq 0``, one row for each ``i \\in \\mathcal{I}``.
   - ``(v_i,\\, t,\\, w_i) \\in \\mathcal{K}_{\\mathrm{pow}}(1/p)``, one row for each ``i \\in \\mathcal{I}``.
 
 The cone rows give ``v_i \\geq w_i^{p} / t^{p-1}``, so the first row gives ``t \\geq \\left(\\sum_{i \\in \\mathcal{I}} w_i^{p}\\right)^{1/p}`` without observation weights. At the optimum ``w_i = \\max(L_i - \\eta, 0)``, so the objective is the minimum of [`PowerNormValueatRisk`](@ref) over ``\\eta``. An observation of weight zero has ``p_i = 0``, so it adds no term to that minimum.
+
+The dual of the row of observation ``i`` in `prm_loss` is the entry of that observation in the Worst-Case Distribution of the measure, the distribution whose expected loss is the value of the measure. [`PRM_worst_case`](@ref) reads it.
 
 ## Objective
 
@@ -65,55 +230,27 @@ Where:
   - $(arg_dict[:slv])
   - `alpha`: Significance level, ``\\alpha \\in (0, 1)``.
   - `p`: Order of the power norm, ``p > 1``.
-  - `w`: Observation weights, or `nothing` for equal weights.
-
-# Validation
-
-  - `w` passes [`checked_observation_weights`](@ref) against `x`. Otherwise that function raises its error.
-  - If `slv` is a `VecSlv`: `!isempty(slv)`, else `IsEmptyError`.
-
-The function does not check `alpha` or `p`. The constructors of the measures check them.
+  - `w`: Checked observation weights, or `nothing` for equal weights.
 
 # Returns
 
-  - The Power Norm Value-at-Risk of `x`, or `NaN` when step 6 does not return and no solver of `slv` solves the programme.
+  - `model::JuMP.Model`: The solved model.
+  - `nothing`: When no solver of `slv` solves the programme.
 
 # Related
 
-  - [`PowerNormValueatRisk`](@ref)
-  - [`ERM`](@ref)
-  - [`RRM`](@ref)
-  - [`worst_positive_weight_loss`](@ref)
+  - [`PRM`](@ref)
+  - [`PRM_worst_case`](@ref)
   - [`positive_weight_rows`](@ref)
-  - [`checked_observation_weights`](@ref)
   - [`optimise_JuMP_model!`](@ref)
-  - [`Slv_VecSlv`](@ref)
-
-# References
-
-  - $(ref_dict[:pnvar]) Equation 32.
-  - $(ref_dict[:chares2009]) Section 4.1, Equations 4.4 and 4.5.
 """
-function PRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, p::Number = 2.0,
-             w::Option{<:ObsWeights} = nothing)
-    w = checked_observation_weights(w, x)
-    if isa(slv, VecSlv)
-        @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
-    end
+function PRM_model(x::VecNum, slv::Slv_VecSlv, alpha::Number, p::Number,
+                   w::Option{<:VecNum})
     T = length(x)
     rows = positive_weight_rows(w, T)
     N = length(rows)
     xr = view(x, rows)
     ip = inv(p)
-    l = worst_positive_weight_loss(x, w)
-    pl = if isnothing(w)
-        count(v -> -v == l, x) / T
-    else
-        sum(w[t] for t in rows if -x[t] == l) / sum(w)
-    end
-    if alpha <= pl^ip
-        return l
-    end
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, false)
     JuMP.@variables(model, begin
@@ -131,15 +268,15 @@ function PRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, p::Number = 2.0,
     end
     JuMP.@constraints(model,
                       begin
-                          (xr + pvar_w) .+ pvar_eta >= 0
+                          prm_loss, (xr + pvar_w) .+ pvar_eta >= 0
                           [k = 1:N],
                           [pvar_v[k], pvar_t, pvar_w[k]] in JuMP.MOI.PowerCone(ip)
                       end)
     JuMP.@objective(model, Min, pvar_eta + iaT * pvar_t)
     return if optimise_JuMP_model!(model, slv).success
-        JuMP.objective_value(model)
+        model
     else
-        NaN
+        nothing
     end
 end
 """
@@ -814,6 +951,26 @@ risk_input_kind(::PowerNormValueatRisk) = NetReturnsInput()
 risk_input_kind(::PowerNormValueatRiskRange) = NetReturnsInput()
 risk_input_kind(::PowerNormDrawdownatRisk) = NetReturnsInput()
 risk_input_kind(::RelativePowerNormDrawdownatRisk) = NetReturnsInput()
+# Worst-Case Distribution — see `worst_case_distribution` and `worst_case_risk`.
+function worst_case_distribution(r::PowerNormValueatRisk, x::VecNum)
+    return PRM_worst_case(x, r.slv, r.alpha, r.p, r.w)
+end
+function worst_case_distribution(r::PowerNormValueatRiskRange, x::VecNum)
+    return worst_case_pair(PRM_worst_case(x, r.slv, r.alpha, r.pa, r.w),
+                           PRM_worst_case(-x, r.slv, r.beta, r.pb, r.w))
+end
+function worst_case_distribution(r::PowerNormDrawdownatRisk, x::VecNum)
+    return PRM_worst_case(absolute_drawdown_vec(x), r.slv, r.alpha, r.p, r.w)
+end
+function worst_case_distribution(r::RelativePowerNormDrawdownatRisk, x::VecNum)
+    return PRM_worst_case(relative_drawdown_vec(x), r.slv, r.alpha, r.p, r.w)
+end
+function worst_case_risk(::PowerNormDrawdownatRisk, x::VecNum, q::VecNum)
+    return -LinearAlgebra.dot(q, absolute_drawdown_vec(x))
+end
+function worst_case_risk(::RelativePowerNormDrawdownatRisk, x::VecNum, q::VecNum)
+    return -LinearAlgebra.dot(q, relative_drawdown_vec(x))
+end
 
 export PowerNormValueatRisk, PowerNormValueatRiskRange, PowerNormDrawdownatRisk,
        RelativePowerNormDrawdownatRisk

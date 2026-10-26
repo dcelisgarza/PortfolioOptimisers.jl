@@ -12,13 +12,124 @@ Both models hold the variables and the rows of the observations of positive weig
 
  1. Check `w` against `x` with [`checked_observation_weights`](@ref).
  2. Check that `slv` is not empty when it is a vector.
- 3. Find `rows`, the indices of the observations of positive weight, and `N`, their number. Without `w`, `rows` holds every observation.
- 4. When `w` is stated, divide its entries in `rows` by the sum of `w`, giving `wi`.
- 5. Compute `ln_k`, the Kaniadakis logarithm of ``1/(\\alpha T)``.
- 6. Build the primal programme in a new model, and solve it with the solvers of `slv` in turn.
- 7. When a solver solves the primal programme, return its objective value.
- 8. Otherwise, build the dual programme in a new model, and solve it with the solvers of `slv` in turn.
- 9. When a solver solves the dual programme, return its objective value. Otherwise, return `NaN`.
+ 3. Build and solve the primal programme, or the dual programme when no solver solves the primal one, with [`RRM_model`](@ref).
+ 4. When a solver solves one of them, return its objective value. Otherwise, return `NaN`.
+
+# Arguments
+
+  - `x`: Vector of portfolio returns.
+  - $(arg_dict[:slv])
+  - `alpha`: Significance level, ``\\alpha \\in (0, 1)``.
+  - `kappa`: Kaniadakis deformation parameter, ``\\kappa \\in (0, 1)``.
+  - `w`: Observation weights, or `nothing` for equal weights.
+
+# Validation
+
+  - `w` passes [`checked_observation_weights`](@ref) against `x`. Otherwise that function raises its error.
+  - If `slv` is a `VecSlv`: `!isempty(slv)`, else `IsEmptyError`.
+
+# Returns
+
+  - The Relativistic Value-at-Risk of `x`, or `NaN` when no solver of `slv` solves either programme.
+
+# Related
+
+  - [`RelativisticValueatRisk`](@ref)
+  - [`RRM_model`](@ref)
+  - [`RRM_worst_case`](@ref)
+  - [`ERM`](@ref)
+  - [`kappa_log`](@ref)
+  - [`optimise_JuMP_model!`](@ref)
+  - [`Slv_VecSlv`](@ref)
+"""
+function RRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0.3,
+             w::Option{<:ObsWeights} = nothing)
+    w = checked_observation_weights(w, x)
+    if isa(slv, VecSlv)
+        @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
+    end
+    sol = RRM_model(x, slv, alpha, kappa, w)
+    return if isnothing(sol)
+        NaN
+    else
+        JuMP.objective_value(sol.model)
+    end
+end
+"""
+    RRM_worst_case(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0.3,
+                   w::Option{<:ObsWeights} = nothing) -> Option{<:VecNum}
+
+Compute the Worst-Case Distribution of the Relativistic Value-at-Risk of the returns `x`, from the programmes of [`RRM_model`](@ref).
+
+The Relativistic Value-at-Risk is the largest expected loss over a Kaniadakis ball, and the Worst-Case Distribution ``\\boldsymbol{q}`` is the distribution in the ball that reaches it. So the expected loss under ``\\boldsymbol{q}`` equals the value of [`RRM`](@ref), to the tolerance of the solver, and ``-\\boldsymbol{q}`` is the gradient of that value with respect to `x`. [`risk_contribution`](@ref) and [`risk_gradient`](@ref) read it through [`worst_case_distribution`](@ref). [`RRM`](@ref) does not compute it, so a call of [`expected_risk`](@ref) does not pay for it.
+
+# Algorithm
+
+ 1. Check `w` against `x` with [`checked_observation_weights`](@ref).
+ 2. Check that `slv` is not empty when it is a vector.
+ 3. Build and solve the programmes with [`RRM_model`](@ref). When no solver solves it, return `nothing`.
+ 4. When the solved model is the primal one, negate the dual of each row of `rrm_loss`. When the solver gives no dual, return `nothing`.
+ 5. When the solved model is the dual one, take the value of its variable `z`.
+ 6. Expand the result to `T` entries with [`expand_positive_weight_rows`](@ref).
+
+# Arguments
+
+  - `x`: Vector of portfolio returns.
+  - $(arg_dict[:slv])
+  - `alpha`: Significance level, ``\\alpha \\in (0, 1)``.
+  - `kappa`: Kaniadakis deformation parameter, ``\\kappa \\in (0, 1)``.
+  - `w`: Observation weights, or `nothing` for equal weights.
+
+# Validation
+
+  - `w` passes [`checked_observation_weights`](@ref) against `x`. Otherwise that function raises its error.
+  - If `slv` is a `VecSlv`: `!isempty(slv)`, else `IsEmptyError`.
+
+# Returns
+
+  - `q::VecNum`: The Worst-Case Distribution, one entry for each observation. An observation of weight zero has the entry zero.
+  - `nothing`: When no solver of `slv` solves either programme, or the solver of the primal programme gives no dual.
+
+# Related
+
+  - [`RRM`](@ref)
+  - [`RRM_model`](@ref)
+  - [`ERM_worst_case`](@ref)
+  - [`worst_case_distribution`](@ref)
+"""
+function RRM_worst_case(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05,
+                        kappa::Number = 0.3, w::Option{<:ObsWeights} = nothing)
+    w = checked_observation_weights(w, x)
+    if isa(slv, VecSlv)
+        @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
+    end
+    sol = RRM_model(x, slv, alpha, kappa, w)
+    if isnothing(sol) || sol.primal && !JuMP.has_duals(sol.model)
+        return nothing
+    end
+    qr = if sol.primal
+        .-JuMP.dual.(sol.model[:rrm_loss])
+    else
+        JuMP.value.(sol.model[:z])
+    end
+    return expand_positive_weight_rows(qr, positive_weight_rows(w, length(x)), length(x))
+end
+"""
+    RRM_model(x::VecNum, slv::Slv_VecSlv, alpha::Number, kappa::Number,
+              w::Option{<:VecNum}) -> Option{<:NamedTuple}
+
+Build the primal programme below in a new model and solve it, and build and solve the dual programme when no solver solves the primal one.
+
+[`RRM`](@ref) reads the objective value of the solved model, and [`RRM_worst_case`](@ref) reads the Worst-Case Distribution from it. The callers check `w` and `slv` first.
+
+# Algorithm
+
+ 1. Find `rows`, the indices of the observations of positive weight, and `N`, their number. Without `w`, `rows` holds every observation.
+ 2. When `w` is stated, divide its entries in `rows` by the sum of `w`, giving `wi`.
+ 3. Compute `ln_k`, the Kaniadakis logarithm of ``1/(\\alpha T)``.
+ 4. Build the primal programme in a new model, and solve it with the solvers of `slv` in turn. When a solver solves it, return the model with `primal = true`.
+ 5. Otherwise, build the dual programme in a new model, and solve it with the solvers of `slv` in turn. When a solver solves it, return the model with `primal = false`.
+ 6. Otherwise, return `nothing`.
 
 # JuMP formulation
 
@@ -41,11 +152,11 @@ The dual model creates these variables:
 
 ## Constraints
 
-No row carries a name. The primal model registers these rows:
+No row carries a string name. The primal model registers these rows:
 
   - ``\\left(\\tfrac{z(1+\\kappa)}{2\\kappa},\\, \\tfrac{\\psi_i(1+\\kappa)}{\\kappa},\\, \\epsilon_i\\right) \\in \\mathcal{K}_{\\mathrm{pow}}\\!\\left(\\tfrac{1}{1+\\kappa}\\right)``, one row for each ``i \\in \\mathcal{I}``.
   - ``\\left(\\tfrac{\\omega_i}{1-\\kappa},\\, \\tfrac{\\theta_i}{\\kappa},\\, -\\tfrac{z}{2\\kappa}\\right) \\in \\mathcal{K}_{\\mathrm{pow}}(1-\\kappa)``, one row for each ``i \\in \\mathcal{I}``.
-  - ``\\epsilon_i + \\omega_i - x_i - t \\leq 0``, one row for each ``i \\in \\mathcal{I}``.
+  - `rrm_loss`: ``\\epsilon_i + \\omega_i - x_i - t \\leq 0``, one row for each ``i \\in \\mathcal{I}``.
 
 The dual model registers these rows:
 
@@ -55,6 +166,8 @@ The dual model registers these rows:
   - ``(q_i,\\, T p_i,\\, \\tau_i) \\in \\mathcal{K}_{\\mathrm{pow}}(1-\\kappa)``, one row for each ``i \\in \\mathcal{I}``.
 
 The two power-cone rows of the dual model give ``\\nu_i \\geq q_i^{1+\\kappa} (T p_i)^{-\\kappa}`` and ``\\tau_i \\leq q_i^{1-\\kappa} (T p_i)^{\\kappa}``. So the second row is the Kaniadakis ball of [`RelativisticValueatRisk`](@ref), ``\\sum_{i} q_i \\ln_{\\kappa}\\!\\left(\\tfrac{q_i}{p_i T}\\right) \\leq \\ln_{\\kappa}\\!\\left(\\tfrac{1}{\\alpha T}\\right)``.
+
+At the optimum, ``\\boldsymbol{q}`` is the Worst-Case Distribution of the ball. The dual of the row of observation ``i`` in `rrm_loss` of the primal model is ``-q_i``. [`RRM_worst_case`](@ref) reads it from the model that a solver solves.
 
 ## Objective
 
@@ -82,31 +195,22 @@ Where:
   - $(arg_dict[:slv])
   - `alpha`: Significance level, ``\\alpha \\in (0, 1)``.
   - `kappa`: Kaniadakis deformation parameter, ``\\kappa \\in (0, 1)``.
-  - `w`: Observation weights, or `nothing` for equal weights.
-
-# Validation
-
-  - `w` passes [`checked_observation_weights`](@ref) against `x`. Otherwise that function raises its error.
-  - If `slv` is a `VecSlv`: `!isempty(slv)`, else `IsEmptyError`.
+  - `w`: Checked observation weights, or `nothing` for equal weights.
 
 # Returns
 
-  - The Relativistic Value-at-Risk of `x`, or `NaN` when no solver of `slv` solves either programme.
+  - `(; model, primal)`: The solved model, and whether it holds the primal programme.
+  - `nothing`: When no solver of `slv` solves either programme.
 
 # Related
 
-  - [`RelativisticValueatRisk`](@ref)
-  - [`ERM`](@ref)
-  - [`kappa_log`](@ref)
+  - [`RRM`](@ref)
+  - [`RRM_worst_case`](@ref)
+  - [`positive_weight_rows`](@ref)
   - [`optimise_JuMP_model!`](@ref)
-  - [`Slv_VecSlv`](@ref)
 """
-function RRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0.3,
-             w::Option{<:ObsWeights} = nothing)
-    w = checked_observation_weights(w, x)
-    if isa(slv, VecSlv)
-        @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
-    end
+function RRM_model(x::VecNum, slv::Slv_VecSlv, alpha::Number, kappa::Number,
+                   w::Option{<:VecNum})
     opk = one(kappa) + kappa
     omk = one(kappa) - kappa
     ik = inv(kappa)
@@ -142,11 +246,11 @@ function RRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0
                           [k = 1:N],
                           [omega[k] * iomk, theta[k] * ik, -z * ik2] in
                           JuMP.MOI.PowerCone(omk)
-                          (epsilon + omega - xr) .- t <= 0
+                          rrm_loss, (epsilon + omega - xr) .- t <= 0
                       end)
     JuMP.@objective(model, Min, risk)
     return if optimise_JuMP_model!(model, slv).success
-        JuMP.objective_value(model)
+        (; model = model, primal = true)
     else
         model = JuMP.Model()
         JuMP.set_string_names_on_creation(model, false)
@@ -167,7 +271,6 @@ function RRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0
                                   [k = 1:N], [z[k], 1, tau[k]] in JuMP.MOI.PowerCone(omk)
                               end)
         else
-            wi = view(w / sum(w), rows)
             JuMP.@constraints(model,
                               begin
                                   [k = 1:N],
@@ -178,9 +281,9 @@ function RRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0
         end
         JuMP.@objective(model, Max, risk)
         if optimise_JuMP_model!(model, slv).success
-            JuMP.objective_value(model)
+            (; model = model, primal = false)
         else
-            NaN
+            nothing
         end
     end
 end
@@ -1016,6 +1119,26 @@ risk_input_kind(::RelativisticValueatRisk) = NetReturnsInput()
 risk_input_kind(::RelativisticValueatRiskRange) = NetReturnsInput()
 risk_input_kind(::RelativisticDrawdownatRisk) = NetReturnsInput()
 risk_input_kind(::RelativeRelativisticDrawdownatRisk) = NetReturnsInput()
+# Worst-Case Distribution — see `worst_case_distribution` and `worst_case_risk`.
+function worst_case_distribution(r::RelativisticValueatRisk, x::VecNum)
+    return RRM_worst_case(x, r.slv, r.alpha, r.kappa, r.w)
+end
+function worst_case_distribution(r::RelativisticValueatRiskRange, x::VecNum)
+    return worst_case_pair(RRM_worst_case(x, r.slv, r.alpha, r.kappa_a, r.w),
+                           RRM_worst_case(-x, r.slv, r.beta, r.kappa_b, r.w))
+end
+function worst_case_distribution(r::RelativisticDrawdownatRisk, x::VecNum)
+    return RRM_worst_case(absolute_drawdown_vec(x), r.slv, r.alpha, r.kappa, r.w)
+end
+function worst_case_distribution(r::RelativeRelativisticDrawdownatRisk, x::VecNum)
+    return RRM_worst_case(relative_drawdown_vec(x), r.slv, r.alpha, r.kappa, r.w)
+end
+function worst_case_risk(::RelativisticDrawdownatRisk, x::VecNum, q::VecNum)
+    return -LinearAlgebra.dot(q, absolute_drawdown_vec(x))
+end
+function worst_case_risk(::RelativeRelativisticDrawdownatRisk, x::VecNum, q::VecNum)
+    return -LinearAlgebra.dot(q, relative_drawdown_vec(x))
+end
 
 export RelativisticValueatRisk, RelativisticValueatRiskRange, RelativisticDrawdownatRisk,
        RelativeRelativisticDrawdownatRisk

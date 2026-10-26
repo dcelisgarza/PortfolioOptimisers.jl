@@ -671,6 +671,10 @@ A neighbourhood of a whole distribution, not of one of its moments: Wasserstein 
 The size of an Ambiguity Set, in the units of the scenarios that the model prices. For a Wasserstein or a Gelbrich ball, it enters the model as the coefficient of a dual-norm penalty on the weights. So the same number is named `val` on a Regularisation Estimator and `r` on a distributionally robust risk measure. Those scenarios are the returns on every owner but one. The distributionally robust drawdown measure measures its transport cost against the per-asset drawdowns, so its radius has drawdown units, and its Calibration Series states them.
 *Avoid*: Norm Ceiling (below), which bounds the same norm instead of multiplying it.
 
+**Worst-Case Distribution**
+The distribution in an Ambiguity Set at which a risk measure reaches its value: one probability for each observation, whose expected loss is the risk. The entropic, the relativistic and the power norm measures solve a conic programme for their value, and the dual of that programme gives the distribution. Held fixed, it gives the gradient of the measure, so `risk_contribution` and `risk_gradient` take one solve for the distribution and differentiate its expected loss, not the solve. `worst_case_distribution` reads it, and it returns `nothing` for a measure whose value is not a solve.
+*Avoid*: Uncertainty Set (above), which bounds a moment and not the probabilities.
+
 **Norm Ceiling**
 The upper bound on a norm of the weight vector, in a constraint and not in the objective: `l2c`, `lpc` and `linfc` on `JuMPOptimiser`. Its reciprocal is a floor on the Effective Number of Assets, so it is a statement about diversification and has no units. A ceiling and an Ambiguity Radius read the same norm, but they are different quantities. So each takes its own family of Calibration Rules, and the slot of one admits no rule of the other family. `LpRegularisation` takes both readings. So its `val` is the one slot whose reading the field that holds the term decides, and not the bound of the field itself.
 *Avoid*: Ambiguity Radius (above), which is the coefficient of the norm and not a bound on it.

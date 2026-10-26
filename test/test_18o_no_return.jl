@@ -1286,6 +1286,158 @@ end
     end
 end
 
+@testset "A measure whose value is a solve differentiates its Worst-Case Distribution (#1835)" begin
+    using PortfolioOptimisers, Test, StableRNGs, LinearAlgebra, StatsBase, Clarabel
+
+    #=
+    The finite difference of a measure whose value is a solve differenced two solves. The
+    change that the step `1e-6` makes is about `1e-8`, and the solver stops at a gap of about
+    `1e-8`, so the contributions missed the risk: by 0.005 % on the EVaR, 5.4 % on the RLVaR
+    and 2.2 % on the EDaR, on the data below. Each measure is the largest expected loss over a
+    set of distributions, so its gradient is the gradient of the expected loss under the
+    Worst-Case Distribution of one solve, which has no solver noise.
+    =#
+
+    po = PortfolioOptimisers
+    X = randn(StableRNG(987456), 200, 5) * 0.01 .+ 0.0005
+    pr = prior(EmpiricalPrior(), X)
+    w = [0.3, 0.25, 0.2, 0.15, 0.1]
+    x = X * w
+    slv = Solver(; solver = Clarabel.Optimizer, settings = Dict("verbose" => false))
+    # Even observations have weight zero, so their rows leave every programme.
+    ow = StatsBase.Weights([iseven(t) ? 0.0 : 1.0 + t / 200 for t in 1:200])
+    ratio(r; kw...) = sum(risk_contribution(r, w, pr; kw...)) /
+                      expected_risk(r, w, pr; kw...)
+
+    @testset "every homogeneous measure of the three families sums to its risk" begin
+        # `alpha = 0.2` and `p = 1.5` put the power norm measures on their programme. At the
+        # defaults they are the largest loss on 200 observations.
+        pn = (; alpha = 0.2, p = 1.5)
+        rs = [EntropicValueatRisk(), EntropicValueatRiskRange(), EntropicDrawdownatRisk(),
+              RelativisticValueatRisk(), RelativisticValueatRiskRange(),
+              RelativisticDrawdownatRisk(), PowerNormValueatRisk(; pn...),
+              PowerNormValueatRiskRange(; alpha = 0.2, beta = 0.2, pa = 1.5, pb = 1.5),
+              PowerNormDrawdownatRisk(; pn...), EntropicValueatRisk(; w = ow),
+              RelativisticValueatRisk(; w = ow), PowerNormValueatRisk(; w = ow, pn...),
+              EntropicValueatRisk(; alpha = 0), PowerNormValueatRisk()]
+        for r in rs
+            @test isapprox(ratio(factory(r, pr, slv)), 1; rtol = 1e-6)
+        end
+        # A vector of them decomposes its aggregate, and a measure with no solve sits beside
+        # them.
+        mixed = [factory(EntropicValueatRisk(), pr, slv), Variance(),
+                 factory(RelativisticValueatRisk(), pr, slv)]
+        @test isapprox(ratio(mixed), 1; rtol = 1e-6)
+        @test isapprox(ratio(mixed; sca = MaxScalariser()), 1; rtol = 1e-6)
+        # A proportional fee keeps the measure homogeneous.
+        fees = Fees(; l = fill(0.0004, 5))
+        r = factory(EntropicValueatRisk(), pr, slv)
+        @test isapprox(sum(risk_contribution(r, w, pr, fees)) /
+                       expected_risk(r, w, pr, fees), 1; rtol = 1e-6)
+    end
+
+    @testset "the gradient is that of the measure" begin
+        r = factory(EntropicValueatRisk(), pr, slv)
+        q = po.ERM_worst_case(x, slv, 0.05)
+        @test isapprox(risk_gradient(r, w, pr), -transpose(X) * q; rtol = 1e-8)
+        # A compounded drawdown is not homogeneous, so its contributions do not sum to its
+        # risk. Its gradient still matches a finite difference whose step dwarfs the noise of
+        # the solver, to the truncation error of that step.
+        for r in (RelativeEntropicDrawdownatRisk(), RelativeRelativisticDrawdownatRisk(),
+                  RelativePowerNormDrawdownatRisk(; alpha = 0.2, p = 1.5))
+            r = factory(r, pr, slv)
+            g = risk_gradient(r, w, pr)
+            gfd = po.finite_difference_gradient(v -> expected_risk(r, v, pr), w, 1e-3)
+            @test isapprox(g, gfd; rtol = 1e-3)
+        end
+    end
+
+    @testset "a composite carries the distributions of the measures it wraps" begin
+        rl = factory(RelativisticValueatRisk(), pr, slv)
+        ev = factory(EntropicValueatRisk(), pr, slv)
+        sd = factory(StandardDeviation(), pr, slv)
+        quot(a, b) = (risk_gradient(a, w, pr) .* expected_risk(b, w, pr) .-
+                      expected_risk(a, w, pr) .* risk_gradient(b, w, pr)) ./
+                     expected_risk(b, w, pr)^2
+        @test isapprox(risk_gradient(RiskRatio(; r1 = rl, r2 = StandardDeviation()), w, pr),
+                       quot(rl, sd); rtol = 1e-6)
+        @test isapprox(risk_gradient(MeanReturnRiskRatio(; rk = rl), w, pr),
+                       quot(MeanReturn(), rl); rtol = 1e-6)
+        top = expected_risk(rl, w, pr) >= expected_risk(ev, w, pr) ? rl : ev
+        nr = NonOptimisationRiskRatio(; r1 = [rl, ev], sca1 = MaxScalariser(),
+                                      r2 = StandardDeviation())
+        @test isapprox(risk_gradient(nr, w, pr), quot(top, sd); rtol = 1e-6)
+        # A ratio of measures with no solve keeps the finite difference of its own figure.
+        r = RiskRatio(; r1 = Variance(), r2 = ConditionalValueatRisk())
+        @test risk_gradient(r, w, pr) ==
+              po.finite_difference_gradient(v -> expected_risk(r, v, pr), w, 1e-6)
+        # The independent tracking measure is the risk of the active weights, so Euler's
+        # theorem holds on them. The finite difference of the measure itself meets failed
+        # solves here, and returns `NaN`.
+        wb = fill(0.2, 5)
+        fees = Fees(; l = fill(0.0004, 5))
+        t = RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = wb), r = rl)
+        @test isapprox(dot(w - wb, risk_gradient(t, w, pr)), expected_risk(t, w, pr);
+                       rtol = 1e-6)
+        @test all(isfinite, risk_gradient(t, w, pr, fees))
+        # An inner measure with no solve keeps the finite difference of the tracking measure.
+        t = RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = wb),
+                                    r = factory(ConditionalValueatRisk(), pr))
+        @test risk_gradient(t, w, pr, fees) ==
+              po.finite_difference_gradient(v -> expected_risk(t, v, pr, fees), w, 1e-6)
+        t = RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = wb), r = sd)
+        @test risk_gradient(t, w, pr, fees) ==
+              po.finite_difference_gradient(v -> expected_risk(t, v, pr, fees), w, 1e-6)
+        t = RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = wb), r = rl,
+                                    alg = DependentVariableTracking())
+        for f in (nothing, fees)
+            gfd = po.finite_difference_gradient(v -> expected_risk(t, v, pr, f), w, 1e-3)
+            @test isapprox(risk_gradient(t, w, pr, f), gfd; rtol = 1e-3)
+        end
+    end
+
+    @testset "the distribution of each programme" begin
+        for (q, v) in ((po.ERM_worst_case(x, slv, 0.05), po.ERM(x, slv, 0.05)),
+                       (po.RRM_worst_case(x, slv, 0.05, 0.3), po.RRM(x, slv, 0.05, 0.3)),
+                       (po.PRM_worst_case(x, slv, 0.2, 1.5), po.PRM(x, slv, 0.2, 1.5)))
+            @test isapprox(sum(q), 1; rtol = 1e-6)
+            @test isapprox(-dot(q, x), v; rtol = 1e-6)
+        end
+        # An observation of weight zero has no probability.
+        for (q, v) in ((po.ERM_worst_case(x, slv, 0.05, ow), po.ERM(x, slv, 0.05, ow)),
+                       (po.RRM_worst_case(x, slv, 0.05, 0.3, ow), po.RRM(x, slv, 0.05, 0.3, ow)),
+                       (po.PRM_worst_case(x, slv, 0.2, 1.5, ow), po.PRM(x, slv, 0.2, 1.5, ow)))
+            @test length(q) == 200 && all(iszero, q[2:2:end])
+            @test isapprox(-dot(q, x), v; rtol = 1e-6)
+        end
+        # Without a programme, the mass sits on the largest loss of positive weight, and a
+        # tie shares it by weight.
+        @test po.ERM_worst_case(x, slv, 0, ow) == po.worst_loss_distribution(x, ow)
+        @test po.PRM_worst_case(x, slv) == po.worst_loss_distribution(x, nothing)
+        @test po.worst_loss_distribution([-0.1, 0.2, -0.1, 0.0], nothing) ==
+              [0.5, 0, 0.5, 0]
+        @test po.worst_loss_distribution([-0.1, 0.2, -0.1, -0.1], [1, 1, 3, 0]) ==
+              [0.25, 0, 0.75, 0]
+        # A failed solve gives no distribution, so the contribution falls back to the
+        # finite difference of the measure itself.
+        bad = Solver(; solver = Clarabel.Optimizer,
+                     settings = Dict("verbose" => false, "max_iter" => 1))
+        @test isnothing(po.ERM_worst_case(x, bad, 0.05))
+        @test isnothing(po.RRM_worst_case(x, bad, 0.05, 0.3))
+        @test isnothing(po.PRM_worst_case(x, bad, 0.2, 1.5))
+        @test isnothing(po.worst_case_distribution(EntropicValueatRiskRange(; slv = bad),
+                                                   x))
+        @test isnothing(po.worst_case_distribution(Variance(), x))
+        @test isnothing(po.worst_case_distribution(Variance(; sigma = cov(X)), w, X,
+                                                   nothing))
+        # The route on the weights checks the slots as `expected_risk` does.
+        @test_throws IsNothingError po.worst_case_distribution(Variance(), w, X, nothing)
+        @test_throws IsEmptyError po.ERM_worst_case(x, Solver[])
+        @test_throws IsEmptyError po.RRM_worst_case(x, Solver[])
+        @test_throws IsEmptyError po.PRM_worst_case(x, Solver[])
+    end
+end
+
 using Clarabel
 
 #=

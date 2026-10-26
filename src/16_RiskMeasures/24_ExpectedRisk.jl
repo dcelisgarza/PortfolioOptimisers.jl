@@ -927,14 +927,16 @@ function number_effective_assets(w::VecNum)
     return inv(LinearAlgebra.dot(w, w))
 end
 """
-    adjusted_risk(ps::Nothing, r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum,
+    adjusted_risk(ps::Nothing, q, r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum,
                   fees::Option{<:Fees}; kwargs...)
-    adjusted_risk(ps::Nothing, r::VarianceSkewKurtosis, w::VecNum, X::MatNum,
+    adjusted_risk(ps::Nothing, q, r::VarianceSkewKurtosis, w::VecNum, X::MatNum,
                   fees::Option{<:Fees}; kwargs...)
-    adjusted_risk(ps::VecNum, rs::VecBaseRM, w::VecNum, X::MatNum,
+    adjusted_risk(ps::VecNum, qs::AbstractVector, rs::VecBaseRM, w::VecNum, X::MatNum,
                   fees::Option{<:Fees}; kwargs...)
 
 Evaluate the risk at `w` with the homogeneity correction applied to each measure, which is the function that [`risk_contribution`](@ref) differentiates.
+
+The risk of each measure comes from [`linearised_risk`](@ref). A measure whose value is a solve has the Worst-Case Distribution `q` at the unperturbed weights, and the function evaluates the expected loss under that distribution. That function has the same gradient at the unperturbed weights, and it holds no solver noise. Every other measure has `q = nothing`, and the function evaluates [`expected_risk`](@ref).
 
 [`adjust_risk_contribution`](@ref) divides the risk of a measure by its degree of homogeneity. By Euler's theorem, the gradient of the divided risk, multiplied by the weights, then sums to the risk. A vector such as `[Variance(), ConditionalValueatRisk()]` holds a measure of degree 2 and a measure of degree 1, so the vector has no single degree. The function therefore corrects each element before it combines them. [`VarianceSkewKurtosis`](@ref) is a sum of three terms of the degrees 2, 3 and 4, so its method divides each term of [`variance_skew_kurtosis_terms`](@ref) by its own degree.
 
@@ -962,6 +964,7 @@ Where:
 # Arguments
 
   - `ps`: Chain-rule weights of a vector of measures, or `nothing` for a single measure.
+  - `q`, `qs`: Worst-Case Distribution of the measure, or of each element of the vector, from [`element_worst_case_distributions`](@ref).
   - $(arg_dict[:r])
   - `w::VecNum`: Portfolio weights vector `assets × 1`.
   - `X::MatNum`: Returns matrix `observations × assets`.
@@ -977,24 +980,25 @@ Where:
   - [`adjust_risk_contribution`](@ref)
   - [`variance_skew_kurtosis_terms`](@ref)
   - [`scalariser_element_weights`](@ref)
+  - [`linearised_risk`](@ref)
   - [`expected_risk`](@ref)
 """
-function adjusted_risk(::Nothing, r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum,
+function adjusted_risk(::Nothing, q, r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum,
                        fees::Option{<:Fees}; kwargs...)
-    return adjust_risk_contribution(r, expected_risk(r, w, X, fees; kwargs...))
+    return adjust_risk_contribution(r, linearised_risk(q, r, w, X, fees; kwargs...))
 end
-function adjusted_risk(::Nothing, r::VarianceSkewKurtosis, w::VecNum, ::MatNum,
+function adjusted_risk(::Nothing, q, r::VarianceSkewKurtosis, w::VecNum, ::MatNum,
                        ::Option{<:Fees}; kwargs...)
     v, s, k = variance_skew_kurtosis_terms(r, w)
     return v / 2 - s / 3 + k / 4
 end
-function adjusted_risk(ps::VecNum, rs::VecBaseRM, w::VecNum, X::MatNum,
+function adjusted_risk(ps::VecNum, qs::AbstractVector, rs::VecBaseRM, w::VecNum, X::MatNum,
                        fees::Option{<:Fees}; kwargs...)
-    return sum(zip(ps, rs)) do (p, r)
+    return sum(zip(ps, qs, rs)) do (p, q, r)
         if iszero(p)
             return zero(p)
         end
-        return p * r.settings.scale * adjusted_risk(nothing, r, w, X, fees; kwargs...)
+        return p * r.settings.scale * adjusted_risk(nothing, q, r, w, X, fees; kwargs...)
     end
 end
 """
@@ -1015,6 +1019,8 @@ Compute the contribution of each asset to the risk of a portfolio with a finite 
 The contributions sum to the risk that [`expected_risk`](@ref) reports, because the function divides the gradient of each measure by its degree of homogeneity. [`homogeneity_degree`](@ref) gives that degree. The sum holds only for a measure that is homogeneous of a degree other than zero. The contributions of a measure of degree 0, such as [`EqualRisk`](@ref) or [`Skewness`](@ref), sum to zero. The contributions of a measure that is not homogeneous in the weights, such as a tracking error, a turnover or a relative drawdown, do not sum to its risk. A vector of measures decomposes its aggregate. The function corrects each element before the scalariser combines them, through [`adjusted_risk`](@ref), so the contributions sum to the aggregate when the elements have different degrees. Under [`MaxScalariser`](@ref) and [`MinScalariser`](@ref), the contributions are those of the element that the scalariser picks at `w`, and at a tie they are those of the earliest such element. Under [`LogSumExpScalariser`](@ref), the contributions sum to the softmax-weighted mean of the scaled risks, which is below the aggregate.
 
 A prior result reduces to the Investable Mask before the finite difference, so no perturbed weight meets a `NaN` moment, and a non-investable asset reports exactly `0`. The prior also resolves the measure once, so a Deferred Quantity is fitted once and not once for each finite difference.
+
+A measure whose value is a solve, of the entropic, the relativistic or the power norm family, solves its programme once at `w`, and the function takes the finite difference of the expected loss under the Worst-Case Distribution of that solve, from [`worst_case_distribution`](@ref). By the envelope theorem, that expected loss has the gradient of the measure at `w`. A finite difference of the measure itself differences two solves, and the noise of the solver is as large as the change that the step makes, so its contributions can miss the risk by several percent. The contributions of the distribution sum to the risk to the tolerance of the solver, and the function solves one programme for each measure, not `2N`. When no solver gives the distribution, the function takes the finite difference of the measure itself.
 
 The contributions are those of the target weights. Under a Weight Drift the return series of a fold is not linear in one weight vector, so the contributions sum to the realised risk of the fold only to first order in the drift. A weight path holds no single vector for the finite difference to move.
 
@@ -1042,9 +1048,10 @@ Where:
  1. Reduce `X`, `w` and `fees` to the Investable Mask with [`investable_reduction`](@ref), which gives the mask `imsk`.
  2. Resolve `r` and the returns matrix `X` with [`resolve_risk_inputs`](@ref).
  3. Compute the chain-rule weights `ps` of a vector of measures at `w` with [`scalariser_element_weights`](@ref). A single measure gets `nothing`.
- 4. Compute `rc`, the finite difference of [`adjusted_risk`](@ref) at `w` with the step `delta`, through [`finite_difference_gradient`](@ref).
- 5. Unless `marginal` is `true`, multiply `rc` by `w` element by element.
- 6. Expand `rc` to the full universe with [`expand_investable_weights`](@ref), with a zero for each non-investable asset.
+ 4. Compute `qs`, the Worst-Case Distribution of each measure at `w`, with [`element_worst_case_distributions`](@ref).
+ 5. Compute `rc`, the finite difference of [`adjusted_risk`](@ref) at `w` with the step `delta`, through [`finite_difference_gradient`](@ref).
+ 6. Unless `marginal` is `true`, multiply `rc` by `w` element by element.
+ 7. Expand `rc` to the full universe with [`expand_investable_weights`](@ref), with a zero for each non-investable asset.
 
 # Arguments
 
@@ -1087,8 +1094,9 @@ function risk_contribution(r::BaseRM_VecBaseRM, w::VecNum, X::MatNum_Pr,
     imsk, X, w, fees = investable_reduction(X, w, fees, strict)
     r, X = resolve_risk_inputs(r, X)
     ps = scalariser_element_weights(sca, r, w, X, fees; kwargs...)
+    qs = element_worst_case_distributions(ps, r, w, X, fees)
     rc = finite_difference_gradient(w, delta) do v
-        return adjusted_risk(ps, r, v, X, fees; kwargs...)
+        return adjusted_risk(ps, qs, r, v, X, fees; kwargs...)
     end
     if !marginal
         rc .*= w
@@ -1173,7 +1181,7 @@ Compute the gradient of a risk measure with respect to the weights, with one ent
 
 The gradient is the derivative of the figure that [`expected_risk`](@ref) reports, at the weights that the caller gives, without a homogeneity correction. The marginal figure of [`risk_contribution`](@ref) divides by the degree of the measure, so that Euler's theorem gives the risk back. On a [`Variance`](@ref) the two differ by a factor of two.
 
-Three measures have a closed form, and the function uses it. Every other measure, and a [`MeanReturn`](@ref) that is charged fees, takes the two-sided finite difference at the step `delta`, which costs `2N` evaluations of the measure. The fee is not linear in the weights, so a `MeanReturn` with fees has no closed form here. Where the gradient is not defined at the point, such as at a tie inside a maximum, at a scenario on a Value-at-Risk atom, or at a zero variance under the square root, the finite difference returns the chord across the kink. The closed form of the standard deviation falls back to the finite difference at a zero variance.
+Three measures have a closed form, and the function uses it. Every other measure, and a [`MeanReturn`](@ref) that is charged fees, takes the two-sided finite difference at the step `delta`, which costs `2N` evaluations of the measure. A measure whose value is a solve, of the entropic, the relativistic or the power norm family, solves its programme once, and the finite difference evaluates the expected loss under the Worst-Case Distribution of that solve, as in [`risk_contribution`](@ref). The fee is not linear in the weights, so a `MeanReturn` with fees has no closed form here. Where the gradient is not defined at the point, such as at a tie inside a maximum, at a scenario on a Value-at-Risk atom, or at a zero variance under the square root, the finite difference returns the chord across the kink. The closed form of the standard deviation falls back to the finite difference at a zero variance.
 
 A vector of measures differentiates the scalarised aggregate by the chain rule, with each element at its own `settings.scale`. Under [`SumScalariser`](@ref) it sums the gradients of the elements. Under [`MaxScalariser`](@ref) and [`MinScalariser`](@ref) it takes the gradient of the element that the scalariser picks, and at a tie the earliest such element, where the subgradient is a set. Under [`LogSumExpScalariser`](@ref) it takes the softmax-weighted sum, which is smooth everywhere. An element with a closed form keeps it inside a vector whose other elements use the finite difference.
 
@@ -1292,7 +1300,7 @@ end
 
 Compute the gradient of one resolved measure on a bare matrix.
 
-The generic method takes the finite difference of [`expected_risk`](@ref). The methods for [`Variance`](@ref), [`StandardDeviation`](@ref) and [`MeanReturn`](@ref) use the closed forms that [`risk_gradient`](@ref) states. A `MeanReturn` that is charged fees takes the generic method, because the fee is not linear in the weights. A `StandardDeviation` at a zero variance also takes the finite difference.
+The generic method takes the finite difference of [`linearised_risk`](@ref) at the Worst-Case Distribution of [`worst_case_distribution`](@ref). For a measure whose value is not a solve, that is [`expected_risk`](@ref). The methods for [`Variance`](@ref), [`StandardDeviation`](@ref) and [`MeanReturn`](@ref) use the closed forms that [`risk_gradient`](@ref) states. A `MeanReturn` that is charged fees takes the generic method, because the fee is not linear in the weights. A `StandardDeviation` at a zero variance also takes the finite difference.
 
 # Arguments
 
@@ -1313,8 +1321,9 @@ The generic method takes the finite difference of [`expected_risk`](@ref). The m
 """
 function measure_gradient(r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum,
                           fees::Option{<:Fees}; delta::Number, kwargs...)
+    q = worst_case_distribution(r, w, X, fees)
     return finite_difference_gradient(w, delta) do v
-        return expected_risk(r, v, X, fees; kwargs...)
+        return linearised_risk(q, r, v, X, fees; kwargs...)
     end
 end
 function measure_gradient(r::Variance, w::VecNum, ::MatNum, ::Option{<:Fees}; kwargs...)
