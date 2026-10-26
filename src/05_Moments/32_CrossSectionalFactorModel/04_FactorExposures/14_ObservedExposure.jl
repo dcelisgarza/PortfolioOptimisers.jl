@@ -122,7 +122,7 @@ ObservedExposure
     family
     function ObservedExposure(xe::AbstractExposureEstimator, series::AbstractString,
                               family::AbstractString)
-        @argcheck(!isa(xe, Union{<:AbstractObservedExposureEstimator, <:DerivedExposure}),
+        @argcheck(!isa(xe, Union{AbstractObservedExposureEstimator, DerivedExposure}),
                   ArgumentError("an ObservedExposure wraps an estimated Exposure Estimator that reads the Asset Panel, and got a $(nameof(typeof(xe))). An observed member is observed already, and a DerivedExposure reads the exposure of another factor of the list."))
         @argcheck(!isempty(series),
                   IsEmptyError("series names a column of the Exogenous Series, so it cannot be the empty string"))

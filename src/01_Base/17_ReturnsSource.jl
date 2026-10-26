@@ -343,7 +343,7 @@ end
 """
     source_frames(x_src::ExcessSource, path::AbstractString, raw::Bool) -> ReturnsFrames
     source_frames(x_src::Nothing, path::AbstractString, raw::Bool) -> ReturnsFrames
-    source_frames(x_src::Union{<:DataSource, <:PriorSource}, path::AbstractString,
+    source_frames(x_src::Union{DataSource, PriorSource}, path::AbstractString,
                   raw::Bool) -> ReturnsFrames
 
 Return the frames of one outermost reader from the source that it states.
@@ -379,7 +379,7 @@ end
 function source_frames(::Nothing, path::AbstractString, raw::Bool)
     return ReturnsFrames(false, raw ? String[path] : String[])
 end
-function source_frames(::Union{<:DataSource, <:PriorSource}, ::AbstractString, ::Bool)
+function source_frames(::Union{DataSource, PriorSource}, ::AbstractString, ::Bool)
     return ReturnsFrames()
 end
 """

@@ -462,7 +462,7 @@ julia> PortfolioOptimisers.norm_error(L1Norm(), [0.5, 0.5], [0.6, 0.4], 2)
 """
 function norm_error end
 """
-    norm_factor(f::Union{Nothing, <:NormError}, T::Option{<:Number})
+    norm_factor(f::Union{Nothing, NormError}, T::Option{<:Number})
 
 Compute the denominator that scales a norm in [`norm_error`](@ref).
 
@@ -504,7 +504,7 @@ julia> PortfolioOptimisers.norm_factor(LInfNorm(), nothing)
   - [`NormError`](@ref)
   - [`Option`](@ref)
 """
-function norm_factor(::Union{Nothing, <:NormError}, ::Nothing)
+function norm_factor(::Union{Nothing, NormError}, ::Nothing)
     return 1
 end
 function norm_factor(::Nothing, T::Number)

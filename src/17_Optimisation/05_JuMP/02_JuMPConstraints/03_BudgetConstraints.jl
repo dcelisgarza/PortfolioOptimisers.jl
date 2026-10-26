@@ -11,11 +11,11 @@ Abstract supertype for all budget constraint estimators.
 """
 abstract type BudgetConstraintEstimator <: JuMPConstraintEstimator end
 """
-    const Num_BgtCE = Union{<:Number, <:BudgetConstraintEstimator}
+    const Num_BgtCE = Union{Number, BudgetConstraintEstimator}
 
 Union of scalar budget values and [`BudgetConstraintEstimator`](@ref) instances.
 """
-const Num_BgtCE = Union{<:Number, <:BudgetConstraintEstimator}
+const Num_BgtCE = Union{Number, BudgetConstraintEstimator}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -100,7 +100,7 @@ function BudgetRange(; lb::Option{<:Number} = 1.0, ub::Option{<:Number} = 1.0)
     return BudgetRange(lb, ub)
 end
 """
-    const Num_BgtRg = Union{<:Number, <:BudgetRange}
+    const Num_BgtRg = Union{Number, BudgetRange}
 
 Alias for a scalar budget value or budget range.
 
@@ -111,7 +111,7 @@ Matches either a plain number (fixed budget, e.g. `1.0`) or a [`BudgetRange`](@r
   - [`BudgetRange`](@ref)
   - [`set_long_short_budget_constraints!`](@ref)
 """
-const Num_BgtRg = Union{<:Number, <:BudgetRange}
+const Num_BgtRg = Union{Number, BudgetRange}
 """
     set_budget_constraints!(args...)
     set_budget_constraints!(model::JuMP.Model, val::Number, w::VecNum)
@@ -617,7 +617,7 @@ function assert_gross_budget_admissible(bgt, sbgt, gbgt, wb)::Nothing
 end
 # No gross budget, or a schedule that `assert_time_dependent_substitution` reaches, has
 # nothing to assert here.
-function assert_gross_budget_admissible(::Any, ::Any, ::Union{Nothing, <:TimeDependent},
+function assert_gross_budget_admissible(::Any, ::Any, ::Union{Nothing, TimeDependent},
                                         ::Any)::Nothing
     return nothing
 end

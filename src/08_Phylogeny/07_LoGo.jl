@@ -246,8 +246,8 @@ function LoGo(; de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistan
     return LoGo(de, sim, pdm)
 end
 """
-    const DVarInfo_DDVarInfo = Union{<:Distance{<:Any, <:VariationInfoDistance},
-                                     <:DistanceDistance{<:Any, <:Any, <:Any, <:Any,
+    const DVarInfo_DDVarInfo = Union{Distance{<:Any, <:VariationInfoDistance},
+                                     DistanceDistance{<:Any, <:Any, <:Any, <:Any,
                                                         <:VariationInfoDistance}}
 
 Alias for the distance estimators whose algorithm is a [`VariationInfoDistance`](@ref).
@@ -261,9 +261,9 @@ The alias matches a [`Distance`](@ref) or a [`DistanceDistance`](@ref) whose alg
   - [`DistanceDistance`](@ref)
   - [`LoGo_dist_assert`](@ref)
 """
-const DVarInfo_DDVarInfo = Union{<:Distance{<:Any, <:VariationInfoDistance},
-                                 <:DistanceDistance{<:Any, <:Any, <:Any, <:Any,
-                                                    <:VariationInfoDistance}}
+const DVarInfo_DDVarInfo = Union{Distance{<:Any, <:VariationInfoDistance},
+                                 DistanceDistance{<:Any, <:Any, <:Any, <:Any,
+                                                  <:VariationInfoDistance}}
 """
     LoGo_dist_assert(de::DVarInfo_DDVarInfo, sigma::MatNum, X::MatNum; dims::Int = 1)
 

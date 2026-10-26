@@ -82,7 +82,7 @@ function ValueatRiskView(; views::LinearConstraintEstimator,
     return ValueatRiskView(views, alpha)
 end
 """
-    const VV_VecVV = Union{<:ValueatRiskView, <:AbstractVector{<:ValueatRiskView}}
+    const VV_VecVV = Union{ValueatRiskView, AbstractVector{<:ValueatRiskView}}
 
 Alias for the shapes a `var_views` field accepts: one [`ValueatRiskView`](@ref), or a vector of them read under their own significance levels.
 
@@ -91,7 +91,7 @@ Alias for the shapes a `var_views` field accepts: one [`ValueatRiskView`](@ref),
   - [`ValueatRiskView`](@ref)
   - [`MeucciEntropyPoolingPrior`](@ref)
 """
-const VV_VecVV = Union{<:ValueatRiskView, <:AbstractVector{<:ValueatRiskView}}
+const VV_VecVV = Union{ValueatRiskView, AbstractVector{<:ValueatRiskView}}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -1074,8 +1074,8 @@ function SequentialRelativisticValueatRiskView(; iters::Integer = 20,
     return SequentialRelativisticValueatRiskView(iters, tol)
 end
 """
-    const CVaRVF_VecCVaRVF = Union{<:AbstractConditionalValueatRiskViewFormulation,
-                                   <:AbstractVector{<:AbstractConditionalValueatRiskViewFormulation}}
+    const CVaRVF_VecCVaRVF = Union{AbstractConditionalValueatRiskViewFormulation,
+                                   AbstractVector{<:AbstractConditionalValueatRiskViewFormulation}}
 
 Alias for a union of a single conditional value-at-risk view formulation or a vector of them.
 
@@ -1083,11 +1083,11 @@ Alias for a union of a single conditional value-at-risk view formulation or a ve
 
   - [`AbstractConditionalValueatRiskViewFormulation`](@ref)
 """
-const CVaRVF_VecCVaRVF = Union{<:AbstractConditionalValueatRiskViewFormulation,
-                               <:AbstractVector{<:AbstractConditionalValueatRiskViewFormulation}}
+const CVaRVF_VecCVaRVF = Union{AbstractConditionalValueatRiskViewFormulation,
+                               AbstractVector{<:AbstractConditionalValueatRiskViewFormulation}}
 """
-    const EVaRVF_VecEVaRVF = Union{<:AbstractEntropicValueatRiskViewFormulation,
-                                   <:AbstractVector{<:AbstractEntropicValueatRiskViewFormulation}}
+    const EVaRVF_VecEVaRVF = Union{AbstractEntropicValueatRiskViewFormulation,
+                                   AbstractVector{<:AbstractEntropicValueatRiskViewFormulation}}
 
 Alias for a union of a single entropic value-at-risk view formulation or a vector of them.
 
@@ -1095,11 +1095,11 @@ Alias for a union of a single entropic value-at-risk view formulation or a vecto
 
   - [`AbstractEntropicValueatRiskViewFormulation`](@ref)
 """
-const EVaRVF_VecEVaRVF = Union{<:AbstractEntropicValueatRiskViewFormulation,
-                               <:AbstractVector{<:AbstractEntropicValueatRiskViewFormulation}}
+const EVaRVF_VecEVaRVF = Union{AbstractEntropicValueatRiskViewFormulation,
+                               AbstractVector{<:AbstractEntropicValueatRiskViewFormulation}}
 """
-    const RLVaRVF_VecRLVaRVF = Union{<:AbstractRelativisticValueatRiskViewFormulation,
-                                     <:AbstractVector{<:AbstractRelativisticValueatRiskViewFormulation}}
+    const RLVaRVF_VecRLVaRVF = Union{AbstractRelativisticValueatRiskViewFormulation,
+                                     AbstractVector{<:AbstractRelativisticValueatRiskViewFormulation}}
 
 Alias for a union of a single relativistic value-at-risk view formulation or a vector of them.
 
@@ -1107,8 +1107,8 @@ Alias for a union of a single relativistic value-at-risk view formulation or a v
 
   - [`AbstractRelativisticValueatRiskViewFormulation`](@ref)
 """
-const RLVaRVF_VecRLVaRVF = Union{<:AbstractRelativisticValueatRiskViewFormulation,
-                                 <:AbstractVector{<:AbstractRelativisticValueatRiskViewFormulation}}
+const RLVaRVF_VecRLVaRVF = Union{AbstractRelativisticValueatRiskViewFormulation,
+                                 AbstractVector{<:AbstractRelativisticValueatRiskViewFormulation}}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -1504,8 +1504,8 @@ function RelativisticValueatRiskView(; views::LinearConstraintEstimator,
     return RelativisticValueatRiskView(views, alpha, kappa, alg, args, kwargs, bracket)
 end
 """
-    const CVV_VecCVV = Union{<:ConditionalValueatRiskView,
-                             <:AbstractVector{<:ConditionalValueatRiskView}}
+    const CVV_VecCVV = Union{ConditionalValueatRiskView,
+                             AbstractVector{<:ConditionalValueatRiskView}}
 
 Alias for the shapes a `cvar_views` field accepts: one [`ConditionalValueatRiskView`](@ref), or a vector of them read under their own significance levels and formulations.
 
@@ -1514,11 +1514,11 @@ Alias for the shapes a `cvar_views` field accepts: one [`ConditionalValueatRiskV
   - [`ConditionalValueatRiskView`](@ref)
   - [`EntropyPoolingPrior`](@ref)
 """
-const CVV_VecCVV = Union{<:ConditionalValueatRiskView,
-                         <:AbstractVector{<:ConditionalValueatRiskView}}
+const CVV_VecCVV = Union{ConditionalValueatRiskView,
+                         AbstractVector{<:ConditionalValueatRiskView}}
 """
-    const EVV_VecEVV = Union{<:EntropicValueatRiskView,
-                             <:AbstractVector{<:EntropicValueatRiskView}}
+    const EVV_VecEVV = Union{EntropicValueatRiskView,
+                             AbstractVector{<:EntropicValueatRiskView}}
 
 Alias for the shapes an `evar_views` field accepts: one [`EntropicValueatRiskView`](@ref), or a vector of them read under their own significance levels and formulations.
 
@@ -1527,11 +1527,10 @@ Alias for the shapes an `evar_views` field accepts: one [`EntropicValueatRiskVie
   - [`EntropicValueatRiskView`](@ref)
   - [`EntropyPoolingPrior`](@ref)
 """
-const EVV_VecEVV = Union{<:EntropicValueatRiskView,
-                         <:AbstractVector{<:EntropicValueatRiskView}}
+const EVV_VecEVV = Union{EntropicValueatRiskView, AbstractVector{<:EntropicValueatRiskView}}
 """
-    const RVV_VecRVV = Union{<:RelativisticValueatRiskView,
-                             <:AbstractVector{<:RelativisticValueatRiskView}}
+    const RVV_VecRVV = Union{RelativisticValueatRiskView,
+                             AbstractVector{<:RelativisticValueatRiskView}}
 
 Alias for the shapes an `rlvar_views` field accepts: one [`RelativisticValueatRiskView`](@ref), or a vector of them read under their own significance levels, deformation parameters and formulations.
 
@@ -1540,8 +1539,8 @@ Alias for the shapes an `rlvar_views` field accepts: one [`RelativisticValueatRi
   - [`RelativisticValueatRiskView`](@ref)
   - [`EntropyPoolingPrior`](@ref)
 """
-const RVV_VecRVV = Union{<:RelativisticValueatRiskView,
-                         <:AbstractVector{<:RelativisticValueatRiskView}}
+const RVV_VecRVV = Union{RelativisticValueatRiskView,
+                         AbstractVector{<:RelativisticValueatRiskView}}
 
 export ValueatRiskView, ConditionalValueatRiskView, EntropicValueatRiskView,
        LinearConditionalValueatRiskView, IntegerConditionalValueatRiskView,

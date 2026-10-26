@@ -220,9 +220,9 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     TimeDependent(val, bind::Symbol = :outermost; default = NoDefault())
-    TimeDependent(; val::Union{<:AbstractVector, <:Base.Callable,
-                               <:PreviousWeightsFunction, <:TimeDependentCallable,
-                               <:TimeDependent}, bind::Symbol = :outermost,
+    TimeDependent(; val::Union{AbstractVector, Base.Callable,
+                               PreviousWeightsFunction, TimeDependentCallable,
+                               TimeDependent}, bind::Symbol = :outermost,
                   default = NoDefault())
 
 ## Validation
@@ -268,9 +268,9 @@ TimeDependent
     Value of the field outside every fold loop. It replaces the static default that [`time_dependent_field_defaults`](@ref) gives for the field. [`NoDefault`](@ref), the default, keeps the static default. A field with no static default needs this value.
     """
     default
-    function TimeDependent(val::Union{<:AbstractVector, <:Base.Callable,
-                                      <:PreviousWeightsFunction, <:TimeDependentCallable,
-                                      <:TimeDependent}, bind::Symbol = :outermost;
+    function TimeDependent(val::Union{AbstractVector, Base.Callable,
+                                      PreviousWeightsFunction, TimeDependentCallable,
+                                      TimeDependent}, bind::Symbol = :outermost;
                            default = NoDefault())
         @argcheck(!isa(val, TimeDependent),
                   ArgumentError("val cannot be a TimeDependent: schedules do not nest. An estimator swapped in by a schedule may carry schedules of its own — they resolve against the same fold context after the swap — but they belong in its fields, not inside this wrapper."))
@@ -297,14 +297,13 @@ function Online(::TimeDependent, args...; kwargs...)
     return throw(ArgumentError("est cannot be a TimeDependent: a schedule is not one estimator, so there is nothing for a buffer to belong to. The two wrappers resolve at different times and neither wraps the other — an `Online` resolves once at warm-up, because the buffer it seeds is threaded from step to step, and a schedule resolves once per fold, because its value is the fold's. They compose in the other order: an estimator an `Online` wraps may hold schedules of its own, which resolve per fold after the seeding, and one estimator may hold a wrapper in one field and a schedule in another."))
 end
 function TimeDependent(;
-                       val::Union{<:AbstractVector, <:Base.Callable,
-                                  <:PreviousWeightsFunction, <:TimeDependentCallable,
-                                  <:TimeDependent}, bind::Symbol = :outermost,
-                       default = NoDefault())::TimeDependent
+                       val::Union{AbstractVector, Base.Callable, PreviousWeightsFunction,
+                                  TimeDependentCallable, TimeDependent},
+                       bind::Symbol = :outermost, default = NoDefault())::TimeDependent
     return TimeDependent(val, bind; default = default)
 end
 """
-    const TD_Option{X} = Union{Nothing, <:TimeDependent, X}
+    const TD_Option{X} = Union{Nothing, TimeDependent, X}
 
 Alias for an optimiser field that takes `nothing`, a static value of type `X`, or a [`TimeDependent`](@ref) schedule.
 
@@ -315,9 +314,9 @@ The fields whose constructor signatures use this alias, or [`TD`](@ref), are the
   - [`TimeDependent`](@ref)
   - [`Option`](@ref)
 """
-const TD_Option{X} = Union{Nothing, <:TimeDependent, X}
+const TD_Option{X} = Union{Nothing, TimeDependent, X}
 """
-    const TD{X} = Union{<:TimeDependent, X}
+    const TD{X} = Union{TimeDependent, X}
 
 Alias for a required optimiser field that takes a static value of type `X` or a [`TimeDependent`](@ref) schedule, but not `nothing`.
 
@@ -329,7 +328,7 @@ The prior estimator, the returns model, the scalariser, the clustering estimator
   - [`TD_Option`](@ref)
   - [`time_dependent_field_defaults`](@ref)
 """
-const TD{X} = Union{<:TimeDependent, X}
+const TD{X} = Union{TimeDependent, X}
 """
     const TD_OptE_Opt = Union{TimeDependent{<:AbstractVector{<:OptE_Opt}},
                               TimeDependent{<:TimeDependentOptimiserCallable},
@@ -357,8 +356,8 @@ const TD_OptE_Opt = Union{TimeDependent{<:AbstractVector{<:OptE_Opt}},
                           TimeDependent{<:PreviousWeightsFunction},
                           TimeDependent{<:Base.Callable}}
 """
-    const TDO_OptE_Opt = Union{<:TD_OptE_Opt,
-                               <:TimeDependent{<:AbstractVector{<:Option{<:OptE_Opt}}}}
+    const TDO_OptE_Opt = Union{TD_OptE_Opt,
+                               TimeDependent{<:AbstractVector{<:Option{<:OptE_Opt}}}}
 
 Alias for the [`TimeDependent`](@ref) forms that an optional field which holds an optimiser takes, such as a fallback.
 
@@ -370,14 +369,14 @@ It holds every form of [`TD_OptE_Opt`](@ref), and a vector whose entries can be 
   - [`TDO_Option`](@ref)
   - [`Option`](@ref)
 """
-const TDO_OptE_Opt = Union{<:TD_OptE_Opt,
-                           <:TimeDependent{<:AbstractVector{<:Option{<:OptE_Opt}}}}
+const TDO_OptE_Opt = Union{TD_OptE_Opt,
+                           TimeDependent{<:AbstractVector{<:Option{<:OptE_Opt}}}}
 """
-    const TDO_Option{X} = Union{Nothing, <:TDO_OptE_Opt, X}
+    const TDO_Option{X} = Union{Nothing, TDO_OptE_Opt, X}
 
 Alias for an optional field that holds an optimiser, such as a fallback.
 
-The field takes `nothing`, a static value of type `X`, or a schedule of optimisers whose entries can be `nothing`, see [`TDO_OptE_Opt`](@ref). A required field that holds an optimiser does not take `nothing`, so its signature writes `Union{<:X, <:TD_OptE_Opt}`.
+The field takes `nothing`, a static value of type `X`, or a schedule of optimisers whose entries can be `nothing`, see [`TDO_OptE_Opt`](@ref). A required field that holds an optimiser does not take `nothing`, so its signature writes `Union{X, TD_OptE_Opt}`.
 
 # Related
 
@@ -386,9 +385,9 @@ The field takes `nothing`, a static value of type `X`, or a schedule of optimise
   - [`TD_Option`](@ref)
   - [`Option`](@ref)
 """
-const TDO_Option{X} = Union{Nothing, <:TDO_OptE_Opt, X}
+const TDO_Option{X} = Union{Nothing, TDO_OptE_Opt, X}
 """
-    const OptE_TD = Union{<:NonFiniteAllocationOptimisationEstimator, <:TD_OptE_Opt}
+    const OptE_TD = Union{NonFiniteAllocationOptimisationEstimator, TD_OptE_Opt}
 
 Alias for an optimisation estimator, or a [`TimeDependent`](@ref) schedule in the place of one.
 
@@ -400,9 +399,9 @@ The cross-validation fold loops that fit take this type. A schedule given direct
   - [`OptE_Opt_TD`](@ref)
   - [`cross_val_predict`](@ref)
 """
-const OptE_TD = Union{<:NonFiniteAllocationOptimisationEstimator, <:TD_OptE_Opt}
+const OptE_TD = Union{NonFiniteAllocationOptimisationEstimator, TD_OptE_Opt}
 """
-    const OptE_Opt_TD = Union{<:OptE_Opt, <:TD_OptE_Opt}
+    const OptE_Opt_TD = Union{OptE_Opt, TD_OptE_Opt}
 
 Alias for an optimisation estimator, a precomputed result, or a [`TimeDependent`](@ref) schedule in the place of one.
 
@@ -414,7 +413,7 @@ The fold loops that take a precomputed result as well as an estimator take this 
   - [`TD_OptE_Opt`](@ref)
   - [`OptE_Opt`](@ref)
 """
-const OptE_Opt_TD = Union{<:OptE_Opt, <:TD_OptE_Opt}
+const OptE_Opt_TD = Union{OptE_Opt, TD_OptE_Opt}
 """
     const VecOptE_Opt_TD = AbstractVector{<:OptE_Opt_TD}
 
@@ -593,9 +592,8 @@ A turnover, a fee, a tracking input, a risk measure, an optimisation estimator o
 function time_dependent_entry_needs_previous_weights(::Any)::Bool
     return false
 end
-function time_dependent_entry_needs_previous_weights(x::Union{<:TnE_Tn, <:FeesE_Fees,
-                                                              <:Tr_VecTr,
-                                                              <:AbstractBaseRiskMeasure})::Bool
+function time_dependent_entry_needs_previous_weights(x::Union{TnE_Tn, FeesE_Fees, Tr_VecTr,
+                                                              AbstractBaseRiskMeasure})::Bool
     return needs_previous_weights(x)
 end
 function time_dependent_entry_needs_previous_weights(x::AbstractVector)::Bool
@@ -1117,8 +1115,8 @@ This fallback serves every optimisation estimator and every optimisation result,
   - [`update_time_dependent_estimator`](@ref)
   - [`is_time_dependent`](@ref)
 """
-function reset_time_dependent_estimator(opt::Union{<:OptimisationEstimator,
-                                                   <:OptimisationResult})
+function reset_time_dependent_estimator(opt::Union{OptimisationEstimator,
+                                                   OptimisationResult})
     return opt
 end
 function reset_time_dependent_estimator(::Nothing)
@@ -1350,19 +1348,19 @@ function returns_tracking_path(td::TimeDependent)
     path = returns_tracking_path(td.default)
     return isnothing(path) ? nothing : tree_path(:default, path)
 end
-function assert_internal_optimiser(td::Union{<:TD_OptE_Opt, <:TD_VecOptE_Opt})::Nothing
+function assert_internal_optimiser(td::Union{TD_OptE_Opt, TD_VecOptE_Opt})::Nothing
     for opt in time_dependent_entries(td)
         assert_internal_optimiser(opt)
     end
     return nothing
 end
-function assert_external_optimiser(td::Union{<:TD_OptE_Opt, <:TD_VecOptE_Opt})::Nothing
+function assert_external_optimiser(td::Union{TD_OptE_Opt, TD_VecOptE_Opt})::Nothing
     for opt in time_dependent_entries(td)
         assert_external_optimiser(opt)
     end
     return nothing
 end
-function assert_special_nco_requirements(td::Union{<:TD_OptE_Opt, <:TD_VecOptE_Opt})::Nothing
+function assert_special_nco_requirements(td::Union{TD_OptE_Opt, TD_VecOptE_Opt})::Nothing
     for opt in time_dependent_entries(td)
         assert_special_nco_requirements(opt)
     end

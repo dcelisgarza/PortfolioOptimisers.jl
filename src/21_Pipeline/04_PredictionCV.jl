@@ -1,5 +1,5 @@
 """
-    const Pipeline_OnlPipe = Union{<:Pipeline, <:Online{<:Pipeline}, <:Resume{<:MultiPeriodPredictionResult{<:Any, <:Any, <:Any, <:Pipeline}}}
+    const Pipeline_OnlPipe = Union{Pipeline, Online{<:Pipeline}, Resume{<:MultiPeriodPredictionResult{<:Any, <:Any, <:Any, <:Pipeline}}}
 
 Alias for the three estimators that the `cross_val_predict` methods of a Pipeline give to the fold loop. The group exists because these methods share one body, [`pipeline_cross_val_predict`](@ref), and this alias is the type that the body dispatches on.
 
@@ -12,9 +12,9 @@ A plain pipeline takes the fold route. `Online(pipe)` declares a refit from a bu
   - [`Resume`](@ref)
   - [`PipelineBufferState`](@ref)
 """
-const Pipeline_OnlPipe = Union{<:Pipeline, <:Online{<:Pipeline},
-                               <:Resume{<:MultiPeriodPredictionResult{<:Any, <:Any, <:Any,
-                                                                      <:Pipeline}}}
+const Pipeline_OnlPipe = Union{Pipeline, Online{<:Pipeline},
+                               Resume{<:MultiPeriodPredictionResult{<:Any, <:Any, <:Any,
+                                                                    <:Pipeline}}}
 #! Begin: TimeDependent schedules as pipeline optimisation steps.
 """
     pipeline_step_is_time_dependent(x)
@@ -29,8 +29,8 @@ An optimisation estimator or result, a schedule, a nested pipeline and a [`Pipel
   - [`Pipeline`](@ref)
 """
 pipeline_step_is_time_dependent(::Any)::Bool = false
-function pipeline_step_is_time_dependent(x::Union{<:OptE_Opt, <:TimeDependent, <:Pipeline,
-                                                  <:PipelineStep})
+function pipeline_step_is_time_dependent(x::Union{OptE_Opt, TimeDependent, Pipeline,
+                                                  PipelineStep})
     return is_time_dependent(x)
 end
 """
@@ -88,7 +88,7 @@ An optimisation step, a [`TimeDependent`](@ref) step and a nested pipeline answe
   - [`assert_time_dependent_fold_count`](@ref)
 """
 assert_pipeline_step_fold_count(::Any, ::Integer, ::Bool)::Nothing = nothing
-function assert_pipeline_step_fold_count(x::Union{<:OptE_Opt, <:TD_OptE_Opt, <:Pipeline},
+function assert_pipeline_step_fold_count(x::Union{OptE_Opt, TD_OptE_Opt, Pipeline},
                                          n::Integer, all_binds::Bool)::Nothing
     assert_time_dependent_fold_count(x, n, all_binds)
     return nothing
@@ -129,7 +129,7 @@ Resolve one [`Pipeline`](@ref) step for the fold that `ctx` describes. This is t
   - [`PipelineStep`](@ref)
 """
 update_time_dependent_step(est, ::TimeDependentContext, ::Bool) = est
-function update_time_dependent_step(x::Union{<:OptE_Opt, <:TD_OptE_Opt, <:Pipeline},
+function update_time_dependent_step(x::Union{OptE_Opt, TD_OptE_Opt, Pipeline},
                                     ctx::TimeDependentContext, all_binds::Bool)
     return update_time_dependent_estimator(x, ctx, all_binds)
 end
@@ -198,7 +198,7 @@ Replace one [`Pipeline`](@ref) step with its value outside a fold.
   - [`TimeDependentDefaultError`](@ref)
 """
 reset_time_dependent_step(est) = est
-function reset_time_dependent_step(x::Union{<:OptE_Opt, <:Pipeline})
+function reset_time_dependent_step(x::Union{OptE_Opt, Pipeline})
     return reset_time_dependent_estimator(x)
 end
 function reset_time_dependent_step(td::TD_OptE_Opt)
@@ -258,7 +258,7 @@ Give the weights `w` of the previous fold to one [`Pipeline`](@ref) step.
   - [`cross_val_predict`](@ref)
 """
 pipeline_step_factory(est, ::Any) = est
-function pipeline_step_factory(x::Union{<:OptE_Opt, <:Pipeline}, w)
+function pipeline_step_factory(x::Union{OptE_Opt, Pipeline}, w)
     return factory(x, w)
 end
 function pipeline_step_factory(ps::PipelineStep, w)
@@ -560,19 +560,19 @@ It is the companion of [`apply_fitted_step`](@ref), and it reads the same data l
 function fitted_step_keeps_observations(::Any, ::Prices_RR)::Bool
     return true
 end
-function fitted_step_keeps_observations(f::Union{<:AbstractPreprocessingEstimator,
-                                                 <:AbstractPreprocessingResult},
+function fitted_step_keeps_observations(f::Union{AbstractPreprocessingEstimator,
+                                                 AbstractPreprocessingResult},
                                         ::Prices_RR)::Bool
     return keeps_observations(f)
 end
-function fitted_step_keeps_observations(::Union{<:AbstractPricesPreprocessingResult,
-                                                <:AbstractPricesPreprocessingEstimator,
-                                                <:PricesToReturns},
+function fitted_step_keeps_observations(::Union{AbstractPricesPreprocessingResult,
+                                                AbstractPricesPreprocessingEstimator,
+                                                PricesToReturns},
                                         ::AbstractReturnsResult)::Bool
     return true
 end
-function fitted_step_keeps_observations(::Union{<:AbstractReturnsPreprocessingResult,
-                                                <:AbstractReturnsPreprocessingEstimator},
+function fitted_step_keeps_observations(::Union{AbstractReturnsPreprocessingResult,
+                                                AbstractReturnsPreprocessingEstimator},
                                         ::AbstractPricesResult)::Bool
     return true
 end

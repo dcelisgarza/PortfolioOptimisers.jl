@@ -186,7 +186,7 @@ For [`PricesToReturns`](@ref), [`PriceGapFill`](@ref) and [`MissingDataFilter`](
 function partial_fit_transform(est::AbstractPreprocessingEstimator, ::Prices_RR)
     return throw(ArgumentError("a `$(typeof(est).name.name)` has no online form: no `partial_fit_transform` method folds a block of observations into it. Give the step a `partial_fit_transform` and a `fit_preprocessing` method that takes no data, or declare a refit with `Online(pipe)`."))
 end
-function partial_fit!(est::Union{<:PricesToReturns, <:PriceGapFill, <:MissingDataFilter},
+function partial_fit!(est::Union{PricesToReturns, PriceGapFill, MissingDataFilter},
                       data::Prices_RR)
     return partial_fit_transform(est, data)[1]
 end
@@ -906,7 +906,7 @@ The display shows `cache` only when the step keeps a state, so a step that has f
 
   - [`show_fields`](@ref)
 """
-function show_fields(est::Union{<:PricesToReturns, <:PriceGapFill, <:MissingDataFilter})
+function show_fields(est::Union{PricesToReturns, PriceGapFill, MissingDataFilter})
     fns = fieldnames(typeof(est))
     return isnothing(est.cache) ? filter(!=(:cache), fns) : fns
 end

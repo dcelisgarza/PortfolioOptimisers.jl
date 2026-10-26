@@ -464,7 +464,7 @@ function turnover_constraints(tns::AbstractVector{<:Turnover}, ::Nothing, args..
     return tns
 end
 """
-    const TnE_Tn = Union{<:Turnover, <:TurnoverEstimator}
+    const TnE_Tn = Union{Turnover, TurnoverEstimator}
 
 One turnover constraint, before or after the resolution of its names. Both types have the fields `w`, `val` and `fixed`, and [`factory`](@ref), [`port_opt_view`](@ref) and [`needs_previous_weights`](@ref) read these fields on either type. The two types differ only in `val`. A [`Turnover`](@ref) holds one bound per asset, and a [`TurnoverEstimator`](@ref) can hold the bounds by name.
 
@@ -475,7 +475,7 @@ One turnover constraint, before or after the resolution of its names. Both types
   - [`turnover_constraints`](@ref): resolves a `TurnoverEstimator` to a `Turnover`.
   - [`FeesEstimator`](@ref): holds one of these in its `tn` field.
 """
-const TnE_Tn = Union{<:Turnover, <:TurnoverEstimator}
+const TnE_Tn = Union{Turnover, TurnoverEstimator}
 """
     const VecTnE_Tn = AbstractVector{<:TnE_Tn}
 
@@ -506,7 +506,7 @@ Vector of [`Turnover`](@ref), with no [`TurnoverEstimator`](@ref). It is the sub
 """
 const VecTn = AbstractVector{<:Turnover}
 """
-    const Tn_VecTn = Union{<:Turnover, <:VecTn}
+    const Tn_VecTn = Union{Turnover, VecTn}
 
 One resolved turnover constraint, or a vector of them. [`ProcessedJuMPOptimiserAttributes`](@ref) holds this type after the resolution of the names, and [`set_turnover_constraints!`](@ref) reads it. A method that dispatches on it never receives a [`TurnoverEstimator`](@ref).
 
@@ -517,9 +517,9 @@ One resolved turnover constraint, or a vector of them. [`ProcessedJuMPOptimiserA
   - [`TnE_Tn_VecTnE_Tn`](@ref): the unresolved counterpart, which the optimiser accepts from the caller.
   - [`set_turnover_constraints!`](@ref)
 """
-const Tn_VecTn = Union{<:Turnover, <:VecTn}
+const Tn_VecTn = Union{Turnover, VecTn}
 """
-    const TnE_Tn_VecTnE_Tn = Union{<:TnE_Tn, <:VecTnE_Tn}
+    const TnE_Tn_VecTnE_Tn = Union{TnE_Tn, VecTnE_Tn}
 
 One turnover constraint or estimator, or a vector of them. It is the widest turnover alias. The `tn` keyword of [`JuMPOptimiser`](@ref) and of [`ProgrammeAllocationSet`](@ref) accepts it, because a caller can give either type, and one entry or a vector. [`turnover_constraints`](@ref) resolves each case of it to a [`Tn_VecTn`](@ref).
 
@@ -532,7 +532,7 @@ One turnover constraint or estimator, or a vector of them. It is the widest turn
   - [`Tn_VecTn`](@ref): what this narrows to once the names are resolved.
   - [`turnover_constraints`](@ref)
 """
-const TnE_Tn_VecTnE_Tn = Union{<:TnE_Tn, <:VecTnE_Tn}
+const TnE_Tn_VecTnE_Tn = Union{TnE_Tn, VecTnE_Tn}
 """
     turnover_constraints(tn::VecTnE_Tn, sets::UniverseSets; datatype::DataType = Float64,
                          strict::Bool = false)

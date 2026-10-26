@@ -756,7 +756,7 @@ The method that Julia selects is the algorithm.
   - [`panel_data_mask`](@ref)
   - [`panel_field_value_column!`](@ref)
 """
-function panel_field_column_mask(f::Union{<:NumericPanelField, <:CategoricalPanelField},
+function panel_field_column_mask(f::Union{NumericPanelField, CategoricalPanelField},
                                  ::Integer, rows = Colon())
     d = panel_data_mask(f)
     return isnothing(d) ? nothing : selectdim(d, 1, rows)

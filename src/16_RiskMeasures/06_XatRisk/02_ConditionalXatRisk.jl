@@ -365,9 +365,9 @@ The robust measure cannot evaluate its robust term on a return series, so it sha
   - [`ConditionalValueatRisk`](@ref)
   - [`DistributionallyRobustConditionalValueatRisk`](@ref)
 """
-const RMCVaR{T} = Union{<:ConditionalValueatRisk{<:Any, <:Any, T},
-                        <:DistributionallyRobustConditionalValueatRisk{<:Any, <:Any, <:Any,
-                                                                       <:Any, T}}
+const RMCVaR{T} = Union{ConditionalValueatRisk{<:Any, <:Any, T},
+                        DistributionallyRobustConditionalValueatRisk{<:Any, <:Any, <:Any,
+                                                                     <:Any, T}}
 function (r::RMCVaR{Nothing})(x::VecNum)
     if iszero(r.alpha)
         return worst_positive_weight_loss(x, nothing)
@@ -792,11 +792,11 @@ The robust range cannot evaluate its robust terms on a return series, so it shar
   - [`ConditionalValueatRiskRange`](@ref)
   - [`DistributionallyRobustConditionalValueatRiskRange`](@ref)
 """
-const RMCVaRRg{T} = Union{<:ConditionalValueatRiskRange{<:Any, <:Any, <:Any, T},
-                          <:DistributionallyRobustConditionalValueatRiskRange{<:Any, <:Any,
-                                                                              <:Any, <:Any,
-                                                                              <:Any, <:Any,
-                                                                              <:Any, T}}
+const RMCVaRRg{T} = Union{ConditionalValueatRiskRange{<:Any, <:Any, <:Any, T},
+                          DistributionallyRobustConditionalValueatRiskRange{<:Any, <:Any,
+                                                                            <:Any, <:Any,
+                                                                            <:Any, <:Any,
+                                                                            <:Any, T}}
 function (r::RMCVaRRg{Nothing})(x::VecNum)
     x = copy(x)
     alpha = r.alpha
@@ -1201,10 +1201,9 @@ The robust measure cannot evaluate its robust term on a return series, so it sha
   - [`ConditionalDrawdownatRisk`](@ref)
   - [`DistributionallyRobustConditionalDrawdownatRisk`](@ref)
 """
-const RMCDaR{T} = Union{<:ConditionalDrawdownatRisk{<:Any, <:Any, <:T},
-                        <:DistributionallyRobustConditionalDrawdownatRisk{<:Any, <:Any,
-                                                                          <:Any, <:Any,
-                                                                          <:T}}
+const RMCDaR{T} = Union{ConditionalDrawdownatRisk{<:Any, <:Any, <:T},
+                        DistributionallyRobustConditionalDrawdownatRisk{<:Any, <:Any, <:Any,
+                                                                        <:Any, <:T}}
 """
     conditional_drawdown_at_risk(dd::VecNum, alpha::Real, ::Nothing) -> Number
     conditional_drawdown_at_risk(dd::VecNum, alpha::Real, w::VecNum) -> Number

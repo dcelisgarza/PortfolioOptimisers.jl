@@ -179,8 +179,8 @@ A new subtype that holds a prior must define the same recursion. A new subtype t
 """
 abstract type AbstractLowOrderPriorEstimator_AF <: AbstractLowOrderPriorEstimator end
 """
-    const AbstractLowOrderPriorEstimator_A_AF = Union{<:AbstractLowOrderPriorEstimator_A,
-                                                      <:AbstractLowOrderPriorEstimator_AF}
+    const AbstractLowOrderPriorEstimator_A_AF = Union{AbstractLowOrderPriorEstimator_A,
+                                                      AbstractLowOrderPriorEstimator_AF}
 
 Union type for asset-only and asset-and-factor low order prior estimators.
 
@@ -196,11 +196,11 @@ A field typed `AbstractLowOrderPriorEstimator_A_AF` admits the asset-only shape 
   - [`FactorBlackLittermanPrior`](@ref)
   - [`AugmentedBlackLittermanPrior`](@ref)
 """
-const AbstractLowOrderPriorEstimator_A_AF = Union{<:AbstractLowOrderPriorEstimator_A,
-                                                  <:AbstractLowOrderPriorEstimator_AF}
+const AbstractLowOrderPriorEstimator_A_AF = Union{AbstractLowOrderPriorEstimator_A,
+                                                  AbstractLowOrderPriorEstimator_AF}
 """
-    const AbstractLowOrderPriorEstimator_F_AF = Union{<:AbstractLowOrderPriorEstimator_F,
-                                                      <:AbstractLowOrderPriorEstimator_AF}
+    const AbstractLowOrderPriorEstimator_F_AF = Union{AbstractLowOrderPriorEstimator_F,
+                                                      AbstractLowOrderPriorEstimator_AF}
 
 Union type for factor-only and asset-and-factor low order prior estimators.
 
@@ -215,12 +215,12 @@ A field typed `AbstractLowOrderPriorEstimator_F_AF` admits the factor-requiring 
   - [`HighOrderFactorPriorEstimator`](@ref)
   - [`assert_prior_regression`](@ref)
 """
-const AbstractLowOrderPriorEstimator_F_AF = Union{<:AbstractLowOrderPriorEstimator_F,
-                                                  <:AbstractLowOrderPriorEstimator_AF}
+const AbstractLowOrderPriorEstimator_F_AF = Union{AbstractLowOrderPriorEstimator_F,
+                                                  AbstractLowOrderPriorEstimator_AF}
 """
-    const AbstractLowOrderPriorEstimator_A_F_AF = Union{<:AbstractLowOrderPriorEstimator_A,
-                                                        <:AbstractLowOrderPriorEstimator_F,
-                                                        <:AbstractLowOrderPriorEstimator_AF}
+    const AbstractLowOrderPriorEstimator_A_F_AF = Union{AbstractLowOrderPriorEstimator_A,
+                                                        AbstractLowOrderPriorEstimator_F,
+                                                        AbstractLowOrderPriorEstimator_AF}
 
 Union type for asset-only, factor-only, and asset-and-factor low order prior estimators.
 
@@ -235,9 +235,9 @@ A field typed `AbstractLowOrderPriorEstimator_A_F_AF` admits all three source sh
   - [`AbstractLowOrderPriorEstimator_F_AF`](@ref)
   - [`EntropyPoolingPrior`](@ref)
 """
-const AbstractLowOrderPriorEstimator_A_F_AF = Union{<:AbstractLowOrderPriorEstimator_A,
-                                                    <:AbstractLowOrderPriorEstimator_F,
-                                                    <:AbstractLowOrderPriorEstimator_AF}
+const AbstractLowOrderPriorEstimator_A_F_AF = Union{AbstractLowOrderPriorEstimator_A,
+                                                    AbstractLowOrderPriorEstimator_F,
+                                                    AbstractLowOrderPriorEstimator_AF}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -282,8 +282,8 @@ A member admits asset returns and requires factor returns, as a member of [`Abst
 """
 abstract type AbstractHighOrderPriorEstimator_F <: AbstractHighOrderPriorEstimator end
 """
-    const AbstractHiLoOrderPriorEstimator_F = Union{<:AbstractLowOrderPriorEstimator_F,
-                                                    <:AbstractHighOrderPriorEstimator_F}
+    const AbstractHiLoOrderPriorEstimator_F = Union{AbstractLowOrderPriorEstimator_F,
+                                                    AbstractHighOrderPriorEstimator_F}
 
 Groups the two families that require factor returns, one for each order.
 
@@ -297,8 +297,8 @@ A member of `AbstractHiLoOrderPriorEstimator_F` cannot fit without factor return
   - [`prior`](@ref)
   - [`ReturnsResult`](@ref)
 """
-const AbstractHiLoOrderPriorEstimator_F = Union{<:AbstractLowOrderPriorEstimator_F,
-                                                <:AbstractHighOrderPriorEstimator_F}
+const AbstractHiLoOrderPriorEstimator_F = Union{AbstractLowOrderPriorEstimator_F,
+                                                AbstractHighOrderPriorEstimator_F}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -371,7 +371,7 @@ julia> PortfolioOptimisers.port_opt_view(pr, [1]).mu
 """
 abstract type AbstractPriorResult <: AbstractResult end
 """
-    const PrE_Pr = Union{<:AbstractPriorEstimator, <:AbstractPriorResult}
+    const PrE_Pr = Union{AbstractPriorEstimator, AbstractPriorResult}
 
 Groups a prior estimator with a fitted prior result.
 
@@ -383,9 +383,9 @@ Groups a prior estimator with a fitted prior result.
   - [`AbstractPriorResult`](@ref)
   - [`prior`](@ref)
 """
-const PrE_Pr = Union{<:AbstractPriorEstimator, <:AbstractPriorResult}
+const PrE_Pr = Union{AbstractPriorEstimator, AbstractPriorResult}
 """
-    const Pr_RR = Union{<:AbstractPriorResult, <:ReturnsResult}
+    const Pr_RR = Union{AbstractPriorResult, ReturnsResult}
 
 Groups the two result types that hold an asset returns matrix `X`.
 
@@ -397,7 +397,7 @@ The clustering, phylogeny and centrality forwarders of `src/10_Prior/20_PriorRet
   - [`ReturnsResult`](@ref)
   - [`returns_matrix_picker`](@ref)
 """
-const Pr_RR = Union{<:AbstractPriorResult, <:ReturnsResult}
+const Pr_RR = Union{AbstractPriorResult, ReturnsResult}
 """
     prior(pe::AbstractPriorEstimator, rd::ReturnsResult; strict::Bool = false,
           dims::Int = 1, cache_reg::Bool = false)
@@ -462,8 +462,8 @@ function prior(pe::AbstractPriorEstimator, rd::ReturnsResult; strict::Bool = fal
     return stamp_returns_source(shared_series_record(pr, rows, T), pe)
 end
 """
-    reads_factor_returns(pe::Union{<:AbstractPriorEstimator, <:Online}) -> Bool
-    reads_factor_returns(pe::Union{Nothing, <:AbstractPriorResult, <:AbstractEstimator}) -> Bool
+    reads_factor_returns(pe::Union{AbstractPriorEstimator, Online}) -> Bool
+    reads_factor_returns(pe::Union{Nothing, AbstractPriorResult, AbstractEstimator}) -> Bool
 
 Answer whether a fit through `pe` reads the factor returns. When it does, a gap in the factor returns drops the observation, see [`shared_series_view`](@ref).
 
@@ -482,10 +482,10 @@ A tree reads them when [`needs_factor_returns`](@ref) answers `true`. A tree who
   - [`needs_factor_returns`](@ref)
   - [`shared_series_view`](@ref)
 """
-function reads_factor_returns(pe::Union{<:AbstractPriorEstimator, <:Online})
+function reads_factor_returns(pe::Union{AbstractPriorEstimator, Online})
     return needs_factor_returns(pe) === true
 end
-function reads_factor_returns(::Union{Nothing, <:AbstractPriorResult, <:AbstractEstimator})
+function reads_factor_returns(::Union{Nothing, AbstractPriorResult, AbstractEstimator})
     return false
 end
 """
@@ -749,7 +749,7 @@ function prior(pr::AbstractPriorResult, args...; kwargs...)::AbstractPriorResult
 end
 """
     port_opt_view(pr::Option{<:AbstractPriorEstimator}, ::Any, args...; kwargs...)
-    port_opt_view(pr::AbstractVector{<:Union{<:AbstractPriorResult, <:AbstractPriorEstimator}},
+    port_opt_view(pr::AbstractVector{<:Union{AbstractPriorResult, AbstractPriorEstimator}},
                   ::Any, args...; kwargs...)
 
 Pass a prior estimator, or a vector of priors, through a view unchanged.
@@ -781,9 +781,9 @@ function port_opt_view(pr::Option{<:AbstractPriorEstimator}, ::Any, args...;
                        kwargs...)::Option{<:AbstractPriorEstimator}
     return pr
 end
-function port_opt_view(pr::AbstractVector{<:Union{<:AbstractPriorResult,
-                                                  <:AbstractPriorEstimator}}, ::Any,
-                       args...; kwargs...)
+function port_opt_view(pr::AbstractVector{<:Union{AbstractPriorResult,
+                                                  AbstractPriorEstimator}}, ::Any, args...;
+                       kwargs...)
     return pr
 end
 """

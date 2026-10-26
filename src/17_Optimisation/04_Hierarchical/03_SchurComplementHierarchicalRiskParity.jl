@@ -1,5 +1,5 @@
 """
-    const Sd_Var = Union{<:StandardDeviation, <:Variance}
+    const Sd_Var = Union{StandardDeviation, Variance}
 
 Groups the two risk measures that a Schur complement bundle accepts.
 
@@ -12,7 +12,7 @@ The allocation reads the risk of each half from the augmented covariance block o
   - [`SchurComplementParams`](@ref)
   - [`naive_portfolio_risk`](@ref): Computes the risk of a block under either measure.
 """
-const Sd_Var = Union{<:StandardDeviation, <:Variance}
+const Sd_Var = Union{StandardDeviation, Variance}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -39,8 +39,8 @@ $(DocStringExtensions.FIELDS)
         wb::Option{<:WeightBounds},
         clr::Option{<:AbstractClusteringResult},
         fees::Option{<:Fees},
-        r::Union{<:Sd_Var, <:VecBaseRM},
-        gamma::Union{<:Number, <:VecNum},
+        r::Union{Sd_Var, VecBaseRM},
+        gamma::Union{Number, VecNum},
         retcode::OptimisationReturnCode,
         w::Option{<:VecNum},
         imsk::Option{<:BitVector} = nothing,
@@ -105,8 +105,8 @@ Keywords correspond to the struct's fields.
                                                          wb::Option{<:WeightBounds},
                                                          clr::Option{<:AbstractClusteringResult},
                                                          fees::Option{<:Fees},
-                                                         r::Union{<:Sd_Var, <:VecBaseRM},
-                                                         gamma::Union{<:Number, <:VecNum},
+                                                         r::Union{Sd_Var, VecBaseRM},
+                                                         gamma::Union{Number, VecNum},
                                                          retcode::OptimisationReturnCode,
                                                          w::Option{<:VecNum},
                                                          imsk::Option{<:BitVector},
@@ -128,8 +128,8 @@ function SchurComplementHierarchicalRiskParityResult(; pr::Option{<:AbstractPrio
                                                      wb::Option{<:WeightBounds},
                                                      clr::Option{<:AbstractClusteringResult},
                                                      fees::Option{<:Fees},
-                                                     r::Union{<:Sd_Var, <:VecBaseRM},
-                                                     gamma::Union{<:Number, <:VecNum},
+                                                     r::Union{Sd_Var, VecBaseRM},
+                                                     gamma::Union{Number, VecNum},
                                                      retcode::OptimisationReturnCode,
                                                      w::Option{<:VecNum},
                                                      imsk::Option{<:BitVector} = nothing,
@@ -429,7 +429,7 @@ A vector of bundles runs one allocation per bundle and blends the portfolios. Th
 """
 const VecScP = AbstractVector{<:SchurComplementParams}
 """
-    const ScP_VecScP = Union{<:SchurComplementParams, <:VecScP}
+    const ScP_VecScP = Union{SchurComplementParams, VecScP}
 
 Groups one Schur complement bundle and a vector of bundles.
 
@@ -440,7 +440,7 @@ The `params` field of the estimator takes either form, so its bound is this alia
   - [`SchurComplementParams`](@ref)
   - [`VecScP`](@ref)
 """
-const ScP_VecScP = Union{<:SchurComplementParams, <:VecScP}
+const ScP_VecScP = Union{SchurComplementParams, VecScP}
 """
     port_opt_view(sp::SchurComplementParams, i, X::MatNum, args...) -> SchurComplementParams
 

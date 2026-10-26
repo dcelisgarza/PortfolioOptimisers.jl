@@ -78,8 +78,8 @@ A deformation slot sits on a measure of the return distribution and on a drawdow
 """
 abstract type AbstractDeformationCalibrationAlgorithm <: AbstractCalibrationAlgorithm end
 """
-    const Num_SigCal = Union{<:AbstractSignificanceCalibrationAlgorithm, <:Function,
-                             <:Number}
+    const Num_SigCal = Union{AbstractSignificanceCalibrationAlgorithm, Function,
+                             Number}
 
 Field bound for a significance slot: the tail probability itself, a rule of the family, or a plain function of the same five arguments.
 
@@ -93,10 +93,10 @@ A rule is run by calling it, so a function and a callable struct are the same th
   - [`Num_DefCal`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-const Num_SigCal = Union{<:AbstractSignificanceCalibrationAlgorithm, <:Function, <:Number}
+const Num_SigCal = Union{AbstractSignificanceCalibrationAlgorithm, Function, Number}
 """
-    const Num_DefCal = Union{<:AbstractDeformationCalibrationAlgorithm, <:Function,
-                             <:Number}
+    const Num_DefCal = Union{AbstractDeformationCalibrationAlgorithm, Function,
+                             Number}
 
 Field bound for a deformation slot: the deformation parameter itself, a rule of the family, or a plain function of the same five arguments. It is the counterpart of [`Num_SigCal`](@ref), and carries its reading unchanged.
 
@@ -106,7 +106,7 @@ Field bound for a deformation slot: the deformation parameter itself, a rule of 
   - [`Num_SigCal`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-const Num_DefCal = Union{<:AbstractDeformationCalibrationAlgorithm, <:Function, <:Number}
+const Num_DefCal = Union{AbstractDeformationCalibrationAlgorithm, Function, Number}
 """
     is_calibration_rule(x) -> Bool
 
@@ -199,8 +199,8 @@ function assert_calibrated_slots(x)
     end
     return nothing
 end
-function assert_calibrated_slots(xs::AbstractArray{<:Union{<:AbstractEstimator,
-                                                           <:AbstractAlgorithm}})
+function assert_calibrated_slots(xs::AbstractArray{<:Union{AbstractEstimator,
+                                                           AbstractAlgorithm}})
     for x in xs
         assert_calibrated_slots(x)
     end
@@ -263,8 +263,8 @@ function assert_declared_calibration_resolver(x)
     end
     return nothing
 end
-function assert_declared_calibration_resolver(xs::AbstractArray{<:Union{<:AbstractEstimator,
-                                                                        <:AbstractAlgorithm}})
+function assert_declared_calibration_resolver(xs::AbstractArray{<:Union{AbstractEstimator,
+                                                                        AbstractAlgorithm}})
     for x in xs
         assert_declared_calibration_resolver(x)
     end
@@ -1740,8 +1740,8 @@ A ceiling is read against one norm order, and that order belongs to the constrai
 """
 abstract type AbstractNormCeilingCalibrationAlgorithm <: AbstractCalibrationAlgorithm end
 """
-    const Num_AmbRadCal = Union{<:AbstractAmbiguityRadiusCalibrationAlgorithm, <:Function,
-                                <:Number}
+    const Num_AmbRadCal = Union{AbstractAmbiguityRadiusCalibrationAlgorithm, Function,
+                                Number}
 
 Field bound for an ambiguity-radius slot: the radius itself, a rule of the family, or a plain function of the same five arguments.
 
@@ -1754,11 +1754,10 @@ The union names one rule family and no other, so a tail-weight rule placed in a 
   - [`Num_AmbRadNormCeilCal`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-const Num_AmbRadCal = Union{<:AbstractAmbiguityRadiusCalibrationAlgorithm, <:Function,
-                            <:Number}
+const Num_AmbRadCal = Union{AbstractAmbiguityRadiusCalibrationAlgorithm, Function, Number}
 """
-    const Num_AmbTwtCal = Union{<:AbstractAmbiguityTailWeightCalibrationAlgorithm,
-                                <:Function, <:Number}
+    const Num_AmbTwtCal = Union{AbstractAmbiguityTailWeightCalibrationAlgorithm,
+                                Function, Number}
 
 Field bound for an ambiguity-tail-weight slot: the tail weight itself, a rule of the family, or a plain function of the same five arguments. It is the counterpart of [`Num_AmbRadCal`](@ref), and carries its reading unchanged.
 
@@ -1768,11 +1767,11 @@ Field bound for an ambiguity-tail-weight slot: the tail weight itself, a rule of
   - [`Num_AmbRadCal`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-const Num_AmbTwtCal = Union{<:AbstractAmbiguityTailWeightCalibrationAlgorithm, <:Function,
-                            <:Number}
+const Num_AmbTwtCal = Union{AbstractAmbiguityTailWeightCalibrationAlgorithm, Function,
+                            Number}
 """
-    const Num_NormCeilCal = Union{<:AbstractNormCeilingCalibrationAlgorithm, <:Function,
-                                  <:Number}
+    const Num_NormCeilCal = Union{AbstractNormCeilingCalibrationAlgorithm, Function,
+                                  Number}
 
 Field bound for a norm-ceiling slot: the ceiling itself, a rule of the family, or a plain function of the same five arguments.
 
@@ -1785,11 +1784,10 @@ The union names one rule family and no other, so a radius rule placed in a ceili
   - [`Num_AmbRadNormCeilCal`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-const Num_NormCeilCal = Union{<:AbstractNormCeilingCalibrationAlgorithm, <:Function,
-                              <:Number}
+const Num_NormCeilCal = Union{AbstractNormCeilingCalibrationAlgorithm, Function, Number}
 """
-    const Num_AmbRadNormCeilCal = Union{<:AbstractAmbiguityRadiusCalibrationAlgorithm,
-                                        <:AbstractNormCeilingCalibrationAlgorithm, <:Number}
+    const Num_AmbRadNormCeilCal = Union{AbstractAmbiguityRadiusCalibrationAlgorithm,
+                                        AbstractNormCeilingCalibrationAlgorithm, Number}
 
 Field bound for the one slot the library reads as two quantities, the `val` field of [`LpRegularisation`](@ref).
 
@@ -1805,8 +1803,8 @@ A plain function is **not** admitted here, and this is the one slot that refuses
   - [`assert_penalty_coefficient_role`](@ref)
   - [`assert_norm_ceiling_role`](@ref)
 """
-const Num_AmbRadNormCeilCal = Union{<:AbstractAmbiguityRadiusCalibrationAlgorithm,
-                                    <:AbstractNormCeilingCalibrationAlgorithm, <:Number}
+const Num_AmbRadNormCeilCal = Union{AbstractAmbiguityRadiusCalibrationAlgorithm,
+                                    AbstractNormCeilingCalibrationAlgorithm, Number}
 # The two families below name a quantity that reaches a JuMP model from a bare field of
 # `JuMPOptimiser`: the ceiling from `l2c` and `linfc`, the radius from `l1` and `linf`.
 # There is no term to rebuild on that route, and the constructor's guard read a rule rather

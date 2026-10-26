@@ -35,5 +35,5 @@ PortfolioOptimisers.read_member
 PortfolioOptimisers.fold_prior_step(pe::EmpiricalPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:PortfolioOptimisers.Option{<:PortfolioOptimisers.PriorCarryState}}, rd::ReturnsResult, gaps::PortfolioOptimisers.Option{<:AbstractVector{Bool}})
 PortfolioOptimisers.assert_carry_step_panel
 PortfolioOptimisers.step_active_kwargs
-PortfolioOptimisers.update_online_estimator(pe::Union{<:HighOrderPriorEstimator, <:BlackLittermanPrior})
+PortfolioOptimisers.update_online_estimator(pe::Union{HighOrderPriorEstimator, BlackLittermanPrior})
 ```

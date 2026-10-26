@@ -1348,7 +1348,7 @@ Each entry names the part and the method that it lacks. The test reads the confi
   - [`FoldOnly`](@ref)
   - [`cross_sectional_carry_rows`](@ref)
 """
-function carry_growing_parts(cfg::Union{<:CrossSectionalFactorPrior, <:NamedTuple})::Vector{String}
+function carry_growing_parts(cfg::Union{CrossSectionalFactorPrior, NamedTuple})::Vector{String}
     return vcat(String[],
                 (carry_growing_part(isnothing(carry_lookback(xe)),
                                     "the factor \"$name\" ($(nameof(typeof(xe)))) has no finite look-back, so the carry keeps every panel row. Each of its Descriptors needs a method of `lookback`")
@@ -1494,8 +1494,7 @@ The method that Julia selects is the algorithm.
 function assert_carry_rule(::FoldOrRefit, ::Any)
     return nothing
 end
-function assert_carry_rule(::FoldOnly,
-                           cfg::Union{<:CrossSectionalFactorPrior, <:NamedTuple})
+function assert_carry_rule(::FoldOnly, cfg::Union{CrossSectionalFactorPrior, NamedTuple})
     parts = carry_growing_parts(cfg)
     @argcheck(isempty(parts),
               ArgumentError("carry = FoldOnly() refuses this CrossSectionalFactorPrior, because the cost of a step of its carry fold grows with the stream for each part below.\n" *

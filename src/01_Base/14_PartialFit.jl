@@ -114,8 +114,8 @@ An estimator with no incremental fit of its own carries no state, so the walk re
   - [`copy_states`](@ref)
   - [`AbstractPartialFitState`](@ref)
 """
-function partial_fit(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator},
-                     args...; kwargs...)
+function partial_fit(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator}, args...;
+                     kwargs...)
     return partial_fit!(copy_states(est), args...; kwargs...)
 end
 """
@@ -257,9 +257,8 @@ julia> PortfolioOptimisers.chan_merge(1, [1.0, 2.0], [0.0, 0.0], 1, [3.0, 6.0], 
   - [`AbstractPartialFitState`](@ref)
   - [`merge_states`](@ref)
 """
-function chan_merge(n_a::Number, mu_a::Union{<:Number, <:VecNum},
-                    M_a::Union{<:Number, <:VecNum}, n_b::Number,
-                    mu_b::Union{<:Number, <:VecNum}, M_b::Union{<:Number, <:VecNum})
+function chan_merge(n_a::Number, mu_a::Union{Number, VecNum}, M_a::Union{Number, VecNum},
+                    n_b::Number, mu_b::Union{Number, VecNum}, M_b::Union{Number, VecNum})
     n = n_a + n_b
     @argcheck(n > zero(n), DomainError(n, "n_a + n_b must be positive"))
     delta = mu_b .- mu_a
@@ -385,7 +384,7 @@ A batch verb called on the estimator alone, with no data, reads the state out of
   - [`AbstractPartialFitState`](@ref)
   - [`partial_fit!`](@ref)
 """
-function partial_fit_cache(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator})
+function partial_fit_cache(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator})
     # An estimator with no `cache` field at all reads as one carrying nothing, so a family
     # that implements no `partial_fit!` meets the same named refusal rather than a
     # `FieldError`.
@@ -420,7 +419,7 @@ Every partial-fit state records the count of observations it has seen in its `n`
   - [`partial_fit!`](@ref)
   - [`AbstractPartialFitState`](@ref)
 """
-function observation_count(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator})
+function observation_count(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator})
     return partial_fit_cache(est).n
 end
 """

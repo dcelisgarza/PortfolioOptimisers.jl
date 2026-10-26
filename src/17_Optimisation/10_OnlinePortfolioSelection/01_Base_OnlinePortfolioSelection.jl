@@ -1819,7 +1819,7 @@ At a stage boundary the rule returns the Start Allocation for period `t + 1` and
   - [`AbstractLearningRateSchedule`](@ref)
   - [`DoublingTrickRate`](@ref)
 """
-function restart(::Union{<:Real, <:AbstractLearningRateSchedule}, ::Integer)
+function restart(::Union{Real, AbstractLearningRateSchedule}, ::Integer)
     return false
 end
 """
@@ -1833,8 +1833,7 @@ Returns the statistic that the state of a rule holds for its schedule before the
   - [`AbstractLearningRateSchedule`](@ref)
   - [`SelfConfidentRate`](@ref)
 """
-function schedule_state_seed(::Union{<:Real, <:AbstractLearningRateSchedule},
-                             ::AbstractVector)
+function schedule_state_seed(::Union{Real, AbstractLearningRateSchedule}, ::AbstractVector)
     return nothing
 end
 """
@@ -1850,8 +1849,8 @@ For a number, and for a schedule that reads no statistic, it returns `s` unchang
   - [`AbstractLearningRateSchedule`](@ref)
   - [`SelfConfidentRate`](@ref)
 """
-function schedule_update!(::Union{<:Real, <:AbstractLearningRateSchedule}, s,
-                          ::AbstractVector, ::AbstractVector)
+function schedule_update!(::Union{Real, AbstractLearningRateSchedule}, s, ::AbstractVector,
+                          ::AbstractVector)
     return s
 end
 """
@@ -1867,8 +1866,7 @@ It is the rule's own `alpha` under a number and under every schedule that does n
   - [`AbstractLearningRateSchedule`](@ref)
   - [`MirrorDescent`](@ref)
 """
-function mixing_share(::Union{<:Real, <:AbstractLearningRateSchedule}, ::Integer,
-                      alpha::Real)
+function mixing_share(::Union{Real, AbstractLearningRateSchedule}, ::Integer, alpha::Real)
     return alpha
 end
 """
@@ -1884,7 +1882,7 @@ It is `true` for a schedule that replays the period before it returns a rate, as
   - [`AbstractLearningRateSchedule`](@ref)
   - [`schedule_update!`](@ref)
 """
-function reads_period_row(::Union{<:Real, <:AbstractLearningRateSchedule})
+function reads_period_row(::Union{Real, AbstractLearningRateSchedule})
     return false
 end
 """

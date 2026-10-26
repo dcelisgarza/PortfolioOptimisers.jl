@@ -8,7 +8,7 @@ The methods below are public. The other names of this topic are private, and the
 
 ```@docs
 set_risk_constraints!(model::JuMP.Model, i::Any, r::TrackingRiskMeasure{<:Any, <:Any, <:L1Norm}, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
-set_risk_constraints!(model::JuMP.Model, i::Any, r::TrackingRiskMeasure{<:Any, <:Any, <:Union{<:L2Norm, <:SquaredL2Norm}}, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
+set_risk_constraints!(model::JuMP.Model, i::Any, r::TrackingRiskMeasure{<:Any, <:Any, <:Union{L2Norm, SquaredL2Norm}}, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
 set_risk_constraints!(model::JuMP.Model, i::Any, r::TrackingRiskMeasure{<:Any, <:Any, <:LpNorm}, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
 set_risk_constraints!(model::JuMP.Model, i::Any, r::TrackingRiskMeasure{<:Any, <:Any, <:LInfNorm}, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
 set_risk_constraints!(model::JuMP.Model, i::Any, r::RiskTrackingRiskMeasure{<:Any, <:Any, <:Any, <:IndependentVariableTracking}, opt::RiskConstraintOwner, pr::AbstractPriorResult, pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees}, args...; kwargs...)

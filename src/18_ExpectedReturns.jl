@@ -863,7 +863,7 @@ end
 # derived recursion resolves a vector element by element.
 deferred_slots(r::ExpectedReturnRiskRatio) = (; rt = r.rt, rk = r.rk)
 """
-    reader_frames(r::Union{<:ExpectedReturn, <:ExpectedReturnRiskRatio}, path::AbstractString,
+    reader_frames(r::Union{ExpectedReturn, ExpectedReturnRiskRatio}, path::AbstractString,
                   refit::Bool) -> ReturnsFrames
 
 Return the frames of the readers in a risk measure that holds a return term, for the frame walk of a head.
@@ -887,7 +887,7 @@ The return term `rt` can hold an uncertainty set with a prior of its own, as [`A
   - [`ExpectedReturn`](@ref)
   - [`ExpectedReturnRiskRatio`](@ref)
 """
-function reader_frames(r::Union{<:ExpectedReturn, <:ExpectedReturnRiskRatio},
+function reader_frames(r::Union{ExpectedReturn, ExpectedReturnRiskRatio},
                        path::AbstractString, refit::Bool)
     return field_frames(r, path, refit)
 end
@@ -934,8 +934,8 @@ function needs_previous_weights(r::ExpectedReturnRiskRatio)
     return needs_previous_weights(r.rk)
 end
 """
-    const PerfRM = Union{<:MeanReturn, <:MeanReturnRiskRatio, <:ExpectedReturn,
-                         <:ExpectedReturnRiskRatio}
+    const PerfRM = Union{MeanReturn, MeanReturnRiskRatio, ExpectedReturn,
+                         ExpectedReturnRiskRatio}
 
 Union of the risk measures whose value is a performance figure, a return or a ratio of return to risk.
 
@@ -950,10 +950,10 @@ Each member gives a **performance** figure and not a loss, so a larger value is 
   - [`PrRM`](@ref): The two members of this group that read a prior result.
   - [`bigger_is_better`](@ref): The method that dispatches on this alias.
 """
-const PerfRM = Union{<:MeanReturn, <:MeanReturnRiskRatio, <:ExpectedReturn,
-                     <:ExpectedReturnRiskRatio}
+const PerfRM = Union{MeanReturn, MeanReturnRiskRatio, ExpectedReturn,
+                     ExpectedReturnRiskRatio}
 """
-    const PrRM = Union{<:ExpectedReturn, <:ExpectedReturnRiskRatio}
+    const PrRM = Union{ExpectedReturn, ExpectedReturnRiskRatio}
 
 Union of the return risk measures that read a prior result, and that refuse a [`PredictionResult`](@ref). On a prediction result, use [`MeanReturn`](@ref) or [`MeanReturnRiskRatio`](@ref) in their place.
 
@@ -971,7 +971,7 @@ Both members read the **prior result** itself and not a returns matrix, so neith
   - [`prrm_prediction_message`](@ref): It builds the message of the refusal of the prediction-result methods.
   - [`risk_input_kind`](@ref): The declaration that neither member makes.
 """
-const PrRM = Union{<:ExpectedReturn, <:ExpectedReturnRiskRatio}
+const PrRM = Union{ExpectedReturn, ExpectedReturnRiskRatio}
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

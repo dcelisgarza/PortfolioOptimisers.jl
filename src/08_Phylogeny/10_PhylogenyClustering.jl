@@ -220,11 +220,11 @@ function clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:An
                        branchorder = branchorder)
 end
 """
-    const HClE_HCl = Union{<:ClustersEstimator{<:Any, <:Any,
+    const HClE_HCl = Union{ClustersEstimator{<:Any, <:Any,
                                                <:AbstractHierarchicalClusteringAlgorithm,
                                                <:Any},
-                           <:Clusters{<:Clustering.Hclust, <:Any, <:Any, <:Any},
-                           <:NetworkClustersEstimator{<:Any,
+                           Clusters{<:Clustering.Hclust, <:Any, <:Any, <:Any},
+                           NetworkClustersEstimator{<:Any,
                                                   <:AbstractHierarchicalClusteringAlgorithm}}
 
 Union of the hierarchical clustering estimators and results.
@@ -244,9 +244,8 @@ It is the bound of the `cle` argument of [`plot_dendrogram`](@ref) and [`plot_cl
   - [`AbstractHierarchicalClusteringAlgorithm`](@ref)
   - [`Clusters`](@ref)
 """
-const HClE_HCl = Union{<:ClustersEstimator{<:Any, <:Any,
-                                           <:AbstractHierarchicalClusteringAlgorithm,
-                                           <:Any},
-                       <:Clusters{<:Clustering.Hclust, <:Any, <:Any, <:Any},
-                       <:NetworkClustersEstimator{<:Any,
-                                                  <:AbstractHierarchicalClusteringAlgorithm}}
+const HClE_HCl = Union{ClustersEstimator{<:Any, <:Any,
+                                         <:AbstractHierarchicalClusteringAlgorithm, <:Any},
+                       Clusters{<:Clustering.Hclust, <:Any, <:Any, <:Any},
+                       NetworkClustersEstimator{<:Any,
+                                                <:AbstractHierarchicalClusteringAlgorithm}}

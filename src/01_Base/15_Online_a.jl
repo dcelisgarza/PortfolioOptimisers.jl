@@ -471,7 +471,7 @@ This function reads the rows out of a [`SampleBufferState`](@ref). It is a view 
 function sample_buffer(state::SampleBufferState)
     return view(state.X, (state.off + 1):(state.off + state.n), :)
 end
-function sample_buffer(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator})
+function sample_buffer(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator})
     return sample_buffer(assert_sample_buffer(est))
 end
 """
@@ -777,8 +777,7 @@ The buffering arm of [`partial_fit!`](@ref) reads its state through this functio
   - [`Online`](@ref)
   - [`partial_fit_cache`](@ref)
 """
-function assert_sample_buffer(est::Union{<:AbstractEstimator,
-                                         <:StatsBase.CovarianceEstimator})
+function assert_sample_buffer(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator})
     cache = hasfield(typeof(est), :cache) ? getfield(est, :cache) : nothing
     @argcheck(isa(cache, SampleBufferState),
               ArgumentError("`$(typeof(est))` carries no sample buffer, so it has no incremental fold of its own to fall back on. Wrap it in `Online` and resolve the wrapper with `update_online_estimator` before folding, which seeds the buffer its refit reads."))
@@ -1776,7 +1775,7 @@ A buffer carries the per-observation masks beside the observations. So a [`Cover
   - [`CoveragePolicy`](@ref)
   - [`partial_fit!`](@ref)
 """
-function partial_fit!(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator},
+function partial_fit!(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator},
                       X::VecNum_MatNum; dims::Int = 1, active_mask = nothing,
                       estimation_mask = nothing, iv = nothing, ivpa = nothing)
     state = assert_sample_buffer(est)

@@ -68,7 +68,7 @@ Where:
   - [`AssetPanel`](@ref)
   - [`IsEmptyError`](@ref)
 """
-function coverage_mask(X::MatNum, ::Union{Nothing, <:AssetPanel{<:Any, Nothing, Nothing}};
+function coverage_mask(X::MatNum, ::Union{Nothing, AssetPanel{<:Any, Nothing, Nothing}};
                        dims::Int = 1)::Option{BitVector}
     Xo = dims_oriented(dims, X)
     cmsk = trues(size(Xo, 2))
@@ -111,7 +111,7 @@ function coverage_mask(X::MatNum, amsk::AbstractMatrix{<:Bool};
 end
 """
     coverage_mask(X::MatNum, iv::MatNum,
-                  pnl::Union{Nothing, <:AssetPanel, <:AbstractMatrix{<:Bool}};
+                  pnl::Union{Nothing, AssetPanel, AbstractMatrix{<:Bool}};
                   dims::Int = 1) -> Option{BitVector}
 
 Derive the Coverage Universe of one [`ImpliedVolatility`](@ref) fit, which reads an implied volatility surface beside its returns.
@@ -171,7 +171,7 @@ Where:
   - [`expand_moment`](@ref)
 """
 function coverage_mask(X::MatNum, iv::MatNum,
-                       pnl::Union{Nothing, <:AssetPanel, <:AbstractMatrix{<:Bool}};
+                       pnl::Union{Nothing, AssetPanel, AbstractMatrix{<:Bool}};
                        dims::Int = 1)::Option{BitVector}
     Xo, ivo = dims_oriented(dims, X, iv)
     @argcheck(size(ivo, 2) == size(Xo, 2),
@@ -819,7 +819,7 @@ end
     expand_moment(sigma::MatNum, cmsk::BitVector) -> MatNum
     expand_moment(mu::VecNum, cmsk::BitVector, dims::Int) -> VecNum
     expand_moment(mu::MatNum, cmsk::BitVector, dims::Int) -> MatNum
-    expand_moment(skV::Tuple{<:MatNum, <:MatNum}, cmsk::BitVector) -> Tuple{MatNum, MatNum}
+    expand_moment(skV::Tuple{MatNum, MatNum}, cmsk::BitVector) -> Tuple{MatNum, MatNum}
     expand_moment(kt::MatNum, cmsk::BitVector, ::Val{:kt}) -> MatNum
 
 Write a moment estimated on the Coverage Universe back into a `NaN` frame of the full width.
@@ -916,7 +916,7 @@ function expand_moment(mu::MatNum, cmsk::BitVector, dims::Int)
         frame
     end
 end
-function expand_moment(skV::Tuple{<:MatNum, <:MatNum}, cmsk::BitVector)
+function expand_moment(skV::Tuple{MatNum, MatNum}, cmsk::BitVector)
     sk, V = skV
     N = length(cmsk)
     frame = coverage_nan_frame(sk, (N, N^2))

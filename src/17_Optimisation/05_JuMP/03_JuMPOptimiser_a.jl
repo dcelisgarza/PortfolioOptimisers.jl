@@ -37,8 +37,8 @@ $(DocStringExtensions.FIELDS)
         smtx::Option{<:MatNum_VecMatNum}, sgmtx::Option{<:MatNum_VecMatNum},
         slt::Option{<:Bt_VecOptBt}, sst::Option{<:Bt_VecOptBt}, sglt::Option{<:Bt_VecOptBt},
         sgst::Option{<:Bt_VecOptBt}, tn::Option{<:Tn_VecTn}, fees::Option{<:Fees},
-        plr::Option{<:Union{<:AbstractPhylogenyConstraintResult,
-                            <:AbstractVector{<:AbstractPhylogenyConstraintResult}}},
+        plr::Option{<:Union{AbstractPhylogenyConstraintResult,
+                            AbstractVector{<:AbstractPhylogenyConstraintResult}}},
         ret::JRE_VecJRE, sca::Scalariser, imsk::Option{<:BitVector} = nothing
     ) -> ProcessedJuMPOptimiserAttributes
 
@@ -172,8 +172,8 @@ true
                                               sglt::Option{<:Bt_VecOptBt},
                                               sgst::Option{<:Bt_VecOptBt},
                                               tn::Option{<:Tn_VecTn}, fees::Option{<:Fees},
-                                              plr::Option{<:Union{<:AbstractPhylogenyConstraintResult,
-                                                                  <:AbstractVector{<:AbstractPhylogenyConstraintResult}}},
+                                              plr::Option{<:Union{AbstractPhylogenyConstraintResult,
+                                                                  AbstractVector{<:AbstractPhylogenyConstraintResult}}},
                                               ret::JRE_VecJRE, sca::Scalariser,
                                               imsk::Option{<:BitVector})
         return new{typeof(pr), typeof(wb), typeof(lt), typeof(st), typeof(lcsr),
@@ -198,8 +198,8 @@ function ProcessedJuMPOptimiserAttributes(; pr::AbstractPriorResult,
                                           sglt::Option{<:Bt_VecOptBt},
                                           sgst::Option{<:Bt_VecOptBt},
                                           tn::Option{<:Tn_VecTn}, fees::Option{<:Fees},
-                                          plr::Option{<:Union{<:AbstractPhylogenyConstraintResult,
-                                                              <:AbstractVector{<:AbstractPhylogenyConstraintResult}}},
+                                          plr::Option{<:Union{AbstractPhylogenyConstraintResult,
+                                                              AbstractVector{<:AbstractPhylogenyConstraintResult}}},
                                           ret::JRE_VecJRE, sca::Scalariser,
                                           imsk::Option{<:BitVector} = nothing)::ProcessedJuMPOptimiserAttributes
     return ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr,
@@ -337,8 +337,8 @@ end
 function result_investable_mask(res::JuMPOptimisationResult)
     return res.pa.imsk
 end
-function result_investable_mask(res::Union{<:RiskJuMPOptimisationResult,
-                                           <:NonRiskJuMPOptimisationResult})
+function result_investable_mask(res::Union{RiskJuMPOptimisationResult,
+                                           NonRiskJuMPOptimisationResult})
     return result_investable_mask(res.jr)
 end
 """

@@ -852,8 +852,8 @@ Each is the square of the dual norm ``\\lVert \\boldsymbol{g}_t - M_t \\rVert_*`
 function hint_residual(::EuclideanProjection, d::AbstractVector)
     return sum(abs2, d)
 end
-function hint_residual(::Union{<:EntropicProjection, <:TsallisProjection,
-                               <:LogBarrierProjection}, d::AbstractVector)
+function hint_residual(::Union{EntropicProjection, TsallisProjection, LogBarrierProjection},
+                       d::AbstractVector)
     return abs2(maximum(abs, d))
 end
 """

@@ -168,7 +168,7 @@ Where:
 """
 struct SOCRiskExpr <: SecondMomentFormulation end
 """
-    const NSkeQuadFormulations = Union{<:QuadRiskExpr, <:SquaredSOCRiskExpr}
+    const NSkeQuadFormulations = Union{QuadRiskExpr, SquaredSOCRiskExpr}
 
 Groups the two encodings under which [`NegativeSkewness`](@ref) reports the quadratic form of its skewness matrix rather than its square root.
 
@@ -180,9 +180,9 @@ The functor of [`NegativeSkewness`](@ref) dispatches on the group. It returns ``
   - [`SquaredSOCRiskExpr`](@ref)
   - [`NegativeSkewness`](@ref)
 """
-const NSkeQuadFormulations = Union{<:QuadRiskExpr, <:SquaredSOCRiskExpr}
+const NSkeQuadFormulations = Union{QuadRiskExpr, SquaredSOCRiskExpr}
 """
-    const QuadSecondMomentFormulations = Union{<:NSkeQuadFormulations, <:RSOCRiskExpr}
+    const QuadSecondMomentFormulations = Union{NSkeQuadFormulations, RSOCRiskExpr}
 
 Groups the three encodings that report the second moment itself rather than its square root.
 
@@ -195,7 +195,7 @@ The value level of [`SecondMoment`](@ref) dispatches on the group. It returns th
   - [`SOCRiskExpr`](@ref)
   - [`SecondMoment`](@ref)
 """
-const QuadSecondMomentFormulations = Union{<:NSkeQuadFormulations, <:RSOCRiskExpr}
+const QuadSecondMomentFormulations = Union{NSkeQuadFormulations, RSOCRiskExpr}
 """
 $(DocStringExtensions.TYPEDEF)
 

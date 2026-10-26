@@ -87,7 +87,7 @@ end
                                            xe::AbstractExposureEstimator,
                                            bw::AbstractString) -> nothing
     assert_cross_sectional_benchmark_field(key::AbstractString,
-                                           xe::Union{<:CompositeExposure, <:DerivedExposure},
+                                           xe::Union{CompositeExposure, DerivedExposure},
                                            bw::AbstractString) -> nothing
 
 Refuse a factor whose Exposure Estimator reads its benchmark weights from a Panel Field the prior does not write.
@@ -124,8 +124,8 @@ function assert_cross_sectional_benchmark_field(key::AbstractString, xe::Observe
     return assert_cross_sectional_benchmark_field(key, xe.xe, bw)
 end
 function assert_cross_sectional_benchmark_field(key::AbstractString,
-                                                xe::Union{<:CompositeExposure,
-                                                          <:DerivedExposure},
+                                                xe::Union{CompositeExposure,
+                                                          DerivedExposure},
                                                 bw::AbstractString)::Nothing
     @argcheck(xe.bw == bw,
               ArgumentError("factor \"$key\" reads its benchmark weights from the Panel Field \"$(xe.bw)\", and the prior writes them onto \"$bw\". Give the Exposure Estimator bw = \"$bw\", or give the prior bw = \"$(xe.bw)\"."))
@@ -758,9 +758,9 @@ Where:
 function cross_sectional_scenario_weights(::Nothing)
     return nothing
 end
-function cross_sectional_scenario_weights(w::Union{<:StatsBase.Weights,
-                                                   <:StatsBase.AnalyticWeights,
-                                                   <:StatsBase.ProbabilityWeights})
+function cross_sectional_scenario_weights(w::Union{StatsBase.Weights,
+                                                   StatsBase.AnalyticWeights,
+                                                   StatsBase.ProbabilityWeights})
     s = sum(w)
     @argcheck(s > zero(s),
               DomainError(s,

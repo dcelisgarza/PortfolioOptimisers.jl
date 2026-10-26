@@ -1044,7 +1044,7 @@ function held_timestamps(opt::OnlinePortfolioSelection)
     return isnothing(opt.cache) ? nothing : opt.cache.ts
 end
 """
-    update_online_estimator(opt::Union{<:OnlinePortfolioSelection, <:PreviousWeights})
+    update_online_estimator(opt::Union{OnlinePortfolioSelection, PreviousWeights})
 
 Resolves the [`Online`](@ref) wrappers in the fallback of the head, at the warm-up.
 
@@ -1056,18 +1056,18 @@ The two heads step their fallback through [`step_fallback`](@ref), so a wrapper 
   - [`step_fallback`](@ref)
   - [`online_unreached_path`](@ref)
 """
-function update_online_estimator(opt::Union{<:OnlinePortfolioSelection, <:PreviousWeights})
+function update_online_estimator(opt::Union{OnlinePortfolioSelection, PreviousWeights})
     return opt
 end
-function update_online_estimator(opt::Union{<:OnlinePortfolioSelection{<:Any, <:Any, <:Any,
-                                                                       <:Any,
-                                                                       <:OptimisationEstimator},
-                                            <:PreviousWeights{<:Any, <:Any,
-                                                              <:OptimisationEstimator}})
+function update_online_estimator(opt::Union{OnlinePortfolioSelection{<:Any, <:Any, <:Any,
+                                                                     <:Any,
+                                                                     <:OptimisationEstimator},
+                                            PreviousWeights{<:Any, <:Any,
+                                                            <:OptimisationEstimator}})
     return rebuild_estimator(opt, (; fb = update_online_estimator(opt.fb)))
 end
 """
-    online_unreached_path(opt::Union{<:OnlinePortfolioSelection, <:PreviousWeights})
+    online_unreached_path(opt::Union{OnlinePortfolioSelection, PreviousWeights})
 
 Names the first [`Online`](@ref) wrapper in the head that the warm-up leaves unresolved, or answers `nothing`.
 
@@ -1078,7 +1078,7 @@ The method runs the warm-up of [`update_online_estimator`](@ref) on the head, an
   - [`online_unreached_path`](@ref)
   - [`assert_online_entry`](@ref)
 """
-function online_unreached_path(opt::Union{<:OnlinePortfolioSelection, <:PreviousWeights})
+function online_unreached_path(opt::Union{OnlinePortfolioSelection, PreviousWeights})
     return online_wrapper_path(update_online_estimator(opt))
 end
 """

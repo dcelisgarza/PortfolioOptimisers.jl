@@ -437,7 +437,7 @@ function assert_external_optimiser(opt::JuMPOptimisationEstimator)::Nothing
     return nothing
 end
 """
-    const RiskBudgetingOptimiser = Union{<:RiskBudgeting, <:RelaxedRiskBudgeting}
+    const RiskBudgetingOptimiser = Union{RiskBudgeting, RelaxedRiskBudgeting}
 
 Group the two JuMP optimisers that carry a risk budget algorithm in `rba`.
 
@@ -448,7 +448,7 @@ Group the two JuMP optimisers that carry a risk budget algorithm in `rba`.
   - [`RiskBudgeting`](@ref)
   - [`RelaxedRiskBudgeting`](@ref)
 """
-const RiskBudgetingOptimiser = Union{<:RiskBudgeting, <:RelaxedRiskBudgeting}
+const RiskBudgetingOptimiser = Union{RiskBudgeting, RelaxedRiskBudgeting}
 function assert_external_optimiser(opt::RiskBudgetingOptimiser)::Nothing
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
     assert_estimated_prior(opt.opt.pe, "opt.opt.pe")

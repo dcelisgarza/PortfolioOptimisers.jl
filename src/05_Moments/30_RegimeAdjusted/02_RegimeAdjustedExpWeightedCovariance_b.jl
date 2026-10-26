@@ -147,7 +147,7 @@ unchanged. Under `debias = RawStatistic()` the factor is one, which is the raw s
 
 # Arguments
 
-  - `method::Union{<:FirstMomentRegimeAdjusted, <:LogRegimeAdjusted}`: Regime adjustment method.
+  - `method::Union{FirstMomentRegimeAdjusted, LogRegimeAdjusted}`: Regime adjustment method.
   - `cache::RegimeAdjustedCovarianceState`: Online covariance computation cache.
   - `ce::RegimeAdjustedExpWeightedCovariance`: Covariance estimator configuration.
   - `C::MatNum`: Bias-corrected covariance block of the contributing assets.
@@ -168,8 +168,7 @@ unchanged. Under `debias = RawStatistic()` the factor is one, which is the raw s
   - [`RegimeTermMoments`](@ref)
   - [`DiagonalTarget`](@ref)
 """
-function diagonal_law_factor(method::Union{<:FirstMomentRegimeAdjusted,
-                                           <:LogRegimeAdjusted},
+function diagonal_law_factor(method::Union{FirstMomentRegimeAdjusted, LogRegimeAdjusted},
                              cache::RegimeAdjustedCovarianceState,
                              ce::RegimeAdjustedExpWeightedCovariance, C::MatNum,
                              idx::AbstractVector{<:Integer}, m::AbstractVector)
@@ -307,7 +306,7 @@ Where:
 
   - `lambda::Number`: Decay of the pair's estimate.
   - `W::Number`: Weight that the pair holds.
-  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight of each lag,
+  - `hac_lags::Option{<:Union{Integer, VecNum}}`: Count of HAC lags, the weight of each lag,
     or `nothing`.
 
 # Returns
@@ -321,7 +320,7 @@ Where:
   - [`hac_lag_weights`](@ref)
 """
 function pair_weight_square_sum(lambda::Number, W::Number,
-                                hac_lags::Option{<:Union{<:Integer, <:VecNum}})
+                                hac_lags::Option{<:Union{Integer, VecNum}})
     v = (one(lambda) - lambda) / (one(lambda) + lambda)
     t = v * (2 - W) / W
     k = hac_lag_weights(hac_lags, one(lambda))
@@ -692,7 +691,7 @@ with ``d_{k} = \\mu_{k} / (1 + 2 \\tau \\mu_{k})``, and the Wishart moments
 
 # Arguments
 
-  - `method::Union{<:FirstMomentRegimeAdjusted, <:LogRegimeAdjusted}`: Regime adjustment method.
+  - `method::Union{FirstMomentRegimeAdjusted, LogRegimeAdjusted}`: Regime adjustment method.
   - `mu::VecNum`: Eigenvalues of ``D \\tilde{R} D``.
   - `V::MatNum`: Their eigenvectors.
   - `Cm::MatNum`: Covariance of the deviations of the variable of the method.
@@ -709,9 +708,8 @@ with ``d_{k} = \\mu_{k} / (1 + 2 \\tau \\mu_{k})``, and the Wishart moments
   - [`regime_law_weights`](@ref)
   - [`diagonal_law_factor`](@ref)
 """
-function regime_law_correction(method::Union{<:FirstMomentRegimeAdjusted,
-                                             <:LogRegimeAdjusted}, mu::VecNum, V::MatNum,
-                               Cm::MatNum)
+function regime_law_correction(method::Union{FirstMomentRegimeAdjusted, LogRegimeAdjusted},
+                               mu::VecNum, V::MatNum, Cm::MatNum)
     T = eltype(mu)
     x = regime_law_grid(T)
     n = length(mu)
@@ -852,7 +850,7 @@ observations that [`regime_bias_open`](@ref) reads.
   - `a::Number`: Decay of the first set of weights.
   - `b::Number`: Decay of the second set of weights.
   - `K::Integer`: Count of observations that the weights span.
-  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight ``k_{i}`` of
+  - `hac_lags::Option{<:Union{Integer, VecNum}}`: Count of HAC lags, the weight ``k_{i}`` of
     each lag, or `nothing`.
 
 # Returns
@@ -865,7 +863,7 @@ observations that [`regime_bias_open`](@ref) reads.
   - [`hac_lag_weights`](@ref)
 """
 function exp_weight_cross_sum(a::Number, b::Number, K::Integer,
-                              hac_lags::Option{<:Union{<:Integer, <:VecNum}} = nothing)
+                              hac_lags::Option{<:Union{Integer, VecNum}} = nothing)
     ab = a * b
     t = one(ab) - ab^K
     k = hac_lag_weights(hac_lags, ab)
@@ -926,11 +924,11 @@ noise. Where it is not, the grid agrees with the finer one to ``5 \\times 10^{-7
 
 # Arguments
 
-  - `method::Union{<:RegimeAdjustedMethod, <:RegimeTermMoments}`: Regime adjustment method,
+  - `method::Union{RegimeAdjustedMethod, RegimeTermMoments}`: Regime adjustment method,
     which names the moment, or the table of the moments of one term.
   - `decay::Number`: Decay of the weights.
   - `K::Integer`: Largest count of observations in the table.
-  - `hac_lags::Union{<:Integer, <:VecNum}`: Count of HAC lags, or the weight of each lag.
+  - `hac_lags::Union{Integer, VecNum}`: Count of HAC lags, or the weight of each lag.
 
 # Returns
 
@@ -944,8 +942,8 @@ noise. Where it is not, the grid agrees with the finer one to ``5 \\times 10^{-7
   - [`regime_bias_table`](@ref)
   - [`regime_bias!`](@ref)
 """
-function regime_bias_table(method::Union{<:RegimeAdjustedMethod, <:RegimeTermMoments},
-                           decay::Number, K::Integer, hac_lags::Union{<:Integer, <:VecNum})
+function regime_bias_table(method::Union{RegimeAdjustedMethod, RegimeTermMoments},
+                           decay::Number, K::Integer, hac_lags::Union{Integer, VecNum})
     h = one(decay) / 10
     s = exp.(range(-60 * one(h), 50 * one(h); step = h))
     T = eltype(s)
@@ -1165,7 +1163,7 @@ target holds one factor for each count.
 
 # Returns
 
-  - `bias::Option{<:Union{<:AbstractVector, <:NamedTuple}}`: The empty store where
+  - `bias::Option{<:Union{AbstractVector, NamedTuple}}`: The empty store where
     [`debiases`](@ref) holds for `ce.debias` and a regime method is set, else `nothing`.
 
 # Related
@@ -1371,7 +1369,7 @@ history.
 
 # Returns
 
-  - `(g, dh)::Tuple{<:Number, <:Number}`: ``\\sum_{j} w_{j} / (1 + c\\, w_{j}\\, b)`` and
+  - `(g, dh)::Tuple{Number, Number}`: ``\\sum_{j} w_{j} / (1 + c\\, w_{j}\\, b)`` and
     ``\\sum_{j} w_{j} / (1 + c\\, w_{j}\\, b)^{2}``.
 
 # Related
@@ -1428,7 +1426,7 @@ HAC estimate has about half the degrees of freedom of a plain one.
   - `decay::Number`: Decay of the weights.
   - `K::Integer`: Count of observations in the estimate.
   - `n::Integer`: Count of assets that contribute to the statistic.
-  - `hac_lags::Union{<:Integer, <:VecNum}`: Count of HAC lags, or the weight of each lag.
+  - `hac_lags::Union{Integer, VecNum}`: Count of HAC lags, or the weight of each lag.
 
 # Returns
 
@@ -1441,7 +1439,7 @@ HAC estimate has about half the degrees of freedom of a plain one.
   - [`MahalanobisTarget`](@ref)
 """
 function mahalanobis_bias(decay::Number, K::Integer, n::Integer,
-                          hac_lags::Union{<:Integer, <:VecNum})
+                          hac_lags::Union{Integer, VecNum})
     b = one(decay)
     for _ in 1:(K > n + 1 ? 100 : 0)
         slopes = hac_log_det_slopes(decay, K, (n + 1) * b, hac_lags)

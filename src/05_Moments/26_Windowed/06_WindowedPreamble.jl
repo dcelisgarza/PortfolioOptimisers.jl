@@ -382,11 +382,11 @@ function windowed_variance_series(est, w::Option{<:ObsWeights},
     return isone(dims) ? val : permutedims(val)
 end
 """
-    const SeedWindowed = Union{<:WindowedExpectedReturns{<:Any, <:Any, <:Any, <:SeedWindow},
-                               <:WindowedCovariance{<:Any, <:Any, <:Any, <:SeedWindow},
-                               <:WindowedVariance{<:Any, <:Any, <:Any, <:SeedWindow},
-                               <:WindowedCoskewness{<:Any, <:Any, <:Any, <:SeedWindow},
-                               <:WindowedCokurtosis{<:Any, <:Any, <:Any, <:SeedWindow}}
+    const SeedWindowed = Union{WindowedExpectedReturns{<:Any, <:Any, <:Any, <:SeedWindow},
+                               WindowedCovariance{<:Any, <:Any, <:Any, <:SeedWindow},
+                               WindowedVariance{<:Any, <:Any, <:Any, <:SeedWindow},
+                               WindowedCoskewness{<:Any, <:Any, <:Any, <:SeedWindow},
+                               WindowedCokurtosis{<:Any, <:Any, <:Any, <:SeedWindow}}
 
 Groups the windowed estimators under a [`SeedWindow`](@ref), which are the windowed estimators that fold.
 
@@ -402,11 +402,11 @@ The fourth type parameter of a windowed estimator is the type of its `rule` fiel
   - [`SeedWindow`](@ref)
   - [`partial_fit!(est::SeedWindowed, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
-const SeedWindowed = Union{<:WindowedExpectedReturns{<:Any, <:Any, <:Any, <:SeedWindow},
-                           <:WindowedCovariance{<:Any, <:Any, <:Any, <:SeedWindow},
-                           <:WindowedVariance{<:Any, <:Any, <:Any, <:SeedWindow},
-                           <:WindowedCoskewness{<:Any, <:Any, <:Any, <:SeedWindow},
-                           <:WindowedCokurtosis{<:Any, <:Any, <:Any, <:SeedWindow}}
+const SeedWindowed = Union{WindowedExpectedReturns{<:Any, <:Any, <:Any, <:SeedWindow},
+                           WindowedCovariance{<:Any, <:Any, <:Any, <:SeedWindow},
+                           WindowedVariance{<:Any, <:Any, <:Any, <:SeedWindow},
+                           WindowedCoskewness{<:Any, <:Any, <:Any, <:SeedWindow},
+                           WindowedCokurtosis{<:Any, <:Any, <:Any, <:SeedWindow}}
 """
     partial_fit!(est::SeedWindowed, X::MatNum; dims::Int = 1, kwargs...)
     partial_fit!(est::SeedWindowed, x::VecNum; kwargs...)
@@ -661,8 +661,7 @@ The `cache` field holds the Partial Fit State of an online fit. It is not config
   - [`show_fields`](@ref)
   - [`set_show_nothing_fields!`](@ref)
 """
-function show_fields(est::Union{<:WindowedExpectedReturns, <:WindowedCovariance,
-                                <:WindowedVariance, <:WindowedCoskewness,
-                                <:WindowedCokurtosis})
+function show_fields(est::Union{WindowedExpectedReturns, WindowedCovariance,
+                                WindowedVariance, WindowedCoskewness, WindowedCokurtosis})
     return filter(!=(:cache), fieldnames(typeof(est)))
 end

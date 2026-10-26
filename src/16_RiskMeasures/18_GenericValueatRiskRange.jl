@@ -1,8 +1,8 @@
 """
-    ValueatRiskRMs = Union{<:ValueatRisk, <:ConditionalValueatRisk,
-                             <:DistributionallyRobustConditionalValueatRisk,
-                             <:EntropicValueatRisk, <:WorstRealisation,
-                             <:RelativisticValueatRisk, <:PowerNormValueatRisk}
+    ValueatRiskRMs = Union{ValueatRisk, ConditionalValueatRisk,
+                             DistributionallyRobustConditionalValueatRisk,
+                             EntropicValueatRisk, WorstRealisation,
+                             RelativisticValueatRisk, PowerNormValueatRisk}
 
 Union of the tail measures of the returns that [`GenericValueatRiskRange`](@ref) accepts as its loss tail and as its gain tail.
 
@@ -19,10 +19,10 @@ Each member measures one tail of a return series, so the range can apply it to t
   - [`PowerNormValueatRisk`](@ref)
   - [`GenericValueatRiskRange`](@ref)
 """
-const ValueatRiskRMs = Union{<:ValueatRisk, <:ConditionalValueatRisk,
-                             <:DistributionallyRobustConditionalValueatRisk,
-                             <:EntropicValueatRisk, <:WorstRealisation,
-                             <:RelativisticValueatRisk, <:PowerNormValueatRisk}
+const ValueatRiskRMs = Union{ValueatRisk, ConditionalValueatRisk,
+                             DistributionallyRobustConditionalValueatRisk,
+                             EntropicValueatRisk, WorstRealisation, RelativisticValueatRisk,
+                             PowerNormValueatRisk}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -288,15 +288,13 @@ end
 # tails both read a return series reads the net returns, and a range with a `ValueatRisk` tail
 # with `DistributionValueatRisk` reads the weights, the returns and the fees.
 risk_input_kind(::GenericValueatRiskRange) = NetReturnsInput()
-function risk_input_kind(::Union{<:GenericValueatRiskRange{<:Any,
-                                                           <:ValueatRisk{<:Any, <:Any,
-                                                                         <:Any,
-                                                                         <:DistributionValueatRisk},
-                                                           <:Any},
-                                 <:GenericValueatRiskRange{<:Any, <:Any,
-                                                           <:ValueatRisk{<:Any, <:Any,
-                                                                         <:Any,
-                                                                         <:DistributionValueatRisk}}})
+function risk_input_kind(::Union{GenericValueatRiskRange{<:Any,
+                                                         <:ValueatRisk{<:Any, <:Any, <:Any,
+                                                                       <:DistributionValueatRisk},
+                                                         <:Any},
+                                 GenericValueatRiskRange{<:Any, <:Any,
+                                                         <:ValueatRisk{<:Any, <:Any, <:Any,
+                                                                       <:DistributionValueatRisk}}})
     return WeightsReturnsFeesInput()
 end
 # The range reads a precomputed return series only when both tails do.

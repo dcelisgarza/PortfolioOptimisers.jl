@@ -200,11 +200,11 @@ Where:
   - [`leader_min_rows`](@ref)
   - [`forecast_min_rows`](@ref)
 """
-function fit_min_rows(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator})
+function fit_min_rows(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator})
     return maximum(f -> fit_min_rows(getfield(est, f)), fieldnames(typeof(est)); init = 1)
 end
-function fit_min_rows(v::AbstractVector{<:Union{<:AbstractEstimator,
-                                                <:StatsBase.CovarianceEstimator}})
+function fit_min_rows(v::AbstractVector{<:Union{AbstractEstimator,
+                                                StatsBase.CovarianceEstimator}})
     return maximum(fit_min_rows, v; init = 1)
 end
 function fit_min_rows(::Any)

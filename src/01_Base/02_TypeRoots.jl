@@ -334,11 +334,11 @@ A caller can then write one loop over a value that is a single estimator or a ve
   - [`AbstractAlgorithm`](@ref)
   - [`AbstractResult`](@ref)
 """
-function Base.iterate(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm,
-                                 <:AbstractResult}, state = 1)
+function Base.iterate(obj::Union{AbstractEstimator, AbstractAlgorithm, AbstractResult},
+                      state = 1)
     return state > 1 ? nothing : (obj, state + 1)
 end
-Base.length(::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult})::Int = 1
+Base.length(::Union{AbstractEstimator, AbstractAlgorithm, AbstractResult})::Int = 1
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -368,8 +368,8 @@ Index estimators, algorithms, and results as length-1 containers. Only index `1`
   - [`AbstractAlgorithm`](@ref)
   - [`AbstractResult`](@ref)
 """
-function Base.getindex(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm,
-                                  <:AbstractResult}, i::Int)
+function Base.getindex(obj::Union{AbstractEstimator, AbstractAlgorithm, AbstractResult},
+                       i::Int)
     return i == 1 ? obj : throw(BoundsError(obj, i))
 end
 """

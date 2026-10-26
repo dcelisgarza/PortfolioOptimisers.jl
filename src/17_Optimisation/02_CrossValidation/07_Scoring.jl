@@ -39,7 +39,7 @@ The library defines no subtype of it, and no method dispatches on it.
 """
 abstract type PopulationScorer <: AbstractCrossValidationScorer end
 """
-    const PredictionCrossValScorer = Union{<:PredictionScorer, <:Function}
+    const PredictionCrossValScorer = Union{PredictionScorer, Function}
 
 Union of the values that the `scorer` field of [`OptimisationCrossValidation`](@ref) accepts: a [`PredictionScorer`](@ref) or a plain function.
 
@@ -51,9 +51,9 @@ The union exists so that a caller can select a path with a function and write no
   - [`NearestQuantilePrediction`](@ref)
   - [`OptimisationCrossValidation`](@ref)
 """
-const PredictionCrossValScorer = Union{<:PredictionScorer, <:Function}
+const PredictionCrossValScorer = Union{PredictionScorer, Function}
 """
-    const PopulationCrossValScorer = Union{<:PopulationScorer, <:Function}
+    const PopulationCrossValScorer = Union{PopulationScorer, Function}
 
 Union of a [`PopulationScorer`](@ref) and a plain function that scores a population of predictions as a whole.
 
@@ -64,7 +64,7 @@ It is the population counterpart of [`PredictionCrossValScorer`](@ref). No field
   - [`PopulationScorer`](@ref)
   - [`PredictionCrossValScorer`](@ref)
 """
-const PopulationCrossValScorer = Union{<:PopulationScorer, <:Function}
+const PopulationCrossValScorer = Union{PopulationScorer, Function}
 """
 $(DocStringExtensions.TYPEDEF)
 

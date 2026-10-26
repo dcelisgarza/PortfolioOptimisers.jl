@@ -228,7 +228,7 @@ $(DocStringExtensions.FIELDS)
         prior::Option{<:AbstractPriorResult} = nothing,
         phylogeny::Option{<:AbstractPhylogenyResult} = nothing,
         uncertainty::Option{<:PipelineUncertaintySets} = nothing,
-        constraints::Option{<:Union{<:AbstractConstraintResult, <:AbstractVector{<:AbstractConstraintResult}}} = nothing,
+        constraints::Option{<:Union{AbstractConstraintResult, AbstractVector{<:AbstractConstraintResult}}} = nothing,
         opt::Option{<:OptimisationResult} = nothing,
     ) -> PipelineContext
 
@@ -274,8 +274,8 @@ Keywords correspond to the struct's fields.
                              prior::Option{<:AbstractPriorResult},
                              phylogeny::Option{<:AbstractPhylogenyResult},
                              uncertainty::Option{<:PipelineUncertaintySets},
-                             constraints::Option{<:Union{<:AbstractConstraintResult,
-                                                         <:AbstractVector{<:AbstractConstraintResult}}},
+                             constraints::Option{<:Union{AbstractConstraintResult,
+                                                         AbstractVector{<:AbstractConstraintResult}}},
                              opt::Option{<:OptimisationResult})
         return new{typeof(prices), typeof(returns), typeof(prior), typeof(phylogeny),
                    typeof(uncertainty), typeof(constraints), typeof(opt)}(prices, returns,
@@ -289,8 +289,8 @@ function PipelineContext(; prices::Option{<:AbstractPricesResult} = nothing,
                          prior::Option{<:AbstractPriorResult} = nothing,
                          phylogeny::Option{<:AbstractPhylogenyResult} = nothing,
                          uncertainty::Option{<:PipelineUncertaintySets} = nothing,
-                         constraints::Option{<:Union{<:AbstractConstraintResult,
-                                                     <:AbstractVector{<:AbstractConstraintResult}}} = nothing,
+                         constraints::Option{<:Union{AbstractConstraintResult,
+                                                     AbstractVector{<:AbstractConstraintResult}}} = nothing,
                          opt::Option{<:OptimisationResult} = nothing)::PipelineContext
     return PipelineContext(prices, returns, prior, phylogeny, uncertainty, constraints, opt)
 end
@@ -553,7 +553,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     PipelineStep(;
-        est::Union{<:AbstractEstimator, <:Function},
+        est::Union{AbstractEstimator, Function},
         writes::Symbol,
         reads::Tuple{Vararg{Symbol}} = (),
         target::Option{Symbol} = nothing,
@@ -608,7 +608,7 @@ ExcessSource()
     Optional routing annotation for heterogeneous slots (one of [`PIPELINE_STEP_TARGETS`](@ref), or `nothing`).
     """
     target
-    function PipelineStep(est::Union{<:AbstractEstimator, <:Function},
+    function PipelineStep(est::Union{AbstractEstimator, Function},
                           reads::Tuple{Vararg{Symbol}}, writes::Symbol,
                           target::Option{Symbol})
         @argcheck(writes in PIPELINE_SLOTS,
@@ -628,7 +628,7 @@ ExcessSource()
                                                                                target)
     end
 end
-function PipelineStep(; est::Union{<:AbstractEstimator, <:Function}, writes::Symbol,
+function PipelineStep(; est::Union{AbstractEstimator, Function}, writes::Symbol,
                       reads::Tuple{Vararg{Symbol}} = (),
                       target::Option{Symbol} = nothing)::PipelineStep
     return PipelineStep(est, reads, writes, target)

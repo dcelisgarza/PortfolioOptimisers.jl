@@ -12,7 +12,7 @@ Every concrete or abstract type that builds a network of assets from data must s
 """
 abstract type AbstractNetworkEstimator <: AbstractPhylogenyEstimator end
 """
-    const NwE_Pl_ClE_Cl = Union{<:AbstractNetworkEstimator, <:PhylogenyResult, <:ClE_Cl}
+    const NwE_Pl_ClE_Cl = Union{AbstractNetworkEstimator, PhylogenyResult, ClE_Cl}
 
 Union of a network estimator, a phylogeny result, a clustering estimator and a clustering result.
 
@@ -24,9 +24,9 @@ It is the bound of the `pl` argument of [`average_centrality`](@ref), which take
   - [`PhylogenyResult`](@ref)
   - [`ClE_Cl`](@ref)
 """
-const NwE_Pl_ClE_Cl = Union{<:AbstractNetworkEstimator, <:PhylogenyResult, <:ClE_Cl}
+const NwE_Pl_ClE_Cl = Union{AbstractNetworkEstimator, PhylogenyResult, ClE_Cl}
 """
-    const NwE_ClE = Union{<:AbstractNetworkEstimator, <:AbstractClustersEstimator}
+    const NwE_ClE = Union{AbstractNetworkEstimator, AbstractClustersEstimator}
 
 Union of a network estimator and a clustering estimator, with no precomputed result.
 
@@ -45,9 +45,9 @@ To use a precomputed structure, build the constraint one time and pass the resul
   - [`CentralityEstimator`](@ref)
   - [`PhylogenyPanel`](@ref)
 """
-const NwE_ClE = Union{<:AbstractNetworkEstimator, <:AbstractClustersEstimator}
+const NwE_ClE = Union{AbstractNetworkEstimator, AbstractClustersEstimator}
 """
-    const NwE_ClE_Cl = Union{<:AbstractNetworkEstimator, <:ClE_Cl}
+    const NwE_ClE_Cl = Union{AbstractNetworkEstimator, ClE_Cl}
 
 Union of a network estimator, a clustering estimator and a clustering result.
 
@@ -58,7 +58,7 @@ It is the bound of the `pl` argument of [`centrality_vector`](@ref), of [`asset_
   - [`AbstractNetworkEstimator`](@ref)
   - [`ClE_Cl`](@ref)
 """
-const NwE_ClE_Cl = Union{<:AbstractNetworkEstimator, <:ClE_Cl}
+const NwE_ClE_Cl = Union{AbstractNetworkEstimator, ClE_Cl}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -313,10 +313,10 @@ function NetworkClustersEstimator(; nte::AbstractNetworkEstimator = NetworkEstim
                                   x_src::Option{<:AbstractReturnsSource} = nothing)
     return NetworkClustersEstimator(nte, alg, onc, x_src)
 end
-function returns_source(x::Union{<:NetworkEstimator, <:NetworkClustersEstimator})
+function returns_source(x::Union{NetworkEstimator, NetworkClustersEstimator})
     return x.x_src
 end
-function reader_frames(x::Union{<:NetworkEstimator, <:NetworkClustersEstimator},
+function reader_frames(x::Union{NetworkEstimator, NetworkClustersEstimator},
                        path::AbstractString, ::Bool)
     return source_frames(x.x_src, path, true)
 end

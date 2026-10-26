@@ -35,7 +35,7 @@ Centres the returns series using the (weighted) mean before computing the Median
 """
 struct MeanCentering <: MedianCenteringFunction end
 """
-    const MedAbsDevMu = Union{<:MuSlot, <:MedianCenteringFunction}
+    const MedAbsDevMu = Union{MuSlot, MedianCenteringFunction}
 
 Union of valid centring-target types for [`MedianAbsoluteDeviation`](@ref).
 
@@ -52,7 +52,7 @@ The two are different quantities, not two spellings of one. The median is not li
   - [`MedianCenteringFunction`](@ref)
   - [`MedianAbsoluteDeviation`](@ref)
 """
-const MedAbsDevMu = Union{<:MuSlot, <:MedianCenteringFunction}
+const MedAbsDevMu = Union{MuSlot, MedianCenteringFunction}
 """
 $(DocStringExtensions.TYPEDEF)
 

@@ -25,5 +25,5 @@ PortfolioOptimisers.advance_anchor
 PortfolioOptimisers.block_gap_return!
 PortfolioOptimisers.series_values_returns
 PortfolioOptimisers.returns_with_series
-PortfolioOptimisers.show_fields(est::Union{<:PricesToReturns, <:PriceGapFill, <:MissingDataFilter})
+PortfolioOptimisers.show_fields(est::Union{PricesToReturns, PriceGapFill, MissingDataFilter})
 ```

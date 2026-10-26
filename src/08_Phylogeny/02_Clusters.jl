@@ -105,7 +105,7 @@ A subtype is a score that [`optimal_number_clusters`](@ref) calculates for each 
 """
 abstract type AbstractOptimalNumberClustersAlgorithm <: AbstractAlgorithm end
 """
-    const Int_ONC = Union{<:Integer, <:AbstractOptimalNumberClustersAlgorithm}
+    const Int_ONC = Union{Integer, AbstractOptimalNumberClustersAlgorithm}
 
 Alias for an integer or optimal number of clusters algorithm.
 
@@ -116,7 +116,7 @@ Matches an integer, which states the number of clusters, or an [`AbstractOptimal
   - [`AbstractOptimalNumberClustersAlgorithm`](@ref)
   - [`OptimalNumberClusters`](@ref)
 """
-const Int_ONC = Union{<:Integer, <:AbstractOptimalNumberClustersAlgorithm}
+const Int_ONC = Union{Integer, AbstractOptimalNumberClustersAlgorithm}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -131,7 +131,7 @@ A subtype holds the output of a clustering estimator. [`Clusters`](@ref) is the 
 """
 abstract type AbstractClusteringResult <: AbstractPhylogenyResult end
 """
-    const ClTypes = Union{<:Clustering.ClusteringResult, <:Clustering.Hclust}
+    const ClTypes = Union{Clustering.ClusteringResult, Clustering.Hclust}
 
 Alias for clustering result types from the Clustering.jl package.
 
@@ -142,7 +142,7 @@ Matches a `Clustering.ClusteringResult` or a `Clustering.Hclust`. The `res` fiel
   - [`Clusters`](@ref)
   - [`ClustersEstimator`](@ref)
 """
-const ClTypes = Union{<:Clustering.ClusteringResult, <:Clustering.Hclust}
+const ClTypes = Union{Clustering.ClusteringResult, Clustering.Hclust}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -778,7 +778,7 @@ function reader_frames(cle::ClustersEstimator, path::AbstractString, ::Bool)
     return source_frames(cle.x_src, path, true)
 end
 """
-    const ClE_Cl = Union{<:AbstractClustersEstimator, <:AbstractClusteringResult}
+    const ClE_Cl = Union{AbstractClustersEstimator, AbstractClusteringResult}
 
 Alias for a clustering estimator or result.
 
@@ -789,7 +789,7 @@ Matches an [`AbstractClustersEstimator`](@ref) or an [`AbstractClusteringResult`
   - [`AbstractClustersEstimator`](@ref)
   - [`AbstractClusteringResult`](@ref)
 """
-const ClE_Cl = Union{<:AbstractClustersEstimator, <:AbstractClusteringResult}
+const ClE_Cl = Union{AbstractClustersEstimator, AbstractClusteringResult}
 
 export Clusters, clusterise, SecondOrderDifference, SilhouetteScore, OptimalNumberClusters,
        HClustAlgorithm, ClustersEstimator

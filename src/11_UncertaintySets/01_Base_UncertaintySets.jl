@@ -149,7 +149,7 @@ A model that takes the worst case over the new shape also needs its own `set_ucs
 """
 abstract type AbstractUncertaintySetResult <: AbstractResult end
 """
-    const UcSE_UcS = Union{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetEstimator}
+    const UcSE_UcS = Union{AbstractUncertaintySetResult, AbstractUncertaintySetEstimator}
 
 Alias for a union of the result types and the estimator types of an uncertainty set.
 
@@ -158,7 +158,7 @@ Alias for a union of the result types and the estimator types of an uncertainty 
   - [`AbstractUncertaintySetResult`](@ref)
   - [`AbstractUncertaintySetEstimator`](@ref)
 """
-const UcSE_UcS = Union{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetEstimator}
+const UcSE_UcS = Union{AbstractUncertaintySetResult, AbstractUncertaintySetEstimator}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -210,7 +210,7 @@ To add a radius algorithm that the library can use, subtype `AbstractUncertainty
 """
 abstract type AbstractUncertaintyKAlgorithm <: AbstractAlgorithm end
 """
-    const Num_UcSK = Union{<:AbstractUncertaintyKAlgorithm, <:Number}
+    const Num_UcSK = Union{AbstractUncertaintyKAlgorithm, Number}
 
 Alias for a union of the radius algorithms of an ellipsoid and the number types. A number is the radius.
 
@@ -218,7 +218,7 @@ Alias for a union of the radius algorithms of an ellipsoid and the number types.
 
   - [`AbstractUncertaintyKAlgorithm`](@ref)
 """
-const Num_UcSK = Union{<:AbstractUncertaintyKAlgorithm, <:Number}
+const Num_UcSK = Union{AbstractUncertaintyKAlgorithm, Number}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -250,7 +250,7 @@ The name of a rule is the name of the **method** that it runs, and no other part
 """
 abstract type AbstractCompactRadiusAlgorithm <: AbstractAlgorithm end
 """
-    const Num_CptRad = Union{<:AbstractCompactRadiusAlgorithm, <:Number}
+    const Num_CptRad = Union{AbstractCompactRadiusAlgorithm, Number}
 
 Type bound of the field that holds the compact covariance radius.
 
@@ -262,7 +262,7 @@ The field holds the radius, or a rule of [`AbstractCompactRadiusAlgorithm`](@ref
   - [`k_compact`](@ref)
   - [`OrthogonalUncertaintySet`](@ref)
 """
-const Num_CptRad = Union{<:AbstractCompactRadiusAlgorithm, <:Number}
+const Num_CptRad = Union{AbstractCompactRadiusAlgorithm, Number}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -297,7 +297,7 @@ To add a radius algorithm that the library can use, subtype `AbstractUncertainty
 """
 abstract type AbstractUncertaintyEpsAlgorithm <: AbstractAlgorithm end
 """
-    const Num_UcSEps = Union{<:AbstractUncertaintyEpsAlgorithm, <:Number}
+    const Num_UcSEps = Union{AbstractUncertaintyEpsAlgorithm, Number}
 
 Alias for a union of the radius algorithms of an ``\\ell_1`` set and the number types. A number is the radius. An algorithm computes the radius from the data.
 
@@ -305,10 +305,10 @@ Alias for a union of the radius algorithms of an ``\\ell_1`` set and the number 
 
   - [`AbstractUncertaintyEpsAlgorithm`](@ref)
 """
-const Num_UcSEps = Union{<:AbstractUncertaintyEpsAlgorithm, <:Number}
+const Num_UcSEps = Union{AbstractUncertaintyEpsAlgorithm, Number}
 """
-    ucs(uc::Option{<:Tuple{<:Option{<:AbstractUncertaintySetResult},
-                           <:Option{<:AbstractUncertaintySetResult}}}, args...; kwargs...)
+    ucs(uc::Option{<:Tuple{Option{<:AbstractUncertaintySetResult},
+                           Option{<:AbstractUncertaintySetResult}}}, args...; kwargs...)
 
 Returns a pair of built uncertainty sets unchanged, so that a consumer can call [`ucs`](@ref) on an estimator or on a result.
 
@@ -322,7 +322,7 @@ The method is a passthrough. It does no procedure, so it has no `# Algorithm` se
 
 # Returns
 
-  - `uc::Option{<:Tuple{<:Option{<:AbstractUncertaintySetResult}, <:Option{<:AbstractUncertaintySetResult}}}`: The input, unchanged.
+  - `uc::Option{<:Tuple{Option{<:AbstractUncertaintySetResult}, Option{<:AbstractUncertaintySetResult}}}`: The input, unchanged.
 
 # Related
 
@@ -331,8 +331,8 @@ The method is a passthrough. It does no procedure, so it has no `# Algorithm` se
   - [`BoxUncertaintySet`](@ref)
   - [`EllipsoidalUncertaintySet`](@ref)
 """
-function ucs(uc::Option{<:Tuple{<:Option{<:AbstractUncertaintySetResult},
-                                <:Option{<:AbstractUncertaintySetResult}}}, args...;
+function ucs(uc::Option{<:Tuple{Option{<:AbstractUncertaintySetResult},
+                                Option{<:AbstractUncertaintySetResult}}}, args...;
              kwargs...)
     return uc
 end
@@ -562,7 +562,7 @@ The method reads the fields of the container and calls the matrix method. The ma
 
 # Returns
 
-  - `uc::Tuple{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetResult}`: The uncertainty sets of the mean and of the covariance.
+  - `uc::Tuple{AbstractUncertaintySetResult, AbstractUncertaintySetResult}`: The uncertainty sets of the mean and of the covariance.
 
 # Related
 
@@ -846,7 +846,7 @@ On the first row, the method drops the prior and does not check it. An estimator
 
 # Returns
 
-  - `uc::Tuple{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetResult}`: The uncertainty sets of the mean and of the covariance.
+  - `uc::Tuple{AbstractUncertaintySetResult, AbstractUncertaintySetResult}`: The uncertainty sets of the mean and of the covariance.
 
 # Related
 

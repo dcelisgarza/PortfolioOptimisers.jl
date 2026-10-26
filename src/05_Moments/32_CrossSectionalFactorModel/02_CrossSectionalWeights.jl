@@ -212,7 +212,7 @@ $(DocStringExtensions.FIELDS)
         p::Real = 0.5,
         lambda::Real,
         ratio::Real = 20.0,
-        wins::Tuple{<:Real, <:Real} = (0.025, 0.975)
+        wins::Tuple{Real, Real} = (0.025, 0.975)
     ) -> BlendedInverseVarianceWeights
 
 Keywords correspond to the struct's fields. `lambda` takes no default, because naming this member is the request for the second pass. A caller that wants one pass writes [`MarketCapWeights`](@ref) instead.
@@ -261,7 +261,7 @@ BlendedInverseVarianceWeights
     """
     wins
     function BlendedInverseVarianceWeights(p::Real, lambda::Real, ratio::Real,
-                                           wins::Tuple{<:Real, <:Real})
+                                           wins::Tuple{Real, Real})
         assert_finite(p, :p)
         assert_nonneg(p, :p)
         assert_closed_unit_interval(lambda, :lambda)
@@ -275,7 +275,7 @@ BlendedInverseVarianceWeights
     end
 end
 function BlendedInverseVarianceWeights(; p::Real = 0.5, lambda::Real, ratio::Real = 20.0,
-                                       wins::Tuple{<:Real, <:Real} = (0.025, 0.975))::BlendedInverseVarianceWeights
+                                       wins::Tuple{Real, Real} = (0.025, 0.975))::BlendedInverseVarianceWeights
     return BlendedInverseVarianceWeights(p, lambda, ratio, wins)
 end
 function needs_second_pass(::BlendedInverseVarianceWeights)::Bool
@@ -519,7 +519,7 @@ An entry is infinite where its variance is exactly zero. When every entry of the
 
   - `IV::Matrix{<:Number}`: Inverse variances `observations × assets`, changed in place.
   - `W0::MatNum`: First-pass weights `observations × assets`. Only the sign of an entry is read, which names the estimation universe.
-  - `wins::Tuple{<:Real, <:Real}`: Lower and upper quantile levels of the clamp.
+  - `wins::Tuple{Real, Real}`: Lower and upper quantile levels of the clamp.
 
 # Validation
 
@@ -548,7 +548,7 @@ julia> IV
   - [`cross_sectional_median_cap!`](@ref)
 """
 function cross_sectional_winsorise!(IV::Matrix{<:Number}, W0::MatNum,
-                                    wins::Tuple{<:Real, <:Real})::Nothing
+                                    wins::Tuple{Real, Real})::Nothing
     @argcheck(size(IV) == size(W0),
               DimensionMismatch("IV ($(size(IV, 1))×$(size(IV, 2))) must match W0 ($(size(W0, 1))×$(size(W0, 2)))"))
     Tf = eltype(IV)

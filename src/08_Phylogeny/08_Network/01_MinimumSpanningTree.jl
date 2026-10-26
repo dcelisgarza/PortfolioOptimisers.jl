@@ -17,8 +17,8 @@ Every concrete or abstract type that selects a minimum spanning tree algorithm m
 """
 abstract type AbstractTreeType <: AbstractPhylogenyAlgorithm end
 """
-    const Tree_SimMat = Union{<:AbstractNonNegativeSimilarityMatrixAlgorithm,
-                              <:AbstractTreeType}
+    const Tree_SimMat = Union{AbstractNonNegativeSimilarityMatrixAlgorithm,
+                              AbstractTreeType}
 
 Union of the tree algorithms and the non-negative similarity algorithms.
 
@@ -33,8 +33,7 @@ The similarity members come from [`AbstractNonNegativeSimilarityMatrixAlgorithm`
   - [`AbstractTreeType`](@ref)
   - [`NetworkEstimator`](@ref)
 """
-const Tree_SimMat = Union{<:AbstractNonNegativeSimilarityMatrixAlgorithm,
-                          <:AbstractTreeType}
+const Tree_SimMat = Union{AbstractNonNegativeSimilarityMatrixAlgorithm, AbstractTreeType}
 """
 $(DocStringExtensions.TYPEDEF)
 

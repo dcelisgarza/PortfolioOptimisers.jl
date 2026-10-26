@@ -66,7 +66,7 @@ function WalkForwardResult(; train_idx::VecVecInt, test_idx::VecVecInt)::WalkFor
     return WalkForwardResult(train_idx, test_idx)
 end
 """
-    const WalkForward_Onl = Union{<:WalkForwardEstimator, <:Online{<:WalkForwardEstimator}}
+    const WalkForward_Onl = Union{WalkForwardEstimator, Online{<:WalkForwardEstimator}}
 
 Alias for a walk-forward scheme, plain or an Online Scheme.
 
@@ -79,9 +79,9 @@ An Online Scheme is an [`Online`](@ref) around a walk-forward, built by the sche
   - [`CVE_Onl`](@ref)
   - [`WFCVER`](@ref)
 """
-const WalkForward_Onl = Union{<:WalkForwardEstimator, <:Online{<:WalkForwardEstimator}}
+const WalkForward_Onl = Union{WalkForwardEstimator, Online{<:WalkForwardEstimator}}
 """
-    const WFCVER = Union{<:WalkForward_Onl, <:WalkForwardResult}
+    const WFCVER = Union{WalkForward_Onl, WalkForwardResult}
 
 Alias for a walk-forward cross-validation scheme, plain or online, or its result.
 
@@ -90,7 +90,7 @@ Alias for a walk-forward cross-validation scheme, plain or online, or its result
   - [`WalkForward_Onl`](@ref)
   - [`WalkForwardResult`](@ref)
 """
-const WFCVER = Union{<:WalkForward_Onl, <:WalkForwardResult}
+const WFCVER = Union{WalkForward_Onl, WalkForwardResult}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -424,7 +424,7 @@ reaches a [`DateWalkForward`](@ref) through its `adjuster` field, whose type bou
 """
 abstract type DateAdjusterEstimator <: AbstractEstimator end
 """
-    const DatesUnionPeriod = Union{<:Dates.Period, <:Dates.CompoundPeriod}
+    const DatesUnionPeriod = Union{Dates.Period, Dates.CompoundPeriod}
 
 Alias for a Dates period or compound period.
 
@@ -435,9 +435,9 @@ Used internally to accept either simple date periods (e.g., `Dates.Month(1)`) or
   - [`IntPeriodDateRange`](@ref)
   - [`DateWalkForward`](@ref)
 """
-const DatesUnionPeriod = Union{<:Dates.Period, <:Dates.CompoundPeriod}
+const DatesUnionPeriod = Union{Dates.Period, Dates.CompoundPeriod}
 """
-    const IntPeriodDateRange = Union{<:Integer, <:DatesUnionPeriod}
+    const IntPeriodDateRange = Union{Integer, DatesUnionPeriod}
 
 Alias for an integer or date period used to specify window sizes.
 
@@ -448,9 +448,9 @@ Matches either a plain integer (number of observations) or a date period ([`Date
   - [`DatesUnionPeriod`](@ref)
   - [`DateWalkForward`](@ref)
 """
-const IntPeriodDateRange = Union{<:Integer, <:DatesUnionPeriod}
+const IntPeriodDateRange = Union{Integer, DatesUnionPeriod}
 """
-    const DateAdjType = Union{<:Function, <:DateAdjusterEstimator}
+    const DateAdjType = Union{Function, DateAdjusterEstimator}
 
 Alias for a date adjustment function or estimator.
 
@@ -461,7 +461,7 @@ Matches either a plain `Function` or a [`DateAdjusterEstimator`](@ref) for adjus
   - [`DateAdjusterEstimator`](@ref)
   - [`DateWalkForward`](@ref)
 """
-const DateAdjType = Union{<:Function, <:DateAdjusterEstimator}
+const DateAdjType = Union{Function, DateAdjusterEstimator}
 """
 $(DocStringExtensions.TYPEDEF)
 

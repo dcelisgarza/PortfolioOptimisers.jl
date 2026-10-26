@@ -408,9 +408,9 @@ methods, and a `regime_method` of `nothing`, take every rule.
 """
 function assert_regime_debias(regime_method::Option{<:RegimeAdjustedMethod},
                               debias::AbstractRegimeDebias, name::Symbol)
-    # A `Union` of bounded type variables, `Union{<:A, <:B}`, is built again on every call, and
-    # an online step reaches this check through the constructor. Each member here is a
-    # `UnionAll` over all its parameters, so the plain `Union` admits the same methods.
+    # A `Union` whose members carry a `<:` bound is built again on every call, and an online
+    # step reaches this check through the constructor. Each member here is a `UnionAll` over
+    # all its parameters, so the plain `Union` admits the same methods (#1824).
     @argcheck(isnothing(regime_method) ||
               isa(regime_method,
                   Union{RootMeanSquaredAdjusted, FirstMomentRegimeAdjusted,
@@ -670,8 +670,8 @@ julia> ce.min_obs
                                                   centring, debias, cache)
     end
 end
-# `Tuple` is covariant, so `Tuple{Number, Number}` admits every pair of numbers. The bounded form
-# `Tuple{<:Number, <:Number}` makes each keyword call build its type again, and an online step
+# `Tuple` is covariant, so `Tuple{Number, Number}` admits every pair of numbers. A form with a
+# `<:` bound on each parameter makes each keyword call build its type again, and an online step
 # rebuilds the estimator through this constructor (`rebuild_estimator`).
 function RegimeAdjustedExpWeightedVariance(; decay::Number = exp2(-inv(40.0)),
                                            min_obs::Integer = round(Int,
@@ -1164,7 +1164,7 @@ The mean of ``Q^{-1}`` is finite from ``K = 3`` and its variance from ``K = 5``,
 
 # Arguments
 
-  - `method::Union{<:RegimeAdjustedMethod, <:RegimeTermMoments}`: Regime adjustment method,
+  - `method::Union{RegimeAdjustedMethod, RegimeTermMoments}`: Regime adjustment method,
     which names the moment, or the table of the moments of one term.
   - `decay::Number`: Decay of the weights.
   - `K::Integer`: Largest count of observations in the table.
@@ -1181,7 +1181,7 @@ The mean of ``Q^{-1}`` is finite from ``K = 3`` and its variance from ``K = 5``,
   - [`mahalanobis_bias`](@ref)
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
 """
-function regime_bias_table(method::Union{<:RegimeAdjustedMethod, <:RegimeTermMoments},
+function regime_bias_table(method::Union{RegimeAdjustedMethod, RegimeTermMoments},
                            decay::Number, K::Integer)
     h = one(decay) / 10
     s = exp.(range(-60 * one(h), 50 * one(h); step = h))
@@ -1210,11 +1210,11 @@ larger count. A fit over ``T`` rows thus makes the table once or a few times, an
 # Arguments
 
   - `bias::AbstractVector`: Table of the state (mutated where it grows).
-  - `method::Union{<:RegimeAdjustedMethod, <:RegimeTermMoments}`: Regime adjustment method,
+  - `method::Union{RegimeAdjustedMethod, RegimeTermMoments}`: Regime adjustment method,
     which names the moment, or the table of the moments of one term.
   - `decay::Number`: Decay of the weights.
   - `K::Integer`: Count of observations in the estimate.
-  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags of the estimate, or the
+  - `hac_lags::Option{<:Union{Integer, VecNum}}`: Count of HAC lags of the estimate, or the
     weight of each lag, whose table [`regime_bias_table`](@ref) computes from its banded weight
     matrix, or `nothing`.
   - `centring::AbstractCentring`: The centring of the estimate. Under [`EstimatedCentring`](@ref)
@@ -1233,9 +1233,8 @@ larger count. A fit over ``T`` rows thus makes the table once or a few times, an
   - [`RegimeAdjustedVarianceState`](@ref)
 """
 function regime_bias!(bias::AbstractVector,
-                      method::Union{<:RegimeAdjustedMethod, <:RegimeTermMoments},
-                      decay::Number, K::Integer,
-                      hac_lags::Option{<:Union{<:Integer, <:VecNum}} = nothing,
+                      method::Union{RegimeAdjustedMethod, RegimeTermMoments}, decay::Number,
+                      K::Integer, hac_lags::Option{<:Union{Integer, VecNum}} = nothing,
                       centring::AbstractCentring = PreCentred(),
                       debias::AbstractRegimeDebias = ExactDebias())
     Ksat = ceil(Int, log(eps(eltype(eltype(bias)))) / log(decay))
@@ -1300,7 +1299,7 @@ Without the correction every observation above `min_obs` is scored.
   - `n::Integer`: Count of directions that the statistic reads.
   - `decay::Number`: Decay of the weights.
   - `K::Integer`: Count of the terms in the estimate.
-  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight of each lag, or
+  - `hac_lags::Option{<:Union{Integer, VecNum}}`: Count of HAC lags, the weight of each lag, or
     `nothing`.
 
 # Returns
@@ -1315,7 +1314,7 @@ Without the correction every observation above `min_obs` is scored.
   - [`RegimeAdjustedExpWeightedCovariance`](@ref)
 """
 function regime_bias_open(debias::AbstractRegimeDebias, n::Integer, decay::Number,
-                          K::Integer, hac_lags::Option{<:Union{<:Integer, <:VecNum}})
+                          K::Integer, hac_lags::Option{<:Union{Integer, VecNum}})
     return !debiases(debias) ||
            K > n + 3 && (isnothing(hac_lags) ||
                          exp_weight_cross_sum(decay, decay, K, hac_lags) * (n + 1) < one(decay))

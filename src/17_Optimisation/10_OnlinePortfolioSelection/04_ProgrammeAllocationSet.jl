@@ -575,9 +575,9 @@ The owner of such a slot must carry `sets`. The estimators are [`WeightBoundsEst
 function name_keyed(::Any)
     return false
 end
-function name_keyed(::Union{<:WeightBoundsEstimator, <:LinearConstraintEstimator,
-                            <:ExposureConstraintEstimator, <:ThresholdEstimator,
-                            <:AssetSetsMatrixEstimator, <:TurnoverEstimator})
+function name_keyed(::Union{WeightBoundsEstimator, LinearConstraintEstimator,
+                            ExposureConstraintEstimator, ThresholdEstimator,
+                            AssetSetsMatrixEstimator, TurnoverEstimator})
     return true
 end
 function name_keyed(x::AbstractVector)
@@ -717,8 +717,8 @@ A precomputed [`LinearConstraint`](@ref), [`IntegerPhylogeny`](@ref) or [`SemiDe
 function fitted_on_rows(::Any)
     return false
 end
-function fitted_on_rows(::Union{<:AbstractCentralityConstraint,
-                                <:AbstractPhylogenyConstraintEstimator})
+function fitted_on_rows(::Union{AbstractCentralityConstraint,
+                                AbstractPhylogenyConstraintEstimator})
     return true
 end
 function fitted_on_rows(x::AbstractVector)
@@ -1186,8 +1186,8 @@ function assert_geometry_admits_set(::AbstractProjectionGeometry,
                                     ::AbstractAllocationSet)::Nothing
     return nothing
 end
-function assert_geometry_admits_set(proj::Union{<:EntropicProjection, <:TsallisProjection,
-                                                <:LogBarrierProjection},
+function assert_geometry_admits_set(proj::Union{EntropicProjection, TsallisProjection,
+                                                LogBarrierProjection},
                                     set::AbstractAllocationSet)::Nothing
     wb = set.wb
     if isa(wb, WeightBounds) && !isnothing(wb.lb)

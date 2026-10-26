@@ -39,7 +39,7 @@ julia> mean(CustomValueExpectedReturns(; val = MyCustomValAlg()), [1 2 3; 4 5 6]
 """
 abstract type CustomExpectedReturnsValueAlgorithm <: AbstractCustomValue end
 """
-    const CER_Func_Num_VecNum = Union{<:CustomExpectedReturnsValueAlgorithm,<:Func_Num_VecNum}
+    const CER_Func_Num_VecNum = Union{CustomExpectedReturnsValueAlgorithm,Func_Num_VecNum}
 
 Alias for the types that the `val` field of [`CustomValueExpectedReturns`](@ref) accepts.
 
@@ -51,7 +51,7 @@ The three shapes of `val` are a scalar, a per-asset vector and a callable. The k
   - [`Func_Num_VecNum`](@ref): The scalar, the per-asset vector and the plain `Function`, which this alias widens with the algorithm supertype.
   - [`CustomValueExpectedReturns`](@ref): The estimator whose `val` field carries this bound.
 """
-const CER_Func_Num_VecNum = Union{<:CustomExpectedReturnsValueAlgorithm, <:Func_Num_VecNum}
+const CER_Func_Num_VecNum = Union{CustomExpectedReturnsValueAlgorithm, Func_Num_VecNum}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -225,8 +225,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 The callable method of [`mean(me::CustomValueExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref). It calls `me.val` with the same arguments, and checks the result against the number of assets.
 """
-function Statistics.mean(me::CustomValueExpectedReturns{<:Union{<:Function,
-                                                                <:CustomExpectedReturnsValueAlgorithm}},
+function Statistics.mean(me::CustomValueExpectedReturns{<:Union{Function,
+                                                                CustomExpectedReturnsValueAlgorithm}},
                          X::MatNum; dims::Int = 1, kwargs...)
     assert_dims(dims)
     _ncols = size(X, setdiff((1, 2), (dims,))[1])

@@ -856,7 +856,7 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
     led = String[]
     vpr = investable_prior(imsk, pr)
     fixed = falses(size(vpr.X, 2), 2)
-    epc = Dict{Symbol, Tuple{<:MatNum, <:VecNum}}()
+    epc = Dict{Symbol, Tuple{MatNum, VecNum}}()
     # mu and VaR
     # Every `prior(...)` reference resolves against the fit above. The CVaR
     # search runs once per stage against a refit `pr`, so resolving inside it would state a
@@ -1040,7 +1040,7 @@ function ep_prior(alg::H0_EntropyPooling, pe::MeucciEntropyPoolingPrior, X::MatN
     imsk, vsets, ni = investable_views(pr, pe.sets)
     led = String[]
     vpr = investable_prior(imsk, pr)
-    epc = Dict{Symbol, Tuple{<:MatNum, <:VecNum}}()
+    epc = Dict{Symbol, Tuple{MatNum, VecNum}}()
     # mu and VaR
     # Every `prior(...)` reference resolves against the fit above.
     cvv = ep_cvar_views_setup(pe.cvar_views, vpr, vsets, w0, pe.ds_opt, pe.dm_opt;

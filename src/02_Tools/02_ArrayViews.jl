@@ -1,16 +1,16 @@
 """
     nothing_scalar_array_view(
-        x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict,
-                 <:AbstractEstimatorValueAlgorithm,
-                 <:DynamicAbstractWeights, <:AbstractEstimator, <:AbstractAlgorithm,
-                 <:StatsBase.CovarianceEstimator},
+        x::Union{Nothing, Number, Pair, VecPair, Dict,
+                 AbstractEstimatorValueAlgorithm,
+                 DynamicAbstractWeights, AbstractEstimator, AbstractAlgorithm,
+                 StatsBase.CovarianceEstimator},
         ::Any
     ) -> x
     nothing_scalar_array_view(x::AbstractVector, i) -> view(x, i)
     nothing_scalar_array_view(x::VecScalar, i) -> VecScalar(; v = view(x.v, i), s = x.s)
     nothing_scalar_array_view(x::AbstractMatrix, i) -> view(x, i, i)
     nothing_scalar_array_view(
-        x::AbstractVector{<:Union{<:AbstractVector, <:AbstractMatrix, <:VecScalar}},
+        x::AbstractVector{<:Union{AbstractVector, AbstractMatrix, VecScalar}},
         i
     ) -> [nothing_scalar_array_view(xi, i) for xi in x]
 
@@ -35,11 +35,11 @@ The method that Julia selects is the algorithm. Each step is one method, and no 
 
   - `x`: Input value.
 
-      + `::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict, <:AbstractEstimatorValueAlgorithm, <:DynamicAbstractWeights, <:AbstractEstimator, <:AbstractAlgorithm, <:StatsBase.CovarianceEstimator}`: Returns `x` unchanged.
+      + `::Union{Nothing, Number, Pair, VecPair, Dict, AbstractEstimatorValueAlgorithm, DynamicAbstractWeights, AbstractEstimator, AbstractAlgorithm, StatsBase.CovarianceEstimator}`: Returns `x` unchanged.
       + `::AbstractVector`: Returns `view(x, i)`.
       + `::VecScalar`: Returns `VecScalar(; v = view(x.v, i), s = x.s)`.
       + `::AbstractMatrix`: Returns `view(x, i, i)`.
-      + `::AbstractVector{<:Union{<:AbstractVector, <:AbstractMatrix, <:VecScalar}}`: Returns a vector of views for each element in `x`.
+      + `::AbstractVector{<:Union{AbstractVector, AbstractMatrix, VecScalar}}`: Returns a vector of views for each element in `x`.
 
 # Examples
 
@@ -65,11 +65,11 @@ julia> PortfolioOptimisers.nothing_scalar_array_view([[1, 2], [3, 4]], 1)
   - [`nothing_scalar_array_getindex`](@ref)
   - [`VecScalar`](@ref)
 """
-function nothing_scalar_array_view(x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict,
-                                            <:AbstractEstimatorValueAlgorithm,
-                                            <:DynamicAbstractWeights, <:AbstractEstimator,
-                                            <:AbstractAlgorithm,
-                                            <:StatsBase.CovarianceEstimator}, ::Any)
+function nothing_scalar_array_view(x::Union{Nothing, Number, Pair, VecPair, Dict,
+                                            AbstractEstimatorValueAlgorithm,
+                                            DynamicAbstractWeights, AbstractEstimator,
+                                            AbstractAlgorithm,
+                                            StatsBase.CovarianceEstimator}, ::Any)
     return x
 end
 function nothing_scalar_array_view(x::AbstractVector, i)
@@ -81,9 +81,8 @@ end
 function nothing_scalar_array_view(x::AbstractMatrix, i)
     return view(x, i, i)
 end
-function nothing_scalar_array_view(x::AbstractVector{<:Union{<:AbstractVector,
-                                                             <:AbstractMatrix, <:VecScalar}},
-                                   i)
+function nothing_scalar_array_view(x::AbstractVector{<:Union{AbstractVector, AbstractMatrix,
+                                                             VecScalar}}, i)
     return [nothing_scalar_array_view(xi, i) for xi in x]
 end
 """
@@ -173,7 +172,7 @@ julia> PortfolioOptimisers.port_opt_view(nothing, 1)
 port_opt_view(::Nothing, ::Any; kwargs...) = nothing
 port_opt_view(::Nothing, ::Any, args...; kwargs...) = nothing
 """
-    port_opt_view(x::AbstractVector{<:Union{Nothing, <:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}}, i, args...; kwargs...) -> Vector
+    port_opt_view(x::AbstractVector{<:Union{Nothing, AbstractEstimator, AbstractAlgorithm, AbstractResult}}, i, args...; kwargs...) -> Vector
 
 Generic vector method for [`port_opt_view`](@ref): view each element of `x` at the index selection `i`.
 
@@ -205,8 +204,8 @@ The result has the length of `x`, because `i` goes to the elements and never to 
   - [`concrete_typed_array_if_abstract`](@ref)
   - [`@vprop`](@ref)
 """
-function port_opt_view(x::AbstractVector{<:Union{Nothing, <:AbstractEstimator,
-                                                 <:AbstractAlgorithm, <:AbstractResult}}, i,
+function port_opt_view(x::AbstractVector{<:Union{Nothing, AbstractEstimator,
+                                                 AbstractAlgorithm, AbstractResult}}, i,
                        args...; kwargs...)
     return [port_opt_view(xi, i, args...; kwargs...) for xi in x]
 end
@@ -301,9 +300,8 @@ The result has the length of `x`, because `i` selects observations inside each e
   - [`obs_weights_view`](@ref)
   - [`@fprop`](@ref)
 """
-function obs_weights_view(x::AbstractVector{<:Union{Nothing, <:AbstractEstimator,
-                                                    <:AbstractAlgorithm, <:AbstractResult}},
-                          i)
+function obs_weights_view(x::AbstractVector{<:Union{Nothing, AbstractEstimator,
+                                                    AbstractAlgorithm, AbstractResult}}, i)
     return [obs_weights_view(xi, i) for xi in x]
 end
 """
@@ -335,7 +333,7 @@ Step 2 clamps the lower end at `start`, so a `window` larger than the number of 
 
 # Returns
 
-  - `window::Union{Colon, <:VecInt}`: The indices of the window.
+  - `window::Union{Colon, VecInt}`: The indices of the window.
 
 # Related
 
@@ -402,9 +400,9 @@ function nothing_scalar_array_view_odd_order(x::AbstractMatrix, i, j)
 end
 """
     nothing_scalar_array_getindex(
-        x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict,
-                 <:AbstractEstimatorValueAlgorithm,
-                 <:DynamicAbstractWeights},
+        x::Union{Nothing, Number, Pair, VecPair, Dict,
+                 AbstractEstimatorValueAlgorithm,
+                 DynamicAbstractWeights},
         ::Any
     ) -> x
     nothing_scalar_array_getindex(x::AbstractVector, i) -> x[i]
@@ -412,7 +410,7 @@ end
     nothing_scalar_array_getindex(x::VecScalar, i) -> VecScalar(; v = x.v[i], s = x.s)
     nothing_scalar_array_getindex(x::AbstractMatrix, i) -> x[i, i]
     nothing_scalar_array_getindex(
-        x::AbstractVector{<:Union{<:AbstractVector, <:AbstractMatrix, <:VecScalar}},
+        x::AbstractVector{<:Union{AbstractVector, AbstractMatrix, VecScalar}},
         i
     ) -> [nothing_scalar_array_getindex(xi, i) for xi in x]
 
@@ -440,11 +438,11 @@ The type list of step 1 is **shorter** than the list of [`nothing_scalar_array_v
 
   - `x`: Input value.
 
-      + `::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict, <:AbstractEstimatorValueAlgorithm, <:DynamicAbstractWeights}`: Returns `x` unchanged.
+      + `::Union{Nothing, Number, Pair, VecPair, Dict, AbstractEstimatorValueAlgorithm, DynamicAbstractWeights}`: Returns `x` unchanged.
       + `::AbstractVector`: Returns `x[i]`.
       + `::StatsBase.AbstractWeights`, except `StatsBase.UnitWeights`: Returns weights of the same kind that hold `x.values[i]`.
       + `::VecScalar`: Returns `VecScalar(; v = x.v[i], s = x.s)`.
-      + `::AbstractVector{<:Union{<:AbstractVector, <:AbstractMatrix, <:VecScalar}}`: Returns a vector of elements indexed by `i`.
+      + `::AbstractVector{<:Union{AbstractVector, AbstractMatrix, VecScalar}}`: Returns a vector of elements indexed by `i`.
       + `::AbstractMatrix`: Returns `x[i, i]`.
 
 # Examples
@@ -471,18 +469,18 @@ julia> PortfolioOptimisers.nothing_scalar_array_getindex([[1, 2], [3, 4]], 1)
   - [`nothing_scalar_array_view`](@ref)
   - [`VecScalar`](@ref)
 """
-function nothing_scalar_array_getindex(x::Union{Nothing, <:Number, <:Pair, <:VecPair,
-                                                <:Dict, <:AbstractEstimatorValueAlgorithm,
-                                                <:DynamicAbstractWeights}, ::Any)
+function nothing_scalar_array_getindex(x::Union{Nothing, Number, Pair, VecPair, Dict,
+                                                AbstractEstimatorValueAlgorithm,
+                                                DynamicAbstractWeights}, ::Any)
     return x
 end
 function nothing_scalar_array_getindex(x::AbstractVector, i)
     return x[i]
 end
-function nothing_scalar_array_getindex(x::Union{<:StatsBase.Weights,
-                                                <:StatsBase.AnalyticWeights,
-                                                <:StatsBase.FrequencyWeights,
-                                                <:StatsBase.ProbabilityWeights}, i)
+function nothing_scalar_array_getindex(x::Union{StatsBase.Weights,
+                                                StatsBase.AnalyticWeights,
+                                                StatsBase.FrequencyWeights,
+                                                StatsBase.ProbabilityWeights}, i)
     return Base.typename(typeof(x)).wrapper(x.values[i])
 end
 function nothing_scalar_array_getindex(x::VecScalar, i)
@@ -491,9 +489,9 @@ end
 function nothing_scalar_array_getindex(x::AbstractMatrix, i)
     return x[i, i]
 end
-function nothing_scalar_array_getindex(x::AbstractVector{<:Union{<:AbstractVector,
-                                                                 <:AbstractMatrix,
-                                                                 <:VecScalar}}, i)
+function nothing_scalar_array_getindex(x::AbstractVector{<:Union{AbstractVector,
+                                                                 AbstractMatrix, VecScalar}},
+                                       i)
     return [nothing_scalar_array_getindex(xi, i) for xi in x]
 end
 """

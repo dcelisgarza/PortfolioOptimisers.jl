@@ -1347,7 +1347,7 @@ function project(proj::GramProjection, set::ProgrammeAllocationSet, q::AbstractV
                  w::AbstractVector)
     return projection_programme(proj, set, q, w)
 end
-function project(proj::Union{<:TsallisProjection, <:LogBarrierProjection},
+function project(proj::Union{TsallisProjection, LogBarrierProjection},
                  set::ProgrammeAllocationSet, q::AbstractVector, w::AbstractVector)
     @argcheck(all(x -> x >= zero(x), set.wb.lb),
               DomainError(set.wb.lb,

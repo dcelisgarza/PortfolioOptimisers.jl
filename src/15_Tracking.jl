@@ -28,7 +28,7 @@ Alias for a vector of tracking Results.
 """
 const VecTr = AbstractVector{<:AbstractTracking}
 """
-    const Tr_VecTr = Union{<:AbstractTracking, <:VecTr}
+    const Tr_VecTr = Union{AbstractTracking, VecTr}
 
 Alias for one tracking Result or a vector of tracking Results.
 
@@ -40,7 +40,7 @@ Alias for one tracking Result or a vector of tracking Results.
   - [`WeightsTracking`](@ref)
   - [`ReturnsTracking`](@ref)
 """
-const Tr_VecTr = Union{<:AbstractTracking, <:VecTr}
+const Tr_VecTr = Union{AbstractTracking, VecTr}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -763,8 +763,8 @@ A [`TimeDependent`](@ref) schedule answers through its `default` only. Entry `i`
   - [`element_path`](@ref)
   - [`tree_path`](@ref)
 """
-function returns_tracking_path(est::Union{<:AbstractEstimator, <:AbstractResult,
-                                          <:AbstractAlgorithm})
+function returns_tracking_path(est::Union{AbstractEstimator, AbstractResult,
+                                          AbstractAlgorithm})
     paths = map(f -> returns_tracking_path(getfield(est, f)), fieldnames(typeof(est)))
     i = findfirst(!isnothing, paths)
     return if isnothing(i)

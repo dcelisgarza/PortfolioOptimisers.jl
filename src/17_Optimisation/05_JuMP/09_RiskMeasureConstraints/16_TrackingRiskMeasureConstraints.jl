@@ -139,7 +139,7 @@ both norms, so it is divided by [`norm_factor`](@ref) of an [`L2Norm`](@ref) wit
 
   - $(arg_dict[:model])
   - $(arg_dict[:ci])
-  - `r::TrackingRiskMeasure{<:Any, <:Any, <:Union{<:L2Norm, <:SquaredL2Norm}}`:
+  - `r::TrackingRiskMeasure{<:Any, <:Any, <:Union{L2Norm, SquaredL2Norm}}`:
     The tracking risk measure.
   - $(arg_dict[:opt_rjumpe])
   - $(arg_dict[:pr])
@@ -156,7 +156,7 @@ both norms, so it is divided by [`norm_factor`](@ref) of an [`L2Norm`](@ref) wit
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::TrackingRiskMeasure{<:Any, <:Any,
-                                                      <:Union{<:L2Norm, <:SquaredL2Norm}},
+                                                      <:Union{L2Norm, SquaredL2Norm}},
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
                                prefix::Symbol = Symbol(""), kwargs...)
     sc = get_constraint_scale(model)

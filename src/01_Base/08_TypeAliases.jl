@@ -1,5 +1,5 @@
 """
-    const VecNum = AbstractVector{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}
+    const VecNum = AbstractVector{<:Union{Number, JuMP.AbstractJuMPScalar}}
 
 Alias for an abstract vector of numeric types or JuMP scalar types.
 
@@ -9,7 +9,7 @@ Alias for an abstract vector of numeric types or JuMP scalar types.
   - [`MatNum`](@ref)
   - [`JuMP.AbstractJuMPScalar`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.JuMP.AbstractJuMPScalar)
 """
-const VecNum = AbstractVector{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}
+const VecNum = AbstractVector{<:Union{Number, JuMP.AbstractJuMPScalar}}
 """
     const VecInt = AbstractVector{<:Integer}
 
@@ -23,7 +23,7 @@ Alias for an abstract vector of integer types.
 """
 const VecInt = AbstractVector{<:Integer}
 """
-    const MatNum = AbstractMatrix{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}
+    const MatNum = AbstractMatrix{<:Union{Number, JuMP.AbstractJuMPScalar}}
 
 Alias for an abstract matrix of numeric types or JuMP scalar types.
 
@@ -33,9 +33,9 @@ Alias for an abstract matrix of numeric types or JuMP scalar types.
   - [`ArrNum`](@ref)
   - [`VecMatNum`](@ref)
 """
-const MatNum = AbstractMatrix{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}
+const MatNum = AbstractMatrix{<:Union{Number, JuMP.AbstractJuMPScalar}}
 """
-    const ArrNum = AbstractArray{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}
+    const ArrNum = AbstractArray{<:Union{Number, JuMP.AbstractJuMPScalar}}
 
 Alias for an abstract array of numeric types or JuMP scalar types.
 
@@ -44,9 +44,9 @@ Alias for an abstract array of numeric types or JuMP scalar types.
   - [`VecNum`](@ref)
   - [`MatNum`](@ref)
 """
-const ArrNum = AbstractArray{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}
+const ArrNum = AbstractArray{<:Union{Number, JuMP.AbstractJuMPScalar}}
 """
-    const Arr3Num = AbstractArray{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}, 3}
+    const Arr3Num = AbstractArray{<:Union{Number, JuMP.AbstractJuMPScalar}, 3}
 
 Alias for an abstract 3-dimensional array of numeric types or JuMP scalar types.
 
@@ -58,9 +58,9 @@ It is [`ArrNum`](@ref) with the rank fixed at three, for data that is a stack of
   - [`MatNum`](@ref)
   - [`ArrNum`](@ref)
 """
-const Arr3Num = AbstractArray{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}, 3}
+const Arr3Num = AbstractArray{<:Union{Number, JuMP.AbstractJuMPScalar}, 3}
 """
-    const VecNum_MatNum = Union{<:VecNum, <:MatNum}
+    const VecNum_MatNum = Union{VecNum, MatNum}
 
 Alias for a union of an abstract vector of numeric types and an abstract matrix of numeric types.
 
@@ -69,9 +69,9 @@ Alias for a union of an abstract vector of numeric types and an abstract matrix 
   - [`VecNum`](@ref)
   - [`MatNum`](@ref)
 """
-const VecNum_MatNum = Union{<:VecNum, <:MatNum}
+const VecNum_MatNum = Union{VecNum, MatNum}
 """
-    const MatNum_Arr3Num = Union{<:MatNum, <:Arr3Num}
+    const MatNum_Arr3Num = Union{MatNum, Arr3Num}
 
 Alias for a union of an abstract matrix and an abstract 3-dimensional array of numeric types.
 
@@ -82,9 +82,9 @@ A Feature Matrix has one of two shapes. It is a static `assets × features` matr
   - [`MatNum`](@ref)
   - [`Arr3Num`](@ref)
 """
-const MatNum_Arr3Num = Union{<:MatNum, <:Arr3Num}
+const MatNum_Arr3Num = Union{MatNum, Arr3Num}
 """
-    const Num_VecNum = Union{<:Number, <:VecNum}
+    const Num_VecNum = Union{Number, VecNum}
 
 Alias for a union of a numeric type and an abstract vector of numeric types.
 
@@ -93,9 +93,9 @@ Alias for a union of a numeric type and an abstract vector of numeric types.
   - [`VecNum`](@ref)
   - [`ArrNum`](@ref)
 """
-const Num_VecNum = Union{<:Number, <:VecNum}
+const Num_VecNum = Union{Number, VecNum}
 """
-    const Func_VecNum = Union{<:Function, <:VecNum}
+    const Func_VecNum = Union{Function, VecNum}
 
 Alias for a union of a function and a vector of numeric types.
 
@@ -104,9 +104,9 @@ Alias for a union of a function and a vector of numeric types.
   - [`VecNum`](@ref)
   - [`Func_Num_VecNum`](@ref)
 """
-const Func_VecNum = Union{<:Function, <:VecNum}
+const Func_VecNum = Union{Function, VecNum}
 """
-    const Func_Num_VecNum = Union{<:Number, <:Func_VecNum}
+    const Func_Num_VecNum = Union{Number, Func_VecNum}
 
 Alias for a union of a function type, a numeric type and an abstract vector of numeric types.
 
@@ -114,7 +114,7 @@ Alias for a union of a function type, a numeric type and an abstract vector of n
 
   - [`Func_VecNum`](@ref)
 """
-const Func_Num_VecNum = Union{<:Number, <:Func_VecNum}
+const Func_Num_VecNum = Union{Number, Func_VecNum}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -130,7 +130,7 @@ The methods that a subtype must implement depend on the estimator that reads it.
 """
 abstract type AbstractCustomValue <: AbstractAlgorithm end
 """
-    const CVal_Func_Num_VecNum = Union{<:AbstractCustomValue, <:Func_Num_VecNum}
+    const CVal_Func_Num_VecNum = Union{AbstractCustomValue, Func_Num_VecNum}
 
 Alias for the two ways in which a caller gives a custom value. The caller gives an [`AbstractCustomValue`](@ref) algorithm, or one of the plain forms of [`Func_Num_VecNum`](@ref).
 
@@ -142,9 +142,9 @@ The `val` field of [`CustomValueExpectedReturns`](@ref) accepts both ways. One b
   - [`Func_Num_VecNum`](@ref)
   - [`CustomValueExpectedReturns`](@ref)
 """
-const CVal_Func_Num_VecNum = Union{<:AbstractCustomValue, <:Func_Num_VecNum}
+const CVal_Func_Num_VecNum = Union{AbstractCustomValue, Func_Num_VecNum}
 """
-    const Num_ArrNum = Union{<:Number, <:ArrNum}
+    const Num_ArrNum = Union{Number, ArrNum}
 
 Alias for a union of a numeric type and an abstract array of numeric types.
 
@@ -153,7 +153,7 @@ Alias for a union of a numeric type and an abstract array of numeric types.
   - [`ArrNum`](@ref)
   - [`VecNum`](@ref)
 """
-const Num_ArrNum = Union{<:Number, <:ArrNum}
+const Num_ArrNum = Union{Number, ArrNum}
 """
     const PairStrNum = Pair{<:AbstractString, <:Number}
 
@@ -166,8 +166,8 @@ Alias for a pair of an abstract string and a numeric type.
 """
 const PairStrNum = Pair{<:AbstractString, <:Number}
 """
-    const GSCVKey = Union{<:AbstractString, Expr, Symbol, <:ComposedFunction,
-                          <:Accessors.PropertyLens, <:Accessors.IndexLens, <:Integer}
+    const GSCVKey = Union{AbstractString, Expr, Symbol, ComposedFunction,
+                          Accessors.PropertyLens, Accessors.IndexLens, Integer}
 
 Alias for the type of a key of a grid search cross-validation. A key is an abstract string, an expression, a symbol, a composed function, an accessor lens, or an integer. An integer is the position of a step when the search tunes a `Pipeline`.
 
@@ -177,10 +177,10 @@ Alias for the type of a key of a grid search cross-validation. A key is an abstr
   - [`DictGSCV`](@ref)
   - [`MultiGSCVValType`](@ref)
 """
-const GSCVKey = Union{<:AbstractString, Expr, Symbol, <:ComposedFunction,
-                      <:Accessors.PropertyLens, <:Accessors.IndexLens, <:Integer}
+const GSCVKey = Union{AbstractString, Expr, Symbol, ComposedFunction,
+                      Accessors.PropertyLens, Accessors.IndexLens, Integer}
 """
-    const RSCVVal = Union{<:AbstractVector, <:Distributions.Distribution}
+    const RSCVVal = Union{AbstractVector, Distributions.Distribution}
 
 Alias for the type of a value of a randomised search cross-validation. A value is an abstract vector or a distribution.
 
@@ -190,7 +190,7 @@ Alias for the type of a value of a randomised search cross-validation. A value i
   - [`DictGSCV`](@ref)
   - [`MultiGSCVValType`](@ref)
 """
-const RSCVVal = Union{<:AbstractVector, <:Distributions.Distribution}
+const RSCVVal = Union{AbstractVector, Distributions.Distribution}
 """
     const PairGSCV = Pair{<:GSCVKey, <:AbstractVector}
 
@@ -225,7 +225,7 @@ Alias for an abstract dictionary with [`GSCVKey`](@ref) keys and abstract vector
 """
 const DictGSCV = AbstractDict{<:GSCVKey, <:AbstractVector}
 """
-    const MultiEstValType = Union{<:DictStrNum, <:AbstractVector{<:PairStrNum}}
+    const MultiEstValType = Union{DictStrNum, AbstractVector{<:PairStrNum}}
 
 Alias for a union of a dictionary with string keys and numeric values, and a vector of string-number pairs.
 
@@ -235,9 +235,9 @@ Alias for a union of a dictionary with string keys and numeric values, and a vec
   - [`PairStrNum`](@ref)
   - [`EstValType`](@ref)
 """
-const MultiEstValType = Union{<:DictStrNum, <:AbstractVector{<:PairStrNum}}
+const MultiEstValType = Union{DictStrNum, AbstractVector{<:PairStrNum}}
 """
-    const MultiGSCVValType = Union{<:DictGSCV, <:AbstractVector{<:PairGSCV}}
+    const MultiGSCVValType = Union{DictGSCV, AbstractVector{<:PairGSCV}}
 
 Alias for a union of a [`DictGSCV`](@ref) and a vector of [`PairGSCV`](@ref) pairs.
 
@@ -248,7 +248,7 @@ Alias for a union of a [`DictGSCV`](@ref) and a vector of [`PairGSCV`](@ref) pai
   - [`VecMultiGSCVValType`](@ref)
   - [`MultiGSCVValType_VecMultiGSCVValType`](@ref)
 """
-const MultiGSCVValType = Union{<:DictGSCV, <:AbstractVector{<:PairGSCV}}
+const MultiGSCVValType = Union{DictGSCV, AbstractVector{<:PairGSCV}}
 """
     const VecMultiGSCVValType = AbstractVector{<:MultiGSCVValType}
 
@@ -263,8 +263,8 @@ Alias for an abstract vector of `MultiGSCVValType` elements.
 """
 const VecMultiGSCVValType = AbstractVector{<:MultiGSCVValType}
 """
-    const MultiGSCVValType_VecMultiGSCVValType = Union{<:MultiGSCVValType,
-                                                       <:VecMultiGSCVValType}
+    const MultiGSCVValType_VecMultiGSCVValType = Union{MultiGSCVValType,
+                                                       VecMultiGSCVValType}
 
 Alias for a union of a `MultiGSCVValType` and a `VecMultiGSCVValType`.
 
@@ -275,8 +275,7 @@ Alias for a union of a `MultiGSCVValType` and a `VecMultiGSCVValType`.
   - [`MultiGSCVValType`](@ref)
   - [`VecMultiGSCVValType`](@ref)
 """
-const MultiGSCVValType_VecMultiGSCVValType = Union{<:MultiGSCVValType,
-                                                   <:VecMultiGSCVValType}
+const MultiGSCVValType_VecMultiGSCVValType = Union{MultiGSCVValType, VecMultiGSCVValType}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -368,9 +367,9 @@ Subtype `VectorAbstractEstimatorValueAlgorithm`, and implement the `estimator_to
 """
 abstract type VectorAbstractEstimatorValueAlgorithm <: AbstractEstimatorValueAlgorithm end
 """
-    const EstValType{T <: AbstractEstimatorValueAlgorithm} = Union{<:Num_VecNum, <:MatNum,
-                                                                   <:PairStrNum,
-                                                                   <:MultiEstValType, T}
+    const EstValType{T <: AbstractEstimatorValueAlgorithm} = Union{Num_VecNum, MatNum,
+                                                                   PairStrNum,
+                                                                   MultiEstValType, T}
 
 Alias for a union of a number, a vector of numbers, a matrix of numbers, a string-number pair, a multi-estimator value, and the branch `T` of [`AbstractEstimatorValueAlgorithm`](@ref) that computes such a value.
 
@@ -388,12 +387,12 @@ Alias for a union of a number, a vector of numbers, a matrix of numbers, a strin
   - [`AbstractEstimatorValueAlgorithm`](@ref)
   - [`VectorAbstractEstimatorValueAlgorithm`](@ref)
 """
-const EstValType{T <: AbstractEstimatorValueAlgorithm} = Union{<:Num_VecNum, <:MatNum,
-                                                               <:PairStrNum,
-                                                               <:MultiEstValType, T}
+const EstValType{T <: AbstractEstimatorValueAlgorithm} = Union{Num_VecNum, MatNum,
+                                                               PairStrNum, MultiEstValType,
+                                                               T}
 """
-    const VectorEstValType = Union{<:Num_VecNum, <:PairStrNum, <:MultiEstValType,
-                                   <:VectorAbstractEstimatorValueAlgorithm}
+    const VectorEstValType = Union{Num_VecNum, PairStrNum, MultiEstValType,
+                                   VectorAbstractEstimatorValueAlgorithm}
 
 Alias for a union of a number, a vector of numbers, a string-number pair, a multi-estimator value, and a [`VectorAbstractEstimatorValueAlgorithm`](@ref).
 
@@ -407,10 +406,10 @@ A slot that holds a number, or a vector of numbers, over the universe takes this
   - [`EstValType`](@ref)
   - [`VectorAbstractEstimatorValueAlgorithm`](@ref)
 """
-const VectorEstValType = Union{<:Num_VecNum, <:PairStrNum, <:MultiEstValType,
-                               <:VectorAbstractEstimatorValueAlgorithm}
+const VectorEstValType = Union{Num_VecNum, PairStrNum, MultiEstValType,
+                               VectorAbstractEstimatorValueAlgorithm}
 """
-    const Str_Expr = Union{<:AbstractString, Expr}
+    const Str_Expr = Union{AbstractString, Expr}
 
 Alias for a union of an abstract string and a Julia expression.
 
@@ -419,7 +418,7 @@ Alias for a union of an abstract string and a Julia expression.
   - [`VecStr_Expr`](@ref)
   - [`EqnType`](@ref)
 """
-const Str_Expr = Union{<:AbstractString, Expr}
+const Str_Expr = Union{AbstractString, Expr}
 """
     const VecStr_Expr = AbstractVector{<:Str_Expr}
 
@@ -432,7 +431,7 @@ Alias for an abstract vector of strings or Julia expressions.
 """
 const VecStr_Expr = AbstractVector{<:Str_Expr}
 """
-    const EqnType = Union{<:AbstractString, Expr, <:VecStr_Expr}
+    const EqnType = Union{AbstractString, Expr, VecStr_Expr}
 
 Alias for a union of a string, a Julia expression, and a vector of strings and expressions.
 
@@ -445,7 +444,7 @@ Every consumer of this alias parses the value with [`parse_equation`](@ref), so 
   - [`EstValType`](@ref)
   - [`parse_equation`](@ref)
 """
-const EqnType = Union{<:AbstractString, Expr, <:VecStr_Expr}
+const EqnType = Union{AbstractString, Expr, VecStr_Expr}
 """
     const VecVecNum = AbstractVector{<:VecNum}
 
@@ -468,7 +467,7 @@ Alias for an abstract vector of integer vectors.
 """
 const VecVecInt = AbstractVector{<:VecInt}
 """
-    const VecInt_VecVecInt = Union{<:VecInt, <:VecVecInt}
+    const VecInt_VecVecInt = Union{VecInt, VecVecInt}
 
 Alias for a union of an abstract vector of integers and an abstract vector of integer vectors.
 
@@ -477,7 +476,7 @@ Alias for a union of an abstract vector of integers and an abstract vector of in
   - [`VecInt`](@ref)
   - [`VecVecInt`](@ref)
 """
-const VecInt_VecVecInt = Union{<:VecInt, <:VecVecInt}
+const VecInt_VecVecInt = Union{VecInt, VecVecInt}
 """
     const VecVecVecInt = AbstractVector{<:VecVecInt}
 
@@ -521,7 +520,7 @@ Alias for an abstract vector of pairs.
 """
 const VecPair = AbstractVector{<:Pair}
 """
-    const VecJuMPScalar = Union{<:AbstractVector{<:JuMP.AbstractJuMPScalar}}
+    const VecJuMPScalar = Union{AbstractVector{<:JuMP.AbstractJuMPScalar}}
 
 Alias for an abstract vector of JuMP scalar types.
 
@@ -529,7 +528,7 @@ Alias for an abstract vector of JuMP scalar types.
 
   - [`VecNum`](@ref)
 """
-const VecJuMPScalar = Union{<:AbstractVector{<:JuMP.AbstractJuMPScalar}}
+const VecJuMPScalar = Union{AbstractVector{<:JuMP.AbstractJuMPScalar}}
 """
     const Option{T} = Union{Nothing, T}
 
@@ -541,7 +540,7 @@ Alias for an optional value of type `T`, which can be `nothing`.
 """
 const Option{T} = Union{Nothing, T}
 """
-    const MatNum_VecMatNum = Union{<:MatNum, <:VecMatNum}
+    const MatNum_VecMatNum = Union{MatNum, VecMatNum}
 
 Alias for a union of a numeric matrix and a vector of numeric matrices.
 
@@ -550,9 +549,9 @@ Alias for a union of a numeric matrix and a vector of numeric matrices.
   - [`MatNum`](@ref)
   - [`VecMatNum`](@ref)
 """
-const MatNum_VecMatNum = Union{<:MatNum, <:VecMatNum}
+const MatNum_VecMatNum = Union{MatNum, VecMatNum}
 """
-    const Int_VecInt = Union{<:Integer, <:VecInt}
+    const Int_VecInt = Union{Integer, VecInt}
 
 Alias for a union of an integer and a vector of integers.
 
@@ -560,9 +559,9 @@ Alias for a union of an integer and a vector of integers.
 
   - [`VecInt`](@ref)
 """
-const Int_VecInt = Union{<:Integer, <:VecInt}
+const Int_VecInt = Union{Integer, VecInt}
 """
-    const VecNum_VecVecNum = Union{<:VecNum, <:VecVecNum}
+    const VecNum_VecVecNum = Union{VecNum, VecVecNum}
 
 Alias for a union of a numeric vector and a vector of numeric vectors.
 
@@ -571,7 +570,7 @@ Alias for a union of a numeric vector and a vector of numeric vectors.
   - [`VecNum`](@ref)
   - [`VecVecNum`](@ref)
 """
-const VecNum_VecVecNum = Union{<:VecNum, <:VecVecNum}
+const VecNum_VecVecNum = Union{VecNum, VecVecNum}
 """
     const VecDate = AbstractVector{<:Dates.AbstractTime}
 
@@ -584,7 +583,7 @@ Alias for an abstract vector of date or time types.
 """
 const VecDate = AbstractVector{<:Dates.AbstractTime}
 """
-    const Dict_Vec = Union{<:AbstractDict, <:AbstractVector}
+    const Dict_Vec = Union{AbstractDict, AbstractVector}
 
 Alias for a union of an abstract dictionary and an abstract vector.
 
@@ -593,9 +592,9 @@ Alias for a union of an abstract dictionary and an abstract vector.
   - [`DictStrNum`](@ref)
   - [`VecNum`](@ref)
 """
-const Dict_Vec = Union{<:AbstractDict, <:AbstractVector}
+const Dict_Vec = Union{AbstractDict, AbstractVector}
 """
-    const Sym_Str = Union{Symbol, <:AbstractString}
+    const Sym_Str = Union{Symbol, AbstractString}
 
 Alias for a union of a symbol and an abstract string.
 
@@ -603,9 +602,9 @@ Alias for a union of a symbol and an abstract string.
 
   - [`VecStr`](@ref)
 """
-const Sym_Str = Union{Symbol, <:AbstractString}
+const Sym_Str = Union{Symbol, AbstractString}
 """
-    const Str_Vec = Union{<:AbstractString, <:AbstractVector}
+    const Str_Vec = Union{AbstractString, AbstractVector}
 
 Alias for a union of an abstract string and an abstract vector.
 
@@ -614,5 +613,5 @@ Alias for a union of an abstract string and an abstract vector.
   - [`VecStr`](@ref)
   - [`Str_Expr`](@ref)
 """
-const Str_Vec = Union{<:AbstractString, <:AbstractVector}
+const Str_Vec = Union{AbstractString, AbstractVector}
 public AbstractEstimatorValueAlgorithm, VectorAbstractEstimatorValueAlgorithm

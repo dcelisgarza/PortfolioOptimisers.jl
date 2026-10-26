@@ -432,8 +432,8 @@ end
                        X::MatNum, g::Graphs.AbstractGraph; dims::Int = 1, kwargs...)
     resolve_separation(sep::AbstractSeparationAlgorithm, nte::AbstractNetworkEstimator,
                        X::MatNum; dims::Int = 1, kwargs...)
-    resolve_separation(sep::Union{<:HopCount{<:HopCountRule},
-                                  <:PathLength{<:PathLengthRule}},
+    resolve_separation(sep::Union{HopCount{<:HopCountRule},
+                                  PathLength{<:PathLengthRule}},
                        nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
 Replace a separation whose budget is a rule by one whose budget is a value.
@@ -527,8 +527,8 @@ function resolve_separation(sep::AbstractSeparationAlgorithm, ::AbstractNetworkE
                             ::MatNum; kwargs...)::AbstractSeparationAlgorithm
     return sep
 end
-function resolve_separation(sep::Union{<:HopCount{<:HopCountRule},
-                                       <:PathLength{<:PathLengthRule}},
+function resolve_separation(sep::Union{HopCount{<:HopCountRule},
+                                       PathLength{<:PathLengthRule}},
                             nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1,
                             kwargs...)::AbstractSeparationAlgorithm
     return resolve_separation(sep, nte, X,

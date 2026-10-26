@@ -1428,8 +1428,8 @@ The block is exact. The set that it adds is the dual description of the measure,
   - $(ref_dict[:EPRLVaR]) Section 2, Equations 1 and 4, and Section 3.2, Equation 7.
 """
 function ep_tail_dual_block!(model::JuMP.Model, pw,
-                             tv::Union{<:LinearConditionalValueatRiskViewConstraint,
-                                       <:SequentialConditionalValueatRiskViewConstraint},
+                             tv::Union{LinearConditionalValueatRiskViewConstraint,
+                                       SequentialConditionalValueatRiskViewConstraint},
                              x::VecNum, sc1::Number)
     alpha = tv.alpha
     T = length(x)
@@ -1441,8 +1441,8 @@ function ep_tail_dual_block!(model::JuMP.Model, pw,
     return LinearAlgebra.dot(nu, x)
 end
 function ep_tail_dual_block!(model::JuMP.Model, pw,
-                             tv::Union{<:ConicEntropicValueatRiskViewConstraint,
-                                       <:SequentialEntropicValueatRiskViewConstraint},
+                             tv::Union{ConicEntropicValueatRiskViewConstraint,
+                                       SequentialEntropicValueatRiskViewConstraint},
                              x::VecNum, sc1::Number)
     alpha = tv.alpha
     T = length(x)
@@ -1456,8 +1456,8 @@ function ep_tail_dual_block!(model::JuMP.Model, pw,
     return LinearAlgebra.dot(nu, x)
 end
 function ep_tail_dual_block!(model::JuMP.Model, pw,
-                             tv::Union{<:ConicRelativisticValueatRiskViewConstraint,
-                                       <:SequentialRelativisticValueatRiskViewConstraint},
+                             tv::Union{ConicRelativisticValueatRiskViewConstraint,
+                                       SequentialRelativisticValueatRiskViewConstraint},
                              x::VecNum, sc1::Number)
     (; alpha, kappa) = tv
     T = length(x)
@@ -1880,9 +1880,9 @@ The lower-bound half of a grid view is a relaxation, and this function does not 
   - $(ref_dict[:EPRLVaR]) Section 3.2, Equation 7.
 """
 function add_ep_tail_view!(model::JuMP.Model, pw,
-                           tv::Union{<:LinearConditionalValueatRiskViewConstraint,
-                                     <:ConicEntropicValueatRiskViewConstraint,
-                                     <:ConicRelativisticValueatRiskViewConstraint},
+                           tv::Union{LinearConditionalValueatRiskViewConstraint,
+                                     ConicEntropicValueatRiskViewConstraint,
+                                     ConicRelativisticValueatRiskViewConstraint},
                            sc1::Number)
     (; x, coef, rhs) = tv
     expr = JuMP.AffExpr()

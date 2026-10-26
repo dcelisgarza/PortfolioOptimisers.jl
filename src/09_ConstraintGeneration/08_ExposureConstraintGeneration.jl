@@ -229,7 +229,7 @@ function ExposureConstraintEstimator(; lce::LcE_Lc_VecLcE_Lc,
     return ExposureConstraintEstimator(lce, space)
 end
 """
-    const EcE_LcE_Lc = Union{<:ExposureConstraintEstimator, <:LcE_Lc}
+    const EcE_LcE_Lc = Union{ExposureConstraintEstimator, LcE_Lc}
 
 Alias for a union of an [`ExposureConstraintEstimator`](@ref) and the types that it wraps.
 
@@ -238,7 +238,7 @@ Alias for a union of an [`ExposureConstraintEstimator`](@ref) and the types that
   - [`ExposureConstraintEstimator`](@ref)
   - [`LcE_Lc`](@ref)
 """
-const EcE_LcE_Lc = Union{<:ExposureConstraintEstimator, <:LcE_Lc}
+const EcE_LcE_Lc = Union{ExposureConstraintEstimator, LcE_Lc}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -250,7 +250,7 @@ Alias for an abstract vector of [`EcE_LcE_Lc`](@ref) elements.
 """
 const VecEcE_LcE_Lc = AbstractVector{<:EcE_LcE_Lc}
 """
-    const EcE_LcE_Lc_VecEcE_LcE_Lc = Union{<:EcE_LcE_Lc, <:VecEcE_LcE_Lc}
+    const EcE_LcE_Lc_VecEcE_LcE_Lc = Union{EcE_LcE_Lc, VecEcE_LcE_Lc}
 
 Alias for an [`EcE_LcE_Lc`](@ref) or a vector of them.
 
@@ -261,7 +261,7 @@ It is the bound of `lcse`, the only slot that admits a re-basis. `gcarde` and `s
   - [`EcE_LcE_Lc`](@ref)
   - [`VecEcE_LcE_Lc`](@ref)
 """
-const EcE_LcE_Lc_VecEcE_LcE_Lc = Union{<:EcE_LcE_Lc, <:VecEcE_LcE_Lc}
+const EcE_LcE_Lc_VecEcE_LcE_Lc = Union{EcE_LcE_Lc, VecEcE_LcE_Lc}
 """
     port_opt_view(space::FactorSpace, i, args...) -> FactorSpace
 

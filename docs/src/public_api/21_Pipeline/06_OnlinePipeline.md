@@ -9,7 +9,7 @@ A [`Pipeline`](@ref) updates incrementally. [`partial_fit!`](@ref) passes each b
 A step that transforms each row on its own updates with each block. A step that only chooses assets waits until you read the result. A step with no incremental form makes the pipeline throw an error that names the step, before the first update. To run such a step, wrap the pipeline as `Online(pipe)`. Its [`PortfolioOptimisers.PipelineBufferState`](@ref) then stores the input data, and reading the result runs a batch fit over it.
 
 ```@docs
-partial_fit!(pipe::Pipeline{<:Any, <:Any, <:PortfolioOptimisers.Option{<:Union{<:PortfolioOptimisers.PipelineBufferState, <:PortfolioOptimisers.ReturnsBufferState}}}, data::Prices_RR)
+partial_fit!(pipe::Pipeline{<:Any, <:Any, <:PortfolioOptimisers.Option{<:Union{PortfolioOptimisers.PipelineBufferState, PortfolioOptimisers.ReturnsBufferState}}}, data::Prices_RR)
 fit(pipe::Pipeline)
 PortfolioOptimisers.partial_fit!(state::PortfolioOptimisers.PipelineBufferState, data::Prices_RR)
 cross_val_predict(o::Online{<:Pipeline}, data::Prices_RR, cv::CVER)

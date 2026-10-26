@@ -336,7 +336,7 @@ end
     panel_fill(alg::ConstantPanelFill, v::AbstractVector, name::AbstractString) -> Vector
     panel_fill(alg::ForwardPanelFill, v::AbstractVector, name::AbstractString) -> Vector
     panel_fill(alg::BackwardPanelFill, v::AbstractVector, name::AbstractString) -> Vector
-    panel_fill(alg::Union{<:ForwardPanelFill, <:BackwardPanelFill}, v::AbstractVector, act::AbstractVector{Bool}, name::AbstractString) -> Vector
+    panel_fill(alg::Union{ForwardPanelFill, BackwardPanelFill}, v::AbstractVector, act::AbstractVector{Bool}, name::AbstractString) -> Vector
     panel_fill(alg::AbstractPanelFillAlgorithm, v::AbstractVector, act::Option{<:AbstractVector{Bool}}, name::AbstractString) -> Vector
 
 Resolve the blanks of one asset's column of one raw Panel Field, along the observation axis.
@@ -395,7 +395,7 @@ function panel_fill(alg::AbstractPanelFillAlgorithm, v::AbstractVector,
                     ::Option{<:AbstractVector{Bool}}, name::AbstractString)
     return panel_fill(alg, v, name)
 end
-function panel_fill(alg::Union{<:ForwardPanelFill, <:BackwardPanelFill}, v::AbstractVector,
+function panel_fill(alg::Union{ForwardPanelFill, BackwardPanelFill}, v::AbstractVector,
                     act::AbstractVector{Bool}, name::AbstractString)
     out = Vector{Union{eltype(v), typeof(alg.val)}}(undef, length(v))
     for r in panel_activity_stretches(act)
@@ -555,7 +555,7 @@ end
     panel_placeholder(alg::ForwardPanelFill, v::AbstractVector) -> BitVector
     panel_placeholder(alg::BackwardPanelFill, v::AbstractVector) -> BitVector
     panel_placeholder(alg::AbstractPanelFillAlgorithm, v::AbstractVector, act::Option{<:AbstractVector{Bool}}) -> AbstractVector{Bool}
-    panel_placeholder(alg::Union{<:ForwardPanelFill, <:BackwardPanelFill}, v::AbstractVector, act::AbstractVector{Bool}) -> BitVector
+    panel_placeholder(alg::Union{ForwardPanelFill, BackwardPanelFill}, v::AbstractVector, act::AbstractVector{Bool}) -> BitVector
 
 Mark the blanks of one asset's column that a fill policy resolves to a placeholder, a value that holds no data.
 
@@ -600,7 +600,7 @@ function panel_placeholder(alg::AbstractPanelFillAlgorithm, v::AbstractVector,
                            ::Option{<:AbstractVector{Bool}})
     return panel_placeholder(alg, v)
 end
-function panel_placeholder(alg::Union{<:ForwardPanelFill, <:BackwardPanelFill},
+function panel_placeholder(alg::Union{ForwardPanelFill, BackwardPanelFill},
                            v::AbstractVector, act::AbstractVector{Bool})
     plc = falses(length(v))
     for r in panel_activity_stretches(act)
@@ -1073,7 +1073,7 @@ Check that a static raw Panel Field does not carry a directional fill policy.
 """
 function assert_panel_input_fill(inp::AbstractPanelFieldInput)::Nothing
     @argcheck(!(panel_input_is_static(inp) &&
-                isa(inp.alg, Union{<:ForwardPanelFill, <:BackwardPanelFill})),
+                isa(inp.alg, Union{ForwardPanelFill, BackwardPanelFill})),
               ArgumentError("the Panel Field \"$(inp.name)\" is static, so it has no observation axis to carry a value along, and its fill policy $(nameof(typeof(inp.alg))) is directional. Use NoPanelFill or ConstantPanelFill, or give the raw values an observation axis."))
     return nothing
 end
@@ -1389,8 +1389,8 @@ function panel_input_placeholder(::AbstractPanelFieldInput,
                                  ::Option{<:AbstractMatrix{Bool}})
     return nothing
 end
-function panel_input_placeholder(inp::Union{<:NumericPanelInput, <:CategoricalPanelInput,
-                                            <:TensorPanelInput},
+function panel_input_placeholder(inp::Union{NumericPanelInput, CategoricalPanelInput,
+                                            TensorPanelInput},
                                  amsk::Option{<:AbstractMatrix{Bool}})
     plc = panel_placeholder_array(inp.vals, inp.alg, panel_input_mask(inp, amsk))
     return any(plc) ? plc : nothing

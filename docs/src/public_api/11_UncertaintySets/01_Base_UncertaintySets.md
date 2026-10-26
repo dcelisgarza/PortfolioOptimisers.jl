@@ -23,7 +23,7 @@ ChiSqKUncertaintyAlgorithm
 EllipsoidalUncertaintySet
 EllipsoidalUncertaintySetAlgorithm
 NormBallUncertaintySetAlgorithm
-ucs(uc::Option{<:Tuple{<:Option{<:AbstractUncertaintySetResult}, <:Option{<:AbstractUncertaintySetResult}}}, args...; kwargs...)
+ucs(uc::Option{<:Tuple{Option{<:AbstractUncertaintySetResult}, Option{<:AbstractUncertaintySetResult}}}, args...; kwargs...)
 ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
 ucs(ue::AbstractPriorUncertaintySetEstimator, ::AbstractPriorResult; kwargs...)
 ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult, pr::AbstractPriorResult; kwargs...)

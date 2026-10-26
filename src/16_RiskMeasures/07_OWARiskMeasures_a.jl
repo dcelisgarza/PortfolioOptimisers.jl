@@ -243,7 +243,7 @@ Each subtype minimises a sum of squares of the OWA weights. The parameter `T` is
 """
 abstract type SquaredOrderedWeightsArrayAlgorithm{T} <: AbstractOrderedWeightsArrayAlgorithm end
 """
-    const UnionAllSOCRiskExpr = Union{<:SquaredSOCRiskExpr, <:RSOCRiskExpr, <:SOCRiskExpr}
+    const UnionAllSOCRiskExpr = Union{SquaredSOCRiskExpr, RSOCRiskExpr, SOCRiskExpr}
 
 The three conic encodings of the objective of a [`SquaredOrderedWeightsArrayAlgorithm`](@ref).
 
@@ -257,9 +257,9 @@ The three conic encodings of the objective of a [`SquaredOrderedWeightsArrayAlgo
   - [`UnionSOCRiskExpr`](@ref)
   - [`UnionRSOCSOCRiskExpr`](@ref)
 """
-const UnionAllSOCRiskExpr = Union{<:SquaredSOCRiskExpr, <:RSOCRiskExpr, <:SOCRiskExpr}
+const UnionAllSOCRiskExpr = Union{SquaredSOCRiskExpr, RSOCRiskExpr, SOCRiskExpr}
 """
-    const UnionSOCRiskExpr = Union{<:SquaredSOCRiskExpr, <:SOCRiskExpr}
+    const UnionSOCRiskExpr = Union{SquaredSOCRiskExpr, SOCRiskExpr}
 
 The encodings that bound the objective norm with one second-order cone.
 
@@ -271,9 +271,9 @@ The methods of [`owa_l_moment_crm`](@ref) for these encodings write the row `t â
   - [`SOCRiskExpr`](@ref)
   - [`UnionAllSOCRiskExpr`](@ref)
 """
-const UnionSOCRiskExpr = Union{<:SquaredSOCRiskExpr, <:SOCRiskExpr}
+const UnionSOCRiskExpr = Union{SquaredSOCRiskExpr, SOCRiskExpr}
 """
-    const UnionRSOCSOCRiskExpr = Union{<:RSOCRiskExpr, <:SOCRiskExpr}
+    const UnionRSOCSOCRiskExpr = Union{RSOCRiskExpr, SOCRiskExpr}
 
 The encodings whose objective is linear in the cone variable `t`.
 
@@ -285,7 +285,7 @@ The encodings whose objective is linear in the cone variable `t`.
   - [`SOCRiskExpr`](@ref)
   - [`UnionAllSOCRiskExpr`](@ref)
 """
-const UnionRSOCSOCRiskExpr = Union{<:RSOCRiskExpr, <:SOCRiskExpr}
+const UnionRSOCSOCRiskExpr = Union{RSOCRiskExpr, SOCRiskExpr}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -2175,7 +2175,7 @@ function (r::LinearMoment)(T::Integer)
     return owa_l_moment_crm(T, r.method; k = r.k)
 end
 """
-    const OWA_Func_VecNum = Union{<:Func_VecNum, <:AbstractOrderedWeightsArrayFunction}
+    const OWA_Func_VecNum = Union{Func_VecNum, AbstractOrderedWeightsArrayFunction}
 
 The values that a weight slot of [`OrderedWeightsArray`](@ref) or [`OrderedWeightsArrayRange`](@ref) accepts.
 
@@ -2188,7 +2188,7 @@ A weight vector fixes the sample size. A function or an [`AbstractOrderedWeights
   - [`OrderedWeightsArray`](@ref)
   - [`OrderedWeightsArrayRange`](@ref)
 """
-const OWA_Func_VecNum = Union{<:Func_VecNum, <:AbstractOrderedWeightsArrayFunction}
+const OWA_Func_VecNum = Union{Func_VecNum, AbstractOrderedWeightsArrayFunction}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -2449,7 +2449,7 @@ It is a `Function` and it computes no quantity, so it is the one occupant of a w
 """
 const OWA_RevFunc = ComposedFunction{typeof(reverse), <:AbstractOrderedWeightsArrayFunction}
 """
-    const OWA_CalOccupant = Union{<:AbstractOrderedWeightsArrayFunction, <:OWA_RevFunc}
+    const OWA_CalOccupant = Union{AbstractOrderedWeightsArrayFunction, OWA_RevFunc}
 
 The occupants of an [`OrderedWeightsArray`](@ref) weight slot that carry a calibration slot of their own: a weight builder, and the reversal of one that the Range container builds.
 
@@ -2462,7 +2462,7 @@ The slot also takes a weight vector and a caller's own plain function, and neith
   - [`OWA_RevFunc`](@ref)
   - [`calibration_slots`](@ref)
 """
-const OWA_CalOccupant = Union{<:AbstractOrderedWeightsArrayFunction, <:OWA_RevFunc}
+const OWA_CalOccupant = Union{AbstractOrderedWeightsArrayFunction, OWA_RevFunc}
 # A reversed builder is a `Function` and computes no quantity, so it withdraws itself from
 # the rule marker â€” see `is_calibration_rule`.
 is_calibration_rule(::OWA_CalOccupant) = false

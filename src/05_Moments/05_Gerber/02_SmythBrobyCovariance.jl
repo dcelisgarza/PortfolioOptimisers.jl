@@ -799,8 +799,8 @@ The statistic is zero when that sum is zero. The trailing `0` has the same meani
   - [`GerberComovementOne`](@ref)
   - [`GerberComovementTwo`](@ref)
 """
-const GerberComovementZero = Union{<:Gerber0, <:SmythBroby0, <:SmythBrobyGerber0,
-                                   <:SmythBrobyCount0}
+const GerberComovementZero = Union{Gerber0, SmythBroby0, SmythBrobyGerber0,
+                                   SmythBrobyCount0}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -819,8 +819,7 @@ The statistic is zero when that sum is zero. The trailing `1` has the same meani
   - [`GerberComovementZero`](@ref)
   - [`GerberComovementTwo`](@ref)
 """
-const GerberComovementOne = Union{<:Gerber1, <:SmythBroby1, <:SmythBrobyGerber1,
-                                  <:SmythBrobyCount1}
+const GerberComovementOne = Union{Gerber1, SmythBroby1, SmythBrobyGerber1, SmythBrobyCount1}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -839,8 +838,7 @@ The trailing `2` has the same meaning in all four families of the Gerber lineage
   - [`GerberComovementZero`](@ref)
   - [`GerberComovementOne`](@ref)
 """
-const GerberComovementTwo = Union{<:Gerber2, <:SmythBroby2, <:SmythBrobyGerber2,
-                                  <:SmythBrobyCount2}
+const GerberComovementTwo = Union{Gerber2, SmythBroby2, SmythBrobyGerber2, SmythBrobyCount2}
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -1127,7 +1125,7 @@ The prefix of a marker selects the score triple, and the trailing digit selects 
   - [`SmythBrobyGerberAlg`](@ref)
   - [`SmythBrobyCountAlg`](@ref)
 """
-const SmythBrobyDeltaAlg = Union{<:SmythBroby0, <:SmythBroby1, <:SmythBroby2}
+const SmythBrobyDeltaAlg = Union{SmythBroby0, SmythBroby1, SmythBroby2}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -1145,8 +1143,7 @@ The prefix of a marker selects the score triple, and the trailing digit selects 
   - [`SmythBrobyDeltaAlg`](@ref)
   - [`SmythBrobyCountAlg`](@ref)
 """
-const SmythBrobyGerberAlg = Union{<:SmythBrobyGerber0, <:SmythBrobyGerber1,
-                                  <:SmythBrobyGerber2}
+const SmythBrobyGerberAlg = Union{SmythBrobyGerber0, SmythBrobyGerber1, SmythBrobyGerber2}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -1165,7 +1162,7 @@ The prefix of a marker selects the score triple, and the trailing digit selects 
   - [`SmythBrobyDeltaAlg`](@ref)
   - [`SmythBrobyGerberAlg`](@ref)
 """
-const SmythBrobyCountAlg = Union{<:SmythBrobyCount0, <:SmythBrobyCount1, <:SmythBrobyCount2}
+const SmythBrobyCountAlg = Union{SmythBrobyCount0, SmythBrobyCount1, SmythBrobyCount2}
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

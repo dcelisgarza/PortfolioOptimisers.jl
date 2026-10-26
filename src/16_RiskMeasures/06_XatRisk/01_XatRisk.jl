@@ -1497,7 +1497,7 @@ function (r::RelativeDrawdownatRisk)(x::VecNum)
 end
 
 """
-    const CholRM = Union{<:Variance, <:StandardDeviation, <:DistributionValueatRisk}
+    const CholRM = Union{Variance, StandardDeviation, DistributionValueatRisk}
 
 Groups the types that hold an optional covariance matrix `sigma` and its optional factor `chol`.
 
@@ -1510,7 +1510,7 @@ The group exists so that one method of [`chol_sigma_selector`](@ref) serves all 
   - [`DistributionValueatRisk`](@ref)
   - [`chol_sigma_selector`](@ref)
 """
-const CholRM = Union{<:Variance, <:StandardDeviation, <:DistributionValueatRisk}
+const CholRM = Union{Variance, StandardDeviation, DistributionValueatRisk}
 
 # Expected-risk input kind — see `risk_input_kind`.
 risk_input_kind(::ValueatRisk) = NetReturnsInput()

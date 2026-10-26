@@ -1090,7 +1090,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
   - [`DecayCoverage`](@ref)
   - [`ExpireCoverage`](@ref)
 """
-function fold_inactive!(::Union{<:DecayCoverage, <:ExpireCoverage},
+function fold_inactive!(::Union{DecayCoverage, ExpireCoverage},
                         state::AbstractPartialFitState, ::AbstractVector{<:Bool})
     return state
 end
@@ -1182,8 +1182,8 @@ Where:
   - [`DecayCoverage`](@ref)
   - [`ResetCoverage`](@ref)
 """
-function admits(::Union{<:DecayCoverage, <:ResetCoverage}, share::Real, active::Bool,
-                ::Integer, min_coverage::Real)
+function admits(::Union{DecayCoverage, ResetCoverage}, share::Real, active::Bool, ::Integer,
+                min_coverage::Real)
     return active && share >= min_coverage
 end
 """

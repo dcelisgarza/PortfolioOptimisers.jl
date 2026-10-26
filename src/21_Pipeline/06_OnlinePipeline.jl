@@ -60,7 +60,7 @@ $(DocStringExtensions.FIELDS)
   - [`AbstractPartialFitState`](@ref)
   - [`Online`](@ref)
   - [`vcat_observations`](@ref)
-  - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref)
+  - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{PipelineBufferState, ReturnsBufferState}}}, data::Prices_RR)`](@ref)
 """
 @concrete struct PipelineBufferState <: AbstractPartialFitState
     """
@@ -224,7 +224,7 @@ A universe-only step folds nothing. In `fit(pipe)` with no data its batch verb r
 # Related
 
   - [`AbstractAssetSelector`](@ref)
-  - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref)
+  - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{PipelineBufferState, ReturnsBufferState}}}, data::Prices_RR)`](@ref)
 """
 is_universe_step(::Any) = false
 is_universe_step(::AbstractAssetSelector) = true
@@ -241,7 +241,7 @@ A prior estimator can, and so can an optimisation step of any form, a schedule i
 """
 is_row_owner(::Any) = false
 is_row_owner(::AbstractPriorEstimator) = true
-is_row_owner(::Union{<:OptE_Opt, <:TD_OptE_Opt}) = true
+is_row_owner(::Union{OptE_Opt, TD_OptE_Opt}) = true
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -257,7 +257,7 @@ A prior step owns the rows when one exists, because [`inject_context`](@ref) rep
 # Related
 
   - [`is_row_owner`](@ref)
-  - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref)
+  - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{PipelineBufferState, ReturnsBufferState}}}, data::Prices_RR)`](@ref)
 """
 function pipeline_row_owner(p::Pipeline)
     k = findfirst(step -> isa(step_estimator(step), AbstractPriorEstimator), p.steps)
@@ -349,7 +349,7 @@ The refusal of a capped owner on the fold route reads this cap. A cap on the own
 step_online_cap(::Any) = nothing
 step_online_cap(o::Online) = o.max_history
 step_online_cap(ps::PipelineStep) = step_online_cap(ps.est)
-function step_online_cap(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator})
+function step_online_cap(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator})
     for f in estimator_fields(est)
         cap = step_online_cap(getfield(est, f))
         if !isnothing(cap)
@@ -560,8 +560,7 @@ A wrapper step becomes the estimator that it wraps, with a seeded buffer. The me
 """
 update_online_step(step) = step
 update_online_step(o::Online) = update_online_estimator(o)
-function update_online_step(est::Union{<:AbstractEstimator,
-                                       <:StatsBase.CovarianceEstimator})
+function update_online_step(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator})
     return update_online_estimator(est)
 end
 function update_online_step(ps::PipelineStep)
@@ -614,7 +613,7 @@ The method rebuilds a [`PipelineStep`](@ref) around its copied estimator, and co
   - [`update_online_step`](@ref)
 """
 copy_step_states(step) = step
-function copy_step_states(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator})
+function copy_step_states(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator})
     return copy_states(est)
 end
 function copy_step_states(ps::PipelineStep)
@@ -712,7 +711,7 @@ function assert_pipeline_entry(r::PipelineResume, cv)
     return nothing
 end
 """
-    partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)
+    partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{PipelineBufferState, ReturnsBufferState}}}, data::Prices_RR)
 
 Folds a block of observations into a [`Pipeline`](@ref), without a fit.
 
@@ -760,8 +759,8 @@ On the fold route:
   - [`update_online_estimator(p::Pipeline)`](@ref)
 """
 function partial_fit!(pipe::Pipeline{<:Any, <:Any,
-                                     <:Option{<:Union{<:PipelineBufferState,
-                                                      <:ReturnsBufferState}}},
+                                     <:Option{<:Union{PipelineBufferState,
+                                                      ReturnsBufferState}}},
                       data::Prices_RR)
     return fold_pipeline(pipe, pipe.cache, data)
 end
@@ -769,13 +768,13 @@ end
     fold_pipeline(pipe::Pipeline, cache::PipelineBufferState, data::Prices_RR)
     fold_pipeline(pipe::Pipeline, cache::Option{<:ReturnsBufferState}, data::Prices_RR)
 
-The two routes of [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref), selected by dispatch on the state that the Pipeline carries.
+The two routes of [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{PipelineBufferState, ReturnsBufferState}}}, data::Prices_RR)`](@ref), selected by dispatch on the state that the Pipeline carries.
 
 A buffer of the input data appends the block. A Fold Context, or no state, walks the steps. The steps and the refusals are those of the verb.
 
 # Related
 
-  - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref)
+  - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{PipelineBufferState, ReturnsBufferState}}}, data::Prices_RR)`](@ref)
   - [`PipelineBufferState`](@ref)
   - [`ReturnsBufferState`](@ref)
 """
@@ -848,7 +847,7 @@ For a prior owner:
 
 # Related
 
-  - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref)
+  - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{PipelineBufferState, ReturnsBufferState}}}, data::Prices_RR)`](@ref)
   - [`assert_online_owner`](@ref)
   - [`fold_prior`](@ref)
   - [`fold_context`](@ref)
@@ -903,7 +902,7 @@ Under `Online(pipe)`, `fit(pipe)` with no data is `fit(pipe, buffer)`, the batch
 
 # Related
 
-  - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref)
+  - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{PipelineBufferState, ReturnsBufferState}}}, data::Prices_RR)`](@ref)
   - [`fit_data_step_from_state`](@ref)
   - [`returns_result`](@ref)
   - [`fit`](@ref)

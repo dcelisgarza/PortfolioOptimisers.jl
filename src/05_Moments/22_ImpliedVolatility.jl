@@ -929,7 +929,7 @@ function coverage_reduced_ivpa(ivpa::VecNum, cmsk::BitVector)
     return ivpa[cmsk]
 end
 """
-    reads_implied_volatility(est::Union{<:AbstractEstimator, <:AbstractCovarianceEstimator}) -> Bool
+    reads_implied_volatility(est::Union{AbstractEstimator, AbstractCovarianceEstimator}) -> Bool
     reads_implied_volatility(est::ImpliedVolatility) -> Bool
     reads_implied_volatility(v::AbstractVector) -> Bool
     reads_implied_volatility(p::Pair) -> Bool
@@ -961,8 +961,8 @@ Each step is one method, and Julia selects the method from the type of the argum
   - [`ImpliedVolatility`](@ref)
   - [`coverage_keyword_reduction`](@ref)
 """
-function reads_implied_volatility(est::Union{<:AbstractEstimator,
-                                             <:AbstractCovarianceEstimator})
+function reads_implied_volatility(est::Union{AbstractEstimator,
+                                             AbstractCovarianceEstimator})
     return any(f -> reads_implied_volatility(getfield(est, f)), fieldnames(typeof(est)))
 end
 function reads_implied_volatility(::ImpliedVolatility)

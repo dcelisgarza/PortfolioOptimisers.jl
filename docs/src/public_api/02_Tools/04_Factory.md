@@ -7,6 +7,6 @@ Description = "Factory, public API of PortfolioOptimisers.jl: factory, factory_c
 ## Utility functions
 
 ```@docs
-factory(a::Union{Nothing, <:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}, args...; kwargs...)
+factory(a::Union{Nothing, AbstractEstimator, AbstractAlgorithm, AbstractResult}, args...; kwargs...)
 factory_child
 ```

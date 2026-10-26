@@ -413,7 +413,7 @@ The factor is ``1 + c_{ij}``, with ``c_{ij} = P_{ij} / (S_{1,i}\\, S_{1,j})`` an
 
 # Returns
 
-  - `F::Union{<:Number, <:MatNum}`: The matrix of the factors of the block, or one.
+  - `F::Union{Number, MatNum}`: The matrix of the factors of the block, or one.
 
 # Related
 
@@ -615,7 +615,7 @@ Where:
 
 # Returns
 
-  - `G::Union{<:Number, <:VecNum, <:MatNum}`: Zero under `PreCentred`, otherwise the vector or the matrix of ``G``.
+  - `G::Union{Number, VecNum, MatNum}`: Zero under `PreCentred`, otherwise the vector or the matrix of ``G``.
 
 # Related
 

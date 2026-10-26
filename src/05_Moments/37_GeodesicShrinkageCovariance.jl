@@ -229,8 +229,8 @@ ConstantCorrelationTarget()
 """
 struct ConstantCorrelationTarget <: AbstractCovarianceShrinkageTarget end
 """
-    const GeodesicShrinkageTarget = Union{<:AbstractCovarianceShrinkageTarget,
-                                          <:DiagonalTarget, <:MatNum}
+    const GeodesicShrinkageTarget = Union{AbstractCovarianceShrinkageTarget,
+                                          DiagonalTarget, MatNum}
 
 Groups the targets a [`GeodesicShrinkageCovariance`](@ref) accepts: the rules that build the target from the matrix being shrunk, and a fixed positive definite matrix.
 
@@ -242,8 +242,8 @@ The members share no supertype. [`DiagonalTarget`](@ref) is also a [`RegimeAdjus
   - [`DiagonalTarget`](@ref)
   - [`MatNum`](@ref)
 """
-const GeodesicShrinkageTarget = Union{<:AbstractCovarianceShrinkageTarget, <:DiagonalTarget,
-                                      <:MatNum}
+const GeodesicShrinkageTarget = Union{AbstractCovarianceShrinkageTarget, DiagonalTarget,
+                                      MatNum}
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -333,8 +333,7 @@ A target rule needs no check, because [`shrinkage_target`](@ref) builds it from 
   - [`GeodesicShrinkageCovariance`](@ref)
   - [`shrinkage_target`](@ref)
 """
-function assert_shrinkage_target(::Union{<:AbstractCovarianceShrinkageTarget,
-                                         <:DiagonalTarget})::Nothing
+function assert_shrinkage_target(::Union{AbstractCovarianceShrinkageTarget, DiagonalTarget})::Nothing
     return nothing
 end
 function assert_shrinkage_target(tgt::MatNum)::Nothing

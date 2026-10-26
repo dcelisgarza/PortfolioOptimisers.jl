@@ -328,7 +328,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     PortfolioTarget(;
-        w::Option{<:Union{<:VecNum, <:MatNum}} = nothing,
+        w::Option{<:Union{VecNum, MatNum}} = nothing,
         indefinite::AbstractIndefiniteBlockRule = RefuseIndefiniteWarmUp()
     ) -> PortfolioTarget
 
@@ -364,7 +364,7 @@ PortfolioTarget
     $(field_dict[:ra_indefinite])
     """
     indefinite
-    function PortfolioTarget(w::Option{<:Union{<:VecNum, <:MatNum}},
+    function PortfolioTarget(w::Option{<:Union{VecNum, MatNum}},
                              indefinite::AbstractIndefiniteBlockRule)
         if !isnothing(w)
             @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
@@ -372,7 +372,7 @@ PortfolioTarget
         return new{typeof(w), typeof(indefinite)}(w, indefinite)
     end
 end
-function PortfolioTarget(; w::Option{<:Union{<:VecNum, <:MatNum}} = nothing,
+function PortfolioTarget(; w::Option{<:Union{VecNum, MatNum}} = nothing,
                          indefinite::AbstractIndefiniteBlockRule = RefuseIndefiniteWarmUp())::PortfolioTarget
     return PortfolioTarget(w, indefinite)
 end
@@ -901,8 +901,8 @@ and the noise of each estimate, to the second order in that noise.
   - [`get_regime_state`](@ref)
   - [`RegimeAdjustedExpWeightedCovariance`](@ref)
 """
-function regime_kappa(method::LogRegimeAdjusted,
-                      ::Union{<:MahalanobisTarget, <:DiagonalTarget}, n::Integer)
+function regime_kappa(method::LogRegimeAdjusted, ::Union{MahalanobisTarget, DiagonalTarget},
+                      n::Integer)
     return SpecialFunctions.digamma(method.x * n) + log(method.y)
 end
 """
@@ -996,7 +996,7 @@ constant, so the debiased statistic does not depend on it.
   - [`RegimeAdjustedExpWeightedCovariance`](@ref)
 """
 function regime_denom(::FirstMomentRegimeAdjusted,
-                      ::Union{<:MahalanobisTarget, <:DiagonalTarget}, n::Integer)
+                      ::Union{MahalanobisTarget, DiagonalTarget}, n::Integer)
     return sqrt(2.0) * exp(SpecialFunctions.loggamma(0.5 * (n + 1)) -
                            SpecialFunctions.loggamma(0.5 * n))
 end

@@ -134,10 +134,10 @@ Validate that each step of a [`Pipeline`](@ref) declares the slot and the target
 """
 function assert_step_declarations(ests)::Nothing
     n = length(ests)
-    families = Union{<:AbstractPricesPreprocessingEstimator,
-                     <:AbstractReturnsPreprocessingEstimator, <:AbstractPriorEstimator,
-                     <:AbstractPhylogenyEstimator, <:AbstractUncertaintySetEstimator,
-                     <:AbstractConstraintEstimator, <:OptimisationEstimator}
+    families = Union{AbstractPricesPreprocessingEstimator,
+                     AbstractReturnsPreprocessingEstimator, AbstractPriorEstimator,
+                     AbstractPhylogenyEstimator, AbstractUncertaintySetEstimator,
+                     AbstractConstraintEstimator, OptimisationEstimator}
     for (i, e) in enumerate(ests)
         est = isa(e, PipelineStep) ? e.est : e
         if isa(est, AbstractUncertaintySetEstimator)
@@ -346,7 +346,7 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    Pipeline(; steps::Union{<:Tuple, <:AbstractVector},
+    Pipeline(; steps::Union{Tuple, AbstractVector},
                cache::Option{<:AbstractPartialFitState} = nothing) -> Pipeline
 
 Give the steps in the order of execution. Each element is a step estimator or a `"name" => estimator` pair.
@@ -376,7 +376,7 @@ A Pipeline takes the online step. [`partial_fit!`](@ref) runs the steps in order
   - A universe-only step folds nothing. An [`AbstractAssetSelector`](@ref) and the column filter of a `MissingDataFilter` are universe-only. `fit(pipe)` with no data fits such a step again over the rows of the row owner, and applies its universe as a view.
   - A window-valued step, and every other step that writes a Data Slot, stops the warm-up with an error that names it. `Online(pipe)` is the declared refit that accepts such a step.
 
-A cap on the row owner alone, `Online(pe; max_history = w)`, is a window that counts the rows of the row owner. A row-local step before it folds a state across the front edge of that window, so the warm-up refuses that pair with an error that names it. The rolling window through a Pipeline is `Online(pipe; max_history = w)`, which fits every step again over the window. `cache` holds the Fold Context of the Pipeline when a prior step owns the rows, or the buffer of the input data that `Online(pipe)` seeds. It is `nothing` until a step writes one. See [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref) and [`fit(pipe::Pipeline)`](@ref).
+A cap on the row owner alone, `Online(pe; max_history = w)`, is a window that counts the rows of the row owner. A row-local step before it folds a state across the front edge of that window, so the warm-up refuses that pair with an error that names it. The rolling window through a Pipeline is `Online(pipe; max_history = w)`, which fits every step again over the window. `cache` holds the Fold Context of the Pipeline when a prior step owns the rows, or the buffer of the input data that `Online(pipe)` seeds. It is `nothing` until a step writes one. See [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{PipelineBufferState, ReturnsBufferState}}}, data::Prices_RR)`](@ref) and [`fit(pipe::Pipeline)`](@ref).
 
 # Examples
 
@@ -416,7 +416,7 @@ julia> pipe.names
         return new{typeof(names), typeof(steps), typeof(cache)}(names, steps, cache)
     end
 end
-function Pipeline(; steps::Union{<:Tuple, <:AbstractVector},
+function Pipeline(; steps::Union{Tuple, AbstractVector},
                   cache::Option{<:AbstractPartialFitState} = nothing)::Pipeline
     @argcheck(!isempty(steps), IsEmptyError("steps cannot be empty"))
     ests = Vector{Any}(undef, length(steps))
@@ -1084,23 +1084,23 @@ function apply_fitted_step(f::PricesToReturns, pr::AbstractPricesResult)
     return apply_preprocessing(f, pr)
 end
 apply_fitted_step(::PricesToReturns, rd::AbstractReturnsResult) = rd
-function apply_fitted_step(f::Union{<:AbstractPricesPreprocessingResult,
-                                    <:AbstractPricesPreprocessingEstimator},
+function apply_fitted_step(f::Union{AbstractPricesPreprocessingResult,
+                                    AbstractPricesPreprocessingEstimator},
                            pr::AbstractPricesResult)
     return apply_preprocessing(f, pr)
 end
-function apply_fitted_step(::Union{<:AbstractPricesPreprocessingResult,
-                                   <:AbstractPricesPreprocessingEstimator},
+function apply_fitted_step(::Union{AbstractPricesPreprocessingResult,
+                                   AbstractPricesPreprocessingEstimator},
                            rd::AbstractReturnsResult)
     return rd
 end
-function apply_fitted_step(f::Union{<:AbstractReturnsPreprocessingResult,
-                                    <:AbstractReturnsPreprocessingEstimator},
+function apply_fitted_step(f::Union{AbstractReturnsPreprocessingResult,
+                                    AbstractReturnsPreprocessingEstimator},
                            rd::AbstractReturnsResult)
     return apply_preprocessing(f, rd)
 end
-function apply_fitted_step(::Union{<:AbstractReturnsPreprocessingResult,
-                                   <:AbstractReturnsPreprocessingEstimator},
+function apply_fitted_step(::Union{AbstractReturnsPreprocessingResult,
+                                   AbstractReturnsPreprocessingEstimator},
                            pr::AbstractPricesResult)
     return pr
 end

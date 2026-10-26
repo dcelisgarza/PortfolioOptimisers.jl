@@ -500,7 +500,7 @@ Step 2 is for performance and is not a second contract. `ce.w` is a field, so it
 
 # Returns
 
-  - `mu::Union{<:Number, <:ArrNum}`: The centring vector.
+  - `mu::Union{Number, ArrNum}`: The centring vector.
   - `cel::AbstractCovarianceEstimator`: The inner covariance estimator. It has the weights `ce.w` when `ce.w` is not `nothing`. It is in a [`GeneralCovariance`](@ref) wrapper when the library does not own it.
 
 # Related
@@ -1487,11 +1487,11 @@ function partial_fit!(ce::Covariance{<:Any, <:Any, <:Any, <:Any, <:Any,
 end
 """
     Statistics.cov(
-        ce::Union{<:GeneralCovariance, <:Covariance{<:Any, <:Any, <:FullMoment}},
+        ce::Union{GeneralCovariance, Covariance{<:Any, <:Any, <:FullMoment}},
         state::CovarianceState;
         strict::Bool = false
     ) -> MatNum
-    Statistics.cov(ce::Union{<:GeneralCovariance, <:Covariance}; strict::Bool = false) -> MatNum
+    Statistics.cov(ce::Union{GeneralCovariance, Covariance}; strict::Bool = false) -> MatNum
 
 Read the covariance matrix of an incremental fit from a [`CovarianceState`](@ref).
 
@@ -1555,8 +1555,8 @@ julia> cov(ce)
   - [`partial_fit_corrected`](@ref)
   - [`cov(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
-function Statistics.cov(ce::Union{<:GeneralCovariance,
-                                  <:Covariance{<:Any, <:Any, <:FullMoment}},
+function Statistics.cov(ce::Union{GeneralCovariance,
+                                  Covariance{<:Any, <:Any, <:FullMoment}},
                         state::CovarianceState; strict::Bool = false)
     return coverage_covariance(ce, coverage_policy(ce), state; strict = strict)
 end
@@ -1601,8 +1601,8 @@ This is the `Nothing` method of [`coverage_covariance`](@ref) for a state. `cov(
   - [`coverage_covariance`](@ref)
   - [`CovarianceState`](@ref)
 """
-function coverage_covariance(ce::Union{<:GeneralCovariance,
-                                       <:Covariance{<:Any, <:Any, <:FullMoment}}, ::Nothing,
+function coverage_covariance(ce::Union{GeneralCovariance,
+                                       Covariance{<:Any, <:Any, <:FullMoment}}, ::Nothing,
                              state::CovarianceState; kwargs...)
     k = state.n - partial_fit_corrected(ce)
     return k >= one(k) ? state.M ./ k : fill(convert(eltype(state.M), NaN), size(state.M))
@@ -1630,14 +1630,14 @@ function coverage_covariance(ce::Covariance{<:Any, <:Any, <:FullMoment},
                          corrected, strict)
     return coverage_divide(state.M, counts.nu, corrected, cmsk)
 end
-function Statistics.cov(ce::Union{<:GeneralCovariance, <:Covariance}; strict::Bool = false)
+function Statistics.cov(ce::Union{GeneralCovariance, Covariance}; strict::Bool = false)
     return Statistics.cov(ce, partial_fit_cache(ce); strict = strict)
 end
 """
-    Statistics.cor(ce::Union{<:GeneralCovariance,
-                             <:Covariance{<:Any, <:Any, <:FullMoment}},
+    Statistics.cor(ce::Union{GeneralCovariance,
+                             Covariance{<:Any, <:Any, <:FullMoment}},
                    state::CovarianceState)
-    Statistics.cor(ce::Union{<:GeneralCovariance, <:Covariance})
+    Statistics.cor(ce::Union{GeneralCovariance, Covariance})
 
 Reads a correlation matrix from a folded covariance estimator.
 
@@ -1663,14 +1663,14 @@ This method is the correlation form of `cov(ce)` with no data. It takes the same
   - [`coverage_correlation`](@ref)
   - [`partial_fit!`](@ref)
 """
-function Statistics.cor(ce::Union{<:GeneralCovariance,
-                                  <:Covariance{<:Any, <:Any, <:FullMoment}},
+function Statistics.cor(ce::Union{GeneralCovariance,
+                                  Covariance{<:Any, <:Any, <:FullMoment}},
                         state::CovarianceState; strict::Bool = false)
     return coverage_correlation(Statistics.cor,
                                 coverage_covariance(ce, coverage_policy(ce), state;
                                                     strict = strict))
 end
-function Statistics.cor(ce::Union{<:GeneralCovariance, <:Covariance}; strict::Bool = false)
+function Statistics.cor(ce::Union{GeneralCovariance, Covariance}; strict::Bool = false)
     return Statistics.cor(ce, partial_fit_cache(ce); strict = strict)
 end
 

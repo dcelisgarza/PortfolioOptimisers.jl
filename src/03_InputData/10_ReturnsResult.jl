@@ -635,7 +635,7 @@ function port_opt_view(rd::AbstractReturnsResult, args...; kwargs...)
     return throw(ArgumentError("$(typeof(rd)) subtypes AbstractReturnsResult but does not implement port_opt_view for $(length(args)) index argument(s). Extension authors: implement port_opt_view for the subtype, so that a meta-optimiser or a cross-validation fold can subselect its assets and observations. See port_opt_view(rd::ReturnsResult, ...) for the method to mirror."))
 end
 """
-    const Prices_RR = Union{<:AbstractReturnsResult, <:AbstractPricesResult}
+    const Prices_RR = Union{AbstractReturnsResult, AbstractPricesResult}
 
 Union of the two data levels cross-validation folds can be computed on: returns-level ([`AbstractReturnsResult`](@ref)) and price-level ([`AbstractPricesResult`](@ref)) data.
 
@@ -649,7 +649,7 @@ Fold generation needs only an observation count, from [`cv_nobs`](@ref), and a t
   - [`cv_timestamps`](@ref)
   - [`n_splits`](@ref)
 """
-const Prices_RR = Union{<:AbstractReturnsResult, <:AbstractPricesResult}
+const Prices_RR = Union{AbstractReturnsResult, AbstractPricesResult}
 """
     benchmark_relative_returns(rd::ReturnsResult, x_src::Option{<:DataSource}) -> Option{<:MatNum}
     benchmark_relative_returns(rd::ReturnsResult, x_src::ExcessSource) -> Option{<:MatNum}

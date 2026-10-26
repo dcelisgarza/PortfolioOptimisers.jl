@@ -22,7 +22,7 @@ PortfolioOptimisers.buffer_fit_count
 PortfolioOptimisers.buffer_kept_rows
 PortfolioOptimisers.buffer_fits_none
 PortfolioOptimisers.shared_series_buffer
-PortfolioOptimisers.assert_sample_buffer(est::Union{<:PortfolioOptimisers.AbstractEstimator, <:StatsBase.CovarianceEstimator})
+PortfolioOptimisers.assert_sample_buffer(est::Union{PortfolioOptimisers.AbstractEstimator, StatsBase.CovarianceEstimator})
 PortfolioOptimisers.sample_buffer_seed
 PortfolioOptimisers.fold_buffer
 PortfolioOptimisers.assert_buffer_factor_width

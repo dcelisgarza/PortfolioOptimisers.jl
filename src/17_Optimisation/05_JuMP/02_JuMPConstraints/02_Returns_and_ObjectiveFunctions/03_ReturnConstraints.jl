@@ -65,9 +65,9 @@ function set_return_bounds!(model::JuMP.Model, i, ret_expr, lb::Front_NumVec)
     if !shared_has(model, :ret_frontier)
         JuMP.@expression(model, ret_frontier,
                          Pair{Tuple{Symbol, Symbol},
-                              Tuple{<:JuMP.AbstractJuMPScalar, <:Front_NumVec, <:Integer}}[(bound_var_key, bound_key) => (ret_expr,
-                                                                                                                          lb,
-                                                                                                                          i)])
+                              Tuple{JuMP.AbstractJuMPScalar, Front_NumVec, Integer}}[(bound_var_key, bound_key) => (ret_expr,
+                                                                                                                    lb,
+                                                                                                                    i)])
     else
         push!(shared_get(model, :ret_frontier),
               (bound_var_key, bound_key) => (ret_expr, lb, i))
@@ -1036,8 +1036,9 @@ function set_return_constraints!(model::JuMP.Model, i,
     fb = ifelse(isnothing(pret.mu), pr.mu, pret.mu)
     # The prior travels beside the returns, because an `AbstractPriorUncertaintySetEstimator`
     # is fitted from the optimisation's own prior result rather than from returns data. An
-    # estimator that carries its own `pe` drops it (see [`mu_ucs`](@ref)).
-    uc = mu_ucs(pret.ucs, rd, pr; kwargs...)
+    # estimator that carries its own `pe` drops it (see [`mu_ucs`](@ref)). The form of three
+    # arguments takes no keyword.
+    uc = mu_ucs(pret.ucs, rd, pr)
     ret, mu, forces_risk = set_ucs_return_constraints!(model, i, uc, fb, settings,
                                                        pret.mtx_sqrt)
     set_return_bounds!(model, i, ret, settings.lb)
@@ -1053,8 +1054,9 @@ function set_return_constraints!(model::JuMP.Model, i, pret::LogarithmicReturn,
     T = length(X)
     t_elog_ret = state_set!(model, Symbol(""), :t_elog_ret_, i,
                             JuMP.@variable(model, [1:T]))
-    wi = nothing_scalar_array_selector(pret.w, pr.w)
-    wi = get_observation_weights(wi, X)
+    # Both fields hold an `Option{<:ObsWeights}`, so the term's own weights and then the
+    # prior's are the choice, as `fb` is in the arithmetic term.
+    wi = get_observation_weights(ifelse(isnothing(pret.w), pr.w, pret.w), X)
     ret = if isnothing(wi)
         JuMP.@expression(model, Statistics.mean(t_elog_ret))
     else

@@ -528,7 +528,7 @@ The score of asset `i` is `score(X[:, i])`. This is the route of a precomputed r
 """
 function assert_scoreable(score::AbstractBaseRiskMeasure)::Nothing
     if !supports_precomputed_returns(score)
-        hint = if isa(score, Union{<:Variance, <:StandardDeviation})
+        hint = if isa(score, Union{Variance, StandardDeviation})
             " `SCM()` computes the same quantity from a return series and is scoreable."
         else
             ""

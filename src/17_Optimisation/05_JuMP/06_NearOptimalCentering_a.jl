@@ -612,10 +612,9 @@ $(DocStringExtensions.FIELDS)
     # Weight and target fields take frontier-safe unions: the sub-problem weights may be a
     # single vector or (in frontier mode) a vector of vectors, and the risk/return targets
     # may likewise be a scalar or a vector.
-    function NearOptimalSetup(w_opt::VecNum_VecVecNum, rk_opt::Union{<:Number, <:VecNum},
-                              rt_opt::Union{<:Number, <:VecNum},
-                              rt_min::Union{<:Number, <:VecNum},
-                              rt_max::Union{<:Number, <:VecNum}, rt_ends::Option{<:VecPair},
+    function NearOptimalSetup(w_opt::VecNum_VecVecNum, rk_opt::Union{Number, VecNum},
+                              rt_opt::Union{Number, VecNum}, rt_min::Union{Number, VecNum},
+                              rt_max::Union{Number, VecNum}, rt_ends::Option{<:VecPair},
                               w_min::VecNum_VecVecNum, w_max::VecNum_VecVecNum, r::RM_VecRM,
                               opt::JuMPOptimiser, attrs::ProcessedJuMPOptimiserAttributes,
                               w_min_retcode::OptimisationReturnCode,
@@ -629,10 +628,9 @@ $(DocStringExtensions.FIELDS)
                                           w_opt_retcode, w_max_retcode)
     end
 end
-function NearOptimalSetup(; w_opt::VecNum_VecVecNum, rk_opt::Union{<:Number, <:VecNum},
-                          rt_opt::Union{<:Number, <:VecNum},
-                          rt_min::Union{<:Number, <:VecNum},
-                          rt_max::Union{<:Number, <:VecNum},
+function NearOptimalSetup(; w_opt::VecNum_VecVecNum, rk_opt::Union{Number, VecNum},
+                          rt_opt::Union{Number, VecNum}, rt_min::Union{Number, VecNum},
+                          rt_max::Union{Number, VecNum},
                           rt_ends::Option{<:VecPair} = nothing, w_min::VecNum_VecVecNum,
                           w_max::VecNum_VecVecNum, r::RM_VecRM, opt::JuMPOptimiser,
                           attrs::ProcessedJuMPOptimiserAttributes,
@@ -790,7 +788,7 @@ the other terms' `scale`, and can leave `rt_min > rt_max`.
 function return_term_ends(swept::VecInt, ret::JRE_VecJRE, nb_r, nb_opt::JuMPOptimiser,
                           rd::ReturnsResult, pr::AbstractPriorResult, fees::Option{<:Fees},
                           w_min::VecNum, w_ini)
-    ends = Pair{Int, Tuple{<:Number, <:Number}}[]
+    ends = Pair{Int, Tuple{Number, Number}}[]
     for i in swept
         rt = return_term(ret, i)
         res = optimise(MeanRisk(; r = nb_r, obj = MaximumElementReturn(i), opt = nb_opt,

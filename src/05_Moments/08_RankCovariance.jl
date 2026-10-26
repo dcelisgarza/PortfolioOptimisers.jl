@@ -252,7 +252,7 @@ A `cache` holds the state of an incremental fit. That state is not part of the c
 
 # Arguments
 
-  - `::Union{<:KendallCovariance, <:SpearmanCovariance}`: The rank covariance estimator. The method reads only its type.
+  - `::Union{KendallCovariance, SpearmanCovariance}`: The rank covariance estimator. The method reads only its type.
 
 # Returns
 
@@ -265,7 +265,7 @@ A `cache` holds the state of an incremental fit. That state is not part of the c
   - [`show_fields`](@ref)
   - [`set_show_nothing_fields!`](@ref)
 """
-show_fields(::Union{<:KendallCovariance, <:SpearmanCovariance}) = (:ve,)
+show_fields(::Union{KendallCovariance, SpearmanCovariance}) = (:ve,)
 """
     Statistics.cor(::SpearmanCovariance, X::MatNum; dims::Int = 1, kwargs...)
 

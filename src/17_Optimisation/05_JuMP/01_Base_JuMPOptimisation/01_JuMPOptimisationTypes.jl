@@ -159,7 +159,7 @@ It is the sibling of [`RiskJuMPOptimisationResult`](@ref). A relaxed risk budget
 """
 abstract type NonRiskJuMPOptimisationResult <: NonFiniteAllocationOptimisationResult end
 """
-    const RJR_NRJR = Union{<:RiskJuMPOptimisationResult, <:NonRiskJuMPOptimisationResult}
+    const RJR_NRJR = Union{RiskJuMPOptimisationResult, NonRiskJuMPOptimisationResult}
 
 Union of the two branches of JuMP optimisation results.
 
@@ -170,7 +170,7 @@ The default `getproperty` and `propertynames` dispatch on this union, not on one
   - [`RiskJuMPOptimisationResult`](@ref)
   - [`NonRiskJuMPOptimisationResult`](@ref)
 """
-const RJR_NRJR = Union{<:RiskJuMPOptimisationResult, <:NonRiskJuMPOptimisationResult}
+const RJR_NRJR = Union{RiskJuMPOptimisationResult, NonRiskJuMPOptimisationResult}
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -309,7 +309,7 @@ The `ccnt` field of [`JuMPOptimiser`](@ref) accepts a vector, and [`add_custom_c
 """
 const VecJuMPConstr = AbstractVector{<:CustomJuMPConstraint}
 """
-    const JuMPConstr_VecJuMPConstr = Union{<:CustomJuMPConstraint, <:VecJuMPConstr}
+    const JuMPConstr_VecJuMPConstr = Union{CustomJuMPConstraint, VecJuMPConstr}
 
 Alias for one custom JuMP constraint or a vector of them.
 
@@ -320,7 +320,7 @@ The `ccnt` field of [`JuMPOptimiser`](@ref) accepts a value of this alias, `noth
   - [`CustomJuMPConstraint`](@ref)
   - [`VecJuMPConstr`](@ref)
 """
-const JuMPConstr_VecJuMPConstr = Union{<:CustomJuMPConstraint, <:VecJuMPConstr}
+const JuMPConstr_VecJuMPConstr = Union{CustomJuMPConstraint, VecJuMPConstr}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -369,7 +369,7 @@ The `cobj` field of [`JuMPOptimiser`](@ref) accepts a vector, and [`add_custom_o
 """
 const VecJuMPObj = AbstractVector{<:CustomJuMPObjective}
 """
-    const JuMPObj_VecJuMPObj = Union{<:CustomJuMPObjective, <:VecJuMPObj}
+    const JuMPObj_VecJuMPObj = Union{CustomJuMPObjective, VecJuMPObj}
 
 Alias for one custom JuMP objective term or a vector of them.
 
@@ -380,7 +380,7 @@ The `cobj` field of [`JuMPOptimiser`](@ref) accepts a value of this alias, `noth
   - [`CustomJuMPObjective`](@ref)
   - [`VecJuMPObj`](@ref)
 """
-const JuMPObj_VecJuMPObj = Union{<:CustomJuMPObjective, <:VecJuMPObj}
+const JuMPObj_VecJuMPObj = Union{CustomJuMPObjective, VecJuMPObj}
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -600,7 +600,7 @@ A [`Frontier`](@ref) sweep solves one model per point, and its result holds one 
 """
 const VecJuMPOptSol = AbstractVector{<:JuMPOptimisationSolution}
 """
-    const JuMPOptSol_VecJuMPOptSol = Union{<:JuMPOptimisationSolution, <:VecJuMPOptSol}
+    const JuMPOptSol_VecJuMPOptSol = Union{JuMPOptimisationSolution, VecJuMPOptSol}
 
 Alias for one JuMP optimisation solution or a vector of them.
 
@@ -611,7 +611,7 @@ It is the type of the `sol` argument of [`JuMPOptimisationResult`](@ref), which 
   - [`JuMPOptimisationSolution`](@ref)
   - [`VecJuMPOptSol`](@ref)
 """
-const JuMPOptSol_VecJuMPOptSol = Union{<:JuMPOptimisationSolution, <:VecJuMPOptSol}
+const JuMPOptSol_VecJuMPOptSol = Union{JuMPOptimisationSolution, VecJuMPOptSol}
 
 export JuMPOptimisationSolution, JuMPOptimisationResult
 public CustomJuMPObjective, CustomJuMPConstraint, VecJuMPObj, VecJuMPConstr,

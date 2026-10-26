@@ -105,7 +105,7 @@ end
 function feature_readable(::LastRow, A::AbstractMatrix{Bool})
     return BitVector(view(A, size(A, 1), :))
 end
-function feature_readable(::Union{<:LastActiveRow, <:AbstractFeatureCollapseAlgorithm},
+function feature_readable(::Union{LastActiveRow, AbstractFeatureCollapseAlgorithm},
                           A::AbstractMatrix{Bool})
     return BitVector(vec(any(A; dims = 1)))
 end
@@ -483,15 +483,15 @@ The method that Julia selects is the algorithm.
 function stack_rescale(metric::Distances.SemiMetric, ::Number, ::AbstractVector, ::Integer)
     return throw(ArgumentError("StackObservations measures a pair of assets on the rows at which both are active, and rescales the distance of a pair that shares fewer rows than the window to the whole window. The metric $(nameof(typeof(metric))) has no rescale. Add a method `PortfolioOptimisers.stack_rescale(metric::$(nameof(typeof(metric))), d, idx, len)` that returns `d`, measured on the coordinates `idx` of the stack, rescaled to its `len` coordinates. Or use AggregateDistances, which needs no rescale."))
 end
-function stack_rescale(::Union{<:AngularDist, <:Distances.CosineDist, <:Distances.CorrDist,
-                               <:Distances.Jaccard, <:Distances.BrayCurtis,
-                               <:Distances.MeanAbsDeviation, <:Distances.MeanSqDeviation,
-                               <:Distances.RMSDeviation}, d::Number, ::AbstractVector,
+function stack_rescale(::Union{AngularDist, Distances.CosineDist, Distances.CorrDist,
+                               Distances.Jaccard, Distances.BrayCurtis,
+                               Distances.MeanAbsDeviation, Distances.MeanSqDeviation,
+                               Distances.RMSDeviation}, d::Number, ::AbstractVector,
                        ::Integer)
     return d
 end
-function stack_rescale(::Union{<:Distances.Cityblock, <:Distances.TotalVariation,
-                               <:Distances.SqEuclidean, <:Distances.ChiSqDist}, d::Number,
+function stack_rescale(::Union{Distances.Cityblock, Distances.TotalVariation,
+                               Distances.SqEuclidean, Distances.ChiSqDist}, d::Number,
                        idx::AbstractVector, len::Integer)
     return d * len / length(idx)
 end
@@ -502,8 +502,8 @@ function stack_rescale(metric::Distances.Minkowski, d::Number, idx::AbstractVect
                        len::Integer)
     return d * (len * one(d) / length(idx))^inv(metric.p)
 end
-function stack_rescale(metric::Union{<:Distances.WeightedCityblock,
-                                     <:Distances.WeightedSqEuclidean}, d::Number,
+function stack_rescale(metric::Union{Distances.WeightedCityblock,
+                                     Distances.WeightedSqEuclidean}, d::Number,
                        idx::AbstractVector, ::Integer)
     return d * sum(metric.weights) / sum(view(metric.weights, idx))
 end
@@ -826,7 +826,7 @@ Measure the pair `(i, j)` of a stack `Zs`, `assets × (observations · features)
   - [`active_feature_distance`](@ref)
 """
 function shared_stack_distance(metric::Distances.SemiMetric, Zs::MatNum,
-                               (i, j)::Tuple{<:Integer, <:Integer}, rows::AbstractVector,
+                               (i, j)::Tuple{Integer, Integer}, rows::AbstractVector,
                                T::Integer)
     idx = [t + (k - 1) * T for k in 1:div(size(Zs, 2), T) for t in rows]
     d = pair_distance(stack_metric(metric, idx), view(Zs, i, idx), view(Zs, j, idx))
@@ -879,8 +879,8 @@ A panel whose every cell is readable takes step 3, and it gives a mask equal to 
 function feature_readable_mask(::Any, imsk::Option{<:BitVector}, ::Any)
     return imsk
 end
-function feature_readable_mask(xs::Union{<:Tuple, <:AbstractVector},
-                               imsk::Option{<:BitVector}, rd)
+function feature_readable_mask(xs::Union{Tuple, AbstractVector}, imsk::Option{<:BitVector},
+                               rd)
     for x in xs
         imsk = feature_readable_mask(x, imsk, rd)
     end
@@ -1180,7 +1180,7 @@ The method that Julia selects is the algorithm.
 function empty_pair_rule(::AbstractFeatureCollapseAlgorithm)
     return nothing
 end
-function empty_pair_rule(alg::Union{<:AggregateDistances, <:StackObservations})
+function empty_pair_rule(alg::Union{AggregateDistances, StackObservations})
     return alg.pair
 end
 """

@@ -882,7 +882,7 @@ function port_opt_view(c::AllocationSetConstraint{<:Any, <:Any, <:ReturnsResult}
                                    port_opt_view(c.X, i))
 end
 """
-    const LeaderOptimiser = Union{<:BestConstantRebalancedPortfolio, <:JuMPOptimisationEstimator}
+    const LeaderOptimiser = Union{BestConstantRebalancedPortfolio, JuMPOptimisationEstimator}
 
 Groups the optimisation estimators that a follow-the-leader rule can re-solve under the head's Allocation Set.
 
@@ -894,8 +894,7 @@ A leader of a [`FollowTheLeader`](@ref) rule must honour the set. The solver-fre
   - [`BestConstantRebalancedPortfolio`](@ref)
   - [`JuMPOptimisationEstimator`](@ref)
 """
-const LeaderOptimiser = Union{<:BestConstantRebalancedPortfolio,
-                              <:JuMPOptimisationEstimator}
+const LeaderOptimiser = Union{BestConstantRebalancedPortfolio, JuMPOptimisationEstimator}
 """
 $(DocStringExtensions.TYPEDEF)
 

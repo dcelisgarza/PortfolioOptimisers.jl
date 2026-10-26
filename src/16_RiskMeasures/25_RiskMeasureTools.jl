@@ -185,7 +185,7 @@ function measure_label(rs::VecBaseRM)
 end
 
 """
-    const MomentRiskMeasures{T} = Union{<:LowOrderMoment{<:Any, T}, <:HighOrderMoment{<:Any, T}, <:Kurtosis{<:Any, T}, <:Skewness{<:Any, <:Any, <:Any, T}, <:ThirdCentralMoment{<:Any, T}}
+    const MomentRiskMeasures{T} = Union{LowOrderMoment{<:Any, T}, HighOrderMoment{<:Any, T}, Kurtosis{<:Any, T}, Skewness{<:Any, <:Any, <:Any, T}, ThirdCentralMoment{<:Any, T}}
 
 Parameterised union of the five central-moment risk measures sharing the same observation-weight (`T`) type parameter.
 
@@ -200,10 +200,9 @@ The kernels read only resolved weights. A measure that holds a [`DynamicAbstract
   - [`calc_deviations_vec`](@ref)
   - [`DynamicAbstractWeights`](@ref)
 """
-const MomentRiskMeasures{T} = Union{<:LowOrderMoment{<:Any, T}, <:HighOrderMoment{<:Any, T},
-                                    <:Kurtosis{<:Any, T},
-                                    <:Skewness{<:Any, <:Any, <:Any, T},
-                                    <:ThirdCentralMoment{<:Any, T}}
+const MomentRiskMeasures{T} = Union{LowOrderMoment{<:Any, T}, HighOrderMoment{<:Any, T},
+                                    Kurtosis{<:Any, T}, Skewness{<:Any, <:Any, <:Any, T},
+                                    ThirdCentralMoment{<:Any, T}}
 """
     resolve_observation_weights(r::AbstractBaseRiskMeasure, X::VecNum_MatNum)
 

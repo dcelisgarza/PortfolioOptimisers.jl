@@ -353,8 +353,8 @@ A subtype holds the output of a regression fitted per observation across the ass
 """
 abstract type AbstractCrossSectionalRegressionResult <: AbstractRegressionResult end
 """
-    const RegE_Reg = Union{<:AbstractLoadingsRegressionResult,
-                           <:AbstractTimeSeriesRegressionEstimator}
+    const RegE_Reg = Union{AbstractLoadingsRegressionResult,
+                           AbstractTimeSeriesRegressionEstimator}
 
 Alias for a loadings regression result or a time-series regression estimator.
 
@@ -369,8 +369,8 @@ The two arms of the union use different rules, on purpose. A result carries data
   - [`AbstractRegressionResult`](@ref)
   - [`AbstractRegressionEstimator`](@ref)
 """
-const RegE_Reg = Union{<:AbstractLoadingsRegressionResult,
-                       <:AbstractTimeSeriesRegressionEstimator}
+const RegE_Reg = Union{AbstractLoadingsRegressionResult,
+                       AbstractTimeSeriesRegressionEstimator}
 """
 $(DocStringExtensions.TYPEDEF)
 

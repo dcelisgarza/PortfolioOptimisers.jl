@@ -12,7 +12,7 @@ To implement a new subset size, subtype `SubsetSizeEstimator` and make an instan
 
 ## Call
 
-  - `(s::MySubsetSize)(rd::Union{<:Pr_RR, <:AbstractPricesResult}) -> Integer`: The number of assets in each subset, from `1` to the number of assets of `rd`.
+  - `(s::MySubsetSize)(rd::Union{Pr_RR, AbstractPricesResult}) -> Integer`: The number of assets in each subset, from `1` to the number of assets of `rd`.
 
 ### Arguments
 
@@ -81,39 +81,39 @@ abstract type WindowSizeEstimator <: AbstractEstimator end
 Union of [`SubsetSizeEstimator`](@ref) subtypes and plain functions that compute a
 subset size from a returns dataset.
 """
-const SubsetSizeEC = Union{<:SubsetSizeEstimator, <:Function}
+const SubsetSizeEC = Union{SubsetSizeEstimator, Function}
 """
     const NumberSubsetsEC
 
 Union of [`NumberSubsetsEstimator`](@ref) subtypes and plain functions that compute the
 number of subsets from a returns dataset.
 """
-const NumberSubsetsEC = Union{<:NumberSubsetsEstimator, <:Function}
+const NumberSubsetsEC = Union{NumberSubsetsEstimator, Function}
 """
     const WindowSizeEC
 
 Union of [`WindowSizeEstimator`](@ref) subtypes and plain functions that compute a
 window size from a returns dataset.
 """
-const WindowSizeEC = Union{<:WindowSizeEstimator, <:Function}
+const WindowSizeEC = Union{WindowSizeEstimator, Function}
 """
     const SubsetSizeE
 
 Union of a concrete subset-size value or an estimator/function for it.
 """
-const SubsetSizeE = Union{<:Real, <:SubsetSizeEC}
+const SubsetSizeE = Union{Real, SubsetSizeEC}
 """
     const NumberSubsetsE
 
 Union of a concrete number-of-subsets value or an estimator/function for it.
 """
-const NumberSubsetsE = Union{<:Integer, <:NumberSubsetsEC}
+const NumberSubsetsE = Union{Integer, NumberSubsetsEC}
 """
     const WindowSizeE
 
 Union of a concrete window-size value or an estimator/function for it.
 """
-const WindowSizeE = Union{<:Real, <:WindowSizeEC}
+const WindowSizeE = Union{Real, WindowSizeEC}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -312,7 +312,7 @@ function n_splits(mrr::MultipleRandomisedResult)
     return length(mrr.path_ids)
 end
 """
-    const MRCVR = Union{<:MultipleRandomised, <:MultipleRandomisedResult}
+    const MRCVR = Union{MultipleRandomised, MultipleRandomisedResult}
 
 Alias for a multiple-randomised cross-validation estimator or result.
 
@@ -323,7 +323,7 @@ Matches either a [`MultipleRandomised`](@ref) estimator or a [`MultipleRandomise
   - [`MultipleRandomised`](@ref)
   - [`MultipleRandomisedResult`](@ref)
 """
-const MRCVR = Union{<:MultipleRandomised, <:MultipleRandomisedResult}
+const MRCVR = Union{MultipleRandomised, MultipleRandomisedResult}
 """
     combination_by_index(idx::Integer, N::Integer, k::Integer) -> VecInt
 
@@ -442,19 +442,17 @@ Resolves the subset size from either an integer (direct count) or a fraction of 
   - [`MultipleRandomised`](@ref)
   - [`sample_unique_assets`](@ref)
 """
-function get_subset_size(subset_size::Integer, rd::Union{<:Pr_RR, <:AbstractPricesResult},
+function get_subset_size(subset_size::Integer, rd::Union{Pr_RR, AbstractPricesResult},
                          args...)
     @argcheck(subset_size <= size(rd.X, 2),
               "subset_size must not be greater than the number of assets")
     return subset_size
 end
-function get_subset_size(subset_size::Real, rd::Union{<:Pr_RR, <:AbstractPricesResult},
-                         args...)
+function get_subset_size(subset_size::Real, rd::Union{Pr_RR, AbstractPricesResult}, args...)
     subset_size = max(round(Int, subset_size * size(rd.X, 2)), 1)
     return subset_size
 end
-function get_subset_size(subset_size::SubsetSizeEC,
-                         rd::Union{<:Pr_RR, <:AbstractPricesResult})
+function get_subset_size(subset_size::SubsetSizeEC, rd::Union{Pr_RR, AbstractPricesResult})
     res = subset_size(rd)
     assert_nonempty_nonneg_finite_val(res - 1, "subset_size - 1")
     @argcheck(res <= size(rd.X, 2),
@@ -486,7 +484,7 @@ Resolves the window size from `nothing` (no windowing), an integer (direct count
 function get_window_size(::Nothing, args...)
     return nothing
 end
-function get_window_size(window_size::Integer, rd::Union{<:Pr_RR, <:AbstractPricesResult},
+function get_window_size(window_size::Integer, rd::Union{Pr_RR, AbstractPricesResult},
                          args...)
     # Every row count in this file is the whole sample a cross-validation window is cut out
     # of. It is not the model-wide `:T` of any one fit, which covers a single window.
@@ -494,15 +492,13 @@ function get_window_size(window_size::Integer, rd::Union{<:Pr_RR, <:AbstractPric
               "window_size must not be greater than the number of observations")
     return window_size
 end
-function get_window_size(window_size::Real, rd::Union{<:Pr_RR, <:AbstractPricesResult},
-                         args...)
+function get_window_size(window_size::Real, rd::Union{Pr_RR, AbstractPricesResult}, args...)
     window_size = max(round(Int, window_size * size(rd.X, 1)), 2)
     @argcheck(window_size <= size(rd.X, 1),
               "window_size must not be greater than the number of observations")
     return window_size
 end
-function get_window_size(window_size::WindowSizeEC,
-                         rd::Union{<:Pr_RR, <:AbstractPricesResult})
+function get_window_size(window_size::WindowSizeEC, rd::Union{Pr_RR, AbstractPricesResult})
     res = window_size(rd)
     assert_nonempty_nonneg_finite_val(res - 2, "window_size - 2")
     @argcheck(res <= size(rd.X, 1),
@@ -538,8 +534,7 @@ function get_n_subsets(n_subsets::Integer, args...)
                         :max_n_subsets)
     return n_subsets
 end
-function get_n_subsets(n_subsets::NumberSubsetsEC,
-                       rd::Union{<:Pr_RR, <:AbstractPricesResult})
+function get_n_subsets(n_subsets::NumberSubsetsEC, rd::Union{Pr_RR, AbstractPricesResult})
     res = n_subsets(rd)
     assert_nonempty_nonneg_finite_val(res - 2, "n_subsets - 2")
     assert_resource_cap(res, RESOURCE_LIMITS[].max_n_subsets, :n_subsets, :max_n_subsets)

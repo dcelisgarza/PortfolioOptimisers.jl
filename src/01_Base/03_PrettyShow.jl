@@ -334,4 +334,4 @@ has_pretty_show_method(::Any)::Bool = false
 has_pretty_show_method(::JuMP.Model)::Bool = true
 has_pretty_show_method(::Clustering.Hclust)::Bool = true
 has_pretty_show_method(::Clustering.KmeansResult)::Bool = true
-@define_pretty_show(Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult})
+@define_pretty_show(Union{AbstractEstimator, AbstractAlgorithm, AbstractResult})

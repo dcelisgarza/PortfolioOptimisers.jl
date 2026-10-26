@@ -32,7 +32,7 @@
         kwargs...
     ) -> Plot
     plot_portfolio_cumulative_returns(
-        pred::Union{<:PredictionResult, <:MultiPeriodPredictionResult};
+        pred::Union{PredictionResult, MultiPeriodPredictionResult};
         compound::Bool = false,
         kwargs...
     ) -> Plot
@@ -614,7 +614,7 @@ function plot_drawdowns end
         x, y, z, c, slv, fees, factory, kwargs...
     ) -> Plot
     plot_measures(
-        pred::Union{<:PredictionResult, <:MultiPeriodPredictionResult, <:PopulationPredictionResult};
+        pred::Union{PredictionResult, MultiPeriodPredictionResult, PopulationPredictionResult};
         x::BaseRM_VecBaseRM = ConditionalValueatRisk(),
         y::BaseRM_VecBaseRM = MeanReturn(),
         z::Option{<:BaseRM_VecBaseRM} = nothing,

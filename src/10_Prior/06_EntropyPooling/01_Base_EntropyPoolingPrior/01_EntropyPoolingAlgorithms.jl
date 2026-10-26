@@ -95,7 +95,7 @@ Each stage keeps the constraints of the stages before it, so the set of views is
 """
 struct H2_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
 """
-    const StagedEP = Union{<:H1_EntropyPooling, <:H2_EntropyPooling}
+    const StagedEP = Union{H1_EntropyPooling, H2_EntropyPooling}
 
 Alias for the union of the two entropy pooling algorithms that enforce the views in stages.
 
@@ -104,7 +104,7 @@ Alias for the union of the two entropy pooling algorithms that enforce the views
   - [`H1_EntropyPooling`](@ref)
   - [`H2_EntropyPooling`](@ref)
 """
-const StagedEP = Union{<:H1_EntropyPooling, <:H2_EntropyPooling}
+const StagedEP = Union{H1_EntropyPooling, H2_EntropyPooling}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -445,7 +445,7 @@ function JuMPEntropyPooling(; slv::Slv_VecSlv, sc1::Number = 1, sc2::Number = 1e
     return JuMPEntropyPooling(slv, sc1, sc2, so, alg)
 end
 """
-    const NonCVaREP = Union{<:OptimEntropyPooling, <:JuMPEntropyPooling}
+    const NonCVaREP = Union{OptimEntropyPooling, JuMPEntropyPooling}
 
 Alias for the union of the two entropy pooling optimisers that solve the problem with no root finder.
 
@@ -454,7 +454,7 @@ Alias for the union of the two entropy pooling optimisers that solve the problem
   - [`OptimEntropyPooling`](@ref)
   - [`JuMPEntropyPooling`](@ref)
 """
-const NonCVaREP = Union{<:OptimEntropyPooling, <:JuMPEntropyPooling}
+const NonCVaREP = Union{OptimEntropyPooling, JuMPEntropyPooling}
 
 export LogEntropyPooling, ExpEntropyPooling, H0_EntropyPooling, H1_EntropyPooling,
        H2_EntropyPooling, JuMPEntropyPooling, OptimEntropyPooling,

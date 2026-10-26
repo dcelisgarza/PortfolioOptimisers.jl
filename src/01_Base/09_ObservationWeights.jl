@@ -1,5 +1,5 @@
 """
-    const ObsWeights = Union{<:DynamicAbstractWeights, <:StatsBase.AbstractWeights}
+    const ObsWeights = Union{DynamicAbstractWeights, StatsBase.AbstractWeights}
 
 Union type for the observation weights that an estimator accepts.
 
@@ -10,10 +10,10 @@ It holds a subtype of [`DynamicAbstractWeights`](@ref), which computes the weigh
   - [`DynamicAbstractWeights`](@ref)
   - [`get_observation_weights`](@ref)
 """
-const ObsWeights = Union{<:DynamicAbstractWeights, <:StatsBase.AbstractWeights}
+const ObsWeights = Union{DynamicAbstractWeights, StatsBase.AbstractWeights}
 """
-    const ScenarioProbabilities = Union{<:StatsBase.AnalyticWeights,
-                                        <:StatsBase.ProbabilityWeights}
+    const ScenarioProbabilities = Union{StatsBase.AnalyticWeights,
+                                        StatsBase.ProbabilityWeights}
 
 Union type for the probabilities of the scenarios of a prior that reweights its scenarios.
 
@@ -26,8 +26,7 @@ The type of the weights fixes the bias correction of a weighted variance, and `c
   - [`MeucciEntropyPoolingPrior`](@ref)
   - [`OpinionPoolingPrior`](@ref)
 """
-const ScenarioProbabilities = Union{<:StatsBase.AnalyticWeights,
-                                    <:StatsBase.ProbabilityWeights}
+const ScenarioProbabilities = Union{StatsBase.AnalyticWeights, StatsBase.ProbabilityWeights}
 """
     scenario_probabilities(w::VecNum)
     scenario_probabilities(w, x::VecNum)

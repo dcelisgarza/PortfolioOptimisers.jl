@@ -9,7 +9,7 @@ Without a HAC adjustment there is no lag.
 
 # Arguments
 
-  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight of each lag, or
+  - `hac_lags::Option{<:Union{Integer, VecNum}}`: Count of HAC lags, the weight of each lag, or
     `nothing`.
   - `o::Number`: A number whose type the Bartlett weights take.
 
@@ -194,7 +194,7 @@ and then rises, and the integral stops at the minimum with half weight, as
 
 # Returns
 
-  - `(m, e)::Tuple{<:VecNum, <:Number}`: ``\\mathbb{E}[x_{a} x_{c} / Q]`` for each ``a`` on the
+  - `(m, e)::Tuple{VecNum, Number}`: ``\\mathbb{E}[x_{a} x_{c} / Q]`` for each ``a`` on the
     first rows, and ``\\mathbb{E}[1 / Q]``.
 
 # Related
@@ -344,7 +344,7 @@ before its update, else `ce.hac_lags`. The kernel is made the first time the sta
 
 # Returns
 
-  - `hac::Option{<:Union{<:Integer, <:VecNum}}`: The kernel, or `ce.hac_lags`.
+  - `hac::Option{<:Union{Integer, VecNum}}`: The kernel, or `ce.hac_lags`.
 
 # Related
 

@@ -857,7 +857,7 @@ function LinearConstraintEstimator(; val::EqnType,
     return LinearConstraintEstimator(val, key)
 end
 """
-    const LcE_Lc = Union{<:LinearConstraintEstimator, <:LinearConstraint}
+    const LcE_Lc = Union{LinearConstraintEstimator, LinearConstraint}
 
 An unparsed [`LinearConstraintEstimator`](@ref), or an assembled [`LinearConstraint`](@ref). The group exists because a constraint slot accepts both. [`linear_constraints`](@ref) parses the first and returns the second unchanged, so a caller can give equations or a block that it built earlier.
 
@@ -867,7 +867,7 @@ An unparsed [`LinearConstraintEstimator`](@ref), or an assembled [`LinearConstra
   - [`LinearConstraint`](@ref)
   - [`linear_constraints`](@ref)
 """
-const LcE_Lc = Union{<:LinearConstraintEstimator, <:LinearConstraint}
+const LcE_Lc = Union{LinearConstraintEstimator, LinearConstraint}
 """
     const VecLcE_Lc = AbstractVector{<:LcE_Lc}
 
@@ -894,7 +894,7 @@ Every abstract vector whose elements are [`LinearConstraintEstimator`](@ref)s. T
 """
 const VecLcE = AbstractVector{<:LinearConstraintEstimator}
 """
-    const LcE_Lc_VecLcE_Lc = Union{<:LcE_Lc, <:VecLcE_Lc}
+    const LcE_Lc_VecLcE_Lc = Union{LcE_Lc, VecLcE_Lc}
 
 One [`LcE_Lc`](@ref), or a vector of them. It is the widest linear-constraint group that the library declares. It names every shape that a user can write into a linear-constraint field, so the type bound of that field uses it.
 
@@ -904,9 +904,9 @@ One [`LcE_Lc`](@ref), or a vector of them. It is the widest linear-constraint gr
   - [`VecLcE_Lc`](@ref)
   - [`linear_constraints`](@ref)
 """
-const LcE_Lc_VecLcE_Lc = Union{<:LcE_Lc, <:VecLcE_Lc}
+const LcE_Lc_VecLcE_Lc = Union{LcE_Lc, VecLcE_Lc}
 """
-    const LcE_VecLcE = Union{<:LinearConstraintEstimator, <:VecLcE}
+    const LcE_VecLcE = Union{LinearConstraintEstimator, VecLcE}
 
 One [`LinearConstraintEstimator`](@ref), or a vector of them. The group excludes an assembled [`LinearConstraint`](@ref), so a method that dispatches on it knows that every element still carries equations to parse.
 
@@ -917,7 +917,7 @@ One [`LinearConstraintEstimator`](@ref), or a vector of them. The group excludes
   - [`LcE_Lc`](@ref)
   - [`linear_constraints`](@ref)
 """
-const LcE_VecLcE = Union{<:LinearConstraintEstimator, <:VecLcE}
+const LcE_VecLcE = Union{LinearConstraintEstimator, VecLcE}
 """
     linear_constraints(lcs::Option{<:LinearConstraint}, args...; kwargs...)
     linear_constraints(lcs::AbstractVector{<:LinearConstraint}, ::Nothing, args...; kwargs...)

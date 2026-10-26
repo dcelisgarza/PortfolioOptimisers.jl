@@ -198,11 +198,11 @@ end
 """
     keeps_observations(pe::AbstractPriorEstimator) -> false
     keeps_observations(pe::EmpiricalPrior) -> Bool
-    keeps_observations(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
-                                 <:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
-                                 <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior,
-                                 <:HighOrderPriorEstimator,
-                                 <:HighOrderFactorPriorEstimator}) -> Bool
+    keeps_observations(pe::Union{FactorPrior, FactorBlackLittermanPrior,
+                                 BlackLittermanPrior, BayesianBlackLittermanPrior,
+                                 EntropyPoolingPrior, MeucciEntropyPoolingPrior,
+                                 HighOrderPriorEstimator,
+                                 HighOrderFactorPriorEstimator}) -> Bool
     keeps_observations(pe::AugmentedBlackLittermanPrior) -> Bool
     keeps_observations(pe::OpinionPoolingPrior) -> Bool
     keeps_observations(pe::Online{<:AbstractPriorEstimator}) -> false
@@ -259,11 +259,11 @@ end
 function keeps_observations(pe::EmpiricalPrior)::Bool
     return isnothing(pe.max_scenarios)
 end
-function keeps_observations(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
-                                      <:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
-                                      <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior,
-                                      <:HighOrderPriorEstimator,
-                                      <:HighOrderFactorPriorEstimator})::Bool
+function keeps_observations(pe::Union{FactorPrior, FactorBlackLittermanPrior,
+                                      BlackLittermanPrior, BayesianBlackLittermanPrior,
+                                      EntropyPoolingPrior, MeucciEntropyPoolingPrior,
+                                      HighOrderPriorEstimator,
+                                      HighOrderFactorPriorEstimator})::Bool
     return keeps_observations(pe.pe)
 end
 function keeps_observations(pe::AugmentedBlackLittermanPrior)::Bool
@@ -278,10 +278,10 @@ end
 """
     kept_scenarios(pe::AbstractPriorEstimator, T::Integer)
     kept_scenarios(pe::EmpiricalPrior, T::Integer)
-    kept_scenarios(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
-                             <:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
-                             <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior,
-                             <:HighOrderPriorEstimator, <:HighOrderFactorPriorEstimator},
+    kept_scenarios(pe::Union{FactorPrior, FactorBlackLittermanPrior,
+                             BlackLittermanPrior, BayesianBlackLittermanPrior,
+                             EntropyPoolingPrior, MeucciEntropyPoolingPrior,
+                             HighOrderPriorEstimator, HighOrderFactorPriorEstimator},
                    T::Integer)
     kept_scenarios(pe::AugmentedBlackLittermanPrior, T::Integer)
     kept_scenarios(pe::OpinionPoolingPrior, T::Integer)
@@ -321,11 +321,11 @@ end
 function kept_scenarios(pe::EmpiricalPrior, T::Integer)::Option{Int}
     return isnothing(pe.max_scenarios) ? T : min(pe.max_scenarios, T)
 end
-function kept_scenarios(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
-                                  <:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
-                                  <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior,
-                                  <:HighOrderPriorEstimator,
-                                  <:HighOrderFactorPriorEstimator}, T::Integer)::Option{Int}
+function kept_scenarios(pe::Union{FactorPrior, FactorBlackLittermanPrior,
+                                  BlackLittermanPrior, BayesianBlackLittermanPrior,
+                                  EntropyPoolingPrior, MeucciEntropyPoolingPrior,
+                                  HighOrderPriorEstimator, HighOrderFactorPriorEstimator},
+                        T::Integer)::Option{Int}
     return kept_scenarios(pe.pe, T)
 end
 function kept_scenarios(pe::AugmentedBlackLittermanPrior, T::Integer)::Option{Int}
@@ -339,11 +339,11 @@ end
 """
     scenario_count(pe::AbstractPriorEstimator, X::MatNum, F::Option{<:MatNum},
                    pnl::Option{<:AssetPanel}; strict::Bool = false, kwargs...)
-    scenario_count(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior}, X::MatNum,
+    scenario_count(pe::Union{FactorPrior, FactorBlackLittermanPrior}, X::MatNum,
                    F::MatNum, pnl::Option{<:AssetPanel}; strict::Bool = false, kwargs...)
-    scenario_count(pe::Union{<:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
-                             <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior,
-                             <:HighOrderPriorEstimator, <:HighOrderFactorPriorEstimator},
+    scenario_count(pe::Union{BlackLittermanPrior, BayesianBlackLittermanPrior,
+                             EntropyPoolingPrior, MeucciEntropyPoolingPrior,
+                             HighOrderPriorEstimator, HighOrderFactorPriorEstimator},
                    X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
     scenario_count(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
                    pnl::Option{<:AssetPanel}; strict::Bool = false, kwargs...)
@@ -402,16 +402,16 @@ function scenario_count(pe::AbstractPriorEstimator, X::MatNum, F::Option{<:MatNu
     end
     return size(prior(pe, X, F, pnl; strict = strict, kwargs...).X, 1)
 end
-function scenario_count(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior}, ::MatNum,
+function scenario_count(pe::Union{FactorPrior, FactorBlackLittermanPrior}, ::MatNum,
                         F::MatNum, ::Option{<:AssetPanel}; strict::Bool = false,
                         kwargs...)::Int
     return scenario_count(pe.pe, F, nothing, nothing; strict = strict)
 end
-function scenario_count(pe::Union{<:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
-                                  <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior,
-                                  <:HighOrderPriorEstimator,
-                                  <:HighOrderFactorPriorEstimator}, X::MatNum,
-                        F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)::Int
+function scenario_count(pe::Union{BlackLittermanPrior, BayesianBlackLittermanPrior,
+                                  EntropyPoolingPrior, MeucciEntropyPoolingPrior,
+                                  HighOrderPriorEstimator, HighOrderFactorPriorEstimator},
+                        X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel};
+                        kwargs...)::Int
     return scenario_count(pe.pe, X, F, pnl; kwargs...)
 end
 function scenario_count(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,

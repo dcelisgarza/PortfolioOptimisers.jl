@@ -703,7 +703,7 @@ function supports_precomputed_returns(r::TrackingRiskMeasure{<:Any,
 end
 """
     bind_data_benchmark(r::TrackingRiskMeasure, rd)
-    bind_data_benchmark(r::Union{<:RiskTrackingError, <:RiskTrackingRiskMeasure}, rd)
+    bind_data_benchmark(r::Union{RiskTrackingError, RiskTrackingRiskMeasure}, rd)
 
 Bind the [`DataBenchmarkTracking`](@ref) that a tracking measure holds to the benchmark `B` of the returns data `rd`.
 
@@ -725,12 +725,12 @@ function bind_data_benchmark(r::TrackingRiskMeasure, rd)
     tr = bind_data_benchmark(r.tr, rd)
     return tr === r.tr ? r : rebuild_estimator(r, (; tr = tr))
 end
-function bind_data_benchmark(r::Union{<:RiskTrackingError, <:RiskTrackingRiskMeasure}, rd)
+function bind_data_benchmark(r::Union{RiskTrackingError, RiskTrackingRiskMeasure}, rd)
     inner = bind_data_benchmark(r.r, rd)
     return inner === r.r ? r : rebuild_estimator(r, (; r = inner))
 end
 """
-    reader_frames(r::Union{<:RiskTrackingError, <:RiskTrackingRiskMeasure},
+    reader_frames(r::Union{RiskTrackingError, RiskTrackingRiskMeasure},
                   path::AbstractString, refit::Bool)
 
 Return the frames that the tracked measure of a risk tracker adds to the group of the optimiser that holds the tracker.
@@ -753,7 +753,7 @@ A [`RiskTrackingError`](@ref) and a [`RiskTrackingRiskMeasure`](@ref) hold the m
   - [`RiskTrackingError`](@ref)
   - [`RiskTrackingRiskMeasure`](@ref)
 """
-function reader_frames(r::Union{<:RiskTrackingError, <:RiskTrackingRiskMeasure},
+function reader_frames(r::Union{RiskTrackingError, RiskTrackingRiskMeasure},
                        path::AbstractString, refit::Bool)
     return reader_frames(r.r, join_path(path, :r), refit)
 end

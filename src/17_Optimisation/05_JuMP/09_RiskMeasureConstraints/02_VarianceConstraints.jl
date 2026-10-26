@@ -1135,9 +1135,9 @@ The box, the ellipsoid and the covariance norm ball bound the covariance matrix,
 function sdp_lifted_set(::Any)
     return false
 end
-function sdp_lifted_set(::Union{<:BoxUncertaintySet, <:EllipsoidalUncertaintySet,
-                                <:NormBallUncertaintySet{<:Any, <:Any, <:Any,
-                                                         <:SigmaUncertaintySetClass}})
+function sdp_lifted_set(::Union{BoxUncertaintySet, EllipsoidalUncertaintySet,
+                                NormBallUncertaintySet{<:Any, <:Any, <:Any,
+                                                       <:SigmaUncertaintySetClass}})
     return true
 end
 """

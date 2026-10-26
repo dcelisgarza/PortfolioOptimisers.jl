@@ -7,7 +7,7 @@ whole repository.
   runtime check. Put precomputed structure on the Result type. The rule has one exception, and
   [ADR 0106](../docs/adr/0106-a-partial-fit-state-is-the-one-result-an-estimator-holds.md) states it.
   A partial-fit state is a Result that no consumer reads, so an estimator may hold one in a field
-  bound to `Union{Nothing, <:AbstractPartialFitState}`. That bound is the enforcement, and it still
+  bound to `Option{<:AbstractPartialFitState}`. That bound is the enforcement, and it still
   refuses every other Result.
 - **A numeric type is derived, never coerced.** Read it off the arguments with `eltype`, `typeof`,
   `real` and `promote_type`, or off the operation that widens it, and take an index with the

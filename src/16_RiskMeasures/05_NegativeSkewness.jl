@@ -1,5 +1,5 @@
 """
-    const NSkeFormulations = Union{<:NSkeQuadFormulations, <:SOCRiskExpr}
+    const NSkeFormulations = Union{NSkeQuadFormulations, SOCRiskExpr}
 
 Union of valid optimisation formulations for the [`NegativeSkewness`](@ref) risk measure.
 
@@ -9,7 +9,7 @@ Union of valid optimisation formulations for the [`NegativeSkewness`](@ref) risk
   - [`SOCRiskExpr`](@ref)
   - [`NegativeSkewness`](@ref)
 """
-const NSkeFormulations = Union{<:NSkeQuadFormulations, <:SOCRiskExpr}
+const NSkeFormulations = Union{NSkeQuadFormulations, SOCRiskExpr}
 """
 $(DocStringExtensions.TYPEDEF)
 

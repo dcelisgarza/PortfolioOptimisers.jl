@@ -35,8 +35,8 @@ Every subtype has the fields `shares`, `cost`, `w`, `cash` and `fees`, and its l
 """
 abstract type FiniteAllocationOptimisationResult <: OptimisationResult end
 """
-    const FOptE_FOpt = Union{<:FiniteAllocationOptimisationEstimator,
-                             <:FiniteAllocationOptimisationResult}
+    const FOptE_FOpt = Union{FiniteAllocationOptimisationEstimator,
+                             FiniteAllocationOptimisationResult}
 
 Alias for a finite allocation estimator or a finite allocation result.
 
@@ -47,10 +47,10 @@ It is the type of the `fb` field of a finite allocation estimator. The fallback 
   - [`FiniteAllocationOptimisationEstimator`](@ref)
   - [`FiniteAllocationOptimisationResult`](@ref)
 """
-const FOptE_FOpt = Union{<:FiniteAllocationOptimisationEstimator,
-                         <:FiniteAllocationOptimisationResult}
+const FOptE_FOpt = Union{FiniteAllocationOptimisationEstimator,
+                         FiniteAllocationOptimisationResult}
 """
-    const FOptE_FOpt_FbChain = Union{<:FOptE_FOpt, <:FbChain}
+    const FOptE_FOpt_FbChain = Union{FOptE_FOpt, FbChain}
 
 Alias for the values that the `fb` field of a finite allocation result can hold.
 
@@ -62,7 +62,7 @@ Alias for the values that the `fb` field of a finite allocation result can hold.
   - [`FbChain`](@ref)
   - [`FiniteAllocationOptimisationResult`](@ref)
 """
-const FOptE_FOpt_FbChain = Union{<:FOptE_FOpt, <:FbChain}
+const FOptE_FOpt_FbChain = Union{FOptE_FOpt, FbChain}
 """
 $(DocStringExtensions.TYPEDEF)
 

@@ -54,7 +54,7 @@ julia> PortfolioOptimisers.calc_num_bins(MyBins(), [1.0, 2.0, 3.0], [3.0, 2.0, 1
 """
 abstract type AbstractBins <: AbstractAlgorithm end
 """
-    const Int_Bin = Union{<:AbstractBins, <:Integer}
+    const Int_Bin = Union{AbstractBins, Integer}
 
 Alias for a histogram binning algorithm or an integer number of bins.
 
@@ -68,7 +68,7 @@ Matches an [`AbstractBins`](@ref) algorithm, which selects the bin count from th
   - [`variation_info`](@ref)
   - [`mutual_variation_info`](@ref)
 """
-const Int_Bin = Union{<:AbstractBins, <:Integer}
+const Int_Bin = Union{AbstractBins, Integer}
 """
 $(DocStringExtensions.TYPEDEF)
 

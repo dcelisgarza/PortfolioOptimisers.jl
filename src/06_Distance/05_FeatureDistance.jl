@@ -955,8 +955,8 @@ Assert that `Z` lies in the domain of `metric`. The fallback does nothing. Most 
 function assert_metric_domain(::Distances.SemiMetric, ::ArrNum, ::Symbol = :Z)::Nothing
     return nothing
 end
-function assert_metric_domain(::Union{<:Distances.Jaccard, <:Distances.BrayCurtis,
-                                      <:Distances.ChiSqDist}, Z::ArrNum,
+function assert_metric_domain(::Union{Distances.Jaccard, Distances.BrayCurtis,
+                                      Distances.ChiSqDist}, Z::ArrNum,
                               sym::Symbol = :Z)::Nothing
     assert_nonneg(Z, sym)
     return nothing

@@ -41,7 +41,7 @@ function Base.split(res::CrossValidationResult, args...)
     return res
 end
 """
-    CVER = Union{<:CVE_Onl, <:CrossValidationResult}
+    CVER = Union{CVE_Onl, CrossValidationResult}
 
 Union of all cross-validation schemes, plain or online, and result types.
 
@@ -50,7 +50,7 @@ Union of all cross-validation schemes, plain or online, and result types.
   - [`CVE_Onl`](@ref)
   - [`CrossValidationResult`](@ref)
 """
-const CVER = Union{<:CVE_Onl, <:CrossValidationResult}
+const CVER = Union{CVE_Onl, CrossValidationResult}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -153,8 +153,8 @@ Union of all optimisation cross-validation estimators and results.
   - [`NonSeqCVER`](@ref)
   - [`SeqCVER`](@ref)
 """
-const OptCVER = Union{<:OptimisationCrossValidationEstimator,
-                      <:OptimisationCrossValidationResult}
+const OptCVER = Union{OptimisationCrossValidationEstimator,
+                      OptimisationCrossValidationResult}
 
 """
     NonSeqCVER
@@ -170,8 +170,8 @@ Union of all non-sequential cross-validation estimators and results.
   - [`SeqCVER`](@ref)
   - [`folds_are_time_ordered`](@ref)
 """
-const NonSeqCVER = Union{<:NonSequentialCrossValidationEstimator,
-                         <:NonSequentialCrossValidationResult}
+const NonSeqCVER = Union{NonSequentialCrossValidationEstimator,
+                         NonSequentialCrossValidationResult}
 """
     SeqCVER
 
@@ -183,8 +183,7 @@ Union of all sequential cross-validation estimators and results.
   - [`SequentialCrossValidationResult`](@ref)
   - [`NonSeqCVER`](@ref)
 """
-const SeqCVER = Union{<:SequentialCrossValidationEstimator,
-                      <:SequentialCrossValidationResult}
+const SeqCVER = Union{SequentialCrossValidationEstimator, SequentialCrossValidationResult}
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -1291,7 +1290,7 @@ function rolling_window_measure(r::BaseRM_VecBaseRM, mpred::MultiPeriodPredictio
     return rolling_window_measure(r, mpred.mrd.X, window; kwargs...)
 end
 """
-    PredRes_MultiPredRes = Union{<:PredictionResult, <:MultiPeriodPredictionResult}
+    PredRes_MultiPredRes = Union{PredictionResult, MultiPeriodPredictionResult}
 
 Alias for a single-fold or multi-period prediction result.
 
@@ -1303,7 +1302,7 @@ Matches either a [`PredictionResult`](@ref) or a [`MultiPeriodPredictionResult`]
   - [`MultiPeriodPredictionResult`](@ref)
   - [`VecPredRes_MultiPredRes`](@ref)
 """
-const PredRes_MultiPredRes = Union{<:PredictionResult, <:MultiPeriodPredictionResult}
+const PredRes_MultiPredRes = Union{PredictionResult, MultiPeriodPredictionResult}
 """
     VecPredRes_MultiPredRes = AbstractVector{<:PredRes_MultiPredRes}
 

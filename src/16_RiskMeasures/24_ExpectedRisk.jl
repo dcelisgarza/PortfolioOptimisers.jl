@@ -1,5 +1,5 @@
 """
-    const MatNum_Pr = Union{<:MatNum, <:AbstractPriorResult, <:ReturnsResult}
+    const MatNum_Pr = Union{MatNum, AbstractPriorResult, ReturnsResult}
 
 Groups the three types that hold a returns matrix and that the value-level risk functions accept as their data argument.
 
@@ -13,9 +13,9 @@ A caller can hold a bare matrix, a prior result or a returns result, and each on
   - [`resolve_risk_inputs`](@ref): Resolves each member to a measure and a matrix.
   - [`risk_contribution`](@ref)
 """
-const MatNum_Pr = Union{<:MatNum, <:AbstractPriorResult, <:ReturnsResult}
+const MatNum_Pr = Union{MatNum, AbstractPriorResult, ReturnsResult}
 """
-    const RkRatioRM = Union{<:RiskRatio, <:NonOptimisationRiskRatio}
+    const RkRatioRM = Union{RiskRatio, NonOptimisationRiskRatio}
 
 Groups the two ratio measures whose value is one risk divided by another risk.
 
@@ -28,7 +28,7 @@ Both members hold their two risks in the fields `r1` and `r2`, so one method of 
   - [`supports_precomputed_returns`](@ref)
   - [`expected_risk`](@ref)
 """
-const RkRatioRM = Union{<:RiskRatio, <:NonOptimisationRiskRatio}
+const RkRatioRM = Union{RiskRatio, NonOptimisationRiskRatio}
 """
     expected_risk(r::AbstractBaseRiskMeasure, w::VecNum, args...; kwargs...)
     expected_risk(rs::VecBaseRM, w::VecNum, args...; sca = SumScalariser(), kwargs...)
@@ -223,7 +223,7 @@ end
 # argument. It is refused with an error that names the measure, on the same terms as an
 # unstated slot, and it states the ways out. `WeightsInput` is absent: it reads no series,
 # so its `args...` method already answers a call with no returns data.
-function expected_risk(::Union{<:NetReturnsInput, <:WeightsReturnsFeesInput},
+function expected_risk(::Union{NetReturnsInput, WeightsReturnsFeesInput},
                        r::AbstractBaseRiskMeasure, w::VecNum, X::Nothing = nothing,
                        fees::Option{<:Fees} = nothing; kwargs...)
     return throw(IsNothingError(missing_returns_data_message(r)))
@@ -782,8 +782,8 @@ function difference_risk(::WeightsReturnsFeesInput, r::AbstractBaseRiskMeasure, 
                          w::VecNum, X::MatNum, fees::Fees)
     return expected_risk_from_returns(r, charge_fees(X * wd, w, fees))
 end
-function difference_risk(r::Union{<:LoHiOrderMoment, <:Kurtosis, <:TCM_Sk,
-                                  <:MedianAbsoluteDeviation}, wd::VecNum, w::VecNum,
+function difference_risk(r::Union{LoHiOrderMoment, Kurtosis, TCM_Sk,
+                                  MedianAbsoluteDeviation}, wd::VecNum, w::VecNum,
                          X::MatNum, fees::Fees)
     resolved = resolve_observation_weights(r, X)
     x = charge_fees(X * wd, w, fees)

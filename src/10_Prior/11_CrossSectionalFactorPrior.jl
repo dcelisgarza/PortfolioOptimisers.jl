@@ -87,8 +87,8 @@ In order to implement a new concrete type that works seamlessly with the library
 abstract type AbstractOrthogonalForecastScaleCalibrationAlgorithm <:
               AbstractCalibrationAlgorithm end
 """
-    const Num_SpanShrinkCal = Union{<:AbstractSpannedShrinkageCalibrationAlgorithm,
-                                    <:Function, <:Number}
+    const Num_SpanShrinkCal = Union{AbstractSpannedShrinkageCalibrationAlgorithm,
+                                    Function, Number}
 
 Field bound for the Spanned Shrinkage slot: the shrinkage itself, a rule of the family, or a plain function of the same five arguments.
 
@@ -100,11 +100,11 @@ The bound names one family, so a rule of the Orthogonal Forecast Scale family in
   - [`Num_OrthFcScaleCal`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
 """
-const Num_SpanShrinkCal = Union{<:AbstractSpannedShrinkageCalibrationAlgorithm, <:Function,
-                                <:Number}
+const Num_SpanShrinkCal = Union{AbstractSpannedShrinkageCalibrationAlgorithm, Function,
+                                Number}
 """
-    const Num_OrthFcScaleCal = Union{<:AbstractOrthogonalForecastScaleCalibrationAlgorithm,
-                                     <:Function, <:Number}
+    const Num_OrthFcScaleCal = Union{AbstractOrthogonalForecastScaleCalibrationAlgorithm,
+                                     Function, Number}
 
 Field bound for the Orthogonal Forecast Scale slot: the scale itself, a rule of the family, or a plain function of the same five arguments. It is the counterpart of [`Num_SpanShrinkCal`](@ref), and carries its reading unchanged.
 
@@ -114,8 +114,8 @@ Field bound for the Orthogonal Forecast Scale slot: the scale itself, a rule of 
   - [`Num_SpanShrinkCal`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
 """
-const Num_OrthFcScaleCal = Union{<:AbstractOrthogonalForecastScaleCalibrationAlgorithm,
-                                 <:Function, <:Number}
+const Num_OrthFcScaleCal = Union{AbstractOrthogonalForecastScaleCalibrationAlgorithm,
+                                 Function, Number}
 """
     reads_forecast_history(rule) -> Bool
 

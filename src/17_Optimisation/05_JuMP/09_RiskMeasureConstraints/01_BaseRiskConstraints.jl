@@ -1,5 +1,5 @@
 """
-    const NonFRCJuMPOpt = Union{<:MeanRisk, <:NearOptimalCentering, <:RiskBudgeting}
+    const NonFRCJuMPOpt = Union{MeanRisk, NearOptimalCentering, RiskBudgeting}
 
 Groups the JuMP optimisers that do not use factor risk contribution.
 
@@ -12,9 +12,9 @@ Groups the JuMP optimisers that do not use factor risk contribution.
   - [`RiskBudgeting`](@ref)
   - [`RiskBoundOwner`](@ref)
 """
-const NonFRCJuMPOpt = Union{<:MeanRisk, <:NearOptimalCentering, <:RiskBudgeting}
+const NonFRCJuMPOpt = Union{MeanRisk, NearOptimalCentering, RiskBudgeting}
 """
-    const RiskConstraintOwner = Union{<:RiskJuMPOptimisationEstimator, <:AbstractProgrammeAllocationSet}
+    const RiskConstraintOwner = Union{RiskJuMPOptimisationEstimator, AbstractProgrammeAllocationSet}
 
 Groups the owners of the risk constraints that a builder writes. An owner is a JuMP optimiser, whose programme the constraint joins, or a programme Allocation Set, whose projection the constraint joins.
 
@@ -27,10 +27,10 @@ Every `set_risk_constraints!` and `set_risk!` method takes the owner in its `opt
   - [`AbstractProgrammeAllocationSet`](@ref)
   - [`set_risk_constraints!`](@ref)
 """
-const RiskConstraintOwner = Union{<:RiskJuMPOptimisationEstimator,
-                                  <:AbstractProgrammeAllocationSet}
+const RiskConstraintOwner = Union{RiskJuMPOptimisationEstimator,
+                                  AbstractProgrammeAllocationSet}
 """
-    const RiskBoundOwner = Union{<:NonFRCJuMPOpt, <:AbstractProgrammeAllocationSet}
+    const RiskBoundOwner = Union{NonFRCJuMPOpt, AbstractProgrammeAllocationSet}
 
 Groups the owners that honour the `settings.ub` of a risk measure.
 
@@ -42,7 +42,7 @@ The group holds every JuMP optimiser except [`FactorRiskContribution`](@ref), an
   - [`NonFRCJuMPOpt`](@ref)
   - [`set_risk_upper_bound!`](@ref)
 """
-const RiskBoundOwner = Union{<:NonFRCJuMPOpt, <:AbstractProgrammeAllocationSet}
+const RiskBoundOwner = Union{NonFRCJuMPOpt, AbstractProgrammeAllocationSet}
 """
     risk_constraint_solver(opt::JuMPOptimisationEstimator)
 
@@ -290,8 +290,8 @@ This route calls no [`factory`](@ref), so a measure that states no solver of its
   - [`assert_declared_calibration_resolver`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, r::RiskMeasure,
-                               opt::Union{<:JuMPOptimisationEstimator,
-                                          <:AbstractProgrammeAllocationSet},
+                               opt::Union{JuMPOptimisationEstimator,
+                                          AbstractProgrammeAllocationSet},
                                pr::AbstractPriorResult, pl::Option{<:PlC_VecPlC},
                                fees::Option{<:Fees}, b1::Option{<:MatNum} = nothing;
                                kwargs...)
@@ -322,8 +322,8 @@ function set_risk_constraints!(model::JuMP.Model, r::RiskMeasure,
     return nothing
 end
 function set_risk_constraints!(model::JuMP.Model, rs::VecRM,
-                               opt::Union{<:JuMPOptimisationEstimator,
-                                          <:AbstractProgrammeAllocationSet},
+                               opt::Union{JuMPOptimisationEstimator,
+                                          AbstractProgrammeAllocationSet},
                                pr::AbstractPriorResult, pl::Option{<:PlC_VecPlC},
                                fees::Option{<:Fees}, b1::Option{<:MatNum} = nothing;
                                kwargs...)
@@ -369,8 +369,8 @@ The two methods of [`set_risk_constraints!`](@ref) both call this function, so a
   - [`set_risk_frontier_owner!`](@ref)
 """
 function set_resolved_risk_constraints!(model::JuMP.Model, i::Integer, r::RiskMeasure,
-                                        opt::Union{<:JuMPOptimisationEstimator,
-                                                   <:AbstractProgrammeAllocationSet},
+                                        opt::Union{JuMPOptimisationEstimator,
+                                                   AbstractProgrammeAllocationSet},
                                         pr::AbstractPriorResult, pl::Option{<:PlC_VecPlC},
                                         fees::Option{<:Fees}, b1::Option{<:MatNum};
                                         kwargs...)
@@ -568,11 +568,11 @@ function set_risk_upper_bound!(model::JuMP.Model, ::NonFRCJuMPOpt,
     if !shared_has(model, :risk_frontier)
         risk_frontier = JuMP.@expression(model, risk_frontier,
                                          Pair{Tuple{Symbol, Symbol},
-                                              Tuple{<:JuMP.AbstractJuMPScalar,
-                                                    <:Front_NumVec, Bool, Int}}[(bound_var_key, bound_key) => (r_expr,
-                                                                                                               ub,
-                                                                                                               flag,
-                                                                                                               0)])
+                                              Tuple{JuMP.AbstractJuMPScalar, Front_NumVec,
+                                                    Bool, Int}}[(bound_var_key, bound_key) => (r_expr,
+                                                                                               ub,
+                                                                                               flag,
+                                                                                               0)])
     else
         risk_frontier = shared_get(model, :risk_frontier)
         push!(risk_frontier, (bound_var_key, bound_key) => (r_expr, ub, flag, 0))

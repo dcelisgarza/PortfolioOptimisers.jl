@@ -56,7 +56,7 @@ function VecScalar(; v::VecNum, s::Number)
     return VecScalar(v, s)
 end
 """
-    const Num_VecNum_VecScalar = Union{<:Num_VecNum, <:VecScalar}
+    const Num_VecNum_VecScalar = Union{Num_VecNum, VecScalar}
 
 Alias for a union of a numeric type, a vector of numeric types and a `VecScalar` result.
 
@@ -65,9 +65,9 @@ Alias for a union of a numeric type, a vector of numeric types and a `VecScalar`
   - [`Num_VecNum`](@ref)
   - [`VecScalar`](@ref)
 """
-const Num_VecNum_VecScalar = Union{<:Num_VecNum, <:VecScalar}
+const Num_VecNum_VecScalar = Union{Num_VecNum, VecScalar}
 """
-    const Num_ArrNum_VecScalar_DynWeights = Union{<:Num_ArrNum, <:VecScalar, <:DynamicAbstractWeights}
+    const Num_ArrNum_VecScalar_DynWeights = Union{Num_ArrNum, VecScalar, DynamicAbstractWeights}
 
 Alias for a union of a numeric type, an array of numeric types, a `VecScalar` result and a [`DynamicAbstractWeights`](@ref).
 
@@ -77,7 +77,6 @@ Alias for a union of a numeric type, an array of numeric types, a `VecScalar` re
   - [`VecScalar`](@ref)
   - [`DynamicAbstractWeights`](@ref)
 """
-const Num_ArrNum_VecScalar_DynWeights = Union{<:Num_ArrNum, <:VecScalar,
-                                              <:DynamicAbstractWeights}
+const Num_ArrNum_VecScalar_DynWeights = Union{Num_ArrNum, VecScalar, DynamicAbstractWeights}
 
 export VecScalar

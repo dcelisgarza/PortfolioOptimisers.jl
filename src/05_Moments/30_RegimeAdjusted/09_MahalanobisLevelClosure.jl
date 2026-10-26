@@ -101,7 +101,7 @@ it, and a barycentric interpolant reads it at each count.
   - `decay::Number`: Decay of the weights.
   - `Ks::AbstractVector{<:Integer}`: Counts of observations.
   - `n::Integer`: Count of assets that contribute to the statistic, at least two.
-  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight of each lag, or
+  - `hac_lags::Option{<:Union{Integer, VecNum}}`: Count of HAC lags, the weight of each lag, or
     `nothing`.
   - `start::Integer`: The first count, [`mahalanobis_bias_start`](@ref).
   - `Ksat::Integer`: The count of saturation, [`mahalanobis_bias_saturation`](@ref).
@@ -124,8 +124,7 @@ function mahalanobis_recursion_ratio(::MeanLevelRecursion, ::RegimeAdjustedMetho
 end
 function mahalanobis_recursion_ratio(::GaussianLevelRecursion, method::RegimeAdjustedMethod,
                                      decay::Number, Ks::AbstractVector{<:Integer},
-                                     n::Integer,
-                                     hac_lags::Option{<:Union{<:Integer, <:VecNum}},
+                                     n::Integer, hac_lags::Option{<:Union{Integer, VecNum}},
                                      start::Integer, Ksat::Integer)
     o = one(decay)
     t = (o .- cos.(pi .* (0:7) ./ 7 .* o)) ./ 2
@@ -212,7 +211,7 @@ derivative ``\\rho = \\rho_{0} - q``.
 
 # Returns
 
-  - `(D, rho)::Tuple{<:Number, <:Number}`: The two values.
+  - `(D, rho)::Tuple{Number, Number}`: The two values.
 
 # Related
 
@@ -692,7 +691,7 @@ grid, with the cut of [`mahalanobis_transform`](@ref) where the count has one.
 
 # Returns
 
-  - `(so, L)::Tuple{<:VecNum, <:VecNum}`: The grid and the transform on it.
+  - `(so, L)::Tuple{VecNum, VecNum}`: The grid and the transform on it.
 
 # Related
 
@@ -743,7 +742,7 @@ of [`GaussianLevelRecursion`](@ref).
   - `decay::Number`: Decay of the weights.
   - `K::Integer`: Count of observations.
   - `n::Integer`: Count of assets that contribute to the statistic, at least two.
-  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight of each lag, or
+  - `hac_lags::Option{<:Union{Integer, VecNum}}`: Count of HAC lags, the weight of each lag, or
     `nothing`.
 
 # Returns
@@ -756,7 +755,7 @@ of [`GaussianLevelRecursion`](@ref).
   - [`mahalanobis_recursion_ratio`](@ref)
 """
 function level_closure_factors(methods::Tuple, decay::Number, K::Integer, n::Integer,
-                               hac_lags::Option{<:Union{<:Integer, <:VecNum}})
+                               hac_lags::Option{<:Union{Integer, VecNum}})
     grid = mahalanobis_bias_grid(decay)
     G, Rh, peaks = mahalanobis_lattice(decay, [K], grid.xf, hac_lags)
     c = (one(decay) - decay) / (one(decay) - decay^K)

@@ -17,10 +17,10 @@ $(DocStringExtensions.FIELDS)
         vars::VecStr,
         coef::VecNum,
         op::AbstractString,
-        rhs::Union{<:Number, <:VecNum},
+        rhs::Union{Number, VecNum},
         eqn::AbstractString,
-        ij::AbstractVector{<:Union{<:Tuple{<:Integer, <:Integer},
-                                   <:Tuple{<:VecInt, <:VecInt}}}
+        ij::AbstractVector{<:Union{Tuple{Integer, Integer},
+                                   Tuple{VecInt, VecInt}}}
     ) -> RhoParsingResult
 
 Positional arguments correspond to the struct's fields. The type has no keyword constructor, because [`replace_coprior_views`](@ref) makes it.
@@ -79,9 +79,9 @@ RhoParsingResult
     """
     ij
     function RhoParsingResult(vars::VecStr, coef::VecNum, op::AbstractString,
-                              rhs::Union{<:Number, <:VecNum}, eqn::AbstractString,
-                              ij::AbstractVector{<:Union{<:Tuple{<:Integer, <:Integer},
-                                                         <:Tuple{<:VecInt, <:VecInt}}})
+                              rhs::Union{Number, VecNum}, eqn::AbstractString,
+                              ij::AbstractVector{<:Union{Tuple{Integer, Integer},
+                                                         Tuple{VecInt, VecInt}}})
         @argcheck(length(vars) == length(coef), DimensionMismatch)
         if isa(rhs, AbstractVector)
             @argcheck(!isempty(ij) &&

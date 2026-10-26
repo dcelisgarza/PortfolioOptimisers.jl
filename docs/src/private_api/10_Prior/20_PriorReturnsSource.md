@@ -20,7 +20,7 @@ graph_reader_gaps
 graph_reader_mask
 implied_volatility_picker
 centrality_constraints_from
-PortfolioOptimisers.refits_regression(::Union{<:EmpiricalPrior, <:LowDimensionEnsemblePrior})
+PortfolioOptimisers.refits_regression(::Union{EmpiricalPrior, LowDimensionEnsemblePrior})
 stamp_returns_source
 prior_returns_source
 ```

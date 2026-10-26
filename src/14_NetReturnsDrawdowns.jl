@@ -342,28 +342,27 @@ A bare returns matrix and a [`ReturnsResult`](@ref) carry no moments, so no mask
   - [`port_opt_view`](@ref)
   - [`strict_diagnostic`](@ref)
 """
-function investable_reduction(X::MatNum, w::Union{<:VecNum, <:VecVecNum, <:MatNum},
+function investable_reduction(X::MatNum, w::Union{VecNum, VecVecNum, MatNum},
                               fees::Option{<:Fees}, ::Bool)
     return nothing, X, w, investable_fees_view(fees, nothing, X)
 end
 function investable_reduction(rd::AbstractReturnsResult,
-                              w::Union{<:VecNum, <:VecVecNum, <:MatNum},
-                              fees::Option{<:Fees}, ::Bool)
+                              w::Union{VecNum, VecVecNum, MatNum}, fees::Option{<:Fees},
+                              ::Bool)
     return nothing, rd, w, investable_fees_view(fees, nothing, rd.X)
 end
-function investable_reduction(pr::AbstractPriorResult,
-                              w::Union{<:VecNum, <:VecVecNum, <:MatNum},
+function investable_reduction(pr::AbstractPriorResult, w::Union{VecNum, VecVecNum, MatNum},
                               fees::Option{<:Fees}, strict::Bool)
     return investable_reduction(investable_mask(pr), pr, w, fees, strict)
 end
 function investable_reduction(::Nothing, pr::AbstractPriorResult,
-                              w::Union{<:VecNum, <:VecVecNum, <:MatNum},
-                              fees::Option{<:Fees}, ::Bool)
+                              w::Union{VecNum, VecVecNum, MatNum}, fees::Option{<:Fees},
+                              ::Bool)
     return nothing, pr, w, investable_fees_view(fees, nothing, pr.X)
 end
 function investable_reduction(imsk::BitVector, pr::AbstractPriorResult,
-                              w::Union{<:VecNum, <:VecVecNum, <:MatNum},
-                              fees::Option{<:Fees}, strict::Bool)
+                              w::Union{VecNum, VecVecNum, MatNum}, fees::Option{<:Fees},
+                              strict::Bool)
     held = held_non_investable(imsk, w)
     if !isempty(held)
         strict_diagnostic("a value-level verb cannot score a holding the prior could not estimate. Assets $(held) are not investable, and the weights hold them. Their weights are dropped, so the figure describes the portfolio without them. Pass `strict = true` to refuse instead, reduce the weights to the investable universe, or refit the prior over a history that covers these assets.",
@@ -442,7 +441,7 @@ function held_gap_pairs(W::MatNum, X::MatNum)
             for t in axes(X, 1) if !iszero(W[t, i]) && !isfinite(X[t, i])]
 end
 """
-    filter_held_gaps(w::Union{<:VecNum, <:VecVecNum, <:MatNum}, X::MatNum, strict::Bool;
+    filter_held_gaps(w::Union{VecNum, VecVecNum, MatNum}, X::MatNum, strict::Bool;
                      nx::Option{<:VecStr} = nothing)
 
 Return the window with every non-finite entry replaced by zero, and name the Held Gaps.
@@ -483,8 +482,8 @@ A fold hands this verb the window **viewed at the Investable Mask**, so a column
   - [`strict_diagnostic`](@ref)
   - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
 """
-function filter_held_gaps(w::Union{<:VecNum, <:VecVecNum, <:MatNum}, X::MatNum,
-                          strict::Bool; nx::Option{<:VecStr} = nothing)
+function filter_held_gaps(w::Union{VecNum, VecVecNum, MatNum}, X::MatNum, strict::Bool;
+                          nx::Option{<:VecStr} = nothing)
     if all(isfinite, X)
         return X
     end

@@ -164,7 +164,7 @@ To add a delay estimator, subtype `GerberIQEpsEstimator` and implement this meth
 """
 abstract type GerberIQEpsEstimator <: AbstractEstimator end
 """
-    const GerberIQEps = Union{<:Number, <:Function, <:GerberIQEpsEstimator}
+    const GerberIQEps = Union{Number, Function, GerberIQEpsEstimator}
 
 A type alias for the union of `Number`, `Function` and `GerberIQEpsEstimator`, the types that give the delay of the Gerber IQ decay.
 
@@ -181,7 +181,7 @@ Each arm is one way to give the delay. A `Number` is the delay. A `Function` com
 
   - $(ref_dict[:gerber2025squeezing]) Section 3.4.2.
 """
-const GerberIQEps = Union{<:Number, <:Function, <:GerberIQEpsEstimator}
+const GerberIQEps = Union{Number, Function, GerberIQEpsEstimator}
 """
     gerber_iq_eps(e::Number, ::MatNum) -> Number
     gerber_iq_eps(e::Function, X::MatNum) -> Number
@@ -286,7 +286,7 @@ To add a decay rate estimator, subtype `GerberIQGammaEstimator` and implement th
 """
 abstract type GerberIQGammaEstimator <: AbstractEstimator end
 """
-    const GerberIQGamma = Union{<:Number, Function, <:GerberIQGammaEstimator}
+    const GerberIQGamma = Union{Number, Function, GerberIQGammaEstimator}
 
 A type alias for the union of `Number`, `Function` and `GerberIQGammaEstimator`, the types that give the rate of the Gerber IQ decay.
 
@@ -303,7 +303,7 @@ Each arm is one way to give the decay rate. A `Number` is the rate. A `Function`
 
   - $(ref_dict[:gerber2025squeezing]) Section 3.4.3.
 """
-const GerberIQGamma = Union{<:Number, Function, <:GerberIQGammaEstimator}
+const GerberIQGamma = Union{Number, Function, GerberIQGammaEstimator}
 """
     gerber_iq_gamma(y::Number, ::MatNum) -> Number
     gerber_iq_gamma(y::Function, X::MatNum) -> Number
@@ -413,7 +413,7 @@ To add a scaler, subtype `GerberIQScalerEstimator` and implement this method:
 """
 abstract type GerberIQScalerEstimator <: AbstractEstimator end
 """
-    const GerberIQScaler = Union{Function, <:GerberIQScalerEstimator}
+    const GerberIQScaler = Union{Function, GerberIQScalerEstimator}
 
 A type alias for the union of `Function` and `GerberIQScalerEstimator`, the types that scale the thresholds of the Gerber IQ statistic.
 
@@ -430,7 +430,7 @@ The alias has no `Number` arm, because a scaler is a rule on the two standard de
 
   - $(ref_dict[:gerber2025squeezing]) Section 3.3.1, Section 4 and Table 2.
 """
-const GerberIQScaler = Union{Function, <:GerberIQScalerEstimator}
+const GerberIQScaler = Union{Function, GerberIQScalerEstimator}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -594,7 +594,7 @@ This example defines a Gaussian decay estimator.
 ```jldoctest
 julia> struct GaussianDecay{T} <: PortfolioOptimisers.GerberIQDecayEstimator
            a::T
-           function GaussianDecay(a::Union{Nothing, <:Number})
+           function GaussianDecay(a::Union{Nothing, Number})
                if isa(a, Number)
                    PortfolioOptimisers.@argcheck(a >= 0,
                                                  DomainError(a, \"`a` must be non-negative\"))
@@ -603,7 +603,7 @@ julia> struct GaussianDecay{T} <: PortfolioOptimisers.GerberIQDecayEstimator
            end
        end
 
-julia> function GaussianDecay(; a::Union{Nothing, <:Number} = nothing)
+julia> function GaussianDecay(; a::Union{Nothing, Number} = nothing)
            return GaussianDecay(a)
        end
 GaussianDecay
@@ -1731,7 +1731,7 @@ function FullGerberIQ(; dp1::Number = 2.0, dp2::Number = dp1, dn1::Number = dp1,
                         n12, n13, n14, n15, n16, n17, n18, n19, n20, n21)
 end
 """
-    gerber_iq_assert_c_d(c::Number, kind::Union{<:PartialGerberIQ, <:FullGerberIQ}) -> Nothing
+    gerber_iq_assert_c_d(c::Number, kind::Union{PartialGerberIQ, FullGerberIQ}) -> Nothing
 
 Checks that the noise threshold `c` is at most each boundary of a [`PartialGerberIQ`](@ref) or a [`FullGerberIQ`](@ref).
 

@@ -38,7 +38,7 @@ A subtype holds the output of a phylogeny estimator, such as a clustering or a p
 """
 abstract type AbstractPhylogenyResult <: AbstractResult end
 """
-    const PlE_Pl = Union{<:AbstractPhylogenyEstimator, <:AbstractPhylogenyResult}
+    const PlE_Pl = Union{AbstractPhylogenyEstimator, AbstractPhylogenyResult}
 
 Alias for a phylogeny estimator or result.
 
@@ -49,7 +49,7 @@ Matches an [`AbstractPhylogenyEstimator`](@ref) or an [`AbstractPhylogenyResult`
   - [`AbstractPhylogenyEstimator`](@ref)
   - [`AbstractPhylogenyResult`](@ref)
 """
-const PlE_Pl = Union{<:AbstractPhylogenyEstimator, <:AbstractPhylogenyResult}
+const PlE_Pl = Union{AbstractPhylogenyEstimator, AbstractPhylogenyResult}
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -233,7 +233,7 @@ A rule must return a `Number`, and `nothing` is not a `Number`. `nothing` in the
 """
 abstract type PathLengthAlgorithm <: AbstractAlgorithm end
 """
-    const HopCountRule = Union{<:HopCountAlgorithm, <:Function}
+    const HopCountRule = Union{HopCountAlgorithm, Function}
 
 Alias for the forms of a hop count that are rules.
 
@@ -246,9 +246,9 @@ Matches the two forms that [`resolve_separation`](@ref) calls and does not read:
   - [`HopCount`](@ref)
   - [`resolve_separation`](@ref)
 """
-const HopCountRule = Union{<:HopCountAlgorithm, <:Function}
+const HopCountRule = Union{HopCountAlgorithm, Function}
 """
-    const HopCountValue = Union{<:Integer, <:HopCountAlgorithm, <:Function}
+    const HopCountValue = Union{Integer, HopCountAlgorithm, Function}
 
 Alias for every value that the `n` field of [`HopCount`](@ref) accepts.
 
@@ -261,9 +261,9 @@ The field accepts a stated `Integer` and the rules of [`HopCountRule`](@ref). An
   - [`HopCountAlgorithm`](@ref)
   - [`PathLengthValue`](@ref)
 """
-const HopCountValue = Union{<:Integer, <:HopCountAlgorithm, <:Function}
+const HopCountValue = Union{Integer, HopCountAlgorithm, Function}
 """
-    const PathLengthRule = Union{<:PathLengthAlgorithm, <:Function}
+    const PathLengthRule = Union{PathLengthAlgorithm, Function}
 
 Alias for the forms of a path-length budget that are rules.
 
@@ -276,9 +276,9 @@ This is the [`PathLength`](@ref) counterpart of [`HopCountRule`](@ref).
   - [`PathLength`](@ref)
   - [`resolve_separation`](@ref)
 """
-const PathLengthRule = Union{<:PathLengthAlgorithm, <:Function}
+const PathLengthRule = Union{PathLengthAlgorithm, Function}
 """
-    const PathLengthValue = Union{<:Number, <:PathLengthAlgorithm, <:Function}
+    const PathLengthValue = Union{Number, PathLengthAlgorithm, Function}
 
 Alias for every value that the `dmax` field of [`PathLength`](@ref) accepts, except `nothing`.
 
@@ -292,7 +292,7 @@ This is the [`PathLength`](@ref) counterpart of [`HopCountValue`](@ref), but the
   - [`HopCountValue`](@ref)
   - [`Option`](@ref)
 """
-const PathLengthValue = Union{<:Number, <:PathLengthAlgorithm, <:Function}
+const PathLengthValue = Union{Number, PathLengthAlgorithm, Function}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -926,8 +926,8 @@ function separation_decay(::NoDecay, d::Number, ::Number)::Number
 end
 """
     assert_separation_decay(dk::AbstractSeparationDecayAlgorithm, ds, dmax::Number)
-    assert_separation_decay(dk::Union{<:LinearDecay, <:ExponentialDecay, <:ReciprocalDecay,
-                                      <:NoDecay}, ds, dmax::Number)
+    assert_separation_decay(dk::Union{LinearDecay, ExponentialDecay, ReciprocalDecay,
+                                      NoDecay}, ds, dmax::Number)
 
 Check that a separation decay satisfies its contract over the separations that the caller will score.
 
@@ -1012,9 +1012,8 @@ function assert_separation_decay(dk::AbstractSeparationDecayAlgorithm, ds,
 end
 # The shipped members satisfy the contract by construction, so the probe is turned off for
 # them and left on for anything an extension defines -- opt-out, not opt-in.
-function assert_separation_decay(::Union{<:LinearDecay, <:ExponentialDecay,
-                                         <:ReciprocalDecay, <:NoDecay}, ::Any,
-                                 ::Number)::Nothing
+function assert_separation_decay(::Union{LinearDecay, ExponentialDecay, ReciprocalDecay,
+                                         NoDecay}, ::Any, ::Number)::Nothing
     return nothing
 end
 

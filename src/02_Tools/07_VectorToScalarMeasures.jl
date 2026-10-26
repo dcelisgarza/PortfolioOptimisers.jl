@@ -40,7 +40,7 @@ To implement a new vector-to-scalar measure, subtype `VectorToScalarMeasure` and
 """
 abstract type VectorToScalarMeasure <: AbstractAlgorithm end
 """
-    const Num_VecToScaM = Union{<:Number, <:VectorToScalarMeasure, <:Function}
+    const Num_VecToScaM = Union{Number, VectorToScalarMeasure, Function}
 
 Union of a number, a `VectorToScalarMeasure` and a `Function`.
 
@@ -51,7 +51,7 @@ A function or a field with this type accepts all three. A caller can give a fixe
   - [`VectorToScalarMeasure`](@ref)
   - [`vec_to_real_measure`](@ref)
 """
-const Num_VecToScaM = Union{<:Number, <:VectorToScalarMeasure, <:Function}
+const Num_VecToScaM = Union{Number, VectorToScalarMeasure, Function}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -683,7 +683,7 @@ end
 """
     vec_to_real_measure(
         measure::Num_VecToScaM,
-        val::Union{<:VecNum, NTuple{N, <:Number} where {N}};
+        val::Union{VecNum, NTuple{N, <:Number} where {N}};
         kwargs...
     ) -> Number
 
@@ -699,8 +699,8 @@ The method that Julia selects is the algorithm. `measure` names the reduction. T
  2. `measure` is a `Function`: return `measure(val)`.
  3. `measure` is a [`MinValue`](@ref), a [`MaxValue`](@ref), a [`SumValue`](@ref) or a [`ProdValue`](@ref): return `minimum`, `maximum`, `sum` or `prod` of `val`.
  4. `measure` is a [`ModeValue`](@ref): return `StatsBase.mode` of `val`.
- 5. `measure` is a [`MeanValue`](@ref) or a [`MedianValue`](@ref): return `Statistics.mean` or `Statistics.median` of `val`, with the weights `measure.w` when the measure holds them. On the weighted branch, `collect` a tuple first.
- 6. `measure` is a [`StdValue`](@ref) or a [`VarValue`](@ref): return `Statistics.std` or `Statistics.var` of `val`, with `corrected = measure.corrected`, with the weights `measure.w` when the measure holds them, and with `kwargs...`. On the weighted branch, `collect` a tuple first.
+ 5. `measure` is a [`MeanValue`](@ref) or a [`MedianValue`](@ref): return `Statistics.mean` or `Statistics.median` of `val`, with weights when the measure holds them. On the weighted branch, `collect` a tuple first, and resolve the weights against `val` with [`get_observation_weights`](@ref). That call returns a `StatsBase.AbstractWeights` itself, and it evaluates a [`DynamicAbstractWeights`](@ref) on `val`.
+ 6. `measure` is a [`StdValue`](@ref) or a [`VarValue`](@ref): return `Statistics.std` or `Statistics.var` of `val`, with `corrected = measure.corrected`, with weights when the measure holds them, and with `kwargs...`. The weighted branch resolves its weights as step 5 does.
  7. `measure` is a [`StandardisedValue`](@ref): follow the algorithm of that type, which reduces two times and guards the denominator.
 
 Because of step 1, a plain number is a valid `measure`. A caller that already has the value writes it where a reduction goes, and `vec_to_real_measure` needs no second signature.
@@ -735,65 +735,68 @@ julia> PortfolioOptimisers.vec_to_real_measure(0.9, [1.2, 3.4, 0.7])
 
   - [`VectorToScalarMeasure`](@ref)
   - [`Num_VecToScaM`](@ref)
+  - [`get_observation_weights`](@ref)
 """
-function vec_to_real_measure(::MinValue,
-                             val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
+function vec_to_real_measure(::MinValue, val::Union{VecNum, NTuple{N, <:Number} where {N}};
+                             kwargs...)
     return minimum(val)
 end
 function vec_to_real_measure(mv::MeanValue{Nothing},
-                             val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
+                             val::Union{VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
     return Statistics.mean(val)
 end
 function vec_to_real_measure(mv::MeanValue{<:ObsWeights}, val::VecNum; kwargs...)
-    return Statistics.mean(val, mv.w)
+    return Statistics.mean(val, get_observation_weights(mv.w, val))
 end
 function vec_to_real_measure(mv::MeanValue{<:ObsWeights},
                              val::NTuple{N, <:Number} where {N}; kwargs...)
-    return Statistics.mean(collect(val), mv.w)
+    return vec_to_real_measure(mv, collect(val))
 end
 function vec_to_real_measure(mdv::MedianValue{Nothing},
-                             val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
+                             val::Union{VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
     return Statistics.median(val)
 end
 function vec_to_real_measure(mdv::MedianValue{<:ObsWeights}, val::VecNum; kwargs...)
-    return Statistics.median(val, mdv.w)
+    return Statistics.median(val, get_observation_weights(mdv.w, val))
 end
 function vec_to_real_measure(mdv::MedianValue{<:ObsWeights},
                              val::NTuple{N, <:Number} where {N}; kwargs...)
-    return Statistics.median(collect(val), mdv.w)
+    return vec_to_real_measure(mdv, collect(val))
 end
-function vec_to_real_measure(::MaxValue,
-                             val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
+function vec_to_real_measure(::MaxValue, val::Union{VecNum, NTuple{N, <:Number} where {N}};
+                             kwargs...)
     return maximum(val)
 end
-function vec_to_real_measure(val::Number, ::Union{<:VecNum, NTuple{N, <:Number} where {N}};
+function vec_to_real_measure(val::Number, ::Union{VecNum, NTuple{N, <:Number} where {N}};
                              kwargs...)
     return val
 end
 function vec_to_real_measure(sv::StdValue{Nothing},
-                             val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
+                             val::Union{VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
     return Statistics.std(val; corrected = sv.corrected, kwargs...)
 end
 function vec_to_real_measure(sv::StdValue{<:ObsWeights}, val::VecNum; kwargs...)
-    return Statistics.std(val, sv.w; corrected = sv.corrected, kwargs...)
+    return Statistics.std(val, get_observation_weights(sv.w, val); corrected = sv.corrected,
+                          kwargs...)
 end
 function vec_to_real_measure(sv::StdValue{<:ObsWeights}, val::NTuple{N, <:Number} where {N};
                              kwargs...)
-    return Statistics.std(collect(val), sv.w; corrected = sv.corrected, kwargs...)
+    return vec_to_real_measure(sv, collect(val); kwargs...)
 end
 function vec_to_real_measure(vv::VarValue{Nothing},
-                             val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
+                             val::Union{VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
     return Statistics.var(val; corrected = vv.corrected, kwargs...)
 end
 function vec_to_real_measure(vv::VarValue{<:ObsWeights}, val::VecNum; kwargs...)
-    return Statistics.var(val, vv.w; corrected = vv.corrected, kwargs...)
+    return Statistics.var(val, get_observation_weights(vv.w, val); corrected = vv.corrected,
+                          kwargs...)
 end
 function vec_to_real_measure(vv::VarValue{<:ObsWeights}, val::NTuple{N, <:Number} where {N};
                              kwargs...)
-    return Statistics.var(collect(val), vv.w; corrected = vv.corrected, kwargs...)
+    return vec_to_real_measure(vv, collect(val); kwargs...)
 end
 function vec_to_real_measure(msv::StandardisedValue,
-                             val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
+                             val::Union{VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
     m = vec_to_real_measure(msv.mv, val)
     s = vec_to_real_measure(msv.sv, val; mean = m)
     s = if isnan(s)
@@ -805,20 +808,20 @@ function vec_to_real_measure(msv::StandardisedValue,
     end
     return m / s
 end
-function vec_to_real_measure(::SumValue,
-                             val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
+function vec_to_real_measure(::SumValue, val::Union{VecNum, NTuple{N, <:Number} where {N}};
+                             kwargs...)
     return sum(val)
 end
-function vec_to_real_measure(::ProdValue,
-                             val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
+function vec_to_real_measure(::ProdValue, val::Union{VecNum, NTuple{N, <:Number} where {N}};
+                             kwargs...)
     return prod(val)
 end
-function vec_to_real_measure(::ModeValue,
-                             val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
+function vec_to_real_measure(::ModeValue, val::Union{VecNum, NTuple{N, <:Number} where {N}};
+                             kwargs...)
     return StatsBase.mode(val)
 end
-function vec_to_real_measure(f::Function,
-                             val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
+function vec_to_real_measure(f::Function, val::Union{VecNum, NTuple{N, <:Number} where {N}};
+                             kwargs...)
     return f(val)
 end
 

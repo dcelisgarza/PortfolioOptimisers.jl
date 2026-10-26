@@ -302,7 +302,7 @@ function WeightBoundsEstimator(; lb::Option{<:VectorEstValType} = 0.0,
     return WeightBoundsEstimator(lb, ub, dlb, dub)
 end
 """
-    const WbE_Wb = Union{<:WeightBoundsEstimator, <:WeightBounds}
+    const WbE_Wb = Union{WeightBoundsEstimator, WeightBounds}
 
 Alias for a weight bounds estimator or result.
 
@@ -316,7 +316,7 @@ The alias has no vector counterpart, and [`weight_bounds_constraints`](@ref) has
   - [`WeightBounds`](@ref)
   - [`weight_bounds_constraints`](@ref)
 """
-const WbE_Wb = Union{<:WeightBoundsEstimator, <:WeightBounds}
+const WbE_Wb = Union{WeightBoundsEstimator, WeightBounds}
 """
     weight_bounds_constraints(wb::WeightBoundsEstimator, sets::UniverseSets; strict::Bool = false,
                               datatype::DataType = Float64, kwargs...)

@@ -5,44 +5,43 @@ Union of risk measures whose expected risk is a squared quantity. When computing
 contributions via finite differences, the library halves the raw gradient value to account
 for the square.
 """
-const SquaredRiskMeasures = Union{<:Variance, <:BrownianDistanceVariance,
-                                  <:UncertaintySetVariance,
-                                  <:LowOrderMoment{<:Any, <:Any, <:Any,
-                                                   <:SecondMoment{<:Any, <:Any,
-                                                                  <:QuadSecondMomentFormulations}},
-                                  <:LowOrderMoment{<:Any, <:Any, <:Any, <:EvenMoment},
-                                  <:Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                             <:SOCRiskExpr},
-                                  <:NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
-                                                     <:NSkeQuadFormulations},
-                                  <:TrackingRiskMeasure{<:Any, <:Any, <:SquaredL2Norm}}
+const SquaredRiskMeasures = Union{Variance, BrownianDistanceVariance,
+                                  UncertaintySetVariance,
+                                  LowOrderMoment{<:Any, <:Any, <:Any,
+                                                 <:SecondMoment{<:Any, <:Any,
+                                                                <:QuadSecondMomentFormulations}},
+                                  LowOrderMoment{<:Any, <:Any, <:Any, <:EvenMoment},
+                                  Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                           <:SOCRiskExpr},
+                                  NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
+                                                   <:NSkeQuadFormulations},
+                                  TrackingRiskMeasure{<:Any, <:Any, <:SquaredL2Norm}}
 """
     const QuadExpressionRiskMeasures
 
 Union of risk measures that use quadratic JuMP expressions in their constraint
 formulations.
 """
-const QuadExpressionRiskMeasures = Union{<:Variance, <:BrownianDistanceVariance,
-                                         <:LowOrderMoment{<:Any, <:Any, <:Any,
-                                                          <:SecondMoment{<:Any, <:Any,
-                                                                         <:QuadSecondMomentFormulations}},
-                                         <:NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
-                                                            <:NSkeQuadFormulations},
-                                         <:Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any,
-                                                    <:Any, <:QuadSecondMomentFormulations},
-                                         <:TrackingRiskMeasure{<:Any, <:Any,
-                                                               <:SquaredL2Norm}}
+const QuadExpressionRiskMeasures = Union{Variance, BrownianDistanceVariance,
+                                         LowOrderMoment{<:Any, <:Any, <:Any,
+                                                        <:SecondMoment{<:Any, <:Any,
+                                                                       <:QuadSecondMomentFormulations}},
+                                         NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
+                                                          <:NSkeQuadFormulations},
+                                         Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                                  <:QuadSecondMomentFormulations},
+                                         TrackingRiskMeasure{<:Any, <:Any, <:SquaredL2Norm}}
 """
     const CubedRiskMeasures
 
 Union of risk measures whose expected risk is a cubed quantity. When computing risk
 contributions via finite differences, the library divides the raw gradient value by three.
 """
-const CubedRiskMeasures = Union{<:ThirdCentralMoment, <:Skewness,
-                                <:HighOrderMoment{<:Any, <:Any, <:Any, <:ThirdLowerMoment},
-                                <:HighOrderMoment{<:Any, <:Any, <:Any,
-                                                  <:StandardisedHighOrderMoment{<:Any,
-                                                                                <:ThirdLowerMoment}}}
+const CubedRiskMeasures = Union{ThirdCentralMoment, Skewness,
+                                HighOrderMoment{<:Any, <:Any, <:Any, <:ThirdLowerMoment},
+                                HighOrderMoment{<:Any, <:Any, <:Any,
+                                                <:StandardisedHighOrderMoment{<:Any,
+                                                                              <:ThirdLowerMoment}}}
 """
     const FourthPowerRiskMeasures
 
@@ -50,25 +49,23 @@ Union of risk measures whose expected risk is a fourth-power quantity. When comp
 risk contributions via finite differences, the library multiplies the raw gradient value
 by 0.25.
 """
-const FourthPowerRiskMeasures = Union{<:HighOrderMoment{<:Any, <:Any, <:Any,
-                                                        <:FourthMoment},
-                                      <:HighOrderMoment{<:Any, <:Any, <:Any,
-                                                        <:StandardisedHighOrderMoment{<:Any,
-                                                                                      <:FourthMoment}},
-                                      <:Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                                 <:QuadSecondMomentFormulations}}
+const FourthPowerRiskMeasures = Union{HighOrderMoment{<:Any, <:Any, <:Any, <:FourthMoment},
+                                      HighOrderMoment{<:Any, <:Any, <:Any,
+                                                      <:StandardisedHighOrderMoment{<:Any,
+                                                                                    <:FourthMoment}},
+                                      Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                               <:QuadSecondMomentFormulations}}
 """
     const DrawdownRiskMeasures
 
 Union of all drawdown-based risk measures.
 """
-const DrawdownRiskMeasures = Union{<:DrawdownatRisk, <:RelativeDrawdownatRisk,
-                                   <:ConditionalDrawdownatRisk,
-                                   <:RelativeConditionalDrawdownatRisk,
-                                   <:EntropicDrawdownatRisk,
-                                   <:RelativeEntropicDrawdownatRisk,
-                                   <:RelativisticDrawdownatRisk,
-                                   <:RelativeRelativisticDrawdownatRisk}
+const DrawdownRiskMeasures = Union{DrawdownatRisk, RelativeDrawdownatRisk,
+                                   ConditionalDrawdownatRisk,
+                                   RelativeConditionalDrawdownatRisk,
+                                   EntropicDrawdownatRisk, RelativeEntropicDrawdownatRisk,
+                                   RelativisticDrawdownatRisk,
+                                   RelativeRelativisticDrawdownatRisk}
 """
     adjust_risk_contribution(r, val::Number, args...)
 

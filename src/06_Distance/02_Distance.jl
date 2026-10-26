@@ -283,8 +283,8 @@ function _dist_from_cor(::CorrelationDistance, power::Integer, rho::MatNum)
 end
 """
     distance(de::Distance{<:Any,
-                          <:Union{<:SimpleDistance, <:SimpleAbsoluteDistance, <:LogDistance,
-                                  <:CorrelationDistance, <:CanonicalDistance}},
+                          <:Union{SimpleDistance, SimpleAbsoluteDistance, LogDistance,
+                                  CorrelationDistance, CanonicalDistance}},
              ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the correlation matrix with `ce` and `X`, and transform it into a distance matrix with the algorithm `de` names.
@@ -347,8 +347,8 @@ function distance(de::Distance{<:Any, <:CanonicalDistance},
                     dims = dims, kwargs...)
 end
 """
-    const LTDCov_AllInternalLTDCov = Union{<:LowerTailDependenceCovariance,
-                                           <:PortfolioOptimisersCovariance{<:LowerTailDependenceCovariance}}
+    const LTDCov_AllInternalLTDCov = Union{LowerTailDependenceCovariance,
+                                           PortfolioOptimisersCovariance{<:LowerTailDependenceCovariance}}
 
 Alias that matches a [`LowerTailDependenceCovariance`](@ref), bare or in a wrapper.
 
@@ -359,8 +359,8 @@ It matches a [`LowerTailDependenceCovariance`](@ref), or a [`PortfolioOptimisers
   - [`LowerTailDependenceCovariance`](@ref)
   - [`DistCov_AllInternalDistCov`](@ref)
 """
-const LTDCov_AllInternalLTDCov = Union{<:LowerTailDependenceCovariance,
-                                       <:PortfolioOptimisersCovariance{<:LowerTailDependenceCovariance}}
+const LTDCov_AllInternalLTDCov = Union{LowerTailDependenceCovariance,
+                                       PortfolioOptimisersCovariance{<:LowerTailDependenceCovariance}}
 """
     distance(de::Distance{Nothing, <:VariationInfoDistance}, ::Any, X::MatNum;
              dims::Int = 1, kwargs...)
@@ -418,8 +418,8 @@ function distance(de::Distance{<:Integer, <:VariationInfoDistance}, ::Any, X::Ma
 end
 """
     distance(::Distance{<:Any,
-                        <:Union{<:SimpleDistance, <:SimpleAbsoluteDistance, <:LogDistance,
-                                <:CorrelationDistance, <:CanonicalDistance}},
+                        <:Union{SimpleDistance, SimpleAbsoluteDistance, LogDistance,
+                                CorrelationDistance, CanonicalDistance}},
              rho::MatNum, args...; kwargs...)
 
 Compute the distance matrix from a correlation matrix, or from a covariance matrix.
@@ -478,9 +478,9 @@ function distance(de::Distance{<:Any, <:CanonicalDistance}, rho::MatNum, args...
 end
 """
     cor_and_dist(de::Distance{<:Any,
-                              <:Union{<:SimpleDistance, <:SimpleAbsoluteDistance,
-                                      <:LogDistance, <:CorrelationDistance,
-                                      <:VariationInfoDistance, <:CanonicalDistance}},
+                              <:Union{SimpleDistance, SimpleAbsoluteDistance,
+                                      LogDistance, CorrelationDistance,
+                                      VariationInfoDistance, CanonicalDistance}},
                  ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the correlation matrix and the distance matrix in one call.
@@ -540,7 +540,7 @@ function cor_and_dist(de::Distance{<:Any, <:CanonicalDistance}, ce::MutualInfoCo
                         X; dims = dims, kwargs...)
 end
 """
-    const AllInternalMutualInfoCov = Union{<:PortfolioOptimisersCovariance{<:MutualInfoCovariance}}
+    const AllInternalMutualInfoCov = Union{PortfolioOptimisersCovariance{<:MutualInfoCovariance}}
 
 Alias that matches a [`MutualInfoCovariance`](@ref) in a wrapper.
 
@@ -551,7 +551,7 @@ It matches a [`PortfolioOptimisersCovariance`](@ref) that wraps a [`MutualInfoCo
   - [`MutualInfoCovariance`](@ref)
   - [`DistCov_AllInternalDistCov`](@ref)
 """
-const AllInternalMutualInfoCov = Union{<:PortfolioOptimisersCovariance{<:MutualInfoCovariance}}
+const AllInternalMutualInfoCov = Union{PortfolioOptimisersCovariance{<:MutualInfoCovariance}}
 function cor_and_dist(de::Distance{<:Any, <:CanonicalDistance},
                       ce::AllInternalMutualInfoCov, X::MatNum; dims::Int = 1, kwargs...)
     return cor_and_dist(Distance(; power = de.power,
@@ -565,8 +565,8 @@ function cor_and_dist(de::Distance{<:Any, <:CanonicalDistance},
                         dims = dims, kwargs...)
 end
 """
-    const DistCov_AllInternalDistCov = Union{<:DistanceCovariance,
-                                             <:PortfolioOptimisersCovariance{<:DistanceCovariance}}
+    const DistCov_AllInternalDistCov = Union{DistanceCovariance,
+                                             PortfolioOptimisersCovariance{<:DistanceCovariance}}
 
 Alias that matches a [`DistanceCovariance`](@ref), bare or in a wrapper.
 
@@ -577,8 +577,8 @@ It matches a [`DistanceCovariance`](@ref), or a [`PortfolioOptimisersCovariance`
   - [`DistanceCovariance`](@ref)
   - [`LTDCov_AllInternalLTDCov`](@ref)
 """
-const DistCov_AllInternalDistCov = Union{<:DistanceCovariance,
-                                         <:PortfolioOptimisersCovariance{<:DistanceCovariance}}
+const DistCov_AllInternalDistCov = Union{DistanceCovariance,
+                                         PortfolioOptimisersCovariance{<:DistanceCovariance}}
 function cor_and_dist(de::Distance{<:Any, <:CanonicalDistance},
                       ce::DistCov_AllInternalDistCov, X::MatNum; dims::Int = 1, kwargs...)
     return cor_and_dist(Distance(; power = de.power, alg = CorrelationDistance()), ce, X;
@@ -592,10 +592,10 @@ function cor_and_dist(de::Distance{<:Any, <:CanonicalDistance},
 end
 """
     distance(de::Distance{<:Any, <:CanonicalDistance},
-             ce::Union{<:MutualInfoCovariance,
-                       <:AllInternalMutualInfoCov,
-                       <:LTDCov_AllInternalLTDCov,
-                       <:DistCov_AllInternalDistCov},
+             ce::Union{MutualInfoCovariance,
+                       AllInternalMutualInfoCov,
+                       LTDCov_AllInternalLTDCov,
+                       DistCov_AllInternalDistCov},
              X::MatNum; dims::Int = 1, kwargs...)
 
 Rebuild `de` with the distance algorithm that fits the range of the covariance estimator, and call [`distance`](@ref) again.

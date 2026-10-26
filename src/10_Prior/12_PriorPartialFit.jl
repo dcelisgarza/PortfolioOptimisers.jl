@@ -111,7 +111,7 @@ function returns_buffer(state::AbstractPartialFitState)
 end
 """
     prior_returns_buffer(pe::AbstractPriorEstimator)
-    prior_returns_buffer(pe::Union{<:HighOrderPriorEstimator, <:BlackLittermanPrior})
+    prior_returns_buffer(pe::Union{HighOrderPriorEstimator, BlackLittermanPrior})
 
 Reads the buffer of asset returns out of the prior that owns the folded rows.
 
@@ -140,7 +140,7 @@ One prior in the chain owns the rows. [`HighOrderPriorEstimator`](@ref) and [`Bl
 function prior_returns_buffer(pe::AbstractPriorEstimator)
     return returns_buffer(partial_fit_cache(pe))
 end
-function prior_returns_buffer(pe::Union{<:HighOrderPriorEstimator, <:BlackLittermanPrior})
+function prior_returns_buffer(pe::Union{HighOrderPriorEstimator, BlackLittermanPrior})
     return prior_returns_buffer(pe.pe)
 end
 """
@@ -657,10 +657,10 @@ end
 function reads_panel_fields(pe::Online)
     return reads_panel_fields(pe.est)
 end
-function reads_panel_fields(pe::Union{<:HighOrderPriorEstimator, <:BlackLittermanPrior,
-                                      <:BayesianBlackLittermanPrior,
-                                      <:HighOrderFactorPriorEstimator,
-                                      <:MeucciEntropyPoolingPrior, <:EntropyPoolingPrior})
+function reads_panel_fields(pe::Union{HighOrderPriorEstimator, BlackLittermanPrior,
+                                      BayesianBlackLittermanPrior,
+                                      HighOrderFactorPriorEstimator,
+                                      MeucciEntropyPoolingPrior, EntropyPoolingPrior})
     return reads_panel_fields(pe.pe)
 end
 function reads_panel_fields(pe::AugmentedBlackLittermanPrior)
@@ -719,18 +719,17 @@ end
 function reads_exogenous_series(ests::AbstractVector)
     return any(reads_exogenous_series, ests)
 end
-function reads_exogenous_series(::Union{<:CurrencyExposure, <:ObservedExposure})
+function reads_exogenous_series(::Union{CurrencyExposure, ObservedExposure})
     return true
 end
 function reads_exogenous_series(de::EWMacroSensitivity)
     return !isnothing(de.series)
 end
-function reads_exogenous_series(xe::Union{<:CompositeExposure, <:DescriptorScores})
+function reads_exogenous_series(xe::Union{CompositeExposure, DescriptorScores})
     return reads_exogenous_series(xe.descriptors)
 end
-function reads_exogenous_series(rfe::Union{<:FixedWeightedReturnForecast,
-                                           <:ExpWeightedReturnForecast,
-                                           <:TargetReturnForecast})
+function reads_exogenous_series(rfe::Union{FixedWeightedReturnForecast,
+                                           ExpWeightedReturnForecast, TargetReturnForecast})
     return reads_exogenous_series(rfe.scores)
 end
 function reads_exogenous_series(pe::CrossSectionalFactorPrior)
@@ -739,11 +738,10 @@ end
 function reads_exogenous_series(pe::Online)
     return reads_exogenous_series(pe.est)
 end
-function reads_exogenous_series(pe::Union{<:HighOrderPriorEstimator, <:BlackLittermanPrior,
-                                          <:BayesianBlackLittermanPrior,
-                                          <:HighOrderFactorPriorEstimator,
-                                          <:MeucciEntropyPoolingPrior,
-                                          <:EntropyPoolingPrior})
+function reads_exogenous_series(pe::Union{HighOrderPriorEstimator, BlackLittermanPrior,
+                                          BayesianBlackLittermanPrior,
+                                          HighOrderFactorPriorEstimator,
+                                          MeucciEntropyPoolingPrior, EntropyPoolingPrior})
     return reads_exogenous_series(pe.pe)
 end
 function reads_exogenous_series(pe::AugmentedBlackLittermanPrior)
@@ -781,7 +779,7 @@ A `pe` of `nothing` is an uncertainty set with no prior of its own. It reads no 
   - [`ReturnsResult`](@ref)
   - [`ucs_prior`](@ref)
 """
-function assert_factor_returns(pe::Union{<:AbstractPriorEstimator, <:Online},
+function assert_factor_returns(pe::Union{AbstractPriorEstimator, Online},
                                F::Option{<:VecNum_MatNum})::Nothing
     if needs_factor_returns(pe) === true
         @argcheck(!isnothing(F),
@@ -1007,15 +1005,15 @@ function pin_buffer_choice(pe::AbstractPriorEstimator)
                             sample_buffer_fit_kwargs(fit, pnl)...)
 end
 """
-    pin_prior_choice(pe::Union{Nothing, <:AbstractPriorEstimator}, X, F, w = nothing,
+    pin_prior_choice(pe::Union{Nothing, AbstractPriorEstimator}, X, F, w = nothing,
                      pnl = nothing; kwargs...)
-    pin_prior_choice(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
-                               <:AugmentedBlackLittermanPrior}, X::MatNum, F::MatNum,
+    pin_prior_choice(pe::Union{FactorPrior, FactorBlackLittermanPrior,
+                               AugmentedBlackLittermanPrior}, X::MatNum, F::MatNum,
                      w::Option{<:ObsWeights} = nothing,
                      pnl::Option{<:AssetPanel} = nothing; kwargs...)
-    pin_prior_choice(pe::Union{<:HighOrderPriorEstimator, <:HighOrderFactorPriorEstimator,
-                               <:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
-                               <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior}, X, F,
+    pin_prior_choice(pe::Union{HighOrderPriorEstimator, HighOrderFactorPriorEstimator,
+                               BlackLittermanPrior, BayesianBlackLittermanPrior,
+                               EntropyPoolingPrior, MeucciEntropyPoolingPrior}, X, F,
                      w = nothing, pnl = nothing; kwargs...)
     pin_prior_choice(pe::OpinionPoolingPrior, X::MatNum, F::MatNum,
                      w::Option{<:ObsWeights} = nothing,
@@ -1075,12 +1073,12 @@ When `w` is not `nothing`, the method reads `factory(pe.pe1, w)` and `factory(pe
   - [`PinnedChoice`](@ref)
   - [`partial_fit!`](@ref)
 """
-function pin_prior_choice(pe::Union{Nothing, <:AbstractPriorEstimator}, ::Any, ::Any,
+function pin_prior_choice(pe::Union{Nothing, AbstractPriorEstimator}, ::Any, ::Any,
                           ::Any = nothing, ::Any = nothing; kwargs...)
     return pe
 end
-function pin_prior_choice(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
-                                    <:AugmentedBlackLittermanPrior}, X::MatNum, F::MatNum,
+function pin_prior_choice(pe::Union{FactorPrior, FactorBlackLittermanPrior,
+                                    AugmentedBlackLittermanPrior}, X::MatNum, F::MatNum,
                           w::Option{<:ObsWeights} = nothing,
                           ::Option{<:AssetPanel} = nothing; kwargs...)
     # The regression reads every row of `F`. Under a Scenario Cap, `w` weighs the
@@ -1089,11 +1087,10 @@ function pin_prior_choice(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
     re = pin_regression_choice(pe.re, X, F, scenario_weights(w, size(F, 1)))
     return re === pe.re ? pe : rebuild_estimator(pe, (; re = re))
 end
-function pin_prior_choice(pe::Union{<:HighOrderPriorEstimator,
-                                    <:HighOrderFactorPriorEstimator, <:BlackLittermanPrior,
-                                    <:BayesianBlackLittermanPrior, <:EntropyPoolingPrior,
-                                    <:MeucciEntropyPoolingPrior}, X, F, w = nothing,
-                          pnl = nothing; kwargs...)
+function pin_prior_choice(pe::Union{HighOrderPriorEstimator, HighOrderFactorPriorEstimator,
+                                    BlackLittermanPrior, BayesianBlackLittermanPrior,
+                                    EntropyPoolingPrior, MeucciEntropyPoolingPrior}, X, F,
+                          w = nothing, pnl = nothing; kwargs...)
     inner = pin_prior_choice(pe.pe, X, F, embedded_pin_weights(pe, w), pnl; kwargs...)
     return inner === pe.pe ? pe : rebuild_estimator(pe, (; pe = inner))
 end
@@ -1120,15 +1117,15 @@ function pin_prior_choice(pe::OpinionPoolingPrior, X::MatNum, F::MatNum,
                              (; pe2 = pin_prior_choice(pe.pe2, X1, F, wp, pnl; kwargs...)))
 end
 """
-    pending_choice(est::Union{Nothing, <:AbstractEstimator})
+    pending_choice(est::Union{Nothing, AbstractEstimator})
     pending_choice(re::StepwiseRegression{<:Any, <:Any, <:Any, <:PinnedChoice})
     pending_choice(re::DimensionReductionRegression{<:Any, <:Any, <:Any, <:PinnedChoice,
                                                     Nothing})
-    pending_choice(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
-                             <:AugmentedBlackLittermanPrior})
-    pending_choice(pe::Union{<:HighOrderPriorEstimator, <:HighOrderFactorPriorEstimator,
-                             <:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
-                             <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior})
+    pending_choice(pe::Union{FactorPrior, FactorBlackLittermanPrior,
+                             AugmentedBlackLittermanPrior})
+    pending_choice(pe::Union{HighOrderPriorEstimator, HighOrderFactorPriorEstimator,
+                             BlackLittermanPrior, BayesianBlackLittermanPrior,
+                             EntropyPoolingPrior, MeucciEntropyPoolingPrior})
     pending_choice(pe::OpinionPoolingPrior)
 
 Answers whether a regression, or a regression in the tree of a prior, holds a choice under a [`PinnedChoice`](@ref) that no fit has pinned yet.
@@ -1160,17 +1157,16 @@ The method that Julia selects is the algorithm.
   - [`pin_regression_choice`](@ref)
   - [`PinnedChoice`](@ref)
 """
-function pending_choice(::Union{Nothing, <:AbstractEstimator})
+function pending_choice(::Union{Nothing, AbstractEstimator})
     return false
 end
-function pending_choice(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
-                                  <:AugmentedBlackLittermanPrior})
+function pending_choice(pe::Union{FactorPrior, FactorBlackLittermanPrior,
+                                  AugmentedBlackLittermanPrior})
     return pending_choice(pe.re)
 end
-function pending_choice(pe::Union{<:HighOrderPriorEstimator,
-                                  <:HighOrderFactorPriorEstimator, <:BlackLittermanPrior,
-                                  <:BayesianBlackLittermanPrior, <:EntropyPoolingPrior,
-                                  <:MeucciEntropyPoolingPrior})
+function pending_choice(pe::Union{HighOrderPriorEstimator, HighOrderFactorPriorEstimator,
+                                  BlackLittermanPrior, BayesianBlackLittermanPrior,
+                                  EntropyPoolingPrior, MeucciEntropyPoolingPrior})
     return pending_choice(pe.pe)
 end
 function pending_choice(pe::OpinionPoolingPrior)
@@ -1953,7 +1949,7 @@ function prior(pe::BlackLittermanPrior; strict::Bool = false, kwargs...)
     return stamp_returns_source(bl_posterior(pe, prior_model, strict; kwargs...), pe)
 end
 """
-    update_online_estimator(pe::Union{<:HighOrderPriorEstimator, <:BlackLittermanPrior})
+    update_online_estimator(pe::Union{HighOrderPriorEstimator, BlackLittermanPrior})
 
 Resolves the [`Online`](@ref) declarations under the prior that a wrapping prior embeds, at warm-up.
 
@@ -1978,8 +1974,7 @@ The generic method scans the fields of the wrapping prior alone, and a wrapping 
   - [`update_online_estimator`](@ref)
   - [`Online`](@ref)
 """
-function update_online_estimator(pe::Union{<:HighOrderPriorEstimator,
-                                           <:BlackLittermanPrior})
+function update_online_estimator(pe::Union{HighOrderPriorEstimator, BlackLittermanPrior})
     fns = online_fields(pe)
     repl = NamedTuple{fns}(map(f -> update_online_estimator(getfield(pe, f)), fns))
     return rebuild_estimator(pe, merge(repl, (; pe = update_online_estimator(pe.pe))))

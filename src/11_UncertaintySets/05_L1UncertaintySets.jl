@@ -701,7 +701,7 @@ L1UncertaintySet
     function CharacteristicUncertaintySet(pe::Option{<:AbstractLowOrderPriorEstimator},
                                           alg::AbstractUncertaintySetAlgorithm)
         @argcheck(isa(alg,
-                      Union{<:L1UncertaintySetAlgorithm, <:SignedL1UncertaintySetAlgorithm}),
+                      Union{L1UncertaintySetAlgorithm, SignedL1UncertaintySetAlgorithm}),
                   ArgumentError("alg must be an L1UncertaintySetAlgorithm or a SignedL1UncertaintySetAlgorithm, got $(typeof(alg))"))
         return new{typeof(pe), typeof(alg)}(pe, alg)
     end
@@ -1069,7 +1069,7 @@ For a [`SignedL1UncertaintySetAlgorithm`](@ref), step 6 finds two radii on two l
 
 # Returns
 
-  - `mu_ucs::Union{<:L1UncertaintySet, <:SignedL1UncertaintySet}`: The uncertainty set, on the full asset universe of `pr`.
+  - `mu_ucs::Union{L1UncertaintySet, SignedL1UncertaintySet}`: The uncertainty set, on the full asset universe of `pr`.
 
 # Examples
 

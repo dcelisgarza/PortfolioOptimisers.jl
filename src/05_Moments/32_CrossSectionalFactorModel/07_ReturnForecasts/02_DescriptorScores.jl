@@ -152,7 +152,7 @@ $(DocStringExtensions.TYPEDFIELDS)
 # Constructors
 
     DescriptorScores(; descriptors::AbstractVector{<:AbstractDescriptorEstimator},
-                     neutralise::Option{<:Union{<:AbstractString, <:VecStr}} = nothing,
+                     neutralise::Option{<:Union{AbstractString, VecStr}} = nothing,
                      nw::AbstractNeutralisationWeights = EstimationMaskWeights(),
                      cre::AbstractCrossSectionalRegressionEstimator = CrossSectionalLinearRegression(;
                                                                                                      intercept = true),
@@ -204,7 +204,7 @@ $(DocStringExtensions.TYPEDFIELDS)
     """
     ex
     function DescriptorScores(descriptors::AbstractVector{<:AbstractDescriptorEstimator},
-                              neutralise::Option{<:Union{<:AbstractString, <:VecStr}},
+                              neutralise::Option{<:Union{AbstractString, VecStr}},
                               nw::AbstractNeutralisationWeights,
                               cre::AbstractCrossSectionalRegressionEstimator,
                               outlier::Option{<:AbstractCrossSectionalTransform},
@@ -229,7 +229,7 @@ $(DocStringExtensions.TYPEDFIELDS)
     end
 end
 function DescriptorScores(; descriptors::AbstractVector{<:AbstractDescriptorEstimator},
-                          neutralise::Option{<:Union{<:AbstractString, <:VecStr}} = nothing,
+                          neutralise::Option{<:Union{AbstractString, VecStr}} = nothing,
                           nw::AbstractNeutralisationWeights = EstimationMaskWeights(),
                           cre::AbstractCrossSectionalRegressionEstimator = CrossSectionalLinearRegression(;
                                                                                                           intercept = true),
@@ -326,7 +326,7 @@ end
                        groups::Option{<:AbstractMatrix{<:Integer}},
                        rows::AbstractUnitRange) -> nothing
     neutralise_scores!(S::AbstractArray{<:Real, 3},
-                       neutralise::Union{<:AbstractString, <:VecStr},
+                       neutralise::Union{AbstractString, VecStr},
                        cre::AbstractCrossSectionalRegressionEstimator,
                        csfm::CrossSectionalFactorModel, w::MatNum,
                        scoring::Option{<:AbstractCrossSectionalTransform},
@@ -382,7 +382,7 @@ function neutralise_scores!(::AbstractArray{<:Real, 3}, ::Nothing,
     return nothing
 end
 function neutralise_scores!(S::AbstractArray{<:Real, 3},
-                            neutralise::Union{<:AbstractString, <:VecStr},
+                            neutralise::Union{AbstractString, VecStr},
                             cre::AbstractCrossSectionalRegressionEstimator,
                             csfm::CrossSectionalFactorModel, w::MatNum,
                             scoring::Option{<:AbstractCrossSectionalTransform},

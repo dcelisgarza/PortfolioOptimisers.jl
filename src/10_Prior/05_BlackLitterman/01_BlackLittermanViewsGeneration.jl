@@ -108,7 +108,7 @@ function BlackLittermanViews(; P::MatNum, Q::VecNum,
     return BlackLittermanViews(P, Q, excl)
 end
 """
-    const Lc_BLV = Union{<:LinearConstraintEstimator, <:BlackLittermanViews}
+    const Lc_BLV = Union{LinearConstraintEstimator, BlackLittermanViews}
 
 Alias for the union of the two shapes of Black-Litterman views: a [`LinearConstraintEstimator`](@ref) of view equations, and a precomputed [`BlackLittermanViews`](@ref).
 
@@ -117,7 +117,7 @@ Alias for the union of the two shapes of Black-Litterman views: a [`LinearConstr
   - [`LinearConstraintEstimator`](@ref)
   - [`BlackLittermanViews`](@ref)
 """
-const Lc_BLV = Union{<:LinearConstraintEstimator, <:BlackLittermanViews}
+const Lc_BLV = Union{LinearConstraintEstimator, BlackLittermanViews}
 """
     get_black_litterman_views(lcs::PR_VecPR, sets::UniverseSets,
                               key::Option{<:AbstractString} = nothing;

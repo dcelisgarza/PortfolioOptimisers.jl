@@ -25,8 +25,8 @@ peel_assets(::NoPeel, ::AbstractMatrix{Bool})
 peel_assets(::GreedyPeel, U::AbstractMatrix{Bool})
 peel_assets(::MinimalPeel, U::AbstractMatrix{Bool})
 fold_inactive!
-fold_inactive!(::Union{<:DecayCoverage, <:ExpireCoverage}, state::PortfolioOptimisers.AbstractPartialFitState, ::AbstractVector{<:Bool})
+fold_inactive!(::Union{DecayCoverage, ExpireCoverage}, state::PortfolioOptimisers.AbstractPartialFitState, ::AbstractVector{<:Bool})
 admits
-admits(::Union{<:DecayCoverage, <:ResetCoverage}, share::Real, active::Bool, ::Integer, min_coverage::Real)
+admits(::Union{DecayCoverage, ResetCoverage}, share::Real, active::Bool, ::Integer, min_coverage::Real)
 admits(alg::ExpireCoverage, share::Real, active::Bool, stale::Integer, min_coverage::Real)
 ```

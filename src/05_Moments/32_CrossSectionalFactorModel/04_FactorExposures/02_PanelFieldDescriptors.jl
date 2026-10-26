@@ -163,8 +163,8 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     PanelFieldRatio(;
-        num::Union{<:AbstractString, <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
-        den::Union{<:AbstractString, <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
+        num::Union{AbstractString, AbstractVector{<:Pair{<:AbstractString, <:Real}}},
+        den::Union{AbstractString, AbstractVector{<:Pair{<:AbstractString, <:Real}}},
         nonneg::Option{<:VecStr} = nothing,
         pos::Option{<:VecStr} = nothing,
         gt0::Option{<:VecStr} = nothing
@@ -229,10 +229,10 @@ PanelFieldRatio
     $(field_dict[:gt0_pnl])
     """
     gt0
-    function PanelFieldRatio(num::Union{<:AbstractString,
-                                        <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
-                             den::Union{<:AbstractString,
-                                        <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
+    function PanelFieldRatio(num::Union{AbstractString,
+                                        AbstractVector{<:Pair{<:AbstractString, <:Real}}},
+                             den::Union{AbstractString,
+                                        AbstractVector{<:Pair{<:AbstractString, <:Real}}},
                              nonneg::Option{<:VecStr}, pos::Option{<:VecStr},
                              gt0::Option{<:VecStr})
         assert_panel_terms(num, :num)
@@ -249,10 +249,10 @@ PanelFieldRatio
     end
 end
 function PanelFieldRatio(;
-                         num::Union{<:AbstractString,
-                                    <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
-                         den::Union{<:AbstractString,
-                                    <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
+                         num::Union{AbstractString,
+                                    AbstractVector{<:Pair{<:AbstractString, <:Real}}},
+                         den::Union{AbstractString,
+                                    AbstractVector{<:Pair{<:AbstractString, <:Real}}},
                          nonneg::Option{<:VecStr} = nothing,
                          pos::Option{<:VecStr} = nothing,
                          gt0::Option{<:VecStr} = nothing)::PanelFieldRatio

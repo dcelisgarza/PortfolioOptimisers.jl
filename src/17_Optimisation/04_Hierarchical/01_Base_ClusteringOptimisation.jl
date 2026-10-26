@@ -438,8 +438,8 @@ The core holds the mask in its field `imsk`, and each of the two leaves holds th
 function result_investable_mask(res::HierarchicalResult)
     return res.imsk
 end
-function result_investable_mask(res::Union{<:HierarchicalRiskParityResult,
-                                           <:HierarchicalEqualRiskContributionResult})
+function result_investable_mask(res::Union{HierarchicalRiskParityResult,
+                                           HierarchicalEqualRiskContributionResult})
     return result_investable_mask(res.hr)
 end
 """

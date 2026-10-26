@@ -952,7 +952,7 @@ The weighted moment methods of `StatsBase` take a `DenseMatrix`. A `Transpose`, 
   - [`robust_cov`](@ref)
   - [`robust_cor`](@ref)
 """
-function densify(X::DenseMatrix{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}})
+function densify(X::DenseMatrix{<:Union{Number, JuMP.AbstractJuMPScalar}})
     return X
 end
 function densify(X::MatNum)
@@ -1278,7 +1278,7 @@ end
 """
     weighted_centre(X::MatNum, me::AbstractExpectedReturnsEstimator,
                     w::Option{<:ObsWeights}; dims::Int = 1, mean = nothing,
-                    kwargs...) -> Union{<:Number, <:ArrNum}
+                    kwargs...) -> Union{Number, ArrNum}
 
 Resolve the centre of a moment estimator with the same observation weights as its deviations.
 
@@ -1303,7 +1303,7 @@ Step 2 makes the function faster and does not change the value. `w` comes from a
 
 # Returns
 
-  - `mu::Union{<:Number, <:ArrNum}`: The centre, weighted by `w` when `w` is not `nothing`.
+  - `mu::Union{Number, ArrNum}`: The centre, weighted by `w` when `w` is not `nothing`.
 
 # Related
 

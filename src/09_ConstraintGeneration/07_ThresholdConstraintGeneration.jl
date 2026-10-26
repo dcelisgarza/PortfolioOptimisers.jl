@@ -219,7 +219,7 @@ function Threshold(; val::Num_VecNum)::Threshold
     return Threshold(val)
 end
 """
-    const BtE_Bt = Union{<:Threshold, <:ThresholdEstimator}
+    const BtE_Bt = Union{Threshold, ThresholdEstimator}
 
 Alias for a threshold constraint result or estimator.
 
@@ -234,7 +234,7 @@ A caller can write a threshold in either form, so an optimiser field must accept
   - [`threshold_constraints`](@ref)
   - [`RkbE_Rkb`](@ref): the matching alias of the risk budget family, which has no vector type.
 """
-const BtE_Bt = Union{<:Threshold, <:ThresholdEstimator}
+const BtE_Bt = Union{Threshold, ThresholdEstimator}
 """
     const VecOptBtE_Bt = AbstractVector{<:Option{<:BtE_Bt}}
 
@@ -252,7 +252,7 @@ The routing targets of a threshold are positional lists. `:slt`, `:sst`, `:sglt`
 """
 const VecOptBtE_Bt = AbstractVector{<:Option{<:BtE_Bt}}
 """
-    const BtE_Bt_VecOptBtE_Bt = Union{<:BtE_Bt, <:VecOptBtE_Bt}
+    const BtE_Bt_VecOptBtE_Bt = Union{BtE_Bt, VecOptBtE_Bt}
 
 Alias for a single or vector of optional threshold estimators or results.
 
@@ -266,7 +266,7 @@ One optimiser field accepts both shapes. The plain targets `:lt` and `:st` hold 
   - [`VecOptBtE_Bt`](@ref)
   - [`threshold_constraints`](@ref)
 """
-const BtE_Bt_VecOptBtE_Bt = Union{<:BtE_Bt, <:VecOptBtE_Bt}
+const BtE_Bt_VecOptBtE_Bt = Union{BtE_Bt, VecOptBtE_Bt}
 """
     const VecOptBt = AbstractVector{<:Option{<:Threshold}}
 
@@ -284,7 +284,7 @@ This alias is the resolved form of [`VecOptBtE_Bt`](@ref). The broadcast method 
 """
 const VecOptBt = AbstractVector{<:Option{<:Threshold}}
 """
-    const Bt_VecOptBt = Union{<:Threshold, <:VecOptBt}
+    const Bt_VecOptBt = Union{Threshold, VecOptBt}
 
 Alias for a single threshold result or a vector of optional threshold results.
 
@@ -298,7 +298,7 @@ This alias is the resolved form of [`BtE_Bt_VecOptBtE_Bt`](@ref). A mixed-intege
   - [`VecOptBt`](@ref)
   - [`BtE_Bt_VecOptBtE_Bt`](@ref): the unresolved counterpart.
 """
-const Bt_VecOptBt = Union{<:Threshold, <:VecOptBt}
+const Bt_VecOptBt = Union{Threshold, VecOptBt}
 """
     threshold_constraints(t::Option{<:Threshold}, args...; kwargs...)
 

@@ -110,14 +110,43 @@ end
 
   | Alias | Meaning |
   | --- | --- |
-  | `VecNum` | `AbstractVector{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}` |
-  | `MatNum` | `AbstractMatrix{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}` |
-  | `ArrNum` | `AbstractArray{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}` |
+  | `VecNum` | `AbstractVector{<:Union{Number, JuMP.AbstractJuMPScalar}}` |
+  | `MatNum` | `AbstractMatrix{<:Union{Number, JuMP.AbstractJuMPScalar}}` |
+  | `ArrNum` | `AbstractArray{<:Union{Number, JuMP.AbstractJuMPScalar}}` |
   | `VecInt` | `AbstractVector{<:Integer}` |
-  | `Num_VecNum` | `Union{<:Number, <:VecNum}` |
-  | `VecNum_MatNum` | `Union{<:VecNum, <:MatNum}` |
+  | `Num_VecNum` | `Union{Number, VecNum}` |
+  | `VecNum_MatNum` | `Union{VecNum, MatNum}` |
   | `ObsWeights` | `StatsBase.AbstractWeights` |
   | `Option{T}` | `Union{Nothing, T}` |
+
+## A `Union` or a `Tuple` names its members without a bound
+
+Write no `<:` before a member of a `Union{…}` or a parameter of a `Tuple{…}`. The rule holds for
+every annotation in `src/` and `ext/`: a keyword argument, a positional argument, a `where`
+bound, an `isa` test, a field, a type alias, and the `# Constructors` signature of a docstring.
+
+| Spelling with a bound | Plain spelling, the same type |
+| --- | --- |
+| `x::Union{<:Real, <:AbstractLearningRateSchedule}` | `x::Union{Real, AbstractLearningRateSchedule}` |
+| `x::Option{<:Tuple{<:Number, <:Number}}` | `x::Option{<:Tuple{Number, Number}}` |
+| `isa(m, Union{<:A, <:B, <:C})` | `isa(m, Union{A, B, C})` |
+| `const Num_VecNum = Union{<:Number, <:VecNum}` | `const Num_VecNum = Union{Number, VecNum}` |
+
+Julia builds a type with a bounded member again on each call that evaluates it: a keyword
+argument that the caller gives, and an `isa` test. `Union{<:Real, <:A}` costs 160 bytes on each
+such call, and `Option{<:Tuple{<:Number, <:Number}}` costs 352. The plain spelling costs nothing,
+and it is the same type (`==`), in an invariant position too: Julia normalises
+`Vector{Union{<:Real, <:A}}` to `Vector{Union{Real, A}}`. A member that is a `UnionAll`, such as
+`Online` or `VecNum`, covers all its parameters already, so a `<:` before it adds nothing.
+
+A bound in any other type keeps its meaning and costs nothing: `Option{<:Integer}`,
+`AbstractVector{<:Real}`, `Pair{<:Symbol, <:Real}`. Keep it. Do not rewrite
+`NTuple{N, <:Number} where {N}` as `Tuple{Vararg{Number}}`. The diagonal rule makes the element
+type of the first one concrete, so the two types differ.
+
+`test/test_85_keyword_rebuild_allocation_census.jl` reads the source text of `src/` and `ext/`
+for a bounded member, and it measures the keyword rebuild of each estimator against a positional
+call (#1824).
 
 ## Numeric types come from the data
 
@@ -228,8 +257,8 @@ owns the rule.
 When several abstract subtypes share an interface, define a `const` union alias and dispatch on it:
 
 ```julia
-const AbstractLowOrderPriorEstimator_A_AF = Union{<:AbstractLowOrderPriorEstimator_A,
-                                                  <:AbstractLowOrderPriorEstimator_AF}
+const AbstractLowOrderPriorEstimator_A_AF = Union{AbstractLowOrderPriorEstimator_A,
+                                                  AbstractLowOrderPriorEstimator_AF}
 ```
 
 The alias saves a copy of each method definition. A union alias is a **dispatch alias**, and its docstring states what the alias groups and why the group exists. [`julia-docstrings.instructions.md`](julia-docstrings.instructions.md) § *Section Structure for Aliases* states which sections that docstring carries, and it is the Authority for that rule.

@@ -342,7 +342,7 @@ DimensionReductionRegression
         w = regression_target_weights(retgt)
         if !isnothing(w)
             @argcheck(isa(w, ObsWeights),
-                      ArgumentError("The weights of retgt, which regression_target_weights(retgt) returns and which a LinearModel or a GeneralisedLinearModel keeps in retgt.kwargs.weights, must be a vector of observation weights, one element per observation, of type ObsWeights = Union{<:DynamicAbstractWeights, <:StatsBase.AbstractWeights}. Got\nregression_target_weights(retgt) => $(typeof(w))"))
+                      ArgumentError("The weights of retgt, which regression_target_weights(retgt) returns and which a LinearModel or a GeneralisedLinearModel keeps in retgt.kwargs.weights, must be a vector of observation weights, one element per observation, of type ObsWeights = Union{DynamicAbstractWeights, StatsBase.AbstractWeights}. Got\nregression_target_weights(retgt) => $(typeof(w))"))
             if isa(w, AbstractVector)
                 @argcheck(!isempty(w), IsEmptyError)
             end
@@ -698,7 +698,7 @@ function pending_choice(::DimensionReductionRegression{<:Any, <:Any, <:Any, <:Pi
     return true
 end
 """
-    returns_source(re::Union{<:StepwiseRegression, <:DimensionReductionRegression})
+    returns_source(re::Union{StepwiseRegression, DimensionReductionRegression})
 
 Returns the source that a regression reader states, which is its `x_src` field.
 
@@ -718,11 +718,11 @@ A prior that holds a regression reads the returns data and gives the regression 
   - [`DimensionReductionRegression`](@ref)
   - [`assert_inner_reader`](@ref)
 """
-function returns_source(re::Union{<:StepwiseRegression, <:DimensionReductionRegression})
+function returns_source(re::Union{StepwiseRegression, DimensionReductionRegression})
     return re.x_src
 end
 """
-    reader_frames(re::Union{<:StepwiseRegression, <:DimensionReductionRegression},
+    reader_frames(re::Union{StepwiseRegression, DimensionReductionRegression},
                   path::AbstractString, refit::Bool)
 
 Returns the frames that a regression reader adds to the group of the optimiser that holds it.
@@ -746,7 +746,7 @@ A regression reader at `x_src = nothing` takes the loadings of the Prior Result 
   - [`refits_regression`](@ref)
   - [`resolve_factor_regression`](@ref)
 """
-function reader_frames(re::Union{<:StepwiseRegression, <:DimensionReductionRegression},
+function reader_frames(re::Union{StepwiseRegression, DimensionReductionRegression},
                        path::AbstractString, refit::Bool)
     return source_frames(re.x_src, path, refit)
 end

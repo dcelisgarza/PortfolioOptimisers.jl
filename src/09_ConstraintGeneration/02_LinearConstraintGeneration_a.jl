@@ -178,7 +178,7 @@ Every abstract vector whose elements are [`LinearConstraint`](@ref)s. The group 
 """
 const VecLc = AbstractVector{<:LinearConstraint}
 """
-    const Lc_VecLc = Union{<:LinearConstraint, <:VecLc}
+    const Lc_VecLc = Union{LinearConstraint, VecLc}
 
 One assembled [`LinearConstraint`](@ref), or a vector of them. The group exists because a caller that ran one constraint step and a caller that ran several reach the same slot, so every method that reads that slot must accept both arities.
 
@@ -188,7 +188,7 @@ One assembled [`LinearConstraint`](@ref), or a vector of them. The group exists 
   - [`VecLc`](@ref)
   - [`linear_constraints`](@ref)
 """
-const Lc_VecLc = Union{<:LinearConstraint, <:VecLc}
+const Lc_VecLc = Union{LinearConstraint, VecLc}
 # Flattened constraint matrices as virtual properties: `:A_ineq`, `:B_ineq`, `:A_eq`,
 # `:B_eq` extract the corresponding sub-matrices from `obj.ineq` / `obj.eq`, returning
 # `nothing` when the relevant constraint set is absent (the function form of `compute`
@@ -407,7 +407,7 @@ Every abstract vector whose elements are [`ParsingResult`](@ref)s. The group exi
 """
 const VecPR = AbstractVector{<:ParsingResult}
 """
-    const PR_VecPR = Union{<:ParsingResult, <:VecPR}
+    const PR_VecPR = Union{ParsingResult, VecPR}
 
 One [`ParsingResult`](@ref), or a vector of them. The group exists because an equation may be written singly or in a list, and every stage after [`parse_equation`](@ref) carries whichever arity it was given through to [`get_linear_constraints`](@ref).
 
@@ -418,7 +418,7 @@ One [`ParsingResult`](@ref), or a vector of them. The group exists because an eq
   - [`replace_group_by_assets`](@ref)
   - [`get_linear_constraints`](@ref)
 """
-const PR_VecPR = Union{<:ParsingResult, <:VecPR}
+const PR_VecPR = Union{ParsingResult, VecPR}
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -1657,7 +1657,7 @@ function eval_numeric_functions(expr, datatype::DataType = Float64)
     end
 end
 """
-    _collect_terms(expr::Union{Symbol, Expr, <:Number}, datatype::DataType = Float64)
+    _collect_terms(expr::Union{Symbol, Expr, Number}, datatype::DataType = Float64)
 
 Expand and collect all terms from a Julia expression representing a linear constraint equation.
 

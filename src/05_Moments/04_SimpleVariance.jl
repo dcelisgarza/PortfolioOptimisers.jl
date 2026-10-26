@@ -193,7 +193,7 @@ One `SimpleVariance` gives the same number for a one-column matrix and for the m
 
 # Returns
 
-  - `sigma::Union{<:Number, <:ArrNum}`: The dispersion of `X` that `f` computes.
+  - `sigma::Union{Number, ArrNum}`: The dispersion of `X` that `f` computes.
 
 # Related
 

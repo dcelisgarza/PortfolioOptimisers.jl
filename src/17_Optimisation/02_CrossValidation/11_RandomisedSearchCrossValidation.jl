@@ -38,7 +38,7 @@ function make_p_grid(ps::AbstractDict, n_iter::Integer, rng::Random.AbstractRNG)
     replace = any(x -> isa(x[2], Distributions.Distribution), ps)
     return Dict(make_p_grid(key => val, n_iter, rng, replace) for (key, val) in ps)
 end
-function make_p_grid(pss::AbstractVector{<:Union{<:AbstractDict, <:AbstractVector{<:Pair}}},
+function make_p_grid(pss::AbstractVector{<:Union{AbstractDict, AbstractVector{<:Pair}}},
                      n_iter::Integer, rng::Random.AbstractRNG)
     return concrete_typed_array([make_p_grid(ps, n_iter, rng) for ps in pss])
 end

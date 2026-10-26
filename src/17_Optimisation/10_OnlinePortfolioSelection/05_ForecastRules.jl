@@ -277,13 +277,12 @@ Returns whether an estimator tree holds a covariance, variance or prior estimato
 
   - [`forecast_min_rows`](@ref)
 """
-function holds_second_moment(est::Union{<:AbstractEstimator,
-                                        <:StatsBase.CovarianceEstimator})
+function holds_second_moment(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator})
     return any(f -> holds_second_moment(getfield(est, f)), estimator_fields(est))
 end
-function holds_second_moment(::Union{<:AbstractCovarianceEstimator,
-                                     <:StatsBase.CovarianceEstimator,
-                                     <:AbstractVarianceEstimator, <:AbstractPriorEstimator})
+function holds_second_moment(::Union{AbstractCovarianceEstimator,
+                                     StatsBase.CovarianceEstimator,
+                                     AbstractVarianceEstimator, AbstractPriorEstimator})
     return true
 end
 function holds_second_moment(::Any)

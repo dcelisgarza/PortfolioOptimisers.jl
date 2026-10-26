@@ -39,7 +39,7 @@ A subtype that carries a panel subselects it together with `X`. A subtype that i
 """
 abstract type AbstractPricesResult <: AbstractResult end
 """
-    assert_nonneg_where_present(val::AbstractArray, sym::Union{Symbol, <:AbstractString} = :val) -> nothing
+    assert_nonneg_where_present(val::AbstractArray, sym::Union{Symbol, AbstractString} = :val) -> nothing
 
 Refuse a negative or an infinite value, and let an absence through.
 
@@ -347,8 +347,8 @@ function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime}
                         span = span)
 end
 function port_opt_view(pr::PricesResult,
-                       i::Union{<:VecInt, <:AbstractRange{<:Integer}, Colon} = :,
-                       j::Union{<:VecInt, <:VecStr, <:AbstractRange{<:Integer}, Colon} = :)
+                       i::Union{VecInt, AbstractRange{<:Integer}, Colon} = :,
+                       j::Union{VecInt, VecStr, AbstractRange{<:Integer}, Colon} = :)
     return port_opt_view(pr, TimeSeries.timestamp(pr.X)[i], j)
 end
 function port_opt_view(pr::AbstractPricesResult, args...; kwargs...)

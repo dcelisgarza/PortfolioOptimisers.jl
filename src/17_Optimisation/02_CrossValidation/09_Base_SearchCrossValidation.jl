@@ -80,11 +80,11 @@ julia> scorer(scores)
 """
 abstract type CrossValidationSearchScorer <: AbstractEstimator end
 """
-    const CrossValSearchScorer = Union{<:CrossValidationSearchScorer, <:Function}
+    const CrossValSearchScorer = Union{CrossValidationSearchScorer, Function}
 
 Union type for search cross-validation scoring strategies. Accepts either a subtype of `CrossValidationSearchScorer` or a plain function that accepts a matrix and returns an integer.
 """
-const CrossValSearchScorer = Union{<:CrossValidationSearchScorer, <:Function}
+const CrossValSearchScorer = Union{CrossValidationSearchScorer, Function}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -181,13 +181,13 @@ GridSearchCrossValidation
     $(field_dict[:kwargs])
     """
     kwargs
-    function GridSearchCrossValidation(p::Union{<:AbstractVector{<:Pair{<:Any,
-                                                                        <:AbstractVector}},
-                                                <:AbstractVector{<:AbstractVector{<:Pair{<:Any,
-                                                                                         <:AbstractVector}}},
-                                                <:AbstractDict{<:Any, <:AbstractVector},
-                                                <:AbstractVector{<:AbstractDict{<:Any,
-                                                                                <:AbstractVector}}},
+    function GridSearchCrossValidation(p::Union{AbstractVector{<:Pair{<:Any,
+                                                                      <:AbstractVector}},
+                                                AbstractVector{<:AbstractVector{<:Pair{<:Any,
+                                                                                       <:AbstractVector}}},
+                                                AbstractDict{<:Any, <:AbstractVector},
+                                                AbstractVector{<:AbstractDict{<:Any,
+                                                                              <:AbstractVector}}},
                                        cv::CVE_Onl, r::AbstractBaseRiskMeasure,
                                        scorer::CrossValSearchScorer,
                                        ex::FLoops.Transducers.Executor, train_score::Bool,
@@ -224,13 +224,12 @@ GridSearchCrossValidation
                                                         kwargs)
     end
 end
-function GridSearchCrossValidation(p::Union{<:AbstractVector{<:Pair{<:Any,
-                                                                    <:AbstractVector}},
-                                            <:AbstractVector{<:AbstractVector{<:Pair{<:Any,
-                                                                                     <:AbstractVector}}},
-                                            <:AbstractDict{<:Any, <:AbstractVector},
-                                            <:AbstractVector{<:AbstractDict{<:Any,
-                                                                            <:AbstractVector}}};
+function GridSearchCrossValidation(p::Union{AbstractVector{<:Pair{<:Any, <:AbstractVector}},
+                                            AbstractVector{<:AbstractVector{<:Pair{<:Any,
+                                                                                   <:AbstractVector}}},
+                                            AbstractDict{<:Any, <:AbstractVector},
+                                            AbstractVector{<:AbstractDict{<:Any,
+                                                                          <:AbstractVector}}};
                                    cv::CVE_Onl = KFold(),
                                    r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
                                    scorer::CrossValSearchScorer = HighestMeanScore(),
@@ -360,10 +359,10 @@ RandomisedSearchCrossValidation
     $(field_dict[:kwargs])
     """
     kwargs
-    function RandomisedSearchCrossValidation(p::Union{<:AbstractVector{<:Pair},
-                                                      <:AbstractVector{<:AbstractVector{<:Pair}},
-                                                      <:AbstractDict,
-                                                      <:AbstractVector{<:AbstractDict}},
+    function RandomisedSearchCrossValidation(p::Union{AbstractVector{<:Pair},
+                                                      AbstractVector{<:AbstractVector{<:Pair}},
+                                                      AbstractDict,
+                                                      AbstractVector{<:AbstractDict}},
                                              cv::CVE_Onl, r::AbstractBaseRiskMeasure,
                                              scorer::CrossValSearchScorer,
                                              ex::FLoops.Transducers.Executor,
@@ -412,10 +411,10 @@ RandomisedSearchCrossValidation
                                    kwargs)
     end
 end
-function RandomisedSearchCrossValidation(p::Union{<:AbstractVector{<:Pair},
-                                                  <:AbstractVector{<:AbstractVector{<:Pair}},
-                                                  <:AbstractDict,
-                                                  <:AbstractVector{<:AbstractDict}};
+function RandomisedSearchCrossValidation(p::Union{AbstractVector{<:Pair},
+                                                  AbstractVector{<:AbstractVector{<:Pair}},
+                                                  AbstractDict,
+                                                  AbstractVector{<:AbstractDict}};
                                          cv::CVE_Onl = KFold(),
                                          r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
                                          scorer::CrossValSearchScorer = HighestMeanScore(),
@@ -543,8 +542,8 @@ $(DocStringExtensions.FIELDS)
     """
     idx
     function SearchCrossValidationResult(opt::AbstractEstimator, test_scores::MatNum,
-                                         train_scores::Option{<:Union{<:MatNum,
-                                                                      <:AbstractVector{<:MatNum}}},
+                                         train_scores::Option{<:Union{MatNum,
+                                                                      AbstractVector{<:MatNum}}},
                                          lens_grid::AbstractVector,
                                          val_grid::AbstractVector, idx::Integer)
         return new{typeof(opt), typeof(test_scores), typeof(train_scores),
@@ -555,8 +554,8 @@ $(DocStringExtensions.FIELDS)
     end
 end
 function SearchCrossValidationResult(; opt::AbstractEstimator, test_scores::MatNum,
-                                     train_scores::Option{<:Union{<:MatNum,
-                                                                  <:AbstractVector{<:MatNum}}},
+                                     train_scores::Option{<:Union{MatNum,
+                                                                  AbstractVector{<:MatNum}}},
                                      lens_grid::AbstractVector, val_grid::AbstractVector,
                                      idx::Integer)::SearchCrossValidationResult
     return SearchCrossValidationResult(opt, test_scores, train_scores, lens_grid, val_grid,
@@ -994,8 +993,8 @@ function parse_lens(key::Union{Expr, Symbol})
               Meta.ParseError("Lens key expression is too deeply nested (exceeds depth $(lim.max_depth))."))
     return expr_to_lens_chain(key)
 end
-function parse_lens(key::Union{<:ComposedFunction, <:Accessors.PropertyLens,
-                               <:Accessors.IndexLens})
+function parse_lens(key::Union{ComposedFunction, Accessors.PropertyLens,
+                               Accessors.IndexLens})
     return key
 end
 """

@@ -80,7 +80,7 @@ Each inequality holds entry by entry, and together they state ``D_{ij} \\geq |x_
 """
 struct IneqBrownianDistanceVariance <: BrownianDistanceVarianceFormulation end
 """
-    const BDVarRkFormulations = Union{<:RSOCRiskExpr, <:QuadRiskExpr}
+    const BDVarRkFormulations = Union{RSOCRiskExpr, QuadRiskExpr}
 
 Groups the two encodings that [`BrownianDistanceVariance`](@ref) accepts for its risk expression.
 
@@ -92,7 +92,7 @@ Both report the bound itself, not a root. [`QuadRiskExpr`](@ref) states the risk
   - [`QuadRiskExpr`](@ref)
   - [`BrownianDistanceVariance`](@ref)
 """
-const BDVarRkFormulations = Union{<:RSOCRiskExpr, <:QuadRiskExpr}
+const BDVarRkFormulations = Union{RSOCRiskExpr, QuadRiskExpr}
 """
 $(DocStringExtensions.TYPEDEF)
 

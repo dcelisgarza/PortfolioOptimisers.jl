@@ -63,7 +63,7 @@ function AssetSetsMatrixEstimator(; val::AbstractString)::AssetSetsMatrixEstimat
     return AssetSetsMatrixEstimator(val)
 end
 """
-    const MatNum_ASetMatE = Union{<:AssetSetsMatrixEstimator, <:MatNum}
+    const MatNum_ASetMatE = Union{AssetSetsMatrixEstimator, MatNum}
 
 Alias for an asset sets matrix estimator or a numeric matrix.
 
@@ -75,7 +75,7 @@ Matches an [`AssetSetsMatrixEstimator`](@ref) or a precomputed numeric membershi
   - [`MatNum`](@ref)
   - [`asset_sets_matrix`](@ref)
 """
-const MatNum_ASetMatE = Union{<:AssetSetsMatrixEstimator, <:MatNum}
+const MatNum_ASetMatE = Union{AssetSetsMatrixEstimator, MatNum}
 """
     const VecMatNum_ASetMatE = AbstractVector{<:MatNum_ASetMatE}
 
@@ -90,7 +90,7 @@ Each entry is a [`MatNum_ASetMatE`](@ref). [`asset_sets_matrix`](@ref) and [`por
 """
 const VecMatNum_ASetMatE = AbstractVector{<:MatNum_ASetMatE}
 """
-    const MatNum_ASetMatE_VecMatNum_ASetMatE = Union{<:MatNum_ASetMatE, <:VecMatNum_ASetMatE}
+    const MatNum_ASetMatE_VecMatNum_ASetMatE = Union{MatNum_ASetMatE, VecMatNum_ASetMatE}
 
 Alias for one asset sets matrix estimator or numeric matrix, or a vector of them.
 
@@ -101,7 +101,7 @@ Matches a [`MatNum_ASetMatE`](@ref) or a [`VecMatNum_ASetMatE`](@ref). The `smtx
   - [`MatNum_ASetMatE`](@ref)
   - [`VecMatNum_ASetMatE`](@ref)
 """
-const MatNum_ASetMatE_VecMatNum_ASetMatE = Union{<:MatNum_ASetMatE, <:VecMatNum_ASetMatE}
+const MatNum_ASetMatE_VecMatNum_ASetMatE = Union{MatNum_ASetMatE, VecMatNum_ASetMatE}
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

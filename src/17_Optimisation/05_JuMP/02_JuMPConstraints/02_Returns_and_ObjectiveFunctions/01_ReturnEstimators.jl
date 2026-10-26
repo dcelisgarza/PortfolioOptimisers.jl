@@ -130,7 +130,7 @@ alone.
 """
 const VecJRE = AbstractVector{<:JuMPReturnsEstimator}
 """
-    const JRE_VecJRE = Union{<:JuMPReturnsEstimator, <:VecJRE}
+    const JRE_VecJRE = Union{JuMPReturnsEstimator, VecJRE}
 
 Field bound for [`JuMPOptimiser`](@ref)'s `ret` slot, which takes one return term or several.
 
@@ -141,9 +141,9 @@ It is the return-side twin of [`RM_VecRM`](@ref).
   - [`JuMPReturnsEstimator`](@ref)
   - [`VecJRE`](@ref)
 """
-const JRE_VecJRE = Union{<:JuMPReturnsEstimator, <:VecJRE}
+const JRE_VecJRE = Union{JuMPReturnsEstimator, VecJRE}
 """
-    const ArithRetMu = Union{<:Num_VecNum, <:AbstractExpectedReturnsEstimator, <:AbstractPriorEstimator}
+    const ArithRetMu = Union{Num_VecNum, AbstractExpectedReturnsEstimator, AbstractPriorEstimator}
 
 Field bound for [`ArithmeticReturn`](@ref)'s `mu` slot, which holds the expected returns or the Estimator that computes them, a [`DeferredQuantity`](@ref).
 
@@ -156,8 +156,8 @@ The bound is [`MuSlot`](@ref) less a [`VecScalar`](@ref), for two reasons. A `Ve
   - [`DeferredQuantity`](@ref)
   - [`resolve_deferred_quantities`](@ref)
 """
-const ArithRetMu = Union{<:Num_VecNum, <:AbstractExpectedReturnsEstimator,
-                         <:AbstractPriorEstimator}
+const ArithRetMu = Union{Num_VecNum, AbstractExpectedReturnsEstimator,
+                         AbstractPriorEstimator}
 """
 $(DocStringExtensions.TYPEDEF)
 

@@ -418,7 +418,7 @@ end
 # Deferrable slots — see `deferred_slots`.
 deferred_slots(r::ThirdCentralMoment) = (; mu = r.mu)
 """
-    const TCM_Sk{T1, T2} = Union{<:ThirdCentralMoment{<:Any, T1, T2}, <:Skewness{<:Any, <:Any, <:Any, T1, T2}}
+    const TCM_Sk{T1, T2} = Union{ThirdCentralMoment{<:Any, T1, T2}, Skewness{<:Any, <:Any, <:Any, T1, T2}}
 
 Parameterised union of [`ThirdCentralMoment`](@ref) and [`Skewness`](@ref) sharing the same observation-weight (`T1`) and target-mean (`T2`) type parameters.
 
@@ -430,8 +430,8 @@ Used for unified dispatch on moment-target calculation methods.
   - [`Skewness`](@ref)
   - [`calc_moment_target`](@ref)
 """
-const TCM_Sk{T1, T2} = Union{<:ThirdCentralMoment{<:Any, T1, T2},
-                             <:Skewness{<:Any, <:Any, <:Any, T1, T2}}
+const TCM_Sk{T1, T2} = Union{ThirdCentralMoment{<:Any, T1, T2},
+                             Skewness{<:Any, <:Any, <:Any, T1, T2}}
 """
     calc_moment_target(::TCM_Sk{Nothing, Nothing}, ::Any, x::VecNum)
     calc_moment_target(r::TCM_Sk{<:StatsBase.AbstractWeights, Nothing}, ::Any, x::VecNum)

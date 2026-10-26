@@ -69,7 +69,7 @@ function needs_previous_weights(r::VecBaseRM)::Bool
     return any(needs_previous_weights, r)
 end
 """
-    const BaseRM_VecBaseRM = Union{<:AbstractBaseRiskMeasure, <:VecBaseRM}
+    const BaseRM_VecBaseRM = Union{AbstractBaseRiskMeasure, VecBaseRM}
 
 Argument bound for every value-level reader of a risk measure: one measure or several.
 
@@ -85,7 +85,7 @@ A vector is scalarised into **one** number by the `sca` keyword, which defaults 
   - [`expected_risk`](@ref)
   - [`Scalariser`](@ref)
 """
-const BaseRM_VecBaseRM = Union{<:AbstractBaseRiskMeasure, <:VecBaseRM}
+const BaseRM_VecBaseRM = Union{AbstractBaseRiskMeasure, VecBaseRM}
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -340,7 +340,7 @@ The rows of `X`, or the entries of a return series `X`, are the observations. A 
   - [`assert_observation_weights`](@ref)
   - [`ObsWeights`](@ref)
 """
-function checked_observation_weights(w::Option{<:Union{<:ObsWeights, <:VecNum}},
+function checked_observation_weights(w::Option{<:Union{ObsWeights, VecNum}},
                                      X::VecNum_MatNum)
     w = get_observation_weights(w, X)
     if isnothing(w)
@@ -639,7 +639,7 @@ Alias for an abstract vector of [`OptimisationRiskMeasure`](@ref) elements.
 """
 const VecOptRM = AbstractVector{<:OptimisationRiskMeasure}
 """
-    const OptRM_VecOptRM = Union{<:OptimisationRiskMeasure, <:VecOptRM}
+    const OptRM_VecOptRM = Union{OptimisationRiskMeasure, VecOptRM}
 
 Union type accepting a single [`OptimisationRiskMeasure`](@ref) or a vector of them.
 
@@ -648,7 +648,7 @@ Union type accepting a single [`OptimisationRiskMeasure`](@ref) or a vector of t
   - [`OptimisationRiskMeasure`](@ref)
   - [`VecOptRM`](@ref)
 """
-const OptRM_VecOptRM = Union{<:OptimisationRiskMeasure, <:VecOptRM}
+const OptRM_VecOptRM = Union{OptimisationRiskMeasure, VecOptRM}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -722,7 +722,7 @@ Alias for an abstract vector of [`RiskMeasure`](@ref) elements.
 """
 const VecRM = AbstractVector{<:RiskMeasure}
 """
-    const RM_VecRM = Union{<:RiskMeasure, <:VecRM}
+    const RM_VecRM = Union{RiskMeasure, VecRM}
 
 Union type accepting a single [`RiskMeasure`](@ref) or a vector of them.
 
@@ -731,7 +731,7 @@ Union type accepting a single [`RiskMeasure`](@ref) or a vector of them.
   - [`RiskMeasure`](@ref)
   - [`VecRM`](@ref)
 """
-const RM_VecRM = Union{<:RiskMeasure, <:VecRM}
+const RM_VecRM = Union{RiskMeasure, VecRM}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -1024,7 +1024,7 @@ function _Frontier(; N::Integer = 20, factor::Number, bound::FrontierBoundEstima
     return Frontier(N, factor, bound)
 end
 """
-    const RkRtBounds = Union{<:Num_VecNum, <:Frontier}
+    const RkRtBounds = Union{Num_VecNum, Frontier}
 
 Union type for risk-measure upper bound specifications.
 
@@ -1036,9 +1036,9 @@ Accepts either a scalar/vector numeric bound or a [`Frontier`](@ref) sweep confi
   - [`Num_VecNum`](@ref)
   - [`RiskMeasureSettings`](@ref)
 """
-const RkRtBounds = Union{<:Num_VecNum, <:Frontier}
+const RkRtBounds = Union{Num_VecNum, Frontier}
 """
-    const Front_NumVec = Union{<:VecNum, <:Frontier}
+    const Front_NumVec = Union{VecNum, Frontier}
 
 Union type for frontier or numeric-vector specifications used internally for risk bounds.
 
@@ -1048,7 +1048,7 @@ Union type for frontier or numeric-vector specifications used internally for ris
   - [`VecNum`](@ref)
   - [`RkRtBounds`](@ref)
 """
-const Front_NumVec = Union{<:VecNum, <:Frontier}
+const Front_NumVec = Union{VecNum, Frontier}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -1799,11 +1799,11 @@ The union exists because no supertype already answers the question: [`AbstractCo
   - [`SkSlot`](@ref)
   - [`resolve_slot`](@ref)
 """
-const DeferredQuantity = Union{<:AbstractExpectedReturnsEstimator,
-                               <:StatsBase.CovarianceEstimator, <:CoskewnessEstimator,
-                               <:CokurtosisEstimator, <:AbstractPriorEstimator}
+const DeferredQuantity = Union{AbstractExpectedReturnsEstimator,
+                               StatsBase.CovarianceEstimator, CoskewnessEstimator,
+                               CokurtosisEstimator, AbstractPriorEstimator}
 """
-    const MuSlot = Union{<:Num_VecNum_VecScalar, <:AbstractExpectedReturnsEstimator, <:AbstractPriorEstimator}
+    const MuSlot = Union{Num_VecNum_VecScalar, AbstractExpectedReturnsEstimator, AbstractPriorEstimator}
 
 Field bound for an expected-returns slot: the value itself, or the Estimator that computes it. See [`DeferredQuantity`](@ref).
 
@@ -1812,10 +1812,10 @@ Field bound for an expected-returns slot: the value itself, or the Estimator tha
   - [`DeferredQuantity`](@ref)
   - [`resolve_slot`](@ref)
 """
-const MuSlot = Union{<:Num_VecNum_VecScalar, <:AbstractExpectedReturnsEstimator,
-                     <:AbstractPriorEstimator}
+const MuSlot = Union{Num_VecNum_VecScalar, AbstractExpectedReturnsEstimator,
+                     AbstractPriorEstimator}
 """
-    const SigmaSlot = Union{<:MatNum, <:StatsBase.CovarianceEstimator, <:AbstractPriorEstimator}
+    const SigmaSlot = Union{MatNum, StatsBase.CovarianceEstimator, AbstractPriorEstimator}
 
 Field bound for a covariance slot: the matrix itself, or the Estimator that computes it. See [`DeferredQuantity`](@ref).
 
@@ -1824,9 +1824,9 @@ Field bound for a covariance slot: the matrix itself, or the Estimator that comp
   - [`DeferredQuantity`](@ref)
   - [`resolve_slot`](@ref)
 """
-const SigmaSlot = Union{<:MatNum, <:StatsBase.CovarianceEstimator, <:AbstractPriorEstimator}
+const SigmaSlot = Union{MatNum, StatsBase.CovarianceEstimator, AbstractPriorEstimator}
 """
-    const KtSlot = Union{<:MatNum, <:CokurtosisEstimator, <:AbstractPriorEstimator}
+    const KtSlot = Union{MatNum, CokurtosisEstimator, AbstractPriorEstimator}
 
 Field bound for a cokurtosis slot: the matrix itself, or the Estimator that computes it. See [`DeferredQuantity`](@ref).
 
@@ -1835,9 +1835,9 @@ Field bound for a cokurtosis slot: the matrix itself, or the Estimator that comp
   - [`DeferredQuantity`](@ref)
   - [`resolve_slot`](@ref)
 """
-const KtSlot = Union{<:MatNum, <:CokurtosisEstimator, <:AbstractPriorEstimator}
+const KtSlot = Union{MatNum, CokurtosisEstimator, AbstractPriorEstimator}
 """
-    const SkSlot = Union{<:MatNum, <:CoskewnessEstimator, <:AbstractPriorEstimator}
+    const SkSlot = Union{MatNum, CoskewnessEstimator, AbstractPriorEstimator}
 
 Field bound for a coskewness slot: the matrix itself, or the Estimator that computes it. See [`DeferredQuantity`](@ref).
 
@@ -1846,7 +1846,7 @@ Field bound for a coskewness slot: the matrix itself, or the Estimator that comp
   - [`DeferredQuantity`](@ref)
   - [`resolve_slot`](@ref)
 """
-const SkSlot = Union{<:MatNum, <:CoskewnessEstimator, <:AbstractPriorEstimator}
+const SkSlot = Union{MatNum, CoskewnessEstimator, AbstractPriorEstimator}
 """
     deferred_factors(pr::AbstractPriorResult)
 
@@ -2026,7 +2026,7 @@ Every other occupant centres itself and has no channel to take one, so `centre` 
 function fit_deferred_moment(dq, pr::AbstractPriorResult, ::Any)
     return fit_deferred_quantity(dq, pr)
 end
-function fit_deferred_moment(dq::Union{<:CokurtosisEstimator, <:CoskewnessEstimator},
+function fit_deferred_moment(dq::Union{CokurtosisEstimator, CoskewnessEstimator},
                              pr::AbstractPriorResult, centre)
     return fit_deferred_quantity(dq, pr; mean = centring_target(centre))
 end
@@ -2277,8 +2277,8 @@ The vector arm is bounded by the element type rather than by `AbstractArray`, so
 function resolve_deferred_child(slot, pr::AbstractPriorResult, slv = nothing)
     return resolve_deferred_quantities(slot, pr, slv)
 end
-function resolve_deferred_child(slot::AbstractArray{<:Union{<:AbstractEstimator,
-                                                            <:AbstractAlgorithm}},
+function resolve_deferred_child(slot::AbstractArray{<:Union{AbstractEstimator,
+                                                            AbstractAlgorithm}},
                                 pr::AbstractPriorResult, slv = nothing)
     return [resolve_deferred_child(s, pr, slv) for s in slot]
 end
@@ -2516,8 +2516,8 @@ function assert_resolved_slots(x)
     end
     return nothing
 end
-function assert_resolved_slots(xs::AbstractArray{<:Union{<:AbstractEstimator,
-                                                         <:AbstractAlgorithm}})
+function assert_resolved_slots(xs::AbstractArray{<:Union{AbstractEstimator,
+                                                         AbstractAlgorithm}})
     for x in xs
         assert_resolved_slots(x)
     end
@@ -2631,7 +2631,7 @@ sel(::Nothing, source_variable::Slv_VecSlv) = solver_selector(nothing, source_va
 sel(risk_variable::UcSE_UcS, source_variable) = ucs_selector(risk_variable, source_variable)
 sel(::Nothing, source_variable::UcSE_UcS) = ucs_selector(nothing, source_variable)
 sel(risk_variable::DeferredQuantity, ::Any) = risk_variable
-sel(risk_variable::Union{<:AbstractCalibrationAlgorithm, <:Function}, ::Any) = risk_variable
+sel(risk_variable::Union{AbstractCalibrationAlgorithm, Function}, ::Any) = risk_variable
 """
     _ctx(args...)
 

@@ -56,7 +56,7 @@ measure left out the first scored row of a zero block, which the statistic now s
 
 # Returns
 
-  - `f::Union{<:Number, <:VecNum}`: One where `bias` is `nothing`, the factor of every direction
+  - `f::Union{Number, VecNum}`: One where `bias` is `nothing`, the factor of every direction
     on one decay, and the factor of each direction on the separate path.
 
 # Related
@@ -125,7 +125,7 @@ Where:
 
 # Returns
 
-  - `(theta, mu)::Tuple{<:Number, <:Number}`: The weight ``\\theta`` and the shift ``\\mu``, both
+  - `(theta, mu)::Tuple{Number, Number}`: The weight ``\\theta`` and the shift ``\\mu``, both
     zero where the variance of the direction is not positive.
 
 # Related

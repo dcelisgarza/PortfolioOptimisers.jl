@@ -383,6 +383,52 @@ end
     @test PO.vec_to_real_measure(sum, t) == 10.0
     @test PO.vec_to_real_measure(maximum, v) == 4.0
 end
+# Two `DynamicAbstractWeights` probes for the test set below. The first resolves a vector to
+# probability weights proportional to the position of each observation. The second has no
+# method, so it reaches the fallback that raises.
+using StatsBase: StatsBase
+struct RampProbeWeights <: PortfolioOptimisers.DynamicAbstractWeights end
+function PortfolioOptimisers.get_observation_weights(::RampProbeWeights, X::AbstractVector;
+                                                     kwargs...)
+    return StatsBase.pweights(collect(1.0:length(X)))
+end
+struct UnresolvedProbeWeights <: PortfolioOptimisers.DynamicAbstractWeights end
+@testset "VectorToScalarMeasure: a weighted measure resolves dynamic weights against the data" begin
+    using PortfolioOptimisers, Test, Statistics, StatsBase
+    PO = PortfolioOptimisers
+    #=
+    Issue #1824. The weighted value measures gave their `w` to `Statistics` as it was. Their
+    constructors take a `DynamicAbstractWeights`, and with one `median`, `std` and `var` raised
+    a `MethodError`, and `mean` read the vector as a function. JET found it when the alias
+    `ObsWeights` took the plain spelling, because it then split the union. Each measure now
+    resolves its weights against the data with `get_observation_weights`.
+    =#
+    v = [1.0, 2.0, 3.0, 4.0]
+    t = (1.0, 2.0, 3.0, 4.0)
+    w = pweights([1.0, 2.0, 3.0, 4.0])
+    for M in (MeanValue, MedianValue)
+        @test PO.vec_to_real_measure(M(; w = RampProbeWeights()), v) ==
+              PO.vec_to_real_measure(M(; w = w), v)
+        @test PO.vec_to_real_measure(M(; w = RampProbeWeights()), t) ==
+              PO.vec_to_real_measure(M(; w = w), v)
+    end
+    # The weighted mean of the ramp: (1 + 4 + 9 + 16) / (1 + 2 + 3 + 4).
+    @test PO.vec_to_real_measure(MeanValue(; w = RampProbeWeights()), v) == 3.0
+    for M in (StdValue, VarValue), corrected in (true, false)
+        @test PO.vec_to_real_measure(M(; w = RampProbeWeights(), corrected = corrected),
+                                     v) ==
+              PO.vec_to_real_measure(M(; w = w, corrected = corrected), v)
+        @test PO.vec_to_real_measure(M(; w = RampProbeWeights(), corrected = corrected),
+                                     t) ==
+              PO.vec_to_real_measure(M(; w = w, corrected = corrected), v)
+    end
+    # A dynamic weight with no method for a vector raises the error that names the method.
+    for M in (MeanValue, MedianValue, StdValue, VarValue)
+        @test_throws PO.ObservationWeightsError PO.vec_to_real_measure(M(;
+                                                                         w = UnresolvedProbeWeights()),
+                                                                       v)
+    end
+end
 @testset "The view and index seam selects the axis its verb names" begin
     using PortfolioOptimisers, Test, StatsBase, LinearAlgebra
     PO = PortfolioOptimisers

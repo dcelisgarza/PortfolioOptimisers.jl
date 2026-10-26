@@ -849,8 +849,8 @@ function HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings()
     return HighOrderMoment(settings, w, mu, factory(alg, w))
 end
 """
-    const LoHiOrderMoment{T1, T2, T3, T4} = Union{<:LowOrderMoment{T1, T2, T3, T4},
-                                                  <:HighOrderMoment{T1, T2, T3, T4}}
+    const LoHiOrderMoment{T1, T2, T3, T4} = Union{LowOrderMoment{T1, T2, T3, T4},
+                                                  HighOrderMoment{T1, T2, T3, T4}}
 
 Groups [`LowOrderMoment`](@ref) and [`HighOrderMoment`](@ref) under the same four type parameters.
 
@@ -863,8 +863,8 @@ The two measures have the same fields in the same order, `settings`, `w`, `mu` a
   - [`calc_moment_target`](@ref)
   - [`calc_deviations_vec`](@ref)
 """
-const LoHiOrderMoment{T1, T2, T3, T4} = Union{<:LowOrderMoment{T1, T2, T3, T4},
-                                              <:HighOrderMoment{T1, T2, T3, T4}}
+const LoHiOrderMoment{T1, T2, T3, T4} = Union{LowOrderMoment{T1, T2, T3, T4},
+                                              HighOrderMoment{T1, T2, T3, T4}}
 """
     calc_moment_target(::LoHiOrderMoment{<:Any, Nothing, Nothing, <:Any},
                        ::Any, x::VecNum)

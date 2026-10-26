@@ -221,8 +221,8 @@ end
                            estval::AbstractVector{<:Pair{<:Any, <:AbstractVector}})
     pipeline_lens_val_grid(pipe::Pipeline, estval::AbstractDict{<:Any, <:AbstractVector})
     pipeline_lens_val_grid(pipe::Pipeline,
-                           estvals::AbstractVector{<:Union{<:AbstractVector{<:Pair{<:Any, <:AbstractVector}},
-                                                           <:AbstractDict{<:Any, <:AbstractVector}}})
+                           estvals::AbstractVector{<:Union{AbstractVector{<:Pair{<:Any, <:AbstractVector}},
+                                                           AbstractDict{<:Any, <:AbstractVector}}})
 
 Build the grid of a Pipeline search, the lenses and the values of every candidate.
 
@@ -304,10 +304,10 @@ function pipeline_lens_val_grid(pipe::Pipeline,
     return lenses, vals
 end
 function pipeline_lens_val_grid(pipe::Pipeline,
-                                estvals::AbstractVector{<:Union{<:AbstractVector{<:Pair{<:Any,
-                                                                                        <:AbstractVector}},
-                                                                <:AbstractDict{<:Any,
-                                                                               <:AbstractVector}}})
+                                estvals::AbstractVector{<:Union{AbstractVector{<:Pair{<:Any,
+                                                                                      <:AbstractVector}},
+                                                                AbstractDict{<:Any,
+                                                                             <:AbstractVector}}})
     lenses_vals = [pipeline_lens_val_grid(pipe, estval) for estval in estvals]
     lenses = mapreduce(x -> x[1], vcat, lenses_vals)
     vals = mapreduce(x -> x[2], vcat, lenses_vals)

@@ -13,7 +13,7 @@ A preprocessing estimator does not depend on a pipeline. A [`Pipeline`](@ref) ca
 ```@docs
 fit_preprocessing
 apply_preprocessing
-PortfolioOptimisers.keeps_observations(::Union{<:PortfolioOptimisers.AbstractPreprocessingEstimator, <:PortfolioOptimisers.AbstractPreprocessingResult})
+PortfolioOptimisers.keeps_observations(::Union{PortfolioOptimisers.AbstractPreprocessingEstimator, PortfolioOptimisers.AbstractPreprocessingResult})
 ```
 
 ## Types

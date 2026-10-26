@@ -12,6 +12,6 @@ Some estimators have no exact incremental fit. Such an estimator stores the obse
 PortfolioOptimisers.partial_fit!(state::PortfolioOptimisers.SampleBufferState, X::PortfolioOptimisers.MatNum, F::PortfolioOptimisers.Option{<:PortfolioOptimisers.MatNum} = nothing; dims::Int = 1)
 PortfolioOptimisers.partial_fit!(state::PortfolioOptimisers.SampleBufferState, x::PortfolioOptimisers.VecNum, f::PortfolioOptimisers.Option{<:PortfolioOptimisers.VecNum} = nothing)
 PortfolioOptimisers.port_opt_view(x::PortfolioOptimisers.SampleBufferState, i, args...)
-PortfolioOptimisers.partial_fit!(est::Union{<:PortfolioOptimisers.AbstractEstimator, <:StatsBase.CovarianceEstimator}, X::PortfolioOptimisers.VecNum_MatNum; dims::Int = 1)
+PortfolioOptimisers.partial_fit!(est::Union{PortfolioOptimisers.AbstractEstimator, StatsBase.CovarianceEstimator}, X::PortfolioOptimisers.VecNum_MatNum; dims::Int = 1)
 merge_states(a::PortfolioOptimisers.SampleBufferState, b::PortfolioOptimisers.SampleBufferState)
 ```

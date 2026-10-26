@@ -708,7 +708,7 @@ function override_fee_amortisation(fees::Fees, fa::AbstractFeeAmortisation)
                 imsk = fees.imsk)
 end
 """
-    const FeesE_Fees = Union{<:Fees, <:FeesEstimator}
+    const FeesE_Fees = Union{Fees, FeesEstimator}
 
 Union type for fee constraint objects and estimators.
 
@@ -719,7 +719,7 @@ There is no vector counterpart, and [`fees_constraints`](@ref) has no vector met
   - [`Fees`](@ref)
   - [`FeesEstimator`](@ref)
 """
-const FeesE_Fees = Union{<:Fees, <:FeesEstimator}
+const FeesE_Fees = Union{Fees, FeesEstimator}
 """
     needs_previous_weights(fe::FeesE_Fees) -> Bool
 
@@ -1613,8 +1613,7 @@ julia> calc_fees([0.1, -0.2], 21, fees)
 function calc_fees(w::VecNum, T::Number, fees::Fees)
     return calc_fees(w, T, fees, fees.fa)
 end
-function calc_fees(w::VecNum, ::Number, fees::Fees,
-                   ::Union{Nothing, <:FirstObservationFees})
+function calc_fees(w::VecNum, ::Number, fees::Fees, ::Union{Nothing, FirstObservationFees})
     return (calc_periodic_fees(w, fees), calc_one_off_fees(w, fees))
 end
 function calc_fees(w::VecNum, T::Number, fees::Fees, ::AmortisedFees)
@@ -1842,8 +1841,8 @@ The verb returns a pair, `(amortised, one_time)`, and each half is itself a pair
 
 # Returns
 
-  - `amortised::Tuple{<:VecNum, <:VecNum}`: The charge every observation carries, per asset that stayed and per asset that left.
-  - `one_time::Tuple{<:VecNum, <:VecNum}`: The charge the first observation carries alone, on the same two axes. It is zero under an [`AmortisedFees`](@ref), which spreads it into `amortised`.
+  - `amortised::Tuple{VecNum, VecNum}`: The charge every observation carries, per asset that stayed and per asset that left.
+  - `one_time::Tuple{VecNum, VecNum}`: The charge the first observation carries alone, on the same two axes. It is zero under an [`AmortisedFees`](@ref), which spreads it into `amortised`.
 
 # Examples
 
@@ -1866,7 +1865,7 @@ function calc_asset_fees(w::VecNum, T::Number, fees::Fees)
     return calc_asset_fees(w, T, fees, fees.fa)
 end
 function calc_asset_fees(w::VecNum, ::Number, fees::Fees,
-                         ::Union{Nothing, <:FirstObservationFees})
+                         ::Union{Nothing, FirstObservationFees})
     return (calc_asset_periodic_fees(w, fees), calc_asset_one_off_fees(w, fees))
 end
 function calc_asset_fees(w::VecNum, T::Number, fees::Fees, ::AmortisedFees)

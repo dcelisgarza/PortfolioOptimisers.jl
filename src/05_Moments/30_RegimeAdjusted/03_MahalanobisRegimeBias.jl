@@ -255,7 +255,7 @@ Evaluates an 8-point stencil on a vector.
 
   - [`mahalanobis_level_bias`](@ref)
 """
-function stencil_dot(st::Tuple{<:Integer, <:NTuple{8, <:Number}}, v::VecNum, m::Integer = 0)
+function stencil_dot(st::Tuple{Integer, NTuple{8, <:Number}}, v::VecNum, m::Integer = 0)
     i0, w = st
     return sum(a -> w[a] * v[i0 + m + a - 1], 1:8)
 end
@@ -336,7 +336,7 @@ Where:
   - `decay::Number`: Decay of the weights.
   - `Ks::AbstractVector{<:Integer}`: Counts of observations, each above `n + 1`.
   - `n::Integer`: Count of assets that contribute to the statistic, at least two.
-  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight of each lag, or
+  - `hac_lags::Option{<:Union{Integer, VecNum}}`: Count of HAC lags, the weight of each lag, or
     `nothing`.
 
 # Returns
@@ -355,7 +355,7 @@ Where:
 """
 function mahalanobis_level_bias(method::RegimeAdjustedMethod, decay::Number,
                                 Ks::AbstractVector{<:Integer}, n::Integer,
-                                hac_lags::Option{<:Union{<:Integer, <:VecNum}} = nothing)
+                                hac_lags::Option{<:Union{Integer, VecNum}} = nothing)
     grid = mahalanobis_bias_grid(decay)
     hf = step(grid.xf)
     G, Rh, peaks = mahalanobis_lattice(decay, Ks, grid.xf, hac_lags)
@@ -403,7 +403,7 @@ the cut of each count. A point past the first zero of the determinant holds ``g 
   - `decay::Number`: Decay of the weights.
   - `Ks::AbstractVector{<:Integer}`: Counts of observations.
   - `xf::AbstractRange`: Lattice of ``\\ln s``.
-  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight of each lag, or
+  - `hac_lags::Option{<:Union{Integer, VecNum}}`: Count of HAC lags, the weight of each lag, or
     `nothing`.
 
 # Returns
@@ -440,7 +440,7 @@ function mahalanobis_lattice(decay::Number, Ks::AbstractVector{<:Integer},
     return G, Rh, fill(nothing, length(Ks))
 end
 function mahalanobis_lattice(decay::Number, Ks::AbstractVector{<:Integer},
-                             xf::AbstractRange, hac_lags::Union{<:Integer, <:VecNum})
+                             xf::AbstractRange, hac_lags::Union{Integer, VecNum})
     ef = exp.(xf)
     G = Matrix{eltype(ef)}(undef, length(ef), length(Ks))
     Rh = similar(G)
@@ -478,11 +478,11 @@ row, which no lag reads, so the path is that of the plain weights.
   - `r::VecNum`: Output: the derivative at each count, zero where `g` is ``\\infty`` (mutated).
   - `s::Number`: Point of the lattice.
   - `decay::Number`: Decay of the weights.
-  - `hac_lags::Union{<:Integer, <:VecNum}`: Count of HAC lags, or the weight of each lag.
+  - `hac_lags::Union{Integer, VecNum}`: Count of HAC lags, or the weight of each lag.
 
 # Returns
 
-  - `(g, r)::Tuple{<:VecNum, <:VecNum}`: The filled vectors.
+  - `(g, r)::Tuple{VecNum, VecNum}`: The filled vectors.
 
 # Related
 
@@ -490,7 +490,7 @@ row, which no lag reads, so the path is that of the plain weights.
   - [`hac_ldl_taylor_row!`](@ref)
 """
 function hac_log_det_path!(g::VecNum, r::VecNum, s::Number, decay::Number,
-                           hac_lags::Union{<:Integer, <:VecNum})
+                           hac_lags::Union{Integer, VecNum})
     z = ntuple(_ -> zero(s), 3)
     k = hac_lag_weights(hac_lags, decay)
     Lb = max(length(k), 1)
@@ -536,14 +536,14 @@ rule.
   - `xf::AbstractRange`: Lattice of ``\\ln \\sigma``.
   - `decay::Number`: Decay of the weights.
   - `K::Integer`: Count of observations.
-  - `hac_lags::Union{<:Integer, <:VecNum}`: Count of HAC lags, or the weight of each lag.
+  - `hac_lags::Union{Integer, VecNum}`: Count of HAC lags, or the weight of each lag.
   - `slope`: In place of `decay`, `K` and `hac_lags`, a function of ``\\sigma`` that gives the exact
     derivative, or a negative number past the first zero of the determinant. The first method
     reads it from [`hac_log_det_slopes`](@ref) on the banded matrix.
 
 # Returns
 
-  - `peak::Option{<:Tuple{<:Number, <:Number}}`: ``(\\sigma^{*}, \\ln \\det(I + \\sigma^{*} B))``, or
+  - `peak::Option{<:Tuple{Number, Number}}`: ``(\\sigma^{*}, \\ln \\det(I + \\sigma^{*} B))``, or
     `nothing` where the derivative is positive on the whole lattice, because ``B`` is positive
     definite.
 
@@ -554,7 +554,7 @@ rule.
   - [`hac_log_det_slopes`](@ref)
 """
 function hac_log_det_peak(gh::VecNum, rh::VecNum, xf::AbstractRange, decay::Number,
-                          K::Integer, hac_lags::Union{<:Integer, <:VecNum})
+                          K::Integer, hac_lags::Union{Integer, VecNum})
     c = (one(decay) - decay) / (one(decay) - decay^K)
     return hac_log_det_peak(gh, rh, xf,
                             function (sigma)
@@ -600,11 +600,11 @@ both sums as its weight, so the loop stops there and adds the remaining mass, as
   - `decay::Number`: Decay of the weights.
   - `K::Integer`: Count of observations in the estimate.
   - `t::Number`: Argument, ``(n + 1) b``.
-  - `hac_lags::Union{<:Integer, <:VecNum}`: Count of HAC lags, or the weight of each lag.
+  - `hac_lags::Union{Integer, VecNum}`: Count of HAC lags, or the weight of each lag.
 
 # Returns
 
-  - `slopes::Option{<:Tuple{<:Number, <:Number}}`: ``(\\ell'(t), \\ell'(t) + t \\ell''(t))``, that is
+  - `slopes::Option{<:Tuple{Number, Number}}`: ``(\\ell'(t), \\ell'(t) + t \\ell''(t))``, that is
     ``\\sum_{k} \\mu_{k} / (1 + t \\mu_{k})`` and ``\\sum_{k} \\mu_{k} / (1 + t \\mu_{k})^{2}``, or
     `nothing` where ``I + t A`` is not positive definite.
 
@@ -614,7 +614,7 @@ both sums as its weight, so the loop stops there and adds the remaining mass, as
   - [`mahalanobis_bias`](@ref)
 """
 function hac_log_det_slopes(decay::Number, K::Integer, t::Number,
-                            hac_lags::Union{<:Integer, <:VecNum})
+                            hac_lags::Union{Integer, VecNum})
     c = (one(decay) - decay) / (one(decay) - decay^K)
     z = ntuple(_ -> zero(c * t), 3)
     k = hac_lag_weights(hac_lags, decay)
@@ -704,7 +704,7 @@ type of `o`.
 
 # Returns
 
-  - `rule::NTuple{4, <:Tuple{<:Number, <:Number}}`: The pair of node and weight of each point.
+  - `rule::NTuple{4, <:Tuple{Number, Number}}`: The pair of node and weight of each point.
 
 # Related
 
@@ -758,7 +758,7 @@ Where:
   - `rh::VecNum`: ``\\rho_{0}`` on the lattice (mutated past ``\\sigma_{m}``).
   - `xf::AbstractRange`: Lattice of ``\\ln \\sigma``.
   - `ct::Number`: The normalisation ``\\tilde{c}`` of the lattice.
-  - `peak::Option{<:Tuple{<:Number, <:Number}}`: The peak of [`hac_log_det_peak`](@ref), or
+  - `peak::Option{<:Tuple{Number, Number}}`: The peak of [`hac_log_det_peak`](@ref), or
     `nothing`.
 
 # Returns
@@ -808,12 +808,12 @@ Fills the differences of ``g`` and of ``\\rho_{0}`` between each node ``s`` and 
   - `grid::NamedTuple`: Grids of [`mahalanobis_bias_grid`](@ref).
   - `gh::VecNum`: ``g`` on the lattice.
   - `rh::VecNum`: ``\\rho_{0}`` on the lattice.
-  - `shift::Tuple{<:Integer, <:Number}`: The shift ``m`` of the lattice and the normalisation
+  - `shift::Tuple{Integer, Number}`: The shift ``m`` of the lattice and the normalisation
     ``\\tilde{c}``.
 
 # Returns
 
-  - `(dg, dr)::Tuple{<:MatNum, <:MatNum}`: The filled matrices.
+  - `(dg, dr)::Tuple{MatNum, MatNum}`: The filled matrices.
 
 # Related
 
@@ -855,7 +855,7 @@ read.
 
 # Returns
 
-  - `(so, L)::Tuple{<:VecNum, <:VecNum}`: The grid and the transform on it.
+  - `(so, L)::Tuple{VecNum, VecNum}`: The grid and the transform on it.
 
 # Related
 
@@ -908,7 +908,7 @@ Runs one level of the recursion of [`mahalanobis_level_bias`](@ref) in place.
 
   - `v::VecNum`: The Chebyshev values of ``q``, then ``q`` on the grid (mutated).
   - `e::VecNum`: Buffer of [`mahalanobis_q_integral!`](@ref) (mutated).
-  - `bufs::Tuple{<:VecNum, <:VecNum, <:VecNum}`: Buffers for ``q`` and ``Q`` at the nodes and for
+  - `bufs::Tuple{VecNum, VecNum, VecNum}`: Buffers for ``q`` and ``Q`` at the nodes and for
     the new ``q`` (mutated).
   - `dg::MatNum`: ``g(s + u) - g(s)`` for each node and step.
   - `dr::MatNum`: ``\\rho_{0}(s + u) - \\rho_{0}(s)`` for each node and step.
@@ -1080,7 +1080,7 @@ at [`mahalanobis_bias_saturation`](@ref).
 
   - `decay::Number`: Decay of the weights.
   - `n::Integer`: Count of assets that contribute to the statistic.
-  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight of each lag, or
+  - `hac_lags::Option{<:Union{Integer, VecNum}}`: Count of HAC lags, the weight of each lag, or
     `nothing`.
 
 # Returns
@@ -1095,8 +1095,7 @@ at [`mahalanobis_bias_saturation`](@ref).
 function mahalanobis_bias_start(::Number, n::Integer, ::Nothing)
     return n + 4
 end
-function mahalanobis_bias_start(decay::Number, n::Integer,
-                                hac_lags::Union{<:Integer, <:VecNum})
+function mahalanobis_bias_start(decay::Number, n::Integer, hac_lags::Union{Integer, VecNum})
     K = n + 4
     Ksat = mahalanobis_bias_saturation(decay, n)
     while K < Ksat && !regime_bias_open(ExactDebias(), n, decay, K, hac_lags)
@@ -1133,7 +1132,7 @@ and up to 3.7 s at a half-life of 250, five lags and 12 assets.
   - `method::RegimeAdjustedMethod`: Regime adjustment method, which names the moment.
   - `decay::Number`: Decay of the weights.
   - `n::Integer`: Count of assets that contribute to the statistic, at least two.
-  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight of each lag, or
+  - `hac_lags::Option{<:Union{Integer, VecNum}}`: Count of HAC lags, the weight of each lag, or
     `nothing`.
   - `centring::AbstractCentring`: The centring of the estimator, [`PreCentred`](@ref) by default.
   - `debias::AbstractRegimeDebias`: The debias rule, [`ExactDebias`](@ref) by default.
@@ -1155,7 +1154,7 @@ and up to 3.7 s at a half-life of 250, five lags and 12 assets.
   - [`inverse_wishart_bias`](@ref)
 """
 function mahalanobis_bias_nodes(method::RegimeAdjustedMethod, decay::Number, n::Integer,
-                                hac_lags::Option{<:Union{<:Integer, <:VecNum}} = nothing,
+                                hac_lags::Option{<:Union{Integer, VecNum}} = nothing,
                                 centring::AbstractCentring = PreCentred(),
                                 debias::AbstractRegimeDebias = ExactDebias(),
                                 recursion::AbstractLevelRecursion = MeanLevelRecursion())
@@ -1195,7 +1194,7 @@ interpolation the first time the state meets a count of assets.
   - `decay::Number`: Decay of the weights.
   - `K::Integer`: Count of observations in the estimate, that [`regime_bias_open`](@ref) scores.
   - `n::Integer`: Count of assets that contribute to the statistic.
-  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight of each lag, or
+  - `hac_lags::Option{<:Union{Integer, VecNum}}`: Count of HAC lags, the weight of each lag, or
     `nothing`.
   - `centring::AbstractCentring`: The centring of the estimator, [`PreCentred`](@ref) by default.
   - `debias::AbstractRegimeDebias`: The debias rule, [`ExactDebias`](@ref) by default.
@@ -1216,7 +1215,7 @@ interpolation the first time the state meets a count of assets.
 """
 function mahalanobis_regime_bias!(store::AbstractDict, method::RegimeAdjustedMethod,
                                   decay::Number, K::Integer, n::Integer,
-                                  hac_lags::Option{<:Union{<:Integer, <:VecNum}} = nothing,
+                                  hac_lags::Option{<:Union{Integer, VecNum}} = nothing,
                                   centring::AbstractCentring = PreCentred(),
                                   debias::AbstractRegimeDebias = ExactDebias(),
                                   recursion::AbstractLevelRecursion = MeanLevelRecursion())

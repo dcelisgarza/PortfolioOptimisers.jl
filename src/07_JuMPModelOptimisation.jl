@@ -12,7 +12,7 @@ A subtype records what happened when [`optimise_JuMP_model!`](@ref) tried the so
 """
 abstract type AbstractJuMPResult <: AbstractResult end
 """
-    const Dict_VecPair = Union{<:AbstractDict, <:AbstractVector{<:Pair}}
+    const Dict_VecPair = Union{AbstractDict, AbstractVector{<:Pair}}
 
 Groups a dictionary and a vector of pairs, the two collections of solver attributes that [`set_solver_attributes`](@ref) applies.
 
@@ -24,9 +24,9 @@ Both collections iterate as pairs of a key and a value. The key names a solver a
   - [`Solver`](@ref)
   - [`set_solver_attributes`](@ref)
 """
-const Dict_VecPair = Union{<:AbstractDict, <:AbstractVector{<:Pair}}
+const Dict_VecPair = Union{AbstractDict, AbstractVector{<:Pair}}
 """
-    const SlvSettings = Union{<:Pair, <:Dict_VecPair}
+    const SlvSettings = Union{Pair, Dict_VecPair}
 
 Groups the two forms that the `settings` of a [`Solver`](@ref) accepts.
 
@@ -38,10 +38,10 @@ The forms are one pair of a solver attribute and its value, and a [`Dict_VecPair
   - [`Solver`](@ref)
   - [`set_solver_attributes`](@ref)
 """
-const SlvSettings = Union{<:Pair, <:Dict_VecPair}
+const SlvSettings = Union{Pair, Dict_VecPair}
 """
-    const SlvKeys = Union{<:AbstractString, <:JuMP.MOI.AbstractModelAttribute,
-                          <:JuMP.MOI.AbstractOptimizerAttribute}
+    const SlvKeys = Union{AbstractString, JuMP.MOI.AbstractModelAttribute,
+                          JuMP.MOI.AbstractOptimizerAttribute}
 
 Groups the three kinds of key that `JuMP.set_attribute` accepts for an attribute of a model.
 
@@ -53,8 +53,8 @@ The kinds are the name of a raw solver attribute as a string, a `MOI.AbstractMod
   - [`Solver`](@ref)
   - [`set_solver_attributes`](@ref)
 """
-const SlvKeys = Union{<:AbstractString, <:JuMP.MOI.AbstractModelAttribute,
-                      <:JuMP.MOI.AbstractOptimizerAttribute}
+const SlvKeys = Union{AbstractString, JuMP.MOI.AbstractModelAttribute,
+                      JuMP.MOI.AbstractOptimizerAttribute}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -175,7 +175,7 @@ Groups the vectors of [`Solver`](@ref)s.
 """
 const VecSlv = AbstractVector{<:Solver}
 """
-    const Slv_VecSlv = Union{<:Solver, <:VecSlv}
+    const Slv_VecSlv = Union{Solver, VecSlv}
 
 Groups one [`Solver`](@ref) and a vector of them, the two forms in which an estimator takes its solvers.
 
@@ -186,7 +186,7 @@ A single `Solver` iterates as a vector of one solver. So [`optimise_JuMP_model!`
   - [`Solver`](@ref)
   - [`VecSlv`](@ref)
 """
-const Slv_VecSlv = Union{<:Solver, <:VecSlv}
+const Slv_VecSlv = Union{Solver, VecSlv}
 """
 $(DocStringExtensions.TYPEDEF)
 

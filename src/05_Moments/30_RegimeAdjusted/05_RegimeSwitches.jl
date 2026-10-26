@@ -399,7 +399,7 @@ The product is the outer product of the deviations, with the HAC products where 
 
 # Returns
 
-  - `F::Union{<:Number, <:MatNum}`: The `N × N` matrix of the factors, or one.
+  - `F::Union{Number, MatNum}`: The `N × N` matrix of the factors, or one.
 
 # Related
 

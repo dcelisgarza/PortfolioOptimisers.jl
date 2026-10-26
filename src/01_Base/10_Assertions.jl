@@ -27,7 +27,7 @@ A `Pair` or a `Number` input does nothing, because a scalar cannot be empty.
   - [`assert_nonempty_gt0_finite_val`](@ref)
   - [`assert_nonempty_finite_val`](@ref)
 """
-function assert_nonempty(val::Union{<:AbstractDict, <:VecPair, <:ArrNum},
+function assert_nonempty(val::Union{AbstractDict, VecPair, ArrNum},
                          sym::Sym_Str = :val)::Nothing
     @argcheck(!isempty(val),
               IsEmptyError("!isempty($sym) must hold. Got\n!isempty($sym) => $(!isempty(val))"))
@@ -42,7 +42,7 @@ A `Pair` or a `Number` value cannot be empty.
 
 # Arguments
 
-  - `::Union{<:Pair, <:Number}`: The scalar value. The method does not read it.
+  - `::Union{Pair, Number}`: The scalar value. The method does not read it.
   - `::Sym_Str = :val`: The symbolic name. The method does not read it.
 
 # Returns
@@ -53,7 +53,7 @@ A `Pair` or a `Number` value cannot be empty.
 
   - [`assert_nonempty`](@ref)
 """
-function assert_nonempty(::Union{<:Pair, <:Number}, ::Sym_Str = :val)::Nothing
+function assert_nonempty(::Union{Pair, Number}, ::Sym_Str = :val)::Nothing
     return nothing
 end
 """
@@ -384,7 +384,7 @@ function assert_gt0(val::Number, sym::Sym_Str = :val)::Nothing
     return nothing
 end
 """
-    assert_unit_interval(val::Number, sym::Union{Symbol,<:AbstractString} = :val)
+    assert_unit_interval(val::Number, sym::Union{Symbol,AbstractString} = :val)
     assert_unit_interval(args...)
 
 Assert that `val` lies strictly inside the open unit interval (`0 < val < 1`).
@@ -421,7 +421,7 @@ function assert_unit_interval(args...)::Nothing
     return nothing
 end
 """
-    assert_closed_unit_interval(val::Number, sym::Union{Symbol,<:AbstractString} = :val)
+    assert_closed_unit_interval(val::Number, sym::Union{Symbol,AbstractString} = :val)
     assert_closed_unit_interval(args...)
 
 Assert that `val` lies inside the closed unit interval (`0 <= val <= 1`).
@@ -460,8 +460,8 @@ function assert_closed_unit_interval(args...)::Nothing
 end
 """
     assert_nonempty_nonneg_finite_val(
-        val::Union{<:AbstractDict, <:VecPair, <:ArrNum, Pair, Number},
-        val_sym::Union{Symbol,<:AbstractString} = :val
+        val::Union{AbstractDict, VecPair, ArrNum, Pair, Number},
+        val_sym::Union{Symbol,AbstractString} = :val
     )
     assert_nonempty_nonneg_finite_val(args...)
 
@@ -500,8 +500,8 @@ Each rule is the rule that the type of `val` selects in the three functions of s
   - [`assert_finite`](@ref)
   - [`assert_nonneg`](@ref)
 """
-function assert_nonempty_nonneg_finite_val(val::Union{<:AbstractDict, <:VecPair, <:ArrNum,
-                                                      <:Pair, <:Number},
+function assert_nonempty_nonneg_finite_val(val::Union{AbstractDict, VecPair, ArrNum, Pair,
+                                                      Number},
                                            val_sym::Sym_Str = :val)::Nothing
     assert_nonempty(val, val_sym)
     assert_finite(val, val_sym)
@@ -513,8 +513,8 @@ function assert_nonempty_nonneg_finite_val(args...)::Nothing
 end
 """
     assert_nonempty_gt0_finite_val(
-        val::Union{<:AbstractDict, <:VecPair, <:ArrNum, Pair, Number},
-        val_sym::Union{Symbol,<:AbstractString} = :val
+        val::Union{AbstractDict, VecPair, ArrNum, Pair, Number},
+        val_sym::Union{Symbol,AbstractString} = :val
     )
     assert_nonempty_gt0_finite_val(args...)
 
@@ -553,8 +553,8 @@ Each rule is the rule that the type of `val` selects in the three functions of s
   - [`assert_finite`](@ref)
   - [`assert_gt0`](@ref)
 """
-function assert_nonempty_gt0_finite_val(val::Union{<:AbstractDict, <:VecPair, <:ArrNum,
-                                                   <:Pair, <:Number},
+function assert_nonempty_gt0_finite_val(val::Union{AbstractDict, VecPair, ArrNum, Pair,
+                                                   Number},
                                         val_sym::Sym_Str = :val)::Nothing
     assert_nonempty(val, val_sym)
     assert_finite(val, val_sym)
@@ -566,8 +566,8 @@ function assert_nonempty_gt0_finite_val(args...)::Nothing
 end
 """
     assert_nonempty_finite_val(
-        val::Union{<:AbstractDict, <:VecPair, <:ArrNum, Pair, Number},
-        val_sym::Union{Symbol,<:AbstractString} = :val
+        val::Union{AbstractDict, VecPair, ArrNum, Pair, Number},
+        val_sym::Union{Symbol,AbstractString} = :val
     )
     assert_nonempty_finite_val(args...)
 
@@ -605,8 +605,8 @@ Each rule is the rule that the type of `val` selects in the two functions of ste
   - [`assert_nonempty`](@ref)
   - [`assert_finite`](@ref)
 """
-function assert_nonempty_finite_val(val::Union{<:AbstractDict, <:VecPair, <:ArrNum, <:Pair,
-                                               <:Number}, val_sym::Sym_Str = :val)::Nothing
+function assert_nonempty_finite_val(val::Union{AbstractDict, VecPair, ArrNum, Pair, Number},
+                                    val_sym::Sym_Str = :val)::Nothing
     assert_nonempty(val, val_sym)
     assert_finite(val, val_sym)
     return nothing

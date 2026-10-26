@@ -1,8 +1,8 @@
 """
     lens_val_grid(estval::AbstractVector{<:Pair{<:Any, <:AbstractVector}})
     lens_val_grid(estval::AbstractDict{<:Any, <:AbstractVector})
-    lens_val_grid(estvals::AbstractVector{<:Union{<:AbstractVector{<:Pair{<:Any, <:AbstractVector}},
-                                                  <:AbstractDict{<:Any, <:AbstractVector}}})
+    lens_val_grid(estvals::AbstractVector{<:Union{AbstractVector{<:Pair{<:Any, <:AbstractVector}},
+                                                  AbstractDict{<:Any, <:AbstractVector}}})
 
 Build the grid of a search, the lenses and the values of every candidate.
 
@@ -81,10 +81,10 @@ function lens_val_grid(estval::AbstractDict{<:Any, <:AbstractVector})
     lenses = fill(map(x -> parse_lens(x), collect(keys(estval))), length(vals))
     return lenses, vals
 end
-function lens_val_grid(estvals::AbstractVector{<:Union{<:AbstractVector{<:Pair{<:Any,
-                                                                               <:AbstractVector}},
-                                                       <:AbstractDict{<:Any,
-                                                                      <:AbstractVector}}})
+function lens_val_grid(estvals::AbstractVector{<:Union{AbstractVector{<:Pair{<:Any,
+                                                                             <:AbstractVector}},
+                                                       AbstractDict{<:Any,
+                                                                    <:AbstractVector}}})
     lenses_vals = [lens_val_grid(estval) for estval in estvals]
     lenses = mapreduce(x -> x[1], vcat, lenses_vals)
     vals = mapreduce(x -> x[2], vcat, lenses_vals)

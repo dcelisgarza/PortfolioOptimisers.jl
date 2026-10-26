@@ -11,7 +11,7 @@ PortfolioOptimisers.fold_prior
 PortfolioOptimisers.fold_context
 PortfolioOptimisers.fold_returns
 PortfolioOptimisers.fold_optimiser
-PortfolioOptimisers.online_state_seed(::Union{<:EqualWeighted, <:RandomWeighted, <:BestConstantRebalancedPortfolio}, max_history::PortfolioOptimisers.Option{<:Integer})
+PortfolioOptimisers.online_state_seed(::Union{EqualWeighted, RandomWeighted, BestConstantRebalancedPortfolio}, max_history::PortfolioOptimisers.Option{<:Integer})
 PortfolioOptimisers.update_online_member
 PortfolioOptimisers.update_online_estimator(opt::PortfolioOptimisers.JuMPOptimisationEstimator)
 PortfolioOptimisers.online_unreached_path
@@ -22,11 +22,11 @@ PortfolioOptimisers.assert_online_fee_source(::Any, ::Any)
 PortfolioOptimisers.assert_step_tracks_no_series
 PortfolioOptimisers.step_fallback
 PortfolioOptimisers.read_out_fallback
-PortfolioOptimisers.returns_result(host::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling})
+PortfolioOptimisers.returns_result(host::Union{JuMPOptimiser, HierarchicalOptimiser, InverseVolatility, NestedClustered, Stacking, SubsetResampling})
 PortfolioOptimisers.held_timestamps
 PortfolioOptimisers.batch_without_state
 PortfolioOptimisers.batch_from_state
-PortfolioOptimisers.show_fields(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:EqualWeighted, <:RandomWeighted, <:NestedClustered, <:Stacking, <:SubsetResampling})
+PortfolioOptimisers.show_fields(opt::Union{JuMPOptimiser, HierarchicalOptimiser, InverseVolatility, EqualWeighted, RandomWeighted, NestedClustered, Stacking, SubsetResampling})
 PortfolioOptimisers.optimiser_shared_series_rows
 PortfolioOptimisers.prior_shared_series_rows
 PortfolioOptimisers.intersect_kept_rows

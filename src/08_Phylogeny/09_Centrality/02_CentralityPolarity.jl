@@ -55,14 +55,14 @@ An algorithm that reads the weighted adjacency matrix, and does not follow a pat
 struct SimilarityPolarity <: AbstractCentralityPolarity end
 """
     centrality_polarity(ct::AbstractCentralityAlgorithm)
-    centrality_polarity(ct::Union{<:BetweennessCentrality{<:Any, <:Any, Nothing},
-                                  <:ClosenessCentrality{<:Any, <:Any, Nothing},
-                                  <:StressCentrality{<:Any, <:Any, Nothing},
-                                  <:RadialityCentrality{Nothing}})
-    centrality_polarity(ct::Union{<:BetweennessCentrality{<:Any, <:Any, TopologyOnly},
-                                  <:ClosenessCentrality{<:Any, <:Any, TopologyOnly},
-                                  <:StressCentrality{<:Any, <:Any, TopologyOnly},
-                                  <:RadialityCentrality{TopologyOnly}})
+    centrality_polarity(ct::Union{BetweennessCentrality{<:Any, <:Any, Nothing},
+                                  ClosenessCentrality{<:Any, <:Any, Nothing},
+                                  StressCentrality{<:Any, <:Any, Nothing},
+                                  RadialityCentrality{Nothing}})
+    centrality_polarity(ct::Union{BetweennessCentrality{<:Any, <:Any, TopologyOnly},
+                                  ClosenessCentrality{<:Any, <:Any, TopologyOnly},
+                                  StressCentrality{<:Any, <:Any, TopologyOnly},
+                                  RadialityCentrality{TopologyOnly}})
     centrality_polarity(ct::EigenvectorCentrality{Nothing})
     centrality_polarity(ct::EigenvectorCentrality{TopologyOnly})
 
@@ -108,16 +108,16 @@ function centrality_polarity end
 function centrality_polarity(::AbstractCentralityAlgorithm)::Nothing
     return nothing
 end
-function centrality_polarity(::Union{<:BetweennessCentrality{<:Any, <:Any, Nothing},
-                                     <:ClosenessCentrality{<:Any, <:Any, Nothing},
-                                     <:StressCentrality{<:Any, <:Any, Nothing},
-                                     <:RadialityCentrality{Nothing}})::DistancePolarity
+function centrality_polarity(::Union{BetweennessCentrality{<:Any, <:Any, Nothing},
+                                     ClosenessCentrality{<:Any, <:Any, Nothing},
+                                     StressCentrality{<:Any, <:Any, Nothing},
+                                     RadialityCentrality{Nothing}})::DistancePolarity
     return DistancePolarity()
 end
-function centrality_polarity(::Union{<:BetweennessCentrality{<:Any, <:Any, TopologyOnly},
-                                     <:ClosenessCentrality{<:Any, <:Any, TopologyOnly},
-                                     <:StressCentrality{<:Any, <:Any, TopologyOnly},
-                                     <:RadialityCentrality{TopologyOnly}})::Nothing
+function centrality_polarity(::Union{BetweennessCentrality{<:Any, <:Any, TopologyOnly},
+                                     ClosenessCentrality{<:Any, <:Any, TopologyOnly},
+                                     StressCentrality{<:Any, <:Any, TopologyOnly},
+                                     RadialityCentrality{TopologyOnly}})::Nothing
     return nothing
 end
 function centrality_polarity(::EigenvectorCentrality{Nothing})::SimilarityPolarity

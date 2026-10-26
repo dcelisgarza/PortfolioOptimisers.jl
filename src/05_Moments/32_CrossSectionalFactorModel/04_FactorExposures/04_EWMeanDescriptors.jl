@@ -220,8 +220,8 @@ function ew_mean_series!(s::AbstractVector{<:Real}, n::AbstractVector{<:Integer}
 end
 """
     assert_ew_ratio_side(x::Nothing, sym::Sym_Str) -> nothing
-    assert_ew_ratio_side(x::Union{<:AbstractString,
-                                  <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
+    assert_ew_ratio_side(x::Union{AbstractString,
+                                  AbstractVector{<:Pair{<:AbstractString, <:Real}}},
                          sym::Sym_Str) -> nothing
     assert_ew_ratio_side(x::AbstractVector{<:AbstractString}, sym::Sym_Str) -> nothing
 
@@ -252,8 +252,8 @@ This function checks the four forms of one side, so [`EWVolumeRatio`](@ref) stat
 function assert_ew_ratio_side(::Nothing, ::Sym_Str)::Nothing
     return nothing
 end
-function assert_ew_ratio_side(x::Union{<:AbstractString,
-                                       <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
+function assert_ew_ratio_side(x::Union{AbstractString,
+                                       AbstractVector{<:Pair{<:AbstractString, <:Real}}},
                               sym::Sym_Str)::Nothing
     assert_panel_terms(x, sym)
     return nothing
@@ -459,12 +459,12 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     EWVolumeRatio(;
-        num::Union{Nothing, <:AbstractString,
-                   <:AbstractVector{<:Pair{<:AbstractString, <:Real}},
-                   <:AbstractVector{<:AbstractString}},
-        den::Union{Nothing, <:AbstractString,
-                   <:AbstractVector{<:Pair{<:AbstractString, <:Real}},
-                   <:AbstractVector{<:AbstractString}},
+        num::Union{Nothing, AbstractString,
+                   AbstractVector{<:Pair{<:AbstractString, <:Real}},
+                   AbstractVector{<:AbstractString}},
+        den::Union{Nothing, AbstractString,
+                   AbstractVector{<:Pair{<:AbstractString, <:Real}},
+                   AbstractVector{<:AbstractString}},
         nonneg::Option{<:VecStr} = nothing,
         gt0::Option{<:VecStr} = nothing,
         decay::Real,
@@ -533,12 +533,12 @@ EWVolumeRatio
     $(field_dict[:ew_desc_cache])
     """
     cache
-    function EWVolumeRatio(num::Union{Nothing, <:AbstractString,
-                                      <:AbstractVector{<:Pair{<:AbstractString, <:Real}},
-                                      <:AbstractVector{<:AbstractString}},
-                           den::Union{Nothing, <:AbstractString,
-                                      <:AbstractVector{<:Pair{<:AbstractString, <:Real}},
-                                      <:AbstractVector{<:AbstractString}},
+    function EWVolumeRatio(num::Union{Nothing, AbstractString,
+                                      AbstractVector{<:Pair{<:AbstractString, <:Real}},
+                                      AbstractVector{<:AbstractString}},
+                           den::Union{Nothing, AbstractString,
+                                      AbstractVector{<:Pair{<:AbstractString, <:Real}},
+                                      AbstractVector{<:AbstractString}},
                            nonneg::Option{<:VecStr}, gt0::Option{<:VecStr}, decay::Real,
                            min_obs::Integer, cache::Option{<:AbstractPartialFitState})
         assert_ew_ratio_side(num, :num)
@@ -554,12 +554,12 @@ EWVolumeRatio
     end
 end
 function EWVolumeRatio(;
-                       num::Union{Nothing, <:AbstractString,
-                                  <:AbstractVector{<:Pair{<:AbstractString, <:Real}},
-                                  <:AbstractVector{<:AbstractString}},
-                       den::Union{Nothing, <:AbstractString,
-                                  <:AbstractVector{<:Pair{<:AbstractString, <:Real}},
-                                  <:AbstractVector{<:AbstractString}},
+                       num::Union{Nothing, AbstractString,
+                                  AbstractVector{<:Pair{<:AbstractString, <:Real}},
+                                  AbstractVector{<:AbstractString}},
+                       den::Union{Nothing, AbstractString,
+                                  AbstractVector{<:Pair{<:AbstractString, <:Real}},
+                                  AbstractVector{<:AbstractString}},
                        nonneg::Option{<:VecStr} = nothing, gt0::Option{<:VecStr} = nothing,
                        decay::Real, min_obs::Integer,
                        cache::Option{<:AbstractPartialFitState} = nothing)::EWVolumeRatio

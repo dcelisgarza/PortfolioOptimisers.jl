@@ -213,7 +213,7 @@ function RiskBudgetEstimator(; val::VectorEstValType,
     return RiskBudgetEstimator(val, dval)
 end
 """
-    const RkbE_Rkb = Union{<:RiskBudgetEstimator, <:RiskBudget}
+    const RkbE_Rkb = Union{RiskBudgetEstimator, RiskBudget}
 
 Alias for a risk budget estimator or result.
 
@@ -232,7 +232,7 @@ A vector given to [`risk_budget_constraints`](@ref) raises `MethodError`, becaus
   - [`risk_budget_constraints`](@ref)
   - [`BtE_Bt_VecOptBtE_Bt`](@ref): the alias of the threshold family, which includes a vector type.
 """
-const RkbE_Rkb = Union{<:RiskBudgetEstimator, <:RiskBudget}
+const RkbE_Rkb = Union{RiskBudgetEstimator, RiskBudget}
 """
     risk_budget_constraints(::Nothing, args...; N::Integer, kwargs...)
 

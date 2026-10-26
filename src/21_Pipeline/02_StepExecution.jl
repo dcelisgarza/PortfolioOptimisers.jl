@@ -608,7 +608,7 @@ function pipe_step_targets(step)
         (:pe,)
     elseif slot === :phylogeny
         est = isa(step, PipelineStep) ? step.est : step
-        if isa(est, Union{<:AbstractClustersEstimator, <:AbstractClusteringResult})
+        if isa(est, Union{AbstractClustersEstimator, AbstractClusteringResult})
             (:cle,)
         else
             ()

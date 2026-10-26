@@ -29,8 +29,8 @@ A subtype holds a fitted relatedness matrix and the parameter of the constraint 
 """
 abstract type AbstractPhylogenyConstraintResult <: AbstractConstraintResult end
 """
-    const PlCE_PlC = Union{<:AbstractPhylogenyConstraintEstimator,
-                           <:AbstractPhylogenyConstraintResult}
+    const PlCE_PlC = Union{AbstractPhylogenyConstraintEstimator,
+                           AbstractPhylogenyConstraintResult}
 
 Alias for a phylogeny constraint estimator or result.
 
@@ -41,8 +41,8 @@ Matches an [`AbstractPhylogenyConstraintEstimator`](@ref) or an [`AbstractPhylog
   - [`AbstractPhylogenyConstraintEstimator`](@ref)
   - [`AbstractPhylogenyConstraintResult`](@ref)
 """
-const PlCE_PlC = Union{<:AbstractPhylogenyConstraintEstimator,
-                       <:AbstractPhylogenyConstraintResult}
+const PlCE_PlC = Union{AbstractPhylogenyConstraintEstimator,
+                       AbstractPhylogenyConstraintResult}
 """
     const VecPlCE_PlC = AbstractVector{<:PlCE_PlC}
 
@@ -56,7 +56,7 @@ Alias for a vector of phylogeny constraint estimators or results.
 """
 const VecPlCE_PlC = AbstractVector{<:PlCE_PlC}
 """
-    const PlCE_PlC_VecPlCE_PlC = Union{<:PlCE_PlC, <:VecPlCE_PlC}
+    const PlCE_PlC_VecPlCE_PlC = Union{PlCE_PlC, VecPlCE_PlC}
 
 Alias for one phylogeny constraint estimator or result, or a vector of them.
 
@@ -67,7 +67,7 @@ Matches a [`PlCE_PlC`](@ref) or a [`VecPlCE_PlC`](@ref). It bounds the `ple` key
   - [`PlCE_PlC`](@ref)
   - [`VecPlCE_PlC`](@ref)
 """
-const PlCE_PlC_VecPlCE_PlC = Union{<:PlCE_PlC, <:VecPlCE_PlC}
+const PlCE_PlC_VecPlCE_PlC = Union{PlCE_PlC, VecPlCE_PlC}
 """
     const VecPlC = AbstractVector{<:AbstractPhylogenyConstraintResult}
 
@@ -82,7 +82,7 @@ Matches the vector that [`phylogeny_constraints`](@ref) returns for a vector of 
 """
 const VecPlC = AbstractVector{<:AbstractPhylogenyConstraintResult}
 """
-    const PlC_VecPlC = Union{<:AbstractPhylogenyConstraintResult, <:VecPlC}
+    const PlC_VecPlC = Union{AbstractPhylogenyConstraintResult, VecPlC}
 
 Alias for one phylogeny constraint result, or a vector of them.
 
@@ -93,7 +93,7 @@ Matches an [`AbstractPhylogenyConstraintResult`](@ref) or a [`VecPlC`](@ref). It
   - [`AbstractPhylogenyConstraintResult`](@ref)
   - [`VecPlC`](@ref)
 """
-const PlC_VecPlC = Union{<:AbstractPhylogenyConstraintResult, <:VecPlC}
+const PlC_VecPlC = Union{AbstractPhylogenyConstraintResult, VecPlC}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -206,7 +206,7 @@ function SemiDefinitePhylogenyEstimator(; pl::NwE_ClE = NetworkEstimator(),
     return SemiDefinitePhylogenyEstimator(pl, p, x_src)
 end
 """
-    const MatNum_PhRMatNum = Union{<:PhylogenyResult{<:MatNum}, <:MatNum}
+    const MatNum_PhRMatNum = Union{PhylogenyResult{<:MatNum}, MatNum}
 
 Alias for a numeric matrix, or a phylogeny result that holds one.
 
@@ -217,7 +217,7 @@ The constructors of [`SemiDefinitePhylogeny`](@ref) and [`IntegerPhylogeny`](@re
   - [`PhylogenyResult`](@ref)
   - [`MatNum`](@ref)
 """
-const MatNum_PhRMatNum = Union{<:PhylogenyResult{<:MatNum}, <:MatNum}
+const MatNum_PhRMatNum = Union{PhylogenyResult{<:MatNum}, MatNum}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -532,12 +532,11 @@ function IntegerPhylogenyEstimator(; pl::NwE_ClE = NetworkEstimator(), B::Int_Ve
                                    x_src::Option{<:AbstractReturnsSource} = nothing)::IntegerPhylogenyEstimator
     return IntegerPhylogenyEstimator(pl, B, x_src)
 end
-function returns_source(x::Union{<:SemiDefinitePhylogenyEstimator,
-                                 <:IntegerPhylogenyEstimator})
+function returns_source(x::Union{SemiDefinitePhylogenyEstimator, IntegerPhylogenyEstimator})
     return x.x_src
 end
-function reader_frames(x::Union{<:SemiDefinitePhylogenyEstimator,
-                                <:IntegerPhylogenyEstimator}, path::AbstractString, ::Bool)
+function reader_frames(x::Union{SemiDefinitePhylogenyEstimator, IntegerPhylogenyEstimator},
+                       path::AbstractString, ::Bool)
     return source_frames(x.x_src, path, true)
 end
 """
@@ -883,7 +882,7 @@ Alias for a vector of [`CentralityConstraint`](@ref) objects.
 """
 const VecCC = AbstractVector{<:CentralityConstraint}
 """
-    const CC_VecCC = Union{<:CentralityConstraint, <:VecCC}
+    const CC_VecCC = Union{CentralityConstraint, VecCC}
 
 Alias for one [`CentralityConstraint`](@ref), or a vector of them.
 
@@ -894,9 +893,9 @@ Matches a [`CentralityConstraint`](@ref) or a [`VecCC`](@ref). [`centrality_cons
   - [`CentralityConstraint`](@ref)
   - [`VecCC`](@ref)
 """
-const CC_VecCC = Union{<:CentralityConstraint, <:VecCC}
+const CC_VecCC = Union{CentralityConstraint, VecCC}
 """
-    const Lc_CC_VecCC = Union{<:CC_VecCC, <:LinearConstraint}
+    const Lc_CC_VecCC = Union{CC_VecCC, LinearConstraint}
 
 Alias for a centrality constraint, a vector of them, or a linear constraint.
 
@@ -907,7 +906,7 @@ Matches a [`CC_VecCC`](@ref) or a [`LinearConstraint`](@ref). It bounds the `cte
   - [`CC_VecCC`](@ref)
   - [`LinearConstraint`](@ref)
 """
-const Lc_CC_VecCC = Union{<:CC_VecCC, <:LinearConstraint}
+const Lc_CC_VecCC = Union{CC_VecCC, LinearConstraint}
 """
     centrality_constraints(ccs::CC_VecCC, X::MatNum; dims::Int = 1, strict::Bool = false,
                            kwargs...)

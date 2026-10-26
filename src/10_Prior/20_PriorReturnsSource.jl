@@ -100,7 +100,7 @@ The warning is logged once for each source.
 
   - [`returns_matrix_picker`](@ref)
 """
-function warn_source_fallback(x_src::Union{<:DataSource, <:ExcessSource})::Nothing
+function warn_source_fallback(x_src::Union{DataSource, ExcessSource})::Nothing
     msg = "a graph reader states `x_src = $(source_label(x_src))`, which reads the returns data, and the call gives no returns data, so the reader reads the `X` of the prior result. Pass the returns data as `rd` to read them, or state `x_src = nothing` to read the prior result with no warning."
     @warn(msg, maxlog = log_limit(:warn, 1), _id = hash(msg))
     return nothing
@@ -157,7 +157,7 @@ function returns_matrix_picker(pr::Pr_RR, rd::Option{<:ReturnsResult}, x_src::No
     return isnothing(data) ? pr.X : benchmark_relative_returns(data, x_src)
 end
 function returns_matrix_picker(pr::Pr_RR, rd::Option{<:ReturnsResult},
-                               x_src::Union{<:DataSource, <:ExcessSource})
+                               x_src::Union{DataSource, ExcessSource})
     data = picked_returns_data(pr, rd)
     if isnothing(data)
         warn_source_fallback(x_src)
@@ -207,22 +207,21 @@ The method that Julia selects is the algorithm.
 function plain_graph_reader(::Any)
     return false
 end
-function plain_graph_reader(xs::Union{<:Tuple, <:AbstractVector})
+function plain_graph_reader(xs::Union{Tuple, AbstractVector})
     return any(plain_graph_reader, xs)
 end
-function plain_graph_reader(x::Union{<:ClustersEstimator, <:NetworkEstimator})
+function plain_graph_reader(x::Union{ClustersEstimator, NetworkEstimator})
     return isfinite(gap_fill_value(x.ce))
 end
-function plain_graph_reader(::Union{<:ClustersEstimator{<:Any, <:FeatureDistance},
-                                    <:NetworkEstimator{<:Any, <:FeatureDistance}})
+function plain_graph_reader(::Union{ClustersEstimator{<:Any, <:FeatureDistance},
+                                    NetworkEstimator{<:Any, <:FeatureDistance}})
     return false
 end
 function plain_graph_reader(x::NetworkClustersEstimator)
     return plain_graph_reader(x.nte)
 end
-function plain_graph_reader(x::Union{<:CentralityEstimator,
-                                     <:SemiDefinitePhylogenyEstimator,
-                                     <:IntegerPhylogenyEstimator})
+function plain_graph_reader(x::Union{CentralityEstimator, SemiDefinitePhylogenyEstimator,
+                                     IntegerPhylogenyEstimator})
     return plain_graph_reader(x.pl)
 end
 function plain_graph_reader(x::CentralityConstraint)
@@ -278,7 +277,7 @@ function assert_graph_readable(x, X::MatNum)::Nothing
 end
 """
     graph_reader_gaps(x, pr::AbstractPriorResult, rd::ReturnsResult) -> Option{BitVector}
-    graph_reader_gaps(xs::Union{<:Tuple, <:AbstractVector}, pr::AbstractPriorResult,
+    graph_reader_gaps(xs::Union{Tuple, AbstractVector}, pr::AbstractPriorResult,
                       rd::ReturnsResult) -> Option{BitVector}
 
 Find the assets that hold a non-finite cell in the rows that the plain graph readers of a fit read.
@@ -318,7 +317,7 @@ function graph_reader_gaps(x, pr::AbstractPriorResult, rd::ReturnsResult)
     end
     return .!vec(all(isfinite, returns_matrix_picker(pr, rd, returns_source(x)); dims = 1))
 end
-function graph_reader_gaps(xs::Union{<:Tuple, <:AbstractVector}, pr::AbstractPriorResult,
+function graph_reader_gaps(xs::Union{Tuple, AbstractVector}, pr::AbstractPriorResult,
                            rd::ReturnsResult)
     gap = nothing
     for x in xs
@@ -891,12 +890,12 @@ function centrality_constraints_from(ccs::CC_VecCC, pr::Pr_RR, rd::Option{<:Retu
                                   dims = 1)
 end
 """
-    returns_source(pe::Union{<:EmpiricalPrior, <:FactorPrior, <:HighOrderPriorEstimator,
-                             <:HighOrderFactorPriorEstimator, <:BlackLittermanPrior,
-                             <:BayesianBlackLittermanPrior, <:FactorBlackLittermanPrior,
-                             <:AugmentedBlackLittermanPrior, <:EntropyPoolingPrior,
-                             <:MeucciEntropyPoolingPrior, <:OpinionPoolingPrior,
-                             <:CrossSectionalFactorPrior, <:LowDimensionEnsemblePrior})
+    returns_source(pe::Union{EmpiricalPrior, FactorPrior, HighOrderPriorEstimator,
+                             HighOrderFactorPriorEstimator, BlackLittermanPrior,
+                             BayesianBlackLittermanPrior, FactorBlackLittermanPrior,
+                             AugmentedBlackLittermanPrior, EntropyPoolingPrior,
+                             MeucciEntropyPoolingPrior, OpinionPoolingPrior,
+                             CrossSectionalFactorPrior, LowDimensionEnsemblePrior})
         -> Option{<:AbstractReturnsSource}
 
 The prior estimators of the library method of [`returns_source`](@ref): the source that the prior states in its `x_src` field.
@@ -917,21 +916,19 @@ The [`ReturnsResult`](@ref) method of [`prior`](@ref), [`partial_fit!`](@ref) an
   - [`prior`](@ref)
   - [`reader_frames`](@ref)
 """
-function returns_source(pe::Union{<:EmpiricalPrior, <:FactorPrior,
-                                  <:HighOrderPriorEstimator,
-                                  <:HighOrderFactorPriorEstimator, <:BlackLittermanPrior,
-                                  <:BayesianBlackLittermanPrior,
-                                  <:FactorBlackLittermanPrior,
-                                  <:AugmentedBlackLittermanPrior, <:EntropyPoolingPrior,
-                                  <:MeucciEntropyPoolingPrior, <:OpinionPoolingPrior,
-                                  <:CrossSectionalFactorPrior, <:LowDimensionEnsemblePrior})
+function returns_source(pe::Union{EmpiricalPrior, FactorPrior, HighOrderPriorEstimator,
+                                  HighOrderFactorPriorEstimator, BlackLittermanPrior,
+                                  BayesianBlackLittermanPrior, FactorBlackLittermanPrior,
+                                  AugmentedBlackLittermanPrior, EntropyPoolingPrior,
+                                  MeucciEntropyPoolingPrior, OpinionPoolingPrior,
+                                  CrossSectionalFactorPrior, LowDimensionEnsemblePrior})
     return pe.x_src
 end
 """
-    refits_regression(pe::Union{<:EmpiricalPrior, <:LowDimensionEnsemblePrior}) -> true
-    refits_regression(pe::Union{<:HighOrderPriorEstimator, <:BlackLittermanPrior,
-                                <:BayesianBlackLittermanPrior, <:EntropyPoolingPrior,
-                                <:MeucciEntropyPoolingPrior}) -> Bool
+    refits_regression(pe::Union{EmpiricalPrior, LowDimensionEnsemblePrior}) -> true
+    refits_regression(pe::Union{HighOrderPriorEstimator, BlackLittermanPrior,
+                                BayesianBlackLittermanPrior, EntropyPoolingPrior,
+                                MeucciEntropyPoolingPrior}) -> Bool
     refits_regression(pe::OpinionPoolingPrior) -> Bool
 
 The prior estimators of the library methods of [`refits_regression`](@ref): whether the prior gives no loadings, so that a regression reader at `x_src = nothing` fits its own regression on the raw returns data.
@@ -959,12 +956,12 @@ Every other prior of the library gives loadings, and the fallback answers `false
   - [`refits_regression`](@ref)
   - [`reader_frames`](@ref)
 """
-function refits_regression(::Union{<:EmpiricalPrior, <:LowDimensionEnsemblePrior})
+function refits_regression(::Union{EmpiricalPrior, LowDimensionEnsemblePrior})
     return true
 end
-function refits_regression(pe::Union{<:HighOrderPriorEstimator, <:BlackLittermanPrior,
-                                     <:BayesianBlackLittermanPrior, <:EntropyPoolingPrior,
-                                     <:MeucciEntropyPoolingPrior})
+function refits_regression(pe::Union{HighOrderPriorEstimator, BlackLittermanPrior,
+                                     BayesianBlackLittermanPrior, EntropyPoolingPrior,
+                                     MeucciEntropyPoolingPrior})
     return refits_regression(pe.pe)
 end
 function refits_regression(pe::OpinionPoolingPrior)
@@ -1014,7 +1011,7 @@ function stamp_returns_source(pr::AbstractPriorResult, ::Any)
     return pr
 end
 """
-    prior_returns_source(pr::Union{<:LowOrderPrior, <:HighOrderPrior})
+    prior_returns_source(pr::Union{LowOrderPrior, HighOrderPrior})
         -> Option{<:AbstractReturnsSource}
     prior_returns_source(pr::AbstractPriorResult) -> Nothing
 
@@ -1035,7 +1032,7 @@ A Prior Result of a type that the library does not ship records no source, so th
   - [`stamp_returns_source`](@ref)
   - [`outer_returns_source`](@ref)
 """
-function prior_returns_source(pr::Union{<:LowOrderPrior, <:HighOrderPrior})
+function prior_returns_source(pr::Union{LowOrderPrior, HighOrderPrior})
     return pr.x_src
 end
 function prior_returns_source(::AbstractPriorResult)

@@ -389,7 +389,7 @@ end
     forward(pe, me, ce)
 end
 """
-    const VecEP = AbstractVector{<:Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior}}
+    const VecEP = AbstractVector{<:Union{EntropyPoolingPrior, MeucciEntropyPoolingPrior}}
 
 Alias for an abstract vector of entropy pooling prior estimators of either family.
 
@@ -398,7 +398,7 @@ Alias for an abstract vector of entropy pooling prior estimators of either famil
   - [`EntropyPoolingPrior`](@ref)
   - [`MeucciEntropyPoolingPrior`](@ref)
 """
-const VecEP = AbstractVector{<:Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior}}
+const VecEP = AbstractVector{<:Union{EntropyPoolingPrior, MeucciEntropyPoolingPrior}}
 """
     prior(pe::EntropyPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing,
           pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, strict::Bool = false,
@@ -518,7 +518,7 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
     led = String[]
     vpr = investable_prior(imsk, pr)
     fixed = falses(size(vpr.X, 2), 2)
-    epc = Dict{Symbol, Tuple{<:MatNum, <:VecNum}}()
+    epc = Dict{Symbol, Tuple{MatNum, VecNum}}()
     tvs = Vector{AbstractEntropyPoolingTailView}(undef, 0)
     # mu, VaR, CVaR, EVaR and RLVaR
     ep_mu_views!(pe.mu_views, epc, vpr, vsets; strict = strict, ledger = led)
@@ -657,7 +657,7 @@ function ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
     imsk, vsets, ni = investable_views(pr, pe.sets)
     led = String[]
     vpr = investable_prior(imsk, pr)
-    epc = Dict{Symbol, Tuple{<:MatNum, <:VecNum}}()
+    epc = Dict{Symbol, Tuple{MatNum, VecNum}}()
     tvs = Vector{AbstractEntropyPoolingTailView}(undef, 0)
     # mu, VaR, CVaR, EVaR and RLVaR
     ep_mu_views!(pe.mu_views, epc, vpr, vsets; strict = strict, ledger = led)
@@ -708,7 +708,7 @@ function factor_residual_config(pe::EntropyPoolingPrior)
     return factor_residual_config(pe.pe)
 end
 """
-    ep_wrapped_prior(pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior},
+    ep_wrapped_prior(pe::Union{EntropyPoolingPrior, MeucciEntropyPoolingPrior},
                      X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel};
                      strict::Bool = false, kwargs...)
 
@@ -742,7 +742,7 @@ Each fit of `pe.pe` passes `cache_reg = true`, so a prior that stores a cache gi
 
 # Returns
 
-  - `pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior}`: The estimator whose `pe.pe` answered `pr`.
+  - `pe::Union{EntropyPoolingPrior, MeucciEntropyPoolingPrior}`: The estimator whose `pe.pe` answered `pr`.
   - `pr::AbstractPriorResult`: Prior result of the wrapped prior.
   - `w0::ScenarioProbabilities`: Prior probabilities, on the rows of `pr.X`.
 
@@ -755,7 +755,7 @@ Each fit of `pe.pe` passes `cache_reg = true`, so a prior that stores a cache gi
   - [`EntropyPoolingPrior`](@ref)
   - [`MeucciEntropyPoolingPrior`](@ref)
 """
-function ep_wrapped_prior(pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior},
+function ep_wrapped_prior(pe::Union{EntropyPoolingPrior, MeucciEntropyPoolingPrior},
                           X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel};
                           strict::Bool = false, kwargs...)
     # The refits under the posterior weights read the cache of this fit (#1751).
@@ -784,7 +784,7 @@ function ep_wrapped_prior(pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolin
 end
 """
     embedded_pin_weights(pe::AbstractPriorEstimator, w)
-    embedded_pin_weights(pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior}, w)
+    embedded_pin_weights(pe::Union{EntropyPoolingPrior, MeucciEntropyPoolingPrior}, w)
 
 Return the observation weights of the fit of `pe.pe`, the prior that `pe` embeds, so that [`pin_prior_choice`](@ref) pins the choice of that fit.
 
@@ -815,8 +815,7 @@ The method that Julia selects is the algorithm.
 function embedded_pin_weights(::AbstractPriorEstimator, w)
     return w
 end
-function embedded_pin_weights(pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior},
-                              w)
+function embedded_pin_weights(pe::Union{EntropyPoolingPrior, MeucciEntropyPoolingPrior}, w)
     return isnothing(w) ? pe.w : w
 end
 """
@@ -824,16 +823,16 @@ end
                      X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
     scenario_factory(pe::EmpiricalPrior, w, pr::Option{<:AbstractPriorResult}, X::MatNum,
                      F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
-    scenario_factory(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior}, w,
+    scenario_factory(pe::Union{FactorPrior, FactorBlackLittermanPrior}, w,
                      pr::Option{<:AbstractPriorResult}, X::MatNum, F::MatNum,
                      pnl::Option{<:AssetPanel}; strict::Bool = false, kwargs...)
-    scenario_factory(pe::Union{<:BlackLittermanPrior, <:BayesianBlackLittermanPrior}, w,
+    scenario_factory(pe::Union{BlackLittermanPrior, BayesianBlackLittermanPrior}, w,
                      pr::Option{<:AbstractPriorResult}, X::MatNum, F::Option{<:MatNum},
                      pnl::Option{<:AssetPanel}; kwargs...)
     scenario_factory(pe::AugmentedBlackLittermanPrior, w, pr::Option{<:AbstractPriorResult},
                      X::MatNum, F::MatNum, pnl::Option{<:AssetPanel}; strict::Bool = false,
                      kwargs...)
-    scenario_factory(pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior}, w,
+    scenario_factory(pe::Union{EntropyPoolingPrior, MeucciEntropyPoolingPrior}, w,
                      pr::Option{<:AbstractPriorResult}, X::MatNum, F::Option{<:MatNum},
                      pnl::Option{<:AssetPanel}; kwargs...)
     scenario_factory(pe::OpinionPoolingPrior, w, pr::Option{<:AbstractPriorResult},
@@ -911,16 +910,16 @@ function scenario_factory(pe::EmpiricalPrior, w, ::Option{<:AbstractPriorResult}
                           ::Option{<:MatNum}, ::Option{<:AssetPanel}; kwargs...)
     return factory(pe, scenario_weights(w, size(X, 1)))
 end
-function scenario_factory(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior}, w,
+function scenario_factory(pe::Union{FactorPrior, FactorBlackLittermanPrior}, w,
                           pr::Option{<:AbstractPriorResult}, ::MatNum, F::MatNum,
                           ::Option{<:AssetPanel}; strict::Bool = false, kwargs...)
     inner = scenario_factory(pe.pe, w, scenario_factor_result(pr), F, nothing, nothing;
                              strict = strict)
     return rebuild_estimator(pe, (; pe = inner))
 end
-function scenario_factory(pe::Union{<:BlackLittermanPrior, <:BayesianBlackLittermanPrior},
-                          w, pr::Option{<:AbstractPriorResult}, X::MatNum,
-                          F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
+function scenario_factory(pe::Union{BlackLittermanPrior, BayesianBlackLittermanPrior}, w,
+                          pr::Option{<:AbstractPriorResult}, X::MatNum, F::Option{<:MatNum},
+                          pnl::Option{<:AssetPanel}; kwargs...)
     return rebuild_estimator(pe,
                              (; pe = scenario_factory(pe.pe, w, pr, X, F, pnl; kwargs...)))
 end
@@ -932,7 +931,7 @@ function scenario_factory(pe::AugmentedBlackLittermanPrior, w,
                             strict = strict)
     return rebuild_estimator(pe, (; a_pe = a_pe, f_pe = f_pe))
 end
-function scenario_factory(pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior}, w,
+function scenario_factory(pe::Union{EntropyPoolingPrior, MeucciEntropyPoolingPrior}, w,
                           pr::Option{<:AbstractPriorResult}, X::MatNum, F::Option{<:MatNum},
                           pnl::Option{<:AssetPanel}; kwargs...)
     # A caller's `pe.w` weighs the scenarios. Under a Scenario Cap the regression and the
@@ -974,7 +973,7 @@ end
 """
     scenario_prior(pe::AbstractPriorEstimator, w, pr::Option{<:AbstractPriorResult},
                    X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
-    scenario_prior(pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior}, w,
+    scenario_prior(pe::Union{EntropyPoolingPrior, MeucciEntropyPoolingPrior}, w,
                    pr::Option{<:AbstractPriorResult}, X::MatNum, F::Option{<:MatNum},
                    pnl::Option{<:AssetPanel}; kwargs...)
     scenario_prior(pe::BlackLittermanPrior, w, pr::Option{<:AbstractPriorResult}, X::MatNum,
@@ -1033,7 +1032,7 @@ function scenario_prior(pe::AbstractPriorEstimator, w, pr::Option{<:AbstractPrio
                         kwargs...)
     return prior(scenario_factory(pe, w, pr, X, F, pnl; kwargs...), X, F, pnl; kwargs...)
 end
-function scenario_prior(pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior}, w,
+function scenario_prior(pe::Union{EntropyPoolingPrior, MeucciEntropyPoolingPrior}, w,
                         pr::Option{<:AbstractPriorResult}, X::MatNum, F::Option{<:MatNum},
                         pnl::Option{<:AssetPanel}; kwargs...)
     # See the note at the same step in `scenario_factory`.
@@ -1065,12 +1064,12 @@ end
                               F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
     prior_probability_factory(pe::EmpiricalPrior, w, X::MatNum, F::Option{<:MatNum},
                               pnl::Option{<:AssetPanel}; kwargs...)
-    prior_probability_factory(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior}, w,
+    prior_probability_factory(pe::Union{FactorPrior, FactorBlackLittermanPrior}, w,
                               X::MatNum, F::MatNum, pnl::Option{<:AssetPanel}; kwargs...)
-    prior_probability_factory(pe::Union{<:BlackLittermanPrior,
-                                        <:BayesianBlackLittermanPrior,
-                                        <:EntropyPoolingPrior,
-                                        <:MeucciEntropyPoolingPrior}, w, X::MatNum,
+    prior_probability_factory(pe::Union{BlackLittermanPrior,
+                                        BayesianBlackLittermanPrior,
+                                        EntropyPoolingPrior,
+                                        MeucciEntropyPoolingPrior}, w, X::MatNum,
                               F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
     prior_probability_factory(pe::AugmentedBlackLittermanPrior, w, X::MatNum, F::MatNum,
                               pnl::Option{<:AssetPanel}; kwargs...)
@@ -1080,10 +1079,10 @@ end
                               F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
     prior_probability_factory(pe::AbstractPriorEstimator, w, n::Integer)
     prior_probability_factory(pe::EmpiricalPrior, w, n::Integer)
-    prior_probability_factory(pe::Union{<:BlackLittermanPrior,
-                                        <:BayesianBlackLittermanPrior,
-                                        <:EntropyPoolingPrior,
-                                        <:MeucciEntropyPoolingPrior}, w, n::Integer)
+    prior_probability_factory(pe::Union{BlackLittermanPrior,
+                                        BayesianBlackLittermanPrior,
+                                        EntropyPoolingPrior,
+                                        MeucciEntropyPoolingPrior}, w, n::Integer)
     prior_probability_factory(pe::OpinionPoolingPrior, w, n::Integer)
 
 Return [`factory`](@ref) of `pe` under the prior probabilities `w` of the scenarios, with each weighted field on the rows that it reads.
@@ -1139,24 +1138,24 @@ end
 function prior_probability_factory(pe::EmpiricalPrior, w, n::Integer)
     return factory(pe, scenario_weights(w, n))
 end
-function prior_probability_factory(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior}, w,
+function prior_probability_factory(pe::Union{FactorPrior, FactorBlackLittermanPrior}, w,
                                    ::MatNum, F::MatNum, ::Option{<:AssetPanel}; kwargs...)
     inner = prior_probability_factory(pe.pe, w, size(F, 1))
     return rebuild_estimator(factory(pe, scenario_weights(w, size(F, 1))), (; pe = inner))
 end
-function prior_probability_factory(pe::Union{<:BlackLittermanPrior,
-                                             <:BayesianBlackLittermanPrior,
-                                             <:EntropyPoolingPrior,
-                                             <:MeucciEntropyPoolingPrior}, w, X::MatNum,
+function prior_probability_factory(pe::Union{BlackLittermanPrior,
+                                             BayesianBlackLittermanPrior,
+                                             EntropyPoolingPrior,
+                                             MeucciEntropyPoolingPrior}, w, X::MatNum,
                                    F::Option{<:MatNum}, pnl::Option{<:AssetPanel};
                                    kwargs...)
     inner = prior_probability_factory(pe.pe, w, X, F, pnl; kwargs...)
     return rebuild_estimator(factory(pe, w), (; pe = inner))
 end
-function prior_probability_factory(pe::Union{<:BlackLittermanPrior,
-                                             <:BayesianBlackLittermanPrior,
-                                             <:EntropyPoolingPrior,
-                                             <:MeucciEntropyPoolingPrior}, w, n::Integer)
+function prior_probability_factory(pe::Union{BlackLittermanPrior,
+                                             BayesianBlackLittermanPrior,
+                                             EntropyPoolingPrior,
+                                             MeucciEntropyPoolingPrior}, w, n::Integer)
     return rebuild_estimator(factory(pe, w),
                              (; pe = prior_probability_factory(pe.pe, w, n)))
 end
@@ -1169,9 +1168,9 @@ function prior_probability_factory(pe::AugmentedBlackLittermanPrior, w, X::MatNu
 end
 """
     assert_scenario_model(pe::AbstractPriorEstimator)
-    assert_scenario_model(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
-                                    <:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
-                                    <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior})
+    assert_scenario_model(pe::Union{FactorPrior, FactorBlackLittermanPrior,
+                                    BlackLittermanPrior, BayesianBlackLittermanPrior,
+                                    EntropyPoolingPrior, MeucciEntropyPoolingPrior})
     assert_scenario_model(pe::AugmentedBlackLittermanPrior)
     assert_scenario_model(pe::OpinionPoolingPrior)
     assert_scenario_model(pe::CrossSectionalFactorPrior)
@@ -1213,11 +1212,9 @@ The method that Julia selects is the algorithm.
 function assert_scenario_model(::AbstractPriorEstimator)
     return nothing
 end
-function assert_scenario_model(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
-                                         <:BlackLittermanPrior,
-                                         <:BayesianBlackLittermanPrior,
-                                         <:EntropyPoolingPrior,
-                                         <:MeucciEntropyPoolingPrior})
+function assert_scenario_model(pe::Union{FactorPrior, FactorBlackLittermanPrior,
+                                         BlackLittermanPrior, BayesianBlackLittermanPrior,
+                                         EntropyPoolingPrior, MeucciEntropyPoolingPrior})
     return assert_scenario_model(pe.pe)
 end
 function assert_scenario_model(pe::AugmentedBlackLittermanPrior)
@@ -1226,7 +1223,7 @@ function assert_scenario_model(pe::AugmentedBlackLittermanPrior)
 end
 """
     assert_scenario_refit(pe::AbstractPriorEstimator)
-    assert_scenario_refit(pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior})
+    assert_scenario_refit(pe::Union{EntropyPoolingPrior, MeucciEntropyPoolingPrior})
     assert_scenario_refit(pe::OpinionPoolingPrior)
 
 Check that [`scenario_prior`](@ref) can refit `pe`, the prior that an entropy pooling prior embeds, under its posterior weights.
@@ -1263,8 +1260,7 @@ The method that Julia selects is the algorithm.
 function assert_scenario_refit(pe::AbstractPriorEstimator)
     return assert_scenario_model(pe)
 end
-function assert_scenario_refit(pe::Union{<:EntropyPoolingPrior,
-                                         <:MeucciEntropyPoolingPrior})
+function assert_scenario_refit(pe::Union{EntropyPoolingPrior, MeucciEntropyPoolingPrior})
     return assert_scenario_refit(pe.pe)
 end
 

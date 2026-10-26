@@ -1,8 +1,8 @@
 """
-    factory(a::Union{Nothing, <:AbstractEstimator, <:AbstractAlgorithm,
-                     <:AbstractResult}, args...; kwargs...) -> a
-    factory(a::AbstractVector{<:Union{Nothing, <:AbstractEstimator, <:AbstractAlgorithm,
-                                      <:AbstractResult}}, args...; kwargs...) -> Vector
+    factory(a::Union{Nothing, AbstractEstimator, AbstractAlgorithm,
+                     AbstractResult}, args...; kwargs...) -> a
+    factory(a::AbstractVector{<:Union{Nothing, AbstractEstimator, AbstractAlgorithm,
+                                      AbstractResult}}, args...; kwargs...) -> Vector
 
 Rebuild an estimator, an algorithm or a result with runtime values. These two methods are the fallbacks of the verb.
 
@@ -54,13 +54,12 @@ MeanValue
   - [`AbstractAlgorithm`](@ref)
   - [`AbstractResult`](@ref)
 """
-function factory(a::Union{Nothing, <:AbstractEstimator, <:AbstractAlgorithm,
-                          <:AbstractResult}, args...; kwargs...)
+function factory(a::Union{Nothing, AbstractEstimator, AbstractAlgorithm, AbstractResult},
+                 args...; kwargs...)
     return a
 end
-function factory(a::AbstractVector{<:Union{Nothing, <:AbstractEstimator,
-                                           <:AbstractAlgorithm, <:AbstractResult}}, args...;
-                 kwargs...)
+function factory(a::AbstractVector{<:Union{Nothing, AbstractEstimator, AbstractAlgorithm,
+                                           AbstractResult}}, args...; kwargs...)
     return [factory(ai, args...; kwargs...) for ai in a]
 end
 
@@ -87,12 +86,12 @@ Because of step 3, this verb does **not** fill a `nothing` field. A weights fiel
   - [`factory`](@ref)
 """
 factory_child(v, args...; kwargs...) = v
-function factory_child(v::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult},
+function factory_child(v::Union{AbstractEstimator, AbstractAlgorithm, AbstractResult},
                        args...; kwargs...)
     return factory(v, args...; kwargs...)
 end
-function factory_child(v::AbstractArray{<:Union{<:AbstractEstimator, <:AbstractAlgorithm,
-                                                <:AbstractResult}}, args...; kwargs...)
+function factory_child(v::AbstractArray{<:Union{AbstractEstimator, AbstractAlgorithm,
+                                                AbstractResult}}, args...; kwargs...)
     return [factory_child(vi, args...; kwargs...) for vi in v]
 end
 """

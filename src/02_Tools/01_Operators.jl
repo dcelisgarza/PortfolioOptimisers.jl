@@ -304,13 +304,13 @@ julia> PortfolioOptimisers.:⊖(8, 2)
 ⊖(A, B::ArrNum) = A .- B
 ⊖(A, B) = A - B
 """
-    dot_scalar(a::Union{<:Number, <:JuMP.AbstractJuMPScalar}, b::VecNum) -> Union{<:Number, <:JuMP.AbstractJuMPScalar}
-    dot_scalar(a::VecNum, b::Union{<:Number, <:JuMP.AbstractJuMPScalar}) -> Union{<:Number, <:JuMP.AbstractJuMPScalar}
+    dot_scalar(a::Union{Number, JuMP.AbstractJuMPScalar}, b::VecNum) -> Union{Number, JuMP.AbstractJuMPScalar}
+    dot_scalar(a::VecNum, b::Union{Number, JuMP.AbstractJuMPScalar}) -> Union{Number, JuMP.AbstractJuMPScalar}
     dot_scalar(a::VecNum, b::VecNum) -> Number
 
 Dot product of two operands, where one operand can be a scalar.
 
-  - If one argument is a `Union{<:Number, <:JuMP.AbstractJuMPScalar}` and the other is a `VecNum`, the function returns the product of the scalar and the sum of the vector.
+  - If one argument is a `Union{Number, JuMP.AbstractJuMPScalar}` and the other is a `VecNum`, the function returns the product of the scalar and the sum of the vector.
   - If both arguments are `VecNum`s, the function returns their `dot` product.
 
 # Mathematical definition
@@ -357,10 +357,10 @@ julia> PortfolioOptimisers.dot_scalar([1.0, 2.0, 3.0], [4.0, 5.0, 6.0])
   - [`VecNum`](@ref)
   - [`JuMP.AbstractJuMPScalar`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.JuMP.AbstractJuMPScalar)
 """
-function dot_scalar(a::Union{<:Number, <:JuMP.AbstractJuMPScalar}, b::VecNum)
+function dot_scalar(a::Union{Number, JuMP.AbstractJuMPScalar}, b::VecNum)
     return a * sum(b)
 end
-function dot_scalar(a::VecNum, b::Union{<:Number, <:JuMP.AbstractJuMPScalar})
+function dot_scalar(a::VecNum, b::Union{Number, JuMP.AbstractJuMPScalar})
     return sum(a) * b
 end
 function dot_scalar(a::VecNum, b::VecNum)
