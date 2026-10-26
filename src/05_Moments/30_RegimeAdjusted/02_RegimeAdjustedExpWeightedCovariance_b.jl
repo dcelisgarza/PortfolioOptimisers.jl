@@ -591,55 +591,62 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Returns the weights of the linear and the quadratic integrands of the first-moment correction at
-one node, the measure ``\\mathrm{d}\\tau = \\tau\\, \\mathrm{d}x`` included.
+Returns the logs of the weights of the linear and the quadratic integrands of the first-moment
+correction at one node, the measure ``\\mathrm{d}\\tau = \\tau\\, \\mathrm{d}x`` included.
 
 ``\\mathbb{E}[y_{i}^{2} S^{-1/2}]`` and ``\\mathbb{E}[y_{i}^{2} y_{j}^{2} S^{-3/2}]`` are
 ``\\Gamma(p)^{-1} \\int \\tau^{p - 1} \\mathbb{E}[\\cdot\\, e^{-\\tau S}]\\, \\mathrm{d}\\tau`` at
-``p = 1/2`` and ``p = 3/2``.
+``p = 1/2`` and ``p = 3/2``, so the weights are ``\\tau^{1/2} / \\sqrt{\\pi}`` and
+``2 \\tau^{3/2} / \\sqrt{\\pi}``. [`regime_law_correction`](@ref) reads the vector ``2 \\tau d``
+in place of ``d``, so each weight here carries the factor ``1 / (2 \\tau)`` of each ``d`` that it
+multiplies, and both weights are ``\\tau^{-1/2} / (2 \\sqrt{\\pi})``.
 
 # Arguments
 
   - `::FirstMomentRegimeAdjusted`: First-moment regime adjustment method.
-  - `tau::Number`: Node of the integration variable.
+  - `ltau::Number`: Log of the node ``\\tau`` of the integration variable.
 
 # Returns
 
-  - `(wl, wq)::Tuple`: ``(\\tau^{1/2} / \\sqrt{\\pi}, 2 \\tau^{3/2} / \\sqrt{\\pi})``.
+  - `(lwl, lwq)::Tuple`: ``-(\\ln \\tau + \\ln \\pi) / 2 - \\ln 2`` in both entries.
 
 # Related
 
   - [`regime_law_correction`](@ref)
 """
-function regime_law_weights(::FirstMomentRegimeAdjusted, tau::Number)
-    r = sqrt(tau / pi)
-    return (r, 2 * tau * r)
+function regime_law_weights(::FirstMomentRegimeAdjusted, ltau::Number)
+    lw = -(ltau + log(pi * one(ltau))) / 2 - log(2 * one(ltau))
+    return (lw, lw)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Returns the weights of the linear and the quadratic integrands of the log correction at one node,
-the measure ``\\mathrm{d}\\tau = \\tau\\, \\mathrm{d}x`` included.
+Returns the logs of the weights of the linear and the quadratic integrands of the log correction
+at one node, the measure ``\\mathrm{d}\\tau = \\tau\\, \\mathrm{d}x`` included.
 
 ``\\mathbb{E}[W_{ii} / S]`` and ``\\mathbb{E}[W_{ii} W_{jj} / S^{2}]`` are
 ``\\int \\tau^{p - 1} \\mathbb{E}[\\cdot\\, e^{-\\tau S}]\\, \\mathrm{d}\\tau`` at ``p = 1`` and
-``p = 2``, and the linear one carries the degrees of freedom ``\\nu = 2 x`` of the tilted mean.
+``p = 2``, and the linear one carries the degrees of freedom ``\\nu = 2 x`` of the tilted mean, so
+the weights are ``2 x \\tau`` and ``\\tau^{2}``. [`regime_law_correction`](@ref) reads the vector
+``2 \\tau d`` in place of ``d``, so each weight here carries the factor ``1 / (2 \\tau)`` of each
+``d`` that it multiplies, and the weights are ``x`` and ``1 / 4`` at every node.
 
 # Arguments
 
   - `method::LogRegimeAdjusted`: Log regime adjustment method.
-  - `tau::Number`: Node of the integration variable.
+  - `ltau::Number`: Log of the node ``\\tau`` of the integration variable, read for its number
+    type alone, so that the log of ``x`` is not rounded to a narrower type than that of the data.
 
 # Returns
 
-  - `(wl, wq)::Tuple`: ``(2 x \\tau, \\tau^{2})``.
+  - `(lwl, lwq)::Tuple`: ``(\\ln x, -2 \\ln 2)``.
 
 # Related
 
   - [`regime_law_correction`](@ref)
 """
-function regime_law_weights(method::LogRegimeAdjusted, tau::Number)
-    return (2 * method.x * tau, tau^2)
+function regime_law_weights(method::LogRegimeAdjusted, ltau::Number)
+    return (log(method.x * one(ltau)), -2 * log(2 * one(ltau)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -671,7 +678,10 @@ with ``d_{k} = \\mu_{k} / (1 + 2 \\tau \\mu_{k})``, and the Wishart moments
  1. On each node of [`regime_law_grid`](@ref), with ``\\tau = e^{x} / n``, accumulate the vector
     ``j = \\sum w_{l} L d`` and the matrix ``J = \\sum w_{q} L d d'``, with
     ``L = \\prod_{k} (1 + 2 \\tau \\mu_{k})^{-a}`` and the weights of
-    [`regime_law_weights`](@ref).
+    [`regime_law_weights`](@ref). Each term reads ``e = 2 \\tau d``, whose entries lie in
+    ``[0, 1)``, and ``\\exp(\\ln w + \\ln L)``, with the factor ``1 / (2 \\tau)`` of each ``d`` in
+    ``w``. Alone, ``w_{q}`` and ``d d'`` overflow and underflow the number type at the two ends of
+    the grid, and their product is bounded there.
  2. The linear sum is ``(W' \\mathrm{diag}(C_{m}))' j``, with ``W = V \\circ V``, and the part of
     the quadratic sum in ``M_{ii} M_{jj}`` is ``\\langle W' C_{m} W, J \\rangle``.
  3. The part in ``M_{ij}^{2}`` is ``\\sum_{kl} J_{kl} \\sum_{ij} C_{m, ij} V_{ik} V_{jk} V_{il} V_{jl}``.
@@ -708,14 +718,15 @@ function regime_law_correction(method::Union{<:FirstMomentRegimeAdjusted,
     a, nu = regime_law_shape(method)
     jl = zeros(T, n)
     J = zeros(T, n, n)
-    d = similar(mu)
+    e = similar(mu)
+    ln = log(n * one(T))
     for xi in x
         tau = exp(xi) / n
-        L = exp(regime_law_log_laplace(mu, a, 2 * one(T), exp(xi)))
-        d .= mu ./ (one(T) .+ 2 .* tau .* mu)
-        wl, wq = regime_law_weights(method, tau)
-        jl .+= (wl * L) .* d
-        J .+= (wq * L) .* d .* transpose(d)
+        lL = regime_law_log_laplace(mu, a, 2 * one(T), exp(xi))
+        e .= 2 .* tau .* mu ./ (one(T) .+ 2 .* tau .* mu)
+        lwl, lwq = regime_law_weights(method, xi - ln)
+        jl .+= exp(lwl + lL) .* e
+        J .+= exp(lwq + lL) .* e .* transpose(e)
     end
     J .*= step(x)
     W = V .^ 2

@@ -88,8 +88,11 @@ by about ``1 - \\ln(\\omega) / 2``.
   - `decay::Number`: Decay of the weights. Its number type is the type of every weight.
   - `hf::Number`: Step of the lattice `xf` of ``\\ln \\sigma``, ``1/8`` by default.
   - `xflo::Number`: First point of `xf`, ``-61 + \\ln(1 - \\lambda)`` by default.
-  - `xfhi::Number`: Last point of `xf`, 42 by default. Past it a stencil extrapolates, which a
-    step of ``1/8`` bears and a finer step does not.
+  - `xfhi::Number`: Last point of `xf`, ``50 + 8 h_{f}`` by default: the top of the output grid
+    `so`, and one stencil past it. Every shift `m hf` is at most zero, so no stencil reads past
+    the lattice. A stencil that extrapolates far past it multiplies the round-off of ``g`` by the
+    sum of its absolute weights, ``1.6 \\times 10^{11}`` at 64 steps, which makes ``g`` negative
+    on `Float32`.
 
 # Returns
 
@@ -106,7 +109,7 @@ by about ``1 - \\ln(\\omega) / 2``.
 """
 function mahalanobis_bias_grid(decay::Number, hf::Number = one(decay) / 8,
                                xflo::Number = -61 * one(decay) + log1p(-decay),
-                               xfhi::Number = 42 * one(decay))
+                               xfhi::Number = 50 * one(decay) + 8 * hf)
     o = one(decay)
     h = o / 4
     xlo = -o

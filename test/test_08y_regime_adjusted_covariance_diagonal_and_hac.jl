@@ -298,7 +298,12 @@ every term carries the same noise (ADR 0190).
             tau = exp(xi) / n
             M = Rb / (I + 2tau * Rb)
             L = det(I + 2tau * Rb)^(-a)
-            wl, wq = PO.regime_law_weights(method, tau)
+            # The weights of the integrands, without the factors that the library folds in.
+            wl, wq = if method isa PO.FirstMomentRegimeAdjusted
+                (sqrt(tau / pi), 2tau * sqrt(tau / pi))
+            else
+                (2method.x * tau, tau^2)
+            end
             lin += wl * L * dot(diag(Cm), diag(M))
             quad += wq *
                     L *
@@ -525,4 +530,46 @@ apart, and its variance left the diagonal of the covariance, which kept the row.
     @test isapprox(var(RegimeAdjustedExpWeightedVariance(; plain...), R),
                    diag(cov(RegimeAdjustedExpWeightedCovariance(; plain...), R));
                    rtol = 1e-12)
+end
+@testset "the bias corrections answer on Float32 data (#1823)" begin
+    # On Float32 the weights of the law correction overflowed at the top of its grid, so the
+    # diagonal fit refused its matrix, and the output grid of the Mahalanobis factor read a
+    # stencil far past its lattice, so the Mahalanobis fit was all NaN.
+    # The parameters of each method are Float32 too, so every operation runs in Float32.
+    FM = PO.FirstMomentRegimeAdjusted(; x = sqrt(2 / Float32(pi)))
+    LG = PO.LogRegimeAdjusted(; x = 0.5f0, y = 2.0f0)
+
+    # Two assets and a small shape: the quadratic weight of the log method times L grows as
+    # τ^{2 - x n}, past floatmax(Float32) at the top of the grid, and d d' underflows there.
+    # Measured: the three corrections are within 3e-6 of Float64.
+    for (method, mu, V, Cm) in ((PO.LogRegimeAdjusted(; x = 0.25f0, y = 2.0f0), [0.6, 1.4],
+                                 Matrix(qr(randn(StableRNG(1823), 2, 2)).Q), [0.07 0.01; 0.01 0.03]),
+                                (FM, [0.2, 0.9, 2.9], Matrix(qr(randn(StableRNG(1823), 3, 3)).Q),
+                                 fill(0.05, 3, 3) + 0.02I),
+                                (LG, [0.2, 0.9, 2.9], Matrix(qr(randn(StableRNG(1823), 3, 3)).Q),
+                                 fill(0.05, 3, 3) + 0.02I))
+        r32 = PO.regime_law_correction(method, Float32.(mu), Float32.(V), Float32.(Cm))
+        @test isfinite(r32) &&
+              isapprox(r32, PO.regime_law_correction(method, mu, V, Cm); rtol = 1e-4)
+    end
+
+    # The lattice reaches one stencil past the output grid, so no stencil extrapolates.
+    grid = PO.mahalanobis_bias_grid(0.9f0)
+    @test last(grid.xf) >= log(last(grid.so)) + 4 * step(grid.xf)
+
+    X = Float32.(randn(StableRNG(1823), 60, 4) ./ 100)
+    function fit(F, target, method, debias)
+        ce = RegimeAdjustedExpWeightedCovariance(; regime_target = target,
+                                                 regime_method = method, debias = debias,
+                                                 decay = F(0.9), min_val = F(1e-12),
+                                                 regime_lohi_mult = (F(0.7), F(1.6)),
+                                                 min_obs = 6)
+        return cov(ce, F.(X))
+    end
+    for target in (DiagonalTarget(), MahalanobisTarget()), method in (FM, LG),
+        debias in (ExactDebias(), LawDebias())
+
+        @test all(isapprox.(fit(Float32, target, method, debias),
+                            fit(Float64, target, method, debias); rtol = 1e-4))
+    end
 end
