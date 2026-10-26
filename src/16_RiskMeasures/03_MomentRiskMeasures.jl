@@ -1083,6 +1083,8 @@ The steps for [`LowOrderMoment`](@ref) and [`HighOrderMoment`](@ref):
 
 [`EvenMoment`](@ref) takes the place of steps 4 and 5. It computes the norm of order `2p` of `val`, each entry scaled by `w_t^(1 / 2p)` when `r.w` is not `nothing`, and returns its square divided by `T^(1 / p)`, with `T` the effective sample size.
 
+[`MedianAbsoluteDeviation`](@ref) returns the median of `abs.(val)`, weighted by `r.w` when it is not `nothing`, and divides it by ``\\Phi^{-1}(3/4)`` when `r.flag` is `true`. [`ThirdCentralMoment`](@ref) returns the mean of `val .^ 3`, weighted by `r.w` when it is not `nothing`.
+
 # Related
 
   - [`calc_deviations_vec`](@ref)
