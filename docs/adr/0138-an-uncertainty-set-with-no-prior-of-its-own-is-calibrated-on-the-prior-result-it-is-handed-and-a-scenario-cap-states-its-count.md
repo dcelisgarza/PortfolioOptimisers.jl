@@ -182,3 +182,24 @@ After `t` steps of `partial_fit!(opt, rd)`:
 - Two ESS formulas coexist for one weighting — the normal set reads `exp(entropy(w))` off `pr.ens`
   and the calibration rules read a Kish count off `w`. This ADR does not reconcile them; it is
   recorded so the next reader does not rediscover it.
+
+## Amendment (2026-10-26)
+
+Two count readers left the route of `effective_sample_size` when no observation weights are stated.
+They read `size(pr.X, 1)`, the rows that the measure carries, because the quantity that each one
+states is a property of those rows:
+
+- **`ScenarioCount`** fixes the number of scenarios that the tail of the measure holds. The measure
+  holds the rows carried, so `alpha = n / ens` left `n * w / t` of them in its tail. Under
+  `max_scenarios = 250` over 1250 observations, `n = 25` held 5.
+- **`EntropyBudget`** states the coefficient `kappa_log(inv(alpha * T), kappa)` that the model of a
+  relativistic measure pays, and the model forms that coefficient with the `T` of its own rows. On
+  the same cap, `target = -5` solved at `T = 1250` and the model paid `-2.716`.
+
+With weights, `ScenarioCount` still reads the Kish count of the weights. The two rate rules,
+`RateSignificance` and `RateRadius`, keep `ens`, because their docstrings define the rate on the
+length of the record. The ambiguity-radius rules keep `ens` too. Whether a radius that a
+distributionally robust measure prices must read the rows is open on
+[#1833](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1833). The sweep of
+`06_CalibrationRules.jl`, [#638](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/638),
+found both defects.

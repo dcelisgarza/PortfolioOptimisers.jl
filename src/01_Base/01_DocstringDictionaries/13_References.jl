@@ -292,4 +292,8 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :trefethen2019 => "[trefethen2019](@cite) L. N. Trefethen. *Approximation Theory and Approximation Practice, Extended Edition*. SIAM (2019). Theorem 19.3.",#
                  :estrada2002 => "[estrada2002](@cite) J. Estrada. *Systematic risk in emerging markets: the D-CAPM*. Emerging Markets Review 3, 365–379 (2002).",#
                  :menchero2011 => "[menchero2011](@cite) J. Menchero, D. J. Orr and J. Wang. *The Barra US Equity Model (USE4): Methodology Notes*. Model Insight, MSCI (2011).",#
-                 :engle2002 => "[engle2002](@cite) R. Engle. *Dynamic conditional correlation: A simple class of multivariate generalized autoregressive conditional heteroskedasticity models*. Journal of Business & Economic Statistics 20, 339–350 (2002).")
+                 :engle2002 => "[engle2002](@cite) R. Engle. *Dynamic conditional correlation: A simple class of multivariate generalized autoregressive conditional heteroskedasticity models*. Journal of Business & Economic Statistics 20, 339–350 (2002).",#
+                 :hill1975 => "[hill1975](@cite) B. M. Hill. *A simple general approach to inference about the tail of a distribution*. The Annals of Statistics 3, 1163–1174 (1975).",#
+                 :kish1965 => "[kish1965](@cite) L. Kish. *Survey Sampling* (John Wiley & Sons, 1965).",#
+                 :blanchet2019 => "[blanchet2019](@cite) J. Blanchet, Y. Kang and K. Murthy. *Robust Wasserstein profile inference and applications to machine learning*. Journal of Applied Probability 56, 830–857 (2019).",#
+                 :fournier2015 => "[fournier2015](@cite) N. Fournier and A. Guillin. *On the rate of convergence in Wasserstein distance of the empirical measure*. Probability Theory and Related Fields 162, 707–738 (2015).")

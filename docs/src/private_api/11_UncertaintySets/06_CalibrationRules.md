@@ -31,3 +31,10 @@ radial_tail_index
 radial_series_inputs
 dual_norm_radius_scale
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

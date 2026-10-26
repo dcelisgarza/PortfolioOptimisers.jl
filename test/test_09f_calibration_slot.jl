@@ -1691,6 +1691,28 @@ end
     @test PO.whitening_factor(both) === both.chol
     @test PO.whitening_factor(PRMVT4) == cholesky(PRMVT4.sigma).U
     @test size(PO.whitening_factor(tall)) == (8, 8)
+
+    # A SQUARE `chol` need not be triangular, and then its diagonal says nothing about its
+    # rank. The `R` factor of its QR factorisation is a triangular factor of the same
+    # matrix. So a symmetric square root whitens like the Cholesky factor of `sigma`, and a
+    # permutation, whose diagonal holds zeros, is a factor of the identity and is accepted.
+    symroot = LowOrderPrior(; X = PRMVT4.X, mu = PRMVT4.mu, sigma = other,
+                            chol = Matrix(sqrt(Symmetric(other))))
+    @test istriu(PO.whitening_factor(symroot))
+    @test rule(:kappa, symroot, nothing, nothing, CalibrationContext(; alpha = 0.05)) ≈
+          rule(:kappa, stated, nothing, nothing, CalibrationContext(; alpha = 0.05))
+    perm = Matrix(1.0I, 8, 8)[:, [2; 1; 3:8]]
+    swapped = LowOrderPrior(; X = PRMVT4.X, mu = PRMVT4.mu, sigma = Matrix(1.0I, 8, 8),
+                            chol = perm)
+    @test PO.whitening_factor(swapped)' * PO.whitening_factor(swapped) ≈ I
+    @test rule(:kappa, swapped, nothing, nothing, CalibrationContext(; alpha = 0.05)) ≈
+          rule(:kappa, identity_sigma, nothing, nothing, CalibrationContext(; alpha = 0.05))
+    # A singular square factor with no zero on its diagonal is refused with the rank
+    # message, and is not solved against.
+    singular = LowOrderPrior(; X = PRMVT4.X[:, 1:4], mu = zeros(4),
+                             sigma = Matrix(1.0I, 4, 4),
+                             chol = [1.0 1.0 0 0; 1.0 1.0 0 0; 0 0 1 0; 0 0 0 1])
+    @test_throws DomainError PO.whitening_factor(singular)
 end
 
 @testset "Calibration rules: `RadialTailDecay` answers one number for both ends" begin
@@ -2473,15 +2495,21 @@ end
         @test PO.effective_sample_size(pu, nothing) == 1250
         @test PO.effective_sample_size(pc, nothing) == 1250
         @test PO.effective_sample_size(pc, StatsBase.pweights(ones(250))) == 250
-        # `ScenarioCount` and the two rate rules read the count behind the moments.
-        @test ScenarioCount(; n = 25)(:alpha, pc, nothing, nothing, ctx) == 25 / 1250
+        # The two rate rules read the count behind the moments.
         @test RateSignificance()(:alpha, pc, nothing, nothing, ctx) ==
               RateSignificance()(:alpha, pu, nothing, nothing, ctx)
         @test RateRadius()(:k, pc, nothing, nothing, ctx) ==
               RateRadius()(:k, pu, nothing, nothing, ctx)
+        # `ScenarioCount` and `EntropyBudget` price the scenarios the measure holds, which
+        # are the rows carried. A tail of `n / ens` would hold `n / 5` of the 250 rows, and
+        # the measure pays `kappa_log(inv(alpha * T), kappa)` at the `T` of its own rows.
+        @test ScenarioCount(; n = 25)(:alpha, pc, nothing, nothing, ctx) == 25 / 250
         actx = CalibrationContext(; alpha = 0.05)
-        @test EntropyBudget(; target = -10.0)(:kappa, pc, nothing, nothing, actx) ==
-              EntropyBudget(; target = -10.0)(:kappa, pu, nothing, nothing, actx)
+        kappa = EntropyBudget(; target = -5.0)(:kappa, pc, nothing, nothing, actx)
+        @test PO.kappa_log(inv(0.05 * 250), kappa) ≈ -5.0
+        @test kappa == EntropyBudget(; target = -5.0)(:kappa,
+                                                      prior(EmpiricalPrior(), X1015[1001:end, :]),
+                                                      nothing, nothing, actx)
         # The normal set's `T` reads `ens`, so its box over the capped prior is the box
         # over the uncapped one: the ellipsoid is not `√5 ≈ 2.24` times too wide.
         ue = NormalUncertaintySet(; pe = nothing)
