@@ -153,6 +153,10 @@ The objective is the Shannon entropy of the coefficients ``\\boldsymbol{\\phi}``
 
 `alg` selects the conic encoding of the entropy, not the problem. [`RelativeEntropy`](@ref) writes one [`JuMP.MOI.RelativeEntropyCone`](https://jump.dev/JuMP.jl/stable/moi/reference/standard_form/#MathOptInterface.RelativeEntropyCone) of dimension `2K - 1`, and [`ExponentialConeEntropy`](@ref) writes `K - 1` [`JuMP.MOI.ExponentialCone`](https://jump.dev/JuMP.jl/stable/moi/reference/standard_form/#MathOptInterface.ExponentialCone) rows.
 
+!!! warning
+
+    Set the objective scale `so` of [`OWAJuMP`](@ref) near `1e-3` for this objective. The default `so = 1` makes the solver stop short of optimal, and [`owa_l_moment_crm`](@ref) then warns and returns the fallback weights. The steps of ``\\boldsymbol{\\theta}`` are of order ``1/T^{2}``, the entropy is of order one, and the maximiser touches the rows ``\\theta_{t+1} \\geq \\theta_{t}`` tangentially. With `max_phi = 0.75`, ``T`` from 30 to 5000 and the highest order from 4 to 10, Clarabel solved 8 of 39 programmes at `so = 1` and all 39 at `so = 1e-3`. On a grid of 20 of these programmes, `so = 1e-2` solved 17 or 18, by encoding, and `so = 1e-5` solved 19. The scale does not change the maximiser.
+
 Equation 13 of [owa2](@cite) maximises ``\\sum_{t} \\ln \\psi_{t}`` over a vector ``\\boldsymbol{\\psi}`` subject to ``\\psi_{t} \\geq \\lvert \\theta_{t} \\rvert`` alone, and that objective has no maximum. Its intent, the entropy of the absolute OWA weights, does not select one vector either, and it is not a convex programme in the normalised form. The L-moment weight vector of order ``k`` has entries of absolute value at most ``1/T`` once ``T > k (k - 1) / 2``, measured for every order up to `10` and every ``T`` up to 600. So every feasible ``\\boldsymbol{\\theta}`` has ``\\lvert \\theta_{t} \\rvert \\leq 1/T``, and the uniform ``\\psi_{t} = 1/T`` bounds it. A probability vector ``\\boldsymbol{\\psi}`` that bounds ``\\lvert \\boldsymbol{\\theta} \\rvert`` from above then has the largest entropy ``\\log T`` at every feasible point. The library puts the entropy on the coefficients for this reason.
 
 # Mathematical definition
@@ -522,7 +526,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Solves a programme for the risk aversion coefficients of an L-moment OWA weight vector.
 
-`alg` selects the objective, and every objective solves over the same feasible set. [`owa_l_moment_crm`](@ref) states the programme. `sc` scales the rows and `so` scales the objective, and neither changes the solution.
+`alg` selects the objective, and every objective solves over the same feasible set. [`owa_l_moment_crm`](@ref) states the programme. `sc` scales the rows and `so` scales the objective, and neither changes the solution. [`MaximumEntropy`](@ref) needs a small `so` to solve, as its docstring states.
 
 When the solver fails, [`owa_model_solve`](@ref) warns and returns the weights of `NormalisedConstantRelativeRiskAversion(; g = 0.5)`. The programme is infeasible for some `max_phi` and some orders: the coefficients sum to one and each is at most `max_phi`, and the OWA weights must be nondecreasing. At `k = 2` it is always infeasible, because its one coefficient must equal one. The fallback then returns the weights of the second L-moment, which is the only answer whose coefficients sum to one. At `k = 3` with the default `max_phi = 0.5`, the rows leave the one choice ``\\boldsymbol{\\phi} = (0.5, 0.5)``, and its OWA weights decrease near the largest return, so the programme is infeasible too.
 
@@ -908,9 +912,7 @@ Add the entropy objective of the [`MaximumEntropy`](@ref) programme to `model`.
 
 The method dispatches on the [`EntropyFormulation`](@ref) in `method.alg.alg`. It reads the risk aversion coefficients `phi`, adds the variable and the cone rows that bound their entropy, and sets the objective. It does not solve the model.
 
-The two encodings state one problem. Under [`ExponentialConeEntropy`](@ref) the objective is the entropy less ``\\log s_c``, because the cones hold ``s_c \\phi_{k}`` and the coefficients sum to one. So the objective values differ when ``s_c \\neq 1``, and the maximiser does not.
-
-The objective carries a factor of ``10^{-3}``, which does not change the maximiser. The steps of ``\\boldsymbol{\\theta}`` are of order ``1/T^{2}``, the entropy is of order one, and the maximiser touches the rows ``\\theta_{t+1} \\geq \\theta_{t}`` tangentially. Without the factor, Clarabel stopped short of optimal on 31 of 39 programmes, with ``T`` from 30 to 5000, the highest order from 4 to 10 and `max_phi = 0.75`. With it, Clarabel solved every one of them.
+The two encodings state one problem. Under [`ExponentialConeEntropy`](@ref) the objective is the entropy less ``\\log s_c``, because the cones hold ``s_c \\phi_{k}`` and the coefficients sum to one. So the objective values differ when ``s_c \\neq 1``, and the maximiser does not. [`MaximumEntropy`](@ref) states why the programme needs a small ``s_o``.
 
 # JuMP formulation
 
@@ -928,8 +930,8 @@ Every row is registered under no name.
 
 ## Objective
 
-  - Under [`RelativeEntropy`](@ref): `Max` of ``-10^{-3} s_o t``.
-  - Under [`ExponentialConeEntropy`](@ref): `Max` of ``10^{-3} s_o \\sum_{k=2}^{K} t_{k}``.
+  - Under [`RelativeEntropy`](@ref): `Max` of ``-s_o t``.
+  - Under [`ExponentialConeEntropy`](@ref): `Max` of ``s_o \\sum_{k=2}^{K} t_{k}``.
 
 Where:
 
@@ -974,9 +976,7 @@ function owa_l_moment_crm_entropy(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
     JuMP.@variable(model, t)
     JuMP.@constraint(model,
                      [sc * t; ovec; sc * phi] in JuMP.MOI.RelativeEntropyCone(2 * N + 1))
-    # The steps of `theta` are of order 1/T^2 and the entropy is of order one, so the
-    # solver stalls short of optimal unless the objective is scaled down.
-    JuMP.@objective(model, Max, -so * t / 1000)
+    JuMP.@objective(model, Max, -so * t)
     return nothing
 end
 function owa_l_moment_crm_entropy(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
@@ -989,7 +989,7 @@ function owa_l_moment_crm_entropy(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
     JuMP.@variable(model, t[1:N])
     JuMP.@constraint(model, [i = 1:N],
                      [sc * t[i], sc * phi[i], 1] in JuMP.MOI.ExponentialCone())
-    JuMP.@objective(model, Max, so * sum(t) / 1000)
+    JuMP.@objective(model, Max, so * sum(t))
     return nothing
 end
 function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MaximumEntropy},

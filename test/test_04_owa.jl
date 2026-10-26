@@ -14,9 +14,10 @@
             owas = [NormalisedConstantRelativeRiskAversion(; g = 0.75),
                     NormalisedConstantRelativeRiskAversion(),
                     NormalisedConstantRelativeRiskAversion(; g = 0.25),
-                    OWAJuMP(; alg = MaximumEntropy(), max_phi = 0.75, slv = slv),
-                    OWAJuMP(; alg = MaximumEntropy(), slv = slv),
-                    OWAJuMP(; alg = MaximumEntropy(), max_phi = 0.25, slv = slv),
+                    # MaximumEntropy needs a small objective scale to solve (#1834).
+                    OWAJuMP(; alg = MaximumEntropy(), max_phi = 0.75, so = 1e-3, slv = slv),
+                    OWAJuMP(; alg = MaximumEntropy(), so = 1e-3, slv = slv),
+                    OWAJuMP(; alg = MaximumEntropy(), max_phi = 0.25, so = 1e-3, slv = slv),
                     OWAJuMP(; alg = MinimumSumSquares(), max_phi = 0.75, slv = slv),
                     OWAJuMP(; alg = MinimumSumSquares(), slv = slv),
                     OWAJuMP(; alg = MinimumSumSquares(), max_phi = 0.25, slv = slv),
@@ -24,11 +25,11 @@
                     OWAJuMP(; alg = MinimumSquaredDistance(), slv = slv),
                     OWAJuMP(; alg = MinimumSquaredDistance(), max_phi = 0.25, slv = slv)]
             owas_entr = [OWAJuMP(; alg = MaximumEntropy(; alg = ExponentialConeEntropy()),
-                                 max_phi = 0.75, slv = slv),
+                                 max_phi = 0.75, so = 1e-3, slv = slv),
                          OWAJuMP(; alg = MaximumEntropy(; alg = ExponentialConeEntropy()),
-                                 slv = slv),
+                                 so = 1e-3, slv = slv),
                          OWAJuMP(; alg = MaximumEntropy(; alg = ExponentialConeEntropy()),
-                                 max_phi = 0.25, slv = slv)]
+                                 max_phi = 0.25, so = 1e-3, slv = slv)]
             owas_sum_sq_sqsoc = [OWAJuMP(;
                                          alg = MinimumSumSquares(;
                                                                  alg = SquaredSOCRiskExpr()),
@@ -333,8 +334,10 @@
                     MinimumSquaredDistance(; alg = RSOCRiskExpr()), MinimumSumSquares(),
                     MinimumSumSquares(; alg = SquaredSOCRiskExpr()),
                     MinimumSumSquares(; alg = RSOCRiskExpr()))
-            thetas = [owa_l_moment_crm(T, OWAJuMP(; slv = slv, alg = alg); k = k)
-                      for alg in algs]
+            thetas = [owa_l_moment_crm(T,
+                                       OWAJuMP(; slv = slv, alg = alg,
+                                               so = alg isa MaximumEntropy ? 1e-3 : 1.0);
+                                       k = k) for alg in algs]
             for theta in thetas
                 # Every answer is in the feasible set of owa_model_setup.
                 phi = W \ theta
