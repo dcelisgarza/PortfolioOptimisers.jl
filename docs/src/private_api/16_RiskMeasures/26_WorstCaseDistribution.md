@@ -11,7 +11,15 @@ element_worst_case_distributions
 worst_case_distribution
 worst_case_pair
 worst_case_risk
+tail_worst_case_risk
 linearised_risk
 difference_worst_case
 difference_linearised_risk
+```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
 ```

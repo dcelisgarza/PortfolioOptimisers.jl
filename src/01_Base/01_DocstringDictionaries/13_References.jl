@@ -56,6 +56,7 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :rlvar => "[rlvar](@cite) D. Cajas. *Portfolio Optimization of Relativistic Value at Risk*. Available at SSRN 4378498 (2023).",#
                  :cdar => "[cdar](@cite) A. Chekhlov, S. Uryasev and M. Zabarankin. *Drawdown measure in portfolio optimization*. International Journal of Theoretical and Applied Finance 8, 13–58 (2005).",#
                  :artzner1999 => "[artzner1999](@cite) P. Artzner, F. Delbaen, J.-M. Eber and D. Heath. *Coherent measures of risk*. Mathematical Finance 9, 203–228 (1999).",#
+                 :delbaen2000 => "[delbaen2000](@cite) F. Delbaen. *Coherent risk measures*. Lecture notes, Cattedra Galileiana, Scuola Normale Superiore di Pisa (2000).",#
                  :morgan1996 => "[morgan1996](@cite) J.P. Morgan and Reuters. *RiskMetrics technical document*. Fourth edition, J.P. Morgan/Reuters (1996).",#
                  :pnvar => "[pnvar](@cite) P. A. Krokhmal. *Higher moment coherent risk measures*. Quantitative Finance 7, 373–387 (2007).",#
                  :ulcer => "[ulcer](@cite) P. G. Martin and B. B. McCann. *The Investor's Guide to Fidelity Funds* (John Wiley & Sons, 1989).",#

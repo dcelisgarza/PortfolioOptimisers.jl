@@ -198,6 +198,10 @@ unique_key_dict!(math_dict, :math_dict,
                  :rho_track => "``\\rho``: Tracked risk measure, the `r` field. Its value at a weight vector is the risk of that vector as [`expected_risk`](@ref) reports it.",#
                  :X_returns => "``\\mathbf{X}``: Returns matrix ``T \\times N``.",#
                  :F_fee_series => "``F(\\boldsymbol{w})``: Fee series ``T \\times 1`` of the portfolio, zero when `fees` is `nothing`. See [`calc_net_returns`](@ref).",#
+                 # The Worst-Case Distribution of a risk measure whose value is a solve.
+                 :q_wcd => "``\\boldsymbol{q}``: Worst-Case Distribution ``T \\times 1``, one probability for each observation. Its entries are not negative, and they sum to one.",#
+                 :y_wcd => "``\\boldsymbol{y}(\\boldsymbol{x})``: Measured series ``T \\times 1``, the series that the risk measure reads. It is the returns, the absolute drawdowns or the relative drawdowns.",#
+                 :Rtilde_wcd => "``\\tilde{R}``: Linearised risk, the expected loss of the measured series under a fixed Worst-Case Distribution.",#
                  # The Range convention (ADR 0057).
                  :negated_upper_tail => "The upper tail is the base measure applied to the negated returns ``-\\boldsymbol{x}``, so both tails are reported on the same sign convention and the range is their sum, not their difference.",#
                  # The ordered weights array family of `07_OWARiskMeasures_a.jl`: the
