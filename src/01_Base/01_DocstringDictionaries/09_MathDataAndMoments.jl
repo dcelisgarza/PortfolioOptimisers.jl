@@ -145,6 +145,8 @@ unique_key_dict!(math_dict, :math_dict,
                  :cal_s_radius => "``s``: Scale of the radius, in the units of the series the slot owner prices.",#
                  :cal_s_i_series => "``\\hat{s}_{i}``: Sample dispersion of the series the slot owner prices, over column ``i``. It is ``\\sqrt{\\hat{\\mathbf{\\Sigma}}_{ii}}`` under a [`ReturnsSeries`](@ref), and the dispersion of column ``i`` of the drawdown sample under a drawdown marker.",#
                  :cal_T_e => "``T_{e}``: Effective sample size, which is Kish's when the observation weights are stated.",#
+                 :cal_T_n => "``T_{n}``: Scenario count of the measure, the number of scenarios that it prices.",#
+                 :cal_T_c => "``T_{c}``: Sample size of the radius. It is the count `n` that the site states in its [`CalibrationContext`](@ref), and ``T_{e}`` when the site states none.",#
                  # The idiosyncratic diagnostics of a cross-sectional fit. Each symbol is
                  # stated by two or more Units of that file.
                  :eps_ti_idio => "``\\varepsilon_{ti}``: Idiosyncratic return of asset ``i`` at observation ``t``.",#

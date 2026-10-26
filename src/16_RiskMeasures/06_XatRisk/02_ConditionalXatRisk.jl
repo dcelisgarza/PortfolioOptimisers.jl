@@ -317,16 +317,19 @@ Each of the three slots takes a Calibration Rule in place of a number. The rebui
 
 Both contexts also carry the series that the measure prices. For this measure it is the returns, which is the default of [`calibration_series`](@ref). The method passes it all the same, because the marker belongs to the measure, and a rule carries no marker of its own.
 
+Both contexts also carry `n`, the count of the empirical measure that the ball is centred on. The programme holds the rows of `pr.X`, weighted by `ws`, so [`scenario_sample_size`](@ref) gives that count. Under a Scenario Cap it is the rows the result carries, and not the observations behind the moments. A radius rule that reads a count reads this one, so the ball has the size that the concentration bound states for the rows it is drawn around.
+
 The measure holds no solver, so the rule receives the `slv` that the caller passes, which is `nothing` by default.
 
 # Algorithm
 
  1. Compute the effective observation weights `ws`, the measure's own `w` or else the weights of `pr`.
  2. Read `s`, the series marker, with [`calibration_series`](@ref).
- 3. Resolve `alpha` with [`resolve_calibration_slot`](@ref).
- 4. Resolve `l`, with a context that carries the resolved `alpha` and `s`.
- 5. Resolve `r`, with a context that carries `s` alone.
- 6. Rebuild the measure with [`rebuild_with_slots`](@ref). It returns `x` itself when all three slots already held numbers, so the common case allocates nothing.
+ 3. Compute `n`, the count of the rows that the programme prices, with [`scenario_sample_size`](@ref).
+ 4. Resolve `alpha` with [`resolve_calibration_slot`](@ref).
+ 5. Resolve `l`, with a context that carries the resolved `alpha`, `s` and `n`.
+ 6. Resolve `r`, with a context that carries `s` and `n`.
+ 7. Rebuild the measure with [`rebuild_with_slots`](@ref). It returns `x` itself when all three slots already held numbers, so the common case allocates nothing.
 
 # Related
 
@@ -342,10 +345,12 @@ function resolve_deferred_quantities(x::DistributionallyRobustConditionalValueat
                                      pr::AbstractPriorResult, slv = nothing)
     ws = sel(x.w, pr.w)
     s = calibration_series(x)
+    n = scenario_sample_size(pr, ws)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
     l = resolve_calibration_slot(x.l, :l, pr, ws, slv,
-                                 CalibrationContext(; alpha = alpha, series = s))
-    r = resolve_calibration_slot(x.r, :r, pr, ws, slv, CalibrationContext(; series = s))
+                                 CalibrationContext(; alpha = alpha, series = s, n = n))
+    r = resolve_calibration_slot(x.r, :r, pr, ws, slv,
+                                 CalibrationContext(; series = s, n = n))
     return rebuild_with_slots(x, (; alpha = alpha, l = l, r = r))
 end
 # Calibration slots — see `calibration_slots`. The significance level, the radius and the
@@ -722,14 +727,17 @@ Each tail weight reads the level of its own tail. `l_a` reads `alpha` and `l_b` 
 
 Both tails price one series, the returns, so the same marker stands in all three contexts. The series belongs to the measure, and the level belongs to a tail.
 
+Both balls are centred on the empirical measure of the same rows, so the same count `n` stands in all three contexts too. [`scenario_sample_size`](@ref) gives it, for the reason that the scalar measure states.
+
 # Algorithm
 
  1. Compute the effective observation weights `ws`, the measure's own `w` or else the weights of `pr`.
  2. Read `se`, the series marker, with [`calibration_series`](@ref).
  3. Resolve `alpha` and `beta` with [`resolve_calibration_slot`](@ref).
- 4. Build three contexts: `cs` carries `se` alone, `ca` carries the resolved `alpha` and `se`, and `cb` carries the resolved `beta` and `se`.
- 5. Resolve `l_a` in `ca`, `r_a` in `cs`, `l_b` in `cb` and `r_b` in `cs`.
- 6. Rebuild the measure with [`rebuild_with_slots`](@ref), which returns `x` itself when every slot already held a number.
+ 4. Compute `n`, the count of the rows that the programme prices, with [`scenario_sample_size`](@ref).
+ 5. Build three contexts, each with `se` and `n`: `cs` carries them alone, `ca` carries the resolved `alpha` too, and `cb` carries the resolved `beta` too.
+ 6. Resolve `l_a` in `ca`, `r_a` in `cs`, `l_b` in `cb` and `r_b` in `cs`.
+ 7. Rebuild the measure with [`rebuild_with_slots`](@ref), which returns `x` itself when every slot already held a number.
 
 # Related
 
@@ -748,12 +756,14 @@ function resolve_deferred_quantities(x::DistributionallyRobustConditionalValueat
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
     beta = resolve_calibration_slot(x.beta, :beta, pr, ws, slv)
     # Each tail weight reads the probability of its OWN end, and the two radii read
-    # neither, so the four slots take three contexts. Both ends price one series, so the
-    # same marker stands in all three. The occupant itself is passed through untouched, so
-    # `rebuild_with_slots` compares each resolved value against the field of `x`.
-    cs = CalibrationContext(; series = se)
-    ca = CalibrationContext(; alpha = alpha, series = se)
-    cb = CalibrationContext(; alpha = beta, series = se)
+    # neither, so the four slots take three contexts. Both ends price one series over the
+    # same rows, so the same marker and the same count stand in all three. The occupant
+    # itself is passed through untouched, so `rebuild_with_slots` compares each resolved
+    # value against the field of `x`.
+    n = scenario_sample_size(pr, ws)
+    cs = CalibrationContext(; series = se, n = n)
+    ca = CalibrationContext(; alpha = alpha, series = se, n = n)
+    cb = CalibrationContext(; alpha = beta, series = se, n = n)
     l_a, r_a, l_b, r_b = map((slot, key, ctx) -> resolve_calibration_slot(slot, key, pr, ws,
                                                                           slv, ctx),
                              (x.l_a, x.r_a, x.l_b, x.r_b), (:l_a, :r_a, :l_b, :r_b),
@@ -1147,16 +1157,17 @@ Resolve the significance level `alpha`, the tail weight `l` and the ambiguity ra
 
 The steps are those of the method for [`DistributionallyRobustConditionalValueatRisk`](@ref), except for the series. This measure prices drawdowns, so [`calibration_series`](@ref) gives [`AbsoluteDrawdownSeries`](@ref), and the marker reaches both the `l` slot and the `r` slot. [`TailTermParity`](@ref) then prices the mean drawdown of each column against the ``\\mathrm{CDaR}_{\\alpha}`` of that column, and a radius rule reads its scale off the drawdown sample. The keys `:l` and `:r` are the same on the two measures, so the marker is the only thing that tells a rule which quantity it prices.
 
-A drawdown series holds one entry per observation, so a rule reads the same sample size here as on the returns.
+A drawdown series holds one entry per row of `pr.X`, so both contexts carry the count `n` that [`scenario_sample_size`](@ref) gives, as on the returns.
 
 # Algorithm
 
  1. Compute the effective observation weights `ws`, the measure's own `w` or else the weights of `pr`.
  2. Read `s`, the series marker, which is [`AbsoluteDrawdownSeries`](@ref).
- 3. Resolve `alpha` with [`resolve_calibration_slot`](@ref).
- 4. Resolve `l`, with a context that carries the resolved `alpha` and `s`.
- 5. Resolve `r`, with a context that carries `s` alone.
- 6. Rebuild the measure with [`rebuild_with_slots`](@ref), which returns `x` itself when all three slots already held numbers.
+ 3. Compute `n`, the count of the rows that the programme prices, with [`scenario_sample_size`](@ref).
+ 4. Resolve `alpha` with [`resolve_calibration_slot`](@ref).
+ 5. Resolve `l`, with a context that carries the resolved `alpha`, `s` and `n`.
+ 6. Resolve `r`, with a context that carries `s` and `n`.
+ 7. Rebuild the measure with [`rebuild_with_slots`](@ref), which returns `x` itself when all three slots already held numbers.
 
 # Related
 
@@ -1173,10 +1184,12 @@ function resolve_deferred_quantities(x::DistributionallyRobustConditionalDrawdow
                                      pr::AbstractPriorResult, slv = nothing)
     ws = sel(x.w, pr.w)
     s = calibration_series(x)
+    n = scenario_sample_size(pr, ws)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
     l = resolve_calibration_slot(x.l, :l, pr, ws, slv,
-                                 CalibrationContext(; alpha = alpha, series = s))
-    r = resolve_calibration_slot(x.r, :r, pr, ws, slv, CalibrationContext(; series = s))
+                                 CalibrationContext(; alpha = alpha, series = s, n = n))
+    r = resolve_calibration_slot(x.r, :r, pr, ws, slv,
+                                 CalibrationContext(; series = s, n = n))
     return rebuild_with_slots(x, (; alpha = alpha, l = l, r = r))
 end
 # Calibration slots — see `calibration_slots`.

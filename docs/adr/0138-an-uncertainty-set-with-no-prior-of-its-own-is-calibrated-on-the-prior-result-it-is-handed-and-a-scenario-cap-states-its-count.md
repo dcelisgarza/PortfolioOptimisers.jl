@@ -198,8 +198,34 @@ states is a property of those rows:
 
 With weights, `ScenarioCount` still reads the Kish count of the weights. The two rate rules,
 `RateSignificance` and `RateRadius`, keep `ens`, because their docstrings define the rate on the
-length of the record. The ambiguity-radius rules keep `ens` too. Whether a radius that a
-distributionally robust measure prices must read the rows is open on
-[#1833](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1833). The sweep of
-`06_CalibrationRules.jl`, [#638](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/638),
-found both defects.
+length of the record. The sweep of `06_CalibrationRules.jl`,
+[#638](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/638), found both defects.
+
+### The site states the count that an ambiguity radius prices
+
+[#1833](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1833) asked the same question
+for `ConcentrationRadius`, `DimensionalRateRadius` and `DualNormRadius`. The answer depends on the
+slot, and the key does not say which quantity the slot prices:
+
+- **The radius slots of a distributionally robust measure, `:r`, `:r_a` and `:r_b`.** The programme
+  centres its Wasserstein ball on the empirical measure of the rows of `pr.X`, weighted by the
+  observation weights of the measure. The concentration bound that each rule follows is a statement
+  about the empirical measure of `T` draws, so `T` is the count of those rows. Under
+  `max_scenarios = 250` over 1250 observations, a read of `ens` made the ball `sqrt(5)` times too
+  small for `ConcentrationRadius` and `DualNormRadius`, and `5^(1/5)` times too small for
+  `DimensionalRateRadius`. A ball that is too small gives a portfolio that is robust to less than the
+  caller asked for, and the optimisation shows no sign of it.
+- **The regularisation slots, `:l1`, `:linf`, `:l2reg_val` and `:lpreg_val`.** The radius prices the
+  error of `pr.mu`, which the cap fits over every observation. So `ens` is the right count there.
+
+So the site states the count. `CalibrationContext` gains a field `n::Option{<:Number}`, in the same
+way as it carries `series` and `p`. The three robust measures set it in every context that they
+build, to `scenario_sample_size(pr, ws)`: the Kish count of the weights of the measure when the
+measure states weights, and `size(pr.X, 1)` otherwise. That is the count of the measure that the
+programme prices, and it is the count that `ScenarioCount` now reads too, so the two readers of the
+rows share one definition. The regularisation sites state no `n`. The three radius rules read
+`ctx.n`, and `effective_sample_size(pr, w)` when it is `nothing`.
+
+Every number without a cap stays the same. With no cap and no weights, both counts are
+`size(pr.X, 1)`. With weights, both counts are the Kish count of the weights. A capped fit is
+`dev`-only. `RateRadius` keeps `ens` and ignores `n`, for the reason that its docstring states.

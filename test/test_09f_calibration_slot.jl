@@ -1092,11 +1092,16 @@ const PR120 = prior(EmpiricalPrior(), randn(RNG, 120, 4))
     @test isa(CalibrationContext().series, ReturnsSeries)
     @test isnothing(CalibrationContext().alpha)
     @test isnothing(CalibrationContext().p)
-    @test isa(CalibrationContext(-1, AbsoluteDrawdownSeries(), 2, nothing).series,
+    @test isa(CalibrationContext(-1, AbsoluteDrawdownSeries(), 2, nothing, nothing).series,
               AbsoluteDrawdownSeries)
     # `cs` belongs to the Cross-Sectional Factor Prior, so a site that names none leaves it
     # unset.
     @test isnothing(CalibrationContext().cs)
+    # `n` belongs to a site that prices its own rows (#1833), so a site that names none
+    # prices the moments, and a radius rule reads `effective_sample_size`.
+    @test isnothing(CalibrationContext().n)
+    @test CalibrationContext(; n = 250).n == 250
+    @test_throws TypeError CalibrationContext(; n = "a")
 
     # `kmin` is a count of order statistics, so a rule that states none is refused at
     # construction. It is a check on the rule's OWN parameter, and not on the parameter the
@@ -2537,6 +2542,58 @@ end
         # The normal set reads `pr.ens` as it always did.
         @test PO.choose_scaling_parameter(NormalUncertaintySet(; pe = nothing), pw) ==
               pw.ens
+    end
+
+    @testset "A robust measure prices the rows of its ball, and a penalty prices the moments (#1833)" begin
+        # A distributionally robust measure centres its Wasserstein ball on the empirical
+        # measure of the rows that its programme holds, so the site states the count of
+        # those rows in `n`. A regularisation slot states no count, so its radius still
+        # prices the error of `pr.mu`, which the cap fits over all 1250 observations.
+        n250 = CalibrationContext(; n = 250)
+        # The count of the rows is the row count, else Kish's count of the weights.
+        @test PO.scenario_sample_size(pc, nothing) == 250
+        @test PO.scenario_sample_size(pu, nothing) == 1250
+        wc = StatsBase.pweights(vcat(fill(0.5, 125), fill(1.5, 125)))
+        kc = sum(wc)^2 / sum(abs2, wc)
+        @test PO.scenario_sample_size(pc, wc) == kc
+        # A stated count replaces `effective_sample_size`, so on the capped prior the ball
+        # widens by the rate of each rule at the ratio `1250 / 250` of the two counts.
+        for (rule, ratio) in
+            ((ConcentrationRadius(), sqrt(5)), (DimensionalRateRadius(), 5^(1 / 5)),
+             (DualNormRadius(), sqrt(5)))
+            @test rule(:r, pc, nothing, nothing, n250) /
+                  rule(:r, pc, nothing, nothing, ctx) ≈ ratio
+            # With no cap the two counts agree, so no number without a cap moves.
+            @test rule(:r, pu, nothing, nothing, CalibrationContext(; n = 1250)) ==
+                  rule(:r, pu, nothing, nothing, ctx)
+        end
+        # Each of the three robust measures states the count of its rows, on every radius
+        # slot, and the drawdown measure states it beside its drawdown marker.
+        drc = DistributionallyRobustConditionalValueatRisk(; r = ConcentrationRadius())
+        @test PO.resolve_deferred_quantities(drc, pc).r ==
+              ConcentrationRadius()(:r, pc, nothing, nothing, n250)
+        drr = DistributionallyRobustConditionalValueatRiskRange(;
+                                                                r_a = DimensionalRateRadius(),
+                                                                r_b = DimensionalRateRadius())
+        rr = PO.resolve_deferred_quantities(drr, pc)
+        @test rr.r_a == rr.r_b == DimensionalRateRadius()(:r_a, pc, nothing, nothing, n250)
+        dcd = DistributionallyRobustConditionalDrawdownatRisk(; r = DualNormRadius())
+        @test PO.resolve_deferred_quantities(dcd, pc).r ==
+              DualNormRadius()(:r, pc, nothing, nothing,
+                               CalibrationContext(; series = AbsoluteDrawdownSeries(),
+                                                  n = 250))
+        # The weights of the measure weight the empirical measure of its rows, so the count
+        # is Kish's count of them.
+        drw = DistributionallyRobustConditionalValueatRisk(; r = ConcentrationRadius(),
+                                                           w = wc)
+        @test PO.resolve_deferred_quantities(drw, pc).r ==
+              ConcentrationRadius()(:r, pc, wc, nothing, CalibrationContext(; n = kc))
+        # The `JuMPOptimiser` sites of `l1` and `linf` hand over the default context, so
+        # their radius prices `ens`, and the capped prior gives the radius of the uncapped one.
+        for key in (:l1, :linf)
+            @test PO.resolve_calibration_slot(DualNormRadius(), key, pc, pc.w) ≈
+                  PO.resolve_calibration_slot(DualNormRadius(), key, pu, pu.w)
+        end
     end
 end
 

@@ -467,7 +467,7 @@ A [`ReturnsSeries`](@ref) reads it from `pr.sigma`, as the square root of the di
 
 A drawdown series reads it from the **drawdown sample**, because a prior result states no moment of a drawdown. [`calibration_series_matrix`](@ref) makes the sample, and the dispersion is the sample standard deviation of each of its columns. [`radial_series_inputs`](@ref) reads its centre and its whitening factor from the drawdown sample for the same reason. `pr.sigma` is a moment of the returns, and no scaling of it gives a moment of a drawdown.
 
-A radius is a distance in the space of the scenarios that the model prices, so this vector gives the radius its units. [`ConcentrationRadius`](@ref) and [`DimensionalRateRadius`](@ref) average it into one scale. [`DualNormRadius`](@ref) divides it by the square root of the effective sample size and takes a norm of the result.
+A radius is a distance in the space of the scenarios that the model prices, so this vector gives the radius its units. [`ConcentrationRadius`](@ref) and [`DimensionalRateRadius`](@ref) average it into one scale. [`DualNormRadius`](@ref) divides it by the square root of the count that the site prices and takes a norm of the result.
 
 # Mathematical definition
 
@@ -526,12 +526,15 @@ The site runs a rule as `alg(key, pr, w, slv, ctx)`. `key` names the **slot** an
 | `series` | the slot owner, through [`calibration_series`](@ref)                          | [`HillTailDecay`](@ref), [`RadialTailDecay`](@ref), [`ConcentrationRadius`](@ref), [`DimensionalRateRadius`](@ref), [`DualNormRadius`](@ref), [`TailTermParity`](@ref) |
 | `p`      | the constraint or the penalty the quantity stands in                          | [`EffectiveAssetFloor`](@ref), [`DualNormRadius`](@ref)                                                                                                                |
 | `cs`     | a [`CrossSectionalFactorPrior`](@ref), after the split of its Return Forecast | [`PrecisionBlend`](@ref), [`SteinShrinkage`](@ref), [`ForecastCalibrationSlope`](@ref)                                                                                 |
+| `n`      | a site that prices the empirical measure of its own rows                      | [`ConcentrationRadius`](@ref), [`DimensionalRateRadius`](@ref), [`DualNormRadius`](@ref)                                                                               |
 
 **No rule has a field for these quantities.** Each one belongs to the site, and a rule cannot know which site it reached. So a site overwrites no value of the rule, and no precedence between the two is necessary. A caller who runs a rule outside a measure builds the context that the site builds. That context is the only place where these quantities are written.
 
 **Only the Cross-Sectional Factor Prior states `cs`.** Its Spanned Shrinkage `lambda` and its Orthogonal Forecast Scale `c` resolve inside [`prior`](@ref), after the prior splits the Return Forecast and before it makes the mean. The prior states `cs = (; g, ap, csfm, hist, cre)`. These are the spanned coefficients `g`, the unscaled orthogonal part `ap`, the factor-model block `csfm`, the Return Forecast history `hist` and the Cross-Sectional Regression Estimator `cre` of the prior. The block holds the idiosyncratic variance history `vs` and the regression weights `rw`, so a rule reads them from `csfm`. The block holds a zero `b` and no Return Forecast, because the scale is not resolved yet.
 
-The default is the context of a site that states nothing. It has no sibling significance level, no norm order and no `cs`. Its series is the [`ReturnsSeries`](@ref) that [`calibration_series`](@ref) returns for every owner that names no other series. A rule that needs a field that the default leaves at `nothing` refuses, and its message names that field.
+**The site states `n` because two sites price two different counts.** A distributionally robust measure centres its Wasserstein ball on the empirical measure of the rows of `pr.X` that its programme holds, weighted by its observation weights. The concentration bound of a radius is a statement about that measure, so its count is the count of those rows, which [`scenario_sample_size`](@ref) gives. A regularisation penalty prices the error of `pr.mu`, and that error decreases with the observations behind the moments, which [`effective_sample_size`](@ref) gives. The two counts differ under a Scenario Cap, which fits the moments over every observation and holds fewer rows. `key` cannot tell the rule which count it prices, so the site states it. A site that states no `n` prices the moments, and a rule then reads [`effective_sample_size`](@ref).
+
+The default is the context of a site that states nothing. It has no sibling significance level, no norm order, no `cs` and no count. Its series is the [`ReturnsSeries`](@ref) that [`calibration_series`](@ref) returns for every owner that names no other series. A rule that needs a field that the default leaves at `nothing` refuses, and its message names that field.
 
 **`alpha` is available only because the slots of one owner resolve in an order.** A deformation rule reads the significance level of a sibling slot. So the [`resolve_deferred_quantities`](@ref) method of the owner resolves `alpha` first, and puts the number in the context of the slot that reads it. No derivation can find that order, so each type writes its own resolution.
 
@@ -545,7 +548,8 @@ $(DocStringExtensions.FIELDS)
         alpha::Option{<:Number} = nothing,
         series::AbstractCalibrationSeries = ReturnsSeries(),
         p::Option{<:Number} = nothing,
-        cs::Option{<:NamedTuple} = nothing
+        cs::Option{<:NamedTuple} = nothing,
+        n::Option{<:Number} = nothing
     ) -> CalibrationContext
 
 Keywords correspond to the fields of the struct. The default of each field is the value that a site that states nothing gives.
@@ -577,17 +581,25 @@ Keywords correspond to the fields of the struct. The default of each field is th
     $(field_dict[:cal_ctx_cs])
     """
     cs
+    """
+    $(field_dict[:cal_ctx_n])
+    """
+    n
     function CalibrationContext(alpha::Option{<:Number}, series::AbstractCalibrationSeries,
-                                p::Option{<:Number}, cs::Option{<:NamedTuple})
-        return new{typeof(alpha), typeof(series), typeof(p), typeof(cs)}(alpha, series, p,
-                                                                         cs)
+                                p::Option{<:Number}, cs::Option{<:NamedTuple},
+                                n::Option{<:Number})
+        return new{typeof(alpha), typeof(series), typeof(p), typeof(cs), typeof(n)}(alpha,
+                                                                                    series,
+                                                                                    p, cs,
+                                                                                    n)
     end
 end
 function CalibrationContext(; alpha::Option{<:Number} = nothing,
                             series::AbstractCalibrationSeries = ReturnsSeries(),
                             p::Option{<:Number} = nothing,
-                            cs::Option{<:NamedTuple} = nothing)
-    return CalibrationContext(alpha, series, p, cs)
+                            cs::Option{<:NamedTuple} = nothing,
+                            n::Option{<:Number} = nothing)
+    return CalibrationContext(alpha, series, p, cs, n)
 end
 """
     resolve_calibration_slot(slot, key::Symbol, pr::AbstractPriorResult, w, slv = nothing,
@@ -602,9 +614,9 @@ A rule gets no portfolio. A prior result holds no portfolio weight vector, so no
   - On the [`factory`](@ref) route, [`@propagatable`](@ref) runs the `@cprop` selection before the resolution, so the struct holds the solver.
   - On the `JuMP` route, no selection runs. [`set_risk_constraints!`](@ref) passes the solver to [`resolve_deferred_quantities`](@ref), and the owner selects it as `sel(x.slv, slv)`.
 
-**The context holds all the facts of the site, and this function rebuilds nothing.** `key` names the slot and not the quantity. So a rule reads from `ctx` the shape of a series, the significance level of a sibling slot, or the norm order of its constraint. No rule has a field for these three facts, so the function rebuilds no occupant and overwrites nothing that a caller stated. [`CalibrationContext`](@ref) states which rule reads which field.
+**The context holds all the facts of the site, and this function rebuilds nothing.** `key` names the slot and not the quantity. So a rule reads from `ctx` the shape of a series, the significance level of a sibling slot, the norm order of its constraint, or the count of the scenarios that the site prices. No rule has a field for these facts, so the function rebuilds no occupant and overwrites nothing that a caller stated. [`CalibrationContext`](@ref) states which rule reads which field.
 
-**This function checks the value of a ceiling rule and of a radius rule, and of no other family.** [`AbstractNormCeilingCalibrationAlgorithm`](@ref) and [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref) each have their own method. It runs [`assert_nonempty_gt0_finite_val`](@ref) on the number that the rule returned, under the `key` of the slot. Both quantities reach a JuMP model from a field of [`JuMPOptimiser`](@ref): the ceiling from `l2c` and `linfc`, and the radius from `l1` and `linf`. No term is rebuilt on that route, so nothing later checks the range. The three other families are only in slots that their owner rebuilds. The rebuild runs the constructor of the owner on the calibrated number, and that constructor checks the range. Only the calibrated path pays for the check, because a stated number takes the first method.
+**This function checks the value of a ceiling rule and of a radius rule, and of no other family.** [`AbstractNormCeilingCalibrationAlgorithm`](@ref) and [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref) share one method. It runs [`assert_nonempty_gt0_finite_val`](@ref) on the number that the rule returned, under the `key` of the slot. Both quantities reach a JuMP model from a field of [`JuMPOptimiser`](@ref): the ceiling from `l2c` and `linfc`, and the radius from `l1` and `linf`. No term is rebuilt on that route, so nothing later checks the range. The three other families are only in slots that their owner rebuilds. The rebuild runs the constructor of the owner on the calibrated number, and that constructor checks the range. Only the calibrated path pays for the check, because a stated number takes the first method.
 
 **The site checks a rule that is a plain function.** A function has no family, so no method here can know the quantity that it computes. [`assemble_jump_model!`](@ref) is the one site that reads a calibrated number and rebuilds no term, and it checks the range of each of its four norm slots.
 
@@ -665,7 +677,7 @@ A calibration rule that prices the sample size of the moments divides by this co
 
 This function does not read an `ens` that is next to a `w`. That `ens` is a diagnostic of `w`, because an entropy-pooling prior writes `exp(entropy(w))` there. So a rule that reads no weights reads no diagnostic of them either. Only a cap writes an `ens` with no `w`.
 
-A rule that prices a property of the scenarios of the measure does not read this count. [`ScenarioCount`](@ref) and [`EntropyBudget`](@ref) read the rows that the measure holds when no weights are stated.
+A rule that prices a property of the scenarios of the measure does not read this count. [`ScenarioCount`](@ref) and [`EntropyBudget`](@ref) read the rows that the measure holds when no weights are stated. A distributionally robust measure states the count of its rows, from [`scenario_sample_size`](@ref), in the `n` of its [`CalibrationContext`](@ref), and a radius rule reads that count in place of this one.
 
 The function reads the weights through [`get_observation_weights`](@ref), so it accepts all of the [`ObsWeights`](@ref) union that the `w` field of a rule admits. A [`DynamicAbstractWeights`](@ref) that has no method for a column of the sample raises [`ObservationWeightsError`](@ref), which names the two signatures to write.
 
@@ -710,8 +722,9 @@ Where:
   - [`get_observation_weights`](@ref)
   - [`stated_sample_size`](@ref)
   - [`ObsWeights`](@ref)
+  - [`scenario_sample_size`](@ref): the count of the rows that a measure prices.
   - [`ScenarioCount`](@ref): reads this count only when observation weights are stated.
-  - [`ConcentrationRadius`](@ref)
+  - [`ConcentrationRadius`](@ref): reads this count when the site states no `n`.
   - [`DimensionalRateRadius`](@ref)
   - [`DualNormRadius`](@ref)
 
@@ -756,6 +769,62 @@ function stated_sample_size(::Nothing, ens::Number, ::MatNum)
 end
 function stated_sample_size(::Any, ::Any, X::MatNum)
     return size(X, 1)
+end
+"""
+    scenario_sample_size(pr::AbstractPriorResult, w::Option{<:ObsWeights})
+
+Returns the count of the empirical measure of the rows that `pr` holds, weighted by `w`.
+
+A risk measure prices the rows of `pr.X`, and not the observations behind the moments. With weights, the measure is the weighted empirical measure of those rows, so the count is the effective sample size of [kish1965](@cite), as in [`effective_sample_size`](@ref). With no weights, the measure gives each row the same mass, so the count is the row count of `pr.X`.
+
+The two counts differ only under a Scenario Cap. A cap fits the moments over every observation, states that number in `ens`, and holds fewer rows. [`effective_sample_size`](@ref) reads `ens` there, and this function reads the rows. The `ens` that an entropy-pooling prior writes is next to a `w`, so neither count reads it.
+
+The function resolves `w` through [`get_observation_weights`](@ref), as the programme of a measure does. So a [`DynamicAbstractWeights`](@ref) that resolves to `nothing` gives the row count, which is the count of the measure that the programme then prices.
+
+# Mathematical definition
+
+```math
+T_{n} = \\begin{cases}
+\\dfrac{\\left(\\sum\\limits_{t=1}^{T} w_{t}\\right)^{2}}{\\sum\\limits_{t=1}^{T} w_{t}^{2}} & \\textrm{if } w \\textrm{ is given}\\\\
+T & \\textrm{otherwise}
+\\end{cases}\\,.
+```
+
+Where:
+
+  - $(math_dict[:T]) It is the row count of the sample that the result holds.
+  - $(math_dict[:w_t_obs])
+  - $(math_dict[:cal_T_n])
+
+# Algorithm
+
+ 1. Resolve `w` against the first column of `pr.X` through [`get_observation_weights`](@ref), which gives `ws`.
+ 2. When `ws` is `nothing`, return `size(pr.X, 1)`.
+ 3. Otherwise, return the count of Kish for `ws`, through [`effective_sample_size`](@ref).
+
+# Arguments
+
+  - `pr`: Prior result whose rows the measure prices.
+  - `w`: Effective observation weights, or `nothing`.
+
+# Returns
+
+  - `T_n::Number`: The count of the scenarios.
+
+# Related
+
+  - [`effective_sample_size`](@ref)
+  - [`ScenarioCount`](@ref)
+  - [`CalibrationContext`](@ref)
+  - [`DistributionallyRobustConditionalValueatRisk`](@ref)
+
+# References
+
+  - $(ref_dict[:kish1965]) Whole book. $(ref_dict[:no_original_source])
+"""
+function scenario_sample_size(pr::AbstractPriorResult, w::Option{<:ObsWeights})
+    ws = get_observation_weights(w, view(pr.X, :, 1))
+    return isnothing(ws) ? size(pr.X, 1) : effective_sample_size(pr, ws)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -828,7 +897,7 @@ Where:
 
   - $(math_dict[:alpha_rm])
   - ``n``: Number of scenarios that the tail must hold.
-  - ``T_{n}``: Count of the scenarios that the measure prices.
+  - $(math_dict[:cal_T_n])
   - $(math_dict[:T]) It is the row count of the sample that the result holds.
   - $(math_dict[:w_t_obs])
 
@@ -848,13 +917,13 @@ Where:
 # Related
 
   - [`ScenarioCount`](@ref)
+  - [`scenario_sample_size`](@ref)
   - [`effective_sample_size`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
 function (alg::ScenarioCount)(::Symbol, pr::AbstractPriorResult, w, ::Any,
                               ::CalibrationContext)
-    T = isnothing(w) ? size(pr.X, 1) : effective_sample_size(pr, w)
-    return alg.n / T
+    return alg.n / scenario_sample_size(pr, w)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1908,14 +1977,8 @@ const Num_AmbRadNormCeilCal = Union{AbstractAmbiguityRadiusCalibrationAlgorithm,
 # only on the calibrated path. The three other families stand only in slots their owner
 # rebuilds, and that rebuild states their range. A rule written as a plain function names no
 # family, so it reaches neither method here and `assemble_jump_model!` states its range.
-function resolve_calibration_slot(alg::AbstractNormCeilingCalibrationAlgorithm, key::Symbol,
-                                  pr::AbstractPriorResult, w, slv = nothing,
-                                  ctx::CalibrationContext = CalibrationContext())
-    val = alg(key, pr, w, slv, ctx)
-    assert_nonempty_gt0_finite_val(val, key)
-    return val
-end
-function resolve_calibration_slot(alg::AbstractAmbiguityRadiusCalibrationAlgorithm,
+function resolve_calibration_slot(alg::Union{AbstractNormCeilingCalibrationAlgorithm,
+                                             AbstractAmbiguityRadiusCalibrationAlgorithm},
                                   key::Symbol, pr::AbstractPriorResult, w, slv = nothing,
                                   ctx::CalibrationContext = CalibrationContext())
     val = alg(key, pr, w, slv, ctx)
@@ -1935,7 +1998,7 @@ The chi-squared factor has no units and increases with the number of assets. So 
 
 **A drawdown owner gets a drawdown scale.** [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) measures the transport cost of its programme against the per-asset drawdown sample. So its ball is a ball over drawdown scenarios, and the radius has the units of a drawdown. `series` names that quantity, and [`calibration_series_dispersion`](@ref) takes the dispersion from the drawdown sample. `pr.sigma` is not read there, because it is a moment of the returns.
 
-`T` is the effective sample size when observation weights are stated, and the count of [`effective_sample_size`](@ref) with no weights otherwise. The radius prices the estimation error, and the error of a weighted estimate decreases with the effective sample size of the weights and not with the number of rows. [`RateRadius`](@ref) reads the length of the record and no weights, because its rate is a property of that length.
+**`T` is the count that the site prices.** It is the `n` that the site states in its [`CalibrationContext`](@ref), and [`effective_sample_size`](@ref) when the site states none. A distributionally robust measure states the count of the rows on which its ball is centred, because the bound is a statement about the empirical measure of those rows. A regularisation slot states no count, because its radius prices the error of `pr.mu`, and that error decreases with the observations behind the moments. With observation weights, both counts are the effective sample size of the weights, because the error of a weighted estimate decreases with that count and not with the number of rows. The two counts differ only under a Scenario Cap. [`RateRadius`](@ref) reads the length of the record and no weights, because its rate is a property of that length.
 
 The rule does not check the range of its value. It returns the quantity of its slot, so the site that receives the number checks the range. [`resolve_calibration_slot`](@ref) refuses a radius that is not `> 0` and finite. The owner of a slot that rebuilds a term refuses a radius outside its range when the fold runs.
 
@@ -1999,7 +2062,7 @@ Computes the chi-squared ambiguity radius on the sample of `pr`.
 
 ```math
 \\begin{align}
-r &= s \\sqrt{\\dfrac{\\chi^{2}_{N,\\, q}}{T_{e}}}\\,,\\\\
+r &= s \\sqrt{\\dfrac{\\chi^{2}_{N,\\, q}}{T_{c}}}\\,,\\\\
 s &= \\begin{cases}
 \\dfrac{1}{N} \\sum\\limits_{i=1}^{N} \\hat{s}_{i} & \\textrm{if } \\texttt{scale} \\textrm{ is } \\texttt{nothing}\\\\
 \\texttt{scale} & \\textrm{otherwise}
@@ -2016,6 +2079,7 @@ Where:
   - $(math_dict[:cal_s_i_series])
   - $(math_dict[:T])
   - $(math_dict[:cal_T_e])
+  - $(math_dict[:cal_T_c])
   - $(math_dict[:w_t_obs])
 
 # Arguments
@@ -2025,7 +2089,7 @@ Where:
   - `pr`: Prior result from which the rule reads the sample size, the asset count and, for a returns series, the covariance matrix. A drawdown series reads the sample.
   - `w`: Effective observation weights, or `nothing`.
   - `slv`: Effective solver. This rule needs none.
-  - `ctx`: The [`CalibrationContext`](@ref) of the site. `ctx.series` names the quantity around which the ball is drawn. The rule reads the per-asset dispersion of that quantity when `scale` is `nothing`.
+  - `ctx`: The [`CalibrationContext`](@ref) of the site. `ctx.series` names the quantity around which the ball is drawn. The rule reads the per-asset dispersion of that quantity when `scale` is `nothing`. `ctx.n` is the count that the site prices, and the rule reads [`effective_sample_size`](@ref) when it is `nothing`.
 
 # Returns
 
@@ -2048,7 +2112,7 @@ Where:
 function (alg::ConcentrationRadius)(::Symbol, pr::AbstractPriorResult, w, ::Any,
                                     ctx::CalibrationContext)
     N = size(pr.X, 2)
-    T = effective_sample_size(pr, w)
+    T = isnothing(ctx.n) ? effective_sample_size(pr, w) : ctx.n
     scale = if isnothing(alg.scale)
         Statistics.mean(calibration_series_dispersion(ctx.series, pr))
     else
@@ -2175,7 +2239,7 @@ Equation 8 of [drcvar](@cite) has a second branch for a short record. Its expone
 
 [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) prices a ball around the drawdown scenarios. The dimension of a scenario is still `N`, so the rate does not change. The site states the marker of the owner in `ctx.series`, and [`calibration_series_dispersion`](@ref) then reads the per-asset dispersion from the drawdown sample and not from `pr.sigma`. A drawdown column is a running function of its returns, so its dispersion is the larger of the two. So with `scale = nothing`, that owner gets a wider ball than a returns owner of the same sample. A stated `scale` has precedence, and it is the way to price a ball whose units are neither of the two.
 
-`T` is the effective sample size when observation weights are stated, and the count of [`effective_sample_size`](@ref) with no weights otherwise, as for [`ConcentrationRadius`](@ref). The rate is a statement of concentration, so it prices the effective sample size of the weights. [`RateRadius`](@ref) reads the length of the record and no weights, because its rate is a property of that length.
+`T` is the count that the site prices, as for [`ConcentrationRadius`](@ref): the `n` of its [`CalibrationContext`](@ref), and [`effective_sample_size`](@ref) when the site states none. Theorem 2 of [fournier2015](@cite) bounds the distance between the true law and the empirical measure of `T` draws. A distributionally robust measure centres its ball on the empirical measure of its rows, so it states the count of those rows. The rate is a statement of concentration, so it prices the effective sample size of the weights when weights are stated. [`RateRadius`](@ref) reads the length of the record and no weights, because its rate is a property of that length.
 
 The rule does not check the range of its value, for the reason that [`ConcentrationRadius`](@ref) states.
 
@@ -2240,7 +2304,7 @@ Computes the ambiguity radius of the measure-concentration bound on the sample o
 
 ```math
 \\begin{align}
-r &= s \\left(\\dfrac{\\ln\\left(\\dfrac{1}{1 - q}\\right)}{T_{e}}\\right)^{\\frac{1}{\\max(N,\\, 2)}}\\,,\\\\
+r &= s \\left(\\dfrac{\\ln\\left(\\dfrac{1}{1 - q}\\right)}{T_{c}}\\right)^{\\frac{1}{\\max(N,\\, 2)}}\\,,\\\\
 s &= \\begin{cases}
 \\dfrac{1}{N} \\sum\\limits_{i=1}^{N} \\hat{s}_{i} & \\textrm{if } \\texttt{scale} \\textrm{ is } \\texttt{nothing}\\\\
 \\texttt{scale} & \\textrm{otherwise}
@@ -2257,6 +2321,7 @@ Where:
   - $(math_dict[:cal_s_i_series])
   - $(math_dict[:T])
   - $(math_dict[:cal_T_e])
+  - $(math_dict[:cal_T_c])
   - $(math_dict[:w_t_obs])
 
 The first equation is Equation 8 of [drcvar](@cite) with ``c_{1} = c_{2} = 1`` and ``\\beta = 1 - q``, times the scale. The exponent is at most one half, so a universe of one or two assets gives the square-root rate and not a faster rate.
@@ -2268,7 +2333,7 @@ The first equation is Equation 8 of [drcvar](@cite) with ``c_{1} = c_{2} = 1`` a
   - `pr`: Prior result from which the rule reads the sample size, the asset count and, for a returns series, the covariance matrix. A drawdown series reads the sample.
   - `w`: Effective observation weights, or `nothing`.
   - `slv`: Effective solver. This rule needs none.
-  - `ctx`: The [`CalibrationContext`](@ref) of the site. `ctx.series` names the quantity around which the ball is drawn. The rule reads the per-asset dispersion of that quantity when `scale` is `nothing`.
+  - `ctx`: The [`CalibrationContext`](@ref) of the site. `ctx.series` names the quantity around which the ball is drawn. The rule reads the per-asset dispersion of that quantity when `scale` is `nothing`. `ctx.n` is the count that the site prices, and the rule reads [`effective_sample_size`](@ref) when it is `nothing`.
 
 # Returns
 
@@ -2292,7 +2357,7 @@ The first equation is Equation 8 of [drcvar](@cite) with ``c_{1} = c_{2} = 1`` a
 function (alg::DimensionalRateRadius)(::Symbol, pr::AbstractPriorResult, w, ::Any,
                                       ctx::CalibrationContext)
     N = size(pr.X, 2)
-    T = effective_sample_size(pr, w)
+    T = isnothing(ctx.n) ? effective_sample_size(pr, w) : ctx.n
     scale = if isnothing(alg.scale)
         Statistics.mean(calibration_series_dispersion(ctx.series, pr))
     else
@@ -2307,7 +2372,7 @@ Computes an ambiguity radius in the ground metric that its slot names, so that t
 
 The eight radius slots of the library do not measure distance in one norm. A radius multiplies a norm of the weight vector, and the ground metric of the ball is the dual of that norm. For a loss that is linear in the sample point, Theorem 6.3 and Proposition 6.5 of [drcvar](@cite) give the worst case over the ball as the sample mean of the loss plus the radius times the dual norm of the weights. So the `l1` coefficient of [`JuMPOptimiser`](@ref) is a distance in the ∞-norm, and its `linf` coefficient is a distance in the 1-norm. This rule reads `key`, selects the ground metric of that slot, and returns the sampling error of the empirical measure in that metric. [`ConcentrationRadius`](@ref) and [`RateRadius`](@ref) return one number for every key. That is correct inside one measure, and not correct across the eight slots.
 
-A linear loss reads the sampling error of the mean vector. The per-asset scale of that error is the dispersion of the series that the slot owner prices, divided by the square root of the effective sample size. The radius is a norm of that error vector, at the confidence level that `confidence` states.
+A linear loss reads the sampling error of the mean vector. The per-asset scale of that error is the dispersion of the series that the slot owner prices, divided by the square root of the count that the site prices. The radius is a norm of that error vector, at the confidence level that `confidence` states.
 
 **The vector has no term for the error of the covariance matrix.** A radius multiplies a norm of the weight vector, so it prices the part of the loss that is **linear** in the weights. The loss of a distributionally robust measure is linear in the sample point. The error of the second moment reaches the objective through the tail term and not through the ball. The tail term has its own coefficient, which [`TailTermParity`](@ref) sets. A radius with both errors prices one error two times.
 
@@ -2323,9 +2388,9 @@ The 1-norm case adds the per-asset errors, so it prices them as if they moved to
 
 **`series` gives the drawdown owner a drawdown scale.** [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) measures the transport cost of its programme against the per-asset drawdown sample. So its ball is a ball over drawdown scenarios, and the ground metric is a distance between two such vectors. Under a drawdown marker, [`calibration_series_dispersion`](@ref) reads the error scale from that sample. `pr.sigma` is not read, because it is a moment of the returns, and no scaling of it gives a moment of a drawdown. The ground metric does not change with the series. Only the vector of the norm changes.
 
-**The error scale of a drawdown series is too small, because of the record.** A drawdown is a running function of the path, so its entries are strongly dependent down a column. ``\\hat{s}_{i} / \\sqrt{T_{e}}`` prices a record of ``T_{e}`` independent draws, and a drawdown sample does not have them. The rule does not correct for this, as it does not correct for the number of assets. A correction needs a model of the dependence, and the sample gives none. So the rule uses the scale of the quantity as if the record were independent.
+**The error scale of a drawdown series is too small, because of the record.** A drawdown is a running function of the path, so its entries are strongly dependent down a column. ``\\hat{s}_{i} / \\sqrt{T_{c}}`` prices a record of ``T_{c}`` independent draws, and a drawdown sample does not have them. The rule does not correct for this, as it does not correct for the number of assets. A correction needs a model of the dependence, and the sample gives none. So the rule uses the scale of the quantity as if the record were independent.
 
-`T_e` is the effective sample size of the weights when observation weights are stated, and the count of [`effective_sample_size`](@ref) with no weights otherwise, as for [`ConcentrationRadius`](@ref).
+`T_c` is the count that the site prices, as for [`ConcentrationRadius`](@ref): the `n` of its [`CalibrationContext`](@ref), and [`effective_sample_size`](@ref) when the site states none. On a distributionally robust measure the error vector is the sampling error of the mean of the rows on which the ball is centred, so the count is the count of those rows. On a regularisation slot it is the sampling error of `pr.mu`, so the count is the count of the observations behind the moments.
 
 The rule does not check the range of its value, for the reason that [`ConcentrationRadius`](@ref) states.
 
@@ -2385,7 +2450,7 @@ Computes the ambiguity radius of the slot that `key` names, in the ground metric
 ```math
 \\begin{align}
 r &= z_{c} \\lVert \\boldsymbol{e} \\rVert_{g}\\,,\\\\
-e_{i} &= \\dfrac{\\hat{s}_{i}}{\\sqrt{T_{e}}}\\,,\\\\
+e_{i} &= \\dfrac{\\hat{s}_{i}}{\\sqrt{T_{c}}}\\,,\\\\
 q &= \\dfrac{p}{p - 1}\\,.
 \\end{align}
 ```
@@ -2399,6 +2464,7 @@ Where:
   - $(math_dict[:cal_s_i_series])
   - $(math_dict[:T])
   - $(math_dict[:cal_T_e])
+  - $(math_dict[:cal_T_c])
   - $(math_dict[:w_t_obs])
   - ``p``: Norm order of the penalty, the `p` field.
   - ``q``: Order of the ground metric of that penalty.
@@ -2423,7 +2489,7 @@ The two ends of a Range measure have one ground metric, so a rule on both ends r
   - `pr`: Prior result from which the rule reads the sample size and, for a returns series, the covariance matrix. A drawdown series reads the sample.
   - `w`: Effective observation weights, or `nothing`.
   - `slv`: Effective solver. This rule needs none.
-  - `ctx`: The [`CalibrationContext`](@ref) of the site. `ctx.series` names the quantity in which the rule measures the error vector. `ctx.p` is the norm order of the penalty, and only the `:lpreg_val` key reads it.
+  - `ctx`: The [`CalibrationContext`](@ref) of the site. `ctx.series` names the quantity in which the rule measures the error vector. `ctx.p` is the norm order of the penalty, and only the `:lpreg_val` key reads it. `ctx.n` is the count that the site prices, and the rule reads [`effective_sample_size`](@ref) when it is `nothing`.
 
 # Validation
 
@@ -2450,7 +2516,7 @@ The two ends of a Range measure have one ground metric, so a rule on both ends r
 """
 function (alg::DualNormRadius)(key::Symbol, pr::AbstractPriorResult, w, ::Any,
                                ctx::CalibrationContext)
-    T = effective_sample_size(pr, w)
+    T = isnothing(ctx.n) ? effective_sample_size(pr, w) : ctx.n
     e = calibration_series_dispersion(ctx.series, pr) ./ sqrt(T)
     z = Distributions.quantile(Distributions.Normal(), alg.confidence)
     return z * dual_norm_radius_scale(key, ctx.p, e)
