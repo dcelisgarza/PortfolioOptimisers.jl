@@ -1515,6 +1515,17 @@ end
             ucsv = CompactCovarianceUncertaintySet(; kappa = 2.0, C = Cc, Q = Qc,
                                                    val = sigmac)
             @test PortfolioOptimisers.port_opt_view(ucsv, iv).val == sigmac[iv, iv]
+            # Issue 663: `i` holds the indices the view keeps, as a vector, a range or a
+            # mask, and the three forms give one set.
+            imv = falses(Nc)
+            imv[iv] .= true
+            for ix in (1:5, imv)
+                vx = PortfolioOptimisers.port_opt_view(ucsc, ix)
+                @test vx.Q == vc.Q && vx.C == vc.C && vx.R == vc.R
+            end
+            # `Q' Q ⪯ I` on a view, so `I - Q Q'` is positive semidefinite and the bound of
+            # the set is a member of the set. On a view it is not a projector: measured 0.237.
+            @test minimum(eigvals(Symmetric(I - vc.Q * transpose(vc.Q)))) > 1e-3
         end
         @testset "The JuMP term reproduces the closed form and lifts no matrix" begin
             resc = optimise(MeanRisk(; r = UncertaintySetVariance(; ucs = ucsc),
