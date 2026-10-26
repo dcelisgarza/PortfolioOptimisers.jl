@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Collect one list-valued argument of a [`CrossSectionalFactorPrior`](@ref) into a vector of Pairs.
 
-The factors, the Neutralisation and the constrained Factor Families of the prior take the same form. Each takes Pairs in the order the caller writes them, or any `AbstractDict`. A dictionary states no order, so the collected order is its order of iteration. A caller who needs a stated order writes Pairs.
+The factors, the Neutralisation and the constrained Factor Families of the prior take the same form. Each takes Pairs in the order the caller writes them, or any `AbstractDict`. A dictionary states no order, so the collected order is its order of iteration. A caller who needs a stated order writes Pairs. A vector of Pairs with `String` keys is held as it is, not copied, as [`string_key_pairs`](@ref) states.
 
 # Arguments
 
@@ -17,7 +17,7 @@ The factors, the Neutralisation and the constrained Factor Families of the prior
 
 # Returns
 
-  - `pr::Vector{<:Pair}`: The collected Pairs, each with a `String` key.
+  - `pr::AbstractVector{<:Pair{String}}`: The collected Pairs, each with a `String` key.
 
 # Examples
 
@@ -30,10 +30,11 @@ julia> PortfolioOptimisers.cross_sectional_prior_pairs([\"style\" => \"industry\
 # Related
 
   - [`CrossSectionalFactorPrior`](@ref)
+  - [`string_key_pairs`](@ref)
   - [`Dict_VecPair`](@ref)
 """
 function cross_sectional_prior_pairs(x::Dict_VecPair, sym::Sym_Str)
-    pr = [String(first(p)) => last(p) for p in x]
+    pr = string_key_pairs(x)
     @argcheck(!isempty(pr), IsEmptyError("$sym cannot be empty"))
     ks = [first(p) for p in pr]
     @argcheck(allunique(ks), ArgumentError("$sym must not repeat a key, got $ks"))

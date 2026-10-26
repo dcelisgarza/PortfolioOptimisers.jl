@@ -222,6 +222,23 @@ end
         @test_throws PO.IsEmptyError CrossSectionalFactorPrior(; lambda = 1,
                                                                factors = Pair{String, Any}[])
     end
+    @testset "A rebuild holds the vectors it was built from (#1825)" begin
+        f = csfp_factors()
+        fam = ["industry" => nothing]
+        p = CrossSectionalFactorPrior(; lambda = 1, factors = f, families = fam)
+        @test p.factors === f
+        @test p.families === fam
+        r = PO.rebuild_estimator(p, (; cache = nothing))
+        @test r.factors === f
+        @test r.families === fam
+        # A dictionary, and a key that is not a String, are still collected.
+        d = Dict("industry" => nothing)
+        q = CrossSectionalFactorPrior(; lambda = 1, factors = f, families = d)
+        @test q.families == ["industry" => nothing]
+        @test q.families !== d
+        @test PO.rebuild_estimator(q, (; cache = nothing)).families === q.families
+        @test PO.string_key_pairs([:a => 1]) == ["a" => 1]
+    end
     @testset "The scalar guards" begin
         f = csfp_factors()
         @test_throws DomainError CrossSectionalFactorPrior(; lambda = 1, factors = f,

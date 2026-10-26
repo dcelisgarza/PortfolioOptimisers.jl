@@ -670,7 +670,7 @@ function calibration_slots(pe::CrossSectionalFactorPrior)
 end
 """
     cross_sectional_prior_option(x::Nothing, sym::Sym_Str) -> nothing
-    cross_sectional_prior_option(x::Dict_VecPair, sym::Sym_Str) -> Vector{<:Pair}
+    cross_sectional_prior_option(x::Dict_VecPair, sym::Sym_Str) -> AbstractVector{<:Pair{String}}
 
 Collect an optional list-valued argument of a [`CrossSectionalFactorPrior`](@ref).
 
@@ -687,7 +687,7 @@ The Neutralisation and the constrained Factor Families are each absent or a list
 
 # Returns
 
-  - `pr::Option{<:Vector{<:Pair}}`: The collected Pairs, or `nothing`.
+  - `pr::Option{<:AbstractVector{<:Pair{String}}}`: The collected Pairs, or `nothing`.
 
 # Related
 
@@ -699,6 +699,46 @@ function cross_sectional_prior_option(::Nothing, ::Sym_Str)
 end
 function cross_sectional_prior_option(x::Dict_VecPair, sym::Sym_Str)
     return cross_sectional_prior_pairs(x, sym)
+end
+"""
+    string_key_pairs(x::AbstractVector{<:Pair{String}}) -> x
+    string_key_pairs(x::Dict_VecPair) -> Vector{<:Pair{String}}
+
+Return the Pairs of a vector or a dictionary as a vector of Pairs with `String` keys.
+
+A vector whose keys are already `String` is returned itself, not a copy. So a rebuild of a [`CrossSectionalFactorPrior`](@ref) through its keyword constructor holds the vectors it was built from, and allocates nothing for them. Any other vector, and every dictionary, is collected into a new vector in its order of iteration. The fields of the prior are read by position, so a dictionary cannot be held as it is.
+
+# Arguments
+
+  - `x`: The Pairs or the dictionary.
+
+# Returns
+
+  - `pr::AbstractVector{<:Pair{String}}`: `x` itself, or the collected Pairs.
+
+# Examples
+
+```jldoctest
+julia> x = [\"style\" => \"industry\"];
+
+julia> PortfolioOptimisers.string_key_pairs(x) === x
+true
+
+julia> PortfolioOptimisers.string_key_pairs([:style => \"industry\"])
+1-element Vector{Pair{String, String}}:
+ "style" => "industry"
+```
+
+# Related
+
+  - [`cross_sectional_prior_pairs`](@ref)
+  - [`Dict_VecPair`](@ref)
+"""
+function string_key_pairs(x::AbstractVector{<:Pair{String}})
+    return x
+end
+function string_key_pairs(x::Dict_VecPair)
+    return [String(first(p)) => last(p) for p in x]
 end
 """
     prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = nothing,
