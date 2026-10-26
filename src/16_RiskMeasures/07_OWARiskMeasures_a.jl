@@ -111,9 +111,9 @@ abstract type EntropyFormulation <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Encodes the entropy objective of [`MaximumEntropy`](@ref) with one exponential cone for each observation.
+Encodes the entropy objective of [`MaximumEntropy`](@ref) with one exponential cone for each risk aversion coefficient.
 
-It selects the branch of [`owa_l_moment_crm_entropy`](@ref) that writes `T` exponential cones.
+It selects the branch of [`owa_l_moment_crm_entropy`](@ref) that writes `K - 1` exponential cones.
 
 # Related
 
@@ -131,7 +131,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Encodes the entropy objective of [`MaximumEntropy`](@ref) with one relative entropy cone.
 
-It selects the branch of [`owa_l_moment_crm_entropy`](@ref) that writes one cone of dimension `2T + 1`. It is the default encoding.
+It selects the branch of [`owa_l_moment_crm_entropy`](@ref) that writes one cone of dimension `2K - 1`. It is the default encoding.
 
 # Related
 
@@ -147,34 +147,29 @@ struct RelativeEntropy <: EntropyFormulation end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Selects the OWA weights of maximum entropy in the L-moment programme of [`OWAJuMP`](@ref).
+Selects the risk aversion coefficients of maximum entropy in the L-moment programme of [`OWAJuMP`](@ref).
 
-The objective is the Shannon entropy of a probability vector that bounds the absolute OWA weights from above, entry by entry.
+The objective is the Shannon entropy of the coefficients ``\\boldsymbol{\\phi}``. The coefficients are a probability vector, so the objective spreads the weight over the L-moments as evenly as the rows let it. The objective is strictly concave, so the programme has one maximiser, and the OWA weights ``\\mathbf{W} \\boldsymbol{\\phi}`` are unique.
 
-The objective does not select one OWA weight vector at a usual sample size. The L-moment weight vector of order ``k`` has entries of absolute value at most ``1/T`` once ``T > k (k - 1) / 2``, measured for every order up to `10` and every ``T`` up to 600. The coefficients are nonnegative and sum to one, so every feasible ``\\boldsymbol{\\theta}`` has ``\\lvert \\theta_{t} \\rvert \\leq 1/T`` once ``T > K (K - 1) / 2``. The uniform ``\\psi_{t} = 1/T`` is then feasible, and the objective takes its largest value ``\\log T`` at every feasible point. The solver returns the feasible point at which its iterations stop.
+`alg` selects the conic encoding of the entropy, not the problem. [`RelativeEntropy`](@ref) writes one [`JuMP.MOI.RelativeEntropyCone`](https://jump.dev/JuMP.jl/stable/moi/reference/standard_form/#MathOptInterface.RelativeEntropyCone) of dimension `2K - 1`, and [`ExponentialConeEntropy`](@ref) writes `K - 1` [`JuMP.MOI.ExponentialCone`](https://jump.dev/JuMP.jl/stable/moi/reference/standard_form/#MathOptInterface.ExponentialCone) rows.
 
-`alg` selects the conic encoding of the entropy, not the problem. [`RelativeEntropy`](@ref) writes one [`JuMP.MOI.RelativeEntropyCone`](https://jump.dev/JuMP.jl/stable/moi/reference/standard_form/#MathOptInterface.RelativeEntropyCone) of dimension `2T + 1`, and [`ExponentialConeEntropy`](@ref) writes `T` [`JuMP.MOI.ExponentialCone`](https://jump.dev/JuMP.jl/stable/moi/reference/standard_form/#MathOptInterface.ExponentialCone) rows. Because the objective is constant, the two encodings can return different OWA weights. On 200 observations at the highest order `5` and `max_phi = 0.75`, the largest difference of the two vectors is 0.9 % of the largest absolute weight.
-
-Equation 13 of [owa2](@cite) maximises ``\\sum_{t} \\ln \\psi_{t}`` subject to ``\\psi_{t} \\geq \\lvert \\theta_{t} \\rvert`` alone, and that objective has no maximum. The library puts ``\\boldsymbol{\\psi}`` on the unit simplex and maximises its Shannon entropy.
+Equation 13 of [owa2](@cite) maximises ``\\sum_{t} \\ln \\psi_{t}`` over a vector ``\\boldsymbol{\\psi}`` subject to ``\\psi_{t} \\geq \\lvert \\theta_{t} \\rvert`` alone, and that objective has no maximum. Its intent, the entropy of the absolute OWA weights, does not select one vector either, and it is not a convex programme in the normalised form. The L-moment weight vector of order ``k`` has entries of absolute value at most ``1/T`` once ``T > k (k - 1) / 2``, measured for every order up to `10` and every ``T`` up to 600. So every feasible ``\\boldsymbol{\\theta}`` has ``\\lvert \\theta_{t} \\rvert \\leq 1/T``, and the uniform ``\\psi_{t} = 1/T`` bounds it. A probability vector ``\\boldsymbol{\\psi}`` that bounds ``\\lvert \\boldsymbol{\\theta} \\rvert`` from above then has the largest entropy ``\\log T`` at every feasible point. The library puts the entropy on the coefficients for this reason.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{\\phi},\\, \\boldsymbol{\\theta},\\, \\boldsymbol{\\psi}}{\\max} \\quad & -\\sum\\limits_{t=1}^{T} \\psi_{t} \\log \\psi_{t}\\\\
+\\underset{\\boldsymbol{\\phi},\\, \\boldsymbol{\\theta}}{\\max} \\quad & -\\sum\\limits_{k=2}^{K} \\phi_{k} \\log \\phi_{k}\\\\
 \\text{s.t.} \\quad & \\boldsymbol{\\theta} = \\mathbf{W} \\boldsymbol{\\phi}\\\\
  & \\sum\\limits_{k=2}^{K} \\phi_{k} = 1\\\\
  & 0 \\leq \\phi_{k} \\leq \\phi_{\\max} \\quad \\forall k = 2,\\, \\ldots,\\, K\\\\
  & \\phi_{k+1} \\leq \\phi_{k} \\quad \\forall k = 2,\\, \\ldots,\\, K - 1\\\\
- & \\theta_{t+1} \\geq \\theta_{t} \\quad \\forall t = 1,\\, \\ldots,\\, T - 1\\\\
- & \\sum\\limits_{t=1}^{T} \\psi_{t} = 1\\\\
- & \\psi_{t} \\geq \\lvert \\theta_{t} \\rvert \\quad \\forall t = 1,\\, \\ldots,\\, T\\,.
+ & \\theta_{t+1} \\geq \\theta_{t} \\quad \\forall t = 1,\\, \\ldots,\\, T - 1\\,.
 \\end{align}
 ```
 
 Where:
 
-  - $(math_dict[:psi_owa_ent])
   - $(math_dict[:theta_owa])
   - $(math_dict[:W_lmom])
   - $(math_dict[:omega_ik_lmom])
@@ -848,7 +843,7 @@ Combine the columns of a signed L-moment weight matrix into one OWA weight vecto
 For an [`OWAJuMP`](@ref) `method`:
 
  1. Build `model`, the feasible set, with [`owa_model_setup`](@ref).
- 2. Add the variables and the rows of the objective of `method.alg`, as `# JuMP formulation` states.
+ 2. Add the variables and the rows of the objective of `method.alg`, as `# JuMP formulation` states. Under [`MaximumEntropy`](@ref), [`owa_l_moment_crm_entropy`](@ref) adds them.
  3. Set the objective, with [`owa_l_moment_crm_entropy`](@ref) for [`MaximumEntropy`](@ref) and with [`owa_l_moment_crm_sumsq_obj`](@ref) otherwise.
  4. Solve `model` and return its OWA weights, with [`owa_model_solve`](@ref).
 
@@ -857,14 +852,12 @@ For an [`OWAJuMP`](@ref) `method`:
 ## Variables
 
   - `theta`: Read, the OWA weights that [`owa_model_setup`](@ref) creates.
-  - `x`: Created under [`MaximumEntropy`](@ref), the entropy variable ``\\boldsymbol{\\psi}``, ``T \\times 1``.
-  - `t`: Created under [`MinimumSquaredDistance`](@ref) and [`MinimumSumSquares`](@ref), the scalar that the cone bounds.
+  - `t`: Created under [`MinimumSquaredDistance`](@ref) and [`MinimumSumSquares`](@ref), the scalar that the cone bounds. Under [`MaximumEntropy`](@ref), [`owa_l_moment_crm_entropy`](@ref) creates it.
 
 ## Constraints
 
-Every row is registered under no name.
+Every row is registered under no name. Under [`MaximumEntropy`](@ref) the method adds no row, and [`owa_l_moment_crm_entropy`](@ref) adds the cone rows of the entropy.
 
-  - Under [`MaximumEntropy`](@ref): ``s_c \\left(\\sum_{t=1}^{T} \\psi_{t} - 1\\right) = 0``, and ``(s_c \\psi_{t},\\, s_c \\theta_{t}) \\in \\mathcal{K}_{1}`` for each ``t``, which states ``\\psi_{t} \\geq \\lvert \\theta_{t} \\rvert``.
   - Under [`MinimumSquaredDistance`](@ref) with [`SOCRiskExpr`](@ref) or [`SquaredSOCRiskExpr`](@ref): ``(s_c t,\\, s_c \\boldsymbol{d}) \\in \\mathcal{K}_{2}``, which states ``t \\geq \\lVert \\boldsymbol{d} \\rVert_{2}``.
   - Under [`MinimumSquaredDistance`](@ref) with [`RSOCRiskExpr`](@ref): ``(s_c t,\\, s_c / 2,\\, s_c \\boldsymbol{d}) \\in \\mathcal{Q}_{r}``, which states ``t \\geq \\lVert \\boldsymbol{d} \\rVert_{2}^{2}``.
   - Under [`MinimumSumSquares`](@ref) with [`SOCRiskExpr`](@ref) or [`SquaredSOCRiskExpr`](@ref): ``(s_c t,\\, s_c \\boldsymbol{\\theta}) \\in \\mathcal{K}_{2}``, which states ``t \\geq \\lVert \\boldsymbol{\\theta} \\rVert_{2}``.
@@ -874,7 +867,6 @@ Where:
 
   - $(math_dict[:sc_scale]) It is the `sc` field of `method`.
   - $(math_dict[:theta_owa])
-  - $(math_dict[:psi_owa_ent])
   - ``\\boldsymbol{d}``: Differences of adjacent OWA weights, ``d_{t} = \\theta_{t+1} - \\theta_{t}`` for ``t = 1, \\ldots, T - 1``.
   - $(math_dict[:K_q_norm])
   - ``\\mathcal{Q}_{r} = \\{(u, v, \\boldsymbol{z}) : 2 u v \\geq \\lVert \\boldsymbol{z} \\rVert_{2}^{2},\\, u, v \\geq 0\\}``: Rotated second-order cone.
@@ -914,42 +906,46 @@ end
 
 Add the entropy objective of the [`MaximumEntropy`](@ref) programme to `model`.
 
-The method dispatches on the [`EntropyFormulation`](@ref) in `method.alg.alg`. It reads the entropy variable `x`, adds the variable and the cone rows that bound the entropy, and sets the objective. It does not solve the model.
+The method dispatches on the [`EntropyFormulation`](@ref) in `method.alg.alg`. It reads the risk aversion coefficients `phi`, adds the variable and the cone rows that bound their entropy, and sets the objective. It does not solve the model.
 
-The two encodings state one problem. Under [`ExponentialConeEntropy`](@ref) the objective is the entropy less ``\\log s_c``, because the cones hold ``s_c \\psi_{t}`` and the entries of ``\\boldsymbol{\\psi}`` sum to one. So the objective values differ when ``s_c \\neq 1``. [`MaximumEntropy`](@ref) states why the OWA weights that the two encodings return can differ too.
+The two encodings state one problem. Under [`ExponentialConeEntropy`](@ref) the objective is the entropy less ``\\log s_c``, because the cones hold ``s_c \\phi_{k}`` and the coefficients sum to one. So the objective values differ when ``s_c \\neq 1``, and the maximiser does not.
+
+The objective carries a factor of ``10^{-3}``, which does not change the maximiser. The steps of ``\\boldsymbol{\\theta}`` are of order ``1/T^{2}``, the entropy is of order one, and the maximiser touches the rows ``\\theta_{t+1} \\geq \\theta_{t}`` tangentially. Without the factor, Clarabel stopped short of optimal on 31 of 39 programmes, with ``T`` from 30 to 5000, the highest order from 4 to 10 and `max_phi = 0.75`. With it, Clarabel solved every one of them.
 
 # JuMP formulation
 
 ## Variables
 
-  - `x`: Read, the entropy variable ``\\boldsymbol{\\psi}``.
-  - `t`: Created. Under [`RelativeEntropy`](@ref) it is a scalar, and under [`ExponentialConeEntropy`](@ref) it is a vector ``T \\times 1``.
+  - `phi`: Read, the risk aversion coefficients ``\\boldsymbol{\\phi}`` that [`owa_model_setup`](@ref) creates.
+  - `t`: Created. Under [`RelativeEntropy`](@ref) it is a scalar, and under [`ExponentialConeEntropy`](@ref) it is a vector ``(K - 1) \\times 1``.
 
 ## Constraints
 
 Every row is registered under no name.
 
-  - Under [`RelativeEntropy`](@ref): ``(s_c t,\\, s_c \\boldsymbol{1},\\, s_c \\boldsymbol{\\psi}) \\in \\mathcal{K}_{\\mathrm{rel}}``, which states ``t \\geq \\sum_{t=1}^{T} \\psi_{t} \\log \\psi_{t}``.
-  - Under [`ExponentialConeEntropy`](@ref): ``(s_c t_{i},\\, s_c \\psi_{i},\\, 1) \\in \\mathcal{K}_{\\exp}`` for each ``i``, which states ``t_{i} \\leq -\\psi_{i} \\log(s_c \\psi_{i})``.
+  - Under [`RelativeEntropy`](@ref): ``(s_c t,\\, s_c \\boldsymbol{1},\\, s_c \\boldsymbol{\\phi}) \\in \\mathcal{K}_{\\mathrm{rel}}``, which states ``t \\geq \\sum_{k=2}^{K} \\phi_{k} \\log \\phi_{k}``.
+  - Under [`ExponentialConeEntropy`](@ref): ``(s_c t_{k},\\, s_c \\phi_{k},\\, 1) \\in \\mathcal{K}_{\\exp}`` for each ``k``, which states ``t_{k} \\leq -\\phi_{k} \\log(s_c \\phi_{k})``.
 
 ## Objective
 
-  - Under [`RelativeEntropy`](@ref): `Max` of ``-s_o t``.
-  - Under [`ExponentialConeEntropy`](@ref): `Max` of ``s_o \\sum_{i=1}^{T} t_{i}``.
+  - Under [`RelativeEntropy`](@ref): `Max` of ``-10^{-3} s_o t``.
+  - Under [`ExponentialConeEntropy`](@ref): `Max` of ``10^{-3} s_o \\sum_{k=2}^{K} t_{k}``.
 
 Where:
 
-  - $(math_dict[:psi_owa_ent])
+  - $(math_dict[:phi_k_lmom])
+  - $(math_dict[:theta_owa])
   - $(math_dict[:sc_scale]) It is the `sc` field of `method`.
   - $(math_dict[:so_scale]) It is the `so` field of `method`.
   - ``\\mathcal{K}_{\\mathrm{rel}} = \\{(u, \\boldsymbol{v}, \\boldsymbol{z}) : u \\geq \\sum_{i} z_{i} \\log(z_{i} / v_{i}),\\, \\boldsymbol{v}, \\boldsymbol{z} \\geq 0\\}``: Relative entropy cone.
   - $(math_dict[:K_exp])
+  - $(math_dict[:K_lmom])
   - $(math_dict[:T])
 
 # Arguments
 
   - `method`: Programme of the coefficients, whose `alg` is a [`MaximumEntropy`](@ref).
-  - `model::JuMP.Model`: Model of [`owa_l_moment_crm`](@ref), which holds the variable `x`.
+  - `model::JuMP.Model`: Model of [`owa_l_moment_crm`](@ref), which holds the variable `phi`.
 
 # Returns
 
@@ -972,13 +968,15 @@ function owa_l_moment_crm_entropy(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
                                   model::JuMP.Model)
     sc = method.sc
     so = method.so
-    x = model[:x]
-    T = length(x)
-    ovec = range(sc, sc; length = T)
+    phi = model[:phi]
+    N = length(phi)
+    ovec = range(sc, sc; length = N)
     JuMP.@variable(model, t)
     JuMP.@constraint(model,
-                     [sc * t; ovec; sc * x] in JuMP.MOI.RelativeEntropyCone(2 * T + 1))
-    JuMP.@objective(model, Max, -so * t)
+                     [sc * t; ovec; sc * phi] in JuMP.MOI.RelativeEntropyCone(2 * N + 1))
+    # The steps of `theta` are of order 1/T^2 and the entropy is of order one, so the
+    # solver stalls short of optimal unless the objective is scaled down.
+    JuMP.@objective(model, Max, -so * t / 1000)
     return nothing
 end
 function owa_l_moment_crm_entropy(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
@@ -986,26 +984,17 @@ function owa_l_moment_crm_entropy(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
                                   model::JuMP.Model)
     sc = method.sc
     so = method.so
-    x = model[:x]
-    T = length(x)
-    JuMP.@variable(model, t[1:T])
-    JuMP.@constraint(model, [i = 1:T],
-                     [sc * t[i], sc * x[i], 1] in JuMP.MOI.ExponentialCone())
-    JuMP.@objective(model, Max, so * sum(t))
+    phi = model[:phi]
+    N = length(phi)
+    JuMP.@variable(model, t[1:N])
+    JuMP.@constraint(model, [i = 1:N],
+                     [sc * t[i], sc * phi[i], 1] in JuMP.MOI.ExponentialCone())
+    JuMP.@objective(model, Max, so * sum(t) / 1000)
     return nothing
 end
 function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MaximumEntropy},
                           weights::MatNum)
-    T = size(weights, 1)
-    sc = method.sc
     model = owa_model_setup(method, weights)
-    theta = model[:theta]
-    JuMP.@variable(model, x[1:T])
-    JuMP.@constraints(model,
-                      begin
-                          sc * (sum(x) - 1) == 0
-                          [i = 1:T], [sc * x[i]; sc * theta[i]] in JuMP.MOI.NormOneCone(2)
-                      end)
     owa_l_moment_crm_entropy(method, model)
     return owa_model_solve(model, method, weights)
 end

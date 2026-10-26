@@ -213,7 +213,6 @@ unique_key_dict!(math_dict, :math_dict,
                  :W_lmom => "``\\mathbf{W}``: Signed L-moment weight matrix ``T \\times (K - 1)``. Its column ``k - 1`` is ``(-1)^{k} \\boldsymbol{\\omega}^{k}`` for ``k = 2, \\ldots, K``.",#
                  :phi_max_owa => "``\\phi_{\\max}``: Ceiling on each risk aversion coefficient, the `max_phi` field of [`OWAJuMP`](@ref).",#
                  :theta_owa => "``\\boldsymbol{\\theta}``: Solved OWA weight vector ``T \\times 1``, the model variable `theta`.",#
-                 :psi_owa_ent => "``\\boldsymbol{\\psi}``: Entropy variable ``T \\times 1``, the model variable `x`. It is a probability vector, and it bounds ``\\lvert \\boldsymbol{\\theta} \\rvert`` from above, entry by entry.",#
                  :gamma_crra => "``\\gamma``: Relative risk aversion `g` of the normalised constant relative risk aversion coefficients, ``\\gamma \\in (0, 1)``.",#
                  # A meta-optimiser's sub-portfolios, the synthetic assets of its outer
                  # problem, and the combination of the two solves.

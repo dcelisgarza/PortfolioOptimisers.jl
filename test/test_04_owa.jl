@@ -74,13 +74,9 @@
             for i in eachindex(owas)
                 owa = owa_l_moment_crm(200, owas[i]; k = 5)
                 if i in 4:6
-                    if i == 4
-                        rtol = 0.05
-                    elseif i == 5
-                        rtol = 0.005
-                    else
-                        rtol = 1e-6
-                    end
+                    # The entropy of the coefficients has one maximiser, so the two
+                    # encodings agree to solver tolerance: 1.6e-6 and 4.8e-6 measured (#1834).
+                    rtol = i in 4:5 ? 2e-5 : 1e-6
                     owa_entr = owa_l_moment_crm(200, owas_entr[i - 3]; k = 5)
                     res = isapprox(owa, owa_entr; rtol = rtol)
                     if !res
@@ -147,10 +143,10 @@
                     end
                     @test res
                 end
-                rtol = if i == 4
-                    0.05
-                elseif i == 5
-                    0.005
+                rtol = if i in 4:5
+                    # The entropy maximiser touches the rows θ_{t+1} ≥ θ_t tangentially, so
+                    # the solver leaves more digits to the host than in the quadratic cases.
+                    1e-5
                 elseif i in (7, 8, 11)
                     # Iteration 11 measures rtol = 1e-7 on a Linux host and passes 5e-8 on CI.
                     # The solver sets the last digits, so the host does (#1709).
@@ -330,17 +326,7 @@
             slv = Solver(; solver = Clarabel.Optimizer, settings = Dict("verbose" => false))
             T, k = 200, 5
             W = reduce(hcat, [(-1)^i * owa_l_moment(T, i) for i in 2:k])
-            # The largest entropy of a given θ over ψ ≥ |θ| on the simplex, by water-filling.
-            function best_entropy(theta)
-                a = abs.(theta)
-                lo, hi = 0.0, 1.0
-                for _ in 1:200
-                    m = (lo + hi) / 2
-                    sum(max.(a, m)) > 1 ? (hi = m) : (lo = m)
-                end
-                psi = max.(a, (lo + hi) / 2)
-                return -sum(p -> p > 0 ? p * log(p) : zero(p), psi)
-            end
+            entropy(phi) = -sum(p -> p > 0 ? p * log(p) : zero(p), phi)
             algs = (MaximumEntropy(), MaximumEntropy(; alg = ExponentialConeEntropy()),
                     MinimumSquaredDistance(),
                     MinimumSquaredDistance(; alg = SquaredSOCRiskExpr()),
@@ -358,15 +344,18 @@
                 @test all(diff(phi) .<= 1e-8)
                 # Twice the default feasibility tolerance of Clarabel, 1e-8.
                 @test all(diff(theta) .>= -2e-8)
-                # Every feasible θ has |θ_t| ≤ 1/T, so the entropy objective is log T at
-                # every answer, its own included (#1834).
-                @test isapprox(best_entropy(theta), log(T); atol = 1e-10)
             end
+            # The entropy of the coefficients has one maximiser, so both encodings reach it,
+            # and no other objective reaches a larger entropy (#1834).
+            hs = [entropy(W \ theta) for theta in thetas]
+            @test isapprox(thetas[1], thetas[2]; rtol = 2e-5)
+            @test maximum(hs[3:8]) < hs[1] - 1e-3
             # Each quadratic objective attains the least value of its own measure.
             ss = [sum(abs2, theta) for theta in thetas]
             sd = [sum(abs2, diff(theta)) for theta in thetas]
             @test argmin(ss) in 6:8
-            @test minimum(ss[6:8]) < 0.8 * minimum(ss[1:5])
+            # The entropy answer comes within 0.5 % of the least sum of squares.
+            @test minimum(ss[6:8]) < (1 - 1e-3) * minimum(ss[1:5])
             @test argmin(sd) in 3:5
             @test minimum(sd[3:5]) < 0.95 * minimum(sd[[1, 2, 6, 7, 8]])
         end
