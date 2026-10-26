@@ -639,7 +639,7 @@ This is Equation 5 of [christensenprabhala1998](@cite). It regresses the log rea
  2. Check that `chunk` exceeds four.
  3. Call [`realised_vol`](@ref) with `alg.ve`. The result is `rv`, the realised volatility of each window.
  4. Call [`implied_vol`](@ref) on `iv` with the same `chunk`, `T` and `N`. The result replaces `iv`, and holds the implied volatility at the last row of each window. The window count comes from `X`, so the function reads `iv` over the rows of the returns sample.
- 5. Check that `rv` and `iv` have the same size. Set `T2` to their number of rows, which is `chunk`.
+ 5. Check that `rv` and `iv` have the same size, and that each of their entries is positive. Set `T2` to their number of rows, which is `chunk`.
  6. Replace `rv` and `iv` by their natural logarithms.
  7. Make `ovec`, the intercept column of ones, of length `T2 - 1`.
  8. For each asset `i`, make the design matrix `X_t` from `ovec` and the first `T2 - 1` rows of `iv` and `rv`. Make the response `y_t` from the rows `2:T2` of `rv`, and the prediction row `X_p` from the row `T2`.
@@ -659,6 +659,8 @@ The implied volatilities are the second positional argument, and the returns are
 
   - `chunk > 4`. The fit has `chunk - 1` rows for three coefficients, so it has a residual only when `chunk > 4`.
   - `size(rv) == size(iv)`, one realised volatility for each implied volatility.
+  - Each implied volatility on the last row of a window is positive. Otherwise the function throws a `DomainError`, because the fit takes its logarithm. An entry on a row that ends no window is not read.
+  - Each window has a positive realised volatility. Otherwise the function throws a `DomainError`. Constant returns over the `ws` rows of a window give a realised volatility of zero.
 
 # Returns
 
@@ -685,6 +687,15 @@ function predict_realised_vols(alg::ImpliedVolatilityRegression, iv::MatNum, X::
     rv = realised_vol(alg.ve, X, alg.ws, chunk, T, N)
     iv = implied_vol(iv, alg.ws, chunk, T, N)
     @argcheck(size(rv) == size(iv), DimensionMismatch)
+    # The fit takes the logarithm of both series, so a volatility of zero has no value in it.
+    k = findfirst(x -> !(x > zero(x)), iv)
+    @argcheck(isnothing(k),
+              DomainError(iv[k],
+                          "`iv` holds $(iv[k]) for asset $(k[2]) on the last row of window $(k[1]) of $chunk. `ImpliedVolatilityRegression` takes the logarithm of the implied volatility on the last row of each window, so that value must be positive. State a positive implied volatility on that row, or use `ImpliedVolatilityPremium`."))
+    k = findfirst(x -> !(x > zero(x)), rv)
+    @argcheck(isnothing(k),
+              DomainError(rv[k],
+                          "Window $(k[1]) of $chunk has no dispersion for asset $(k[2]): its realised volatility is $(rv[k]). `ImpliedVolatilityRegression` takes the logarithm of the realised volatility of each window, so that value must be positive. State another `ImpliedVolatilityRegression.ws`, or remove the asset."))
     T2 = size(iv, 1)
     rv = log.(rv)
     iv = log.(iv)
@@ -791,7 +802,7 @@ So each diagonal entry of ``\\hat{\\mathbf{\\Sigma}}`` is the square of the pred
   - `dims in (1, 2)`. [`dims_oriented`](@ref) checks it.
   - `size(X) == size(iv)`, one implied volatility for each return.
   - Each entry of `X` is finite. Otherwise the method throws an `IsNonFiniteError`. The panel method removes an asset with a gap from the Coverage Universe, and this check keeps the plain call in agreement with it. Without the check, a plain call reads past the gap and gives a value for an asset that the panel method does not price.
-  - Each entry of `iv` is finite and not negative. Otherwise the method throws a `DomainError`. The method refuses a gap in `iv` for the same reason as a gap in `X`. [`ImpliedVolatilityPremium`](@ref) turns a negative entry into a negative volatility, and `StatsBase.cor2cov!` hides its sign. [`ImpliedVolatilityRegression`](@ref) takes the logarithm of each entry.
+  - Each entry of `iv` is finite and not negative. Otherwise the method throws a `DomainError`. The method refuses a gap in `iv` for the same reason as a gap in `X`. [`ImpliedVolatilityPremium`](@ref) turns a negative entry into a negative volatility, and `StatsBase.cor2cov!` hides its sign. [`ImpliedVolatilityRegression`](@ref) takes the logarithm of the entry on the last row of each window, and refuses a zero there, through [`predict_realised_vols`](@ref).
   - The checks of `ce.alg`, through [`predict_realised_vols`](@ref). [`ImpliedVolatilityPremium`](@ref) needs an `ivpa` that is not `nothing`, with each entry finite and strictly positive.
 
 # Returns
@@ -857,7 +868,7 @@ That round trip is the identity only in exact arithmetic. In floating point, the
   - `dims in (1, 2)`. [`dims_oriented`](@ref) checks it.
   - `size(X) == size(iv)`, one implied volatility for each return.
   - Each entry of `X` is finite. Otherwise the method throws an `IsNonFiniteError`. The panel method removes an asset with a gap from the Coverage Universe, and this check keeps the plain call in agreement with it. Without the check, a plain call reads past the gap and gives a value for an asset that the panel method does not price.
-  - Each entry of `iv` is finite and not negative. Otherwise the method throws a `DomainError`. The method refuses a gap in `iv` for the same reason as a gap in `X`. [`ImpliedVolatilityPremium`](@ref) turns a negative entry into a negative volatility, and `StatsBase.cor2cov!` hides its sign. [`ImpliedVolatilityRegression`](@ref) takes the logarithm of each entry.
+  - Each entry of `iv` is finite and not negative. Otherwise the method throws a `DomainError`. The method refuses a gap in `iv` for the same reason as a gap in `X`. [`ImpliedVolatilityPremium`](@ref) turns a negative entry into a negative volatility, and `StatsBase.cor2cov!` hides its sign. [`ImpliedVolatilityRegression`](@ref) takes the logarithm of the entry on the last row of each window, and refuses a zero there, through [`predict_realised_vols`](@ref).
   - The checks of `ce.alg`, through [`predict_realised_vols`](@ref). [`ImpliedVolatilityPremium`](@ref) needs an `ivpa` that is not `nothing`, with each entry finite and strictly positive.
 
 # Returns

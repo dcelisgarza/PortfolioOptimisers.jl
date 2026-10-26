@@ -550,6 +550,9 @@ inequality the raw statistic of `debias = RawStatistic()` read low at every corr
 constant of `MahalanobisTarget`, `√2 Γ((n + 1)/2) / Γ(n/2)`, for both targets, which is exact for
 the diagonal sum at independent returns. `diagonal_law_factor` divides `S` by
 `(E[√S] / E[χ(n)])²`, so it is one at `μ = 1`, and it reads the constant, so the debiased statistic
-of the default `ExactDebias()` does not move: measured, a default fit is equal bit for bit. Only a
-raw fit moves, by `n / E[χ(n)]²` before the clip. The decision above keeps its law factor and its
+of the default `ExactDebias()` does not move in exact arithmetic. Measured against `v0.33.0` on a
+panel of six assets with a late listing and holidays, a `DiagonalTarget` fit of the first moment
+under `ExactDebias()` moves by 7.4e-16 relative at most, which is round-off, and the default
+estimator, on `PortfolioTarget`, is equal bit for bit. A raw fit moves by `n / E[χ(n)]²` before the
+clip, 1.0865 at `n = 6`. The decision above keeps its law factor and its
 shrunk spectrum.

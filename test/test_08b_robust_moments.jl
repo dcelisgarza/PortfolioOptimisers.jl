@@ -859,6 +859,32 @@ end
         ivzero = copy(iv)
         ivzero[end, 2] = 0
         @test all(isfinite, cov(cep, X; iv = ivzero, ivpa = ivpav))
+        #=
+        The regression takes the logarithm of the implied volatility at the end of each
+        window and of the realised volatility of each window, so a zero there has no value in
+        the fit. A zero at the end of an earlier window raised a LAPACK error that named
+        neither input, a zero on the last row made a predicted volatility of zero or infinity,
+        and a window of constant returns raised the same LAPACK error (R5 of #1817). A zero
+        on a row that ends no window is not read, and the fit still answers.
+        =#
+        sampled = (T - (div(T, 20) - 1) * 20):20:T
+        for row in (sampled[5], T)
+            ivz = copy(iv)
+            ivz[row, 2] = 0
+            for f in (cov, cor)
+                @test_throws DomainError f(cer, X; iv = ivz)
+                @test_throws "`iv`" f(cer, X; iv = ivz)
+            end
+        end
+        ivz = copy(iv)
+        ivz[sampled[5] - 1, 2] = 0
+        @test cov(cer, X; iv = ivz) == cov(cer, X; iv = iv)
+        Xc = copy(X)
+        Xc[(sampled[5] - 19):sampled[5], 2] .= X[sampled[5], 2]
+        for f in (cov, cor)
+            @test_throws DomainError f(cer, Xc; iv = iv)
+            @test_throws "no dispersion" f(cer, Xc; iv = iv)
+        end
         # The implied volatility series itself is mandatory. Every method refuses a missing
         # `iv` and an `iv = nothing` by name, and so does a prior fitted on returns that
         # carry none, since `prior(pe, rd)` passes `iv = rd.iv`.
