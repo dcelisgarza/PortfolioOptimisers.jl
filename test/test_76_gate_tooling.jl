@@ -511,6 +511,8 @@ end
                       @test 1 == 1
                       @test 1 == 2
                       @test_broken 1 == 2
+                      # A failed `@test_logs` is a fail, not an error of the driver.
+                      @test_logs (:warn, "never logged") nothing
                   end
                   @test error("boom")
               end
@@ -520,11 +522,11 @@ end
             return RF.run_file(path; code)
         end
         RF.OUT[] = stdout
-        @test (ts.pass, ts.fail, ts.error, ts.broken) == (4, 1, 1, 1)
+        @test (ts.pass, ts.fail, ts.error, ts.broken) == (4, 2, 1, 1)
         @test seconds >= 0
         @test RF.result_line(ts, 1.0) ==
-              "RESULT test_fixture.jl pass=4 fail=1 error=1 broken=1 seconds=1.0"
-        @test RF.done_line([ts]) == "DONE files=1 pass=4 fail=1 error=1 broken=1 status=red"
+              "RESULT test_fixture.jl pass=4 fail=2 error=1 broken=1 seconds=1.0"
+        @test RF.done_line([ts]) == "DONE files=1 pass=4 fail=2 error=1 broken=1 status=red"
         @test RF.resolve("test_76_gate_tooling.jl") ==
               joinpath(RF.TEST_DIR, "test_76_gate_tooling.jl")
         @test_throws ErrorException RF.resolve("test_no_such_file.jl")

@@ -262,6 +262,32 @@ end
         end
     end
 
+    @testset "A zero-weight loss does not move the even moment model" begin
+        # Every asset loses 0.3 on the third observation, which carries no weight. Its power
+        # cone rows do not change the optimum, but at the default tolerances the solver
+        # stalled on them before they were dropped, as in the EVaR and power-norm programmes.
+        X0 = copy(_Xm598)
+        X0[3, :] .= -0.3
+        rd0 = ReturnsResult(; nx = _rd598.nx, X = X0)
+        rd1 = ReturnsResult(; nx = _rd598.nx, X = X0[setdiff(1:120, 3), :])
+        w0 = pweights([1.0; 1.0; 0.0; ones(117)])
+        slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                     settings = Dict("verbose" => false),
+                     check_sol = (; allow_local = true, allow_almost = true))
+        for (p, alg) in ((2, FullMoment()), (2, SemiMoment()), (3, FullMoment()))
+            e = EvenMoment(; p = p, alg = alg)
+            s0 = optimise(MeanRisk(; r = LowOrderMoment(; w = w0, mu = 0.0, alg = e),
+                                   opt = JuMPOptimiser(; pe = prior(EmpiricalPrior(), rd0),
+                                                       slv = slv)), rd0)
+            s1 = optimise(MeanRisk(; r = LowOrderMoment(; mu = 0.0, alg = e),
+                                   opt = JuMPOptimiser(; pe = prior(EmpiricalPrior(), rd1),
+                                                       slv = slv)), rd1)
+            @test isapprox(s0.w, s1.w; atol = 1e-8)
+            @test isapprox(JuMP.value(s0.model[:risk]), JuMP.value(s1.model[:risk]);
+                           rtol = 1e-8)
+        end
+    end
+
     @testset "The model of the mean absolute deviation holds for every target" begin
         M(; kw...) = LowOrderMoment(; alg = MeanAbsoluteDeviation(), kw...)
         ws = pweights(collect(range(0.5, 1.5; length = 120)))

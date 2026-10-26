@@ -202,8 +202,9 @@ function Test.record(ts::Collect, r::Test.Broken)
     ts.broken += 1
     return r
 end
-function Test.record(ts::Collect, r::Union{Test.Fail, Test.Error})
-    if r isa Test.Fail
+# A failed `@test_logs` records a `Test.LogTestFailure`, which is a failed test too.
+function Test.record(ts::Collect, r::Union{Test.Fail, Test.Error, Test.LogTestFailure})
+    if r isa Union{Test.Fail, Test.LogTestFailure}
         ts.fail += 1
     else
         ts.error += 1
