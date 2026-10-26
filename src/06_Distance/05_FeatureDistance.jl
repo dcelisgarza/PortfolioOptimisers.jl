@@ -671,6 +671,8 @@ Concatenates the window into one long feature vector per asset, so the collapse 
 
 It turns `observations × assets × features` into an `assets × (observations · features)` matrix, and applies the metric once. Two assets are near only when their whole trajectories agree. For the same reason, the observations with the largest magnitudes have the largest effect on the result. Standardise features of different scales before you use it.
 
+A metric with one parameter per coordinate, such as `Distances.WeightedEuclidean`, measures the long vector. So it takes `observations · features` entries, not one entry per feature. The entries follow the columns of step 2 of the algorithm: the first `observations` entries are the observations of the first feature, and so on.
+
 In general, its result is different from the result of each other member of the family. At `observations == 1`, all the members give the same result.
 
 A window of an Asset Panel can hold an inactive cell. For each pair of assets, the collapse then stacks the ``n`` rows at which both assets are active. [`stack_rescale`](@ref) rescales the distance of the pair from those rows to the ``T`` rows of the window. A metric that sums over the coordinates, such as the Minkowski family, `Distances.SqEuclidean` or `Distances.ChiSqDist`, takes a factor of ``T / n`` inside its power. A ratio metric, such as [`AngularDist`](@ref) or `Distances.CosineDist`, takes no factor. A metric with no rescale method refuses a pair that shares fewer rows than the window. A pair with no shared active row takes the rule in `pair`.

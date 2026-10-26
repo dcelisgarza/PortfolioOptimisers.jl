@@ -510,6 +510,21 @@
         @test r_fixed isa StepRange
         @test collect(r_fixed) ==
               [d - Day(3) for d in Date(2021, 1, 1):Week(1):Date(2021, 2, 28)]
+        # So the anchor of 2021-02-19, row 50, opens a fold (R7 of #1817). Under `reduce_test`
+        # it starts the last test window, which runs to the last row. Without it, the anchor
+        # closes the one test window. A range that stops at 2021-01-22 gives the one window
+        # 22:56 under `reduce_test`, and no fold without it.
+        rde = ReturnsResult(; nx = ["a", "b"], X = zeros(length(ts_end), 2),
+                            ts = collect(ts_end))
+        for previous in (false, true), train_size in (1, Day(20))
+            cv = DateWalkForward(train_size, 1; period = Month(1), period_offset = Day(-10),
+                                 previous = previous, reduce_test = true)
+            @test split(cv, rde).test_idx == [22:49, 50:56]
+            @test n_splits(cv, rde) == 2
+        end
+        cv = DateWalkForward(1, 1; period = Month(1), period_offset = Day(-10))
+        @test split(cv, rde).test_idx == [22:49]
+        @test n_splits(cv, rde) == 1
         for cv in (DateWalkForward(12, 3; period = Month(1), period_offset = Day(-10)),
                    DateWalkForward(12, 3; period = Month(1), period_offset = Day(-10),
                                    previous = true),

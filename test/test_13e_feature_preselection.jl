@@ -684,6 +684,16 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
         @test PO.stack_metric(SqMahalanobis(Q), [1, 3]).qmat == [2.0 0; 0 4]
         @test PO.stack_metric(WeightedHamming([1.0, 2, 3]), [1, 3]).weights == [1.0, 3]
         @test PO.stack_metric(PeriodicEuclidean([1.0, 2, 3]), [2]).periods == [2.0]
+        # A weighted metric of the stack takes one weight per coordinate of the long vector,
+        # the three observations of the first feature first (R7 of #1817). Weights on those
+        # three measure the first feature alone, and one weight per feature does not fit.
+        Zf = float.(Z3)
+        dwe = distance(fdist(StackObservations();
+                             metric = WeightedEuclidean([1.0, 1, 1, 0, 0, 0])), Zf)
+        @test dwe ≈ [Euclidean()(Zf[:, i, 1], Zf[:, j, 1]) for i in 1:3, j in 1:3] rtol = 1e-15
+        @test_throws DimensionMismatch distance(fdist(StackObservations();
+                                                      metric = WeightedEuclidean([1.0, 1])),
+                                                Zf)
     end
 end
 

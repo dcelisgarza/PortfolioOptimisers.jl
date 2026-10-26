@@ -537,7 +537,7 @@ end
 
 Read one Panel Field from a table, as its manifest entry `s` describes it.
 
-A cell that a long table does not hold is outside the universe, and the table holds no value for it. It gets the value zero, the first level of a categorical Panel Field, and `false` in the observed mask and in the placeholder mask.
+A cell that a long table does not hold is outside the universe, and the table holds no value for it. It gets the value zero, the first level of a categorical Panel Field, and `false` in each mask that the manifest records. A Panel Field whose manifest records no observed mask or no placeholder mask comes back with no such mask.
 
 # Algorithm
 
@@ -977,7 +977,7 @@ The two tables can go through any table format and come back, for example throug
 The function reads the long and the wide layouts, and tells them apart by the `"asset"` column, which only the long layout holds. It does not read the single-field shape, which holds no mask.
 
   - A wide table holds every cell and both universe masks, so the panel comes back whole.
-  - A long table holds only the rows where the active mask is `true`. The function makes the active mask from the rows that the table holds, and the manifest gives the axes. The value of a cell outside the universe does not come back. The cell gets zero, the first level of a categorical Panel Field, and `false` in the observed mask and in the placeholder mask.
+  - A long table holds only the rows where the active mask is `true`. The function makes the active mask from the rows that the table holds, and the manifest gives the axes. The value of a cell outside the universe does not come back. The cell gets zero, the first level of a categorical Panel Field, and `false` in each mask that the Panel Field carries. A Panel Field with no observed mask or no placeholder mask comes back with no such mask.
 
 A read that masks the cells outside the universe gives the same answer before and after a long round trip, for example [`panel_field_values`](@ref) with `inactive = NaN`. A read that keeps those cells gets the new values. Two such reads are [`panel_field_values`](@ref) with its default `inactive = nothing`, and the wide layout of [`panel_dataframe`](@ref).
 

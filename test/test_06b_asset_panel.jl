@@ -1674,6 +1674,9 @@ stored type and the two policies.
                                                      unobserved = nothing)
         @test eltype(panel_field_values(up, "u"; inactive = 0, unobserved = nothing)) ===
               UInt
+        # The default `unobserved = NaN` floats the field, so `-1` fits (R7 of #1817).
+        @test panel_field_values(up, "u"; inactive = -1) == [1.0 -1.0; 3.0 4.0]
+        @test eltype(panel_field_values(up, "u"; inactive = -1)) === Float64
         # A float type converts every integer, and one past its range reads as an infinity.
         hp = AssetPanel(; pf = [NumericPanelField(; name = "h", vals = Float16[1 2; 3 4])],
                         amsk = [true false; true true], emsk = [true false; true true])
@@ -2177,6 +2180,9 @@ end
     fp2 = asset_panel(panel_dataframe(fp; layout = :long), panel_manifest(fp))
     @test panel_field(fp2, "m").pmsk == Bool[1 0; 0 0; 0 0]
     @test panel_field(fp2, "m").omsk == Bool[0 1; 1 0; 1 1]
+    # A Panel Field with no mask comes back with none, so the masks hold no `false` cell
+    # outside the universe (R7 of #1817).
+    @test isnothing(panel_field(p2, "mcap").omsk) && isnothing(panel_field(p2, "mcap").pmsk)
     # A Panel Field holds a finite value in every cell, so a table cell is never NaN.
     @test_throws PO.IsNonFiniteError NumericPanelField(; name = "x", vals = [NaN, 1.0])
     # The selections refuse a repeated asset, an unknown asset, and a code that `T` cannot hold.

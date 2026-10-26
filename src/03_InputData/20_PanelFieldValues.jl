@@ -184,7 +184,7 @@ Where:
   - The panel holds a Panel Field named `name`. Raises a `KeyError`.
   - `rd.pnl` is an [`AssetPanel`](@ref). Raises an [`IsNothingError`](@ref).
   - A policy value converts to the element type of the answer. An integer field read with `inactive = 0.5` is floated, and a `Rational` field read with `NaN` raises an `InexactError` at the first cell that the policy writes.
-  - An integer policy value keeps an integer field, so the integer type must hold it. A `UInt` field read with `inactive = -1` raises an `InexactError` at the first cell that the policy writes. A float type converts every integer, and an integer past its range reads as an infinity. A `Float16` field read with `inactive = 100000` holds `Inf16` there.
+  - An integer policy value keeps an integer field when the other policy keeps it too, so the integer type must hold it. The default `unobserved = NaN` floats an integer field. A `UInt` field read with `inactive = -1` and `unobserved = nothing` raises an `InexactError` at the first cell that the policy writes. A float type converts every integer, and an integer past its range reads as an infinity. A `Float16` field read with `inactive = 100000` holds `Inf16` there.
 
 # Returns
 
