@@ -480,7 +480,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Measures a weighted sum of the variance, the third central moment and the fourth central moment of the portfolio returns.
 
-The third moment enters with a negative sign, because a larger skewness is better. Each term takes the `scale` of its child as its weight, and the bound of its child as its bound. The skewness bound is the floor `sk.settings.lb`, and the other two are ceilings. The terms are the raw moments: the third moment is not standardised, and the fourth moment is not square-rooted under any `alg2` of `kt`.
+The third moment enters with a negative sign, because a larger skewness is better. Each term takes the `scale` of its child as its weight, and the bound of its child as its bound. The skewness bound is the floor `sk.settings.lb`, and the other two are ceilings. The terms are the raw moments: the third moment is not standardised, and the fourth moment is not square-rooted under any `alg2` of `kt`. The model and the functor read the matrices of the children, so the observation weights `w` of `sk` and of `kt`, and the `alg1` of `kt`, act on the functors of the children alone. To weight a term, name a **Deferred Quantity** that carries the weights, such as `kt = Kurtosis(; kt = Cokurtosis(; w = w))`.
 
 [`set_risk_constraints!`](@ref) states the model. It is the semidefinite relaxation of Problems 12 to 14 of [sdpmom](@cite), and that work states that the relaxation is tight over a range of skewness values only. The `## Relaxation` of the method states the gap of each term.
 

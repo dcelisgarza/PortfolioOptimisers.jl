@@ -86,7 +86,7 @@ Where:
   - ``z_t \\geq 0``: Auxiliary variables capturing deviations below the mean.
   - ``\\boldsymbol{\\mu}``: Expected returns vector.
   - ``\\bar{F}(\\boldsymbol{w})``: Mean fee per period, subtracted by [`calc_risk_constraint_target`](@ref) so that the target is the net mean. Zero without a fee.
-  - ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}``: Portfolio return at time ``t``.
+  - ``\\hat{r}_t``: Net portfolio return at time ``t``, ``\\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` less the fee of the period.
 
 Mean absolute deviation:
 
@@ -106,9 +106,7 @@ Where:
   - ``z_t \\geq 0``: Auxiliary variables capturing the deviations below the target.
   - ``\\boldsymbol{\\mu}``: Expected returns vector.
   - ``\\bar{F}(\\boldsymbol{w})``: Mean fee per period, subtracted by [`calc_risk_constraint_target`](@ref) so that the target is the net mean. Zero without a fee.
-  - ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}``: Portfolio return at time ``t``.
-
-where ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` is the net portfolio return at time ``t``.
+  - ``\\hat{r}_t``: Net portfolio return at time ``t``, ``\\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` less the fee of the period.
 
 # Arguments
 
@@ -120,7 +118,7 @@ where ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` is the net p
 
 # Returns
 
-  - `nothing`.
+  - The risk expression: `flm_risk_` under [`FirstLowerMoment`](@ref), `mad_risk_` under [`MeanAbsoluteDeviation`](@ref), and `second_moment_risk_` under [`SecondMoment`](@ref).
 
 # Related
 
@@ -173,7 +171,7 @@ expression and upper-bound constraint.
 
 # Returns
 
-  - `nothing`.
+  - `mad_risk`: The risk expression.
 
 # Related
 
@@ -344,7 +342,7 @@ the risk expression and upper-bound constraint.
 
 # Returns
 
-  - `nothing`.
+  - `second_moment_risk`: The risk expression of [`set_second_moment_risk!`](@ref).
 
 # Related
 
@@ -444,7 +442,7 @@ Where:
 
 # Returns
 
-  - `nothing`.
+  - `even_moment_risk`: The epigraph variable of the even moment, the risk expression.
 
 # Related
 

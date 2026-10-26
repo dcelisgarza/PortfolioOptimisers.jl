@@ -108,7 +108,7 @@ end
         @test kl(w, X) ≈ sqrt(mean((x .- dot(w, prl.mu)) .^ 4))
         @test_throws ArgumentError _solve599(Kurtosis(); pr = prl)
     end
-    @testset "The model reads kt and not alg1" begin
+    @testset "The model reads kt, and neither alg1 nor w" begin
         full = _solve599(Kurtosis())
         semi = _solve599(Kurtosis(; alg1 = SemiMoment()))
         # The default prior holds the full cokurtosis, so the semi measure minimises the full
@@ -129,6 +129,16 @@ end
                                 kt = Cokurtosis(; alg = SemiMoment())))
         @test ds.w ≈ hs.w rtol = 1e-5
         @test JuMP.value(ds.model[:risk]) ≈ JuMP.value(hs.model[:risk]) rtol = 1e-6
+        # The model reads no observation weights either. `w` weights the functor alone, 4 % below
+        # the model here, and a deferred cokurtosis that carries the weights weights the model.
+        fw = _solve599(Kurtosis(; w = ow))
+        @test fw.w ≈ full.w rtol = 1e-6
+        @test JuMP.value(fw.model[:risk]) ≈ JuMP.value(full.model[:risk]) rtol = 1e-6
+        @test factory(Kurtosis(; w = ow), pr)(fw.w, X) < 0.97 * JuMP.value(fw.model[:risk])
+        dk = Kurtosis(; w = ow, kt = Cokurtosis(; w = ow))
+        dks = _solve599(dk)
+        @test JuMP.value(dks.model[:risk]) ≈ factory(dk, pr)(dks.w, X) rtol = 1e-6
+        @test !isapprox(dks.w, full.w; atol = 1e-2)
     end
     @testset "The views agree with a refit on the subset" begin
         idx = [1, 3]
@@ -201,6 +211,10 @@ end
         @test rf(w, X) ≈
               2.0 * dot(w, pr.sigma, w) - 0.5 * _m3_599(pr, w) + 3.0 * _m4_599(pr, w)
         @test !PO.supports_precomputed_returns(r)
+        # The terms read the matrices, so the observation weights of a child do not reach them.
+        rw = factory(VarianceSkewKurtosis(; sk = Skewness(; w = ow),
+                                          kt = Kurtosis(; w = ow)), pr)
+        @test rw(w, X) ≈ var(x) - mean(d .^ 3) + mean(d .^ 4) rtol = 1e-10
     end
     @testset "The semidefinite relaxation of VarianceSkewKurtosis" begin
         sol = _solve599(VarianceSkewKurtosis())
