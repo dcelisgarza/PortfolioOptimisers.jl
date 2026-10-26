@@ -396,8 +396,8 @@ The estimator checks the width of ``\\mathbf{P}``. A precomputed [`BlackLitterma
  7. Build the posterior factor precision ``\\mathbf{H}`` as `sigma_hat`.
  8. Solve `sigma_hat` against the sum of the two precision-weighted means. The result is `mu_hat`, the posterior factor mean ``\\bar{\\boldsymbol{\\Pi}}_f``.
  9. Build the posterior asset covariance `posterior_sigma` from ``\\mathbf{H}``, the loadings and `prior_sigma`.
-10. Process `posterior_sigma` in place with [`matrix_processing!`](@ref), under `pe.mp` and `posterior_X`.
-11. Build the posterior asset mean from the same quantities, add `rr.b`, and add `pe.rf` with [`apply_rf`](@ref). This is the one site that adds the rate.
+10. Build the posterior asset mean from the same quantities, add `rr.b`, and add `pe.rf` with [`apply_rf`](@ref). This is the one site that adds the rate.
+11. Process `posterior_sigma` in place with [`matrix_processing!`](@ref), under `pe.mp` and `posterior_X`. This step comes after step 10, so `pe.mp` does not change the mean.
 12. Invert `sigma_hat` for the posterior factor covariance ``\\bar{\\mathbf{\\Sigma}}_f``, and process it in place under `pe.f_mp` and `F`.
 13. Forward the factor block with [`forward_prior`](@ref). Replace `mu` and `sigma` with the posterior factor pair, and drop `chol`. Do not expand the block, because the reduction did not change the factor axis.
 14. Announce the departures once with [`announce_bl_departures`](@ref). [`investable_universe_names`](@ref) gives their names.
@@ -563,11 +563,13 @@ function bbl_posterior(pe::BayesianBlackLittermanPrior, prior_result::AbstractPr
     v2 = sigma_hat + transpose(M) * v1
     v3 = prior_sigma \ LinearAlgebra.I
     posterior_sigma = (v3 - v1 * (v2 \ transpose(M)) * v3) \ LinearAlgebra.I
-    matrix_processing!(pe.mp, posterior_sigma, posterior_X; kwargs...)
     # `pe.rf` is applied here and only here (see [`apply_rf`](@ref)): once, on the asset
     # expected returns this estimator returns. The wrapped prior's moments are used as they
     # stand, so a rate that prior applied internally is left alone.
     posterior_mu = apply_rf(pe.rf, posterior_sigma * v1 * (v2 \ sigma_hat) * mu_hat + b)
+    # The mean reads the unprocessed covariance, as in the other three members, so `pe.mp`
+    # changes the covariance alone and `mu == rr.M * fpr.mu + rr.b + rf` holds under it.
+    matrix_processing!(pe.mp, posterior_sigma, posterior_X; kwargs...)
     # The views land on the *factors*, so `mu_hat` and `sigma_hat` are the posterior factor
     # moments — `sigma_hat` is a precision (`inv(f_sigma) + P'Ω⁻¹P`), so the covariance is its
     # inverse. Reporting them rather than the prior ones is what makes this prior result

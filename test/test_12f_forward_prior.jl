@@ -604,6 +604,16 @@ end
                                                sets = xfsets, views = contrary_f_views), rd)
     @test bbl_dn.fpr.sigma != bbl.fpr.sigma
     @test bbl_dn.sigma == bbl.sigma
+    # `mp` processes the asset covariance after the posterior mean is formed, as in the
+    # other three members. So a processing estimator that changes the covariance moves
+    # neither the mean nor the identity. R8 of #1817 found the mean read the processed one.
+    bbl_amp = prior(BayesianBlackLittermanPrior(; pe = FactorPrior(; pe = ep_factor),
+                                                mp = MatrixProcessing(; dn = Denoise()),
+                                                sets = xfsets, views = contrary_f_views),
+                    rd)
+    @test bbl_amp.sigma != bbl.sigma
+    @test bbl_amp.mu == bbl.mu
+    @test identity_gap(bbl_amp) < 1e-12
 
     # `AugmentedBlackLittermanPrior` — both halves are posterior, and the identity
     # still fails, so the warning it carries is about the model rather than about a

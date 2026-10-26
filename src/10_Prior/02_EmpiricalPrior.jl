@@ -250,7 +250,7 @@ Where:
 
 # Algorithm
 
-Steps 3 to 5 must run in this order. Step 4 reads the `mu` that step 3 left, which is ``\\hat{\\mu}_i + 1``, because step 5 has not yet subtracted the one. The second closed form needs that factor. If step 5 runs before step 4, each ``\\hat{\\mu}_i + 1`` becomes ``\\hat{\\mu}_i``, and on a daily return series the covariance falls by about three orders of magnitude.
+Steps 3 to 5 must run in this order. Step 4 reads the `mu` that step 3 left, which is ``\\hat{\\mu}_i + 1``, because step 5 has not yet subtracted the one. The second closed form needs that factor. If step 5 runs before step 4, each ``\\hat{\\mu}_i + 1`` becomes ``\\hat{\\mu}_i``. Entry ``(i,\\, j)`` of the covariance then falls by the factor ``\\hat{\\mu}_i \\hat{\\mu}_j / ((\\hat{\\mu}_i + 1)(\\hat{\\mu}_j + 1))``, which is about six orders of magnitude on a daily return series.
 
  1. Scale `mu` by `horizon`.
  2. Scale `sigma` by `horizon`.
@@ -421,7 +421,7 @@ The `X` of the returned [`LowOrderPrior`](@ref) is the arithmetic returns matrix
 
 # Algorithm
 
-Steps 5 to 7 must run in this order. Step 6 reads the `mu` that step 5 left, which is ``\\hat{\\mu}_i + 1``, because step 7 has not yet subtracted the one. The second closed form needs that factor, so the order supplies it with no second computation. If step 7 runs before step 6, each ``\\hat{\\mu}_i + 1`` becomes ``\\hat{\\mu}_i``, and on a daily return series the covariance falls by about three orders of magnitude. Steps 4 to 7 are [`horizon_moments!`](@ref).
+Steps 5 to 7 must run in this order. Step 6 reads the `mu` that step 5 left, which is ``\\hat{\\mu}_i + 1``, because step 7 has not yet subtracted the one. The second closed form needs that factor, so the order supplies it with no second computation. If step 7 runs before step 6, each ``\\hat{\\mu}_i + 1`` becomes ``\\hat{\\mu}_i``. Entry ``(i,\\, j)`` of the covariance then falls by the factor ``\\hat{\\mu}_i \\hat{\\mu}_j / ((\\hat{\\mu}_i + 1)(\\hat{\\mu}_j + 1))``, which is about six orders of magnitude on a daily return series. Steps 4 to 7 are [`horizon_moments!`](@ref).
 
  1. Orient `X` to `observations × assets` with [`dims_oriented`](@ref).
  2. Take the log-returns `X_log`, as `log1p.(X)`.
