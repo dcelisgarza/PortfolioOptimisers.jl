@@ -495,6 +495,21 @@
         # step with split.
         @test PortfolioOptimisers.walk_forward_date_range(rd.ts, Month(1), Day(-10),
                                                           identity)[1] < rd.ts[1]
+        # It also moves the end of the range forward, so an anchor in the ten days after the
+        # last timestamp shifts back into the data. Here 2021-03-01 becomes 2021-02-19. A range
+        # that stops at the last timestamp loses that date and ends at 2021-01-22. So does a
+        # shift by range arithmetic, `(2020-12-22):Month(1):(2021-02-19)`, whose month step
+        # passes 2021-02-19 at 2021-02-22. The offset must move each date.
+        ts_end = Date(2021, 1, 1):Day(1):Date(2021, 2, 25)
+        @test collect(PortfolioOptimisers.walk_forward_date_range(ts_end, Month(1),
+                                                                  Day(-10), identity)) ==
+              [Date(2020, 12, 22), Date(2021, 1, 22), Date(2021, 2, 19)]
+        # Under a fixed step and a fixed offset, the shift stays a range and moves each date.
+        r_fixed = PortfolioOptimisers.walk_forward_date_range(ts_end, Week(1), Day(-3),
+                                                              identity)
+        @test r_fixed isa StepRange
+        @test collect(r_fixed) ==
+              [d - Day(3) for d in Date(2021, 1, 1):Week(1):Date(2021, 2, 28)]
         for cv in (DateWalkForward(12, 3; period = Month(1), period_offset = Day(-10)),
                    DateWalkForward(12, 3; period = Month(1), period_offset = Day(-10),
                                    previous = true),

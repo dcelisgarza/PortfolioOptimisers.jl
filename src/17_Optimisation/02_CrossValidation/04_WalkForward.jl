@@ -732,9 +732,10 @@ end
 Build the date range that a [`DateWalkForward`](@ref) estimator walks over the timestamps `ts`.
 
 The range runs from the first to the last timestamp with a step of `period`. If `period_offset` is
-not `nothing`, the start moves to `min(ts[1], ts[1] - period_offset)`, the `adjuster` is applied, and
-the offset is added to every date. This shifts each date by the offset without losing the start of
-`ts`.
+not `nothing`, the start moves to `min(ts[1], ts[1] - period_offset)` and the end moves to
+`max(ts[end], ts[end] - period_offset)`. Then the `adjuster` is applied, and the offset is added to
+every date. This shifts each date by the offset and loses neither end of `ts`. A negative offset
+moves a date after `ts[end]` back into the data, so that date stays in the range.
 
 # Arguments
 
@@ -764,7 +765,18 @@ function walk_forward_date_range(ts::AbstractVector, period::DatesUnionPeriod,
     end
     date_range = adjuster(ti:period:tf)
     if po_flag
-        date_range += period_offset
+        # A range plus a period keeps its step from the shifted start. That shifts every date
+        # only when the step and the offset are fixed periods. A calendar step needs each date
+        # shifted: `(2020-12-22):Month(1):(2021-02-19)` loses 2021-02-19, the shift of
+        # 2021-03-01, and a start of 2020-12-22 puts it at 2021-02-22.
+        exact = isa(date_range, StepRange) &&
+                isa(step(date_range), Dates.FixedPeriod) &&
+                isa(period_offset, Dates.FixedPeriod)
+        date_range = if exact
+            date_range + period_offset
+        else
+            [d + period_offset for d in date_range]
+        end
     end
     return date_range
 end
