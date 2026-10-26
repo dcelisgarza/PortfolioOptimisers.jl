@@ -61,7 +61,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Compute the loss-tail z-score of the parametric Value-at-Risk at significance level `alpha`.
 
-The z-score is the ``1 - \\alpha`` quantile of the distribution, the loss that the standardised return exceeds with probability ``\\alpha``.
+The z-score is the ``1 - \\alpha`` quantile of the distribution, the standardised loss that the portfolio exceeds with probability ``\\alpha``.
 
 # Mathematical definition
 
@@ -73,7 +73,7 @@ z_{\\alpha} &= F^{-1}(1 - \\alpha)\\,.
 
 Each method reads ``F`` from its own distribution:
 
-  - `Normal`: ``F`` is the cumulative distribution function of `dist` as given, so the default `Normal()` is standardised.
+  - `Normal`: ``F`` is the cumulative distribution function of `dist` as given, so the default `Normal()` is standardised. A mean ``m`` adds ``m`` to ``z_{\\alpha}``, and a standard deviation ``s`` multiplies its quantile term by ``s``.
   - `TDist`: ``F`` is the Student-t distribution with ``\\nu`` degrees of freedom, scaled to unit variance, so ``z_{\\alpha} = t_{\\nu}^{-1}(1 - \\alpha) \\sqrt{(\\nu - 2)/\\nu}``.
   - `Laplace`: ``F`` is the Laplace distribution with zero mean and unit variance, whatever the parameters of `dist`. Its closed form is below.
 
@@ -86,7 +86,7 @@ z_{\\alpha} &= \\begin{cases} -\\dfrac{\\ln(2 \\alpha)}{\\sqrt{2}}\\,, & \\alpha
 Where:
 
   - ``z_{\\alpha}``: Loss-tail z-score.
-  - ``F``: Cumulative distribution function of the standardised return.
+  - ``F``: Cumulative distribution function of the standardised loss.
   - ``t_{\\nu}``: Cumulative distribution function of the Student-t distribution with ``\\nu`` degrees of freedom.
   - ``\\nu``: Degrees of freedom of `dist`.
   - $(math_dict[:alpha_rm])
@@ -95,7 +95,7 @@ Where:
 
 # Arguments
 
-  - `dist`: Distribution of the standardised return, a `Normal`, a `TDist` or a `Laplace`.
+  - `dist`: Distribution of the standardised loss, a `Normal`, a `TDist` or a `Laplace`.
   - `alpha::Number`: Significance level.
 
 # Validation
@@ -142,18 +142,18 @@ z^{c}_{\\alpha} &= F^{-1}(\\alpha)\\,.
 \\end{align}
 ```
 
-Each method reads ``F`` from the same distribution as [`compute_value_at_risk_z`](@ref). The three distributions are symmetric about zero when standardised, so ``z^{c}_{\\alpha} = -z_{\\alpha}``, and the `Laplace` method returns that value.
+Each method reads ``F`` from the same distribution as [`compute_value_at_risk_z`](@ref). For a distribution that is symmetric about zero, ``z^{c}_{\\alpha} = -z_{\\alpha}``. The `Laplace` method returns that value, and so do the `TDist` method and the `Normal` method for a zero mean. A `Normal` with a mean ``m`` gives ``z^{c}_{\\alpha} = -z_{\\alpha} + 2 m``.
 
 Where:
 
   - ``z^{c}_{\\alpha}``: Gain-tail z-score.
   - ``z_{\\alpha}``: Loss-tail z-score, from [`compute_value_at_risk_z`](@ref).
-  - ``F``: Cumulative distribution function of the standardised return.
+  - ``F``: Cumulative distribution function of the standardised loss.
   - $(math_dict[:alpha_rm])
 
 # Arguments
 
-  - `dist`: Distribution of the standardised return, a `Normal`, a `TDist` or a `Laplace`.
+  - `dist`: Distribution of the standardised loss, a `Normal`, a `TDist` or a `Laplace`.
   - `alpha::Number`: Significance level.
 
 # Validation
@@ -181,6 +181,40 @@ end
 function compute_value_at_risk_cz(dist::Distributions.Laplace, alpha::Number)
     return -compute_value_at_risk_z(dist, alpha)
 end
+"""
+    gain_tail_distribution(dist::Distributions.Normal) -> Distributions.Normal
+    gain_tail_distribution(dist::Distributions.Distribution) -> Distributions.Distribution
+
+Return the distribution of the standardised loss of the negated portfolio, which the gain tail of [`GenericValueatRiskRange`](@ref) reads.
+
+The parametric loss of the portfolio is ``-\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} + \\sigma_{\\boldsymbol{w}} \\varepsilon``, where `dist` is the law of ``\\varepsilon``. The loss of the negated portfolio is the negated loss, so its standardised loss is ``-\\varepsilon``. A gain tail that evaluates the loss tail on ``-\\boldsymbol{w}`` must read the law of ``-\\varepsilon``. Then its value equals the gain tail of [`ValueatRiskRange`](@ref), ``\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - z^{c}_{\\alpha} \\sigma_{\\boldsymbol{w}}``, because ``F_{-\\varepsilon}^{-1}(1 - \\alpha) = -F_{\\varepsilon}^{-1}(\\alpha)``.
+
+  - `Normal`: [`compute_value_at_risk_z`](@ref) reads `dist` as given, so the method rebuilds it with the negated mean and the same standard deviation. A `Normal` with a zero mean is returned unchanged.
+  - Any other distribution passes through unchanged. [`compute_value_at_risk_z`](@ref) reads `TDist` and `Laplace` as laws with zero mean, which are symmetric about zero, so each is its own reflection.
+
+# Arguments
+
+  - `dist`: Distribution of the standardised loss of the portfolio.
+
+# Returns
+
+  - `dist`: Distribution of the standardised loss of the negated portfolio.
+
+# Related
+
+  - [`compute_value_at_risk_z`](@ref)
+  - [`compute_value_at_risk_cz`](@ref)
+  - [`DistributionValueatRisk`](@ref)
+  - [`GenericValueatRiskRange`](@ref)
+  - [`gain_tail_measure`](@ref)
+"""
+function gain_tail_distribution(dist::Distributions.Normal)
+    mu, sigma = Distributions.params(dist)
+    # A zero mean is its own reflection. Returning `dist` itself lets `rebuild_with_slots` keep
+    # the measure, where `Normal(-0.0, sigma)` is not `===` to `dist`.
+    return iszero(mu) ? dist : Distributions.Normal(-mu, sigma)
+end
+gain_tail_distribution(dist::Distributions.Distribution) = dist
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -348,6 +382,10 @@ Where:
 
 The range is the Value-at-Risk of the returns plus the Value-at-Risk of the negated returns, and the two mean terms cancel.
 
+!!! note
+
+    `dist` is the law of the standardised loss ``\\varepsilon`` of the portfolio, so the loss is ``-\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} + \\sqrt{\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}}\\, \\varepsilon``. A `Normal` with a mean ``m \\neq 0`` is not symmetric about zero. It moves the loss tail up by ``m \\sqrt{\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}}`` and the gain tail down by the same amount. A [`GenericValueatRiskRange`](@ref) evaluates the gain tail of a [`ValueatRisk`](@ref) on ``-\\boldsymbol{w}``, and the standardised loss of ``-\\boldsymbol{w}`` is ``-\\varepsilon``. So it reads the law that [`gain_tail_distribution`](@ref) gives, and its value equals that of a [`ValueatRiskRange`](@ref) with the same `dist`.
+
 The two estimands agree only when the returns follow `dist`. On a large sample drawn from `dist`, the parametric quantile of the sample moments is close to the empirical quantile. On a sample whose loss tail is heavier than that of `dist`, the parametric quantile at a small ``\\alpha`` is below the empirical quantile, so it understates the loss. On a sample whose loss tail is lighter, it is above the empirical quantile. At a larger ``\\alpha`` the order can reverse.
 
 Sections 1.2 and 4.5.2.2 of [morgan1996](@cite) state the Value-at-Risk of normal returns. Section 2.6 of [lobo1998](@cite) states its bound as a second-order cone for a confidence of at least one half, which is the condition ``\\alpha \\leq 1/2`` above. Equation 11.5 of [cajas2025](@cite) states the quantiles of the Student-t law, scaled to unit variance, and of the Laplace law. No copy of the work that first states those two forms was found. Equation 7.52 of [cajas2025](@cite) calls ``z_{\\alpha}`` the ``\\alpha`` quantile of the normal law, but the definition needs the ``1 - \\alpha`` quantile, which its Equation 11.5 states.
@@ -406,6 +444,7 @@ DistributionValueatRisk
   - [`ValueatRiskFormulation`](@ref)
   - [`MIPValueatRisk`](@ref)
   - [`ValueatRisk`](@ref)
+  - [`gain_tail_distribution`](@ref)
   - [`MuSlot`](@ref)
   - [`SigmaSlot`](@ref)
   - [`resolve_deferred_quantities`](@ref)

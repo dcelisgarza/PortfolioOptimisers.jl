@@ -86,7 +86,7 @@ outer `settings`-controlled expression.
 
 The first method computes the range of a portfolio returns vector `x` as `loss(x) + gain(-x)`. A tail that needs a solver, such as [`EntropicValueatRisk`](@ref), needs its own `slv`, which [`factory`](@ref) fills from the solver of the optimiser.
 
-A [`ValueatRisk`](@ref) tail with [`DistributionValueatRisk`](@ref) reads the portfolio weights and the moments of the prior, not a returns vector. The second method evaluates each tail on its own input through [`range_tail_risk`](@ref). It computes the net returns `x` of `w`, then evaluates the loss tail on `w` and `x`, and the gain tail on `-w` and `-x`. The gain tail of such a [`ValueatRisk`](@ref) is then `dot(mu, w) + z * sqrt(dot(w, sigma, w))`, which is the gain tail that the optimisation model builds. [`risk_input_kind`](@ref) of the range is [`WeightsReturnsFeesInput`](@ref) when a tail is such a [`ValueatRisk`](@ref), so [`expected_risk`](@ref) calls the second method. Otherwise it is [`NetReturnsInput`](@ref), and [`expected_risk`](@ref) calls the first method.
+A [`ValueatRisk`](@ref) tail with [`DistributionValueatRisk`](@ref) reads the portfolio weights and the moments of the prior, not a returns vector. The second method evaluates each tail on its own input through [`range_tail_risk`](@ref). It computes the net returns `x` of `w`, then evaluates the loss tail on `w` and `x`, and the gain tail on `-w` and `-x`. The gain tail of such a [`ValueatRisk`](@ref) reads the law of the standardised loss of `-w`, which [`gain_tail_distribution`](@ref) gives, through [`gain_tail_measure`](@ref). It is then `dot(mu, w) - zc * sqrt(dot(w, sigma, w))`, with `zc = compute_value_at_risk_cz(dist, alpha)`, which is the gain tail that the optimisation model builds and the gain tail of a [`ValueatRiskRange`](@ref). For a `dist` that is symmetric about zero, `-zc` equals the `z` of the loss tail. [`risk_input_kind`](@ref) of the range is [`WeightsReturnsFeesInput`](@ref) when a tail is such a [`ValueatRisk`](@ref), so [`expected_risk`](@ref) calls the second method. Otherwise it is [`NetReturnsInput`](@ref), and [`expected_risk`](@ref) calls the first method.
 
 ## Validation
 
@@ -139,6 +139,8 @@ GenericValueatRiskRange
   - [`PowerNormValueatRiskRange`](@ref): the same value, with two [`PowerNormValueatRisk`](@ref) tails.
   - [`range_tails`](@ref)
   - [`range_tail_risk`](@ref)
+  - [`gain_tail_measure`](@ref)
+  - [`gain_tail_distribution`](@ref)
   - [`no_risk_expr_risk_measure`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
@@ -214,7 +216,7 @@ end
 
 Evaluate one tail of a [`GenericValueatRiskRange`](@ref) on the input that the tail reads.
 
-The functor of the range on the weights calls this function once for each tail. It passes `w` and the net returns `x` for the loss tail, and `-w` and `-x` for the gain tail.
+The functor of the range on the weights calls this function once for each tail. It passes `w` and the net returns `x` for the loss tail, and [`gain_tail_measure`](@ref) of the gain tail, `-w` and `-x` for the gain tail.
 
   - A tail that reads a return series, [`NetReturnsInput`](@ref), returns `r(x)`.
   - A [`ValueatRisk`](@ref) tail with [`DistributionValueatRisk`](@ref), [`WeightsReturnsFeesInput`](@ref), returns `r(w)`. It reads the moments of the prior against the weights.
@@ -235,6 +237,7 @@ The gain tail of a returns measure reads `-x`, not the net returns of `-w`. A fe
 
   - [`GenericValueatRiskRange`](@ref)
   - [`ValueatRiskRMs`](@ref)
+  - [`gain_tail_measure`](@ref)
   - [`risk_input_kind`](@ref)
   - [`DistributionValueatRisk`](@ref)
 """
@@ -243,12 +246,42 @@ function range_tail_risk(r::ValueatRisk{<:Any, <:Any, <:Any, <:DistributionValue
                          w::VecNum, ::VecNum)
     return r(w)
 end
+"""
+    gain_tail_measure(r::ValueatRiskRMs)
+    gain_tail_measure(r::ValueatRisk{<:Any, <:Any, <:Any, <:DistributionValueatRisk})
+
+Return the measure that the gain tail of a [`GenericValueatRiskRange`](@ref) evaluates on the negated portfolio.
+
+  - A tail that reads a return series returns `r` unchanged. It reads the negated returns, which are the returns of the negated portfolio.
+  - A [`ValueatRisk`](@ref) tail with [`DistributionValueatRisk`](@ref) is rebuilt with the law that [`gain_tail_distribution`](@ref) gives, the law of the standardised loss of `-w`. On `-w`, the rebuilt tail then equals the gain tail of a [`ValueatRiskRange`](@ref) with the same `dist`, also for a `Normal` with a nonzero mean. A law that is symmetric about zero is its own reflection, so the method returns `r` itself.
+
+# Arguments
+
+  - `r`: Gain tail of the range.
+
+# Returns
+
+  - `r`: The measure to evaluate on the negated portfolio.
+
+# Related
+
+  - [`GenericValueatRiskRange`](@ref)
+  - [`range_tail_risk`](@ref)
+  - [`gain_tail_distribution`](@ref)
+  - [`DistributionValueatRisk`](@ref)
+"""
+gain_tail_measure(r::ValueatRiskRMs) = r
+function gain_tail_measure(r::ValueatRisk{<:Any, <:Any, <:Any, <:DistributionValueatRisk})
+    alg = rebuild_with_slots(r.alg, (; dist = gain_tail_distribution(r.alg.dist)))
+    return rebuild_with_slots(r, (; alg = alg))
+end
 # A range with a tail that reads the weights reads the weights, the returns and the fees. The
 # loss tail reads `w` and `x`, and the gain tail reads `-w` and `-x`, as the model builds them.
+# The gain tail of a `DistributionValueatRisk` reads the law of the negated standardised loss.
 function (r::GenericValueatRiskRange)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     loss = range_tail_risk(r.loss, w, x)
-    gain = range_tail_risk(r.gain, -w, -x)
+    gain = range_tail_risk(gain_tail_measure(r.gain), -w, -x)
     return loss + gain
 end
 # Expected-risk input kind — see `risk_input_kind`. The kind follows the tails: a range whose

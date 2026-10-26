@@ -352,6 +352,72 @@ rel_dd(x) = cumprod(1 .+ x) ./ accumulate(max, cumprod(1 .+ x); init = one(eltyp
                                                                                     alg = DistributionValueatRisk()),
                                                                         pr))
     end
+    @testset "The gain tail of a generic range reads the law of the negated loss (#1822)" begin
+        PO = PortfolioOptimisers
+        # The rebuild negates the mean of a `Normal`, and every other law passes through.
+        @test PO.gain_tail_distribution(Normal(0.1, 2.0)) == Normal(-0.1, 2.0)
+        for dist in (Normal(), Normal(0.0, 2.0), TDist(5), Laplace(), Laplace(0.1, 2.0))
+            @test PO.gain_tail_distribution(dist) === dist
+        end
+        # The loss quantile of the reflected law is the negated gain quantile of the law.
+        for dist in (Normal(), Normal(0.1, 2.0), TDist(5), Laplace(), Laplace(0.1, 2.0)),
+            alpha in (0.05, 0.2)
+
+            @test isapprox(PO.compute_value_at_risk_z(PO.gain_tail_distribution(dist),
+                                                      alpha),
+                           -PO.compute_value_at_risk_cz(dist, alpha))
+        end
+        # The reproduction of #1822. A `Normal` with a nonzero mean made the two ranges differ
+        # by twice the mean times the standard deviation of the portfolio.
+        rng = StableRNG(5)
+        X = 0.01 .* randn(rng, 300, 6) .+ range(-0.0005, 0.002; length = 6)'
+        pr = prior(EmpiricalPrior(), X)
+        w = fill(1 / 6, 6)
+        sd = sqrt(dot(w, pr.sigma, w))
+        for dist in (Normal(), Normal(0.1, 2.0), Laplace(), Laplace(0.1, 2.0), TDist(5)),
+            (alpha, beta) in ((0.05, 0.05), (0.05, 0.2))
+
+            alg = DistributionValueatRisk(; dist = dist)
+            gen = factory(GenericValueatRiskRange(;
+                                                  loss = ValueatRisk(; alpha = alpha,
+                                                                     alg = alg),
+                                                  gain = ValueatRisk(; alpha = beta,
+                                                                     alg = alg)), pr)
+            var = factory(ValueatRiskRange(; alpha = alpha, beta = beta, alg = alg), pr)
+            @test isapprox(expected_risk(gen, w, pr), expected_risk(var, w, pr))
+        end
+        # The gain tail of the non-centred law is `dot(mu, w) - zc * sd`, the gain tail of
+        # `ValueatRiskRange`, not `dot(mu, w) + z * sd`.
+        dist = Normal(0.1, 2.0)
+        vd = ValueatRisk(; alg = DistributionValueatRisk(; dist = dist))
+        g = factory(GenericValueatRiskRange(; loss = ConditionalValueatRisk(), gain = vd),
+                    pr)
+        zc = PO.compute_value_at_risk_cz(dist, 0.05)
+        @test isapprox(g(w, pr.X),
+                       ConditionalValueatRisk()(pr.X * w) + dot(pr.mu, w) - zc * sd)
+        # The rebuild of the gain tail keeps a symmetric law and every returns tail as they are.
+        vs = factory(ValueatRisk(; alg = DistributionValueatRisk()), pr)
+        @test PO.gain_tail_measure(vs) === vs
+        cv = ConditionalValueatRisk()
+        @test PO.gain_tail_measure(cv) === cv
+        @test PO.gain_tail_measure(vd).alg.dist == Normal(-0.1, 2.0)
+        # The model builds the same gain tail, so its risk equals the functor and the range.
+        cslv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                      settings = Dict("verbose" => false))
+        opt = JuMPOptimiser(; pe = pr, slv = cslv)
+        for r in (GenericValueatRiskRange(; loss = vd, gain = vd),
+                  GenericValueatRiskRange(; loss = ConditionalValueatRisk(), gain = vd))
+            sol = optimise(MeanRisk(; r = r, obj = MinimumRisk(), opt = opt))
+            @test isa(sol.retcode, OptimisationSuccess)
+            @test isapprox(JuMP.value(sol.model[:risk]),
+                           expected_risk(factory(r, pr), sol.w, pr); rtol = 1e-6)
+        end
+        sol = optimise(MeanRisk(; r = GenericValueatRiskRange(; loss = vd, gain = vd),
+                                obj = MinimumRisk(), opt = opt))
+        @test isapprox(JuMP.value(sol.model[:risk]),
+                       expected_risk(factory(ValueatRiskRange(; alg = vd.alg), pr), sol.w,
+                                     pr); rtol = 1e-6)
+    end
     @testset "The parametric quantile against the empirical one" begin
         # The parametric functor of one asset at unit weight, with the sample moments.
         function par(x, alpha)

@@ -490,7 +490,8 @@
         @test isapprox(expected_risk(gm, w, pr, fees),
                        vd(w) + ConditionalValueatRisk(; alpha = 0.1)(-xf))
         @test isapprox(gm(w, pr.X, fees), expected_risk(gm, w, pr, fees))
-        # The gain tail of a `DistributionValueatRisk` is `dot(mu, w) + z * sigma(w)`.
+        # The gain tail of a `DistributionValueatRisk` is `dot(mu, w) + z * sigma(w)` for a law
+        # symmetric about zero. `test_09n` checks a `Normal` with a nonzero mean (#1822).
         gg = factory(GenericValueatRiskRange(; loss = ConditionalValueatRisk(),
                                              gain = vdist), pr)
         z = PortfolioOptimisers.compute_value_at_risk_z(vdist.alg.dist, vdist.alpha)

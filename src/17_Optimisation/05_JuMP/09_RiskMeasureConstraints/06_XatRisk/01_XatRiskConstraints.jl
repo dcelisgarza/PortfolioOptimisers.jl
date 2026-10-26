@@ -197,8 +197,11 @@ to `model`.
 Uses the closed-form z-score from `compute_value_at_risk_z` and adds a second-order cone
 constraint to bound the portfolio standard deviation. The VaR expression is
 `-mu'w + z * g_var`. The gain tail is the same expression for the negated portfolio, `-w`,
-which is `mu'w + z * g_var`, because the cone is symmetric in `w`. The bound of the measure
-applies to the value of the tail on both sides.
+which is `mu'w + z_g * g_var`, because the cone is symmetric in `w`. Here `z_g` is the
+z-score of [`gain_tail_distribution`](@ref) of `dist`, the law of the standardised loss of
+`-w`, so `z_g = -compute_value_at_risk_cz(dist, alpha)`. For a `dist` that is symmetric
+about zero, `z_g = z`. The bound of the measure applies to the value of the tail on both
+sides.
 
 # Arguments
 
@@ -225,6 +228,7 @@ applies to the value of the tail on both sides.
   - [`ValueatRisk`](@ref)
   - [`DistributionValueatRisk`](@ref)
   - [`compute_value_at_risk_z`](@ref)
+  - [`gain_tail_distribution`](@ref)
   - [`set_risk_constraints!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
@@ -237,10 +241,12 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     G = chol_sigma_selector(model, pr, r.alg)
     w = get_w(model, prefix)
     sc = get_constraint_scale(model)
-    z = compute_value_at_risk_z(r.alg.dist, r.alpha)
     # The gain tail is the loss tail of the negated portfolio, `-w`. The cone is symmetric in
-    # `w`, so only the sign of the mean term changes. The bound and the returned expression
-    # are the value of the tail, as the functor reports it on `-w`.
+    # `w`, so the sign of the mean term changes, and the standardised loss of `-w` is the
+    # negated standardised loss, whose law `gain_tail_distribution` gives (#1822). The bound
+    # and the returned expression are the value of the tail, as `range_tail_risk` reports it.
+    dist = loss ? r.alg.dist : gain_tail_distribution(r.alg.dist)
+    z = compute_value_at_risk_z(dist, r.alpha)
     mu_w = loss ? -LinearAlgebra.dot(mu, w) : LinearAlgebra.dot(mu, w)
     g_var = state_set!(model, prefix, :g_var_, i, JuMP.@variable(model))
     var_risk = state_set!(model, prefix, :var_risk_, i,
