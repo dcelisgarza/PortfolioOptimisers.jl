@@ -315,7 +315,12 @@ span, and reads the p-value off a wild bootstrap, as the IC summaries do. `Overl
 the rule of zero lags of Diebold and Mariano. On a null loss difference with MA(1) dependence and
 a volatility break, at the level 5 % over 2,000 draws, the old test at one lag rejected 11.0 % at
 60 steps and 7.5 % at 240, the rule of zero lags 16.5 % and 14.5 %, and the default 5.6 % and
-5.0 %.
+5.0 %. That run did not record its series. The review of the release (R4 of PR #1817) measured
+again on `d_t = s_t (u_t + 0.8 u_{t−1})`, with standard normal `u_t` and `s_t = 3` on the second
+half of the steps, at 5 % over 2,000 draws. The old test at one lag, run on the parent of the
+change, rejected 9.4 % at 60 steps and 9.6 % at 240, and at zero lags 16.6 % and 16.7 %.
+`OverlapMeanTest()` rejected 14.8 % and 16.5 %, and the default 5.2 % and 4.9 %. One Bartlett lag reads the long-run variance 3.24 of
+this series as 2.44, so the nominal 5 % becomes about 8.9 %.
 
 The Result replaces `variance`, `z`, `p` and `lags` with `t_stat`, `p_value`, `mean_ci_lower` and
 `mean_ci_upper`, the fields of the IC summaries. A step that one side did not score is missing at

@@ -109,18 +109,18 @@ end
     empty_row_msg(eqn, nx, key; noun::AbstractString = "constraint",
                   axis::AbstractString = "asset") -> String
 
-Build the warning or error text for a parsed equation `eqn` whose names all resolved against the universe `nx`, which the asset sets hold under `key`, but whose row is all zero. The library drops that row. The message names the equation and the size of the universe, and never the full universe or the parsed struct. `noun` is `"constraint"` for a linear constraint or `"view"` for a Black-Litterman view. `axis` names the universe, as in [`unknown_variable_msg`](@ref).
+Build the warning or error text for a parsed equation `eqn` whose names all resolved against the universe `nx`, which the asset sets hold under `key`, but whose row is all zero. The library drops that row. The message names the equation and the size of the universe, and never the full universe or the parsed struct. `noun` is `"constraint"` for a linear constraint or `"view"` for a Black-Litterman or an entropy pooling view. `axis` names the universe, as in [`unknown_variable_msg`](@ref).
 
 A name that is not in the universe never gets to this message. The row is the unit, so a name that does not resolve removes the whole row at that name, and [`unknown_variable_msg`](@ref) reports it with `consequence = "row dropped"`. A row that gets to this message summed to zero for a different reason. Its coefficients cancel, as in `A - A == 0.0`, which parses to the single term `0.0*A`. Or the row holds no variable, as in `1 == 0.004`. A typo message for either case sends the user to look for a typo that does not exist. [`empty_projected_row_msg`](@ref) and [`zero_centrality_msg`](@ref) follow the same rule.
 
-[`get_linear_constraints`](@ref) and the generation of Black-Litterman views call this function.
+[`get_linear_constraints`](@ref), the generation of Black-Litterman views, and the covariance and correlation views of entropy pooling ([`ep_cov_views!`](@ref), [`ep_rho_views!`](@ref)) call this function.
 
 # Arguments
 
   - `eqn`: The parsed equation that resolved and still summed to zero.
   - `nx`: The universe that the terms resolved against. Only its length goes into the message.
   - `key`: The key of the universe in the asset sets.
-  - `noun::AbstractString = "constraint"`: `"constraint"` for a linear constraint, and `"view"` for a Black-Litterman view.
+  - `noun::AbstractString = "constraint"`: `"constraint"` for a linear constraint, and `"view"` for a Black-Litterman or an entropy pooling view.
   - `axis::AbstractString = "asset"`: The name of the universe, as in [`unknown_variable_msg`](@ref).
 
 # Returns

@@ -1176,7 +1176,7 @@ function leader_allocation(opt::BestConstantRebalancedPortfolio, rd::ReturnsResu
     res = optimise(factory(bcrp, w), rd)
     fp = isa(res.retcode, OptimisationSuccess) ? res.retcode.res : nothing
     if isa(fp, NamedTuple) && !get(fp, :converged, true)
-        @warn("the solver-free leader stopped at `iters = $(opt.iters)` on $(size(rd.X, 1)) selected rows, $(fp.gap) or less short of the optimal log wealth; later short steps are not reported. The exact leader is `MeanRisk` under `LogarithmicReturn` and `MaximumReturn` on a solver.",
+        @warn("the solver-free leader stopped at `iters = $(opt.iters)` on $(size(rd.X, 1)) selected rows, $(fp.gap) or less short of the optimal log wealth; later short steps at this `iters` are not reported. The exact leader is `MeanRisk` under `LogarithmicReturn` and `MaximumReturn` on a solver.",
               maxlog = log_limit(:warn, 1), _id = @log_id(opt.iters))
     end
     return res.w

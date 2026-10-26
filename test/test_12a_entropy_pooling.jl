@@ -1704,6 +1704,43 @@ the row names no asset.
                                    strict = true)
 end
 
+@testset "A covariance or correlation view whose pair cancels drops its row (R4 of #1817)" begin
+    #=
+    `(AAPL, AMD) - (AAPL, AMD) == 0.1` parses to the one pair `0.0*(AAPL, AMD)`. Its row on
+    the probabilities is `0 == 0.1`, which holds for no probabilities, and the solve of the
+    entropy pooling programme failed. Even `0 == 0` failed. The linear families drop such a
+    row through `get_linear_constraints` (#1797), so the two pair families drop it too: the
+    default warns, and `strict = true` raises an `IsZeroError`.
+    =#
+    lce(v) = LinearConstraintEstimator(; val = v)
+    pr0 = prior(EmpiricalPrior(), rd)
+    c12 = 1.1 * pr0.sigma[1, 2]
+    for (fam, zero_view, real_view) in
+        ((:cov_views, "(AAPL, AMD) - (AAPL, AMD) == 0.1", "(AAPL, AMD) == $(c12)"),
+         (:rho_views, "(AAPL, AMD) - (AAPL, AMD) == 0.0", "(AAPL, AMD) == 0.5")),
+        EP in (EntropyPoolingPrior, MeucciEntropyPoolingPrior)
+
+        pr = @test_logs (:warn, r"still summed to zero") prior(EP(; sets = sets,
+                                                                  fam => lce(zero_view)),
+                                                               rd)
+        @test iszero(pr.kld)
+        @test pr.mu == pr0.mu
+        @test pr.sigma == pr0.sigma
+        e = @test_throws IsZeroError prior(EP(; sets = sets, fam => lce(zero_view)), rd;
+                                           strict = true)
+        @test occursin("view `0.0*(AAPL, AMD)", e.value.msg)
+        # Beside a view that states a row, the cancelled pair changes nothing.
+        both = @test_logs (:warn, r"still summed to zero") prior(EP(; sets = sets,
+                                                                    fam => lce([zero_view,
+                                                                                real_view])),
+                                                                 rd)
+        alone = prior(EP(; sets = sets, fam => lce(real_view)), rd)
+        @test both.kld > 0
+        @test both.w == alone.w
+        @test both.sigma == alone.sigma
+    end
+end
+
 @testset "An entropy pooling prior over a factor prior meets its views (#1649)" begin
     # The data of #1649: asset 1 loads on factor 1 in the first 60 rows, and the fit reads
     # those rows alone.

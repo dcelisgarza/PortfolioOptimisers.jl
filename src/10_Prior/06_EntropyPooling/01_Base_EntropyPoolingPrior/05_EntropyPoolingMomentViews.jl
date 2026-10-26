@@ -698,7 +698,7 @@ The identity holds only while the posterior means of assets ``i`` and ``j`` equa
  1. Parse the view equations of `cov_views.val` into one [`ParsingResult`](@ref) for each view.
  2. Replace every group name by the assets that it spans. A pair view stays a pair view.
  3. Replace every `prior(a, b)` reference by the prior covariance, through [`replace_coprior_views`](@ref). Each view is now a [`RhoParsingResult`](@ref) that holds its index pairs.
- 4. For each view in turn, drop it when step 3 left it with no pair, and raise unless it names exactly one.
+ 4. For each view in turn, drop it when step 3 left it with no pair, and raise unless it names exactly one. Drop it through [`strict_diagnostic`](@ref) when the coefficient of its pair is zero.
  5. Read the sign `d` and the inequality flag from the operator with [`comparison_sign_ineq_flag`](@ref).
  6. Read the index pair `(i, j)`, and build `Ai`, the product of the two return columns scaled by `d` and the coefficient of the view.
  7. Build `Bi`, the target moved by the product of the prior means less the entry of the residual block `E` at the pair, scaled the same way. `E` is the diagonal matrix of [`scenario_residual_variances`](@ref). A single asset pair gives a scalar, which the method puts in a vector of one element. A group pair gives one entry for each spanned pair.
@@ -716,6 +716,7 @@ The identity holds only while the posterior means of assets ``i`` and ``j`` equa
 # Validation
 
   - Every view names exactly one asset pair. A view that mixes pairs raises an `ArgumentError`. If every pair of a view holds an asset that the universe does not hold, the view has no pair left. Under `strict = false`, [`replace_coprior_views`](@ref) already reported the unknown names, and the method drops such a view with no second report. Under `strict = true`, that function already raised an error.
+  - The coefficient of the pair is not zero. A pair whose coefficients cancel, as in `(A, B) - (A, B) == 0.1`, gives the row `0 == 0.1`, which no probabilities can meet. The method drops it, as [`get_linear_constraints`](@ref) drops a cancelled linear row: under `strict = false` it warns, and under `strict = true` it raises an [`IsZeroError`](@ref).
 
 # Returns
 
@@ -756,6 +757,16 @@ function ep_cov_views!(cov_views::LinearConstraintEstimator, epc::AbstractDict,
         end
         @argcheck(length(cov_view.vars) == 1,
                   "Cannot mix multiple covariance pairs in a single view `$(cov_view.eqn)`.")
+        #! A pair whose coefficients cancel gives the row `0 ⋄ b`, which no probabilities
+        #! can move, so it goes as `get_linear_constraints` drops it (#1797).
+        if iszero(cov_view.coef[1])
+            strict_diagnostic(empty_row_msg(cov_view.eqn, sets.dict[sets.xkey], sets.xkey;
+                                            noun = "view",
+                                            axis = universe_axis(sets, sets.xkey)), strict;
+                              id = @log_id(cov_view.eqn, sets.xkey),
+                              exception = IsZeroError)
+            continue
+        end
         d, flag = comparison_sign_ineq_flag(cov_view.op)
         i, j = cov_view.ij[1]
         Ai = d * cov_view.coef[1] * view(X, :, i) .* view(X, :, j)
@@ -821,7 +832,7 @@ The identity holds only while the posterior means and variances of assets ``i`` 
  2. Replace every group name by the assets that it spans. A pair view stays a pair view.
  3. Replace every `prior(a, b)` reference by the prior correlation, through [`replace_coprior_views`](@ref). Each view is now a [`RhoParsingResult`](@ref) that holds its index pairs.
  4. Read the prior variances, the diagonal of `pr.sigma`, into `sigma`.
- 5. For each view in turn, drop it when step 3 left it with no pair, raise unless it names exactly one, and raise unless every target lies in ``[-1, 1]``.
+ 5. For each view in turn, drop it when step 3 left it with no pair, raise unless it names exactly one, and raise unless every target lies in ``[-1, 1]``. Drop it through [`strict_diagnostic`](@ref) when the coefficient of its pair is zero.
  6. Read the sign `d` and the inequality flag from the operator with [`comparison_sign_ineq_flag`](@ref).
  7. Read the index pair `(i, j)`, and build `sigma_ij`, the root of the product of the two prior variances.
  8. Build `Ai`, the product of the two return columns scaled by `d` and the coefficient of the view.
@@ -841,6 +852,7 @@ The identity holds only while the posterior means and variances of assets ``i`` 
 
   - Every view names exactly one asset pair. A view that mixes pairs raises an `ArgumentError`. If every pair of a view holds an asset that the universe does not hold, the view has no pair left. Under `strict = false`, [`replace_coprior_views`](@ref) already reported the unknown names, and the method drops such a view with no second report. Under `strict = true`, that function already raised an error.
   - Every target lies in ``[-1, 1]``. A target outside that range raises an `ArgumentError`.
+  - The coefficient of the pair is not zero. A pair whose coefficients cancel, as in `(A, B) - (A, B) == 0.0`, gives a row that no probabilities can move. The method drops it, as [`get_linear_constraints`](@ref) drops a cancelled linear row: under `strict = false` it warns, and under `strict = true` it raises an [`IsZeroError`](@ref).
 
 # Returns
 
@@ -879,6 +891,15 @@ function ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
                   "Cannot mix multiple correlation pairs in a single view `$(rho_view.eqn)`.")
         @argcheck(all(x -> -one(eltype(X)) <= x <= one(eltype(X)), rho_view.rhs),
                   "Correlation prior rho_view `$(rho_view.eqn)` must be in [-1, 1].")
+        #! See the twin note in `ep_cov_views!`: a cancelled pair drops its row.
+        if iszero(rho_view.coef[1])
+            strict_diagnostic(empty_row_msg(rho_view.eqn, sets.dict[sets.xkey], sets.xkey;
+                                            noun = "view",
+                                            axis = universe_axis(sets, sets.xkey)), strict;
+                              id = @log_id(rho_view.eqn, sets.xkey),
+                              exception = IsZeroError)
+            continue
+        end
         d, flag = comparison_sign_ineq_flag(rho_view.op)
         i, j = rho_view.ij[1]
         sigma_ij = if !isa(i, AbstractVector)
