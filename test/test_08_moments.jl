@@ -2568,6 +2568,16 @@ end
 function Statistics.cor(::IVProbe, ::PortfolioOptimisers.MatNum; iv = nothing, kwargs...)
     return iv_probe_shape(iv)
 end
+"""
+Returns the matrix it holds from `cov`, so a test can hand a shrinkage estimator an
+indefinite covariance that no covariance estimator of the library returns.
+"""
+struct FixedMatrixCovariance{T} <: PortfolioOptimisers.AbstractCovarianceEstimator
+    S::T
+end
+function Statistics.cov(ce::FixedMatrixCovariance, ::PortfolioOptimisers.MatNum; kwargs...)
+    return ce.S
+end
 @testset "Windowed estimator family" begin
     using Test, PortfolioOptimisers, DataFrames, TimeSeries, CSV, StatsBase, Statistics
     rd = prices_to_returns(price_ingestion(PriceIngestion(),
@@ -3362,6 +3372,40 @@ end
             # A `Rational` intensity keeps its type.
             @test PortfolioOptimisers.shrinkage_intensity(UnitIntervalIntensity(),
                                                           3 // 2) === 1 // 1
+        end
+
+        @testset "the intensity rule clamps the Bayes-Stein intensity of an indefinite covariance (#1784)" begin
+            # R3 of #1817: the Bayes-Stein intensity leaves `(0, 1]` only under an indefinite
+            # covariance, the one case where the default rule moves it. One negative
+            # eigenvalue sets the quadratic form `q` so that the raw intensity
+            # `(N + 2) / ((N + 2) + T q)` is 2, and then -1.
+            mu = vec(mean(X460; dims = 1))
+            b = fill(mean(mu), length(mu))
+            d = mu - b
+            Tb, Nb = size(X460)
+            E = eigen(Symmetric(cov(me460.ce, X460; dims = 1)))
+            proj = E.vectors' * d
+            function bs_mean(S, rule)
+                return vec(mean(ShrunkExpectedReturns(; ce = FixedMatrixCovariance(S),
+                                                      alg = BayesStein(; intensity = rule)),
+                                X460))
+            end
+            for a in (2.0, -1.0)
+                q = (Nb + 2) * (1 / a - 1) / Tb
+                lam1 = proj[1]^2 / (q - sum(proj[2:end] .^ 2 ./ E.values[2:end]))
+                @test lam1 < 0
+                S = Matrix(Symmetric(E.vectors *
+                                     Diagonal([lam1; E.values[2:end]]) *
+                                     E.vectors'))
+                @test isapprox((Nb + 2) / ((Nb + 2) + Tb * dot(d, S \ d)), a)
+                for (rule, ac) in ((UnitIntervalIntensity(), clamp(a, 0, 1)),
+                                   (NonNegativeIntensity(), max(a, 0)), (UnclampedIntensity(), a))
+                    @test isapprox(bs_mean(S, rule), (1 - ac) * mu + ac * b)
+                end
+                @test bs_mean(S, UnitIntervalIntensity()) ==
+                      vec(mean(ShrunkExpectedReturns(; ce = FixedMatrixCovariance(S),
+                                                     alg = BayesStein()), X460))
+            end
         end
 
         @testset "the degenerate samples the docstrings name" begin
