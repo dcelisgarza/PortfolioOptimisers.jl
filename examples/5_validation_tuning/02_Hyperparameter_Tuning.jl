@@ -158,38 +158,37 @@ plot_composition(res_gs1, rd)
 #=
 ### 2.2 Randomised cross validation search
 
-[`RandomisedSearchCrossValidation`](@ref) samples values from the grid, and then runs a grid
-search over the samples with [`search_cross_validation`](@ref). It takes the same grids as
+[`RandomisedSearchCrossValidation`](@ref) draws `n_iter` trials from the grid, and then runs a
+grid search over the trials with [`search_cross_validation`](@ref). It takes the same grids as
 [`GridSearchCrossValidation`](@ref). A parameter can also take a
 [`Distributions.Distribution`](https://juliastats.org/Distributions.jl/latest/types/#Distributions)
 in place of a vector of values.
 
-The search samples every parameter on its own, and `n_iter` sets the number of samples.
+A trial is one candidate. It sets every parameter of one grid at the same time, so the search
+fits `n_iter` candidates, however many parameters it tunes.
 
-  - From a distribution, it draws `n_iter` values.
-  - From a vector, it draws `min(n_iter, length(v))` values. It draws without replacement,
-    unless the grid also holds a distribution. Then it draws with replacement, and it can draw
-    a value twice.
+  - If every value is a vector, the search draws `n_iter` distinct candidates of the grid
+    search, each with the same probability. It keeps them in the order of the grid search. If
+    the grid holds `n_iter` candidates or fewer, the search takes all of them.
+  - If a value is a distribution, each trial picks one grid with equal probability. Then it
+    draws one value from each distribution and one entry from each vector of that grid. Two
+    trials can then be the same.
 
-Then it takes the product of the samples in each grid, as the grid search does. A vector of
-grids works as it does for [`GridSearchCrossValidation`](@ref).
-
-The search draws from one random number generator, `rng`, grid by grid and parameter by
-parameter. The order of the grids and of the parameters therefore changes the samples. To repeat a
-search, keep that order fixed. Use an `OrderedDict` from
+The search draws from one random number generator, `rng`, trial by trial and parameter by
+parameter. The order of the grids and of the parameters therefore changes the trials. To repeat
+a search, keep that order fixed. Use an `OrderedDict` from
 [`OrderedCollections`](https://juliacollections.github.io/OrderedCollections.jl/stable/) or a vector
 for each grid.
 
 #### 2.2.1 Sampling from a predefined parameter space
 
-We sample from the same grids as before, with `n_iter = 2`. Every value is in a vector. The
-search draws two values for each parameter, without replacement.
+We sample from the same grids as before, with `n_iter = 8`. Every value is in a vector, so the
+search draws 8 of the 17 candidates of the grid search, without replacement.
 =#
-rs_cv1 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r, n_iter = 2)
+rs_cv1 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r, n_iter = 8)
 
 #=
-The first grid has two parameters and gives `2 × 2 = 4` candidates. The other three grids
-give 2 candidates each, for `4 + 2 + 2 + 2 = 10` in total.
+The search fits 8 candidates, where the grid search fitted 17.
 =#
 rs_res1 = search_cross_validation(st, rs_cv1, rd)
 
@@ -210,7 +209,7 @@ plot_composition(res_rs1, rd)
 #=
 #### 2.2.2 Sampling from a distribution
 
-We now mix vectors and distributions, with `n_iter = 5`. This grid needs no
+We now mix vectors and distributions, with `n_iter = 10`. This grid needs no
 [`concrete_typed_array`](@ref). A distribution among the values makes the literal a vector of
 vectors of `Pair{String, Any}`, which the constructor of [`RandomisedSearchCrossValidation`](@ref)
 accepts. The constructor checks that every value is a vector or a distribution. A grid of vectors
@@ -223,14 +222,14 @@ p = [["opti[2].opt.l1" => range(; start = 0.0005, stop = 0.0008, length = 3),
      ["opti[2]" => [MeanRisk(; opt = opt, obj = MaximumUtility()),
                     MeanRisk(; opt = opt, obj = MaximumRatio())]]]
 
-rs_cv2 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r, n_iter = 5)
+rs_cv2 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r, n_iter = 10)
 
 #=
-The first grid holds a distribution. The search draws 5 values from it, and 3 values with
-replacement from the vector of three. The second grid gives 5 values from its distribution.
-The third and fourth grids hold only vectors and give their 3 and 2 values. That makes
-`3 × 5 + 5 + 3 + 2 = 25` candidates. A draw with replacement can repeat a value, and then
-two candidates are the same.
+Two grids hold a distribution, so each of the 10 trials picks one of the four grids with
+equal probability. A trial of the first grid draws one value of `opti[1].opt.l2.val` from its
+distribution and one of the three values of `opti[2].opt.l1`. A trial of the fourth grid picks
+one of the two estimators. That makes 10 candidates. Two trials of the fourth grid can pick the
+same estimator, and then two candidates are the same.
 =#
 rs_res2 = search_cross_validation(st, rs_cv2, rd)
 

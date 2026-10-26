@@ -249,6 +249,17 @@ unique_key_dict!(math_dict, :math_dict,
                  :C_finite_cand => "``\\mathcal{C}``: Finite candidates, the candidates whose every score is finite. A failed fold scores `NaN`, so a candidate that failed one is not in ``\\mathcal{C}``.",#
                  :sigma_scorer => "``\\sigma``: Search scorer `scorer`, a map from a score matrix to the position of its best column. The default [`HighestMeanScore`](@ref) takes the column of greatest mean.",#
                  :i_star_cand => "``i^{\\star}``: Selected candidate, the position in the grid of the candidate that the search returns.",#
+                 # The trials of a randomised search, which `make_p_grid` draws from the
+                 # search space before the grid search scores them.
+                 :Lambda_l_space => "``\\Lambda^{(l)}``: Space of the ``l``-th parameter set, the product of its value vectors.",#
+                 :Lambda_space => "``\\Lambda``: Search space, the concatenation of the spaces of the parameter sets. It is the grid that [`GridSearchCrossValidation`](@ref) scores for the same `p`.",#
+                 :Theta_trials => "``\\Theta``: Trial sequence, the points of the search space that [`make_p_grid`](@ref) draws. It is the grid that the grid search of the trials scores.",#
+                 :n_iter_trials => "``n``: Trial count, the field `n_iter`.",#
+                 :U_uniform_law => "``\\mathcal{U}``: Uniform law over a finite set.",#
+                 :l_t_set => "``l_t``: Parameter set of trial ``t``.",#
+                 :lambda_tj_value => "``\\lambda_{tj}``: Trial value, the value of the ``j``-th key at trial ``t``.",#
+                 :D_j_law => "``D_j``: Law of the ``j``-th key of one parameter set. It is the distribution that the set gives the key, or the uniform law over the entries of its value vector.",#
+                 :theta_t_trial => "``\\theta_t``: Trial ``t``, one value of every key of its parameter set.",#
                  # The recursive bisection that `HierarchicalRiskParity` and
                  # `SchurComplementHierarchicalRiskParity` share.
                  :C_halves_hier => "``C_1``, ``C_2``: Halves of a part of the dendrogram's leaf order. ``C_1`` holds the first ``\\lfloor n/2 \\rfloor`` of the part's ``n`` leaves, and ``C_2`` holds the rest.",#

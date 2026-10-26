@@ -1565,7 +1565,9 @@
 
         gs_cv = GridSearchCrossValidation(p; r = r)
         gs_res1 = search_cross_validation(mr, gs_cv, rd)
-        rs_cv1 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r)
+        # The four sets hold 9 + 3 + 3 + 2 = 17 points. A trial count of 17 draws every
+        # point, so the randomised search scores the grid and finds the same winner.
+        rs_cv1 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r, n_iter = 17)
         rs_res1 = search_cross_validation(mr, rs_cv1, rd)
         @test gs_res1.val_grid[gs_res1.idx] == rs_res1.val_grid[rs_res1.idx]
         @test gs_res1.lens_grid[gs_res1.idx] == rs_res1.lens_grid[rs_res1.idx]
@@ -1585,7 +1587,7 @@
                                   Dict(:(opti[2]) =>
                                            [MeanRisk(; opt = opt, obj = MaximumUtility()),
                                             MeanRisk(; opt = opt, obj = MaximumRatio())])])
-        rs_cv2 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r)
+        rs_cv2 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r, n_iter = 17)
         rs_res2 = search_cross_validation(mr, rs_cv2, rd)
         rev = rs_res2.val_grid[rs_res2.idx] != rs_res1.val_grid[rs_res1.idx]
         if rev

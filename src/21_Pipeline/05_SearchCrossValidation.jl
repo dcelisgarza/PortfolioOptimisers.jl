@@ -413,7 +413,7 @@ For `gscv`:
 For `rscv`:
 
  1. Resolve the random number generator from `rscv.rng` and `rscv.seed` through [`resolve_rng`](@ref).
- 2. Sample the grid through [`make_p_grid`](@ref), with at most `rscv.n_iter` values per key.
+ 2. Draw at most `rscv.n_iter` trials through [`make_p_grid`](@ref), each a joint value of every key of one parameter set.
  3. Build a [`GridSearchCrossValidation`](@ref) with that grid and the other fields of `rscv`, and run the search of that grid. Under a [`CombinatorialCrossValidation`](@ref) this is the combinatorial method.
 
 # Arguments

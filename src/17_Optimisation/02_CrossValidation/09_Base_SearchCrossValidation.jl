@@ -240,7 +240,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Randomised search cross-validation estimator for portfolio optimisation. Samples parameter sets from distributions or vectors, applies cross-validation splits, fits and scores each configuration, and selects the optimal parameters using the provided scoring strategy.
+Randomised search cross-validation estimator for portfolio optimisation. It draws `n_iter` trials from the search space, each a joint value of every key of one parameter set, through [`make_p_grid`](@ref). Then it scores the trials with the search of [`GridSearchCrossValidation`](@ref), and selects one with the scorer. The count of fits grows with `n_iter`, not with the count of keys.
 
 # Fields
 

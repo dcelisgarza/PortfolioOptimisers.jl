@@ -146,7 +146,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :n_subsets => "`n_subsets`: Number of random subsets.",#
                  :max_comb => "`max_comb`: Largest number of possible asset subsets for which the draw is exact. When `binomial(N, subset_size)` is larger, the draw takes each subset alone, and two subsets can be equal.",#
                  :window_size => "`window_size`: Rolling window size for randomised cross-validation.",#
-                 :n_iter => "`n_iter`: Number of random iterations.",#
+                 :n_iter => "`n_iter`: Trial count, the count of the candidates that the randomised search draws. Each trial sets every key of one parameter set. When every value is a vector and the space holds fewer points, the search takes each point once.",#
                  :cv => "`cv`: Cross-validation estimator.",#
                  :scorer => "`scorer`: Scoring function. Given the orientation-normalised score matrix (rows = CV splits, columns = parameter sets), it returns the column index of the best parameter set. The matrix is normalised so that **higher is always better**, whatever the risk measure, so a scorer selects the largest aggregate score (see [`CrossValidationSearchScorer`](@ref)).",#
                  :train_score => "`train_score`: Whether to also compute the training set score.",#

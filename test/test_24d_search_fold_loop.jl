@@ -16,7 +16,7 @@ The fixture is the online fold loop's, because the identities are structural.
 =#
 @testset "The search scores every candidate through the one fold loop" begin
     using Test, PortfolioOptimisers, Clarabel, StableRNGs, Statistics, Dates, LinearAlgebra,
-          FLoops, Accessors
+          FLoops, Accessors, Distributions, StatsBase
     po = PortfolioOptimisers
     rng = StableRNG(20260911)
     T, N = 160, 8
@@ -386,6 +386,107 @@ The fixture is the online fold loop's, because the identities are structural.
         @test all(isnan, fres.test_scores[:, 1])
         @test all(isfinite, fres.test_scores[:, 2])
         @test fres.idx == 2
+    end
+
+    @testset "11. The randomised search draws `n_iter` joint trials" begin
+        # Each trial is one point of the space, a joint value of every key, so the count of
+        # candidates is `n_iter`, not `n_iter` per key multiplied over the keys.
+        g3 = ["opt.a" => [1, 2, 3, 4], "opt.b" => [10, 20, 30, 40], "opt.c" => [5, 6, 7, 8]]
+        trials = po.make_p_grid(g3, 3, StableRNG(1))
+        lg, vg = po.lens_val_grid(trials)
+        @test length(trials) == length(vg) == 3
+        full = po.lens_val_grid(g3)[2]
+        @test allunique(vg) && all(in(full), vg)
+        # A space of vectors alone gives distinct points in the order of the grid, so
+        # `n_iter` at the size of the grid or more gives the grid itself.
+        @test issorted([findfirst(==(v), full) for v in vg])
+        @test po.lens_val_grid(po.make_p_grid(g3, 64, StableRNG(1)))[2] == full
+        @test po.lens_val_grid(po.make_p_grid(g3, 100, StableRNG(1)))[2] == full
+        sets = Union{Vector{Pair{String, Vector{Int}}}, Dict{String, Vector{Int}}}[["opt.a" =>
+                                                                                        [1,
+                                                                                         2,
+                                                                                         3],
+                                                                                    "opt.b" =>
+                                                                                        [10,
+                                                                                         20]],
+                                                                                   Dict("opt.c" =>
+                                                                                            [7,
+                                                                                             8])]
+        @test po.lens_val_grid(po.make_p_grid(sets, 8, StableRNG(2)))[2] ==
+              po.lens_val_grid(sets)[2]
+        # Every point of a space of 12 comes in 3 of 12 draws, a quarter of the time.
+        sets12 = [["opt.a" => [1, 2, 3], "opt.b" => [10, 20]], ["opt.c" => collect(1:6)]]
+        R = 4000
+        rng12 = StableRNG(3)
+        cnt = countmap(reduce(vcat,
+                              [po.lens_val_grid(po.make_p_grid(sets12, 3, rng12))[2]
+                               for _ in 1:R]))
+        @test length(cnt) == 12
+        @test all(c -> isapprox(c / R, 0.25; atol = 0.03), values(cnt))
+        # A space past `typemax(Int)`: 32 keys of 5 values give 5^32 points.
+        big_ps = ["k$j" => collect(1:5) .+ 10j for j in 1:32]
+        bt = po.make_p_grid(big_ps, 4, StableRNG(4))
+        @test length(bt) == 4 && allunique(bt)
+        @test all(t -> all(j -> t[j][2][1] in big_ps[j][2], 1:32), bt)
+        bidx = po.sample_grid_positions(StableRNG(5), big(5)^32, 6)
+        @test eltype(bidx) == BigInt && allunique(bidx) && issorted(bidx)
+        @test all(i -> 1 <= i <= big(5)^32, bidx)
+        @test po.sample_grid_positions(StableRNG(5), 12, 12) == 1:12
+        # A distribution makes every trial an independent draw: a set chosen with equal
+        # probability, and one value of each of its keys.
+        mix = Union{Vector{Pair{String, Any}}, Dict{String, Vector{Int}}}[Pair{String, Any}["opt.a" => [1,
+                                                                                                        2,
+                                                                                                        3],
+                                                                                            "opt.x" => Normal(2,
+                                                                                                              3)],
+                                                                          Dict("opt.c" =>
+                                                                                   [7, 8])]
+        mt = po.make_p_grid(mix, 6000, StableRNG(6))
+        @test length(mt) == 6000
+        s1 = filter(t -> length(t) == 2, mt)
+        s2 = filter(t -> length(t) == 1, mt)
+        @test length(s1) + length(s2) == 6000
+        @test all(t -> t[1][1] == "opt.c" && t[1][2][1] in (7, 8), s2)
+        @test isapprox(length(s1) / 6000, 0.5; atol = 0.03)
+        @test isapprox(mean(t[2][2][1] for t in s1), 2; atol = 0.2)
+        @test all(t -> t[1][2][1] in 1:3, s1)
+        mv = po.make_p_grid(Pair{String, Any}["opt.m" => MvNormal(zeros(2), I(2))], 2,
+                            StableRNG(7))
+        @test all(t -> t[1][2][1] isa AbstractVector && length(t[1][2][1]) == 2, mv)
+        # An empty value vector is refused by name, and the trial count meets the cap of
+        # the grid before any draw.
+        for p in (Pair{String, Any}["opt.a" => Float64[], "opt.x" => Normal()],
+                  ["opt.a" => Float64[], "opt.b" => [0.1]])
+            err = try
+                po.make_p_grid(p, 2, StableRNG(1))
+            catch e
+                e
+            end
+            @test err isa IsEmptyError
+            @test occursin("`opt.a`", sprint(showerror, err))
+        end
+        @test_throws DomainError po.make_p_grid(["opt.x" => Normal()], 100_001,
+                                                StableRNG(1))
+        @test_throws DomainError po.make_p_grid(["opt.a" => 1:1000, "opt.b" => 1:1000],
+                                                100_001, StableRNG(1))
+        # The search scores the trials as the grid search scores its grid.
+        cgrid = concrete_typed_array(["opt.wb" => wbgrid[1][2],
+                                      "opt.pe.ce.ce.ce.ce" =>
+                                          [SimpleCovariance(; corrected = true),
+                                           SimpleCovariance(; corrected = false)]])
+        kcv = KFold(; n = 4)
+        gres = search_cross_validation(hrp, gs(kcv, cgrid; ex = SequentialEx()), rd)
+        rs6 = RandomisedSearchCrossValidation(cgrid; cv = kcv, r = r, ex = SequentialEx(),
+                                              n_iter = 6, seed = 1)
+        rres = search_cross_validation(hrp, rs6, rd)
+        @test rres.test_scores == gres.test_scores
+        @test rres.val_grid == gres.val_grid && rres.idx == gres.idx
+        rs3 = RandomisedSearchCrossValidation(cgrid; cv = kcv, r = r, ex = SequentialEx(),
+                                              n_iter = 3, seed = 1)
+        r3 = search_cross_validation(hrp, rs3, rd)
+        cols = [findfirst(==(v), gres.val_grid) for v in r3.val_grid]
+        @test size(r3.test_scores) == (4, 3)
+        @test r3.test_scores == gres.test_scores[:, cols]
     end
 
     @testset "A result's own prior scores its weights at the result's mask" begin
