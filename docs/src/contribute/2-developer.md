@@ -233,7 +233,7 @@ Here is how you do it:
 
 ### A preview of the documentation of a pull request
 
-The documentation of a pull request deploys as a preview only when the pull request carries the label `docs-preview`. Add the label to start the build. The preview is at `https://dcelisgarza.github.io/PortfolioOptimisers.jl/previews/PR<number>/`. Each preview is a full build, and GitHub Pages refuses a site above 10 GiB, so the `Doc preview cleanup` workflow deletes a preview when its pull request closes. Each week it also deletes the preview of a pull request without the label.
+The documentation of each pull request from a branch of this repository deploys as a preview. A pull request from a fork builds the documentation but deploys no preview. The preview is at `https://dcelisgarza.github.io/PortfolioOptimisers.jl/previews/PR<number>/`. Each preview is a full build, and GitHub Pages refuses a site above 10 GiB, so the `Doc preview cleanup` workflow deletes a preview when its pull request closes. Each week it also deletes a preview whose pull request is not open.
 
 The same workflow keeps the documentation of the five newest minor series online and deletes the older versions each week. A link into a deleted version stops resolving.
 

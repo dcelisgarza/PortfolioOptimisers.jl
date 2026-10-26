@@ -56,9 +56,11 @@ checks.
 
 Two jobs keep a part of their pull-request run:
 
-- The `Documentation` job of `Docs.yml` also runs when the pull request carries the label
-  `docs-preview`. `docs/make.jl` deploys only from `main`, so the pull-request run is the only one
-  that deploys the preview. The `Doctests` job skips.
+- The `Documentation` job of `Docs.yml` runs on every pull request. `docs/make.jl` deploys only
+  from `main`, so the pull-request run is the only one that deploys the preview. The `Doctests` job
+  skips. `DocPreviewCleanup.yml` deletes the preview when the pull request closes. Until 2026-10-26,
+  a preview needed the label `docs-preview` (#1722). The maintainer then chose a preview for each
+  pull request.
 - The flag of a new Rationale in `Complexity.yml` diffs the merge commit against its base, and a
   push run has no base to diff. It is the job `rationale`, which runs on every pull request.
 

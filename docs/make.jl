@@ -314,13 +314,13 @@ makedocs(; modules = [PortfolioOptimisers], doctest = false,
 include(joinpath(@__DIR__, "generate_sitemap.jl"))
 generate_sitemap(joinpath(@__DIR__, "build"), CANONICAL_URL)
 
-# A pull request deploys a preview only when it carries the label `docs-preview`, which
-# `Docs.yml` passes as `DOCS_PREVIEW` (#1722). `versions` stays at its default: it shapes
-# only the version selector, and Documenter deletes no version from `gh-pages`. The cap on
-# the versions that `gh-pages` keeps is in `.github/workflows/DocPreviewCleanup.yml`.
+# Each pull request deploys a preview under `previews/PR<number>`, and
+# `.github/workflows/DocPreviewCleanup.yml` deletes it when the pull request closes.
+# `versions` stays at its default: it shapes only the version selector, and Documenter
+# deletes no version from `gh-pages`. The cap on the versions that `gh-pages` keeps is in
+# the same workflow.
 deploydocs(; repo = "github.com/dcelisgarza/PortfolioOptimisers.jl", target = "build",
-           devbranch = "main", branch = "gh-pages",
-           push_preview = get(ENV, "DOCS_PREVIEW", "false") == "true")
+           devbranch = "main", branch = "gh-pages", push_preview = true)
 
 # ---------------------------------------------------------------------------------------
 # Viewing the docs locally
