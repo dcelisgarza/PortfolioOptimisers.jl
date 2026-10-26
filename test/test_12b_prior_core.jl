@@ -3750,6 +3750,17 @@ end
     end
 end
 
+# A Prior Result of a type that the library does not ship, with no field for the source.
+struct SourcelessPriorResult <: PortfolioOptimisers.AbstractPriorResult end
+
+@testset "A Prior Result of another type records no source" begin
+    PO = PortfolioOptimisers
+    pr = SourcelessPriorResult()
+    # The stamp returns the Result unchanged, and the Result answers no source.
+    @test PO.stamp_returns_source(pr, EmpiricalPrior(; x_src = ExcessSource())) === pr
+    @test isnothing(PO.prior_returns_source(pr))
+end
+
 @testset "No verb or type that took `brt` takes it, and no sink swallows it (#1705)" begin
     PO = PortfolioOptimisers
     rngs = StableRNG(17051)

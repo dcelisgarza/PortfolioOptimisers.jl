@@ -4474,6 +4474,10 @@ end
                    PortfolioOptimisers.zero_centrality_msg(BetweennessCentrality(), 0))
     @test_throws PortfolioOptimisers.IsEmptyError centrality_constraints(CentralityConstraint[],
                                                                          X2)
+    # The prior method of an empty vector states no source, and refuses the vector in the same way.
+    @test_throws PortfolioOptimisers.IsEmptyError centrality_constraints(CentralityConstraint[],
+                                                                         prior(EmpiricalPrior(),
+                                                                               X2))
 end
 @testset "The centrality threshold is read off the unscaled vector" begin
     using PortfolioOptimisers, Test, StableRNGs
