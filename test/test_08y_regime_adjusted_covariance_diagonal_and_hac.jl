@@ -569,7 +569,33 @@ end
     for target in (DiagonalTarget(), MahalanobisTarget()), method in (FM, LG),
         debias in (ExactDebias(), LawDebias())
 
-        @test all(isapprox.(fit(Float32, target, method, debias),
-                            fit(Float64, target, method, debias); rtol = 1e-4))
+        S32 = fit(Float32, target, method, debias)
+        # The first-moment constant of the two whole-block targets was a Float64 literal, so
+        # the first-moment fit gave a Float64 matrix on Float32 data (#1827).
+        @test eltype(S32) == Float32
+        @test all(isapprox.(S32, fit(Float64, target, method, debias); rtol = 1e-4))
+    end
+end
+
+@testset "the Gaussian level closure answers on Float32 data (#1827)" begin
+    # The kernel of the closure is a difference of two near-equal terms, which Float32 loses
+    # to round-off, so the fit was all NaN. The closure now runs in Float64 at least, and its
+    # ratio returns to the type of the decay. The ratio does not read the debias rule.
+    X = Float32.(randn(StableRNG(1827), 80, 4) ./ 100)
+    function fit(F, method)
+        ce = RegimeAdjustedExpWeightedCovariance(;
+                                                 regime_target = MahalanobisTarget(;
+                                                                                   recursion = GaussianLevelRecursion()),
+                                                 regime_method = method, decay = F(0.9),
+                                                 min_val = F(1e-12),
+                                                 regime_lohi_mult = (F(0.7), F(1.6)),
+                                                 min_obs = 6)
+        return cov(ce, F.(X))
+    end
+    for method in (PO.FirstMomentRegimeAdjusted(; x = sqrt(2 / Float32(pi))),
+                   PO.LogRegimeAdjusted(; x = 0.5f0, y = 2.0f0))
+        S32 = fit(Float32, method)
+        @test eltype(S32) == Float32
+        @test all(isapprox.(S32, fit(Float64, method); rtol = 1e-4))
     end
 end

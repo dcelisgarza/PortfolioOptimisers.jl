@@ -981,7 +981,8 @@ constant, so the debiased statistic does not depend on it.
 
 # Arguments
 
-  - `::FirstMomentRegimeAdjusted`: First-moment regime adjustment method (unused).
+  - `method::FirstMomentRegimeAdjusted`: First-moment regime adjustment method. The type of its
+    field `x` is the type of the constant.
   - `::Union{MahalanobisTarget, DiagonalTarget}`: Regime-adjustment target.
   - `n::Integer`: Count of assets that contribute to the statistic.
 
@@ -995,10 +996,11 @@ constant, so the debiased statistic does not depend on it.
   - [`get_regime_state`](@ref)
   - [`RegimeAdjustedExpWeightedCovariance`](@ref)
 """
-function regime_denom(::FirstMomentRegimeAdjusted,
+function regime_denom(method::FirstMomentRegimeAdjusted,
                       ::Union{MahalanobisTarget, DiagonalTarget}, n::Integer)
-    return sqrt(2.0) * exp(SpecialFunctions.loggamma(0.5 * (n + 1)) -
-                           SpecialFunctions.loggamma(0.5 * n))
+    o = one(method.x)
+    return sqrt(2 * o) * exp(SpecialFunctions.loggamma((n + 1) * o / 2) -
+                             SpecialFunctions.loggamma(n * o / 2))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

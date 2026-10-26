@@ -198,6 +198,17 @@ converts internally. An index is the usual case.
 - An index or a count from integer arithmetic keeps `eltype`, and divides with `÷` rather than
   with `/` followed by a conversion.
 
+**Support a type narrower than `Float64` on a best-effort basis (#1827).** Make a narrower type
+work when the fix costs the `Float64` default nothing. Do not make the default worse, and do not
+make a compromise that gives nothing back, to hold a narrower type. When the narrower type cannot
+hold the answer for that reason, promote it with `promote_type(typeof(x), Float64)` at the one
+site. `Float64`, `BigFloat` and a dual on `Float64` keep their own type. Convert the result back
+to the type of the input with `oftype` where the result holds in it. State the promotion in a
+`!!! warning` admonition in the docstring of the type or function that the user calls, and add the
+site to `RULED` in `test/test_55_numeric_coercion_census.jl`, which otherwise refuses that
+spelling. A site that widens a computation that its narrower input already holds is not this
+case. It is the breach of #1808.
+
 **Keep a signature as wide as the body allows.** Prefer `VecNum`, `MatNum`, `ArrNum` and
 `<:Number` over a narrower bound, so that a caller can bring a number type from another package. Narrow
 to `<:Real` only where the body needs an order, and to a concrete type only where the body needs
