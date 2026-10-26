@@ -201,3 +201,15 @@ for ten rows. Seven rose in the `main` run, among them `20_Base_Regression.jl` f
 three rose in the `plots_ext` run, among them `02_DimensionReductionRegression.jl` from 1 to 27.
 Eight rows fell. With no source change in the commit, every rise is the analyser's. The coverage
 baseline's provenance line was moved by hand, for the reason the first amendment gives.
+
+## Amendment (2026-10-26, #1832)
+
+The push trigger of `JET.yml` has no `paths:` filter. The pull-request trigger keeps it. The
+ruleset of `main` now requires the checks `JET - push` and `Complexity - push` on the head of a
+pull request into `main`. A filter that skips the push run leaves that check pending, and the
+merge waits forever. This is the case that the second item of the Consequences warned about. From
+2026-10-22 to 2026-10-26, the filter skipped 4 of 117 pushes to `dev`, so the removal costs little.
+The `build` job of each workflow carries the event in its name, `JET - push` or
+`Complexity - push`.
+[ADR 0220](0220-a-pull-request-from-a-pushed-branch-skips-the-jobs-its-push-runs.md) records the
+ruleset and the names.

@@ -59,6 +59,9 @@ jobs:
   # catalogue and the type hierarchy) are untracked, so lychee never sees them. The Docs build
   # writes them and fails on a local link they carry to a page that does not exist. ADR 0151.
   link-checker:
+    # The name carries the event, so the ruleset of `main` can require the push check by a name that
+    # a skipped pull-request run never carries. ADR 0220.
+    name: Link checker - ${{ github.event_name }}
     # A pull request from `dev*` or `agents/**` in this repository skips this job. The push to that
     # branch runs it, and its check shows on the head commit of the pull request. ADR 0220.
     if: >-

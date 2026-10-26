@@ -29,7 +29,9 @@ concurrency:
 
 jobs:
   docs:
-    name: Documentation
+    # The name carries the event, so the ruleset of `main` can require the push check by a name that
+    # a skipped pull-request run never carries. ADR 0220.
+    name: Documentation - ${{ github.event_name }}
     # A pull request from `dev*` or `agents/**` in this repository skips this job unless it carries
     # the label `docs-preview`. The push to that branch builds the docs, but `docs/make.jl` deploys
     # only from `main`, so the pull-request run alone deploys the preview. ADR 0220.
@@ -65,7 +67,9 @@ jobs:
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
           GKSwstype: "100" # https://discourse.julialang.org/t/generation-of-documentation-fails-qt-qpa-xcb-could-not-connect-to-display/60988
   doctest:
-    name: Doctests
+    # The name carries the event, so the ruleset of `main` can require the push check by a name that
+    # a skipped pull-request run never carries. ADR 0220.
+    name: Doctests - ${{ github.event_name }}
     # The `docs-preview` label cancels the run of the same commit, doctests included, so run them again.
     # A pull request from `dev*` or `agents/**` in this repository skips this job. The push to that
     # branch runs it, and its check shows on the head commit of the pull request. ADR 0220.

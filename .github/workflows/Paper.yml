@@ -21,7 +21,9 @@ concurrency:
 
 jobs:
   paper:
-    name: Paper
+    # The name carries the event, so the ruleset of `main` can require the push check by a name that
+    # a skipped pull-request run never carries. ADR 0220.
+    name: Paper - ${{ github.event_name }}
     # A pull request from `dev*` or `agents/**` in this repository skips this job. The push to that
     # branch runs it, and its check shows on the head commit of the pull request. ADR 0220.
     if: >-
