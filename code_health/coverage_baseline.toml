@@ -289,7 +289,7 @@ commit = "8610300"
 "src/16_RiskMeasures/10_MaximumDrawdown.jl" = { lines = 14, misses = 0 }
 "src/16_RiskMeasures/11_BrownianDistanceVariance.jl" = { lines = 15, misses = 0 }
 "src/16_RiskMeasures/12_WorstRealisation.jl" = { lines = 6, misses = 0 }
-"src/16_RiskMeasures/13_NoRisk.jl" = { lines = 27, misses = 3 }
+"src/16_RiskMeasures/13_NoRisk.jl" = { lines = 27, misses = 0 }
 "src/16_RiskMeasures/14_Range.jl" = { lines = 6, misses = 0 }
 "src/16_RiskMeasures/15_TurnoverRiskMeasure.jl" = { lines = 13, misses = 0 }
 "src/16_RiskMeasures/16_TrackingRiskMeasure.jl" = { lines = 56, misses = 0 }
@@ -299,7 +299,7 @@ commit = "8610300"
 "src/16_RiskMeasures/20_EqualRiskMeasure.jl" = { lines = 5, misses = 0 }
 "src/16_RiskMeasures/21_MedianAbsoluteDeviationRisk.jl" = { lines = 41, misses = 3 }
 "src/16_RiskMeasures/22_NonOptimisationRiskMeasures.jl" = { lines = 47, misses = 8 }
-"src/16_RiskMeasures/23_AdjustRiskContributions.jl" = { lines = 8, misses = 6 }
+"src/16_RiskMeasures/23_AdjustRiskContributions.jl" = { lines = 8, misses = 0 }
 "src/16_RiskMeasures/24_ExpectedRisk.jl" = { lines = 105, misses = 0 }
 "src/16_RiskMeasures/25_RiskMeasureTools.jl" = { lines = 46, misses = 16 }
 "src/17_Optimisation/01_Base_Optimisation/01_OptimisationTypes.jl" = { lines = 19, misses = 0 }

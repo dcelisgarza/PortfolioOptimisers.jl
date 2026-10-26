@@ -928,13 +928,15 @@ function number_effective_assets(w::VecNum)
 end
 """
     adjusted_risk(ps::Nothing, r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum,
-                  fees::Option{<:Fees}, delta::Number; kwargs...)
+                  fees::Option{<:Fees}; kwargs...)
+    adjusted_risk(ps::Nothing, r::VarianceSkewKurtosis, w::VecNum, X::MatNum,
+                  fees::Option{<:Fees}; kwargs...)
     adjusted_risk(ps::VecNum, rs::VecBaseRM, w::VecNum, X::MatNum,
-                  fees::Option{<:Fees}, delta::Number; kwargs...)
+                  fees::Option{<:Fees}; kwargs...)
 
 Evaluate the risk at `w` with the homogeneity correction applied to each measure, which is the function that [`risk_contribution`](@ref) differentiates.
 
-[`adjust_risk_contribution`](@ref) divides the risk of a measure by its degree of homogeneity. By Euler's theorem, the gradient of the divided risk, multiplied by the weights, then sums to the risk. A vector such as `[Variance(), ConditionalValueatRisk()]` holds a measure of degree 2 and a measure of degree 1, so the vector has no single degree. The function therefore corrects each element before it combines them.
+[`adjust_risk_contribution`](@ref) divides the risk of a measure by its degree of homogeneity. By Euler's theorem, the gradient of the divided risk, multiplied by the weights, then sums to the risk. A vector such as `[Variance(), ConditionalValueatRisk()]` holds a measure of degree 2 and a measure of degree 1, so the vector has no single degree. The function therefore corrects each element before it combines them. [`VarianceSkewKurtosis`](@ref) is a sum of three terms of the degrees 2, 3 and 4, so its method divides each term of [`variance_skew_kurtosis_terms`](@ref) by its own degree.
 
 The chain-rule weights ``p_k`` come from [`scalariser_element_weights`](@ref), which the caller evaluates once at the unperturbed weights. The finite difference moves the risk of each element and keeps the weights, so a maximum or a minimum keeps the element that it picks at `w`. Under the sum, the maximum and the minimum, the gradient of ``A`` times the weights then sums to ``\\sum_k p_k s_k R_k(\\boldsymbol{w})``, which is the aggregate that [`expected_risk`](@ref) reports. Under the log-sum-exp scalariser the same sum is the softmax-weighted mean of the scaled risks, which is below the aggregate, because the log-sum-exp is not homogeneous.
 
@@ -964,7 +966,6 @@ Where:
   - `w::VecNum`: Portfolio weights vector `assets × 1`.
   - `X::MatNum`: Returns matrix `observations × assets`.
   - `fees`: Optional [`Fees`](@ref) structure.
-  - `delta::Number`: Step of the finite difference, which [`adjust_risk_contribution`](@ref) reads for [`EqualRisk`](@ref).
 
 # Returns
 
@@ -974,21 +975,26 @@ Where:
 
   - [`risk_contribution`](@ref)
   - [`adjust_risk_contribution`](@ref)
+  - [`variance_skew_kurtosis_terms`](@ref)
   - [`scalariser_element_weights`](@ref)
   - [`expected_risk`](@ref)
 """
 function adjusted_risk(::Nothing, r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum,
-                       fees::Option{<:Fees}, delta::Number; kwargs...)
-    return adjust_risk_contribution(r, expected_risk(r, w, X, fees; kwargs...), delta)
+                       fees::Option{<:Fees}; kwargs...)
+    return adjust_risk_contribution(r, expected_risk(r, w, X, fees; kwargs...))
+end
+function adjusted_risk(::Nothing, r::VarianceSkewKurtosis, w::VecNum, ::MatNum,
+                       ::Option{<:Fees}; kwargs...)
+    v, s, k = variance_skew_kurtosis_terms(r, w)
+    return v / 2 - s / 3 + k / 4
 end
 function adjusted_risk(ps::VecNum, rs::VecBaseRM, w::VecNum, X::MatNum,
-                       fees::Option{<:Fees}, delta::Number; kwargs...)
+                       fees::Option{<:Fees}; kwargs...)
     return sum(zip(ps, rs)) do (p, r)
         if iszero(p)
             return zero(p)
         end
-        val = adjust_risk_contribution(r, expected_risk(r, w, X, fees; kwargs...), delta)
-        return p * r.settings.scale * val
+        return p * r.settings.scale * adjusted_risk(nothing, r, w, X, fees; kwargs...)
     end
 end
 """
@@ -1006,7 +1012,7 @@ end
 
 Compute the contribution of each asset to the risk of a portfolio with a finite difference.
 
-The contributions sum to the risk that [`expected_risk`](@ref) reports, because the function divides the gradient of each measure by its degree of homogeneity. A vector of measures decomposes its aggregate. The function corrects each element before the scalariser combines them, through [`adjusted_risk`](@ref), so the contributions sum to the aggregate when the elements have different degrees. Under [`MaxScalariser`](@ref) and [`MinScalariser`](@ref), the contributions are those of the element that the scalariser picks at `w`, and at a tie they are those of the earliest such element. Under [`LogSumExpScalariser`](@ref), the contributions sum to the softmax-weighted mean of the scaled risks, which is below the aggregate.
+The contributions sum to the risk that [`expected_risk`](@ref) reports, because the function divides the gradient of each measure by its degree of homogeneity. [`homogeneity_degree`](@ref) gives that degree. The sum holds only for a measure that is homogeneous of a degree other than zero. The contributions of a measure of degree 0, such as [`EqualRisk`](@ref) or [`Skewness`](@ref), sum to zero. The contributions of a measure that is not homogeneous in the weights, such as a tracking error, a turnover or a relative drawdown, do not sum to its risk. A vector of measures decomposes its aggregate. The function corrects each element before the scalariser combines them, through [`adjusted_risk`](@ref), so the contributions sum to the aggregate when the elements have different degrees. Under [`MaxScalariser`](@ref) and [`MinScalariser`](@ref), the contributions are those of the element that the scalariser picks at `w`, and at a tie they are those of the earliest such element. Under [`LogSumExpScalariser`](@ref), the contributions sum to the softmax-weighted mean of the scaled risks, which is below the aggregate.
 
 A prior result reduces to the Investable Mask before the finite difference, so no perturbed weight meets a `NaN` moment, and a non-investable asset reports exactly `0`. The prior also resolves the measure once, so a Deferred Quantity is fitted once and not once for each finite difference.
 
@@ -1082,7 +1088,7 @@ function risk_contribution(r::BaseRM_VecBaseRM, w::VecNum, X::MatNum_Pr,
     r, X = resolve_risk_inputs(r, X)
     ps = scalariser_element_weights(sca, r, w, X, fees; kwargs...)
     rc = finite_difference_gradient(w, delta) do v
-        return adjusted_risk(ps, r, v, X, fees, delta; kwargs...)
+        return adjusted_risk(ps, r, v, X, fees; kwargs...)
     end
     if !marginal
         rc .*= w
@@ -1764,5 +1770,5 @@ function rolling_window_measure(r::BaseRM_VecBaseRM, ret::VecVecNum, window::Int
     return [rolling_window_measure(r, reti, window; kwargs...) for reti in ret]
 end
 
-export RiskRatio, number_effective_assets, risk_contribution, risk_gradient,
-       factor_risk_contribution, rolling_window_measure
+export number_effective_assets, risk_contribution, risk_gradient, factor_risk_contribution,
+       rolling_window_measure

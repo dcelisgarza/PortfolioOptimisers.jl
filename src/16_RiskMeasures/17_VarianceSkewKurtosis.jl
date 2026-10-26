@@ -676,10 +676,54 @@ end
 # STANDARDISED skewness and, under `SOCRiskExpr`, the square root of the fourth moment, so the
 # functor did not agree with the model it names.
 function (r::VarianceSkewKurtosis)(w::VecNum, ::MatNum, ::Option{<:Fees} = nothing)
+    v, s, k = variance_skew_kurtosis_terms(r, w)
+    return v - s + k
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the three scaled terms of [`VarianceSkewKurtosis`](@ref) `r` at the weights `w`, as the tuple `(v, s, k)`.
+
+The functor of `r` returns `v - s + k`. The terms have the degrees of homogeneity 2, 3 and 4, so the sum has no single degree. [`adjusted_risk`](@ref) divides each term by its own degree, and so [`risk_contribution`](@ref) decomposes the sum exactly.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+v &= s_{\\sigma^2}\\, \\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}\\,, \\\\
+s &= s_{\\mathrm{sk}}\\, m_3(\\boldsymbol{w})\\,, \\\\
+k &= s_{\\kappa}\\, m_4(\\boldsymbol{w})\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - $(math_dict[:Sigma_rm])
+  - $(math_dict[:m3_port])
+  - $(math_dict[:m4_port])
+  - ``s_{\\sigma^2}``, ``s_{\\mathrm{sk}}``, ``s_{\\kappa}``: The `settings.scale` of `vr`, `sk` and `kt`.
+
+# Arguments
+
+  - `r::VarianceSkewKurtosis`: Measure whose matrices are stated.
+  - `w::VecNum`: Portfolio weights vector `assets × 1`.
+
+# Returns
+
+  - `(v, s, k)::Tuple`: The scaled variance, third moment and fourth moment terms.
+
+# Related
+
+  - [`VarianceSkewKurtosis`](@ref)
+  - [`adjusted_risk`](@ref)
+  - [`homogeneity_degree`](@ref)
+"""
+function variance_skew_kurtosis_terms(r::VarianceSkewKurtosis, w::VecNum)
     w2 = LinearAlgebra.kron(w, w)
-    return r.vr(w) * r.vr.settings.scale -
-           LinearAlgebra.dot(w, r.sk.sk, w2) * r.sk.settings.scale +
-           LinearAlgebra.dot(w2, r.kt.kt, w2) * r.kt.settings.scale
+    return (r.vr(w) * r.vr.settings.scale,
+            LinearAlgebra.dot(w, r.sk.sk, w2) * r.sk.settings.scale,
+            LinearAlgebra.dot(w2, r.kt.kt, w2) * r.kt.settings.scale)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

@@ -9,6 +9,9 @@ SquaredRiskMeasures
 QuadExpressionRiskMeasures
 CubedRiskMeasures
 FourthPowerRiskMeasures
-DrawdownRiskMeasures
+ScaleFreeRiskMeasures
+homogeneity_degree
+scalarised_degree
+degree_difference
 adjust_risk_contribution
 ```
