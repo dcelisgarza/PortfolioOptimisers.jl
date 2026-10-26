@@ -341,7 +341,7 @@
 "src/16_RiskMeasures/12_WorstRealisation.jl" = { map = 9, units = 1, algorithm = 0, swept = true, bindings = ["WorstRealisation"] }
 "src/16_RiskMeasures/13_NoRisk.jl" = { map = 9, units = 6, swept = false }
 "src/16_RiskMeasures/14_Range.jl" = { map = 9, units = 1, algorithm = 0, swept = true, bindings = ["Range"] }
-"src/16_RiskMeasures/15_TurnoverRiskMeasure.jl" = { map = 9, units = 4, swept = false }
+"src/16_RiskMeasures/15_TurnoverRiskMeasure.jl" = { map = 9, units = 4, algorithm = 0, swept = true, bindings = ["TurnoverRiskMeasure", "factory", "factory", "needs_previous_weights"] }
 "src/16_RiskMeasures/16_TrackingRiskMeasure.jl" = { map = 9, units = 20, algorithm = 6, swept = true, bindings = ["RiskTrackingError", "RiskTrackingRiskMeasure", "TrackingRiskMeasure", "bind_data_benchmark", "factory", "factory", "factory", "factory", "factory", "factory", "needs_previous_weights", "needs_previous_weights", "needs_previous_weights", "port_opt_view", "port_opt_view", "reader_frames", "supports_precomputed_returns", "supports_precomputed_returns", "supports_precomputed_returns", "supports_precomputed_returns"] }
 "src/16_RiskMeasures/17_VarianceSkewKurtosis.jl" = { map = 9, units = 19, algorithm = 5, swept = true, bindings = ["MaxRiskMeasureSettings", "Skewness", "VarianceSkewKurtosis", "bigger_is_better", "bounds_risk_measure", "factory", "factory", "factory", "no_bounds_no_risk_expr_risk_measure", "no_bounds_no_risk_expr_risk_measure", "no_bounds_risk_measure", "no_bounds_risk_measure", "no_risk_expr_risk_measure", "port_opt_view", "port_opt_view", "resolve_deferred_quantities", "resolve_deferred_quantities", "supports_precomputed_returns", "supports_precomputed_returns"] }
 "src/16_RiskMeasures/18_GenericValueatRiskRange.jl" = { map = 9, units = 4, algorithm = 0, swept = true, bindings = ["GenericValueatRiskRange", "ValueatRiskRMs", "gain_tail_measure", "range_tail_risk"] }
@@ -427,7 +427,7 @@
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/12_WorstRealisationConstraints.jl" = { map = 11, units = 2, swept = false }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/13_NoRiskConstraints.jl" = { map = 11, units = 1, swept = false }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/14_RangeConstraints.jl" = { map = 11, units = 1, swept = false }
-"src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/15_TurnoverRiskMeasureConstraints.jl" = { map = 11, units = 1, swept = false }
+"src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/15_TurnoverRiskMeasureConstraints.jl" = { map = 11, units = 1, algorithm = 0, swept = true, bindings = ["set_risk_constraints!"] }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/16_TrackingRiskMeasureConstraints.jl" = { map = 11, units = 9, swept = false }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/17_VarianceSkewKurtosisConstraints.jl" = { map = 11, units = 1, algorithm = 1, swept = true, bindings = ["set_risk_constraints!"] }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/18_GenericValueatRiskRangeConstraints.jl" = { map = 11, units = 1, swept = false }

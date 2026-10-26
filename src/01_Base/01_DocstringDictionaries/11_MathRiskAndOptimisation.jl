@@ -190,6 +190,9 @@ unique_key_dict!(math_dict, :math_dict,
                  :C_prev_alloc => "``C^{\\text{prev}}``: Previous cash, the cash that the portfolio held before the trade, the `prev_cash` of [`FiniteAllocationInput`](@ref).",#
                  :m_prev_alloc => "``\\boldsymbol{m}^{\\text{prev}}``: Previous money vector, the money in each position of one side before the trade.",#
                  :L_liq_alloc => "``L``: Forced-exit charge, the constant fee over the whole horizon for the assets that left the universe.",#
+                 # The turnover family.
+                 :Tn_turnover => "``\\mathrm{Turnover}(\\boldsymbol{w})``: Turnover of the portfolio, the sum over the assets of the absolute change of weight from the reference weights.",#
+                 :w_0_turnover => "``\\boldsymbol{w}_{0}``: Reference portfolio weights vector ``N \\times 1``, the weights from which the turnover is measured.",#
                  # The risk tracking family.
                  :w_b_track => "``\\boldsymbol{w}_b``: Benchmark portfolio weights vector ``N \\times 1``, the `w` of the tracking specification `tr`.",#
                  :rho_track => "``\\rho``: Tracked risk measure, the `r` field. Its value at a weight vector is the risk of that vector as [`expected_risk`](@ref) reports it.",#

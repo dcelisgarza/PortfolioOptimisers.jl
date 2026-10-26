@@ -248,7 +248,7 @@ Where:
 
   - ``\\boldsymbol{Tn}(\\boldsymbol{w})``: `N × 1` turnover vector.
   - ``\\boldsymbol{w}``: `N × 1` vector of candidate portfolio weights.
-  - ``\\boldsymbol{w}_{0}``: `N × 1` vector of reference portfolio weights, the `w` field.
+  - $(math_dict[:w_0_turnover])
   - ``\\boldsymbol{\\delta}``: `N × 1` vector of maximum turnover, the `val` field. A scalar `val` broadcasts to every asset.
   - ``\\lvert \\cdot \\rvert``: Element-wise absolute value.
 
