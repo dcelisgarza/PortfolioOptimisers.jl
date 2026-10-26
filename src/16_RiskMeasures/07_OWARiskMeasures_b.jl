@@ -7,7 +7,7 @@ A sorting network is a fixed list of comparators. Each comparator reads two posi
 
 # Interfaces
 
-In order to implement a new sorting network that works seamlessly with the library, subtype `AbstractSortingNetworkMerge` and implement the following method:
+To implement a new sorting network, subtype `AbstractSortingNetworkMerge` and implement the following method:
 
 ## `sorting_network`
 
@@ -338,7 +338,7 @@ The order changes the columns of the model, not the risk. A solver that permutes
 
 # Interfaces
 
-In order to implement a new order that works seamlessly with the library, subtype `AbstractSortingNetworkOrdering` and implement the following method:
+To implement a new order of the network variables, subtype `AbstractSortingNetworkOrdering` and implement the following method:
 
 ## `sorting_network_columns`
 
@@ -535,13 +535,13 @@ Two setups give a supernodal factorisation. The times below are for the minimum 
 
 Where:
 
-  - ``\\boldsymbol{\\omega}``: Is the nondecreasing OWA weight vector.
-  - ``\\hat{\\boldsymbol{r}}``: Is the `T × 1` vector of net portfolio returns.
-  - ``s``: Is the largest absolute asset return, which scales the network values towards one.
-  - ``K``: Is the number of comparators of the network.
-  - ``a(k),\\, b(k)``: Are the two values that comparator ``k`` reads.
-  - ``l(k),\\, h(k)``: Are the smaller and the larger value that comparator ``k`` writes.
-  - ``\\boldsymbol{z}_{\\mathrm{in}},\\, \\boldsymbol{z}_{\\mathrm{out}}``: Are the values that the network reads and the last value that it writes to each position, in ascending position.
+  - ``\\boldsymbol{\\omega}``: Nondecreasing OWA weight vector ``T \\times 1``.
+  - $(math_dict[:rhat_net_vec])
+  - ``s``: Largest absolute asset return, which scales the network values towards one.
+  - ``K``: Number of comparators of the network.
+  - ``a(k),\\, b(k)``: The two values that comparator ``k`` reads.
+  - ``l(k),\\, h(k)``: The smaller and the larger value that comparator ``k`` writes.
+  - ``\\boldsymbol{z}_{\\mathrm{in}},\\, \\boldsymbol{z}_{\\mathrm{out}}``: The values that the network reads, and the last value that it writes to each position, in ascending order of position.
 
 # Fields
 
@@ -638,7 +638,7 @@ Measures risk as the sum of a loss tail and a gain tail of the sorted portfolio 
 
 The risk is the sorted returns weighted by the difference of two OWA weight vectors, `w1` for the loss tail and `w2` for the gain tail.
 
-The constructor reverses `w2` unless the caller declares that it is already reversed (see `rev`). That reversal is what makes the *difference* of the two weight vectors a *range*: `w1` addresses the lower tail of the sorted returns, and the reversed `w2` addresses the upper tail, so `w1 - w2` sums the two tails rather than cancelling them. It is the weight-space form of the convention [`ValueatRiskRange`](@ref) states on the returns themselves.
+The constructor reverses `w2` unless `rev` is `true`, which declares that `w2` is already reversed. The reversal makes the difference of the two weight vectors a range. `w1` weighs the lower tail of the sorted returns and the reversed `w2` weighs the upper tail, so `w1 - w2` adds the two tails and does not cancel them. It is the weight-space form of the convention [`ValueatRiskRange`](@ref) states on the returns themselves.
 
 # Mathematical definition
 
@@ -816,7 +816,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the weight builder inside the reversal that [`OrderedWeightsArrayRange`](@ref) wraps its `w2` in.
 
-The Range constructor stores `w2` as `reverse ∘ w2` whenever the caller has not already reversed it, so the object the `w2` slot holds is a composition and the builder a rule sits in is its inner half. Without this method the recursion would stop at the composition and a rule in the gain-side builder would never resolve, while the same rule in `w1` did.
+The Range constructor stores `w2` as `reverse ∘ w2` when the caller did not reverse it, so the `w2` slot holds a composition, and the builder that holds a rule is the inner function of that composition. Without this method the recursion stops at the composition, and a rule in the gain-tail builder does not resolve, while the same rule in `w1` does.
 
 The composition is rebuilt around the resolved half, so the reversal survives. The bound names `reverse` and an [`AbstractOrderedWeightsArrayFunction`](@ref), so no other composition reaches it.
 

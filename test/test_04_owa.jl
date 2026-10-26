@@ -1,5 +1,6 @@
 @testset "OWA" begin
-    using PortfolioOptimisers, CSV, DataFrames, Clarabel, Test, Random, Logging
+    using PortfolioOptimisers, CSV, DataFrames, Clarabel, Test, Random, Logging, JuMP,
+          StableRNGs, LinearAlgebra
     # Scope warning suppression to this task. `Logging.disable_logging` mutates a
     # process-global level that never restores and leaks into other test files sharing
     # a reused worker (see ParallelTestRunner worker pool), randomly emptying their
@@ -256,6 +257,182 @@
             # Each level needs one weight. `zip` dropped the extra levels with no error.
             @test_throws DimensionMismatch owa_wcvar(T, [0.05, 0.1], [1.0])
             @test_throws DimensionMismatch owa_wcvarrg(T, [0.05], [1.0], [0.05, 0.1], [1.0])
+        end
+        @testset "OWA weight vectors against their measures and their hand forms" begin
+            PO = PortfolioOptimisers
+            x = randn(StableRNG(605), 37) / 50
+            T = length(x)
+            # The CVaR weights reproduce the measure at a fractional, an integer and a
+            # sub-unit tail size.
+            for alpha in (0.01, 0.05, 0.1, 0.27, 0.5, 0.9)
+                @test isapprox(dot(owa_cvar(T, alpha), sort(x)),
+                               ConditionalValueatRisk(; alpha = alpha)(x); atol = 1e-15)
+            end
+            @test isapprox(dot(owa_wr(T), sort(x)), WorstRealisation()(x); atol = 1e-15)
+            @test isapprox(dot(owa_rg(T), sort(x)), Range()(x); atol = 1e-15)
+            # The CVaR range is the CVaR of the losses plus the CVaR of the gains.
+            @test isapprox(dot(owa_cvarrg(T; alpha = 0.1, beta = 0.2), sort(x)),
+                           ConditionalValueatRisk(; alpha = 0.1)(x) +
+                           ConditionalValueatRisk(; alpha = 0.2)(-x); atol = 1e-15)
+            # The hand forms at T = 7.
+            @test isapprox(owa_cvar(7, 0.3), [-1 / 2.1, -1 / 2.1, -1 + 2 / 2.1, 0, 0, 0, 0])
+            @test owa_cvar(7, 0.1) == [-1.0, 0, 0, 0, 0, 0, 0]
+            @test isapprox(owa_gmd(7), [2 * (2 * t - 1 - 7) / (7 * 6) for t in 1:7])
+            @test owa_wr(7) == [-1.0, 0, 0, 0, 0, 0, 0]
+            @test owa_rg(7) == [-1.0, 0, 0, 0, 0, 0, 1]
+            # Each builder returns its closed form when it is called.
+            @test OrderedWeightsArrayConditionalValueatRiskRange(; alpha = 0.1, beta = 0.2)(T) ==
+                  owa_cvarrg(T; alpha = 0.1, beta = 0.2)
+            @test OrderedWeightsArrayTailGiniRange(; alpha = 0.2, beta = 0.3, a_sim = 5,
+                                                   b_sim = 7)(T) ==
+                  owa_tgrg(T; alpha = 0.2, beta = 0.3, a_sim = 5, b_sim = 7)
+            @test LinearMoment(; k = 4)(T) == owa_l_moment_crm(T; k = 4)
+            # A builder and its reversal hold calibration slots, and neither is a rule.
+            @test !PO.is_calibration_rule(OrderedWeightsArrayTailGini())
+            @test !PO.is_calibration_rule(reverse ∘ OrderedWeightsArrayTailGini())
+            @test PO.is_calibration_rule(t -> t)
+            # The L-moment weights against exact rational arithmetic, at a size whose
+            # binomials overflowed an `Int` before the weights were computed in their own
+            # element type.
+            lm_exact(T, k) = [sum((-1)^j *
+                                  binomial(big(k - 1), j) *
+                                  binomial(big(i - 1), k - 1 - j) *
+                                  binomial(big(T - i), j) for j in 0:(k - 1)) //
+                              (k * binomial(big(T), k)) for i in 1:T]
+            for (Ti, k) in ((7, 3), (100, 10), (1000, 8), (10000, 6))
+                w = owa_l_moment(Ti, k)
+                @test maximum(abs.(w - lm_exact(Ti, k))) * Ti < 1e-13
+                # The first entry is (-1)^(k-1)/T and the last is 1/T.
+                @test isapprox(w[1], (-1)^(k - 1) / Ti)
+                @test isapprox(w[end], 1 / Ti)
+            end
+            @test owa_l_moment(5, 5) == [0.2, -0.8, 1.2, -0.8, 0.2]
+            @test_throws DomainError owa_l_moment(3, 5)
+            @test_throws DomainError owa_l_moment(3, 0)
+            @test_throws DomainError LinearMoment(; k = 5)(3)
+            @test eltype(owa_l_moment(big(20), 3)) == BigFloat
+            # The fallback weights are the running maximum of the combination.
+            W = reduce(hcat, [(-1)^i * owa_l_moment(40, i) for i in 2:6])
+            phis = [prod(0.5 + j for j in 0:(i - 1)) / factorial(i + 1) for i in 1:5]
+            @test PO.ncrra_weights(W, 0.5) ≈ accumulate(max, W * (phis / sum(phis)))
+        end
+        @testset "L-moment order: the first weight stays at -1/T" begin
+            T = 60
+            crm = [owa_l_moment_crm(T; k = k) for k in 2:8]
+            @test crm[1] ≈ owa_l_moment(T, 2)
+            @test all(w -> isapprox(w[1], -1 / T), crm)
+            moves = [maximum(abs.(crm[k] - crm[k - 1])) * T for k in 2:7]
+            @test isapprox(moves[1], 0.61; atol = 0.005)
+            @test isapprox(moves[end], 0.053; atol = 0.0005)
+            @test issorted(moves; rev = true)
+        end
+        @testset "L-moment programme: one feasible set, one objective each" begin
+            slv = Solver(; solver = Clarabel.Optimizer, settings = Dict("verbose" => false))
+            T, k = 200, 5
+            W = reduce(hcat, [(-1)^i * owa_l_moment(T, i) for i in 2:k])
+            # The largest entropy of a given θ over ψ ≥ |θ| on the simplex, by water-filling.
+            function best_entropy(theta)
+                a = abs.(theta)
+                lo, hi = 0.0, 1.0
+                for _ in 1:200
+                    m = (lo + hi) / 2
+                    sum(max.(a, m)) > 1 ? (hi = m) : (lo = m)
+                end
+                psi = max.(a, (lo + hi) / 2)
+                return -sum(p -> p > 0 ? p * log(p) : zero(p), psi)
+            end
+            algs = (MaximumEntropy(), MaximumEntropy(; alg = ExponentialConeEntropy()),
+                    MinimumSquaredDistance(),
+                    MinimumSquaredDistance(; alg = SquaredSOCRiskExpr()),
+                    MinimumSquaredDistance(; alg = RSOCRiskExpr()), MinimumSumSquares(),
+                    MinimumSumSquares(; alg = SquaredSOCRiskExpr()),
+                    MinimumSumSquares(; alg = RSOCRiskExpr()))
+            thetas = [owa_l_moment_crm(T, OWAJuMP(; slv = slv, alg = alg); k = k)
+                      for alg in algs]
+            for theta in thetas
+                # Every answer is in the feasible set of owa_model_setup.
+                phi = W \ theta
+                @test maximum(abs.(W * phi - theta)) < 1e-7
+                @test isapprox(sum(phi), 1; atol = 1e-8)
+                @test all(-1e-8 .<= phi .<= 0.5 + 1e-8)
+                @test all(diff(phi) .<= 1e-8)
+                # Twice the default feasibility tolerance of Clarabel, 1e-8.
+                @test all(diff(theta) .>= -2e-8)
+                # Every feasible θ has |θ_t| ≤ 1/T, so the entropy objective is log T at
+                # every answer, its own included (#1834).
+                @test isapprox(best_entropy(theta), log(T); atol = 1e-10)
+            end
+            # Each quadratic objective attains the least value of its own measure.
+            ss = [sum(abs2, theta) for theta in thetas]
+            sd = [sum(abs2, diff(theta)) for theta in thetas]
+            @test argmin(ss) in 6:8
+            @test minimum(ss[6:8]) < 0.8 * minimum(ss[1:5])
+            @test argmin(sd) in 3:5
+            @test minimum(sd[3:5]) < 0.95 * minimum(sd[[1, 2, 6, 7, 8]])
+        end
+        @testset "L-moment programme: a failed solve warns and falls back" begin
+            slv = Solver(; solver = Clarabel.Optimizer, settings = Dict("verbose" => false))
+            ncrra(T, k) = PortfolioOptimisers.ncrra_weights(reduce(hcat,
+                                                                   [(-1)^i *
+                                                                    owa_l_moment(T, i)
+                                                                    for i in 2:k]), 0.5)
+            # At k = 2 the one coefficient must equal one, above max_phi, and the fallback
+            # is the second L-moment. At k = 3 the rows leave phi = (0.5, 0.5), whose
+            # weights decrease. At k = 4 the programme is infeasible up to 21 observations.
+            for (T, k) in ((50, 2), (100, 3), (10, 4))
+                method = OWAJuMP(; slv = slv, alg = MinimumSumSquares())
+                w = @test_logs (:warn, r"Reverting to ncrra_weights") match_mode = :any owa_l_moment_crm(T,
+                                                                                                         method;
+                                                                                                         k = k)
+                @test w ≈ ncrra(T, k)
+            end
+            @test owa_l_moment_crm(50, OWAJuMP(; slv = slv); k = 2) ≈ owa_l_moment(50, 2)
+            w = @test_logs min_level = Logging.Warn owa_l_moment_crm(100,
+                                                                     OWAJuMP(; slv = slv,
+                                                                             alg = MinimumSumSquares());
+                                                                     k = 4)
+            @test !(w ≈ ncrra(100, 4))
+            # A solver that fails is reported on every call, not swallowed.
+            fail = Solver(; solver = () -> error("no solver"))
+            for _ in 1:2
+                w = @test_logs (:warn, r"Reverting to ncrra_weights") match_mode = :any owa_l_moment_crm(60,
+                                                                                                         OWAJuMP(;
+                                                                                                                 slv = fail);
+                                                                                                         k = 5)
+                @test w ≈ owa_l_moment_crm(60; k = 5)
+            end
+        end
+        @testset "Approximate OWA formulation: an upper bound on the exact risk" begin
+            slv = Solver(; name = :c, solver = Clarabel.Optimizer,
+                         settings = Dict("verbose" => false, "tol_gap_abs" => 1e-10,
+                                         "tol_gap_rel" => 1e-10, "tol_feas" => 1e-10),
+                         check_sol = (; allow_local = true, allow_almost = true))
+            X = 0.01 * randn(StableRNG(295), 120, 6) .+ 0.0005
+            pr = prior(EmpiricalPrior(), ReturnsResult(; nx = string.('A':'F'), X = X))
+            opt = JuMPOptimiser(; pe = pr, slv = slv)
+            # The measured relative gap of the model risk over the exact minimum. Two-valued
+            # weight vectors close it, as the `## Relaxation` block of the approximate
+            # `set_risk_constraints!` method states. αT = 6 is an integer here.
+            for (w, lo, hi) in
+                ((owa_wr, -1e-7, 1e-7), (owa_cvar, -1e-7, 1e-7), (owa_gmd, 2e-4, 2e-3),
+                 (T -> owa_l_moment_crm(T; k = 4), 0.02, 0.1))
+                re = optimise(MeanRisk(;
+                                       r = OrderedWeightsArray(; w = w,
+                                                               alg = ExactOrderedWeightsArray()),
+                                       obj = MinimumRisk(), opt = opt))
+                ra = optimise(MeanRisk(;
+                                       r = OrderedWeightsArray(; w = w,
+                                                               alg = ApproxOrderedWeightsArray()),
+                                       obj = MinimumRisk(), opt = opt))
+                f = OrderedWeightsArray(; w = w)
+                exact = JuMP.value(re.model[:owa_risk_1])
+                approx = JuMP.value(ra.model[:aowa_risk_1])
+                @test isapprox(exact, f(X * re.w); rtol = 1e-6)
+                # model risk ≥ the exact risk of its weights ≥ the exact minimum.
+                @test approx >= f(X * ra.w) * (1 - 1e-7)
+                @test f(X * ra.w) >= exact * (1 - 1e-7)
+                @test lo <= approx / exact - 1 <= hi
+            end
         end
     end
 end

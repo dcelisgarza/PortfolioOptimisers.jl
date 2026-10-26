@@ -149,9 +149,11 @@ $(DocStringExtensions.TYPEDEF)
 
 Selects the OWA weights of maximum entropy in the L-moment programme of [`OWAJuMP`](@ref).
 
-The objective is the Shannon entropy of a probability vector that bounds the absolute OWA weights from above, entry by entry. So the solution spreads its mass over the order statistics.
+The objective is the Shannon entropy of a probability vector that bounds the absolute OWA weights from above, entry by entry.
 
-`alg` selects the conic encoding of the entropy, not the problem. [`RelativeEntropy`](@ref) writes one [`JuMP.MOI.RelativeEntropyCone`](https://jump.dev/JuMP.jl/stable/moi/reference/standard_form/#MathOptInterface.RelativeEntropyCone) of dimension `2T + 1`, and [`ExponentialConeEntropy`](@ref) writes `T` [`JuMP.MOI.ExponentialCone`](https://jump.dev/JuMP.jl/stable/moi/reference/standard_form/#MathOptInterface.ExponentialCone) rows. Both give the same OWA weights to solver tolerance.
+The objective does not select one OWA weight vector at a usual sample size. The L-moment weight vector of order ``k`` has entries of absolute value at most ``1/T`` once ``T > k (k - 1) / 2``, measured for every order up to `10` and every ``T`` up to 600. The coefficients are nonnegative and sum to one, so every feasible ``\\boldsymbol{\\theta}`` has ``\\lvert \\theta_{t} \\rvert \\leq 1/T`` once ``T > K (K - 1) / 2``. The uniform ``\\psi_{t} = 1/T`` is then feasible, and the objective takes its largest value ``\\log T`` at every feasible point. The solver returns the feasible point at which its iterations stop.
+
+`alg` selects the conic encoding of the entropy, not the problem. [`RelativeEntropy`](@ref) writes one [`JuMP.MOI.RelativeEntropyCone`](https://jump.dev/JuMP.jl/stable/moi/reference/standard_form/#MathOptInterface.RelativeEntropyCone) of dimension `2T + 1`, and [`ExponentialConeEntropy`](@ref) writes `T` [`JuMP.MOI.ExponentialCone`](https://jump.dev/JuMP.jl/stable/moi/reference/standard_form/#MathOptInterface.ExponentialCone) rows. Because the objective is constant, the two encodings can return different OWA weights. On 200 observations at the highest order `5` and `max_phi = 0.75`, the largest difference of the two vectors is 0.9 % of the largest absolute weight.
 
 Equation 13 of [owa2](@cite) maximises ``\\sum_{t} \\ln \\psi_{t}`` subject to ``\\psi_{t} \\geq \\lvert \\theta_{t} \\rvert`` alone, and that objective has no maximum. The library puts ``\\boldsymbol{\\psi}`` on the unit simplex and maximises its Shannon entropy.
 
@@ -527,7 +529,7 @@ Solves a programme for the risk aversion coefficients of an L-moment OWA weight 
 
 `alg` selects the objective, and every objective solves over the same feasible set. [`owa_l_moment_crm`](@ref) states the programme. `sc` scales the rows and `so` scales the objective, and neither changes the solution.
 
-When the solver fails, [`owa_model_solve`](@ref) warns and returns the weights of `NormalisedConstantRelativeRiskAversion(; g = 0.5)`. The programme is infeasible for some `max_phi` and some orders: the coefficients sum to one and each is at most `max_phi`, and the OWA weights must be nondecreasing. At `k = 2` it is always infeasible, because its one coefficient must equal one. The fallback then returns the weights of the second L-moment, which is the only feasible answer.
+When the solver fails, [`owa_model_solve`](@ref) warns and returns the weights of `NormalisedConstantRelativeRiskAversion(; g = 0.5)`. The programme is infeasible for some `max_phi` and some orders: the coefficients sum to one and each is at most `max_phi`, and the OWA weights must be nondecreasing. At `k = 2` it is always infeasible, because its one coefficient must equal one. The fallback then returns the weights of the second L-moment, which is the only answer whose coefficients sum to one. At `k = 3` with the default `max_phi = 0.5`, the rows leave the one choice ``\\boldsymbol{\\phi} = (0.5, 0.5)``, and its OWA weights decrease near the largest return, so the programme is infeasible too.
 
 # Fields
 
@@ -704,7 +706,7 @@ function ncrra_weights(weights::MatNum, g::Number = 0.5)
     w = similar(a)
     w[1] = a[1]
     for i in 2:length(a)
-        w[i] = maximum(view(a, 1:i))
+        w[i] = max(w[i - 1], a[i])
     end
     return w
 end
@@ -790,7 +792,12 @@ Solve the L-moment programme in `model`, and return its OWA weights.
 
 The returned weights are the value of the variable `theta`, which [`owa_model_setup`](@ref) holds equal to `weights * phi`. The model holds the coefficients `phi` to a sum of one, not `theta`.
 
-The programme is infeasible for some combinations of the sample size, the highest order and `max_phi`, and the function then returns the fallback. Measured on 100 observations with the default `max_phi = 0.5`, it is infeasible at the highest orders `3` and `4`, and feasible from `5` to `8`. At the highest order `4` it is feasible on 1000 observations. At the highest order `2` it is always infeasible, because the one coefficient must equal one, and `max_phi < 1`.
+The programme is infeasible for some combinations of the sample size, the highest order and `max_phi`, and the function then returns the fallback. These are the cases with the default `max_phi = 0.5`, measured with a linear programme that maximises the smallest step of the OWA weights:
+
+  - At the highest order `2` it is always infeasible, because the one coefficient must equal one, and `max_phi < 1`.
+  - At the highest order `3` the rows leave the one choice ``\\boldsymbol{\\phi} = (0.5, 0.5)``, and its OWA weights decrease near the largest return. It is infeasible at every sample size measured: 3 to 300, 1000 and 5000 observations.
+  - At the highest order `4` it is infeasible up to 21 observations, and feasible at every sample size measured from 22 to 80, 100 and 1000 observations.
+  - At each highest order `k` from `5` to `8` it is feasible at every sample size measured, from `k` to 80 observations.
 
 # Algorithm
 
@@ -909,7 +916,7 @@ Add the entropy objective of the [`MaximumEntropy`](@ref) programme to `model`.
 
 The method dispatches on the [`EntropyFormulation`](@ref) in `method.alg.alg`. It reads the entropy variable `x`, adds the variable and the cone rows that bound the entropy, and sets the objective. It does not solve the model.
 
-The two encodings give one maximiser. Under [`ExponentialConeEntropy`](@ref) the objective is the entropy less ``\\log s_c``, because the cones hold ``s_c \\psi_{t}`` and the entries of ``\\boldsymbol{\\psi}`` sum to one. So the objective values differ when ``s_c \\neq 1``, and the OWA weights do not.
+The two encodings state one problem. Under [`ExponentialConeEntropy`](@ref) the objective is the entropy less ``\\log s_c``, because the cones hold ``s_c \\psi_{t}`` and the entries of ``\\boldsymbol{\\psi}`` sum to one. So the objective values differ when ``s_c \\neq 1``. [`MaximumEntropy`](@ref) states why the OWA weights that the two encodings return can differ too.
 
 # JuMP formulation
 
@@ -1092,7 +1099,6 @@ function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
                                           <:MinimumSumSquares{<:UnionSOCRiskExpr}},
                           weights::MatNum)
     sc = method.sc
-    so = method.so
     model = owa_model_setup(method, weights)
     theta = model[:theta]
     JuMP.@variable(model, t)
@@ -1974,6 +1980,8 @@ Compute the OWA weight vector of the sample L-moment of order `k`.
 
 The `k`-th sample L-moment is a weighted sum of the order statistics of the sample, so it is an OWA operator, and this function returns its weights. For `k >= 2` the weights sum to zero, and for `k = 1` they are ``1/T``, the weights of the mean.
 
+The binomial coefficients that hold ``T`` are computed in the element type of the weights, because ``\\binom{T}{k}`` exceeds the largest `Int` at `T = 1000` and `k = 8`. On a `Float64` vector the weights agree with exact rational arithmetic to a relative error below `1e-14` up to `k = 10`.
+
 # Mathematical definition
 
 ```math
@@ -1994,11 +2002,15 @@ Where:
 # Arguments
 
   - `T`: Number of observations.
-  - `k`: Order of the L-moment, `k >= 1`.
+  - `k`: Order of the L-moment.
+
+# Validation
+
+  - `1 <= k <= T`. Raises a `DomainError`.
 
 # Returns
 
-  - `w::VecNum`: Vector of OWA weights of length `T`. For `k >= 2` it sums to zero.
+  - `w::VecNum`: Vector of OWA weights of length `T`. For `k >= 2` it sums to zero. Its first entry is ``(-1)^{k-1}/T`` and its last entry is ``1/T``.
 
 # Related
 
@@ -2012,18 +2024,24 @@ Where:
   - $(ref_dict[:cajas2025]) Section 3.1.5.
 """
 function owa_l_moment(T::Integer, k::Integer = 2)
+    @argcheck(1 <= k <= T,
+              DomainError(k,
+                          "`k` is $k and `T` is $T. The sample L-moment of order `k` weighs `k` order statistics at a time, so `1 <= k <= T` must hold."))
     T, k = promote(T, k)
-    w = Vector{typeof(inv(T * k))}(undef, T)
+    F = typeof(inv(T * k))
+    w = Vector{F}(undef, T)
+    # The binomials of `T` overflow an integer at a moderate size, `binomial(1000, 8)`
+    # among them, so the sample-size binomials are computed in the type of the weights.
+    d = k * binomial(convert(F, T), k)
     for i in eachindex(w)
-        a = zero(k)
+        a = zero(F)
         for j in 0:(k - 1)
             a += (-1)^j *
                  binomial(k - 1, j) *
-                 binomial(i - 1, k - 1 - j) *
-                 binomial(T - i, j)
+                 binomial(convert(F, i - 1), k - 1 - j) *
+                 binomial(convert(F, T - i), j)
         end
-        a *= 1 / (k * binomial(T, k))
-        w[i] = a
+        w[i] = a / d
     end
     return w
 end
@@ -2035,6 +2053,8 @@ end
 Compute the OWA weight vector of the L-moment convex risk measure of the orders `2` to `k`.
 
 The risk measure is a signed combination of the L-moments of the portfolio returns, with the risk aversion coefficients that `method` finds. The coefficients sum to one, and the OWA weights do not, because each L-moment weight vector of order two or more sums to zero.
+
+Each signed L-moment weight vector starts at ``-1/T``, so the first OWA weight is ``-1/T`` at every order and for every `method`. A higher `k` moves the other entries. Under the default `method` on 60 observations, the largest move is ``0.61/T`` from `k = 2` to `k = 3`, and ``0.053/T`` from `k = 7` to `k = 8`.
 
 # Mathematical definition
 
@@ -2072,6 +2092,7 @@ Where:
 # Validation
 
   - `k >= 2`. Raises a `DomainError`.
+  - `k <= T`, through [`owa_l_moment`](@ref). Raises a `DomainError`.
 
 # Returns
 
@@ -2219,7 +2240,7 @@ Encodes the exact OWA risk with the linear programme that sorts the sample.
 
 The programme is the dual of the assignment problem that pairs each weight with an order statistic. So it sorts the sample inside the model, and the sort costs `T^2` rows. It adds two vector variables `a` and `b` of length `T` and the `T × T` block of rows ``y_{i} w_{j} \\leq a_{j} + b_{i}``, and the risk is ``\\sum_{t} (a_{t} + b_{t})``. The method of [`set_risk_constraints!`](@ref) for this formulation states the model. For a long sample, [`SortingNetworkOrderedWeightsArray`](@ref) gives the same exact risk at ``O(T \\log^{2} T)`` rows, and [`ApproxOrderedWeightsArray`](@ref) gives an upper bound at a lower cost.
 
-The programme pairs the largest weight with the largest sorted return, so it attains ``\\mathrm{sort}(\\boldsymbol{\\omega})^{\\intercal} \\mathrm{sort}(\\hat{\\boldsymbol{r}})``. This is the OWA risk when, and only when, the weight vector is monotonic non-decreasing, which is also the condition for the risk measure to be convex. Every weight builder in this package returns such a vector. A weight vector supplied out of order is sorted by the programme, so the model and the functor then disagree.
+The programme pairs the largest weight with the largest sorted return, so it attains ``\\mathrm{sort}(\\boldsymbol{\\omega})^{\\intercal} \\mathrm{sort}(\\hat{\\boldsymbol{r}})``. This is the OWA risk when, and only when, the weight vector is nondecreasing, which is also the condition for the risk measure to be convex. Every weight builder in this package returns such a vector. The programme sorts a weight vector that is out of order, so the model and the functor then disagree.
 
 # Related
 
@@ -2453,7 +2474,7 @@ const OWA_RevFunc = ComposedFunction{typeof(reverse), <:AbstractOrderedWeightsAr
 
 The occupants of an [`OrderedWeightsArray`](@ref) weight slot that carry a calibration slot of their own: a weight builder, and the reversal of one that the Range container builds.
 
-The slot also takes a weight vector and a caller's own plain function, and neither carries a slot. Neither is therefore named in [`calibration_slots`](@ref), and the distinction matters because a plain function standing in a calibration slot **is** a Calibration Rule everywhere else in the library. The rule is what [`resolve_calibration_slot`](@ref) calls and what [`assert_calibrated_slots`](@ref) refuses, so a weight builder written as a plain function must not reach either.
+The slot also takes a weight vector and a caller's own plain function, and neither carries a slot, so [`calibration_slots`](@ref) names neither. Everywhere else in the library, a plain function in a calibration slot is a Calibration Rule. The rule is what [`resolve_calibration_slot`](@ref) calls and what [`assert_calibrated_slots`](@ref) refuses, so a weight builder written as a plain function must not reach either.
 
 # Related
 
