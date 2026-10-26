@@ -1359,8 +1359,8 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     MirrorDescent(;
-        eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05,
-        proj::Union{<:EuclideanProjection, <:EntropicProjection, <:TsallisProjection, <:LogBarrierProjection} = EntropicProjection(),
+        eta::Union{Real, AbstractLearningRateSchedule} = 0.05,
+        proj::Union{EuclideanProjection, EntropicProjection, TsallisProjection, LogBarrierProjection} = EntropicProjection(),
         alpha::Real = 0,
         obj::AbstractOnlineObjective = LogWealth(),
         grad::AbstractGradientTransform = PlainGradient()
@@ -1428,12 +1428,11 @@ MirrorDescent
     """
     grad
     function MirrorDescent(eta::T1, proj::T2, alpha::T3, obj::T4,
-                           grad::T5) where {T1 <:
-                                            Union{<:Real, <:AbstractLearningRateSchedule},
-                                            T2 <: Union{<:EuclideanProjection,
-                                                        <:EntropicProjection, <:TsallisProjection,
-                                                        <:LogBarrierProjection}, T3 <: Real,
-                                            T4 <: AbstractOnlineObjective,
+                           grad::T5) where {T1 <: Union{Real, AbstractLearningRateSchedule},
+                                            T2 <:
+                                            Union{EuclideanProjection, EntropicProjection,
+                                                  TsallisProjection, LogBarrierProjection},
+                                            T3 <: Real, T4 <: AbstractOnlineObjective,
                                             T5 <: AbstractGradientTransform}
         if isa(eta, Real)
             @argcheck(eta > zero(eta), DomainError(eta, "eta must be positive"))
@@ -1443,9 +1442,9 @@ MirrorDescent
         return new{T1, T2, T3, T4, T5}(eta, proj, alpha, obj, grad)
     end
 end
-function MirrorDescent(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05,
-                       proj::Union{<:EuclideanProjection, <:EntropicProjection,
-                                   <:TsallisProjection, <:LogBarrierProjection} = EntropicProjection(),
+function MirrorDescent(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05,
+                       proj::Union{EuclideanProjection, EntropicProjection,
+                                   TsallisProjection, LogBarrierProjection} = EntropicProjection(),
                        alpha::Real = 0, obj::AbstractOnlineObjective = LogWealth(),
                        grad::AbstractGradientTransform = PlainGradient())::MirrorDescent
     return MirrorDescent(eta, proj, alpha, obj, grad)
@@ -1606,7 +1605,7 @@ function reprojection(proj::AbstractProjectionGeometry, set::AbstractAllocationS
     return project(proj, set, q, w)
 end
 """
-    ExponentiatedGradient(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05, alpha::Real = 0, obj::AbstractOnlineObjective = LogWealth(), grad::AbstractGradientTransform = PlainGradient())
+    ExponentiatedGradient(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, alpha::Real = 0, obj::AbstractOnlineObjective = LogWealth(), grad::AbstractGradientTransform = PlainGradient())
 
 Builds the exponentiated gradient, a [`MirrorDescent`](@ref) rule under [`EntropicProjection`](@ref) (EG). It is the rule of Equation 3.3 of [helmbold1998](@cite). [helmbold1997](@citet) derive the same update for mixture estimation, as Equation 6 of that work.
 
@@ -1655,14 +1654,14 @@ MirrorDescent
   - $(ref_dict[:helmbold1998]) Section 3, Equation 3.3. Section 4, Theorem 4.1, Corollary 4.3. Section 5.2.
   - $(ref_dict[:helmbold1997]) Section 3, Equation 6.
 """
-function ExponentiatedGradient(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05,
+function ExponentiatedGradient(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05,
                                alpha::Real = 0, obj::AbstractOnlineObjective = LogWealth(),
                                grad::AbstractGradientTransform = PlainGradient())::MirrorDescent
     return MirrorDescent(; eta = eta, proj = EntropicProjection(), alpha = alpha, obj = obj,
                          grad = grad)
 end
 """
-    GradientProjection(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05, alpha::Real = 0, obj::AbstractOnlineObjective = LogWealth(), grad::AbstractGradientTransform = PlainGradient())
+    GradientProjection(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, alpha::Real = 0, obj::AbstractOnlineObjective = LogWealth(), grad::AbstractGradientTransform = PlainGradient())
 
 Builds the gradient projection, a [`MirrorDescent`](@ref) rule under [`EuclideanProjection`](@ref) (GP, OGD). It is the rule of Equation 5 of [helmbold1997](@cite).
 
@@ -1710,14 +1709,14 @@ MirrorDescent
   - $(ref_dict[:helmbold1997]) Section 3, Equation 5. Section 4.2, Theorem 3.
   - $(ref_dict[:zinkevich2003]) Algorithm 1, Theorem 1.
 """
-function GradientProjection(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05,
+function GradientProjection(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05,
                             alpha::Real = 0, obj::AbstractOnlineObjective = LogWealth(),
                             grad::AbstractGradientTransform = PlainGradient())::MirrorDescent
     return MirrorDescent(; eta = eta, proj = EuclideanProjection(), alpha = alpha,
                          obj = obj, grad = grad)
 end
 """
-    EGE(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05, gamma1::Real = 0.99, alpha::Real = 0)
+    EGE(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, gamma1::Real = 0.99, alpha::Real = 0)
 
 Builds the exponentiated gradient with the momentum of an exponential moving average, [`ExponentiatedGradient`](@ref) under [`GradientMomentum`](@ref) (EGE).
 
@@ -1748,13 +1747,13 @@ MirrorDescent
   - $(ref_dict[:li2022egm]) Section 4.2.1, Equation 7. Section 5.5.1.
   - $(ref_dict[:helmbold1998]) Section 4, Theorem 4.1.
 """
-function EGE(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05,
-             gamma1::Real = 0.99, alpha::Real = 0)::MirrorDescent
+function EGE(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, gamma1::Real = 0.99,
+             alpha::Real = 0)::MirrorDescent
     return ExponentiatedGradient(; eta = eta, alpha = alpha,
                                  grad = GradientMomentum(; gamma1 = gamma1))
 end
 """
-    EGR(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05, gamma2::Real = 0, eps::Real = 1e-8, alpha::Real = 0)
+    EGR(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, gamma2::Real = 0, eps::Real = 1e-8, alpha::Real = 0)
 
 Builds the exponentiated gradient with a root-mean-square scale on the gradient, [`ExponentiatedGradient`](@ref) under [`RootMeanSquareGradient`](@ref) (EGR).
 
@@ -1785,14 +1784,14 @@ MirrorDescent
 
   - $(ref_dict[:li2022egm]) Section 4.2.2, Equation 8. Section 5.5.1.
 """
-function EGR(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05, gamma2::Real = 0,
+function EGR(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, gamma2::Real = 0,
              eps::Real = 1e-8, alpha::Real = 0)::MirrorDescent
     return ExponentiatedGradient(; eta = eta, alpha = alpha,
                                  grad = RootMeanSquareGradient(; gamma2 = gamma2,
                                                                eps = eps))
 end
 """
-    EGA(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05, gamma1::Real = 0.99, gamma2::Real = 0, eps::Real = 1e-8, alpha::Real = 0)
+    EGA(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, gamma1::Real = 0.99, gamma2::Real = 0, eps::Real = 1e-8, alpha::Real = 0)
 
 Builds the exponentiated gradient with an adaptive-moment scale on the gradient, [`ExponentiatedGradient`](@ref) under [`AdaptiveMomentGradient`](@ref) (EGA).
 
@@ -1824,9 +1823,8 @@ MirrorDescent
 
   - $(ref_dict[:li2022egm]) Section 4.2.3, Equation 9. Section 5.5.1.
 """
-function EGA(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05,
-             gamma1::Real = 0.99, gamma2::Real = 0, eps::Real = 1e-8,
-             alpha::Real = 0)::MirrorDescent
+function EGA(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, gamma1::Real = 0.99,
+             gamma2::Real = 0, eps::Real = 1e-8, alpha::Real = 0)::MirrorDescent
     return ExponentiatedGradient(; eta = eta, alpha = alpha,
                                  grad = AdaptiveMomentGradient(; gamma1 = gamma1,
                                                                gamma2 = gamma2, eps = eps))

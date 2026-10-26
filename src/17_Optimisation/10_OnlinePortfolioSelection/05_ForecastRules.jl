@@ -417,7 +417,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     ForecastReversion(;
-        me::Union{<:AbstractExpectedReturnsEstimator, <:Online} = PriceLevelExpectedReturns(),
+        me::Union{AbstractExpectedReturnsEstimator, Online} = PriceLevelExpectedReturns(),
         eps::Real = 10,
         scale::Option{<:AbstractPriceLevelStatistic} = nothing,
         proj::EuclideanProjection = EuclideanProjection()
@@ -498,7 +498,7 @@ function ForecastReversion(me::Online, ::Real, ::Option{<:AbstractPriceLevelStat
     return assert_forecaster(me)
 end
 function ForecastReversion(;
-                           me::Union{<:AbstractExpectedReturnsEstimator, <:Online} = PriceLevelExpectedReturns(),
+                           me::Union{AbstractExpectedReturnsEstimator, Online} = PriceLevelExpectedReturns(),
                            eps::Real = 10,
                            scale::Option{<:AbstractPriceLevelStatistic} = nothing,
                            proj::EuclideanProjection = EuclideanProjection())::ForecastReversion
@@ -841,7 +841,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     ForecastTracking(;
-        me::Union{<:AbstractExpectedReturnsEstimator, <:Online} = PriceLevelExpectedReturns(; alg = WindowPeak()),
+        me::Union{AbstractExpectedReturnsEstimator, Online} = PriceLevelExpectedReturns(; alg = WindowPeak()),
         eps::Real = 100,
         proj::EuclideanProjection = EuclideanProjection()
     ) -> ForecastTracking
@@ -906,8 +906,8 @@ function ForecastTracking(me::Online, ::Real, ::EuclideanProjection)
     return assert_forecaster(me)
 end
 function ForecastTracking(;
-                          me::Union{<:AbstractExpectedReturnsEstimator, <:Online} = PriceLevelExpectedReturns(;
-                                                                                                              alg = WindowPeak()),
+                          me::Union{AbstractExpectedReturnsEstimator, Online} = PriceLevelExpectedReturns(;
+                                                                                                          alg = WindowPeak()),
                           eps::Real = 100,
                           proj::EuclideanProjection = EuclideanProjection())::ForecastTracking
     return ForecastTracking(me, eps, proj)
@@ -1116,7 +1116,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     KernelTrendTracking(;
-        me::Union{<:AbstractExpectedReturnsEstimator, <:Online} = PriceLevelExpectedReturns(; alg = KernelTrendPattern()),
+        me::Union{AbstractExpectedReturnsEstimator, Online} = PriceLevelExpectedReturns(; alg = KernelTrendPattern()),
         eta::Real = 1000,
         q::Real = 6,
         proj::EuclideanProjection = EuclideanProjection()
@@ -1189,8 +1189,8 @@ function KernelTrendTracking(me::Online, ::Real, ::Real, ::EuclideanProjection)
     return assert_forecaster(me)
 end
 function KernelTrendTracking(;
-                             me::Union{<:AbstractExpectedReturnsEstimator, <:Online} = PriceLevelExpectedReturns(;
-                                                                                                                 alg = KernelTrendPattern()),
+                             me::Union{AbstractExpectedReturnsEstimator, Online} = PriceLevelExpectedReturns(;
+                                                                                                             alg = KernelTrendPattern()),
                              eta::Real = 1000, q::Real = 6,
                              proj::EuclideanProjection = EuclideanProjection())::KernelTrendTracking
     return KernelTrendTracking(me, eta, q, proj)
@@ -1320,7 +1320,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     TransactionCostOptimisation(;
-        me::Union{<:AbstractExpectedReturnsEstimator, <:Online} = PriceLevelExpectedReturns(; alg = LaggedPrice()),
+        me::Union{AbstractExpectedReturnsEstimator, Online} = PriceLevelExpectedReturns(; alg = LaggedPrice()),
         eta::Real = 10,
         gamma::Real = 0.001,
         proj::EuclideanProjection = EuclideanProjection()
@@ -1390,9 +1390,8 @@ function TransactionCostOptimisation(me::Online, ::Real, ::Real, ::EuclideanProj
     return assert_forecaster(me)
 end
 function TransactionCostOptimisation(;
-                                     me::Union{<:AbstractExpectedReturnsEstimator,
-                                               <:Online} = PriceLevelExpectedReturns(;
-                                                                                     alg = LaggedPrice()),
+                                     me::Union{AbstractExpectedReturnsEstimator, Online} = PriceLevelExpectedReturns(;
+                                                                                                                     alg = LaggedPrice()),
                                      eta::Real = 10, gamma::Real = 0.001,
                                      proj::EuclideanProjection = EuclideanProjection())::TransactionCostOptimisation
     return TransactionCostOptimisation(me, eta, gamma, proj)
@@ -1500,7 +1499,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     ShortTermSparsePortfolio(;
-        me::Union{<:AbstractExpectedReturnsEstimator, <:Online} = PriceLevelExpectedReturns(; alg = WindowPeak()),
+        me::Union{AbstractExpectedReturnsEstimator, Online} = PriceLevelExpectedReturns(; alg = WindowPeak()),
         alg::AbstractSparsePortfolioAlgorithm = HuberOptimum(),
         zeta::Real = 500,
         proj::EuclideanProjection = EuclideanProjection()
@@ -1574,8 +1573,8 @@ function ShortTermSparsePortfolio(me::Online, ::AbstractSparsePortfolioAlgorithm
     return assert_forecaster(me)
 end
 function ShortTermSparsePortfolio(;
-                                  me::Union{<:AbstractExpectedReturnsEstimator, <:Online} = PriceLevelExpectedReturns(;
-                                                                                                                      alg = WindowPeak()),
+                                  me::Union{AbstractExpectedReturnsEstimator, Online} = PriceLevelExpectedReturns(;
+                                                                                                                  alg = WindowPeak()),
                                   alg::AbstractSparsePortfolioAlgorithm = HuberOptimum(),
                                   zeta::Real = 500,
                                   proj::EuclideanProjection = EuclideanProjection())::ShortTermSparsePortfolio

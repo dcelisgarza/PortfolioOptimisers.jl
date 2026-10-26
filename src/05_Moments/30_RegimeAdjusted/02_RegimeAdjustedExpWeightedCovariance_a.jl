@@ -550,7 +550,7 @@ $(DocStringExtensions.FIELDS)
         regime_decay::Number                                  = exp2(-2 / decay_half_life(decay)),
         regime_min_obs::Integer                               = round(Int, max(1, decay_half_life(decay) / 2)),
         regime_target::RegimeAdjustedTarget                   = PortfolioTarget(),
-        regime_lohi_mult::Option{<:Tuple{<:Number, <:Number}} = (0.7, 1.6),
+        regime_lohi_mult::Option{<:Tuple{Number, Number}}     = (0.7, 1.6),
         min_val::Number                                       = 1e-12,
         centring::AbstractCentring                            = EstimatedCentring(),
         debias::AbstractRegimeDebias                          = ExactDebias(),
@@ -674,8 +674,8 @@ true
                                                  regime_decay::Number,
                                                  regime_min_obs::Integer,
                                                  regime_target::RegimeAdjustedTarget,
-                                                 regime_lohi_mult::Option{<:Tuple{<:Number,
-                                                                                  <:Number}},
+                                                 regime_lohi_mult::Option{<:Tuple{Number,
+                                                                                  Number}},
                                                  min_val::Number,
                                                  centring::AbstractCentring,
                                                  debias::AbstractRegimeDebias,
@@ -713,6 +713,8 @@ true
                                                                     debias, cache)
     end
 end
+# The pair bound reads `Tuple{Number, Number}` for the reason that the keyword constructor of
+# `RegimeAdjustedExpWeightedVariance` states.
 function RegimeAdjustedExpWeightedCovariance(; decay::Number = exp2(-inv(40.0)),
                                              cor_decay::Option{<:Number} = nothing,
                                              min_obs::Integer = round(Int,
@@ -736,9 +738,9 @@ function RegimeAdjustedExpWeightedCovariance(; decay::Number = exp2(-inv(40.0)),
                                                                                  decay_half_life(decay) /
                                                                                  2)),
                                              regime_target::RegimeAdjustedTarget = PortfolioTarget(),
-                                             regime_lohi_mult::Option{<:Tuple{<:Number,
-                                                                              <:Number}} = (0.7,
-                                                                                            1.6),
+                                             regime_lohi_mult::Option{<:Tuple{Number,
+                                                                              Number}} = (0.7,
+                                                                                          1.6),
                                              min_val::Number = 1e-12,
                                              centring::AbstractCentring = EstimatedCentring(),
                                              debias::AbstractRegimeDebias = ExactDebias(),

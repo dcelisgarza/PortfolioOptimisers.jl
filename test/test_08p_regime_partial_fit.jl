@@ -76,6 +76,32 @@ end
 end
 
 #=
+Each block that the online fold reads rebuilds the estimator through its keyword constructor
+(`rebuild_estimator`, #1807). A keyword annotation with bounded type variables inside it,
+`Tuple{<:Number, <:Number}`, and the `Union{<:A, <:B, <:C}` of `assert_regime_debias`, made
+Julia build the type again on each call: 624 bytes for each rebuild, and 352 bytes more on each
+step than the `Accessors.@reset` route that the fold took before (R6 of #1817). The plain
+spellings admit the same values, so the rebuild allocates nothing.
+=#
+@testset "A rebuild of the folded estimator allocates nothing" begin
+    X = ra_sample()
+    allocs(f, x) = (f(x); @allocated f(x))
+    rebuild_cache(e) = PO.rebuild_estimator(e, (; cache = e.cache))
+    for T in (RegimeAdjustedExpWeightedVariance, RegimeAdjustedExpWeightedCovariance)
+        e = partial_fit!(T(), X[1:30, :])
+        @test allocs(rebuild_cache, e) == 0
+        # The pair bound admits every pair of numbers and `nothing`, and refuses the rest.
+        @test T(; regime_lohi_mult = (1, 2)).regime_lohi_mult === (1, 2)
+        @test isnothing(T(; regime_lohi_mult = nothing).regime_lohi_mult)
+        @test_throws TypeError T(; regime_lohi_mult = ("a", "b"))
+    end
+    debias_check(m) = PO.assert_regime_debias(m, ExactDebias(), :name)
+    for m in (FirstMomentRegimeAdjusted(), RootMeanSquaredAdjusted(), LogRegimeAdjusted())
+        @test allocs(debias_check, m) == 0
+    end
+end
+
+#=
 The incremental fit of the four second-order sample estimators, issue #700.
 
 The four properties the seam owes, in the order the ticket states them: exactness against the

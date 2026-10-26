@@ -12,7 +12,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     ActiveAssetsUncertaintyAlgorithm(;
-        active::Union{<:Integer, <:AbstractFloat} = 0.2
+        active::Union{Integer, AbstractFloat} = 0.2
     ) -> ActiveAssetsUncertaintyAlgorithm
 
 Keywords correspond to the struct's fields.
@@ -50,7 +50,7 @@ ActiveAssetsUncertaintyAlgorithm
     $(field_dict[:active_ucs])
     """
     active
-    function ActiveAssetsUncertaintyAlgorithm(active::Union{<:Integer, <:AbstractFloat})
+    function ActiveAssetsUncertaintyAlgorithm(active::Union{Integer, AbstractFloat})
         if isa(active, Integer)
             @argcheck(active >= one(active),
                       DomainError(active, "active must be >= 1 when given as a count"))
@@ -63,7 +63,7 @@ ActiveAssetsUncertaintyAlgorithm
     end
 end
 function ActiveAssetsUncertaintyAlgorithm(;
-                                          active::Union{<:Integer, <:AbstractFloat} = 0.2)::ActiveAssetsUncertaintyAlgorithm
+                                          active::Union{Integer, AbstractFloat} = 0.2)::ActiveAssetsUncertaintyAlgorithm
     return ActiveAssetsUncertaintyAlgorithm(active)
 end
 """
@@ -786,7 +786,7 @@ function l1_activation_ladder(mu::VecNum, sd::Option{<:VecNum})
             for k in 1:N]
 end
 """
-    l1_active_count(active::Union{<:Integer, <:AbstractFloat}, N::Int)
+    l1_active_count(active::Union{Integer, AbstractFloat}, N::Int)
 
 Convert an `active` target, a count or a fraction of the universe, to a number of assets in `1:N`.
 
@@ -829,7 +829,7 @@ julia> PortfolioOptimisers.l1_active_count(20, 10)
 
   - $(ref_dict[:quintile])
 """
-function l1_active_count(active::Union{<:Integer, <:AbstractFloat}, N::Int)
+function l1_active_count(active::Union{Integer, AbstractFloat}, N::Int)
     q = isa(active, Integer) ? Int(active) : round(Int, active * N)
     return clamp(q, 1, N)
 end

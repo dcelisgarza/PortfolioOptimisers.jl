@@ -295,7 +295,7 @@ $(DocStringExtensions.FIELDS)
         beta::Real = 1,
         delta::Real = 0.125,
         eta::Real = 0,
-        proj::Union{<:EuclideanProjection, <:GramProjection} = EuclideanProjection()
+        proj::Union{EuclideanProjection, GramProjection} = EuclideanProjection()
     ) -> NewtonStep
 
 Keywords correspond to the struct's fields. The defaults `beta = 1`, `delta = 1/8` and `eta = 0` are the values of the experiments of [agarwal2006](@cite). The `proj` slot takes the Gram geometry of Theorem 1 of [agarwal2006](@cite), or the Euclidean geometry.
@@ -347,8 +347,7 @@ NewtonStep
     proj
     function NewtonStep(beta::T1, delta::T2, eta::T3,
                         proj::T4) where {T1 <: Real, T2 <: Real, T3 <: Real,
-                                         T4 <:
-                                         Union{<:EuclideanProjection, <:GramProjection}}
+                                         T4 <: Union{EuclideanProjection, GramProjection}}
         @argcheck(beta > zero(beta), DomainError(beta, "beta must be positive"))
         @argcheck(delta > zero(delta), DomainError(delta, "delta must be positive"))
         @argcheck(zero(eta) <= eta < one(eta), DomainError(eta, "eta must be in [0, 1)"))
@@ -356,7 +355,7 @@ NewtonStep
     end
 end
 function NewtonStep(; beta::Real = 1, delta::Real = 0.125, eta::Real = 0,
-                    proj::Union{<:EuclideanProjection, <:GramProjection} = EuclideanProjection())::NewtonStep
+                    proj::Union{EuclideanProjection, GramProjection} = EuclideanProjection())::NewtonStep
     return NewtonStep(beta, delta, eta, proj)
 end
 function projection_geometry(::NewtonStep)

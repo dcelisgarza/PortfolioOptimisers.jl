@@ -408,10 +408,13 @@ methods, and a `regime_method` of `nothing`, take every rule.
 """
 function assert_regime_debias(regime_method::Option{<:RegimeAdjustedMethod},
                               debias::AbstractRegimeDebias, name::Symbol)
+    # A `Union` of bounded type variables, `Union{<:A, <:B}`, is built again on every call, and
+    # an online step reaches this check through the constructor. Each member here is a
+    # `UnionAll` over all its parameters, so the plain `Union` admits the same methods.
     @argcheck(isnothing(regime_method) ||
               isa(regime_method,
-                  Union{<:RootMeanSquaredAdjusted, <:FirstMomentRegimeAdjusted,
-                        <:LogRegimeAdjusted}) ||
+                  Union{RootMeanSquaredAdjusted, FirstMomentRegimeAdjusted,
+                        LogRegimeAdjusted}) ||
               !debiases(debias),
               ArgumentError("`$name.regime_method` is a `$(nameof(typeof(regime_method)))`, and `$name.debias` is `$(nameof(typeof(debias)))()`. That rule divides the regime statistic by the bias of the moment that the method reads, and the library computes that bias for `RootMeanSquaredAdjusted`, `FirstMomentRegimeAdjusted` and `LogRegimeAdjusted` alone. Set `debias = RawStatistic()` for this method."))
     return nothing
@@ -539,7 +542,7 @@ $(DocStringExtensions.FIELDS)
         regime_method::Option{<:RegimeAdjustedMethod} = FirstMomentRegimeAdjusted(),
         regime_decay::Number      = exp2(-2 / decay_half_life(decay)),
         regime_min_obs::Integer   = round(Int, max(1, decay_half_life(decay) / 2)),
-        regime_lohi_mult::Option{<:Tuple{<:Number, <:Number}} = (0.7, 1.6),
+        regime_lohi_mult::Option{<:Tuple{Number, Number}} = (0.7, 1.6),
         min_val::Number           = 1e-12,
         centring::AbstractCentring = EstimatedCentring(),
         debias::AbstractRegimeDebias = ExactDebias(),
@@ -640,8 +643,8 @@ julia> ce.min_obs
                                                regime_method::Option{<:RegimeAdjustedMethod},
                                                regime_decay::Number,
                                                regime_min_obs::Integer,
-                                               regime_lohi_mult::Option{<:Tuple{<:Number,
-                                                                                <:Number}},
+                                               regime_lohi_mult::Option{<:Tuple{Number,
+                                                                                Number}},
                                                min_val::Number, centring::AbstractCentring,
                                                debias::AbstractRegimeDebias,
                                                cache::Option{<:AbstractPartialFitState})
@@ -667,6 +670,9 @@ julia> ce.min_obs
                                                   centring, debias, cache)
     end
 end
+# `Tuple` is covariant, so `Tuple{Number, Number}` admits every pair of numbers. The bounded form
+# `Tuple{<:Number, <:Number}` makes each keyword call build its type again, and an online step
+# rebuilds the estimator through this constructor (`rebuild_estimator`).
 function RegimeAdjustedExpWeightedVariance(; decay::Number = exp2(-inv(40.0)),
                                            min_obs::Integer = round(Int,
                                                                     max(1,
@@ -680,9 +686,8 @@ function RegimeAdjustedExpWeightedVariance(; decay::Number = exp2(-inv(40.0)),
                                                                            max(1,
                                                                                decay_half_life(decay) /
                                                                                2)),
-                                           regime_lohi_mult::Option{<:Tuple{<:Number,
-                                                                            <:Number}} = (0.7,
-                                                                                          1.6),
+                                           regime_lohi_mult::Option{<:Tuple{Number, Number}} = (0.7,
+                                                                                                1.6),
                                            min_val::Number = 1e-12,
                                            centring::AbstractCentring = EstimatedCentring(),
                                            debias::AbstractRegimeDebias = ExactDebias(),

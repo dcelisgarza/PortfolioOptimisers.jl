@@ -128,25 +128,49 @@ end
     # Every list that does not equal its channel, as (type, heading, fields, listed).
     bad = Tuple{Symbol, String, Vector{Symbol}, Union{Nothing, Vector{Symbol}}}[]
     checked = 0
+    function check_docstring(node)
+        CH.isdocstring(node) || return nothing
+        s = documented_struct(node.args[end])
+        isnothing(s) && return CH.PRUNE
+        text = CH.docstring_text(node)
+        f, v = channel_fields(s)
+        for (heading, fs) in (("Propagated parameters", f), ("View parameters", v))
+            isempty(fs) && continue
+            checked += 1
+            l = listed_fields(text, heading)
+            l == fs || push!(bad, (struct_name(s), heading, fs, l))
+        end
+        return CH.PRUNE
+    end
+
+    #=
+    A struct that a macro writes is not in the source text. `@windowed_estimator` writes the five
+    windowed estimators, with their tags and their docstrings, so the census expands each call
+    one level and reads the expansion. No other macro of the library writes a struct:
+    `@propagatable` rewrites a struct that the source holds.
+    =#
+    struct_macros = (Symbol("@windowed_estimator"),)
+    expanded = Symbol[]
     for file in files
         CH.walk_ast(CH.parse_file(file; root)) do node
-            CH.isdocstring(node) || return nothing
-            s = documented_struct(node.args[end])
-            isnothing(s) && return CH.PRUNE
-            text = CH.docstring_text(node)
-            f, v = channel_fields(s)
-            for (heading, fs) in (("Propagated parameters", f), ("View parameters", v))
-                isempty(fs) && continue
-                checked += 1
-                l = listed_fields(text, heading)
-                l == fs || push!(bad, (struct_name(s), heading, fs, l))
+            if Meta.isexpr(node, :macrocall) && node.args[1] in struct_macros
+                ex = macroexpand(PortfolioOptimisers, node; recursive = false)
+                CH.walk_ast(check_docstring, ex)
+                CH.walk_ast(ex) do n
+                    s = documented_struct(n)
+                    isnothing(s) || push!(expanded, struct_name(s))
+                    return isnothing(s) ? nothing : CH.PRUNE
+                end
+                return CH.PRUNE
             end
-            return CH.PRUNE
+            return check_docstring(node)
         end
     end
 
     # A floor on the walk: the library tags far more lists than this.
     @test checked > 150
+    @test sort(expanded) == [:WindowedCokurtosis, :WindowedCoskewness, :WindowedCovariance,
+                             :WindowedExpectedReturns, :WindowedVariance]
 
     # The label names the list, so a failure says which type and which list moved.
     sort!(bad; by = b -> (b[1], b[2]))

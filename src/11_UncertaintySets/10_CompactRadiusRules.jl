@@ -176,7 +176,7 @@ $(DocStringExtensions.FIELDS)
 
     VarianceFraction(;
         f::Number = 0.1,
-        w0::Union{Nothing, <:VecNum, <:NonFiniteAllocationOptimisationEstimator} = nothing
+        w0::Union{Nothing, VecNum, NonFiniteAllocationOptimisationEstimator} = nothing
     ) -> VarianceFraction
 
 Keywords correspond to the struct's fields. Both have defaults, so a bare call sets the penalty at a tenth of the nominal variance of the equal-weight portfolio.
@@ -221,8 +221,8 @@ VarianceFraction
     """
     w0
     function VarianceFraction(f::Number,
-                              w0::Union{Nothing, <:VecNum,
-                                        <:NonFiniteAllocationOptimisationEstimator})
+                              w0::Union{Nothing, VecNum,
+                                        NonFiniteAllocationOptimisationEstimator})
         @argcheck(isfinite(f) && f > zero(f), DomainError(f, "f must be finite and > 0"))
         if isa(w0, AbstractVector)
             @argcheck(!isempty(w0), IsEmptyError("w0 cannot be empty"))
@@ -231,8 +231,8 @@ VarianceFraction
     end
 end
 function VarianceFraction(; f::Number = 0.1,
-                          w0::Union{Nothing, <:VecNum,
-                                    <:NonFiniteAllocationOptimisationEstimator} = nothing)::VarianceFraction
+                          w0::Union{Nothing, VecNum,
+                                    NonFiniteAllocationOptimisationEstimator} = nothing)::VarianceFraction
     return VarianceFraction(f, w0)
 end
 """

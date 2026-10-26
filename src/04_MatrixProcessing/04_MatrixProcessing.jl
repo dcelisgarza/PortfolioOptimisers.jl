@@ -206,8 +206,8 @@ $(DocStringExtensions.FIELDS)
         dn::Option{<:AbstractDenoiseEstimator} = nothing,
         dt::Option{<:AbstractDetoneEstimator} = nothing,
         alg::Option{<:AbstractMatrixProcessingAlgorithm} = nothing,
-        order::Union{<:NTuple{N, <:Symbol} where {N},
-                     <:AbstractVector{<:Symbol}} = (:pdm, :dn, :dt, :alg)
+        order::Union{Tuple{Vararg{Symbol}},
+                     AbstractVector{<:Symbol}} = (:pdm, :dn, :dt, :alg)
     ) -> MatrixProcessing
 
 Keywords correspond to the struct's fields.
@@ -290,9 +290,10 @@ MatrixProcessing
                               dn::Option{<:AbstractDenoiseEstimator},
                               dt::Option{<:AbstractDetoneEstimator},
                               alg::Option{<:AbstractMatrixProcessingAlgorithm},
-                              order::Union{<:NTuple{N, <:Symbol} where {N},
-                                           <:AbstractVector{<:Symbol}} = (:pdm, :dn, :dt,
-                                                                          :alg))
+                              order::Union{Tuple{Vararg{Symbol}}, AbstractVector{<:Symbol}} = (:pdm,
+                                                                                               :dn,
+                                                                                               :dt,
+                                                                                               :alg))
         keys = setdiff(fieldnames(MatrixProcessing), (:order,))
         inorder = (k in keys for k in order)
         @argcheck(all(inorder), "Unknown field name in order: $(order[.!inorder])")
@@ -305,8 +306,10 @@ function MatrixProcessing(; pdm::Option{<:AbstractPosdefEstimator} = Posdef(),
                           dn::Option{<:AbstractDenoiseEstimator} = nothing,
                           dt::Option{<:AbstractDetoneEstimator} = nothing,
                           alg::Option{<:AbstractMatrixProcessingAlgorithm} = nothing,
-                          order::Union{<:NTuple{N, <:Symbol} where {N},
-                                       <:AbstractVector{<:Symbol}} = (:pdm, :dn, :dt, :alg))
+                          order::Union{Tuple{Vararg{Symbol}}, AbstractVector{<:Symbol}} = (:pdm,
+                                                                                           :dn,
+                                                                                           :dt,
+                                                                                           :alg))
     return MatrixProcessing(pdm, dn, dt, alg, order)
 end
 """

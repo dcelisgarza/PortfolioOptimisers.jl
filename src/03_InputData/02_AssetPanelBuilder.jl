@@ -93,7 +93,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     ConstantPanelFill(;
-        val::Union{<:Number, <:AbstractString} = 0.0
+        val::Union{Number, AbstractString} = 0.0
     ) -> ConstantPanelFill
 
 Keywords correspond to the struct's fields.
@@ -122,15 +122,14 @@ ConstantPanelFill
     The value every blank cell becomes: a number for a numeric or tensor Panel Field, a level label for a categorical one.
     """
     val
-    function ConstantPanelFill(val::Union{<:Number, <:AbstractString})
+    function ConstantPanelFill(val::Union{Number, AbstractString})
         if isa(val, Number)
             assert_finite(val, :val)
         end
         return new{typeof(val)}(val)
     end
 end
-function ConstantPanelFill(;
-                           val::Union{<:Number, <:AbstractString} = 0.0)::ConstantPanelFill
+function ConstantPanelFill(; val::Union{Number, AbstractString} = 0.0)::ConstantPanelFill
     return ConstantPanelFill(val)
 end
 """
@@ -151,7 +150,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     ForwardPanelFill(;
-        val::Union{<:Number, <:AbstractString} = 0.0,
+        val::Union{Number, AbstractString} = 0.0,
         lim::Option{<:Integer} = nothing
     ) -> ForwardPanelFill
 
@@ -187,13 +186,12 @@ ForwardPanelFill
     Longest run of consecutive blanks the fill carries a value across, or `nothing` for no limit.
     """
     lim
-    function ForwardPanelFill(val::Union{<:Number, <:AbstractString},
-                              lim::Option{<:Integer})
+    function ForwardPanelFill(val::Union{Number, AbstractString}, lim::Option{<:Integer})
         assert_panel_fill(val, lim)
         return new{typeof(val), typeof(lim)}(val, lim)
     end
 end
-function ForwardPanelFill(; val::Union{<:Number, <:AbstractString} = 0.0,
+function ForwardPanelFill(; val::Union{Number, AbstractString} = 0.0,
                           lim::Option{<:Integer} = nothing)::ForwardPanelFill
     return ForwardPanelFill(val, lim)
 end
@@ -219,7 +217,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     BackwardPanelFill(;
-        val::Union{<:Number, <:AbstractString} = 0.0,
+        val::Union{Number, AbstractString} = 0.0,
         lim::Option{<:Integer} = nothing
     ) -> BackwardPanelFill
 
@@ -255,18 +253,17 @@ BackwardPanelFill
     Longest run of consecutive blanks the fill carries a value across, or `nothing` for no limit.
     """
     lim
-    function BackwardPanelFill(val::Union{<:Number, <:AbstractString},
-                               lim::Option{<:Integer})
+    function BackwardPanelFill(val::Union{Number, AbstractString}, lim::Option{<:Integer})
         assert_panel_fill(val, lim)
         return new{typeof(val), typeof(lim)}(val, lim)
     end
 end
-function BackwardPanelFill(; val::Union{<:Number, <:AbstractString} = 0.0,
+function BackwardPanelFill(; val::Union{Number, AbstractString} = 0.0,
                            lim::Option{<:Integer} = nothing)::BackwardPanelFill
     return BackwardPanelFill(val, lim)
 end
 """
-    assert_panel_fill(val::Union{<:Number, <:AbstractString}, lim::Option{<:Integer}) -> nothing
+    assert_panel_fill(val::Union{Number, AbstractString}, lim::Option{<:Integer}) -> nothing
 
 Check the terminal value and the run limit shared by the two directional fill policies.
 
@@ -295,7 +292,7 @@ Check the terminal value and the run limit shared by the two directional fill po
   - [`BackwardPanelFill`](@ref)
   - [`Option`](@ref)
 """
-function assert_panel_fill(val::Union{<:Number, <:AbstractString},
+function assert_panel_fill(val::Union{Number, AbstractString},
                            lim::Option{<:Integer})::Nothing
     if isa(val, Number)
         assert_finite(val, :val)

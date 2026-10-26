@@ -1930,7 +1930,7 @@ unknown key of `field_dict` or `ret_dict`. The error for an unknown key ends wit
  3. Parse every entry of `forward` with [`windowed_parse_forward`](@ref), giving `specs`. Append one `:AssetPanel` copy of each `MatNum` entry, so every matrix generic also gets its Asset Panel method.
  4. Render one cross-reference per entry of `specs` with [`windowed_method_ref`](@ref), giving `refs`.
  5. For each entry of `specs`, build one documented forwarding method: [`windowed_method_doc`](@ref) writes its docstring, and [`windowed_method_def`](@ref) writes its body. Each method's `# Related` section lists the `refs` of its siblings and not its own.
- 6. Build `structexpr`, the `@concrete` struct. It declares the inner estimator tagged `@fprop @vprop`, `w` tagged `@wprop`, `window`, `rule` and `cache` tagged `@fprop @vprop`, each with its live [`field_dict`](@ref) lookup, and the inner constructor that validates `w` and `window`.
+ 6. Build `structexpr`, the `@concrete` struct. It declares the inner estimator tagged `@fprop @vprop`, `w` tagged `@wprop`, `window` and `rule` with no tag, and `cache` tagged `@fprop @vprop`, each with its live [`field_dict`](@ref) lookup, and the inner constructor that validates `w` and `window`.
  7. Build `kwctor`, the keyword constructor, whose defaults are `default`, `nothing`, `nothing`, [`RollingWindow`](@ref)`()` and `nothing`.
  8. Write the type's docstring with [`windowed_type_doc`](@ref), and attach it to `structexpr` wrapped in `@propagatable @concrete`.
  9. Return the escaped block: the documented struct, `kwctor`, the forwarding methods, and the `export` of `name`.

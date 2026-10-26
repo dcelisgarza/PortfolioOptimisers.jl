@@ -866,7 +866,7 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    ExpectationMaximisation(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05, proj::EuclideanProjection = EuclideanProjection()) -> ExpectationMaximisation
+    ExpectationMaximisation(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, proj::EuclideanProjection = EuclideanProjection()) -> ExpectationMaximisation
 
 Keywords correspond to the struct's fields.
 
@@ -909,7 +909,7 @@ ExpectationMaximisation
     $(field_dict[:proj])
     """
     proj
-    function ExpectationMaximisation(eta::Union{<:Real, <:AbstractLearningRateSchedule},
+    function ExpectationMaximisation(eta::Union{Real, AbstractLearningRateSchedule},
                                      proj::EuclideanProjection)
         if isa(eta, Real)
             @argcheck(zero(eta) < eta < one(eta), DomainError(eta, "eta must be in (0, 1)"))
@@ -919,8 +919,7 @@ ExpectationMaximisation
         return new{typeof(eta), typeof(proj)}(eta, proj)
     end
 end
-function ExpectationMaximisation(;
-                                 eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05,
+function ExpectationMaximisation(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05,
                                  proj::EuclideanProjection = EuclideanProjection())::ExpectationMaximisation
     return ExpectationMaximisation(eta, proj)
 end
@@ -950,7 +949,7 @@ The ceiling is one for a number and for every Learning-Rate Schedule that names 
   - [`SelfConfidentRate`](@ref)
   - [`learning_rate`](@ref)
 """
-function correction_ratio_cap(::Union{<:Real, <:AbstractLearningRateSchedule}, ::Integer)
+function correction_ratio_cap(::Union{Real, AbstractLearningRateSchedule}, ::Integer)
     return 1
 end
 function online_update!(alg::ExpectationMaximisation, st::ExpectationMaximisationState,
