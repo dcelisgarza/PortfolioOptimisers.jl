@@ -17,8 +17,9 @@ A pull-request run and a push run do not test the same tree. The pull-request ru
 `refs/pull/N/merge`, the merge of the head into the base. The push run checks out the head. For a
 release pull request from `dev` into `main`, after earlier squash merges, the two trees can differ.
 
-No ruleset of this repository requires a status check. The "Protect Main" ruleset has none, so a
-skipped job cannot block a merge.
+No rule of this repository requires a status check, so a skipped job cannot block a merge. The one
+ruleset, "Protect Main", holds no status check, and its list of target branches is empty, so
+GitHub applies none of its rules to `main` (#1832).
 
 ## Decision
 
