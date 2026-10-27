@@ -355,7 +355,7 @@ commit = "8610300"
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_b.jl" = { lines = 98, misses = 6 }
 "src/17_Optimisation/05_JuMP/04_MeanRisk.jl" = { lines = 147, misses = 0 }
 "src/17_Optimisation/05_JuMP/05_FactorRiskContribution.jl" = { lines = 55, misses = 0 }
-"src/17_Optimisation/05_JuMP/06_NearOptimalCentering_a.jl" = { lines = 207, misses = 3 }
+"src/17_Optimisation/05_JuMP/06_NearOptimalCentering_a.jl" = { lines = 207, misses = 0 }
 "src/17_Optimisation/05_JuMP/06_NearOptimalCentering_b.jl" = { lines = 71, misses = 0 }
 "src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl" = { lines = 123, misses = 0 }
 "src/17_Optimisation/05_JuMP/08_RelaxedRiskBudgeting.jl" = { lines = 88, misses = 0 }

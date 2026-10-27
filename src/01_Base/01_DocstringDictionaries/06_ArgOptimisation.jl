@@ -218,29 +218,29 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :gamma_sspo => "`gamma`: The soft-threshold width. The ratio `lambda / gamma` is twice the weight of the quadratic coupling in Equation 13 of [lai2018sspo](@cite).",#
                  :iter => "`iter`: Maximum number of iterations.",#
                  # Near optimal centering.
-                 :w_opt_noc => "`w_opt`: Optimal portfolio weights.",#
-                 :w_min_noc => "`w_min`: Minimum risk portfolio weights.",#
-                 :w_max_noc => "`w_max`: Maximum return portfolio weights.",#
-                 :ucs_flag => "`ucs_flag`: Whether to use the uncertainty set.",#
+                 :w_opt_noc => "`w_opt`: Anchor portfolio of the objective, or one for each point of a frontier sweep. If `nothing`, a sub-problem solves it.",#
+                 :w_min_noc => "`w_min`: Anchor portfolio of minimum risk. If `nothing`, a sub-problem solves it.",#
+                 :w_max_noc => "`w_max`: Anchor portfolio of maximum return. If `nothing`, a sub-problem solves it.",#
+                 :ucs_flag => "`ucs_flag`: If `true`, the copies of the risk measures and of the return terms without bounds keep their uncertainty sets. If `false`, they use the nominal moments. These copies solve the anchors of minimum risk and of maximum return, and the centring model of [`UnconstrainedNearOptimalCentering`](@ref).",#
                  # Optimiser config.
                  :kwargs => "`kwargs`: More keyword arguments.",#
                  # Near optimal centering result fields.
                  :attrs_noc => "`attrs`: Processed JuMP optimiser attributes for the model-assembly pipeline.",#
-                 :w_opt => "`w_opt`: Optimal portfolio weights (vector or vector of vectors).",#
-                 :w_max => "`w_max`: Maximum-risk portfolio weights.",#
-                 :w_min => "`w_min`: Minimum-risk portfolio weights.",#
-                 :w_opt_ini => "`w_opt_ini`: Initial weights for the optimal sub-problem.",#
-                 :w_max_ini => "`w_max_ini`: Initial weights for the maximum-risk sub-problem.",#
-                 :w_min_ini => "`w_min_ini`: Initial weights for the minimum-risk sub-problem.",#
-                 :w_opt_retcode => "`w_opt_retcode`: Return code for the optimal-objective sub-problem.",#
-                 :w_max_retcode => "`w_max_retcode`: Return code for the maximum-risk sub-problem.",#
-                 :w_min_retcode => "`w_min_retcode`: Return code for the minimum-risk sub-problem.",#
-                 :rt_opt => "`rt_opt`: Optimal return target.",#
-                 :rt_max => "`rt_max`: Maximum return target.",#
-                 :rt_min => "`rt_min`: Minimum return target.",#
-                 :rt_ends => "`rt_ends`: Per-term return spans for a return-frontier sweep, as `i => (rt_min_i, rt_max_i)` pairs, or `nothing` when no return term declares a frontier bound. The aggregate `rt_min`/`rt_max` pair above serves the barrier; these serve the sweep, and the two are different quantities because a term's own span must be read off a portfolio that maximised that term alone.",#
-                 :rk_opt => "`rk_opt`: Optimal risk target.",#
-                 :noc_retcode => "`noc_retcode`: Return code for the near-optimal centering sub-problem.",#
+                 :w_opt => "`w_opt`: Anchor portfolio of the objective, or a vector of them.",#
+                 :w_max => "`w_max`: Anchor portfolio of maximum return.",#
+                 :w_min => "`w_min`: Anchor portfolio of minimum risk.",#
+                 :w_opt_ini => "`w_opt_ini`: Initial weights of the sub-problem of the objective.",#
+                 :w_max_ini => "`w_max_ini`: Initial weights of the sub-problem of maximum return.",#
+                 :w_min_ini => "`w_min_ini`: Initial weights of the sub-problem of minimum risk.",#
+                 :w_opt_retcode => "`w_opt_retcode`: Return code of the sub-problem of the objective, or one for each point of a frontier sweep.",#
+                 :w_max_retcode => "`w_max_retcode`: Return code of the sub-problem of maximum return.",#
+                 :w_min_retcode => "`w_min_retcode`: Return code of the sub-problem of minimum risk.",#
+                 :rt_opt => "`rt_opt`: Return floor ``\\epsilon_{1}`` of the near optimal region, or one for each point of a frontier sweep.",#
+                 :rt_max => "`rt_max`: Return of the anchor of maximum return.",#
+                 :rt_min => "`rt_min`: Return of the anchor of minimum risk.",#
+                 :rt_ends => "`rt_ends`: The span of each return term that holds a [`Frontier`](@ref), as `i => (rt_min_i, rt_max_i)` pairs, or `nothing` when no return term holds one. The low end is the return of the term at the anchor of minimum risk. The high end is its return at the portfolio that maximises that term alone.",#
+                 :rk_opt => "`rk_opt`: Risk ceiling ``\\epsilon_{2}`` of the near optimal region, or one for each point of a frontier sweep.",#
+                 :noc_retcode => "`noc_retcode`: Return code of the centring solve, or one for each point of a frontier sweep.",#
                  # Discrete allocation result fields.
                  :l_model => "`l_model`: `JuMP` model for the long allocation.",#
                  :s_model => "`s_model`: `JuMP` model for the short allocation.",#
