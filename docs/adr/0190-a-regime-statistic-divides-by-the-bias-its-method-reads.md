@@ -556,3 +556,14 @@ under `ExactDebias()` moves by 7.4e-16 relative at most, which is round-off, and
 estimator, on `PortfolioTarget`, is equal bit for bit. A raw fit moves by `n / E[χ(n)]²` before the
 clip, 1.0865 at `n = 6`. The decision above keeps its law factor and its
 shrunk spectrum.
+
+## Amendment (2026-10-27)
+
+**`hac_floor = nothing` turns the per-term floor off, and `NoHacFloor` is removed (#1867).** The
+two regime-adjusted estimators turned `regime_method` off with `nothing`, but turned `hac_floor`
+off with the singleton `NoHacFloor()`. One struct then had two spellings of "off". The maintainer
+ruled that `hac_floor` takes `nothing` too, so the field is bound to `Option{<:AbstractHacFloor}`,
+and `hac_floor!(::Nothing, X2, valid)` returns the squares unchanged. The default and the numbers do
+not move: no floor is still the default, and `PerTermHacFloor()` is still the oracle's rule. Where
+the decision above names `hac_floor = NoHacFloor()`, read `hac_floor = nothing`. The removal is a
+clean break with no deprecation, as ADR 0044 and ADR 0213 set.

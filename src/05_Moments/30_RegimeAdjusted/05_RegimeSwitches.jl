@@ -126,33 +126,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Lets a HAC-adjusted product enter the variance recursion as it is, negative or not. This is the default floor rule.
-
-A HAC term adds the lagged products of the deviations to the square, so it can be negative. Under returns with no autocorrelation each term has the mean of the variance, and the recursion is an unbiased quadratic form. Only the variance that the estimator returns is floored at zero.
-
-# Constructors
-
-    NoHacFloor() -> NoHacFloor
-
-# Examples
-
-```jldoctest
-julia> RegimeAdjustedExpWeightedVariance().hac_floor
-NoHacFloor()
-```
-
-# Related
-
-  - [`AbstractHacFloor`](@ref)
-  - [`PerTermHacFloor`](@ref)
-"""
-struct NoHacFloor <: AbstractHacFloor end
-"""
-$(DocStringExtensions.TYPEDEF)
-
 Floors each HAC-adjusted square at zero before it enters the variance recursion.
 
-The floor removes the negative part of each term, so the mean of a term is above the variance. Under returns with no autocorrelation the variance is 6.7 %, 16 % and 41 % too large at one, two and five lags.
+The floor removes the negative part of each term, so the mean of a term is above the variance. Under returns with no autocorrelation the variance is 6.7 %, 16 % and 41 % too large at one, two and five lags. The default `hac_floor = nothing` puts no floor on a term.
 
 # Constructors
 
@@ -168,14 +144,16 @@ PerTermHacFloor()
 # Related
 
   - [`AbstractHacFloor`](@ref)
-  - [`NoHacFloor`](@ref)
+  - [`hac_floor!`](@ref)
 """
 struct PerTermHacFloor <: AbstractHacFloor end
 """
-    hac_floor!(::NoHacFloor, X2::VecNum, valid::AbstractVector{<:Bool})
+    hac_floor!(::Nothing, X2::VecNum, valid::AbstractVector{<:Bool})
     hac_floor!(::PerTermHacFloor, X2::VecNum, valid::AbstractVector{<:Bool})
 
 Applies the floor rule to the HAC-adjusted squares of the valid assets.
+
+With no rule, each HAC-adjusted product enters the variance recursion as it is, negative or not. Under returns with no autocorrelation each term then has the mean of the variance, and the recursion is an unbiased quadratic form. Only the variance that the estimator returns is floored at zero.
 
 # Arguments
 
@@ -184,13 +162,13 @@ Applies the floor rule to the HAC-adjusted squares of the valid assets.
 
 # Returns
 
-  - `X2`: The squares, unchanged under [`NoHacFloor`](@ref), and floored at zero on the valid assets under [`PerTermHacFloor`](@ref).
+  - `X2`: The squares, unchanged under `nothing`, and floored at zero on the valid assets under [`PerTermHacFloor`](@ref).
 
 # Related
 
   - [`AbstractHacFloor`](@ref)
 """
-function hac_floor!(::NoHacFloor, X2::VecNum, ::AbstractVector{<:Bool})
+function hac_floor!(::Nothing, X2::VecNum, ::AbstractVector{<:Bool})
     return X2
 end
 function hac_floor!(::PerTermHacFloor, X2::VecNum, valid::AbstractVector{<:Bool})
@@ -536,8 +514,8 @@ end
 function indefinite_block(::ScoreIndefiniteBlock, C::MatNum, ::Bool)
     return C
 end
-export ExactDebias, LawDebias, RawStatistic, NoHacFloor, PerTermHacFloor,
-       VolatilityBeforeUpdate, VolatilityAfterUpdate, BiasCorrectedVolatility,
-       RawVolatility, RefuseIndefiniteWarmUp, ClipIndefiniteBlock, ScoreIndefiniteBlock
+export ExactDebias, LawDebias, RawStatistic, PerTermHacFloor, VolatilityBeforeUpdate,
+       VolatilityAfterUpdate, BiasCorrectedVolatility, RawVolatility,
+       RefuseIndefiniteWarmUp, ClipIndefiniteBlock, ScoreIndefiniteBlock
 public debiases, reads_dependence, hac_floor!, volatility_before_update,
        correlation_variance, indefinite_block

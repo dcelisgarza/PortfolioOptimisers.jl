@@ -426,6 +426,13 @@ and `hac_floor = PerTermHacFloor()` keeps it (ADR 0190).
     @test isnothing(first_open(12, 2.0^(-1 / 5), 2))
     @test first_open(12, lam, nothing) == 16
 
+    # `nothing` turns the floor off, as it turns `regime_method` off, and it is the default (#1867).
+    @test isnothing(RegimeAdjustedExpWeightedVariance().hac_floor)
+    @test isnothing(RegimeAdjustedExpWeightedCovariance().hac_floor)
+    @test PO.hac_floor!(nothing, [-1.0, 2.0], [true, true]) == [-1.0, 2.0]
+    @test PO.hac_floor!(PerTermHacFloor(), [-1.0, 2.0, -3.0], [true, true, false]) ==
+          [0.0, 2.0, -3.0]
+
     # Without the floor the scalar HAC variance is the diagonal of the HAC covariance of one
     # decay, as the plain variance is. The floor breaks that identity.
     rng = StableRNG(1433)

@@ -569,7 +569,7 @@ $(DocStringExtensions.FIELDS)
         decay::Number             = exp2(-inv(40.0)),
         min_obs::Integer          = round(Int, max(1, decay_half_life(decay))),
         hac_lags::Option{<:Integer} = nothing,
-        hac_floor::AbstractHacFloor = NoHacFloor(),
+        hac_floor::Option{<:AbstractHacFloor} = nothing,
         regime_method::Option{<:RegimeAdjustedMethod} = FirstMomentRegimeAdjusted(),
         regime_decay::Number      = exp2(-2 / decay_half_life(decay)),
         regime_min_obs::Integer   = round(Int, max(1, decay_half_life(decay) / 2)),
@@ -671,7 +671,7 @@ julia> ce.min_obs
     cache
     function RegimeAdjustedExpWeightedVariance(decay::Number, min_obs::Integer,
                                                hac_lags::Option{<:Integer},
-                                               hac_floor::AbstractHacFloor,
+                                               hac_floor::Option{<:AbstractHacFloor},
                                                regime_method::Option{<:RegimeAdjustedMethod},
                                                regime_decay::Number,
                                                regime_min_obs::Integer,
@@ -710,7 +710,7 @@ function RegimeAdjustedExpWeightedVariance(; decay::Number = exp2(-inv(40.0)),
                                                                     max(1,
                                                                         decay_half_life(decay))),
                                            hac_lags::Option{<:Integer} = nothing,
-                                           hac_floor::AbstractHacFloor = NoHacFloor(),
+                                           hac_floor::Option{<:AbstractHacFloor} = nothing,
                                            regime_method::Option{<:RegimeAdjustedMethod} = FirstMomentRegimeAdjusted(),
                                            regime_decay::Number = exp2(-2 /
                                                                        decay_half_life(decay)),
@@ -1365,8 +1365,8 @@ factor.
 
 The factor is the mean of the term in units of the variance, for returns that are independent in
 time: [`centring_factor`](@ref) of the square plus [`centring_lag_factor`](@ref) of the lagged
-products. Both are one and zero under [`PreCentred`](@ref). The floor rule of `ce.hac_floor` then
-acts on the terms of the valid assets.
+products. Both are one and zero under [`PreCentred`](@ref). The floor rule of `ce.hac_floor`, if
+it is not `nothing`, then acts on the terms of the valid assets.
 
 # Arguments
 

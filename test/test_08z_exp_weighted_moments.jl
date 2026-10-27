@@ -1089,7 +1089,7 @@ end
     # two estimated deviations has a non-zero mean. The factor reads it, so the recursion is
     # unbiased for returns independent in time, at one, two and five lags, with holidays. The
     # test reads the raw state: the report floors a negative HAC variance at zero, which is the
-    # floor of `NoHacFloor` and adds a positive bias to a young estimate.
+    # floor of `hac_floor = nothing` and adds a positive bias to a young estimate.
     rng = StableRNG(1509)
     μ, M, T = 0.3, 20_000, 30
     λ = 2.0^(-1 / 10)

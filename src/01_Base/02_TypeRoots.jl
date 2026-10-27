@@ -445,7 +445,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the floor of a HAC term. The rule selects whether the estimator floors each HAC-adjusted product at zero before the product enters the variance recursion.
 
-The two regime-adjusted estimators hold a floor rule in their `hac_floor` field: [`RegimeAdjustedExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedCovariance`](@ref). The rule acts only where `hac_lags` is not `nothing`. On the covariance estimator it acts only on the variance of the separate correlation path, because the covariance of one decay floors no term. This file declares the root with the other roots, because the estimators bind their field to it before the members load.
+The two regime-adjusted estimators hold a floor rule, or `nothing` for no floor, in their `hac_floor` field: [`RegimeAdjustedExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedCovariance`](@ref). The rule acts only where `hac_lags` is not `nothing`. On the covariance estimator it acts only on the variance of the separate correlation path, because the covariance of one decay floors no term. This file declares the root with the other roots, because the estimators bind their field to it before the members load.
 
 # Interfaces
 
@@ -453,8 +453,8 @@ A floor rule is a marker for dispatch, and it holds no data. A new rule needs a 
 
 # Related
 
-  - [`NoHacFloor`](@ref)
   - [`PerTermHacFloor`](@ref)
+  - [`hac_floor!`](@ref)
 """
 abstract type AbstractHacFloor <: AbstractAlgorithm end
 """
