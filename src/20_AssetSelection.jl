@@ -515,7 +515,7 @@ The score of asset `i` is `score(X[:, i])`. This is the route of a precomputed r
 
 # Validation
 
-  - `supports_precomputed_returns(score)`. Otherwise the function throws an `ArgumentError` that names the measure. When the measure is a [`Variance`](@ref) or a [`StandardDeviation`](@ref), the message also names `SCM()`, which computes the same quantity from a return series.
+  - `supports_precomputed_returns(score)`. Otherwise the function throws an `ArgumentError` that names the measure. When the measure is a [`Variance`](@ref) or a [`StandardDeviation`](@ref), the message also names `SCM()`, which computes the same quantity from a return series. When it is a [`Skewness`](@ref), the message names [`ThirdCentralMoment`](@ref), and when it is a [`Kurtosis`](@ref), it names [`HighOrderMoment`](@ref) and [`LowOrderMoment`](@ref).
 
 # Returns
 
@@ -530,6 +530,10 @@ function assert_scoreable(score::AbstractBaseRiskMeasure)::Nothing
     if !supports_precomputed_returns(score)
         hint = if isa(score, Union{Variance, StandardDeviation})
             " `SCM()` computes the same quantity from a return series and is scoreable."
+        elseif isa(score, Skewness)
+            " `ThirdCentralMoment()` computes the third moment from a return series, and `ThirdCentralMoment(; ve = SimpleVariance())` the standardised skewness. Both are scoreable."
+        elseif isa(score, Kurtosis)
+            " `HighOrderMoment(; alg = FourthMoment())` computes the fourth moment from a return series, and `LowOrderMoment(; alg = EvenMoment())` its square root. Both are scoreable."
         else
             ""
         end
@@ -557,7 +561,7 @@ The function gives each column to `score` as a view. The functor of a risk measu
 
 # Validation
 
-  - Every score is finite. Otherwise the function throws a `DomainError` that names the columns with a non-finite score. [`Skewness`](@ref) on a constant series, for example, divides by a zero standard deviation and gives `NaN`. A `NaN` score has no place in an order, so the function throws and does not sort the scores arbitrarily.
+  - Every score is finite. Otherwise the function throws a `DomainError` that names the columns with a non-finite score. [`ThirdCentralMoment`](@ref) with a variance estimator in `ve`, on a constant series for example, divides by a zero standard deviation and gives `NaN`. A `NaN` score has no place in an order, so the function throws and does not sort the scores arbitrarily.
 
 # Returns
 

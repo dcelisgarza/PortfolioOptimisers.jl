@@ -5,6 +5,7 @@ Description = "Variance Skew Kurtosis, private API of PortfolioOptimisers.jl: re
 # Variance Skew Kurtosis: private API
 
 ```@docs
+resolve_deferred_quantities(r::Skewness, pr::AbstractPriorResult)
 resolve_deferred_quantities(r::VarianceSkewKurtosis, pr::AbstractPriorResult)
 variance_skew_kurtosis_terms
 portfolio_third_moment

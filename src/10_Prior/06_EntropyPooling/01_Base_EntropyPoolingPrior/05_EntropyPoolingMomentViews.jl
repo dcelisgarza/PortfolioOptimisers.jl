@@ -924,7 +924,7 @@ end
 
 Read the prior skewness of asset `i`.
 
-`get_pr_value` is the dispatch table that resolves a `prior(...)` reference inside a view. This method reads the statistic that the tag `Val(:skew)` names. It applies [`Skewness`](@ref) to the `i`-th column of `pr.X`. That is the standardised third central moment of the sample under `w`, the weights of `pr`. [`Skewness`](@ref) also gives the weights to its mean and to its variance estimator.
+`get_pr_value` is the dispatch table that resolves a `prior(...)` reference inside a view. This method reads the statistic that the tag `Val(:skew)` names. It applies [`ThirdCentralMoment`](@ref) with a [`SimpleVariance`](@ref) in `ve` to the `i`-th column of `pr.X`. That is the standardised third central moment of the sample under `w`, the weights of `pr`. [`ThirdCentralMoment`](@ref) also gives the weights to its mean and to its variance estimator.
 
 A refit prior does not keep its weights in `pr.w`, so the caller gives them, as for the value at risk method of [`get_pr_value`](@ref). Under a staged algorithm, they are the weights of the prior of the stage.
 
@@ -950,7 +950,7 @@ A refit prior does not keep its weights in `pr.w`, so the caller gives them, as 
 """
 function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:skew},
                       ::Nothing = nothing, w::Option{<:ObsWeights} = nothing)
-    return Skewness(; w = w)(view(pr.X, :, i))
+    return ThirdCentralMoment(; w = w, ve = SimpleVariance())(view(pr.X, :, i))
 end
 """
     ep_sk_views!(skew_views::LinearConstraintEstimator, epc::AbstractDict,

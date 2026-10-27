@@ -4,8 +4,7 @@
                                                      <:SecondMoment{<:Any, <:Any,
                                                                     <:QuadSecondMomentFormulations}},
                                       LowOrderMoment{<:Any, <:Any, <:Any, <:EvenMoment},
-                                      Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                               <:SOCRiskExpr},
+                                      Kurtosis{<:Any, <:Any, <:Any, <:SOCRiskExpr},
                                       NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
                                                        <:NSkeQuadFormulations},
                                       TrackingRiskMeasure{<:Any, <:Any, <:SquaredL2Norm}}
@@ -31,8 +30,7 @@ const SquaredRiskMeasures = Union{Variance, BrownianDistanceVariance,
                                                  <:SecondMoment{<:Any, <:Any,
                                                                 <:QuadSecondMomentFormulations}},
                                   LowOrderMoment{<:Any, <:Any, <:Any, <:EvenMoment},
-                                  Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                           <:SOCRiskExpr},
+                                  Kurtosis{<:Any, <:Any, <:Any, <:SOCRiskExpr},
                                   NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
                                                    <:NSkeQuadFormulations},
                                   TrackingRiskMeasure{<:Any, <:Any, <:SquaredL2Norm}}
@@ -43,7 +41,7 @@ const SquaredRiskMeasures = Union{Variance, BrownianDistanceVariance,
                                                                            <:QuadSecondMomentFormulations}},
                                              NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
                                                               <:NSkeQuadFormulations},
-                                             Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                             Kurtosis{<:Any, <:Any, <:Any,
                                                       <:QuadSecondMomentFormulations},
                                              TrackingRiskMeasure{<:Any, <:Any, <:SquaredL2Norm}}
 
@@ -66,29 +64,30 @@ const QuadExpressionRiskMeasures = Union{Variance, BrownianDistanceVariance,
                                                                        <:QuadSecondMomentFormulations}},
                                          NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
                                                           <:NSkeQuadFormulations},
-                                         Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                         Kurtosis{<:Any, <:Any, <:Any,
                                                   <:QuadSecondMomentFormulations},
                                          TrackingRiskMeasure{<:Any, <:Any, <:SquaredL2Norm}}
 """
-    const CubedRiskMeasures = Union{ThirdCentralMoment,
+    const CubedRiskMeasures = Union{Skewness, ThirdCentralMoment{<:Any, <:Any, <:Any, Nothing},
                                     HighOrderMoment{<:Any, <:Any, <:Any, <:ThirdLowerMoment}}
 
 Union of the risk measures that are homogeneous of degree 3 in the portfolio weights. [`homogeneity_degree`](@ref) returns `3` for each member.
 
-A member reports a raw third moment. The standardised third moment and [`Skewness`](@ref) divide by the cube of a standard deviation, so they are members of [`ScaleFreeRiskMeasures`](@ref) and not of this union.
+A member reports a raw third moment. The standardised third moments, of [`StandardisedHighOrderMoment`](@ref) and of a [`ThirdCentralMoment`](@ref) with a variance estimator in `ve`, divide by the cube of a standard deviation, so they are members of [`ScaleFreeRiskMeasures`](@ref) and not of this union.
 
 # Related
 
+  - [`Skewness`](@ref)
   - [`ThirdCentralMoment`](@ref)
   - [`HighOrderMoment`](@ref)
   - [`ThirdLowerMoment`](@ref)
   - [`homogeneity_degree`](@ref)
 """
-const CubedRiskMeasures = Union{ThirdCentralMoment,
+const CubedRiskMeasures = Union{Skewness, ThirdCentralMoment{<:Any, <:Any, <:Any, Nothing},
                                 HighOrderMoment{<:Any, <:Any, <:Any, <:ThirdLowerMoment}}
 """
     const FourthPowerRiskMeasures = Union{HighOrderMoment{<:Any, <:Any, <:Any, <:FourthMoment},
-                                          Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                          Kurtosis{<:Any, <:Any, <:Any,
                                                    <:QuadSecondMomentFormulations}}
 
 Union of the risk measures that are homogeneous of degree 4 in the portfolio weights. [`homogeneity_degree`](@ref) returns `4` for each member.
@@ -103,10 +102,12 @@ A member reports a raw fourth moment. [`Kurtosis`](@ref) under [`SOCRiskExpr`](@
   - [`homogeneity_degree`](@ref)
 """
 const FourthPowerRiskMeasures = Union{HighOrderMoment{<:Any, <:Any, <:Any, <:FourthMoment},
-                                      Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                      Kurtosis{<:Any, <:Any, <:Any,
                                                <:QuadSecondMomentFormulations}}
 """
-    const ScaleFreeRiskMeasures = Union{EqualRisk, Skewness,
+    const ScaleFreeRiskMeasures = Union{EqualRisk,
+                                        ThirdCentralMoment{<:Any, <:Any, <:Any,
+                                                           <:AbstractVarianceEstimator},
                                         HighOrderMoment{<:Any, <:Any, <:Any,
                                                         <:StandardisedHighOrderMoment}}
 
@@ -117,12 +118,14 @@ A member does not change when every weight is multiplied by the same positive nu
 # Related
 
   - [`EqualRisk`](@ref)
-  - [`Skewness`](@ref)
+  - [`ThirdCentralMoment`](@ref)
   - [`HighOrderMoment`](@ref)
   - [`StandardisedHighOrderMoment`](@ref)
   - [`homogeneity_degree`](@ref)
 """
-const ScaleFreeRiskMeasures = Union{EqualRisk, Skewness,
+const ScaleFreeRiskMeasures = Union{EqualRisk,
+                                    ThirdCentralMoment{<:Any, <:Any, <:Any,
+                                                       <:AbstractVarianceEstimator},
                                     HighOrderMoment{<:Any, <:Any, <:Any,
                                                     <:StandardisedHighOrderMoment}}
 """

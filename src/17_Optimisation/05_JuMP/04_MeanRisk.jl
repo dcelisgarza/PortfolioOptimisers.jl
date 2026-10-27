@@ -579,51 +579,6 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResu
     return frontier_sweep!(model, mr, eltype(pr.X), frontier_sweep_axes(ret_axis, nothing))
 end
 """
-    frontier_risk(r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum, fees::Option{<:Fees})
-    frontier_risk(r::Skewness, w::VecNum, X::MatNum, fees::Option{<:Fees})
-    frontier_risk(r::Kurtosis, w::VecNum, X::MatNum, fees::Option{<:Fees})
-
-Value the owner `r` of a `:risk_frontier` entry at the weights `w`, in the units of the expression that the entry bounds.
-
-[`_rebuild_risk_frontier`](@ref) values each corner portfolio with this function. The bounded expression of most measures holds the value of the measure, so the generic method returns [`expected_risk`](@ref). The models of [`Skewness`](@ref) and [`Kurtosis`](@ref) read a comoment matrix, but their functors read the returns, so the two methods for these measures read the matrix that the model reads.
-
-  - `Skewness`: the `lb` bounds the third moment that [`VarianceSkewKurtosis`](@ref) reads off `r.sk`, and the functor gives the standardised skewness. The method returns [`portfolio_third_moment`](@ref).
-  - `Kurtosis`: the method returns [`portfolio_fourth_moment`](@ref) of `r.kt` in the units of the functor. These are the square root of the moment under [`SOCRiskExpr`](@ref), and the moment under the other formulations. The functor gives the same value only when `r.kt` is the sample cokurtosis about the Moment Target of the measure. With an integer `r.N`, the model bounds the approximate moment of [`cokurtosis_spectrum`](@ref), which lies at or below the moment of the matrix, so the span is the span of the full moment.
-
-# Arguments
-
-  - `r`: The owner of the entry, already through [`factory`](@ref). The `sk` of a `Skewness` and the `kt` of a `Kurtosis` must be matrices.
-  - $(arg_dict[:pw])
-  - `X::MatNum`: Returns matrix `observations × assets`.
-  - $(arg_dict[:fees_opt])
-
-# Returns
-
-  - `rk::Number`: The value of the bounded expression at `w`.
-
-# Related
-
-  - [`_rebuild_risk_frontier`](@ref)
-  - [`set_risk_frontier_owner!`](@ref)
-  - [`expected_risk`](@ref)
-"""
-function frontier_risk(r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum,
-                       fees::Option{<:Fees})
-    return expected_risk(r, w, X, fees)
-end
-function frontier_risk(r::Skewness, w::VecNum, ::MatNum, ::Option{<:Fees})
-    return portfolio_third_moment(r.sk, w)
-end
-function frontier_risk(r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SOCRiskExpr},
-                       w::VecNum, ::MatNum, ::Option{<:Fees})
-    return sqrt(portfolio_fourth_moment(r.kt, w))
-end
-function frontier_risk(r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                   <:QuadSecondMomentFormulations}, w::VecNum, ::MatNum,
-                       ::Option{<:Fees})
-    return portfolio_fourth_moment(r.kt, w)
-end
-"""
     _rebuild_risk_frontier(pr::AbstractPriorResult, fees::Option{<:Fees},
                            r::AbstractBaseRiskMeasure, risk_frontier::VecPair,
                            w_min::VecNum, w_max::VecNum, i::Integer = 1)
@@ -635,7 +590,7 @@ The span is the span of a risk ceiling that the `# Mathematical definition` of [
 # Algorithm
 
  1. Read the expression, the `Frontier`, the polarity and the owner of entry `i`.
- 2. Compute the risk of `r` at `w_min` and at `w_max` with [`frontier_risk`](@ref), in the units of the bounded expression.
+ 2. Compute the risk of `r` at `w_min` and at `w_max` with [`expected_risk`](@ref). The functor of `r` gives the value of the bounded expression.
  3. Transform each risk with [`variance_risk_bounds_val`](@ref) and the `bound` of the `Frontier`, and multiply it by `factor`, giving the two ends.
  4. Sort the two ends with `minmax`, and divide the interval into `N` levels with `range`, giving `ub`.
 
@@ -666,8 +621,8 @@ function _rebuild_risk_frontier(pr::AbstractPriorResult, fees::Option{<:Fees},
     (expr, front, flag, owner) = risk_frontier[i].second
     (; N, factor, bound) = front
     X = pr.X
-    rk_a = factor * variance_risk_bounds_val(bound, frontier_risk(r, w_min, X, fees))
-    rk_b = factor * variance_risk_bounds_val(bound, frontier_risk(r, w_max, X, fees))
+    rk_a = factor * variance_risk_bounds_val(bound, expected_risk(r, w_min, X, fees))
+    rk_b = factor * variance_risk_bounds_val(bound, expected_risk(r, w_max, X, fees))
     ub = range(minmax(rk_a, rk_b)...; length = N)
     return risk_frontier[i].first => (expr, ub, flag, owner)
 end

@@ -440,7 +440,7 @@ FourthMoment
   - [`UnstandardisedHighOrderMomentMeasureAlgorithm`](@ref)
   - [`AbstractMomentAlgorithm`](@ref)
   - [`EvenMoment`](@ref): at `p = 2` and `ddof = 0`, the square root of the same moment, on a measure that the optimiser can model.
-  - [`Kurtosis`](@ref)
+  - [`Kurtosis`](@ref): the same moment read from a cokurtosis matrix.
 
 # References
 
@@ -520,8 +520,7 @@ StandardisedHighOrderMoment
   - [`HighOrderMomentMeasureAlgorithm`](@ref)
   - [`AbstractVarianceEstimator`](@ref)
   - [`UnstandardisedHighOrderMomentMeasureAlgorithm`](@ref)
-  - [`Skewness`](@ref)
-  - [`Kurtosis`](@ref)
+  - [`ThirdCentralMoment`](@ref): the same choice for the full third moment, through its `ve`.
   - [`factory`](@ref)
 """
 @concrete struct StandardisedHighOrderMoment <: HighOrderMomentMeasureAlgorithm
@@ -1060,8 +1059,6 @@ function calc_deviations_vec(r::LoHiOrderMoment, x::VecNum)
 end
 """
     moment_risk(r::LoHiOrderMoment, val::VecNum)
-    moment_risk(r::Kurtosis, val::VecNum)
-    moment_risk(r::Skewness, val::VecNum)
     moment_risk(r::MedianAbsoluteDeviation, val::VecNum)
     moment_risk(r::ThirdCentralMoment, val::VecNum)
 
@@ -1083,7 +1080,7 @@ The steps for [`LowOrderMoment`](@ref) and [`HighOrderMoment`](@ref):
 
 [`EvenMoment`](@ref) takes the place of steps 4 and 5. It computes the norm of order `2p` of `val`, each entry scaled by `w_t^(1 / 2p)` when `r.w` is not `nothing`, and returns its square divided by `T^(1 / p)`, with `T` the effective sample size.
 
-[`MedianAbsoluteDeviation`](@ref) returns the median of `abs.(val)`, weighted by `r.w` when it is not `nothing`, and divides it by ``\\Phi^{-1}(3/4)`` when `r.flag` is `true`. [`ThirdCentralMoment`](@ref) returns the mean of `val .^ 3`, weighted by `r.w` when it is not `nothing`.
+[`MedianAbsoluteDeviation`](@ref) returns the median of `abs.(val)`, weighted by `r.w` when it is not `nothing`, and divides it by ``\\Phi^{-1}(3/4)`` when `r.flag` is `true`. [`ThirdCentralMoment`](@ref) returns the mean of `val .^ 3`, weighted by `r.w` when it is not `nothing`. When `r.ve` is a variance estimator, it divides that mean by the cube of `Statistics.std(r.ve, val; mean = 0)`.
 
 # Related
 

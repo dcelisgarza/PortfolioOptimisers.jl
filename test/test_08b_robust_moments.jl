@@ -361,19 +361,18 @@ const PO = PortfolioOptimisers
         @test isa(LowOrderMoment()(w, X), Number)
         @test isa(LowOrderMoment(; w = eweights(1:60, inv(60); scale = true))(w, X), Number)
 
-        # All five central-moment measures rebuild through one generic, so the rule is
-        # asserted on all five rather than on the two that used to be covered. Only
-        # `LowOrderMoment` and `HighOrderMoment` were tested here, which is how the other
-        # three drifted: `Skewness` dropped `settings` from its rebuild, and `Kurtosis`
-        # bound its rebuild to `SemiMoment`, so the default `FullMoment` matched no method.
+        # All three central-moment measures that read the returns rebuild through one
+        # generic, so the rule is asserted on all three, and on both forms of the third
+        # moment. `Kurtosis` and `Skewness` read a comoment matrix since #1846, so they
+        # hold no observation weights.
         rw = PO.get_observation_weights(cw, X; dims = 1)
         for (dyn, sta) in ((LowOrderMoment(; w = cw), LowOrderMoment(; w = rw)),
                            (HighOrderMoment(; w = cw), HighOrderMoment(; w = rw)),
-                           (Kurtosis(; w = cw), Kurtosis(; w = rw)),
-                           (Kurtosis(; w = cw, alg1 = PO.SemiMoment()),
-                            Kurtosis(; w = rw, alg1 = PO.SemiMoment())),
-                           (Skewness(; w = cw), Skewness(; w = rw)),
-                           (PO.ThirdCentralMoment(; w = cw), PO.ThirdCentralMoment(; w = rw)))
+                           (HighOrderMoment(; w = cw, alg = PO.FourthMoment(; alg = PO.SemiMoment())),
+                            HighOrderMoment(; w = rw, alg = PO.FourthMoment(; alg = PO.SemiMoment()))),
+                           (PO.ThirdCentralMoment(; w = cw), PO.ThirdCentralMoment(; w = rw)),
+                           (PO.ThirdCentralMoment(; w = cw, ve = SimpleVariance()),
+                            PO.ThirdCentralMoment(; w = rw, ve = SimpleVariance())))
             # Resolving the weights is all the rebuild does: the answer is the one the
             # measure gives when it is handed the same weights directly.
             @test dyn(w, X) == sta(w, X)
@@ -390,12 +389,12 @@ const PO = PortfolioOptimisers
                                  mu = 0.001, alg = SecondMoment()),
                   HighOrderMoment(; w = cw, settings = RiskMeasureSettings(; scale = 3),
                                   mu = 0.001, alg = PO.StandardisedHighOrderMoment()),
-                  Kurtosis(; w = cw, settings = RiskMeasureSettings(; scale = 3), mu = 0.001,
-                           N = 7, alg1 = PO.SemiMoment()),
-                  Skewness(; w = cw, settings = MaxRiskMeasureSettings(; scale = 3), mu = 0.001),
                   PO.ThirdCentralMoment(; w = cw,
                                         settings = PO.HierarchicalRiskMeasureSettings(; scale = 3),
-                                        mu = 0.001))
+                                        mu = 0.001),
+                  PO.ThirdCentralMoment(; w = cw,
+                                        settings = PO.HierarchicalRiskMeasureSettings(; scale = 3),
+                                        mu = 0.001, ve = SimpleVariance()))
             rebuilt = PO.resolve_observation_weights(r, X)
             @test rebuilt.w == rw
             @test all(f -> f in (:w, :alg, :ve) || getfield(rebuilt, f) === getfield(r, f),
@@ -422,7 +421,7 @@ const PO = PortfolioOptimisers
                                        alg = SecondMoment(; alg1 = PO.SemiMoment())),
                   ow -> HighOrderMoment(; w = ow, mu = mu, alg = sha()),
                   ow -> HighOrderMoment(; w = ow, mu = mu, alg = sha(; alg = PO.FourthMoment())),
-                  ow -> Skewness(; w = ow, mu = mu))
+                  ow -> PO.ThirdCentralMoment(; w = ow, mu = mu, ve = SimpleVariance()))
             dyn, sta = f(mw), f(rw)
             val = factory(sta, pr)(w, X)
             @test isapprox(sta(w, X), val; rtol = 1e-12)

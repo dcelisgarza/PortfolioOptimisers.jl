@@ -1188,10 +1188,14 @@ end
 
     sk_views = LinearConstraintEstimator(; val = "AAPL == prior(AAPL)*2")
     pr = prior(EntropyPoolingPrior(; sets = sets, sk_views = sk_views, opt = opt), rd)
-    @test isapprox(Skewness(; w = pr.w, ve = SimpleVariance(; w = pr.w))([1],
-                                                                         reshape(pr.X[:, 1],
-                                                                                 :, 1)),
-                   2 * Skewness()([1], reshape(pr0.X[:, 1], :, 1)), rtol = 2e-3)
+    @test isapprox(ThirdCentralMoment(; w = pr.w, ve = SimpleVariance(; w = pr.w))([1],
+                                                                                   reshape(pr.X[:,
+                                                                                                1],
+                                                                                           :,
+                                                                                           1)),
+                   2 * ThirdCentralMoment(; ve = SimpleVariance())([1],
+                                                                   reshape(pr0.X[:, 1], :, 1)),
+                   rtol = 2e-3)
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
                                              sk_views = sk_views), rd).w, rtol = 5e-3)
@@ -1208,10 +1212,15 @@ end
     # skewness stage, the posterior of the mean and variance views (#1741).
     ps = prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views,
                                    sigma_views = sigma_views, opt = opt), rd)
-    @test isapprox(Skewness(; w = pr.w, ve = SimpleVariance(; w = pr.w))([1],
-                                                                         reshape(pr.X[:, 1],
-                                                                                 :, 1)),
-                   2 * Skewness(; w = ps.w)([1], reshape(ps.X[:, 1], :, 1)), rtol = 5e-3)
+    @test isapprox(ThirdCentralMoment(; w = pr.w, ve = SimpleVariance(; w = pr.w))([1],
+                                                                                   reshape(pr.X[:,
+                                                                                                1],
+                                                                                           :,
+                                                                                           1)),
+                   2 * ThirdCentralMoment(; w = ps.w, ve = SimpleVariance())([1],
+                                                                             reshape(ps.X[:, 1],
+                                                                                     :, 1)),
+                   rtol = 5e-3)
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views,
                                              sigma_views = sigma_views,
@@ -1383,11 +1392,15 @@ end
                                                                                                :,
                                                                                                1)) *
           0.3
-    @test !isapprox(Skewness(; w = pr.w, ve = SimpleVariance(; w = pr.w))([1],
-                                                                          reshape(pr.X[:,
-                                                                                       end - 1],
-                                                                                  :, 1)),
-                    1.4 * Skewness()([1], reshape(pr0.X[:, end - 1], :, 1)); rtol = 5e-3)
+    @test !isapprox(ThirdCentralMoment(; w = pr.w, ve = SimpleVariance(; w = pr.w))([1],
+                                                                                    reshape(pr.X[:,
+                                                                                                 end - 1],
+                                                                                            :,
+                                                                                            1)),
+                    1.4 * ThirdCentralMoment(; ve = SimpleVariance())([1],
+                                                                      reshape(pr0.X[:, end - 1],
+                                                                              :, 1));
+                    rtol = 5e-3)
 end
 
 @testset "Opinion pooling" begin

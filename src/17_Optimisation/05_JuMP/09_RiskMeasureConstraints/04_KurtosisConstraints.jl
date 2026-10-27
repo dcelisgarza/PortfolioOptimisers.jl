@@ -159,7 +159,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Bound the epigraph of the square root of the kurtosis, and add the risk expression of the formulation that `r.alg2` selects.
+Bound the epigraph of the square root of the kurtosis, and add the risk expression of the formulation that `r.alg` selects.
 
 Both formulations of [`set_risk_constraints!`](@ref) for [`Kurtosis`](@ref) end with this call. The bound acts on ``g`` under every formulation. Under [`SOCRiskExpr`](@ref) the risk expression is ``g``, in the units of the square root of the fourth moment, and `settings.ub` is in the same units. Under the other three the risk expression is in the units of the fourth moment, and the bound row reads the square root of `settings.ub`. [`set_risk_upper_bound!`](@ref) adds the bound row, and [`set_risk_expression!`](@ref) adds the risk expression to `risk_vec`.
 
@@ -202,7 +202,7 @@ The relation of ``\\lVert \\boldsymbol{x}_{kt} \\rVert_2^2`` to the fourth momen
 # Arguments
 
   - $(arg_dict[:model])
-  - `r::Kurtosis`: The measure, read for `alg2` and `settings`.
+  - `r::Kurtosis`: The measure, read for `alg` and `settings`.
   - $(arg_dict[:opt_rjumpe])
   - `sqrt_kurtosis_risk::JuMP.AbstractJuMPScalar`: ``g``.
   - `x_kurt`: ``\\boldsymbol{x}_{kt}``. The methods for [`SOCRiskExpr`](@ref) and [`SquaredSOCRiskExpr`](@ref) do not read it.
@@ -225,8 +225,8 @@ The relation of ``\\lVert \\boldsymbol{x}_{kt} \\rVert_2^2`` to the fourth momen
   - [`variance_risk_bounds_val`](@ref)
 """
 function set_kurtosis_risk!(model::JuMP.Model,
-                            r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                        <:SOCRiskExpr}, opt::RiskConstraintOwner,
+                            r::Kurtosis{<:Any, <:Any, <:Any, <:SOCRiskExpr},
+                            opt::RiskConstraintOwner,
                             sqrt_kurtosis_risk::JuMP.AbstractJuMPScalar, ::Any, i;
                             prefix::Symbol = Symbol(""))
     set_risk_bounds_and_expression!(model, opt, sqrt_kurtosis_risk, r.settings,
@@ -234,8 +234,8 @@ function set_kurtosis_risk!(model::JuMP.Model,
     return sqrt_kurtosis_risk
 end
 function set_kurtosis_risk!(model::JuMP.Model,
-                            r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                        <:SquaredSOCRiskExpr}, opt::RiskConstraintOwner,
+                            r::Kurtosis{<:Any, <:Any, <:Any, <:SquaredSOCRiskExpr},
+                            opt::RiskConstraintOwner,
                             sqrt_kurtosis_risk::JuMP.AbstractJuMPScalar, ::Any, i;
                             prefix::Symbol = Symbol(""))
     qsqrt_kurtosis_risk = state_set!(model, prefix, :sq_kurtosis_risk_, i,
@@ -247,8 +247,8 @@ function set_kurtosis_risk!(model::JuMP.Model,
     return qsqrt_kurtosis_risk
 end
 function set_kurtosis_risk!(model::JuMP.Model,
-                            r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                        <:QuadRiskExpr}, opt::RiskConstraintOwner,
+                            r::Kurtosis{<:Any, <:Any, <:Any, <:QuadRiskExpr},
+                            opt::RiskConstraintOwner,
                             sqrt_kurtosis_risk::JuMP.AbstractJuMPScalar, x_kurt, i;
                             prefix::Symbol = Symbol(""))
     qsqrt_kurtosis_risk = state_set!(model, prefix, :qd_kurtosis_risk_, i,
@@ -261,8 +261,8 @@ function set_kurtosis_risk!(model::JuMP.Model,
     return qsqrt_kurtosis_risk
 end
 function set_kurtosis_risk!(model::JuMP.Model,
-                            r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                        <:RSOCRiskExpr}, opt::RiskConstraintOwner,
+                            r::Kurtosis{<:Any, <:Any, <:Any, <:RSOCRiskExpr},
+                            opt::RiskConstraintOwner,
                             sqrt_kurtosis_risk::JuMP.AbstractJuMPScalar, x_kurt, i;
                             prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
@@ -354,7 +354,7 @@ $(val_dict[:relax])
 
   - $(arg_dict[:model])
   - $(arg_dict[:ci])
-  - `r::Kurtosis`: The measure, read for `kt`, `N`, `alg2` and `settings`.
+  - `r::Kurtosis`: The measure, read for `kt`, `N`, `alg` and `settings`.
   - $(arg_dict[:opt_rjumpe])
   - `pr::AbstractPriorResult`: The prior result. It supplies `kt` when the measure states none.
 
@@ -385,9 +385,8 @@ $(val_dict[:relax])
   - $(ref_dict[:pkurtapprox])
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
-                               r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Integer, <:Any,
-                                           <:Any}, opt::RiskConstraintOwner,
-                               pr::AbstractPriorResult, args...;
+                               r::Kurtosis{<:Any, <:Any, <:Integer, <:Any, <:Any},
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
                                prefix::Symbol = Symbol(""), kwargs...)
     assert_high_order_quantity(r.kt, pr, :Kurtosis, :kt, :CokurtosisEstimator)
     sc = get_constraint_scale(model)
@@ -500,7 +499,7 @@ $(val_dict[:relax])
 
   - $(arg_dict[:model])
   - $(arg_dict[:ci])
-  - `r::Kurtosis`: The measure, read for `kt`, `mtx_sqrt`, `alg2` and `settings`.
+  - `r::Kurtosis`: The measure, read for `kt`, `mtx_sqrt`, `alg` and `settings`.
   - $(arg_dict[:opt_rjumpe])
   - `pr::AbstractPriorResult`: The prior result. It supplies `kt` when the measure states none.
 
@@ -531,9 +530,8 @@ $(val_dict[:relax])
   - $(ref_dict[:pkurt]) Section 2, Equation 6, and Section 3.1, Equation 13.
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
-                               r::Kurtosis{<:Any, <:Any, <:Any, <:Any, Nothing, <:Any,
-                                           <:Any}, opt::RiskConstraintOwner,
-                               pr::AbstractPriorResult, args...;
+                               r::Kurtosis{<:Any, <:Any, Nothing, <:Any, <:Any},
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
                                prefix::Symbol = Symbol(""), kwargs...)
     assert_high_order_quantity(r.kt, pr, :Kurtosis, :kt, :CokurtosisEstimator)
     sc = get_constraint_scale(model)

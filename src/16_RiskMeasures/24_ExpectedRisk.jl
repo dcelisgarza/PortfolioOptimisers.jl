@@ -782,7 +782,7 @@ function difference_risk(::WeightsReturnsFeesInput, r::AbstractBaseRiskMeasure, 
                          w::VecNum, X::MatNum, fees::Fees)
     return expected_risk_from_returns(r, charge_fees(X * wd, w, fees))
 end
-function difference_risk(r::Union{LoHiOrderMoment, Kurtosis, TCM_Sk,
+function difference_risk(r::Union{LoHiOrderMoment, ThirdCentralMoment,
                                   MedianAbsoluteDeviation}, wd::VecNum, w::VecNum,
                          X::MatNum, fees::Fees)
     resolved = resolve_observation_weights(r, X)

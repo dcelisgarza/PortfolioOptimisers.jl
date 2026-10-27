@@ -120,32 +120,13 @@ end
                  for t in 1:T) / T
         r = PO.resolve_deferred_quantities(Kurtosis(; kt = Cokurtosis()), _pr596)
         @test r.kt ≈ kt
-        @test r.mu ≈ mu
-        @test PO.fit_deferred_moment(Cokurtosis(), _pr596, mu) ≈ kt
-        @test PO.fit_deferred_moment(Cokurtosis(), _pr596, nothing) ≈ kt
+        # The functor reads the matrix, and the sample cokurtosis about the mean of each
+        # asset gives the fourth moment of the portfolio returns about their mean.
+        w = fill(0.2, 5)
+        @test r(w)^2 ≈ mean((X * w .- dot(w, mu)) .^ 4)
         # A measure that carries the quantity is returned as it is.
         stated = Kurtosis(; kt = kt)
         @test PO.resolve_deferred_quantities(stated, _pr596) === stated
-    end
-
-    @testset "A per-asset centre gives a scalar target only when the weights sum to one" begin
-        vs = PO.VecScalar(; v = [0.001, 0.002, 0.0, -0.001, 0.0005], s = 0.003)
-        target(w, mu::PO.VecScalar) = dot(w, mu.v) + mu.s
-        target(w, mu::Number) = mu
-        target(w, mu::AbstractVector) = dot(w, mu)
-        # The fourth moment about the target, from the tensor and from the series.
-        function pair(w, mu)
-            kt = cokurtosis(Cokurtosis(), _X596; mean = PO.centring_target(mu))
-            ww = kron(w, w)
-            return dot(ww, kt, ww), mean((_X596 * w .- target(w, mu)) .^ 4)
-        end
-        for mu in (vs, 0.003, vs.v)
-            @test isapprox(pair(fill(0.2, 5), mu)...)
-        end
-        @test isapprox(pair(fill(0.1, 5), vs.v)...)
-        @test !isapprox(pair(fill(0.1, 5), vs)...; rtol = 0.1)
-        @test !isapprox(pair(fill(0.1, 5), 0.003)...; rtol = 0.1)
-        @test isnothing(PO.centring_target(nothing))
     end
 
     @testset "The four traits answer for every concrete measure" begin

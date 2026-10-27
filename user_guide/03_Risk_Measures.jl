@@ -137,7 +137,7 @@ catalogue = ["Dispersion and moments" =>
                   :LowOrderMoment => "Generic low-order moment measure, which includes the mean absolute deviation. Section 4 lists its aliases.",
                   :HighOrderMoment => "Generic third and fourth moment measure. Section 4 lists its aliases.",
                   :MedianAbsoluteDeviation => "Median absolute deviation, a robust counterpart of `MAD()`.",
-                  :Kurtosis => "Square root of the fourth central moment of the portfolio returns.",
+                  :Kurtosis => "Square root of the fourth central moment, read off the cokurtosis matrix.",
                   :NegativeSkewness => "Downside asymmetry from the coskewness tensor.",
                   :VarianceSkewKurtosis => "Variance, skewness, and kurtosis combined in one expression.",
                   :BrownianDistanceVariance => "Upper bound on the distance variance of the portfolio returns, built from the distances between observations."],
@@ -190,8 +190,8 @@ catalogue = ["Dispersion and moments" =>
              "Non-optimisation (diagnostics and scoring)" =>
                  [:ExpectedReturn => "Prior expected return of the portfolio.",
                   :MeanReturn => "Realised mean return of the portfolio.",
-                  :Skewness => "Standardised skewness of the return distribution.",
-                  :ThirdCentralMoment => "Unstandardised third central moment.",
+                  :Skewness => "Third central moment, read off the coskewness matrix. `VarianceSkewKurtosis` bounds it from below.",
+                  :ThirdCentralMoment => "Third central moment of the returns, or the standardised skewness with a variance estimator in `ve`.",
                   :NonOptimisationRiskRatio => "Ratio of any two non-optimisation measures.",
                   :ExpectedReturnRiskRatio => "Prior expected return over risk, a Sharpe-style score.",
                   :MeanReturnRiskRatio => "Realised mean return over risk."]]

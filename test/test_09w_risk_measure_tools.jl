@@ -214,7 +214,8 @@ const _changed610 = (; no_bounds = (; rm = ["settings.ub"], sk = ["settings.lb"]
                   r -> LowOrderMoment(; w = r, alg = SecondMoment()),
                   r -> HighOrderMoment(; w = r),
                   r -> HighOrderMoment(; w = r, alg = StandardisedHighOrderMoment()),
-                  r -> Kurtosis(; w = r), r -> Skewness(; w = r),
+                  r -> HighOrderMoment(; w = r, alg = FourthMoment()),
+                  r -> ThirdCentralMoment(; w = r, ve = SimpleVariance()),
                   r -> ThirdCentralMoment(; w = r))
         for mk in makers
             dyn = mk(Ramp610())
@@ -237,8 +238,9 @@ const _changed610 = (; no_bounds = (; rm = ["settings.ub"], sk = ["settings.lb"]
                                                            alg = StandardisedHighOrderMoment()),
                                            _X610)
         @test r.alg.ve.w == _ramp610
-        @test PO.resolve_observation_weights(Skewness(; w = Ramp610()), _X610).ve.w ==
-              _ramp610
+        @test PO.resolve_observation_weights(ThirdCentralMoment(; w = Ramp610(),
+                                                                ve = SimpleVariance()),
+                                             _X610).ve.w == _ramp610
         # A measure outside the union, and a member with no weights, return as themselves.
         r = Variance()
         @test PO.resolve_observation_weights(r, _X610) === r

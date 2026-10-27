@@ -149,6 +149,7 @@ const _rd609 = ReturnsResult(; nx = ["a", "b", "c", "d"], X = _X609)
     @testset "ThirdCentralMoment is better when larger, as Skewness is" begin
         @test PO.bigger_is_better(ThirdCentralMoment()) === true
         @test PO.bigger_is_better(Skewness()) === true
+        @test PO.bigger_is_better(ThirdCentralMoment(; ve = SimpleVariance())) === true
         # A vector of the two now agrees on its polarity.
         @test PO.bigger_is_better([Skewness(), ThirdCentralMoment()]) === true
     end

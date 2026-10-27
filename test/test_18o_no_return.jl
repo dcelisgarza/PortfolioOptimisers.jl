@@ -1127,10 +1127,17 @@ end
     @testset "every declared slot refuses, and none that has a sample reading" begin
         # `mu` at `nothing` means the sample mean on a value-level route, so the moment
         # measures pass and evaluate.
-        for r in (LowOrderMoment(), HighOrderMoment(), Kurtosis(), Skewness(),
-                  MedianAbsoluteDeviation(), ThirdCentralMoment())
+        for r in (LowOrderMoment(), HighOrderMoment(), MedianAbsoluteDeviation(),
+                  ThirdCentralMoment(), ThirdCentralMoment(; ve = SimpleVariance()))
             @test isnothing(PO.assert_resolved_slots(r))
             @test isa(expected_risk(r, w, X), Number)
+        end
+        # `Kurtosis` and `Skewness` read their comoment matrix as it stands, so a bare
+        # returns matrix cannot fill it (#1846).
+        for (r, name) in ((Kurtosis(), "`Kurtosis.kt`"), (Skewness(), "`Skewness.sk`"))
+            @test_throws IsNothingError expected_risk(r, w, X)
+            @test occursin(name, message(() -> expected_risk(r, w, X)))
+            @test isa(expected_risk(r, w, hpr), Number)
         end
         @test_throws IsNothingError expected_risk(UncertaintySetVariance(), w, X)
         @test_throws IsNothingError expected_risk(NegativeSkewness(), w, X)
@@ -1143,27 +1150,26 @@ end
         @test occursin("`DistributionValueatRisk.mu`",
                        message(() -> expected_risk(rv, w, X)))
         @test isa(expected_risk(rv, w, pr), Number)
-        # A container that reads a grandchild names it by the path the caller wrote. `vr`
-        # is reached through the child, so the child's own name is what the refusal reads,
-        # and it is refused first. With `vr` stated the grandchildren are the ones named.
+        # A container reaches each child through its slot, so the child's own name is what
+        # the refusal reads. `vr` is refused first, and with `vr` stated the refusal names
+        # `sk`, which the child `Skewness` reads.
         vsk = VarianceSkewKurtosis()
         @test_throws IsNothingError expected_risk(vsk, w, X)
         @test occursin("`Variance.sigma`", message(() -> expected_risk(vsk, w, X)))
         vsk2 = VarianceSkewKurtosis(; vr = Variance(; sigma = sigma))
         @test_throws IsNothingError expected_risk(vsk2, w, X)
-        @test occursin("`VarianceSkewKurtosis.sk.sk`",
-                       message(() -> expected_risk(vsk2, w, X)))
-        # A Deferred Quantity below the container is named before the slot the container
-        # reads off that child: the deferred `pe` is what would fill `sk`.
+        @test occursin("`Skewness.sk`", message(() -> expected_risk(vsk2, w, X)))
+        # A Deferred Quantity in a child is named as a Deferred Quantity, not as an empty
+        # slot.
         vsk3 = VarianceSkewKurtosis(; vr = Variance(; sigma = sigma),
-                                    sk = Skewness(; pe = HighOrderPriorEstimator()))
+                                    sk = Skewness(; sk = HighOrderPriorEstimator()))
         @test_throws ArgumentError expected_risk(vsk3, w, X)
-        @test occursin("`Skewness.pe`", message(() -> expected_risk(vsk3, w, X)))
+        @test occursin("holds a Deferred Quantity",
+                       message(() -> expected_risk(vsk3, w, X)))
         # A low-order prior carries no co-moment tensor, so the prior route leaves the
-        # grandchild empty and the same refusal names it; the high-order prior fills it.
+        # child empty and the same refusal names it; the high-order prior fills it.
         @test_throws IsNothingError expected_risk(vsk, w, pr)
-        @test occursin("`VarianceSkewKurtosis.sk.sk`",
-                       message(() -> expected_risk(vsk, w, pr)))
+        @test occursin("`Skewness.sk`", message(() -> expected_risk(vsk, w, pr)))
         @test isa(expected_risk(vsk, w, hpr), Number)
         @test isa(expected_risk(NegativeSkewness(), w, hpr), Number)
         # A child measure held by a tracking measure is reached through its slot.

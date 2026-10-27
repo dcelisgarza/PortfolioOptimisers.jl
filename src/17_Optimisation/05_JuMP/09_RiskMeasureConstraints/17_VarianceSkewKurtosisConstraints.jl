@@ -16,7 +16,7 @@ Any prior result is accepted. Both tensors must resolve, on their child or on th
  5. Build `W1`, `W2`, `W3`, `L2W1` and the block `M` once for the namespace, and register the cone row below.
  6. Register `vr_risk`, `sk_risk` and `kt_risk`, the three traces.
  7. Compute the bound of each term with [`variance_risk_bounds_val`](@ref). The bound of `kt` is the square of `kt.settings.ub` under [`SOCRiskExpr`](@ref), because that `ub` is in the units of ``\\sqrt{m_4}``.
- 8. Bound each term with [`set_variance_risk_bounds_and_expression!`](@ref). The skewness bound is a floor, so its row has the opposite sign. The children hold `rke = false`, so no term enters `risk_vec` alone. Record `r.vr`, `r.sk` and `r.kt` as the owners of the frontier entries of their terms with [`set_risk_frontier_owner!`](@ref), so that a sweep on a term takes its span from that term. [`frontier_risk`](@ref) values `r.sk` as the third moment of the coskewness matrix, the units of `sk.settings.lb`.
+ 8. Bound each term with [`set_variance_risk_bounds_and_expression!`](@ref). The skewness bound is a floor, so its row has the opposite sign. The children hold `rke = false`, so no term enters `risk_vec` alone. Record `r.vr`, `r.sk` and `r.kt` as the owners of the frontier entries of their terms with [`set_risk_frontier_owner!`](@ref), so that a sweep on a term takes its span from that term. [`expected_risk`](@ref) values `r.sk` as the third moment of the coskewness matrix, the units of `sk.settings.lb`, because that is the value of the functor of [`Skewness`](@ref).
  9. Register `vr_sk_kt_risk`, the weighted sum, bound it and add it to `risk_vec` with [`set_risk_bounds_and_expression!`](@ref), and return it.
 
 # JuMP formulation
@@ -174,7 +174,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::VarianceSkewKurtosi
     state_set!(model, prefix, :kt_risk_, i, kt_risk)
     vr_bound = variance_risk_bounds_val(LinearBound(), r.vr.settings.ub)
     sk_bound = variance_risk_bounds_val(LinearBound(), r.sk.settings.lb)
-    kt_bound = variance_risk_bounds_val(ifelse(isa(r.kt.alg2, QuadSecondMomentFormulations),
+    kt_bound = variance_risk_bounds_val(ifelse(isa(r.kt.alg, QuadSecondMomentFormulations),
                                                LinearBound(), SquaredBound()),
                                         r.kt.settings.ub)
     # A sweep on a term takes its span from the measure of that term, so each term records

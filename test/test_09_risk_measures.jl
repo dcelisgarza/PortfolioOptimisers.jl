@@ -212,14 +212,22 @@
         r3 = factory(NegativeSkewness(; alg = QuadRiskExpr()), pr)
         @test isapprox(expected_risk(r1, w, rd.X), sqrt(expected_risk(r2, w, rd.X)))
         @test isapprox(expected_risk(r3, w, rd.X), expected_risk(r2, w, rd.X))
-        @test isapprox(expected_risk(Kurtosis(; alg1 = SemiMoment()), w, rd.X),
-                       0.0002291596657404573)
-        @test isapprox(expected_risk(Kurtosis(;), w, rd.X),
-                       expected_risk(Kurtosis(; mu = pr.mu), w, rd.X))
-        @test isapprox(expected_risk(Kurtosis(; mu = LinearAlgebra.dot(w, pr.mu)), w, rd.X),
-                       expected_risk(Kurtosis(;), w, rd.X))
-        @test isapprox(expected_risk(Kurtosis(; w = wt), w, rd.X),
-                       expected_risk(Kurtosis(;), w, rd.X))
+        # The values of the returns that the functor of `Kurtosis` gave before #1846 are on
+        # the moment measures, and the functor of `Kurtosis` reads its matrix.
+        kt4 = HighOrderMoment(; alg = FourthMoment())
+        @test isapprox(expected_risk(LowOrderMoment(;
+                                                    alg = EvenMoment(; alg = SemiMoment())),
+                                     w, rd.X), 0.0002291596657404573)
+        @test isapprox(expected_risk(kt4, w, rd.X),
+                       expected_risk(HighOrderMoment(; mu = pr.mu, alg = FourthMoment()), w,
+                                     rd.X))
+        @test isapprox(expected_risk(HighOrderMoment(; mu = LinearAlgebra.dot(w, pr.mu),
+                                                     alg = FourthMoment()), w, rd.X),
+                       expected_risk(kt4, w, rd.X))
+        @test isapprox(expected_risk(HighOrderMoment(; w = wt, alg = FourthMoment()), w,
+                                     rd.X), expected_risk(kt4, w, rd.X))
+        @test isapprox(expected_risk(factory(Kurtosis(), pr), w, rd.X)^2,
+                       expected_risk(kt4, w, rd.X))
         @test isapprox(expected_risk(LowOrderMoment(;
                                                     alg = SecondMoment(;
                                                                        alg1 = SemiMoment(),
@@ -910,12 +918,12 @@ const _OLD_NETRETURNS = Any[WorstRealisation, _VAR_MIP, _VAR_RANGE_MIP,
                             PowerNormDrawdownatRisk, RelativePowerNormDrawdownatRisk,
                             _GEN_RANGE_RET]
 const _OLD_WEIGHTSRETURNSFEES = Any[LowOrderMoment, HighOrderMoment, TrackingRiskMeasure,
-                                    RiskTrackingRiskMeasure, Kurtosis, ThirdCentralMoment,
-                                    Skewness, MedianAbsoluteDeviation, VarianceSkewKurtosis,
+                                    RiskTrackingRiskMeasure, ThirdCentralMoment,
+                                    MedianAbsoluteDeviation, VarianceSkewKurtosis,
                                     _VAR_DIST, _VAR_RANGE_DIST, _GEN_RANGE_DIST_LOSS,
                                     _GEN_RANGE_DIST_GAIN]
 const _OLD_WEIGHTS = Any[StandardDeviation, NegativeSkewness, TurnoverRiskMeasure, Variance,
-                         UncertaintySetVariance, EqualRisk]
+                         UncertaintySetVariance, EqualRisk, Kurtosis, Skewness]
 
 # Composite / return-like measures handled by explicit `expected_risk` methods — they
 # orchestrate other measures and intentionally declare no input kind.
@@ -983,8 +991,8 @@ const _x_series = [sinpi(2i / 64) * 0.1 + cospi(i / 32) * 0.03 for i in 1:64]
     # ratio composites whose constituents are themselves eligible.
     eligible = Any[ConditionalValueatRisk(), MaximumDrawdown(), ValueatRisk(),
                    WorstRealisation(), Range(), MeanReturn(), LowOrderMoment(),
-                   HighOrderMoment(), Skewness(), Kurtosis(), MedianAbsoluteDeviation(),
-                   ThirdCentralMoment(), LowOrderMoment(; mu = 0.01),
+                   HighOrderMoment(), MedianAbsoluteDeviation(), ThirdCentralMoment(),
+                   ThirdCentralMoment(; ve = SimpleVariance()), LowOrderMoment(; mu = 0.01),
                    MedianAbsoluteDeviation(; mu = PO.MeanCentering()),
                    RiskRatio(; r1 = ConditionalValueatRisk(), r2 = MaximumDrawdown()),
                    MeanReturnRiskRatio(; rk = ConditionalValueatRisk()),
@@ -1005,8 +1013,9 @@ const _x_series = [sinpi(2i / 64) * 0.1 + cospi(i / 32) * 0.03 for i in 1:64]
 
     # Differential oracle: for the moment family the single-vector form equals the one-asset
     # `(w, X, fees)` form — the same oracle the entropy-pooling tests use (ADR 0007).
-    for r in (LowOrderMoment(), HighOrderMoment(), Skewness(), Kurtosis(),
-              MedianAbsoluteDeviation(), ThirdCentralMoment(), LowOrderMoment(; mu = 0.01))
+    for r in (LowOrderMoment(), HighOrderMoment(), MedianAbsoluteDeviation(),
+              ThirdCentralMoment(), ThirdCentralMoment(; ve = SimpleVariance()),
+              LowOrderMoment(; mu = 0.01))
         @test g(r, _x_series) ≈ r([1], reshape(_x_series, :, 1))
     end
 
@@ -1018,9 +1027,8 @@ const _x_series = [sinpi(2i / 64) * 0.1 + cospi(i / 32) * 0.03 for i in 1:64]
                      StandardDeviation(; sigma = [1.0 0.0; 0.0 1.0]),
                      Variance(; sigma = [1.0 0.0; 0.0 1.0]), NegativeSkewness(),
                      VarianceSkewKurtosis(), RiskRatio(), LowOrderMoment(; mu = mu2),
-                     HighOrderMoment(; mu = mu2), Skewness(; mu = mu2),
-                     Kurtosis(; mu = mu2), MedianAbsoluteDeviation(; mu = mu2),
-                     ThirdCentralMoment(; mu = mu2),
+                     HighOrderMoment(; mu = mu2), Skewness(), Kurtosis(),
+                     MedianAbsoluteDeviation(; mu = mu2), ThirdCentralMoment(; mu = mu2),
                      TrackingRiskMeasure(; tr = WeightsTracking(; w = [0.5, 0.5]))]
     for r in ineligible
         @test !PO.supports_precomputed_returns(r)
@@ -1629,7 +1637,8 @@ end
         sha = PortfolioOptimisers.StandardisedHighOrderMoment
         for f in (ow -> LowOrderMoment(; w = ow, mu = pr.mu, alg = SecondMoment()),
                   ow -> HighOrderMoment(; w = ow, mu = pr.mu, alg = sha()),
-                  ow -> Kurtosis(; w = ow, mu = pr.mu), ow -> Skewness(; w = ow, mu = pr.mu))
+                  ow -> HighOrderMoment(; w = ow, mu = pr.mu, alg = FourthMoment()),
+                  ow -> ThirdCentralMoment(; w = ow, mu = pr.mu, ve = SimpleVariance()))
             @test isapprox(track(f(TrackedDecayWeights()))(w, X, fees),
                            track(f(ow))(w, X, fees); rtol = 1e-12)
         end
@@ -2601,8 +2610,6 @@ using Clarabel, JuMP, Statistics
                       HighOrderMoment(; alg = FourthMoment()), ThirdCentralMoment())
                 @test isapprox(factory(r, pr)(w, X, fees), r(w, X, fees); rtol = 1e-10)
             end
-            @test isapprox(factory(Kurtosis(), prh)(w, X, fees), Kurtosis()(w, X, fees);
-                           rtol = 1e-10)
             @test isapprox(MedianAbsoluteDeviation(; mu = mu)(w, X, fees),
                            MedianAbsoluteDeviation(; mu = MeanCentering())(w, X, fees);
                            rtol = 1e-10)
@@ -2936,10 +2943,9 @@ end
               ["r.rk.ucs.pe"]
         @test noframes(PO.reader_frames(ExpectedReturn(), "r", false))
         # The `pe` of a moment measure fits on the returns of the Prior Result that the
-        # measure receives, so it states no source of its own.
-        for T in (Skewness, Kurtosis, VarianceSkewKurtosis),
-            x_src in (DataSource(), ExcessSource())
-
+        # measure receives, so it states no source of its own. `Skewness` and `Kurtosis`
+        # carry no `pe` since #1846.
+        for T in (VarianceSkewKurtosis,), x_src in (DataSource(), ExcessSource())
             @test_throws ArgumentError T(; pe = EmpiricalPrior(; x_src = x_src))
             @test isa(T(; pe = EmpiricalPrior()), T)
         end
@@ -3042,7 +3048,7 @@ end
                  ConditionalDrawdownatRisk, DistributionallyRobustConditionalDrawdownatRisk,
                  RelativeConditionalDrawdownatRisk, AverageDrawdown,
                  RelativeAverageDrawdown, UlcerIndex, RelativeUlcerIndex, LowOrderMoment,
-                 HighOrderMoment, Kurtosis, MeanReturn, ThirdCentralMoment, Skewness)
+                 HighOrderMoment, MeanReturn, ThirdCentralMoment)
         slv_ctors = (EntropicValueatRisk, EntropicValueatRiskRange, EntropicDrawdownatRisk,
                      RelativeEntropicDrawdownatRisk, RelativisticValueatRisk,
                      RelativisticValueatRiskRange, RelativisticDrawdownatRisk,

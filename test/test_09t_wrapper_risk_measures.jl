@@ -199,14 +199,15 @@ end
         @test hd(StandardDeviation()) == 1
         @test hd(NoRisk()) == 1
         @test hd(Variance()) == 2
-        @test hd(Kurtosis(; alg2 = SOCRiskExpr())) == 2
+        @test hd(Kurtosis(; alg = SOCRiskExpr())) == 2
         @test hd(LowOrderMoment(; alg = EvenMoment(; p = 3))) == 2
         @test hd(ThirdCentralMoment()) == 3
+        @test hd(Skewness()) == 3
         @test hd(HighOrderMoment(; alg = ThirdLowerMoment())) == 3
         @test hd(HighOrderMoment(; alg = FourthMoment())) == 4
-        @test hd(Kurtosis(; alg2 = QuadRiskExpr())) == 4
+        @test hd(Kurtosis(; alg = QuadRiskExpr())) == 4
         @test hd(EqualRisk()) == 0
-        @test hd(Skewness()) == 0
+        @test hd(ThirdCentralMoment(; ve = SimpleVariance())) == 0
         @test hd(HighOrderMoment(;
                                  alg = StandardisedHighOrderMoment(; alg = FourthMoment()))) ==
               0
@@ -216,7 +217,7 @@ end
               0
         @test hd(RiskRatio()) == 1
         @test hd(RiskRatio(; r1 = StandardDeviation())) == 0
-        @test hd(RiskRatio(; r1 = Kurtosis(; alg2 = QuadRiskExpr()))) == 3
+        @test hd(RiskRatio(; r1 = Kurtosis(; alg = QuadRiskExpr()))) == 3
         @test hd(NonOptimisationRiskRatio(; r1 = ConditionalValueatRisk(), r2 = Variance())) ==
               -1
         @test hd(NonOptimisationRiskRatio(; r1 = [Variance(), Variance()])) == 1
@@ -243,11 +244,11 @@ end
         @test risk_contribution(Variance(), _w607, _pr607) ≈ _w607 .* (S * _w607)
         prh = prior(HighOrderPriorEstimator(), _X607)
         for r in (Variance(), StandardDeviation(), ConditionalValueatRisk(),
-                  ThirdCentralMoment(), HighOrderMoment(; alg = FourthMoment()),
-                  Kurtosis(; alg2 = SOCRiskExpr()), Kurtosis(; alg2 = QuadRiskExpr()),
+                  ThirdCentralMoment(), Skewness(), HighOrderMoment(; alg = FourthMoment()),
+                  Kurtosis(; alg = SOCRiskExpr()), Kurtosis(; alg = QuadRiskExpr()),
                   LowOrderMoment(; alg = EvenMoment(; p = 3)),
                   NegativeSkewness(; alg = QuadRiskExpr()),
-                  RiskRatio(; r1 = Kurtosis(; alg2 = QuadRiskExpr())),
+                  RiskRatio(; r1 = Kurtosis(; alg = QuadRiskExpr())),
                   NonOptimisationRiskRatio(; r1 = ConditionalValueatRisk(), r2 = Variance()),
                   VarianceSkewKurtosis(), [Variance(), VarianceSkewKurtosis()])
             rr = factory(r, prh)
@@ -261,7 +262,8 @@ end
         @test k ≈ dot(kron(_w607, _w607), prh.kt, kron(_w607, _w607))
         # The contributions of a measure of degree 0 sum to zero, and not to its risk. Each
         # one is not zero, except for EqualRisk, whose risk does not read the weights.
-        for r in (Skewness(), RiskRatio(; r1 = StandardDeviation()),
+        for r in (ThirdCentralMoment(; ve = SimpleVariance()),
+                  RiskRatio(; r1 = StandardDeviation()),
                   HighOrderMoment(; alg = StandardisedHighOrderMoment(; alg = FourthMoment())))
             rr = factory(r, prh)
             rc = risk_contribution(rr, _w607, prh)

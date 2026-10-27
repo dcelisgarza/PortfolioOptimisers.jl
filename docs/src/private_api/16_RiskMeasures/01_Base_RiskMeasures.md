@@ -34,9 +34,6 @@ scalarise_logsumexp
 nothing_scalar_array_selector
 deferred_factors
 fit_deferred_quantity
-deferred_centre
-centring_target
-fit_deferred_moment
 deferred_quantity
 fan_out_slot
 fan_out_pe

@@ -46,58 +46,58 @@ end
     d = x .- mean(x)
     ow = pweights(collect(range(0.5, 1.5; length = T)))
     dw = x .- mean(x, ow)
-    @testset "Kurtosis is the raw fourth central moment, or its square root" begin
+    @testset "Kurtosis is the fourth moment of its cokurtosis, or its square root" begin
         m4 = mean(d .^ 4)
-        @test factory(Kurtosis(), pr)(w, X) ≈ sqrt(m4)
-        for alg2 in (QuadRiskExpr(), SquaredSOCRiskExpr(), RSOCRiskExpr())
-            @test factory(Kurtosis(; alg2 = alg2), pr)(w, X) ≈ m4
+        @test factory(Kurtosis(), pr)(w) ≈ sqrt(m4)
+        for alg in (QuadRiskExpr(), SquaredSOCRiskExpr(), RSOCRiskExpr())
+            @test factory(Kurtosis(; alg = alg), pr)(w) ≈ m4
         end
         # The divisor is `T`, and the moment is neither standardised nor an excess.
         @test !isapprox(m4, mean(d .^ 4) / var(x; corrected = false)^2)
         # Equation 4 of `pkurt`: the Kronecker form agrees with the series.
         @test _m4_599(pr, w) ≈ m4 rtol = 1e-10
+        # The functor reads the matrix it holds, so a stated matrix gives its own moment.
+        @test Kurtosis(; kt = 2 .* pr.kt)(w) ≈ sqrt(2 * m4)
+        # The values of the returns are on the moment measures (#1846).
         semi = mean(min.(d, 0) .^ 4)
-        @test factory(Kurtosis(; alg1 = SemiMoment()), pr)(w, X) ≈ sqrt(semi)
-        @test factory(Kurtosis(; alg1 = SemiMoment(), alg2 = QuadRiskExpr()), pr)(w, X) ≈
-              semi
-        # Observation weights weight the average and the centre of the functor.
-        @test Kurtosis(; w = ow)(w, X) ≈ sqrt(mean(dw .^ 4, ow))
-        @test Kurtosis(; w = ow, alg1 = SemiMoment(), alg2 = QuadRiskExpr())(w, X) ≈
+        @test LowOrderMoment(; alg = EvenMoment())(w, X) ≈ sqrt(m4)
+        @test HighOrderMoment(; alg = FourthMoment())(w, X) ≈ m4
+        @test LowOrderMoment(; alg = EvenMoment(; alg = SemiMoment()))(w, X) ≈ sqrt(semi)
+        @test HighOrderMoment(; alg = FourthMoment(; alg = SemiMoment()))(w, X) ≈ semi
+        @test HighOrderMoment(; w = ow, alg = FourthMoment())(w, X) ≈ mean(dw .^ 4, ow)
+        @test HighOrderMoment(; w = ow, alg = FourthMoment(; alg = SemiMoment()))(w, X) ≈
               mean(min.(dw, 0) .^ 4, ow)
-        # After `factory`, a `mu` that was `nothing` is the mean of the prior.
         dc = x .- dot(w, pr.mu)
-        @test factory(Kurtosis(; w = ow), pr)(w, X) ≈ sqrt(mean(dc .^ 4, ow))
+        @test factory(HighOrderMoment(; w = ow, alg = FourthMoment()), pr)(w, X) ≈
+              mean(dc .^ 4, ow)
     end
-    @testset "Each type of mu gives its centre" begin
-        mu = vec(mean(X; dims = 1)) .+ 0.001
-        @test Kurtosis(; mu = mu)(w, X) ≈ sqrt(mean((x .- dot(w, mu)) .^ 4))
-        @test Kurtosis(; mu = 0.002)(w, X) ≈ sqrt(mean((x .- 0.002) .^ 4))
-        vs = VecScalar(; v = mu, s = 0.001)
-        @test Kurtosis(; mu = vs)(w, X) ≈ sqrt(mean((x .- dot(w, mu) .- 0.001) .^ 4))
-        @test PO.calc_moment_target(Kurtosis(; mu = vs), w, x) ≈ dot(w, mu) + 0.001
-        # A `VecScalar` beside a matrix `kt` is checked against its size.
-        @test Kurtosis(; mu = vs, kt = pr.kt).kt === pr.kt
-        @test_throws DimensionMismatch Kurtosis(; mu = VecScalar(; v = mu[1:2], s = 0.0),
-                                                kt = pr.kt)
-        # Only a centre that is a function of the series supports a precomputed series.
-        @test PO.supports_precomputed_returns(Kurtosis())
-        @test PO.supports_precomputed_returns(Kurtosis(; mu = 0.1))
-        @test !PO.supports_precomputed_returns(Kurtosis(; mu = mu))
-        @test !PO.supports_precomputed_returns(Kurtosis(; mu = vs))
-        @test !PO.supports_precomputed_returns(Kurtosis(; mu = EmpiricalPrior()))
-        @test !PO.supports_precomputed_returns(Skewness(; mu = vs))
-        @test PO.supports_precomputed_returns(Skewness(; mu = 0.1))
+    @testset "Kurtosis and Skewness read their matrices, not the returns" begin
+        @test PO.risk_input_kind(Kurtosis()) isa PO.WeightsInput
+        @test PO.risk_input_kind(Skewness()) isa PO.WeightsInput
+        @test !PO.supports_precomputed_returns(Kurtosis(; kt = pr.kt))
+        @test !PO.supports_precomputed_returns(Skewness(; sk = pr.sk))
+        # The fields that the functors read from the returns are gone.
+        @test_throws MethodError Kurtosis(; mu = 0.1)
+        @test_throws MethodError Kurtosis(; w = ow)
+        @test_throws MethodError Kurtosis(; alg1 = SemiMoment())
+        @test_throws MethodError Kurtosis(; pe = EmpiricalPrior())
+        @test_throws MethodError Skewness(; mu = 0.1)
+        @test_throws MethodError Skewness(; w = ow)
+        @test_throws MethodError Skewness(; pe = EmpiricalPrior())
+        @test_throws DimensionMismatch Kurtosis(; kt = pr.kt[:, 1:4])
+        @test_throws PO.IsEmptyError Kurtosis(; kt = zeros(0, 0))
+        @test_throws DimensionMismatch Skewness(; sk = pr.sk[:, 1:4])
     end
-    @testset "A deferred co-moment resolves with its centre" begin
+    @testset "A deferred co-moment resolves on its own" begin
         kd = factory(Kurtosis(; kt = Cokurtosis()), pr)
         @test kd.kt ≈ pr.kt
-        @test kd.mu ≈ pr.mu
         sd = factory(Skewness(; sk = Coskewness()), pr)
         @test sd.sk ≈ pr.sk
-        @test sd.mu ≈ pr.mu
+        # A prior estimator in the slot gives the matrix of its own prior.
+        @test factory(Kurtosis(; kt = HighOrderPriorEstimator()), pr).kt ≈ pr.kt
+        @test factory(Skewness(; sk = HighOrderPriorEstimator()), pr).sk ≈ pr.sk
         @test_throws DomainError Kurtosis(; N = 0)
         @test_throws ArgumentError NegativeSkewness(; sk = Coskewness(), V = pr.V)
-        # A view reads the number of assets from `kt` when `mu` is not stated.
         prs = prior(HighOrderPriorEstimator(), X[:, [1, 3]])
         @test PO.port_opt_view(Kurtosis(; kt = pr.kt), [1, 3]).kt ≈ prs.kt atol = 1e-18
     end
@@ -105,56 +105,53 @@ end
         prl = prior(EmpiricalPrior(), X)
         kl = factory(Kurtosis(), prl)
         @test isnothing(kl.kt)
-        @test kl(w, X) ≈ sqrt(mean((x .- dot(w, prl.mu)) .^ 4))
+        @test isnothing(factory(Skewness(), prl).sk)
+        @test_throws PO.IsNothingError expected_risk(kl, w, X)
+        # A deferred co-moment needs only the returns, so it resolves here too.
+        @test factory(Kurtosis(; kt = Cokurtosis()), prl).kt ≈ pr.kt
+        @test factory(Skewness(; sk = Coskewness()), prl).sk ≈ pr.sk
         @test_throws ArgumentError _solve599(Kurtosis(); pr = prl)
     end
-    @testset "The model reads kt, and neither alg1 nor w" begin
+    @testset "The model and the functor read the same kt" begin
         full = _solve599(Kurtosis())
-        semi = _solve599(Kurtosis(; alg1 = SemiMoment()))
-        # The default prior holds the full cokurtosis, so the semi measure minimises the full
-        # moment, and the functor reports a smaller value.
-        @test semi.w ≈ full.w rtol = 1e-6
-        @test JuMP.value(semi.model[:risk]) ≈ sqrt(_m4_599(pr, semi.w)) rtol = 1e-5
-        rs = factory(Kurtosis(; alg1 = SemiMoment()), pr)
-        @test rs(semi.w, X) < 0.5 * JuMP.value(semi.model[:risk])
-        # A lower semi-cokurtosis gives the heuristic of `pkurt`, which is not the semi-moment.
+        @test JuMP.value(full.model[:risk]) ≈ factory(Kurtosis(), pr)(full.w) rtol = 1e-5
+        @test JuMP.value(full.model[:risk]) ≈ expected_risk(Kurtosis(), full.w, pr) rtol = 1e-5
+        # A lower semi-cokurtosis gives the heuristic of `pkurt`, which is not the semi-moment
+        # of the portfolio returns.
         prs = prior(HighOrderPriorEstimator(; kte = Cokurtosis(; alg = SemiMoment())), X)
-        hs = _solve599(Kurtosis(; alg1 = SemiMoment()); pr = prs)
-        @test JuMP.value(hs.model[:risk]) ≈ sqrt(_m4_599(prs, hs.w)) rtol = 1e-5
+        hs = _solve599(Kurtosis(); pr = prs)
+        @test JuMP.value(hs.model[:risk]) ≈ factory(Kurtosis(), prs)(hs.w) rtol = 1e-5
         @test !isapprox(JuMP.value(hs.model[:risk]),
-                        factory(Kurtosis(; alg1 = SemiMoment()), prs)(hs.w, X); rtol = 1e-2)
+                        LowOrderMoment(; alg = EvenMoment(; alg = SemiMoment()))(hs.w, X);
+                        rtol = 1e-2)
         # A deferred semi-cokurtosis in `kt` fits the same tensor against the default prior,
         # so it gives the model of the semi prior (#1818).
-        ds = _solve599(Kurtosis(; alg1 = SemiMoment(),
-                                kt = Cokurtosis(; alg = SemiMoment())))
+        ds = _solve599(Kurtosis(; kt = Cokurtosis(; alg = SemiMoment())))
         @test ds.w ≈ hs.w rtol = 1e-5
         @test JuMP.value(ds.model[:risk]) ≈ JuMP.value(hs.model[:risk]) rtol = 1e-6
-        # The model reads no observation weights either. `w` weights the functor alone, 4 % below
-        # the model here, and a deferred cokurtosis that carries the weights weights the model.
-        fw = _solve599(Kurtosis(; w = ow))
-        @test fw.w ≈ full.w rtol = 1e-6
-        @test JuMP.value(fw.model[:risk]) ≈ JuMP.value(full.model[:risk]) rtol = 1e-6
-        @test factory(Kurtosis(; w = ow), pr)(fw.w, X) < 0.97 * JuMP.value(fw.model[:risk])
-        dk = Kurtosis(; w = ow, kt = Cokurtosis(; w = ow))
+        # A deferred cokurtosis that carries observation weights weights the model and the
+        # functor alike.
+        dk = Kurtosis(; kt = Cokurtosis(; w = ow))
         dks = _solve599(dk)
-        @test JuMP.value(dks.model[:risk]) ≈ factory(dk, pr)(dks.w, X) rtol = 1e-6
+        @test JuMP.value(dks.model[:risk]) ≈ factory(dk, pr)(dks.w) rtol = 1e-6
         @test !isapprox(dks.w, full.w; atol = 1e-2)
     end
     @testset "The views agree with a refit on the subset" begin
         idx = [1, 3]
         prs = prior(HighOrderPriorEstimator(), X[:, idx])
-        kv = PO.port_opt_view(Kurtosis(; kt = pr.kt, mu = pr.mu), idx)
+        kv = PO.port_opt_view(Kurtosis(; kt = pr.kt), idx)
         @test kv.kt ≈ prs.kt atol = 1e-18
-        @test kv.mu == prs.mu
-        sv = PO.port_opt_view(Skewness(; sk = pr.sk, mu = pr.mu), idx)
+        sv = PO.port_opt_view(Skewness(; sk = pr.sk), idx)
         @test sv.sk ≈ prs.sk atol = 1e-18
-        @test sv.mu == prs.mu
         nv = PO.port_opt_view(NegativeSkewness(; sk = pr.sk, V = pr.V), idx, X)
         @test nv.V ≈ prs.V rtol = 1e-12
-        # A Deferred Quantity crosses the view unresolved.
-        @test PO.port_opt_view(Kurtosis(; kt = Cokurtosis(), mu = pr.mu), idx).kt isa
-              Cokurtosis
+        # A Deferred Quantity crosses the view unresolved, and a measure with no matrix
+        # returns as itself.
+        @test PO.port_opt_view(Kurtosis(; kt = Cokurtosis()), idx).kt isa Cokurtosis
         @test PO.port_opt_view(Skewness(; sk = Coskewness()), idx).sk isa Coskewness
+        k0, s0 = Kurtosis(), Skewness()
+        @test PO.port_opt_view(k0, idx) === k0
+        @test PO.port_opt_view(s0, idx) === s0
     end
     @testset "NegativeSkewness is the negative quadratic skewness" begin
         @test pr.V ≈ _V599(pr.sk) rtol = 1e-12
@@ -166,22 +163,30 @@ end
         end
         # Smaller is better: the mirrored data have the opposite skew and a larger measure.
         prn = prior(HighOrderPriorEstimator(), -X)
-        @test factory(Skewness(), pr)(w, X) > 0
-        @test factory(Skewness(), prn)(w, -X) < 0
+        @test factory(Skewness(), pr)(w) > 0
+        @test factory(Skewness(), prn)(w) < 0
         @test factory(NegativeSkewness(), prn)(w) > 2 * soc
         @test !PO.bigger_is_better(NegativeSkewness())
     end
-    @testset "Skewness divides the third moment by T and the variance by T - 1" begin
+    @testset "Skewness is the third moment of its coskewness" begin
+        # Equation 1 of `sdpmom`: the moment of the coskewness agrees with the series.
+        @test factory(Skewness(), pr)(w) ≈ mean(d .^ 3) rtol = 1e-10
+        @test _m3_599(pr, w) ≈ mean(d .^ 3) rtol = 1e-10
+        @test PO.bigger_is_better(Skewness())
+    end
+    @testset "ThirdCentralMoment divides the third moment by T and the variance by T - 1" begin
+        # The standardised value is the old value of the functor of `Skewness` (#1846).
+        @test ThirdCentralMoment()(w, X) ≈ mean(d .^ 3)
         g1 = mean(d .^ 3) / std(d; corrected = false)^3
-        sk = factory(Skewness(), pr)(w, X)
+        sk = ThirdCentralMoment(; ve = SimpleVariance())(w, X)
         @test sk ≈ mean(d .^ 3) / std(d; corrected = true)^3
         @test sk ≈ ((T - 1) / T)^(3 / 2) * g1
         @test sk ≈ ((T - 1) / T)^(3 / 2) * StatsBase.skewness(x)
-        @test Skewness(; w = ow)(w, X) ≈
+        @test ThirdCentralMoment(; ve = SimpleVariance(; me = nothing, corrected = false))(x) ≈
+              g1
+        @test ThirdCentralMoment(; w = ow, ve = SimpleVariance())(w, X) ≈
               mean(dw .^ 3, ow) / std(dw, ow; corrected = true, mean = 0)^3
-        # Equation 1 of `sdpmom`: the moment of the coskewness agrees with the series.
-        @test _m3_599(pr, w) ≈ mean(d .^ 3) rtol = 1e-10
-        @test PO.bigger_is_better(Skewness())
+        @test PO.bigger_is_better(ThirdCentralMoment(; ve = SimpleVariance()))
     end
     @testset "The bound traits of Skewness rebuild a MaxRiskMeasureSettings" begin
         s = Skewness(; settings = MaxRiskMeasureSettings(; scale = 0.5, lb = 1e-7))
@@ -211,10 +216,10 @@ end
         @test rf(w, X) ≈
               2.0 * dot(w, pr.sigma, w) - 0.5 * _m3_599(pr, w) + 3.0 * _m4_599(pr, w)
         @test !PO.supports_precomputed_returns(r)
-        # The terms read the matrices, so the observation weights of a child do not reach them.
-        rw = factory(VarianceSkewKurtosis(; sk = Skewness(; w = ow),
-                                          kt = Kurtosis(; w = ow)), pr)
-        @test rw(w, X) ≈ var(x) - mean(d .^ 3) + mean(d .^ 4) rtol = 1e-10
+        # The functors of the children give the raw terms, the kurtosis as its square root.
+        _, s3, k4 = PO.variance_skew_kurtosis_terms(rf, w)
+        @test 0.5 * rf.sk(w) ≈ s3
+        @test 3.0 * rf.kt(w)^2 ≈ k4
     end
     @testset "The semidefinite relaxation of VarianceSkewKurtosis" begin
         sol = _solve599(VarianceSkewKurtosis())

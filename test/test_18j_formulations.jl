@@ -722,7 +722,7 @@ end
     for N in (nothing, 4),
         alg2 in (SOCRiskExpr(), SquaredSOCRiskExpr(), QuadRiskExpr(), RSOCRiskExpr())
 
-        res = kurt(Kurtosis(; N = N, alg2 = alg2))
+        res = kurt(Kurtosis(; N = N, alg = alg2))
         @test isa(res.retcode, OptimisationSuccess)
         @test isapprox(res.w, ref.w; atol = 1e-4)
         rk = isa(alg2, SOCRiskExpr) ? sqrt(m4(res.w)) : m4(res.w)
@@ -730,7 +730,7 @@ end
     end
     # The rotated cone registers its epigraph variable, and the risk expression is that
     # variable, not the cone row.
-    res = kurt(Kurtosis(; alg2 = RSOCRiskExpr()))
+    res = kurt(Kurtosis(; alg = RSOCRiskExpr()))
     @test haskey(res.model, :tkurtosis_risk_1) && haskey(res.model, :ckurtosis_rsoc_1)
     @test isapprox(JuMP.value(res.model[:tkurtosis_risk_1]), m4(res.w); rtol = 1e-6)
     # The approximate formulation adds real rows only.
@@ -748,8 +748,8 @@ end
         ((SOCRiskExpr(), 0.4), (SquaredSOCRiskExpr(), 0.16), (QuadRiskExpr(), 0.16),
          (RSOCRiskExpr(), 0.16))
 
-        res = kurt(Kurtosis(; N = N, alg2 = alg2,
-                            settings = RiskMeasureSettings(; ub = ub)); obj = obj)
+        res = kurt(Kurtosis(; N = N, alg = alg2, settings = RiskMeasureSettings(; ub = ub));
+                   obj = obj)
         @test isapprox(sqrt(m4(res.w)), 0.4; rtol = 1e-6)
     end
     # With fewer forms than the rank of the matrix, the bound holds the truncated sum, and the

@@ -1644,10 +1644,26 @@ end
         # the score of column i is `score(X[:, i])`, computed one column at a time
         @test PO.asset_scores(SCM(), XZ) == [SCM()(view(XZ, :, i)) for i in axes(XZ, 2)]
 
-        # a NaN score is rejected: Skewness divides by a zero standard deviation
+        # a NaN score is rejected: the standardised third moment divides by a zero standard
+        # deviation
         Xc = [0.1 0.0; -0.1 0.0; 0.2 0.0]
-        @test isnan(Skewness()(view(Xc, :, 2)))
-        @test_throws DomainError PO.asset_scores(Skewness(), Xc)
+        sks = ThirdCentralMoment(; ve = SimpleVariance())
+        @test isnan(sks(view(Xc, :, 2)))
+        @test_throws DomainError PO.asset_scores(sks, Xc)
+        # A measure that reads a comoment matrix cannot score a column, and the refusal
+        # names the measure of the returns that can (#1846).
+        @test occursin("ThirdCentralMoment(; ve = SimpleVariance())",
+                       sprint(showerror, try
+                                  PO.assert_scoreable(Skewness())
+                              catch e
+                                  e
+                              end))
+        @test occursin("HighOrderMoment(; alg = FourthMoment())",
+                       sprint(showerror, try
+                                  PO.assert_scoreable(Kurtosis())
+                              catch e
+                                  e
+                              end))
         # a drawdown measure on a constant column is finite, so it is not that case
         @test isfinite(MaximumDrawdown()(view(Xc, :, 2)))
 

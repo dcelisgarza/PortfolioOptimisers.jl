@@ -150,7 +150,7 @@ end
 function mrs_vsk_kt(ub; alg2 = SOCRiskExpr())
     return VarianceSkewKurtosis(;
                                 kt = Kurtosis(; settings = RiskMeasureSettings(; ub = ub),
-                                              alg2 = alg2))
+                                              alg = alg2))
 end
 
 @testset "MeanRisk sweep: a sweep on a term of VarianceSkewKurtosis spans that term" begin
@@ -268,24 +268,18 @@ end
     m3, m4 = PO.portfolio_third_moment(pr.sk, w), PO.portfolio_fourth_moment(pr.kt, w)
     @test m3 ≈ dot(w, pr.sk, kron(w, w))
     @test m4 ≈ dot(kron(w, w), pr.kt, kron(w, w))
-    # On the sample comoments, the span of a kurtosis owner is the value of its functor, in
-    # the units of its formulation.
+    # The span of a kurtosis owner is the value of its functor, in the units of its
+    # formulation. The functor reads the matrix of the model, so a stated matrix moves the
+    # span with it (#1846).
     for (alg2, g) in ((SOCRiskExpr(), sqrt), (RSOCRiskExpr(), identity))
-        kt = factory(Kurtosis(; alg2 = alg2), pr)
-        @test PO.frontier_risk(kt, w, MRS_X, nothing) ≈ g(m4)
-        @test PO.frontier_risk(kt, w, MRS_X, nothing) ≈ expected_risk(kt, w, MRS_X) rtol = 1e-10
-        # A stated matrix is the matrix of the model, so the span reads it, and the functor
-        # reads the returns.
-        kt = factory(Kurtosis(; alg2 = alg2, kt = 2 .* pr.kt), pr)
-        @test PO.frontier_risk(kt, w, MRS_X, nothing) ≈ g(2 * m4)
-        @test !isapprox(PO.frontier_risk(kt, w, MRS_X, nothing),
-                        expected_risk(kt, w, MRS_X); rtol = 1e-2)
+        kt = factory(Kurtosis(; alg = alg2), pr)
+        @test expected_risk(kt, w, MRS_X) ≈ g(m4)
+        kt = factory(Kurtosis(; alg = alg2, kt = 2 .* pr.kt), pr)
+        @test expected_risk(kt, w, MRS_X) ≈ g(2 * m4)
     end
-    # The functor of Skewness standardises the moment, and the floor bounds the moment.
+    # The functor of Skewness is the moment that the floor bounds.
     sk = factory(Skewness(; sk = 2 .* pr.sk), pr)
-    @test PO.frontier_risk(sk, w, MRS_X, nothing) ≈ 2 * m3
-    @test !isapprox(PO.frontier_risk(sk, w, MRS_X, nothing), expected_risk(sk, w, MRS_X);
-                    rtol = 1e-2)
+    @test expected_risk(sk, w, MRS_X) ≈ 2 * m3
 end
 
 @testset "MeanRisk sweep: a sweep on the whole of VarianceSkewKurtosis meets each level" begin

@@ -244,10 +244,14 @@ include(joinpath(@__DIR__, "test12_setup.jl"))
 
     sk_views = LinearConstraintEstimator(; val = "AAPL == prior(AAPL)*2")
     pr = prior(EntropyPoolingPrior(; sets = sets, sk_views = sk_views), rd)
-    @test isapprox(Skewness(; w = pr.w, ve = SimpleVariance(; w = pr.w))([1],
-                                                                         reshape(pr.X[:, 1],
-                                                                                 :, 1)),
-                   2 * Skewness()([1], reshape(pr0.X[:, 1], :, 1)), rtol = 2e-3)
+    @test isapprox(ThirdCentralMoment(; w = pr.w, ve = SimpleVariance(; w = pr.w))([1],
+                                                                                   reshape(pr.X[:,
+                                                                                                1],
+                                                                                           :,
+                                                                                           1)),
+                   2 * ThirdCentralMoment(; ve = SimpleVariance())([1],
+                                                                   reshape(pr0.X[:, 1], :, 1)),
+                   rtol = 2e-3)
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
                                              sk_views = sk_views), rd).w, rtol = 5e-3)
@@ -263,10 +267,15 @@ include(joinpath(@__DIR__, "test12_setup.jl"))
     # skewness stage, the posterior of the mean and variance views (#1741).
     ps = prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views,
                                    sigma_views = sigma_views), rd)
-    @test isapprox(Skewness(; w = pr.w, ve = SimpleVariance(; w = pr.w))([1],
-                                                                         reshape(pr.X[:, 1],
-                                                                                 :, 1)),
-                   2 * Skewness(; w = ps.w)([1], reshape(ps.X[:, 1], :, 1)), rtol = 5e-3)
+    @test isapprox(ThirdCentralMoment(; w = pr.w, ve = SimpleVariance(; w = pr.w))([1],
+                                                                                   reshape(pr.X[:,
+                                                                                                1],
+                                                                                           :,
+                                                                                           1)),
+                   2 * ThirdCentralMoment(; w = ps.w, ve = SimpleVariance())([1],
+                                                                             reshape(ps.X[:, 1],
+                                                                                     :, 1)),
+                   rtol = 5e-3)
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views,
                                              sigma_views = sigma_views,
@@ -473,11 +482,15 @@ include(joinpath(@__DIR__, "test12_setup.jl"))
                                                                                                :,
                                                                                                1)) *
           0.3
-    @test !isapprox(Skewness(; w = pr.w, ve = SimpleVariance(; w = pr.w))([1],
-                                                                          reshape(pr.X[:,
-                                                                                       end - 1],
-                                                                                  :, 1)),
-                    1.4 * Skewness()([1], reshape(pr0.X[:, end - 1], :, 1)); rtol = 5e-3)
+    @test !isapprox(ThirdCentralMoment(; w = pr.w, ve = SimpleVariance(; w = pr.w))([1],
+                                                                                    reshape(pr.X[:,
+                                                                                                 end - 1],
+                                                                                            :,
+                                                                                            1)),
+                    1.4 * ThirdCentralMoment(; ve = SimpleVariance())([1],
+                                                                      reshape(pr0.X[:, end - 1],
+                                                                              :, 1));
+                    rtol = 5e-3)
 end
 
 # A covariance or correlation view carries its operator through a sign flip, and its
@@ -2231,7 +2244,7 @@ end
     X = X[1:60, :]
     T = size(X, 1)
     sets = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["A$i" for i in 1:N]))
-    skf = (w, x) -> Skewness(; w = w)(x)
+    skf = (w, x) -> ThirdCentralMoment(; w = w, ve = SimpleVariance())(x)
     ktf = (w, x) -> HighOrderMoment(; w = w,
                                     alg = StandardisedHighOrderMoment(;
                                                                       alg = FourthMoment()))(x)

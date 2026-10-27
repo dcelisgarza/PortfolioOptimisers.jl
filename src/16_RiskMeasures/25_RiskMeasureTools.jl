@@ -339,11 +339,11 @@ function measure_label(rs::VecBaseRM)
 end
 
 """
-    const MomentRiskMeasures{T} = Union{LowOrderMoment{<:Any, T}, HighOrderMoment{<:Any, T}, Kurtosis{<:Any, T}, Skewness{<:Any, <:Any, <:Any, T}, ThirdCentralMoment{<:Any, T}}
+    const MomentRiskMeasures{T} = Union{LowOrderMoment{<:Any, T}, HighOrderMoment{<:Any, T}, ThirdCentralMoment{<:Any, T}}
 
-Parameterised union of the five central-moment risk measures whose observation weights have the type `T`.
+Parameterised union of the three central-moment risk measures that read the returns and whose observation weights have the type `T`.
 
-The members are [`LowOrderMoment`](@ref), [`HighOrderMoment`](@ref), [`Kurtosis`](@ref), [`Skewness`](@ref) and [`ThirdCentralMoment`](@ref). Each member computes its risk in the same three operations. [`resolve_observation_weights`](@ref) resolves the weights against the data, [`calc_deviations_vec`](@ref) gives the deviations from the Moment Target, and [`moment_risk`](@ref) reduces the deviations. So the union holds the two functor methods, one for the asset returns and one for a return series, and each member uses them.
+The members are [`LowOrderMoment`](@ref), [`HighOrderMoment`](@ref) and [`ThirdCentralMoment`](@ref). [`Kurtosis`](@ref) and [`Skewness`](@ref) read a comoment matrix and not the returns, so they are not members. Each member computes its risk in the same three operations. [`resolve_observation_weights`](@ref) resolves the weights against the data, [`calc_deviations_vec`](@ref) gives the deviations from the Moment Target, and [`moment_risk`](@ref) reduces the deviations. So the union holds the two functor methods, one for the asset returns and one for a return series, and each member uses them.
 
 The kernels read only resolved weights. A measure that holds a [`DynamicAbstractWeights`](@ref) rebuilds one time for each call, with the resolved weights, and passes the new measure to each kernel. A measure with stored weights or with no weights does not rebuild, so it has no extra cost.
 
@@ -355,14 +355,13 @@ The kernels read only resolved weights. A measure that holds a [`DynamicAbstract
   - [`DynamicAbstractWeights`](@ref)
 """
 const MomentRiskMeasures{T} = Union{LowOrderMoment{<:Any, T}, HighOrderMoment{<:Any, T},
-                                    Kurtosis{<:Any, T}, Skewness{<:Any, <:Any, <:Any, T},
                                     ThirdCentralMoment{<:Any, T}}
 """
     resolve_observation_weights(r::AbstractBaseRiskMeasure, X::VecNum_MatNum)
 
 Return the risk measure `r` with its observation weights resolved against the data `X`.
 
-A [`MomentRiskMeasures`](@ref) member that holds a [`DynamicAbstractWeights`](@ref) rebuilds with its keyword constructor. The constructor passes the weights to the variance estimator of the measure. That estimator is `alg.ve` of a [`SecondMoment`](@ref) or of a [`StandardisedHighOrderMoment`](@ref), and `ve` of a [`Skewness`](@ref). So the measure and its variance estimator read the same resolved weights, as they do after [`factory`](@ref) against a prior.
+A [`MomentRiskMeasures`](@ref) member that holds a [`DynamicAbstractWeights`](@ref) rebuilds with its keyword constructor. The constructor passes the weights to the variance estimator of the measure. That estimator is `alg.ve` of a [`SecondMoment`](@ref) or of a [`StandardisedHighOrderMoment`](@ref), and `ve` of a [`ThirdCentralMoment`](@ref). So the measure and its variance estimator read the same resolved weights, as they do after [`factory`](@ref) against a prior.
 
 A member that holds a `StatsBase.AbstractWeights` returns unchanged, after [`checked_observation_weights`](@ref) checks its weights against `X`. Every other measure returns unchanged. A measure with `w = nothing` needs no weights, and a measure outside the union resolves its own weights inside its kernel.
 
@@ -409,22 +408,10 @@ function resolve_observation_weights(r::HighOrderMoment{<:Any, <:DynamicAbstract
     return HighOrderMoment(; settings = r.settings, w = checked_observation_weights(r.w, X),
                            mu = r.mu, alg = r.alg)
 end
-function resolve_observation_weights(r::Kurtosis{<:Any, <:DynamicAbstractWeights},
-                                     X::VecNum_MatNum)
-    return Kurtosis(; settings = r.settings, w = checked_observation_weights(r.w, X),
-                    mu = r.mu, kt = r.kt, N = r.N, alg1 = r.alg1, alg2 = r.alg2, pe = r.pe,
-                    mtx_sqrt = r.mtx_sqrt)
-end
-function resolve_observation_weights(r::Skewness{<:Any, <:Any, <:Any,
-                                                 <:DynamicAbstractWeights},
-                                     X::VecNum_MatNum)
-    return Skewness(; settings = r.settings, ve = r.ve, sk = r.sk,
-                    w = checked_observation_weights(r.w, X), mu = r.mu, pe = r.pe)
-end
 function resolve_observation_weights(r::ThirdCentralMoment{<:Any, <:DynamicAbstractWeights},
                                      X::VecNum_MatNum)
     return ThirdCentralMoment(; settings = r.settings,
-                              w = checked_observation_weights(r.w, X), mu = r.mu)
+                              w = checked_observation_weights(r.w, X), mu = r.mu, ve = r.ve)
 end
 function (r::MomentRiskMeasures)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
     resolved = resolve_observation_weights(r, X)
