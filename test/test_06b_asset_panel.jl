@@ -23,6 +23,8 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
     @test cat.codes == [1, 2, 1]
     @test PortfolioOptimisers.panel_field_labels(cat) == ["sector=Tech", "sector=Energy"]
     @test PortfolioOptimisers.panel_field_axes(cat) == (3,)
+    # The mask of a categorical Panel Field has no level axis, so it names one column.
+    @test PortfolioOptimisers.panel_field_observed_labels(cat) == ["sector::observed"]
 
     ten = TensorPanelField(; name = "beta", axis = "factor", labels = ["size", "value"],
                            groups = ["style", "style"], vals = [1.0 2.0; 3.0 4.0])
@@ -233,6 +235,78 @@ end
     # A duplicated column name is still refused, by the panel itself.
     @test_throws ArgumentError matrix_panel(["a", "a"], ones(2, 2))
     @test PortfolioOptimisers.panel_feature_names(nothing) === nothing
+end
+@testset "The observed mask of a categorical Panel Field is one column (#682)" begin
+    #=
+    The mask of a categorical Panel Field has no level axis. The Feature Matrix once gave it one
+    column per level, and each column held one ASSET column of the mask, copied across the
+    assets. With more levels than assets the stack threw a `BoundsError`.
+    =#
+    omsk = [true false true true; true true false true]
+    cat = CategoricalPanelField(; name = "sector", levels = ["T", "E", "F"],
+                                codes = [1 2 3 1; 2 2 1 3], omsk = omsk)
+    pnl = AssetPanel(; pf = [cat], amsk = trues(2, 4), emsk = trues(2, 4))
+    nz, Z = panel_feature_matrix(pnl)
+    @test nz == ["sector=T", "sector=E", "sector=F", "sector::observed"]
+    @test nz == PortfolioOptimisers.panel_feature_names(pnl)
+    @test Z[:, :, 4] == omsk
+    @test Z[:, :, 1] == [1.0 0.0 0.0 1.0; 0.0 0.0 1.0 0.0]
+
+    # Five levels over two assets.
+    c5 = CategoricalPanelField(; name = "s", levels = ["a", "b", "c", "d", "e"],
+                               codes = [1 2; 3 5], omsk = [true false; true true])
+    nz5, Z5 = panel_feature_matrix(AssetPanel(; pf = [c5], amsk = trues(2, 2),
+                                              emsk = trues(2, 2)))
+    @test nz5 == ["s=a", "s=b", "s=c", "s=d", "s=e", "s::observed"]
+    @test Z5[:, :, 6] == [1.0 0.0; 1.0 1.0]
+
+    # A static categorical Panel Field.
+    snz, sZ = panel_feature_matrix(AssetPanel(;
+                                              pf = [CategoricalPanelField(; name = "s",
+                                                                          levels = ["a",
+                                                                                    "b"],
+                                                                          codes = [1, 2, 1],
+                                                                          omsk = [true,
+                                                                                  false,
+                                                                                  true])]))
+    @test snz == ["s=a", "s=b", "s::observed"]
+    @test sZ[:, 3] == [1.0, 0.0, 1.0]
+
+    #=
+    A tensor Panel Field keeps a label axis in its mask, so it names one mask column per label,
+    also when it has one label. The table of `panel_dataframe` uses the same name.
+    =#
+    t1 = TensorPanelField(; name = "b", axis = "f", labels = ["x"],
+                          vals = reshape([1.0, 2.0, 3.0, 4.0], 2, 2, 1),
+                          omsk = reshape([true, false, true, true], 2, 2, 1))
+    tnz, tZ = panel_feature_matrix(AssetPanel(; pf = [t1], amsk = trues(2, 2),
+                                              emsk = trues(2, 2)))
+    @test tnz == ["b=x", "b=x::observed"]
+    @test tZ[:, :, 2] == [1.0 1.0; 0.0 1.0]
+
+    # A Panel Field with no observed mask writes no mask column, whatever its kind.
+    W = zeros(2, 2, 1)
+    @test PortfolioOptimisers.panel_field_stack_observed!(W,
+                                                          NumericPanelField(; name = "n",
+                                                                            vals = ones(2,
+                                                                                        2)),
+                                                          [1]) === nothing
+    @test PortfolioOptimisers.panel_field_stack_observed!(W,
+                                                          TensorPanelField(; name = "t",
+                                                                           axis = "f",
+                                                                           labels = ["x"],
+                                                                           vals = ones(2, 2,
+                                                                                       1)),
+                                                          [1]) === nothing
+    @test iszero(W)
+
+    # The name rule of the derived columns sees the new mask names.
+    @test_throws ArgumentError AssetPanel(;
+                                          pf = [cat,
+                                                NumericPanelField(;
+                                                                  name = "sector::observed",
+                                                                  vals = ones(2, 4))],
+                                          amsk = trues(2, 4), emsk = trues(2, 4))
 end
 @testset "AssetPanel views" begin
     amsk = [true true true; true true false]

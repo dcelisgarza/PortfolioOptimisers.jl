@@ -5,7 +5,7 @@ Supertype of the Panel Fields an [`AssetPanel`](@ref) holds.
 
 All concrete types that carry one Panel Field's name, its values and its observed mask should subtype `AbstractPanelField`.
 
-A Panel Field **owns its values**. Nothing else holds them, and nothing needs an index to find them: an [`AssetPanel`](@ref) is a vector of Panel Fields, and [`panel_field`](@ref) looks one up by name. A Panel Field is static or time-varying, and every Panel Field of one panel agrees.
+A Panel Field **owns its values**. Nothing else holds them, and nothing needs an index to find them. An [`AssetPanel`](@ref) is a vector of Panel Fields, and [`panel_field`](@ref) finds one by its name. A Panel Field is static or time-varying, and all Panel Fields of one panel are the same of the two.
 
 # Interfaces
 
@@ -87,7 +87,11 @@ end
 
 Check that a Panel Field's name is not empty.
 
-The name is the key [`panel_field`](@ref) looks a Panel Field up by, so an empty one is unreachable.
+[`panel_field`](@ref) finds a Panel Field by its name, so it cannot find a Panel Field with an empty name.
+
+# Algorithm
+
+ 1. Check that `name` is not empty.
 
 # Arguments
 
@@ -253,14 +257,14 @@ end
 """
     assert_panel_finite(vals::AbstractArray{<:Real}, name::AbstractString) -> nothing
 
-Check that a resolved Panel Field carries no non-finite value.
+Check that a Panel Field carries no non-finite value.
 
-The fill policies each write a finite value by construction, so this catches a non-finite cell that the *raw input* carried and that no policy touched: an infinity is not a blank, so [`is_panel_blank`](@ref) leaves it where it stands.
+Each fill policy writes a finite value. In the builder, this check finds a non-finite cell that the *raw input* carried and that no policy touched. A `NaN` is a blank, and a fill policy resolves it. An infinity is not a blank, so [`is_panel_blank`](@ref) does not mark it, and no policy writes over it. The constructors of [`NumericPanelField`](@ref) and [`TensorPanelField`](@ref) run the same check, so a Panel Field made by hand holds no `NaN` either.
 
 # Algorithm
 
  1. Find the first non-finite cell.
- 2. Throw when there is one, naming the Panel Field and the cell.
+ 2. Throw when there is one, and name the Panel Field and the cell.
 
 # Arguments
 
@@ -280,11 +284,13 @@ The fill policies each write a finite value by construction, so this catches a n
   - [`panel_resolve`](@ref)
   - [`is_panel_blank`](@ref)
   - [`asset_panel`](@ref)
+  - [`NumericPanelField`](@ref)
+  - [`TensorPanelField`](@ref)
 """
 function assert_panel_finite(vals::AbstractArray{<:Real}, name::AbstractString)::Nothing
     i = findfirst(!isfinite, vals)
     @argcheck(isnothing(i),
-              IsNonFiniteError("the Panel Field \"$name\" carries a non-finite value at $(isnothing(i) ? "" : string(Tuple(i))). An infinity is not a blank, so no fill policy resolves it; correct the raw input."))
+              IsNonFiniteError("the Panel Field \"$name\" carries a non-finite value at $(isnothing(i) ? "" : string(Tuple(i))). A Panel Field holds finite values only. The builder fills a NaN as a blank, and no fill policy resolves an infinity, so correct the raw input."))
     return nothing
 end
 """
@@ -309,6 +315,7 @@ $(DocStringExtensions.FIELDS)
   - `!isempty(name)`. Raises an [`IsEmptyError`](@ref).
   - `!isempty(vals)`. Raises an [`IsEmptyError`](@ref).
   - `ndims(vals) in (1, 2)`. Raises a `DimensionMismatch`.
+  - Every value is finite. See [`assert_panel_finite`](@ref).
   - `size(omsk) == size(vals)` when `omsk` is given. Raises a `DimensionMismatch`.
   - `pmsk` marks only unobserved cells. See [`assert_panel_field_placeholder`](@ref).
 
@@ -363,7 +370,7 @@ $(DocStringExtensions.TYPEDEF)
 
 A Panel Field holding one category label per asset, and per observation when it is time-varying.
 
-A sector, an industry or a country classification is this kind. It stores **integer codes over its levels** rather than the labels themselves, and rather than a one-hot block: a code is what a cross-sectional group label is, and the one-hot form is built where a matrix is needed. It contributes one column per level to a derived Feature Matrix, named `"<field>=<level>"`.
+A sector, an industry or a country classification is this kind. It stores **integer codes over its levels**, not the labels and not a one-hot block. A code is the form of a cross-sectional group label, and [`panel_onehot`](@ref) builds the one-hot block where a matrix is needed. It contributes one column per level to a derived Feature Matrix, named `"<field>=<level>"`. Its observed mask has no level axis, so it contributes one mask column, see [`panel_field_observed_labels`](@ref).
 
 # Fields
 
@@ -477,6 +484,7 @@ $(DocStringExtensions.FIELDS)
   - `length(groups) == length(labels)` when `groups` is given. Raises a `DimensionMismatch`.
   - `!isempty(vals)`. Raises an [`IsEmptyError`](@ref).
   - `ndims(vals) in (2, 3)`. Raises a `DimensionMismatch`.
+  - Every value is finite. See [`assert_panel_finite`](@ref).
   - `size(vals, ndims(vals)) == length(labels)`. Raises a `DimensionMismatch`.
   - `size(omsk) == size(vals)` when `omsk` is given. Raises a `DimensionMismatch`.
   - `pmsk` marks only unobserved cells. See [`assert_panel_field_placeholder`](@ref).
@@ -578,9 +586,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Reads a static array as though it carried a leading observation axis, storing it once.
 
-`RepeatedLeading` is the **lazy lift**: it is how a static Panel Field input joins a time-varying [`AssetPanel`](@ref) without copying itself `T` times. It stores the static array as `parent` and answers `size` as `(n, size(parent)...)`, so `R[t, i]` reads `parent[i]` for every `t`. A `view` of it is an ordinary `SubArray`, which [`port_opt_view`](@ref) slices like any other value array.
+`RepeatedLeading` is the **lazy lift**. A static Panel Field input joins a time-varying [`AssetPanel`](@ref) through it, and the input is not copied `n` times. It stores the static array as `parent` and answers `size` as `(n, size(parent)...)`. So `R[t, i]` reads `parent[i]` for every `t`. A `view` of it is an ordinary `SubArray`, which [`port_opt_view`](@ref) slices like any other value array.
 
-It is unexported and Base-only: it owns `size`, `getindex` and `show`, and nothing else in the library dispatches on it.
+It is unexported. It owns the Base methods `size`, `getindex`, `IndexStyle` and `show`. One library method dispatches on it: [`PortfolioOptimisers.panel_values_vcat`](@ref) keeps a concatenation of equal lifts lazy.
 
 # Fields
 
@@ -590,12 +598,17 @@ $(DocStringExtensions.FIELDS)
 
     RepeatedLeading(parent::AbstractArray, n::Integer) -> RepeatedLeading
 
+## Validation
+
+  - `n >= 1`. Raises a `DomainError`.
+
 # Related
 
   - [`AssetPanel`](@ref)
   - [`asset_panel`](@ref)
   - [`panel_field_lift`](@ref)
   - [`AbstractPanelField`](@ref)
+  - [`PortfolioOptimisers.panel_values_vcat`](@ref)
 """
 struct RepeatedLeading{T, N, A} <: AbstractArray{T, N}
     """
@@ -635,11 +648,11 @@ $(DocStringExtensions.TYPEDEF)
 
 Reads a universe mask that is true everywhere, storing no cell.
 
-`AllTrueMask` is the shape a gapless ingestion emits for both of an [`AssetPanel`](@ref)'s universe masks. Every asset is listed at every observation and every return is finite, so the mask is a constant, and storing it as one costs two integers instead of `observations × assets` bits. It answers `size` as `(n, N)` and `getindex` as `true`.
+`AllTrueMask` is the shape that a gapless ingestion emits for both universe masks of an [`AssetPanel`](@ref). Every asset is listed at every observation and every return is finite, so the mask is a constant. It stores two integers, not `observations × assets` bits. It answers `size` as `(n, N)` and `getindex` as `true`.
 
-It is unexported and Base-only, exactly as [`PortfolioOptimisers.ListingSpan`](@ref) is: it owns `size`, `getindex` and `show`, and the public bound stays `AbstractMatrix{Bool}`. A method specialised on it is a library-internal fast path, not a contract an extension author may rely on. A `view` of it is an ordinary `SubArray` over a lazy matrix, so [`port_opt_view`](@ref) slices it correctly and still allocates no cell.
+It is unexported, as [`PortfolioOptimisers.ListingSpan`](@ref) is. It owns the Base methods `size`, `getindex`, `IndexStyle` and `show`, and the public bound stays `AbstractMatrix{Bool}`. A method specialised on it, such as [`PortfolioOptimisers.panel_mask_vcat`](@ref), is a fast path inside the library. An extension author cannot rely on it. A `view` of it is an ordinary `SubArray` over a lazy matrix, so [`port_opt_view`](@ref) slices it correctly and allocates no cell.
 
-The library's usual spelling for "all of them" — a `nothing` Coverage Universe or Investable Mask — is unavailable here: `nothing` masks on an [`AssetPanel`](@ref) already mean the panel is *static*, and a second meaning on the same field would cost that reading.
+Elsewhere the library writes "all of them" as `nothing`, for example a `nothing` Coverage Universe or Investable Mask. A `nothing` mask on an [`AssetPanel`](@ref) already means that the panel is *static*, so it cannot also mean "all true".
 
 # Fields
 
@@ -670,6 +683,7 @@ julia> Matrix(msk)
 
   - [`AssetPanel`](@ref)
   - [`PortfolioOptimisers.ListingSpan`](@ref)
+  - [`PortfolioOptimisers.panel_mask_vcat`](@ref)
   - [`port_opt_view`](@ref)
 """
 struct AllTrueMask <: AbstractMatrix{Bool}
@@ -711,7 +725,7 @@ end
 
 Return a Panel Field's observation and asset axes, without its trailing label axis.
 
-This is the shape every Panel Field of one [`AssetPanel`](@ref) shares, and it is what says whether the panel is static. A static Panel Field returns `(N,)`; a time-varying one returns `(T, N)`.
+Every Panel Field of one [`AssetPanel`](@ref) shares this shape, and the shape tells whether the panel is static. A static Panel Field returns `(N,)`, and a time-varying one returns `(T, N)`.
 
 # Algorithm
 
@@ -749,15 +763,15 @@ end
 
 Return the numeric type a Panel Field carries, or the one a Feature Matrix over several of them stacks into.
 
-The type comes from the values, never from a written type. A raw field arrives as `Union{Missing, Float64}`, as `Union{Nothing, Float64}` or as `Any`, and none of those is the type its cells carry, so the cells are read and their types promoted. A `Float32` field resolves in `Float32`, a blank-carrying `Union{Missing, Float64}` field in `Float64`, and an integer field stays exact.
+The type comes from the values, never from a written type. A raw field arrives as `Union{Missing, Float64}`, as `Union{Nothing, Float64}` or as `Any`. The builder fills the blanks first, and the filled array keeps that element type. No cell of it carries the type, so the function reads the cells and promotes their types. A `Float32` field resolves in `Float32`, a `Union{Missing, Float64}` field with filled blanks in `Float64`, and an integer field stays exact. An array that still holds a `missing` cell gives a type that holds `Missing`.
 
-A categorical Panel Field contributes nothing. An indicator is built rather than read, so it carries no type of its own and takes the type of the blocks it is stacked beside. A Feature Matrix that stacks indicators alone has nothing to derive from, and stacks in `Float64`.
+A categorical Panel Field contributes nothing. The library builds an indicator and does not read it, so the indicator carries no type of its own. It takes the type of the blocks that it is stacked beside. A Feature Matrix that stacks indicators alone has nothing to derive from, and stacks in `Float64`.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. `AbstractArray`: the element type when it is already concrete, and otherwise the promotion of the types its own cells carry. An empty array carries no type, and gives `Union{}`.
+ 1. `AbstractArray`: the element type when it is concrete. Otherwise the promotion of the types that its cells carry, which is `Union{}` for an empty array.
  2. [`NumericPanelField`](@ref) and [`TensorPanelField`](@ref): the type of their values.
  3. [`CategoricalPanelField`](@ref): `Union{}`, which promotes away against every other type.
  4. A vector of Panel Fields: the promotion over the fields, and `Float64` when none of them contributes a type.
@@ -836,18 +850,20 @@ function panel_field_labels(f::TensorPanelField)::Vector{String}
 end
 """
     panel_field_observed_labels(f::AbstractPanelField) -> Vector{String}
+    panel_field_observed_labels(f::TensorPanelField) -> Vector{String}
 
 Return the names of the observed-mask columns one Panel Field contributes to a derived Feature Matrix.
 
-A Panel Field with a single observable takes `"<name>::observed"`. One with several takes each value column's own name with `"::observed"` appended, so a tensor Panel Field keeps one mask column per label.
+The observed mask has the shape of the values, so the mask decides the count of its columns. A numeric and a categorical Panel Field have no label axis. Their mask gives one column, `"<name>::observed"`, also when a categorical Panel Field has many levels. A tensor Panel Field keeps a label axis in its mask. Its mask gives one column per label, `"<name>=<label>::observed"`, also when it has one label. The table of [`panel_dataframe`](@ref) uses the same names.
 
-The separator is `"::"` rather than the `"="` the value columns use, so a mask column cannot be mistaken for a level of the same Panel Field.
+The separator is `"::"`, and the value columns use `"="`. So a mask column does not have the name of a level of the same Panel Field.
 
 # Algorithm
 
- 1. Read the Panel Field's value column names from [`panel_field_labels`](@ref).
- 2. When there is one, return the single name `"<name>::observed"`.
- 3. Otherwise append `"::observed"` to each of them.
+The method that Julia selects is the algorithm.
+
+ 1. A Panel Field with no label axis returns the single name `"<name>::observed"`.
+ 2. A [`TensorPanelField`](@ref) reads its value column names from [`panel_field_labels`](@ref), and appends `"::observed"` to each of them.
 
 # Arguments
 
@@ -861,15 +877,14 @@ The separator is `"::"` rather than the `"="` the value columns use, so a mask c
 
   - [`AbstractPanelField`](@ref)
   - [`panel_field_labels`](@ref)
+  - [`panel_field_stack_observed!`](@ref)
   - [`panel_feature_matrix`](@ref)
 """
 function panel_field_observed_labels(f::AbstractPanelField)::Vector{String}
-    labels = panel_field_labels(f)
-    return if isone(length(labels))
-        ["$(f.name)::observed"]
-    else
-        ["$l::observed" for l in labels]
-    end
+    return ["$(f.name)::observed"]
+end
+function panel_field_observed_labels(f::TensorPanelField)::Vector{String}
+    return ["$l::observed" for l in panel_field_labels(f)]
 end
 """
     assert_panel_feature_names(pf::AbstractVector{<:AbstractPanelField}) -> nothing
@@ -974,7 +989,7 @@ end
 
 Build the one-hot block a categorical Panel Field contributes to a derived Feature Matrix.
 
-One column per level, `one(datatype)` where the cell carries that level and `zero(datatype)` elsewhere: `assets × levels` for a static field, `observations × assets × levels` for a time-varying one. The codes are the storage and this is the matrix form, built only where a matrix is needed.
+The block has one column per level. A cell holds `one(datatype)` in the column of its level and `zero(datatype)` in the others. The block is `assets × levels` for a static field, and `observations × assets × levels` for a time-varying one. The field stores the codes, and the library builds this block only where a matrix is needed.
 
 An indicator is built rather than read, so it carries no type of its own and the caller names the one the block is stacked beside. Every caller inside the library derives that type from the data it stacks the block against, so the default is what a caller who stacks the block against nothing gets. [`panel_field_stack!`](@ref) writes the same block into a Feature Matrix under construction without building it, and takes its type from the matrix.
 
@@ -1007,14 +1022,19 @@ function panel_onehot(f::CategoricalPanelField; datatype::DataType = Float64)
 end
 """
     panel_field_stack_observed!(Z::AbstractArray, f::AbstractPanelField, cols::VecInt) -> nothing
+    panel_field_stack_observed!(Z::AbstractArray, f::TensorPanelField, cols::VecInt) -> nothing
 
 Write one Panel Field's observed mask into a derived Feature Matrix, as `0`/`1` columns.
 
+The columns are the ones that [`panel_field_observed_labels`](@ref) names. A Panel Field with no label axis claims one column, and a [`TensorPanelField`](@ref) claims one column per label.
+
 # Algorithm
 
+The method that Julia selects is the algorithm.
+
  1. Return when the Panel Field carries no mask.
- 2. Write the whole mask into the single column when the Panel Field claims one.
- 3. Otherwise write one label slice of the mask per column.
+ 2. A Panel Field with no label axis writes its whole mask into its single column.
+ 3. A [`TensorPanelField`](@ref) writes one label slice of its mask into each column.
 
 # Arguments
 
@@ -1039,13 +1059,18 @@ function panel_field_stack_observed!(Z::AbstractArray, f::AbstractPanelField,
     if isnothing(omsk)
         return nothing
     end
-    if isone(length(cols))
-        selectdim(Z, ndims(Z), cols[1]) .= omsk
-    else
-        d = ndims(omsk)
-        for (l, c) in pairs(cols)
-            selectdim(Z, ndims(Z), c) .= selectdim(omsk, d, l)
-        end
+    selectdim(Z, ndims(Z), cols[1]) .= omsk
+    return nothing
+end
+function panel_field_stack_observed!(Z::AbstractArray, f::TensorPanelField,
+                                     cols::VecInt)::Nothing
+    omsk = f.omsk
+    if isnothing(omsk)
+        return nothing
+    end
+    d = ndims(omsk)
+    for (l, c) in pairs(cols)
+        selectdim(Z, ndims(Z), c) .= selectdim(omsk, d, l)
     end
     return nothing
 end
@@ -1098,7 +1123,7 @@ end
 
 View one [`TensorPanelField`](@ref) array over the observations `i`, the assets `j` and the labels `k`.
 
-A tensor Panel Field keeps its labels on its **trailing** axis, so its asset axis is the first one when it is static and the second when it is time-varying. The label index is a `Colon` for every field but the square one, whose labels *are* the assets; [`features_are_assets`](@ref) states when that holds.
+A tensor Panel Field keeps its labels on its **trailing** axis. So its asset axis is the first one when it is static, and the second when it is time-varying. The label index is a `Colon` for every field but the square one, whose labels *are* the assets. [`features_are_assets`](@ref) states when that holds.
 
 # Algorithm
 
@@ -1194,7 +1219,15 @@ end
 
 Return the groups of a tensor Panel Field under an asset view.
 
-A group belongs to one label, so in the square case the groups are cut by the same asset index as the labels, and otherwise they are returned whole. A field with no groups answers `nothing`.
+A group belongs to one label. So in the square case the asset index cuts the groups as it cuts the labels, and otherwise the function returns the groups whole.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `groups` is `nothing`: return `nothing`.
+ 2. `sq` is `true`: return `groups[j]`.
+ 3. Otherwise: return `groups`.
 
 # Arguments
 
@@ -1224,9 +1257,9 @@ end
 
 Report whether one Panel Field's trailing axis *is* the asset axis, so a view must slice both.
 
-True when a tensor Panel Field's labels equal the asset names, which is what a square phylogeny or adjacency matrix put on a `PricesResult` or a `ReturnsResult` produces: an `assets × assets` block whose labels are "adjacent to asset ``k``". Subselecting assets without also subselecting that axis would leave the columns pointing at the full universe while the rows point at the subset — a silently wrong distance rather than an error.
+True when the labels of a tensor Panel Field equal the asset names. A square phylogeny or adjacency matrix on a `PricesResult` or a `ReturnsResult` gives this field, an `assets × assets` block whose label ``k`` reads "adjacent to asset ``k``". A view that cuts the assets and not that axis keeps the columns over the full universe and the rows over the subset. The distance is then wrong, and no error shows it.
 
-The fact is **derived**, never recorded. Comparing the names rather than the axis lengths is what makes it derivable: a rectangular-by-accident coincidence of counts is not a claim that the two axes mean the same thing, and the comparison stays correct under repeated views, since both name vectors are sliced by the same indices. A numeric or categorical Panel Field has no trailing axis, so it is never square.
+The fact is **derived**, never recorded. The function compares the names, not the axis lengths. Two equal counts do not state that the two axes mean the same thing. The comparison stays correct under repeated views, because the view cuts both name vectors by the same indices. A numeric or a categorical Panel Field has no trailing axis, so it is never square.
 
 # Algorithm
 
@@ -1263,14 +1296,14 @@ $(DocStringExtensions.TYPEDEF)
 
 The Asset Panel: the Panel Fields of one universe, and the two point-in-time universe masks.
 
-The two universe masks are the panel's **defining content**, and the Panel Fields are optional payload. A panel with fields owns their values, so nothing else on a `PricesResult` or a `ReturnsResult` holds a feature matrix, and the Feature Matrix a distance measures is derived from the panel by [`feature_matrix`](@ref) and stored nowhere. A panel with **no** field is the ingestion layer's common case: a caller holding only prices has no market capitalisation and no sector, and the panel states a universe and nothing else. A panel with neither a field nor a mask carries nothing at all and is refused.
+The two universe masks are the **defining content** of the panel, and the Panel Fields are optional payload. A panel with fields owns their values, so nothing else on a `PricesResult` or a `ReturnsResult` holds a feature matrix. [`feature_matrix`](@ref) derives the Feature Matrix that a distance measures from the panel, and nothing stores it. A panel with **no** field is the common case of the ingestion layer. A caller that holds only prices has no market capitalisation and no sector, and the panel states a universe and nothing else. The constructor refuses a panel with neither a field nor a mask, because it carries nothing.
 
 One panel takes one of two shapes, and its type parameters say which.
 
   - **Static**: every Panel Field is `assets` or `assets × labels`, and both masks are `nothing`. A fundamentals table or a sector classification with no history is this shape. It needs at least one Panel Field, because nothing else would state its asset axis.
   - **Time-varying**: every Panel Field prepends an observation axis, and both masks are `observations × assets`. A point-in-time panel is this shape.
 
-`nothing` masks therefore read as *static, or hand-built*, and never as *gapless*: a panel the ingestion layer emits always carries both, all true where the price table held no gap.
+So `nothing` masks mean *static, or hand-built*, and never *gapless*. A panel that the ingestion layer emits always carries both masks, and they are all true where the price table held no gap.
 
 # Fields
 
@@ -1412,17 +1445,17 @@ end
 
 Read the axes one [`AssetPanel`](@ref) is stated on.
 
-The two universe masks are the panel's defining content and the Panel Fields are optional payload, so the axes are read from the fields when the panel has any and from the active mask when it has none. The ingestion layer's common case is the second: a caller holding only prices has no market capitalisation and no sector, and the panel it emits states a universe and nothing else.
+The two universe masks are the defining content of the panel, and the Panel Fields are optional payload. So the function reads the axes from the fields when the panel has any, and from the active mask when it has none. The second case is common in the ingestion layer. A caller that holds only prices has no market capitalisation and no sector, and the panel that it emits states a universe and nothing else.
 
-A panel with neither a Panel Field nor a mask carries nothing at all, and is refused here rather than answering an empty tuple that every reader would then have to test.
+A panel with neither a Panel Field nor a mask carries nothing. The function refuses it, so that no reader must test an empty tuple.
 
 # Algorithm
 
-The method that Julia selects reads the panel apart or whole; the rule is one.
+The method that Julia selects is the algorithm. Both methods apply the same rule.
 
- 1. `pf` is non-empty: return [`panel_field_axes`](@ref) of its first Panel Field. The constructor has already checked that every field agrees.
+ 1. `pf` is non-empty: return [`panel_field_axes`](@ref) of its first Panel Field. The constructor checks that every field agrees.
  2. `pf` is empty: return `size(amsk)`.
- 3. An [`AssetPanel`](@ref): read its own Panel Fields and active mask by steps 1 and 2. This is the form every consumer calls; the two-argument form is the constructor's, which has no panel yet.
+ 3. An [`AssetPanel`](@ref): apply steps 1 and 2 to its own Panel Fields and active mask. Every consumer calls this form. The constructor calls the form with two arguments, because it has no panel yet.
 
 # Arguments
 
@@ -1524,7 +1557,11 @@ end
 
 Return whether an [`AssetPanel`](@ref) is the static shape.
 
-A static panel's Panel Fields carry no observation axis, and its masks are `nothing`. The two go together by construction, so either one answers.
+The Panel Fields of a static panel carry no observation axis, and its masks are `nothing`. The constructor makes sure that the two go together, so either one gives the answer.
+
+# Algorithm
+
+ 1. Return `true` when the active mask is `nothing`.
 
 # Arguments
 
@@ -1547,7 +1584,7 @@ end
 
 Look one Panel Field up in an [`AssetPanel`](@ref) by name.
 
-This is the only supported route from a Panel Field's name to its values. A consumer that parses a derived column name instead is reading a convention rather than the panel, and the two part company as soon as a Panel Field's own name carries the convention's punctuation.
+This is the only supported route from the name of a Panel Field to its values. A consumer that parses a derived column name reads a naming convention, not the panel. The parse gives a wrong field when the name of a Panel Field holds the `"="` or the `"::"` of that convention.
 
 # Algorithm
 
@@ -1619,9 +1656,9 @@ Derive the Feature Matrix an [`AssetPanel`](@ref)'s Panel Fields stack into, and
 
 Input data that holds no panel derives nothing, so the `nothing` method answers with two of them and no consumer needs a branch of its own.
 
-Nothing stores the result. A Feature Matrix is what a distance measures, so it is built where it is measured and thrown away after: the panel is the data, and the matrix is one view of it.
+Nothing stores the result. A distance measures a Feature Matrix, so the distance builds it and drops it after the measure. The panel is the data, and the matrix is one view of it.
 
-The column order is the Panel Field order, and within one Panel Field its value columns come first and its observed-mask columns after. A static panel gives an `assets × features` matrix, and a time-varying one an `observations × assets × features` matrix.
+The column order is the Panel Field order. Within one Panel Field, its value columns come first and its observed-mask columns after. A numeric or a categorical Panel Field has one observed-mask column, and a tensor Panel Field has one per label. A static panel gives an `assets × features` matrix, and a time-varying one an `observations × assets × features` matrix.
 
 # Algorithm
 
@@ -1706,19 +1743,19 @@ end
 
 Return a view of the [`AssetPanel`](@ref) over the observations `i` and the assets `j`.
 
-Every Panel Field owns its values, so an asset view reaches them all: the one-argument arity keeps every observation and selects assets, and the three-argument arity selects both. A static panel has no observation axis and ignores the observation index, which is the same asymmetry the two [`port_opt_view`](@ref) arities have for `ivpa`.
+Every Panel Field owns its values, so an asset view reaches all of them. The form with one index keeps every observation, and its index `i` selects the assets, as in the one-index form for a [`ReturnsResult`](@ref). The form with two indices selects the observations and the assets. A static panel has no observation axis, so it ignores the observation index.
 
-`nx` holds the asset names of the input data, and it is what makes the **square case** derivable: a tensor Panel Field whose labels are those names is sliced on its label axis by the same asset index. Nothing records the fact, and no `PricesResult` or `ReturnsResult` holds a flag for it; [`features_are_assets`](@ref) states the comparison.
+`nx` holds the asset names of the input data, and it makes the **square case** derivable. The view cuts the label axis of a tensor Panel Field whose labels are those names by the same asset index. Nothing records the fact, and no `PricesResult` or `ReturnsResult` holds a flag for it. [`features_are_assets`](@ref) states the comparison. The form with one index passes `nx = nothing`, so it does not cut a label axis.
 
 # Algorithm
 
- 1. View each Panel Field with [`panel_field_view`](@ref), passing a `Colon` for the observation index of a static panel and `nx` for the square case.
+ 1. View each Panel Field with [`panel_field_view`](@ref). Pass a `Colon` for the observation index of a static panel, and pass `nx` for the square case. A panel with no Panel Field keeps its own empty vector.
  2. View both masks with [`panel_mask_view`](@ref), which keeps them `nothing` when the panel is static.
 
 # Arguments
 
   - `pnl`: The Asset Panel.
-  - `i`: Observation index.
+  - `i`: Observation index in the form with two indices, and asset index in the form with one index.
   - `j`: Asset index.
   - `nx`: The asset names of the input data, or `nothing`.
 
