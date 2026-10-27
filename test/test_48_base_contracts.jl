@@ -899,3 +899,102 @@ end
     @test derr isa ArgumentError
     @test occursin("different decay cannot be merged", derr.msg)
 end
+@testset "chan_merge is the merge in sums of Equation 2.1b, and is symmetric" begin
+    pe = PortfolioOptimisers
+    rng = StableRNG(13579)
+    x = randn(rng, 25) .+ 3.0
+    # The merge in sums of the Stanford report: S = S_A + S_B + n_A / (n_B n) (n_B / n_A T_A -
+    # T_B)^2, with the block sums T. `chan_merge` writes the same term in means.
+    nA, nB = 9, 16
+    xa, xb = view(x, 1:nA), view(x, (nA + 1):(nA + nB))
+    TA, TB = sum(xa), sum(xb)
+    SA = sum(abs2, xa .- TA / nA)
+    SB = sum(abs2, xb .- TB / nB)
+    n, mu, M = pe.chan_merge(nA, TA / nA, SA, nB, TB / nB, SB)
+    @test isapprox(M, SA + SB + nA / (nB * n) * (nB / nA * TA - TB)^2; rtol = 1e-14)
+    @test isapprox(mu, (TA + TB) / n; rtol = 1e-14)
+    # The two blocks enter the formula alike, so the order of the operands does not change the
+    # state.
+    X = randn(rng, 20, 3)
+    a = batch_state(view(X, 1:6, :))
+    b = batch_state(view(X, 7:20, :))
+    ab = pe.chan_merge(a..., b...)
+    ba = pe.chan_merge(b..., a...)
+    @test ab[1] == ba[1]
+    @test isapprox(ab[2], ba[2]; rtol = 1e-14)
+    @test isapprox(ab[3], ba[3]; rtol = 1e-14)
+    # One entry of the co-moment merge is Equation 3.1 of the Sandia report, the pairwise update
+    # of the co-moment of two variables u and v.
+    du = b[2][1] - a[2][1]
+    dv = b[2][3] - a[2][3]
+    @test isapprox(ab[3][1, 3], a[3][1, 3] + b[3][1, 3] + a[1] * b[1] / ab[1] * du * dv;
+                   rtol = 1e-14)
+end
+@testset "A Welford fold stays inside the updating bound of Table 1" begin
+    using Statistics
+    pe = PortfolioOptimisers
+    # The fixture of the partial-fit tests, shifted to a mean of 1000 and unit spread, so the
+    # condition number of each column is about 1000.
+    rng = StableRNG(987654321)
+    X = randn(rng, 50, 4) .+ 1000.0
+    N = size(X, 1)
+    u = eps(Float64) / 2
+    S = vec(sum(abs2, big.(X) .- mean(big.(X); dims = 1); dims = 1))
+    exact = Float64.(S / (N - 1))
+    # The condition number of Equation 2.1 of the American Statistician survey.
+    kappa = Float64.(sqrt.(1 .+ vec(mean(big.(X); dims = 1)) .^ 2 .* N ./ S))
+    @test all(>(500), kappa)
+    fold(est) = foldl(partial_fit!, eachrow(X); init = est)
+    relerr(v) = abs.(v .- exact) ./ exact
+    @test all(relerr(var(fold(SimpleVariance()))) .<= N .* kappa .* u)
+    C = cov(fold(Covariance()))
+    @test all(relerr([C[i, i] for i in axes(C, 1)]) .<= N .* kappa .* u)
+end
+@testset "assert_partial_fit_state refuses each quantity that cannot describe a sample" begin
+    pe = PortfolioOptimisers
+    @test isnothing(pe.assert_partial_fit_state(0, [1.0, 2.0]))
+    @test isnothing(pe.assert_partial_fit_state(0, [1.0, 2.0], zeros(2)))
+    @test isnothing(pe.assert_partial_fit_state(3, [1.0, 2.0], zeros(2, 2)))
+    @test_throws DomainError pe.assert_partial_fit_state(-1, [1.0])
+    @test_throws IsEmptyError pe.assert_partial_fit_state(1, Float64[])
+    @test_throws IsNonFiniteError pe.assert_partial_fit_state(1, [NaN])
+    @test_throws IsNonFiniteError pe.assert_partial_fit_state(1, [1.0], [Inf])
+    @test_throws DimensionMismatch pe.assert_partial_fit_state(1, [1.0, 2.0], zeros(3))
+    @test_throws DimensionMismatch pe.assert_partial_fit_state(1, [1.0, 2.0], zeros(2, 3))
+end
+@testset "observation_count reads the folded rows, and names a state that has no count" begin
+    using Statistics
+    pe = PortfolioOptimisers
+    rng = StableRNG(1)
+    X = randn(rng, 10, 3)
+    X[4, 2] = NaN
+    # A row that holds a NaN is still a row of the sample, as `size(X, 1)` counts it.
+    @test pe.observation_count(partial_fit!(Covariance(), X)) == 10
+    @test pe.observation_count(partial_fit!(SimpleVariance(), X)) == 10
+    @test pe.observation_count(partial_fit!(SimpleExpectedReturns(), X)) == 10
+    @test_throws ArgumentError pe.observation_count(Covariance())
+    # An exponentially weighted state counts the observations of each asset alone. The verb
+    # refuses it by name, and the call with no data of the wrapper meets the same refusal.
+    ew = partial_fit!(ExpWeightedCovariance(), X)
+    err = try
+        pe.observation_count(ew)
+        nothing
+    catch e
+        e
+    end
+    @test err isa ArgumentError
+    @test occursin("`ExpWeightedCovarianceState` records no count", err.msg)
+    pc = partial_fit!(PortfolioOptimisersCovariance(; ce = ExpWeightedCovariance()), X)
+    @test_throws ArgumentError cov(pc)
+end
+@testset "A rolling window has no fold, and a seed window folds" begin
+    pe = PortfolioOptimisers
+    rng = StableRNG(2)
+    X = randn(rng, 12, 2)
+    @test_throws ArgumentError partial_fit!(WindowedVariance(; window = 5,
+                                                             rule = RollingWindow()), X)
+    sw = partial_fit!(WindowedVariance(; window = 5, rule = SeedWindow()), X)
+    @test sw isa WindowedVariance
+    # The declaration of each windowed type sets the inner estimator as the first field.
+    @test isnothing(pe.obs_weights_view(getfield(sw, 1).cache, 1:3))
+end
