@@ -158,6 +158,12 @@ unique_key_dict!(math_dict, :math_dict,
                  :m_pt_idio => "``m_{pt}``: Central moment of order ``p`` of the finite standardised returns of observation ``t``.",#
                  :a_t_series => "``a_{t}``: Diagnostic series value at observation ``t``.",#
                  :A_series_fin => "``\\mathcal{A}``: Finite observations of a diagnostic series, those at which ``a_{t}`` is finite.",#
+                 # The weight policies of a cross-sectional regression. Each symbol is
+                 # stated by two or more Units of that file.
+                 :w_ti_cs => "``w_{t,i}``: Cross-sectional regression weight of asset ``i`` at observation ``t``.",#
+                 :m_ti_mcap => "``m_{t,i}``: Market capitalisation of asset ``i`` at observation ``t``.",#
+                 :p_mcap => "``p``: Market capitalisation power.",#
+                 :M_cs_mask => "``\\mathcal{M}``: Eligibility mask, the set of pairs ``(t, i)`` that enter the fit.",#
                  :rho_S_cs => "``\\rho_{S}``: Cross-sectional rank correlation, over the assets at which both cross-sections are finite. Under the default `ties = :average`, equal values share the mean of their ranks. Under `ties = :ordinal`, they take consecutive ranks, in the order of the asset axis.",#
                  # The factor model summary of `32_CrossSectionalFactorModel/`. Each symbol
                  # is stated by two or more Units of `10_FactorModelSummary.jl`.

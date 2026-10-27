@@ -74,6 +74,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :drtgt => "`drtgt`: Dimension reduction target.",#
                  :csrint => "`intercept`: Whether a per-observation intercept is fitted. When `false`, the regression runs through the origin of the cross-section.",
                  :csalg => "`alg`: Solve algorithm, an [`AbstractCrossSectionalSolveAlgorithm`](@ref). It decides what the fit does with a rank-deficient weighted design.",#
+                 :mcap_p => "`p`: Exponent applied to the market capitalisation. A value of `0` needs no capitalisation matrix, because every eligible asset then takes the same weight.",#
                  ## Gerber
                  :gerbalg => "`alg`: Gerber covariance algorithm.",#
                  :gerbce => "`ce`: Gerber covariance estimator.",#

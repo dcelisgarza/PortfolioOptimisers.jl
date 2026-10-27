@@ -294,6 +294,7 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :trefethen2019 => "[trefethen2019](@cite) L. N. Trefethen. *Approximation Theory and Approximation Practice, Extended Edition*. SIAM (2019). Theorem 19.3.",#
                  :estrada2002 => "[estrada2002](@cite) J. Estrada. *Systematic risk in emerging markets: the D-CAPM*. Emerging Markets Review 3, 365–379 (2002).",#
                  :menchero2011 => "[menchero2011](@cite) J. Menchero, D. J. Orr and J. Wang. *The Barra US Equity Model (USE4): Methodology Notes*. Model Insight, MSCI (2011).",#
+                 :aitken1935 => "[aitken1935](@cite) A. C. Aitken. *On least squares and linear combination of observations*. Proceedings of the Royal Society of Edinburgh 55, 42–48 (1935).",#
                  :paleologo2025 => "[paleologo2025](@cite) G. A. Paleologo. *The Elements of Quantitative Investing*. Wiley (2025).",#
                  :engle2002 => "[engle2002](@cite) R. Engle. *Dynamic conditional correlation: A simple class of multivariate generalized autoregressive conditional heteroskedasticity models*. Journal of Business & Economic Statistics 20, 339–350 (2002).",#
                  :hill1975 => "[hill1975](@cite) B. M. Hill. *A simple general approach to inference about the tail of a distribution*. The Annals of Statistics 3, 1163–1174 (1975).",#
