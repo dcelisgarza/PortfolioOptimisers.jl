@@ -220,7 +220,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Records `r` as the owner of every `:risk_frontier` entry after position `first` that has no owner yet.
 
-[`rebuild_risk_frontier`](@ref) resolves a [`Frontier`](@ref) bound into a span of numbers, and it values the corner portfolios with the measure that owns the entry. The owner is the measure whose value the bounded expression holds, in the units that the `bound` of the `Frontier` converts. For a plain measure, that is the measure itself. A composite measure bounds the expression of a term, so its builder records the measure of that term first. The `vr` and `kt` terms of [`VarianceSkewKurtosis`](@ref) are the example. The position of an entry does not give its measure: a measure registers an entry only when its `settings.ub` is a [`Front_NumVec`](@ref), and one measure can register several entries.
+[`rebuild_risk_frontier`](@ref) resolves a [`Frontier`](@ref) bound into a span of numbers, and it values the corner portfolios with the measure that owns the entry. The owner is the measure that the bounded expression measures, and [`frontier_risk`](@ref) values it in the units that the `bound` of the `Frontier` converts. For a plain measure, that is the measure itself. A composite measure bounds the expression of a term, so its builder records the measure of that term first. The `vr`, `sk` and `kt` terms of [`VarianceSkewKurtosis`](@ref) are the example. The position of an entry does not give its measure: a measure registers an entry only when its `settings.ub` is a [`Front_NumVec`](@ref), and one measure can register several entries.
 
 # Algorithm
 

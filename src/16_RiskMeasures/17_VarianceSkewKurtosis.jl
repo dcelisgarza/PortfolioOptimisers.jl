@@ -744,10 +744,70 @@ Where:
   - [`homogeneity_degree`](@ref)
 """
 function variance_skew_kurtosis_terms(r::VarianceSkewKurtosis, w::VecNum)
-    w2 = LinearAlgebra.kron(w, w)
     return (r.vr(w) * r.vr.settings.scale,
-            LinearAlgebra.dot(w, r.sk.sk, w2) * r.sk.settings.scale,
-            LinearAlgebra.dot(w2, r.kt.kt, w2) * r.kt.settings.scale)
+            portfolio_third_moment(r.sk.sk, w) * r.sk.settings.scale,
+            portfolio_fourth_moment(r.kt.kt, w) * r.kt.settings.scale)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the third moment of the portfolio at the weights `w`, read off the coskewness matrix `sk`.
+
+This is the term that the model of [`VarianceSkewKurtosis`](@ref) relaxes, and that the `lb` of a [`Skewness`](@ref) bounds. The functor of `Skewness` reads the returns and standardises the moment, so it gives a different value.
+
+Where:
+
+  - $(math_dict[:m3_port])
+  - $(math_dict[:M3_cosk])
+
+# Arguments
+
+  - `sk::MatNum`: Coskewness matrix `assets × assets^2`.
+  - $(arg_dict[:pw])
+
+# Returns
+
+  - `m3::Number`: The third moment of the portfolio.
+
+# Related
+
+  - [`portfolio_fourth_moment`](@ref)
+  - [`variance_skew_kurtosis_terms`](@ref)
+  - [`frontier_risk`](@ref)
+"""
+function portfolio_third_moment(sk::MatNum, w::VecNum)
+    return LinearAlgebra.dot(w, sk, LinearAlgebra.kron(w, w))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the fourth moment of the portfolio at the weights `w`, read off the cokurtosis matrix `kt`.
+
+This is the term that the models of [`Kurtosis`](@ref) and of [`VarianceSkewKurtosis`](@ref) read. The functor of `Kurtosis` reads the returns, so the two agree only when `kt` is the sample cokurtosis about the Moment Target of the measure.
+
+Where:
+
+  - $(math_dict[:m4_port])
+  - $(math_dict[:K_cokurt])
+
+# Arguments
+
+  - `kt::MatNum`: Cokurtosis matrix `assets^2 × assets^2`.
+  - $(arg_dict[:pw])
+
+# Returns
+
+  - `m4::Number`: The fourth moment of the portfolio.
+
+# Related
+
+  - [`portfolio_third_moment`](@ref)
+  - [`variance_skew_kurtosis_terms`](@ref)
+  - [`frontier_risk`](@ref)
+"""
+function portfolio_fourth_moment(kt::MatNum, w::VecNum)
+    w2 = LinearAlgebra.kron(w, w)
+    return LinearAlgebra.dot(w2, kt, w2)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

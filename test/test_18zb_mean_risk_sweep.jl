@@ -232,6 +232,78 @@ end
     @test collect(only(span).second[2]) ≈ range(k_lo, k_hi; length = 3) rtol = 1e-10
 end
 
+@testset "MeanRisk sweep: a sweep on the skewness floor of VarianceSkewKurtosis spans m3" begin
+    pr = prior(HighOrderPriorEstimator(), MRS_X)
+    opt = JuMPOptimiser(; pe = pr, slv = MRS_SLV)
+    wmin = optimise(MeanRisk(; opt = opt, r = VarianceSkewKurtosis())).w
+    wmax = optimise(MeanRisk(; opt = opt, r = VarianceSkewKurtosis(),
+                             obj = MaximumReturn())).w
+    # The floor bounds the third moment that the model reads off the coskewness matrix. The
+    # span took the risk of the whole measure, and the functor of `Skewness` gives the
+    # standardised skewness, so neither is in the units of the floor.
+    m3(w) = PO.portfolio_third_moment(pr.sk, w)
+    r = VarianceSkewKurtosis(;
+                             sk = Skewness(;
+                                           settings = MaxRiskMeasureSettings(;
+                                                                             lb = Frontier(;
+                                                                                           N = 5))))
+    res = optimise(MeanRisk(; opt = opt, r = r, obj = MaximumReturn()))
+    @test all(c -> isa(c, PO.OptimisationSuccess), res.retcode)
+    entry = only(res.model[:risk_frontier])
+    @test entry.second[4] isa Skewness
+    owner = factory(entry.second[4], pr, MRS_SLV)
+    span = PO._rebuild_risk_frontier(pr, nothing, owner, [entry], wmin, wmax, 1)
+    @test collect(span.second[2]) ≈ range(m3(wmax), m3(wmin); length = 5) rtol = 1e-12
+    # NearOptimalCentering takes the same span.
+    noc = NearOptimalCentering(; r = r, obj = MaximumReturn(), opt = opt,
+                               alg = ConstrainedNearOptimalCentering())
+    span = PO.rebuild_risk_frontier(noc, pr, nothing, [entry], wmin, wmax, [1])
+    @test collect(only(span).second[2]) ≈ range(m3(wmax), m3(wmin); length = 5) rtol = 1e-12
+end
+
+@testset "MeanRisk sweep: a span reads the comoment matrix that the model reads" begin
+    pr = prior(HighOrderPriorEstimator(), MRS_X)
+    w = collect(range(0.1, 0.3; length = 5))
+    w ./= sum(w)
+    m3, m4 = PO.portfolio_third_moment(pr.sk, w), PO.portfolio_fourth_moment(pr.kt, w)
+    @test m3 ≈ dot(w, pr.sk, kron(w, w))
+    @test m4 ≈ dot(kron(w, w), pr.kt, kron(w, w))
+    # On the sample comoments, the span of a kurtosis owner is the value of its functor, in
+    # the units of its formulation.
+    for (alg2, g) in ((SOCRiskExpr(), sqrt), (RSOCRiskExpr(), identity))
+        kt = factory(Kurtosis(; alg2 = alg2), pr)
+        @test PO.frontier_risk(kt, w, MRS_X, nothing) ≈ g(m4)
+        @test PO.frontier_risk(kt, w, MRS_X, nothing) ≈ expected_risk(kt, w, MRS_X) rtol = 1e-10
+        # A stated matrix is the matrix of the model, so the span reads it, and the functor
+        # reads the returns.
+        kt = factory(Kurtosis(; alg2 = alg2, kt = 2 .* pr.kt), pr)
+        @test PO.frontier_risk(kt, w, MRS_X, nothing) ≈ g(2 * m4)
+        @test !isapprox(PO.frontier_risk(kt, w, MRS_X, nothing),
+                        expected_risk(kt, w, MRS_X); rtol = 1e-2)
+    end
+    # The functor of Skewness standardises the moment, and the floor bounds the moment.
+    sk = factory(Skewness(; sk = 2 .* pr.sk), pr)
+    @test PO.frontier_risk(sk, w, MRS_X, nothing) ≈ 2 * m3
+    @test !isapprox(PO.frontier_risk(sk, w, MRS_X, nothing), expected_risk(sk, w, MRS_X);
+                    rtol = 1e-2)
+end
+
+@testset "MeanRisk sweep: a sweep on the whole of VarianceSkewKurtosis meets each level" begin
+    pr = prior(HighOrderPriorEstimator(), MRS_X)
+    opt = JuMPOptimiser(; pe = pr, slv = MRS_SLV)
+    wmin = optimise(MeanRisk(; opt = opt, r = VarianceSkewKurtosis())).w
+    wmax = optimise(MeanRisk(; opt = opt, r = VarianceSkewKurtosis(),
+                             obj = MaximumReturn())).w
+    # At a unit skewness scale the relaxation is tight between the corners, so the bound on
+    # the weighted sum holds the functor, which reads the matrices of the model.
+    r = VarianceSkewKurtosis(; settings = RiskMeasureSettings(; ub = Frontier(; N = 5)))
+    res = optimise(MeanRisk(; opt = opt, r = r, obj = MaximumReturn()))
+    @test all(c -> isa(c, PO.OptimisationSuccess), res.retcode)
+    fr = factory(r, pr)
+    levels = range(fr(wmin, MRS_X), fr(wmax, MRS_X); length = 5)
+    @test isapprox([fr(w, MRS_X) for w in res.w], levels; rtol = 1e-6)
+end
+
 @testset "Frontier sweep: a sweep of one point gives the portfolio of its scalar bound" begin
     pr = prior(HighOrderPriorEstimator(), MRS_X)
     opt = JuMPOptimiser(; pe = pr, slv = MRS_SLV)

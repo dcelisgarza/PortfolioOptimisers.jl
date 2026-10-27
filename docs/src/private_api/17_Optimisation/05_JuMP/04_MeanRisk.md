@@ -1,5 +1,5 @@
 ```@meta
-Description = "Mean Risk, private API of PortfolioOptimisers.jl: mean_risk_td_defaults, solve_mean_risk!, return_term, compute_ret_lbs, _rebuild_risk_frontier, …"
+Description = "Mean Risk, private API of PortfolioOptimisers.jl: mean_risk_td_defaults, solve_mean_risk!, return_term, compute_ret_lbs, frontier_risk, …"
 ```
 
 # Mean Risk: private API
@@ -9,6 +9,7 @@ mean_risk_td_defaults
 solve_mean_risk!
 return_term
 compute_ret_lbs
+frontier_risk
 _rebuild_risk_frontier
 rebuild_risk_frontier
 unresolved_risk_frontier
