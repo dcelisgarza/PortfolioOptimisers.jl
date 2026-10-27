@@ -74,7 +74,7 @@ RiskTrackingError
       │   fixed ┴ Bool: false
     r ┼ StandardDeviation
       │   settings ┼ RiskMeasureSettings
-      │            │   scale ┼ Int64: 1
+      │            │   scale ┼ Float64: 1.0
       │            │      ub ┼ nothing
       │            │     rke ┴ Bool: false
       │      sigma ┼ nothing
@@ -495,7 +495,7 @@ RiskTrackingRiskMeasure
            │   fixed ┴ Bool: false
          r ┼ Variance
            │    settings ┼ RiskMeasureSettings
-           │             │   scale ┼ Int64: 1
+           │             │   scale ┼ Float64: 1.0
            │             │      ub ┼ nothing
            │             │     rke ┴ Bool: false
            │       sigma ┼ nothing

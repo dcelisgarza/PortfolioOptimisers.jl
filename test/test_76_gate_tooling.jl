@@ -536,6 +536,18 @@ end
               "        - function f(x)\n        3     y = x\n        0     z = 1\n" *
               "        - end\n")
         @test RF.coverage_lines(cov) == (2, [3])
+        # Each of the two refusals of `--coverage` names its own cause.
+        msg(f) =
+            try
+                f()
+                ""
+            catch e
+                sprint(showerror, e)
+            end
+        @test occursin("absolute directory", msg(() -> RF.run_coverage("cov", String[])))
+        missing_dir = joinpath(mktempdir(), "no_such_dir")
+        @test occursin("a source directory that exists",
+                       msg(() -> RF.run_coverage(missing_dir, String[])))
     end
 
     @testset "run_files --testset prunes to the selected sets, --time-depth times them" begin

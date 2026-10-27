@@ -2678,7 +2678,7 @@ function expected_risk_from_returns end
 
 Return a copy of risk measure `r` with no bound, and with its `scale` and its risk-expression flag kept.
 
-Generic function extended by concrete risk measure types. It builds no model. For hierarchical risk measures, returns `r` unchanged.
+Generic function extended by concrete risk measure types. It builds no model. A [`HierarchicalRiskMeasure`](@ref) and a [`NonOptimisationRiskMeasure`](@ref) return unchanged.
 
 # Related
 
@@ -2689,9 +2689,9 @@ function no_bounds_risk_measure end
 """
     no_bounds_no_risk_expr_risk_measure(r, args...; kwargs...)
 
-Return a copy of risk measure `r` with no bound, with its risk-expression flag disabled and with `scale = 1`.
+Return a copy of risk measure `r` with no bound, with its risk-expression flag disabled and with a unit `scale`.
 
-Generic function extended by concrete risk measure types. It builds no model. For hierarchical risk measures, returns `r` unchanged.
+Generic function extended by concrete risk measure types. It builds no model. A [`HierarchicalRiskMeasure`](@ref) and a [`NonOptimisationRiskMeasure`](@ref) return unchanged.
 
 # Related
 
@@ -2702,9 +2702,9 @@ function no_bounds_no_risk_expr_risk_measure end
 """
     no_risk_expr_risk_measure(r, args...; kwargs...)
 
-Return a copy of risk measure `r` with its risk-expression flag disabled while preserving its upper-bound constraint.
+Return a copy of risk measure `r` with its risk-expression flag disabled, and with its bound and its `scale` kept.
 
-Generic function extended by concrete risk measure types. For hierarchical risk measures, returns `r` unchanged.
+Generic function extended by concrete risk measure types. A [`HierarchicalRiskMeasure`](@ref) and a [`NonOptimisationRiskMeasure`](@ref) return unchanged.
 
 # Related
 
@@ -2719,7 +2719,7 @@ function no_risk_expr_risk_measure end
 
 Return a copy of risk measure `r` with its bound set to `ub`.
 
-Generic function extended by concrete risk measure types. The bound is the `ub` of a [`RiskMeasureSettings`](@ref), and the `lb` of a [`MaxRiskMeasureSettings`](@ref). For hierarchical risk measures, returns `r` unchanged.
+Generic function extended by concrete risk measure types. The bound is the `ub` of a [`RiskMeasureSettings`](@ref), and the `lb` of a [`MaxRiskMeasureSettings`](@ref). A [`HierarchicalRiskMeasure`](@ref) and a [`NonOptimisationRiskMeasure`](@ref) return unchanged.
 
 # Related
 

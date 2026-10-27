@@ -79,7 +79,9 @@ rows whose test set ran are judged.
 `--coverage=<absolute dir>` runs the files in a child process under `--code-coverage=@<dir>`,
 because Julia writes the counters only when a process exits. The parent then prints one
 `COVERAGE` line per source file under `<dir>`, with the lines that no test reached, and deletes the
-counter files of the child. The other options are passed to the child.
+counter files of the child. The other options are passed to the child. `<dir>` is the source
+directory to measure, such as `<worktree>/src/16_RiskMeasures`, because Julia counts only the files
+under it. A scratch directory holds no source file, so the run prints no `COVERAGE` line at all.
 
 `--ci` runs the files in a child process under the flags of `Pkg.test` on CI,
 `--check-bounds=yes --code-coverage=user`. A test that pins solver output can pass locally and fail
@@ -604,8 +606,10 @@ Run the driver again in a child process under `--code-coverage=@<dir>`, then rep
 files that child wrote and delete them.
 """
 function run_coverage(dir::AbstractString, rest::Vector{String})
-    if !(isabspath(dir) && isdir(dir))
-        error("`--coverage` needs an absolute directory. A relative one instruments nothing.")
+    if !isabspath(dir)
+        error("`--coverage` needs an absolute directory. A relative one instruments nothing. Got $dir")
+    elseif !isdir(dir)
+        error("`--coverage` needs a source directory that exists, such as <worktree>/src. Got $dir")
     end
     cmd = `$(Base.julia_cmd()) -t 1 --project=$(Base.active_project()) --code-coverage=@$dir $(@__FILE__) $rest`
     p = run(ignorestatus(cmd); wait = false)

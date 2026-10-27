@@ -82,7 +82,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Measures the standardised skewness of the portfolio returns, the third central moment divided by the cube of the standard deviation.
 
-A larger skewness is better, so [`bigger_is_better`](@ref) returns `true`. The measure is a [`NonOptimisationRiskMeasure`](@ref) and carries a [`MaxRiskMeasureSettings`](@ref), whose bound is the floor `lb`. So it answers [`bigger_is_better`](@ref), [`bounds_risk_measure`](@ref), [`no_bounds_risk_measure`](@ref), [`no_risk_expr_risk_measure`](@ref) and [`no_bounds_no_risk_expr_risk_measure`](@ref) with methods of its own: the methods for a [`RiskMeasure`](@ref) build a [`RiskMeasureSettings`](@ref), which has a ceiling `ub` and no floor.
+A larger skewness is better, so [`bigger_is_better`](@ref) returns `true`. The measure is a [`NonOptimisationRiskMeasure`](@ref) and carries a [`MaxRiskMeasureSettings`](@ref), whose bound is the floor `lb`. So it answers [`bigger_is_better`](@ref), [`bounds_risk_measure`](@ref), [`no_bounds_risk_measure`](@ref), [`no_risk_expr_risk_measure`](@ref), [`no_bounds_no_risk_expr_risk_measure`](@ref) and [`unit_scale_risk_measure`](@ref) with methods of its own: the methods for a [`RiskMeasure`](@ref) build a [`RiskMeasureSettings`](@ref), which has a ceiling `ub` and no floor.
 
 No optimiser takes the measure alone. [`VarianceSkewKurtosis`](@ref) reads its `sk` and its `settings`, and it builds the third moment ``m_3(\\boldsymbol{w})`` from `sk`. That term is not standardised, so `settings.lb` and `settings.scale` act on ``m_3`` and not on the value of the functor.
 
@@ -426,8 +426,8 @@ This is the copy that a measure takes when it only measures a distance, as the m
 function no_bounds_no_risk_expr_risk_measure(r::Skewness, ::Any = nothing)
     return Skewness(;
                     settings = MaxRiskMeasureSettings(; rke = false, lb = nothing,
-                                                      scale = 1), ve = r.ve, sk = r.sk,
-                    w = r.w, mu = r.mu, pe = r.pe)
+                                                      scale = one(r.settings.scale)),
+                    ve = r.ve, sk = r.sk, w = r.w, mu = r.mu, pe = r.pe)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -466,6 +466,30 @@ function no_bounds_risk_measure(r::Skewness, ::Any = nothing)
                     settings = MaxRiskMeasureSettings(; rke = r.settings.rke, lb = nothing,
                                                       scale = r.settings.scale), ve = r.ve,
                     sk = r.sk, w = r.w, mu = r.mu, pe = r.pe)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a copy of [`Skewness`](@ref) `r` with a unit `scale`, and keep `lb` and `rke`.
+
+A measure that already has a unit `scale` returns unchanged. The method exists because the method for a [`RiskMeasure`](@ref) builds a [`RiskMeasureSettings`](@ref), which has no `lb`.
+
+# Related
+
+  - [`Skewness`](@ref)
+  - [`MaxRiskMeasureSettings`](@ref)
+  - [`unit_scale_risk_measure`](@ref)
+"""
+function unit_scale_risk_measure(r::Skewness)
+    settings = r.settings
+    scale = settings.scale
+    if isone(scale)
+        return r
+    end
+    return Skewness(;
+                    settings = MaxRiskMeasureSettings(; rke = settings.rke,
+                                                      lb = settings.lb, scale = one(scale)),
+                    ve = r.ve, sk = r.sk, w = r.w, mu = r.mu, pe = r.pe)
 end
 function moment_risk(r::Skewness{<:Any, <:Any, <:Any, <:Option{<:StatsBase.AbstractWeights},
                                  <:Any}, val::VecNum)
