@@ -1,13 +1,13 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Result type for Factor Risk Contribution portfolio optimisation.
+Result of a [`FactorRiskContribution`](@ref) optimisation.
 
 # Fields
 
 $(DocStringExtensions.FIELDS)
 
-Property access delegates to the embedded [`JuMPOptimisationResult`](@ref); unknown properties forward into `rr` first, then through `jr` (including the virtual `:w` and the `pa` fall-through).
+A property that is not a field resolves in `rr` first, and then in `jr`. So `res.L` reads the loadings, and `res.w` reads the asset weights through the virtual `:w` of [`JuMPOptimisationResult`](@ref).
 
 # Constructors
 
@@ -66,7 +66,7 @@ end
 
 Rebuild a [`FactorRiskContributionResult`](@ref) with a different return code.
 
-`retcode` is not a field of this result and resolves through the [`JuMPOptimisationResult`](@ref) it embeds, so the rebuild rebuilds `jr` and carries every other member over unchanged.
+`retcode` is a field of the [`JuMPOptimisationResult`](@ref) in `jr`, not of this result. So the method rebuilds `jr` and keeps every other field.
 
 # Arguments
 
@@ -96,9 +96,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return the static defaults of the [`FactorRiskContribution`](@ref) fields that may hold a [`TimeDependent`](@ref).
+Return the static defaults of the [`FactorRiskContribution`](@ref) fields that can hold a [`TimeDependent`](@ref).
 
-Shared by the constructor's test-substitution pass and [`time_dependent_field_defaults`](@ref), so the fold-less value of a field is declared once. Fields whose static default is `nothing` are omitted.
+The constructor reads them to check each schedule, and [`time_dependent_field_defaults`](@ref) returns them, so the value of a field outside a fold is written once. A field whose static default is `nothing` is not in the tuple.
 
 # Related
 
@@ -112,17 +112,19 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Solves a mean-risk problem whose decision variable is the vector of factor exposures rather than the vector of asset weights.
+Solves a mean-risk problem whose decision variable is the vector of factor weights, not the vector of asset weights.
 
-The asset weights are recovered from the exposures through the factor loadings, so a constraint written on the decision variable is a constraint on a factor. This is the change of basis alone: `FactorRiskContribution` sets **no** risk budget of its own. A target contribution per factor is stated through the risk measure's own `rc` constraints, exactly as it is for assets.
+The asset weights are a linear map of the factor weights through the factor loadings, so a constraint on the decision variable is a constraint on a factor. `FactorRiskContribution` changes the basis and sets **no** risk budget of its own. A target contribution of a factor is a row of the `rc` constraints of the risk measure, as the target of an asset is.
 
-Under [`Variance`](@ref) those rows sit on the semidefinite relaxation of [sdprp](@cite), formulation 16, over the factor weights. With `flag = true` the lift covers the off-factor weights ``\\tilde{\\boldsymbol{y}}_{af}`` too, so the variance is that of the returned weights, and each row states the Euler contribution of a factor as a share of the whole variance, as [`factor_risk_contribution`](@ref) reports it. [`set_risk_constraints!`](@ref) states the formulation. A solve can report success while the factor shares of the returned portfolio miss the rows, so compare [`factor_risk_contribution`](@ref) of the result with them. The `## Risk contribution constraints` subsection of [`Variance`](@ref) states the relaxation and the condition under which the rows bind.
+Under [`Variance`](@ref) the `rc` rows sit on the semidefinite relaxation of Formulation 16 of [sdprp](@cite), over the factor weights. With `flag = true` the lift covers the off-factor weights ``\\boldsymbol{w}_2`` too. The variance is then the variance of the returned weights, and each row states the Euler contribution of a factor as a share of the whole variance, as [`factor_risk_contribution`](@ref) reports it. [`set_risk_constraints!`](@ref) states the formulation. A solve can report success while the factor shares of the returned portfolio miss the rows, so compare [`factor_risk_contribution`](@ref) of the result with them. The `## Risk contribution constraints` subsection of [`Variance`](@ref) states the relaxation and the condition under which the rows bind.
 
 A [`Variance`](@ref) always takes this semidefinite formulation here, with or without rows. Under [`MaximumRatio`](@ref) the `ratio_alg` of the variance selects the degree of its objective term, and so the ratio. The default gives the Sharpe ratio, and [`LinearRatio`](@ref) gives the excess return per unit of variance. The `# Mathematical definition` of [`MaximumRatio`](@ref) states the rule, and [`set_sdp_frc_objective_lift!`](@ref) states the lift.
 
+The optimiser solves its model once. A `settings.ub` on a risk measure logs a warning, and the model ignores the bound, see [`set_risk_upper_bound!`](@ref). A return term with a [`Frontier`](@ref) or a vector floor raises an `ArgumentError`, see [`assert_frontier_sweep_owner`](@ref). [`MeanRisk`](@ref) sweeps a frontier.
+
 # Mathematical definition
 
-The factor model of the loadings, fitted by `re` or carried by the prior:
+The factor model of the loadings, which `re` fits or the prior carries:
 
 ```math
 \\begin{align}
@@ -130,47 +132,52 @@ The factor model of the loadings, fitted by `re` or carried by the prior:
 \\end{align}
 ```
 
-The portfolio's factor exposures are ``\\boldsymbol{y}_{f} = \\mathbf{B}^\\intercal \\boldsymbol{w}``, and the weights are recovered from them by the Moore-Penrose pseudoinverse:
+The asset weights are a linear map of the decision variables. The first form is the model when `flag = false`, and the second is the model when `flag = true`:
 
 ```math
 \\begin{align}
-\\boldsymbol{w} &= (\\mathbf{B}^\\intercal)^{+} \\boldsymbol{y}_{f}\\,, \\\\
-\\boldsymbol{w} &= (\\mathbf{B}^\\intercal)^{+} \\boldsymbol{y}_{f} + (\\tilde{\\mathbf{B}}^\\intercal)^{+} \\tilde{\\boldsymbol{y}}_{af}\\,, \\quad \\tilde{\\mathbf{B}} = \\ker(\\mathbf{B}^\\intercal)\\,.
+\\boldsymbol{w} &= \\mathbf{B}_1 \\boldsymbol{w}_1\\,, \\\\
+\\boldsymbol{w} &= \\mathbf{B}_1 \\boldsymbol{w}_1 + \\mathbf{B}_2 \\boldsymbol{w}_2\\,, \\\\
+\\mathbf{B}_1 &= (\\mathbf{B}^\\intercal)^{+}\\,.
 \\end{align}
 ```
 
-The first form is the model built when `flag = false`, and the second when `flag = true`. The second adds the ``N - N_{f}`` directions the loadings do not span, so the weight vector is no longer confined to the factor subspace.
+The columns of ``\\mathbf{B}_2`` are an orthonormal basis of the null space of ``\\mathbf{B}^\\intercal``, so ``\\mathbf{B}^\\intercal \\mathbf{B}_2 = \\mathbf{0}``. When ``\\mathbf{B}`` has full column rank, ``\\mathbf{B}^\\intercal \\mathbf{B}_1`` is the identity, and the factor exposures of the portfolio are ``\\mathbf{B}^\\intercal \\boldsymbol{w} = \\boldsymbol{w}_1``. The first form keeps ``\\boldsymbol{w}`` in the column space of ``\\mathbf{B}``. The second form adds the directions that the loadings do not span, so ``\\boldsymbol{w}`` can be any vector of size ``N``.
 
-The problem is then the mean-risk problem of [`MeanRisk`](@ref) over ``\\boldsymbol{y}_{f}``:
+The problem is the mean-risk problem of [`MeanRisk`](@ref) over the decision variables:
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{y}_{f}}{\\min} \\; f(\\boldsymbol{w}(\\boldsymbol{y}_{f})) \\quad \\text{s.t.} \\quad \\boldsymbol{w}(\\boldsymbol{y}_{f}) \\in \\mathcal{W}\\,.
+\\underset{\\boldsymbol{w}_1,\\, \\boldsymbol{w}_2}{\\min} \\; f(\\boldsymbol{w}) \\quad \\text{s.t.} \\quad \\boldsymbol{w} \\in \\mathcal{W}\\,.
 \\end{align}
 ```
 
-The risk contribution of factor ``j``, which [`factor_risk_contribution`](@ref) reports, follows from the Euler decomposition in that basis:
+The risk contribution of factor ``j``, which [`factor_risk_contribution`](@ref) reports, is the Euler decomposition in this basis. The last entry is the contribution of the off-factor part, and the entries sum to ``\\boldsymbol{w}^\\intercal \\nabla R(\\boldsymbol{w})``, which is ``R(\\boldsymbol{w})`` for a risk measure that is homogeneous of degree one:
 
 ```math
 \\begin{align}
-RC_j(\\boldsymbol{y}_{f}) &= \\left[ \\frac{\\partial \\mathcal{R}(\\boldsymbol{w})}{\\partial \\boldsymbol{w}} (\\mathbf{B}^\\intercal)^{+} \\right]_{j} \\left[ \\mathbf{B}^\\intercal \\boldsymbol{w} \\right]_{j}\\,.
+RC_j &= \\left[ \\mathbf{B}^\\intercal \\boldsymbol{w} \\right]_j \\left[ \\mathbf{B}_1^\\intercal \\nabla R(\\boldsymbol{w}) \\right]_j\\,, \\quad j = 1, \\ldots, N_f\\,, \\\\
+RC_{N_f + 1} &= \\left( \\mathbf{B}_2^\\intercal \\boldsymbol{w} \\right)^\\intercal \\mathbf{B}_2^\\intercal \\nabla R(\\boldsymbol{w})\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\mathbf{R}``: Asset returns matrix.
-  - ``\\mathbf{F}``: Factor returns matrix.
+  - ``\\mathbf{R}``: Asset returns matrix, ``T \\times N``.
+  - ``\\mathbf{F}``: Factor returns matrix, ``T \\times N_f``.
   - $(math_dict[:B_loadings])
-  - ``\\mathbf{E}``: Residual matrix.
-  - ``\\boldsymbol{w}``: Portfolio weight vector.
-  - ``\\boldsymbol{y}_{f}``: Factor exposure vector, the decision variable.
-  - ``\\tilde{\\boldsymbol{y}}_{af}``: Exposures to the additional directions, which carry no economic interpretation.
+  - ``\\mathbf{E}``: Residual matrix, ``T \\times N``.
+  - $(math_dict[:w_port])
+  - $(math_dict[:w_1_factor])
+  - $(math_dict[:w_2_off_factor])
+  - ``\\mathbf{B}_1``: The factor basis, ``N \\times N_f``.
+  - ``\\mathbf{B}_2``: The off-factor basis, ``N \\times (N - \\operatorname{rank}\\mathbf{B})``.
   - ``(\\cdot)^{+}``: Moore-Penrose pseudoinverse.
-  - ``f(\\boldsymbol{w})``: Objective function (depends on [`ObjectiveFunction`](@ref)).
+  - ``f(\\boldsymbol{w})``: The objective, which `obj` selects, see [`ObjectiveFunction`](@ref).
   - $(math_dict[:W_feas])
-  - ``\\mathcal{R}(\\boldsymbol{w})``: Portfolio risk measure.
+  - $(math_dict[:R_w])
   - ``RC_j``: Risk contribution of factor ``j``.
+  - $(math_dict[:N])
 
 # Fields
 
@@ -190,16 +197,16 @@ $(DocStringExtensions.FIELDS)
         fb::TDO_Option{<:OptE_Opt} = nothing
     ) -> FactorRiskContribution
 
-Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the factor model, risk measure, objective, factor phylogeny constraints, asset sets, warm start and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default. `flag` is execution control and stays static.
+Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) can hold a [`TimeDependent`](@ref) schedule in place of a static value. These fields define the problem: the factor model, the risk measure, the objective, the factor phylogeny constraints, the asset sets, the warm start and the fallback. A cross-validation fold loop resolves each schedule for its fold, and an `optimise` outside a fold uses the static default of each field. `flag` controls the execution and is always static.
 
 ## Validation
 
   - If `r` is a vector: `!isempty(r)`.
   - If `wi` is a vector: `!isempty(wi)`.
   - `fb` schedules: `bind !== :nearest`.
-  - A risk expression that is identically zero is refused. The problem is stated in the
-    factor basis, so a model with no risk term bounds nothing. A [`NoRisk`](@ref) measure and
-    `settings.rke = false` on every measure are the two routes to it.
+  - The risk expression is not identically zero. The problem is stated in the factor basis,
+    so a model with no risk term bounds nothing. A [`NoRisk`](@ref) measure and
+    `settings.rke = false` on every measure are the two ways to get such a model.
   - If `r` holds a [`DataBenchmarkTracking`](@ref): `opt.pe` must not state `x_src = ExcessSource()`, see [`assert_data_benchmark_prior`](@ref).
   - Each estimator of `frc_ple` states no source, because it reads the factor returns that the head picks, see [`assert_inner_reader`](@ref).
   - A reader that states no source and reads the raw returns data, beside a reader that states `x_src = ExcessSource()`, logs one warning that names its path, see [`warn_raw_readers`](@ref). The head then builds as configured.
@@ -214,12 +221,13 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Opti
 
 ## View parameters
 
-`FactorRiskContribution` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
+`FactorRiskContribution` has its own [`port_opt_view`](@ref) method. It does not derive the view from the tags of the fields.
 
-  - The method reads the returns matrix `X` as its third argument. When `opt.pe` already holds a prior **result**, the method replaces `X` with `opt.pe.X`, so the children are viewed against the prior's own observations rather than the caller's matrix.
-  - `opt` and `r` recurse through [`port_opt_view`](@ref) with that matrix. `re` recurses with the index alone, which slices its loadings to the selected assets and leaves the factor axis whole.
-  - `wi` is carried through unchanged, because it holds initial **factor** weights. The optimisation re-bases the weight variable onto the factor axis, so the asset selection does not index `wi`.
-  - `obj`, `frc_ple`, `sets`, `flag` and `fb` are carried through unchanged.
+  - The method reads the returns matrix `X` as its third argument. When `opt.pe` holds a prior **result**, the method replaces `X` with `opt.pe.X`, so the children are viewed against the observations of the prior and not against the matrix of the caller.
+  - `opt` and `r` recurse through [`port_opt_view`](@ref) with that matrix. `re` recurses with the index alone, which slices its loadings to the selected assets and keeps every factor.
+  - `fb` goes through [`view_child`](@ref), which views a fallback estimator and keeps a fallback result.
+  - `wi` is not changed, because it holds start values of the **factor** weights. The asset selection does not index the factor axis.
+  - `obj`, `frc_ple`, `sets` and `flag` are not changed.
 
 # Related
 
@@ -235,10 +243,9 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Opti
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 10.2.1.
-  - $(ref_dict[:sdprp]) Formulation 16.
-  - $(ref_dict[:roncalliweisang2012])
-  - $(ref_dict[:meucci2007])
+  - $(ref_dict[:roncalliweisang2012]) Section 3, Equation 2 and Theorem 1. The matrix ``\\mathbf{A}`` of that work is ``\\mathbf{B}`` here.
+  - $(ref_dict[:meucci2007]) Section 4, Equations 20 and 21. The completion of the basis by the null space.
+  - $(ref_dict[:sdprp]) Section 3.2, Formulation 16. The semidefinite relaxation of the `rc` rows under [`Variance`](@ref).
 """
 @propagatable @concrete struct FactorRiskContribution <: RiskJuMPOptimisationEstimator
     """
@@ -324,7 +331,14 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `true` if any sub-estimator of `opt` requires previous portfolio weights (JuMP optimiser, risk measure, or fallback).
+Return `true` when a part of `opt` needs the previous portfolio weights.
+
+The parts are the schedules of the time-dependent fields, the [`JuMPOptimiser`](@ref) in `opt.opt`, the risk measure `opt.r` and the fallback `opt.fb`.
+
+# Related
+
+  - [`needs_previous_weights`](@ref)
+  - [`FactorRiskContribution`](@ref)
 """
 function needs_previous_weights(opt::FactorRiskContribution)
     return (any(f -> needs_previous_weights(getfield(opt, f)),
@@ -336,7 +350,14 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return a cluster-sliced copy of [`FactorRiskContribution`](@ref) for asset index set `i` and returns matrix `X`.
+Return the view of a [`FactorRiskContribution`](@ref) at the assets `i`, for the returns matrix `X`.
+
+The `## View parameters` subsection of [`FactorRiskContribution`](@ref) states how each field is viewed.
+
+# Related
+
+  - [`port_opt_view`](@ref)
+  - [`FactorRiskContribution`](@ref)
 """
 function port_opt_view(frc::FactorRiskContribution, i, X::MatNum,
                        args...)::FactorRiskContribution
@@ -351,31 +372,65 @@ end
 """
     set_factor_risk_contribution_constraints!(model, re, rd, pr, flag, wi; hedge = false)
 
-Add factor risk contribution constraints to the JuMP model.
+Create the factor weights of a model, and register the asset weights `w` as their image in the asset basis.
 
-Re-bases the weight variable onto the factor axis, `w = b1 * w1` (or `w = b1 * w1 + b2 * w2` when `flag` is `true`), using the factor loadings to specify the basis.
+The `# Mathematical definition` of [`FactorRiskContribution`](@ref) states the two forms of the map, which `flag` selects.
 
-When `flag` and `hedge` are both `true`, the rows `b2' Σ w = 0` fix the off-factor weights at the minimum-variance hedge of the factor exposures `w1`. They are the first-order condition of `w' Σ w` in `w2`, so the off-factor weights take no risk contribution under the variance, and `w' Σ w = w1' (B' Σ⁻¹ B)⁻¹ w1`. The weights then lie in a subspace of dimension `N_f`, so a bound that the free off-factor weights meet can be infeasible.
+When `flag` and `hedge` are both `true`, the rows ``\\mathbf{B}_2^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w} = \\boldsymbol{0}`` fix the off-factor weights at the minimum-variance hedge of the factor exposures ``\\boldsymbol{w}_1``. They are the first-order condition of ``\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}`` in ``\\boldsymbol{w}_2``. So the off-factor weights take no risk contribution under the variance, and ``\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w} = \\boldsymbol{w}_1^\\intercal (\\mathbf{B}^\\intercal \\mathbf{\\Sigma}^{-1} \\mathbf{B})^{-1} \\boldsymbol{w}_1``. The weights then lie in a subspace of dimension ``N_f``, so a bound that the free off-factor weights meet can make the model infeasible.
 
-The loadings come from [`resolve_factor_regression`](@ref), which is the same precedence the value-level [`factor_risk_contribution`](@ref) uses: a precomputed [`Regression`](@ref) in `re` wins, then the prior's own `rr`, then a refit from `rd`. The prior outranks the refit so that the decision basis is the one the moments were projected through.
+[`resolve_factor_regression`](@ref) picks the loadings, in the order that the value-level [`factor_risk_contribution`](@ref) uses: a precomputed [`Regression`](@ref) in `re`, then the `rr` of the prior, then a fit on `rd`. The prior comes before the fit, so the basis of the decision variable is the basis through which the prior projected its moments.
 
 !!! warning
 
-    A stated regression **estimator** loses to a prior that carries loadings. To override a factor prior, pass the loadings as a precomputed [`Regression`](@ref) in `re`.
+    A prior that carries loadings comes before a regression **estimator** in `re`. To replace the loadings of a factor prior, pass them as a precomputed [`Regression`](@ref) in `re`.
+
+# Algorithm
+
+ 1. Pick the loadings `rr` with [`resolve_factor_regression`](@ref).
+ 2. Form `Bt`, the transpose of the loadings, and `b1`, the pseudoinverse of `Bt`. `Nf` is the number of columns of `b1`.
+ 3. When `flag` is `true`, form `b2` from an orthonormal basis of the null space of `Bt`, create `w1` and `w2`, and register `w`. When `hedge` is also `true`, add the hedge rows.
+ 4. When `flag` is `false`, set `b2 = nothing`, create `w1`, and register `w`.
+ 5. Set the start values of `w1` from `wi` with [`set_initial_w!`](@ref).
+
+# JuMP formulation
+
+## Variables
+
+  - `w1`: Created, ``N_f`` entries.
+  - `w2`: Created when `flag = true`, one entry for each column of ``\\mathbf{B}_2``.
+
+## Expressions
+
+  - `w`: ``\\mathbf{B}_1 \\boldsymbol{w}_1``, or ``\\mathbf{B}_1 \\boldsymbol{w}_1 + \\mathbf{B}_2 \\boldsymbol{w}_2`` when `flag = true`.
+
+## Constraints
+
+  - `cfrb_hedge`: ``s_c \\mathbf{B}_2^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w} = \\boldsymbol{0}``, when `flag = true` and `hedge = true`.
+
+Where:
+
+  - $(math_dict[:w_1_factor])
+  - $(math_dict[:w_2_off_factor])
+  - $(math_dict[:w_port])
+  - ``\\mathbf{B}_1``: The factor basis, ``(\\mathbf{B}^\\intercal)^{+}``.
+  - ``\\mathbf{B}_2``: The off-factor basis, an orthonormal basis of the null space of ``\\mathbf{B}^\\intercal``, ``N \\times (N - \\operatorname{rank}\\mathbf{B})``.
+  - $(math_dict[:B_loadings])
+  - ``\\mathbf{\\Sigma}``: The covariance matrix of the prior, `pr.sigma`.
+  - $(math_dict[:sc_scale])
 
 # Arguments
 
   - `model`: JuMP model.
   - `re`: Regression result or estimator ([`RegE_Reg`](@ref)).
-  - `rd`: Returns result carrying `X` and `F`, used only when the loadings must be refitted.
-  - `pr`: Prior result, read for its factor block.
-  - `flag`: Whether to add the off-factor weight block.
-  - `wi`: Optional initial factor weights.
-  - `hedge`: Whether to add the hedge rows. Read only when `flag` is `true`, and then `pr` must carry `sigma`.
+  - `rd`: Returns result that carries `X` and `F`. The method reads it only to fit the loadings.
+  - `pr`: Prior result. The method reads its loadings, and `sigma` for the hedge rows.
+  - `flag`: `true` adds the off-factor weights.
+  - `wi`: Start values of the factor weights, or `nothing`.
+  - `hedge`: `true` adds the hedge rows. The method reads it only when `flag` is `true`, and then `pr` must carry `sigma`.
 
 # Returns
 
-  - `b1, b2, rr`: The factor basis, the off-factor basis, and the loadings they were built from. `b2` is `nothing` when `flag` is `false`.
+  - `b1, b2, rr`: The factor basis, the off-factor basis, and the loadings of both. `b2` is `nothing` when `flag` is `false`.
 
 # Related
 
@@ -394,10 +449,11 @@ function set_factor_risk_contribution_constraints!(model::JuMP.Model, re::RegE_R
     Nf = size(b1, 2)
     if flag
         b2 = LinearAlgebra.pinv(transpose(LinearAlgebra.nullspace(Bt)))
-        N = size(rr.M, 1)
+        # The null space has `N - rank(B)` columns, which is more than `N - Nf` when the
+        # loadings have a lower rank, so `w2` takes its size from `b2`.
         JuMP.@variables(model, begin
                             w1[1:Nf]
-                            w2[1:(N - Nf)]
+                            w2[1:size(b2, 2)]
                         end)
         JuMP.@expression(model, w, b1 * w1 + b2 * w2)
         if hedge
@@ -412,6 +468,46 @@ function set_factor_risk_contribution_constraints!(model::JuMP.Model, re::RegE_R
     set_initial_w!(w1, wi)
     return b1, b2, rr
 end
+"""
+    _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResult();
+              str_names::Bool = false, save::Bool = true, kwargs...) -> FactorRiskContributionResult
+
+Build the model of a [`FactorRiskContribution`](@ref), solve it, and return its result.
+
+[`optimise`](@ref) reaches this method through [`shared_series_solve`](@ref), which drops the observations of a Shared Series gap before the solve.
+
+# Algorithm
+
+ 1. Replace each schedule of `frc` with its static default through [`reset_time_dependent_estimator`](@ref).
+ 2. Process the attributes of `frc.opt` against `rd` with [`processed_jump_optimiser_attributes`](@ref), giving `attrs`.
+ 3. Take the view of `frc` and of `rd` at the investable assets with [`investable_view`](@ref). Both are unchanged when every asset is investable.
+ 4. Bind the benchmark of each [`DataBenchmarkTracking`](@ref) measure to `rd` with [`bind_data_benchmark`](@ref).
+ 5. Build a new model. Register the scales with [`set_model_scales!`](@ref), the number of observations with [`set_model_observations!`](@ref), the homogenisation variables of a ratio with [`set_maximum_ratio_factor_variables!`](@ref) and the corner of a lifted variance with [`set_sdp_lift_corner!`](@ref).
+ 6. Create the factor weights and register `w` with [`set_factor_risk_contribution_constraints!`](@ref), giving `b1`, `b2` and `rr`. `b` is `b1`, or `[b1 b2]` when `flag = true`, the basis of the whole decision vector.
+ 7. Add the weight bounds with [`set_weight_constraints!`](@ref).
+ 8. Add the constraints, the return terms and the risk measures with [`assemble_jump_model!`](@ref), which reads `b` and adds no asset phylogeny of the semidefinite kind.
+ 9. Resolve `frc.frc_ple` on the factor returns with [`phylogeny_constraints`](@ref), giving `frc_plr`. Add its rows with [`set_sdp_frc_phylogeny_constraints!`](@ref) and [`set_frc_iplg_constraints!`](@ref).
+10. Set the objective with [`set_portfolio_objective_function!`](@ref), and solve with [`optimise_JuMP_model!`](@ref), giving `retcode` and `sol`.
+11. Build the result. It holds `attrs`, `retcode`, `sol`, the model when `save` is `true`, the risk measures resolved against the prior, `rr` and `frc_plr`.
+
+# Arguments
+
+  - `frc::FactorRiskContribution`: The optimiser.
+  - $(arg_dict[:rd])
+  - `str_names::Bool`: `true` gives each variable and each row of the model its string name.
+  - `save::Bool`: `true` keeps the model in the result.
+  - `kwargs...`: Passed on to [`processed_jump_optimiser_attributes`](@ref).
+
+# Returns
+
+  - [`FactorRiskContributionResult`](@ref): The result, with `fb = nothing`. The method of [`optimise`](@ref) for an optimiser with a fallback runs the fallback chain.
+
+# Related
+
+  - [`optimise`](@ref)
+  - [`set_factor_risk_contribution_constraints!`](@ref)
+  - [`FactorRiskContributionResult`](@ref)
+"""
 function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResult();
                    str_names::Bool = false, save::Bool = true, kwargs...)
     frc = reset_time_dependent_estimator(frc)
@@ -459,15 +555,17 @@ end
                   },
              rd::ReturnsResult; str_names::Bool = false, save::Bool = true, kwargs...) -> FactorRiskContributionResult
 
-Run the Factor Risk Contribution portfolio optimisation.
+Optimise a [`FactorRiskContribution`](@ref) that has no fallback, and return its result.
+
+This method serves an optimiser whose `fb` is `nothing`. It solves through [`shared_series_solve`](@ref), and [`_optimise`](@ref) states the steps of the solve.
 
 # Arguments
 
-  - `frc`: The factor risk contribution optimiser to use.
-  - $(arg_dict[:rd]) If `isa(frc.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
-  - `str_names`: Whether to use string names for the assets in the optimisation.
-  - `save`: Whether to save the JuMP model in the optimisation result.
-  - `kwargs`: Additional keyword arguments passed to the optimisation function.
+  - `frc`: The optimiser.
+  - $(arg_dict[:rd]) The solve reads it to fit the loadings when neither `re` nor the prior holds them, and reads its factor returns to resolve `frc_ple`. A fallback or a clustering step can also read it.
+  - `str_names`: `true` gives each variable and each row of the model its string name.
+  - `save`: `true` keeps the model in the result.
+  - `kwargs`: Passed on to [`_optimise`](@ref).
 
 # Validation
 

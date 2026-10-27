@@ -9,9 +9,12 @@ frontier_point_count
 frontier_sweep_points
 assert_frontier_sweep_cap
 frontier_axis
+parameter_scale
+unit_frontier
 set_ret_frontier_parameters!
 set_risk_frontier_parameters!
 frontier_sweep_axes
 set_frontier_point!
 frontier_sweep!
+assert_frontier_sweep_owner
 ```

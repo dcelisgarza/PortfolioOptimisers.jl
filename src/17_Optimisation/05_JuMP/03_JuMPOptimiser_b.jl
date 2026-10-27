@@ -390,7 +390,8 @@ before calling this function. See `Model Assembly` in `GLOSSARY.md` and
 The tail of the sequence is [`assert_frontier_sweep_cap`](@ref): both frontier registries are
 complete here and no sweep solve has started, so this is the one point at which the **total**
 sweep — the product across every swept return term and every swept risk measure — is in hand
-and can be capped.
+and can be capped. [`assert_frontier_sweep_owner`](@ref) follows it, and refuses a frontier
+when the optimiser solves its model once.
 
 # Arguments
 
@@ -426,6 +427,7 @@ and can be capped.
   - [`processed_jump_optimiser_attributes`](@ref)
   - [`set_risk_and_scalarise!`](@ref)
   - [`assert_frontier_sweep_cap`](@ref)
+  - [`assert_frontier_sweep_owner`](@ref)
   - [`JuMPOptimiser`](@ref)
   - [`MeanRisk`](@ref)
   - [`RiskBudgeting`](@ref)
@@ -484,6 +486,7 @@ function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEsti
     end
     add_custom_constraint!(model, opt.ccnt, optimiser, attrs)
     assert_frontier_sweep_cap(model)
+    assert_frontier_sweep_owner(model, optimiser)
     return nothing
 end
 """

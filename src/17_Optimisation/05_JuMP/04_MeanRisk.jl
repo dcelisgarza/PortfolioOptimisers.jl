@@ -367,6 +367,10 @@ end
 function time_dependent_field_defaults(::MeanRisk)::NamedTuple
     return mean_risk_td_defaults()
 end
+# `solve_mean_risk!` sweeps every frontier of the model.
+function assert_frontier_sweep_owner(::JuMP.Model, ::MeanRisk)::Nothing
+    return nothing
+end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

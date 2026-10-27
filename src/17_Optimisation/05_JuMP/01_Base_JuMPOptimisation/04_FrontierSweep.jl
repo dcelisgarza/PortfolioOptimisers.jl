@@ -94,6 +94,41 @@ function assert_frontier_sweep_cap(model::JuMP.Model)
     return nothing
 end
 """
+    assert_frontier_sweep_owner(model::JuMP.Model, optimiser::JuMPOptimisationEstimator)
+
+Check that the model holds no frontier when its optimiser solves the model once.
+
+A return term with a [`Frontier`](@ref) or a vector floor adds an entry to `:ret_frontier`, and a risk measure with a [`Frontier`](@ref) or a vector ceiling adds an entry to `:risk_frontier`. [`MeanRisk`](@ref) and [`NearOptimalCentering`](@ref) sweep these entries, and each has a method that returns `nothing`. Every other optimiser solves its model once, so the solve would ignore the bound and return one portfolio. [`assemble_jump_model!`](@ref) runs this check after [`assert_frontier_sweep_cap`](@ref).
+
+# Algorithm
+
+ 1. Count the points with [`frontier_sweep_points`](@ref), giving `factors`.
+ 2. Check that `factors` is empty.
+
+# Validation
+
+  - The model holds no entry in `:ret_frontier` or `:risk_frontier`. Otherwise an `ArgumentError` names the optimiser and the keys of the bounds.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_frontier_sweep_cap`](@ref)
+  - [`frontier_sweep_points`](@ref)
+  - [`assemble_jump_model!`](@ref)
+  - [`set_return_bounds!`](@ref)
+  - [`set_risk_upper_bound!`](@ref)
+"""
+function assert_frontier_sweep_owner(model::JuMP.Model,
+                                     optimiser::JuMPOptimisationEstimator)::Nothing
+    _, factors = frontier_sweep_points(model)
+    @argcheck(isempty(factors),
+              ArgumentError("`$(nameof(typeof(optimiser)))` solves its model once and does not sweep a frontier, so it cannot honour the bounds $(join((key for (key, _) in factors), ", ")). Give each of them one number, or use `MeanRisk` or `NearOptimalCentering`, which sweep a frontier."))
+    return nothing
+end
+"""
     frontier_axis(frontier::VecPair)
 
 Turn one resolved frontier registry into the sweep axis that it defines.

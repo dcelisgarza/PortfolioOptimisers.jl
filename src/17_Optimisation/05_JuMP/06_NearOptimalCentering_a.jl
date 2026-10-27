@@ -450,6 +450,10 @@ end
 function time_dependent_field_defaults(::NearOptimalCentering)::NamedTuple
     return near_optimal_centering_td_defaults()
 end
+# `solve_noc!` sweeps every frontier of the model.
+function assert_frontier_sweep_owner(::JuMP.Model, ::NearOptimalCentering)::Nothing
+    return nothing
+end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
