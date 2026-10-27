@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all cross-sectional solve algorithm types.
 
-A member decides what [`CrossSectionalLinearRegression`](@ref) and [`CrossSectionalTargetRegression`](@ref) do when the weighted design of an observation is rank deficient, and the members differ on two axes: whether a rank test runs at all, and what happens when it fails. The decision is a real one, because Julia's `\\` answers a deficient design in three different ways. A **square** design goes to an `LU` factorisation that throws `LinearAlgebra.SingularException` on an exactly zero pivot. A **non-square** one goes to a column-pivoted `QR` whose solve completes the orthogonal factorisation, so it returns the minimum-norm solution and agrees with a pseudo-inverse. A design that is only **nearly** dependent passes the rank test of every member and returns a badly conditioned answer that a pseudo-inverse would truncate.
+A member decides what [`CrossSectionalLinearRegression`](@ref) and [`CrossSectionalTargetRegression`](@ref) do when the weighted design of an observation is rank deficient. The members differ in whether a rank test runs at all, and in what happens when it fails. The choice changes the answer, because Julia's `\\` answers a deficient design in three ways. A **square** design goes to an `LU` factorisation that throws `LinearAlgebra.SingularException` on an exactly zero pivot. A **non-square** one goes to a column-pivoted `QR` whose solve completes the orthogonal factorisation, so it returns the minimum-norm solution and agrees with a pseudo-inverse. A design that is only **nearly** dependent passes the rank test of every member and returns a badly conditioned answer that a pseudo-inverse would truncate.
 
 A member means the same thing under both estimators, so the two give the same factor returns for a least-squares target. [`CrossSectionalTargetRegression`](@ref) refuses [`MinimumNormSolve`](@ref), whose answer on a target is the answer of [`PseudoInverseFallback`](@ref).
 
@@ -13,7 +13,7 @@ All concrete and/or abstract types representing cross-sectional solve algorithms
 
 In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractCrossSectionalSolveAlgorithm` and implement the following methods. A member that only [`CrossSectionalLinearRegression`](@ref) reads needs only [`cross_sectional_solve`](@ref), and a member that only [`CrossSectionalTargetRegression`](@ref) reads needs only [`cross_sectional_target_solve`](@ref).
 
-A new member gets no mask of dropped columns: the regression keeps `dc` at `nothing` for every member except [`DependentColumnDrop`](@ref). So a new member that drops a column gives it no mark, and the regression diagnostics and the factor attribution read the pseudo-inverse of the full design of each observation for it.
+A new member gets no mask of dropped columns, because the regression keeps `dc` at `nothing` for every member except [`DependentColumnDrop`](@ref). So a new member that drops a column gives it no mark, and the regression diagnostics and the factor attribution read the pseudo-inverse of the full design of each observation for it.
 
 ## `cross_sectional_solve`
 
@@ -83,7 +83,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Solves the full-rank design directly and pseudo-inverts a rank-deficient one.
 
-This is the default of [`CrossSectionalLinearRegression`](@ref) and of [`CrossSectionalTargetRegression`](@ref). It never throws on a dependent factor set: a square design that `\\` would refuse reaches the pseudo-inverse instead, and a non-square one reaches the same minimum-norm answer through either route. The rank test is what it costs, because the design is factorised twice whenever it passes.
+This is the default of [`CrossSectionalLinearRegression`](@ref) and of [`CrossSectionalTargetRegression`](@ref). It never throws on a dependent factor set. A square design that `\\` would refuse reaches the pseudo-inverse instead, and a non-square one reaches the same minimum-norm answer through either route. The rank test costs a second factorisation of every design that passes it.
 
 A target has no pseudo-inverse, so on a rank-deficient design it fits the columns that [`DependentColumnDrop`](@ref) keeps, and the answer is projected onto the row space of the weighted design. Every coefficient vector that differs from the fit by a vector of the null space gives the same linear predictor, and the projection is the one of least norm among them. For a least-squares target it is the answer of [`CrossSectionalLinearRegression`](@ref). The projection reads the fit through the linear predictor alone, which is what [`is_basis_invariant`](@ref) states of a target, so the constructor refuses a target that answers `false`.
 
@@ -131,7 +131,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Runs no rank test and takes whatever `\\` returns.
 
-It is the cheapest member, because it factorises the design once instead of twice. A rank-deficient **non-square** design reaches a column-pivoted `QR` whose solve returns the minimum-norm answer, so it agrees with [`MinimumNormSolve`](@ref) there. An exactly singular **square** design reaches an `LU` factorisation instead and throws `LinearAlgebra.SingularException`, which is the one case where taking the answer unchecked costs the fit.
+It is the cheapest member, because it factorises the design once instead of twice. A rank-deficient **non-square** design reaches a column-pivoted `QR` whose solve returns the minimum-norm answer, so it agrees with [`MinimumNormSolve`](@ref) there. An exactly singular **square** design reaches an `LU` factorisation instead and throws `LinearAlgebra.SingularException`. That is the one design on which the member fails.
 
 Under [`CrossSectionalTargetRegression`](@ref) the target sees the full design, and its own factorisation decides. `GLM` drops a collinear column by its own pivot and gives it a return of zero, and its pivot need not drop the column that the rank test of [`DependentColumnDrop`](@ref) drops. A factor set that is dependent to rounding alone can pass the pivot of `GLM` and fail its Cholesky factorisation, which throws `LinearAlgebra.PosDefException`. On the carry fold of a [`CrossSectionalFactorPrior`](@ref), a move solves an observation again when [`cross_sectional_rank`](@ref) finds it rank-deficient, so an observation that the pivot of `GLM` drops and the rank test keeps can keep the answer of the old basis.
 
@@ -155,7 +155,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Always pseudo-inverts, so it runs no rank test and takes no threshold.
 
-Every observation takes the minimum-norm least-squares solution, whatever its rank, so the factor returns of two observations are comparable even when one of them lost a factor. It is the most expensive member. It parts from [`UncheckedSolve`](@ref) on a square design, which `\\` sends to an `LU` factorisation, and on a design that is only nearly dependent, where the pseudo-inverse truncates a singular value that `\\` keeps.
+Every observation takes the minimum-norm least-squares solution, whatever its rank, so one rule gives the factor returns of an observation that lost a factor and of one that did not. It is the most expensive member, because it takes a singular value decomposition of every design. It parts from [`UncheckedSolve`](@ref) on a square design, which `\\` sends to an `LU` factorisation, and on a design that is only nearly dependent, where the pseudo-inverse truncates a singular value that `\\` keeps.
 
 [`CrossSectionalTargetRegression`](@ref) refuses it. A target has no pseudo-inverse, and the projection of [`PseudoInverseFallback`](@ref) changes nothing on a design of full rank, so the member would be a second name for that one.
 
@@ -178,7 +178,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Solves the full-rank design directly, and drops the dependent columns of a rank-deficient one.
 
-The member reads the rank `r` of the weighted design with [`cross_sectional_rank`](@ref). When `r` falls short of the factor count, it keeps the columns that the first `r` pivots of the column-pivoted `QR` of the design name, solves on them, and gives every other factor a return of zero. A design of rank zero gives zero to every factor. The answer is a basic solution, not the answer of least norm: the fitted values and the residuals are those of [`PseudoInverseFallback`](@ref), and the factor returns are not. The pivot prefers the column of larger weighted norm, so which factor takes zero depends on the scale of the exposures and on the basis of a Factor Family.
+The member reads the rank `r` of the weighted design with [`cross_sectional_rank`](@ref). When `r` falls short of the factor count, it keeps the columns that the first `r` pivots of the column-pivoted `QR` of the design name, solves on them, and gives every other factor a return of zero. A design of rank zero gives zero to every factor. The answer is a basic solution, not the answer of least norm. Its fitted values and its residuals are those of [`PseudoInverseFallback`](@ref), and its factor returns are not. The pivot prefers the column of larger weighted norm, so which factor takes zero depends on the scale of the exposures and on the basis of a Factor Family.
 
 The fit marks each dropped factor in the `dc` field of [`CrossSectionalRegression`](@ref). So the t-statistics of [`cs_regression_t_stats`](@ref) and the standard errors of a factor attribution give a dropped factor no estimation error, and read the kept factors on the columns that the fit solved, rather than the pseudo-inverse of the whole design.
 
@@ -294,13 +294,13 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the factor returns, the residuals, the eligible asset counts and the optional intercepts of a fitted cross-sectional regression.
 
-The result is a sibling of [`Regression`](@ref) rather than a widening of it, because the two disagree on what an asset index means: a [`Regression`](@ref) holds one row per asset and [`port_opt_view`](@ref) slices its rows, whereas this result holds one row per observation and one column per asset, so the same index slices its columns. It carries no loadings matrix, because the exposures are the regression's input and an Exposure Estimator produces them.
+The result is a sibling of [`Regression`](@ref) rather than a widening of it, because the two disagree on what an asset index means. A [`Regression`](@ref) holds one row per asset, and [`port_opt_view`](@ref) slices its rows. This result holds one row per observation and one column per asset, so the same index slices its columns. It carries no loadings matrix, because the exposures are the regression's input and an Exposure Estimator produces them.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\boldsymbol{f}_{t} &= \\underset{\\boldsymbol{f}}{\\arg\\min} \\sum_{i = 1}^{N} w_{t,i} \\left(x_{t,i} - b_{t} - \\boldsymbol{z}_{t,i}^{\\intercal} \\boldsymbol{f}\\right)^{2} \\\\
+\\left(b_{t}, \\boldsymbol{f}_{t}\\right) &= \\underset{b, \\boldsymbol{f}}{\\arg\\min} \\sum_{i = 1}^{N} w_{t,i} \\left(x_{t,i} - b - \\boldsymbol{z}_{t,i}^{\\intercal} \\boldsymbol{f}\\right)^{2} \\\\
 \\boldsymbol{\\varepsilon}_{t} &= \\boldsymbol{x}_{t} - b_{t} \\boldsymbol{1} - \\mathbf{Z}_{t} \\boldsymbol{f}_{t}\\,.
 \\end{align}
 ```
@@ -313,11 +313,11 @@ Where:
   - ``\\mathbf{Z}_{t}``: Exposure slice of observation ``t``, ``N \\times K``, one row per asset.
   - ``\\boldsymbol{z}_{t,i}``: Exposures of asset ``i`` at observation ``t``, the ``i``-th row of ``\\mathbf{Z}_{t}``.
   - ``w_{t,i} \\geq 0``: Cross-sectional weight of asset ``i`` at observation ``t``. A weight of zero excludes the pair from the fit.
-  - ``b_{t}``: Intercept of observation ``t``, the ``t``-th entry of `b`. The term is absent when `b` is unset.
+  - ``b_{t}``: Intercept of observation ``t``, the ``t``-th entry of `b`. When `b` is unset, the minimisation holds ``b`` at zero.
   - $(math_dict[:N])
   - $(math_dict[:K])
 
-Each observation is one independent problem, so a factor return is a cross-sectional quantity and never a time-series one.
+Each observation is one independent problem, so a factor return is a cross-sectional quantity and never a time-series one. When the weighted design of an observation is rank deficient, the minimiser is not unique, and the solve algorithm of the estimator picks one of them.
 
 A pair whose leverage is one has a direction of the design of its own, for example the only member of a level of a one-hot family. The fit reproduces its return whatever the return is, so its residual is zero by construction and tells nothing about its idiosyncratic risk. `h1` marks these pairs, and a least-squares fit writes an exact zero there in place of the round-off of the subtraction.
 
@@ -514,7 +514,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Fits one weighted least squares per observation across the assets, in closed form.
 
-The solve runs on the weighted design ``\\sqrt{w_{t,i}} \\, \\boldsymbol{z}_{t,i}`` rather than on the normal matrix ``\\mathbf{Z}_{t}^{\\intercal} \\mathbf{W}_{t} \\mathbf{Z}_{t}``, which halves the condition number in the exponent, and `alg` decides what happens when that design is rank deficient.
+The solve runs on the weighted design ``\\sqrt{w_{t,i}} \\, \\boldsymbol{z}_{t,i}`` rather than on the normal matrix ``\\mathbf{Z}_{t}^{\\intercal} \\mathbf{W}_{t} \\mathbf{Z}_{t}``. The condition number of the normal matrix is the square of the condition number of the weighted design. `alg` decides what happens when the weighted design is rank deficient.
 
 The square root sets the arithmetic of the solve. An integer and a `Rational` weight have a floating-point square root, so the solve of a `Rational` panel runs in floating point. `f` keeps the `Rational` type of the panel, and holds the floating-point answer written as a `Rational`, not the exact least-squares answer. A caller who needs the exact answer solves the weighted normal equations in `Rational` arithmetic.
 
@@ -590,9 +590,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Fits one external regression model per observation across the assets.
 
-The cross-sectional weights reach the model as observation weights, through [`factory`](@ref) and the target's own `kwargs`, so any target the library carries — a [`LinearModel`](@ref) or a [`GeneralisedLinearModel`](@ref) — runs here unchanged. A caller's own target runs here too, when it states the methods of the `# Interfaces` section of [`AbstractRegressionTarget`](@ref). A target with no weight method is refused, because its fit would ignore the cross-sectional weights. Unlike [`CrossSectionalLinearRegression`](@ref), the fit **refuses** an observation with no eligible asset, because an external model has no cross-section to read.
+The cross-sectional weights reach the model as observation weights, through [`factory`](@ref) and the target's own `kwargs`, so both targets of the library, [`LinearModel`](@ref) and [`GeneralisedLinearModel`](@ref), run here unchanged. A caller's own target runs here too, when it states the methods of the `# Interfaces` section of [`AbstractRegressionTarget`](@ref). A target with no weight method is refused, because its fit would ignore the cross-sectional weights. Unlike [`CrossSectionalLinearRegression`](@ref), the fit **refuses** an observation with no eligible asset, because an external model has no cross-section to read.
 
-`alg` decides what the fit does with a rank-deficient weighted design, as it does for [`CrossSectionalLinearRegression`](@ref), and [`cross_sectional_target_solve`](@ref) states each member. The default [`PseudoInverseFallback`](@ref) fits the columns that the rank test keeps and projects the answer onto the row space of the weighted design, so a least-squares target gives the factor returns of [`CrossSectionalLinearRegression`](@ref). A rank test is needed because a factor set can be dependent to rounding alone, such as a beta that shrinks fully to the mean of its industry, and the factorisation of `GLM` refuses such a design with a `PosDefException`. A rank-deficient design is not a degenerate case: under [`SolvedUnseenMember`](@ref) the design of an observation with an Unseen Member is rank-deficient by construction.
+`alg` decides what the fit does with a rank-deficient weighted design, as it does for [`CrossSectionalLinearRegression`](@ref), and [`cross_sectional_target_solve`](@ref) states each member. The default [`PseudoInverseFallback`](@ref) fits the columns that the rank test keeps and projects the answer onto the row space of the weighted design, so a least-squares target gives the factor returns of [`CrossSectionalLinearRegression`](@ref). A rank test is needed because a factor set can be dependent to rounding alone, such as a beta that shrinks fully to the mean of its industry, and the factorisation of `GLM` refuses such a design with a `PosDefException`. A rank-deficient design also comes from ordinary use. Under [`SolvedUnseenMember`](@ref), the design of an observation with an Unseen Member is rank-deficient by construction.
 
 # Algorithm
 
@@ -1129,7 +1129,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the coefficients of a target fitted to a weighted design of full rank, at the precision of the design rather than of its Gram matrix.
 
-`GLM` factorises the Gram matrix ``\\mathbf{D}^{\\intercal} \\mathbf{D}`` of the weighted design, which squares its condition number. So a factor set whose design has a condition number above about ``10^{8}`` loses its precision in `GLM`, or `GLM` drops a column by its own pivot, while [`cross_sectional_rank`](@ref) keeps every column up to about ``10^{14} / K``. A target that [`is_basis_invariant`](@ref) states gives the same coefficients on any basis of the span of the design, mapped back. So the verb fits such a target to the design whose weighted Gram matrix is the identity, and maps the answer back. The solve then reads the triangular factor of `D`, as the solve of [`CrossSectionalLinearRegression`](@ref) does, and a least-squares target gives its factor returns to rounding. A target that is not invariant fits `A` itself, because a change of basis changes its answer.
+`GLM` factorises the Gram matrix ``\\mathbf{D}^{\\intercal} \\mathbf{D}`` of the weighted design, which squares its condition number. So a factor set whose design has a condition number above about ``10^{8}`` loses its precision in `GLM`, or `GLM` drops a column by its own pivot. [`cross_sectional_rank`](@ref) keeps every column up to a condition number of about ``1 / (K \\epsilon)``, where ``\\epsilon`` is the machine epsilon of the design. That is about ``10^{15}`` in `Float64` for up to eight factors. A target that [`is_basis_invariant`](@ref) states gives the same coefficients on any basis of the span of the design, mapped back. So the verb fits such a target to the design whose weighted Gram matrix is the identity, and maps the answer back. The solve then reads the triangular factor of `D`, as the solve of [`CrossSectionalLinearRegression`](@ref) does, and a least-squares target gives its factor returns to rounding. A target that is not invariant fits `A` itself, because a change of basis changes its answer.
 
 # Mathematical definition
 
@@ -1179,7 +1179,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the eligibility mask of a cross-sectional design, after checking its three arrays.
 
-An `(observation, asset)` pair is eligible when its cross-sectional weight is positive. The weight is the one contract: a pair excluded by a zero weight may carry a missing return or a missing exposure, and a pair with a positive weight may not.
+An `(observation, asset)` pair is eligible when its cross-sectional weight is positive. The weight alone decides. A pair that a zero weight excludes may carry a missing return or a missing exposure, and a pair with a positive weight may not.
 
 # Arguments
 
@@ -1332,7 +1332,7 @@ end
 
 Return a history of a cross-sectional fit with `NaN` at every pair whose leverage is one.
 
-A pair that `h1` marks gives no observation of its idiosyncratic return: the fit reproduced its return, so its residual is zero by construction, and so is the variance that reads that residual. A reader that treats such a pair as data reads the design, not the asset. The function writes `NaN` over the pair, so every reader that skips a value that is not finite leaves the pair out. It never changes `A`.
+A pair that `h1` marks gives no observation of its idiosyncratic return. The fit reproduced its return, so its residual is zero by construction, and so is the variance that reads that residual. A reader that treats such a pair as data reads the design, not the asset. The function writes `NaN` over the pair, so every reader that skips a value that is not finite leaves the pair out. It never changes `A`.
 
 # Algorithm
 
@@ -1664,7 +1664,7 @@ Where:
 
   - `f::MatNum`: Factor returns matrix `observations × factors`.
   - `b::Option{<:VecNum}`: Intercept vector, or `nothing` when none was fitted.
-  - `Z::Arr3Num`: Exposure tensor `observations × assets × factors`. The asset axis may differ from the one the fit saw; the observation and factor axes may not.
+  - `Z::Arr3Num`: Exposure tensor `observations × assets × factors`. The asset axis may differ from the one the fit saw. The observation axis and the factor axis must match `f`.
 
 # Validation
 
@@ -1694,7 +1694,7 @@ end
 
 Return the systematic part of a fitted cross-sectional regression, `observations × assets`.
 
-The residuals the result already carries are `X - predict(csr, Z)` for the `X` the fit saw, so this method earns its place on an exposure tensor the fit did not see.
+For the `X` that the fit saw, the residuals of the result are `X - predict(csr, Z)` already. The method gives the systematic part on an exposure tensor that the fit did not see.
 
 # Algorithm
 
@@ -1703,7 +1703,7 @@ The residuals the result already carries are `X - predict(csr, Z)` for the `X` t
 # Arguments
 
   - `csr`: A cross-sectional regression result.
-  - `Z::Arr3Num`: Exposure tensor `observations × assets × factors`. The asset axis may differ from the one the fit saw; the observation and factor axes may not.
+  - `Z::Arr3Num`: Exposure tensor `observations × assets × factors`. The asset axis may differ from the one the fit saw. The observation axis and the factor axis must match `csr.f`.
 
 # Validation
 
