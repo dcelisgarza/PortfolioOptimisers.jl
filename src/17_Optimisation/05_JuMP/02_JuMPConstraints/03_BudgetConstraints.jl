@@ -595,7 +595,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Assert that a gross budget is admissible alongside the net and short budgets.
 
-`bgt` and `sbgt` constrain the net and gross exposures only *together*: pinning both gives `1'w == bgt` and `norm(w, 1) == bgt + 2 * sbgt`. `gbgt` exists for the combination they cannot reach — gross pinned with net free — so it is rejected when they already determine the gross exposure, and when the weight bounds forbid short positions (whereupon gross and net coincide and `bgt` already owns the constraint).
+`bgt` and `sbgt` constrain the net and gross exposures only *together*. When both are numbers, the long budget is `sum(lw) == bgt + sbgt` and the short budget is `sum(sw) == sbgt`, so the gross budget `sum(lw) + sum(sw)` is `bgt + 2 * sbgt`, the row that `gbgt` writes. The realised gross exposure `norm(w, 1)` equals it when `xbgt` is `true`, and it can be smaller when `xbgt` is `false`. `gbgt` exists for the combination they cannot reach — gross pinned with net free — so it is rejected when they already determine the gross exposure, and when the weight bounds forbid short positions (whereupon gross and net coincide and `bgt` already owns the constraint).
 
 Only the statically-decidable contradictions are caught. Ranges may still conflict at solve time, surfacing as infeasibility, and a [`WeightBoundsEstimator`](@ref) is not resolved until then. [`TimeDependent`](@ref) schedules are reached through [`assert_time_dependent_substitution`](@ref).
 
@@ -608,7 +608,7 @@ Only the statically-decidable contradictions are caught. Ranges may still confli
 """
 function assert_gross_budget_admissible(bgt, sbgt, gbgt, wb)::Nothing
     @argcheck(!(isa(bgt, Number) && isa(sbgt, Number)),
-              ArgumentError("gross budget (gbgt) is over-determined: net budget (bgt = $bgt) and short budget (sbgt = $sbgt) already pin the gross exposure at bgt + 2 * sbgt = $(bgt + 2 * sbgt). Give at most two of bgt, sbgt and gbgt — gbgt exists for the case bgt and sbgt cannot express, a pinned gross exposure with a free net exposure (bgt = nothing)."))
+              ArgumentError("gross budget (gbgt) is over-determined: net budget (bgt = $bgt) and short budget (sbgt = $sbgt) already pin the gross budget at bgt + 2 * sbgt = $(bgt + 2 * sbgt). Give at most two of bgt, sbgt and gbgt. gbgt exists for the case that bgt and sbgt cannot express, a pinned gross budget with a free net exposure (bgt = nothing)."))
     if isa(wb, WeightBounds)
         @argcheck(w_neg_flag(wb.lb) || w_neg_flag(wb.ub),
                   ArgumentError(gross_budget_bounds_msg(wb.lb, wb.ub)))

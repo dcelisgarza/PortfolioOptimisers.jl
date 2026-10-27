@@ -402,7 +402,7 @@
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/11_TrackingErrorConstraints.jl" = { map = 11, units = 3, swept = false }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/12_RegularisationConstraints.jl" = { map = 11, units = 20, algorithm = 7, swept = true, bindings = ["AbstractRegularisationEstimator", "L2Reg_VecL2Reg", "L2Regularisation", "LpReg_VecLpReg", "LpRegularisation", "VecL2Reg", "VecLpReg", "_set_l2_regularisation!", "assert_ambiguity_radius_formulation", "assert_norm_ceiling_role", "assert_penalty_coefficient_role", "factory", "factory", "norm_ceiling_factory", "set_l1_regularisation!", "set_l2_regularisation!", "set_linf_regularisation!", "set_lp_regularisation!", "squared_norm_over_k!", "squared_norm_radius_msg"] }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/13_WeightNormConstraints.jl" = { map = 11, units = 4, algorithm = 0, swept = true, bindings = ["norm_ball_dual_norm_epigraph!", "set_weight_norm_2_constraints!", "set_weight_norm_inf_constraints!", "set_weight_norm_p_constraints!"] }
-"src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl" = { map = 10, units = 11, swept = false }
+"src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl" = { map = 10, units = 10, algorithm = 2, swept = true, bindings = ["JuMPOptimisationResult", "JuMPOptimiser", "ProcessedAttributes", "ProcessedJuMPOptimiserAttributes", "factory", "investable_view", "jump_optimiser_td_defaults", "needs_previous_weights", "port_opt_view", "set_retcode"] }
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_b.jl" = { map = 10, units = 11, swept = false }
 "src/17_Optimisation/05_JuMP/04_MeanRisk.jl" = { map = 10, units = 15, swept = false }
 "src/17_Optimisation/05_JuMP/05_FactorRiskContribution.jl" = { map = 10, units = 8, swept = false }

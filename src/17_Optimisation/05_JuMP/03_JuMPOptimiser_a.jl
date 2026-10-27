@@ -1,10 +1,10 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for processed optimiser attributes.
+Abstract supertype for the processed attributes of an optimiser.
 
-A subtype is the flat bundle of results one optimiser family produces once per `optimise`
-call and hands to its model-assembly pipeline. Every collection of processed optimiser
+A subtype holds the results that one optimiser family makes once for each `optimise` call. The
+family gives them to the code that builds its model. Every bundle of processed optimiser
 attributes subtypes `ProcessedAttributes`.
 
 # Related
@@ -17,12 +17,11 @@ abstract type ProcessedAttributes <: AbstractResult end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Flat bundle of all processed constraint and prior results consumed by
-[`assemble_jump_model!`](@ref).
+Holds the prior result and every processed constraint result that a JuMP model reads.
 
-Produced once per `optimise` call by [`processed_jump_optimiser_attributes`](@ref) and
-passed directly to the model-assembly pipeline, so every builder reads already-resolved
-results rather than re-processing estimators.
+[`processed_jump_optimiser_attributes`](@ref) makes the bundle once for each `optimise` call,
+and [`assemble_jump_model!`](@ref) reads it. So each builder of the model reads a result, and no
+builder processes an estimator again.
 
 # Fields
 
@@ -42,11 +41,11 @@ $(DocStringExtensions.FIELDS)
         ret::JRE_VecJRE, sca::Scalariser, imsk::Option{<:BitVector} = nothing
     ) -> ProcessedJuMPOptimiserAttributes
 
-Keywords correspond to the struct's fields. The field types are the *result* side of the
-matching [`JuMPOptimiser`](@ref) estimator slots: this bundle holds the constraint and
-prior results produced by [`processed_jump_optimiser_attributes`](@ref), not the raw
-estimators (`ret` aside — a returns estimator has no separate result form). In practice,
-construct via [`processed_jump_optimiser_attributes`](@ref) rather than directly.
+Keywords correspond to the struct's fields. Each field holds the result of the slot of the
+same name in [`JuMPOptimiser`](@ref), and not the estimator. `ret` is the exception, because a
+returns estimator has no result form. Make the bundle with
+[`processed_jump_optimiser_attributes`](@ref). The constructor checks the types of the fields
+and no value, because the processing checked the values.
 
 # Examples
 
@@ -152,11 +151,6 @@ true
     $(field_dict[:imsk])
     """
     imsk
-    # Field types are the *result* side of each matching `JuMPOptimiser` estimator slot:
-    # this bundle holds the constraint/prior results produced by
-    # `processed_jump_optimiser_attributes` — never the raw estimators. `ret` is the sole
-    # exception: a returns estimator has no separate result form. Processing has already
-    # validated the contents, so this bundle only type-gates.
     function ProcessedJuMPOptimiserAttributes(pr::AbstractPriorResult,
                                               wb::Option{<:WeightBounds},
                                               lt::Option{<:Threshold},
@@ -209,15 +203,19 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Reduce an optimisation estimator and its returns data to the assets an Investable Mask keeps.
+Restricts an optimiser head and its returns data to the assets that an Investable Mask keeps.
 
-[`processed_jump_optimiser_attributes`](@ref) reduces what the bundle carries — the prior result and every constraint result. It cannot reduce what the *head* carries: an initial weight vector, a risk measure holding per-asset data, a tracking estimator, a custom constraint. Those travel from the head into [`assemble_jump_model!`](@ref) unmediated by the bundle, so each head takes this view of itself and of `rd` before it assembles a model.
+[`processed_jump_optimiser_attributes`](@ref) restricts the prior result and every constraint result of the bundle. It cannot restrict the values that the head holds outside the bundle, such as an initial weight vector, a risk measure with data for each asset, a tracking estimator or a custom constraint. These go from the head to [`assemble_jump_model!`](@ref) directly. So each head calls this function on itself and on `rd` before it builds a model.
 
-The `nothing` method is the whole all-investable path: it returns both arguments unchanged, so a universe with nothing to exclude allocates nothing and takes the route it took before the mask existed.
+The function does not report the reduction, because [`investable_reduction`](@ref) reports it once for the bundle.
 
-The returns matrix the view slices tracking against is `rd.X`, and `pr.X` when the caller stated a fitted prior instead of data. [`port_opt_view`](@ref) reads the prior's own matrix in that case and ignores what it is given, so either is correct and only one of them always exists.
+# Algorithm
 
-The mask is handed to [`port_opt_view`](@ref) as the index vector `findall(imsk)` rather than as the mask itself. Every other caller of that verb passes an integer index, and a view specialised on one index type is a view whose inference is already exercised.
+ 1. When `imsk` is `nothing`, every asset is investable. Return `optimiser` and `rd` unchanged, with no allocation.
+ 2. Take the returns matrix `X` from `rd.X`, or from `pr.X` when `rd` holds no matrix. When the head holds a fitted prior, [`port_opt_view`](@ref) reads the matrix of that prior and ignores `X`, so the two choices give the same view.
+ 3. Find the positions `idx = findall(imsk)` of the investable assets. Every other caller of [`port_opt_view`](@ref) passes an index vector, so the function passes one too.
+ 4. View `optimiser` at `idx` with [`port_opt_view`](@ref). Then declare the names that the mask leaves out on the Non-Investable Axis of the sets that the head holds, with [`non_investable_universe`](@ref). The generic method returns a head with no such sets unchanged. A risk budget keyed by name resolves after this step.
+ 5. View `rd` at `idx`, and return the two views.
 
 # Arguments
 
@@ -244,11 +242,9 @@ function investable_view(optimiser::JuMPOptimisationEstimator, rd::ReturnsResult
                          pr::AbstractPriorResult, imsk::BitVector)
     X = isnothing(rd.X) ? pr.X : rd.X
     idx = findall(imsk)
-    # The head takes the same view of itself that `investable_reduction` took of the
-    # optimiser for the bundle, so it declares the Non-Investable Axis on whatever sets it
-    # carries — a risk budget keyed by name is resolved from here, after this view. It stays
-    # quiet: `investable_reduction` has already announced the departure, and one event is
-    # reported once.
+    # The head takes the view that `investable_reduction` took of the optimiser for the
+    # bundle, so it declares the Non-Investable Axis on the sets that it holds. It reports
+    # nothing, because `investable_reduction` reported the departure.
     return non_investable_universe(port_opt_view(optimiser, idx, X),
                                    non_investable_names(rd.nx, imsk)),
            port_opt_view(rd, idx)
@@ -265,11 +261,11 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Shared field core for JuMP-based optimisation results.
+Holds the fields that every JuMP optimisation result shares.
 
-Holds the fields common to every JuMP optimisation result. Embedded as the first field (`jr`) of each concrete JuMP result, analogous to how [`JuMPOptimiser`](@ref) is embedded as `opt` in each JuMP optimiser. The concrete result keeps only its unique fields plus the trailing `fb`.
+Each concrete JuMP result holds it as its first field, `jr`, as each JuMP optimiser holds a [`JuMPOptimiser`](@ref) as `opt`. The concrete result adds its own fields and the last field `fb`.
 
-Defined here (rather than in `01_Base_JuMPOptimisation/01_JuMPOptimisationTypes.jl`, where its [`BaseJuMPOptimisationResult`](@ref) supertype lives) so its typed constructor can bind `pa::ProcessedJuMPOptimiserAttributes` and `sol::JuMPOptimisationSolution`, both in scope at this point in load order.
+The result holds the weights on the full asset universe of the caller. The solver solves over the investable assets alone, and `model` keeps that reduced problem when the head saves the model. The property `w` reads the weights of `sol`, and a vector of solutions gives a vector of weight vectors. A property name that is neither `w` nor a field reads the field of `pa` of the same name.
 
 # Fields
 
@@ -284,13 +280,18 @@ $(DocStringExtensions.FIELDS)
         model::Option{<:JuMP.Model}
     ) -> JuMPOptimisationResult
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. The keyword constructor expands the weights of `sol` from the investable assets to the full asset universe with [`expand_investable_weights`](@ref), at the mask `pa.imsk`. An asset outside the mask gets the weight zero. When `pa.imsk` is `nothing`, `sol` is kept unchanged.
+
+## Validation
+
+  - When `pa.imsk` is a mask, each weight vector of `sol` holds one weight for each `true` entry of the mask. Otherwise the constructor raises a `DimensionMismatch`.
 
 # Related
 
   - [`BaseJuMPOptimisationResult`](@ref)
   - [`RiskJuMPOptimisationResult`](@ref)
   - [`JuMPOptimiser`](@ref)
+  - [`set_retcode`](@ref): Rebuilds the result with a new return code, and does not expand the weights again.
 """
 @concrete struct JuMPOptimisationResult <: BaseJuMPOptimisationResult
     """
@@ -309,6 +310,8 @@ Keywords correspond to the struct's fields.
     $(field_dict[:model])
     """
     model
+    # The type is declared here and not beside its supertype `BaseJuMPOptimisationResult`, so
+    # that this constructor can bind `ProcessedJuMPOptimiserAttributes` and the solution types.
     function JuMPOptimisationResult(pa::ProcessedJuMPOptimiserAttributes,
                                     retcode::OptRetCode_VecOptRetCode,
                                     sol::JuMPOptSol_VecJuMPOptSol,
@@ -321,14 +324,10 @@ function JuMPOptimisationResult(; pa::ProcessedJuMPOptimiserAttributes,
                                 retcode::OptRetCode_VecOptRetCode,
                                 sol::JuMPOptSol_VecJuMPOptSol,
                                 model::Option{<:JuMP.Model})::JuMPOptimisationResult
-    # The one constructor every JuMP family's result comes through, and so the one place
-    # the weight expansion belongs: `MeanRisk`, `RiskBudgeting`, `RelaxedRiskBudgeting`,
-    # `FactorRiskContribution` and `NearOptimalCentering` all build their result here. `sol`
-    # arrives holding the reduced vector the solver returned, and the result carries that
-    # vector on the caller's own universe; the reduced problem survives in `model` when the
-    # head was asked to save it. It sits here rather than in the inner constructor because
-    # the inner one states the field types of `new`, and a reassignment there widens what
-    # inference knows about `sol` and `model` both.
+    # Every JuMP family builds its result through this constructor, so the weight expansion
+    # is here. `MeanRisk`, `RiskBudgeting`, `RelaxedRiskBudgeting`, `FactorRiskContribution`
+    # and `NearOptimalCentering` all call it. The expansion is not in the inner constructor,
+    # because a new value of `sol` there makes the inferred field types wider.
     return JuMPOptimisationResult(pa, retcode, expand_investable_weights(pa.imsk, sol),
                                   model)
 end
@@ -346,7 +345,7 @@ end
 
 Rebuild a [`JuMPOptimisationResult`](@ref) with a different return code.
 
-The rebuild reaches the inner constructor rather than the keyword one, because the keyword constructor expands the solver's reduced weight vector onto the caller's universe. `sol` is already expanded here, so a second pass through the keyword constructor would expand it twice.
+The rebuild calls the positional constructor, not the keyword constructor. The keyword constructor expands the weights from the investable assets to the full asset universe. The weights of `res.sol` are expanded already, and a second expansion raises a `DimensionMismatch` when the mask leaves out an asset.
 
 # Arguments
 
@@ -375,54 +374,13 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Assert that `val` is finite and positive; throw an `ArgCheck` error otherwise.
+Returns the static defaults of the [`JuMPOptimiser`](@ref) fields that can hold a [`TimeDependent`](@ref).
 
-Accepts a scalar `Number` or a `VecNum`. The scalar overload requires `isfinite(val)` and
-`val > 0`. The vector overload is weaker: it requires at least one finite element, at least
-one strictly positive element, and no negative element, so a vector carrying zeros passes
-where the scalar `0` does not.
-
-# Arguments
-
-  - `val`: Scalar or vector to validate.
+The constructor reads them when it checks each entry of a schedule, and [`time_dependent_field_defaults`](@ref) returns them. So the value of a field outside every fold loop is declared once. A field whose static default is `nothing` is not in the tuple.
 
 # Returns
 
-  - `nothing`.
-
-# Examples
-
-```jldoctest
-julia> PortfolioOptimisers.assert_finite_nonnegative_real_or_vec(1.0)
-
-julia> PortfolioOptimisers.assert_finite_nonnegative_real_or_vec([0.5, 1.0])
-
-```
-
-# Related
-
-  - [`JuMPOptimiser`](@ref)
-"""
-function assert_finite_nonnegative_real_or_vec(val::Number)::Nothing
-    @argcheck(isfinite(val), IsNonFiniteError("val must be finite, got $val"))
-    @argcheck(val > zero(val), DomainError(val, "val must be > 0"))
-    return nothing
-end
-function assert_finite_nonnegative_real_or_vec(val::VecNum)::Nothing
-    @argcheck(any(isfinite, val),
-              IsNonFiniteError("val must contain at least one finite element, got $val"))
-    @argcheck(any(x -> x > zero(x), val),
-              DomainError(val, "val must contain at least one positive element"))
-    @argcheck(all(x -> zero(x) <= x, val),
-              DomainError(val, "all elements of val must be >= 0"))
-    return nothing
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return the static defaults of the [`JuMPOptimiser`](@ref) fields that may hold a [`TimeDependent`](@ref).
-
-Shared by the constructor's test-substitution pass and [`time_dependent_field_defaults`](@ref), so the fold-less value of a field is declared once. Fields whose static default is `nothing` are omitted.
+  - `NamedTuple`: The defaults of `pe`, `wb`, `bgt`, `ret` and `sca`.
 
 # Related
 
@@ -437,9 +395,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Main JuMP-based portfolio optimiser configuration.
+Holds the problem definition and the solver settings that every JuMP optimiser shares.
 
-`JuMPOptimiser` collects all the inputs needed to formulate and solve a JuMP-based portfolio optimisation problem: prior estimator, solver, constraints, bounds, fees, tracking, regularisation, and more. It is intended to be passed to a higher-level optimiser such as [`MeanRisk`](@ref) or [`RiskBudgeting`](@ref).
+It holds the prior estimator, the solvers, the budgets, the bounds, the constraints, the fees, the tracking and the regularisation. Give it to a JuMP optimiser such as [`MeanRisk`](@ref) or [`RiskBudgeting`](@ref), which adds the objective and the risk measure.
 
 # Fields
 
@@ -492,28 +450,25 @@ $(DocStringExtensions.FIELDS)
         cache::Option{<:ReturnsBufferState} = nothing,
     ) -> JuMPOptimiser
 
-Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or [`TD`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value; a cross-validation fold loop resolves it per fold, and a fold-less `optimise` runs with the field at its static default. The problem definition — the prior estimator, returns model, scalariser and asset sets as much as the constraints — may therefore vary over folds; execution control (`slv`, `sc`, `so`, `strict`) stays static.
+Keywords correspond to the struct's fields. A field typed [`TD_Option`](@ref) or [`TD`](@ref) can hold a [`TimeDependent`](@ref) schedule in place of a static value. A cross-validation fold loop resolves the schedule at each fold, and an `optimise` call outside a fold loop reads the static default of the field. So the prior estimator, the returns model, the scalariser, the asset sets and the constraints can change from fold to fold. The execution settings `slv`, `sc`, `so` and `strict` are static.
 
 ## Validation
 
   - If `slv` is a vector: `!isempty(slv)`.
   - If `bgt` is a number: `isfinite(bgt)`.
-  - If `bgt` is a `BudgetCostEstimator`: `isnothing(sbgt)`.
-  - If `sbgt` is a number: `isfinite(sbgt)` and `sbgt >= 0`.
-  - If `gbgt` is a number: `isfinite(gbgt)` and `gbgt >= 0`.
-  - If `gbgt` is provided: `wb` must admit short positions, and `bgt` and `sbgt` must not *both* be pinned numbers (which already determine the gross exposure as `bgt + 2 * sbgt`).
-  - If `cte` is a vector: `!isempty(cte)`.
-  - If `card` is provided: `card > 0` and finite.
-  - If `tn` or `tr` is a vector: each must be non-empty.
-  - If `tr` holds a [`DataBenchmarkTracking`](@ref): `pe` must not state `x_src = ExcessSource()`, see [`assert_data_benchmark_prior`](@ref).
-  - If `l2c`, `linfc`, `l1`, or `linf` is provided as a number: each must be `> 0` and finite. `l1` and `linf` also take an ambiguity-radius rule, and `l2c` and `linfc` a norm-ceiling rule. A rule states no number here, so the check runs on the number the rule returns, in [`assemble_jump_model!`](@ref).
-  - The rule in each [`LpRegularisation`](@ref) is checked against the field that holds it: `lp` is a penalty, so it refuses a norm-ceiling rule, and `lpc` is a constraint, so it refuses an ambiguity-radius rule. The term itself carries one bound for both readings, so this is the point at which the reading is known.
-  - If `l2`, `lp` or `lpc` is a vector: each must be non-empty. An empty vector builds no term, which is what `nothing` already spells.
-  - `l2`, `lp` and `lpc` are validated by their own estimator constructors ([`L2Regularisation`](@ref), [`LpRegularisation`](@ref)).
-  - If `scard` is provided: compatible `smtx`, `slt`, `sst` sizes required.
-  - If `sgcarde` is provided: compatible `sgmtx`, `sglt`, `sgst` sizes required.
-  - If any estimator-type field (`wb`, `lt`, `fees`, etc.) is provided: `!isnothing(sets)`.
-  - If any field holds a [`TimeDependent`](@ref): every vector entry is test-substituted through this constructor (with the other time-dependent fields at their static defaults) so type and cross-field compatibility errors surface immediately. Validation coupling a time-dependent field to static fields is deferred to the per-fold rebuild.
+  - If `bgt` is a [`BudgetCostEstimator`](@ref): `isnothing(sbgt)`. Otherwise the constructor raises a `ConflictingArgumentError`.
+  - If `sbgt` or `gbgt` is a number: it is finite and `>= 0`.
+  - If `gbgt` is not `nothing`: `bgt` and `sbgt` are not both numbers, see [`assert_gross_budget_admissible`](@ref). Two numbers fix the gross budget of the model at `bgt + 2 * sbgt`, which is the row that `gbgt` writes. The realised gross exposure `norm(w, 1)` equals this budget when `xbgt` is `true`, and it can be smaller when `xbgt` is `false`.
+  - If `gbgt` is not `nothing` and `wb` is a [`WeightBounds`](@ref): `wb` admits a negative weight. The check of a [`WeightBoundsEstimator`](@ref) waits for the solve.
+  - If `cte`, `tn`, `tr`, `l2`, `lp` or `lpc` is a vector: `!isempty`. An empty `l2`, `lp` or `lpc` builds no term, which is what `nothing` states.
+  - If `card`, `l2c`, `linfc`, `l1` or `linf` is a number: it is finite and `> 0`. `l1` and `linf` also take an ambiguity-radius rule, and `l2c` and `linfc` a norm-ceiling rule. A rule states no number at construction, so [`assemble_jump_model!`](@ref) checks the number that the rule returns.
+  - The rule in each [`LpRegularisation`](@ref) agrees with the field that holds it. `lp` is a penalty, so it refuses a norm-ceiling rule, and `lpc` is a constraint, so it refuses an ambiguity-radius rule. The term has one field for both readings, so the constructor of the optimiser is the first point that knows the reading. The constructors of [`L2Regularisation`](@ref) and [`LpRegularisation`](@ref) check the other values of `l2`, `lp` and `lpc`.
+  - The shapes of `scard`, `smtx`, `slt` and `sst` agree, see [`assert_subgroup_mip_fields`](@ref). The shapes of `sgcarde`, `sgmtx`, `sglt` and `sgst` agree, see [`assert_subgrouped_mip_fields`](@ref).
+  - If a slot holds an estimator keyed by name ([`name_keyed`](@ref)), or `fees` is a [`FeesEstimator`](@ref): `!isnothing(sets)`.
+  - If `tr` holds a [`DataBenchmarkTracking`](@ref): `pe` does not state `x_src = ExcessSource()`, see [`assert_data_benchmark_prior`](@ref).
+  - If a field holds a [`TimeDependent`](@ref): the constructor runs again once for each entry of the schedule, with the other schedules at their static defaults, see [`assert_time_dependent_substitution`](@ref). So a type error or a conflict between two fields shows at construction. A check that couples a schedule to a static field runs again when each fold rebuilds the optimiser.
+
+A value outside its bound raises an `IsEmptyError`, an `IsNonFiniteError`, a `DomainError`, an `IsNothingError`, an `ArgumentError` or a `DimensionMismatch`, as the helper that checks it states.
 
 # Related
 
@@ -735,37 +690,22 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
             assert_nonempty_nonneg_finite_val(gbgt, :gbgt)
         end
         assert_gross_budget_admissible(bgt, sbgt, gbgt, wb)
-        if isa(cte, AbstractVector)
-            @argcheck(!isempty(cte), IsEmptyError("cte cannot be empty"))
-        end
-        if !isnothing(card) && !isa(card, TimeDependent)
-            assert_nonempty_gt0_finite_val(card, :card)
-        end
-        if isa(tn, AbstractVector)
-            @argcheck(!isempty(tn), IsEmptyError("tn cannot be empty"))
-        end
-        if isa(tr, AbstractVector)
-            @argcheck(!isempty(tr), IsEmptyError("tr cannot be empty"))
+        # `map` compiles one call for each slot, so the slots of different types are not boxed.
+        map(((cte, :cte), (tn, :tn), (tr, :tr), (l2, :l2), (lp, :lp), (lpc, :lpc))) do (x,
+                                                                                        name)
+            if isa(x, AbstractVector)
+                @argcheck(!isempty(x), IsEmptyError("$name cannot be empty"))
+            end
+            return nothing
         end
         assert_data_benchmark_prior(tr, pe, :tr, :JuMPOptimiser)
-        if !isnothing(l2c) && !isa(l2c, TimeDependent)
-            assert_nonempty_gt0_finite_val(l2c, :l2c)
-        end
-        if !isnothing(linfc) && !isa(linfc, TimeDependent)
-            assert_nonempty_gt0_finite_val(linfc, :linfc)
-        end
-        if !isnothing(l1) && !isa(l1, TimeDependent)
-            assert_nonempty_gt0_finite_val(l1, :l1)
-        end
-        if isa(l2, AbstractVector)
-            @argcheck(!isempty(l2), IsEmptyError("l2 cannot be empty"))
-        end
-        if isa(lp, AbstractVector)
-            @argcheck(!isempty(lp), IsEmptyError("lp cannot be empty"))
-        end
-        if isa(lpc, AbstractVector)
-            @argcheck(!isempty(lpc), IsEmptyError("lpc cannot be empty"))
-        end
+        # The method for a value other than a number checks nothing, so `nothing`, a schedule
+        # and a calibration rule pass these calls.
+        assert_nonempty_gt0_finite_val(card, :card)
+        assert_nonempty_gt0_finite_val(l2c, :l2c)
+        assert_nonempty_gt0_finite_val(linfc, :linfc)
+        assert_nonempty_gt0_finite_val(l1, :l1)
+        assert_nonempty_gt0_finite_val(linf, :linf)
         # `LpRegularisation.val` is read as a coefficient in `lp` and as a ceiling in
         # `lpc`, and one field cannot carry two bounds. This is the first point at which
         # the reading is known, so it is where the wrong role is refused. A `TimeDependent`
@@ -773,43 +713,10 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
         # constructor test-substitutes each of its entries through this same check.
         assert_penalty_coefficient_role(lp)
         assert_norm_ceiling_role(lpc)
-        if !isnothing(linf) && !isa(linf, TimeDependent)
-            assert_nonempty_gt0_finite_val(linf, :linf)
-        end
         assert_subgroup_mip_fields(scard, smtx, slt, sst)
         assert_subgrouped_mip_fields(sgcarde, sgmtx, sglt, sgst)
-        if isa(wb, WeightBoundsEstimator) ||
-           isa(lt, ThresholdEstimator) ||
-           isa(st, ThresholdEstimator) ||
-           isa(slt, ThresholdEstimator) ||
-           isa(sst, ThresholdEstimator) ||
-           isa(sglt, ThresholdEstimator) ||
-           isa(sgst, ThresholdEstimator) ||
-           isa(lcse, LinearConstraintEstimator) ||
-           isa(lcse, ExposureConstraintEstimator) ||
-           isa(cte, LinearConstraintEstimator) ||
-           isa(gcarde, LinearConstraintEstimator) ||
-           isa(sgcarde, LinearConstraintEstimator) ||
-           isa(smtx, AssetSetsMatrixEstimator) ||
-           isa(sgmtx, AssetSetsMatrixEstimator) ||
-           isa(fees, FeesEstimator) ||
-           isa(tn, TurnoverEstimator) ||
-           isa(slt, AbstractVector) && any(x -> isa(x, ThresholdEstimator), slt) ||
-           isa(sst, AbstractVector) && any(x -> isa(x, ThresholdEstimator), sst) ||
-           isa(sglt, AbstractVector) && any(x -> isa(x, ThresholdEstimator), sglt) ||
-           isa(sgst, AbstractVector) && any(x -> isa(x, ThresholdEstimator), sgst) ||
-           isa(lcse, AbstractVector) &&
-           any(x -> isa(x, LinearConstraintEstimator) || isa(x, ExposureConstraintEstimator),
-               lcse) ||
-           isa(cte, AbstractVector) && any(x -> isa(x, LinearConstraintEstimator), cte) ||
-           isa(gcarde, AbstractVector) &&
-           any(x -> isa(x, LinearConstraintEstimator), gcarde) ||
-           isa(sgcarde, AbstractVector) &&
-           any(x -> isa(x, LinearConstraintEstimator), sgcarde) ||
-           isa(smtx, AbstractVector) && any(x -> isa(x, AssetSetsMatrixEstimator), smtx) ||
-           isa(sgmtx, AbstractVector) &&
-           any(x -> isa(x, AssetSetsMatrixEstimator), sgmtx) ||
-           isa(tn, AbstractVector) && any(x -> isa(x, TurnoverEstimator), tn)
+        if isa(fees, FeesEstimator) || any(name_keyed,
+                                           (wb, lt, st, lcse, gcarde, sgcarde, smtx, sgmtx, slt, sst, sglt, sgst, tn))
             @argcheck(!isnothing(sets),
                       IsNothingError("sets cannot be nothing when estimator-type fields are provided"))
         end
@@ -884,17 +791,17 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `true` if any sub-estimator of `opt` requires previous portfolio weights.
+Returns `true` if a field of `opt` reads the portfolio weights of the previous fold.
 
-Checks turnover, fees, tracking error, custom constraint, and custom objective fields.
+The function asks `tn`, `fees`, `tr`, `ccnt` and `cobj`. It also asks every field that holds a [`TimeDependent`](@ref) that the fold loop resolves, see [`time_dependent_fields`](@ref). A schedule reads the previous weights when it holds a [`PreviousWeightsFunction`](@ref) or an entry that reads them.
 
 # Arguments
 
-  - `opt::JuMPOptimiser`: JuMP optimiser configuration.
+  - `opt::JuMPOptimiser`: The JuMP optimiser.
 
 # Returns
 
-  - `Bool`: `true` if any sub-estimator needs previous weights; `false` otherwise.
+  - `Bool`: `true` if one of these fields reads the previous weights, and `false` otherwise.
 
 # Examples
 
@@ -923,19 +830,18 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return a copy of `opt` with all weight-tracking estimator fields updated through `factory` for the new weights `w`.
+Returns a copy of `opt` whose fields that read previous weights hold the weights `w`.
 
-Updates turnover, fees, tracking error, custom constraint, and custom objective fields;
-all other fields are carried through unchanged.
+The function calls `factory(x, w)` on `tn`, `fees`, `tr`, `ccnt` and `cobj`, and it keeps every other field. A [`TimeDependent`](@ref) in one of these fields applies `factory` to each of its entries. The keyword constructor of [`JuMPOptimiser`](@ref) checks the new fields.
 
 # Arguments
 
-  - `opt::JuMPOptimiser`: JuMP optimiser configuration.
-  - `w::AbstractVector`: New portfolio weights.
+  - `opt::JuMPOptimiser`: The JuMP optimiser.
+  - `w::AbstractVector`: The new portfolio weights.
 
 # Returns
 
-  - `JuMPOptimiser`: Updated optimiser with weight-tracking fields refreshed.
+  - `JuMPOptimiser`: The optimiser with the five fields rebuilt for `w`.
 
 # Examples
 
@@ -952,41 +858,35 @@ true
   - [`factory`](@ref)
 """
 function factory(opt::JuMPOptimiser, w::AbstractVector)::JuMPOptimiser
-    tn = factory(opt.tn, w)
-    fees = factory(opt.fees, w)
-    tr = factory(opt.tr, w)
-    ccnt = factory(opt.ccnt, w)
-    cobj = factory(opt.cobj, w)
-    return JuMPOptimiser(; pe = opt.pe, slv = opt.slv, wb = opt.wb, bgt = opt.bgt,
-                         sbgt = opt.sbgt, gbgt = opt.gbgt, xbgt = opt.xbgt, lt = opt.lt,
-                         st = opt.st, lcse = opt.lcse, cte = opt.cte, gcarde = opt.gcarde,
-                         sgcarde = opt.sgcarde, smtx = opt.smtx, sgmtx = opt.sgmtx,
-                         slt = opt.slt, sst = opt.sst, sglt = opt.sglt, sgst = opt.sgst,
-                         tn = tn, fees = fees, sets = opt.sets, tr = tr, ple = opt.ple,
-                         ret = opt.ret, sca = opt.sca, ccnt = ccnt, cobj = cobj,
-                         sc = opt.sc, so = opt.so, ss = opt.ss, card = opt.card,
-                         scard = opt.scard, l2c = opt.l2c, lpc = opt.lpc, linfc = opt.linfc,
-                         l1 = opt.l1, l2 = opt.l2, lp = opt.lp, linf = opt.linf,
-                         strict = opt.strict, cache = opt.cache)
+    return rebuild_estimator(opt,
+                             (; tn = factory(opt.tn, w), fees = factory(opt.fees, w),
+                              tr = factory(opt.tr, w), ccnt = factory(opt.ccnt, w),
+                              cobj = factory(opt.cobj, w)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return a cluster-sliced copy of `opt` restricted to asset indices `i`.
+Returns a copy of `opt` restricted to the assets at the indices `i`.
 
-Slices all per-asset estimator fields (prior, weight bounds, thresholds, turnover, fees,
-tracking, custom constraint/objective) to the cluster; solver and scalar parameters are
-carried through unchanged.
+A hierarchical optimiser calls it to build the optimiser of one cluster, and the entry of a fit calls it to restrict the optimiser to the Investable Mask.
+
+# Algorithm
+
+ 1. When `opt.pe` is a prior result, replace `X` with `opt.pe.X`.
+ 2. View at `i` the fields that can hold a value for each asset: `pe`, `wb`, `bgt`, `lt`, `st`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `tn`, `lcse`, `sets`, `ret`, `ccnt`, `cobj` and `cache`. When `smtx` and `sgmtx` hold the same object, view it once, so that the two views are one object too. The same holds for `slt` and `sglt`, and for `sst` and `sgst`.
+ 3. View `fees` and `tr` at `i` with `X`. A fee finds the assets outside `i`, which its liquidation charges read, from the width of `X`. A tracking measure gives `X` to the risk measure that it tracks.
+ 4. Keep every other field. An estimator in `cte`, `gcarde` or `sgcarde` resolves its names against the viewed `sets`. A precomputed constraint in one of them keeps its width, because no view can narrow its matrix, see `port_opt_view(::LinearConstraint, i)`. `ple` reads the viewed prior. The other fields hold no value for each asset.
+ 5. Rebuild the optimiser with its keyword constructor, which checks the viewed fields again.
 
 # Arguments
 
-  - `opt::JuMPOptimiser`: JuMP optimiser configuration.
-  - `i`: Asset index or index set for the cluster.
-  - `X::MatNum`: Asset returns matrix (observations x assets) used to slice tracking estimators. A precomputed prior in `opt.pe` supplies its own `X` instead.
+  - `opt::JuMPOptimiser`: The JuMP optimiser.
+  - `i`: The indices of the assets that the view keeps.
+  - `X::MatNum`: The returns matrix of the full universe, with one column for each asset. A prior result in `opt.pe` gives its own `X` in its place.
 
 # Returns
 
-  - `JuMPOptimiser`: Cluster-restricted optimiser.
+  - `JuMPOptimiser`: The optimiser restricted to the assets at `i`.
 
 # Examples
 
@@ -1032,25 +932,18 @@ function port_opt_view(opt::JuMPOptimiser, i, X::MatNum, args...)::JuMPOptimiser
     tn = port_opt_view(opt.tn, i)
     lcse = port_opt_view(opt.lcse, i)
     sets = port_opt_view(opt.sets, i)
-    # A fee spans two axes: the five per-asset fields on the investable assets, and the two
-    # liquidation charges on the complement. Its view derives that complement from the
-    # width of the unreduced `X`, so this is the one constraint that must be handed the
-    # matrix rather than the index alone.
+    # A fee has two axes. Its five fields for each asset are on the kept assets, and its two
+    # liquidation charges are on the other assets. Its view finds the other assets from the
+    # width of the unreduced `X`, so it is the one constraint that needs the matrix.
     fees = port_opt_view(opt.fees, i, X)
     tr = port_opt_view(opt.tr, i, X)
     ret = port_opt_view(opt.ret, i)
     ccnt = port_opt_view(opt.ccnt, i)
     cobj = port_opt_view(opt.cobj, i)
-    return JuMPOptimiser(; pe = pe, slv = opt.slv, wb = wb, bgt = bgt, sbgt = opt.sbgt,
-                         gbgt = opt.gbgt, xbgt = opt.xbgt, lt = lt, st = st, lcse = lcse,
-                         cte = opt.cte, gcarde = opt.gcarde, sgcarde = opt.sgcarde,
-                         smtx = smtx, sgmtx = sgmtx, slt = slt, sst = sst, sglt = sglt,
-                         sgst = sgst, tn = tn, fees = fees, sets = sets, tr = tr,
-                         ple = opt.ple, ret = ret, sca = opt.sca, ccnt = ccnt, cobj = cobj,
-                         sc = opt.sc, so = opt.so, ss = opt.ss, card = opt.card,
-                         scard = opt.scard, l2c = opt.l2c, lpc = opt.lpc, linfc = opt.linfc,
-                         l1 = opt.l1, l2 = opt.l2, lp = opt.lp, linf = opt.linf,
-                         strict = opt.strict, cache = port_opt_view(opt.cache, i))
+    cache = port_opt_view(opt.cache, i)
+    return rebuild_estimator(opt,
+                             (; pe, wb, bgt, lt, st, lcse, smtx, sgmtx, slt, sst, sglt,
+                              sgst, tn, fees, sets, tr, ret, ccnt, cobj, cache))
 end
 function non_investable_universe(opt::JuMPOptimiser, ni::VecStr)::JuMPOptimiser
     return rebuild_estimator(opt, (; sets = non_investable_sets(opt.sets, ni)))

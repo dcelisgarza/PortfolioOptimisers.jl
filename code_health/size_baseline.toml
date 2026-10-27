@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.3"
 julia_syntax = "1.0.2"
-commit = "89e09f3534"
+commit = "bd71535e5e"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { code = 287, doc = 0, comment = 12, blank = 2, total = 301 }
@@ -354,7 +354,7 @@ commit = "89e09f3534"
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/11_TrackingErrorConstraints.jl" = { code = 197, doc = 82, comment = 3, blank = 31, total = 313 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/12_RegularisationConstraints.jl" = { code = 234, doc = 545, comment = 11, blank = 264, total = 1054 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/13_WeightNormConstraints.jl" = { code = 92, doc = 208, comment = 2, blank = 96, total = 398 }
-"src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl" = { code = 449, doc = 473, comment = 31, blank = 106, total = 1059 }
+"src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl" = { code = 366, doc = 461, comment = 24, blank = 101, total = 952 }
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_b.jl" = { code = 186, doc = 268, comment = 51, blank = 97, total = 602 }
 "src/17_Optimisation/05_JuMP/04_MeanRisk.jl" = { code = 257, doc = 438, comment = 4, blank = 127, total = 826 }
 "src/17_Optimisation/05_JuMP/05_FactorRiskContribution.jl" = { code = 172, doc = 229, comment = 13, blank = 76, total = 490 }

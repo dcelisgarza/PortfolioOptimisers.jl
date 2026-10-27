@@ -1848,3 +1848,180 @@ end
         @test nx == ["a", "b"]
     end
 end
+@testset "JuMP optimiser against its docstrings" begin
+    using PortfolioOptimisers, Test, JuMP, HiGHS, StableRNGs
+    PO = PortfolioOptimisers
+    slv = Solver(; solver = nothing)
+    N = 5
+    nx = ["A", "B", "C", "D", "E"]
+    rng = StableRNG(685)
+    X = randn(rng, 200, N) .* 0.01 .+ [0.001 0.0005 -0.0003 0.0008 -0.0006]
+    rd = ReturnsResult(; nx = nx, X = X)
+
+    @testset "the constructor raises as its Validation list states" begin
+        @test_throws IsEmptyError JuMPOptimiser(; slv = Solver[])
+        @test_throws IsNonFiniteError JuMPOptimiser(; slv, bgt = Inf)
+        @test_throws ConflictingArgumentError JuMPOptimiser(; slv,
+                                                            bgt = BudgetCosts(;
+                                                                              w = fill(1 /
+                                                                                       3,
+                                                                                       3)),
+                                                            sbgt = 0.2)
+        @test_throws DomainError JuMPOptimiser(; slv, sbgt = -0.1)
+        @test_throws DomainError JuMPOptimiser(; slv, bgt = nothing, gbgt = -1.0,
+                                               wb = WeightBounds(; lb = -1, ub = 1))
+        # A gross budget needs a negative bound, and it is over-determined by two numbers.
+        @test_throws ArgumentError JuMPOptimiser(; slv, bgt = nothing, gbgt = 1.5)
+        @test_throws ArgumentError JuMPOptimiser(; slv, bgt = 1.0, sbgt = 0.3, gbgt = 1.6,
+                                                 wb = WeightBounds(; lb = -1, ub = 1))
+        for (k, v) in
+            ((:cte, CentralityConstraint[]), (:tn, Turnover[]), (:tr, TrackingError[]),
+             (:l2, L2Regularisation[]), (:lp, LpRegularisation[]),
+             (:lpc, LpRegularisation[]))
+            @test_throws IsEmptyError JuMPOptimiser(; slv, k => v)
+        end
+        for k in (:card, :l2c, :linfc, :l1, :linf)
+            @test_throws DomainError JuMPOptimiser(; slv, k => (k === :card ? 0 : 0.0))
+        end
+        # A schedule passes the direct check, and the substitution checks each entry.
+        @test JuMPOptimiser(; slv, l1 = TimeDependent([0.1, 0.2])) isa JuMPOptimiser
+        @test_throws DomainError JuMPOptimiser(; slv, card = TimeDependent([2, 0]))
+        # A slot keyed by name, a fee estimator among them, needs `sets`.
+        sets = UniverseSets(; dict = Dict("nx" => nx))
+        for kw in ((; wb = WeightBoundsEstimator(; lb = Dict("A" => 0.1))),
+                   (; fees = FeesEstimator(; l = Dict("A" => 0.01))),
+                   (; smtx = [AssetSetsMatrixEstimator(; val = "x")],
+                    slt = [ThresholdEstimator(; val = Dict("A" => 0.1))]))
+            @test_throws IsNothingError JuMPOptimiser(; slv, kw...)
+            @test JuMPOptimiser(; slv, sets, kw...) isa JuMPOptimiser
+        end
+    end
+
+    @testset "two numbers fix the gross budget, and xbgt makes the weights reach it" begin
+        hs = Solver(; solver = HiGHS.Optimizer, settings = Dict("log_to_console" => false))
+        g = map((false, true)) do xb
+            res = optimise(MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(),
+                                    opt = JuMPOptimiser(; slv = hs,
+                                                        wb = WeightBounds(; lb = -1.0,
+                                                                          ub = 1.0),
+                                                        bgt = 1.0, sbgt = 0.3, xbgt = xb)),
+                           rd)
+            @test res.retcode isa OptimisationSuccess
+            @test isapprox(sum(res.w), 1.0; atol = 1e-6)
+            # The short budget of the model is pinned in both cases.
+            @test isapprox(JuMP.value(sum(res.model[:sw]) / res.model[:k]), 0.3;
+                           atol = 1e-6)
+            sum(abs, res.w)
+        end
+        # Without `xbgt` the realised gross exposure is below bgt + 2 * sbgt.
+        @test g[1] < 1.6 - 1e-3
+        @test isapprox(g[2], 1.6; atol = 1e-6)
+    end
+
+    @testset "the previous weights, factory and the view" begin
+        tnv = Turnover(; w = fill(0.2, N), val = 0.1)
+        o = JuMPOptimiser(; slv, tn = tnv)
+        @test !PO.needs_previous_weights(JuMPOptimiser(; slv))
+        @test PO.needs_previous_weights(o)
+        # A schedule that reads the previous weights counts, a plain vector does not.
+        @test PO.needs_previous_weights(JuMPOptimiser(; slv,
+                                                      bgt = TimeDependent(PreviousWeightsFunction(;
+                                                                                                  f = ctx -> 1.0))))
+        @test !PO.needs_previous_weights(JuMPOptimiser(; slv,
+                                                       bgt = TimeDependent([1.0, 0.9])))
+        w1 = [0.6, 0.1, 0.1, 0.1, 0.1]
+        f = PO.factory(o, w1)
+        @test f.tn.w == w1
+        @test f.tn.val == 0.1
+        @test all(n -> n in (:tn, :fees, :tr, :ccnt, :cobj) ||
+                       getfield(f, n) === getfield(o, n), fieldnames(JuMPOptimiser))
+
+        lt5 = Threshold(; val = [0.01, 0.02, 0.03, 0.04, 0.05])
+        st5 = Threshold(; val = [0.11, 0.12, 0.13, 0.14, 0.15])
+        sm = [1 1 0 0 0; 0 0 1 1 1]
+        idx = [2, 4, 5]
+        # Distinct objects in the pairs view one by one.
+        v = PO.port_opt_view(JuMPOptimiser(; slv, smtx = sm, sgmtx = sm, slt = lt5,
+                                           sglt = nothing, sst = st5,
+                                           sgst = Threshold(; val = fill(0.2, N)),
+                                           tn = Turnover(; w = fill(0.2, N),
+                                                         val = collect(0.1:0.1:0.5))), idx,
+                             X)
+        @test v.slt.val == [0.02, 0.04, 0.05]
+        @test isnothing(v.sglt)
+        @test v.sst.val == [0.12, 0.14, 0.15]
+        @test v.sgst.val == fill(0.2, 3)
+        @test v.smtx === v.sgmtx
+        @test v.smtx == [1 0 0; 0 1 1]
+        @test v.tn.val == [0.2, 0.4, 0.5]
+        # One object in a pair stays one object.
+        vs = PO.port_opt_view(JuMPOptimiser(; slv, smtx = sm, sgmtx = sm, slt = lt5,
+                                            sglt = lt5, sst = st5, sgst = st5), idx, X)
+        @test vs.slt === vs.sglt
+        @test vs.sst === vs.sgst
+        vm = PO.port_opt_view(JuMPOptimiser(; slv, smtx = sm, sgmtx = [1 0 1 0 1],
+                                            slt = lt5, sglt = lt5), idx, X)
+        @test vm.smtx == [1 0 0; 0 1 1]
+        @test vm.sgmtx == [0 0 1]
+        # After the view, the optimiser declares the departed names on its own sets, and it
+        # refuses a name that is still on the asset axis.
+        kept = UniverseSets(; dict = Dict("nx" => ["A", "B", "D", "E"]))
+        nv = PO.non_investable_universe(JuMPOptimiser(; slv, sets = kept), ["C"])
+        @test nv.sets.dict["ni"] == ["C"]
+        @test_throws ArgumentError PO.non_investable_universe(JuMPOptimiser(; slv,
+                                                                            sets = kept),
+                                                              ["A"])
+    end
+
+    @testset "the result expands the weights once" begin
+        pr = prior(EmpiricalPrior(),
+                   ReturnsResult(; nx = ["a", "b", "c"],
+                                 X = [0.1 -0.2 0.0; -0.1 0.2 0.01; 0.05 0.1 -0.02]))
+        function attrs(imsk)
+            return ProcessedJuMPOptimiserAttributes(; pr = pr, wb = nothing, lt = nothing,
+                                                    st = nothing, lcsr = nothing,
+                                                    ctr = nothing, gcardr = nothing,
+                                                    sgcardr = nothing, smtx = nothing,
+                                                    sgmtx = nothing, slt = nothing,
+                                                    sst = nothing, sglt = nothing,
+                                                    sgst = nothing, tn = nothing,
+                                                    fees = nothing, plr = nothing,
+                                                    ret = ArithmeticReturn(),
+                                                    sca = SumScalariser(), imsk = imsk)
+        end
+        pa = attrs(BitVector([1, 0, 1]))
+        sol = PO.JuMPOptimisationSolution(; w = [0.4, 0.6])
+        res = JuMPOptimisationResult(; pa, retcode = OptimisationSuccess(), sol,
+                                     model = nothing)
+        @test res.w == [0.4, 0.0, 0.6]
+        @test res.imsk == BitVector([1, 0, 1])
+        resv = JuMPOptimisationResult(; pa, retcode = OptimisationSuccess(),
+                                      sol = [sol,
+                                             PO.JuMPOptimisationSolution(; w = [1.0, 0.0])],
+                                      model = nothing)
+        @test resv.w == [[0.4, 0.0, 0.6], [1.0, 0.0, 0.0]]
+        @test JuMPOptimisationResult(; pa = attrs(nothing), retcode = OptimisationSuccess(),
+                                     sol, model = nothing).w == [0.4, 0.6]
+        # `set_retcode` keeps the expanded weights, and a second expansion raises.
+        @test PO.set_retcode(res, OptimisationFailure()).w == res.w
+        @test_throws DimensionMismatch JuMPOptimisationResult(; pa,
+                                                              retcode = OptimisationSuccess(),
+                                                              sol = res.sol,
+                                                              model = nothing)
+    end
+
+    @testset "the view of a head declares the departed names on its own sets" begin
+        sets = UniverseSets(; dict = Dict("nx" => nx))
+        rb = RiskBudgeting(;
+                           rba = AssetRiskBudgeting(; sets,
+                                                    rkb = RiskBudgetEstimator(;
+                                                                              val = Dict("A" =>
+                                                                                             0.5))),
+                           opt = JuMPOptimiser(; slv))
+        imsk = BitVector([1, 1, 0, 1, 1])
+        rbv, rdv = PO.investable_view(rb, rd, prior(EmpiricalPrior(), rd), imsk)
+        @test rbv.rba.sets.dict["ni"] == ["C"]
+        @test rbv.rba.sets.dict["nx"] == ["A", "B", "D", "E"]
+        @test rdv.nx == ["A", "B", "D", "E"]
+    end
+end

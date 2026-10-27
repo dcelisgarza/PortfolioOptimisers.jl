@@ -5,7 +5,7 @@
 julia = "1.13.3"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "4ba0ca6670"
+commit = "bd71535e5e"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { cyc = 5, cog = 7, arg = 8, cyc_sum = 53, cog_sum = 57, arg_sum = 99, macros = [] }
@@ -353,7 +353,7 @@ commit = "4ba0ca6670"
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/11_TrackingErrorConstraints.jl" = { cyc = 2, cog = 2, arg = 10, cyc_sum = 13, cog_sum = 2, arg_sum = 67, macros = [] }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/12_RegularisationConstraints.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 44, cog_sum = 10, arg_sum = 88, macros = [] }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/13_WeightNormConstraints.jl" = { cyc = 4, cog = 4, arg = 5, cyc_sum = 11, cog_sum = 5, arg_sum = 14, macros = [] }
-"src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl" = { cyc = 61, cog = 35, arg = 42, cyc_sum = 92, cog_sum = 55, arg_sum = 85, macros = ["@forward_properties"] }
+"src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl" = { cyc = 9, cog = 9, arg = 42, cyc_sum = 38, cog_sum = 29, arg_sum = 85, macros = ["@forward_properties"] }
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_b.jl" = { cyc = 5, cog = 7, arg = 9, cyc_sum = 30, cog_sum = 25, arg_sum = 59, macros = [] }
 "src/17_Optimisation/05_JuMP/04_MeanRisk.jl" = { cyc = 5, cog = 5, arg = 7, cyc_sum = 42, cog_sum = 24, arg_sum = 85, macros = ["@pipe_delegates", "@pipe_route_sigma_ucs", "@propagatable"] }
 "src/17_Optimisation/05_JuMP/05_FactorRiskContribution.jl" = { cyc = 4, cog = 4, arg = 9, cyc_sum = 21, cog_sum = 16, arg_sum = 34, macros = ["@forward_properties", "@pipe_delegates", "@pipe_route_sigma_ucs", "@propagatable"] }

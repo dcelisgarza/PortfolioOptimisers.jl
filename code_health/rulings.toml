@@ -510,18 +510,6 @@ metric = "cog"
 rationale = "a-definition-a-file-split-moved-unchanged"
 
 [[exemption]]
-path = "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl"
-definition = "JuMPOptimiser"
-metric = "cyc"
-rationale = "a-definition-a-file-split-moved-unchanged"
-
-[[exemption]]
-path = "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl"
-definition = "JuMPOptimiser"
-metric = "cog"
-rationale = "a-definition-a-file-split-moved-unchanged"
-
-[[exemption]]
 path = "src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_a.jl"
 definition = "PredictionReturnsResult"
 metric = "cyc"
