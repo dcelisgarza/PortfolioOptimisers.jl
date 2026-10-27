@@ -6,7 +6,8 @@ Names the regime statistic that [`RegimeAdjustedExpWeightedCovariance`](@ref) re
 The statistic compares the realised risk of the observation with the risk that the covariance
 before it predicts, so the target names which part of the covariance the regime multiplier
 calibrates. The cross-sectional bias statistic of [menchero2011](@cite) reads the volatilities
-alone, and it is [`DiagonalTarget`](@ref).
+alone, and it is [`DiagonalTarget`](@ref). The Short-Term Volatility Updating of
+[paleologo2025](@cite) reads the whole standardised vector, and it is [`MahalanobisTarget`](@ref).
 
 # Interfaces
 
@@ -74,6 +75,7 @@ true
 # References
 
   - $(ref_dict[:menchero2011]) Section 4.3, Equation 4.3.
+  - $(ref_dict[:paleologo2025]) Section 6.3.3, Model 6.8.
 """
 abstract type RegimeAdjustedTarget <: AbstractAlgorithm end
 """
@@ -105,6 +107,15 @@ Scores an observation by its squared Mahalanobis distance against the covariance
 The distance reads every eigen-direction of the block of the scored assets, so the target
 calibrates the whole covariance structure. A direction with a small estimated variance takes as
 much weight as the market direction. The target needs two scored assets.
+
+The squared distance is the ``\\lVert \\boldsymbol{u}_{t} \\rVert^{2}`` of the Short-Term
+Volatility Updating of [paleologo2025](@cite), with
+``\\boldsymbol{u}_{t} = \\mathbf{C}_{t}^{-1/2} \\mathbf{V}_{t}^{-1} \\boldsymbol{f}_{t}``. There,
+``\\mathbf{C}_{t}`` is the correlation, ``\\mathbf{V}_{t}`` the diagonal of the volatilities and
+``\\boldsymbol{f}_{t}`` the returns of the model. Under Model 6.8 it is ``e^{x_{t}}`` times a
+``\\chi^{2}_{n}`` variate, so [`regime_kappa`](@ref) is the ``\\kappa = \\psi(n/2) + \\ln 2`` of
+the book at the default law. The book reads the covariance of the model, and this target reads
+the estimate before the observation.
 
 The statistic reads the inverse of an estimated block, and the inverse of an estimate is too
 large on average (Jensen's inequality). At 12 assets and a half-life of 10, the squared distance
@@ -200,7 +211,7 @@ MahalanobisTarget
 
 # References
 
-  - $(ref_dict[:paleologo2025]) Section 6.3.3, page 122. $(ref_dict[:no_original_source])
+  - $(ref_dict[:paleologo2025]) Section 6.3.3, pages 122 and 123, Model 6.8 and the estimate of the state.
 """
 @concrete struct MahalanobisTarget <: RegimeAdjustedTarget
     """
@@ -290,6 +301,14 @@ The target calibrates the covariance along the directions that a portfolio holds
 other direction. Each direction gives one statistic, and the regime method averages the
 transformed statistics.
 
+The Short-Term Volatility Updating of [paleologo2025](@cite) reads the whole standardised vector.
+Under its Model 6.8, the return along a fixed direction ``\\boldsymbol{p}`` is
+``e^{x_{t}/2} \\sqrt{\\boldsymbol{p}^{\\intercal} \\boldsymbol{\\Omega} \\boldsymbol{p}}\\, z_{t}``,
+with the covariance ``\\boldsymbol{\\Omega}`` of the model and a standard normal ``z_{t}``. So
+each direction reads the same latent ``x_{t}``, as ``e^{x_{t}}`` times a ``\\chi^{2}_{1}``
+variate. This target is that case of one dimension, times ``n_{t}`` so that its mean is
+``n_{t}``. The inverse-volatility direction of `w = nothing` is a construction of this library.
+
 Each direction reads one estimated variance, and the inverse of an estimate is too large on
 average. Where the estimator has `debias = ExactDebias()`, [`regime_target_statistic`](@ref) divides each
 direction by the bias that the regime method reads. The factor is exact for fixed weights. The
@@ -366,7 +385,7 @@ PortfolioTarget
 
 # References
 
-  - $(ref_dict[:paleologo2025]) Section 6.3.3, page 122. $(ref_dict[:no_original_source])
+  - $(ref_dict[:paleologo2025]) Section 6.3.3, page 123, Model 6.8.
 """
 @concrete struct PortfolioTarget <: RegimeAdjustedTarget
     """
@@ -406,7 +425,9 @@ direction, the volatilities alone, or the whole covariance structure.
 
 The regime adjustment is the Volatility Regime Adjustment of factor risk of
 [menchero2011](@cite). It multiplies the whole matrix by the square of one multiplier, so it does
-not change a correlation. The separate correlation path is the exponential smoother of
+not change a correlation. The log and the first-moment methods, and the Mahalanobis and the
+portfolio targets, are the Short-Term Volatility Updating of [paleologo2025](@cite). The separate
+correlation path is the exponential smoother of
 [engle2002](@cite). The HAC adjustment is the estimator of [neweywest1987](@cite), applied to each
 term of the recursion.
 
@@ -612,6 +633,7 @@ true
 # References
 
   - $(ref_dict[:menchero2011]) Section 4.3, Equations 4.3 to 4.5.
+  - $(ref_dict[:paleologo2025]) Section 6.3.3, Model 6.8 and Equations 6.9 to 6.11.
   - $(ref_dict[:neweywest1987]) Equation 5.
   - $(ref_dict[:engle2002]) Equation 17.
 """

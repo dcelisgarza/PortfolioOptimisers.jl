@@ -7,7 +7,8 @@ The estimator scores each observation against the variance before it. The method
 of one observation into one statistic. The regime state smooths that statistic, and the method
 turns the state into a volatility multiplier. This is the Volatility Regime Adjustment of
 [menchero2011](@cite), and [`RootMeanSquaredAdjusted`](@ref) is its statistic. The other methods
-replace the mean square with a statistic that one outlier moves less.
+replace the mean square with a statistic that one outlier moves less. They are the Short-Term
+Volatility Updating of [paleologo2025](@cite).
 
 # Interfaces
 
@@ -84,6 +85,7 @@ ERROR: ArgumentError: `RegimeAdjustedExpWeightedVariance.regime_method` is a `My
 # References
 
   - $(ref_dict[:menchero2011]) Section 4.3.
+  - $(ref_dict[:paleologo2025]) Section 6.3.3, Model 6.8 and Equations 6.9 to 6.11.
 """
 abstract type RegimeAdjustedMethod <: AbstractEstimator end
 """
@@ -97,6 +99,15 @@ multiplier of [`RootMeanSquaredAdjusted`](@ref). The constant ``\\kappa`` is the
 ``y = 2`` make ``z^{2}`` a ``\\chi^{2}(1)`` variate, the square of a standard normal return. The
 regime state is then a log variance ratio for every law, so the volatility multiplier is the
 exponential of half the state.
+
+This is the Short-Term Volatility Updating of [paleologo2025](@cite), Section 6.3.3. Model 6.8
+scales a correctly calibrated return by ``e^{x_{t}/2}``, so ``\\ln z^{2} - \\kappa`` is an
+unbiased observation of the latent log variance ratio ``x_{t}``. The smoothed state is the
+estimate ``\\hat{x}_{t}`` of the book, and the multiplier is its ``e^{\\hat{x}_{t}/2}``. The book
+reads the squared norm of the whole standardised vector of ``m`` returns, with
+``\\kappa = \\psi(m/2) + \\ln 2``. This method reads each asset at ``m = 1`` and takes the mean of
+the values. [`RegimeAdjustedExpWeightedCovariance`](@ref) with a [`MahalanobisTarget`](@ref)
+reads the norm of the book.
 
 # Mathematical definition
 
@@ -162,7 +173,7 @@ LogRegimeAdjusted
 
 # References
 
-  - $(ref_dict[:paleologo2025]) Section 6.3.3, page 122. $(ref_dict[:no_original_source])
+  - $(ref_dict[:paleologo2025]) Section 6.3.3, pages 122 and 123, Model 6.8 and the estimate of the state.
 """
 @concrete struct LogRegimeAdjusted <: RegimeAdjustedMethod
     """
@@ -196,6 +207,13 @@ The absolute value grows linearly in a return, so one outlier moves this multipl
 moves the multiplier of [`RootMeanSquaredAdjusted`](@ref) and more than it moves the multiplier of
 [`LogRegimeAdjusted`](@ref). The default ``x = \\sqrt{2/\\pi}`` is the expectation of ``|z|`` for a
 standard normal ``z``.
+
+This is Equation 6.11 of [paleologo2025](@cite), the linear form of the Short-Term Volatility
+Updating. The book divides the norm of the standardised vector of ``m`` returns by ``\\sqrt{m}``,
+the limit of its expectation as ``m`` grows. This method reads each asset at ``m = 1`` and
+divides by the exact expectation ``x``, 0.798 by default, where the book divides by 1.
+[`RegimeAdjustedExpWeightedCovariance`](@ref) divides the root of the statistic of its target by
+the exact expectation of that root. At ``m = 5`` this is 2.128 against ``\\sqrt{5} = 2.236``.
 
 # Mathematical definition
 
@@ -252,7 +270,7 @@ FirstMomentRegimeAdjusted
 
 # References
 
-  - $(ref_dict[:paleologo2025]) Section 6.3.3, page 122. $(ref_dict[:no_original_source])
+  - $(ref_dict[:paleologo2025]) Section 6.3.3, page 124, Equation 6.11.
 """
 @concrete struct FirstMomentRegimeAdjusted <: RegimeAdjustedMethod
     """
@@ -464,7 +482,8 @@ defaults to `nothing`, and this family carries no `CoveragePolicy` to derive a l
 fit warns about every fill.
 
 The estimator is the Volatility Regime Adjustment of specific risk of [menchero2011](@cite), on
-an exponentially weighted variance. The HAC adjustment is the estimator of
+an exponentially weighted variance. The log and the first-moment methods are the Short-Term
+Volatility Updating of [paleologo2025](@cite). The HAC adjustment is the estimator of
 [neweywest1987](@cite), applied to each term of the recursion.
 
 # Mathematical definition
@@ -598,6 +617,7 @@ julia> ce.min_obs
 # References
 
   - $(ref_dict[:menchero2011]) Section 5.3, Equations 5.10 to 5.12.
+  - $(ref_dict[:paleologo2025]) Section 6.3.3, Model 6.8 and Equations 6.9 to 6.11.
   - $(ref_dict[:neweywest1987]) Equation 5.
 """
 @concrete struct RegimeAdjustedExpWeightedVariance <: AbstractVarianceEstimator
