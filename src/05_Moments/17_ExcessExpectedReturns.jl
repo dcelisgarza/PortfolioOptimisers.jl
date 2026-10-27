@@ -46,13 +46,11 @@ ExcessExpectedReturns
 
 # Related
 
-  - [`AbstractShrunkExpectedReturnsEstimator`](@ref)
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
 """
-@propagatable @concrete struct ExcessExpectedReturns <:
-                               AbstractShrunkExpectedReturnsEstimator
+@propagatable @concrete struct ExcessExpectedReturns <: AbstractExpectedReturnsEstimator
     """
     $(field_dict[:me])
     """

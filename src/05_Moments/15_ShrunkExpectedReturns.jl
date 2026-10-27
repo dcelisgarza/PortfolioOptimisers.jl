@@ -8,8 +8,6 @@ A subtype computes the sample expected returns and moves them toward a shrinkage
 # Related
 
   - [`ShrunkExpectedReturns`](@ref)
-  - [`EquilibriumExpectedReturns`](@ref)
-  - [`ExcessExpectedReturns`](@ref)
   - [`AbstractExpectedReturnsEstimator`](@ref)
 """
 abstract type AbstractShrunkExpectedReturnsEstimator <: AbstractExpectedReturnsEstimator end

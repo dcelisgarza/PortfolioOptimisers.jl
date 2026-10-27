@@ -184,6 +184,14 @@
         @test mean(exe461, X461) ==
               mean(EquilibriumExpectedReturns(; w = w461), X461) .- 0.01
         @test isa(mean(exe461, X461), Vector)
+        # Neither subtracting `rf` nor reverse optimisation is a shrinkage, so both types sit
+        # directly under the family, not under the shrunk family (#1859).
+        for T in (ExcessExpectedReturns, EquilibriumExpectedReturns)
+            @test supertype(T) === PortfolioOptimisers.AbstractExpectedReturnsEstimator
+            @test !(T <: PortfolioOptimisers.AbstractShrunkExpectedReturnsEstimator)
+        end
+        @test ShrunkExpectedReturns <:
+              PortfolioOptimisers.AbstractShrunkExpectedReturnsEstimator
 
         # --- StandardDeviationExpectedReturns and VarianceExpectedReturns ----
         # One is the elementwise square of the other, on the same data and the same `ce`.

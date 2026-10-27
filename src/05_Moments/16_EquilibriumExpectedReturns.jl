@@ -70,7 +70,7 @@ EquilibriumExpectedReturns
 
 # Related
 
-  - [`AbstractShrunkExpectedReturnsEstimator`](@ref)
+  - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`equilibrium_mu`](@ref)
@@ -86,7 +86,7 @@ EquilibriumExpectedReturns
   - $(ref_dict[:cajas2025]) Section 5.1.1, Equations 5.1 and 5.2.
 """
 @propagatable @concrete struct EquilibriumExpectedReturns <:
-                               AbstractShrunkExpectedReturnsEstimator
+                               AbstractExpectedReturnsEstimator
     """
     $(field_dict[:ce])
     """
