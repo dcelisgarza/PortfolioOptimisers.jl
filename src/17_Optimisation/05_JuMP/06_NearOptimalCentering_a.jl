@@ -1103,9 +1103,9 @@ function rebuild_risk_frontier(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:
                                risk_frontier::VecPair, w_min::VecNum, w_max::VecNum,
                                idx::VecInt, args...)
     risk_frontier = copy(risk_frontier)
-    r = factory(frontier_owner_measures(noc.r, risk_frontier, idx), pr, noc.opt.slv)
-    for (i, ri) in zip(idx, r)
-        risk_frontier[i] = _rebuild_risk_frontier(pr, fees, ri, risk_frontier, w_min, w_max,
+    for i in idx
+        r = factory(risk_frontier[i].second[4], pr, noc.opt.slv)
+        risk_frontier[i] = _rebuild_risk_frontier(pr, fees, r, risk_frontier, w_min, w_max,
                                                   i)
     end
     return risk_frontier

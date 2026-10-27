@@ -125,7 +125,7 @@ end
     for (bound, g) in
         ((LinearBound(), identity), (SquareRootBound(), sqrt), (SquaredBound(), x -> x^2))
         front = PO._Frontier(; N = 4, factor = 2, bound = bound)
-        registry = [(:a_ub_var, :a_ub) => (:EXPR, front, true, 1)]
+        registry = [(:a_ub_var, :a_ub) => (:EXPR, front, true, rs)]
         entry = PO._rebuild_risk_frontier(pr, nothing, rs, registry, w_lo, w_hi, 1)
         @test collect(entry.second[2]) ≈ range(2 * g(v_lo), 2 * g(v_hi); length = 4)
         # A corner pair in the other order gives the same ascending span. A measure of a
@@ -137,20 +137,99 @@ end
     end
 end
 
-@testset "MeanRisk sweep: one measure owns every registry entry" begin
-    front = Frontier(; N = 2)
-    registry = [(:a_ub_var, :a_ub) => (:EXPR_ONE, [0.1, 0.2], true, 1),
-                (:b_ub_var, :b_ub) => (:EXPR_TWO, front, true, 1),
-                (:c_ub_var, :c_ub) => (:EXPR_THREE, front, true, 1)]
-    r = Variance()
-    owners = PO.frontier_owner_measures(r, registry, [2, 3])
-    @test length(owners) == 2
-    @test all(x -> x === r, owners)
-    rs = [Variance(), ConditionalValueatRisk(), StandardDeviation()]
-    registry = [(:b_ub_var, :b_ub) => (:EXPR_TWO, front, true, 2),
-                (:c_ub_var, :c_ub) => (:EXPR_THREE, front, true, 3)]
-    @test collect(PO.frontier_owner_measures(rs, registry, [1, 2])) == rs[2:3]
-    @test collect(PO.frontier_owner_measures(rs, registry, [2])) == rs[3:3]
+# The variance and the fourth moment of `VarianceSkewKurtosis` at `w`, read off the matrices
+# that the model reads. These are the units of the `vr` and `kt` expressions.
+function mrs_vsk_terms(pr, w)
+    v, _, k = PO.variance_skew_kurtosis_terms(factory(VarianceSkewKurtosis(), pr), w)
+    return v, k
+end
+function mrs_vsk_vr(ub)
+    return VarianceSkewKurtosis(;
+                                vr = Variance(; settings = RiskMeasureSettings(; ub = ub)))
+end
+function mrs_vsk_kt(ub; alg2 = SOCRiskExpr())
+    return VarianceSkewKurtosis(;
+                                kt = Kurtosis(; settings = RiskMeasureSettings(; ub = ub),
+                                              alg2 = alg2))
+end
+
+@testset "MeanRisk sweep: a sweep on a term of VarianceSkewKurtosis spans that term" begin
+    pr = prior(HighOrderPriorEstimator(), MRS_X)
+    opt = JuMPOptimiser(; pe = pr, slv = MRS_SLV)
+    wmin = optimise(MeanRisk(; opt = opt, r = VarianceSkewKurtosis())).w
+    wmax = optimise(MeanRisk(; opt = opt, r = VarianceSkewKurtosis(),
+                             obj = MaximumReturn())).w
+    (v_lo, k_lo), (v_hi, k_hi) = mrs_vsk_terms(pr, wmin), mrs_vsk_terms(pr, wmax)
+    tol = 1e-4
+    # The variance term takes a LinearBound and the kurtosis term a SquaredBound, so each span
+    # runs in the units of its expression. A span from the risk of the whole measure put the
+    # first kurtosis level below the kurtosis of every portfolio, so that solve failed, and it
+    # stopped the sweep short of the maximum-return corner. Under a quadratic formulation the
+    # kurtosis term takes a LinearBound, because its functor gives the fourth moment itself.
+    for (r, j, lo, hi, owner) in ((mrs_vsk_vr(Frontier(; N = 5)), 1, v_lo, v_hi, Variance),
+                                  (mrs_vsk_kt(Frontier(; N = 5)), 2, k_lo, k_hi, Kurtosis),
+                                  (mrs_vsk_kt(Frontier(; N = 5); alg2 = RSOCRiskExpr()), 2, k_lo, k_hi, Kurtosis))
+        for rr in (r, [r])
+            res = optimise(MeanRisk(; opt = opt, r = rr, obj = MaximumReturn()))
+            @test all(c -> isa(c, PO.OptimisationSuccess), res.retcode)
+            @test only(res.model[:risk_frontier]).second[4] isa owner
+            got = [mrs_vsk_terms(pr, w)[j] for w in res.w]
+            @test isapprox(got, range(lo, hi; length = 5); rtol = tol)
+        end
+    end
+    # Two terms swept together form the product of their levels. The variance entry
+    # registers first, so its level changes fastest.
+    r = VarianceSkewKurtosis(;
+                             vr = Variance(;
+                                           settings = RiskMeasureSettings(;
+                                                                          ub = Frontier(;
+                                                                                        N = 3))),
+                             kt = Kurtosis(;
+                                           settings = RiskMeasureSettings(;
+                                                                          ub = Frontier(;
+                                                                                        N = 3))))
+    res = optimise(MeanRisk(; opt = opt, r = r, obj = MaximumReturn()))
+    @test length(res.w) == 9
+    @test all(c -> isa(c, PO.OptimisationSuccess), res.retcode)
+    lv, lk = range(v_lo, v_hi; length = 3), range(k_lo, k_hi; length = 3)
+    # The tolerance is a share of the largest level of each span. At the first point both
+    # levels are the terms of the minimum-risk corner, so that corner is the only feasible
+    # portfolio, and the solve meets the ceilings to its absolute tolerance, which is a large
+    # share of a kurtosis level near 1e-9.
+    av, ak = tol * lv[end], tol * lk[end]
+    for (j, w) in enumerate(res.w)
+        a, b = mod1(j, 3), cld(j, 3)
+        v, k = mrs_vsk_terms(pr, w)
+        @test v <= lv[a] + av && k <= lk[b] + ak
+        # The maximum-return objective moves the weights until one of the two ceilings holds.
+        @test isapprox(v, lv[a]; atol = av) || isapprox(k, lk[b]; atol = ak)
+    end
+    @test isapprox(res.w[end], wmax; atol = 1e-6)
+end
+
+@testset "NearOptimalCentering sweep: a sweep on a term of VarianceSkewKurtosis spans that term" begin
+    pr = prior(HighOrderPriorEstimator(), MRS_X)
+    opt = JuMPOptimiser(; pe = pr, slv = MRS_SLV)
+    wmin = optimise(MeanRisk(; opt = opt, r = VarianceSkewKurtosis())).w
+    wmax = optimise(MeanRisk(; opt = opt, r = VarianceSkewKurtosis(),
+                             obj = MaximumReturn())).w
+    k_lo, k_hi = mrs_vsk_terms(pr, wmin)[2], mrs_vsk_terms(pr, wmax)[2]
+    function noc(ub)
+        return NearOptimalCentering(; r = mrs_vsk_kt(ub), obj = MaximumReturn(), opt = opt,
+                                    alg = ConstrainedNearOptimalCentering())
+    end
+    nf = noc(Frontier(; N = 3))
+    res = optimise(nf)
+    # The span from the whole measure asked for less kurtosis than any portfolio has, so the
+    # first point failed.
+    @test all(c -> isa(c, PO.OptimisationSuccess), res.retcode)
+    entry = only(res.model[:risk_frontier])
+    @test entry.second[4] isa Kurtosis
+    # The levels are the span of the term between the corners, which NOC solves as MeanRisk
+    # does. A near-optimal centre lies inside its region and not on its bound, so the test
+    # checks the levels and not the kurtosis of each portfolio.
+    span = PO.rebuild_risk_frontier(nf, pr, nothing, [entry], wmin, wmax, [1])
+    @test collect(only(span).second[2]) ≈ range(k_lo, k_hi; length = 3) rtol = 1e-10
 end
 
 @testset "MeanRisk sweep: one measure with two bounds keeps both" begin

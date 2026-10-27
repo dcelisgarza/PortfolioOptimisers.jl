@@ -16,7 +16,7 @@ Any prior result is accepted. Both tensors must resolve, on their child or on th
  5. Build `W1`, `W2`, `W3`, `L2W1` and the block `M` once for the namespace, and register the cone row below.
  6. Register `vr_risk`, `sk_risk` and `kt_risk`, the three traces.
  7. Compute the bound of each term with [`variance_risk_bounds_val`](@ref). The bound of `kt` is the square of `kt.settings.ub` under [`SOCRiskExpr`](@ref), because that `ub` is in the units of ``\\sqrt{m_4}``.
- 8. Bound each term with [`set_variance_risk_bounds_and_expression!`](@ref). The skewness bound is a floor, so its row has the opposite sign. The children hold `rke = false`, so no term enters `risk_vec` alone.
+ 8. Bound each term with [`set_variance_risk_bounds_and_expression!`](@ref). The skewness bound is a floor, so its row has the opposite sign. The children hold `rke = false`, so no term enters `risk_vec` alone. Record `r.vr` and `r.kt` as the owners of the frontier entries of their terms with [`set_risk_frontier_owner!`](@ref), so that a sweep on either term takes its span from that term.
  9. Register `vr_sk_kt_risk`, the weighted sum, bound it and add it to `risk_vec` with [`set_risk_bounds_and_expression!`](@ref), and return it.
 
 # JuMP formulation
@@ -176,13 +176,19 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::VarianceSkewKurtosi
     kt_bound = variance_risk_bounds_val(ifelse(isa(r.kt.alg2, QuadSecondMomentFormulations),
                                                LinearBound(), SquaredBound()),
                                         r.kt.settings.ub)
+    # A sweep on a term takes its span from the measure of that term, so each term records
+    # its own measure as the owner of its entry before the whole measure claims the rest.
+    first = risk_frontier_length(model)
     set_variance_risk_bounds_and_expression!(model, opt, vr_risk, vr_bound, :vr_risk_, i,
                                              vr_risk, r.vr.settings; prefix = prefix)
+    set_risk_frontier_owner!(model, first, r.vr)
     # We want to maximise the skewness (distribution skewed towards more positive values), so we set a lower bound instead.
     set_variance_risk_bounds_and_expression!(model, opt, sk_risk, sk_bound, :sk_risk_, i,
                                              sk_risk, r.sk.settings, false; prefix = prefix)
+    first = risk_frontier_length(model)
     set_variance_risk_bounds_and_expression!(model, opt, kt_risk, kt_bound, :kt_risk_, i,
                                              kt_risk, r.kt.settings; prefix = prefix)
+    set_risk_frontier_owner!(model, first, r.kt)
     vr_sk_kt_risk = state_set!(model, prefix, :vr_sk_kt_risk_, i,
                                JuMP.@expression(model,
                                                 r.vr.settings.scale * vr_risk -

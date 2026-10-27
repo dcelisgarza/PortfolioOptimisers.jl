@@ -12,7 +12,5 @@ compute_ret_lbs
 _rebuild_risk_frontier
 rebuild_risk_frontier
 unresolved_risk_frontier
-risk_frontier_owners
-frontier_owner_measures
 compute_risk_ubs
 ```

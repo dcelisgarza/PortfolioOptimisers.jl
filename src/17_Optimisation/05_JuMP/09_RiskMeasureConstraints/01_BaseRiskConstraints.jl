@@ -218,21 +218,21 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Records `i` as the owner of every `:risk_frontier` entry after position `first`.
+Records `r` as the owner of every `:risk_frontier` entry after position `first` that has no owner yet.
 
-[`rebuild_risk_frontier`](@ref) resolves a [`Frontier`](@ref) bound into a span of numbers, and it needs the risk measure that owns the span. The position of an entry does not give its measure, for two reasons. A measure registers an entry only when its `settings.ub` is a [`Front_NumVec`](@ref). A memoised measure such as [`UlcerIndex`](@ref) registers one entry for each copy of itself in the measure vector. So each entry records its owner. The entries of `:ret_frontier` record their term index in the same way.
+[`rebuild_risk_frontier`](@ref) resolves a [`Frontier`](@ref) bound into a span of numbers, and it values the corner portfolios with the measure that owns the entry. The owner is the measure whose value the bounded expression holds, in the units that the `bound` of the `Frontier` converts. For a plain measure, that is the measure itself. A composite measure bounds the expression of a term, so its builder records the measure of that term first. The `vr` and `kt` terms of [`VarianceSkewKurtosis`](@ref) are the example. The position of an entry does not give its measure: a measure registers an entry only when its `settings.ub` is a [`Front_NumVec`](@ref), and one measure can register several entries.
 
 # Algorithm
 
  1. When the model holds no `:risk_frontier`, return `nothing`.
- 2. For each entry `j` after position `first`, replace the fourth value of the entry, the owner, with `i`.
+ 2. For each entry `j` after position `first` whose owner, the fourth value, is `nothing`, replace the owner with `r`.
 
 # Arguments
 
   - $(arg_dict[:model])
-  - `first::Integer`: The registry length before measure `i` built its constraints, as
+  - `first::Integer`: The registry length before `r` built its constraints, as
     [`risk_frontier_length`](@ref) reads it.
-  - `i::Integer`: The position of the measure in the risk measure vector.
+  - `r::AbstractBaseRiskMeasure`: The measure that values the entries.
 
 # Returns
 
@@ -244,14 +244,17 @@ Records `i` as the owner of every `:risk_frontier` entry after position `first`.
   - [`rebuild_risk_frontier`](@ref)
   - [`set_risk_upper_bound!`](@ref)
 """
-function set_risk_frontier_owner!(model::JuMP.Model, first::Integer, i::Integer)
+function set_risk_frontier_owner!(model::JuMP.Model, first::Integer,
+                                  r::AbstractBaseRiskMeasure)
     if !shared_has(model, :risk_frontier)
         return nothing
     end
     risk_frontier = shared_get(model, :risk_frontier)
     for j in (first + 1):length(risk_frontier)
         keys, vals = risk_frontier[j]
-        risk_frontier[j] = keys => (vals[1], vals[2], vals[3], Int(i))
+        if isnothing(vals[4])
+            risk_frontier[j] = keys => (vals[1], vals[2], vals[3], r)
+        end
     end
     return nothing
 end
@@ -345,7 +348,7 @@ The two methods of [`set_risk_constraints!`](@ref) both call this function, so a
  2. Resolve the Deferred Quantities of `r` against the solver of the owner, giving `resolved`. [`resolve_deferred_quantities`](@ref) does the work, and [`risk_constraint_solver`](@ref) gives the solver.
  3. Refuse a Calibration Rule that `resolved` still holds, with [`assert_declared_calibration_resolver`](@ref).
  4. Build the constraints of `resolved` at index `i` with the index method of `set_risk_constraints!`.
- 5. Record `i` as the owner of the registry entries after `first`, with [`set_risk_frontier_owner!`](@ref).
+ 5. Record `resolved` as the owner of the registry entries after `first` that the build left without one, with [`set_risk_frontier_owner!`](@ref).
 
 # Arguments
 
@@ -378,7 +381,7 @@ function set_resolved_risk_constraints!(model::JuMP.Model, i::Integer, r::RiskMe
     resolved = resolve_deferred_quantities(r, pr, risk_constraint_solver(opt))
     assert_declared_calibration_resolver(resolved)
     set_risk_constraints!(model, i, resolved, opt, pr, pl, fees, b1; kwargs...)
-    set_risk_frontier_owner!(model, first, i)
+    set_risk_frontier_owner!(model, first, resolved)
     return nothing
 end
 """
@@ -493,7 +496,7 @@ The type of `ub` and the owner `opt` select the method.
 
   - A `nothing` bound adds nothing.
   - A number adds one row. The row bounds `r_expr` from above when `flag` is `true`, and from below when it is `false`.
-  - A [`Front_NumVec`](@ref) adds an entry to the `:risk_frontier` registry, and the frontier solve reads the entry later. The owner of the entry is written as `0`, because the measure is not known here. [`set_risk_frontier_owner!`](@ref) writes the owner afterwards.
+  - A [`Front_NumVec`](@ref) adds an entry to the `:risk_frontier` registry, and the frontier solve reads the entry later. The owner of the entry is written as `nothing`, because the measure is not known here. [`set_risk_frontier_owner!`](@ref) writes the owner afterwards.
 
 Under a ratio objective the head divides the weights by ``k`` after the solve, so the row bounds the risk of the weights that the head returns. That is exact for a risk expression of degree one in the weights. A builder whose risk expression has a higher degree passes a separate expression of degree one, as [`set_variance_risk_bounds_and_expression!`](@ref) does.
 
@@ -501,7 +504,7 @@ Under a ratio objective the head divides the weights by ``k`` after the solve, s
 
 ## Expressions
 
-  - `risk_frontier`: registered by the frontier method on its first call. It is a vector of entries `(<key>_ub_var, <key>_ub) => (R, ub, flag, 0)`, and each later call appends one entry.
+  - `risk_frontier`: registered by the frontier method on its first call. It is a vector of entries `(<key>_ub_var, <key>_ub) => (R, ub, flag, nothing)`, and each later call appends one entry.
 
 ## Constraints
 
@@ -569,13 +572,14 @@ function set_risk_upper_bound!(model::JuMP.Model, ::NonFRCJuMPOpt,
         risk_frontier = JuMP.@expression(model, risk_frontier,
                                          Pair{Tuple{Symbol, Symbol},
                                               Tuple{JuMP.AbstractJuMPScalar, Front_NumVec,
-                                                    Bool, Int}}[(bound_var_key, bound_key) => (r_expr,
-                                                                                               ub,
-                                                                                               flag,
-                                                                                               0)])
+                                                    Bool,
+                                                    Union{Nothing, AbstractBaseRiskMeasure}}}[(bound_var_key, bound_key) => (r_expr,
+                                                                                                                             ub,
+                                                                                                                             flag,
+                                                                                                                             nothing)])
     else
         risk_frontier = shared_get(model, :risk_frontier)
-        push!(risk_frontier, (bound_var_key, bound_key) => (r_expr, ub, flag, 0))
+        push!(risk_frontier, (bound_var_key, bound_key) => (r_expr, ub, flag, nothing))
     end
     return nothing
 end

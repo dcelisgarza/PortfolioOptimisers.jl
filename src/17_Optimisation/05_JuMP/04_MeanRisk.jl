@@ -635,8 +635,8 @@ Two corner portfolios bound every span, and the method solves each of them once.
  1. Copy the registry, giving `risk_frontier`.
  2. Set the objective [`MinimumRisk`](@ref) and solve, giving `sol_min`. Unregister the objective expression.
  3. Set the objective [`MaximumReturn`](@ref) and solve, giving `sol_max`. Unregister the objective expression.
- 4. Find the measure that owns each entry of `idx` with [`frontier_owner_measures`](@ref), and resolve each measure against the prior and the solver with [`factory`](@ref), giving `r`.
- 5. For each position `i` of `idx` and its measure, replace entry `i` with [`_rebuild_risk_frontier`](@ref) at `sol_min.w` and `sol_max.w`.
+ 4. For each position `i` of `idx`, resolve the owner of entry `i` against the prior and the solver with [`factory`](@ref), giving `r`. [`set_risk_frontier_owner!`](@ref) wrote the owner during Model Assembly.
+ 5. Replace entry `i` with [`_rebuild_risk_frontier`](@ref) of `r` at `sol_min.w` and `sol_max.w`.
 
 # Arguments
 
@@ -660,7 +660,7 @@ Two corner portfolios bound every span, and the method solves each of them once.
 
   - [`MeanRisk`](@ref)
   - [`_rebuild_risk_frontier`](@ref)
-  - [`frontier_owner_measures`](@ref)
+  - [`set_risk_frontier_owner!`](@ref)
   - [`compute_risk_ubs`](@ref)
 """
 function rebuild_risk_frontier(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResult,
@@ -678,9 +678,9 @@ function rebuild_risk_frontier(model::JuMP.Model, mr::MeanRisk, pr::AbstractPrio
     @argcheck(isa(retcode, OptimisationSuccess),
               ArgumentError("maximum-return solve failed with retcode $retcode"))
     JuMP.unregister(model, :obj_expr)
-    r = factory(frontier_owner_measures(mr.r, risk_frontier, idx), pr, mr.opt.slv)
-    for (i, ri) in zip(idx, r)
-        risk_frontier[i] = _rebuild_risk_frontier(pr, fees, ri, risk_frontier, sol_min.w,
+    for i in idx
+        r = factory(risk_frontier[i].second[4], pr, mr.opt.slv)
+        risk_frontier[i] = _rebuild_risk_frontier(pr, fees, r, risk_frontier, sol_min.w,
                                                   sol_max.w, i)
     end
     return risk_frontier
@@ -715,60 +715,6 @@ function unresolved_risk_frontier(model::JuMP.Model)
         end
     end
     return risk_frontier, idx
-end
-"""
-    risk_frontier_owners(risk_frontier::VecPair, idx::VecInt)
-
-Map registry positions to the positions of the risk measures that own them.
-
-The positions of the `:risk_frontier` registry are not the positions of the risk measure vector. A measure registers an entry only when its `settings.ub` is a [`Front_NumVec`](@ref). A memoised measure such as [`UlcerIndex`](@ref) registers one entry for several copies of itself. So an index of the registry picks the wrong measure when the two counts differ. Each entry holds the position of its owner, which [`set_risk_frontier_owner!`](@ref) writes, and this function reads it.
-
-# Arguments
-
-  - `risk_frontier::VecPair`: The `:risk_frontier` registry.
-  - `idx::VecInt`: Registry positions, as [`unresolved_risk_frontier`](@ref) returns them.
-
-# Returns
-
-  - `owners::Vector{Int}`: One measure position per entry of `idx`, in the same order.
-
-# Related
-
-  - [`unresolved_risk_frontier`](@ref)
-  - [`set_risk_frontier_owner!`](@ref)
-  - [`rebuild_risk_frontier`](@ref)
-"""
-function risk_frontier_owners(risk_frontier::VecPair, idx::VecInt)::Vector{Int}
-    return [risk_frontier[i].second[4] for i in idx]
-end
-"""
-    frontier_owner_measures(r::VecRM, risk_frontier::VecPair, idx::VecInt)
-    frontier_owner_measures(r::RiskMeasure, risk_frontier::VecPair, idx::VecInt)
-
-Return the risk measure that owns each entry `idx` of the `:risk_frontier` registry.
-
-For a vector of measures, the owner of an entry is the measure at the position that [`risk_frontier_owners`](@ref) reads. When `r` is one measure, it owns every entry. One measure can register several entries, such as [`VarianceSkewKurtosis`](@ref) with a `Frontier` on two of its terms, so the method gives the measure once for each entry of `idx`.
-
-# Arguments
-
-  - `r`: The risk measures of the optimiser, a vector or one measure.
-  - `risk_frontier::VecPair`: The `:risk_frontier` registry.
-  - `idx::VecInt`: Registry positions, as [`unresolved_risk_frontier`](@ref) returns them.
-
-# Returns
-
-  - A vector of measures, one for each entry of `idx`, in the same order.
-
-# Related
-
-  - [`risk_frontier_owners`](@ref)
-  - [`rebuild_risk_frontier`](@ref)
-"""
-function frontier_owner_measures(r::VecRM, risk_frontier::VecPair, idx::VecInt)
-    return view(r, risk_frontier_owners(risk_frontier, idx))
-end
-function frontier_owner_measures(r::RiskMeasure, ::VecPair, idx::VecInt)
-    return fill(r, length(idx))
 end
 """
     compute_risk_ubs(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResult,
