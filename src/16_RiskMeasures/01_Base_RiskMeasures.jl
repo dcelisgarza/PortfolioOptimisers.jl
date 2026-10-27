@@ -914,6 +914,24 @@ Stand this in a risk measure's bound slot instead of a number. The optimisation 
 
 The levels are evenly spaced in the units of the **risk expression** the bound is applied to, which `bound` names, and not in the units of the measure. See [`SquareRootBound`](@ref) for the case where the two differ.
 
+!!! warning "A sweep under `MaximumRatio`"
+
+    Under [`MaximumRatio`](@ref), a `Frontier` and a vector of bounds both fail. This holds for a risk ceiling and for a return floor of [`JuMPReturnsSettings`](@ref). The objective homogenises the model with one more variable, the ratio factor. Two parts of the sweep read that model, and each part fails for its own reason.
+
+      - **The span.** A `Frontier` finds its span from a minimum-risk solve and a maximum-return solve on the homogenised model. The first gives the maximum-ratio portfolio. With a positive risk-free rate the second is unbounded, and `optimise` raises an `ArgumentError`. With a zero rate, the span collapses, and every point is the maximum-ratio portfolio.
+      - **The rows.** A sweep builds the model once and writes each level into a `JuMP.Parameter`. The bound row multiplies that parameter by the ratio factor. A solver that receives the parameter as a variable sees a product of two variables, and a conic solver such as Clarabel refuses it with `MOI.UnsupportedConstraint{MOI.ScalarQuadraticFunction{Float64}, MOI.LessThan{Float64}}`. Each point then returns an [`OptimisationFailure`](@ref).
+
+    Give the bounds as a vector. To find the span, sweep a `Frontier` under [`MaximumReturn`](@ref) or [`MinimumRisk`](@ref) first. Then wrap the solver in the `Optimizer` of [ParametricOptInterface](https://jump.dev/ParametricOptInterface.jl/stable/). The wrapper puts the value of each parameter into the row before the solve, so the solver receives a linear row. Version 0.15 or later takes the type of the inner solver, and passes the `settings` of the [`Solver`](@ref) to it.
+
+    ```julia
+    import ParametricOptInterface as POI
+    using Clarabel
+    slv = Solver(; name = :clarabel, solver = () -> POI.Optimizer(Clarabel.Optimizer),
+                 settings = Dict(\"verbose\" => false))
+    ```
+
+    Under every other objective the ratio factor is the number `1`, and the problem does not occur. The [efficient frontier](@ref example-efficient-frontier) example sweeps a `MaximumRatio` frontier in this way.
+
 Page 82 of [markowitz1952](@cite) states the efficient set for the variance, as the minimum variance for a given expected return and the maximum expected return for a given variance. Equations 8.7 and 8.10 of [cajas2025](@cite) state the two programmes for a general convex risk measure, and the text of that section builds a frontier by a sweep of the bound.
 
 # Fields

@@ -217,7 +217,7 @@ end
 
 Register one parameter and one floor row for each swept return term.
 
-The bound of each term acts on the expression of that term, so the return side is a product over the terms and not one ladder. `k` multiplies the bound, as it multiplies the scalar bound of [`set_return_bounds!`](@ref).
+The bound of each term acts on the expression of that term, so the return side is a product over the terms and not one ladder. `k` multiplies the bound, as it multiplies the scalar bound of [`set_return_bounds!`](@ref). Under [`MaximumRatio`](@ref), ``b_j k`` is the product of a parameter and a variable, so a conic solver needs a parametric wrapper, as the docstring of [`Frontier`](@ref) shows.
 
 # JuMP formulation
 
@@ -269,7 +269,7 @@ end
 
 Register one parameter and one bound row for each swept risk measure.
 
-It is the twin of [`set_ret_frontier_parameters!`](@ref). The risk side adds the direction ``d`` of the bound, which turns the ceiling into a floor for a measure whose flag is `false`. `k` multiplies the bound, as it multiplies the scalar bound of [`set_risk_upper_bound!`](@ref). Two heads call this builder. Under [`MeanRisk`](@ref), `k` is the ratio variable for a [`MaximumRatio`](@ref) objective and the number `1` for any other objective. [`NearOptimalCentering`](@ref) minimises a barrier and registers `k = 1`, so the factor has no effect there. One builder for both heads keeps the two from drifting apart.
+It is the twin of [`set_ret_frontier_parameters!`](@ref). The risk side adds the direction ``d`` of the bound, which turns the ceiling into a floor for a measure whose flag is `false`. `k` multiplies the bound, as it multiplies the scalar bound of [`set_risk_upper_bound!`](@ref). Two heads call this builder. Under [`MeanRisk`](@ref), `k` is the ratio variable for a [`MaximumRatio`](@ref) objective and the number `1` for any other objective. Under `MaximumRatio`, ``u_j k`` is the product of a parameter and a variable, so a conic solver needs a parametric wrapper, as the docstring of [`Frontier`](@ref) shows. [`NearOptimalCentering`](@ref) minimises a barrier and registers `k = 1`, so the factor has no effect there. One builder for both heads keeps the two from drifting apart.
 
 # JuMP formulation
 
