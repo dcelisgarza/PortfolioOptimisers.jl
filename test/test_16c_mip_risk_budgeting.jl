@@ -62,19 +62,15 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
     v1 = minimum(rkc)
     v2 = maximum(rkc)
     @test isapprox(v2 / v1, 1; rtol = 5e-4)
-    # Host-sensitive, like `test_16b` index 18. This branch-and-bound solve is unbudgeted
-    # and unbounded, so its weights are large and a small relative move in the relaxation
-    # lands outside `5e-4`. On a Linux developer machine it needs `5.1e-4`: the first entry
-    # comes back `-11.960911070533959` against the `-11.967020478519200` recorded here,
-    # with every entry finite and no NaN, so it is a weight drift and not a failed solve.
-    # A `git archive` export of the untouched tip reproduces the same failure, so no change
-    # caused it. `1e-3` sits inside the spread of the hosts and holds on both sides.
-    # Issue #518.
-    @test isapprox(res.w,
-                   [-11.9670204785192, -20.27855656466867, -9.031638570761155,
-                    -12.404198792206339, 23.38560846510856, -11.411103386313773,
-                    15.532421847999915, 11.074304614043934, 5.235656319779921,
-                    10.963933763939947], rtol = 1e-3)
+    # With `bgt = nothing` no row fixes `k`, so the solver sets the scale and the sign of
+    # the weights, and the pins below compare the weights divided by their first entry.
+    # The recorded weights came from an older model, whose row `sum(y) >= k` the sweep of
+    # #689 removed; they equal the new ones up to a factor, to a spread of 1.3e-4. This
+    # solve was host-sensitive at `5e-4` (issue #518), so it keeps `1e-3`.
+    w0 = [-11.9670204785192, -20.27855656466867, -9.031638570761155, -12.404198792206339,
+          23.38560846510856, -11.411103386313773, 15.532421847999915, 11.074304614043934,
+          5.235656319779921, 10.963933763939947]
+    @test isapprox(res.w / res.w[1], w0 / w0[1], rtol = 1e-3)
 
     rb = RiskBudgeting(; r = r, opt = opt,
                        rba = AssetRiskBudgeting(;
@@ -85,9 +81,12 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
     idx = isone.(rb.rba.alg.z)
     @test all(res1.w[idx] .>= 0)
     @test all(res1.w[.!idx] .< 0)
-    v1 = minimum(rkc)
-    v2 = maximum(rkc)
-    @test isapprox(v2 / v1, 1; rtol = 5e-4)
+    # The orthant solves meet the budget to 9.1e-4 under the Clarabel settings of
+    # `test16_setup.jl`.
+    rkc1 = risk_contribution(r, res1.w, pr2.X)
+    v1 = minimum(rkc1)
+    v2 = maximum(rkc1)
+    @test isapprox(v2 / v1, 1; rtol = 2e-3)
     @test isapprox(res.w/sum(res.w), res1.w/sum(res1.w), rtol = 1e-3)
 
     rb = RiskBudgeting(; r = r, opt = opt,
@@ -99,9 +98,10 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
     idx = isone.(rb.rba.alg.z)
     @test all(res1.w[idx] .>= 0)
     @test all(res1.w[.!idx] .< 0)
-    v1 = minimum(rkc)
-    v2 = maximum(rkc)
-    @test isapprox(v2 / v1, 1; rtol = 5e-4)
+    rkc1 = risk_contribution(r, res1.w, pr2.X)
+    v1 = minimum(rkc1)
+    v2 = maximum(rkc1)
+    @test isapprox(v2 / v1, 1; rtol = 2e-3)
 
     rb = RiskBudgeting(; r = r, opt = opt,
                        rba = AssetRiskBudgeting(; alg = MixedIntegerRiskBudgeting(),
@@ -113,11 +113,10 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
     @test isapprox(v2 / v1, 10; rtol = 5e-4)
     @test m1 == 1
     @test m2 == 10
-    @test isapprox(res.w,
-                   [-2.4295346851425466, -4.782006626613654, -2.4181860407479356,
-                    -3.5475446827000723, 5.25869258317521, -3.557616841873538,
-                    3.737346772646009, 3.54749774747547, 1.626855992937381,
-                    3.665078207675533], rtol = 5e-4)
+    w0 = [-2.4295346851425466, -4.782006626613654, -2.4181860407479356, -3.5475446827000723,
+          5.25869258317521, -3.557616841873538, 3.737346772646009, 3.54749774747547,
+          1.626855992937381, 3.665078207675533]
+    @test isapprox(res.w / res.w[1], w0 / w0[1], rtol = 5e-4)
 
     rb = RiskBudgeting(; r = r, opt = opt,
                        rba = AssetRiskBudgeting(; rkb = RiskBudget(; val = 1:10),
@@ -138,11 +137,11 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
     v1 = minimum(rkc)
     v2 = maximum(rkc)
     @test isapprox(v2 / v1, 1; rtol = 5e-4)
-    @test isapprox(res.w,
-                   [0.005049243860991792, 0.00855665106568725, 0.003810322142750114,
-                    0.005233835537719221, -0.009867552804947562, 0.0048147567001987045,
-                    -0.006553717442072589, -0.004672617364069549, -0.002209020574956733,
-                    -0.0046259448171769154], rtol = 5e-4)
+    w0 = [0.005049243860991792, 0.00855665106568725, 0.003810322142750114,
+          0.005233835537719221, -0.009867552804947562, 0.0048147567001987045,
+          -0.006553717442072589, -0.004672617364069549, -0.002209020574956733,
+          -0.0046259448171769154]
+    @test isapprox(res.w / res.w[1], w0 / w0[1], rtol = 5e-4)
 
     rb = RiskBudgeting(; r = r, opt = opt,
                        rba = AssetRiskBudgeting(; alg = MixedIntegerRiskBudgeting(),
@@ -154,9 +153,9 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
     @test isapprox(v2 / v1, 10; rtol = 5e-4)
     @test m1 == 1
     @test m2 == 10
-    @test isapprox(res.w,
-                   [0.0038783685946485852, 0.0076341311932820125, 0.0038604291393048358,
-                    0.005663308711158661, -0.0083951759687286, 0.0056794244876683265,
-                    -0.005966226762046662, -0.005663164898664754, -0.0025971591991454266,
-                    -0.005850802364782971], rtol = 5e-4)
+    w0 = [0.0038783685946485852, 0.0076341311932820125, 0.0038604291393048358,
+          0.005663308711158661, -0.0083951759687286, 0.0056794244876683265,
+          -0.005966226762046662, -0.005663164898664754, -0.0025971591991454266,
+          -0.005850802364782971]
+    @test isapprox(res.w / res.w[1], w0 / w0[1], rtol = 5e-4)
 end

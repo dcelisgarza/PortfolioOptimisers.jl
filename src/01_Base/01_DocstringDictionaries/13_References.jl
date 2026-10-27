@@ -240,6 +240,7 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :martin2021 => "[martin2021](@cite) R. A. Martin. *PyPortfolioOpt: portfolio optimization in Python*. Journal of Open Source Software 6, 3066 (2021).",#
                  :maillard2008 => "[maillard2008](@cite) S. Maillard, T. Roncalli and J. Teiletche. *On the properties of equally-weighted risk contributions portfolios*. Available at SSRN 1271972 (2008).",#
                  :bruderroncalli2012 => "[bruderroncalli2012](@cite) B. Bruder and T. Roncalli. *Managing risk exposures using the risk budgeting approach*. Available at SSRN 2009778 (2012).",#
+                 :bai2016 => "[bai2016](@cite) X. Bai, K. Scheinberg and R. Tutuncu. *Least-squares approach to risk parity in portfolio selection*. Quantitative Finance 16, 357–376 (2016).",#
                  :mausserromanko2014 => "[mausserromanko2014](@cite) H. Mausser and O. Romanko. *Computing equal risk contribution portfolios*. IBM Journal of Research and Development 58, 5:1–5:12 (2014).",#
                  :roncalliweisang2012 => "[roncalliweisang2012](@cite) T. Roncalli and G. Weisang. *Risk parity portfolios with risk factors*. Available at SSRN 2155159 (2012).",#
                  :meucci2007 => "[meucci2007](@cite) A. Meucci. *Risk contributions from generic user-defined factors*. Available at SSRN 930034 (2007).",#

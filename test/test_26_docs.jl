@@ -1128,7 +1128,7 @@ in the sense of `CODING_STANDARDS.md`.
     edit and not a silent one.
     =#
     @testset "# Details is abolished" begin
-        DETAILS_TOTAL = 10
+        DETAILS_TOTAL = 6
 
         @testset "a swept file carries no # Details section" begin
             offenders = Tuple{String, Int}[]
@@ -1426,7 +1426,7 @@ in the sense of `CODING_STANDARDS.md`.
     library-wide pass.
     =#
     @testset "a math_dict value is interpolated, never copied" begin
-        MATH_COPY_TOTAL = 2
+        MATH_COPY_TOTAL = 1
 
         mvals = Dict{String, Symbol}(v => k for (k, v) in math_pairs)
         @test !isempty(mvals)
