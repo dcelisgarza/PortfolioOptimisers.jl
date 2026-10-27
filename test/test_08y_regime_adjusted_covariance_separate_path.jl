@@ -543,13 +543,22 @@ below zero was floored the same way. The statistic now scores only a built asset
     eqw = PortfolioTarget(; w = fill(1 / na, na))
     state(target, X) = partial_fit!(sep(target), X).cache.regime_state
 
-    # Seed 2: no block is built after 5 rows, so the first scored row, the sixth, is skipped.
+    # Seed 2: after 5 rows only asset 8 has no diagonal of the correlation state, so it is not
+    # built and its row is zero (#631). The sixth row scores the other seven assets alone, so a
+    # mask that removes asset 8 gives the same state.
     X = panel(2)
-    @test !any(PO.regime_block_built(partial_fit!(sep(eqw), X[1:5, :]).cache, sep(eqw)))
+    cache = partial_fit!(sep(eqw), X[1:5, :]).cache
+    @test findall(.!PO.regime_block_built(cache, sep(eqw))) == [8]
+    @test iszero(cache.covariance[8, :]) && iszero(cache.covariance[:, 8])
+    mask = trues(6, na)
+    mask[:, 8] .= false
     for target in (eqw, PO.DiagonalTarget())
-        @test isnothing(state(target, X[1:6, :]))
+        masked = PO.regime_adjusted_covariance_pass!(sep(target), X[1:6, :], 1, mask,
+                                                     nothing)
+        @test isequal(state(target, X[1:6, :]), masked.regime_state)
         @test 0 < state(target, X) < 10
     end
+    @test !isnothing(state(PO.DiagonalTarget(), X[1:6, :]))
 
     # Seed 7: the block after 5 rows is built and indefinite, and the equal-weight direction has a
     # variance below zero, so the row is refused rather than scored at 1e12.
@@ -572,10 +581,38 @@ below zero was floored the same way. The statistic now scores only a built asset
 end
 
 #=
+Issue #631. Under HAC the separate path wrote its covariance block only when every active asset
+had a diagonal of the correlation state above `min_val`. Under the rule of the volatility before
+the update, an asset adds nothing to its diagonal on the row of its first deviation. So a late
+listing kept the block of every other asset at the row before, and the next row scored those
+assets against it: the block of the two old assets below was 16.9 % from the block that the same
+two assets give alone. Now the row of an asset with no diagonal is zero, so it is not built, and
+the other assets take their row.
+=#
+@testset "a late listing holds no row of the other assets" begin
+    X = randn(StableRNG(631), 60, 3) .* [0.01 0.02 0.015]
+    X[1:20, 3] .= NaN
+    ce = RegimeAdjustedExpWeightedCovariance(; decay = 0.9, cor_decay = 0.95, hac_lags = 2,
+                                             min_obs = 3, regime_min_obs = 1)
+    both, built = Matrix{Float64}[], Bool[]
+    PO.regime_adjusted_covariance_pass!(ce, X, 1, nothing, nothing) do i, c
+        push!(both, c.covariance[1:2, 1:2])
+        push!(built, PO.regime_block_built(c, ce)[3])
+        return nothing
+    end
+    alone = Matrix{Float64}[]
+    PO.regime_adjusted_covariance_pass!((i, c) -> push!(alone, copy(c.covariance)), ce,
+                                        X[:, 1:2], 1, nothing, nothing)
+    @test all(i -> isapprox(both[i], alone[i]; rtol = 1e-12), eachindex(alone))
+    # The new asset lists at row 21. Its first deviation is at row 22, where it is not built.
+    @test !built[22] && built[23]
+end
+
+#=
 Issue #1736. Under HAC a built block in the warm-up can be indefinite, and a direction with a
 small positive variance on it scores a large statistic. On seed 28 of the case below the
 inverse-volatility direction read, after 6 rows, a block with the smallest eigenvalue -0.31 and a
-direction variance of 0.0057, and the next row set the regime state to 51. `PortfolioTarget`
+direction variance of 0.0057, and the next row scored 51. `PortfolioTarget`
 holds the rule in its field `indefinite`: `RefuseIndefiniteWarmUp()`, the default, refuses such a
 block while the gate of the Mahalanobis target for the same assets is closed;
 `ClipIndefiniteBlock()` clips the eigenvalues of its correlation; `ScoreIndefiniteBlock()` scores
@@ -598,18 +635,22 @@ it as it is.
                                                    regime_method = PO.RootMeanSquaredAdjusted())
     end
     @test PortfolioTarget().indefinite === RefuseIndefiniteWarmUp()
-    # The reproduction of the issue: a fit of 6 rows, then the first 7 rows again.
+    # The reproduction of the issue: a fit of 6 rows, then the transformed statistic of row 7.
+    # Since #631 row 6 is scored too, so the state no longer equals the score of row 7.
     function state(rule)
         ce = sep(rule)
         cache = partial_fit!(ce, X[1:6, :]).cache
         C = PO.regime_covariance_block(cache, ce, collect(1:na))
-        return eigmin(Symmetric(C)), partial_fit!(ce, X[1:7, :]).cache.regime_state
+        stats = PO.regime_target_statistic(ce.regime_target, cache, ce, X[7, :],
+                                           collect(1:na))
+        return eigmin(Symmetric(C)), isnothing(stats) ? nothing : only(stats) / na
     end
     lo, score = state(ScoreIndefiniteBlock())
     @test lo < -0.3 && score > 50
     # Every block of these rows is young and indefinite, so no row is scored.
     @test isnothing(state(RefuseIndefiniteWarmUp())[2])
-    # The clip keeps the rows, and the state is a third of the score (measured 15.1).
+    @test isnothing(partial_fit!(sep(RefuseIndefiniteWarmUp()), X[1:7, :]).cache.regime_state)
+    # The clip keeps the row, and it scores a third of the score (measured 15.1).
     @test 0 < state(ClipIndefiniteBlock())[2] < score / 2
 
     # The rules on one block: the warm-up rule refuses only a young block with a negative

@@ -327,10 +327,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Mask of the assets whose row of the covariance state the regime statistic can read.
 
 Where `cor_decay` is `nothing`, the state steps at every observation, so every asset is built.
-On the separate path, [`update_var_cor!`](@ref) writes the block only when the diagonal of the
-correlation state is above `min_val`. Under HAC an asset contributes nothing on its first row,
-so the block can stay at its zero seed for the first rows. A written asset has a diagonal equal
-to its variance state, so an asset with a positive variance and a zero diagonal is not built.
+On the separate path, [`update_var_cor!`](@ref) writes the row of an asset only when its
+diagonal of the correlation state is above `min_val`, and it sets the row of every other asset
+with a positive variance to zero. Under HAC an asset contributes nothing on its first row, so its
+row can stay at zero for the first rows. A written asset has a diagonal equal to its variance
+state, so an asset with a positive variance and a zero diagonal is not built.
 A constant asset has a variance of zero, and it stays built: its row is zero by design.
 
 # Arguments
