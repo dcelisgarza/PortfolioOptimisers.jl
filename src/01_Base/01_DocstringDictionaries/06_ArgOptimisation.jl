@@ -6,7 +6,8 @@ unique_key_dict!(arg_dict, :arg_dict,
                  # Risk aversion, the ratio problem and the return term it maximises.
                  :l => "`l`: Risk aversion parameter.",#
                  :ohf => "`ohf`: Objective homogenisation factor for the ratio problem, or `nothing` to size it from the resolved characteristic.",#
-                 :kmin => "`kmin`: Floor on the ratio problem's homogenisation variable `k`, or `nothing` to size it from the resolved characteristic. It keeps the solver off the degenerate ray `k = 0`, on which every homogeneous constraint holds vacuously.",#
+                 :kmin => "`kmin`: Floor on the ratio problem's homogenisation variable `k`, or `nothing` to size it from the resolved characteristic. `0` turns the floor off. It keeps the solver off the degenerate ray `k = 0`, on which every homogeneous constraint holds vacuously.",#
+                 :kmin_rb => "`kmin`: Floor on the variable `k` that scales the risk budgeting weights, or `nothing` to size it from the budget of `opt`. `0` turns the floor off. It keeps the solver off `k = 0`, where the weights `w = y / k` have no finite value. A `k` on the floor is the signal that no portfolio meets the budget in the orthant of the solve.",#
                  :i_ret_term => "`i`: Index of the return term to maximise.",#
                  # Errors
                  :msg => "`msg`: Error message that states the condition that caused the exception.",#

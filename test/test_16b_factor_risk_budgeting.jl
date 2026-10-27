@@ -40,19 +40,9 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
         end
         @test success
 
-        rtol = if i ∈ (9, 15, 16, 17, 22, 27)
-            5e-3
-        elseif i == 14
-            5e-2
-        elseif i == 21
-            5e-3
-        elseif i ∈ (12, 18, 19)
-            5e-4
-        elseif i ∈ (10, 11)
-            5e-4
-        else
-            1e-4
-        end
+        # The pins were generated again after `k` gained its bound (#1844, #1845). A case
+        # takes a wider tolerance only when a host shows that it needs one.
+        rtol = 1e-6
         success = isapprox([res.w; rkc], df[!, "$i"]; rtol = rtol)
         if !success
             println("Weights and Contribution $i fails")
@@ -104,29 +94,10 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
         end
         @test success
 
-        rtol = if i ∈ (12, 18, 22) || Sys.isapple() && i == 20 || Sys.iswindows() && i == 10
-            # 12 is host-sensitive: reproduces at 1e-4 on a developer machine, needs 5e-4 on CI.
-            #
-            # 18 is host-sensitive too, and it is the reason this row is no longer keyed on
-            # the platform. It was granted 1e-3 on macOS alone and 5e-4 everywhere else, and
-            # it fails at 5e-4 on a Linux developer machine while CI passes at the same
-            # commit: the solve is a weight drift, not a failed solve, and the exported tip
-            # reproduces the drift to the last digit. So the threshold sits inside the
-            # spread of the hosts rather than on one platform's side of it. Issue #518.
-            1e-3
-        elseif i ∈ (1, 10) || Sys.isapple() && i ∈ (2, 6)
-            5e-4
-        elseif i ∈ (15, 16, 17, 19, 27)
-            5e-3
-        elseif i in (13, 14)
-            1e-2
-        elseif i ∈ (20, 24)
-            5e-4
-        elseif i == 21
-            5e-2
-        else
-            1e-4
-        end
+        # The pins were generated again after `k` gained its bound (#1844, #1845). A case
+        # takes a wider tolerance only when a host shows that it needs one. Before, cases 12
+        # and 18 drifted between hosts at the same commit (#518).
+        rtol = 1e-6
         success = isapprox([res.w; rkc], df[!, "$i"]; rtol = rtol)
         if !success
             println("Weights and Contribution $i fails")

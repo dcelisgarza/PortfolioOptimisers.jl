@@ -619,7 +619,8 @@ end
     @testset "`kmin` is validated where `ohf` is" begin
         @test isnothing(MaximumRatio().kmin)
         @test MaximumRatio(; kmin = 0.5).kmin == 0.5
-        @test_throws DomainError MaximumRatio(; kmin = 0.0)
+        # A stated zero turns the floor off and keeps only `k >= 0`.
+        @test MaximumRatio(; kmin = 0.0).kmin == 0.0
         @test_throws DomainError MaximumRatio(; kmin = -1e-8)
     end
 end

@@ -27,7 +27,8 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
             2.5e-1
         elseif i == 26
             1e-2
-        elseif i == 29
+        elseif i ∈ (28, 29)
+            # 28 measured at 1e-3 after `k` gained its bound (#1844, #1845).
             1e-3
         else
             5e-4
@@ -39,19 +40,9 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
         end
         @test success
 
-        rtol = if i ∈ (5, 7, 19, 25, 12) || Sys.isapple() && i == 2
-            1e-4
-        elseif i == 17
-            5e-3
-        elseif i ∈ (9, 10, 11, 18, 24)
-            5e-4
-        elseif i == 20
-            1e-3
-        elseif i ∈ (13, 21, 14, 15, 16, 22)
-            1e-2
-        else
-            5e-5
-        end
+        # The pins were generated again after `k` gained its bound (#1844, #1845). A case
+        # takes a wider tolerance only when a host shows that it needs one.
+        rtol = 1e-6
         success = isapprox([res.w; rkc], df[!, "$i"]; rtol = rtol)
         if !success
             println("Weights and Contribution $i fails")
@@ -100,23 +91,9 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
         end
         @test success
 
-        rtol = if i ∈ (9, 11, 24)
-            5e-4
-        elseif i == 17
-            1e-3
-        elseif i == 21
-            5e-2
-        elseif i == 14
-            # Was Apple-only. Linux CI drifted onto the same figure, needing 1e-2 where the
-            # 5e-3 below no longer covers it, so the carve-out is no longer platform-specific.
-            1e-2
-        elseif i ∈ (15, 16, 20, 22)
-            5e-3
-        elseif i == 18
-            5e-4
-        else
-            1e-4
-        end
+        # The pins were generated again after `k` gained its bound (#1844, #1845). A case
+        # takes a wider tolerance only when a host shows that it needs one.
+        rtol = 1e-6
         success = isapprox([res.w; rkc], df[!, "$i"]; rtol = rtol)
         if !success
             println("Weights and Contribution $i fails")

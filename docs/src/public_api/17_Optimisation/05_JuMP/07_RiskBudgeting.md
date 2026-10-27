@@ -16,7 +16,7 @@ Base.getproperty(r::RiskBudgetingResult, sym::Symbol)
 port_opt_view(alg::LogRiskBudgeting{<:VecInt}, i, args...)
 factory(rb::RiskBudgeting, w::AbstractVector)
 port_opt_view(rb::RiskBudgeting, i, X::MatNum, args...)
-optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult; dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
+optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult; dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
 needs_previous_weights(opt::RiskBudgeting)
 ```
 

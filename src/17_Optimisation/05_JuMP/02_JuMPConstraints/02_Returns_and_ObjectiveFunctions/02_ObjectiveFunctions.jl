@@ -120,7 +120,7 @@ deducts a worst-case penalty or a charge forces the risk form, because the retur
 solution in these cases. Thus a ``k`` equal to its floor shows that the objective never went
 above zero. The weights then maximise the return expression at that scale, not the ratio. The
 field `kmin` lets a caller read and set the floor, and a `kmin` that the caller names applies
-to both forms.
+to both forms. `kmin = 0` turns the floor off and keeps only ``k \\geq 0``.
 
 # Mathematical definition
 
@@ -167,7 +167,7 @@ Where:
   - $(math_dict[:R_w])
   - $(math_dict[:ohf_ratio])
   - $(math_dict[:d_homog]) Here it is the degree of the expression that the model builds.
-  - $(math_dict[:k_min_ratio])
+  - $(math_dict[:k_min])
   - ``\\mathbf{\\Sigma}``: The covariance matrix of the variance.
   - ``\\sigma(\\boldsymbol{w})``: The portfolio's standard deviation, ``\\sqrt{\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}}``.
   - $(math_dict[:W_lift])
@@ -199,7 +199,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `ohf` is provided: `ohf > 0`.
-  - If `kmin` is provided: `kmin > 0`.
+  - If `kmin` is provided: `kmin >= 0`.
 
 # Related
 
@@ -236,7 +236,7 @@ Keywords correspond to the struct's fields.
             @argcheck(ohf > zero(ohf), DomainError(ohf, "ohf must be > 0"))
         end
         if !isnothing(kmin)
-            @argcheck(kmin > zero(kmin), DomainError(kmin, "kmin must be > 0"))
+            @argcheck(kmin >= zero(kmin), DomainError(kmin, "kmin must be >= 0"))
         end
         return new{typeof(rf), typeof(ohf), typeof(kmin)}(rf, ohf, kmin)
     end
@@ -678,7 +678,7 @@ k_{\\min} &= \\frac{10^{-4}\\,\\mathrm{ohf}}{\\max\\left(\\mathrm{ohf},\\, \\max
 
 Where:
 
-  - $(math_dict[:k_min_ratio]) A stated `obj.kmin` replaces the formula.
+  - $(math_dict[:k_min]) A stated `obj.kmin` replaces the formula.
   - $(math_dict[:ohf_ratio])
   - ``\\bar{\\mu}_i``: Entry ``i`` of the aggregate characteristic, the expected returns of the prior when no term in the expression carries one.
   - $(math_dict[:r_f_ratio])
@@ -698,7 +698,7 @@ thus cannot raise the floor above ``10^{-4}``.
 Where:
 
   - $(math_dict[:k_budget])
-  - $(math_dict[:k_min_ratio])
+  - $(math_dict[:k_min])
 
 # Arguments
 
@@ -718,6 +718,7 @@ Where:
   - [`MaximumRatio`](@ref)
   - [`set_maximum_ratio_normalisation!`](@ref)
   - [`set_max_ratio_return_constraints!`](@ref)
+  - [`risk_budgeting_scale_floor`](@ref)
 """
 function set_maximum_ratio_scale_floor!(model::JuMP.Model, obj::MaximumRatio,
                                         mu::Option{<:Num_VecNum}, pr::AbstractPriorResult,

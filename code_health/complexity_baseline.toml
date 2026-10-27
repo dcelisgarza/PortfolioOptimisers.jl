@@ -5,7 +5,7 @@
 julia = "1.13.3"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "bd71535e5e"
+commit = "e44cd966e7"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { cyc = 5, cog = 7, arg = 8, cyc_sum = 53, cog_sum = 57, arg_sum = 99, macros = [] }
@@ -359,7 +359,7 @@ commit = "bd71535e5e"
 "src/17_Optimisation/05_JuMP/05_FactorRiskContribution.jl" = { cyc = 4, cog = 4, arg = 9, cyc_sum = 21, cog_sum = 16, arg_sum = 34, macros = ["@forward_properties", "@pipe_delegates", "@pipe_route_sigma_ucs", "@propagatable"] }
 "src/17_Optimisation/05_JuMP/06_NearOptimalCentering_a.jl" = { cyc = 12, cog = 12, arg = 14, cyc_sum = 59, cog_sum = 38, arg_sum = 134, macros = ["@propagatable"] }
 "src/17_Optimisation/05_JuMP/06_NearOptimalCentering_b.jl" = { cyc = 12, cog = 12, arg = 14, cyc_sum = 22, cog_sum = 13, arg_sum = 67, macros = ["@pipe_delegates", "@pipe_route_sigma_ucs"] }
-"src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl" = { cyc = 4, cog = 3, arg = 5, cyc_sum = 45, cog_sum = 20, arg_sum = 79, macros = ["@forward_properties", "@pipe_delegates", "@pipe_route_rkb", "@pipe_route_sigma_ucs", "@propagatable"] }
+"src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl" = { cyc = 4, cog = 3, arg = 6, cyc_sum = 46, cog_sum = 22, arg_sum = 75, macros = ["@forward_properties", "@pipe_delegates", "@pipe_route_rkb", "@pipe_route_sigma_ucs", "@propagatable"] }
 "src/17_Optimisation/05_JuMP/08_RelaxedRiskBudgeting.jl" = { cyc = 3, cog = 3, arg = 9, cyc_sum = 29, cog_sum = 20, arg_sum = 66, macros = ["@forward_properties", "@pipe_delegates", "@pipe_route_rkb", "@propagatable"] }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/01_BaseRiskConstraints.jl" = { cyc = 4, cog = 4, arg = 9, cyc_sum = 46, cog_sum = 24, arg_sum = 120, macros = [] }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/02_VarianceConstraints.jl" = { cyc = 6, cog = 8, arg = 11, cyc_sum = 68, cog_sum = 47, arg_sum = 193, macros = [] }

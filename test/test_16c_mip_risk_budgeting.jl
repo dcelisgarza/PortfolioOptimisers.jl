@@ -62,11 +62,15 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
     v1 = minimum(rkc)
     v2 = maximum(rkc)
     @test isapprox(v2 / v1, 1; rtol = 5e-4)
-    # With `bgt = nothing` no row fixes `k`, so the solver sets the scale and the sign of
-    # the weights, and the pins below compare the weights divided by their first entry.
-    # The recorded weights came from an older model, whose row `sum(y) >= k` the sweep of
-    # #689 removed; they equal the new ones up to a factor, to a spread of 1.3e-4. This
-    # solve was host-sensitive at `5e-4` (issue #518), so it keeps `1e-3`.
+    # `k >= 0`, so the sign of each weight is the sign of the unscaled weight (#1844).
+    @test JuMP.lower_bound(res.model[:k]) == 0
+    @test JuMP.value(res.model[:k]) > 0
+    # With `bgt = nothing` no row fixes `k`, so the solver sets the scale of the weights.
+    # The standard deviation is even, so the orthants `z` and `-z` hold the same risk, and
+    # the search can return either. The pins below compare the weights divided by their
+    # first entry. The recorded weights came from an older model, whose row `sum(y) >= k`
+    # the sweep of #689 removed; they equal the new ones up to a factor, to a spread of
+    # 1.3e-4. This solve was host-sensitive at `5e-4` (issue #518), so it keeps `1e-3`.
     w0 = [-11.9670204785192, -20.27855656466867, -9.031638570761155, -12.404198792206339,
           23.38560846510856, -11.411103386313773, 15.532421847999915, 11.074304614043934,
           5.235656319779921, 10.963933763939947]
@@ -126,10 +130,17 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
     res1 = optimise(rb, rd2)
     @test isapprox(res.w/sum(res.w), res1.w/sum(res1.w), rtol = 5e-4)
 
+    lt = [1000, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    st = [0, 0, 0, 0, 1000, 0, 0, 0, 0, 0]
     opt = JuMPOptimiser(; pe = pr2, slv = mip_slv, sbgt = nothing, bgt = nothing,
-                        wb = nothing,
-                        lt = Threshold(; val = [1000, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-                        st = Threshold(; val = [0, 0, 0, 0, 1000, 0, 0, 0, 0, 0]))
+                        wb = nothing, lt = Threshold(; val = lt),
+                        st = Threshold(; val = st))
+    # A long weight is zero or at least `lt`, and a short weight is zero or at most `-st`.
+    # The rows read `y >= lt * k` and `y <= -st * k`, which state that only for `k > 0`.
+    # Before #1844 the solve returned `k < 0`, and asset 1 held a long weight of 0.005.
+    meets_thresholds(w) = all(i -> (w[i] <= 1e-6 || w[i] >= lt[i] * (1 - 1e-6)) &&
+                                   (w[i] >= -1e-6 || -w[i] >= st[i] * (1 - 1e-6)),
+                              eachindex(w))
     rb = RiskBudgeting(; r = r, opt = opt,
                        rba = AssetRiskBudgeting(; alg = MixedIntegerRiskBudgeting()))
     res = optimise(rb, rd2)
@@ -137,6 +148,8 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
     v1 = minimum(rkc)
     v2 = maximum(rkc)
     @test isapprox(v2 / v1, 1; rtol = 5e-4)
+    @test meets_thresholds(res.w)
+    # The recorded weights came from the model with `k < 0`, so they hold the same ratios.
     w0 = [0.005049243860991792, 0.00855665106568725, 0.003810322142750114,
           0.005233835537719221, -0.009867552804947562, 0.0048147567001987045,
           -0.006553717442072589, -0.004672617364069549, -0.002209020574956733,
@@ -153,6 +166,7 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
     @test isapprox(v2 / v1, 10; rtol = 5e-4)
     @test m1 == 1
     @test m2 == 10
+    @test meets_thresholds(res.w)
     w0 = [0.0038783685946485852, 0.0076341311932820125, 0.0038604291393048358,
           0.005663308711158661, -0.0083951759687286, 0.0056794244876683265,
           -0.005966226762046662, -0.005663164898664754, -0.0025971591991454266,

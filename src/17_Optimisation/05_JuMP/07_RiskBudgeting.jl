@@ -202,7 +202,7 @@ Selects the log-barrier formulation of the risk budgeting condition, in one orth
 
 Equation 9 of [bruderroncalli2012](@cite) states it in the positive orthant, and problem 2.13 of [bai2016](@cite) states it in any orthant. The logarithm needs a positive argument, so the solution lies in the orthant that `z` states, asset by asset. A stated orthant costs no binary variable, but the signs must be known in advance. [`MixedIntegerRiskBudgeting`](@ref) searches every orthant.
 
-The solution in the orthant of `z` must have a positive sum. Otherwise the budget row needs a negative ``k``, which a short budget or a weight bound forbids. The solve then returns a portfolio of that orthant that misses the budget, or it fails. Lemma 2.2 of [bai2016](@cite) states that the portfolio of that orthant, normalised to a positive budget, lies in the complementary orthant, so `-z` gives it.
+The solution in the orthant of `z` must have a positive sum. Otherwise the budget row needs a negative ``k``, and ``k \\geq 0``. The solve then returns a portfolio of that orthant that misses the budget, or it fails. When no weight bound and no short budget bounds the scale, ``k`` falls to the floor of [`risk_budgeting_scale_floor`](@ref), and the weights grow as ``1/k``. A ``k`` on the floor is the signal of this case. Lemma 2.2 of [bai2016](@cite) states, for the variance, that the portfolio of that orthant, normalised to a positive budget, lies in the complementary orthant, so `-z` gives it. The lemma needs ``R(-\\boldsymbol{y}) = R(\\boldsymbol{y})``. A risk measure that is not even, such as [`ConditionalValueatRisk`](@ref), has a different solution in the orthant `-z`, so solve in that orthant.
 
 # Fields
 
@@ -520,7 +520,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Optimises the portfolio whose assets, or whose factors, take stated shares of the risk.
 
-`rba` selects the budget and its formulation, `r` gives the risk measures, and `opt` gives the prior, the solver and every other constraint. A row of `opt` that binds at the solution changes the optimality conditions, so the shares then miss the budget. With `bgt = nothing` no row fixes ``k``, and the scale of the weights is the scale that the solver returns.
+`rba` selects the budget and its formulation, `r` gives the risk measures, and `opt` gives the prior, the solver and every other constraint. A row of `opt` that binds at the solution changes the optimality conditions, so the shares then miss the budget. With `bgt = nothing` no row fixes ``k``, and the scale of the weights is the scale that the solver returns. ``k \\geq 0``, so the sign of each weight is the sign of its unscaled weight. `kmin` sets the floor of ``k``, see [`risk_budgeting_scale_floor`](@ref).
 
 # Mathematical definition
 
@@ -572,7 +572,8 @@ Where:
 
   - $(math_dict[:w_port])
   - ``\\boldsymbol{y}``: Unscaled weights, the weight variable of the model.
-  - $(math_dict[:k_budget]) The model declares it free.
+  - $(math_dict[:k_budget]) The model bounds it below by ``k_{\\min}``.
+  - $(math_dict[:k_min]) [`risk_budgeting_scale_floor`](@ref) sizes it, and a stated `kmin` replaces it.
   - $(math_dict[:R_w]) With many measures it is the scalarised risk of the model.
   - ``RC_{i}(\\boldsymbol{w})``: Risk contribution of asset ``i``.
   - ``\\boldsymbol{b}``: Budget of the assets, `rba.rkb`.
@@ -602,15 +603,17 @@ $(DocStringExtensions.FIELDS)
         r::TD{<:RM_VecRM} = Variance(),
         rba::TD{<:RiskBudgetingAlgorithm} = AssetRiskBudgeting(),
         wi::TD_Option{<:VecNum} = nothing,
+        kmin::Option{<:Number} = nothing,
         fb::TDO_Option{<:OptE_Opt} = nothing
     ) -> RiskBudgeting
 
-Keywords correspond to the struct's fields. A field of the type [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) can hold a [`TimeDependent`](@ref) schedule in place of a static value. The risk measures, the budgeting algorithm with its budget, the initial weights and the fallback define the problem, so a cross-validation fold loop resolves them for each fold. An `optimise` outside a fold loop uses the static default of each field. The default of `wi` and of `fb` is `nothing`.
+Keywords correspond to the struct's fields. A field of the type [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) can hold a [`TimeDependent`](@ref) schedule in place of a static value. The risk measures, the budgeting algorithm with its budget, the initial weights and the fallback define the problem, so a cross-validation fold loop resolves them for each fold. An `optimise` outside a fold loop uses the static default of each field. The default of `wi`, of `kmin` and of `fb` is `nothing`.
 
 ## Validation
 
   - If `r` is a vector: `!isempty(r)`.
   - If `wi` is provided: `!isempty(wi)`.
+  - If `kmin` is provided: `kmin >= 0`.
   - A schedule in `fb`: `bind !== :nearest`.
   - The constructor refuses a risk expression that is identically zero, because every portfolio that meets the row of the logarithm is then optimal. A [`NoRisk`](@ref) measure gives such an expression, and so does `settings.rke = false` on every measure.
   - If `r` holds a [`DataBenchmarkTracking`](@ref): `opt.pe` must not state `x_src = ExcessSource()`, see [`assert_data_benchmark_prior`](@ref).
@@ -674,12 +677,16 @@ Keywords correspond to the struct's fields. A field of the type [`TD`](@ref), [`
     """
     wi
     """
+    $(field_dict[:kmin_rb])
+    """
+    kmin
+    """
     $(field_dict[:fb])
     """
     @fprop fb
     function RiskBudgeting(opt::JuMPOptimiser, r::TD{<:RM_VecRM},
                            rba::TD{<:RiskBudgetingAlgorithm}, wi::TD_Option{<:VecNum},
-                           fb::TDO_Option{<:OptE_Opt})
+                           kmin::Option{<:Number}, fb::TDO_Option{<:OptE_Opt})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :RiskBudgeting)
         if isa(r, AbstractVector)
             @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
@@ -688,20 +695,23 @@ Keywords correspond to the struct's fields. A field of the type [`TD`](@ref), [`
         if isa(wi, VecNum)
             @argcheck(!isempty(wi), IsEmptyError("wi cannot be empty"))
         end
-        assert_time_dependent_substitution(RiskBudgeting, (; opt, r, rba, wi, fb),
+        if !isnothing(kmin)
+            @argcheck(kmin >= zero(kmin), DomainError(kmin, "kmin must be >= 0"))
+        end
+        assert_time_dependent_substitution(RiskBudgeting, (; opt, r, rba, wi, kmin, fb),
                                            risk_budgeting_td_defaults())
         assert_data_benchmark_prior(r, opt.pe, :r, :RiskBudgeting, "opt.pe")
-        est = new{typeof(opt), typeof(r), typeof(rba), typeof(wi), typeof(fb)}(opt, r, rba,
-                                                                               wi, fb)
+        est = new{typeof(opt), typeof(r), typeof(rba), typeof(wi), typeof(kmin),
+                  typeof(fb)}(opt, r, rba, wi, kmin, fb)
         warn_raw_readers(est)
         return est
     end
 end
 function RiskBudgeting(; opt::JuMPOptimiser, r::TD{<:RM_VecRM} = Variance(),
                        rba::TD{<:RiskBudgetingAlgorithm} = AssetRiskBudgeting(),
-                       wi::TD_Option{<:VecNum} = nothing,
+                       wi::TD_Option{<:VecNum} = nothing, kmin::Option{<:Number} = nothing,
                        fb::TDO_Option{<:OptE_Opt} = nothing)::RiskBudgeting
-    return RiskBudgeting(opt, r, rba, wi, fb)
+    return RiskBudgeting(opt, r, rba, wi, kmin, fb)
 end
 function time_dependent_field_defaults(::RiskBudgeting)::NamedTuple
     return risk_budgeting_td_defaults()
@@ -760,7 +770,7 @@ function port_opt_view(rb::RiskBudgeting, i, X::MatNum, args...)::RiskBudgeting
     r = port_opt_view(rb.r, i, X)
     rba = port_opt_view(rb.rba, i)
     wi = nothing_scalar_array_view(rb.wi, i)
-    return RiskBudgeting(; opt = opt, r = r, rba = rba, wi = wi,
+    return RiskBudgeting(; opt = opt, r = r, rba = rba, wi = wi, kmin = rb.kmin,
                          fb = view_child(rb.fb, i, X))
 end
 """
@@ -802,6 +812,56 @@ function risk_budget_universe_key(rba::FactorRiskBudgeting{<:Any, <:RiskBudgetEs
     return key
 end
 """
+    risk_budgeting_scale_floor(rb::RiskBudgeting) -> Number
+
+Return the lower bound ``k_{\\min}`` of the variable ``k`` that scales the weights of a [`RiskBudgeting`](@ref): `rb.kmin` when the caller states it, and a size derived from the budget of `rb.opt` otherwise.
+
+The floor closes the collapse of the scale. A positive budget fixes ``\\boldsymbol{1}^\\intercal \\boldsymbol{y} = b_{g} k``. In an orthant whose solution has a negative sum, the solve then drives ``k`` toward zero, and the weights ``\\boldsymbol{w} = \\boldsymbol{y} / k`` grow without bound. A finite weight bound or a finite short budget stops the collapse. Without them only the tolerance of the solver stops it. On the floor, the weights miss the budget, and a ``k`` on the floor is the signal of that case.
+
+``1 / b_{g}^{+}`` is the floor of a long-only book. The row of the logarithm and the weighted inequality of the arithmetic and the geometric means give ``\\boldsymbol{1}^\\intercal \\boldsymbol{y} \\geq 1``, so no long-only model can fix ``k`` below it. A long-short book, or the factor form, has no such bound, so the factor ``10^{-4}`` is a margin with two limits. It must be below the smallest scale that a well-posed model fixes, which is ``0.46 / b_{g}^{+}`` as measured over the risk budgeting tests. It must be above the scale where the solver stops on a collapse, measured at ``2.2 \\times 10^{-6}``. It is the margin of the floor of [`MaximumRatio`](@ref).
+
+With no budget, or a budget with no upper bound, no row ties ``k`` to the sum of the weights, and ``b_{g}^{+} = \\infty`` gives ``k_{\\min} = 0``. A zero budget does not read ``k``, and it also gives ``k_{\\min} = 0``.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+k_{\\min} &= \\begin{cases}
+10^{-4} / \\lvert b_{g}^{+} \\rvert & \\text{if } 0 < \\lvert b_{g}^{+} \\rvert < \\infty\\,, \\\\
+0 & \\text{otherwise}\\,.
+\\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:k_min]) A stated `rb.kmin` replaces the formula.
+  - ``b_{g}^{+}``: The upper bound of the budget `rb.opt.bgt`, from [`budget_upper_bound`](@ref).
+
+# Arguments
+
+  - `rb::RiskBudgeting`: The optimiser, whose `kmin` overrides the size above.
+
+# Returns
+
+  - `kmin::Number`: The lower bound of ``k``.
+
+# Related
+
+  - [`RiskBudgeting`](@ref)
+  - [`_set_risk_budgeting_constraints!`](@ref)
+  - [`set_maximum_ratio_scale_floor!`](@ref)
+  - [`budget_upper_bound`](@ref)
+"""
+function risk_budgeting_scale_floor(rb::RiskBudgeting)
+    if !isnothing(rb.kmin)
+        return rb.kmin
+    end
+    bg = abs(budget_upper_bound(rb.opt.bgt))
+    kmin = 1e-4 / bg
+    return ifelse(iszero(bg), zero(kmin), kmin)
+end
+"""
     _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting,
                                      w::VecJuMPScalar; strict::Bool = false) -> RiskBudget
 
@@ -813,7 +873,7 @@ Every method of [`set_risk_budgeting_constraints!`](@ref) calls it, with the vec
 
 ## Variables
 
-  - `k`: ``k``, free. It is not bounded below by zero and it is not the number `1`.
+  - `k`: ``k \\geq k_{\\min} \\geq 0``, with ``k_{\\min}`` from [`risk_budgeting_scale_floor`](@ref). A row of ``\\boldsymbol{y} \\in k\\, \\mathcal{W}`` such as ``\\boldsymbol{a}^\\intercal \\boldsymbol{y} \\leq c\\, k`` states ``\\boldsymbol{a}^\\intercal \\boldsymbol{w} \\leq c`` only when ``k > 0``. A negative ``k`` reverses every such row.
   - `log_w`: ``\\boldsymbol{t}``, one entry for each entry of `w`.
 
 ## Constraints
@@ -827,6 +887,7 @@ Where:
   - ``\\boldsymbol{t}``: Lower bounds of the logarithms of ``\\boldsymbol{x}``.
   - ``\\boldsymbol{b}``: The budget, resolved from `rb.rba.rkb`.
   - $(math_dict[:K_exp])
+  - $(math_dict[:k_min])
 
 # Arguments
 
@@ -861,10 +922,13 @@ function _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting,
     @argcheck(length(b) == N, DimensionMismatch("rb ($(length(b))) must match N ($N)"))
     sc = get_constraint_scale(model)
     # This head is the one producer of `k` that is not
-    # `set_maximum_ratio_factor_variables!`: the barrier below pins the scale, so `k` is a
-    # *free* variable here rather than `k >= 0` or the literal `1`. `get_k`'s error message
-    # names both routes.
-    JuMP.@variable(model, k)
+    # `set_maximum_ratio_factor_variables!`: the barrier below pins the scale of `y`, so `k`
+    # is a variable here rather than the literal `1`. A row `a' * y <= c * k` states
+    # `a' * w <= c` only for `k > 0`, so `k` is bounded below by zero (#1844), and by a
+    # floor where a budget can collapse the scale (#1845). The floor is a variable bound
+    # and not a row, as in `set_maximum_ratio_scale_floor!`. `get_k`'s error message names
+    # both routes.
+    JuMP.@variable(model, k >= risk_budgeting_scale_floor(rb))
     JuMP.@variable(model, log_w[1:N])
     JuMP.@constraints(model,
                       begin
@@ -873,7 +937,7 @@ function _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting,
                           crkb, sc * LinearAlgebra.dot(b, log_w) >= 0
                       end)
     # The log-barrier normalisation above pins the scale, so downstream builders may use 1
-    # in place of the free variable `k`.
+    # in place of the variable `k`.
     set_unit_budget!(model)
     return rkb
 end
@@ -1108,7 +1172,7 @@ function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult();
                                fb = nothing)
 end
 """
-    optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
+    optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
              rd::ReturnsResult; str_names::Bool = false, save::Bool = true, kwargs...) -> RiskBudgetingResult
 
 Optimise a [`RiskBudgeting`](@ref) that has no fallback, and return its result.
@@ -1137,8 +1201,8 @@ This method serves an optimiser whose `fb` is `nothing`. It solves through [`sha
   - [`RiskBudgetingResult`](@ref)
   - [`_optimise`](@ref)
 """
-function optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult;
-                  str_names::Bool = false, save::Bool = true, kwargs...)
+function optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
+                  rd::ReturnsResult; str_names::Bool = false, save::Bool = true, kwargs...)
     assert_batch_entry(rb, "`optimise`")
     return shared_series_solve(rb, rd; str_names = str_names, save = save, kwargs...)
 end

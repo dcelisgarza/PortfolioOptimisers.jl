@@ -151,7 +151,7 @@ unique_key_dict!(math_dict, :math_dict,
                  :mu_hat_ucs => "``\\hat{\\boldsymbol{\\mu}}``: Centre of the mean uncertainty set, ``N \\times 1``. It is the centre that the set carries, else the `mu` of the term, else the expected returns of the prior.",#
                  :r_f_ratio => "``r_f``: Risk-free rate of the ratio objective, the `rf` field of [`MaximumRatio`](@ref).",#
                  :ohf_ratio => "``\\mathrm{ohf}``: Normalisation factor of the ratio problem, the model's `:ohf`. It is positive.",#
-                 :k_min_ratio => "``k_{\\min}``: Lower bound on the homogenisation variable ``k`` of the ratio problem. It is positive.",#
+                 :k_min => "``k_{\\min}``: Lower bound on the homogenisation variable ``k``, the field `kmin` of the optimiser or a size that the model derives. It is not negative, and zero turns the floor off.",#
                  :y_homog => "``\\boldsymbol{y} = k \\boldsymbol{w}``: Homogenised weights, the weight variable of the model under the ratio objective.",#
                  :l_utility => "``l``: Risk aversion of the utility objective, the `l` field of [`MaximumUtility`](@ref). It is non-negative.",#
                  :op_penalty => "``\\mathrm{op}``: Penalty term of the objective, the model's `:op`, which holds the Objective Penalty. The regularisation, soft-constraint and custom-term builders add to it, and it is zero when none of them does.",#

@@ -112,7 +112,11 @@ end
     # sign is fixed, because the orthants z and -z hold the same solution up to its sign.
     zs = [vcat(1, collect(t)) for t in Iterators.product(fill((1, -1), 4)...)][:]
     risk = map(zs) do z
-        w = rbs_solve(LogRiskBudgeting(; z = z); kw...).w
+        res = rbs_solve(LogRiskBudgeting(; z = z); kw...)
+        w = res.w
+        # No row fixes `k` here, and `k >= 0` keeps the orthant of `z` (#1844).
+        @test value(res.model[:k]) > 0
+        @test sign.(w) == z
         @test isapprox(rbs_share(w), RBS_B; atol = 5e-5)
         u = w * exp(-dot(RBS_B, log.(abs.(w))))
         return dot(u, S * u)
@@ -168,6 +172,55 @@ end
     L = res.prb.rr.L
     g = transpose(nullspace(Matrix(transpose(L)))) * (S * res.w)
     @test norm(g) <= 1e-8 * norm(S * res.w)
+end
+
+@testset "RiskBudgeting sweep: the floor of k" begin
+    # The derived floor is 1e-4 over the upper bound of the budget, and zero when no finite
+    # budget ties `k` to the sum of the weights. A stated `kmin` replaces it.
+    rb_of(; kmin = nothing, kw...) = RiskBudgeting(;
+                                                   opt = JuMPOptimiser(; slv = RBS_SLV,
+                                                                       kw...), kmin = kmin)
+    floor_of(; kw...) = PO.risk_budgeting_scale_floor(rb_of(; kw...))
+    @test floor_of() == 1e-4
+    @test floor_of(; bgt = 0.5) == 2e-4
+    @test floor_of(; bgt = BudgetRange(; lb = 0.4, ub = 0.8)) ≈ 1.25e-4
+    @test iszero(floor_of(; bgt = nothing))
+    @test iszero(floor_of(; bgt = BudgetRange(; lb = 0.4, ub = nothing)))
+    @test floor_of(; kmin = 1e-2) == 1e-2
+    @test floor_of(; kmin = 1e-2, bgt = nothing) == 1e-2
+    # A stated zero turns the floor off and keeps only `k >= 0`.
+    @test iszero(floor_of(; kmin = 0.0))
+    @test_throws DomainError rb_of(; kmin = -1)
+    @test PO.port_opt_view(rb_of(; kmin = 1e-3), 1:3, RBS_X).kmin == 1e-3
+    # The solution in the orthant of `z` has a negative sum, and no weight bound or short
+    # budget bounds the scale. No portfolio of that orthant meets a positive budget, so the
+    # scale collapses onto the floor, and the weights miss the budget. Measured at the
+    # tolerance of the solver alone, before the floor: k = 2.2e-6 and a gross exposure of
+    # 5e6, with `OptimisationSuccess`.
+    kw = (; wb = WeightBounds(; lb = -Inf, ub = Inf),
+          sbgt = BudgetRange(; lb = 0.0, ub = nothing))
+    z = [-1, 1, 1, -1, -1]
+    for (bgt, kmin) in ((1.0, nothing), (0.5, nothing), (1.0, 1e-2))
+        opt = JuMPOptimiser(; pe = RBS_PR, slv = RBS_SLV, bgt = bgt, kw...)
+        rba = AssetRiskBudgeting(; rkb = RiskBudget(; val = RBS_B),
+                                 alg = LogRiskBudgeting(; z = z))
+        rb = RiskBudgeting(; opt = opt, r = Variance(), rba = rba, kmin = kmin)
+        res = optimise(rb, RBS_RD)
+        kf = PO.risk_budgeting_scale_floor(rb)
+        @test lower_bound(res.model[:k]) == kf
+        # Measured on the floor to 1.3e-5.
+        @test isapprox(value(res.model[:k]), kf; rtol = 1e-4)
+        @test sign.(res.w) == z
+        @test isapprox(sum(res.w), bgt; rtol = 1e-6)
+        @test maximum(abs.(rbs_share(res.w) - RBS_B)) > 1e-1
+    end
+    # The complementary orthant has a positive sum, so its scale stays far above the floor.
+    # Its k = 0.459 is the smallest scale that a well-posed model fixed over the risk
+    # budgeting tests.
+    res = rbs_solve(LogRiskBudgeting(; z = -z); kw...)
+    @test value(res.model[:k]) > 1e3 * floor_of()
+    @test sign.(res.w) == -z
+    @test isapprox(rbs_share(res.w), RBS_B; atol = 5e-5)
 end
 
 @testset "RiskBudgeting sweep: views, validation and the result" begin
