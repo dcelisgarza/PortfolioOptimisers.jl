@@ -168,7 +168,7 @@ Where:
   - ``\\tilde{\\boldsymbol{y}}_{af}``: Exposures to the additional directions, which carry no economic interpretation.
   - ``(\\cdot)^{+}``: Moore-Penrose pseudoinverse.
   - ``f(\\boldsymbol{w})``: Objective function (depends on [`ObjectiveFunction`](@ref)).
-  - ``\\mathcal{W}``: Feasible weight set defined by portfolio constraints.
+  - $(math_dict[:W_feas])
   - ``\\mathcal{R}(\\boldsymbol{w})``: Portfolio risk measure.
   - ``RC_j``: Risk contribution of factor ``j``.
 

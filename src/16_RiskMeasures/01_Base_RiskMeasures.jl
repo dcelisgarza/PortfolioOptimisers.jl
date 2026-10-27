@@ -939,7 +939,7 @@ Internal constructor. Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `N > 0` and `N <= RESOURCE_LIMITS[].max_frontier` (each sweep point runs a full solve; see [`RESOURCE_LIMITS`](@ref)). This is the cheap early check on **one** bound. The sweep across several swept bounds is their product, capped separately at Model Assembly by [`assert_frontier_sweep_cap`](@ref).
+  - `N > 1` and `N <= RESOURCE_LIMITS[].max_frontier`. The sweep runs from the minimum-risk end to the maximum-return end, so it needs two points. Each sweep point runs a full solve, see [`RESOURCE_LIMITS`](@ref). This is the cheap early check on **one** bound. The sweep across several swept bounds is their product, capped separately at Model Assembly by [`assert_frontier_sweep_cap`](@ref).
   - `isfinite(factor)` and `factor > 0`.
 
 # Examples
@@ -981,7 +981,9 @@ Frontier
     bound
     function Frontier(N::Integer, factor::Number = 1,
                       bound::FrontierBoundEstimator = LinearBound())::Frontier
-        @argcheck(N > zero(N), DomainError(N, "N must be > 0"))
+        @argcheck(N > one(N),
+                  DomainError(N,
+                              "N must be > 1: the sweep runs from the minimum-risk end to the maximum-return end, and one point cannot hold both. To solve at one bound, give the bound as a number."))
         assert_resource_cap(N, RESOURCE_LIMITS[].max_frontier, :N, :max_frontier)
         @argcheck(isfinite(factor), IsNonFiniteError("factor must be finite, got $factor"))
         @argcheck(factor > zero(factor), DomainError(factor, "factor must be positive"))

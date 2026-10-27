@@ -404,7 +404,7 @@
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/13_WeightNormConstraints.jl" = { map = 11, units = 4, algorithm = 0, swept = true, bindings = ["norm_ball_dual_norm_epigraph!", "set_weight_norm_2_constraints!", "set_weight_norm_inf_constraints!", "set_weight_norm_p_constraints!"] }
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl" = { map = 10, units = 10, algorithm = 2, swept = true, bindings = ["JuMPOptimisationResult", "JuMPOptimiser", "ProcessedAttributes", "ProcessedJuMPOptimiserAttributes", "factory", "investable_view", "jump_optimiser_td_defaults", "needs_previous_weights", "port_opt_view", "set_retcode"] }
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_b.jl" = { map = 10, units = 11, swept = false }
-"src/17_Optimisation/05_JuMP/04_MeanRisk.jl" = { map = 10, units = 15, swept = false }
+"src/17_Optimisation/05_JuMP/04_MeanRisk.jl" = { map = 10, units = 17, algorithm = 6, swept = true, bindings = ["MeanRisk", "MeanRiskResult", "_optimise", "_rebuild_risk_frontier", "compute_ret_lbs", "compute_risk_ubs", "frontier_owner_measures", "mean_risk_td_defaults", "needs_previous_weights", "optimise", "port_opt_view", "rebuild_risk_frontier", "return_term", "risk_frontier_owners", "set_retcode", "solve_mean_risk!", "unresolved_risk_frontier"] }
 "src/17_Optimisation/05_JuMP/05_FactorRiskContribution.jl" = { map = 10, units = 8, swept = false }
 "src/17_Optimisation/05_JuMP/06_NearOptimalCentering_a.jl" = { map = 10, units = 21, swept = false }
 "src/17_Optimisation/05_JuMP/06_NearOptimalCentering_b.jl" = { map = 10, units = 5, swept = false }

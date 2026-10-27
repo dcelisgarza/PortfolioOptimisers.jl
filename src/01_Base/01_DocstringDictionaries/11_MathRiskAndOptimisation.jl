@@ -6,6 +6,7 @@ unique_key_dict!(math_dict, :math_dict,
                  # Risk measure parameters.
                  :alpha_rm => "``\\alpha``: Significance level (left tail probability), ``\\alpha \\in (0, 1)``.",#
                  :w_port => "``\\boldsymbol{w}``: Portfolio weights vector ``N \\times 1``.",#
+                 :W_feas => "``\\mathcal{W}``: Feasible weight set, the portfolios that the constraints of the optimiser admit.",#
                  # The divergence Ambiguity Set reading, in the sense GLOSSARY.md
                  # gives the noun. `EntropicValueatRisk` is the Kullback-Leibler
                  # ball and `RelativisticValueatRisk` is its Kaniadakis

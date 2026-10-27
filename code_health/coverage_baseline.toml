@@ -353,7 +353,7 @@ commit = "8610300"
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/13_WeightNormConstraints.jl" = { lines = 39, misses = 0 }
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl" = { lines = 128, misses = 0 }
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_b.jl" = { lines = 98, misses = 6 }
-"src/17_Optimisation/05_JuMP/04_MeanRisk.jl" = { lines = 147, misses = 2 }
+"src/17_Optimisation/05_JuMP/04_MeanRisk.jl" = { lines = 147, misses = 0 }
 "src/17_Optimisation/05_JuMP/05_FactorRiskContribution.jl" = { lines = 55, misses = 0 }
 "src/17_Optimisation/05_JuMP/06_NearOptimalCentering_a.jl" = { lines = 207, misses = 3 }
 "src/17_Optimisation/05_JuMP/06_NearOptimalCentering_b.jl" = { lines = 71, misses = 0 }

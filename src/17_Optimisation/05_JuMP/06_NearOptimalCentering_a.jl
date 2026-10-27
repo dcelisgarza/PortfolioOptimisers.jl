@@ -259,7 +259,7 @@ The NOC portfolio is the **analytic centre** of that region, which is the point 
 Where:
 
   - ``\\boldsymbol{w}``: Portfolio weight vector.
-  - ``\\mathcal{W}``: Feasible weight set defined by portfolio constraints.
+  - $(math_dict[:W_feas])
   - ``\\boldsymbol{w}_{\\min}``: Minimum-risk anchor weights, `w_min`.
   - ``\\boldsymbol{w}_{\\mathrm{opt}}``: Anchor weights of the user's objective, `w_opt`.
   - ``\\boldsymbol{w}_{\\max}``: Maximum-return anchor weights, `w_max`.
@@ -1095,31 +1095,20 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
         return set_noc_anchor!(noc_rk, noc_rt, rk_opts, rt_opts, i)
     end
 end
-function rebuild_risk_frontier(noc::NearOptimalCentering{<:Any, <:AbstractVector, <:Any,
-                                                         <:Any, <:Any, <:Any, <:Any, <:Any,
-                                                         <:Any, <:Any, <:Any,
-                                                         <:ConstrainedNearOptimalCentering},
-                               pr::AbstractPriorResult, fees::Option{<:Fees},
-                               risk_frontier::VecPair, w_min::VecNum, w_max::VecNum,
-                               idx::VecInt, args...)
-    risk_frontier = copy(risk_frontier)
-    r = factory(view(noc.r, risk_frontier_owners(risk_frontier, idx)), pr, noc.opt.slv)
-    for (i, ri) in zip(idx, r)
-        risk_frontier[i] = _rebuild_risk_frontier(pr, fees, ri, risk_frontier, w_min, w_max,
-                                                  i)
-    end
-    return risk_frontier
-end
 function rebuild_risk_frontier(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
                                                          <:Any, <:Any, <:Any, <:Any, <:Any,
                                                          <:Any,
                                                          <:ConstrainedNearOptimalCentering},
                                pr::AbstractPriorResult, fees::Option{<:Fees},
                                risk_frontier::VecPair, w_min::VecNum, w_max::VecNum,
-                               args...)
+                               idx::VecInt, args...)
     risk_frontier = copy(risk_frontier)
-    r = factory(noc.r, pr, noc.opt.slv)
-    return [_rebuild_risk_frontier(pr, fees, r, risk_frontier, w_min, w_max)]
+    r = factory(frontier_owner_measures(noc.r, risk_frontier, idx), pr, noc.opt.slv)
+    for (i, ri) in zip(idx, r)
+        risk_frontier[i] = _rebuild_risk_frontier(pr, fees, ri, risk_frontier, w_min, w_max,
+                                                  i)
+    end
+    return risk_frontier
 end
 
 export NearOptimalCentering, UnconstrainedNearOptimalCentering,
