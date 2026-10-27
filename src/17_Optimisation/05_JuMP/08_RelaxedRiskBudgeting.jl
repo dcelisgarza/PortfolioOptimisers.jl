@@ -1,7 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for relaxed risk budgeting algorithm variants.
+Supertype of the three models of [`RelaxedRiskBudgeting`](@ref).
+
+Each subtype selects the cones that bound the variable ``\\psi`` of the model. The models are Models (A), (B) and (C) of [gambetakwon2020](@cite), and the `# Mathematical definition` of [`RelaxedRiskBudgeting`](@ref) states them.
 
 # Related
 
@@ -9,33 +11,39 @@ Abstract supertype for relaxed risk budgeting algorithm variants.
   - [`RegularisedRelaxedRiskBudgeting`](@ref)
   - [`RegularisedPenalisedRelaxedRiskBudgeting`](@ref)
   - [`RelaxedRiskBudgeting`](@ref)
+  - [`set_relaxed_risk_budgeting_alg_constraints!`](@ref)
 
 # References
 
-  - $(ref_dict[:richardroncalli2019])
+  - $(ref_dict[:gambetakwon2020]) Section 3.
 """
 abstract type RelaxedRiskBudgetingAlgorithm <: OptimisationAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Bounds the risk variable by the portfolio standard deviation alone, which is the relaxation with no extra term.
+Selects Model (A) of [`RelaxedRiskBudgeting`](@ref), where the standard deviation of the portfolio alone bounds ``\\psi``.
+
+The objective of this model is zero exactly when the contributions meet the budget, so the model gives the risk budgeting portfolio when no other row binds. Model (A) of [gambetakwon2020](@cite) is the second-order cone model of [mausserromanko2014](@cite) with a target return.
 
 # Related
 
   - [`RelaxedRiskBudgetingAlgorithm`](@ref)
   - [`RegularisedRelaxedRiskBudgeting`](@ref)
+  - [`RegularisedPenalisedRelaxedRiskBudgeting`](@ref)
   - [`RelaxedRiskBudgeting`](@ref)
 
 # References
 
-  - $(ref_dict[:gambetakwon2020])
-  - $(ref_dict[:richardroncalli2019])
+  - $(ref_dict[:gambetakwon2020]) Model (0), Equations 5 to 11, and Model (A), Equations 12 to 17. $(ref_dict[:no_original_source])
+  - $(ref_dict[:mausserromanko2014])
 """
 struct BasicRelaxedRiskBudgeting <: RelaxedRiskBudgetingAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Adds a second cone on an auxiliary scalar, which lifts the floor on the risk variable and improves numerical stability.
+Selects Model (B) of [`RelaxedRiskBudgeting`](@ref), which adds a regulating term ``\\rho`` that the standard deviation of the portfolio bounds.
+
+The term raises the price of the standard deviation in the objective, so the model trades the budget for a lower standard deviation. The objective is not zero at the budget, so the solution can leave the budget also when no other row binds.
 
 # Related
 
@@ -46,13 +54,15 @@ Adds a second cone on an auxiliary scalar, which lifts the floor on the risk var
 
 # References
 
-  - $(ref_dict[:richardroncalli2019])
+  - $(ref_dict[:gambetakwon2020]) Section 3.2, Model (B), Equations 21 to 27.
 """
 struct RegularisedRelaxedRiskBudgeting <: RelaxedRiskBudgetingAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Bounds the auxiliary scalar by the individual standard deviations rather than the portfolio one, weighted by `p`.
+Selects Model (C) of [`RelaxedRiskBudgeting`](@ref), where the variances of the single assets, times the penalty `p`, bound the regulating term ``\\rho``.
+
+The term reads the diagonal of the covariance matrix, and not the whole matrix as Model (B) does. So it limits the weight of an asset of high variance. Section 3.3 of [gambetakwon2020](@cite) uses this to keep the contributions nearer to the budget than Model (B) does. A larger `p` gives the term more strength. The objective is not zero at the budget, so the solution can leave the budget also when no other row binds.
 
 # Fields
 
@@ -68,21 +78,22 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `isfinite(p)` and `p > 0`.
+  - `isfinite(p)` and `p > 0`. Otherwise a `DomainError` names `p`.
 
 # Related
 
   - [`RelaxedRiskBudgetingAlgorithm`](@ref)
+  - [`BasicRelaxedRiskBudgeting`](@ref)
   - [`RegularisedRelaxedRiskBudgeting`](@ref)
   - [`RelaxedRiskBudgeting`](@ref)
 
 # References
 
-  - $(ref_dict[:richardroncalli2019])
+  - $(ref_dict[:gambetakwon2020]) Section 3.3, Equations 28 and 30, and Section 3.4, Model (C), Equations 31 to 37.
 """
 @concrete struct RegularisedPenalisedRelaxedRiskBudgeting <: RelaxedRiskBudgetingAlgorithm
     """
-    $(field_dict[:p_rm])
+    Penalty ``\\lambda`` of the regulating term. It multiplies ``\\boldsymbol{w}^\\intercal \\mathbf{\\Theta} \\boldsymbol{w}``, the variances of the single assets times the squares of their weights.
     """
     p
     function RegularisedPenalisedRelaxedRiskBudgeting(p::Number)
@@ -97,9 +108,13 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return the static defaults of the [`RelaxedRiskBudgeting`](@ref) fields that may hold a [`TimeDependent`](@ref).
+Return the static defaults of the fields of [`RelaxedRiskBudgeting`](@ref) that can hold a [`TimeDependent`](@ref) schedule.
 
-Shared by the constructor's test-substitution pass and [`time_dependent_field_defaults`](@ref), so the fold-less value of a field is declared once. Fields whose static default is `nothing` are omitted.
+The constructor reads them when it checks a schedule through [`assert_time_dependent_substitution`](@ref), and [`time_dependent_field_defaults`](@ref) returns them. So the value of each field outside a fold loop is stated in one place. A field whose static default is `nothing` is not in the result.
+
+# Returns
+
+  - `NamedTuple`: `(; rba = AssetRiskBudgeting())`.
 
 # Related
 
@@ -113,9 +128,84 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Relaxed Risk Budgeting (RRB) portfolio optimiser.
+Optimises the portfolio whose assets, or whose factors, take stated shares of the variance, through a model of second-order cones.
 
-`RelaxedRiskBudgeting` implements a relaxed formulation of the risk budgeting problem using a Second Order Cone constraint on the portfolio variance. Unlike [`RiskBudgeting`](@ref), it does not require a logarithmic or mixed-integer formulation, making it computationally more tractable.
+`rba` selects the budget, `alg` selects the model, and `opt` gives the prior, the solver and every other constraint. The model reads the covariance matrix alone and resolves no risk measure, so its result carries no `r`. Model (A) gives the risk budgeting portfolio when no row of `opt` binds at that portfolio. A row that binds, such as a target return, moves the contributions away from the budget. Models (B) and (C) can leave the budget also when no row binds. [`RiskBudgeting`](@ref) states the budget as a row of the logarithm, and it reads any risk measure.
+
+# Mathematical definition
+
+The risk budgeting condition asks that each asset contribute the share ``b_{i}`` of the variance, ``w_{i} (\\mathbf{\\Sigma} \\boldsymbol{w})_{i} = b_{i} \\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}``. [mausserromanko2014](@cite) writes the condition for equal shares as a second-order cone programme, and [gambetakwon2020](@cite) adds a target return and a regulating term to it. The library writes Models (A), (B) and (C) of [gambetakwon2020](@cite) with the shares of a general budget:
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w},\\, \\psi,\\, \\gamma,\\, \\boldsymbol{\\zeta}}{\\min} \\quad & \\psi - \\gamma \\\\
+\\text{s.t.} \\quad & \\boldsymbol{\\zeta} = \\mathbf{\\Sigma} \\boldsymbol{w}\\,, \\quad \\boldsymbol{\\zeta} \\geq \\boldsymbol{0}\\,, \\\\
+& w_{i} \\zeta_{i} \\geq b_{i} \\gamma^{2}\\,, \\quad i = 1, \\ldots, n\\,, \\\\
+& \\boldsymbol{w} \\in \\mathcal{W}\\,.
+\\end{align}
+```
+
+The model in `alg` adds the cones that bound ``\\psi``. Model (A), [`BasicRelaxedRiskBudgeting`](@ref), adds one:
+
+```math
+\\begin{align}
+\\psi &\\geq \\lVert \\mathbf{G} \\boldsymbol{w} \\rVert_{2}\\,.
+\\end{align}
+```
+
+Model (B), [`RegularisedRelaxedRiskBudgeting`](@ref), and Model (C), [`RegularisedPenalisedRelaxedRiskBudgeting`](@ref), add a regulating term ``\\rho``:
+
+```math
+\\begin{align}
+\\psi^{2} &\\geq \\lVert \\mathbf{G} \\boldsymbol{w} \\rVert_{2}^{2} + \\rho^{2}\\,, \\\\
+\\rho^{2} &\\geq n\\, \\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w} \\quad \\text{in Model (B)}\\,, \\\\
+\\rho^{2} &\\geq n \\lambda\\, \\boldsymbol{w}^\\intercal \\mathbf{\\Theta} \\boldsymbol{w}\\,, \\quad \\mathbf{\\Theta} = \\mathrm{diag}(\\mathbf{\\Sigma})\\,, \\quad \\text{in Model (C)}\\,.
+\\end{align}
+```
+
+The variables ``\\psi``, ``\\gamma`` and ``\\rho`` are ``\\sqrt{n}`` times the variables of [gambetakwon2020](@cite), so the objective is ``\\sqrt{n}`` times its objective and the weights are the same. With ``b_{i} = 1/n`` the rows are its Equations 13 to 15, 22 to 25 and 32 to 35. Its target return, Equations 16, 26 and 36, is the lower bound of the return that `opt.ret` can state. It is then a row of ``\\mathcal{W}``.
+
+In Model (A), for a budget whose shares sum to one, the rows give the chain ``\\gamma^{2} = \\gamma^{2} \\sum_{i} b_{i} \\leq \\sum_{i} w_{i} \\zeta_{i} = \\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w} \\leq \\psi^{2}``. So the objective is not below zero, and it is zero exactly when ``w_{i} \\zeta_{i} = b_{i} \\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}`` for every ``i``, which is the risk budgeting condition. In Models (B) and (C) the regulating term is at its bound at the optimum, so ``\\psi`` is larger than the standard deviation, and the objective is not zero at the budget. The optimum then trades the budget for a lower ``\\psi``.
+
+Where:
+
+  - $(math_dict[:w_port])
+  - ``\\psi``: Upper bound of the standard deviation of the portfolio. In Models (B) and (C) it also bounds the regulating term.
+  - ``\\gamma``: Lower bound of ``\\sqrt{w_{i} \\zeta_{i} / b_{i}}`` over the assets.
+  - ``\\boldsymbol{\\zeta}``: Marginal risks, ``\\mathbf{\\Sigma} \\boldsymbol{w}``. So ``w_{i} \\zeta_{i}`` is the contribution of asset ``i`` to the variance.
+  - ``b_{i}``: Share of asset ``i`` in the budget `rba.rkb`, its entry divided by the sum of the entries. So a budget of `1:5` and a budget of `(1:5) / 15` give the same portfolio.
+  - ``n``: Number of entries of the budget, which is the number of assets, or the number of factors of a [`FactorRiskBudgeting`](@ref).
+  - $(math_dict[:W_feas]) It holds the weight bounds, the budget, the target return and every other row of `opt`. The budgeted weights are not negative, because ``\\boldsymbol{\\zeta} \\geq \\boldsymbol{0}`` and the cones give ``w_{i} \\geq 0``.
+  - $(math_dict[:G_cov_factor]) It is the `chol` of the prior, or the transpose of the square root of ``\\mathbf{\\Sigma}`` that [`matrix_square_root`](@ref) takes under `mtx_sqrt`.
+  - ``\\mathbf{\\Sigma}``: Covariance matrix of the prior.
+  - ``\\rho``: Regulating term of Models (B) and (C).
+  - ``\\lambda``: Penalty `p` of [`RegularisedPenalisedRelaxedRiskBudgeting`](@ref).
+  - ``\\mathbf{\\Theta}``: Diagonal matrix of the variances of the single assets.
+
+## Factor risk budgeting
+
+With a [`FactorRiskBudgeting`](@ref) the budget is over the factor weights ``\\boldsymbol{w}_{1}``. So the cones of the budget pair ``[\\boldsymbol{w}_{1}]_{j}`` with ``\\zeta_{j}`` and read the share of factor ``j``. The marginal risks and the cones on ``\\psi`` read the whole portfolio:
+
+```math
+\\begin{align}
+\\boldsymbol{w} &= \\begin{cases} \\mathbf{B}_{1} \\boldsymbol{w}_{1} & \\text{if } \\texttt{flag} = \\texttt{false}\\,, \\\\ \\mathbf{B}_{1} \\boldsymbol{w}_{1} + \\mathbf{B}_{2} \\boldsymbol{w}_{2} & \\text{if } \\texttt{flag} = \\texttt{true}\\,, \\end{cases} \\\\
+\\boldsymbol{\\zeta} &= \\mathbf{B}_{1}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}\\,, \\qquad \\psi \\geq \\lVert \\mathbf{G} \\boldsymbol{w} \\rVert_{2} \\quad \\text{in Model (A)}\\,.
+\\end{align}
+```
+
+So ``[\\boldsymbol{w}_{1}]_{j} \\zeta_{j}`` is the Euler contribution of factor ``j`` to ``\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}``, the value that [`factor_risk_contribution`](@ref) reports. With `flag = true` the variance splits into the factor contributions and the off-factor contribution ``c_{2} = \\boldsymbol{w}_{2}^\\intercal \\mathbf{B}_{2}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}``, which takes no budget. The chain of Model (A) then gives ``\\gamma^{2} \\leq \\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w} - c_{2}``. So the objective can fall below zero by the term ``c_{2}``, and in general its optimum is not the optimum of [`RiskBudgeting`](@ref). The penalty of Model (C) reads the decision vector, ``\\boldsymbol{w}_{1}``, or ``\\boldsymbol{w}_{1}`` followed by ``\\boldsymbol{w}_{2}``, with the covariance ``\\mathbf{P}^\\intercal \\mathbf{\\Sigma} \\mathbf{P}`` of its basis ``\\mathbf{P}``.
+
+With `hedge = true` the model adds the rows ``\\mathbf{B}_{2}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w} = \\boldsymbol{0}``. They are the first-order condition of the variance in ``\\boldsymbol{w}_{2}``, so ``c_{2} = 0``, and the model is the model above on the factor covariance ``(\\mathbf{B}^\\intercal \\mathbf{\\Sigma}^{-1} \\mathbf{B})^{-1}``. Model (A) is then exact: when no other row binds, its optimum is the optimum of [`RiskBudgeting`](@ref) under [`Variance`](@ref). The cost is that the weights lie in a subspace of dimension ``N_{f}``, so a weight bound that the free off-factor weights meet can make the model infeasible.
+
+Where:
+
+  - ``\\boldsymbol{w}_{1}``: Factor weights, one entry for each of the ``N_{f}`` factors.
+  - $(math_dict[:w_2_off_factor])
+  - $(math_dict[:B_loadings]) It is `rr.L`.
+  - ``\\mathbf{B}_{1}``: Factor basis, the pseudoinverse of ``\\mathbf{B}^\\intercal``.
+  - ``\\mathbf{B}_{2}``: Off-factor basis, an orthonormal basis of the null space of ``\\mathbf{B}^\\intercal``.
+  - ``\\mathbf{P}``: Basis of the decision vector, ``\\mathbf{B}_{1}``, or ``[\\mathbf{B}_{1} \\; \\mathbf{B}_{2}]`` when `flag = true`.
+  - ``c_{2}``: Off-factor contribution to the variance.
 
 # Fields
 
@@ -132,103 +222,13 @@ $(DocStringExtensions.FIELDS)
         mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot()
     ) -> RelaxedRiskBudgeting
 
-Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the budgeting algorithm (and with it the risk budget), warm start and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default (`nothing` for `wi` and `fb`). The relaxation variant `alg` and the square-root algorithm `mtx_sqrt` are formulation control and stay static.
+Keywords correspond to the struct's fields. A field of the type [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) can hold a [`TimeDependent`](@ref) schedule in place of a static value. The budgeting algorithm with its budget, the initial weights and the fallback define the problem, so a cross-validation fold loop resolves them for each fold. An `optimise` outside a fold loop uses the static default of each field. The default of `wi` and of `fb` is `nothing`. The model `alg` and the square-root algorithm `mtx_sqrt` control the formulation, and they cannot hold a schedule.
 
 ## Validation
 
-  - If `wi` is provided: `!isempty(wi)`.
-  - `fb` schedules: `bind !== :nearest`.
-  - A reader that states no source and reads the raw returns data, beside a reader that states `x_src = ExcessSource()`, logs one warning that names its path, see [`warn_raw_readers`](@ref). The head then builds as configured.
-
-# Mathematical definition
-
-The Relaxed Risk Budgeting (RRB) formulation replaces the non-convex risk-parity constraint with a second-order cone (SOC) relaxation. Let ``\\mathbf{G}`` be the prior's `chol`, or the transpose of the square root of ``\\mathbf{\\Sigma}`` that [`matrix_square_root`](@ref) takes under `mtx_sqrt` (so ``\\mathbf{G}^\\intercal\\mathbf{G} = \\mathbf{\\Sigma}``). Introduce auxiliary variables ``\\boldsymbol{\\zeta} = \\mathbf{\\Sigma}\\boldsymbol{w}``, ``\\psi \\geq 0``, ``\\gamma \\geq 0``:
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w},\\psi,\\gamma,\\boldsymbol{\\zeta}}{\\min} \\quad & \\psi - \\gamma\\,, \\\\
-\\text{s.t.} \\quad & \\boldsymbol{\\zeta} = \\mathbf{\\Sigma}\\boldsymbol{w}\\,, \\\\
-& \\begin{pmatrix} w_i + \\zeta_i \\\\ 2\\gamma\\sqrt{b_i} \\\\ w_i - \\zeta_i \\end{pmatrix} \\in \\mathcal{K}_{\\mathrm{SOC}}\\,, \\quad \\forall i\\,.
-\\end{align}
-```
-
-The variant in `alg` decides the cone that bounds ``\\psi``. The three variants are versions A, B and C of the constrained risk budgeting model of Richard and Roncalli.
-
-[`BasicRelaxedRiskBudgeting`](@ref) bounds it by the portfolio standard deviation alone:
-
-```math
-\\begin{align}
-\\psi &\\geq \\lVert \\mathbf{G}\\boldsymbol{w} \\rVert_2 = \\sqrt{\\boldsymbol{w}^\\intercal\\mathbf{\\Sigma}\\boldsymbol{w}}\\,.
-\\end{align}
-```
-
-[`RegularisedRelaxedRiskBudgeting`](@ref) adds a scalar ``\\rho \\geq 0`` and a second cone:
-
-```math
-\\begin{align}
-\\psi &\\geq \\sqrt{\\boldsymbol{w}^\\intercal\\mathbf{\\Sigma}\\boldsymbol{w} + \\rho^{2}}\\,, \\\\
-\\rho &\\geq \\lVert \\mathbf{G}\\boldsymbol{w} \\rVert_2\\,.
-\\end{align}
-```
-
-[`RegularisedPenalisedRelaxedRiskBudgeting`](@ref) keeps the first cone and replaces the second one, so that ``\\rho`` is bounded by the weighted individual standard deviations rather than by the portfolio one. `p` weights that term:
-
-```math
-\\begin{align}
-\\rho &\\geq \\sqrt{p} \\, \\lVert \\mathbf{\\Theta}\\boldsymbol{w} \\rVert_2\\,, \\quad \\mathbf{\\Theta} = \\mathrm{diag}\\left(\\sqrt{\\mathrm{diag}(\\mathbf{\\Sigma})}\\right)\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: Portfolio weight vector.
-  - ``\\psi``: Average risk of the portfolio.
-  - ``\\gamma``: Lower bound of the risk contribution of every asset.
-  - ``\\boldsymbol{\\zeta}``: Auxiliary vector equal to ``\\mathbf{\\Sigma}\\boldsymbol{w}``.
-  - ``b_i``: Risk budget for asset ``i``.
-  - ``\\mathbf{G}``: The prior's `chol`, or the transpose of the square root of ``\\mathbf{\\Sigma}`` under `mtx_sqrt` (so ``\\mathbf{G}^\\intercal\\mathbf{G} = \\mathbf{\\Sigma}``).
-  - ``\\mathbf{\\Sigma}``: Covariance matrix.
-  - ``\\mathbf{\\Theta}``: Diagonal matrix of the individual standard deviations.
-  - ``\\rho``: Scalar auxiliary variable of the two regularised variants.
-  - ``p``: Penalty weight of [`RegularisedPenalisedRelaxedRiskBudgeting`](@ref).
-  - ``\\mathcal{K}_{\\mathrm{SOC}}``: Second-order cone.
-
-## Factor risk budgeting
-
-With a [`FactorRiskBudgeting`](@ref) the budgeted weights are the factor weights ``\\boldsymbol{w}_1``, so the rotated cones pair ``[\\boldsymbol{w}_1]_j`` with ``\\zeta_j`` and read the budget of factor ``j``. The marginal risks and the cone on ``\\psi`` read the whole portfolio:
-
-```math
-\\begin{align}
-\\boldsymbol{w} &= \\begin{cases} \\mathbf{B}_1 \\boldsymbol{w}_1 & \\text{if } \\texttt{flag} = \\texttt{false}\\,, \\\\ \\mathbf{B}_1 \\boldsymbol{w}_1 + \\mathbf{B}_2 \\boldsymbol{w}_2 & \\text{if } \\texttt{flag} = \\texttt{true}\\,, \\end{cases} \\\\
-\\boldsymbol{\\zeta} &= \\mathbf{B}_1^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}\\,, \\qquad \\psi \\geq \\lVert \\mathbf{G} \\boldsymbol{w} \\rVert_2\\,.
-\\end{align}
-```
-
-So ``[\\boldsymbol{w}_1]_j \\zeta_j`` is the Euler contribution of factor ``j`` to ``\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}``, the value that [`factor_risk_contribution`](@ref) reports. With `flag = true` the variance splits into the factor contributions and the off-factor contribution ``c_2 = \\boldsymbol{w}_2^\\intercal \\mathbf{B}_2^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}``, which takes no budget. The chain of the relaxation then gives ``\\gamma^2 \\leq \\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w} - c_2`` for a budget that sums to one, so the objective can fall below zero by the term ``c_2``, and its optimum is in general not the optimum of [`RiskBudgeting`](@ref). The penalty of [`RegularisedPenalisedRelaxedRiskBudgeting`](@ref) reads the decision vector, ``\\boldsymbol{w}_1``, or ``\\boldsymbol{w}_1`` followed by ``\\boldsymbol{w}_2``, with the covariance ``\\mathbf{P}^\\intercal \\mathbf{\\Sigma} \\mathbf{P}`` of its basis ``\\mathbf{P}``.
-
-With `hedge = true` the model adds the rows ``\\mathbf{B}_2^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w} = \\boldsymbol{0}``. They are the first-order condition of the variance in ``\\boldsymbol{w}_2``, so ``c_2 = 0``, and the model is the relaxation above on the factor covariance ``(\\mathbf{B}^\\intercal \\mathbf{\\Sigma}^{-1} \\mathbf{B})^{-1}``. It is then exact: when no other constraint binds, its optimum is the optimum of [`RiskBudgeting`](@ref) under [`Variance`](@ref). The price is that the weights lie in a subspace of dimension ``N_f``, so a weight bound that the free off-factor weights meet can make the model infeasible.
-
-Where:
-
-  - ``\\boldsymbol{w}_1``: Factor weights, one entry for each of the ``N_f`` factors.
-  - $(math_dict[:w_2_off_factor])
-  - ``\\mathbf{B}``: The factor loadings, `rr.L`.
-  - ``\\mathbf{B}_1``: The factor basis, the pseudoinverse of ``\\mathbf{B}^\\intercal``.
-  - ``\\mathbf{B}_2``: The off-factor basis, an orthonormal basis of the null space of ``\\mathbf{B}^\\intercal``.
-  - ``\\mathbf{P}``: The basis of the decision vector, ``\\mathbf{B}_1``, or ``[\\mathbf{B}_1 \\; \\mathbf{B}_2]`` when `flag = true`.
-  - ``c_2``: The off-factor contribution to the variance.
-
-# Details
-
-  - The hyperbolic constraint is the substitution that makes the least squares risk parity
-    problem disciplined convex, and the same device carries it here.
-  - The hyperbolic constraint reads ``\\gamma \\leq \\sqrt{w_{i} \\zeta_{i} / b_{i}}`` for every ``i``, and ``w_{i} \\zeta_{i}`` is the risk contribution of asset ``i`` under the variance. So maximising ``\\gamma`` drives the contributions towards the stated proportions, while minimising ``\\psi`` drives the total risk down. The single objective ``\\psi - \\gamma`` does both.
-  - The cones read the risk budget as shares, ``b_i / \\sum_j b_j``. The chain ``\\gamma^2 \\leq \\sum_i w_i \\zeta_i \\leq \\psi^2`` holds the objective at zero only for a budget that sums to one, and a hand-built [`RiskBudget`](@ref) keeps its own sum, so without the shares a budget of `1:5` and one of `(1:5) / 15` would give different portfolios.
-  - The relaxation reads the covariance alone. This head resolves no risk measure, which is why its result carries no `r`.
-
-# Notes
-
-Because this is a *relaxation* of the risk budgeting problem, the realised risk contributions will not adhere to the target risk budget as tightly as the exact logarithmic-barrier or mixed-integer formulations in [`RiskBudgeting`](@ref). In well-behaved problems the deviation is negligible, but in pathological cases (e.g. ill-conditioned covariance matrices or extreme budget allocations) it can be noticeable. The trade-off is that the SOC formulation is convex and composes cleanly with additional constraints, making it the friendlier choice when the risk budget is one of several objectives rather than a hard requirement. Use [`RiskBudgeting`](@ref) when strict adherence to the risk budget is essential.
+  - If `wi` is provided: `!isempty(wi)`. Otherwise an `IsEmptyError`.
+  - A schedule in `fb`: `bind !== :nearest`.
+  - A part that states no source and reads the raw returns, beside a part that states `x_src = ExcessSource()`, logs one warning that names its path, see [`warn_raw_readers`](@ref). The constructor then builds the estimator as configured.
 
 ## Propagated parameters
 
@@ -241,10 +241,11 @@ Because this is a *relaxation* of the risk budgeting problem, the realised risk 
 
 `RelaxedRiskBudgeting` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
 
-  - The method reads the returns matrix `X` as its third argument. When `opt.pe` already holds a prior **result**, the method replaces `X` with `opt.pe.X`, so the children are viewed against the prior's own observations rather than the caller's matrix.
-  - `opt` recurses through [`port_opt_view`](@ref) with that matrix. `rba` recurses with the index alone.
+  - The method reads the returns matrix `X` as its third argument. When `opt.pe` holds a prior result, the method uses `opt.pe.X` in place of `X`. So the views of the children read the observations of the prior, and not the matrix of the caller.
+  - `opt` recurses through [`port_opt_view`](@ref) with that matrix. `rba` recurses with the indices alone.
+  - `fb` recurses through [`view_child`](@ref) with that matrix.
   - `wi` is sliced to the selected assets.
-  - `alg`, `fb` and `mtx_sqrt` are carried through unchanged.
+  - `alg` and `mtx_sqrt` pass unchanged.
 
 # Related
 
@@ -253,15 +254,18 @@ Because this is a *relaxation* of the risk budgeting problem, the realised risk 
   - [`JuMPOptimisationEstimator`](@ref)
   - [`RiskBudgeting`](@ref)
   - [`RelaxedRiskBudgetingAlgorithm`](@ref)
+  - [`AssetRiskBudgeting`](@ref)
+  - [`FactorRiskBudgeting`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
 
 # References
 
-  - $(ref_dict[:gambetakwon2020])
-  - $(ref_dict[:richardroncalli2019])
+  - $(ref_dict[:gambetakwon2020]) Model (0), Equations 5 to 11, and Model (A), Equations 12 to 17. $(ref_dict[:no_original_source])
+  - $(ref_dict[:gambetakwon2020]) Model (B), Equations 21 to 27, and Model (C), Equations 31 to 37.
   - $(ref_dict[:mausserromanko2014])
-  - $(ref_dict[:cajas2025]) Section 10.1.2, Equations 10.5-10.6.
+  - $(ref_dict[:cajas2025]) Section 10.1.2, Equations 10.5 and 10.6, for the rotated cone with a general budget.
+  - $(ref_dict[:roncalliweisang2012]) Problem 8 and Section 4.1.1, for the budget over the factors.
 """
 @propagatable @concrete struct RelaxedRiskBudgeting <: JuMPOptimisationEstimator
     """
@@ -277,7 +281,7 @@ Because this is a *relaxation* of the risk budgeting problem, the realised risk 
     """
     wi
     """
-    Relaxed risk budgeting algorithm variant.
+    Model of the relaxation, a [`RelaxedRiskBudgetingAlgorithm`](@ref).
     """
     alg
     """
@@ -319,15 +323,13 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Result type for Relaxed Risk Budgeting portfolio optimisation.
+Holds the solution, the budget and the fallback chain of a relaxed risk budgeting optimisation.
+
+[`optimise`](@ref) returns it for a [`RelaxedRiskBudgeting`](@ref). The model reads the covariance matrix of the prior and resolves no risk measure, so the result has no `r`, and it is a [`NonRiskJuMPOptimisationResult`](@ref). A name that is not a field resolves through `prb` first, so `res.rkb` is the budget of the model. Every other name, and the property `w`, then resolves through `jr`, the [`JuMPOptimisationResult`](@ref) that the result holds.
 
 # Fields
 
 $(DocStringExtensions.FIELDS)
-
-It carries **no** `r`. A [`RelaxedRiskBudgeting`](@ref) run builds its constraints straight from `pr.sigma` and never resolves a risk measure, so it sits on the [`NonRiskJuMPOptimisationResult`](@ref) half of the split and not beside [`RiskBudgetingResult`](@ref), whose `r` is mandatory.
-
-Property access delegates to the embedded [`JuMPOptimisationResult`](@ref); unknown properties forward to `prb` first, then through `jr` (including the virtual `:w` and the `pa` fall-through).
 
 # Constructors
 
@@ -349,7 +351,7 @@ Keywords correspond to the struct's fields.
 """
 @concrete struct RelaxedRiskBudgetingResult <: NonRiskJuMPOptimisationResult
     """
-    Shared JuMP result core, see [`JuMPOptimisationResult`](@ref).
+    The [`JuMPOptimisationResult`](@ref) that holds the processed attributes, the return code, the solution and the model.
     """
     jr
     """
@@ -378,7 +380,7 @@ end
 
 Rebuild a [`RelaxedRiskBudgetingResult`](@ref) with a different return code.
 
-`retcode` is not a field of this result and resolves through the [`JuMPOptimisationResult`](@ref) it embeds, so the rebuild rebuilds `jr` and carries every other member over unchanged.
+`retcode` is not a field of this result. It resolves through `jr`, the [`JuMPOptimisationResult`](@ref) that the result holds. So the method rebuilds `jr` with the new return code, and keeps `prb` and `fb` unchanged.
 
 # Arguments
 
@@ -407,7 +409,19 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `true` if the JuMP optimiser or fallback requires previous portfolio weights.
+Return `true` when a part of `opt` needs the previous portfolio weights.
+
+The parts are the schedules of the time-dependent fields, the [`JuMPOptimiser`](@ref) `opt.opt` and the fallback `opt.fb`. A turnover constraint or a fee on the turnover is a part that needs them.
+
+# Returns
+
+  - `Bool`: `true` when any part answers `true`.
+
+# Related
+
+  - [`needs_previous_weights`](@ref)
+  - [`time_dependent_fields`](@ref)
+  - [`RelaxedRiskBudgeting`](@ref)
 """
 function needs_previous_weights(opt::RelaxedRiskBudgeting)
     return (any(f -> needs_previous_weights(getfield(opt, f)),
@@ -418,7 +432,26 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return a cluster-sliced copy of [`RelaxedRiskBudgeting`](@ref) for asset index set `i` and returns matrix `X`.
+Return the view of a [`RelaxedRiskBudgeting`](@ref) at the assets `i`.
+
+The `## View parameters` subsection of [`RelaxedRiskBudgeting`](@ref) states how the method takes the view of each field.
+
+# Arguments
+
+  - `rrb`: The optimiser.
+  - `i`: Indices of the assets that the view keeps.
+  - `X::MatNum`: Returns matrix of the caller. The method uses the matrix of the prior in its place when `rrb.opt.pe` holds a prior result.
+  - `args...`: Not read.
+
+# Returns
+
+  - `RelaxedRiskBudgeting`: A new optimiser, built through the keyword constructor.
+
+# Related
+
+  - [`port_opt_view`](@ref)
+  - [`view_child`](@ref)
+  - [`RelaxedRiskBudgeting`](@ref)
 """
 function port_opt_view(rrb::RelaxedRiskBudgeting, i, X::MatNum,
                        args...)::RelaxedRiskBudgeting
@@ -434,25 +467,46 @@ function non_investable_universe(rrb::RelaxedRiskBudgeting,
     return rebuild_estimator(rrb, (; rba = non_investable_universe(rrb.rba, ni)))
 end
 """
-    set_relaxed_risk_budgeting_alg_constraints!(alg, model, w, sigma, chol = nothing,
-                                                z = w, sigma_z = sigma, mtx_sqrt = EigenFallbackSquareRoot())
+    set_relaxed_risk_budgeting_alg_constraints!(alg, model::JuMP.Model, n::Integer,
+                                                Gw::VecJuMPScalar, z::VecJuMPScalar,
+                                                sigma_z::MatNum) -> Nothing
 
-Add algorithm-specific second-order cone constraints for Relaxed Risk Budgeting.
+Add the cones that bound ``\\psi`` in the model that `alg` selects.
 
-Dispatches based on the RRB algorithm variant. Adds second-order cone constraints implementing the basic, regularised, or regularised-penalised RRB formulation.
+The method dispatches on `alg`. Model (A) adds one cone. Models (B) and (C) add the regulating term ``\\rho`` and two cones. The `# Mathematical definition` of [`RelaxedRiskBudgeting`](@ref) states the three models.
 
-The portfolio cones read `w` and `sigma`. The penalty of [`RegularisedPenalisedRelaxedRiskBudgeting`](@ref) reads the individual standard deviations of the decision vector `z` under `sigma_z`. The decision vector is `w` for [`AssetRiskBudgeting`](@ref), and the factor weights, followed by the off-factor weights when `flag = true`, for [`FactorRiskBudgeting`](@ref).
+# JuMP formulation
+
+## Variables
+
+  - `psi`: ``\\psi``, read from the model.
+  - `rho`: ``\\rho \\geq 0``, created by Models (B) and (C).
+
+## Constraints
+
+  - `cbasic_rrp`: ``s_{c} (\\psi, \\mathbf{G} \\boldsymbol{w}) \\in \\mathcal{K}_{2}``, for [`BasicRelaxedRiskBudgeting`](@ref).
+  - `creg_rrp_soc_1`: ``s_{c} (\\psi, \\mathbf{G} \\boldsymbol{w}, \\rho) \\in \\mathcal{K}_{2}``, for [`RegularisedRelaxedRiskBudgeting`](@ref).
+  - `creg_rrp_soc_2`: ``s_{c} (\\rho, \\sqrt{n}\\, \\mathbf{G} \\boldsymbol{w}) \\in \\mathcal{K}_{2}``, for [`RegularisedRelaxedRiskBudgeting`](@ref).
+  - `creg_pen_rrp_soc_1`: ``s_{c} (\\psi, \\mathbf{G} \\boldsymbol{w}, \\rho) \\in \\mathcal{K}_{2}``, for [`RegularisedPenalisedRelaxedRiskBudgeting`](@ref).
+  - `creg_pen_rrp_soc_2`: ``s_{c} (\\rho, \\sqrt{n \\lambda\\, \\mathrm{diag}(\\mathbf{\\Sigma}_{z})} \\odot \\boldsymbol{z}) \\in \\mathcal{K}_{2}``, for [`RegularisedPenalisedRelaxedRiskBudgeting`](@ref).
+
+Where:
+
+  - $(math_dict[:sc_scale])
+  - $(math_dict[:K_q_norm])
+  - ``n``: Number of entries of the budget.
+  - ``\\mathbf{G} \\boldsymbol{w}``: The vector `Gw`, whose norm is the standard deviation of the portfolio.
+  - ``\\boldsymbol{z}``, ``\\mathbf{\\Sigma}_{z}``: The decision vector `z` and its covariance matrix `sigma_z`.
+  - ``\\lambda``: Penalty `alg.p`.
 
 # Arguments
 
-  - `alg`: RRB algorithm ([`BasicRelaxedRiskBudgeting`](@ref), [`RegularisedRelaxedRiskBudgeting`](@ref), or [`RegularisedPenalisedRelaxedRiskBudgeting`](@ref)).
-  - `model::JuMP.Model`: JuMP optimisation model.
-  - `w::VecJuMPScalar`: Portfolio weight variables.
-  - `sigma::MatNum`: Covariance matrix.
-  - `chol::Option{<:MatNum}`: Optional pre-computed factor, with `chol' * chol == sigma`.
-  - `z::VecJuMPScalar`: The decision vector that the penalty reads.
-  - `sigma_z::MatNum`: The covariance matrix of `z`.
-  - `mtx_sqrt`: Square-root algorithm of `sigma` when `chol` is `nothing`, the `mtx_sqrt` of the [`RelaxedRiskBudgeting`](@ref). [`matrix_square_root`](@ref) states each algorithm.
+  - `alg`: The model, a [`RelaxedRiskBudgetingAlgorithm`](@ref).
+  - $(arg_dict[:model])
+  - `n`: Number of entries of the budget.
+  - `Gw`: The covariance factor times the weights. Its norm is the standard deviation of the portfolio.
+  - `z`: The decision vector that the penalty of Model (C) reads. It is the weights for [`AssetRiskBudgeting`](@ref). For [`FactorRiskBudgeting`](@ref) it is the factor weights, followed by the off-factor weights when `flag = true`.
+  - `sigma_z`: Covariance matrix of `z`.
 
 # Returns
 
@@ -460,65 +514,49 @@ The portfolio cones read `w` and `sigma`. The penalty of [`RegularisedPenalisedR
 
 # Related
 
+  - [`RelaxedRiskBudgetingAlgorithm`](@ref)
+  - [`_set_relaxed_risk_budgeting_constraints!`](@ref)
   - [`RelaxedRiskBudgeting`](@ref)
-  - [`set_relaxed_risk_budgeting_constraints!`](@ref)
 """
 function set_relaxed_risk_budgeting_alg_constraints!(::BasicRelaxedRiskBudgeting,
-                                                     model::JuMP.Model, w::VecJuMPScalar,
-                                                     sigma::MatNum,
-                                                     chol::Option{<:MatNum} = nothing,
-                                                     z::VecJuMPScalar = w,
-                                                     sigma_z::MatNum = sigma,
-                                                     mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
+                                                     model::JuMP.Model, n::Integer,
+                                                     Gw::VecJuMPScalar, z::VecJuMPScalar,
+                                                     sigma_z::MatNum)
     sc = get_constraint_scale(model)
     psi = shared_get(model, :psi)
-    G = isnothing(chol) ? transpose(matrix_square_root(mtx_sqrt, sigma)) : chol
-    JuMP.@constraint(model, cbasic_rrp, [sc * psi; sc * G * w] in JuMP.SecondOrderCone())
+    JuMP.@constraint(model, cbasic_rrp, [sc * psi; sc * Gw] in JuMP.SecondOrderCone())
     return nothing
 end
 function set_relaxed_risk_budgeting_alg_constraints!(::RegularisedRelaxedRiskBudgeting,
-                                                     model::JuMP.Model, w::VecJuMPScalar,
-                                                     sigma::MatNum,
-                                                     chol::Option{<:MatNum} = nothing,
-                                                     z::VecJuMPScalar = w,
-                                                     sigma_z::MatNum = sigma,
-                                                     mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
+                                                     model::JuMP.Model, n::Integer,
+                                                     Gw::VecJuMPScalar, z::VecJuMPScalar,
+                                                     sigma_z::MatNum)
     sc = get_constraint_scale(model)
     psi = shared_get(model, :psi)
-    G = isnothing(chol) ? transpose(matrix_square_root(mtx_sqrt, sigma)) : chol
     JuMP.@variable(model, rho >= 0)
     JuMP.@constraints(model,
                       begin
                           creg_rrp_soc_1,
-                          [sc * 2 * psi;
-                           sc * 2 * G * w;
-                           sc * -2 * rho] in JuMP.SecondOrderCone()
-                          creg_rrp_soc_2, [sc * rho; sc * G * w] in JuMP.SecondOrderCone()
+                          [sc * psi; sc * Gw; sc * rho] in JuMP.SecondOrderCone()
+                          creg_rrp_soc_2,
+                          [sc * rho; sc * sqrt(n) * Gw] in JuMP.SecondOrderCone()
                       end)
     return nothing
 end
 function set_relaxed_risk_budgeting_alg_constraints!(alg::RegularisedPenalisedRelaxedRiskBudgeting,
-                                                     model::JuMP.Model, w::VecJuMPScalar,
-                                                     sigma::MatNum,
-                                                     chol::Option{<:MatNum} = nothing,
-                                                     z::VecJuMPScalar = w,
-                                                     sigma_z::MatNum = sigma,
-                                                     mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
+                                                     model::JuMP.Model, n::Integer,
+                                                     Gw::VecJuMPScalar, z::VecJuMPScalar,
+                                                     sigma_z::MatNum)
     sc = get_constraint_scale(model)
     psi = shared_get(model, :psi)
-    G = isnothing(chol) ? transpose(matrix_square_root(mtx_sqrt, sigma)) : chol
-    theta = LinearAlgebra.Diagonal(sqrt.(LinearAlgebra.diag(sigma_z)))
-    p = alg.p
+    theta = sqrt.(n * alg.p * LinearAlgebra.diag(sigma_z))
     JuMP.@variable(model, rho >= 0)
     JuMP.@constraints(model,
                       begin
                           creg_pen_rrp_soc_1,
-                          [sc * 2 * psi;
-                           sc * 2 * G * w;
-                           sc * -2 * rho] in JuMP.SecondOrderCone()
+                          [sc * psi; sc * Gw; sc * rho] in JuMP.SecondOrderCone()
                           creg_pen_rrp_soc_2,
-                          [sc * rho;
-                           sc * sqrt(p) * theta * z] in JuMP.SecondOrderCone()
+                          [sc * rho; sc * (theta .* z)] in JuMP.SecondOrderCone()
                       end)
     return nothing
 end
@@ -526,9 +564,9 @@ end
     _set_relaxed_risk_budgeting_constraints!(model, rrb, x, A, w, sigma, chol = nothing,
                                              z = w, sigma_z = sigma)
 
-Add the variables, the rotated cones and the risk cone of the relaxed risk budgeting formulation.
+Add the variables, the cones of the budget and the cones on ``\\psi`` of a [`RelaxedRiskBudgeting`](@ref) to the model.
 
-Each budgeted weight ``x_i`` takes a rotated cone with its marginal risk ``\\zeta_i = [\\mathbf{A} \\boldsymbol{w}]_i``, so ``x_i \\zeta_i`` is its risk contribution. The cones of `rrb.alg` then bound ``\\psi`` by the standard deviation of ``\\boldsymbol{w}`` under `sigma`, and a penalty reads the decision vector `z` under `sigma_z`. The callers pass these values:
+Each budgeted weight ``x_{i}`` takes one cone with its marginal risk ``\\zeta_{i} = [\\mathbf{A} \\boldsymbol{w}]_{i}``, so ``x_{i} \\zeta_{i}`` is its contribution to the variance. The function then takes the covariance factor ``\\mathbf{G}`` of `sigma`, and adds the cones of `rrb.alg` through [`set_relaxed_risk_budgeting_alg_constraints!`](@ref). The callers pass these values:
 
 | Caller                                        | `x`            | `A`                                                          | `w`            | `sigma`                                                      |
 |:--------------------------------------------- |:-------------- |:------------------------------------------------------------ |:-------------- |:------------------------------------------------------------ |
@@ -536,27 +574,66 @@ Each budgeted weight ``x_i`` takes a rotated cone with its marginal risk ``\\zet
 | [`FactorRiskBudgeting`](@ref), `flag = false` | factor weights | ``\\mathbf{B}_1^\\intercal \\mathbf{\\Sigma} \\mathbf{B}_1`` | factor weights | ``\\mathbf{B}_1^\\intercal \\mathbf{\\Sigma} \\mathbf{B}_1`` |
 | [`FactorRiskBudgeting`](@ref), `flag = true`  | factor weights | ``\\mathbf{B}_1^\\intercal \\mathbf{\\Sigma}``               | asset weights  | ``\\mathbf{\\Sigma}``                                        |
 
+# JuMP formulation
+
+## Variables
+
+  - `psi`: ``\\psi \\geq 0``.
+  - `gamma`: ``\\gamma \\geq 0``.
+  - `zeta`: ``\\boldsymbol{\\zeta} \\geq \\boldsymbol{0}``, one entry for each entry of `x`.
+
+## Expressions
+
+  - `risk`: ``\\psi - \\gamma``, which the objective [`MinimumRisk`](@ref) minimises.
+
+## Constraints
+
+  - `crrp`: ``s_{c} (\\boldsymbol{\\zeta} - \\mathbf{A} \\boldsymbol{w}) = \\boldsymbol{0}``.
+  - `crrp_soc[i]`: ``s_{c} (x_{i} + \\zeta_{i}, 2 \\gamma \\sqrt{b_{i}}, x_{i} - \\zeta_{i}) \\in \\mathcal{K}_{2}``, which is ``x_{i} \\zeta_{i} \\geq b_{i} \\gamma^{2}`` with ``x_{i} + \\zeta_{i} \\geq 0``.
+  - The rows of [`set_relaxed_risk_budgeting_alg_constraints!`](@ref).
+
+Where:
+
+  - $(math_dict[:sc_scale])
+  - $(math_dict[:K_q_norm])
+  - ``\\boldsymbol{x}``, ``\\mathbf{A}``, ``\\boldsymbol{w}``: The arguments `x`, `A` and `w`.
+  - ``n``: Number of entries of the budget, `length(x)`.
+  - ``b_{i}``: Share of entry ``i`` in the budget, its entry divided by the sum of the entries. The chain of the `# Mathematical definition` of [`RelaxedRiskBudgeting`](@ref) needs shares that sum to one, and a [`RiskBudget`](@ref) built by hand keeps its own sum.
+
+## Relaxation
+
+$(val_dict[:relax])
+
+  - The row `crrp_soc[i]` holds `gamma` at or **below** ``\\min_{i} \\sqrt{x_{i} \\zeta_{i} / b_{i}}``, and the cones of `rrb.alg` hold `psi` at or **above** the standard deviation of the portfolio. So `risk` lies at or above the gap between the standard deviation and the least scaled contribution.
+  - For [`BasicRelaxedRiskBudgeting`](@ref), with no off-factor weights, the bound is tight, and `risk` is zero, exactly when ``x_{i} \\zeta_{i} = b_{i} \\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}`` for every ``i``. The minimum reaches it when no other row of the model binds at that portfolio.
+  - For the regularised models, `psi` also bounds the regulating term, so the bound is not tight. At a portfolio that meets the budget, `risk` is at least ``(\\sqrt{n + 1} - 1)`` times the standard deviation in Model (B).
+
 # Arguments
 
   - $(arg_dict[:model])
-  - `rrb::RelaxedRiskBudgeting`: The estimator, read for its risk budget and its variant `alg`.
-  - `x::VecJuMPScalar`: The budgeted weights, one entry for each entry of the risk budget.
+  - `rrb::RelaxedRiskBudgeting`: The optimiser. The function reads its budget, `alg`, `mtx_sqrt` and `opt.strict`.
+  - `x::VecJuMPScalar`: The budgeted weights, one entry for each entry of the budget.
   - `A::MatNum`: The matrix that maps `w` to the marginal risks of `x`.
-  - `w::VecJuMPScalar`: The weights whose standard deviation bounds ``\\psi``.
-  - `sigma::MatNum`: The covariance matrix of `w`.
-  - `chol::Option{<:MatNum}`: Optional pre-computed factor of `sigma`, with `chol' * chol == sigma`.
+  - `w::VecJuMPScalar`: The weights whose standard deviation the cones on ``\\psi`` read.
+  - `sigma::MatNum`: Covariance matrix of `w`.
+  - `chol::Option{<:MatNum}`: Covariance factor of `sigma`, with `chol' * chol == sigma`. When it is `nothing`, the function takes the transpose of the square root of `sigma` that [`matrix_square_root`](@ref) gives under `rrb.mtx_sqrt`.
   - `z::VecJuMPScalar`: The decision vector that the penalty of [`RegularisedPenalisedRelaxedRiskBudgeting`](@ref) reads: `w`, or the factor weights followed by the off-factor weights when `flag = true`.
-  - `sigma_z::MatNum`: The covariance matrix of `z`.
+  - `sigma_z::MatNum`: Covariance matrix of `z`.
+
+# Validation
+
+  - The budget has one entry for each entry of `x`. Otherwise a `DimensionMismatch` names both lengths.
 
 # Returns
 
-  - `rkb`: The resolved risk budget.
+  - `rkb::RiskBudget`: The budget that the cones read.
 
 # Related
 
   - [`RelaxedRiskBudgeting`](@ref)
   - [`set_relaxed_risk_budgeting_constraints!`](@ref)
   - [`set_relaxed_risk_budgeting_alg_constraints!`](@ref)
+  - [`risk_budget_constraints`](@ref)
 """
 function _set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                                                   rrb::RelaxedRiskBudgeting,
@@ -589,32 +666,56 @@ function _set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                            sc * (2 * gamma * sqrt(rb[i]))
                            sc * (x[i] - zeta[i])] in JuMP.SecondOrderCone()
                       end)
-    set_relaxed_risk_budgeting_alg_constraints!(rrb.alg, model, w, sigma, chol, z, sigma_z,
-                                                rrb.mtx_sqrt)
+    G = isnothing(chol) ? transpose(matrix_square_root(rrb.mtx_sqrt, sigma)) : chol
+    set_relaxed_risk_budgeting_alg_constraints!(rrb.alg, model, N, G * w, z, sigma_z)
     return rkb
 end
 """
     set_relaxed_risk_budgeting_constraints!(model, rrb, pr, wb, args...)
+    set_relaxed_risk_budgeting_constraints!(model, rrb, pr, wb, rd::ReturnsResult)
 
-Add Relaxed Risk Budgeting (RRB) constraints and weight variables to the JuMP model.
+Add the weights, the cones of the model and the weight constraints of a [`RelaxedRiskBudgeting`](@ref) to the model.
 
-Dispatches based on the risk budgeting algorithm type. Configures weight variables, budget constraints, second-order cone constraints, and weight bounds.
+The method dispatches on `rrb.rba`. Each method registers the weights, calls [`_set_relaxed_risk_budgeting_constraints!`](@ref) with the vectors and the matrices that its budget reads, and adds the weight bounds and the budgets with [`set_weight_constraints!`](@ref). The table of [`_set_relaxed_risk_budgeting_constraints!`](@ref) states the values that each method passes.
+
+# JuMP formulation
+
+## Variables
+
+  - `w`: ``\\boldsymbol{w}``, registered by [`set_w!`](@ref) for [`AssetRiskBudgeting`](@ref).
+  - `w1`, `w2`: ``\\boldsymbol{w}_{1}``, ``\\boldsymbol{w}_{2}``, registered by [`set_factor_risk_contribution_constraints!`](@ref) for [`FactorRiskBudgeting`](@ref). `w` is then an expression of them.
+
+## Constraints
+
+  - The rows of [`_set_relaxed_risk_budgeting_constraints!`](@ref), with the budget on ``\\boldsymbol{w}`` for [`AssetRiskBudgeting`](@ref), and on ``\\boldsymbol{w}_{1}`` for [`FactorRiskBudgeting`](@ref).
+  - The rows of [`set_weight_constraints!`](@ref). [`AssetRiskBudgeting`](@ref) calls it with `long = true`.
+
+Where:
+
+  - $(math_dict[:w_port])
+  - ``\\boldsymbol{w}_{1}``: Factor weights.
+  - $(math_dict[:w_2_off_factor])
 
 # Arguments
 
-  - `model::JuMP.Model`: JuMP optimisation model.
-  - `rrb::RelaxedRiskBudgeting`: RRB estimator configuration.
-  - `pr::AbstractPriorResult`: Prior result with asset moments.
-  - `wb::WeightBounds`: Weight bounds configuration.
-  - `args...`: Additional arguments (e.g. returns data for factor risk budgeting).
+  - $(arg_dict[:model])
+  - `rrb`: The optimiser.
+  - $(arg_dict[:pr])
+  - $(arg_dict[:wb_arg])
+  - `rd`: Returns data that [`FactorRiskBudgeting`](@ref) reads when it fits the loadings. The asset method does not read it.
+
+# Validation
+
+  - [`AssetRiskBudgeting`](@ref): no weight bound is negative. Otherwise [`set_weight_constraints!`](@ref) throws an `ArgumentError`.
 
 # Returns
 
-  - Processed risk budgeting attributes.
+  - [`ProcessedAssetRiskBudgetingAttributes`](@ref) for [`AssetRiskBudgeting`](@ref), and [`ProcessedFactorRiskBudgetingAttributes`](@ref) for [`FactorRiskBudgeting`](@ref).
 
 # Related
 
   - [`RelaxedRiskBudgeting`](@ref)
+  - [`_set_relaxed_risk_budgeting_constraints!`](@ref)
   - [`set_relaxed_risk_budgeting_alg_constraints!`](@ref)
 """
 function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
@@ -659,6 +760,44 @@ function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                                                    pr.chol)
     return ProcessedAssetRiskBudgetingAttributes(; rkb = rkb)
 end
+"""
+    _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult();
+              str_names::Bool = false, save::Bool = true, kwargs...) -> RelaxedRiskBudgetingResult
+
+Build the model of a [`RelaxedRiskBudgeting`](@ref), solve it, and return its result.
+
+[`optimise`](@ref) reaches this method through [`shared_series_solve`](@ref), which drops the observations of a Shared Series gap before the solve.
+
+# Algorithm
+
+ 1. Replace each schedule of `rrb` with its static default through [`reset_time_dependent_estimator`](@ref).
+ 2. Process the attributes of `rrb.opt` against `rd` with [`processed_jump_optimiser_attributes`](@ref), giving `attrs`. It holds the prior, the weight bounds, the fees, the return terms and the Investable Mask.
+ 3. Take the view of `rrb` and of `rd` at the investable assets with [`investable_view`](@ref). Both are unchanged when every asset is investable.
+ 4. Bind the benchmark of each [`DataBenchmarkTracking`](@ref) term to `rd` with [`bind_data_benchmark`](@ref).
+ 5. Build a new model. Register the scales with [`set_model_scales!`](@ref), the number of observations with [`set_model_observations!`](@ref), and the expression `k = 1` with [`set_maximum_ratio_factor_variables!`](@ref), because [`MinimumRisk`](@ref) does not scale the weights.
+ 6. Add the weights, the cones and the weight constraints with [`set_relaxed_risk_budgeting_constraints!`](@ref), giving `prb`.
+ 7. Add the constraints and the return terms of `rrb.opt` with [`assemble_jump_model!`](@ref).
+ 8. Set the objective [`MinimumRisk`](@ref), which minimises `risk`, and solve with [`optimise_JuMP_model!`](@ref), giving `retcode` and `sol`.
+ 9. Build the result. It holds `attrs`, `retcode`, `sol`, the model when `save` is `true`, and `prb`.
+
+# Arguments
+
+  - `rrb::RelaxedRiskBudgeting`: The optimiser.
+  - $(arg_dict[:rd])
+  - `str_names::Bool`: `true` gives each variable and each row of the model its string name.
+  - `save::Bool`: `true` keeps the model in the result.
+  - `kwargs...`: Passed on to [`processed_jump_optimiser_attributes`](@ref).
+
+# Returns
+
+  - [`RelaxedRiskBudgetingResult`](@ref): The result, with `fb = nothing`. The method of [`optimise`](@ref) for an optimiser with a fallback runs the fallback chain.
+
+# Related
+
+  - [`optimise`](@ref)
+  - [`set_relaxed_risk_budgeting_constraints!`](@ref)
+  - [`RelaxedRiskBudgetingResult`](@ref)
+"""
 function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult();
                    str_names::Bool = false, save::Bool = true, kwargs...)
     rrb = reset_time_dependent_estimator(rrb)
@@ -686,24 +825,31 @@ end
     optimise(rrb::RelaxedRiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
              rd::ReturnsResult; str_names::Bool = false, save::Bool = true, kwargs...) -> RelaxedRiskBudgetingResult
 
-Run the Relaxed Risk Budgeting portfolio optimisation.
+Optimise a [`RelaxedRiskBudgeting`](@ref) that has no fallback, and return its result.
+
+This method serves an optimiser whose `fb` is `nothing`. It solves through [`shared_series_solve`](@ref), and [`_optimise`](@ref) states the steps of the solve.
 
 # Arguments
 
-  - `rrb`: The relaxed risk budgeting optimiser to use.
-  - $(arg_dict[:rd]) If `isa(rrb.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
-  - `str_names`: Whether to use string names for the assets in the optimisation.
-  - `save`: Whether to save the JuMP model in the optimisation result.
-  - `kwargs`: Additional keyword arguments passed to the optimisation function.
+  - `rrb`: The optimiser.
+  - $(arg_dict[:rd]) When `rrb.opt.pe` is a prior result, the solve does not read `rd`, except to fit the loadings of [`FactorRiskBudgeting`](@ref) when no other source holds them. A fallback or a clustering step can still read it.
+  - `str_names`: `true` gives each variable and each row of the model its string name.
+  - `save`: `true` keeps the model in the result.
+  - `kwargs`: Passed on to [`_optimise`](@ref).
 
 # Validation
 
-  - No field in the tree of `rrb` holds an [`Online`](@ref). An `ArgumentError` naming the field is thrown otherwise, through [`assert_batch_entry`](@ref): a plain `optimise` is a batch fit, and a wrapper resolves only at the warm-up of the fold loop's online arm.
+  - No field in the tree of `rrb` holds an [`Online`](@ref). Otherwise [`assert_batch_entry`](@ref) throws an `ArgumentError` that names the field. A plain `optimise` is a batch fit, and the fold loop resolves an `Online` only in its online branch.
+
+# Returns
+
+  - [`RelaxedRiskBudgetingResult`](@ref): The result of the solve.
 
 # Related
 
   - [`RelaxedRiskBudgeting`](@ref)
   - [`RelaxedRiskBudgetingResult`](@ref)
+  - [`_optimise`](@ref)
 """
 function optimise(rrb::RelaxedRiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult; str_names::Bool = false, save::Bool = true, kwargs...)

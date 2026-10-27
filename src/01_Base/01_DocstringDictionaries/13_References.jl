@@ -249,7 +249,6 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :cajas2019noc => "[cajas2019noc](@cite) D. Cajas. *Robust portfolio selection with near optimal centering*. Available at SSRN 3572435 (2019).",#
                  :degraaf2016 => "[degraaf2016](@cite) T. de Graaf. *Robust Mean-Variance Optimization*. Master's Thesis, Leiden University (2016).",#
                  :gambetakwon2020 => "[gambetakwon2020](@cite) V. Gambeta and R. Kwon. *Risk return trade-off in relaxed risk parity portfolio optimization*. Journal of Risk and Financial Management 13, 237 (2020).",#
-                 :richardroncalli2019 => "[richardroncalli2019](@cite) J.-C. Richard and T. Roncalli. *Constrained Risk Budgeting Portfolios: Theory, Algorithms, Applications & Puzzles*. arXiv preprint arXiv:1902.05710 (2019).",#
                  :cover1984 => "[cover1984](@cite) T. M. Cover. *An algorithm for maximizing expected log investment return*. IEEE Transactions on Information Theory 30(2), 369–373 (1984).",#
                  :lihoi2014 => "[lihoi2014](@cite) B. Li and S. C. H. Hoi. *Online portfolio selection: A survey*. ACM Computing Surveys 46(3), 1–36 (2014).",#
                  :li2011cwmr => "[li2011cwmr](@cite) B. Li, S. C. H. Hoi, P. Zhao and V. Gopalkrishnan. *Confidence weighted mean reversion strategy for on-line portfolio selection*. In: Proceedings of the 14th International Conference on Artificial Intelligence and Statistics, PMLR 15, 434–442 (2011).",#
