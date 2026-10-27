@@ -341,8 +341,7 @@ end
                 :RiskBudgetingFormulation, :RiskInputKind, :RiskJuMPOptimisationEstimator,
                 :RiskJuMPOptimisationResult, :SecondMomentFormulation,
                 :SequentialCrossValidationResult, :SmythBrobyCovarianceAlgorithm,
-                :SquaredOrderedWeightsArrayAlgorithm,
-                :UnstandardisedLowOrderMomentMeasureAlgorithm, :ValueatRiskFormulation,
+                :SquaredOrderedWeightsArrayAlgorithm, :ValueatRiskFormulation,
                 :VariableTracking, :VarianceFormulation, :WalkForwardEstimator])
 
     # Floors on the walk: the package declares far more abstract types than carry a

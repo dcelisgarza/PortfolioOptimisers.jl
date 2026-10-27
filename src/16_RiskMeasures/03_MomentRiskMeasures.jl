@@ -17,29 +17,17 @@ $(DocStringExtensions.TYPEDEF)
 
 Selects a moment of order one or two, or the root of an even moment, for a low-order moment risk measure.
 
-[`LowOrderMoment`](@ref) holds it. The reduction of each member is homogeneous in the deviations, of degree one or two, so the model of each member is a linear, second-order cone or power cone programme. [`SecondMoment`](@ref) subtypes this type directly, and [`UnstandardisedLowOrderMomentMeasureAlgorithm`](@ref) holds the other members.
-
-# Related
-
-  - [`UnstandardisedLowOrderMomentMeasureAlgorithm`](@ref)
-  - [`SecondMoment`](@ref)
-  - [`LowOrderMoment`](@ref)
-"""
-abstract type LowOrderMomentMeasureAlgorithm <: MomentMeasureAlgorithm end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Groups the low-order moments that hold no variance estimator.
-
-The members are [`FirstLowerMoment`](@ref), [`MeanAbsoluteDeviation`](@ref) and [`EvenMoment`](@ref). Each reads only the deviations and the observation weights of the measure. No method of the library dispatches on the group. The library has no standardised low-order moment.
+[`LowOrderMoment`](@ref) holds it. The reduction of each member is homogeneous in the deviations, of degree one or two, so the model of each member is a linear, second-order cone or power cone programme. The members are [`FirstLowerMoment`](@ref), [`MeanAbsoluteDeviation`](@ref), [`SecondMoment`](@ref) and [`EvenMoment`](@ref). No member gives a standardised moment. The `ve` of [`SecondMoment`](@ref) supplies only its divisor and its observation weights.
 
 # Related
 
   - [`FirstLowerMoment`](@ref)
   - [`MeanAbsoluteDeviation`](@ref)
+  - [`SecondMoment`](@ref)
   - [`EvenMoment`](@ref)
+  - [`LowOrderMoment`](@ref)
 """
-abstract type UnstandardisedLowOrderMomentMeasureAlgorithm <: LowOrderMomentMeasureAlgorithm end
+abstract type LowOrderMomentMeasureAlgorithm <: MomentMeasureAlgorithm end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -80,7 +68,7 @@ Where:
 
 # Related
 
-  - [`UnstandardisedLowOrderMomentMeasureAlgorithm`](@ref)
+  - [`LowOrderMomentMeasureAlgorithm`](@ref)
   - [`MeanAbsoluteDeviation`](@ref): the two-sided deviation from the same target.
   - [`LowOrderMoment`](@ref)
 
@@ -89,7 +77,7 @@ Where:
   - $(ref_dict[:cajas2025]) Section 7.2.2.2, Equation 7.45 with ``q = 1``. $(ref_dict[:no_original_source])
   - $(ref_dict[:lpm])
 """
-struct FirstLowerMoment <: UnstandardisedLowOrderMomentMeasureAlgorithm end
+struct FirstLowerMoment <: LowOrderMomentMeasureAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -117,7 +105,7 @@ The second form follows from ``\\lvert d \\rvert = 2 \\max(-d, 0) + d``. When ``
 
 # Related
 
-  - [`UnstandardisedLowOrderMomentMeasureAlgorithm`](@ref)
+  - [`LowOrderMomentMeasureAlgorithm`](@ref)
   - [`FirstLowerMoment`](@ref): the one-sided deviation from the same target.
   - [`LowOrderMoment`](@ref)
   - [`MedianAbsoluteDeviation`](@ref): a different risk measure, which centres at the median.
@@ -127,7 +115,7 @@ The second form follows from ``\\lvert d \\rvert = 2 \\max(-d, 0) + d``. When ``
   - $(ref_dict[:cajas2025]) Section 7.2.1.3, Equation 7.31. $(ref_dict[:no_original_source])
   - $(ref_dict[:mad])
 """
-struct MeanAbsoluteDeviation <: UnstandardisedLowOrderMomentMeasureAlgorithm end
+struct MeanAbsoluteDeviation <: LowOrderMomentMeasureAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -291,7 +279,7 @@ EvenMoment
 
 # Related
 
-  - [`UnstandardisedLowOrderMomentMeasureAlgorithm`](@ref)
+  - [`LowOrderMomentMeasureAlgorithm`](@ref)
   - [`LowOrderMoment`](@ref)
   - [`FullMoment`](@ref)
   - [`SemiMoment`](@ref)
@@ -301,7 +289,7 @@ EvenMoment
 
   - $(ref_dict[:emom]) Equations 3 and 4, Formulations 5 and 8.
 """
-@concrete struct EvenMoment <: UnstandardisedLowOrderMomentMeasureAlgorithm
+@concrete struct EvenMoment <: LowOrderMomentMeasureAlgorithm
     """
     $(field_dict[:p_rm])
     """

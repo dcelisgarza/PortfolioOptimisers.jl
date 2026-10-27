@@ -59,7 +59,12 @@ that their functors read from the returns move to the moment measures.**
    `UnstandardisedHighOrderMomentMeasureAlgorithm` go. `ThirdLowerMoment` and `FourthMoment`
    subtype `HighOrderMomentMeasureAlgorithm` directly. A lower moment divides by the lower
    second moment, and a full moment by the full one, as the wrapper did. `SSK`, `KT` and `SKT`
-   keep their default `ve = SimpleVariance(; me = nothing)`, so their values do not move.
+   keep their default `ve = SimpleVariance(; me = nothing)`, so their values do not move. The
+   low-order twin `UnstandardisedLowOrderMomentMeasureAlgorithm` goes too
+   ([#1869](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1869)). No method
+   dispatched on it, and no low-order moment is standardised. `FirstLowerMoment`,
+   `MeanAbsoluteDeviation` and `EvenMoment` subtype `LowOrderMomentMeasureAlgorithm` directly,
+   as `SecondMoment` does.
 
 Each old value of the returns has a name that states what it is:
 
@@ -97,6 +102,9 @@ Each old value of the returns has a name that states what it is:
 - The change breaks code that states `w`, `mu`, `alg1`, `alg2` or `pe` on either measure, or `ve`
   on `Skewness`, and code that evaluates either measure on a bare returns matrix. The migration
   guide of the next release takes the table above.
-- The change breaks code that names `StandardisedHighOrderMoment`. The last row of the table
+- The change breaks code that names `StandardisedHighOrderMoment`, and code that dispatches on
+  `UnstandardisedHighOrderMomentMeasureAlgorithm` or
+  `UnstandardisedLowOrderMomentMeasureAlgorithm`. Such code names the parent
+  `HighOrderMomentMeasureAlgorithm` or `LowOrderMomentMeasureAlgorithm`. The last row of the table
   gives its replacement. `homogeneity_degree` reads the type of `ve`: a `HighOrderMoment` with
   `ve = nothing` has degree 3 or 4, and one with a variance estimator has degree 0.
