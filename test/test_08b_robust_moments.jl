@@ -879,11 +879,21 @@ end
         ivz = copy(iv)
         ivz[sampled[5] - 1, 2] = 0
         @test cov(cer, X; iv = ivz) == cov(cer, X; iv = iv)
-        Xc = copy(X)
-        Xc[(sampled[5] - 19):sampled[5], 2] .= X[sampled[5], 2]
-        for f in (cov, cor)
-            @test_throws DomainError f(cer, Xc; iv = iv)
-            @test_throws "no dispersion" f(cer, Xc; iv = iv)
+        #=
+        The round-off of the mean can leave a constant window a standard deviation of the
+        order of `eps`, and whether it does depends on the value and on the host. On the CI
+        host, the first value gave about `1e-19`, and the fit answered. The last three give a
+        positive value on the host that wrote the test, so the comparison of the returns
+        refuses them there too.
+        =#
+        for v in (X[sampled[5], 2], 0.015453143833033613, -0.009848612891382565,
+                  -0.0048880224182851865)
+            Xc = copy(X)
+            Xc[(sampled[5] - 19):sampled[5], 2] .= v
+            for f in (cov, cor)
+                @test_throws DomainError f(cer, Xc; iv = iv)
+                @test_throws "no dispersion" f(cer, Xc; iv = iv)
+            end
         end
         # The implied volatility series itself is mandatory. Every method refuses a missing
         # `iv` and an `iv = nothing` by name, and so does a prior fitted on returns that

@@ -139,8 +139,10 @@ end
               (expected_risk(Variance(), _w607, _pr607) +
                expected_risk(WorstRealisation(), _w607, _pr607))
         @test RiskRatio(; r1 = Range(), r2 = WorstRealisation())(_x607) == 2.5
-        # A zero denominator follows IEEE division: a constant asset held alone.
-        Xz = hcat(fill(0.001, 50), randn(StableRNG(1), 50, 2) * 0.01)
+        # A zero denominator follows IEEE division: a constant asset held alone. The constant
+        # is a power of two, so every partial sum is exact, and the variance is zero on every
+        # host. A constant of 0.001 gave a variance of 4.3e-37 on the CI host.
+        Xz = hcat(fill(2.0^-10, 50), randn(StableRNG(1), 50, 2) * 0.01)
         prz = prior(EmpiricalPrior(), Xz)
         wz = [1.0, 0.0, 0.0]
         @test iszero(expected_risk(Variance(), wz, prz))

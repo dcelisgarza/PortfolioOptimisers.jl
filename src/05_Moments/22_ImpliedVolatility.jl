@@ -639,7 +639,7 @@ This is Equation 5 of [christensenprabhala1998](@cite). It regresses the log rea
  2. Check that `chunk` exceeds four.
  3. Call [`realised_vol`](@ref) with `alg.ve`. The result is `rv`, the realised volatility of each window.
  4. Call [`implied_vol`](@ref) on `iv` with the same `chunk`, `T` and `N`. The result replaces `iv`, and holds the implied volatility at the last row of each window. The window count comes from `X`, so the function reads `iv` over the rows of the returns sample.
- 5. Check that `rv` and `iv` have the same size, and that each of their entries is positive. Set `T2` to their number of rows, which is `chunk`.
+ 5. Check that `rv` and `iv` have the same size, and that each of their entries is positive. Check that the returns of each asset are not all equal over each window. Set `T2` to their number of rows, which is `chunk`.
  6. Replace `rv` and `iv` by their natural logarithms.
  7. Make `ovec`, the intercept column of ones, of length `T2 - 1`.
  8. For each asset `i`, make the design matrix `X_t` from `ovec` and the first `T2 - 1` rows of `iv` and `rv`. Make the response `y_t` from the rows `2:T2` of `rv`, and the prediction row `X_p` from the row `T2`.
@@ -660,7 +660,7 @@ The implied volatilities are the second positional argument, and the returns are
   - `chunk > 4`. The fit has `chunk - 1` rows for three coefficients, so it has a residual only when `chunk > 4`.
   - `size(rv) == size(iv)`, one realised volatility for each implied volatility.
   - Each implied volatility on the last row of a window is positive. Otherwise the function throws a `DomainError`, because the fit takes its logarithm. An entry on a row that ends no window is not read.
-  - Each window has a positive realised volatility. Otherwise the function throws a `DomainError`. Constant returns over the `ws` rows of a window give a realised volatility of zero.
+  - Each window has a positive realised volatility, and the returns of each asset are not all equal over it. Otherwise the function throws a `DomainError`. Constant returns over the `ws` rows of a window have a realised volatility of zero. In floating point, the round-off of their mean can leave a very small positive value instead, which depends on the host. So the function also compares the returns themselves.
 
 # Returns
 
@@ -692,7 +692,14 @@ function predict_realised_vols(alg::ImpliedVolatilityRegression, iv::MatNum, X::
     @argcheck(isnothing(k),
               DomainError(iv[k],
                           "`iv` holds $(iv[k]) for asset $(k[2]) on the last row of window $(k[1]) of $chunk. `ImpliedVolatilityRegression` takes the logarithm of the implied volatility on the last row of each window, so that value must be positive. State a positive implied volatility on that row, or use `ImpliedVolatilityPremium`."))
-    k = findfirst(x -> !(x > zero(x)), rv)
+    # Constant returns can leave a standard deviation of the order of `eps` from the round-off
+    # of their mean, so the check also compares the returns of each window.
+    offset = T - chunk * alg.ws
+    k = findfirst(CartesianIndices(rv)) do k
+        c, i = Tuple(k)
+        rows = (offset + (c - 1) * alg.ws + 1):(offset + c * alg.ws)
+        return !(rv[k] > zero(rv[k])) || allequal(view(X, rows, i))
+    end
     @argcheck(isnothing(k),
               DomainError(rv[k],
                           "Window $(k[1]) of $chunk has no dispersion for asset $(k[2]): its realised volatility is $(rv[k]). `ImpliedVolatilityRegression` takes the logarithm of the realised volatility of each window, so that value must be positive. State another `ImpliedVolatilityRegression.ws`, or remove the asset."))
