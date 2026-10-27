@@ -151,25 +151,27 @@ end
     @testset "A standardised moment divides by the divisor of ve" begin
         x = _x598
         T = length(x)
+        sv = SimpleVariance(; me = nothing)
         unc = SimpleVariance(; me = nothing, corrected = false)
         num = -mean(_dm598 .^ 3)
-        r = HighOrderMoment(; alg = StandardisedHighOrderMoment())
-        ru = HighOrderMoment(; alg = StandardisedHighOrderMoment(; ve = unc))
+        r = HighOrderMoment(; ve = sv)
+        ru = HighOrderMoment(; ve = unc)
         @test r(x) ≈ num / (sum(_dm598 .^ 2) / (T - 1))^1.5
         @test ru(x) ≈ num / mean(_dm598 .^ 2)^1.5
         @test r(x) ≈ 1.4555036361053537
         @test ru(x) ≈ 2.034128169893555
-        # The unstandardised value is the numerator alone.
+        # The unstandardised value is the numerator alone, and `ve = nothing` is the default.
+        @test HighOrderMoment().ve === nothing
         @test HighOrderMoment(; alg = ThirdLowerMoment())(x) ≈ num
         fm = FourthMoment()
         sfm = FourthMoment(; alg = SemiMoment())
-        @test HighOrderMoment(; alg = StandardisedHighOrderMoment(; alg = fm))(x) ≈
+        @test HighOrderMoment(; alg = fm, ve = sv)(x) ≈
               mean(_d598 .^ 4) / (sum(_d598 .^ 2) / (T - 1))^2
-        @test HighOrderMoment(; alg = StandardisedHighOrderMoment(; alg = sfm))(x) ≈
+        @test HighOrderMoment(; alg = sfm, ve = sv)(x) ≈
               mean(_dm598 .^ 4) / (sum(_dm598 .^ 2) / (T - 1))^2
         # The weights of the measure reach the estimator of the denominator.
-        rw = HighOrderMoment(; w = _lw598, alg = StandardisedHighOrderMoment())
-        @test rw.alg.ve.w === _lw598
+        rw = HighOrderMoment(; w = _lw598, ve = sv)
+        @test rw.ve.w === _lw598
         dmw = min.(x .- mean(x, _lw598), 0)
         @test rw(x) ≈
               -mean(dmw .^ 3, _lw598) / var(dmw, _lw598; mean = 0, corrected = true)^1.5
@@ -215,9 +217,14 @@ end
         # A member that holds no estimator returns unchanged.
         @test factory(FirstLowerMoment(), _lw598) === FirstLowerMoment()
         @test factory(EvenMoment(), _lw598) isa EvenMoment
-        s = factory(StandardisedHighOrderMoment(), _lw598)
-        @test s.ve.w === _lw598
-        @test s.alg isa ThirdLowerMoment
+        @test factory(ThirdLowerMoment(), _lw598) === ThirdLowerMoment()
+        # `factory` keeps the `ve` of a standardised moment with the weights it selects, and a
+        # view keeps it.
+        lw = pweights(fill(1.0, 120))
+        rs = factory(HighOrderMoment(; w = lw, ve = SimpleVariance(; me = nothing)), pr)
+        @test rs.ve.w === lw
+        @test rs.alg isa ThirdLowerMoment
+        @test PO.port_opt_view(rs, [2, 4]).ve === rs.ve
         for M in (LowOrderMoment, HighOrderMoment)
             # A measure that states nothing takes the mean and the weights of the prior.
             r = factory(M(), pr)

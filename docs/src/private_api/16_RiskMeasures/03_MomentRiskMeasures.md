@@ -9,7 +9,6 @@ MomentMeasureAlgorithm
 LowOrderMomentMeasureAlgorithm
 UnstandardisedLowOrderMomentMeasureAlgorithm
 HighOrderMomentMeasureAlgorithm
-UnstandardisedHighOrderMomentMeasureAlgorithm
 LoHiOrderMoment
 calc_moment_target(::LoHiOrderMoment{<:Any, Nothing, Nothing, <:Any}, ::Any, x::VecNum)
 calc_moment_target(r::LoHiOrderMoment{<:Any, <:StatsBase.AbstractWeights, Nothing, <:Any}, ::Any, x::VecNum)

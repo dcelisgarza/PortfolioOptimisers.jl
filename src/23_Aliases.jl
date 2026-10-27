@@ -216,15 +216,14 @@ end
           mu::Option{<:Num_VecNum_VecScalar} = nothing,
           ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing)) -> HighOrderMoment
 
-Alias for the Standardised Third Lower Moment (SSK) risk measure, a [`HighOrderMoment`](@ref) with [`StandardisedHighOrderMoment`](@ref) and [`ThirdLowerMoment`](@ref). It is the semi-skewness of the portfolio returns over the scenarios.
+Alias for the Standardised Third Lower Moment (SSK) risk measure, a [`HighOrderMoment`](@ref) with [`ThirdLowerMoment`](@ref) and a variance estimator in `ve`. It is the semi-skewness of the portfolio returns over the scenarios.
 """
 function SSK(; settings::RiskMeasureSettings = RiskMeasureSettings(),
              w::Option{<:ObsWeights} = nothing,
              mu::Option{<:Num_VecNum_VecScalar} = nothing,
              ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing))::HighOrderMoment
-    return HighOrderMoment(; settings = settings, w = w, mu = mu,
-                           alg = StandardisedHighOrderMoment(; ve = ve,
-                                                             alg = ThirdLowerMoment()))
+    return HighOrderMoment(; settings = settings, w = w, mu = mu, alg = ThirdLowerMoment(),
+                           ve = ve)
 end
 """
     FTCM(; settings::RiskMeasureSettings = RiskMeasureSettings(),
@@ -258,15 +257,13 @@ end
          mu::Option{<:Num_VecNum_VecScalar} = nothing,
          ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing)) -> HighOrderMoment
 
-Alias for the Standardised Fourth Central Moment (KT) risk measure, a [`HighOrderMoment`](@ref) with [`StandardisedHighOrderMoment`](@ref), [`FourthMoment`](@ref) and [`FullMoment`](@ref). It is the kurtosis of the portfolio returns over the scenarios.
+Alias for the Standardised Fourth Central Moment (KT) risk measure, a [`HighOrderMoment`](@ref) with [`FourthMoment`](@ref), [`FullMoment`](@ref) and a variance estimator in `ve`. It is the kurtosis of the portfolio returns over the scenarios.
 """
 function KT(; settings::RiskMeasureSettings = RiskMeasureSettings(),
             w::Option{<:ObsWeights} = nothing, mu::Option{<:Num_VecNum_VecScalar} = nothing,
             ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing))::HighOrderMoment
     return HighOrderMoment(; settings = settings, w = w, mu = mu,
-                           alg = StandardisedHighOrderMoment(; ve = ve,
-                                                             alg = FourthMoment(;
-                                                                                alg = FullMoment())))
+                           alg = FourthMoment(; alg = FullMoment()), ve = ve)
 end
 """
     SKT(; settings::RiskMeasureSettings = RiskMeasureSettings(),
@@ -274,16 +271,14 @@ end
           mu::Option{<:Num_VecNum_VecScalar} = nothing,
           ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing)) -> HighOrderMoment
 
-Alias for the Standardised Fourth Lower Moment (SKT) risk measure, a [`HighOrderMoment`](@ref) with [`StandardisedHighOrderMoment`](@ref), [`FourthMoment`](@ref) and [`SemiMoment`](@ref). It is the semi-kurtosis of the portfolio returns over the scenarios.
+Alias for the Standardised Fourth Lower Moment (SKT) risk measure, a [`HighOrderMoment`](@ref) with [`FourthMoment`](@ref), [`SemiMoment`](@ref) and a variance estimator in `ve`. It is the semi-kurtosis of the portfolio returns over the scenarios.
 """
 function SKT(; settings::RiskMeasureSettings = RiskMeasureSettings(),
              w::Option{<:ObsWeights} = nothing,
              mu::Option{<:Num_VecNum_VecScalar} = nothing,
              ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing))::HighOrderMoment
     return HighOrderMoment(; settings = settings, w = w, mu = mu,
-                           alg = StandardisedHighOrderMoment(; ve = ve,
-                                                             alg = FourthMoment(;
-                                                                                alg = SemiMoment())))
+                           alg = FourthMoment(; alg = SemiMoment()), ve = ve)
 end
 
 # ── Risk measures — Value-at-Risk family ──────────────────────────────────────

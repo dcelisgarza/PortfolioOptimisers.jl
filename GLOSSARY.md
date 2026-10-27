@@ -1121,7 +1121,7 @@ The per-observation series a conic tail measure reduces. Two exist: the net port
 ### Dispersion / moment measures
 
 - **Variance**, **StandardDeviation**, **UncertaintySetVariance** (robust).
-- **LowOrderMoment** (`FirstLowerMoment`, `MeanAbsoluteDeviation` (MAD), `SecondMoment`, `EvenMoment`) and **HighOrderMoment** (`ThirdLowerMoment`, `FourthMoment`, `StandardisedHighOrderMoment`).
+- **LowOrderMoment** (`FirstLowerMoment`, `MeanAbsoluteDeviation` (MAD), `SecondMoment`, `EvenMoment`) and **HighOrderMoment** (`ThirdLowerMoment`, `FourthMoment`). With a variance estimator in `ve`, `HighOrderMoment` divides the moment by a power of the second moment of the same deviations, so it gives the standardised moment.
 - **Kurtosis**, **Skewness**, **NegativeSkewness**, **VarianceSkewKurtosis** (composite), **ThirdCentralMoment**. `Kurtosis` and `Skewness` read a comoment matrix, `kt` and `sk`, as `Variance` reads `sigma`, so their functors give the value that their models bound. `ThirdCentralMoment` reads the returns, and with a variance estimator in `ve` it gives the standardised skewness.
 - **MedianAbsoluteDeviation**: centred by `MedianCentering` or `MeanCentering`. It has no acronym. MAD and the factory alias `MAD` name the mean absolute deviation, a `LowOrderMoment` with `MeanAbsoluteDeviation`.
 

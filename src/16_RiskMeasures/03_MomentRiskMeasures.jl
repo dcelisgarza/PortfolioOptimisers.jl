@@ -31,7 +31,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Groups the low-order moments that hold no variance estimator.
 
-The members are [`FirstLowerMoment`](@ref), [`MeanAbsoluteDeviation`](@ref) and [`EvenMoment`](@ref). Each reads only the deviations and the observation weights of the measure. No method of the library dispatches on the group. It is the low-order mirror of [`UnstandardisedHighOrderMomentMeasureAlgorithm`](@ref), and the library has no standardised low-order moment.
+The members are [`FirstLowerMoment`](@ref), [`MeanAbsoluteDeviation`](@ref) and [`EvenMoment`](@ref). Each reads only the deviations and the observation weights of the measure. No method of the library dispatches on the group. The library has no standardised low-order moment.
 
 # Related
 
@@ -45,7 +45,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the moment measure algorithm `alg` unchanged.
 
-A member that holds no variance estimator has nothing that a prior or observation weights can replace. [`factory`](@ref) on [`LowOrderMoment`](@ref) and [`HighOrderMoment`](@ref) calls this method for such a member. [`SecondMoment`](@ref) and [`StandardisedHighOrderMoment`](@ref) have methods of their own, which pass the weights to `ve`.
+A member that holds no variance estimator has nothing that a prior or observation weights can replace. [`factory`](@ref) on [`LowOrderMoment`](@ref) calls this method for such a member. [`SecondMoment`](@ref) has a method of its own, which passes the weights to `ve`. A [`HighOrderMomentMeasureAlgorithm`](@ref) holds no variance estimator, because [`HighOrderMoment`](@ref) holds its `ve` itself.
 
 # Related
 
@@ -331,30 +331,15 @@ $(DocStringExtensions.TYPEDEF)
 
 Selects a moment of order three or four for a high-order moment risk measure.
 
-[`HighOrderMoment`](@ref) holds it. [`HighOrderMoment`](@ref) is a hierarchical risk measure, and the library builds no `JuMP` model for it. [`StandardisedHighOrderMoment`](@ref) subtypes this type directly, and [`UnstandardisedHighOrderMomentMeasureAlgorithm`](@ref) holds the other members.
-
-# Related
-
-  - [`UnstandardisedHighOrderMomentMeasureAlgorithm`](@ref)
-  - [`StandardisedHighOrderMoment`](@ref)
-  - [`HighOrderMoment`](@ref)
-"""
-abstract type HighOrderMomentMeasureAlgorithm <: MomentMeasureAlgorithm end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Groups the high-order moments that the measure reports with no division by a variance.
-
-The members are [`ThirdLowerMoment`](@ref) and [`FourthMoment`](@ref). The group is the type bound of the field `alg` of [`StandardisedHighOrderMoment`](@ref), which divides a member by a power of a variance. So a standardised moment cannot hold a second standardised moment.
+[`HighOrderMoment`](@ref) holds it. [`HighOrderMoment`](@ref) is a hierarchical risk measure, and the library builds no `JuMP` model for it. The members are [`ThirdLowerMoment`](@ref) and [`FourthMoment`](@ref). A member holds no variance estimator. The field `ve` of [`HighOrderMoment`](@ref) divides a member by a power of its second moment.
 
 # Related
 
   - [`ThirdLowerMoment`](@ref)
   - [`FourthMoment`](@ref)
-  - [`StandardisedHighOrderMoment`](@ref)
+  - [`HighOrderMoment`](@ref)
 """
-abstract type UnstandardisedHighOrderMomentMeasureAlgorithm <:
-              HighOrderMomentMeasureAlgorithm end
+abstract type HighOrderMomentMeasureAlgorithm <: MomentMeasureAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -380,16 +365,15 @@ Where:
 
 # Related
 
-  - [`UnstandardisedHighOrderMomentMeasureAlgorithm`](@ref)
-  - [`HighOrderMoment`](@ref)
-  - [`StandardisedHighOrderMoment`](@ref): divides the measure by the cube of the lower standard deviation.
+  - [`HighOrderMomentMeasureAlgorithm`](@ref)
+  - [`HighOrderMoment`](@ref): a variance estimator in its `ve` divides the measure by the cube of the lower standard deviation.
 
 # References
 
   - $(ref_dict[:cajas2025]) Section 7.2.2.2, Equation 7.45 with ``q = 3``. $(ref_dict[:no_original_source])
   - $(ref_dict[:lpm])
 """
-struct ThirdLowerMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm end
+struct ThirdLowerMoment <: HighOrderMomentMeasureAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -437,7 +421,8 @@ FourthMoment
 
 # Related
 
-  - [`UnstandardisedHighOrderMomentMeasureAlgorithm`](@ref)
+  - [`HighOrderMomentMeasureAlgorithm`](@ref)
+  - [`HighOrderMoment`](@ref): a variance estimator in its `ve` divides the measure by the square of the second moment of the same deviations.
   - [`AbstractMomentAlgorithm`](@ref)
   - [`EvenMoment`](@ref): at `p = 2` and `ddof = 0`, the square root of the same moment, on a measure that the optimiser can model.
   - [`Kurtosis`](@ref): the same moment read from a cokurtosis matrix.
@@ -447,7 +432,7 @@ FourthMoment
   - $(ref_dict[:cajas2025]) Section 7.2.2.2, Equation 7.45 with ``q = 4``. $(ref_dict[:no_original_source])
   - $(ref_dict[:lpm])
 """
-@concrete struct FourthMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm
+@concrete struct FourthMoment <: HighOrderMomentMeasureAlgorithm
     """
     $(field_dict[:malg])
     """
@@ -458,106 +443,6 @@ FourthMoment
 end
 function FourthMoment(; alg::AbstractMomentAlgorithm = FullMoment())::FourthMoment
     return FourthMoment(alg)
-end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Divides a high-order moment of the net portfolio returns by the matching power of their second moment.
-
-`alg` selects the moment of order ``n``, three for [`ThirdLowerMoment`](@ref) and four for [`FourthMoment`](@ref). `ve` computes the second moment on the same deviations as `alg`, so a lower moment is divided by a lower second moment, and a full moment by a full one. The result has no units.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-R(\\boldsymbol{w}) &= \\frac{R_{n}(\\boldsymbol{w})}{\\left(\\sigma^{2}\\right)^{n/2}}\\,, \\\\
-\\sigma^{2} &= f \\sum_{t=1}^{T} w_t\\, \\delta_t^{2}\\,.
-\\end{align}
-```
-
-Where:
-
-  - $(math_dict[:R_w])
-  - ``R_{n}(\\boldsymbol{w})``: The value of `alg`, the moment of order ``n``.
-  - ``n``: Order of the moment, ``3`` or ``4``.
-  - ``\\sigma^{2}``: Second moment of the deviations that `alg` reads.
-  - ``\\delta_t``: The deviation that `alg` reads, ``d_t^{-}`` for a lower moment and ``d_t`` for a full moment.
-  - $(math_dict[:f_ve_div])
-  - $(math_dict[:w_t_obs]) It is ``1`` for every ``t`` when the measure holds no observation weights.
-  - $(math_dict[:d_t_moment])
-  - $(math_dict[:d_t_lower])
-  - $(math_dict[:T])
-
-The numerator is an observation mean, and the denominator takes the divisor of `ve`. The default `ve` sets `corrected = true`, so the default denominator divides by ``T - 1`` and the numerator by ``T``. Set `ve = SimpleVariance(; me = nothing, corrected = false)` for the ratio of two observation means.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    StandardisedHighOrderMoment(;
-        ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing),
-        alg::UnstandardisedHighOrderMomentMeasureAlgorithm = ThirdLowerMoment(),
-    ) -> StandardisedHighOrderMoment
-
-Keywords correspond to the struct's fields.
-
-# Examples
-
-```jldoctest
-julia> StandardisedHighOrderMoment()
-StandardisedHighOrderMoment
-   ve ┼ SimpleVariance
-      │          me ┼ nothing
-      │           w ┼ nothing
-      │   corrected ┴ Bool: true
-  alg ┴ ThirdLowerMoment()
-```
-
-# Related
-
-  - [`HighOrderMomentMeasureAlgorithm`](@ref)
-  - [`AbstractVarianceEstimator`](@ref)
-  - [`UnstandardisedHighOrderMomentMeasureAlgorithm`](@ref)
-  - [`ThirdCentralMoment`](@ref): the same choice for the full third moment, through its `ve`.
-  - [`factory`](@ref)
-"""
-@concrete struct StandardisedHighOrderMoment <: HighOrderMomentMeasureAlgorithm
-    """
-    $(field_dict[:ve])
-    """
-    ve
-    """
-    $(field_dict[:malg])
-    """
-    alg
-    function StandardisedHighOrderMoment(ve::AbstractVarianceEstimator,
-                                         alg::UnstandardisedHighOrderMomentMeasureAlgorithm)
-        return new{typeof(ve), typeof(alg)}(ve, alg)
-    end
-end
-function StandardisedHighOrderMoment(;
-                                     ve::AbstractVarianceEstimator = SimpleVariance(;
-                                                                                    me = nothing),
-                                     alg::UnstandardisedHighOrderMomentMeasureAlgorithm = ThirdLowerMoment())::StandardisedHighOrderMoment
-    return StandardisedHighOrderMoment(ve, alg)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a new [`StandardisedHighOrderMoment`](@ref) whose `ve` holds the observation weights `w`.
-
-The keyword constructors of [`HighOrderMoment`](@ref) and [`factory`](@ref) against a prior call it, so the second moment of the denominator reads the same weights as the measure. `alg` holds no weights and passes through unchanged.
-
-# Related
-
-  - [`StandardisedHighOrderMoment`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(alg::StandardisedHighOrderMoment,
-                 w::ObsWeights)::StandardisedHighOrderMoment
-    return StandardisedHighOrderMoment(; ve = factory(alg.ve, w), alg = alg.alg)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -709,20 +594,24 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Measures a moment of order three or four of the deviations of the net portfolio returns from the Moment Target.
+Measures a moment of order three or four of the deviations of the net portfolio returns from the Moment Target, or that moment divided by a power of the second moment.
 
-`alg` selects the moment: [`ThirdLowerMoment`](@ref), the default, [`FourthMoment`](@ref), or [`StandardisedHighOrderMoment`](@ref), which divides one of the two by a power of a second moment. Each states its closed form. `mu` selects the target, as it does for [`LowOrderMoment`](@ref). The measure is a hierarchical risk measure. The hierarchical optimisers and the value level read it, and the library builds no `JuMP` model for it.
+`alg` selects the moment of order ``n``: [`ThirdLowerMoment`](@ref), the default, or [`FourthMoment`](@ref). Each states its closed form. `mu` selects the target, as it does for [`LowOrderMoment`](@ref). When `ve` is `nothing`, the measure reports the moment as it is. When `ve` is a variance estimator, the measure divides the moment by the power ``n/2`` of the second moment of the same deviations, so the value has no units. The measure is a hierarchical risk measure. The hierarchical optimisers and the value level read it, and the library builds no `JuMP` model for it.
 
-A larger value is always more risk. The odd moment is the negated mean of negative cubes, and the even moments are non-negative.
+A larger value is always more risk. The odd moment is the negated mean of negative cubes, and the even moments are non-negative. The second moment is positive, so the standardised value has the sign of the moment.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
 d_t &= \\hat{r}_t - \\tau\\,,\\quad t = 1, \\ldots, T\\,, \\\\
-R(\\boldsymbol{w}) &= \\rho\\left(d_1, \\ldots, d_T\\right)\\,.
+R_{n}(\\boldsymbol{w}) &= \\rho\\left(d_1, \\ldots, d_T\\right)\\,, \\\\
+R(\\boldsymbol{w}) &= \\frac{R_{n}(\\boldsymbol{w})}{\\left(\\sigma^{2}\\right)^{n/2}}\\,, \\\\
+\\sigma^{2} &= f \\sum_{t=1}^{T} w_t\\, \\delta_t^{2}\\,.
 \\end{align}
 ```
+
+When `ve` is `nothing`, the measure reports ``R_{n}(\\boldsymbol{w})``. The third and the fourth lines apply when `ve` is a variance estimator.
 
 Where:
 
@@ -733,7 +622,16 @@ Where:
   - $(math_dict[:E_obs_mean])
   - $(math_dict[:T])
   - $(math_dict[:R_w])
+  - ``R_{n}(\\boldsymbol{w})``: The value of `alg`, the moment of order ``n``.
   - ``\\rho``: The reduction that `alg` states.
+  - ``n``: Order of the moment, ``3`` or ``4``.
+  - ``\\sigma^{2}``: Second moment of the deviations that `alg` reads.
+  - ``\\delta_t``: The deviation that `alg` reads, ``d_t^{-}`` for a lower moment and ``d_t`` for a full moment.
+  - $(math_dict[:f_ve_div])
+  - $(math_dict[:w_t_obs]) It is ``1`` for every ``t`` when the measure holds no observation weights.
+  - $(math_dict[:d_t_lower])
+
+The numerator is an observation mean, and the denominator takes the divisor of `ve`. `SimpleVariance` sets `corrected = true` by default, so its denominator divides by ``T - 1`` and the numerator by ``T``. Set `ve = SimpleVariance(; me = nothing, corrected = false)` for the ratio of two observation means.
 
 # Fields
 
@@ -746,9 +644,10 @@ $(DocStringExtensions.FIELDS)
         w::Option{<:ObsWeights} = nothing,
         mu::Option{<:MuSlot} = nothing,
         alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment(),
+        ve::Option{<:AbstractVarianceEstimator} = nothing,
     ) -> HighOrderMoment
 
-Keywords correspond to the struct's fields. The keyword constructor passes a `w` that is not `nothing` to `alg` with [`factory`](@ref), so a variance estimator inside `alg` reads the same weights as the measure.
+Keywords correspond to the struct's fields. A `w` that is not `nothing` is passed to `ve` with [`factory`](@ref), so the variance estimator reads the same weights as the measure.
 
 ## Validation
 
@@ -785,21 +684,19 @@ HighOrderMoment
            │     rke ┴ Bool: true
          w ┼ nothing
         mu ┼ nothing
-       alg ┴ ThirdLowerMoment()
+       alg ┼ ThirdLowerMoment()
+        ve ┴ nothing
 
 julia> x = [0.02, -0.01, 0.03, -0.04, 0.01];
 
-julia> HighOrderMoment(; alg = StandardisedHighOrderMoment())(x)
+julia> HighOrderMoment(; ve = SimpleVariance(; me = nothing))(x)
 1.4555036361053537
 
-julia> HighOrderMoment(;
-                       alg = StandardisedHighOrderMoment(;
-                                                         ve = SimpleVariance(; me = nothing,
-                                                                             corrected = false)))(x)
+julia> HighOrderMoment(; ve = SimpleVariance(; me = nothing, corrected = false))(x)
 2.034128169893555
 ```
 
-The two values differ in the divisor of the lower second moment alone, ``T - 1`` under the default `ve` and ``T`` with `corrected = false`.
+The two values differ in the divisor of the lower second moment alone, ``T - 1`` under `corrected = true`, the default of `SimpleVariance`, and ``T`` with `corrected = false`.
 
 # Related
 
@@ -807,7 +704,8 @@ The two values differ in the divisor of the lower second moment alone, ``T - 1``
   - [`HighOrderMomentMeasureAlgorithm`](@ref)
   - [`ThirdLowerMoment`](@ref)
   - [`FourthMoment`](@ref)
-  - [`StandardisedHighOrderMoment`](@ref)
+  - [`AbstractVarianceEstimator`](@ref)
+  - [`ThirdCentralMoment`](@ref): the same choice for the full third moment, through its `ve`.
   - [`calc_moment_target`](@ref): selects the Moment Target from `mu`.
   - [`moment_risk`](@ref)
   - [`LowOrderMoment`](@ref): the optimisation measure of the moments of order one and two.
@@ -829,8 +727,13 @@ The two values differ in the divisor of the lower second moment alone, ``T - 1``
     $(field_dict[:malg])
     """
     alg
+    """
+    Variance estimator of the second moment that divides the moment, or `nothing` for the moment as it is. The estimator reads the same deviations as `alg`: the deviations below the Moment Target for a lower moment, [`ThirdLowerMoment`](@ref) or a [`FourthMoment`](@ref) of a [`SemiMoment`](@ref), and all the deviations for a full moment. It reads them about zero, so its own `me` does not enter.
+    """
+    ve
     function HighOrderMoment(settings::RiskMeasureSettings, w::Option{<:ObsWeights},
-                             mu::Option{<:MuSlot}, alg::HighOrderMomentMeasureAlgorithm)
+                             mu::Option{<:MuSlot}, alg::HighOrderMomentMeasureAlgorithm,
+                             ve::Option{<:AbstractVarianceEstimator})
         if isa(mu, VecNum)
             @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
             @argcheck(all(isfinite, mu), IsNonFiniteError("mu must be finite, got $mu"))
@@ -838,14 +741,17 @@ The two values differ in the divisor of the lower second moment alone, ``T - 1``
             @argcheck(isfinite(mu), IsNonFiniteError("mu must be finite, got $mu"))
         end
         assert_observation_weights(w, :w)
-        return new{typeof(settings), typeof(w), typeof(mu), typeof(alg)}(settings, w, mu,
-                                                                         alg)
+        return new{typeof(settings), typeof(w), typeof(mu), typeof(alg), typeof(ve)}(settings,
+                                                                                     w, mu,
+                                                                                     alg,
+                                                                                     ve)
     end
 end
 function HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                          w::Option{<:ObsWeights} = nothing, mu::Option{<:MuSlot} = nothing,
-                         alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment())::HighOrderMoment
-    return HighOrderMoment(settings, w, mu, factory(alg, w))
+                         alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment(),
+                         ve::Option{<:AbstractVarianceEstimator} = nothing)::HighOrderMoment
+    return HighOrderMoment(settings, w, mu, alg, factory(ve, w))
 end
 """
     const LoHiOrderMoment{T1, T2, T3, T4} = Union{LowOrderMoment{T1, T2, T3, T4},
@@ -853,7 +759,7 @@ end
 
 Groups [`LowOrderMoment`](@ref) and [`HighOrderMoment`](@ref) under the same four type parameters.
 
-The two measures have the same fields in the same order, `settings`, `w`, `mu` and `alg`, and they select the Moment Target and the deviations in the same way. So [`calc_moment_target`](@ref) dispatches on the second and the third parameter, the types of `w` and `mu`, once for both measures. [`calc_deviations_vec`](@ref) and [`supports_precomputed_returns`](@ref) also take the group.
+The two measures have the same first four fields in the same order, `settings`, `w`, `mu` and `alg`. [`HighOrderMoment`](@ref) has a fifth field, `ve`, and the group leaves its parameter free. The two measures select the Moment Target and the deviations in the same way. So [`calc_moment_target`](@ref) dispatches on the second and the third parameter, the types of `w` and `mu`, once for both measures. [`calc_deviations_vec`](@ref) and [`supports_precomputed_returns`](@ref) also take the group.
 
 # Related
 
@@ -1072,11 +978,11 @@ The steps for [`LowOrderMoment`](@ref) and [`HighOrderMoment`](@ref):
 
  1. For a lower moment, replace `val` with `min.(val, 0)`. [`FirstLowerMoment`](@ref), [`ThirdLowerMoment`](@ref) and a [`SemiMoment`](@ref) are lower moments.
  2. For [`SecondMoment`](@ref), return `Statistics.var(r.alg.ve, val; mean = 0)`, or `Statistics.std` under [`SOCRiskExpr`](@ref). Stop.
- 3. For [`StandardisedHighOrderMoment`](@ref), compute `sigma = Statistics.var(r.alg.ve, val; mean = 0)` before the power.
+ 3. For a [`HighOrderMoment`](@ref) whose `ve` is a variance estimator, compute `sigma = Statistics.var(r.ve, val; mean = 0)` before the power.
  4. Raise each entry of `val` to the power of the moment: `abs` for [`MeanAbsoluteDeviation`](@ref), the cube or the fourth power for a high-order moment.
  5. Take the mean of `val`, weighted by `r.w` when it is not `nothing`, giving `res`.
  6. Negate `res` for [`FirstLowerMoment`](@ref) and [`ThirdLowerMoment`](@ref), so that a larger value is more risk.
- 7. For [`StandardisedHighOrderMoment`](@ref), divide `res` by `sigma^(n / 2)`, with `n` the order of `r.alg.alg`.
+ 7. For a [`HighOrderMoment`](@ref) whose `ve` is a variance estimator, divide `res` by `sigma^(n / 2)`, with `n` the order of `r.alg`.
 
 [`EvenMoment`](@ref) takes the place of steps 4 and 5. It computes the norm of order `2p` of `val`, each entry scaled by `w_t^(1 / 2p)` when `r.w` is not `nothing`, and returns its square divided by `T^(1 / p)`, with `T` the effective sample size.
 
@@ -1149,47 +1055,44 @@ function moment_risk(r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeigh
     return val^2 / T^inv(r.alg.p)
 end
 function moment_risk(r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
-                                        <:ThirdLowerMoment}, val::VecNum)
+                                        <:ThirdLowerMoment, Nothing}, val::VecNum)
     val = min.(val, zero(eltype(val)))
     val .= val .^ 3
     return isnothing(r.w) ? -Statistics.mean(val) : -Statistics.mean(val, r.w)
 end
 function moment_risk(r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
-                                        <:StandardisedHighOrderMoment{<:Any,
-                                                                      <:ThirdLowerMoment}},
+                                        <:ThirdLowerMoment, <:AbstractVarianceEstimator},
                      val::VecNum)
     val = min.(val, zero(eltype(val)))
-    sigma = Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
+    sigma = Statistics.var(r.ve, val; mean = zero(eltype(val)))
     val .= val .^ 3
     res = isnothing(r.w) ? -Statistics.mean(val) : -Statistics.mean(val, r.w)
     return res / (sigma * sqrt(sigma))
 end
 function moment_risk(r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
-                                        <:FourthMoment{<:FullMoment}}, val::VecNum)
+                                        <:FourthMoment{<:FullMoment}, Nothing}, val::VecNum)
     val .= val .^ 4
     return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
 end
 function moment_risk(r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
-                                        <:FourthMoment{<:SemiMoment}}, val::VecNum)
+                                        <:FourthMoment{<:SemiMoment}, Nothing}, val::VecNum)
     val = min.(val, zero(eltype(val)))
     val .= val .^ 4
     return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
 end
 function moment_risk(r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
-                                        <:StandardisedHighOrderMoment{<:Any,
-                                                                      <:FourthMoment{<:FullMoment}}},
-                     val::VecNum)
-    sigma = Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
+                                        <:FourthMoment{<:FullMoment},
+                                        <:AbstractVarianceEstimator}, val::VecNum)
+    sigma = Statistics.var(r.ve, val; mean = zero(eltype(val)))
     val .= val .^ 4
     res = isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
     return res / sigma^2
 end
 function moment_risk(r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
-                                        <:StandardisedHighOrderMoment{<:Any,
-                                                                      <:FourthMoment{<:SemiMoment}}},
-                     val::VecNum)
+                                        <:FourthMoment{<:SemiMoment},
+                                        <:AbstractVarianceEstimator}, val::VecNum)
     val = min.(val, zero(eltype(val)))
-    sigma = Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
+    sigma = Statistics.var(r.ve, val; mean = zero(eltype(val)))
     val .= val .^ 4
     res = isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
     return res / sigma^2
@@ -1277,8 +1180,7 @@ A measure whose `mu` is `nothing` takes `pr.mu`, so after this method its Moment
  1. Resolve a **Deferred Quantity** in `mu` with [`resolve_deferred_quantities`](@ref), giving `r`.
  2. Select `w`, the weights of `r` or else `pr.w`, with [`nothing_scalar_array_selector`](@ref).
  3. Select `mu`, the target of `r` or else `pr.mu`, with [`nothing_scalar_array_selector`](@ref).
- 4. Pass `w` to `r.alg` with [`factory`](@ref), giving `alg`.
- 5. Build a new `HighOrderMoment` from `r.settings`, `w`, `mu` and `alg`.
+ 4. Build a new `HighOrderMoment` from `r.settings`, `w`, `mu`, `r.alg` and `r.ve` with the keyword constructor, which passes `w` to `ve` with [`factory`](@ref).
 
 # Related
 
@@ -1291,8 +1193,7 @@ function factory(r::HighOrderMoment, pr::AbstractPriorResult, args...; kwargs...
     r = resolve_deferred_quantities(r, pr)
     w = nothing_scalar_array_selector(r.w, pr.w)
     mu = nothing_scalar_array_selector(r.mu, pr.mu)
-    alg = factory(r.alg, w)
-    return HighOrderMoment(; settings = r.settings, alg = alg, w = w, mu = mu)
+    return HighOrderMoment(; settings = r.settings, alg = r.alg, w = w, mu = mu, ve = r.ve)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1322,7 +1223,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a [`HighOrderMoment`](@ref) restricted to the assets `i`.
 
-The method slices a per-asset `mu` to the assets `i` with [`nothing_scalar_array_view`](@ref). A number and `nothing` pass through unchanged, and so does a **Deferred Quantity**, which resolves on the subset. `w` weighs observations, not assets, so it passes through unchanged, and so do `settings` and `alg`.
+The method slices a per-asset `mu` to the assets `i` with [`nothing_scalar_array_view`](@ref). A number and `nothing` pass through unchanged, and so does a **Deferred Quantity**, which resolves on the subset. `w` weighs observations, not assets, so it passes through unchanged, and so do `settings`, `alg` and `ve`.
 
 # Related
 
@@ -1332,7 +1233,8 @@ The method slices a per-asset `mu` to the assets `i` with [`nothing_scalar_array
 """
 function port_opt_view(r::HighOrderMoment, i, args...)
     mu = nothing_scalar_array_view(r.mu, i)
-    return HighOrderMoment(; settings = r.settings, alg = r.alg, w = r.w, mu = mu)
+    return HighOrderMoment(; settings = r.settings, alg = r.alg, w = r.w, mu = mu,
+                           ve = r.ve)
 end
 
 # Expected-risk input kind — see `risk_input_kind`.
@@ -1353,5 +1255,4 @@ The answer is [`weight_independent_target`](@ref) of `r.mu`. It is `true` when `
 supports_precomputed_returns(r::LoHiOrderMoment) = weight_independent_target(r.mu)
 
 export FirstLowerMoment, SecondMoment, MeanAbsoluteDeviation, ThirdLowerMoment,
-       FourthMoment, StandardisedHighOrderMoment, LowOrderMoment, HighOrderMoment,
-       EvenMoment
+       FourthMoment, LowOrderMoment, HighOrderMoment, EvenMoment

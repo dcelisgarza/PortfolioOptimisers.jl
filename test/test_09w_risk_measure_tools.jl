@@ -213,7 +213,7 @@ const _changed610 = (; no_bounds = (; rm = ["settings.ub"], sk = ["settings.lb"]
         makers = (r -> LowOrderMoment(; w = r),
                   r -> LowOrderMoment(; w = r, alg = SecondMoment()),
                   r -> HighOrderMoment(; w = r),
-                  r -> HighOrderMoment(; w = r, alg = StandardisedHighOrderMoment()),
+                  r -> HighOrderMoment(; w = r, ve = SimpleVariance(; me = nothing)),
                   r -> HighOrderMoment(; w = r, alg = FourthMoment()),
                   r -> ThirdCentralMoment(; w = r, ve = SimpleVariance()),
                   r -> ThirdCentralMoment(; w = r))
@@ -235,9 +235,10 @@ const _changed610 = (; no_bounds = (; rm = ["settings.ub"], sk = ["settings.lb"]
         @test r.w == _ramp610
         @test r.alg.ve.w == _ramp610
         r = PO.resolve_observation_weights(HighOrderMoment(; w = Ramp610(),
-                                                           alg = StandardisedHighOrderMoment()),
+                                                           ve = SimpleVariance(;
+                                                                               me = nothing)),
                                            _X610)
-        @test r.alg.ve.w == _ramp610
+        @test r.ve.w == _ramp610
         @test PO.resolve_observation_weights(ThirdCentralMoment(; w = Ramp610(),
                                                                 ve = SimpleVariance()),
                                              _X610).ve.w == _ramp610

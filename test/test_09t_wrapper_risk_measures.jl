@@ -208,13 +208,12 @@ end
         @test hd(Kurtosis(; alg = QuadRiskExpr())) == 4
         @test hd(EqualRisk()) == 0
         @test hd(ThirdCentralMoment(; ve = SimpleVariance())) == 0
-        @test hd(HighOrderMoment(;
-                                 alg = StandardisedHighOrderMoment(; alg = FourthMoment()))) ==
-              0
-        @test hd(HighOrderMoment(;
-                                 alg = StandardisedHighOrderMoment(;
-                                                                   alg = ThirdLowerMoment()))) ==
-              0
+        # A variance estimator in `ve` moves the measure out of the cubed and the fourth power
+        # unions, whose `alg` it shares, and into the scale-free union.
+        sv = SimpleVariance(; me = nothing)
+        @test hd(HighOrderMoment(; alg = FourthMoment(), ve = sv)) == 0
+        @test hd(HighOrderMoment(; alg = FourthMoment(; alg = SemiMoment()), ve = sv)) == 0
+        @test hd(HighOrderMoment(; alg = ThirdLowerMoment(), ve = sv)) == 0
         @test hd(RiskRatio()) == 1
         @test hd(RiskRatio(; r1 = StandardDeviation())) == 0
         @test hd(RiskRatio(; r1 = Kurtosis(; alg = QuadRiskExpr()))) == 3
@@ -264,7 +263,7 @@ end
         # one is not zero, except for EqualRisk, whose risk does not read the weights.
         for r in (ThirdCentralMoment(; ve = SimpleVariance()),
                   RiskRatio(; r1 = StandardDeviation()),
-                  HighOrderMoment(; alg = StandardisedHighOrderMoment(; alg = FourthMoment())))
+                  HighOrderMoment(; alg = FourthMoment(), ve = SimpleVariance(; me = nothing)))
             rr = factory(r, prh)
             rc = risk_contribution(rr, _w607, prh)
             @test !iszero(expected_risk(rr, _w607, prh))

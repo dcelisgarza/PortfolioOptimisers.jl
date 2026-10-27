@@ -297,7 +297,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Measures the third central moment of the portfolio returns, or the standardised skewness when `ve` is a variance estimator.
 
-The moment has the divisor ``T``. When `ve` is `nothing`, the measure reports the moment as it is. When `ve` is a variance estimator, the measure divides the moment by the cube of the standard deviation of the same deviations, so it reports the skewness coefficient, which has no units. This is the choice that [`StandardisedHighOrderMoment`](@ref) makes for the fourth moment. Both values measure the asymmetry of the returns, and a larger value is better, so [`bigger_is_better`](@ref) returns `true`.
+The moment has the divisor ``T``. When `ve` is `nothing`, the measure reports the moment as it is. When `ve` is a variance estimator, the measure divides the moment by the cube of the standard deviation of the same deviations, so it reports the skewness coefficient, which has no units. The field `ve` of [`HighOrderMoment`](@ref) makes the same choice for the moments of order three and four. Both values measure the asymmetry of the returns, and a larger value is better, so [`bigger_is_better`](@ref) returns `true`.
 
 The measure is a [`NonOptimisationRiskMeasure`](@ref). The library has no `JuMP` model of it, so the type bound of every optimiser refuses it. Each value can be negative, so neither value is a risk that a hierarchical optimiser can allocate by. It serves reports, and the scores of an asset selection or a parameter search. [`Skewness`](@ref) reads the third moment from a coskewness matrix instead, which is the term that [`VarianceSkewKurtosis`](@ref) bounds.
 
@@ -396,7 +396,7 @@ The second value is the first divided by the cube of the standard deviation of `
 
   - [`NonOptimisationRiskMeasure`](@ref)
   - [`AbstractVarianceEstimator`](@ref)
-  - [`StandardisedHighOrderMoment`](@ref): the same choice for the moments of order three and four of [`HighOrderMoment`](@ref).
+  - [`HighOrderMoment`](@ref): the same choice for the moments of order three and four, through its `ve`.
   - [`Skewness`](@ref): the third moment read from a coskewness matrix.
   - [`calc_moment_target`](@ref)
   - [`bigger_is_better`](@ref)

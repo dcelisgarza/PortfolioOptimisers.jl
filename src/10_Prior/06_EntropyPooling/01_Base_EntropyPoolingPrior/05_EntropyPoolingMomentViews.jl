@@ -1069,7 +1069,7 @@ end
 
 Read the prior kurtosis of asset `i`.
 
-`get_pr_value` is the dispatch table that resolves a `prior(...)` reference inside a view. This method reads the statistic that the tag `Val(:kurtosis)` names. It applies [`HighOrderMoment`](@ref) with a [`StandardisedHighOrderMoment`](@ref) of [`FourthMoment`](@ref) to the `i`-th column of `pr.X`. That is the standardised fourth central moment of the sample under `w`. It reads `w` for the same reason as the skewness method of [`get_pr_value`](@ref).
+`get_pr_value` is the dispatch table that resolves a `prior(...)` reference inside a view. This method reads the statistic that the tag `Val(:kurtosis)` names. It applies [`HighOrderMoment`](@ref) with [`FourthMoment`](@ref) and a `SimpleVariance` in `ve` to the `i`-th column of `pr.X`. That is the standardised fourth central moment of the sample under `w`. It reads `w` for the same reason as the skewness method of [`get_pr_value`](@ref).
 
 # Arguments
 
@@ -1093,10 +1093,8 @@ Read the prior kurtosis of asset `i`.
 """
 function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:kurtosis},
                       ::Nothing = nothing, w::Option{<:ObsWeights} = nothing)
-    return HighOrderMoment(; w = w,
-                           alg = StandardisedHighOrderMoment(; alg = FourthMoment()))(view(pr.X,
-                                                                                           :,
-                                                                                           i))
+    return HighOrderMoment(; w = w, alg = FourthMoment(),
+                           ve = SimpleVariance(; me = nothing))(view(pr.X, :, i))
 end
 """
     ep_kt_views!(kurtosis_views::LinearConstraintEstimator, epc::AbstractDict,

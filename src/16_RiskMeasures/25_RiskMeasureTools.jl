@@ -361,7 +361,7 @@ const MomentRiskMeasures{T} = Union{LowOrderMoment{<:Any, T}, HighOrderMoment{<:
 
 Return the risk measure `r` with its observation weights resolved against the data `X`.
 
-A [`MomentRiskMeasures`](@ref) member that holds a [`DynamicAbstractWeights`](@ref) rebuilds with its keyword constructor. The constructor passes the weights to the variance estimator of the measure. That estimator is `alg.ve` of a [`SecondMoment`](@ref) or of a [`StandardisedHighOrderMoment`](@ref), and `ve` of a [`ThirdCentralMoment`](@ref). So the measure and its variance estimator read the same resolved weights, as they do after [`factory`](@ref) against a prior.
+A [`MomentRiskMeasures`](@ref) member that holds a [`DynamicAbstractWeights`](@ref) rebuilds with its keyword constructor. The constructor passes the weights to the variance estimator of the measure. That estimator is `alg.ve` of a [`SecondMoment`](@ref), and `ve` of a [`HighOrderMoment`](@ref) or of a [`ThirdCentralMoment`](@ref). So the measure and its variance estimator read the same resolved weights, as they do after [`factory`](@ref) against a prior.
 
 A member that holds a `StatsBase.AbstractWeights` returns unchanged, after [`checked_observation_weights`](@ref) checks its weights against `X`. Every other measure returns unchanged. A measure with `w = nothing` needs no weights, and a measure outside the union resolves its own weights inside its kernel.
 
@@ -406,7 +406,7 @@ end
 function resolve_observation_weights(r::HighOrderMoment{<:Any, <:DynamicAbstractWeights},
                                      X::VecNum_MatNum)
     return HighOrderMoment(; settings = r.settings, w = checked_observation_weights(r.w, X),
-                           mu = r.mu, alg = r.alg)
+                           mu = r.mu, alg = r.alg, ve = r.ve)
 end
 function resolve_observation_weights(r::ThirdCentralMoment{<:Any, <:DynamicAbstractWeights},
                                      X::VecNum_MatNum)

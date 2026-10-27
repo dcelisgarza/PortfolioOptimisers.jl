@@ -12,9 +12,7 @@ EvenMoment
 LowOrderMoment
 ThirdLowerMoment
 FourthMoment
-StandardisedHighOrderMoment
 HighOrderMoment
-factory(alg::StandardisedHighOrderMoment, w::ObsWeights)
 factory(alg::MomentMeasureAlgorithm, args...; kwargs...)
 factory(r::LowOrderMoment, pr::AbstractPriorResult, args...; kwargs...)
 port_opt_view(r::LowOrderMoment, i, args...)

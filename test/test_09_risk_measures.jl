@@ -280,45 +280,33 @@
         @test isapprox(expected_risk(HighOrderMoment(; mu = LinearAlgebra.dot(w, pr.mu),
                                                      alg = FourthMoment()), w, rd.X),
                        expected_risk(HighOrderMoment(; alg = FourthMoment()), w, rd.X))
-        @test isapprox(expected_risk(HighOrderMoment(;
-                                                     alg = StandardisedHighOrderMoment(;
-                                                                                       alg = ThirdLowerMoment())),
+        sv = SimpleVariance(; me = nothing)
+        @test isapprox(expected_risk(HighOrderMoment(; alg = ThirdLowerMoment(), ve = sv),
                                      w, rd.X), 2.4944191180382487)
         @test isapprox(expected_risk(HighOrderMoment(; mu = LinearAlgebra.dot(w, pr.mu),
-                                                     alg = StandardisedHighOrderMoment(;
-                                                                                       alg = ThirdLowerMoment())),
-                                     w, rd.X),
-                       expected_risk(HighOrderMoment(;
-                                                     alg = StandardisedHighOrderMoment(;
-                                                                                       alg = ThirdLowerMoment())),
+                                                     alg = ThirdLowerMoment(), ve = sv), w,
+                                     rd.X),
+                       expected_risk(HighOrderMoment(; alg = ThirdLowerMoment(), ve = sv),
                                      w, rd.X))
         @test isapprox(expected_risk(HighOrderMoment(;
-                                                     alg = StandardisedHighOrderMoment(;
-                                                                                       alg = FourthMoment(;
-                                                                                                          alg = SemiMoment()))),
-                                     w, rd.X), 7.5781142136319515)
+                                                     alg = FourthMoment(;
+                                                                        alg = SemiMoment()),
+                                                     ve = sv), w, rd.X), 7.5781142136319515)
         @test isapprox(expected_risk(HighOrderMoment(; mu = LinearAlgebra.dot(w, pr.mu),
-                                                     alg = StandardisedHighOrderMoment(;
-                                                                                       alg = FourthMoment(;
-                                                                                                          alg = SemiMoment()))),
-                                     w, rd.X),
+                                                     alg = FourthMoment(;
+                                                                        alg = SemiMoment()),
+                                                     ve = sv), w, rd.X),
                        expected_risk(HighOrderMoment(;
-                                                     alg = StandardisedHighOrderMoment(;
-                                                                                       alg = FourthMoment(;
-                                                                                                          alg = SemiMoment()))),
-                                     w, rd.X))
-        @test isapprox(expected_risk(HighOrderMoment(;
-                                                     alg = StandardisedHighOrderMoment(;
-                                                                                       alg = FourthMoment())),
-                                     w, rd.X), 3.616393337050389)
+                                                     alg = FourthMoment(;
+                                                                        alg = SemiMoment()),
+                                                     ve = sv), w, rd.X))
+        @test isapprox(expected_risk(HighOrderMoment(; alg = FourthMoment(), ve = sv), w,
+                                     rd.X), 3.616393337050389)
         @test isapprox(expected_risk(HighOrderMoment(; mu = LinearAlgebra.dot(w, pr.mu),
-                                                     alg = StandardisedHighOrderMoment(;
-                                                                                       alg = FourthMoment())),
-                                     w, rd.X),
-                       expected_risk(HighOrderMoment(;
-                                                     alg = StandardisedHighOrderMoment(;
-                                                                                       alg = FourthMoment())),
-                                     w, rd.X))
+                                                     alg = FourthMoment(), ve = sv), w,
+                                     rd.X),
+                       expected_risk(HighOrderMoment(; alg = FourthMoment(), ve = sv), w,
+                                     rd.X))
         @test isapprox(expected_risk(AverageDrawdown(), w, rd.X), 0.048143525862128035)
         @test isapprox(expected_risk(AverageDrawdown(), w, rd.X),
                        expected_risk(AverageDrawdown(; w = wt), w, rd.X))
@@ -1634,9 +1622,9 @@ end
         # Every moment family resolves its weights against `X`, down to the variance
         # estimator it holds, and agrees with the same measure built with the resolved
         # weights (#1319).
-        sha = PortfolioOptimisers.StandardisedHighOrderMoment
+        sv = SimpleVariance(; me = nothing)
         for f in (ow -> LowOrderMoment(; w = ow, mu = pr.mu, alg = SecondMoment()),
-                  ow -> HighOrderMoment(; w = ow, mu = pr.mu, alg = sha()),
+                  ow -> HighOrderMoment(; w = ow, mu = pr.mu, ve = sv),
                   ow -> HighOrderMoment(; w = ow, mu = pr.mu, alg = FourthMoment()),
                   ow -> ThirdCentralMoment(; w = ow, mu = pr.mu, ve = SimpleVariance()))
             @test isapprox(track(f(TrackedDecayWeights()))(w, X, fees),

@@ -388,7 +388,7 @@ const PO = PortfolioOptimisers
         for r in (LowOrderMoment(; w = cw, settings = RiskMeasureSettings(; scale = 3),
                                  mu = 0.001, alg = SecondMoment()),
                   HighOrderMoment(; w = cw, settings = RiskMeasureSettings(; scale = 3),
-                                  mu = 0.001, alg = PO.StandardisedHighOrderMoment()),
+                                  mu = 0.001, ve = SimpleVariance(; me = nothing)),
                   PO.ThirdCentralMoment(; w = cw,
                                         settings = PO.HierarchicalRiskMeasureSettings(; scale = 3),
                                         mu = 0.001),
@@ -415,12 +415,12 @@ const PO = PortfolioOptimisers
         rw = PO.get_observation_weights(mw, X)
         pr = prior(HighOrderPriorEstimator(), X)
         mu = pr.mu
-        sha = PO.StandardisedHighOrderMoment
+        sv = SimpleVariance(; me = nothing)
         for f in (ow -> LowOrderMoment(; w = ow, mu = mu, alg = SecondMoment()),
                   ow -> LowOrderMoment(; w = ow, mu = mu,
                                        alg = SecondMoment(; alg1 = PO.SemiMoment())),
-                  ow -> HighOrderMoment(; w = ow, mu = mu, alg = sha()),
-                  ow -> HighOrderMoment(; w = ow, mu = mu, alg = sha(; alg = PO.FourthMoment())),
+                  ow -> HighOrderMoment(; w = ow, mu = mu, ve = sv),
+                  ow -> HighOrderMoment(; w = ow, mu = mu, alg = PO.FourthMoment(), ve = sv),
                   ow -> PO.ThirdCentralMoment(; w = ow, mu = mu, ve = SimpleVariance()))
             dyn, sta = f(mw), f(rw)
             val = factory(sta, pr)(w, X)

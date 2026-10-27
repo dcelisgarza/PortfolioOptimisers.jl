@@ -1229,15 +1229,11 @@ end
 
     kt_views = LinearConstraintEstimator(; val = "AAPL == 7.5")
     pr = prior(EntropyPoolingPrior(; sets = sets, kt_views = kt_views, opt = opt), rd)
-    @test isapprox(HighOrderMoment(; w = pr.w,
-                                   alg = StandardisedHighOrderMoment(; alg = FourthMoment(),
-                                                                     ve = SimpleVariance(;
-                                                                                         w = pr.w)))([1],
-                                                                                                     reshape(pr.X[:,
-                                                                                                                  1],
-                                                                                                             :,
-                                                                                                             1)),
-                   7.5, rtol = 5e-3)
+    @test isapprox(HighOrderMoment(; w = pr.w, alg = FourthMoment(),
+                                   ve = SimpleVariance(; w = pr.w))([1],
+                                                                    reshape(pr.X[:, 1], :,
+                                                                            1)), 7.5,
+                   rtol = 5e-3)
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
                                              kt_views = kt_views), rd).w, rtol = 1e-2)
@@ -1256,12 +1252,10 @@ end
     # bind there, so the posterior stays at that prior.
     pk = prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views,
                                    sigma_views = sigma_views, opt = opt), rd)
-    kt = wi -> HighOrderMoment(; w = wi,
-                               alg = StandardisedHighOrderMoment(; alg = FourthMoment()))([1],
-                                                                                          reshape(pr.X[:,
-                                                                                                       1],
-                                                                                                  :,
-                                                                                                  1))
+    kt = wi -> HighOrderMoment(; w = wi, alg = FourthMoment(),
+                               ve = SimpleVariance(; me = nothing))([1],
+                                                                    reshape(pr.X[:, 1], :,
+                                                                            1))
     @test kt(pr.w) >= 0.87 * kt(pk.w)
     @test isapprox(pr.w, pk.w, rtol = 1e-5)
     @test isapprox(pr.w,
@@ -1379,14 +1373,10 @@ end
     @test isapprox(pr.sigma[19, 19], 1.4 * pr0.sigma[19, 19], rtol = 5e-3)
     @test !isapprox(StatsBase.cov2cor(pr.sigma)[1, end], 0.35; rtol = 5e-4)
     @test pr0.sigma[13, 14] * 0.8 >= pr.sigma[13, 14]
-    @test HighOrderMoment(; w = pr.w,
-                          alg = StandardisedHighOrderMoment(; alg = FourthMoment(),
-                                                            ve = SimpleVariance(; w = pr.w)))([1],
-                                                                                              reshape(pr.X[:,
-                                                                                                           1],
-                                                                                                      :,
-                                                                                                      1)) >=
-          HighOrderMoment(; alg = StandardisedHighOrderMoment(; alg = FourthMoment()))([1],
+    @test HighOrderMoment(; w = pr.w, alg = FourthMoment(),
+                          ve = SimpleVariance(; w = pr.w))([1],
+                                                           reshape(pr.X[:, 1], :, 1)) >=
+          HighOrderMoment(; alg = FourthMoment(), ve = SimpleVariance(; me = nothing))([1],
                                                                                        reshape(pr.X[:,
                                                                                                     1],
                                                                                                :,

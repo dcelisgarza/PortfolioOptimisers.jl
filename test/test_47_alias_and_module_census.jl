@@ -288,8 +288,7 @@ end
                                           alg = ThirdLowerMoment()))
         @test alias_equal(SSK(; settings = st, w = ow, mu = mu, ve = ve),
                           HighOrderMoment(; settings = st, w = ow, mu = mu,
-                                          alg = StandardisedHighOrderMoment(; ve = ve,
-                                                                            alg = ThirdLowerMoment())))
+                                          alg = ThirdLowerMoment(), ve = ve))
         @test alias_equal(FTCM(; settings = st, w = ow, mu = mu),
                           HighOrderMoment(; settings = st, w = ow, mu = mu,
                                           alg = FourthMoment(; alg = FullMoment())))
@@ -298,14 +297,12 @@ end
                                           alg = FourthMoment(; alg = SemiMoment())))
         @test alias_equal(KT(; settings = st, w = ow, mu = mu, ve = ve),
                           HighOrderMoment(; settings = st, w = ow, mu = mu,
-                                          alg = StandardisedHighOrderMoment(; ve = ve,
-                                                                            alg = FourthMoment(;
-                                                                                               alg = FullMoment()))))
+                                          alg = FourthMoment(; alg = FullMoment()),
+                                          ve = ve))
         @test alias_equal(SKT(; settings = st, w = ow, mu = mu, ve = ve),
                           HighOrderMoment(; settings = st, w = ow, mu = mu,
-                                          alg = StandardisedHighOrderMoment(; ve = ve,
-                                                                            alg = FourthMoment(;
-                                                                                               alg = SemiMoment()))))
+                                          alg = FourthMoment(; alg = SemiMoment()),
+                                          ve = ve))
 
         # The eight OWA aliases. Three take a weight FUNCTION and five a weight ESTIMATOR,
         # and both reach the same `w` slot of `OrderedWeightsArray`.

@@ -69,11 +69,12 @@ const QuadExpressionRiskMeasures = Union{Variance, BrownianDistanceVariance,
                                          TrackingRiskMeasure{<:Any, <:Any, <:SquaredL2Norm}}
 """
     const CubedRiskMeasures = Union{Skewness, ThirdCentralMoment{<:Any, <:Any, <:Any, Nothing},
-                                    HighOrderMoment{<:Any, <:Any, <:Any, <:ThirdLowerMoment}}
+                                    HighOrderMoment{<:Any, <:Any, <:Any, <:ThirdLowerMoment,
+                                                    Nothing}}
 
 Union of the risk measures that are homogeneous of degree 3 in the portfolio weights. [`homogeneity_degree`](@ref) returns `3` for each member.
 
-A member reports a raw third moment. The standardised third moments, of [`StandardisedHighOrderMoment`](@ref) and of a [`ThirdCentralMoment`](@ref) with a variance estimator in `ve`, divide by the cube of a standard deviation, so they are members of [`ScaleFreeRiskMeasures`](@ref) and not of this union.
+A member reports a raw third moment. The standardised third moments, of a [`HighOrderMoment`](@ref) and of a [`ThirdCentralMoment`](@ref) with a variance estimator in `ve`, divide by the cube of a standard deviation, so they are members of [`ScaleFreeRiskMeasures`](@ref) and not of this union.
 
 # Related
 
@@ -84,15 +85,17 @@ A member reports a raw third moment. The standardised third moments, of [`Standa
   - [`homogeneity_degree`](@ref)
 """
 const CubedRiskMeasures = Union{Skewness, ThirdCentralMoment{<:Any, <:Any, <:Any, Nothing},
-                                HighOrderMoment{<:Any, <:Any, <:Any, <:ThirdLowerMoment}}
+                                HighOrderMoment{<:Any, <:Any, <:Any, <:ThirdLowerMoment,
+                                                Nothing}}
 """
-    const FourthPowerRiskMeasures = Union{HighOrderMoment{<:Any, <:Any, <:Any, <:FourthMoment},
+    const FourthPowerRiskMeasures = Union{HighOrderMoment{<:Any, <:Any, <:Any, <:FourthMoment,
+                                                          Nothing},
                                           Kurtosis{<:Any, <:Any, <:Any,
                                                    <:QuadSecondMomentFormulations}}
 
 Union of the risk measures that are homogeneous of degree 4 in the portfolio weights. [`homogeneity_degree`](@ref) returns `4` for each member.
 
-A member reports a raw fourth moment. [`Kurtosis`](@ref) under [`SOCRiskExpr`](@ref) reports the square root of the moment, so it is a member of [`SquaredRiskMeasures`](@ref). The standardised fourth moment is a member of [`ScaleFreeRiskMeasures`](@ref).
+A member reports a raw fourth moment. [`Kurtosis`](@ref) under [`SOCRiskExpr`](@ref) reports the square root of the moment, so it is a member of [`SquaredRiskMeasures`](@ref). A [`HighOrderMoment`](@ref) with a variance estimator in `ve` reports the standardised fourth moment, so it is a member of [`ScaleFreeRiskMeasures`](@ref).
 
 # Related
 
@@ -101,15 +104,16 @@ A member reports a raw fourth moment. [`Kurtosis`](@ref) under [`SOCRiskExpr`](@
   - [`Kurtosis`](@ref)
   - [`homogeneity_degree`](@ref)
 """
-const FourthPowerRiskMeasures = Union{HighOrderMoment{<:Any, <:Any, <:Any, <:FourthMoment},
+const FourthPowerRiskMeasures = Union{HighOrderMoment{<:Any, <:Any, <:Any, <:FourthMoment,
+                                                      Nothing},
                                       Kurtosis{<:Any, <:Any, <:Any,
                                                <:QuadSecondMomentFormulations}}
 """
     const ScaleFreeRiskMeasures = Union{EqualRisk,
                                         ThirdCentralMoment{<:Any, <:Any, <:Any,
                                                            <:AbstractVarianceEstimator},
-                                        HighOrderMoment{<:Any, <:Any, <:Any,
-                                                        <:StandardisedHighOrderMoment}}
+                                        HighOrderMoment{<:Any, <:Any, <:Any, <:Any,
+                                                        <:AbstractVarianceEstimator}}
 
 Union of the risk measures that are homogeneous of degree 0 in the portfolio weights. [`homogeneity_degree`](@ref) returns `0` for each member.
 
@@ -120,14 +124,13 @@ A member does not change when every weight is multiplied by the same positive nu
   - [`EqualRisk`](@ref)
   - [`ThirdCentralMoment`](@ref)
   - [`HighOrderMoment`](@ref)
-  - [`StandardisedHighOrderMoment`](@ref)
   - [`homogeneity_degree`](@ref)
 """
 const ScaleFreeRiskMeasures = Union{EqualRisk,
                                     ThirdCentralMoment{<:Any, <:Any, <:Any,
                                                        <:AbstractVarianceEstimator},
-                                    HighOrderMoment{<:Any, <:Any, <:Any,
-                                                    <:StandardisedHighOrderMoment}}
+                                    HighOrderMoment{<:Any, <:Any, <:Any, <:Any,
+                                                    <:AbstractVarianceEstimator}}
 """
     homogeneity_degree(r::AbstractBaseRiskMeasure) -> Option{<:Integer}
 
