@@ -660,7 +660,7 @@ The implied volatilities are the second positional argument, and the returns are
   - `chunk > 4`. The fit has `chunk - 1` rows for three coefficients, so it has a residual only when `chunk > 4`.
   - `size(rv) == size(iv)`, one realised volatility for each implied volatility.
   - Each implied volatility on the last row of a window is positive. Otherwise the function throws a `DomainError`, because the fit takes its logarithm. An entry on a row that ends no window is not read.
-  - Each window has a positive realised volatility, and the returns of each asset are not all equal over it. Otherwise the function throws a `DomainError`. Constant returns over the `ws` rows of a window have a realised volatility of zero. In floating point, the round-off of their mean can leave a very small positive value instead, which depends on the host. So the function also compares the returns themselves.
+  - Each window has a positive realised volatility, and the returns of each asset are not all equal over it. Otherwise the function throws a `DomainError`. Constant returns over the `ws` rows of a window have a realised volatility of zero. In floating point, the round-off of their mean can leave a very small positive value instead, which depends on the order of the summation. So the function also compares the returns themselves.
 
 # Returns
 
