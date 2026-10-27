@@ -939,9 +939,10 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
                     model::JuMP.Model, rk_opts::VecNum, rt_opts::VecNum,
                     opt::BaseJuMPOptimisationEstimator,
                     attrs::ProcessedJuMPOptimiserAttributes, args...)
-    noc_rk, noc_rt = set_noc_anchor_parameters!(model, noc, attrs, rk_opts, rt_opts)
+    p_rk, p_rt, rk_units, rt_units = set_noc_anchor_parameters!(model, noc, attrs, rk_opts,
+                                                                rt_opts)
     return frontier_sweep!(model, noc, eltype(opt.pe.X), length(rk_opts)) do i
-        return set_noc_anchor!(noc_rk, noc_rt, rk_opts, rt_opts, i)
+        return set_noc_anchor!(p_rk, p_rt, rk_units, rt_units, i)
     end
 end
 """
@@ -950,8 +951,14 @@ end
 Register the two anchor parameters the centring barrier reads, and set the objective.
 
 `noc_rk` and `noc_rt` are the risk and return of the near-optimal anchor the barrier centres
-on. A sweep moves them from point to point, so they are parameters rather than expressions —
-the model is assembled once and only their values change between solves.
+on. A sweep moves them from point to point, so each is a parameter times a constant rather
+than a constant — the model is assembled once and only the values of the parameters change
+between solves.
+
+The constant is the [`parameter_scale`](@ref) of the anchors, so each parameter takes values
+in ``[-1, 1]``. A raw parameter of the size of an anchor risk leaves the exponential cone of
+the barrier badly scaled. For a ceiling on the kurtosis term of [`VarianceSkewKurtosis`](@ref),
+it moved the centre by `3e-3` from the centre that constant anchors give.
 
 # Arguments
 
@@ -963,24 +970,31 @@ the model is assembled once and only their values change between solves.
 
 # Returns
 
-  - `(noc_rk, noc_rt)`: The two parameter references.
+  - `(p_rk, p_rt, rk_units, rt_units)`: The two parameter references, and the anchor risks
+    and returns in the units of their parameters, which [`set_noc_anchor!`](@ref) writes.
 
 # Related
 
   - [`set_noc_anchor!`](@ref)
   - [`set_near_optimal_objective_function!`](@ref)
   - [`solve_noc!`](@ref)
+  - [`parameter_scale`](@ref)
 """
 function set_noc_anchor_parameters!(model::JuMP.Model, noc::NearOptimalCentering,
                                     attrs::ProcessedJuMPOptimiserAttributes,
                                     rk_opts::VecNum, rt_opts::VecNum)
-    JuMP.@variable(model, noc_rk in JuMP.Parameter(zero(eltype(rk_opts))))
-    JuMP.@variable(model, noc_rt in JuMP.Parameter(zero(eltype(rt_opts))))
+    m_rk, m_rt = parameter_scale(rk_opts), parameter_scale(rt_opts)
+    p_rk = JuMP.@variable(model, base_name = "noc_rk_unit",
+                          set = JuMP.Parameter(zero(eltype(rk_opts))))
+    p_rt = JuMP.@variable(model, base_name = "noc_rt_unit",
+                          set = JuMP.Parameter(zero(eltype(rt_opts))))
+    JuMP.@expression(model, noc_rk, m_rk * p_rk)
+    JuMP.@expression(model, noc_rt, m_rt * p_rt)
     set_near_optimal_objective_function!(noc.alg, model, noc, attrs)
-    return noc_rk, noc_rt
+    return p_rk, p_rt, rk_opts ./ m_rk, rt_opts ./ m_rt
 end
 """
-    set_noc_anchor!(noc_rk, noc_rt, rk_opts, rt_opts, i)
+    set_noc_anchor!(p_rk, p_rt, rk_units, rt_units, i)
 
 Move the centring anchor onto sweep point `i`.
 
@@ -992,10 +1006,10 @@ centring solve centre on its own point rather than on some other point's optimum
 
 # Arguments
 
-  - `noc_rk`: The anchor-risk parameter.
-  - `noc_rt`: The anchor-return parameter.
-  - `rk_opts::VecNum`: The anchor risks, in flat sweep order.
-  - `rt_opts::VecNum`: The anchor returns, in flat sweep order.
+  - `p_rk`: The anchor-risk parameter.
+  - `p_rt`: The anchor-return parameter.
+  - `rk_units::VecNum`: The anchor risks in the units of `p_rk`, in flat sweep order.
+  - `rt_units::VecNum`: The anchor returns in the units of `p_rt`, in flat sweep order.
   - `i::Integer`: The flat index of the sweep point.
 
 # Returns
@@ -1008,9 +1022,9 @@ centring solve centre on its own point rather than on some other point's optimum
   - [`frontier_sweep!`](@ref)
   - [`near_optimal_centering_setup`](@ref)
 """
-function set_noc_anchor!(noc_rk, noc_rt, rk_opts::VecNum, rt_opts::VecNum, i::Integer)
-    JuMP.set_parameter_value(noc_rk, rk_opts[i])
-    JuMP.set_parameter_value(noc_rt, rt_opts[i])
+function set_noc_anchor!(p_rk, p_rt, rk_units::VecNum, rt_units::VecNum, i::Integer)
+    JuMP.set_parameter_value(p_rk, rk_units[i])
+    JuMP.set_parameter_value(p_rt, rt_units[i])
     return nothing
 end
 """
@@ -1089,10 +1103,11 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
                     args...)
     ret_frontier = compute_ret_lbs(shared_get(model, :ret_frontier), rt_ends)
     ret_axis = set_ret_frontier_parameters!(model, ret_frontier)
-    noc_rk, noc_rt = set_noc_anchor_parameters!(model, noc, attrs, rk_opts, rt_opts)
+    p_rk, p_rt, rk_units, rt_units = set_noc_anchor_parameters!(model, noc, attrs, rk_opts,
+                                                                rt_opts)
     return frontier_sweep!(model, noc, eltype(opt.pe.X),
                            frontier_sweep_axes(ret_axis, nothing)) do i
-        return set_noc_anchor!(noc_rk, noc_rt, rk_opts, rt_opts, i)
+        return set_noc_anchor!(p_rk, p_rt, rk_units, rt_units, i)
     end
 end
 function rebuild_risk_frontier(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,

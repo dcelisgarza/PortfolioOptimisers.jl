@@ -232,6 +232,49 @@ end
     @test collect(only(span).second[2]) ≈ range(k_lo, k_hi; length = 3) rtol = 1e-10
 end
 
+@testset "Frontier sweep: a sweep of one point gives the portfolio of its scalar bound" begin
+    pr = prior(HighOrderPriorEstimator(), MRS_X)
+    opt = JuMPOptimiser(; pe = pr, slv = MRS_SLV)
+    wmin = optimise(MeanRisk(; opt = opt, r = VarianceSkewKurtosis())).w
+    wmax = optimise(MeanRisk(; opt = opt, r = VarianceSkewKurtosis(),
+                             obj = MaximumReturn())).w
+    (v_lo, k_lo), (v_hi, k_hi) = mrs_vsk_terms(pr, wmin), mrs_vsk_terms(pr, wmax)
+    noc(r) = NearOptimalCentering(; r = r, obj = MaximumReturn(), opt = opt,
+                                  alg = ConstrainedNearOptimalCentering())
+    mr(r) = MeanRisk(; r = r, obj = MaximumReturn(), opt = opt)
+    # A sweep writes its bound into a parameter, which the solver receives as a variable
+    # fixed by an equality row. In the units of its point, a bound near 1e-7 broke the
+    # kurtosis ceiling of a constrained NOC by 0.22 %, and the weights moved by 7e-4 from
+    # those of the scalar ceiling. The anchors of the barrier, raw parameters too, moved the
+    # centre by 3e-3. The kurtosis term takes a SquaredBound, so its bound is the root of the
+    # level.
+    for (r, j, level, ub) in ((mrs_vsk_kt, 2, (k_lo + k_hi) / 2, sqrt((k_lo + k_hi) / 2)),
+                              (mrs_vsk_vr, 1, (v_lo + v_hi) / 2, (v_lo + v_hi) / 2)),
+        head in (noc, mr)
+
+        a = optimise(head(r(ub)))
+        b = optimise(head(r([ub])))
+        @test isa(a.retcode, PO.OptimisationSuccess)
+        @test isa(only(b.retcode), PO.OptimisationSuccess)
+        @test mrs_vsk_terms(pr, only(b.w))[j] <= level * (1 + 1e-5)
+        @test isapprox(only(b.w), a.w; atol = 1e-5)
+    end
+    # A return floor of a constrained NOC. The floor holds, and the centre is the centre of the
+    # scalar floor.
+    rl = (dot(pr.mu, wmin) + dot(pr.mu, wmax)) / 2
+    function noc_ret(lb)
+        return NearOptimalCentering(; r = StandardDeviation(), obj = MinimumRisk(),
+                                    opt = JuMPOptimiser(; pe = pr, slv = MRS_SLV,
+                                                        ret = mrs_floor(lb)),
+                                    alg = ConstrainedNearOptimalCentering())
+    end
+    a = optimise(noc_ret(rl))
+    b = optimise(noc_ret([rl]))
+    @test isa(only(b.retcode), PO.OptimisationSuccess)
+    @test dot(pr.mu, only(b.w)) >= rl * (1 - 1e-8)
+    @test isapprox(only(b.w), a.w; atol = 1e-5)
+end
+
 @testset "MeanRisk sweep: one measure with two bounds keeps both" begin
     pr = prior(HighOrderPriorEstimator(), MRS_X)
     opt = JuMPOptimiser(; pe = pr, slv = MRS_SLV)

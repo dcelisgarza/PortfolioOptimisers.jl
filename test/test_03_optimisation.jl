@@ -1326,35 +1326,36 @@ struct HookObjective03d <: PortfolioOptimisers.CustomJuMPObjective end
         risk = [(:a_var, :a) => (1.0 * x, [1.0, 2.0], true, 0),
                 (:b_var, :b) => (1.0 * x, [3.0], false, 0)]
         rax = PO.set_risk_frontier_parameters!(model, risk)
-        # A `true` flag is the ceiling `x <= u k`, a `false` flag the floor `x >= u k`,
-        # and `s_c = 2` multiplies both.
+        # A `true` flag is the ceiling `x <= m u k`, a `false` flag the floor `x >= m u k`,
+        # and `s_c = 2` multiplies both. `m` is the largest absolute point of the entry: 2 for
+        # `a` and 3 for `b`.
         ca = JuMP.constraint_object(model[:a])
         cb = JuMP.constraint_object(model[:b])
         @test ca.set == JuMP.MOI.LessThan(0.0) && cb.set == JuMP.MOI.LessThan(0.0)
         @test JuMP.coefficient(ca.func, x) == 2.0
-        @test JuMP.coefficient(ca.func, model[:a_var]) == -2.0
+        @test JuMP.coefficient(ca.func, model[:a_var]) == -4.0
         @test JuMP.coefficient(cb.func, x) == -2.0
-        @test JuMP.coefficient(cb.func, model[:b_var]) == 2.0
+        @test JuMP.coefficient(cb.func, model[:b_var]) == 6.0
         ret = [(:r_var, :r) => (3.0 * x, [0.5, 0.7, 0.9], 1)]
         tax = PO.set_ret_frontier_parameters!(model, ret)
         cr = JuMP.constraint_object(model[:r])
         @test cr.set == JuMP.MOI.GreaterThan(0.0)
         @test JuMP.coefficient(cr.func, x) == 6.0
-        @test JuMP.coefficient(cr.func, model[:r_var]) == -2.0
+        @test JuMP.coefficient(cr.func, model[:r_var]) ≈ -1.8
         # The product: two risk points, one risk point and three return points.
         pts = collect(PO.frontier_sweep_axes(tax, rax))
         @test length(pts) == 6
         @test length(collect(PO.frontier_sweep_axes(tax, nothing))) == 3
         @test length(collect(PO.frontier_sweep_axes(nothing, rax))) == 2
         @test length(collect(PO.frontier_sweep_axes(nothing, nothing))) == 1
-        # The risk axis changes fastest.
+        # The risk axis changes fastest. Each parameter holds its point in units of `m`.
         PO.set_frontier_point!(model, pts[2])
-        @test JuMP.parameter_value(model[:a_var]) == 2.0
-        @test JuMP.parameter_value(model[:r_var]) == 0.5
+        @test JuMP.parameter_value(model[:a_var]) == 2.0 / 2
+        @test JuMP.parameter_value(model[:r_var]) == 0.5 / 0.9
         PO.set_frontier_point!(model, pts[3])
-        @test JuMP.parameter_value(model[:a_var]) == 1.0
-        @test JuMP.parameter_value(model[:r_var]) == 0.7
-        @test JuMP.parameter_value(model[:b_var]) == 3.0
+        @test JuMP.parameter_value(model[:a_var]) == 1.0 / 2
+        @test JuMP.parameter_value(model[:r_var]) == 0.7 / 0.9
+        @test JuMP.parameter_value(model[:b_var]) == 3.0 / 3
     end
 
     @testset "weights, start values and the return series" begin
@@ -1502,8 +1503,11 @@ struct HookObjective03d <: PortfolioOptimisers.CustomJuMPObjective end
         mu = vec(sum(X; dims = 1)) / size(X, 1)
         rets = [dot(mu, w) for w in res.w]
         @test issorted(rets)
-        # The last point binds its floor.
-        lb = JuMP.parameter_value(res.model[:ret_lb_var_1])
+        # The last point binds its floor. The parameter holds the floor in units of the fixed
+        # coefficient `m` of the row `s_c (ret - m b) >= 0`.
+        m = -JuMP.normalized_coefficient(res.model[:ret_lb_1], res.model[:ret_lb_var_1]) /
+            PO.get_constraint_scale(res.model)
+        lb = m * JuMP.parameter_value(res.model[:ret_lb_var_1])
         @test rets[end] >= lb - 1e-8
         @test isapprox(rets[end], lb; rtol = 1e-6)
     end

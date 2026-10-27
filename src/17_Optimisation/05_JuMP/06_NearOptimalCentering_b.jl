@@ -47,10 +47,11 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
                     w_min::VecNum, w_max::VecNum, ::Val{false}, ::Val{true}, args...)
     risk_frontier = compute_risk_ubs(model, noc, opt.pe, opt.fees, w_min, w_max, args...)
     risk_axis = set_risk_frontier_parameters!(model, risk_frontier)
-    noc_rk, noc_rt = set_noc_anchor_parameters!(model, noc, attrs, rk_opts, rt_opts)
+    p_rk, p_rt, rk_units, rt_units = set_noc_anchor_parameters!(model, noc, attrs, rk_opts,
+                                                                rt_opts)
     return frontier_sweep!(model, noc, eltype(opt.pe.X),
                            frontier_sweep_axes(nothing, risk_axis)) do i
-        return set_noc_anchor!(noc_rk, noc_rt, rk_opts, rt_opts, i)
+        return set_noc_anchor!(p_rk, p_rt, rk_units, rt_units, i)
     end
 end
 function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -65,10 +66,11 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
     risk_frontier = compute_risk_ubs(model, noc, opt.pe, opt.fees, w_min, w_max, args...)
     risk_axis = set_risk_frontier_parameters!(model, risk_frontier)
     ret_axis = set_ret_frontier_parameters!(model, ret_frontier)
-    noc_rk, noc_rt = set_noc_anchor_parameters!(model, noc, attrs, rk_opts, rt_opts)
+    p_rk, p_rt, rk_units, rt_units = set_noc_anchor_parameters!(model, noc, attrs, rk_opts,
+                                                                rt_opts)
     return frontier_sweep!(model, noc, eltype(opt.pe.X),
                            frontier_sweep_axes(ret_axis, risk_axis)) do i
-        return set_noc_anchor!(noc_rk, noc_rt, rk_opts, rt_opts, i)
+        return set_noc_anchor!(p_rk, p_rt, rk_units, rt_units, i)
     end
 end
 """

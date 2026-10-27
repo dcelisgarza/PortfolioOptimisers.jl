@@ -565,6 +565,33 @@ end
     @test all(p -> p === (), pts)
 end
 
+# A sweep parameter takes its points in the units of the largest absolute point, so its values
+# lie in [-1, 1] and its row keeps the size of the expression that it bounds.
+@testset "Frontier sweep units: a parameter takes its points in units of its scale" begin
+    @test PO.parameter_scale([1e-7, -3e-7, 2e-7]) == 3e-7
+    # Every point zero: the scale is one, so the division is defined.
+    @test PO.parameter_scale([0.0, 0.0]) === 1.0
+    # The scale keeps the number type of the points.
+    @test PO.parameter_scale([1 // 4, -1 // 2]) === 1 // 2
+    @test PO.parameter_scale([2, 3]) === 3
+    two = [(:ret_lb_var_1, :ret_lb_1) => (nothing, [10.0, 20.0], 1),
+           (:ret_lb_var_2, :ret_lb_2) => (nothing, [-30.0, 40.0, 50.0], 2)]
+    units = PO.unit_frontier(two)
+    @test [entry.first for entry in units] == [entry.first for entry in two]
+    @test units[1].second == (nothing, [0.5, 1.0], 1)
+    @test units[2].second == (nothing, [-0.6, 0.8, 1.0], 2)
+    # The registry itself keeps its points.
+    @test two[2].second[2] == [-30.0, 40.0, 50.0]
+    # The order of the axis does not change.
+    pts = PO.frontier_sweep_axes(PO.frontier_axis(units), nothing)
+    order = Vector{Float64}[]
+    for p in pts
+        push!(order, collect(p[1][2]))
+    end
+    @test order ==
+          [[0.5, -0.6], [1.0, -0.6], [0.5, 0.8], [1.0, 0.8], [0.5, 1.0], [1.0, 1.0]]
+end
+
 # A `:risk_frontier` entry is `(bound_var_key, bound_key) => (expr, points, flag, owner)`.
 # The registry is **not** parallel to the risk measure vector: a measure registers an entry
 # only when its `settings.ub` is a `Front_NumVec`. So an entry holds the measure that owns it,
