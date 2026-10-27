@@ -427,6 +427,23 @@ end
     @test isa(CategoricalPanelInput(; name = "s", vals = ["a", missing],
                                     alg = ForwardPanelFill(; val = "a")),
               CategoricalPanelInput)
+    # A numeric or a tensor input refuses a string val at construction, also when no
+    # cell takes it, and not with a conversion error at the first cell that does.
+    @test_throws ArgumentError NumericPanelInput(; name = "x", vals = [1.0 missing],
+                                                 alg = ConstantPanelFill(; val = "a"))
+    @test_throws ArgumentError TensorPanelInput(; name = "b", vals = ones(2, 2, 1),
+                                                axis = "f", labels = ["s"],
+                                                alg = ForwardPanelFill(; val = "a"))
+    # A constant fill types each column alike, so a first column with no blank does not
+    # fix the type of the field before a later column takes a wider val.
+    vint = Union{Missing, Int}[1 1; 2 missing; 3 3]
+    pint = asset_panel([NumericPanelInput(; name = "x", vals = vint,
+                                          alg = ConstantPanelFill(; val = 0.5))])
+    @test PortfolioOptimisers.panel_field(pint, "x").vals == [1.0 1.0; 2.0 0.5; 3.0 3.0]
+    @test eltype(PortfolioOptimisers.panel_field(pint, "x").vals) === Float64
+    pkeep = asset_panel([NumericPanelInput(; name = "x", vals = vint,
+                                           alg = ConstantPanelFill(; val = 0))])
+    @test eltype(PortfolioOptimisers.panel_field(pkeep, "x").vals) === Int
 
     @test ConstantPanelFill().val == 0.0
     @test ForwardPanelFill().lim === nothing
@@ -474,6 +491,16 @@ struct Test06bPanelFill <: PortfolioOptimisers.AbstractPanelFillAlgorithm end
 function PortfolioOptimisers.panel_fill(::Test06bPanelFill, v::AbstractVector,
                                         ::AbstractString)
     return PortfolioOptimisers.panel_fill(ForwardPanelFill(), v, "f")
+end
+@testset "A policy of the user needs no val" begin
+    # The check of the type of val reads only the policies of the library, so a categorical
+    # input takes a policy that carries no field val.
+    inp = CategoricalPanelInput(; name = "s", vals = ["a", missing],
+                                alg = Test06bPanelFill())
+    f = panel_field(asset_panel([inp]), "s")
+    @test f.levels == ["a"]
+    @test f.codes == [1, 1]
+    @test f.omsk == [true, false]
 end
 @testset "A directional fill stops at the edge of an inactive stretch (#1413)" begin
     # Asset 1 delists after observation 4 and lists again at 8, whose first cell is blank.
