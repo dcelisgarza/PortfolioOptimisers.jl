@@ -781,6 +781,159 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResu
                            frontier_sweep_axes(ret_axis, risk_axis))
 end
 """
+    build_mean_risk_model(mr::MeanRisk, attrs::ProcessedJuMPOptimiserAttributes,
+                          rd::ReturnsResult, str_names::Bool)
+
+Build the model of a [`MeanRisk`](@ref), with every constraint, return term and risk measure, and with no objective.
+
+`mr.obj` shapes the model. Under [`MaximumRatio`](@ref) the model holds the homogenised weights, and under every other objective ``k`` is the number `1`. [`_optimise`](@ref) builds the model of the optimisation with this function. [`resolve_ratio_frontier!`](@ref) builds a second model with it, with [`MinimumRisk`](@ref) in place of the ratio.
+
+# Algorithm
+
+ 1. Make a new model. With `str_names`, give each variable and each row its string name.
+ 2. Register the scales with [`set_model_scales!`](@ref), the number of observations with [`set_model_observations!`](@ref), the homogenisation variables of a ratio with [`set_maximum_ratio_factor_variables!`](@ref), the corner of a lifted variance with [`set_sdp_lift_corner!`](@ref), the weights with [`set_w!`](@ref) and the weight bounds with [`set_weight_constraints!`](@ref).
+ 3. Add the constraints, the return terms and the risk measures with [`assemble_jump_model!`](@ref).
+
+# Arguments
+
+  - `mr::MeanRisk`: The optimiser, already reduced to the investable assets.
+  - `attrs::ProcessedJuMPOptimiserAttributes`: The processed attributes of the optimiser.
+  - $(arg_dict[:rd])
+  - `str_names::Bool`: `true` gives each variable and each row of the model its string name.
+
+# Returns
+
+  - `model::JuMP.Model`: The model, with no objective.
+
+# Related
+
+  - [`_optimise`](@ref)
+  - [`resolve_ratio_frontier!`](@ref)
+  - [`assemble_jump_model!`](@ref)
+"""
+function build_mean_risk_model(mr::MeanRisk, attrs::ProcessedJuMPOptimiserAttributes,
+                               rd::ReturnsResult, str_names::Bool)
+    model = JuMP.Model()
+    JuMP.set_string_names_on_creation(model, str_names)
+    set_model_scales!(model, mr.opt.sc, mr.opt.so)
+    set_model_observations!(model, size(attrs.pr.X, 1))
+    set_maximum_ratio_factor_variables!(model, mr.obj)
+    set_sdp_lift_corner!(model, mr.obj, attrs.pr)
+    set_w!(model, attrs.pr.X, mr.wi)
+    set_weight_constraints!(model, attrs.wb, mr.opt)
+    assemble_jump_model!(model, mr, mr.opt, attrs, rd, mr.r, mr.obj)
+    return model
+end
+"""
+    set_frontier_spans!(model::JuMP.Model, name::Symbol, resolved::VecPair)
+
+Write the bound of each entry of `resolved` into the entry of the registry `name` of `model` that has the same key.
+
+The entries of `resolved` belong to another model, built from the same optimiser, so their expressions are expressions of that model. Only the bound moves. The key of an entry, `(bound_var_key, bound_key)`, names the bound in each model, so the function matches the entries by key and not by position.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `name::Symbol`: The registry, `:ret_frontier` or `:risk_frontier`.
+  - `resolved::VecPair`: The resolved registry of the other model.
+
+# Validation
+
+  - Each entry of the registry of `model` has an entry with the same key in `resolved`. Otherwise an `ArgumentError` names the key.
+
+# Returns
+
+  - `nothing`. The registry `name` of `model` is replaced with a copy that holds the bounds of `resolved`.
+
+# Related
+
+  - [`resolve_ratio_frontier!`](@ref)
+"""
+function set_frontier_spans!(model::JuMP.Model, name::Symbol, resolved::VecPair)
+    frontier = copy(shared_get(model, name))
+    for (j, entry) in enumerate(frontier)
+        idx = findfirst(x -> x.first == entry.first, resolved)
+        @argcheck(!isnothing(idx),
+                  ArgumentError("the corner model holds no $name entry with the key $(entry.first)"))
+        frontier[j] = entry.first => Base.setindex(entry.second, resolved[idx].second[2], 2)
+    end
+    shared_set!(model, name, frontier)
+    return nothing
+end
+"""
+    resolve_ratio_frontier!(model::JuMP.Model, mr::MeanRisk,
+                            attrs::ProcessedJuMPOptimiserAttributes, rd::ReturnsResult)
+
+Resolve each [`Frontier`](@ref) of the model of a [`MaximumRatio`](@ref) on a model that is not homogenised, and write the spans into the registries of `model`.
+
+The span of a `Frontier` reads the two corner portfolios ``\\boldsymbol{w}^{-}`` and ``\\boldsymbol{w}^{+}``, which the `# Mathematical definition` of [`MeanRisk`](@ref) states over the weights ``\\boldsymbol{w}``. Under every other objective ``k`` is the number `1`, so the model of the optimisation states these programmes, and [`compute_ret_lbs`](@ref) and [`compute_risk_ubs`](@ref) solve the corners on it. The model of a `MaximumRatio` holds the weights ``\\boldsymbol{y} = k \\boldsymbol{w}``, the normalisation row and the floor of ``k``. On that model, a minimum-risk solve gives the maximum-ratio portfolio. A maximum-return solve is unbounded in ``k`` when ``r_f > 0``, and gives any feasible point when ``r_f = 0``.
+
+A fix of ``k = 1`` on that model does not give the programmes back. The objective also sets the corner of a lifted variance, [`set_sdp_lift_corner!`](@ref), and the mark of [`mark_risk_minimised!`](@ref) that a semidefinite phylogeny reads. So the method builds a second model with [`build_mean_risk_model`](@ref), with [`MinimumRisk`](@ref) in place of the ratio, and resolves the registries on it. The span is then the span that the same `Frontier` has under `MinimumRisk`.
+
+The objective of the second model changes the model only through the mark of [`mark_risk_minimised!`](@ref). With the mark, a semidefinite phylogeny on the weights of a variance in the objective omits its penalty ``p\\,\\mathrm{tr}(\\mathbf{W})``. Neither corner programme holds that penalty. Under [`MaximumReturn`](@ref) the penalty enters both corner solves, and a penalty that is large next to the returns moves the maximum-return corner far from the maximum return. Without a semidefinite phylogeny, the two objectives build the same model.
+
+The cost is one more model build. Only a `MaximumRatio` pays it, and only when a registry holds a `Frontier`. A vector of bounds needs no corner solve, and it costs nothing.
+
+# Algorithm
+
+ 1. Under an objective that is not a `MaximumRatio`, return.
+ 2. Collect the registries, `:ret_frontier` and `:risk_frontier`, that hold an entry whose bound is not a vector of numbers. When there is none, return.
+ 3. Rebuild `mr` with the objective `MinimumRisk()`, giving `cmr`. Build its model with [`build_mean_risk_model`](@ref), giving `cmodel`.
+ 4. Resolve the return registry of `cmodel` with [`compute_ret_lbs`](@ref), and its risk registry with [`compute_risk_ubs`](@ref). The order is the order of [`solve_mean_risk!`](@ref).
+ 5. Write each resolved bound into the entry of `model` that has the same key, with [`set_frontier_spans!`](@ref). [`solve_mean_risk!`](@ref) then finds no entry to resolve, and solves no corner on the homogenised model.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `mr::MeanRisk`: The optimiser, already reduced to the investable assets.
+  - `attrs::ProcessedJuMPOptimiserAttributes`: The processed attributes of the optimiser.
+  - $(arg_dict[:rd])
+
+# Validation
+
+  - Each corner solve must succeed, as [`compute_ret_lbs`](@ref) and [`compute_risk_ubs`](@ref) state.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`MaximumRatio`](@ref)
+  - [`Frontier`](@ref)
+  - [`build_mean_risk_model`](@ref)
+  - [`set_frontier_spans!`](@ref)
+  - [`compute_ret_lbs`](@ref)
+  - [`compute_risk_ubs`](@ref)
+"""
+function resolve_ratio_frontier!(::JuMP.Model, ::MeanRisk,
+                                 ::ProcessedJuMPOptimiserAttributes, ::ReturnsResult)
+    return nothing
+end
+function resolve_ratio_frontier!(model::JuMP.Model,
+                                 mr::MeanRisk{<:Any, <:Any, <:MaximumRatio},
+                                 attrs::ProcessedJuMPOptimiserAttributes, rd::ReturnsResult)
+    names = filter((:ret_frontier, :risk_frontier)) do name
+        return shared_has(model, name) &&
+               any(entry -> !isa(entry.second[2], VecNum), shared_get(model, name))
+    end
+    if isempty(names)
+        return nothing
+    end
+    cmr = rebuild_estimator(mr, (; obj = MinimumRisk()))
+    cmodel = build_mean_risk_model(cmr, attrs, rd, false)
+    pr, fees = attrs.pr, attrs.fees
+    if :ret_frontier in names
+        set_frontier_spans!(model, :ret_frontier,
+                            compute_ret_lbs(cmodel, cmr, pr, fees, attrs))
+    end
+    if :risk_frontier in names
+        set_frontier_spans!(model, :risk_frontier,
+                            compute_risk_ubs(cmodel, cmr, pr, fees, attrs))
+    end
+    return nothing
+end
+"""
     _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); str_names::Bool = false,
               save::Bool = true, kwargs...) -> MeanRiskResult
 
@@ -794,8 +947,8 @@ Build the model of a [`MeanRisk`](@ref), solve it, and return its result.
  2. Process the attributes of `mr.opt` against `rd` with [`processed_jump_optimiser_attributes`](@ref), giving `attrs`. It holds the prior, the weight bounds, the fees, the return terms and the Investable Mask.
  3. Take the view of `mr` and of `rd` at the investable assets with [`investable_view`](@ref). Both are unchanged when every asset is investable.
  4. Bind the benchmark of each [`DataBenchmarkTracking`](@ref) measure to `rd` with [`bind_data_benchmark`](@ref).
- 5. Build a new model. Register the scales with [`set_model_scales!`](@ref), the number of observations with [`set_model_observations!`](@ref), the homogenisation variables of a ratio with [`set_maximum_ratio_factor_variables!`](@ref), the corner of a lifted variance with [`set_sdp_lift_corner!`](@ref), the weights with [`set_w!`](@ref) and the weight bounds with [`set_weight_constraints!`](@ref).
- 6. Add the constraints, the return terms and the risk measures with [`assemble_jump_model!`](@ref).
+ 5. Build the model with [`build_mean_risk_model`](@ref).
+ 6. Under [`MaximumRatio`](@ref), resolve each [`Frontier`](@ref) of the model on a model that is not homogenised, with [`resolve_ratio_frontier!`](@ref). Under every other objective this step does nothing.
  7. Solve with [`solve_mean_risk!`](@ref), which sweeps a frontier when the model holds one, giving `retcode` and `sol`.
  8. Build the result. It holds `attrs`, `retcode`, `sol`, the model when `save` is `true`, and the risk measures resolved against the prior.
 
@@ -814,6 +967,8 @@ Build the model of a [`MeanRisk`](@ref), solve it, and return its result.
 # Related
 
   - [`optimise`](@ref)
+  - [`build_mean_risk_model`](@ref)
+  - [`resolve_ratio_frontier!`](@ref)
   - [`solve_mean_risk!`](@ref)
   - [`MeanRiskResult`](@ref)
 """
@@ -827,15 +982,8 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult();
     # `rd`. Both are unchanged when every asset is investable.
     mr, rd = investable_view(mr, rd, attrs.pr, attrs.imsk)
     mr = bind_data_benchmark(mr, rd)
-    model = JuMP.Model()
-    JuMP.set_string_names_on_creation(model, str_names)
-    set_model_scales!(model, mr.opt.sc, mr.opt.so)
-    set_model_observations!(model, size(attrs.pr.X, 1))
-    set_maximum_ratio_factor_variables!(model, mr.obj)
-    set_sdp_lift_corner!(model, mr.obj, attrs.pr)
-    set_w!(model, attrs.pr.X, mr.wi)
-    set_weight_constraints!(model, attrs.wb, mr.opt)
-    assemble_jump_model!(model, mr, mr.opt, attrs, rd, mr.r, mr.obj)
+    model = build_mean_risk_model(mr, attrs, rd, str_names)
+    resolve_ratio_frontier!(model, mr, attrs, rd)
     retcode, sol = solve_mean_risk!(model, mr, attrs.pr,
                                     Val(shared_has(model, :ret_frontier)),
                                     Val(shared_has(model, :risk_frontier)), attrs.fees,

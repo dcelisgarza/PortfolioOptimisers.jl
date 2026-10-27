@@ -13,4 +13,7 @@ _rebuild_risk_frontier
 rebuild_risk_frontier
 unresolved_risk_frontier
 compute_risk_ubs
+build_mean_risk_model
+set_frontier_spans!
+resolve_ratio_frontier!
 ```

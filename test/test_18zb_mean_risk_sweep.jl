@@ -98,6 +98,50 @@ end
     end
 end
 
+@testset "MeanRisk sweep: a Frontier under MaximumRatio spans the corners of the plain weights" begin
+    # #1848: the corners were solved on the homogenised model. The minimum-risk solve gave
+    # the tangency portfolio, and the maximum-return solve was unbounded in k for rf > 0 and
+    # any feasible point for rf = 0. The span must run between the two corners of the plain
+    # weights. The rows of the sweep need a parametric solver (#1842), so this test reads the
+    # resolved span from the model, which the sweep writes before its first point.
+    mu, S = MRS_PR.mu, MRS_PR.sigma
+    sd(w) = sqrt(w' * S * w)
+    wmin = optimise(MeanRisk(; opt = mrs_opt())).w
+    wmax = optimise(MeanRisk(; opt = mrs_opt(), obj = MaximumReturn())).w
+    risk_levels = range(sd(wmin), sd(wmax); length = 5)
+    ret_levels = range(mu' * wmin, mu' * wmax; length = 5)
+    r = Variance(; settings = RiskMeasureSettings(; ub = Frontier(; N = 5)))
+    # rf = 0, a rate below the means (the return form), and a rate above every mean (the
+    # risk form).
+    for rf in (0.0, 1e-4, 2 * maximum(mu))
+        res = optimise(MeanRisk(; opt = mrs_opt(), r = r, obj = MaximumRatio(; rf = rf)))
+        @test length(res.w) == 5
+        @test isapprox(collect(only(res.model[:risk_frontier]).second[2]), risk_levels;
+                       rtol = 1e-6)
+        res = optimise(MeanRisk(; opt = mrs_opt(; ret = mrs_floor(Frontier(; N = 5))),
+                                obj = MaximumRatio(; rf = rf)))
+        @test length(res.w) == 5
+        @test isapprox(collect(only(res.model[:ret_frontier]).second[2]), ret_levels;
+                       rtol = 1e-6)
+    end
+end
+
+@testset "MeanRisk sweep: the corners of a MaximumRatio Frontier hold no phylogeny penalty" begin
+    # The corner model of a ratio takes MinimumRisk. With a semidefinite phylogeny on the
+    # weights of the variance, MinimumRisk omits the penalty p tr(W), and MaximumReturn puts
+    # it into both corner solves. On this data the penalty moved the maximum-return corner
+    # to a return of 0.00195, below the return of the minimum-risk corner, 0.00209. A
+    # long-only maximum return is one asset, so it meets every phylogeny row.
+    mu = MRS_PR.mu
+    ple = SemiDefinitePhylogenyEstimator(; pl = NetworkEstimator())
+    wmin = optimise(MeanRisk(; opt = mrs_opt(; ple = ple))).w
+    res = optimise(MeanRisk(;
+                            opt = mrs_opt(; ple = ple, ret = mrs_floor(Frontier(; N = 3))),
+                            obj = MaximumRatio(; rf = 1e-4)))
+    @test isapprox(collect(only(res.model[:ret_frontier]).second[2]),
+                   range(mu' * wmin, maximum(mu); length = 3); rtol = 1e-6)
+end
+
 @testset "MeanRisk sweep: vector floors give the closed-form frontier" begin
     mu, S = MRS_PR.mu, MRS_PR.sigma
     Si = inv(S)

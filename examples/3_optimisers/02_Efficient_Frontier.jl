@@ -16,8 +16,7 @@ by maximising return below a risk ceiling, and plots the two on one chart. It in
 [`Frontier`](@ref), which finds the bounds of the frontier for you. It then compares the
 [`MeanRisk`](@ref) frontier with the centred frontier of [`NearOptimalCentering`](@ref), which gives
 up a little of the objective for a portfolio that holds more assets at each point. Last, it sweeps a
-risk ceiling under [`MaximumRatio`](@ref), which needs a vector of ceilings and a parametric solver
-wrapper.
+risk ceiling under [`MaximumRatio`](@ref), which needs a parametric solver wrapper.
 
 !!! tip "When to reach for this"
     Reach for an efficient frontier when you do not want to fix one point of risk and return
@@ -244,11 +243,11 @@ the CVaR of the tangency portfolio, the one that maximises the ratio with no cei
 binds, and the point is the point of direction B. Above it, the ceiling does not bind, and every
 point is the tangency portfolio.
 
-`MaximumRatio` homogenises the problem with one more variable, the ratio factor, and this needs two
-changes to direction B. The [`Frontier`](@ref) docstring explains both.
+`MaximumRatio` homogenises the problem with one more variable, the ratio factor. The
+[`Frontier`](@ref) docstring explains what this changes.
 
-  - A `Frontier` cannot find its span under `MaximumRatio`, so we give the ceilings as a vector. We
-    take the span of direction B and divide it into 30 levels.
+  - A `Frontier` finds its span on a second model without the ratio factor, so the span is the
+    span of direction B. The second model costs one more model build.
   - The sweep writes each ceiling into a `JuMP.Parameter`, and the ceiling row multiplies it by the
     ratio factor. Clarabel receives a parameter as a variable, so it sees a product of two
     variables and refuses the row. We wrap each solver in the `Optimizer` of
@@ -265,12 +264,12 @@ slv_poi = [Solver(; name = :clarabel1, solver = () -> POI.Optimizer(Clarabel.Opt
                   settings = Dict("verbose" => false, "max_step_fraction" => 0.75),
                   check_sol = (; allow_local = true, allow_almost = true))]
 
-ubs = range(extrema(xs_B)...; length = 30)
 resR = optimise(MeanRisk(; opt = JuMPOptimiser(; pe = pr, slv = slv_poi),
                          obj = MaximumRatio(; rf = rf),
                          r = ConditionalValueatRisk(;
                                                     settings = RiskMeasureSettings(;
-                                                                                   ub = ubs))))
+                                                                                   ub = Frontier(;
+                                                                                                 N = 30)))))
 all(x -> isa(x, OptimisationSuccess), resR.retcode)
 
 #=
