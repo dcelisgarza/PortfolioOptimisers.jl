@@ -1224,7 +1224,9 @@ const PO = PortfolioOptimisers
 
 @testset "matrix_square_root: the three policies on a matrix of rank one" begin
     sigma = [1.0 1.0; 1.0 1.0]
+    # `nothing` is `PlainCholeskySquareRoot` (#1878), and both refuse the matrix.
     @test_throws PosDefException matrix_square_root(nothing, sigma)
+    @test_throws PosDefException matrix_square_root(PlainCholeskySquareRoot(), sigma)
     L = matrix_square_root(RidgeCholeskySquareRoot(), sigma)
     @test L isa LowerTriangular
     # The first ridge is 1e-12 of the mean variance.
@@ -1233,7 +1235,8 @@ const PO = PortfolioOptimisers
     @test maximum(abs, L * L' - sigma) < 1e-15
     # A positive definite matrix gives its plain lower Cholesky factor under every policy.
     A = [4.0 2.0; 2.0 3.0]
-    for alg in (nothing, RidgeCholeskySquareRoot(), EigenFallbackSquareRoot())
+    for alg in (nothing, PlainCholeskySquareRoot(), RidgeCholeskySquareRoot(),
+                EigenFallbackSquareRoot())
         @test matrix_square_root(alg, A) == cholesky(A).L
     end
     # The ridge is relative to the mean variance, so the ridge of `c Σ` is `c` times the ridge.

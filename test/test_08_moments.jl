@@ -1314,6 +1314,32 @@
         @test all(giqw(a, b, full) ≈ giqw(b, a, full)
                   for a in range(-4, 4; length = 31), b in range(-4, 4; length = 31))
     end
+    # Subtypes of the three Gerber IQ rule families with no method of their own (#1878).
+    struct NoMethodGerberIQScaler <: PortfolioOptimisers.GerberIQScalerEstimator end
+    struct NoMethodGerberIQEps <: PortfolioOptimisers.GerberIQEpsEstimator end
+    struct NoMethodGerberIQGamma <: PortfolioOptimisers.GerberIQGammaEstimator end
+    @testset "Gerber IQ: the pair-mean scaler is named, and a subtype with no method raises (#1878)" begin
+        # `nothing` is `PairMeanGerberIQScaler`, so the default estimate does not move.
+        @test PortfolioOptimisers.gerber_iq_scaling(PairMeanGerberIQScaler(), 1.0, 3.0) ==
+              (2.0, 2.0)
+        @test PortfolioOptimisers.gerber_iq_scaling(nothing, 1.0, 3.0) == (2.0, 2.0)
+        Xg = randn(StableRNG(1878), 60, 4)
+        seq = PortfolioOptimisers.FLoops.SequentialEx()
+        @test cov(GerberIQCovariance(; sc = PairMeanGerberIQScaler(), ex = seq), Xg) ==
+              cov(GerberIQCovariance(; ex = seq), Xg)
+        # `nothing` keeps the default delay and the default rate.
+        @test PortfolioOptimisers.gerber_iq_eps(nothing, Xg) == 45
+        @test PortfolioOptimisers.gerber_iq_gamma(nothing, Xg) == log(2) / 4
+        # A subtype with no method of its own raises. It got the default in silence before.
+        @test_throws ArgumentError PortfolioOptimisers.gerber_iq_scaling(NoMethodGerberIQScaler(),
+                                                                         1.0, 3.0)
+        @test_throws ArgumentError cov(GerberIQCovariance(; sc = NoMethodGerberIQScaler(),
+                                                          ex = seq), Xg)
+        @test_throws ArgumentError PortfolioOptimisers.gerber_iq_eps(NoMethodGerberIQEps(),
+                                                                     Xg)
+        @test_throws ArgumentError PortfolioOptimisers.gerber_iq_gamma(NoMethodGerberIQGamma(),
+                                                                       Xg)
+    end
     @testset "Regression" begin
         res = [StepwiseRegression(; alg = ForwardSelection()),
                StepwiseRegression(; alg = ForwardSelection(), crit = :aic),

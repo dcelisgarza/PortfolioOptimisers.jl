@@ -70,6 +70,8 @@ work of #1867 removed two: `NoHacFloor` (ADR 0190) and `NoPeel` (ADR 0117).
 | `ForecastReversion.scale = nothing` | `nothing` | It skips the preconditioning. |
 | `PricesToReturns.gap_return_alg = nothing` | `nothing` | The simple default rule. |
 | `PricesToReturns.ret_method`, `padding` | `Symbol`, `Bool` | Acceptable as they are. |
+| `mtx_sqrt = nothing` | `nothing`, beside the new `PlainCholeskySquareRoot()` | The simple default. Its siblings are named leaves, so the plain Cholesky factor gets a name too ([#1878](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1878)). |
+| `GerberIQCovariance.sc = nothing` | `nothing`, beside the new `PairMeanGerberIQScaler()` | The simple default, named for the same reason. The method on `nothing` and the fallback of the family are separate, and the fallback refuses a subtype with no method of its own (#1878). |
 
 The scan of #1867 also kept `IdentityMetric`, `RawVolatility`, `NoSystematicRepair`, `NoDecay`,
 `IdentityTarget` and `NoDefault`. Each one has its own behaviour or a descriptive name.

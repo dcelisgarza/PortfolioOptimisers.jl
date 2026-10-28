@@ -140,7 +140,7 @@ To add a delay estimator, subtype `GerberIQEpsEstimator` and implement this meth
 
 ## `gerber_iq_eps`
 
-  - `gerber_iq_eps(e::MyGerberIQEps, X::MatNum) -> Number`: The delay, in periods, computed from `X`. A subtype that implements no method gets the fall-through of [`gerber_iq_eps`](@ref).
+  - `gerber_iq_eps(e::MyGerberIQEps, X::MatNum) -> Number`: The delay, in periods, computed from `X`. A subtype that implements no method raises an `ArgumentError` that names the subtype.
 
 ### Arguments
 
@@ -185,13 +185,14 @@ const GerberIQEps = Union{Number, Function, GerberIQEpsEstimator}
 """
     gerber_iq_eps(e::Number, ::MatNum) -> Number
     gerber_iq_eps(e::Function, X::MatNum) -> Number
-    gerber_iq_eps(e::Option{<:GerberIQEpsEstimator}, X::MatNum) -> Number
+    gerber_iq_eps(e::Nothing, X::MatNum) -> Number
+    gerber_iq_eps(e::GerberIQEpsEstimator, X::MatNum)
 
 Returns the delay `e` of the Gerber IQ decay. A rule in `e` computes the delay from `X`.
 
 # Mathematical definition
 
-The fall-through computes the delay from the shape of the returns matrix alone.
+The default, `nothing`, computes the delay from the shape of the returns matrix alone.
 
 ```math
 \\begin{align}
@@ -211,15 +212,21 @@ The decay discounts an observation only when its index satisfies ``k < T - \\var
 
  1. Return the number unchanged when `e` is a `Number`.
  2. Call `e(X)` when `e` is a `Function`, and return its result.
- 3. Otherwise read `T` and `N` from `size(X)`, and return `round(Int, T - T / N)`.
+ 3. Read `T` and `N` from `size(X)` when `e` is `nothing`, and return `round(Int, T - T / N)`.
+ 4. Throw an `ArgumentError` for a [`GerberIQEpsEstimator`](@ref) that implements no method of its own.
 
 # Arguments
 
   - `e`: The delay, or the rule that computes it.
       + `::Number`: The method returns the number unchanged.
       + `::Function`: A function that takes the data matrix `X` and returns a `Number`.
-      + `::Option{<:GerberIQEpsEstimator}`: The fall-through. It returns `round(Int, T - T / N)`, where `T` is the number of rows of `X` and `N` the number of columns.
+      + `::Nothing`: The default. It returns `round(Int, T - T / N)`, where `T` is the number of rows of `X` and `N` the number of columns.
+      + `::GerberIQEpsEstimator`: The fallback of the family, for a subtype that implements no method of its own. It always throws.
   - $(arg_dict[:X])
+
+# Validation
+
+  - A [`GerberIQEpsEstimator`](@ref) subtype that implements no method raises an `ArgumentError` that names the subtype. Without the refusal, such a subtype gets the default delay in silence.
 
 # Returns
 
@@ -243,9 +250,12 @@ end
 function gerber_iq_eps(e::Function, X::MatNum)
     return e(X)
 end
-function gerber_iq_eps(::Option{<:GerberIQEpsEstimator}, X::MatNum)
+function gerber_iq_eps(::Nothing, X::MatNum)
     T, N = size(X)
     return round(Int, T - T / N)
+end
+function gerber_iq_eps(e::GerberIQEpsEstimator, ::MatNum)
+    return throw(ArgumentError("$(typeof(e)) subtypes GerberIQEpsEstimator but does not implement gerber_iq_eps. Extension authors: a delay estimator must implement gerber_iq_eps(e, X) -> Number, the delay in periods computed from the returns matrix X."))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -262,7 +272,7 @@ To add a decay rate estimator, subtype `GerberIQGammaEstimator` and implement th
 
 ## `gerber_iq_gamma`
 
-  - `gerber_iq_gamma(y::MyGerberIQGamma, X::MatNum) -> Number`: The decay rate, computed from `X`. A subtype that implements no method gets the fall-through of [`gerber_iq_gamma`](@ref).
+  - `gerber_iq_gamma(y::MyGerberIQGamma, X::MatNum) -> Number`: The decay rate, computed from `X`. A subtype that implements no method raises an `ArgumentError` that names the subtype.
 
 ### Arguments
 
@@ -307,13 +317,14 @@ const GerberIQGamma = Union{Number, Function, GerberIQGammaEstimator}
 """
     gerber_iq_gamma(y::Number, ::MatNum) -> Number
     gerber_iq_gamma(y::Function, X::MatNum) -> Number
-    gerber_iq_gamma(y::Option{<:GerberIQGammaEstimator}, X::MatNum) -> Number
+    gerber_iq_gamma(y::Nothing, X::MatNum) -> Number
+    gerber_iq_gamma(y::GerberIQGammaEstimator, X::MatNum)
 
 Returns the rate `y` of the Gerber IQ decay. A rule in `y` computes the rate from `X`.
 
 # Mathematical definition
 
-The fall-through computes the decay rate from the number of assets alone.
+The default, `nothing`, computes the decay rate from the number of assets alone.
 
 ```math
 \\begin{align}
@@ -332,15 +343,21 @@ The default is a half-life of ``N`` periods. After the delay, the weight of a co
 
  1. Return the number unchanged when `y` is a `Number`.
  2. Call `y(X)` when `y` is a `Function`, and return its result.
- 3. Otherwise return `log(2) / size(X, 2)`.
+ 3. Return `log(2) / size(X, 2)` when `y` is `nothing`.
+ 4. Throw an `ArgumentError` for a [`GerberIQGammaEstimator`](@ref) that implements no method of its own.
 
 # Arguments
 
   - `y`: The decay rate, or the rule that computes it.
       + `::Number`: The method returns the number unchanged.
       + `::Function`: A function that takes the data matrix `X` and returns a `Number`.
-      + `::Option{<:GerberIQGammaEstimator}`: The fall-through. It returns `log(2) / size(X, 2)`.
+      + `::Nothing`: The default. It returns `log(2) / size(X, 2)`.
+      + `::GerberIQGammaEstimator`: The fallback of the family, for a subtype that implements no method of its own. It always throws.
   - $(arg_dict[:X])
+
+# Validation
+
+  - A [`GerberIQGammaEstimator`](@ref) subtype that implements no method raises an `ArgumentError` that names the subtype. Without the refusal, such a subtype gets the default rate in silence.
 
 # Returns
 
@@ -364,8 +381,11 @@ end
 function gerber_iq_gamma(y::Function, X::MatNum)
     return y(X)
 end
-function gerber_iq_gamma(::Option{<:GerberIQGammaEstimator}, X::MatNum)
+function gerber_iq_gamma(::Nothing, X::MatNum)
     return log(2) / size(X, 2)
+end
+function gerber_iq_gamma(y::GerberIQGammaEstimator, ::MatNum)
+    return throw(ArgumentError("$(typeof(y)) subtypes GerberIQGammaEstimator but does not implement gerber_iq_gamma. Extension authors: a decay rate estimator must implement gerber_iq_gamma(y, X) -> Number, the decay rate computed from the returns matrix X."))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -381,7 +401,7 @@ A subtype sets the units of the thresholds of a pair of assets. The source names
   - The larger of the two volatilities.
   - The smaller of the two volatilities.
 
-The library ships the first choice as [`AssetVolatilityGerberIQScaler`](@ref), and the second as the fall-through of [`gerber_iq_scaling`](@ref). The `Function` arm of [`GerberIQScaler`](@ref) gives the other two.
+The library ships the first choice as [`AssetVolatilityGerberIQScaler`](@ref), and the second as [`PairMeanGerberIQScaler`](@ref). `nothing` in the place of a scaler is [`PairMeanGerberIQScaler`](@ref). The `Function` arm of [`GerberIQScaler`](@ref) gives the other two.
 
 # Interfaces
 
@@ -389,7 +409,7 @@ To add a scaler, subtype `GerberIQScalerEstimator` and implement this method:
 
 ## `gerber_iq_scaling`
 
-  - `gerber_iq_scaling(sca::MyGerberIQScaler, sdi::Number, sdj::Number) -> (Number, Number)`: The scales of the thresholds of assets `i` and `j`, computed from their standard deviations. A subtype that implements no method gets the fall-through of [`gerber_iq_scaling`](@ref).
+  - `gerber_iq_scaling(sca::MyGerberIQScaler, sdi::Number, sdj::Number) -> (Number, Number)`: The scales of the thresholds of assets `i` and `j`, computed from their standard deviations. A subtype that implements no method raises an `ArgumentError` that names the subtype.
 
 ### Arguments
 
@@ -405,6 +425,7 @@ To add a scaler, subtype `GerberIQScalerEstimator` and implement this method:
   - [`GerberIQCovariance`](@ref)
   - [`GerberIQScaler`](@ref)
   - [`AssetVolatilityGerberIQScaler`](@ref)
+  - [`PairMeanGerberIQScaler`](@ref)
   - [`gerber_iq_scaling`](@ref)
 
 # References
@@ -424,6 +445,7 @@ The alias has no `Number` arm, because a scaler is a rule on the two standard de
   - [`GerberIQCovariance`](@ref)
   - [`GerberIQScalerEstimator`](@ref)
   - [`AssetVolatilityGerberIQScaler`](@ref)
+  - [`PairMeanGerberIQScaler`](@ref)
   - [`gerber_iq_scaling`](@ref)
 
 # References
@@ -436,7 +458,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Scales the thresholds of each asset by the volatility of that asset.
 
-Each asset keeps its own units. So the scaler measures asset ``i`` against ``\\sigma_i`` and asset ``j`` against ``\\sigma_j``. Kendall's tau and the Gerber statistic use the same convention. With this choice, the Gerber IQ statistic reduces to the Gerber statistic, and [`gerber_IQ`](@ref) states that reduction. The fall-through of [`gerber_iq_scaling`](@ref) gives both assets the mean of the two volatilities.
+Each asset keeps its own units. So the scaler measures asset ``i`` against ``\\sigma_i`` and asset ``j`` against ``\\sigma_j``. Kendall's tau and the Gerber statistic use the same convention. With this choice, the Gerber IQ statistic reduces to the Gerber statistic, and [`gerber_IQ`](@ref) states that reduction. [`PairMeanGerberIQScaler`](@ref) gives both assets the mean of the two volatilities.
 
 # Mathematical definition
 
@@ -466,6 +488,7 @@ AssetVolatilityGerberIQScaler()
 
   - [`GerberIQScalerEstimator`](@ref)
   - [`GerberIQScaler`](@ref)
+  - [`PairMeanGerberIQScaler`](@ref)
   - [`GerberIQCovariance`](@ref)
   - [`gerber_iq_scaling`](@ref)
 
@@ -475,15 +498,61 @@ AssetVolatilityGerberIQScaler()
 """
 struct AssetVolatilityGerberIQScaler <: GerberIQScalerEstimator end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Scales the thresholds of both assets of a pair by the mean of their two volatilities.
+
+Both assets of a pair have the same units, so a volatile asset and a quiet asset have the same absolute threshold. The scaler is not pair-separable, because the mean of the pair changes with the partner. `nothing` in the place of a scaler is this scaler, and it is the default of [`GerberIQCovariance`](@ref). [`AssetVolatilityGerberIQScaler`](@ref) gives each asset its own units.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+(s_i,\\, s_j) &= \\left(\\frac{\\sigma_i + \\sigma_j}{2},\\, \\frac{\\sigma_i + \\sigma_j}{2}\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``s_i``, ``s_j``: Threshold scaling factors of the pair.
+  - $(math_dict[:sigma_i_asset])
+
+# Constructors
+
+    PairMeanGerberIQScaler() -> PairMeanGerberIQScaler
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.gerber_iq_scaling(PairMeanGerberIQScaler(), 1.0, 3.0)
+(2.0, 2.0)
+```
+
+# Related
+
+  - [`GerberIQScalerEstimator`](@ref)
+  - [`GerberIQScaler`](@ref)
+  - [`AssetVolatilityGerberIQScaler`](@ref)
+  - [`GerberIQCovariance`](@ref)
+  - [`gerber_iq_scaling`](@ref)
+
+# References
+
+  - $(ref_dict[:gerber2025squeezing]) Section 3.3.1, Section 4 and Table 2.
+"""
+struct PairMeanGerberIQScaler <: GerberIQScalerEstimator end
+"""
     gerber_iq_scaling(sca::AssetVolatilityGerberIQScaler, sdi::Number, sdj::Number) -> (Number, Number)
+    gerber_iq_scaling(sca::PairMeanGerberIQScaler, sdi::Number, sdj::Number) -> (Number, Number)
+    gerber_iq_scaling(sca::Nothing, sdi::Number, sdj::Number) -> (Number, Number)
     gerber_iq_scaling(sca::Function, sdi::Number, sdj::Number) -> (Number, Number)
-    gerber_iq_scaling(sca::Option{<:GerberIQScalerEstimator}, sdi::Number, sdj::Number) -> (Number, Number)
+    gerber_iq_scaling(sca::GerberIQScalerEstimator, sdi::Number, sdj::Number)
 
 Computes the scaling factors of the thresholds of a pair of assets in the Gerber IQ statistic.
 
 The statistic multiplies each threshold of the pair by the factor that this function returns for the axis of the threshold. The thresholds are the noise threshold `c` and each boundary of the squeezing template. So the scaler sets the units in which a return is large.
 
-A scaler is pair-separable when its first factor uses `sdi` alone and its second factor uses `sdj` alone. The thresholds of an asset are then the same for every partner. [`AssetVolatilityGerberIQScaler`](@ref) is pair-separable. The fall-through is not, because the mean of the pair changes with `sdj`. A `Function` can be either. Every scaler is safe under every marker. [`Gerber2`](@ref) computes its denominator in the units of the pair through [`iq_add_diagonal`](@ref). So when a scaler changes the class of an asset, the numerator and the denominator change together.
+A scaler is pair-separable when its first factor uses `sdi` alone and its second factor uses `sdj` alone. The thresholds of an asset are then the same for every partner. [`AssetVolatilityGerberIQScaler`](@ref) is pair-separable. [`PairMeanGerberIQScaler`](@ref) is not, because the mean of the pair changes with `sdj`. A `Function` can be either. Every scaler is safe under every marker. [`Gerber2`](@ref) computes its denominator in the units of the pair through [`iq_add_diagonal`](@ref). So when a scaler changes the class of an asset, the numerator and the denominator change together.
 
 # Mathematical definition
 
@@ -491,7 +560,7 @@ A scaler is pair-separable when its first factor uses `sdi` alone and its second
 \\begin{align}
 (s_i,\\, s_j) &= \\begin{cases}
 (\\sigma_i,\\, \\sigma_j) & \\text{AssetVolatilityGerberIQScaler} \\\\
-\\left(\\dfrac{\\sigma_i + \\sigma_j}{2},\\, \\dfrac{\\sigma_i + \\sigma_j}{2}\\right) & \\text{fall-through}
+\\left(\\dfrac{\\sigma_i + \\sigma_j}{2},\\, \\dfrac{\\sigma_i + \\sigma_j}{2}\\right) & \\text{PairMeanGerberIQScaler}
 \\end{cases}\\,.
 \\end{align}
 ```
@@ -501,25 +570,32 @@ Where:
   - ``s_i``, ``s_j``: Threshold scaling factors of the pair.
   - $(math_dict[:sigma_i_asset])
 
-The fall-through gives both assets the same units, so a volatile asset and a quiet asset have the same absolute threshold. [`AssetVolatilityGerberIQScaler`](@ref) gives each asset its own units. The source names both choices.
+[`PairMeanGerberIQScaler`](@ref) gives both assets the same units, so a volatile asset and a quiet asset have the same absolute threshold. [`AssetVolatilityGerberIQScaler`](@ref) gives each asset its own units. The source names both choices.
 
 # Algorithm
 
  1. Return `(sdi, sdj)` unchanged for [`AssetVolatilityGerberIQScaler`](@ref).
- 2. Call `sca(sdi, sdj)` for a `Function`, and return its result.
- 3. Otherwise compute `(sdi + sdj) / 2` once, and return it for both axes.
+ 2. Compute `(sdi + sdj) / 2` once for [`PairMeanGerberIQScaler`](@ref) and for `nothing`, and return it for both axes.
+ 3. Call `sca(sdi, sdj)` for a `Function`, and return its result.
+ 4. Throw an `ArgumentError` for any other [`GerberIQScalerEstimator`](@ref).
 
 # Arguments
 
   - `sca`: The threshold scaler.
 
       + `::AssetVolatilityGerberIQScaler`: The method returns `sdi` and `sdj` unchanged, so each asset has the units of its own volatility.
-      + `::Option{<:GerberIQScalerEstimator}`: The fall-through. It returns the mean of `sdi` and `sdj` for both assets. A new [`GerberIQScalerEstimator`](@ref) subtype adds a method to change this.
+      + `::PairMeanGerberIQScaler`: The method returns the mean of `sdi` and `sdj` for both assets.
+      + `::Nothing`: The default, [`PairMeanGerberIQScaler`](@ref).
       + `::Function`: A function that takes `sdi` and `sdj` and returns the two scaling factors.
+      + `::GerberIQScalerEstimator`: The fallback of the family, for a subtype that implements no method of its own. It always throws.
 
   - `sdi`: Standard deviation of asset `i`.
 
   - `sdj`: Standard deviation of asset `j`.
+
+# Validation
+
+  - A [`GerberIQScalerEstimator`](@ref) subtype that implements no method raises an `ArgumentError` that names the subtype. Without the refusal, such a subtype gets the pair mean in silence.
 
 # Returns
 
@@ -531,6 +607,7 @@ The fall-through gives both assets the same units, so a volatile asset and a qui
   - [`GerberIQScaler`](@ref)
   - [`GerberIQScalerEstimator`](@ref)
   - [`AssetVolatilityGerberIQScaler`](@ref)
+  - [`PairMeanGerberIQScaler`](@ref)
   - [`GerberIQKernel`](@ref)
   - [`GerberIQCovariance`](@ref)
 
@@ -541,12 +618,18 @@ The fall-through gives both assets the same units, so a volatile asset and a qui
 function gerber_iq_scaling(::AssetVolatilityGerberIQScaler, sdi::Number, sdj::Number)
     return sdi, sdj
 end
-function gerber_iq_scaling(::Option{<:GerberIQScalerEstimator}, sdi::Number, sdj::Number)
+function gerber_iq_scaling(::PairMeanGerberIQScaler, sdi::Number, sdj::Number)
     res = (sdi + sdj) / 2
     return res, res
 end
+function gerber_iq_scaling(::Nothing, sdi::Number, sdj::Number)
+    return gerber_iq_scaling(PairMeanGerberIQScaler(), sdi, sdj)
+end
 function gerber_iq_scaling(sca::Function, sdi::Number, sdj::Number)
     return sca(sdi, sdj)
+end
+function gerber_iq_scaling(sca::GerberIQScalerEstimator, ::Number, ::Number)
+    return throw(ArgumentError("$(typeof(sca)) subtypes GerberIQScalerEstimator but does not implement gerber_iq_scaling. Extension authors: a threshold scaler must implement gerber_iq_scaling(sca, sdi, sdj) -> (sci, scj), the scales of the thresholds of assets i and j computed from their standard deviations."))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -2110,7 +2193,7 @@ GerberIQCovariance
     """
     @fprop decay
     """
-    Threshold scaler, a [`GerberIQScaler`](@ref). It sets the units of the thresholds of each pair. `nothing` gives both assets of a pair the mean of their two standard deviations.
+    Threshold scaler, a [`GerberIQScaler`](@ref). It sets the units of the thresholds of each pair. `nothing` is [`PairMeanGerberIQScaler`](@ref), which gives both assets of a pair the mean of their two standard deviations.
     """
     sc
     """
@@ -2164,8 +2247,8 @@ function GerberIQCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance
     return GerberIQCovariance(ve, me, pdm, c, decay, sc, kind, alg, ex, cache)
 end
 
-export AssetVolatilityGerberIQScaler, BasicGerberIQ, PartialGerberIQ, FullGerberIQ,
-       ExpGerberIQDecay, GerberIQCovariance
+export AssetVolatilityGerberIQScaler, PairMeanGerberIQScaler, BasicGerberIQ,
+       PartialGerberIQ, FullGerberIQ, ExpGerberIQDecay, GerberIQCovariance
 public BaseGerberIQCovariance, GerberIQCovarianceAlgorithm, GerberIQEpsEstimator,
        GerberIQGammaEstimator, GerberIQScalerEstimator, GerberIQDecayEstimator,
        regenerate_decay, clamp_gerber_iq_n, gerber_iq_eps, gerber_iq_gamma,
