@@ -1114,9 +1114,6 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/17_Optimisation/02_CrossValidation/07_Scoring/</loc>
   </url>
   <url>
-    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/17_Optimisation/02_CrossValidation/08_OptimisationCrossValidation/</loc>
-  </url>
-  <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/17_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation/</loc>
   </url>
   <url>
@@ -2300,9 +2297,6 @@
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/17_Optimisation/02_CrossValidation/07_Scoring/</loc>
-  </url>
-  <url>
-    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/17_Optimisation/02_CrossValidation/08_OptimisationCrossValidation/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/17_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation/</loc>
