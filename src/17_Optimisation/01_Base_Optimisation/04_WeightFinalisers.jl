@@ -299,13 +299,13 @@ end
 
 Adds the rows that bound the norm of `r` by `t`, ``t \\geq \\lVert \\boldsymbol{r} \\rVert``, and returns them.
 
-Every row is scaled by the constraint scale ``s_c`` of `model`.
+Every row is scaled by the constraint scale ``s_c`` of `model`. The norm gives the order, and [`norm_epigraph!`](@ref) writes the rows.
 
 # JuMP formulation
 
 ## Variables
 
-  - `z`: One auxiliary variable for each entry of `r`, created with no key, only for an [`LpNorm`](@ref).
+  - `z`: One auxiliary variable for each entry of `r`, created with no key, only for an [`LpNorm`](@ref) of an order other than `2` and `Inf`.
 
 ## Constraints
 
@@ -314,7 +314,7 @@ The rows that `alg` selects:
   - [`L1Norm`](@ref): ``(s_c t,\\, s_c \\boldsymbol{r}) \\in \\mathcal{K}_{1}``.
   - [`L2Norm`](@ref) and [`SquaredL2Norm`](@ref): ``(s_c t,\\, s_c \\boldsymbol{r}) \\in \\mathcal{K}_{2}``.
   - [`LInfNorm`](@ref): ``(s_c t,\\, s_c \\boldsymbol{r}) \\in \\mathcal{K}_{\\infty}``.
-  - [`LpNorm`](@ref): ``(s_c z_{i},\\, s_c t,\\, s_c r_{i}) \\in \\mathcal{P}_{1/p}`` for each ``i``, and ``s_c (\\boldsymbol{1}^\\intercal \\boldsymbol{z} - t) = 0``.
+  - [`LpNorm`](@ref): ``(s_c z_{i},\\, s_c t,\\, s_c r_{i}) \\in \\mathcal{P}_{1/p}`` for each ``i``, and ``s_c (\\boldsymbol{1}^\\intercal \\boldsymbol{z} - t) = 0``. At ``p = 2`` and ``p = \\infty`` it is the row of [`L2Norm`](@ref) or of [`LInfNorm`](@ref).
 
 Where:
 
@@ -333,40 +333,26 @@ Where:
 
 # Returns
 
-  - The constraint, or for an [`LpNorm`](@ref) the tuple of the power cone rows and the sum row.
+  - `(cone, csum, z)`: The cone row or rows, the sum row and the auxiliary variables. `csum` and `z` are `nothing` off the power cone route.
 
 # Related
 
   - [`ErrorWeightFinaliser`](@ref)
   - [`NormError`](@ref)
+  - [`norm_epigraph!`](@ref)
 """
 function set_norm_error_epigraph!(model::JuMP.Model, t, r::AbstractVector, ::L1Norm)
-    sc = get_constraint_scale(model)
-    N = length(r)
-    cnorm = JuMP.@constraint(model, [sc * t; sc * r] in JuMP.MOI.NormOneCone(N + 1))
-    return cnorm
+    return norm_epigraph!(model, t, r, 1, get_constraint_scale(model))
 end
 function set_norm_error_epigraph!(model::JuMP.Model, t, r::AbstractVector,
                                   ::Union{L2Norm, SquaredL2Norm})
-    sc = get_constraint_scale(model)
-    cnorm = JuMP.@constraint(model, [sc * t; sc * r] in JuMP.SecondOrderCone())
-    return cnorm
+    return norm_epigraph!(model, t, r, 2, get_constraint_scale(model))
 end
 function set_norm_error_epigraph!(model::JuMP.Model, t, r::AbstractVector, ::LInfNorm)
-    sc = get_constraint_scale(model)
-    N = length(r)
-    cnorm = JuMP.@constraint(model, [sc * t; sc * r] in JuMP.MOI.NormInfinityCone(N + 1))
-    return cnorm
+    return norm_epigraph!(model, t, r, Inf, get_constraint_scale(model))
 end
 function set_norm_error_epigraph!(model::JuMP.Model, t, r::AbstractVector, alg::LpNorm)
-    sc = get_constraint_scale(model)
-    p_inv = inv(alg.p)
-    N = length(r)
-    z = JuMP.@variable(model, [1:N])
-    cpow = JuMP.@constraint(model, [i = 1:N],
-                            [sc * z[i], sc * t, sc * r[i]] in JuMP.MOI.PowerCone(p_inv))
-    csum = JuMP.@constraint(model, sc * (sum(z) - t) == 0)
-    return cpow, csum
+    return norm_epigraph!(model, t, r, alg.p, get_constraint_scale(model))
 end
 """
 $(DocStringExtensions.TYPEDEF)

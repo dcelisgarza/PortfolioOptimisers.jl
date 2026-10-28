@@ -191,6 +191,32 @@ end
     end
 end
 
+@testset "The norm epigraph reaches the norm on every route and at every scale" begin
+    # The one epigraph of a norm (#1884). A model with no registered scale passes `1`.
+    xv = [0.3, -0.7, 0.05, 1.2, -0.4]
+    for p in (2, 1, Inf, 3, 1.5), sc in (1, 3.0)
+        model = JuMP.Model(Clarabel.Optimizer)
+        JuMP.set_silent(model)
+        JuMP.@variable(model, x[1:length(xv)])
+        JuMP.fix.(x, xv)
+        JuMP.@variable(model, t)
+        cone, csum, r = PO.norm_epigraph!(model, t, x, p, sc)
+        JuMP.@objective(model, Min, t)
+        JuMP.optimize!(model)
+        @test isapprox(JuMP.value(t), norm(xv, p); rtol = 1e-6)
+        if p in (1, 2, Inf)
+            @test isa(cone, JuMP.ConstraintRef)
+            @test isnothing(csum)
+            @test isnothing(r)
+        else
+            @test length(cone) == length(xv)
+            @test length(r) == length(xv)
+            @test isapprox(sum(JuMP.value.(r)), JuMP.value(t); rtol = 1e-6)
+            @test isa(csum, JuMP.ConstraintRef)
+        end
+    end
+end
+
 # The regularisation penalties. Each testset reads the model back by the names that the
 # `# JuMP formulation` of the builder states, and checks the entries against the closed form
 # of its `# Mathematical definition`.

@@ -276,7 +276,7 @@ This row is the one part of the model that the error of [`DiscreteAllocation`](@
 
 ## Constraints
 
-  - `cerr`: The rows of [`set_norm_error_epigraph!`](@ref) for the norm `wf.alg`, which bound the norm of the residual ``\\boldsymbol{d}`` by ``u``.
+  - `cerr`: The tuple `(cone, csum, z)` of rows and variables that [`set_norm_error_epigraph!`](@ref) returns for the norm `wf.alg`, which bound the norm of the residual ``\\boldsymbol{d}`` by ``u``.
 
 The rows are the epigraph of a norm. The objective of [`finite_sub_allocation`](@ref) minimises ``u`` with a positive coefficient, so ``u`` equals the norm at the optimum.
 

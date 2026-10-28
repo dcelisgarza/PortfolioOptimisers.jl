@@ -497,70 +497,6 @@ function series_regret(ra::VecNum, rb::VecNum, mt::AbstractMeanTestEstimator,
 end
 
 """
-    path_norm_epigraph!(model::JuMP.Model, t, x, p::Number)
-
-Writes the epigraph ``t \\geq \\lVert \\boldsymbol{x} \\rVert_p`` of one step of a comparator path into a bare model.
-
-The cone is the norm's own at `p = 2`, `p = 1` and `p = Inf`. Every other order takes the power-cone form, one row per entry. It is the epigraph that [`norm_ball_dual_norm_epigraph!`](@ref) writes, without the model registry, which a bare programme does not use.
-
-# JuMP formulation
-
-## Variables
-
-  - `t`: read. It is the caller's epigraph variable.
-  - `r`: created at an order other than `1`, `2` and `Inf`, an anonymous vector of one variable per entry of ``\\boldsymbol{x}``.
-
-## Constraints
-
-Every row is registered under no name.
-
-  - At ``p = 2``, the second-order cone row ``t \\geq \\lVert \\boldsymbol{x} \\rVert_2``.
-  - At ``p = 1``, the norm-one cone row ``t \\geq \\lVert \\boldsymbol{x} \\rVert_1``.
-  - At ``p = \\infty``, the norm-infinity cone row ``t \\geq \\lVert \\boldsymbol{x} \\rVert_\\infty``.
-  - At any other ``p``, one power cone row per entry, ``r_j^{1/p}\\, t^{1 - 1/p} \\geq \\lvert x_j \\rvert`` with ``r_j \\geq 0`` and ``t \\geq 0``, and the row ``\\sum_j r_j - t = 0``.
-
-Where:
-
-  - ``t``: Epigraph variable of the step.
-  - ``\\boldsymbol{x}``: Affine expression whose norm is bounded, with entries ``x_j``.
-  - $(math_dict[:p_norm_order])
-  - ``r_j``: Auxiliary variable of entry ``j``.
-
-The power-cone rows are exact. Each row gives ``r_j \\geq \\lvert x_j \\rvert^p / t^{p-1}``, and the sum of the rows gives ``t^p \\geq \\sum_j \\lvert x_j \\rvert^p``, which is ``t \\geq \\lVert \\boldsymbol{x} \\rVert_p``.
-
-# Arguments
-
-  - $(arg_dict[:model])
-  - `t`: The epigraph variable.
-  - `x`: The affine expression whose norm is bounded, one entry per asset.
-  - `p`: The norm order, `1 <= p`.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`path_budget_constraint!`](@ref)
-  - [`norm_ball_dual_norm_epigraph!`](@ref)
-"""
-function path_norm_epigraph!(model::JuMP.Model, t, x, p::Number)::Nothing
-    N = length(x)
-    if p == 2
-        JuMP.@constraint(model, [t; x] in JuMP.SecondOrderCone())
-    elseif isone(p)
-        JuMP.@constraint(model, [t; x] in JuMP.MOI.NormOneCone(N + 1))
-    elseif isinf(p)
-        JuMP.@constraint(model, [t; x] in JuMP.MOI.NormInfinityCone(N + 1))
-    else
-        p_inv = inv(p)
-        r = JuMP.@variable(model, [1:N])
-        JuMP.@constraint(model, [j = 1:N], [r[j], t, x[j]] in JuMP.MOI.PowerCone(p_inv))
-        JuMP.@constraint(model, sum(r) - t == 0)
-    end
-    return nothing
-end
-"""
     row_bound_view(b::Number, m::AbstractVector{Bool})
     row_bound_view(b::VecNum, m::AbstractVector{Bool})
 
@@ -665,7 +601,7 @@ end
 
 Writes the path-length budget of the budgeted path programme.
 
-Each step of the path takes one epigraph variable through [`path_norm_epigraph!`](@ref), and the sum of these variables is at most `L`. A path of one row has no step, so the function writes nothing.
+Each step of the path takes one epigraph variable through [`norm_epigraph!`](@ref), and the sum of these variables is at most `L`. The bare programme registers no constraint scale, so the rows take the scale `1`. A path of one row has no step, so the function writes nothing.
 
 # JuMP formulation
 
@@ -680,7 +616,7 @@ Each step of the path takes one epigraph variable through [`path_norm_epigraph!`
 Every row is registered under no name.
 
   - ``\\boldsymbol{d}_{t-1} = \\boldsymbol{u}_t - \\boldsymbol{u}_{t-1}``, for ``t = 2, \\ldots, T``, one row per entry.
-  - The rows of [`path_norm_epigraph!`](@ref) on ``s_{t-1} \\geq \\lVert \\boldsymbol{d}_{t-1} \\rVert_p``, for ``t = 2, \\ldots, T``.
+  - The rows of [`norm_epigraph!`](@ref) on ``s_{t-1} \\geq \\lVert \\boldsymbol{d}_{t-1} \\rVert_p``, for ``t = 2, \\ldots, T``.
   - ``\\sum_{t=1}^{T-1} s_t \\leq L``.
 
 Where:
@@ -718,7 +654,7 @@ function path_budget_constraint!(model::JuMP.Model, u, L::Number, p::Number)::No
     d = JuMP.@variable(model, [1:(T - 1), 1:size(u, 2)])
     for t in 2:T
         JuMP.@constraint(model, view(d, t - 1, :) .== view(u, t, :) - view(u, t - 1, :))
-        path_norm_epigraph!(model, s[t - 1], view(d, t - 1, :), p)
+        norm_epigraph!(model, s[t - 1], view(d, t - 1, :), p, 1)
     end
     JuMP.@constraint(model, sum(s) <= L)
     return nothing

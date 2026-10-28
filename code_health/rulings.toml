@@ -834,17 +834,10 @@ count = 14
 rationale = "a-form-its-package-recommends"
 
 [[dismissal]]
-file = "src/17_Optimisation/01_Base_Optimisation/04_WeightFinalisers.jl"
-kind = "BuiltinErrorReport"
-message = "invalid builtin function call: getfield"
-count = 2
-rationale = "a-form-its-package-recommends"
-
-[[dismissal]]
 file = "src/17_Optimisation/02_CrossValidation/16_LogWealthRegret.jl"
 kind = "BuiltinErrorReport"
 message = "invalid builtin function call: getfield"
-count = 10
+count = 8
 rationale = "a-form-its-package-recommends"
 
 [[dismissal]]
