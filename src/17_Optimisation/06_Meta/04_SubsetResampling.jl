@@ -836,7 +836,7 @@ function optimise(sr::SubsetResampling{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
 end
 """
     group_frames(opt::NestedClustered) -> ReturnsFrames
-    group_frames(opt::Union{Stacking, SubsetResampling}) -> ReturnsFrames
+    group_frames(opt::Union{BaseStackingOptimisationEstimator, BaseSubsetResamplingOptimisationEstimator}) -> ReturnsFrames
 
 Walk the readers of a meta-optimiser, for the warning of a forgotten raw reader and the gap rule of the head.
 
@@ -859,7 +859,8 @@ The group of a meta-optimiser is the head and every reader in its own slots: the
 function group_frames(opt::NestedClustered)
     return field_frames(opt, "", refits_regression(opt.pe))
 end
-function group_frames(opt::Union{Stacking, SubsetResampling})
+function group_frames(opt::Union{BaseStackingOptimisationEstimator,
+                                 BaseSubsetResamplingOptimisationEstimator})
     return field_frames(opt, "", refits_regression(opt.pe))
 end
 

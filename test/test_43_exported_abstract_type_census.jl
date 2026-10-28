@@ -106,6 +106,8 @@
     `LastObservation` became the abstract family itself, with the `# Interfaces` section of
     `AbstractLastObservationAlgorithm`, which left the list. `LastRow` and `LastActiveRow`
     subtype it directly (issue #1861, the maintainer's ruling).
+    `AbstractPipelineEstimator`, `AbstractPipelineResult` and `BaseSmythBrobyCovariance` joined
+    with their `# Interfaces` sections on 2026-10-28 (issue #1890, from the verdict of #1874).
     They are held to their own list for the same reason — public is API too.
     =#
     #! format: off
@@ -194,6 +196,8 @@
         :AbstractPenalisedRegressionTarget,
         :AbstractPenaltyStrength,
         :AbstractPhylogenyFeatureAlgorithm,
+        :AbstractPipelineEstimator,
+        :AbstractPipelineResult,
         :AbstractPosdefEstimator,
         :AbstractPreorderBy,
         :AbstractPreprocessingEstimator,
@@ -246,6 +250,7 @@
         :BaseGerberIQCovariance,
         :BaseHierarchicalOptimisationResult,
         :BaseOptimisationEstimator,
+        :BaseSmythBrobyCovariance,
         :BinWidthBins,
         :BootstrapUncertaintySetEstimator,
         :CokurtosisEstimator,

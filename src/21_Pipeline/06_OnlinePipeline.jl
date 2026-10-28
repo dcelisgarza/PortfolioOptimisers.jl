@@ -1099,12 +1099,12 @@ function view_owner(est, idx, n::Integer, ctx::PipelineContext)
     return port_opt_view(est, idx, ctx.returns.X)
 end
 """
-    pipeline_fold_fit(pipe::Pipeline, data::Prices_RR, train_idx::VecInt, cols = :)
-    pipeline_fold_fit(pipe::Pipeline, data::Prices_RR, ::Nothing, cols = :)
+    pipeline_fold_fit(pipe::AbstractPipelineEstimator, data::Prices_RR, train_idx::VecInt, cols = :)
+    pipeline_fold_fit(pipe::AbstractPipelineEstimator, data::Prices_RR, ::Nothing, cols = :)
 
-The fit of one fold of a [`Pipeline`](@ref), by whether the fold carries a training window.
+The fit of one fold of a pipeline, by whether the fold carries a training window.
 
-This is the pipeline form of [`fit_fold_result`](@ref). A window fits the workflow over it, `fit(pipe, data[train_idx])`, which is the refit that every fold of the batch arms runs. `nothing` means that the pipeline holds its window, because the online arm of [`fold_loop`](@ref) folded every row of it. The fold then reads the pipeline out through `fit(pipe)` with no data.
+This is the pipeline form of [`fit_fold_result`](@ref). A window fits the workflow over it, `fit(pipe, data[train_idx])`, which is the refit that every fold of the batch arms runs. `nothing` means that the pipeline holds its window, because the online arm of [`fold_loop`](@ref) folded every row of it. The fold then reads the pipeline out through `fit(pipe)` with no data. The two methods call only `fit`, so they serve every [`AbstractPipelineEstimator`](@ref). The second method needs `fit(pipe)`, which only a pipeline that holds a partial-fit state implements.
 
 # Related
 
@@ -1112,10 +1112,12 @@ This is the pipeline form of [`fit_fold_result`](@ref). A window fits the workfl
   - [`fit(pipe::Pipeline)`](@ref)
   - [`cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CVER)`](@ref)
 """
-function pipeline_fold_fit(pipe::Pipeline, data::Prices_RR, train_idx::VecInt, cols = :)
+function pipeline_fold_fit(pipe::AbstractPipelineEstimator, data::Prices_RR,
+                           train_idx::VecInt, cols = :)
     return StatsAPI.fit(pipe, pipeline_data_view(data, train_idx, cols))
 end
-function pipeline_fold_fit(pipe::Pipeline, ::Prices_RR, ::Nothing, ::Any = :)
+function pipeline_fold_fit(pipe::AbstractPipelineEstimator, ::Prices_RR, ::Nothing,
+                           ::Any = :)
     return StatsAPI.fit(pipe)
 end
 """

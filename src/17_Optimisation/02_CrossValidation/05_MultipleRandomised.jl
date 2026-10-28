@@ -380,18 +380,22 @@ function n_splits(mrr::MultipleRandomisedResult)
     return length(mrr.path_ids)
 end
 """
-    const MRCVR = Union{MultipleRandomised, MultipleRandomisedResult}
+    const MRCVR = Union{NonOptimisationSequentialCrossValidationEstimator,
+                        NonOptimisationSequentialCrossValidationResult}
 
 Alias for a multiple-randomised cross-validation estimator or result.
 
-Matches either a [`MultipleRandomised`](@ref) estimator or a [`MultipleRandomisedResult`](@ref).
+Matches either a [`NonOptimisationSequentialCrossValidationEstimator`](@ref), such as [`MultipleRandomised`](@ref), or a [`NonOptimisationSequentialCrossValidationResult`](@ref), such as [`MultipleRandomisedResult`](@ref).
 
 # Related
 
   - [`MultipleRandomised`](@ref)
   - [`MultipleRandomisedResult`](@ref)
+  - [`NonOptimisationSequentialCrossValidationEstimator`](@ref)
+  - [`NonOptimisationSequentialCrossValidationResult`](@ref)
 """
-const MRCVR = Union{MultipleRandomised, MultipleRandomisedResult}
+const MRCVR = Union{NonOptimisationSequentialCrossValidationEstimator,
+                    NonOptimisationSequentialCrossValidationResult}
 """
     combination_by_index(idx::Integer, N::Integer, k::Integer) -> VecInt
 

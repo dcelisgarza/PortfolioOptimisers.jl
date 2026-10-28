@@ -100,18 +100,19 @@ function BudgetRange(; lb::Option{<:Number} = 1.0, ub::Option{<:Number} = 1.0)
     return BudgetRange(lb, ub)
 end
 """
-    const Num_BgtRg = Union{Number, BudgetRange}
+    const Num_BgtRg = Union{Number, BudgetEstimator}
 
 Alias for a scalar budget value or budget range.
 
-Matches either a plain number (fixed budget, e.g. `1.0`) or a [`BudgetRange`](@ref) (interval budget constraint). Used for dispatch in budget constraint generation.
+Matches either a plain number (fixed budget, e.g. `1.0`) or a [`BudgetEstimator`](@ref), such as a [`BudgetRange`](@ref) (interval budget constraint). Used for dispatch in budget constraint generation.
 
 # Related
 
+  - [`BudgetEstimator`](@ref)
   - [`BudgetRange`](@ref)
   - [`set_long_short_budget_constraints!`](@ref)
 """
-const Num_BgtRg = Union{Number, BudgetRange}
+const Num_BgtRg = Union{Number, BudgetEstimator}
 """
     set_budget_constraints!(args...)
     set_budget_constraints!(model::JuMP.Model, val::Number, w::VecNum)

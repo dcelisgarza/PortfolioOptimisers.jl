@@ -350,23 +350,15 @@ end
     kept_types = Dict{Symbol, String}(#
                                       :AbstractCrossSectionalRegressionResult => "a second cross-sectional regression result, a robust or a constrained fit",
                                       :AbstractJuMPResult => "a second JuMP result carrier, one that keeps the model",
-                                      :AbstractPipelineEstimator => "a second pipeline shape beside `Pipeline`",
-                                      :AbstractPipelineResult => "the result of a second pipeline shape",
                                       :AbstractSearchCrossValidationResult => "carries an `# Interfaces` section: an Open Family",
                                       :AbstractShrunkExpectedReturnsEstimator => "a second shrinkage estimator beside `ShrunkExpectedReturns`, kept by default by #1859 (ADR 0222)",
-                                      :BaseClusteringOptimisationEstimator => "a second clustering optimiser beside `HierarchicalOptimiser`",
                                       :BaseGerberIQCovariance => "carries an `# Interfaces` section: an Open Family",
                                       :BaseHierarchicalOptimisationResult => "carries an `# Interfaces` section: an Open Family",
                                       :BaseJuMPOptimisationResult => "a second JuMP optimisation result beside `JuMPOptimisationResult`",
-                                      :BaseSmythBrobyCovariance => "a second Smyth-Broby family member, as `BaseGerberIQCovariance` has",
-                                      :BaseStackingOptimisationEstimator => "a second stacking estimator beside `Stacking`",
-                                      :BaseSubsetResamplingOptimisationEstimator => "a second resampling estimator beside `SubsetResampling`",
+                                      :BaseSmythBrobyCovariance => "carries an `# Interfaces` section: an Open Family",
                                       :BootstrapUncertaintySetEstimator => "carries an `# Interfaces` section: an Open Family",
-                                      :BudgetEstimator => "a second budget estimator beside `BudgetRange`, a solver-driven one",
                                       :HierarchicalScalariser => "the max and sum scalarisers beside `MinScalariser`",
                                       :InverseMatrixSparsificationAlgorithm => "a second sparsification beside `LoGo`, a graphical lasso",
-                                      :NonOptimisationSequentialCrossValidationEstimator => "a second sequential non-optimisation scheme beside `MultipleRandomised`",
-                                      :NonOptimisationSequentialCrossValidationResult => "the result of a second sequential non-optimisation scheme",
                                       :OptimisationModelResult => "carries an `# Interfaces` section: an Open Family")
 
     # ------------------------------------------------------------- the assertions

@@ -560,9 +560,9 @@ function assert_no_holdout(pipe::Pipeline)::Nothing
     return nothing
 end
 """
-    port_opt_view(pipe::Pipeline, i, args...; kwargs...)
+    port_opt_view(pipe::AbstractPipelineEstimator, i, args...; kwargs...)
 
-Refuse an asset view of a [`Pipeline`](@ref).
+Refuse an asset view of a [`Pipeline`](@ref), or of any other [`AbstractPipelineEstimator`](@ref).
 
 A meta-optimiser such as [`NestedClustered`](@ref), [`Stacking`](@ref) or [`SubsetResampling`](@ref) takes a `port_opt_view` of its inner estimator to build a portfolio over a subset of the assets. The asset universe of a pipeline is fitted state, because a missing-data filter selects it from the training window. So an asset view before the fit has no defined meaning. A meta-optimiser cannot wrap a `Pipeline`, but it can be the optimisation step of one.
 
@@ -573,9 +573,9 @@ A meta-optimiser such as [`NestedClustered`](@ref), [`Stacking`](@ref) or [`Subs
 # Related
 
   - [`Pipeline`](@ref)
-  - [`optimise(::Pipeline)`](@ref)
+  - [`optimise`](@ref)
 """
-function port_opt_view(::Pipeline, args...; kwargs...)
+function port_opt_view(::AbstractPipelineEstimator, args...; kwargs...)
     return throw(ArgumentError("a Pipeline cannot be sub-selected with port_opt_view: its asset universe is fitted state, so wrapping a Pipeline inside a meta-optimiser is unsupported. A meta-optimiser may be used as the optimisation step of a Pipeline instead."))
 end
 """
@@ -1241,8 +1241,9 @@ function StatsAPI.predict(res::PipelineResult, data::AbstractReturnsResult,
     return [StatsAPI.predict(res, data, test_idx, cols; kwargs...)
             for test_idx in test_idxs]
 end
-function fit_and_predict(res::PipelineResult, data::Prices_RR; test_idx::VecInt_VecVecInt,
-                         cols = :, wd::Option{<:AbstractWeightDrift} = nothing,
+function fit_and_predict(res::AbstractPipelineResult, data::Prices_RR;
+                         test_idx::VecInt_VecVecInt, cols = :,
+                         wd::Option{<:AbstractWeightDrift} = nothing,
                          hwd::Option{<:AbstractWeightDrift} = wd,
                          fa::Option{<:AbstractFeeAmortisation} = nothing,
                          store_weight_path::Bool = false, strict::Bool = false,
@@ -1251,7 +1252,7 @@ function fit_and_predict(res::PipelineResult, data::Prices_RR; test_idx::VecInt_
                             store_weight_path = store_weight_path, strict = strict,
                             w_prev = w_prev)
 end
-function fit_and_predict(pipe::Pipeline, data::Prices_RR;
+function fit_and_predict(pipe::AbstractPipelineEstimator, data::Prices_RR;
                          train_idx::Option{<:VecInt} = nothing, test_idx::VecInt_VecVecInt,
                          cols = :, wd::Option{<:AbstractWeightDrift} = nothing,
                          hwd::Option{<:AbstractWeightDrift} = wd,
@@ -1333,7 +1334,7 @@ function run_step(p::Pipeline, ctx::PipelineContext)
     slot = pipe_writes(p)
     return res, set_slot(ctx, slot, getproperty(getfield(res, :ctx), slot))
 end
-function optimise(::Pipeline, args...; kwargs...)
+function optimise(::AbstractPipelineEstimator, args...; kwargs...)
     return throw(ArgumentError("a Pipeline is a workflow, not an OptimisationEstimator: fit it with fit(pipeline, data). Wrapping a Pipeline inside a meta-optimiser is not supported."))
 end
 

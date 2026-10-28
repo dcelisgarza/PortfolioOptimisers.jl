@@ -174,8 +174,8 @@ end
     fit_and_predict(opt, rd::ReturnsResult, cv::CombCVER; cols, ex) -> PopulationPredictionResult
     fit_and_predict(opt, rd::ReturnsResult; train_idx = nothing, test_idx, cols) -> PredictionResult
     fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult; test_idx, cols) -> PredictionResult
-    fit_and_predict(pipe::Pipeline, data::Prices_RR; train_idx = nothing, test_idx, cols) -> PredictionResult
-    fit_and_predict(res::PipelineResult, data::Prices_RR; test_idx, cols) -> PredictionResult
+    fit_and_predict(pipe::AbstractPipelineEstimator, data::Prices_RR; train_idx = nothing, test_idx, cols) -> PredictionResult
+    fit_and_predict(res::AbstractPipelineResult, data::Prices_RR; test_idx, cols) -> PredictionResult
 
 Fit an optimisation estimator on training data and predict on test data using cross-validation.
 
@@ -187,7 +187,7 @@ The estimator form reads `train_idx = nothing` as *the estimator holds its windo
 
 The result form is fitted already, so it ignores `train_idx` and every keyword that [`predict`](@ref) does not take. The fold loop passes the same keywords to an estimator and to a result.
 
-The two [`Pipeline`](@ref) methods take price data or returns data. The `Pipeline` method fits the pipeline over the rows `train_idx` and the columns `cols` with [`pipeline_fold_fit`](@ref), or reads a stepped pipeline out when `train_idx` is `nothing`. It then predicts over `test_idx` with [`predict(res::PipelineResult, data::AbstractPricesResult, window)`](@ref). The [`PipelineResult`](@ref) method is fitted already, and predicts over `test_idx`.
+The two pipeline methods take price data or returns data. They call only `fit` and `predict`, so they serve every [`AbstractPipelineEstimator`](@ref) and every [`AbstractPipelineResult`](@ref). The estimator method fits the pipeline over the rows `train_idx` and the columns `cols` with [`pipeline_fold_fit`](@ref), or reads a stepped pipeline out when `train_idx` is `nothing`. It then predicts over `test_idx` with [`predict(res::PipelineResult, data::AbstractPricesResult, window)`](@ref). The result method is fitted already, and predicts over `test_idx`.
 
 # Algorithm
 

@@ -5,6 +5,46 @@ Abstract supertype for all Smyth-Broby covariance estimators.
 
 Every concrete or abstract type that implements a Smyth-Broby covariance estimator must subtype `BaseSmythBrobyCovariance`. It subtypes [`BaseGerberCovariance`](@ref), because a Smyth-Broby statistic is a Gerber statistic with a second zone. Each observation adds a real-valued contribution to it, not a count of one. [`GerberCovariance`](@ref) states the Gerber statistic, and this docstring does not repeat it.
 
+# Interfaces
+
+A new subtype must follow the interface of [`AbstractCovarianceEstimator`](@ref).
+
+### Examples
+
+This subtype holds a [`SmythBrobyCovariance`](@ref) and doubles its covariance matrix. Its correlation matrix is that of the estimator it holds.
+
+```jldoctest
+julia> struct MySmythBroby{T} <: PortfolioOptimisers.BaseSmythBrobyCovariance
+           ce::T
+       end
+
+julia> function Statistics.cov(est::MySmythBroby, X::PortfolioOptimisers.MatNum; kwargs...)
+           return 2 * cov(est.ce, X; kwargs...)
+       end
+
+julia> function Statistics.cor(est::MySmythBroby, X::PortfolioOptimisers.MatNum; kwargs...)
+           return cor(est.ce, X; kwargs...)
+       end
+
+julia> function PortfolioOptimisers.factory(est::MySmythBroby, w::PortfolioOptimisers.ObsWeights)
+           return MySmythBroby(PortfolioOptimisers.factory(est.ce, w))
+       end
+
+julia> X = [0.01 0.02 -0.01; -0.02 0.01 0.03; 0.03 -0.01 0.02; 0.01 0.0 -0.02;
+            -0.01 0.02 0.01; 0.02 0.01 0.0];
+
+julia> ce = MySmythBroby(SmythBrobyCovariance());
+
+julia> cov(ce, X) == 2 * cov(SmythBrobyCovariance(), X)
+true
+
+julia> cor(ce, X)
+3×3 Matrix{Float64}:
+  1.0        -0.357035  -0.0336873
+ -0.357035    1.0       -0.438569
+ -0.0336873  -0.438569   1.0
+```
+
 # Related
 
   - [`SmythBrobyCovariance`](@ref)
@@ -1673,3 +1713,4 @@ end
 export SmythBroby0, SmythBroby1, SmythBroby2, SmythBrobyGerber0, SmythBrobyGerber1,
        SmythBrobyGerber2, SmythBrobyCount0, SmythBrobyCount1, SmythBrobyCount2,
        SmythBrobyCovariance
+public BaseSmythBrobyCovariance

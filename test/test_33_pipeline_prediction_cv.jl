@@ -669,3 +669,47 @@ end
         end
     end
 end
+
+# A second pipeline shape implements only `fit` and `predict` (#1890).
+struct Ticket1890Pipeline{T} <: PortfolioOptimisers.AbstractPipelineEstimator
+    opt::T
+end
+struct Ticket1890PipelineResult{T} <: PortfolioOptimisers.AbstractPipelineResult
+    res::T
+end
+function PortfolioOptimisers.StatsAPI.fit(pipe::Ticket1890Pipeline, rd::ReturnsResult)
+    return Ticket1890PipelineResult(optimise(pipe.opt, rd))
+end
+function PortfolioOptimisers.StatsAPI.predict(res::Ticket1890PipelineResult,
+                                              rd::ReturnsResult, args...; kwargs...)
+    return PortfolioOptimisers.StatsAPI.predict(res.res, rd, args...; kwargs...)
+end
+
+@testset "A second pipeline shape reaches the methods on the abstract types (#1890)" begin
+    rd = ReturnsResult(; nx = ["A", "B", "C"],
+                       X = [0.01 0.02 -0.01; -0.02 0.01 0.03; 0.03 -0.01 0.02;
+                            0.01 0.0 -0.02; -0.01 0.02 0.01; 0.02 0.01 0.0])
+    pipe = Ticket1890Pipeline(InverseVolatility())
+
+    # The estimator method fits over the training rows and predicts over the test rows.
+    ref = optimise(InverseVolatility(), PortfolioOptimisers.port_opt_view(rd, 1:4, :))
+    pred = PortfolioOptimisers.fit_and_predict(pipe, rd; train_idx = 1:4, test_idx = 5:6)
+    @test pred.res.w ≈ ref.w
+    @test pred.rd.X ≈ predict(ref, rd, 5:6).rd.X
+
+    # The result method predicts over one window, or over each of a vector of windows.
+    res = fit(pipe, rd)
+    @test PortfolioOptimisers.fit_and_predict(res, rd; test_idx = 5:6).rd.X ≈
+          predict(res.res, rd, 5:6).rd.X
+    preds = PortfolioOptimisers.fit_and_predict(res, rd; test_idx = [4:5, 5:6])
+    @test length(preds) == 2
+    @test preds[1].rd.X ≈ predict(res.res, rd, 4:5).rd.X
+
+    # A pipeline is not an optimiser, whatever its shape.
+    @test_throws ArgumentError PortfolioOptimisers.port_opt_view(pipe, 1:2)
+    @test_throws ArgumentError optimise(pipe, rd)
+
+    # With no training rows the method reads the pipeline out with `fit(pipe)`, which only a
+    # pipeline that holds a partial-fit state implements.
+    @test_throws MethodError PortfolioOptimisers.fit_and_predict(pipe, rd; test_idx = 5:6)
+end
