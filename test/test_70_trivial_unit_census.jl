@@ -350,6 +350,7 @@ end
     kept_types = Dict{Symbol, String}(#
                                       :AbstractCrossSectionalRegressionResult => "a second cross-sectional regression result, a robust or a constrained fit",
                                       :AbstractJuMPResult => "a second JuMP result carrier, one that keeps the model",
+                                      :AbstractPenalisedRegressionTarget => "carries an `# Interfaces` section: an Open Family",
                                       :AbstractSearchCrossValidationResult => "carries an `# Interfaces` section: an Open Family",
                                       :AbstractShrunkExpectedReturnsEstimator => "a second shrinkage estimator beside `ShrunkExpectedReturns`, kept by default by #1859 (ADR 0222)",
                                       :BaseGerberIQCovariance => "carries an `# Interfaces` section: an Open Family",

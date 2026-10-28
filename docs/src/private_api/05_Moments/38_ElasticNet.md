@@ -1,5 +1,5 @@
 ```@meta
-Description = "Elastic net, private API of PortfolioOptimisers.jl: ElasticNetFit, StatsAPI.coef, StatsAPI.predict, elastic_net_design, elastic_net_sweeps, …"
+Description = "Elastic net, private API of PortfolioOptimisers.jl: ElasticNetFit, StatsAPI.coef, elastic_net_design, elastic_net_sweeps, elastic_net_polish."
 ```
 
 # Elastic net: private API
@@ -9,7 +9,6 @@ These are the fitted model of [`ElasticNet`](@ref) and the steps of its fit. `el
 ```@docs
 PortfolioOptimisers.ElasticNetFit
 PortfolioOptimisers.StatsAPI.coef(m::PortfolioOptimisers.ElasticNetFit)
-PortfolioOptimisers.StatsAPI.predict(m::PortfolioOptimisers.ElasticNetFit, X::MatNum)
 PortfolioOptimisers.elastic_net_design
 PortfolioOptimisers.elastic_net_sweeps
 PortfolioOptimisers.elastic_net_polish
