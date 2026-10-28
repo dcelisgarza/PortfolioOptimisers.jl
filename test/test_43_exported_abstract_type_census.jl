@@ -286,6 +286,7 @@
         :VecJuMPObj,
         :VectorAbstractEstimatorValueAlgorithm,
         :VectorToScalarMeasure,
+        :WeightDeviation,
         :WeightFinaliser
     ])
     #! format: on

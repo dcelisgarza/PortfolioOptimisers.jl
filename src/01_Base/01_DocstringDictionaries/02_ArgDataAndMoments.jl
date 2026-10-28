@@ -210,6 +210,8 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :ew_mu => "`mu`: Running exponentially weighted mean vector, seeded at zero.",#
                  :sq => "`sq`: Whether to use variance instead of volatility in the inverse weighting.",#
                  :wfalg => "`alg`: Weight finaliser error formulation algorithm.",#
+                 :wfnorm => "`alg`: Norm of the deviation from the target weights. The programme bounds the norm itself and does not divide it, so the `ddof` of the norm has no effect.",#
+                 :wfdev => "`dev`: Whether the deviation is relative to the target weights or absolute.",#
                  :res_retcode => "`res`: Optional result or message from the solver.",#
                  :N_msc => "`N`: Number of evenly spaced values of `gamma` the monotonic Schur complement scans for its turning point, both ends included.",#
                  :alpha_dirichlet => "`alpha`: Dirichlet concentration parameter.",#

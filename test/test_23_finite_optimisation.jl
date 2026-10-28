@@ -660,8 +660,10 @@ using JuMP
                                                                                         "verbose" =>
                                                                                             false)),
                        check_sol = (; allow_local = true, allow_almost = true))
-    wfs = (AbsoluteErrorWeightFinaliser(), SquaredAbsoluteErrorWeightFinaliser(),
-           RelativeErrorWeightFinaliser(), SquaredRelativeErrorWeightFinaliser())
+    abs_dev = AbsoluteWeightDeviation()
+    wfs = (ErrorWeightFinaliser(; dev = abs_dev),
+           ErrorWeightFinaliser(; alg = L2Norm(), dev = abs_dev), ErrorWeightFinaliser(),
+           ErrorWeightFinaliser(; alg = L2Norm()))
     da(wf) = DiscreteAllocation(; slv = conic_slv, wf = wf, fb = nothing)
 
     @testset "validation" begin
@@ -676,14 +678,11 @@ using JuMP
         function objective(wf, w, p, C, x)
             we = map(v -> iszero(v) ? eps(eltype(w)) : v, w)
             r = C - dot(x, p)
-            return r + if isa(wf, AbsoluteErrorWeightFinaliser)
-                norm(w * C - x .* p, 1)
-            elseif isa(wf, SquaredAbsoluteErrorWeightFinaliser)
-                norm(w * C - x .* p, 2)
-            elseif isa(wf, RelativeErrorWeightFinaliser)
-                C * norm((x .* p) ./ (we * C) .- 1, 1)
+            q = isa(wf.alg, L1Norm) ? 1 : 2
+            return r + if isa(wf.dev, AbsoluteWeightDeviation)
+                norm(w * C - x .* p, q)
             else
-                C * norm((x .* p) ./ (we * C) .- 1, 2)
+                C * norm((x .* p) ./ (we * C) .- 1, q)
             end
         end
         function enumerate_best(wf, w, p, C)
@@ -711,21 +710,10 @@ using JuMP
             @test isapprox(JuMP.objective_value(r.l_model), obj; rtol = 1e-6)
             # The objective is `e + r`: `u` under an absolute error, `C u` under a relative one.
             m = r.l_model
-            e = JuMP.value(m[:u]) * (if isa(wf,
-                                            Union{RelativeErrorWeightFinaliser,
-                                                  SquaredRelativeErrorWeightFinaliser})
-                                         C
-                                     else
-                                         1
-                                     end)
+            e = JuMP.value(m[:u]) * (isa(wf.dev, RelativeWeightDeviation) ? C : 1)
             @test isapprox(JuMP.objective_value(m), e + JuMP.value(m[:r]); rtol = 1e-6)
-        end
-        # The row that `wf` names is the one in the model.
-        rows = [:cabs_err, :csqabs_err, :crel_err, :csqrel_err]
-        for (wf, row) in zip(wfs, rows)
-            m = optimise(da(wf), FiniteAllocationInput(; w = w, prices = p, cash = cash)).l_model
-            @test haskey(m, row)
-            @test all(!haskey(m, other) for other in setdiff(rows, [row]))
+            # The error row is registered as `cerr`, for every norm and deviation.
+            @test haskey(m, :cerr)
         end
     end
 
@@ -779,7 +767,7 @@ using JuMP
                         end)
         wv = [0.5, 0.0, 0.5]
         err = PO.set_discrete_error!(model, wv, [10.0, 20.0, 100.0], 1000.0,
-                                     RelativeErrorWeightFinaliser())
+                                     ErrorWeightFinaliser())
         @test wv == [0.5, 0.0, 0.5]
         @test isequal(err, 1000.0 * u)
     end
@@ -794,7 +782,7 @@ using JuMP
         m = r.l_model
         for k in
             (:money, :fee_prop, :fee_tn, :fee_fixed, :fee, :t_ftn, :b, :cftn_ub, :cftn_lb,
-             :cb_ub, :cb_lb, :cr, :r, :x, :u, :sc, :so, :cabs_err)
+             :cb_ub, :cb_lb, :cr, :r, :x, :u, :sc, :so, :cerr)
             @test haskey(m, k)
         end
         x = JuMP.value.(m[:x])

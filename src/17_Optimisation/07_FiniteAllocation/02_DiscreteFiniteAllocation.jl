@@ -116,7 +116,7 @@ The long and the short side of a book are two separate sub-problems, each with i
 
 # Mathematical definition
 
-One sub-problem, under the default [`AbsoluteErrorWeightFinaliser`](@ref):
+One sub-problem, under the default `ErrorWeightFinaliser(; dev = AbsoluteWeightDeviation())`:
 
 ```math
 \\begin{align}
@@ -143,25 +143,24 @@ Where:
 
 The fee of [`set_allocation_fees!`](@ref) enters the budget and never the objective. The objective reads *track well, and leave no capital idle*, so a fee added to ``r`` and minimised would reward the model for paying more fees, because a larger fee shrinks the leftover. The budget instead states that the fee must be affordable. The objective still pushes ``\\boldsymbol{x}^\\intercal \\boldsymbol{p}`` up, so every unit of fee competes with a unit of position, and the model drops a position whose fixed fee buys too little tracking.
 
-`wf` selects the row that bounds ``u``, and the error term ``e`` that takes the place of ``u`` in the objective ``e + r``. The integrality and the budget do not change with it.
+`wf` selects the row that bounds ``u``, and the error term ``e`` that takes the place of ``u`` in the objective ``e + r``. The norm `wf.alg` selects the norm of the row, and the deviation `wf.dev` selects the residual and ``e``. The integrality and the budget do not change with it.
 
-| `wf`                                          | Row on ``u``                                                                                                          | ``e``   |
-|:--------------------------------------------- |:--------------------------------------------------------------------------------------------------------------------- |:------- |
-| [`AbsoluteErrorWeightFinaliser`](@ref)        | ``u \\geq \\lVert C \\boldsymbol{w} - \\boldsymbol{x} \\odot \\boldsymbol{p} \\rVert_1``                              | ``u``   |
-| [`SquaredAbsoluteErrorWeightFinaliser`](@ref) | ``u \\geq \\lVert C \\boldsymbol{w} - \\boldsymbol{x} \\odot \\boldsymbol{p} \\rVert_2``                              | ``u``   |
-| [`RelativeErrorWeightFinaliser`](@ref)        | ``u \\geq \\lVert (\\boldsymbol{x} \\odot \\boldsymbol{p}) \\oslash (C \\boldsymbol{w}) - \\boldsymbol{1} \\rVert_1`` | ``C u`` |
-| [`SquaredRelativeErrorWeightFinaliser`](@ref) | ``u \\geq \\lVert (\\boldsymbol{x} \\odot \\boldsymbol{p}) \\oslash (C \\boldsymbol{w}) - \\boldsymbol{1} \\rVert_2`` | ``C u`` |
+| `wf.dev`                          | Row on ``u``                                                                                                        | ``e``   |
+|:--------------------------------- |:------------------------------------------------------------------------------------------------------------------- |:------- |
+| [`AbsoluteWeightDeviation`](@ref) | ``u \\geq \\lVert \\boldsymbol{x} \\odot \\boldsymbol{p} - C \\boldsymbol{w} \\rVert``                              | ``u``   |
+| [`RelativeWeightDeviation`](@ref) | ``u \\geq \\lVert (\\boldsymbol{x} \\odot \\boldsymbol{p}) \\oslash (C \\boldsymbol{w}) - \\boldsymbol{1} \\rVert`` | ``C u`` |
 
 Where:
 
+  - ``\\lVert \\cdot \\rVert``: The norm of `wf.alg`.
   - $(math_dict[:oslash])
   - ``\\boldsymbol{1}``: Vector of ones.
 
-The absolute error is money, and so is ``r``. The relative error is the realised weight of each position over its target weight, less one, and it has no unit. The relative formulations price it in money as ``C u``, so a relative error of one over the whole side is worth the whole side's cash. Without that factor the model gives up any amount of tracking to leave one unit less of cash idle.
+The absolute error is money, and so is ``r``. The relative error is the realised weight of each position over its target weight, less one, and it has no unit. The relative deviation prices it in money as ``C u``, so a relative error of one over the whole side is worth the whole side's cash. Without that factor the model gives up any amount of tracking to leave one unit less of cash idle.
 
 !!! note
 
-    The two `Squared` formulations bound the ``\\ell_2`` norm itself, not its square. They build a `JuMP.SecondOrderCone` over ``[u;\\, \\cdot]``. The square is monotonic on a non-negative norm, so the minimiser is the one a squared objective would give, but the objective *value* is the norm. The two relative formulations replace a zero target weight with `eps` so that the division is defined.
+    The row bounds the norm itself. It does not divide the norm by [`norm_factor`](@ref), and an [`L2Norm`](@ref) and a [`SquaredL2Norm`](@ref) build the same `JuMP.SecondOrderCone` over ``[u;\\, \\cdot]``. The square is monotonic on a non-negative norm, so the minimiser is the one a squared objective would give, but the objective *value* is the norm. The relative deviation replaces a zero target weight with `eps` so that the division is defined.
 
 # Fields
 
@@ -173,7 +172,8 @@ $(DocStringExtensions.FIELDS)
         slv::Slv_VecSlv,
         sc::Number = 1,
         so::Number = 1,
-        wf::JuMPWeightFinaliserFormulation = AbsoluteErrorWeightFinaliser(),
+        wf::JuMPWeightFinaliserFormulation = ErrorWeightFinaliser(;
+                                                 dev = AbsoluteWeightDeviation()),
         fb::Option{<:FOptE_FOpt} = GreedyAllocation()
     ) -> DiscreteAllocation
 
@@ -197,7 +197,10 @@ DiscreteAllocation
       │   add_bridges ┴ Bool: true
    sc ┼ Int64: 1
    so ┼ Int64: 1
-   wf ┼ AbsoluteErrorWeightFinaliser()
+   wf ┼ ErrorWeightFinaliser
+      │   alg ┼ L1Norm
+      │       │   ddof ┴ Int64: 0
+      │   dev ┴ AbsoluteWeightDeviation()
    fb ┼ GreedyAllocation
       │     unit ┼ Int64: 1
       │     args ┼ Tuple{}: ()
@@ -251,17 +254,18 @@ DiscreteAllocation
     end
 end
 function DiscreteAllocation(; slv::Slv_VecSlv, sc::Number = 1, so::Number = 1,
-                            wf::JuMPWeightFinaliserFormulation = AbsoluteErrorWeightFinaliser(),
+                            wf::JuMPWeightFinaliserFormulation = ErrorWeightFinaliser(;
+                                                                                      dev = AbsoluteWeightDeviation()),
                             fb::Option{<:FOptE_FOpt} = GreedyAllocation())::DiscreteAllocation
     return DiscreteAllocation(slv, sc, so, wf, fb)
 end
 """
     set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Number,
-                        wf::JuMPWeightFinaliserFormulation)
+                        wf::ErrorWeightFinaliser)
 
 Bound the model's error variable `u` by the allocation error that `wf` selects, and return the error term of the objective.
 
-This row is the one part of the model that separates the four formulations of [`DiscreteAllocation`](@ref). [`finite_sub_allocation`](@ref) creates `x` and `u` before it calls this method, and it builds the objective from the term this method returns.
+This row is the one part of the model that the error of [`DiscreteAllocation`](@ref) changes. [`finite_sub_allocation`](@ref) creates `x` and `u` before it calls this method, and it builds the objective from the term this method returns.
 
 # JuMP formulation
 
@@ -272,25 +276,19 @@ This row is the one part of the model that separates the four formulations of [`
 
 ## Constraints
 
-One row, which `wf` names:
+  - `cerr`: The rows of [`set_norm_error_epigraph!`](@ref) for the norm `wf.alg`, which bound the norm of the residual ``\\boldsymbol{d}`` by ``u``.
 
-  - `cabs_err`, under [`AbsoluteErrorWeightFinaliser`](@ref): ``(s_c u,\\, s_c (C \\boldsymbol{w} - \\boldsymbol{x} \\odot \\boldsymbol{p})) \\in \\mathcal{K}_{1}``.
-  - `csqabs_err`, under [`SquaredAbsoluteErrorWeightFinaliser`](@ref): ``(s_c u,\\, s_c (C \\boldsymbol{w} - \\boldsymbol{x} \\odot \\boldsymbol{p})) \\in \\mathcal{K}_{2}``.
-  - `crel_err`, under [`RelativeErrorWeightFinaliser`](@ref): ``(s_c u,\\, s_c ((\\boldsymbol{x} \\odot \\boldsymbol{p}) \\oslash (C \\tilde{\\boldsymbol{w}}) - \\boldsymbol{1})) \\in \\mathcal{K}_{1}``.
-  - `csqrel_err`, under [`SquaredRelativeErrorWeightFinaliser`](@ref): ``(s_c u,\\, s_c ((\\boldsymbol{x} \\odot \\boldsymbol{p}) \\oslash (C \\tilde{\\boldsymbol{w}}) - \\boldsymbol{1})) \\in \\mathcal{K}_{2}``.
-
-Each row is the epigraph of a norm. The objective of [`finite_sub_allocation`](@ref) minimises ``u`` with a positive coefficient, so ``u`` equals the norm at the optimum.
+The rows are the epigraph of a norm. The objective of [`finite_sub_allocation`](@ref) minimises ``u`` with a positive coefficient, so ``u`` equals the norm at the optimum.
 
 Where:
 
   - $(math_dict[:x_shares])
   - $(math_dict[:u_alloc_err])
+  - ``\\boldsymbol{d}``: The residual of [`weight_deviation`](@ref) for `wf.dev`, ``(\\boldsymbol{x} \\odot \\boldsymbol{p}) \\oslash (C \\tilde{\\boldsymbol{w}}) - \\boldsymbol{1}`` for a [`RelativeWeightDeviation`](@ref), and ``\\boldsymbol{x} \\odot \\boldsymbol{p} - C \\boldsymbol{w}`` for an [`AbsoluteWeightDeviation`](@ref).
   - $(math_dict[:w_side_target])
   - ``\\tilde{\\boldsymbol{w}}``: ``\\boldsymbol{w}`` with each zero entry replaced by `eps(eltype(w))`, so that the division is defined.
   - $(math_dict[:C_side_cash])
   - $(math_dict[:p_prices])
-  - $(math_dict[:sc_scale])
-  - $(math_dict[:K_q_norm])
   - ``\\odot``: Element-wise (Hadamard) product.
   - $(math_dict[:oslash])
   - ``\\boldsymbol{1}``: Vector of ones.
@@ -298,75 +296,29 @@ Where:
 # Arguments
 
   - $(arg_dict[:model])
-  - `w::VecNum`: Side target weights, normalised to sum to one. The relative formulations replace a zero entry on a **copy**, so the caller's vector does not change.
+  - `w::VecNum`: Side target weights, normalised to sum to one. The relative deviation replaces a zero entry on a **copy**, so the caller's vector does not change.
   - `p::VecNum`: Asset prices of this side, in the same order as `w`.
   - `cash::Number`: Cash of this side.
-  - `wf::JuMPWeightFinaliserFormulation`: Selects the error. See the table in [`DiscreteAllocation`](@ref).
+  - `wf::ErrorWeightFinaliser`: Selects the error. See the table in [`DiscreteAllocation`](@ref).
 
 # Returns
 
-  - `err`: The error term of the objective, in money: `u` under an absolute formulation, and `cash * u` under a relative one, whose error has no unit.
+  - `err`: The error term of the objective, in money, from [`deviation_error_term`](@ref): `u` under an absolute deviation, and `cash * u` under a relative one, whose error has no unit.
 
 # Related
 
   - [`DiscreteAllocation`](@ref)
   - [`finite_sub_allocation`](@ref)
-  - [`JuMPWeightFinaliserFormulation`](@ref)
+  - [`ErrorWeightFinaliser`](@ref)
 """
 function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Number,
-                             ::RelativeErrorWeightFinaliser)
-    mask = iszero.(w)
-    if any(mask)
-        w = copy(w)
-        w[mask] .= eps(eltype(w))
-    end
+                             wf::ErrorWeightFinaliser)
     x = model[:x]
     u = model[:u]
-    sc = get_constraint_scale(model)
-    JuMP.@constraint(model, crel_err,
-                     [sc * u
-                      sc *
-                      ((x .* p) ⊘ (w * cash) .- one(promote_type(eltype(w), eltype(p))))] in
-                     JuMP.MOI.NormOneCone(length(x) + 1))
-    # A relative error has no unit, and the leftover cash of the objective is money.
-    return cash * u
-end
-function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Number,
-                             ::SquaredRelativeErrorWeightFinaliser)
-    mask = iszero.(w)
-    if any(mask)
-        w = copy(w)
-        w[mask] .= eps(eltype(w))
-    end
-    x = model[:x]
-    u = model[:u]
-    sc = get_constraint_scale(model)
-    JuMP.@constraint(model, csqrel_err,
-                     [sc * u;
-                      sc *
-                      ((x .* p) ⊘ (w * cash) .- one(promote_type(eltype(w), eltype(p))))] in
-                     JuMP.SecondOrderCone())
-    return cash * u
-end
-function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Number,
-                             ::AbsoluteErrorWeightFinaliser)
-    x = model[:x]
-    u = model[:u]
-    sc = get_constraint_scale(model)
-    JuMP.@constraint(model, cabs_err,
-                     [sc * u; sc * (w * cash .- x .* p)] in
-                     JuMP.MOI.NormOneCone(length(x) + 1))
-    return u
-end
-function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Number,
-                             ::SquaredAbsoluteErrorWeightFinaliser)
-    x = model[:x]
-    u = model[:u]
-    sc = get_constraint_scale(model)
-    JuMP.@constraint(model, csqabs_err,
-                     [sc * u;
-                      sc * (w * cash .- x .* p)] in JuMP.SecondOrderCone())
-    return u
+    model[:cerr] = set_norm_error_epigraph!(model, u,
+                                            weight_deviation(wf.dev, x .* p, w, cash),
+                                            wf.alg)
+    return deviation_error_term(wf.dev, u, cash)
 end
 """
     set_allocation_fees!(model::JuMP.Model, p::VecNum, cash::Number, sf::Option{<:NamedTuple})

@@ -397,14 +397,21 @@ end
     w0 = [0.5, 0.3, 0.15, 0.05]
     wb = WeightBounds(; lb = fill(0.1, 4), ub = fill(0.4, 4))
     @testset "The objective is the norm the docstring states" begin
-        # Two of the four names say "Squared". The cone bounds the norm itself, so the
-        # objective value is the L2 norm and not its square; the minimiser is the same.
-        for (alg, obj) in
-            ((RelativeErrorWeightFinaliser(), w -> norm(w ./ w0 .- one(eltype(w0)), 1)),
-             (SquaredRelativeErrorWeightFinaliser(),
-              w -> norm(w ./ w0 .- one(eltype(w0)), 2)),
-             (AbsoluteErrorWeightFinaliser(), w -> norm(w - w0, 1)),
-             (SquaredAbsoluteErrorWeightFinaliser(), w -> norm(w - w0, 2)))
+        # The cone bounds the norm itself, so under a SquaredL2Norm the objective value is
+        # the L2 norm and not its square; the minimiser is the same.
+        rel = RelativeWeightDeviation()
+        abs_dev = AbsoluteWeightDeviation()
+        rel_res(w) = w ./ w0 .- one(eltype(w0))
+        for (alg, obj) in ((ErrorWeightFinaliser(), w -> norm(rel_res(w), 1)),
+                           (ErrorWeightFinaliser(; alg = L2Norm()), w -> norm(rel_res(w), 2)),
+                           (ErrorWeightFinaliser(; alg = SquaredL2Norm()), w -> norm(rel_res(w), 2)),
+                           (ErrorWeightFinaliser(; alg = LInfNorm()), w -> norm(rel_res(w), Inf)),
+                           (ErrorWeightFinaliser(; alg = LpNorm(; p = 3)), w -> norm(rel_res(w), 3)),
+                           (ErrorWeightFinaliser(; dev = abs_dev), w -> norm(w - w0, 1)),
+                           (ErrorWeightFinaliser(; alg = L2Norm(), dev = abs_dev), w -> norm(w - w0, 2)),
+                           (ErrorWeightFinaliser(; alg = LInfNorm(), dev = abs_dev), w -> norm(w - w0, Inf)),
+                           (ErrorWeightFinaliser(; alg = LpNorm(; p = 3), dev = abs_dev),
+                            w -> norm(w - w0, 3)))
             model = JuMP.Model()
             JuMP.@expression(model, sc, 1.0)
             JuMP.@expression(model, so, 1.0)
@@ -499,7 +506,9 @@ end
         wbj = WeightBounds(; lb = fill(0.1, 4), ub = fill(0.3, 4))
         wj = [0.6, 0.25, 0.1, 0.05]
         wq = PortfolioOptimisers.opt_weight_bounds(JuMPWeightFinaliser(; slv = slv,
-                                                                       alg = SquaredAbsoluteErrorWeightFinaliser()),
+                                                                       alg = ErrorWeightFinaliser(;
+                                                                                                  alg = L2Norm(),
+                                                                                                  dev = AbsoluteWeightDeviation())),
                                                    wbj, copy(wj))
         @test proj(wj, wbj) ≈ [0.3, 0.3, 0.225, 0.175]
         # Clarabel solves the cone to about `5e-6`.
@@ -1757,34 +1766,38 @@ end
         @test PO.time_dependent_candidate_fields(JuMPOptimiser(; slv = slv)) == ()
     end
 
-    @testset "the four JuMP formulations give their hand minimisers" begin
+    @testset "the JuMP formulations give their hand minimisers" begin
         # w0 = [0.7, 0.2, 0.1] under ub = 0.5 moves a mass of 0.2 to the two free weights.
         wb = WeightBounds(; lb = 0.0, ub = 0.5)
         w0 = [0.7, 0.2, 0.1]
         fin(alg) = PO.opt_weight_bounds(JuMPWeightFinaliser(; slv = slv, alg = alg), wb, w0)
+        abs_dev = AbsoluteWeightDeviation()
         # The L2 norm of the absolute deviation shifts the free weights by one constant.
-        @test isapprox(fin(SquaredAbsoluteErrorWeightFinaliser()), [0.5, 0.3, 0.2];
-                       atol = 1e-6)
+        @test isapprox(fin(ErrorWeightFinaliser(; alg = L2Norm(), dev = abs_dev)),
+                       [0.5, 0.3, 0.2]; atol = 1e-6)
         # The L1 norm of the relative deviation moves the mass to the largest free weight.
-        @test isapprox(fin(RelativeErrorWeightFinaliser()), [0.5, 0.4, 0.1]; atol = 1e-6)
+        @test isapprox(fin(ErrorWeightFinaliser()), [0.5, 0.4, 0.1]; atol = 1e-6)
         # The L2 norm of the relative deviation gives w0 + c w0², with c = 4.
-        @test isapprox(fin(SquaredRelativeErrorWeightFinaliser()), [0.5, 0.36, 0.14];
+        @test isapprox(fin(ErrorWeightFinaliser(; alg = L2Norm())), [0.5, 0.36, 0.14];
                        atol = 1e-6)
         # The L1 norm of the absolute deviation is not unique, and its value is twice the
         # moved mass.
-        wa = fin(AbsoluteErrorWeightFinaliser())
+        wa = fin(ErrorWeightFinaliser(; dev = abs_dev))
         @test isapprox(sum(abs, wa - w0), 0.4; atol = 1e-6)
         @test isapprox(sum(wa), 1.0; atol = 1e-8)
         @test all(x -> -1e-8 <= x <= 0.5 + 1e-8, wa)
         # The Euclidean projection is the minimiser of the absolute L2 norm.
         @test isapprox(PO.opt_weight_bounds(EuclideanWeightFinaliser(), wb, w0),
                        [0.5, 0.3, 0.2]; atol = 1e-12)
-        # A relative formulation does not change the weights of the caller.
+        # A relative deviation does not change the weights of the caller.
         wz = [0.7, 0.3, 0.0]
         PO.opt_weight_bounds(JuMPWeightFinaliser(; slv = slv,
-                                                 alg = SquaredRelativeErrorWeightFinaliser()),
+                                                 alg = ErrorWeightFinaliser(;
+                                                                            alg = L2Norm())),
                              wb, wz)
         @test wz == [0.7, 0.3, 0.0]
+        # A p-norm needs 1 < p for its power cone, so the constructor refuses p = 1.
+        @test_throws DomainError ErrorWeightFinaliser(; alg = LpNorm(; p = 1))
         # Weights in the bounds come back unchanged, with no solve.
         wi = [0.4, 0.4, 0.2]
         @test PO.opt_weight_bounds(JuMPWeightFinaliser(; slv = slv), wb, wi) === wi

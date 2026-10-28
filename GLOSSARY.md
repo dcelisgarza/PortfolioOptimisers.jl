@@ -976,6 +976,8 @@ A struct, not a bare function, that computes the per-fold value of a Time-Depend
 
 **Weight Finaliser**
 A post-solve adjustment that forces weights into the feasible region at the budget that they carry. There are four. `IterativeWeightFinaliser` is the default. It redistributes the weights and keeps the ratios of the free weights, and it falls back to the Euclidean projection when it cannot reach the bounds. `EuclideanWeightFinaliser` is the exact Euclidean projection. `EntropicWeightFinaliser` is the exact entropic projection for long-only weights, and it keeps the ratios of the free weights. `JuMPWeightFinaliser` solves again.
+The programme of `JuMPWeightFinaliser` minimises an `ErrorWeightFinaliser`: a norm of the LxNorm error family (`alg`) over a Weight Deviation (`dev`). The Weight Deviation is `RelativeWeightDeviation`, the target ratio less one, or `AbsoluteWeightDeviation`, the plain difference. `DiscreteAllocation` reads the same struct for its tracking error. Issue #1870.
+*Avoid*: a separate type for each pair of a norm and a deviation, which the four `…ErrorWeightFinaliser` singletons were.
 
 **Turnover**
 The change in the portfolio relative to a reference, either the previous weights or a static target. It can be a soft penalty or a hard constraint.

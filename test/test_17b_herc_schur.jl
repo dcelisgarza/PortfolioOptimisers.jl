@@ -111,8 +111,7 @@ end
     @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.xkey])] - 0.08) < 5e-10
 
     opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn,
-                                wf = JuMPWeightFinaliser(;
-                                                         alg = RelativeErrorWeightFinaliser(),
+                                wf = JuMPWeightFinaliser(; alg = ErrorWeightFinaliser(),
                                                          slv = slv))
     res = optimise(HierarchicalEqualRiskContribution(; opt = opt))
     @test isa(res.retcode, OptimisationSuccess)
@@ -123,7 +122,8 @@ end
 
     opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn,
                                 wf = JuMPWeightFinaliser(;
-                                                         alg = SquaredRelativeErrorWeightFinaliser(),
+                                                         alg = ErrorWeightFinaliser(;
+                                                                                    alg = L2Norm()),
                                                          slv = slv))
     res = optimise(HierarchicalEqualRiskContribution(; opt = opt))
     @test isa(res.retcode, OptimisationSuccess)
@@ -134,7 +134,8 @@ end
 
     opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn,
                                 wf = JuMPWeightFinaliser(;
-                                                         alg = AbsoluteErrorWeightFinaliser(),
+                                                         alg = ErrorWeightFinaliser(;
+                                                                                    dev = AbsoluteWeightDeviation()),
                                                          slv = slv))
     res = optimise(HierarchicalEqualRiskContribution(; opt = opt))
     @test isa(res.retcode, OptimisationSuccess)
@@ -145,7 +146,9 @@ end
 
     opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn,
                                 wf = JuMPWeightFinaliser(;
-                                                         alg = SquaredAbsoluteErrorWeightFinaliser(),
+                                                         alg = ErrorWeightFinaliser(;
+                                                                                    alg = L2Norm(),
+                                                                                    dev = AbsoluteWeightDeviation()),
                                                          slv = slv))
     res = optimise(HierarchicalEqualRiskContribution(; opt = opt))
     @test isa(res.retcode, OptimisationSuccess)

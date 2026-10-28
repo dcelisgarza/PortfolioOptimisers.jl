@@ -8,7 +8,7 @@ jet = "0.13.1"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "StatsPlots"]
-commit = "89e09f3534"
+commit = "828bf1884c"
 
 [run.main]
 load_set = ["GraphRecipes", "StatsPlots"]
@@ -313,7 +313,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/17_Optimisation/01_Base_Optimisation/01_OptimisationTypes.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/01_Base_Optimisation/02_PipeRouting.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/01_Base_Optimisation/03_TimeDependent.jl" = { raw = 0, reviewed = 0 }
-"src/17_Optimisation/01_Base_Optimisation/04_WeightFinalisers.jl" = { raw = 0, reviewed = 0 }
+"src/17_Optimisation/01_Base_Optimisation/04_WeightFinalisers.jl" = { raw = 2, reviewed = 2 }
 "src/17_Optimisation/01_Base_Optimisation/05_InvestableUniverse.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/01_Base_Optimisation/06_PanelCollapse.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/01_Base_Optimisation/07_ResultInvestableView.jl" = { raw = 0, reviewed = 0 }
