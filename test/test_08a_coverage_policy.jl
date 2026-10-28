@@ -885,7 +885,9 @@ end
         @test isequal((@test_logs (:warn,) cov(ow)), s1)
         @test_throws ArgumentError cov(ow; strict = true)
         @test_throws ArgumentError cor(ow; strict = true)
-        # A NoPeel matrix still meets the refusal of the matrix repair.
+        # The warning names `nothing` as the way to keep the cells, not the removed `NoPeel`
+        # (#1867), and an unpeeled matrix still meets the refusal of the matrix repair.
+        @test_logs (:warn, r"set `peel = nothing`") cov(peel_covariance(MinimalPeel()), X)
         @test_throws PortfolioOptimisers.IsNonFiniteError PortfolioOptimisers.matrix_processing_block!(MatrixProcessing(),
                                                                                                        copy(s0),
                                                                                                        X)

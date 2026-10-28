@@ -1770,13 +1770,25 @@ A Previous-Weights Source names the weights [`fold_loop`](@ref) threads from a f
 
 An unset source follows the scheme's Weight Drift: it threads the target weights when the scheme drifts nothing, and the drifted weights when it drifts. [`resolve_previous_weights_source`](@ref) applies that rule before the fold loop runs, and it maps [`TargetWeights`](@ref) to `nothing`, the target read of the loop.
 
-The two walk-forward schemes carry this family in their `pws` field, bound to `Option{<:AbstractPreviousWeightsSource}`. A scheme whose folds are not a timeline carries no such field: no fold of it has a fold behind it, so it has no previous weights of any kind to thread.
+The three timeline schemes, [`IndexWalkForward`](@ref), [`DateWalkForward`](@ref) and [`HindsightSplit`](@ref), carry this family in their `pws` field, bound to `Option{<:AbstractPreviousWeightsSource}`, beside their Weight Drift `wd`. A scheme whose folds are not a timeline carries no such field: no fold of it has a fold behind it, so it has no previous weights of any kind to thread.
+
+# The four settings of the two switches
+
+| `wd` of the scheme     | `pws` of the scheme             | Return series of a fold                    | The next fold starts from | Drift that runs        | Use                                                          |
+|:---------------------- |:------------------------------- |:------------------------------------------ |:------------------------- |:---------------------- |:------------------------------------------------------------ |
+| `nothing`              | `nothing` or `TargetWeights()`  | `X * w` net of fees, at the target weights | the target weights        | none                   | The reading of the decision, to compare optimisers.          |
+| `SelfFinancingDrift()` | `nothing` or `DriftedWeights()` | the wealth ratio of the drifted holdings   | the held weights          | the `wd` of the scheme | The reading of the fund, for both the series and the trades. |
+| `SelfFinancingDrift()` | `TargetWeights()`               | the wealth ratio of the drifted holdings   | the target weights        | the `wd` of the scheme | The series of the fund, with the turnover of the decision.   |
+| `nothing`              | `DriftedWeights()`              | `X * w` net of fees, at the target weights | the held weights          | `SelfFinancingDrift()` | The trades of the fund, with the series of the decision.     |
+
+The first two rows are the consistent pairs, which an unset `pws` gives. The last two rows are the mixed pairs, which an explicit `pws` gives. A fold whose drift is none carries no [`HeldWeightsResult`](@ref). The first and third rows thread no source to the fold loop, so an [`OnlinePortfolioSelection`](@ref) head whose fees carry a turnover term refuses them.
 
 # Interfaces
 
-In order to implement a new previous-weights source which will work seamlessly with the library, subtype `AbstractPreviousWeightsSource` with a `wd::AbstractWeightDrift` field, the Weight Drift `held_weights_drift` runs when the scheme sets no drift of its own, and implement the following method:
+In order to implement a new previous-weights source which will work seamlessly with the library, subtype `AbstractPreviousWeightsSource`. A new source is a sibling of [`TargetWeights`](@ref) and [`DriftedWeights`](@ref), and it can implement the following methods:
 
   - `previous_weights(pws::AbstractPreviousWeightsSource, prev::PredictionResult) -> VecNum_VecVecNum`: Read the weights the previous fold threads into the fold that follows it. A fallback method reads the held weights of the previous fold, `prev.hw.w`, so it is only needed when the source threads something else.
+  - `held_weights_drift(wd::Nothing, pws::AbstractPreviousWeightsSource) -> AbstractWeightDrift`: Give the Weight Drift that computes the held weights when the scheme drifts nothing. A fallback method gives [`SelfFinancingDrift`](@ref), so it is only needed when the source drifts its held weights in another way.
 
 # Related
 
@@ -1784,9 +1796,11 @@ In order to implement a new previous-weights source which will work seamlessly w
   - [`TargetWeights`](@ref)
   - [`resolve_previous_weights_source`](@ref)
   - [`previous_weights`](@ref)
+  - [`held_weights_drift`](@ref)
   - [`AbstractWeightDrift`](@ref)
   - [`IndexWalkForward`](@ref)
   - [`DateWalkForward`](@ref)
+  - [`HindsightSplit`](@ref)
 """
 abstract type AbstractPreviousWeightsSource <: AbstractAlgorithm end
 """
@@ -1796,24 +1810,13 @@ Thread the weights a fold **held** after its last observation into the fold that
 
 The target weights of the previous fold are the weights the optimiser chose, so a turnover, a tracking or a fee estimator that reads them measures the change in the decision. This source threads the weights the portfolio held after the last observation of that fold instead, so the same estimators measure the trades a fund places. A scheme that sets a Weight Drift and no `pws` threads this source, through [`resolve_previous_weights_source`](@ref).
 
-`wd` names the Weight Drift the held weights are computed under, and it is read **only** when the scheme's own `wd` is `nothing`. A scheme that drifts its return series drifts its held weights the same way, because one drift runs per fold and [`HeldWeightsResult`](@ref) records the form that ran.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    DriftedWeights(; wd::AbstractWeightDrift = SelfFinancingDrift()) -> DriftedWeights
-
-Keyword arguments correspond to the struct's fields.
+A scheme that drifts its return series drifts its held weights the same way, because one drift runs per fold and [`HeldWeightsResult`](@ref) records the form that ran. A scheme that drifts nothing computes the held weights under [`SelfFinancingDrift`](@ref), through [`held_weights_drift`](@ref). The table of [`AbstractPreviousWeightsSource`](@ref) gives the four settings of `wd` and `pws`.
 
 # Examples
 
 ```jldoctest
 julia> DriftedWeights()
-DriftedWeights
-  wd ┴ SelfFinancingDrift()
+DriftedWeights()
 ```
 
 # Related
@@ -1823,21 +1826,11 @@ DriftedWeights
   - [`SelfFinancingDrift`](@ref)
   - [`HeldWeightsResult`](@ref)
   - [`previous_weights`](@ref)
+  - [`held_weights_drift`](@ref)
   - [`resolve_previous_weights_source`](@ref)
   - [`fold_loop`](@ref)
 """
-@concrete struct DriftedWeights <: AbstractPreviousWeightsSource
-    """
-    $(field_dict[:pws_wd])
-    """
-    wd
-    function DriftedWeights(wd::AbstractWeightDrift)
-        return new{typeof(wd)}(wd)
-    end
-end
-function DriftedWeights(; wd::AbstractWeightDrift = SelfFinancingDrift())::DriftedWeights
-    return DriftedWeights(wd)
-end
+struct DriftedWeights <: AbstractPreviousWeightsSource end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -1845,7 +1838,7 @@ Thread the **target** weights of a fold into the fold that follows it, whatever 
 
 An unset `pws` follows the scheme's `wd`: it threads the target weights when `wd` is `nothing`, and the drifted weights through [`DriftedWeights`](@ref) when `wd` is set. Those are the two consistent pairs, because a fund that drifts holds the drifted weights at the end of the fold, and the trade it places next starts there. This source states the target weights explicitly, so a scheme can drift its return series and still measure the change in the decision. That mixed pair separates the turnover of the decision from the turnover the fund executes.
 
-[`resolve_previous_weights_source`](@ref) reads this source as the target read of the fold loop, so it carries no Weight Drift of its own, and it reaches no method of [`previous_weights`](@ref).
+[`resolve_previous_weights_source`](@ref) reads this source as the target read of the fold loop, so it reaches no method of [`previous_weights`](@ref). The table of [`AbstractPreviousWeightsSource`](@ref) gives the four settings of `wd` and `pws`.
 
 # Examples
 
@@ -2136,13 +2129,13 @@ end
 
 Resolve the one Weight Drift a fold runs, from the two switches of its scheme.
 
-It reads the source that [`resolve_previous_weights_source`](@ref) gives, and either switch alone asks for a drift. A scheme that drifts its return series drifts its held weights the same way. A scheme that drifts nothing but threads drifted weights runs the form the [`DriftedWeights`](@ref) source carries, because the series stays at the target weights and the holdings still move.
+It reads the source that [`resolve_previous_weights_source`](@ref) gives, and either switch alone asks for a drift. A scheme that drifts its return series drifts its held weights the same way. A scheme that drifts nothing but threads drifted weights runs [`SelfFinancingDrift`](@ref), because the series stays at the target weights and the holdings still move. A new sibling of [`DriftedWeights`](@ref) that drifts its held weights in another way adds a method on `wd::Nothing` and its own type.
 
 # Algorithm
 
  1. Neither switch is set: no drift runs, and the fold carries no [`HeldWeightsResult`](@ref).
  2. `wd` is set: it is the form that runs, whatever `pws` is.
- 3. Only `pws` is set: the form it carries is the form that runs.
+ 3. Only `pws` is set: [`SelfFinancingDrift`](@ref) runs, unless the source has a method of its own.
 
 # Arguments
 
@@ -2156,7 +2149,9 @@ It reads the source that [`resolve_previous_weights_source`](@ref) gives, and ei
 # Related
 
   - [`AbstractWeightDrift`](@ref)
+  - [`AbstractPreviousWeightsSource`](@ref)
   - [`DriftedWeights`](@ref)
+  - [`SelfFinancingDrift`](@ref)
   - [`held_weights_result`](@ref)
   - [`HeldWeightsResult`](@ref)
 """
@@ -2166,8 +2161,8 @@ end
 function held_weights_drift(wd::AbstractWeightDrift, ::Any)
     return wd
 end
-function held_weights_drift(::Nothing, pws::AbstractPreviousWeightsSource)
-    return pws.wd
+function held_weights_drift(::Nothing, ::AbstractPreviousWeightsSource)
+    return SelfFinancingDrift()
 end
 """
     nan_held_member(X::MatNum, store_weight_path::Bool, ::Type{Tw})
@@ -2460,4 +2455,4 @@ function expand_held_member(imsk::BitVector, x::VecMatNum)
 end
 export calc_net_returns, calc_net_asset_returns, calc_turnover, cumulative_returns,
        drawdowns, SelfFinancingDrift, DriftedWeights, TargetWeights, HeldWeightsResult
-public AbstractPreviousWeightsSource
+public AbstractPreviousWeightsSource, held_weights_drift

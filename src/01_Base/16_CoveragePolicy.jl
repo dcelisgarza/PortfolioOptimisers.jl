@@ -1353,7 +1353,7 @@ Builds the text of the report of [`coverage_peel`](@ref).
   - [`strict_diagnostic`](@ref)
 """
 function peel_msg(idx::AbstractVector{<:Integer}, m::Integer, peel::AbstractPeel)
-    return "an available-case covariance peeled the assets at indices $(idx) of its universe, to remove $(m) undetermined pair(s): pairs of admitted assets that each have a variance but share too few observations for a covariance. $(peel) chose them. A peeled asset is `NaN` across its row and column, so it leaves the Investable Mask. Pass `strict = true` to refuse instead, set `peel = NoPeel()` on the `CoveragePolicy` to keep the `NaN` cells, raise `min_coverage`, or fit over a window that the pairs share."
+    return "an available-case covariance peeled the assets at indices $(idx) of its universe, to remove $(m) undetermined pair(s): pairs of admitted assets that each have a variance but share too few observations for a covariance. $(peel) chose them. A peeled asset is `NaN` across its row and column, so it leaves the Investable Mask. Pass `strict = true` to refuse instead, set `peel = nothing` on the `CoveragePolicy` to keep the `NaN` cells, raise `min_coverage`, or fit over a window that the pairs share."
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

@@ -18,7 +18,6 @@ drifted_held_weights
 assert_held_weights_shape
 assert_held_start_shape
 rebuild_weight_path
-held_weights_drift
 nan_held_member
 held_weights_member
 held_weights_result

@@ -1612,7 +1612,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 This is the [`CoveragePolicy`](@ref) method of [`coverage_covariance`](@ref) for a state. `cov(ce)` with no data calls it. The method divides the accumulator of each pair by the count of that pair less the Bessel correction. An asset that the policy refuses is `NaN` in all of its row and column.
 
-A pair of two admitted assets that share too few observations has no covariance, because a covariance of no observations is not a number. [`coverage_peel`](@ref) removes the assets of such pairs from the admitted set with the `peel` rule of the policy. It reports the peel as `strict` sets. Under [`NoPeel`](@ref) the cell stays `NaN`, and the matrix repair refuses it.
+A pair of two admitted assets that share too few observations has no covariance, because a covariance of no observations is not a number. [`coverage_peel`](@ref) removes the assets of such pairs from the admitted set with the `peel` rule of the policy. It reports the peel as `strict` sets. Under `peel = nothing` the cell stays `NaN`, and the matrix repair refuses it.
 
 # Related
 

@@ -2030,7 +2030,13 @@
             @test isnothing(PO.held_weights_drift(nothing, nothing))
             @test PO.held_weights_drift(sfd, nothing) === sfd
             @test PO.held_weights_drift(sfd, dw) === sfd
-            @test PO.held_weights_drift(nothing, dw) === dw.wd
+            # The source carries no drift of its own (#1860): a scheme that drifts nothing
+            # computes the held weights under the self-financing drift, and every source
+            # without a method of its own does the same.
+            @test Base.issingletontype(DriftedWeights)
+            @test PO.held_weights_drift(nothing, dw) === SelfFinancingDrift()
+            @test PO.held_weights_drift(nothing, TargetWeights()) === SelfFinancingDrift()
+            @test PO.resolve_previous_weights_source(nothing, sfd) === DriftedWeights()
         end
         @testset "HeldWeightsResult checks the shapes of its members" begin
             X24 = [0.01 0.02; -0.01 0.03]

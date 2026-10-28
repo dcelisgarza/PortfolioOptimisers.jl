@@ -72,6 +72,7 @@ work of #1867 removed two: `NoHacFloor` (ADR 0190) and `NoPeel` (ADR 0117).
 | `PricesToReturns.ret_method`, `padding` | `Symbol`, `Bool` | Acceptable as they are. |
 | `mtx_sqrt = nothing` | `nothing`, beside the new `PlainCholeskySquareRoot()` | The simple default. Its siblings are named leaves, so the plain Cholesky factor gets a name too ([#1878](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1878)). |
 | `GerberIQCovariance.sc = nothing` | `nothing`, beside the new `PairMeanGerberIQScaler()` | The simple default, named for the same reason. The method on `nothing` and the fallback of the family are separate, and the fallback refuses a subtype with no method of its own (#1878). |
+| `DriftedWeights.wd` | removed, so `DriftedWeights()` is a singleton | The field had one reader, and when the scheme set `wd` it had no effect. The types `DriftedWeights` and `TargetWeights` stay, because methods dispatch on them and ADR 0110 names them. A new drift of the held weights is a new sibling ([#1860](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1860)). |
 
 The scan of #1867 also kept `IdentityMetric`, `RawVolatility`, `NoSystematicRepair`, `NoDecay`,
 `IdentityTarget` and `NoDefault`. Each one has its own behaviour or a descriptive name.

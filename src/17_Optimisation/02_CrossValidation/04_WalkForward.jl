@@ -131,7 +131,7 @@ Each switch is `nothing` by default. An unset `pws` follows `wd`, so `wd` alone 
 
 `pws` is the Previous-Weights Source. A [`TargetWeights`](@ref) threads the target weights of the previous fold into the next one. A [`DriftedWeights`](@ref) threads the weights held after the last observation of the previous fold instead, so a turnover, a tracking or a fee estimator measures the trades a fund places rather than the change in the decision. A fold enumeration of this scheme is a timeline, so the source has a previous fold to read.
 
-`nothing` follows `wd`, through [`resolve_previous_weights_source`](@ref): the target weights when `wd` is `nothing`, and the drifted weights when `wd` is set. If the series drifts, the fund holds the drifted weights at the end of the fold, so the next trade starts there. An explicit `pws` overrides the rule. `wd` with `pws = TargetWeights()` drifts the series and still measures the change in the decision, which separates the turnover of the decision from the turnover the fund executes.
+`nothing` follows `wd`, through [`resolve_previous_weights_source`](@ref): the target weights when `wd` is `nothing`, and the drifted weights when `wd` is set. If the series drifts, the fund holds the drifted weights at the end of the fold, so the next trade starts there. An explicit `pws` overrides the rule. `wd` with `pws = TargetWeights()` drifts the series and still measures the change in the decision, which separates the turnover of the decision from the turnover the fund executes. The table of [`AbstractPreviousWeightsSource`](@ref) gives the four settings of `wd` and `pws`.
 
 ## Fee clock
 
@@ -506,7 +506,7 @@ Each switch is `nothing` by default. An unset `pws` follows `wd`, so `wd` alone 
 
 `pws` is the Previous-Weights Source. A [`TargetWeights`](@ref) threads the target weights of the previous fold into the next one. A [`DriftedWeights`](@ref) threads the weights held after the last observation of the previous fold instead, so a turnover, a tracking or a fee estimator measures the trades a fund places rather than the change in the decision. A fold enumeration of this scheme is a timeline, so the source has a previous fold to read.
 
-`nothing` follows `wd`, through [`resolve_previous_weights_source`](@ref): the target weights when `wd` is `nothing`, and the drifted weights when `wd` is set. If the series drifts, the fund holds the drifted weights at the end of the fold, so the next trade starts there. An explicit `pws` overrides the rule. `wd` with `pws = TargetWeights()` drifts the series and still measures the change in the decision, which separates the turnover of the decision from the turnover the fund executes.
+`nothing` follows `wd`, through [`resolve_previous_weights_source`](@ref): the target weights when `wd` is `nothing`, and the drifted weights when `wd` is set. If the series drifts, the fund holds the drifted weights at the end of the fold, so the next trade starts there. An explicit `pws` overrides the rule. `wd` with `pws = TargetWeights()` drifts the series and still measures the change in the decision, which separates the turnover of the decision from the turnover the fund executes. The table of [`AbstractPreviousWeightsSource`](@ref) gives the four settings of `wd` and `pws`.
 
 ## Fee clock
 
@@ -1268,7 +1268,7 @@ The fold loop reads `nothing` as the target weights. So the resolution maps [`Ta
 # Algorithm
 
  1. `pws` and `wd` are both unset: give `nothing`, the target weights.
- 2. `pws` is unset and `wd` is set: give [`DriftedWeights`](@ref) under `wd`.
+ 2. `pws` is unset and `wd` is set: give [`DriftedWeights`](@ref), and [`held_weights_drift`](@ref) runs `wd`.
  3. `pws` is a [`TargetWeights`](@ref): give `nothing`, the target weights, whatever `wd` is.
  4. Any other `pws`: give it unchanged.
 
@@ -1292,8 +1292,8 @@ The fold loop reads `nothing` as the target weights. So the resolution maps [`Ta
 function resolve_previous_weights_source(::Nothing, ::Nothing)
     return nothing
 end
-function resolve_previous_weights_source(::Nothing, wd::AbstractWeightDrift)
-    return DriftedWeights(wd)
+function resolve_previous_weights_source(::Nothing, ::AbstractWeightDrift)
+    return DriftedWeights()
 end
 function resolve_previous_weights_source(::TargetWeights, ::Option{<:AbstractWeightDrift})
     return nothing
