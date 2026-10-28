@@ -738,6 +738,24 @@ end
             sigma = cov(ImpliedVolatility(; alg = alg, ppy = ppy), X; iv = iv)
             @test isapprox(sqrt.(diag(sigma)), got)
         end
+        # #1886: the estimator names its first column, the column of ones, to the target. An
+        # elastic net at a strength that shrinks both slopes to zero then keeps the
+        # intercept at its unpenalised value, the mean of the log realised volatility of
+        # windows 2 to C; a penalised intercept would predict exp(0) = 1.
+        ws, ppy = 20, 252
+        chunk = div(T, ws)
+        offset = T - chunk * ws
+        lrv = log.(reduce(vcat,
+                          [Statistics.std(SimpleVariance(),
+                                          view(X,
+                                               (offset + (c - 1) * ws + 1):(offset + c * ws),
+                                               :); dims = 1) for c in 1:chunk]))
+        big = ElasticNet(; strength = FixedStrength(; gamma = 1e8))
+        got = PortfolioOptimisers.predict_realised_vols(ImpliedVolatilityRegression(;
+                                                                                    ws = ws,
+                                                                                    re = big),
+                                                        iv / sqrt(ppy), X, nothing)
+        @test got ≈ exp.(vec(mean(lrv[2:chunk, :]; dims = 1)))
     end
 
     @testset "ImpliedVolatility reproduces its documented covariance" begin

@@ -643,7 +643,7 @@ This is Equation 5 of [christensenprabhala1998](@cite). It regresses the log rea
  6. Replace `rv` and `iv` by their natural logarithms.
  7. Make `ovec`, the intercept column of ones, of length `T2 - 1`.
  8. For each asset `i`, make the design matrix `X_t` from `ovec` and the first `T2 - 1` rows of `iv` and `rv`. Make the response `y_t` from the rows `2:T2` of `rv`, and the prediction row `X_p` from the row `T2`.
- 9. Fit `alg.re` on `X_t` and `y_t`. Predict from `X_p` with the fit, and set `rv_p[i]` to the exponential of the prediction.
+ 9. Fit `alg.re` on `X_t` and `y_t`, with the first column named to it by `factory(alg.re, InterceptColumn(1))`, so that a penalised target such as [`ElasticNet`](@ref) does not shrink the intercept. Predict from `X_p` with the fit, and set `rv_p[i]` to the exponential of the prediction.
 10. Return `rv_p`.
 
 # Arguments
@@ -712,13 +712,15 @@ function predict_realised_vols(alg::ImpliedVolatilityRegression, iv::MatNum, X::
     # reg = Matrix{promote_type(eltype(rv), eltype(iv))}(undef, N, 3)
     # r2s = Vector{promote_type(eltype(rv), eltype(iv))}(undef, N)
     rv_p = Vector{promote_type(eltype(rv), eltype(iv))}(undef, N)
+    # The column of ones is first, and a penalised target must not shrink its coefficient.
+    re = factory(alg.re, InterceptColumn(1))
     # fr = []
     for i in 1:N
         X = [view(iv, :, i) view(rv, :, i)]
         X_t = [ovec view(X, 1:(T2 - 1), :)]
         X_p = [one(eltype(X)) transpose(view(X, T2, :))]
         y_t = view(rv, 2:T2, i)
-        fri = StatsAPI.fit(alg.re, X_t, y_t)
+        fri = StatsAPI.fit(re, X_t, y_t)
         # params = StatsAPI.coef(fri)
         # reg[i, 1] = params[1]
         # reg[i, 2:3] .= params[2:end]

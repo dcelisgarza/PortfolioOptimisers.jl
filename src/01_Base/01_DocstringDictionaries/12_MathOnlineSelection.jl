@@ -39,12 +39,14 @@ unique_key_dict!(math_dict, :math_dict,
                  :p_ti_level => "``p_{t,i}``: Price level of asset ``i`` at period ``t``, the entry ``i`` of ``\\boldsymbol{p}_t``.",#
                  :alpha_ema => "``\\alpha``: Smoothing weight on the current level, in ``(0, 1]``. A smaller weight gives a longer memory.",#
                  :s_i_trend => "``s_i``: Trend sign of asset ``i``, ``+1`` for a rising asset, ``0`` for a flat one and ``-1`` for a falling one.",#
-                 # The elastic net that the kernel trend pattern fits.
+                 # The elastic net, the penalised regression target.
                  :y_enet => "``\\boldsymbol{y}``: Response of the elastic net, one entry per observation.",#
                  :P_enet => "``\\mathbf{P}``: Regressors of the elastic net, one row per observation and one column per regressor. Column ``k`` is ``\\mathbf{P}_k``.",#
                  :z_enet => "``\\boldsymbol{z}``: Coefficients of the elastic net, one per column of ``\\mathbf{P}``. Coefficient ``k`` is ``z_k``.",#
                  :gamma_enet => "``\\gamma``: Regularisation strength of the elastic net.",#
-                 :theta_enet => "``\\vartheta``: Share of the ``L_1`` penalty in the elastic net, the `theta` field of [`ElasticNetPath`](@ref).",#
+                 :theta_enet => "``\\vartheta``: Share of the ``L_1`` penalty in the elastic net, the `theta` field of [`ElasticNet`](@ref).",#
+                 :V_enet => "``\\mathbf{V}``: Diagonal matrix of the weights of the observations of the elastic net, the identity when the fit has no observation weights.",#
+                 :K_enet => "``\\mathcal{K}``: Penalised columns of the elastic net, every column of ``\\mathbf{P}`` but the intercept column that an estimator names.",#
                  :Sigma_hat_pred => "``\\hat{\\mathbf{\\Sigma}}_{t+1}``: Predictive covariance of the price relatives of period ``t + 1``, made after the row of period ``t``.",#
                  :Sigma_hat_RO => "``\\hat{\\mathbf{\\Sigma}}_{\\mathrm{RO}}``: Rank-one covariance estimate of a window, the matrix that [`RankOneCovariance`](@ref) computes.",#
                  # The Constrained Update: the raw step, the set it is projected onto,

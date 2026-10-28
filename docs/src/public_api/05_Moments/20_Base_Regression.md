@@ -8,6 +8,10 @@ Description = "Base regression, public API of PortfolioOptimisers.jl: AbstractTi
 AbstractTimeSeriesRegressionEstimator
 AbstractCrossSectionalRegressionEstimator
 AbstractRegressionTarget
+AbstractUnpenalisedRegressionTarget
+AbstractPenalisedRegressionTarget
+InterceptColumn
+factory(tgt::AbstractRegressionTarget, ::InterceptColumn)
 factory(tgt::AbstractRegressionTarget, w::ObsWeights)
 regression_target_weights(tgt::AbstractRegressionTarget)
 regression_target_weights(tgt::Union{LinearModel, GeneralisedLinearModel})

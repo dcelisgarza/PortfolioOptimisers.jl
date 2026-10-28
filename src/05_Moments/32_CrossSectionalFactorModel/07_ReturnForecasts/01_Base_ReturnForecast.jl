@@ -156,7 +156,7 @@ The weights are the estimation mask of the Asset Panel read as numbers, so an as
 
 # Arguments
 
-  - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
+  - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`, or returns in `rd.X`, which give the mask-only panel of [`returns_with_universe`](@ref).
 
 # Validation
 
@@ -265,7 +265,7 @@ Where:
 
 # Arguments
 
-  - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
+  - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`, or returns in `rd.X`, which give the mask-only panel of [`returns_with_universe`](@ref).
   - `Tc`: Number of observations of the returns data, in place of `rd`. [`return_forecast_step`](@ref) reads it off the scores it gets.
   - `csfm`: The fitted factor-model block.
 

@@ -100,6 +100,8 @@ Estimates a loadings matrix by selecting a factor subset per asset, one factor a
 
 `crit` scores a candidate model, `alg` sets the direction in which the factor set moves, and `tgt` fits each model. Each asset gets its own subset, so a factor that an asset does not select has an exact zero in the row of that asset in the loadings matrix.
 
+`tgt` is an [`AbstractUnpenalisedRegressionTarget`](@ref), so the keyword constructor refuses an [`ElasticNet`](@ref) with a `TypeError`. The criteria do not hold for a penalised fit. [`PValue`](@ref) reads p-values that a penalty makes invalid. `:aic`, `:aicc`, `:bic` and `:adjr2` count one degree of freedom for each coefficient, and a penalised fit has fewer. The ``L_1`` penalty also selects the factors itself.
+
 The search reads every observation, so a fit over more observations can choose another factor set. `included` fixes the factor set of each asset, and the fit then runs no search for that asset. `choice` states whether the online step of a prior that fits this regression writes the factor set of the first fit into `included`. A batch fit gives the same answer under both rules.
 
 # Fields
@@ -112,7 +114,7 @@ $(DocStringExtensions.FIELDS)
         crit::Union{Symbol, MinMaxValStepwiseRegressionCriterion,
                     AbstractStepwiseRegressionCriterion} = PValue(),
         alg::AbstractStepwiseRegressionAlgorithm = ForwardSelection(),
-        tgt::AbstractRegressionTarget = LinearModel(),
+        tgt::AbstractUnpenalisedRegressionTarget = LinearModel(),
         choice::AbstractChoiceRule = BatchChoice(),
         included::Option{<:AbstractVector{<:Option{<:AbstractVector{<:Integer}}}} = nothing,
         x_src::Option{<:AbstractReturnsSource} = nothing
@@ -199,7 +201,8 @@ StepwiseRegression
     function StepwiseRegression(crit::Union{MinMaxValStepwiseRegressionCriterion,
                                             AbstractStepwiseRegressionCriterion},
                                 alg::AbstractStepwiseRegressionAlgorithm,
-                                tgt::AbstractRegressionTarget, choice::AbstractChoiceRule,
+                                tgt::AbstractUnpenalisedRegressionTarget,
+                                choice::AbstractChoiceRule,
                                 included::Option{<:AbstractVector{<:Option{<:AbstractVector{<:Integer}}}},
                                 x_src::Option{<:AbstractReturnsSource})
         if isa(crit, Val{:adjr2}) &&
@@ -225,7 +228,7 @@ function StepwiseRegression(;
                             crit::Union{Symbol, MinMaxValStepwiseRegressionCriterion,
                                         AbstractStepwiseRegressionCriterion} = PValue(),
                             alg::AbstractStepwiseRegressionAlgorithm = ForwardSelection(),
-                            tgt::AbstractRegressionTarget = LinearModel(),
+                            tgt::AbstractUnpenalisedRegressionTarget = LinearModel(),
                             choice::AbstractChoiceRule = BatchChoice(),
                             included::Option{<:AbstractVector{<:Option{<:AbstractVector{<:Integer}}}} = nothing,
                             x_src::Option{<:AbstractReturnsSource} = nothing)::StepwiseRegression

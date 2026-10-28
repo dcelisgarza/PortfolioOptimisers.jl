@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.3"
 julia_syntax = "1.0.2"
-commit = "bd71535e5e"
+commit = "7a17d96d8e"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { code = 287, doc = 0, comment = 12, blank = 2, total = 301 }
@@ -186,6 +186,7 @@ commit = "bd71535e5e"
 "src/05_Moments/35_CompositePriceLevelStatistics.jl" = { code = 350, doc = 606, comment = 9, blank = 230, total = 1195 }
 "src/05_Moments/36_RankOneCovariance.jl" = { code = 40, doc = 128, comment = 6, blank = 63, total = 237 }
 "src/05_Moments/37_GeodesicShrinkageCovariance.jl" = { code = 200, doc = 557, comment = 0, blank = 260, total = 1017 }
+"src/05_Moments/38_ElasticNet.jl" = { code = 177, doc = 431, comment = 2, blank = 184, total = 794 }
 "src/06_Distance/01_Base_Distance.jl" = { code = 24, doc = 228, comment = 0, blank = 93, total = 345 }
 "src/06_Distance/02_Distance.jl" = { code = 162, doc = 350, comment = 0, blank = 157, total = 669 }
 "src/06_Distance/03_DistanceDistance.jl" = { code = 39, doc = 132, comment = 0, blank = 58, total = 229 }

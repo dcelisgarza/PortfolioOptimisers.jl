@@ -367,14 +367,16 @@ Builds a factor model that maps factor returns to asset returns. Factor priors u
 
 - **StepwiseRegression**: greedy feature selection, `ForwardSelection` or `BackwardElimination`, under a criterion (`PValue`, or one of the symbols `:aic`, `:aicc`, `:bic`, `:r2`, `:adjr2`).
 - **DimensionReductionRegression**: regression on reduced factors, with the targets `PCA` and `PPCA`.
-- **Regression target** models: `LinearModel`, `GeneralisedLinearModel` (GLM), and the elastic net, a Penalised Regression Target (below).
+- **Regression target** models: `LinearModel`, `GeneralisedLinearModel` (GLM), and the elastic net `ElasticNet`, a Penalised Regression Target (below). The unpenalised targets subtype `AbstractUnpenalisedRegressionTarget`, and a target that the user writes subtypes that branch or `AbstractPenalisedRegressionTarget`. `StepwiseRegression` accepts an unpenalised target alone.
 
 **Penalised Regression Target**
 A regression target whose fit adds a penalty on the size of its coefficients, such as the elastic net. Its fit has no valid p-values, and it has fewer effective degrees of freedom than coefficients. The column of ones that an estimator adds for the intercept is not penalised. ADR 0223.
+In code it subtypes `AbstractPenalisedRegressionTarget`, and `ElasticNet` is the library member. An estimator names its column of ones with `factory(tgt, InterceptColumn(k))` before the fit, and an unpenalised target ignores the call.
 *Avoid*: Objective Penalty and regularisation penalty, which penalise the portfolio weights, not the coefficients of a fit.
 
 **Penalty Strength**
 The weight of the penalty of a Penalised Regression Target. A rule chooses it: the middle of the regularisation path, or a value that the user gives. ADR 0223.
+In code the rule subtypes `AbstractPenaltyStrength`: `MiddleOfPath` reads the strength off the data, and `FixedStrength` takes it from the user.
 
 **Cross-Sectional Regression**
 A regression of one observation's asset returns on the lagged Factor Exposures across the assets, one fit per observation.

@@ -656,7 +656,7 @@ with no `kwargs` field. Every verb an estimator reads therefore reaches it throu
 the `# Interfaces` section of `AbstractRegressionTarget` names, never through a field that only
 the library's targets carry, and its results must equal the library's.
 =#
-struct CallerTestTarget{W} <: PortfolioOptimisers.AbstractRegressionTarget
+struct CallerTestTarget{W} <: PortfolioOptimisers.AbstractUnpenalisedRegressionTarget
     w::W
 end
 CallerTestTarget() = CallerTestTarget(nothing)
@@ -676,7 +676,7 @@ function PortfolioOptimisers.regression_target_weights(tgt::CallerTestTarget)
     return tgt.w
 end
 # A target that states its fit and no other method.
-struct BareTestTarget <: PortfolioOptimisers.AbstractRegressionTarget end
+struct BareTestTarget <: PortfolioOptimisers.AbstractUnpenalisedRegressionTarget end
 function PortfolioOptimisers.StatsAPI.fit(::BareTestTarget, A::AbstractMatrix,
                                           y::AbstractVector)
     return StatsAPI.fit(PO.GLM.LinearModel, A, y)
@@ -1358,11 +1358,11 @@ function cross_sectional_panel(; T = 6, N = 25, K = 4, seed = 987)
 end
 
 # A regression target the library does not know, for `cross_sectional_least_squares`.
-struct LeverageTestTarget <: PortfolioOptimisers.AbstractRegressionTarget end
+struct LeverageTestTarget <: PortfolioOptimisers.AbstractUnpenalisedRegressionTarget end
 
 # A caller's own weighted least-squares target, which states no basis invariance, so the fit
 # hands it the design itself (#1719). Its solve is a pseudo-inverse.
-struct PinvTestTarget{W} <: PortfolioOptimisers.AbstractRegressionTarget
+struct PinvTestTarget{W} <: PortfolioOptimisers.AbstractUnpenalisedRegressionTarget
     w::W
 end
 struct PinvTestFit{C}
@@ -3115,4 +3115,44 @@ end
             @test !f.excess && isempty(f.raw)
         end
     end
+end
+
+@testset "A dimension reduction regression names its column of ones (#1886)" begin
+    using Test, PortfolioOptimisers, StableRNGs, StatsBase, Statistics, LinearAlgebra
+    PO = PortfolioOptimisers
+    S = PO.StatsAPI
+    rng = StableRNG(21)
+    T, K, N = 120, 4, 3
+    F = 0.01 .* randn(rng, T, K)
+    X = F * randn(rng, K, N) .+ 0.005 .* randn(rng, T, N) .+ 0.002
+    aw = StatsBase.aweights(rand(rng, T))
+    # The fitted values of the reduced fit, intercept included, equal the values that the
+    # recovered loadings and intercept rebuild on the original factors.
+    function gap(re, y)
+        x1, Vp, mu, sigma = PO.prep_dim_red_reg(re, F)
+        fitted = S.predict(S.fit(factory(re.retgt, InterceptColumn(1)), x1, y), x1)
+        beta = PO._regression(re, y, mu, sigma, x1, Vp)
+        return maximum(abs.(fitted .- (beta[1] .+ F * beta[2:end])))
+    end
+    weighted(tgt) = factory(DimensionReductionRegression(; retgt = tgt), aw)
+    en = ElasticNet(; strength = FixedStrength(; gamma = 0.02))
+    for re in
+        (DimensionReductionRegression(; retgt = en), weighted(LinearModel()), weighted(en),
+         weighted(ElasticNet()),
+         weighted(ElasticNet(; strength = FixedStrength(; gamma = 0.02),
+                             ve = SimpleVariance())))
+        @test gap(re, X[:, 1]) < 1e-14
+    end
+    @test weighted(en).retgt.w === aw && weighted(en).ve.w === aw
+    # The penalty shrinks the loadings and keeps the intercept unpenalised: at a strength
+    # that zeroes every slope, the intercept is the weighted mean of each asset.
+    big = ElasticNet(; strength = FixedStrength(; gamma = 1e10))
+    rb = regression(weighted(big), X, F)
+    @test rb.b ≈ vec(mean(X, aw; dims = 1)) && all(iszero, rb.M)
+    @test regression(DimensionReductionRegression(; retgt = big), X, F).b ≈
+          vec(mean(X; dims = 1))
+    @test norm(regression(DimensionReductionRegression(; retgt = en), X, F).M) <
+          norm(regression(DimensionReductionRegression(), X, F).M)
+    # An unpenalised target ignores the call, so the default fit does not move.
+    @test factory(LinearModel(), InterceptColumn(1)) === LinearModel()
 end

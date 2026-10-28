@@ -228,6 +228,8 @@ Estimates a loadings matrix by regressing each asset on the leading components o
 
 The standardisation and the recovery read the same statistics. [`prep_dim_red_reg`](@ref) computes them from `ve`, and `_regression` recovers the coefficients with the pair that it returns. So a weighted `ve`, which [`factory`](@ref) builds from the observation weights, gives its weights to both steps. Equations 8, 11, 12, 35 and 36 of [fekedulegn2002](@cite) need this. That work fits the regression on the principal components of the standardised factors, with the eigenvectors of their correlation matrix. A probabilistic target puts the matrix of Equation 9 of [tipping1999](@cite) in place of the eigenvectors, and neither source states this composition.
 
+A penalised `retgt`, such as [`ElasticNet`](@ref), keeps the fit and the recovery in agreement. The estimator names the column of ones with [`InterceptColumn`](@ref), so the target does not penalise the intercept. The intercept is then the weighted mean of the residual of the slopes. The components have a weighted mean of zero, so the intercept is the weighted mean of the response, which the recovery rebuilds. The condition is the same as for an unpenalised target: `ve` and `retgt` carry the same weights, as [`factory`](@ref) gives them. The penalty shrinks the coefficients of the components, which are in the units of the standardised factors. The degrees of freedom of the residuals count one for each column of the reduced design, and a penalised fit has fewer.
+
 The reduction reads every observation, so a fit over more observations can reduce to other components. `proj` fixes the components as linear combinations of the original factors, and the fit then makes no reduction. `choice` states whether the online step of a prior that fits this regression writes the components of the first fit into `proj`. A batch fit gives the same answer under both rules.
 
 # Fields
@@ -541,7 +543,7 @@ Where:
 # Algorithm
 
  1. Read the weights of `re.retgt` with [`regression_target_weights`](@ref), and call them `w`. Take the mean of `y`, weighted by `w` when it is not `nothing`, and call it `mean_y`.
- 2. Fit `re.retgt` to `x1` and `y`, and drop the leading coefficient. Call the rest `beta_pc`.
+ 2. Fit `re.retgt` to `x1` and `y`, with the leading column of ones named to it by `factory(re.retgt, InterceptColumn(1))`, and drop the leading coefficient. Call the rest `beta_pc`.
  3. Map `beta_pc` through `Vp` and divide by `sigma`. Call the result `beta`, the coefficients in the original factor space.
  4. Subtract the `mu`-weighted sum of `beta` from `mean_y`, and call the result `beta0`.
  5. Prepend `beta0` to `beta`.
@@ -573,7 +575,7 @@ function _regression(re::DimensionReductionRegression, y::VecNum, mu::VecNum, si
                      x1::MatNum, Vp::MatNum)
     w = regression_target_weights(re.retgt)
     mean_y = isnothing(w) ? Statistics.mean(y) : Statistics.mean(y, w)
-    fit_result = StatsAPI.fit(re.retgt, x1, y)
+    fit_result = StatsAPI.fit(factory(re.retgt, InterceptColumn(1)), x1, y)
     beta_pc = StatsAPI.coef(fit_result)[2:end]
     beta = Vp * beta_pc ./ sigma
     beta0 = mean_y - LinearAlgebra.dot(beta, mu)

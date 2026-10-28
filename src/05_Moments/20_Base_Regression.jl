@@ -406,19 +406,20 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all regression target types.
 
-A target is the model that a regression estimator fits. The library has two targets, [`LinearModel`](@ref) and [`GeneralisedLinearModel`](@ref). Any other model that fits under observation weights and returns its coefficients can be a target, for example a robust M-estimator that the caller writes on top of `StatsAPI`. The library has no such model. The `# Interfaces` section below states the methods that such a model must have.
+A target is the model that a regression estimator fits. The family has two branches. [`AbstractUnpenalisedRegressionTarget`](@ref) holds the targets that fit the coefficients with no penalty, [`LinearModel`](@ref) and [`GeneralisedLinearModel`](@ref). [`AbstractPenalisedRegressionTarget`](@ref) holds the targets that add a penalty on the coefficients, [`ElasticNet`](@ref). Any other model that fits under observation weights and returns its coefficients can be a target, for example a robust M-estimator that the caller writes on top of `StatsAPI`. The library has no such model. The `# Interfaces` section below states the methods that such a model must have.
 
 # Interfaces
 
-To add a regression target, subtype `AbstractRegressionTarget`, keep its parameters in the fields of the struct, and add the methods below. Each estimator reads only some of them, so a target needs only the methods of the estimators that it runs under.
+To add a regression target, subtype [`AbstractUnpenalisedRegressionTarget`](@ref) or [`AbstractPenalisedRegressionTarget`](@ref), keep its parameters in the fields of the struct, and add the methods below. Each estimator reads only some of them, so a target needs only the methods of the estimators that it runs under. [`StepwiseRegression`](@ref) accepts an unpenalised target alone, because its criteria do not hold for a penalised fit.
 
 | Estimator                                | Methods it reads                                                                                                               |
 |:---------------------------------------- |:------------------------------------------------------------------------------------------------------------------------------ |
 | [`CrossSectionalTargetRegression`](@ref) | `factory`, `StatsAPI.fit`, `StatsAPI.coef`, `is_basis_invariant`                                                               |
-| [`TargetReturnForecast`](@ref)           | `StatsAPI.fit`, `StatsAPI.predict`                                                                                             |
-| [`ImpliedVolatilityRegression`](@ref)    | `StatsAPI.fit`, `StatsAPI.predict`                                                                                             |
+| [`TargetReturnForecast`](@ref)           | `StatsAPI.fit`, `StatsAPI.predict`, and `factory` with an [`InterceptColumn`](@ref) under `intercept = true`                   |
+| [`ImpliedVolatilityRegression`](@ref)    | `factory` with an [`InterceptColumn`](@ref), `StatsAPI.fit`, `StatsAPI.predict`                                                |
 | [`StepwiseRegression`](@ref)             | `StatsAPI.fit`, and `StatsAPI.coeftable` under [`PValue`](@ref) or the score verb of its criterion under every other criterion |
-| [`DimensionReductionRegression`](@ref)   | `StatsAPI.fit`, `StatsAPI.coef`, `regression_target_weights`                                                                   |
+| [`DimensionReductionRegression`](@ref)   | `factory` with an [`InterceptColumn`](@ref), `StatsAPI.fit`, `StatsAPI.coef`, `regression_target_weights`                      |
+| [`KernelTrendPattern`](@ref)             | `StatsAPI.fit`, `StatsAPI.predict`                                                                                             |
 
 The three time-series estimators carry their target through [`factory`](@ref), so each of them also reads `factory` when it gets observation weights.
 
@@ -436,6 +437,21 @@ The cross-sectional regression fits every observation under its cross-sectional 
 ### Returns
 
   - `tgt::MyRegressionTarget`: A target whose fit weighs row `i` by `w[i]`.
+
+## `factory` with an `InterceptColumn`
+
+  - `factory(tgt::MyRegressionTarget, ic::InterceptColumn) -> MyRegressionTarget`: Return a target whose fit leaves column `ic.k` of the design out of the penalty.
+
+An estimator that adds a column of ones to the design calls this method before the fit, with the index of that column. [`factory(::AbstractRegressionTarget, ::InterceptColumn)`](@ref) returns the target unchanged, so an unpenalised target needs no method. A penalised target that must not shrink the intercept adds one, as [`ElasticNet`](@ref) does.
+
+### Arguments
+
+  - `tgt`: The new regression target.
+  - `ic`: The intercept column, which holds the index of the column of ones.
+
+### Returns
+
+  - `tgt::MyRegressionTarget`: A target whose fit does not penalise column `ic.k`.
 
 ## `StatsAPI.fit`
 
@@ -537,18 +553,162 @@ A fit that minimises a loss of the fitted values alone, such as the weighted squ
 # Related
 
   - [`AbstractRegressionAlgorithm`](@ref)
+  - [`AbstractUnpenalisedRegressionTarget`](@ref)
+  - [`AbstractPenalisedRegressionTarget`](@ref)
   - [`LinearModel`](@ref)
   - [`GeneralisedLinearModel`](@ref)
+  - [`ElasticNet`](@ref)
+  - [`InterceptColumn`](@ref)
   - [`CrossSectionalTargetRegression`](@ref)
   - [`TargetReturnForecast`](@ref)
   - [`ImpliedVolatilityRegression`](@ref)
   - [`StepwiseRegression`](@ref)
   - [`DimensionReductionRegression`](@ref)
+  - [`KernelTrendPattern`](@ref)
   - [`factory`](@ref)
   - [`regression_target_weights`](@ref)
   - [`is_basis_invariant`](@ref)
 """
 abstract type AbstractRegressionTarget <: AbstractRegressionAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the regression targets that fit their coefficients with no penalty.
+
+[`LinearModel`](@ref) and [`GeneralisedLinearModel`](@ref) subtype it. A target of this branch fits every coefficient by its loss alone, so the inference of the fit counts one degree of freedom for each coefficient. [`StepwiseRegression`](@ref) binds its target to this branch, because its p-values and its information criteria read that count.
+
+# Interfaces
+
+To add an unpenalised regression target, subtype `AbstractUnpenalisedRegressionTarget`, and add the methods that the `# Interfaces` section of [`AbstractRegressionTarget`](@ref) names for the estimators that the target runs under. The target needs no method for an [`InterceptColumn`](@ref), because the method of [`AbstractRegressionTarget`](@ref) returns the target unchanged.
+
+## `StatsAPI.fit`
+
+  - `StatsAPI.fit(tgt::MyUnpenalisedRegressionTarget, A::MatNum, y::VecNum) -> MyRegressionFit`: Fit the target to the design `A` and the response `y`, with no penalty on the coefficients.
+
+[`StepwiseRegression`](@ref) also reads `StatsAPI.coeftable` or the score verb of its criterion on the fit, as the section of [`AbstractRegressionTarget`](@ref) states.
+
+### Arguments
+
+  - `tgt`: The new regression target.
+  - `A`: The design matrix, `samples × regressors`.
+  - `y`: The response vector, one entry per row of `A`.
+
+### Returns
+
+  - `m::MyRegressionFit`: The fitted model.
+
+# Related
+
+  - [`AbstractRegressionTarget`](@ref)
+  - [`AbstractPenalisedRegressionTarget`](@ref)
+  - [`LinearModel`](@ref)
+  - [`GeneralisedLinearModel`](@ref)
+  - [`StepwiseRegression`](@ref)
+"""
+abstract type AbstractUnpenalisedRegressionTarget <: AbstractRegressionTarget end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the regression targets that add a penalty on their coefficients.
+
+[`ElasticNet`](@ref) subtypes it. A penalty shrinks the coefficients toward zero, so the fit has fewer degrees of freedom than coefficients, and its p-values are not valid. A penalty also depends on the units of each column, so a target of this branch is not invariant to the basis of the design. An estimator that adds a column of ones names it with [`InterceptColumn`](@ref), so that the target does not shrink the intercept.
+
+# Interfaces
+
+To add a penalised regression target, subtype `AbstractPenalisedRegressionTarget`, and add the methods that the `# Interfaces` section of [`AbstractRegressionTarget`](@ref) names for the estimators that the target runs under. Add the method below too, so that the penalty leaves the intercept alone.
+
+## `factory`
+
+  - `factory(tgt::MyPenalisedRegressionTarget, ic::InterceptColumn) -> MyPenalisedRegressionTarget`: Return a target whose fit leaves column `ic.k` of the design out of the penalty.
+
+Without this method, the method of [`AbstractRegressionTarget`](@ref) returns the target unchanged, and the fit shrinks the intercept toward zero.
+
+### Arguments
+
+  - `tgt`: The new regression target.
+  - `ic`: The intercept column, which holds the index of the column of ones.
+
+### Returns
+
+  - `tgt::MyPenalisedRegressionTarget`: A target whose fit does not penalise column `ic.k`.
+
+# Related
+
+  - [`AbstractRegressionTarget`](@ref)
+  - [`AbstractUnpenalisedRegressionTarget`](@ref)
+  - [`ElasticNet`](@ref)
+  - [`InterceptColumn`](@ref)
+  - [`is_basis_invariant`](@ref)
+"""
+abstract type AbstractPenalisedRegressionTarget <: AbstractRegressionTarget end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Names the column of ones that a regression estimator adds to its design.
+
+An estimator that adds an intercept to its design calls `factory(tgt, InterceptColumn(k))` before the fit, with `k` the index of the column of ones. A penalised target, such as [`ElasticNet`](@ref), then leaves that coefficient out of the penalty. An unpenalised target ignores the call. The estimator names the column, because only the estimator knows where it put the column: [`ImpliedVolatilityRegression`](@ref) and [`DimensionReductionRegression`](@ref) put it first, and [`TargetReturnForecast`](@ref) puts it last. The target does not detect a constant column, because [`KernelTrendPattern`](@ref) has a column of ones whose coefficient the penalty must shrink.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    InterceptColumn(k::Integer) -> InterceptColumn
+
+## Validation
+
+  - `k >= 1`. A `DomainError` is thrown otherwise.
+
+# Examples
+
+```jldoctest
+julia> InterceptColumn(1)
+InterceptColumn
+  k ┴ Int64: 1
+```
+
+# Related
+
+  - [`AbstractPenalisedRegressionTarget`](@ref)
+  - [`ElasticNet`](@ref)
+  - [`factory(::AbstractRegressionTarget, ::InterceptColumn)`](@ref)
+"""
+@concrete struct InterceptColumn <: AbstractAlgorithm
+    """
+    The index of the column of ones in the design.
+    """
+    k
+    function InterceptColumn(k::Integer)
+        @argcheck(k >= 1, DomainError(k, "k must be at least 1"))
+        return new{typeof(k)}(k)
+    end
+end
+"""
+    factory(tgt::AbstractRegressionTarget, ic::InterceptColumn) -> AbstractRegressionTarget
+
+Return a regression target unchanged when an estimator names its column of ones.
+
+An unpenalised target fits the intercept as it fits every other coefficient, so the index of the column changes nothing. A penalised target that must leave the intercept out of the penalty has a method of its own, as [`ElasticNet`](@ref) has.
+
+# Arguments
+
+  - `tgt`: The regression target.
+  - `ic`: The intercept column.
+
+# Returns
+
+  - `tgt::AbstractRegressionTarget`: The input target, unchanged.
+
+# Related
+
+  - [`InterceptColumn`](@ref)
+  - [`AbstractRegressionTarget`](@ref)
+  - [`factory`](@ref)
+"""
+function factory(tgt::AbstractRegressionTarget, ::InterceptColumn)
+    return tgt
+end
 """
     factory(tgt::AbstractRegressionTarget, w::ObsWeights)
 
@@ -607,7 +767,7 @@ LinearModel
   - [`GeneralisedLinearModel`](@ref)
   - [`StatsAPI.fit(::LinearModel, ::MatNum, ::VecNum)`](@ref)
 """
-@concrete struct LinearModel <: AbstractRegressionTarget
+@concrete struct LinearModel <: AbstractUnpenalisedRegressionTarget
     """
     Keyword arguments passed to `fit(GLM.LinearModel, X, y; kwargs...)`.
     """
@@ -906,7 +1066,7 @@ GeneralisedLinearModel
 
   - $(ref_dict[:nelder1972]) Pages 370-384. $(ref_dict[:no_original_source])
 """
-@concrete struct GeneralisedLinearModel <: AbstractRegressionTarget
+@concrete struct GeneralisedLinearModel <: AbstractUnpenalisedRegressionTarget
     """
     Positional arguments passed to `fit(GLM.GeneralizedLinearModel, X, y, args...; kwargs...)`.
     """
@@ -1073,7 +1233,7 @@ true
 julia> PortfolioOptimisers.is_basis_invariant(GeneralisedLinearModel())
 true
 
-julia> struct RidgeTarget <: PortfolioOptimisers.AbstractRegressionTarget end
+julia> struct RidgeTarget <: PortfolioOptimisers.AbstractPenalisedRegressionTarget end
 
 julia> PortfolioOptimisers.is_basis_invariant(RidgeTarget())
 false
@@ -1871,3 +2031,6 @@ public AbstractOrthogonalityMetric, orthogonality_weights, cs_diagnostic_weights
 # `regression_target_weights`, which #1441 added for the time-series estimators, and
 # `is_basis_invariant`, which #1614 added for the carry fold of the cross-sectional prior.
 public AbstractRegressionTarget, regression_target_weights, is_basis_invariant
+# The two branches of #1885 (ADR 0223): a caller's own target subtypes one of them.
+public AbstractUnpenalisedRegressionTarget, AbstractPenalisedRegressionTarget
+export InterceptColumn

@@ -1138,11 +1138,15 @@ KernelTrendTracking
        │   alg ┼ KernelTrendPattern
        │       │   window ┼ Int64: 5
        │       │       nu ┼ Float64: 0.5
-       │       │     path ┼ ElasticNetPath
-       │       │          │   theta ┼ Float64: 0.99
-       │       │          │   ratio ┼ Float64: 0.001
-       │       │          │   iters ┼ Int64: 10000
-       │       │          │     tol ┴ Float64: 1.0e-10
+       │       │      tgt ┼ ElasticNet
+       │       │          │      theta ┼ Float64: 0.99
+       │       │          │   strength ┼ MiddleOfPath
+       │       │          │            │   ratio ┴ Float64: 0.001
+       │       │          │         ve ┼ nothing
+       │       │          │      iters ┼ Int64: 10000
+       │       │          │        tol ┼ Float64: 1.0e-10
+       │       │          │          w ┼ nothing
+       │       │          │         ic ┴ nothing
    eta ┼ Int64: 1000
      q ┼ Int64: 6
   proj ┴ EuclideanProjection()
@@ -1217,11 +1221,11 @@ function online_update!(alg::KernelTrendTracking, st, w::AbstractVector, x::Abst
     return st, project(alg.proj, set, q, price_adjusted_allocation(w, x))
 end
 """
-    KernelTrendPatternTracking(; window::Integer = 5, nu::Real = 0.5, theta::Real = 0.99, iters::Integer = 10_000, tol::Real = 1e-10, q::Real = 6, eta::Real = 1000, proj::EuclideanProjection = EuclideanProjection())
+    KernelTrendPatternTracking(; window::Integer = 5, nu::Real = 0.5, theta::Real = 0.99, ratio::Real = 1e-3, iters::Integer = 10_000, tol::Real = 1e-10, q::Real = 6, eta::Real = 1000, proj::EuclideanProjection = EuclideanProjection())
 
 Builds the kernel-based trend pattern tracking, KTPT.
 
-It is the rule of [lai2018ktpt](@citet). It is a [`KernelTrendTracking`](@ref) whose forecast is the [`KernelTrendPattern`](@ref) over `window` levels. `nu` mixes its initial state, and an [`ElasticNetPath`](@ref) at `theta` gives its intermediate state, with at most `iters` sweeps stopped at `tol`. The defaults `window = 5`, `nu = 0.5`, `theta = 0.99`, `q = 6` and `eta = 1000` are the values of [lai2018ktpt](@cite).
+It is the rule of [lai2018ktpt](@citet). It is a [`KernelTrendTracking`](@ref) whose forecast is the [`KernelTrendPattern`](@ref) over `window` levels. `nu` mixes its initial state. An [`ElasticNet`](@ref) at `theta` gives its intermediate state, at the [`MiddleOfPath`](@ref) with the floor `ratio`, with at most `iters` sweeps stopped at `tol`. The defaults `window = 5`, `nu = 0.5`, `theta = 0.99`, `q = 6` and `eta = 1000` are the values of [lai2018ktpt](@cite). A [`KernelTrendPattern`](@ref) with another regression target goes into [`KernelTrendTracking`](@ref) directly.
 
 [lai2018ktpt](@citet) report that the wealth is robust to `eta` from 800 to 1300 and stable for `q` near 6. The statistic folds with a memory, so the head holds only the current row for this rule.
 
@@ -1234,11 +1238,15 @@ KernelTrendTracking
        │   alg ┼ KernelTrendPattern
        │       │   window ┼ Int64: 3
        │       │       nu ┼ Float64: 0.5
-       │       │     path ┼ ElasticNetPath
-       │       │          │   theta ┼ Float64: 0.99
-       │       │          │   ratio ┼ Float64: 0.001
-       │       │          │   iters ┼ Int64: 10000
-       │       │          │     tol ┴ Float64: 1.0e-10
+       │       │      tgt ┼ ElasticNet
+       │       │          │      theta ┼ Float64: 0.99
+       │       │          │   strength ┼ MiddleOfPath
+       │       │          │            │   ratio ┴ Float64: 0.001
+       │       │          │         ve ┼ nothing
+       │       │          │      iters ┼ Int64: 10000
+       │       │          │        tol ┼ Float64: 1.0e-10
+       │       │          │          w ┼ nothing
+       │       │          │         ic ┴ nothing
    eta ┼ Int64: 1000
      q ┼ Int64: 6
   proj ┴ EuclideanProjection()
@@ -1248,7 +1256,8 @@ KernelTrendTracking
 
   - [`KernelTrendTracking`](@ref)
   - [`KernelTrendPattern`](@ref)
-  - [`ElasticNetPath`](@ref)
+  - [`ElasticNet`](@ref)
+  - [`MiddleOfPath`](@ref)
   - [`PeakPriceTracking`](@ref)
 
 # References
@@ -1256,12 +1265,14 @@ KernelTrendTracking
   - $(ref_dict[:lai2018ktpt]) Section 3.1.2, Algorithm 1 and Section 3.3.
 """
 function KernelTrendPatternTracking(; window::Integer = 5, nu::Real = 0.5,
-                                    theta::Real = 0.99, iters::Integer = 10_000,
-                                    tol::Real = 1e-10, q::Real = 6, eta::Real = 1000,
+                                    theta::Real = 0.99, ratio::Real = 1e-3,
+                                    iters::Integer = 10_000, tol::Real = 1e-10, q::Real = 6,
+                                    eta::Real = 1000,
                                     proj::EuclideanProjection = EuclideanProjection())::KernelTrendTracking
     alg = KernelTrendPattern(; window = window, nu = nu,
-                             path = ElasticNetPath(; theta = theta, iters = iters,
-                                                   tol = tol))
+                             tgt = ElasticNet(; theta = theta,
+                                              strength = MiddleOfPath(; ratio = ratio),
+                                              iters = iters, tol = tol))
     return KernelTrendTracking(; me = PriceLevelExpectedReturns(; alg = alg), eta = eta,
                                q = q, proj = proj)
 end

@@ -5,7 +5,7 @@
 julia = "1.13.3"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "e44cd966e7"
+commit = "7a17d96d8e"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { cyc = 5, cog = 7, arg = 8, cyc_sum = 53, cog_sum = 57, arg_sum = 99, macros = [] }
@@ -185,6 +185,7 @@ commit = "e44cd966e7"
 "src/05_Moments/35_CompositePriceLevelStatistics.jl" = { cyc = 7, cog = 10, arg = 5, cyc_sum = 67, cog_sum = 57, arg_sum = 61, macros = [] }
 "src/05_Moments/36_RankOneCovariance.jl" = { cyc = 3, cog = 3, arg = 4, cyc_sum = 8, cog_sum = 5, arg_sum = 11, macros = ["@propagatable"] }
 "src/05_Moments/37_GeodesicShrinkageCovariance.jl" = { cyc = 5, cog = 5, arg = 5, cyc_sum = 41, cog_sum = 26, arg_sum = 60, macros = ["@propagatable"] }
+"src/05_Moments/38_ElasticNet.jl" = { cyc = 8, cog = 12, arg = 10, cyc_sum = 41, cog_sum = 40, arg_sum = 41, macros = [] }
 "src/06_Distance/01_Base_Distance.jl" = { cyc = 2, cog = 1, arg = 2, cyc_sum = 3, cog_sum = 2, arg_sum = 2, macros = [] }
 "src/06_Distance/02_Distance.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 33, cog_sum = 18, arg_sum = 112, macros = [] }
 "src/06_Distance/03_DistanceDistance.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 6, cog_sum = 5, arg_sum = 19, macros = [] }
