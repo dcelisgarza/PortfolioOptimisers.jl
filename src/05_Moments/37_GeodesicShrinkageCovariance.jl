@@ -1015,6 +1015,14 @@ function observation_count(ce::GeodesicShrinkageCovariance{<:Any, <:Any, <:Any, 
                                                            Nothing})
     return observation_count(ce.ce)
 end
+# The shrinkage reads the matrix of `ce.ce` over the same `X`, so both forms read `ce.ce`.
+function effective_observation_count(ce::GeodesicShrinkageCovariance, X::MatNum)
+    return effective_observation_count(ce.ce, X)
+end
+function effective_observation_count(ce::GeodesicShrinkageCovariance{<:Any, <:Any, <:Any,
+                                                                     <:Any, Nothing})
+    return effective_observation_count(ce.ce)
+end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

@@ -118,7 +118,7 @@ commit = "9f7e0ac503"
 "src/05_Moments/24_AbstractCovarianceVariance.jl" = { cyc = 3, cog = 3, arg = 4, cyc_sum = 15, cog_sum = 7, arg_sum = 30, macros = [] }
 "src/05_Moments/25_StandardDeviationExpectedReturns.jl" = { cyc = 1, cog = 1, arg = 4, cyc_sum = 6, cog_sum = 2, arg_sum = 10, macros = ["@propagatable"] }
 "src/05_Moments/26_Windowed/01_WindowedExpectedReturns.jl" = { cyc = 0, cog = 0, arg = 0, cyc_sum = 0, cog_sum = 0, arg_sum = 0, macros = ["@windowed_estimator"] }
-"src/05_Moments/26_Windowed/02_WindowedCovariance.jl" = { cyc = 1, cog = 0, arg = 5, cyc_sum = 2, cog_sum = 0, arg_sum = 9, macros = ["@windowed_estimator"] }
+"src/05_Moments/26_Windowed/02_WindowedCovariance.jl" = { cyc = 1, cog = 1, arg = 5, cyc_sum = 3, cog_sum = 1, arg_sum = 11, macros = ["@windowed_estimator"] }
 "src/05_Moments/26_Windowed/03_WindowedVariance.jl" = { cyc = 1, cog = 1, arg = 5, cyc_sum = 3, cog_sum = 1, arg_sum = 11, macros = ["@windowed_estimator"] }
 "src/05_Moments/26_Windowed/04_WindowedCoskewness.jl" = { cyc = 0, cog = 0, arg = 0, cyc_sum = 0, cog_sum = 0, arg_sum = 0, macros = ["@windowed_estimator"] }
 "src/05_Moments/26_Windowed/05_WindowedCokurtosis.jl" = { cyc = 0, cog = 0, arg = 0, cyc_sum = 0, cog_sum = 0, arg_sum = 0, macros = ["@windowed_estimator"] }

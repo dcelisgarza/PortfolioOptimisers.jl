@@ -1157,9 +1157,11 @@ function systematic_processing!(::SystematicRepair, mp::AbstractMatrixProcessing
 end
 function systematic_processing!(::Nothing, mp::MatrixProcessing, sigma::MatNum, X::MatNum;
                                 kwargs...)
+    # The block is assembled from a model, so its count is the row count of `X` (#1893).
+    T = size(X, 1)
     for step in mp.order
         if step !== :pdm
-            matrix_processing_step!(Val(step), mp, sigma, X; kwargs...)
+            matrix_processing_step!(Val(step), mp, sigma, X, T; kwargs...)
         end
     end
     # The product of the loadings and the factor covariance is symmetric only to rounding, and

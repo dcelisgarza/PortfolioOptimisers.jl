@@ -899,11 +899,50 @@ The count tends to ``(1 + \\lambda) / (1 - \\lambda)`` as ``n_{i}`` grows, which
 """
 function exp_weighted_variance_count(decay::Number, X::MatNum, centring::AbstractCentring)
     m = map(axes(X, 2)) do i
-        lk = decay^centring_terms(centring, count(isfinite, view(X, :, i)))
-        return (one(lk) - lk) * (one(decay) + decay) /
-               ((one(decay) - decay) * (one(lk) + lk))
+        return exp_weighted_kish_count(decay,
+                                       centring_terms(centring,
+                                                      count(isfinite, view(X, :, i))))
     end
     return (; n = m .+ centring_lag(centring), m = m)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the Kish count of `K` exponential weights, the closed form of [`exp_weighted_variance_count`](@ref).
+
+The weights are proportional to ``\\lambda^{k}``, ``k = 0, \\ldots, K - 1``. The count is zero when `K` is zero.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\kappa &= \\dfrac{\\left(\\sum_{k=0}^{K-1} \\lambda^{k}\\right)^{2}}{\\sum_{k=0}^{K-1} \\lambda^{2k}} = \\dfrac{\\left(1 - \\lambda^{K}\\right)\\left(1 + \\lambda\\right)}{\\left(1 - \\lambda\\right)\\left(1 + \\lambda^{K}\\right)}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\kappa``: Kish count of the weights.
+  - ``K``: Number of weights.
+  - $(math_dict[:lambda_ew])
+
+# Arguments
+
+  - `decay`: Decay of the recursion.
+  - `K`: Number of weights.
+
+# Returns
+
+  - `kappa::Number`: The Kish count.
+
+# Related
+
+  - [`exp_weighted_variance_count`](@ref)
+  - [`exp_weighted_covariance_count`](@ref)
+"""
+function exp_weighted_kish_count(decay::Number, K::Integer)
+    lk = decay^K
+    return (one(lk) - lk) * (one(decay) + decay) / ((one(decay) - decay) * (one(lk) + lk))
 end
 function variance_count(ve::ExpWeightedVariance, X::MatNum)
     return exp_weighted_variance_count(ve.decay, X, ve.centring)

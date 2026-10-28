@@ -1050,6 +1050,11 @@ function Statistics.cor(ce::ImpliedVolatility, X::MatNum, pnl::Option{<:AssetPan
                          ivpa = coverage_reduced_ivpa(ivpa, cmsk), kwargs...)
     return expand_moment(rho, cmsk)
 end
+# The correlation of `ce.ce` over `X` is the only part that the observations weight, so the
+# count is the count of `ce.ce`.
+function effective_observation_count(ce::ImpliedVolatility, X::MatNum)
+    return effective_observation_count(ce.ce, X)
+end
 
 export ImpliedVolatility, ImpliedVolatilityPremium, ImpliedVolatilityRegression
 public ImpliedVolatilityAlgorithm, predict_realised_vols

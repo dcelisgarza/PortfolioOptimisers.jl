@@ -518,6 +518,10 @@ function observation_count(est::SeedWindowed)
     # The declaration of every windowed type sets the inner estimator as the first field.
     return observation_count(getfield(est, 1))
 end
+# The inner estimator holds the state of the fold, as for `observation_count` above.
+function effective_observation_count(est::SeedWindowed)
+    return effective_observation_count(getfield(est, 1))
+end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

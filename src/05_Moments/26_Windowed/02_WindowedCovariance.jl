@@ -95,3 +95,7 @@ function variance_series(ce::WindowedCovariance, X::MatNum, pnl::Option{<:AssetP
                          dims::Int = 1, kwargs...)
     return windowed_variance_series(ce.ce, ce.w, ce.window, X, pnl; dims = dims, kwargs...)
 end
+function effective_observation_count(ce::WindowedCovariance, X::MatNum)
+    inner, Xw, _ = windowed_preamble(ce.ce, ce.w, ce.window, X)
+    return effective_observation_count(inner, Xw)
+end

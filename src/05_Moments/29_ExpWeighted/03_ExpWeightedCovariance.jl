@@ -1196,6 +1196,58 @@ The state counts the observations of each asset in `obs_count`, and a reset sets
 function observation_count(state::ExpWeightedCovarianceState)
     return state.rows[]
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the effective number of observations of an exponentially weighted covariance over `n` rows.
+
+It is the count of [`exp_weighted_variance_count`](@ref) for one column of `n` finite rows. The covariance reads every row with the weight of its age, so the count reads all `n` rows, the rows with a `NaN` too, as `size(X, 1)` counts them. The count tends to ``(1 + \\lambda) / (1 - \\lambda)`` as `n` grows. Under equal weights it is `n`.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+T_{e} &= \\kappa\\left(K\\right) + \\ell\\,, \\\\
+K &= \\max\\left(n - \\ell, 0\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:cal_T_e])
+  - ``\\kappa(K)``: Kish count of ``K`` exponential weights, from [`exp_weighted_kish_count`](@ref).
+  - ``n``: Number of rows.
+  - ``\\ell``: The lag of the centring, from [`centring_lag`](@ref).
+
+# Arguments
+
+  - `decay`: Decay of the recursion.
+  - `n`: Number of rows.
+  - `centring`: The centring of the estimator.
+
+# Returns
+
+  - `T_e::Number`: The effective number of observations.
+
+# Related
+
+  - [`effective_observation_count`](@ref)
+  - [`exp_weighted_kish_count`](@ref)
+  - [`ExpWeightedCovariance`](@ref)
+  - [`RegimeAdjustedExpWeightedCovariance`](@ref)
+"""
+function exp_weighted_covariance_count(decay::Number, n::Integer,
+                                       centring::AbstractCentring)
+    return exp_weighted_kish_count(decay, centring_terms(centring, n)) +
+           centring_lag(centring)
+end
+function effective_observation_count(ce::ExpWeightedCovariance, X::MatNum)
+    return exp_weighted_covariance_count(ce.decay, size(X, 1), ce.centring)
+end
+function effective_observation_count(ce::ExpWeightedCovariance,
+                                     state::ExpWeightedCovarianceState)
+    return exp_weighted_covariance_count(ce.decay, observation_count(state), ce.centring)
+end
 
 # An exponentially weighted recursion folds in every configuration (see
 # [`supports_partial_fit`](@ref)).

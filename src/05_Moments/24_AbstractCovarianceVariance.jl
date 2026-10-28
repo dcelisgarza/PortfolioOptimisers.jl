@@ -350,6 +350,88 @@ function variance_count(::AbstractVarianceEstimator, ::MatNum)::Nothing
     return nothing
 end
 """
+    effective_observation_count(ce::StatsBase.CovarianceEstimator, X::MatNum) -> Real
+    effective_observation_count(ce) -> Real
+    effective_observation_count(ce, state::AbstractPartialFitState) -> Real
+    effective_observation_count(ce, state::SampleBufferState) -> Real
+
+Return the number of observations that the covariance of `ce` is worth, as one number for the whole matrix.
+
+The denoising step of [`MatrixProcessing`](@ref) reads the ratio `T / N` of the sample. An unweighted moment reads every row of `X` with the same weight, so `T` is `size(X, 1)`. A weighted moment is worth fewer observations than `X` has rows. A denoiser that reads `size(X, 1)` then gets a ratio that is too large, and it removes too little noise. So [`PortfolioOptimisersCovariance`](@ref) reads `T` from this function.
+
+The form with `X` is the batch fit. Its default is `size(X, 1)`, so an unweighted estimator pays nothing. The form with no data is the fit from a fold. It reads the state of `ce` with [`partial_fit_cache`](@ref), and the form with a state reads the count from it. The default of a state is the folded row count of [`observation_count`](@ref). A [`SampleBufferState`](@ref) holds the observations, so it reads the batch form over the rows of the buffer.
+
+The count covers every row of `X`, the rows with a `NaN` too, as `size(X, 1)` does. It does not count the rows of each asset.
+
+# Interfaces
+
+An estimator that weights its observations adds a method of the batch form. A method of the state form is necessary when the estimator folds into a state that holds no observations.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+T_{e} &= \\dfrac{\\left(\\sum_{t} w_{t}\\right)^{2}}{\\sum_{t} w_{t}^{2}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:cal_T_e])
+  - $(math_dict[:w_t_obs])
+
+The count is ``T`` under equal weights. Frequency weights count replicated observations, so their count is ``\\sum_{t} w_{t}``.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. On a covariance estimator with no method of its own, return `size(X, 1)`.
+ 2. On [`Covariance`](@ref), [`GeneralCovariance`](@ref) and [`DistanceCovariance`](@ref), return the count of the observation weights with [`observation_weight_count`](@ref). A [`Covariance`](@ref) with no weights reads the count of its inner estimator, because the inner estimator can hold weights of its own.
+ 3. On [`ExpWeightedCovariance`](@ref), return the count of [`exp_weighted_covariance_count`](@ref) over the rows of `X`. On [`RegimeAdjustedExpWeightedCovariance`](@ref), do the same with the decay and the centring of its correlation. The denoising step processes the correlation, so it reads the count of the correlation.
+ 4. On [`WindowedCovariance`](@ref), apply the window and the weights of the wrapper with [`windowed_preamble`](@ref). Then return the count of the inner estimator over the rows that the window keeps.
+ 5. On [`PortfolioOptimisersCovariance`](@ref), [`CorrelationCovariance`](@ref), [`GeodesicShrinkageCovariance`](@ref) and [`ImpliedVolatility`](@ref), return the count of the inner estimator, because these estimators pass `X` to it without change.
+ 6. With no data, read the state of `ce`, and return the count of the state. A composite that keeps no state of its own reads its inner estimator, as [`observation_count`](@ref) does. The two exponentially weighted states return the count of step 3 over the folded rows.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - `X`: The data matrix, of shape `observations × assets`.
+  - `state`: The partial-fit state of `ce`.
+
+# Returns
+
+  - `T::Real`: The effective number of observations. It is an `Integer` for an unweighted estimator.
+
+# Related
+
+  - [`sample_matrix_processing!`](@ref)
+  - [`observation_count`](@ref)
+  - [`variance_count`](@ref)
+  - [`PortfolioOptimisersCovariance`](@ref)
+
+# References
+
+  - $(ref_dict[:kish1965]) Whole book. $(ref_dict[:no_original_source])
+"""
+function effective_observation_count(::StatsBase.CovarianceEstimator, X::MatNum)
+    return size(X, 1)
+end
+function effective_observation_count(ce::Union{AbstractEstimator,
+                                               StatsBase.CovarianceEstimator})
+    return effective_observation_count(ce, partial_fit_cache(ce))
+end
+function effective_observation_count(::Union{AbstractEstimator,
+                                             StatsBase.CovarianceEstimator},
+                                     state::AbstractPartialFitState)
+    return observation_count(state)
+end
+function effective_observation_count(ce::Union{AbstractEstimator,
+                                               StatsBase.CovarianceEstimator},
+                                     state::SampleBufferState)
+    return effective_observation_count(ce, sample_buffer(state))
+end
+"""
     Statistics.cov(ce::AbstractCovarianceEstimator; kwargs...)
     Statistics.cor(ce::AbstractCovarianceEstimator; kwargs...)
     Statistics.var(ve::AbstractVarianceEstimator)
@@ -393,3 +475,4 @@ end
 function Statistics.std(ve::AbstractVarianceEstimator)
     return Statistics.std(ve, partial_fit_cache(ve))
 end
+public effective_observation_count

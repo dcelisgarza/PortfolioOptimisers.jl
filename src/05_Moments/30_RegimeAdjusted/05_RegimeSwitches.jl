@@ -299,6 +299,42 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Return the effective number of observations of the correlation of a regime-adjusted covariance over `n` rows.
+
+The denoising step processes the correlation, so the count is the count of the correlation. Under a separate correlation decay, the correlation reads the pre-centred law at `cor_decay`, as the regime bias does. Otherwise it reads `decay` and the centring of the estimator. The count ignores the regime multiplier and the lags of a HAC adjustment, as [`variance_count`](@ref) does.
+
+# Arguments
+
+  - `ce`: Regime-adjusted exponentially weighted covariance estimator.
+  - `n`: Number of rows.
+
+# Returns
+
+  - `T_e::Number`: The effective number of observations, from [`exp_weighted_covariance_count`](@ref).
+
+# Related
+
+  - [`effective_observation_count`](@ref)
+  - [`has_separate_cor_decay`](@ref)
+  - [`exp_weighted_covariance_count`](@ref)
+"""
+function regime_correlation_count(ce::RegimeAdjustedExpWeightedCovariance, n::Integer)
+    return if has_separate_cor_decay(ce)
+        exp_weighted_covariance_count(ce.cor_decay, n, PreCentred())
+    else
+        exp_weighted_covariance_count(ce.decay, n, ce.centring)
+    end
+end
+function effective_observation_count(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum)
+    return regime_correlation_count(ce, size(X, 1))
+end
+function effective_observation_count(ce::RegimeAdjustedExpWeightedCovariance,
+                                     state::RegimeAdjustedCovarianceState)
+    return regime_correlation_count(ce, observation_count(state))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Computes the outer product of one observation, with the Newey-West HAC correction where `hac_lags` is not `nothing`, and divides each product by its exact factor.
 
 The correction adds each lagged cross-product and its transpose, weighted by the Bartlett kernel ``w_j = 1 - j/(L+1)``, so the update reads the serial correlation of the returns. An entry of a lagged observation that is not finite is read as zero, which freezes that pair's contribution. Each product is then divided by [`hac_pair_factor`](@ref), its mean in units of the covariance of the pair, which is one under [`PreCentred`](@ref).

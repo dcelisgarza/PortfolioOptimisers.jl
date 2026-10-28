@@ -149,4 +149,53 @@ end
 function get_observation_weights(w::VecNum, args...; kwargs...)
     return w
 end
+"""
+    observation_weight_count(w::Nothing, T::Integer) -> Integer
+    observation_weight_count(w::StatsBase.FrequencyWeights, T::Integer) -> Number
+    observation_weight_count(w::AbstractVector, T::Integer) -> Number
+
+Return the number of observations that a sample of `T` rows under the weights `w` is worth.
+
+The function dispatches on the weight type, as [`simple_variance_count`](@ref) and [`glm_weights`](@ref) do. Frequency weights count replicated observations, so their count is their sum. Every other weight vector states the relative weight of each observation and no count, so its count is the Kish count. With no weights the count is `T`.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+T_{e} &= \\dfrac{\\left(\\sum_{t} w_{t}\\right)^{2}}{\\sum_{t} w_{t}^{2}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:cal_T_e])
+  - $(math_dict[:w_t_obs])
+
+# Arguments
+
+  - `w`: The resolved observation weights, or `nothing`. [`get_observation_weights`](@ref) resolves them.
+  - `T`: The number of rows of the sample.
+
+# Returns
+
+  - `T_e::Number`: The effective number of observations.
+
+# Related
+
+  - [`effective_observation_count`](@ref)
+  - [`get_observation_weights`](@ref)
+
+# References
+
+  - $(ref_dict[:kish1965]) Whole book. $(ref_dict[:no_original_source])
+"""
+function observation_weight_count(::Nothing, T::Integer)
+    return T
+end
+function observation_weight_count(w::StatsBase.FrequencyWeights, ::Integer)
+    return sum(w)
+end
+function observation_weight_count(w::AbstractVector, ::Integer)
+    return sum(w)^2 / sum(abs2, w)
+end
 public get_observation_weights

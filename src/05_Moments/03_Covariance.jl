@@ -519,6 +519,18 @@ function covariance_centre_and_estimator(ce::Covariance, X::MatNum; dims::Int = 
                                                 factory_child(ce.ce, ce.w)
                                             end)
 end
+# `ce.w` replaces the weights of `ce.ce` when it is set, as `covariance_centre_and_estimator`
+# does, so only an unweighted `Covariance` reads the count of its inner estimator.
+function effective_observation_count(ce::Covariance, X::MatNum)
+    return if isnothing(ce.w)
+        effective_observation_count(ce.ce, X)
+    else
+        observation_weight_count(get_observation_weights(ce.w, X; dims = 1), size(X, 1))
+    end
+end
+function effective_observation_count(ce::GeneralCovariance, X::MatNum)
+    return observation_weight_count(get_observation_weights(ce.w, X; dims = 1), size(X, 1))
+end
 """
     Statistics.cov(
         ce::Covariance,

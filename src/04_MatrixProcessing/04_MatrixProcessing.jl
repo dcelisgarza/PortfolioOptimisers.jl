@@ -325,6 +325,8 @@ Runs the steps of a matrix processing estimator on the covariance or correlation
 
 `mp.order` is a tuple or vector of the symbols `:pdm`, `:dn`, `:dt` and `:alg`, and it sets the steps and their order. [`matrix_processing_step!`](@ref) dispatches each step.
 
+The method reads the number of observations as `T = size(X, 1)`, and gives it to [`sample_matrix_processing!`](@ref). A weighted moment is worth fewer observations, and its caller calls [`sample_matrix_processing!`](@ref) with the count of its weights.
+
 # Algorithm
 
  1. Take the next symbol of `mp.order`. The default order is `(:pdm, :dn, :dt, :alg)`.
@@ -406,25 +408,71 @@ function matrix_processing!(::Nothing, sigma::MatNum, args...; kwargs...)::MatNu
 end
 function matrix_processing!(mp::MatrixProcessing, sigma::MatNum, X::MatNum, args...;
                             kwargs...)
+    return sample_matrix_processing!(mp, sigma, X, size(X, 1); kwargs...)
+end
+"""
+    sample_matrix_processing!(mp::MatrixProcessing, sigma::MatNum, X::MatNum, T::Real;
+                              kwargs...) -> MatNum
+    sample_matrix_processing!(mp::Option{<:AbstractMatrixProcessingEstimator}, sigma::MatNum,
+                              X::MatNum, T::Real; kwargs...) -> MatNum
+
+Runs the steps of a matrix processing estimator on `sigma` in place, from the sample `X` and the effective number of observations `T`.
+
+[`matrix_processing!`](@ref) reads `T = size(X, 1)`, and it calls this function. A weighted moment does not read every row with the same weight, so it is worth fewer observations than `X` has rows. A caller that knows the weights passes their count from [`effective_observation_count`](@ref), and the denoising step then reads the ratio `T / N` of that count. [`PortfolioOptimisersCovariance`](@ref), [`Cokurtosis`](@ref) and [`Coskewness`](@ref) do this. The other steps read `X`, as in [`matrix_processing!`](@ref).
+
+A matrix processing estimator of the caller states only [`matrix_processing!`](@ref) on the sample, so it gets `X` and not `T`.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A [`MatrixProcessing`](@ref) runs each step of `mp.order` in turn, through the matrix methods of [`matrix_processing_step!`](@ref), with `X` and `T`.
+ 2. Every other `mp` goes to [`matrix_processing!`](@ref) with `X`, and the function ignores `T`.
+
+# Arguments
+
+  - $(arg_dict[:omp])
+  - $(arg_dict[:sigrho])
+  - $(arg_dict[:X])
+  - `T`: The effective number of observations of the moment.
+  - `kwargs...`: The keyword arguments for a custom algorithm.
+
+# Returns
+
+  - `sigma::MatNum`: The input matrix `sigma`, modified in place.
+
+# Related
+
+  - [`matrix_processing!`](@ref)
+  - [`effective_observation_count`](@ref)
+  - [`matrix_processing_step!`](@ref)
+"""
+function sample_matrix_processing!(mp::MatrixProcessing, sigma::MatNum, X::MatNum, T::Real;
+                                   kwargs...)
     for step in mp.order
-        matrix_processing_step!(Val(step), mp, sigma, X; kwargs...)
+        matrix_processing_step!(Val(step), mp, sigma, X, T; kwargs...)
     end
     return sigma
 end
+function sample_matrix_processing!(mp::Option{<:AbstractMatrixProcessingEstimator},
+                                   sigma::MatNum, X::MatNum, ::Real; kwargs...)
+    return matrix_processing!(mp, sigma, X; kwargs...)
+end
 """
-    matrix_processing_step!(::Val{step}, mp::MatrixProcessing, sigma::MatNum, X::MatNum; kwargs...) -> MatNum
+    matrix_processing_step!(::Val{step}, mp::MatrixProcessing, sigma::MatNum, X::MatNum,
+                            T::Real; kwargs...) -> MatNum
 
 Applies one named matrix processing step to `sigma` in place. The symbol `step` selects the method.
 
-[`matrix_processing!`](@ref) calls this function once for each symbol of `mp.order`. Each symbol names one estimator field of `mp`. A `nothing` estimator does nothing, because the function that its step calls has a `nothing` method that returns the matrix.
+[`sample_matrix_processing!`](@ref) calls this function once for each symbol of `mp.order`. Each symbol names one estimator field of `mp`. A `nothing` estimator does nothing, because the function that its step calls has a `nothing` method that returns the matrix.
 
 # Algorithm
 
 The method that Julia selects is the algorithm. Each step is one method, and each method calls the function of its field.
 
- 1. `Val{:pdm}`: apply [`posdef!`](@ref) to `sigma`, under `mp.pdm`. `X` is not read.
- 2. `Val{:dn}`: read `T, N = size(X)`, then apply [`denoise!`](@ref) to `sigma`, under `mp.dn` and the effective sample ratio `T / N`. This is the one step that reads `X`, and it reads only its shape.
- 3. `Val{:dt}`: apply [`detone!`](@ref) to `sigma`, under `mp.dt`. `X` is not read.
+ 1. `Val{:pdm}`: apply [`posdef!`](@ref) to `sigma`, under `mp.pdm`. `X` and `T` are not read.
+ 2. `Val{:dn}`: read `N = size(X, 2)`, then apply [`denoise!`](@ref) to `sigma`, under `mp.dn` and the effective sample ratio `T / N`. This is the one step that reads `T`, and it reads only the number of columns of `X`.
+ 3. `Val{:dt}`: apply [`detone!`](@ref) to `sigma`, under `mp.dt`. `X` and `T` are not read.
  4. `Val{:alg}`: apply [`matrix_processing_algorithm!`](@ref) to `sigma`, under `mp.alg`, and pass `X` and `kwargs` to it. This is the step that a caller extends.
 
 No method exists for any other symbol, so another symbol raises a `MethodError`. The constructor of [`MatrixProcessing`](@ref) refuses such a symbol first, so only a hand-built `Val` gets to the `MethodError`.
@@ -434,7 +482,7 @@ No method exists for any other symbol, so another symbol raises a `MethodError`.
   - `::Val{step}`: The processing step to apply, named by a symbol:
 
       + `:pdm`: The positive definite repair under `mp.pdm`.
-      + `:dn`: The denoising under `mp.dn` and the ratio `T / N` of the shape of `X`.
+      + `:dn`: The denoising under `mp.dn` and the ratio `T / N`, with `N` the number of columns of `X`.
       + `:dt`: The detoning under `mp.dt`.
       + `:alg`: The optional custom algorithm `mp.alg`.
       + Any other symbol: A `MethodError`.
@@ -445,6 +493,8 @@ No method exists for any other symbol, so another symbol raises a `MethodError`.
 
   - $(arg_dict[:X])
 
+  - `T`: The effective number of observations of the moment. It is `size(X, 1)` for an unweighted moment.
+
   - `kwargs...`: The keyword arguments for a custom algorithm.
 
 # Returns
@@ -454,23 +504,23 @@ No method exists for any other symbol, so another symbol raises a `MethodError`.
 # Related
 
   - [`matrix_processing!`](@ref)
+  - [`sample_matrix_processing!`](@ref)
   - [`MatrixProcessing`](@ref)
 """
-function matrix_processing_step!(::Val{:pdm}, mp::MatrixProcessing, sigma::MatNum,
-                                 X::MatNum; kwargs...)
+function matrix_processing_step!(::Val{:pdm}, mp::MatrixProcessing, sigma::MatNum, ::MatNum,
+                                 ::Real; kwargs...)
     return posdef!(mp.pdm, sigma)
 end
-function matrix_processing_step!(::Val{:dn}, mp::MatrixProcessing, sigma::MatNum, X::MatNum;
-                                 kwargs...)
-    T, N = size(X)
-    return denoise!(mp.dn, sigma, T / N)
+function matrix_processing_step!(::Val{:dn}, mp::MatrixProcessing, sigma::MatNum, X::MatNum,
+                                 T::Real; kwargs...)
+    return denoise!(mp.dn, sigma, T / size(X, 2))
 end
-function matrix_processing_step!(::Val{:dt}, mp::MatrixProcessing, sigma::MatNum, X::MatNum;
-                                 kwargs...)
+function matrix_processing_step!(::Val{:dt}, mp::MatrixProcessing, sigma::MatNum, ::MatNum,
+                                 ::Real; kwargs...)
     return detone!(mp.dt, sigma)
 end
 function matrix_processing_step!(::Val{:alg}, mp::MatrixProcessing, sigma::MatNum,
-                                 X::MatNum; kwargs...)
+                                 X::MatNum, ::Real; kwargs...)
     return matrix_processing_algorithm!(mp.alg, sigma, X; kwargs...)
 end
 """
@@ -682,14 +732,14 @@ function assert_matrix_processing_posdef(mp::Option{<:AbstractMatrixProcessingEs
     return nothing
 end
 """
-    matrix_processing!(mp::MatrixProcessing, sigma::MatNum, T::Option{<:Integer},
+    matrix_processing!(mp::MatrixProcessing, sigma::MatNum, T::Option{<:Real},
                        N::Integer; kwargs...) -> MatNum
     matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::MatNum,
-                       T::Option{<:Integer}, N::Integer; kwargs...) -> MatNum
+                       T::Option{<:Real}, N::Integer; kwargs...) -> MatNum
 
 Applies matrix processing to `sigma` in place, from the shape of the sample and not from the sample.
 
-An incremental fit calls this method when it makes the estimate from its state. A fold keeps a moment and a count, so the observations that the matrix method reads no longer exist. The matrix method reads one number from them, the effective sample ratio `T / N` of the denoising step, and the state keeps that count. So the substitution is exact, and `T` comes from [`observation_count`](@ref).
+An incremental fit calls this method when it makes the estimate from its state. A fold keeps a moment and a count, so the observations that the matrix method reads no longer exist. The matrix method reads one number from them, the effective sample ratio `T / N` of the denoising step, and the state keeps that count. So the substitution is exact, and `T` comes from [`effective_observation_count`](@ref). `T` is a real number, because the effective count of a weighted moment is not a whole number.
 
 A caller passes `T = nothing` when [`matrix_processing_reads_count`](@ref) answers `false`, because then no step reads `T`. The caller then reads no count from the state, and a state that records no count works.
 
@@ -704,7 +754,7 @@ A caller passes `T = nothing` when [`matrix_processing_reads_count`](@ref) answe
 
   - $(arg_dict[:mp])
   - $(arg_dict[:sigrho])
-  - `T`: The number of observations of the fit, with the `NaN` rows, or `nothing` when no step reads it.
+  - `T`: The effective number of observations of the fit, with the `NaN` rows, or `nothing` when no step reads it.
   - `N`: The number of assets.
   - `kwargs...`: The keyword arguments for the steps.
 
@@ -721,11 +771,11 @@ A caller passes `T = nothing` when [`matrix_processing_reads_count`](@ref) answe
 
   - [`matrix_processing!`](@ref)
   - [`assert_shape_only_matrix_processing`](@ref)
-  - [`observation_count`](@ref)
+  - [`effective_observation_count`](@ref)
   - [`matrix_processing_reads_count`](@ref)
   - [`matrix_processing_step!`](@ref)
 """
-function matrix_processing!(mp::MatrixProcessing, sigma::MatNum, T::Option{<:Integer},
+function matrix_processing!(mp::MatrixProcessing, sigma::MatNum, T::Option{<:Real},
                             N::Integer; kwargs...)
     assert_shape_only_matrix_processing(mp)
     for step in mp.order
@@ -734,13 +784,13 @@ function matrix_processing!(mp::MatrixProcessing, sigma::MatNum, T::Option{<:Int
     return sigma
 end
 function matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::MatNum,
-                            T::Option{<:Integer}, N::Integer; kwargs...)
+                            T::Option{<:Real}, N::Integer; kwargs...)
     assert_shape_only_matrix_processing(mp)
     return sigma
 end
 """
     matrix_processing_step!(::Val{step}, mp::MatrixProcessing, sigma::MatNum,
-                            T::Option{<:Integer}, N::Integer; kwargs...) -> MatNum
+                            T::Option{<:Real}, N::Integer; kwargs...) -> MatNum
 
 Applies one named matrix processing step to `sigma` in place, from the shape of the sample.
 
@@ -753,7 +803,7 @@ A `T` of `nothing` states that the caller read no count, because [`matrix_proces
   - `::Val{step}`: The processing step to apply, named by a symbol, as in the matrix methods.
   - $(arg_dict[:mp])
   - $(arg_dict[:sigrho])
-  - `T`: The number of observations of the fit, or `nothing` when the caller read no count.
+  - `T`: The effective number of observations of the fit, or `nothing` when the caller read no count.
   - `N`: The number of assets.
   - `kwargs...`: The keyword arguments, which these methods ignore.
 
@@ -772,25 +822,25 @@ A `T` of `nothing` states that the caller read no count, because [`matrix_proces
   - [`assert_shape_only_matrix_processing`](@ref)
 """
 function matrix_processing_step!(::Val{:pdm}, mp::MatrixProcessing, sigma::MatNum,
-                                 ::Option{<:Integer}, ::Integer; kwargs...)
+                                 ::Option{<:Real}, ::Integer; kwargs...)
     return posdef!(mp.pdm, sigma)
 end
-function matrix_processing_step!(::Val{:dn}, mp::MatrixProcessing, sigma::MatNum,
-                                 T::Integer, N::Integer; kwargs...)
+function matrix_processing_step!(::Val{:dn}, mp::MatrixProcessing, sigma::MatNum, T::Real,
+                                 N::Integer; kwargs...)
     return denoise!(mp.dn, sigma, T / N)
 end
 function matrix_processing_step!(::Val{:dn}, mp::MatrixProcessing, sigma::MatNum, ::Nothing,
                                  ::Integer; kwargs...)
     @argcheck(isnothing(mp.dn),
-              ArgumentError("`$(nameof(typeof(mp.dn)))` reads the ratio `T / N` of the sample, and the call passed no count `T`. Read the count with `observation_count` when `matrix_processing_reads_count(mp)` is `true`."))
+              ArgumentError("`$(nameof(typeof(mp.dn)))` reads the ratio `T / N` of the sample, and the call passed no count `T`. Read the count with `effective_observation_count` when `matrix_processing_reads_count(mp)` is `true`."))
     return sigma
 end
 function matrix_processing_step!(::Val{:dt}, mp::MatrixProcessing, sigma::MatNum,
-                                 ::Option{<:Integer}, ::Integer; kwargs...)
+                                 ::Option{<:Real}, ::Integer; kwargs...)
     return detone!(mp.dt, sigma)
 end
 function matrix_processing_step!(::Val{:alg}, mp::MatrixProcessing, sigma::MatNum,
-                                 ::Option{<:Integer}, ::Integer; kwargs...)
+                                 ::Option{<:Real}, ::Integer; kwargs...)
     return matrix_processing_algorithm!(mp.alg, sigma)
 end
 """
@@ -814,7 +864,7 @@ An estimate from the state calls this method, and not the plain one, for the sam
 
   - $(arg_dict[:omp])
   - $(arg_dict[:sigrho])
-  - `T`: The number of observations of the fit, or `nothing` when no step reads it.
+  - `T`: The effective number of observations of the fit, or `nothing` when no step reads it.
   - `N`: The number of assets of the matrix.
   - `kwargs...`: The keyword arguments for the steps.
 
@@ -830,8 +880,7 @@ An estimate from the state calls this method, and not the plain one, for the sam
   - [`zero_variance_rows!`](@ref)
 """
 function matrix_processing_block!(mp::Option{<:AbstractMatrixProcessingEstimator},
-                                  sigma::MatNum, T::Option{<:Integer}, N::Integer;
-                                  kwargs...)
+                                  sigma::MatNum, T::Option{<:Real}, N::Integer; kwargs...)
     fin = isfinite.(LinearAlgebra.diag(sigma))
     if !any(fin)
         matrix_processing!(mp, sigma, T, N; kwargs...)
@@ -921,7 +970,8 @@ end
 
 """
     matrix_processing_block!(mp::Option{<:AbstractMatrixProcessingEstimator},
-                             sigma::MatNum, X::MatNum, args...; kwargs...) -> MatNum
+                             sigma::MatNum, X::MatNum, T::Real = size(X, 1);
+                             kwargs...) -> MatNum
 
 Repair the finite block of a covariance-like frame in place, and leave the frame around it alone.
 
@@ -943,14 +993,14 @@ The plain [`matrix_processing!`](@ref) and [`posdef!`](@ref) do not change, so t
  4. Set the rows and columns of the zero variances to zero with [`zero_variance_rows!`](@ref), and take the block `blk` as the rows of `fin` whose variance is not zero.
  5. When `blk` holds no `false`, run the plain repair on `sigma` itself and return. A complete matrix has no frame to keep.
  6. When `blk` holds no `true`, return `sigma`. Every finite variance is zero, so nothing is left to repair.
- 7. Copy the block out, repair the copy with [`matrix_processing!`](@ref) under the columns of `X` that the block names, write it back into `sigma`, and return `sigma`. The function cuts `X` only when the axis of `sigma` is the asset axis. A cokurtosis matrix has an axis of asset pairs, so its block names no column of `X`. The function then passes the whole returns matrix, as the plain path does for that matrix.
+ 7. Copy the block out, repair the copy with [`sample_matrix_processing!`](@ref) under `T` and the columns of `X` that the block names, write it back into `sigma`, and return `sigma`. The function cuts `X` only when the axis of `sigma` is the asset axis. A cokurtosis matrix has an axis of asset pairs, so its block names no column of `X`. The function then passes the whole returns matrix, as the plain path does for that matrix.
 
 # Arguments
 
   - $(arg_dict[:mp])
   - $(arg_dict[:sigrho])
   - $(arg_dict[:X])
-  - `args...`: The positional arguments for [`matrix_processing!`](@ref).
+  - `T`: The effective number of observations of the moment. It is `size(X, 1)` by default, the count of an unweighted moment. The block keeps it, because the block cuts assets and not observations.
   - `kwargs...`: The keyword arguments for [`matrix_processing!`](@ref).
 
 # Validation
@@ -964,17 +1014,18 @@ The plain [`matrix_processing!`](@ref) and [`posdef!`](@ref) do not change, so t
 # Related
 
   - [`matrix_processing!`](@ref)
+  - [`sample_matrix_processing!`](@ref)
   - [`investable_mask`](@ref)
   - [`IsNonFiniteError`](@ref)
   - [`zero_variance_rows!`](@ref)
 """
 function matrix_processing_block!(mp::Option{<:AbstractMatrixProcessingEstimator},
-                                  sigma::MatNum, X::MatNum, args...; kwargs...)
+                                  sigma::MatNum, X::MatNum, T::Real = size(X, 1); kwargs...)
     fin = isfinite.(LinearAlgebra.diag(sigma))
     # A matrix with no finite diagonal has no block to repair, so it is the plain repair's and
     # its refusal is the one its caller already met.
     if !any(fin)
-        matrix_processing!(mp, sigma, X, args...; kwargs...)
+        sample_matrix_processing!(mp, sigma, X, T; kwargs...)
         return sigma
     end
     assert_finite_block(view(sigma, fin, fin))
@@ -983,7 +1034,7 @@ function matrix_processing_block!(mp::Option{<:AbstractMatrixProcessingEstimator
     # A complete matrix has no frame to leave alone, so the repair runs on it whole. The
     # refusal above has already covered its block, which is the matrix itself.
     if all(blk)
-        matrix_processing!(mp, sigma, X, args...; kwargs...)
+        sample_matrix_processing!(mp, sigma, X, T; kwargs...)
         return sigma
     end
     if !any(blk)
@@ -994,7 +1045,7 @@ function matrix_processing_block!(mp::Option{<:AbstractMatrixProcessingEstimator
     # indexed by asset pairs, so its block mask is `assets²` long and names no column of `X`;
     # the plain path hands `matrix_processing!` the whole returns matrix at that order too.
     Xb = size(X, 2) == length(blk) ? X[:, blk] : X
-    matrix_processing!(mp, block, Xb, args...; kwargs...)
+    sample_matrix_processing!(mp, block, Xb, T; kwargs...)
     sigma[blk, blk] = block
     return sigma
 end

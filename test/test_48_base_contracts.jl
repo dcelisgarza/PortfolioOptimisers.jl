@@ -1038,6 +1038,84 @@ end
           pe.matrix_processing_block!(MatrixProcessing(), copy(sigma), 120, 3)
     @test_throws ArgumentError pe.matrix_processing_block!(dn, copy(sigma), nothing, 3)
 end
+@testset "A denoiser of a weighted moment reads the effective sample size (#1892)" begin
+    using Statistics
+    pe = PortfolioOptimisers
+    rng = StableRNG(7)
+    X = randn(rng, 200, 3) * randn(rng, 3, 25) .* 0.01 .+ randn(rng, 200, 25) .* 0.01
+    T, N = size(X)
+    dn = MatrixProcessing(; dn = Denoise())
+    w = StatsBase.pweights(collect(range(0.2, 1.0; length = T)))
+    kish = sum(w)^2 / sum(abs2, w)
+    ew = ExpWeightedCovariance(; decay = 0.97)
+    # The Kish count of the weights `0.97^(T - t)`. The estimated centring spends one
+    # observation, as `exp_weighted_variance_count` states.
+    lw = [0.97^k for k in 0:(T - 2)]
+    Tew = sum(lw)^2 / sum(abs2, lw) + 1
+    # The counts. An unweighted estimator keeps `size(X, 1)`.
+    @test pe.effective_observation_count(Covariance(), X) === T
+    @test pe.effective_observation_count(ew, X) ≈ Tew
+    @test pe.effective_observation_count(Covariance(; w = w), X) ≈ kish
+    @test pe.effective_observation_count(Covariance(; ce = GeneralCovariance(; w = w)), X) ≈
+          kish
+    @test pe.effective_observation_count(Covariance(; w = StatsBase.fweights(fill(2, T))),
+                                         X) == 2T
+    @test pe.effective_observation_count(DistanceCovariance(; w = w), X) ≈ kish
+    @test pe.effective_observation_count(RegimeAdjustedExpWeightedCovariance(;
+                                                                             decay = 0.97),
+                                         X) ≈ Tew
+    # A separate correlation decay reads the pre-centred law of the correlation.
+    lc = [0.99^k for k in 0:(T - 1)]
+    @test pe.effective_observation_count(RegimeAdjustedExpWeightedCovariance(; decay = 0.97,
+                                                                             cor_decay = 0.99),
+                                         X) ≈ sum(lc)^2 / sum(abs2, lc)
+    wc = WindowedCovariance(; ce = ew, window = 50)
+    @test pe.effective_observation_count(wc, X) ≈
+          pe.effective_observation_count(ew, X[151:end, :])
+    for ce in
+        (PortfolioOptimisersCovariance(; ce = PortfolioOptimisersCovariance(; ce = ew)),
+         CorrelationCovariance(; ce = ew), GeodesicShrinkageCovariance(; ce = ew),
+         ImpliedVolatility(; ce = ew, ppy = 252))
+        @test pe.effective_observation_count(ce, X) ≈ Tew
+    end
+    # The batch route denoises at the ratio of the count, and a weighted moment moves.
+    S = Matrix(cov(ew, X))
+    ref = pe.denoise!(Denoise(), pe.posdef!(Posdef(), copy(S)), Tew / N)
+    pc = PortfolioOptimisersCovariance(; ce = ew, mp = dn)
+    @test cov(pc, X) ≈ ref
+    @test !isapprox(cov(pc, X),
+                    pe.denoise!(Denoise(), pe.posdef!(Posdef(), copy(S)), T / N))
+    @test cor(pc, X) ≈
+          pe.denoise!(Denoise(), pe.posdef!(Posdef(), Matrix(cor(ew, X))), Tew / N)
+    @test cov(pc, X, nothing) ≈ ref
+    # The fold reads the same count as the batch route.
+    for ce in (ew, RegimeAdjustedExpWeightedCovariance(; decay = 0.97, cor_decay = 0.99),
+               WindowedCovariance(; ce = ew, window = 50, rule = SeedWindow()),
+               pe.update_online_estimator(Online(wc)))
+        pcb = PortfolioOptimisersCovariance(; ce = ce, mp = dn)
+        pcf = partial_fit!(pcb, X)
+        @test pe.effective_observation_count(pcf) ≈ pe.processing_observation_count(pcb, X)
+        @test cov(pcf) ≈ cov(pcb, X)
+        @test cor(pcf) ≈ cor(pcb, X)
+    end
+    # A weighted cokurtosis and a weighted coskewness denoise at the count of their weights.
+    X6 = X[:, 1:6]
+    Y = X6 .- mean(X6, w; dims = 1)
+    o = transpose(ones(6))
+    z = kron(o, Y) .* kron(Y, o)
+    kt = transpose(w .* z) * z / sum(w)
+    @test cokurtosis(Cokurtosis(; w = w, mp = dn), X6) ≈
+          pe.denoise!(Denoise(), pe.posdef!(Posdef(), kt), kish / 6)
+    cs, V = coskewness(Coskewness(; w = w, mp = dn), X6)
+    @test V ≈ pe.negative_spectral_coskewness(cs, X6, dn, kish)
+    # A matrix processing estimator of the caller states only the sample form, so it gets `X`.
+    sigma = cov(X)
+    @test pe.sample_matrix_processing!(nothing, copy(sigma), X, kish) == sigma
+    @test pe.matrix_processing_block!(dn, copy(sigma), X) ≈
+          matrix_processing!(dn, copy(sigma), X)
+    @test pe.matrix_processing_block!(dn, copy(sigma), X, kish) ≈
+          pe.matrix_processing_block!(dn, copy(sigma), kish, N)
+end
 @testset "A rolling window has no fold, and a seed window folds" begin
     pe = PortfolioOptimisers
     rng = StableRNG(2)

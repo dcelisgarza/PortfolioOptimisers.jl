@@ -21,4 +21,5 @@ variance_series(ce::ExpWeightedVariance, X::MatNum; dims::Int = 1, active_mask::
 variance_series(ce::ExpWeightedVariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
 Base.copy(x::PortfolioOptimisers.ExpWeightedVarianceState)
 exp_weighted_variance_count
+exp_weighted_kish_count
 ```

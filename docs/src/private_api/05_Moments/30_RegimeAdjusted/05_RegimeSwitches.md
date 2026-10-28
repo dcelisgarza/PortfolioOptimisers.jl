@@ -1,5 +1,5 @@
 ```@meta
-Description = "Regime switches, private API of PortfolioOptimisers.jl: hac_outer_product!, hac_pair_factor, has_separate_cor_decay."
+Description = "Regime switches, private API of PortfolioOptimisers.jl: hac_outer_product!, hac_pair_factor, has_separate_cor_decay, regime_correlation_count."
 ```
 
 # [Regime switches: private API](@id private-api-regime-switches)
@@ -10,4 +10,5 @@ Description = "Regime switches, private API of PortfolioOptimisers.jl: hac_outer
 hac_outer_product!
 hac_pair_factor
 has_separate_cor_decay
+regime_correlation_count
 ```

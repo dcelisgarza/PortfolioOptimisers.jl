@@ -326,7 +326,7 @@ function negative_spectral_part(vals::AbstractVector{<:Complex}, vecs::MatNum, T
 end
 """
     negative_spectral_coskewness(cskew::MatNum, X::MatNum,
-                 mp::Option{<:AbstractMatrixProcessingEstimator})
+                 mp::Option{<:AbstractMatrixProcessingEstimator}, T::Real = size(X, 1))
 
 Builds the negative spectral skewness matrix of a coskewness tensor.
 
@@ -371,7 +371,7 @@ Section 2 of [nskew](@cite) splits each block as ``\\mathbf{S}_{i} = \\mathbf{S}
  5. Allocate the accumulator `V` of zeros at the width of the block.
  6. For each block index `i`, take `coskew_jk`, the view of the columns `(i - 1) * N + 1` to `i * N` of the cut tensor.
  7. Take the eigenvalues `vals` and the eigenvectors `vecs` of `coskew_jk`. Subtract from `V` the negative semidefinite part that [`negative_spectral_part`](@ref) rebuilds from them.
- 8. Run [`matrix_processing!`](@ref) once, on the accumulated `V`. The function does not process a block on its own.
+ 8. Run [`sample_matrix_processing!`](@ref) once, on the accumulated `V`, with the cut `X` and `T`. The function does not process a block on its own.
  9. When the block is the whole tensor, return `V`. Otherwise, write `V` into the block of a `NaN` frame of the full width, and return the frame.
 
 # Arguments
@@ -381,6 +381,7 @@ Section 2 of [nskew](@cite) splits each block as ``\\mathbf{S}_{i} = \\mathbf{S}
   - $(arg_dict[:omp])
       + `::AbstractMatrixProcessingEstimator`: The estimator processes the accumulated `V` in place.
       + `::Nothing`: The function does not process `V`, which is the sum of the negated negative parts.
+  - `T`: The effective number of observations of the tensor, which the denoising step reads. It is `size(X, 1)` by default, the count of an unweighted tensor. [`_coskewness`](@ref) passes the count of its weights.
 
 # Validation
 
@@ -406,7 +407,8 @@ Section 2 of [nskew](@cite) splits each block as ``\\mathbf{S}_{i} = \\mathbf{S}
   - $(ref_dict[:nskew]) Section 2.
 """
 function negative_spectral_coskewness(cskew::MatNum, X::MatNum,
-                                      mp::Option{<:AbstractMatrixProcessingEstimator})
+                                      mp::Option{<:AbstractMatrixProcessingEstimator},
+                                      T::Real = size(X, 1))
     N0 = size(cskew, 1)
     blk = BitVector(isfinite(cskew[i, (i - 1) * N0 + i]) for i in 1:N0)
     # A tensor with no finite per-asset diagonal has no block, so it is the plain path's and
@@ -429,7 +431,7 @@ function negative_spectral_coskewness(cskew::MatNum, X::MatNum,
         vals, vecs = LinearAlgebra.eigen(coskew_jk)
         V .-= negative_spectral_part(vals, vecs, eltype(cskew_b))
     end
-    matrix_processing!(mp, V, Xb)
+    sample_matrix_processing!(mp, V, Xb, T)
     if !frame
         return V
     end
@@ -487,13 +489,13 @@ The unweighted tensor is the matrix formula for ``\\mathbf{M}_3`` in Appendix A 
  2. Build `z`, the pairwise expansion `kron(o, Y) ⊙ kron(Y, o)`. Its column `(i - 1) * N + j` is the element-wise product of the columns `i` and `j` of `Y`.
  3. Without weights, form `cskew` as `transpose(Y) * z / size(Y, 1)`.
  4. With weights, form `cskew` as `transpose(w .* Y) * z / sum(w)`. The weights multiply the left factor alone, so each summand carries one weight and not three.
- 5. Reduce `cskew` to `V` with [`negative_spectral_coskewness`](@ref), which runs `mp` on the reduced matrix.
+ 5. Reduce `cskew` to `V` with [`negative_spectral_coskewness`](@ref), which runs `mp` on the reduced matrix. With weights, pass the count of the weights from [`observation_weight_count`](@ref), so that the denoising step reads the effective number of observations and not `size(X, 1)`.
  6. Return the pair `(cskew, V)`.
 
 # Arguments
 
   - `Y`: The deviation matrix (observations × assets). The caller centres it.
-  - `X`: The data matrix (observations × assets). It goes to [`matrix_processing!`](@ref) through [`negative_spectral_coskewness`](@ref).
+  - `X`: The data matrix (observations × assets). It goes to [`sample_matrix_processing!`](@ref) through [`negative_spectral_coskewness`](@ref).
   - `mp`: The matrix processing estimator.
   - `w`: The optional observation weights. The unweighted method takes `nothing` through its `args...`.
 
@@ -526,7 +528,7 @@ function _coskewness(Y::MatNum, X::MatNum, mp::AbstractMatrixProcessingEstimator
     o = transpose(range(one(eltype(Y)), one(eltype(Y)); length = size(Y, 2)))
     z = kron(o, Y) ⊙ kron(Y, o)
     cskew = transpose(w .* Y) * z / sum(w)
-    V = negative_spectral_coskewness(cskew, X, mp)
+    V = negative_spectral_coskewness(cskew, X, mp, observation_weight_count(w, size(X, 1)))
     return cskew, V
 end
 """

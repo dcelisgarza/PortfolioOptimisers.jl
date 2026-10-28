@@ -329,7 +329,7 @@ Where:
  2. Build `z`, the pairwise expansion `kron(o, X) ⊙ kron(X, o)`. Its column `(i - 1) * N + j` is the element-wise product of the columns `i` and `j` of `X`.
  3. Without weights, form `ckurt` as `transpose(z) * z / T`.
  4. With weights, form `ckurt` as `transpose(w .* z) * z / sum(w)`. The weights multiply the left factor alone, so each summand carries one weight and not four.
- 5. Run [`matrix_processing!`](@ref) on `ckurt` in place, and return it.
+ 5. Run [`matrix_processing!`](@ref) on `ckurt` in place, and return it. With weights, run [`sample_matrix_processing!`](@ref) with the count of the weights from [`observation_weight_count`](@ref), so that the denoising step reads the effective number of observations and not `size(X, 1)`.
 
 # Arguments
 
@@ -365,7 +365,8 @@ function _cokurtosis(X::MatNum, mp::AbstractMatrixProcessingEstimator,
     o = transpose(range(one(eltype(X)), one(eltype(X)); length = size(X, 2)))
     z = kron(o, X) ⊙ kron(X, o)
     ckurt = transpose(w .* z) * z / sum(w)
-    matrix_processing!(mp, ckurt, X)
+    # A weighted moment is worth the count of its weights, and not `size(X, 1)`.
+    sample_matrix_processing!(mp, ckurt, X, observation_weight_count(w, size(X, 1)))
     return ckurt
 end
 """
