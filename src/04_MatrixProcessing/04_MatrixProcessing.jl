@@ -554,6 +554,41 @@ function supports_shape_processing(::AbstractMatrixProcessingEstimator)
     return false
 end
 """
+    matrix_processing_reads_count(mp::MatrixProcessing) -> Bool
+    matrix_processing_reads_count(mp::AbstractMatrixProcessingEstimator) -> Bool
+
+Tells whether the shape route of a matrix processing estimator reads the number of observations `T`.
+
+An estimate from a fold reads `T` from the state with [`observation_count`](@ref). Some states record no such count. So the estimate reads `T` only when a step needs it, and the default `mp` then works over every state. Of the steps of [`MatrixProcessing`](@ref), only the denoising step reads `T`, through the ratio `T / N`. The steps `pdm` and `dt` read the matrix alone.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A [`MatrixProcessing`](@ref) answers `true` when `mp.dn` is not `nothing`.
+ 2. Every other subtype of [`AbstractMatrixProcessingEstimator`](@ref) answers `true`, because the library cannot see what it reads.
+
+# Arguments
+
+  - `mp`: The matrix processing estimator.
+
+# Returns
+
+  - `flag::Bool`: `true` when the shape route of `mp` can read `T`.
+
+# Related
+
+  - [`observation_count`](@ref)
+  - [`supports_shape_processing`](@ref)
+  - [`matrix_processing!`](@ref)
+"""
+function matrix_processing_reads_count(mp::MatrixProcessing)
+    return !isnothing(mp.dn)
+end
+function matrix_processing_reads_count(::AbstractMatrixProcessingEstimator)
+    return true
+end
+"""
     matrix_processing_posdef(mp::MatrixProcessing) -> Option{<:AbstractPosdefEstimator}
     matrix_processing_posdef(mp::AbstractMatrixProcessingEstimator) -> Option{<:AbstractPosdefEstimator}
     matrix_processing_posdef(mp::Nothing) -> Nothing
@@ -647,14 +682,16 @@ function assert_matrix_processing_posdef(mp::Option{<:AbstractMatrixProcessingEs
     return nothing
 end
 """
-    matrix_processing!(mp::MatrixProcessing, sigma::MatNum, T::Integer, N::Integer;
-                       kwargs...) -> MatNum
-    matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, T::Integer,
+    matrix_processing!(mp::MatrixProcessing, sigma::MatNum, T::Option{<:Integer},
                        N::Integer; kwargs...) -> MatNum
+    matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::MatNum,
+                       T::Option{<:Integer}, N::Integer; kwargs...) -> MatNum
 
 Applies matrix processing to `sigma` in place, from the shape of the sample and not from the sample.
 
 An incremental fit calls this method when it makes the estimate from its state. A fold keeps a moment and a count, so the observations that the matrix method reads no longer exist. The matrix method reads one number from them, the effective sample ratio `T / N` of the denoising step, and the state keeps that count. So the substitution is exact, and `T` comes from [`observation_count`](@ref).
+
+A caller passes `T = nothing` when [`matrix_processing_reads_count`](@ref) answers `false`, because then no step reads `T`. The caller then reads no count from the state, and a state that records no count works.
 
 `alg` is the one step that the shape cannot replace. Before any step runs, [`assert_shape_only_matrix_processing`](@ref) refuses it with an `ArgumentError` that names its type. It also refuses a matrix processing estimator that a caller defines, because that interface states no shape method.
 
@@ -667,13 +704,14 @@ An incremental fit calls this method when it makes the estimate from its state. 
 
   - $(arg_dict[:mp])
   - $(arg_dict[:sigrho])
-  - `T`: The number of observations of the fit, with the `NaN` rows.
+  - `T`: The number of observations of the fit, with the `NaN` rows, or `nothing` when no step reads it.
   - `N`: The number of assets.
   - `kwargs...`: The keyword arguments for the steps.
 
 # Validation
 
   - `mp` is a [`MatrixProcessing`](@ref), and `mp.alg` is `nothing`. Otherwise, the method raises an `ArgumentError`.
+  - `T` is not `nothing` when `mp.dn` is not `nothing`. Otherwise, the denoising step raises an `ArgumentError`.
 
 # Returns
 
@@ -684,10 +722,11 @@ An incremental fit calls this method when it makes the estimate from its state. 
   - [`matrix_processing!`](@ref)
   - [`assert_shape_only_matrix_processing`](@ref)
   - [`observation_count`](@ref)
+  - [`matrix_processing_reads_count`](@ref)
   - [`matrix_processing_step!`](@ref)
 """
-function matrix_processing!(mp::MatrixProcessing, sigma::MatNum, T::Integer, N::Integer;
-                            kwargs...)
+function matrix_processing!(mp::MatrixProcessing, sigma::MatNum, T::Option{<:Integer},
+                            N::Integer; kwargs...)
     assert_shape_only_matrix_processing(mp)
     for step in mp.order
         matrix_processing_step!(Val(step), mp, sigma, T, N; kwargs...)
@@ -695,26 +734,32 @@ function matrix_processing!(mp::MatrixProcessing, sigma::MatNum, T::Integer, N::
     return sigma
 end
 function matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::MatNum,
-                            T::Integer, N::Integer; kwargs...)
+                            T::Option{<:Integer}, N::Integer; kwargs...)
     assert_shape_only_matrix_processing(mp)
     return sigma
 end
 """
-    matrix_processing_step!(::Val{step}, mp::MatrixProcessing, sigma::MatNum, T::Integer,
-                            N::Integer; kwargs...) -> MatNum
+    matrix_processing_step!(::Val{step}, mp::MatrixProcessing, sigma::MatNum,
+                            T::Option{<:Integer}, N::Integer; kwargs...) -> MatNum
 
 Applies one named matrix processing step to `sigma` in place, from the shape of the sample.
 
 These methods are the shape forms of the matrix methods of [`matrix_processing_step!`](@ref), one method for each step. Only the shape method of [`matrix_processing!`](@ref) calls them. The steps `pdm` and `dt` read `sigma` alone, so they are the same as the matrix methods. The step `dn` takes the ratio `T / N` from the arguments and not from `size(X)`. The step `alg` does nothing, because the caller refuses an `alg` that is not `nothing` before the loop starts.
+
+A `T` of `nothing` states that the caller read no count, because [`matrix_processing_reads_count`](@ref) answered `false`. The step `dn` then refuses a denoiser that is not `nothing`, because the ratio `T / N` has no value.
 
 # Arguments
 
   - `::Val{step}`: The processing step to apply, named by a symbol, as in the matrix methods.
   - $(arg_dict[:mp])
   - $(arg_dict[:sigrho])
-  - `T`: The number of observations of the fit.
+  - `T`: The number of observations of the fit, or `nothing` when the caller read no count.
   - `N`: The number of assets.
   - `kwargs...`: The keyword arguments, which these methods ignore.
+
+# Validation
+
+  - The step `dn` with `T = nothing` needs `mp.dn` to be `nothing`. Otherwise, it raises an `ArgumentError`.
 
 # Returns
 
@@ -727,19 +772,25 @@ These methods are the shape forms of the matrix methods of [`matrix_processing_s
   - [`assert_shape_only_matrix_processing`](@ref)
 """
 function matrix_processing_step!(::Val{:pdm}, mp::MatrixProcessing, sigma::MatNum,
-                                 ::Integer, ::Integer; kwargs...)
+                                 ::Option{<:Integer}, ::Integer; kwargs...)
     return posdef!(mp.pdm, sigma)
 end
 function matrix_processing_step!(::Val{:dn}, mp::MatrixProcessing, sigma::MatNum,
                                  T::Integer, N::Integer; kwargs...)
     return denoise!(mp.dn, sigma, T / N)
 end
-function matrix_processing_step!(::Val{:dt}, mp::MatrixProcessing, sigma::MatNum, ::Integer,
+function matrix_processing_step!(::Val{:dn}, mp::MatrixProcessing, sigma::MatNum, ::Nothing,
                                  ::Integer; kwargs...)
+    @argcheck(isnothing(mp.dn),
+              ArgumentError("`$(nameof(typeof(mp.dn)))` reads the ratio `T / N` of the sample, and the call passed no count `T`. Read the count with `observation_count` when `matrix_processing_reads_count(mp)` is `true`."))
+    return sigma
+end
+function matrix_processing_step!(::Val{:dt}, mp::MatrixProcessing, sigma::MatNum,
+                                 ::Option{<:Integer}, ::Integer; kwargs...)
     return detone!(mp.dt, sigma)
 end
 function matrix_processing_step!(::Val{:alg}, mp::MatrixProcessing, sigma::MatNum,
-                                 ::Integer, ::Integer; kwargs...)
+                                 ::Option{<:Integer}, ::Integer; kwargs...)
     return matrix_processing_algorithm!(mp.alg, sigma)
 end
 """
@@ -763,7 +814,7 @@ An estimate from the state calls this method, and not the plain one, for the sam
 
   - $(arg_dict[:omp])
   - $(arg_dict[:sigrho])
-  - `T`: The number of observations of the fit.
+  - `T`: The number of observations of the fit, or `nothing` when no step reads it.
   - `N`: The number of assets of the matrix.
   - `kwargs...`: The keyword arguments for the steps.
 
@@ -779,7 +830,8 @@ An estimate from the state calls this method, and not the plain one, for the sam
   - [`zero_variance_rows!`](@ref)
 """
 function matrix_processing_block!(mp::Option{<:AbstractMatrixProcessingEstimator},
-                                  sigma::MatNum, T::Integer, N::Integer; kwargs...)
+                                  sigma::MatNum, T::Option{<:Integer}, N::Integer;
+                                  kwargs...)
     fin = isfinite.(LinearAlgebra.diag(sigma))
     if !any(fin)
         matrix_processing!(mp, sigma, T, N; kwargs...)

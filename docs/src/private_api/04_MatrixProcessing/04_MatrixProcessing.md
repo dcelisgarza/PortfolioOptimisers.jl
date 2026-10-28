@@ -12,5 +12,6 @@ PortfolioOptimisers.assert_finite_block
 matrix_processing_step!
 PortfolioOptimisers.assert_shape_only_matrix_processing
 PortfolioOptimisers.supports_shape_processing
+PortfolioOptimisers.matrix_processing_reads_count
 PortfolioOptimisers.assert_matrix_processing_posdef
 ```

@@ -23,7 +23,7 @@ Keywords correspond to the struct's fields.
 
 The composite folds by composition. The state in `cache` selects one of two routes.
 
-If `cache` holds `nothing`, [`partial_fit!`](@ref) passes the observation to `ce.ce` and keeps no state of its own. This route works because `mp` needs only a moment and a count. `pdm` and `dt` read only `sigma`, and `dn` reads the effective sample ratio `T / N`. The one-argument [`Statistics.cov`](@ref) reads the folded matrix of the inner estimator. Then it applies `mp` with the count from [`observation_count`](@ref), which is the same `size(X, 1)` that the matrix method reads. An `mp.alg` of the caller is the one step that needs the sample itself. The fold refuses it with an error that names it.
+If `cache` holds `nothing`, [`partial_fit!`](@ref) passes the observation to `ce.ce` and keeps no state of its own. This route works because `mp` needs only a moment and a count. `pdm` and `dt` read only `sigma`, and `dn` reads the effective sample ratio `T / N`. The one-argument [`Statistics.cov`](@ref) reads the folded matrix of the inner estimator. Then it applies `mp`. When `mp` denoises, it reads the count from [`observation_count`](@ref), which is the same `size(X, 1)` that the matrix method reads. An `mp.alg` of the caller is the one step that needs the sample itself. The fold refuses it with an error that names it.
 
 If `cache` holds a [`SampleBufferState`](@ref), which [`Online`](@ref) seeds, the composite takes the buffer route. Then `cov(ce)` with no data runs the batch verb over the observations that the buffer kept. An `mp.alg` needs this route.
 
@@ -489,14 +489,19 @@ Reads the covariance or the correlation that a folded [`PortfolioOptimisersCovar
 
 This method makes the estimate from the fold by composition. It is `cov(ce)` or `cor(ce)` with no data. `ce.ce` returns its own folded matrix. Then the method applies `ce.mp` to that matrix from the shape of the sample. [`observation_count`](@ref) reads the number of folded observations from the inner state. That number is the same `size(X, 1)` that the matrix method of [`matrix_processing!`](@ref) reads, with the `NaN` rows, so the substitution is an identity and not an approximation. This method returns the same result as a batch fit over the same observations.
 
+The method reads the count only when [`matrix_processing_reads_count`](@ref) answers `true`, which is when `ce.mp` denoises. So the default `mp`, which only repairs the matrix, works over an inner state that records no count.
+
+A windowed `ce.ce` under a [`SeedWindow`](@ref) is the one exception to the identity. The fold counts the rows that the window kept, and the batch fit passes every row of `X`. So a denoiser reads a different ratio `T / N` on the two routes.
+
 If the matrix of the inner estimator is immutable, the method copies it, because the processing writes in place. The matrix methods of this file do the same.
 
 # Algorithm
 
  1. Read the folded matrix of the inner estimator with the one-argument `Statistics.cov` or `Statistics.cor`.
  2. Copy it into a `Matrix` when it is immutable.
- 3. Apply `ce.mp` in place through the shape method of [`matrix_processing_block!`](@ref), with `T` from [`observation_count`](@ref) and `N` from the matrix. The method uses the block form, because a fold over a changing universe returns `NaN` for an asset outside the Coverage Universe. The [`AssetPanel`](@ref) methods of this file do the same. A complete matrix costs nothing more.
- 4. Return the matrix.
+ 3. Take `T` from [`observation_count`](@ref) when [`matrix_processing_reads_count`](@ref) answers `true`, and `nothing` otherwise.
+ 4. Apply `ce.mp` in place through the shape method of [`matrix_processing_block!`](@ref), with `T` and with `N` from the matrix. The method uses the block form, because a fold over a changing universe returns `NaN` for an asset outside the Coverage Universe. The [`AssetPanel`](@ref) methods of this file do the same. A complete matrix costs nothing more.
+ 5. Return the matrix.
 
 # Arguments
 
@@ -507,6 +512,7 @@ If the matrix of the inner estimator is immutable, the method copies it, because
 
   - `ce.ce` holds a partial-fit state. An `ArgumentError` is thrown otherwise.
   - `ce.mp` runs from the shape of the sample, as [`assert_shape_only_matrix_processing`](@ref) states. An `ArgumentError` is thrown otherwise.
+  - When `ce.mp` reads the count, the state of `ce.ce` records one, as [`observation_count`](@ref) states. An `ArgumentError` is thrown otherwise.
 
 # Returns
 
@@ -517,6 +523,7 @@ If the matrix of the inner estimator is immutable, the method copies it, because
   - [`PortfolioOptimisersCovariance`](@ref)
   - [`partial_fit!`](@ref)
   - [`observation_count`](@ref)
+  - [`matrix_processing_reads_count`](@ref)
   - [`matrix_processing!`](@ref)
 """
 function Statistics.cov(ce::PortfolioOptimisersCovariance{<:Any, <:Any, Nothing}; kwargs...)
@@ -524,8 +531,10 @@ function Statistics.cov(ce::PortfolioOptimisersCovariance{<:Any, <:Any, Nothing}
     if !ismutable(sigma)
         sigma = Matrix(sigma)
     end
-    matrix_processing_block!(ce.mp, sigma, observation_count(ce.ce), size(sigma, 1);
-                             kwargs...)
+    # The count is read only when a step reads it, so the default `mp` works over a state
+    # that records no count.
+    T = matrix_processing_reads_count(ce.mp) ? observation_count(ce.ce) : nothing
+    matrix_processing_block!(ce.mp, sigma, T, size(sigma, 1); kwargs...)
     return sigma
 end
 function Statistics.cor(ce::PortfolioOptimisersCovariance{<:Any, <:Any, Nothing}; kwargs...)
@@ -533,7 +542,8 @@ function Statistics.cor(ce::PortfolioOptimisersCovariance{<:Any, <:Any, Nothing}
     if !ismutable(rho)
         rho = Matrix(rho)
     end
-    matrix_processing_block!(ce.mp, rho, observation_count(ce.ce), size(rho, 1); kwargs...)
+    T = matrix_processing_reads_count(ce.mp) ? observation_count(ce.ce) : nothing
+    matrix_processing_block!(ce.mp, rho, T, size(rho, 1); kwargs...)
     return rho
 end
 """
@@ -596,6 +606,33 @@ The composite folds by composition, so it folds exactly when the inner estimator
 function supports_partial_fit(ce::PortfolioOptimisersCovariance)
     return isa(ce.cache, SampleBufferState) ||
            (supports_shape_processing(ce.mp) && supports_partial_fit(ce.ce))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`PortfolioOptimisersCovariance`](@ref) method of [`observation_count`](@ref), for a composite whose own `cache` is `nothing`.
+
+The composite then folds through `ce.ce` and keeps no state of its own, so the method reads the count of `ce.ce`. A composite whose `cache` holds a [`SampleBufferState`](@ref) reads the count of its buffer through the generic method instead.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+
+# Validation
+
+  - `ce.ce` holds a partial-fit state with a count, as [`observation_count`](@ref) states. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `n::Integer`: The number of observations that `ce.ce` folded.
+
+# Related
+
+  - [`observation_count`](@ref)
+  - [`PortfolioOptimisersCovariance`](@ref)
+"""
+function observation_count(ce::PortfolioOptimisersCovariance{<:Any, <:Any, Nothing})
+    return observation_count(ce.ce)
 end
 
 export PortfolioOptimisersCovariance

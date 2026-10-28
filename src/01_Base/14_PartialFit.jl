@@ -401,22 +401,24 @@ function partial_fit_cache(est::Union{AbstractEstimator, StatsBase.CovarianceEst
 end
 
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    observation_count(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator}) -> Integer
+    observation_count(state::AbstractPartialFitState) -> Integer
 
 Returns the number of observations that an estimator folded into its partial-fit state.
 
 The states of the sample moments and the sample buffer record this count in an `n` field. A call with no data that needs the sample size, and not the sample, reads the count from the state. [`Statistics.cov`](@ref) of a [`PortfolioOptimisersCovariance`](@ref) is one such call. Its matrix processing reads `size(X, 1)` alone in a batch fit, and the folded count is that number, with the rows that hold a `NaN`.
 
-An exponentially weighted state counts the observations of each asset, and it records no count of the folded rows. The function refuses such a state with a message that names it.
+The estimator method reads the state from `est.cache`, and the state method reads the count. A state that keeps the count in another field adds its own state method. The two exponentially weighted covariance states do this. A composite that folds through an inner estimator, and keeps no state of its own, adds an estimator method that reads the inner estimator.
 
 # Arguments
 
   - `est`: The estimator whose state holds the count.
+  - `state`: The state that holds the count.
 
 # Validation
 
   - `est.cache` is not `nothing`. The function throws an `ArgumentError` otherwise.
-  - The state has an `n` field. The function throws an `ArgumentError` otherwise.
+  - The state has an `n` field, or a method of its own. The function throws an `ArgumentError` otherwise.
 
 # Returns
 
@@ -427,9 +429,12 @@ An exponentially weighted state counts the observations of each asset, and it re
   - [`partial_fit_cache`](@ref)
   - [`partial_fit!`](@ref)
   - [`AbstractPartialFitState`](@ref)
+  - [`matrix_processing_reads_count`](@ref)
 """
 function observation_count(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator})
-    state = partial_fit_cache(est)
+    return observation_count(partial_fit_cache(est))
+end
+function observation_count(state::AbstractPartialFitState)
     @argcheck(hasfield(typeof(state), :n),
               ArgumentError("`$(nameof(typeof(state)))` records no count of the observations that it folded, so a call with no data cannot read the sample size from it. Pass the observations, as in `cov(ce, X)`."))
     return getfield(state, :n)

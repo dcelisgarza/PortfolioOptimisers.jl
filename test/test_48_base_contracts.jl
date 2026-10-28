@@ -973,19 +973,70 @@ end
     @test pe.observation_count(partial_fit!(SimpleVariance(), X)) == 10
     @test pe.observation_count(partial_fit!(SimpleExpectedReturns(), X)) == 10
     @test_throws ArgumentError pe.observation_count(Covariance())
-    # An exponentially weighted state counts the observations of each asset alone. The verb
-    # refuses it by name, and the call with no data of the wrapper meets the same refusal.
-    ew = partial_fit!(ExpWeightedCovariance(), X)
+    # The two exponentially weighted covariance states count the rows in `rows`, because
+    # `obs_count` counts each asset alone and a reset sets it to zero (#1851).
+    @test pe.observation_count(partial_fit!(ExpWeightedCovariance(), X)) == 10
+    @test pe.observation_count(partial_fit!(RegimeAdjustedExpWeightedCovariance(), X)) == 10
+    act = trues(10, 3)
+    act[5:6, 1] .= false
+    ew = partial_fit!(ExpWeightedCovariance(), X; active_mask = act)
+    @test pe.observation_count(ew) == 10
+    # A fold of the copy does not count in the original.
+    st = copy(ew.cache)
+    @test st.rows !== ew.cache.rows
+    ew2 = partial_fit!(ExpWeightedCovariance(; cache = st), X)
+    @test pe.observation_count(ew2) == 20
+    @test pe.observation_count(ew) == 10
+    ra = partial_fit!(RegimeAdjustedExpWeightedCovariance(), X)
+    @test copy(ra.cache).rows !== ra.cache.rows
+    # A state that records no count still meets the named refusal.
     err = try
-        pe.observation_count(ew)
+        pe.observation_count(partial_fit!(ExpWeightedVariance(), X))
         nothing
     catch e
         e
     end
     @test err isa ArgumentError
-    @test occursin("`ExpWeightedCovarianceState` records no count", err.msg)
-    pc = partial_fit!(PortfolioOptimisersCovariance(; ce = ExpWeightedCovariance()), X)
-    @test_throws ArgumentError cov(pc)
+    @test occursin("`ExpWeightedVarianceState` records no count", err.msg)
+end
+@testset "A folded PortfolioOptimisersCovariance reads the count of its inner state (#1851)" begin
+    using Statistics
+    pe = PortfolioOptimisers
+    X = randn(StableRNG(1), 120, 3)
+    dn = MatrixProcessing(; dn = Denoise())
+    # The default `mp` repairs alone and reads no count. A denoiser reads `T = size(X, 1)` on
+    # the batch route, and the fold reads the same rows.
+    for ce in (ExpWeightedCovariance(), RegimeAdjustedExpWeightedCovariance(),
+               GeodesicShrinkageCovariance(; ce = ExpWeightedCovariance())),
+        mp in (MatrixProcessing(), dn)
+
+        pcb = PortfolioOptimisersCovariance(; ce = ce, mp = mp)
+        pc = partial_fit!(pcb, X)
+        @test pe.observation_count(pc) == 120
+        @test cov(pc) ≈ cov(pcb, X)
+        @test cor(pc) ≈ cor(pcb, X)
+    end
+    # A seed window folds the rows that the window kept. The default `mp` reads no count, so
+    # the fold equals the batch fit.
+    sw = WindowedCovariance(; window = 50, rule = SeedWindow(), ce = Covariance())
+    pc = partial_fit!(PortfolioOptimisersCovariance(; ce = sw), X)
+    @test pe.observation_count(pc) == 50
+    @test cov(pc) ≈ cov(PortfolioOptimisersCovariance(; ce = sw), X)
+    @test cor(pc) ≈ cor(PortfolioOptimisersCovariance(; ce = sw), X)
+    # `cor` and `std` with no data read the inner estimator too, as `cov` and `var` do.
+    @test cor(pc.ce) ≈ cor(sw, X)
+    wv = WindowedVariance(; window = 50, rule = SeedWindow())
+    @test std(partial_fit!(wv, X)) ≈ vec(std(wv, X))
+    pc = partial_fit!(pc, X[1:7, :])
+    @test pe.observation_count(pc) == 57
+    # The shape route reads no count where no step reads one, and a denoiser refuses a
+    # missing count by name.
+    @test !pe.matrix_processing_reads_count(MatrixProcessing())
+    @test pe.matrix_processing_reads_count(dn)
+    sigma = cov(X)
+    @test pe.matrix_processing_block!(MatrixProcessing(), copy(sigma), nothing, 3) ≈
+          pe.matrix_processing_block!(MatrixProcessing(), copy(sigma), 120, 3)
+    @test_throws ArgumentError pe.matrix_processing_block!(dn, copy(sigma), nothing, 3)
 end
 @testset "A rolling window has no fold, and a seed window folds" begin
     pe = PortfolioOptimisers

@@ -884,31 +884,10 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:ra_lag_records])
     """
     lag_records
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-States whether the estimator runs the variance and the correlation at separate decays.
-
-A `cor_decay` of `nothing` states one decay for the whole matrix, and a `cor_decay` equal to
-`decay` states the same recursion in two places. Both take the single covariance recursion, so
-the cache allocates no correlation state.
-
-# Arguments
-
-  - `ce`: Regime-adjusted exponentially weighted covariance estimator.
-
-# Returns
-
-  - `flag::Bool`: `true` where `cor_decay` is not `nothing` and differs from `decay`.
-
-# Related
-
-  - [`RegimeAdjustedExpWeightedCovariance`](@ref)
-  - [`RegimeAdjustedCovarianceState`](@ref)
-"""
-function has_separate_cor_decay(ce::RegimeAdjustedExpWeightedCovariance)
-    return !isnothing(ce.cor_decay) && !isapprox(ce.cor_decay, ce.decay)
+    """
+    $(field_dict[:ew_rows])
+    """
+    rows
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1535,7 +1514,7 @@ function update_regime!(cache::RegimeAdjustedCovarianceState,
                                          c.cor_state, c.cor_weight, c.XXt, c.Xi, c.X_old_i,
                                          c.location, c.obs_count, c.active, rs,
                                          c.n_regime_obs + 1, c.bias, c.overlap,
-                                         c.lag_records)
+                                         c.lag_records, c.rows)
 end
 function update_regime!(cache::RegimeAdjustedCovarianceState,
                         ::RegimeAdjustedExpWeightedCovariance{<:Any, <:Any, <:Any, <:Any,
@@ -1556,7 +1535,7 @@ state, so a later listing starts from zero.
 
 # Algorithm
 
- 1. Find the valid assets: a finite return, and active where `active_mask` is not `nothing`.
+ 1. Add one to `cache.rows`, because every row counts. Find the valid assets: a finite return, and active where `active_mask` is not `nothing`.
     Find the assets with a deviation: under [`EstimatedCentring`](@ref), a valid asset with a
     valid return before; under [`PreCentred`](@ref), every valid asset.
  2. Advance the location, and store the deviations ``u_{t}`` in `cache.Xi`, with zero for an asset
@@ -1599,6 +1578,8 @@ function process_observation!(cache::RegimeAdjustedCovarianceState,
                               ce::RegimeAdjustedExpWeightedCovariance, X::VecNum,
                               estimation_mask::Option{<:AbstractVector{<:Bool}},
                               active_mask::Option{<:AbstractVector{<:Bool}})
+    # Every row counts, the rows with no valid asset too, as `size(X, 1)` counts them.
+    cache.rows[] += 1
     T = eltype(cache.covariance)
     finite_mask = isfinite.(X)
     valid = isnothing(active_mask) ? finite_mask : (finite_mask .& active_mask)
@@ -1853,7 +1834,7 @@ function regime_adjusted_covariance_pass!(f, ce::RegimeAdjustedExpWeightedCovari
                                       trues(N), nothing, 0, regime_bias_state(ce, Tf),
                                       overlap,
                                       centring_lag_records(ce.centring, ce.hac_lags,
-                                                           overlap))
+                                                           overlap), Ref(0))
     else
         @argcheck(size(state.covariance, 1) == N,
                   DimensionMismatch("the state holds $(size(state.covariance, 1)) assets, and `X` holds $N"))

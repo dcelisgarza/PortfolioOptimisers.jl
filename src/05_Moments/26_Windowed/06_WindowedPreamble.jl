@@ -493,6 +493,34 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+[`SeedWindowed`](@ref) method of [`observation_count`](@ref).
+
+A windowed estimator under a [`SeedWindow`](@ref) keeps no state of its own, and its inner estimator holds the state of the fold. So the method reads the count of the inner estimator. That count is the number of rows that the inner estimator folded: the rows of the first block that the window kept, and every later row.
+
+# Arguments
+
+  - `est`: Windowed estimator under a seed window.
+
+# Validation
+
+  - The inner estimator holds a partial-fit state with a count, as [`observation_count`](@ref) states. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `n::Integer`: The number of observations that the inner estimator folded.
+
+# Related
+
+  - [`observation_count`](@ref)
+  - [`partial_fit!(est::SeedWindowed, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+"""
+function observation_count(est::SeedWindowed)
+    # The declaration of every windowed type sets the inner estimator as the first field.
+    return observation_count(getfield(est, 1))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Return `"rule"`, the path to the seed window inside a windowed estimator under a [`SeedWindow`](@ref).
 
 The walk of [`seed_window_path`](@ref) over an estimator tree stops at this method. The walk puts the names of the fields above the estimator before `"rule"`.
@@ -566,6 +594,31 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Read the correlation from the fold of a windowed estimator under a [`SeedWindow`](@ref).
+
+The inner estimator holds the state of the fold, so the method reads it there. The generic `cor` with no data reads the `cache` of the windowed estimator, which stays `nothing`.
+
+# Arguments
+
+  - `ce`: Windowed covariance estimator under a seed window.
+  - `kwargs...`: Keywords for the read of the inner estimator.
+
+# Returns
+
+  - $(ret_dict[:rho])
+
+# Related
+
+  - [`WindowedCovariance`](@ref)
+  - [`partial_fit!(est::SeedWindowed, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+"""
+function Statistics.cor(ce::WindowedCovariance{<:Any, <:Any, <:Any, <:SeedWindow};
+                        kwargs...)
+    return Statistics.cor(ce.ce; kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Read the variance from the fold of a windowed estimator under a [`SeedWindow`](@ref).
 
 The inner estimator holds the state of the fold, so the method reads it there.
@@ -586,6 +639,30 @@ The inner estimator holds the state of the fold, so the method reads it there.
 """
 function Statistics.var(ve::WindowedVariance{<:Any, <:Any, <:Any, <:SeedWindow}; kwargs...)
     return Statistics.var(ve.ve; kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Read the standard deviation from the fold of a windowed estimator under a [`SeedWindow`](@ref).
+
+The inner estimator holds the state of the fold, so the method reads it there. The generic `std` with no data reads the `cache` of the windowed estimator, which stays `nothing`.
+
+# Arguments
+
+  - `ve`: Windowed variance estimator under a seed window.
+  - `kwargs...`: Keywords for the read of the inner estimator.
+
+# Returns
+
+  - $(ret_dict[:stdarr])
+
+# Related
+
+  - [`WindowedVariance`](@ref)
+  - [`partial_fit!(est::SeedWindowed, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+"""
+function Statistics.std(ve::WindowedVariance{<:Any, <:Any, <:Any, <:SeedWindow}; kwargs...)
+    return Statistics.std(ve.ve; kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

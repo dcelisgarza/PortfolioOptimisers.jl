@@ -371,6 +371,8 @@ end
         own = PortfolioOptimisersCovariance(; mp = MatrixProcessingProbe())
         @test !pe.supports_partial_fit(own)
         @test !pe.supports_shape_processing(own.mp)
+        # The library cannot see what the estimator reads, so it states that it reads `T`.
+        @test pe.matrix_processing_reads_count(own.mp)
         msg = "`MatrixProcessingProbe` is a matrix processing estimator of your own"
         @test_throws msg partial_fit!(own, view(X, 1, :))
         @test_throws msg partial_fit!(own, X)

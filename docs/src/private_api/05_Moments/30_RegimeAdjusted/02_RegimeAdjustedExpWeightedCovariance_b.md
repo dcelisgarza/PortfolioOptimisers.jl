@@ -19,7 +19,6 @@ regime_law_weights
 regime_law_correction
 exp_weight_cross_sum
 hac_ldl_row!
-hac_laplace!
 inverse_volatility_bias
 regime_bias_state
 safe_regime_cholesky
@@ -29,6 +28,7 @@ taylor_mul
 taylor_div
 gap_fill_value(::RegimeAdjustedExpWeightedCovariance)
 Base.copy(x::PortfolioOptimisers.RegimeAdjustedCovarianceState)
+PortfolioOptimisers.observation_count(state::PortfolioOptimisers.RegimeAdjustedCovarianceState)
 variance_series(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum; dims::Int = 1, estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
 variance_series(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
 ```

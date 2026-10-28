@@ -170,6 +170,10 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:ra_active])
     """
     active
+    """
+    $(field_dict[:ew_rows])
+    """
+    rows
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -180,7 +184,7 @@ An asset is valid when its return is finite and the active mask admits it. An ac
 
 # Algorithm
 
- 1. Mark as `valid` each asset whose return in `X` is finite and that `active_mask` admits.
+ 1. Add one to `cache.rows`, because every row counts. Mark as `valid` each asset whose return in `X` is finite and that `active_mask` admits.
  2. When `active_mask` is not `nothing`, take `newly_inactive` as the assets that the mask excludes and that `cache.active` admits. Set their rows and columns of `cache.covariance`, `cache.weight` and `cache.overlap`, and their counts in `cache.obs_count`, to zero, and their entries of `cache.location` to `NaN`.
  3. Copy the mask into `cache.active`, or set every entry to `true` when the mask is `nothing`.
  4. Return `cache` when no asset is valid.
@@ -206,6 +210,8 @@ An asset is valid when its return is finite and the active mask admits it. An ac
 """
 function process_observation!(cache::ExpWeightedCovarianceState, ce::ExpWeightedCovariance,
                               X::VecNum, active_mask::Option{<:AbstractVector{<:Bool}})
+    # Every row counts, the rows with no valid asset too, as `size(X, 1)` counts them.
+    cache.rows[] += 1
     finite_mask = isfinite.(X)
     valid = isnothing(active_mask) ? finite_mask : (finite_mask .& active_mask)
 
@@ -256,7 +262,7 @@ Covariance method of [`exp_weighted_pass!`](@ref). Runs one forward pass of the 
 
  1. Check `dims`, and check that `active_mask` has the size of `X` when it is not `nothing`.
  2. Take `N` as the number of assets.
- 3. When `state` is `nothing`, make a zero state of `N` assets in the type `T` of `X`, floated where it is an integer. Its `covariance`, `weight` and `obs_count` are zero, its `active` entries are `true`, its `location` is `NaN`, and its `overlap` is [`centring_overlap`](@ref) of `est.centring`. When `state` is given, check that it holds `N` assets and take it as it is.
+ 3. When `state` is `nothing`, make a zero state of `N` assets in the type `T` of `X`, floated where it is an integer. Its `covariance`, `weight` and `obs_count` are zero, its `active` entries are `true`, its `location` is `NaN`, its `rows` is a `Ref` of zero, and its `overlap` is [`centring_overlap`](@ref) of `est.centring`. When `state` is given, check that it holds `N` assets and take it as it is.
  4. For each observation `i`, fold the observation and its row of `active_mask` into the state with [`process_observation!`](@ref), then call `f(i, cache)`.
  5. Return the state.
 
@@ -306,7 +312,7 @@ function exp_weighted_pass!(f, est::ExpWeightedCovariance, X::MatNum, dims::Int,
     cache = if isnothing(state)
         ExpWeightedCovarianceState(zeros(T, N, N), zeros(T, N, N), fill(convert(T, NaN), N),
                                    centring_overlap(est.centring, T, N), zeros(Int, N),
-                                   trues(N))
+                                   trues(N), Ref(0))
     else
         @argcheck(size(state.covariance, 1) == N,
                   DimensionMismatch("the state holds $(size(state.covariance, 1)) assets, and `X` holds $N"))
@@ -1146,7 +1152,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Copies an [`ExpWeightedCovarianceState`](@ref), so the copy shares no array with the original.
 
-It is the `copy` method of the [`AbstractPartialFitState`](@ref) interface, which [`partial_fit`](@ref) calls before it folds. It copies each array, and keeps an `overlap` of `nothing`.
+It is the `copy` method of the [`AbstractPartialFitState`](@ref) interface, which [`partial_fit`](@ref) calls before it folds. It copies each array, and keeps an `overlap` of `nothing`. It puts the row count in a new `Ref`, so a fold of the copy does not count in the original.
 
 # Arguments
 
@@ -1165,7 +1171,30 @@ It is the `copy` method of the [`AbstractPartialFitState`](@ref) interface, whic
 function Base.copy(x::ExpWeightedCovarianceState)
     return ExpWeightedCovarianceState(copy(x.covariance), copy(x.weight), copy(x.location),
                                       isnothing(x.overlap) ? nothing : copy(x.overlap),
-                                      copy(x.obs_count), copy(x.active))
+                                      copy(x.obs_count), copy(x.active), Ref(x.rows[]))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`ExpWeightedCovarianceState`](@ref) method of [`observation_count`](@ref).
+
+The state counts the observations of each asset in `obs_count`, and a reset sets such a count to zero. So the method reads `rows`, the number of folded rows, which is the `size(X, 1)` of a batch fit over the same rows.
+
+# Arguments
+
+  - `state`: The state that holds the count.
+
+# Returns
+
+  - `n::Integer`: The number of observations folded so far.
+
+# Related
+
+  - [`observation_count`](@ref)
+  - [`ExpWeightedCovarianceState`](@ref)
+"""
+function observation_count(state::ExpWeightedCovarianceState)
+    return state.rows[]
 end
 
 # An exponentially weighted recursion folds in every configuration (see

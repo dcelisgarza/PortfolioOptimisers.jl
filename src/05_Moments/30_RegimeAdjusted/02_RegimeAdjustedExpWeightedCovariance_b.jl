@@ -1019,40 +1019,6 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Forms the Laplace transform of a HAC estimate on the grid, cut at its minimum.
-
-Where the weight matrix is positive definite, ``G`` falls on the whole grid and nothing is cut.
-Where it is not, ``G`` falls to a minimum and then rises to the first zero of the determinant,
-where the negative part of the estimate rules the transform. The transform is cut at the minimum,
-and the last point takes the weight one half of a closed trapezoid, so the error of the cut is of
-the second order in the step.
-
-# Arguments
-
-  - `G::VecNum`: Transform on the grid (mutated).
-  - `lG::VecNum`: ``\\ln G`` on the grid, ``-\\infty`` past the first zero of the determinant.
-
-# Returns
-
-  - `G::VecNum`: The cut transform.
-
-# Related
-
-  - [`regime_bias_table`](@ref)
-"""
-function hac_laplace!(G::VecNum, lG::VecNum)
-    i = argmin(j -> isinf(lG[j]) ? typemax(eltype(lG)) : lG[j], eachindex(lG))
-    G .= exp.(lG)
-    if i < lastindex(G)
-        G[i] /= 2
-        G[(i + 1):end] .= zero(eltype(G))
-    end
-
-    return G
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
 Computes the second-order excess bias of the regime statistic of the inverse-volatility direction,
 which is built from the estimate it divides by.
 
@@ -2038,7 +2004,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Copies a [`RegimeAdjustedCovarianceState`](@ref), so the copy shares no array with the original.
 
 The `copy` method of the [`AbstractPartialFitState`](@ref) interface, which [`partial_fit`](@ref)
-calls before it folds. Every array field is copied, and the two scalar fields pass through. The
+calls before it folds. Every array field is copied, and the two scalar fields pass through. The row count goes into a
+new `Ref`, so a fold of the copy does not count in the original. The
 circular buffer of recent centred returns is rebuilt at the same capacity, and each observation
 it holds is copied into it, so a fold on the copy pushes into a buffer of its own. The two
 fields of the separate correlation recursion pass through as `nothing` where they are `nothing`.
@@ -2080,7 +2047,31 @@ function Base.copy(x::RegimeAdjustedCovarianceState)
                                          copy(x.X_old_i), copy(x.location),
                                          copy(x.obs_count), copy(x.active), x.regime_state,
                                          x.n_regime_obs, deepcopy(x.bias),
-                                         deepcopy(x.overlap), deepcopy(x.lag_records))
+                                         deepcopy(x.overlap), deepcopy(x.lag_records),
+                                         Ref(x.rows[]))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`RegimeAdjustedCovarianceState`](@ref) method of [`observation_count`](@ref).
+
+The state counts the observations of each asset in `obs_count`, and a reset sets such a count to zero. `n_regime_obs` counts only the observations that the regime statistic scored. So the method reads `rows`, the number of folded rows, which is the `size(X, 1)` of a batch fit over the same rows.
+
+# Arguments
+
+  - `state`: The state that holds the count.
+
+# Returns
+
+  - `n::Integer`: The number of observations folded so far.
+
+# Related
+
+  - [`observation_count`](@ref)
+  - [`RegimeAdjustedCovarianceState`](@ref)
+"""
+function observation_count(state::RegimeAdjustedCovarianceState)
+    return state.rows[]
 end
 """
     Statistics.cov(

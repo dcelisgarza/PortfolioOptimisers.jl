@@ -366,3 +366,37 @@ function correlation_hac_lags!(store::NamedTuple, ce::RegimeAdjustedExpWeightedC
 
     return store.kernel
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Forms the Laplace transform of a HAC estimate on the grid, cut at its minimum.
+
+Where the weight matrix is positive definite, ``G`` falls on the whole grid and nothing is cut.
+Where it is not, ``G`` falls to a minimum and then rises to the first zero of the determinant,
+where the negative part of the estimate rules the transform. The transform is cut at the minimum,
+and the last point takes the weight one half of a closed trapezoid, so the error of the cut is of
+the second order in the step.
+
+# Arguments
+
+  - `G::VecNum`: Transform on the grid (mutated).
+  - `lG::VecNum`: ``\\ln G`` on the grid, ``-\\infty`` past the first zero of the determinant.
+
+# Returns
+
+  - `G::VecNum`: The cut transform.
+
+# Related
+
+  - [`regime_bias_table`](@ref)
+"""
+function hac_laplace!(G::VecNum, lG::VecNum)
+    i = argmin(j -> isinf(lG[j]) ? typemax(eltype(lG)) : lG[j], eachindex(lG))
+    G .= exp.(lG)
+    if i < lastindex(G)
+        G[i] /= 2
+        G[(i + 1):end] .= zero(eltype(G))
+    end
+
+    return G
+end

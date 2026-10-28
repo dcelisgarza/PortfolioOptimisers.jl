@@ -274,6 +274,31 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+States whether the estimator runs the variance and the correlation at separate decays.
+
+A `cor_decay` of `nothing` states one decay for the whole matrix, and a `cor_decay` equal to
+`decay` states the same recursion in two places. Both take the single covariance recursion, so
+the cache allocates no correlation state.
+
+# Arguments
+
+  - `ce`: Regime-adjusted exponentially weighted covariance estimator.
+
+# Returns
+
+  - `flag::Bool`: `true` where `cor_decay` is not `nothing` and differs from `decay`.
+
+# Related
+
+  - [`RegimeAdjustedExpWeightedCovariance`](@ref)
+  - [`RegimeAdjustedCovarianceState`](@ref)
+"""
+function has_separate_cor_decay(ce::RegimeAdjustedExpWeightedCovariance)
+    return !isnothing(ce.cor_decay) && !isapprox(ce.cor_decay, ce.decay)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Computes the outer product of one observation, with the Newey-West HAC correction where `hac_lags` is not `nothing`, and divides each product by its exact factor.
 
 The correction adds each lagged cross-product and its transpose, weighted by the Bartlett kernel ``w_j = 1 - j/(L+1)``, so the update reads the serial correlation of the returns. An entry of a lagged observation that is not finite is read as zero, which freezes that pair's contribution. Each product is then divided by [`hac_pair_factor`](@ref), its mean in units of the covariance of the pair, which is one under [`PreCentred`](@ref).

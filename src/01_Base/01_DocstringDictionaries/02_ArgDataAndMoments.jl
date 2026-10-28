@@ -205,6 +205,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :ra_Xi => "`Xi`: Working array for the current centred returns.",#
                  # Plain exponentially weighted estimators.
                  :ew_overlap => "`overlap`: Overlap of the locations of each pair of assets, the sum over their common valid returns of the products of the two unnormalised weights, which the factor of a pair reads. It is `nothing` under [`PreCentred`](@ref), which takes no location.",#
+                 :ew_rows => "`rows`: Number of the observations folded so far, the rows that hold a `NaN` included, in a `Ref` that the fold writes in place. Unlike `obs_count`, an asset that leaves the active mask does not reset it, so it is the `size(X, 1)` of a batch fit over the same rows, which [`observation_count`](@ref) reads.",#
                  :ew_weight => "`weight`: Running total of the weights that each pair of assets holds in `covariance`. It takes the step of `covariance` on a unit outer product, so a pair gains weight only at an observation where both of its assets are valid.",#
                  :ew_cache => "`cache`: Running state of an incremental fit, or `nothing` before the first call to [`partial_fit!`](@ref). It is the one Result this estimator holds, and its type bound is the enforcement of that exception. A fit over a matrix ignores it.",#
                  :ew_mu => "`mu`: Running exponentially weighted mean vector, seeded at zero.",#

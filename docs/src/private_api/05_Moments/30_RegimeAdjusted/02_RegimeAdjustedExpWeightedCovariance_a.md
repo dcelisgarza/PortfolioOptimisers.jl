@@ -1,5 +1,5 @@
 ```@meta
-Description = "Regime adjusted exp weighted covariance (a), private API of PortfolioOptimisers.jl: RegimeAdjustedCovarianceState, has_separate_cor_decay, …"
+Description = "Regime adjusted exp weighted covariance (a), private API of PortfolioOptimisers.jl: RegimeAdjustedCovarianceState, pair_weighted_correlation, …"
 ```
 
 # Regime adjusted exp weighted covariance (a): private API
@@ -13,7 +13,6 @@ RegimeAdjustedCovarianceState
 ## Functions
 
 ```@docs
-has_separate_cor_decay
 pair_weighted_correlation
 update_var_cor!
 bias_corrected_covariance

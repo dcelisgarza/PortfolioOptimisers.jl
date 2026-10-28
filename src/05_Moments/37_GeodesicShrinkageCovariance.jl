@@ -990,6 +990,34 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+[`GeodesicShrinkageCovariance`](@ref) method of [`observation_count`](@ref), for an estimator whose own `cache` is `nothing`.
+
+The estimator then folds through `ce.ce` and keeps no state of its own, so the method reads the count of `ce.ce`. An estimator whose `cache` holds a [`SampleBufferState`](@ref) reads the count of its buffer through the generic method instead.
+
+# Arguments
+
+  - `ce`: The geodesic shrinkage covariance estimator.
+
+# Validation
+
+  - `ce.ce` holds a partial-fit state with a count, as [`observation_count`](@ref) states. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `n::Integer`: The number of observations that `ce.ce` folded.
+
+# Related
+
+  - [`observation_count`](@ref)
+  - [`GeodesicShrinkageCovariance`](@ref)
+"""
+function observation_count(ce::GeodesicShrinkageCovariance{<:Any, <:Any, <:Any, <:Any,
+                                                           Nothing})
+    return observation_count(ce.ce)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 [`GeodesicShrinkageCovariance`](@ref) method of [`supports_partial_fit`](@ref).
 
 The estimator folds through `ce.ce`, so it folds when `ce.ce` folds. An estimator whose `cache` holds a [`SampleBufferState`](@ref) folds whatever `ce.ce` is, because it takes the buffering fold.
