@@ -11,17 +11,6 @@ Abstract supertype for all cross-validation result types.
 """
 abstract type CrossValidationResult <: AbstractResult end
 """
-$(DocStringExtensions.TYPEDEF)
-
-Abstract supertype for all cross-validation algorithm types.
-
-# Related
-
-  - [`CrossValidationEstimator`](@ref)
-  - [`CrossValidationResult`](@ref)
-"""
-abstract type CrossValidationAlgorithm <: AbstractAlgorithm end
-"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Give a split result back unchanged.
@@ -271,12 +260,19 @@ cv_timestamps(pr::AbstractPricesResult) = TimeSeries.timestamp(pr.X)
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for cross-validation estimators used in non-optimisation contexts
-(e.g. resampling for hierarchical clustering or phylogeny methods).
+Abstract supertype for the cross-validation schemes that [`OptimisationCrossValidation`](@ref) does
+not take.
+
+The `cv` field of `OptimisationCrossValidation` is bound to [`OptCVER`](@ref), so a scheme of this
+branch reaches an optimiser through [`cross_val_predict`](@ref). [`MultipleRandomised`](@ref) is the one
+member. It draws random asset subsets, applies an inner walk-forward to each, and backtests an
+optimiser on every path.
 
 # Related
 
   - [`CrossValidationEstimator`](@ref)
+  - [`NonOptimisationSequentialCrossValidationEstimator`](@ref)
+  - [`NonOptimisationCrossValidationResult`](@ref)
 """
 abstract type NonOptimisationCrossValidationEstimator <: CrossValidationEstimator end
 """
@@ -295,20 +291,6 @@ abstract type NonOptimisationSequentialCrossValidationEstimator <:
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for non-sequential non-optimisation cross-validation estimators. A
-non-sequential scheme makes folds that are not a timeline, such as randomly sampled or
-combinatorial folds.
-
-# Related
-
-  - [`NonOptimisationCrossValidationEstimator`](@ref)
-  - [`NonOptimisationNonSequentialCrossValidationResult`](@ref)
-"""
-abstract type NonOptimisationNonSequentialCrossValidationEstimator <:
-              NonOptimisationCrossValidationEstimator end
-"""
-$(DocStringExtensions.TYPEDEF)
-
 Abstract supertype for result types produced by non-optimisation cross-validation
 routines.
 
@@ -317,7 +299,6 @@ routines.
   - [`CrossValidationResult`](@ref)
   - [`NonOptimisationCrossValidationEstimator`](@ref)
   - [`NonOptimisationSequentialCrossValidationResult`](@ref)
-  - [`NonOptimisationNonSequentialCrossValidationResult`](@ref)
 """
 abstract type NonOptimisationCrossValidationResult <: CrossValidationResult end
 """
@@ -332,6 +313,24 @@ Abstract supertype for sequential non-optimisation cross-validation result types
 """
 abstract type NonOptimisationSequentialCrossValidationResult <:
               NonOptimisationCrossValidationResult end
+# The non-sequential pair below is the empty cell of the non-optimisation branch. No scheme
+# subtypes it yet. A future twin of `MultipleRandomised` over a `KFold` or a combinatorial inner
+# scheme, whose folds are not a timeline, can uncomment the pair and subtype it (#1873).
+#=
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for non-sequential non-optimisation cross-validation estimators. A
+non-sequential scheme makes folds that are not a timeline, such as randomly sampled or
+combinatorial folds.
+
+# Related
+
+  - [`NonOptimisationCrossValidationEstimator`](@ref)
+  - [`NonOptimisationNonSequentialCrossValidationResult`](@ref)
+"""
+abstract type NonOptimisationNonSequentialCrossValidationEstimator <:
+              NonOptimisationCrossValidationEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -344,6 +343,7 @@ Abstract supertype for non-sequential non-optimisation cross-validation result t
 """
 abstract type NonOptimisationNonSequentialCrossValidationResult <:
               NonOptimisationCrossValidationResult end
+=#
 """
 $(DocStringExtensions.TYPEDEF)
 

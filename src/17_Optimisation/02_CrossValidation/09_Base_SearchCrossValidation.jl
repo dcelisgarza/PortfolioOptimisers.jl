@@ -25,20 +25,9 @@ abstract type AbstractSearchCrossValidationResult <: AbstractResult end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all search-based cross-validation algorithm types.
-
-Subtypes define the strategy used to select the best hyperparameter combination from the search results (e.g. selecting by highest mean score).
-
-# Related
-
-  - [`AbstractSearchCrossValidationEstimator`](@ref)
-  - [`SearchCrossValidationResult`](@ref)
-"""
-abstract type AbstractSearchCrossValidationAlgorithm <: AbstractAlgorithm end
-"""
-$(DocStringExtensions.TYPEDEF)
-
 Defines the interface for scoring strategies used in search cross-validation. Implementations select the optimal parameter set based on cross-validation scores.
+
+It is the branch of [`AbstractCrossValidationScorer`](@ref) that selects a candidate of a search. Its sibling [`PredictionScorer`](@ref) selects a path of a cross-validation.
 
 # Interfaces
 
@@ -74,11 +63,12 @@ julia> scorer(scores)
 
 # Related
 
+  - [`AbstractCrossValidationScorer`](@ref)
   - [`CrossValSearchScorer`](@ref)
   - [`HighestMeanScore`](@ref)
   - [`AbstractSearchCrossValidationEstimator`](@ref)
 """
-abstract type CrossValidationSearchScorer <: AbstractEstimator end
+abstract type CrossValidationSearchScorer <: AbstractCrossValidationScorer end
 """
     const CrossValSearchScorer = Union{CrossValidationSearchScorer, Function}
 

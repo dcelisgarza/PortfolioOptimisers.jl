@@ -1,12 +1,11 @@
 ```@meta
-Description = "Base Cross Validation (a), private API of PortfolioOptimisers.jl: CrossValidationResult, CrossValidationAlgorithm, CVER, …"
+Description = "Base Cross Validation (a), private API of PortfolioOptimisers.jl: CrossValidationResult, CVER, OptimisationCrossValidationEstimator, …"
 ```
 
 # Base Cross Validation (a): private API
 
 ```@docs
 CrossValidationResult
-CrossValidationAlgorithm
 CVER
 OptimisationCrossValidationEstimator
 SequentialCrossValidationEstimator
@@ -19,10 +18,8 @@ NonSeqCVER
 SeqCVER
 NonOptimisationCrossValidationEstimator
 NonOptimisationSequentialCrossValidationEstimator
-NonOptimisationNonSequentialCrossValidationEstimator
 NonOptimisationCrossValidationResult
 NonOptimisationSequentialCrossValidationResult
-NonOptimisationNonSequentialCrossValidationResult
 AbstractPredictionResult
 VecPredRes
 PredRes_MultiPredRes

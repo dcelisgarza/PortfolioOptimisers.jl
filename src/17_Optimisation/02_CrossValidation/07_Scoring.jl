@@ -3,12 +3,15 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype of the cross-validation scorers.
 
-A scorer reads the population of paths that a cross-validation scheme returns. [`PredictionScorer`](@ref) selects one path from it, and [`PopulationScorer`](@ref) scores the population as a whole.
+A scorer reads the scores of a cross-validation and selects one of the items it scored. The family has two branches:
+
+  - [`PredictionScorer`](@ref) selects one path from the population of paths that a cross-validation scheme returns.
+  - [`CrossValidationSearchScorer`](@ref) selects one candidate of a search from the matrix of its cross-validation scores.
 
 # Related
 
   - [`PredictionScorer`](@ref)
-  - [`PopulationScorer`](@ref)
+  - [`CrossValidationSearchScorer`](@ref)
 """
 abstract type AbstractCrossValidationScorer <: AbstractEstimator end
 """
@@ -26,19 +29,6 @@ A subtype is callable. It takes a [`PopulationPredictionResult`](@ref) and retur
 """
 abstract type PredictionScorer <: AbstractCrossValidationScorer end
 """
-$(DocStringExtensions.TYPEDEF)
-
-Abstract supertype of the scorers that score a population of predictions as a whole.
-
-The library defines no subtype of it, and no method dispatches on it.
-
-# Related
-
-  - [`AbstractCrossValidationScorer`](@ref)
-  - [`PopulationCrossValScorer`](@ref)
-"""
-abstract type PopulationScorer <: AbstractCrossValidationScorer end
-"""
     const PredictionCrossValScorer = Union{PredictionScorer, Function}
 
 Union of the values that the `scorer` field of [`OptimisationCrossValidation`](@ref) accepts: a [`PredictionScorer`](@ref) or a plain function.
@@ -52,19 +42,6 @@ The union exists so that a caller can select a path with a function and write no
   - [`OptimisationCrossValidation`](@ref)
 """
 const PredictionCrossValScorer = Union{PredictionScorer, Function}
-"""
-    const PopulationCrossValScorer = Union{PopulationScorer, Function}
-
-Union of a [`PopulationScorer`](@ref) and a plain function that scores a population of predictions as a whole.
-
-It is the population counterpart of [`PredictionCrossValScorer`](@ref). No field or method of the library takes it.
-
-# Related
-
-  - [`PopulationScorer`](@ref)
-  - [`PredictionCrossValScorer`](@ref)
-"""
-const PopulationCrossValScorer = Union{PopulationScorer, Function}
 """
 $(DocStringExtensions.TYPEDEF)
 

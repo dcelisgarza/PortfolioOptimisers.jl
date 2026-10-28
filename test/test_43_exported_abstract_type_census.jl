@@ -254,6 +254,7 @@
         :CustomExpectedReturnsValueAlgorithm,
         :CustomJuMPConstraint,
         :CustomJuMPObjective,
+        :DateAdjusterEstimator,
         :DynamicAbstractWeights,
         :FrontierBoundEstimator,
         :GerberCovarianceAlgorithm,
@@ -270,6 +271,7 @@
         :NonFiniteAllocationOptimisationResult,
         :NonJuMPOptimisationResult,
         :NormError,
+        :NumberSubsetsEstimator,
         :OpinionPoolingAlgorithm,
         :OptimisationAlgorithm,
         :OptimisationEstimator,
@@ -290,7 +292,8 @@
         :VectorAbstractEstimatorValueAlgorithm,
         :VectorToScalarMeasure,
         :WeightDeviation,
-        :WeightFinaliser
+        :WeightFinaliser,
+        :WindowSizeEstimator
     ])
     #! format: on
 

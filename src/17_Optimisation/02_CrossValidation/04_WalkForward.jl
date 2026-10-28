@@ -414,13 +414,52 @@ Abstract supertype for date adjustment estimators in walk-forward cross-validati
 
 Subtypes implement specific strategies for adjusting dates used in walk-forward splits. A subtype
 reaches a [`DateWalkForward`](@ref) through its `adjuster` field, whose type bound is
-[`DateAdjType`](@ref).
+[`DateAdjType`](@ref). The default `adjuster` is `identity`, which keeps every date of the range.
+
+# Interfaces
+
+To implement a new date adjuster, subtype `DateAdjusterEstimator` and make an instance callable as below.
+
+## Call
+
+  - `(a::MyDateAdjuster)(dates::AbstractVector{<:Dates.TimeType}) -> AbstractVector{<:Dates.TimeType}`: The dates that the test windows of the split align to.
+
+### Arguments
+
+  - `a`: The date adjuster.
+  - `dates`: The date range `ti:period:tf`, from the first to the last timestamp of the data, with the `period` of the [`DateWalkForward`](@ref). The caller `walk_forward_date_range` widens `ti` and `tf` by the `period_offset` before the call.
+
+### Returns
+
+  - `dates::AbstractVector{<:Dates.TimeType}`: The adjusted dates. They must stay sorted in increasing order, because `date_index_positions` reads them in order and stops at the first date after the last timestamp. The caller adds the `period_offset` to each date after the call, and runs no other check.
+
+# Examples
+
+A date adjuster that moves a date on a weekend to the next Monday.
+
+```jldoctest
+julia> struct NextWeekday <: PortfolioOptimisers.DateAdjusterEstimator end
+
+julia> function (::NextWeekday)(dates)
+           return unique!([Dates.dayofweek(d) > 5 ? d + Dates.Day(8 - Dates.dayofweek(d)) : d
+                           for d in dates])
+       end
+
+julia> NextWeekday()(Dates.Date(2024, 1, 5):Dates.Day(1):Dates.Date(2024, 1, 8))
+2-element Vector{Date}:
+ 2024-01-05
+ 2024-01-08
+
+julia> DateWalkForward(252, 21; adjuster = NextWeekday()).adjuster
+NextWeekday()
+```
 
 # Related
 
   - [`DateWalkForward`](@ref)
   - [`DateAdjType`](@ref)
   - [`walk_forward_date_range`](@ref)
+  - [`date_index_positions`](@ref)
 """
 abstract type DateAdjusterEstimator <: AbstractEstimator end
 """
@@ -1373,3 +1412,4 @@ function fold_evaluation(cv::HindsightSplit)
 end
 export WalkForwardResult, IndexWalkForward, DateWalkForward, HindsightSplit,
        OnlineIndexWalkForward, OnlineDateWalkForward, OnlineHindsightSplit, n_splits
+public DateAdjusterEstimator

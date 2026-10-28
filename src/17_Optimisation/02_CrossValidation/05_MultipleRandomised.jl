@@ -55,10 +55,44 @@ Abstract supertype for estimators that determine the number of random subsets to
 A subtype reaches a [`MultipleRandomised`](@ref) through its `n_subsets` field, and is called on the
 returns data to give the value.
 
+# Interfaces
+
+To implement a new number of subsets, subtype `NumberSubsetsEstimator` and make an instance callable as below.
+
+## Call
+
+  - `(n::MyNumberSubsets)(rd::Union{Pr_RR, AbstractPricesResult}) -> Integer`: The number of random asset subsets to draw.
+
+### Arguments
+
+  - `n`: The number of subsets estimator.
+  - `rd`: The prior result, the returns result or the prices result of the assets to draw from. Its `X` holds one row for each observation and one column for each asset.
+
+### Returns
+
+  - `n_subsets::Integer`: The number of random asset subsets. The caller throws when `n_subsets < 2`, and when `n_subsets` is larger than `RESOURCE_LIMITS[].max_n_subsets`.
+
+# Examples
+
+A number of subsets that grows with the number of assets.
+
+```jldoctest
+julia> struct TenthOfAssets <: PortfolioOptimisers.NumberSubsetsEstimator end
+
+julia> (::TenthOfAssets)(rd) = max(2, cld(size(rd.X, 2), 10))
+
+julia> TenthOfAssets()(ReturnsResult(; nx = string.(1:25), X = rand(10, 25)))
+3
+
+julia> MultipleRandomised(IndexWalkForward(4, 2); n_subsets = TenthOfAssets()).n_subsets
+TenthOfAssets()
+```
+
 # Related
 
   - [`MultipleRandomised`](@ref)
   - [`NumberSubsetsEC`](@ref)
+  - [`get_n_subsets`](@ref)
 """
 abstract type NumberSubsetsEstimator <: AbstractEstimator end
 """
@@ -69,10 +103,44 @@ Abstract supertype for estimators that determine the rolling window size.
 A subtype reaches a [`MultipleRandomised`](@ref) through its `window_size` field, and is called on the
 returns data to give the value.
 
+# Interfaces
+
+To implement a new window size, subtype `WindowSizeEstimator` and make an instance callable as below.
+
+## Call
+
+  - `(w::MyWindowSize)(rd::Union{Pr_RR, AbstractPricesResult}) -> Integer`: The number of observations in the window of each path.
+
+### Arguments
+
+  - `w`: The window size estimator.
+  - `rd`: The prior result, the returns result or the prices result of the assets to draw from. Its `X` holds one row for each observation and one column for each asset.
+
+### Returns
+
+  - `window_size::Integer`: The number of observations in each window. The caller throws when `window_size < 2`, and when `window_size` is larger than the number of observations of `rd`.
+
+# Examples
+
+A window size that takes half the observations, rounded down.
+
+```jldoctest
+julia> struct HalfWindowSize <: PortfolioOptimisers.WindowSizeEstimator end
+
+julia> (::HalfWindowSize)(rd) = max(2, fld(size(rd.X, 1), 2))
+
+julia> HalfWindowSize()(ReturnsResult(; nx = [\"A\", \"B\", \"C\"], X = rand(21, 3)))
+10
+
+julia> MultipleRandomised(IndexWalkForward(4, 2); window_size = HalfWindowSize()).window_size
+HalfWindowSize()
+```
+
 # Related
 
   - [`MultipleRandomised`](@ref)
   - [`WindowSizeEC`](@ref)
+  - [`get_window_size`](@ref)
 """
 abstract type WindowSizeEstimator <: AbstractEstimator end
 """
@@ -771,4 +839,4 @@ function folds_are_stepped(cv::MultipleRandomised)
     return folds_are_stepped(cv.cv)
 end
 export MultipleRandomised, MultipleRandomisedResult
-public SubsetSizeEstimator
+public SubsetSizeEstimator, NumberSubsetsEstimator, WindowSizeEstimator
