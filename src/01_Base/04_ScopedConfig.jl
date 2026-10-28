@@ -723,7 +723,7 @@ struct ResourceLimits
     """
     max_search_grid::Int
     """
-    The maximum number of grid points, `K`, that [`GridEntropicValueatRiskView`](@ref) and [`GridRelativisticValueatRiskView`](@ref) accept. The default is `10_000`. Each grid point is one binary variable of the mixed-integer program that an upper-bound or equality view builds. It is also one dense row over the `T` posterior probabilities. The memory is linear in `K`, at `K · T` coefficients, and the compute is a branch-and-bound tree over `K` binary variables. The cap is far below the compute caps that bound a plain solve, and far above the default `K = 11`.
+    The maximum number of grid points, `K`, that [`GridTailView`](@ref) accepts. The default is `10_000`. Each grid point is one binary variable of the mixed-integer program that an upper-bound or equality view builds. It is also one dense row over the `T` posterior probabilities. The memory is linear in `K`, at `K · T` coefficients, and the compute is a branch-and-bound tree over `K` binary variables. The cap is far below the compute caps that bound a plain solve, and far above the default `K = 11`.
     """
     max_ep_grid::Int
     function ResourceLimits(max_n_sim::Integer, max_n_subsets::Integer,

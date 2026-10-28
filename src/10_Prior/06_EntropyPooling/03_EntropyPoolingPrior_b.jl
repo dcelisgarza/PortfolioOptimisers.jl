@@ -421,8 +421,8 @@ function ep_assert_reachable_view(op::Symbol, rhs::Number, x::AbstractVector{<:V
     return nothing
 end
 """
-    ep_cvar_formulation(alg::Option{<:AbstractConditionalValueatRiskViewFormulation},
-                        mixed::Bool, op::Symbol, rhs::Number, pv::Number)
+    ep_cvar_formulation(alg::Option{<:CVaRVF}, mixed::Bool, op::Symbol, rhs::Number,
+                        pv::Number)
 
 Select the formulation of one conditional value-at-risk view.
 
@@ -439,7 +439,7 @@ The table gives the branch for each input:
 | `nothing` | `false` | `:leq` | any                | [`IntegerConditionalValueatRiskView`](@ref) |
 | `nothing` | `true`  | any    | any                | [`IntegerConditionalValueatRiskView`](@ref) |
 
-[`SequentialConditionalValueatRiskView`](@ref) is never the default. It writes every view that the integer formulation writes, with no integer variable. But its posterior is a local minimiser of the divergence, and `nothing` selects an exact formulation.
+[`SequentialTailView`](@ref) is never the default. It writes every view that the integer formulation writes, with no integer variable. But its posterior is a local minimiser of the divergence, and `nothing` selects an exact formulation.
 
 # Arguments
 
@@ -451,16 +451,16 @@ The table gives the branch for each input:
 
 # Returns
 
-  - `alg::AbstractConditionalValueatRiskViewFormulation`: The formulation to use.
+  - `alg::CVaRVF`: The formulation to use.
 
 # Related
 
   - [`LinearConditionalValueatRiskView`](@ref)
   - [`IntegerConditionalValueatRiskView`](@ref)
-  - [`SequentialConditionalValueatRiskView`](@ref)
+  - [`SequentialTailView`](@ref)
   - [`ep_tail_views!`](@ref)
 """
-function ep_cvar_formulation(alg::AbstractConditionalValueatRiskViewFormulation, args...)
+function ep_cvar_formulation(alg::CVaRVF, args...)
     return alg
 end
 function ep_cvar_formulation(::Nothing, mixed::Bool, op::Symbol, rhs::Number, pv::Number)
@@ -471,25 +471,25 @@ function ep_cvar_formulation(::Nothing, mixed::Bool, op::Symbol, rhs::Number, pv
     end
 end
 """
-    ep_evar_formulation(alg::Option{<:AbstractEntropicValueatRiskViewFormulation}, mixed::Bool,
-                        single::Bool, op::Symbol, rhs::Number, pv::Number)
+    ep_evar_formulation(alg::Option{<:EVaRVF}, mixed::Bool, single::Bool, op::Symbol,
+                        rhs::Number, pv::Number)
 
 Select the formulation of one entropic value-at-risk view.
 
-The function returns a stated formulation with no change. For `nothing`, it selects [`ConicEntropicValueatRiskView`](@ref) when that formulation writes the view exactly, which it does for every view whose upper level set is convex. An upper bound and an equality below the prior value use [`GridEntropicValueatRiskView`](@ref) when the view names one asset. The grid holds one asset only, so the same views over several assets use [`SequentialEntropicValueatRiskView`](@ref), the one formulation that can write them. A view whose coefficients have both signs also uses [`SequentialEntropicValueatRiskView`](@ref).
+The function returns a stated formulation with no change. For `nothing`, it selects [`ConicEntropicValueatRiskView`](@ref) when that formulation writes the view exactly, which it does for every view whose upper level set is convex. An upper bound and an equality below the prior value use [`GridTailView`](@ref) when the view names one asset. The grid holds one asset only, so the same views over several assets use [`SequentialTailView`](@ref), the one formulation that can write them. A view whose coefficients have both signs also uses [`SequentialTailView`](@ref).
 
 The table gives the branch for each input:
 
-| `alg`     | `mixed` | `single` | `op`   | `rhs` against `pv` | Branch                                      |
-|:--------- |:------- |:-------- |:------ |:------------------ |:------------------------------------------- |
-| stated    | any     | any      | any    | any                | `alg`, unchanged                            |
-| `nothing` | `false` | any      | `:geq` | any                | [`ConicEntropicValueatRiskView`](@ref)      |
-| `nothing` | `false` | any      | `:eq`  | `rhs >= pv`        | [`ConicEntropicValueatRiskView`](@ref)      |
-| `nothing` | `false` | `true`   | `:eq`  | `rhs < pv`         | [`GridEntropicValueatRiskView`](@ref)       |
-| `nothing` | `false` | `true`   | `:leq` | any                | [`GridEntropicValueatRiskView`](@ref)       |
-| `nothing` | `false` | `false`  | `:eq`  | `rhs < pv`         | [`SequentialEntropicValueatRiskView`](@ref) |
-| `nothing` | `false` | `false`  | `:leq` | any                | [`SequentialEntropicValueatRiskView`](@ref) |
-| `nothing` | `true`  | `false`  | any    | any                | [`SequentialEntropicValueatRiskView`](@ref) |
+| `alg`     | `mixed` | `single` | `op`   | `rhs` against `pv` | Branch                                 |
+|:--------- |:------- |:-------- |:------ |:------------------ |:-------------------------------------- |
+| stated    | any     | any      | any    | any                | `alg`, unchanged                       |
+| `nothing` | `false` | any      | `:geq` | any                | [`ConicEntropicValueatRiskView`](@ref) |
+| `nothing` | `false` | any      | `:eq`  | `rhs >= pv`        | [`ConicEntropicValueatRiskView`](@ref) |
+| `nothing` | `false` | `true`   | `:eq`  | `rhs < pv`         | [`GridTailView`](@ref)                 |
+| `nothing` | `false` | `true`   | `:leq` | any                | [`GridTailView`](@ref)                 |
+| `nothing` | `false` | `false`  | `:eq`  | `rhs < pv`         | [`SequentialTailView`](@ref)           |
+| `nothing` | `false` | `false`  | `:leq` | any                | [`SequentialTailView`](@ref)           |
+| `nothing` | `true`  | `false`  | any    | any                | [`SequentialTailView`](@ref)           |
 
 # Arguments
 
@@ -502,51 +502,51 @@ The table gives the branch for each input:
 
 # Returns
 
-  - `alg::AbstractEntropicValueatRiskViewFormulation`: The formulation to use.
+  - `alg::EVaRVF`: The formulation to use.
 
 # Related
 
   - [`ConicEntropicValueatRiskView`](@ref)
-  - [`GridEntropicValueatRiskView`](@ref)
-  - [`SequentialEntropicValueatRiskView`](@ref)
+  - [`GridTailView`](@ref)
+  - [`SequentialTailView`](@ref)
   - [`ep_tail_views!`](@ref)
 """
-function ep_evar_formulation(alg::AbstractEntropicValueatRiskViewFormulation, args...)
+function ep_evar_formulation(alg::EVaRVF, args...)
     return alg
 end
 function ep_evar_formulation(::Nothing, mixed::Bool, single::Bool, op::Symbol, rhs::Number,
                              pv::Number)
     return if mixed
-        SequentialEntropicValueatRiskView()
+        SequentialTailView()
     elseif op == :geq || op == :eq && rhs >= pv
         ConicEntropicValueatRiskView()
     elseif single
-        GridEntropicValueatRiskView()
+        GridTailView()
     else
         # The grid is one asset's. Issue #1287.
-        SequentialEntropicValueatRiskView()
+        SequentialTailView()
     end
 end
 """
-    ep_rlvar_formulation(alg::Option{<:AbstractRelativisticValueatRiskViewFormulation},
-                         mixed::Bool, single::Bool, op::Symbol, rhs::Number, pv::Number)
+    ep_rlvar_formulation(alg::Option{<:RLVaRVF}, mixed::Bool, single::Bool, op::Symbol,
+                         rhs::Number, pv::Number)
 
 Select the formulation of one relativistic value-at-risk view.
 
-The function returns a stated formulation with no change. For `nothing`, it selects [`ConicRelativisticValueatRiskView`](@ref) when that formulation writes the view exactly, which it does for every view whose upper level set is convex. An upper bound and an equality below the prior value use [`GridRelativisticValueatRiskView`](@ref) when the view names one asset. The grid holds one asset only, so the same views over several assets use [`SequentialRelativisticValueatRiskView`](@ref), the one formulation that can write them. A view whose coefficients have both signs also uses [`SequentialRelativisticValueatRiskView`](@ref).
+The function returns a stated formulation with no change. For `nothing`, it selects [`ConicRelativisticValueatRiskView`](@ref) when that formulation writes the view exactly, which it does for every view whose upper level set is convex. An upper bound and an equality below the prior value use [`GridTailView`](@ref) when the view names one asset. The grid holds one asset only, so the same views over several assets use [`SequentialTailView`](@ref), the one formulation that can write them. A view whose coefficients have both signs also uses [`SequentialTailView`](@ref).
 
 The table gives the branch for each input:
 
-| `alg`     | `mixed` | `single` | `op`   | `rhs` against `pv` | Branch                                          |
-|:--------- |:------- |:-------- |:------ |:------------------ |:----------------------------------------------- |
-| stated    | any     | any      | any    | any                | `alg`, unchanged                                |
-| `nothing` | `false` | any      | `:geq` | any                | [`ConicRelativisticValueatRiskView`](@ref)      |
-| `nothing` | `false` | any      | `:eq`  | `rhs >= pv`        | [`ConicRelativisticValueatRiskView`](@ref)      |
-| `nothing` | `false` | `true`   | `:eq`  | `rhs < pv`         | [`GridRelativisticValueatRiskView`](@ref)       |
-| `nothing` | `false` | `true`   | `:leq` | any                | [`GridRelativisticValueatRiskView`](@ref)       |
-| `nothing` | `false` | `false`  | `:eq`  | `rhs < pv`         | [`SequentialRelativisticValueatRiskView`](@ref) |
-| `nothing` | `false` | `false`  | `:leq` | any                | [`SequentialRelativisticValueatRiskView`](@ref) |
-| `nothing` | `true`  | `false`  | any    | any                | [`SequentialRelativisticValueatRiskView`](@ref) |
+| `alg`     | `mixed` | `single` | `op`   | `rhs` against `pv` | Branch                                     |
+|:--------- |:------- |:-------- |:------ |:------------------ |:------------------------------------------ |
+| stated    | any     | any      | any    | any                | `alg`, unchanged                           |
+| `nothing` | `false` | any      | `:geq` | any                | [`ConicRelativisticValueatRiskView`](@ref) |
+| `nothing` | `false` | any      | `:eq`  | `rhs >= pv`        | [`ConicRelativisticValueatRiskView`](@ref) |
+| `nothing` | `false` | `true`   | `:eq`  | `rhs < pv`         | [`GridTailView`](@ref)                     |
+| `nothing` | `false` | `true`   | `:leq` | any                | [`GridTailView`](@ref)                     |
+| `nothing` | `false` | `false`  | `:eq`  | `rhs < pv`         | [`SequentialTailView`](@ref)               |
+| `nothing` | `false` | `false`  | `:leq` | any                | [`SequentialTailView`](@ref)               |
+| `nothing` | `true`  | `false`  | any    | any                | [`SequentialTailView`](@ref)               |
 
 # Arguments
 
@@ -559,29 +559,29 @@ The table gives the branch for each input:
 
 # Returns
 
-  - `alg::AbstractRelativisticValueatRiskViewFormulation`: The formulation to use.
+  - `alg::RLVaRVF`: The formulation to use.
 
 # Related
 
   - [`ConicRelativisticValueatRiskView`](@ref)
-  - [`GridRelativisticValueatRiskView`](@ref)
-  - [`SequentialRelativisticValueatRiskView`](@ref)
+  - [`GridTailView`](@ref)
+  - [`SequentialTailView`](@ref)
   - [`ep_tail_views!`](@ref)
 """
-function ep_rlvar_formulation(alg::AbstractRelativisticValueatRiskViewFormulation, args...)
+function ep_rlvar_formulation(alg::RLVaRVF, args...)
     return alg
 end
 function ep_rlvar_formulation(::Nothing, mixed::Bool, single::Bool, op::Symbol, rhs::Number,
                               pv::Number)
     return if mixed
-        SequentialRelativisticValueatRiskView()
+        SequentialTailView()
     elseif op == :geq || op == :eq && rhs >= pv
         ConicRelativisticValueatRiskView()
     elseif single
-        GridRelativisticValueatRiskView()
+        GridTailView()
     else
         # The grid is one asset's. Issue #1287.
-        SequentialRelativisticValueatRiskView()
+        SequentialTailView()
     end
 end
 """
@@ -628,7 +628,7 @@ function ep_sequential_sides(x::AbstractVector{<:VecNum}, coef::VecNum, op::Symb
     return x[d], coef[d], x[p], coef[p], rhs * sgn
 end
 """
-    ep_add_cvar_view!(tvs::AbstractVector, alg::AbstractConditionalValueatRiskViewFormulation,
+    ep_add_cvar_view!(tvs::AbstractVector, alg::CVaRVF,
                       x::AbstractVector{<:VecNum}, coef::VecNum, op::Symbol, rhs::Number,
                       alpha::Number, w::VecNum, pv::Number, eqn::AbstractString)
 
@@ -640,7 +640,7 @@ Lower one conditional value-at-risk view into the tail view constraint that its 
  2. [`IntegerConditionalValueatRiskView`](@ref) sorts the loss series of each asset that the view names. The result is the ascending order `o`. It finds the length `sb` of the tail window of that asset with [`ep_sbar`](@ref).
  3. It keeps the last `sb` positions of `o` as `ord[k]`, and the losses at those positions as `xw[k]`.
  4. It appends one [`IntegerConditionalValueatRiskViewConstraint`](@ref) that holds those windows, `coef`, `alpha`, `op` and `rhs`.
- 5. [`SequentialConditionalValueatRiskView`](@ref) orients the view and splits its assets with [`ep_sequential_sides`](@ref). It builds a [`SequentialConditionalValueatRiskViewConstraint`](@ref) with an empty surrogate row. It reads the first row at the prior `w` with [`ep_sequential_start`](@ref), and appends the constraint.
+ 5. [`SequentialTailView`](@ref) orients the view and splits its assets with [`ep_sequential_sides`](@ref). It builds a [`SequentialConditionalValueatRiskViewConstraint`](@ref) with an empty surrogate row. It reads the first row at the prior `w` with [`ep_sequential_start`](@ref), and appends the constraint.
 
 # Arguments
 
@@ -667,7 +667,7 @@ Lower one conditional value-at-risk view into the tail view constraint that its 
 
   - [`LinearConditionalValueatRiskView`](@ref)
   - [`IntegerConditionalValueatRiskView`](@ref)
-  - [`SequentialConditionalValueatRiskView`](@ref)
+  - [`SequentialTailView`](@ref)
   - [`ep_sequential_sides`](@ref)
   - [`ep_tail_views!`](@ref)
 """
@@ -676,11 +676,11 @@ function ep_add_cvar_view!(tvs::AbstractVector, ::LinearConditionalValueatRiskVi
                            rhs::Number, alpha::Number, w::VecNum, pv::Number,
                            eqn::AbstractString)
     @argcheck(all(>(zero(eltype(coef))), coef),
-              ArgumentError("View `$(eqn)` carries coefficients of both signs. `LinearConditionalValueatRiskView` writes a positive combination of CVaRs, whose upper level set is convex; a relative view needs `IntegerConditionalValueatRiskView` or `SequentialConditionalValueatRiskView`."))
+              ArgumentError("View `$(eqn)` carries coefficients of both signs. `LinearConditionalValueatRiskView` writes a positive combination of CVaRs, whose upper level set is convex; a relative view needs `IntegerConditionalValueatRiskView` or `SequentialTailView`."))
     @argcheck(op != :leq,
-              ArgumentError("View `$(eqn)` is an upper bound. `LinearConditionalValueatRiskView` bounds the CVaR from below only; use `IntegerConditionalValueatRiskView` or `SequentialConditionalValueatRiskView`."))
+              ArgumentError("View `$(eqn)` is an upper bound. `LinearConditionalValueatRiskView` bounds the CVaR from below only; use `IntegerConditionalValueatRiskView` or `SequentialTailView`."))
     @argcheck(op != :eq || rhs >= pv,
-              ArgumentError("View `$(eqn)` targets $(rhs), below the prior CVaR $(pv). `LinearConditionalValueatRiskView` writes an equality as a lower bound, which is slack at the prior and would leave the view unmet; use `IntegerConditionalValueatRiskView` or `SequentialConditionalValueatRiskView`."))
+              ArgumentError("View `$(eqn)` targets $(rhs), below the prior CVaR $(pv). `LinearConditionalValueatRiskView` writes an equality as a lower bound, which is slack at the prior and would leave the view unmet; use `IntegerConditionalValueatRiskView` or `SequentialTailView`."))
     push!(tvs, LinearConditionalValueatRiskViewConstraint(x, coef, alpha, rhs))
     return nothing
 end
@@ -701,7 +701,7 @@ function ep_add_cvar_view!(tvs::AbstractVector, alg::IntegerConditionalValueatRi
     push!(tvs, IntegerConditionalValueatRiskViewConstraint(ord, xw, coef, alpha, op, rhs))
     return nothing
 end
-function ep_add_cvar_view!(tvs::AbstractVector, alg::SequentialConditionalValueatRiskView,
+function ep_add_cvar_view!(tvs::AbstractVector, alg::SequentialTailView,
                            x::AbstractVector{<:VecNum}, coef::VecNum, op::Symbol,
                            rhs::Number, alpha::Number, w::VecNum, pv::Number,
                            eqn::AbstractString)
@@ -715,7 +715,7 @@ function ep_add_cvar_view!(tvs::AbstractVector, alg::SequentialConditionalValuea
 end
 """
     ep_add_evar_view!(epc::AbstractDict, tvs::AbstractVector,
-                      alg::AbstractEntropicValueatRiskViewFormulation,
+                      alg::EVaRVF,
                       x::AbstractVector{<:VecNum}, coef::VecNum, alpha::Number, op::Symbol,
                       rhs::Number, w::VecNum, zstar::VecNum, pv::Number, eqn::AbstractString;
                       args::Tuple = (), kwargs::NamedTuple = (;),
@@ -723,17 +723,17 @@ end
 
 Lower one entropic value-at-risk view into the constraints that its formulation needs.
 
-[`ConicEntropicValueatRiskView`](@ref) and [`SequentialEntropicValueatRiskView`](@ref) each make one tail view constraint. [`GridEntropicValueatRiskView`](@ref) makes linear rows on the posterior probabilities for the lower-bound half of the view, and a tail view constraint for the upper-bound half. So an equality view gets both.
+[`ConicEntropicValueatRiskView`](@ref) and [`SequentialTailView`](@ref) each make one tail view constraint. [`GridTailView`](@ref) makes linear rows on the posterior probabilities for the lower-bound half of the view, and a tail view constraint for the upper-bound half. So an equality view gets both.
 
 # Algorithm
 
  1. [`ConicEntropicValueatRiskView`](@ref) checks the three conditions of the `Validation` section. Then it appends one [`ConicEntropicValueatRiskViewConstraint`](@ref) that holds `x`, `coef`, `alpha` and `rhs`.
- 2. [`GridEntropicValueatRiskView`](@ref) checks that the view names one asset. It normalises `w` to sum to one, which gives `wi`.
+ 2. [`GridTailView`](@ref) checks that the view names one asset. It normalises `w` to sum to one, which gives `wi`.
  3. It builds the grid `z` of dual variables with [`ep_evar_grid`](@ref).
  4. It keeps the points whose row is finite, as `keep`, and raises an error if `keep` is empty. For the upper-bound half, it keeps only the points whose bound is positive, and raises an error if no point has a positive bound.
  5. For the lower-bound half of the view, it builds the row of each kept point with [`ep_evar_grid_row`](@ref). It multiplies the row by minus one, so that the row has the `<=` sense of the key `:ineq`, and adds the row to `epc` under that key with [`add_ep_constraint!`](@ref).
  6. For the upper-bound half of the view, it appends one [`GridEntropicValueatRiskViewConstraint`](@ref) that holds `x`, the kept grid, `alpha`, `rhs` and the big-M multiplier `M`.
- 7. [`SequentialEntropicValueatRiskView`](@ref) orients the view and splits its assets with [`ep_sequential_sides`](@ref). It builds a [`SequentialEntropicValueatRiskViewConstraint`](@ref) with an empty surrogate row. It reads the first row at the prior `w` with [`ep_sequential_start`](@ref), and appends the constraint.
+ 7. [`SequentialTailView`](@ref) orients the view and splits its assets with [`ep_sequential_sides`](@ref). It builds a [`SequentialEntropicValueatRiskViewConstraint`](@ref) with an empty surrogate row. It reads the first row at the prior `w` with [`ep_sequential_start`](@ref), and appends the constraint.
 
 # Arguments
 
@@ -756,7 +756,7 @@ Lower one entropic value-at-risk view into the constraints that its formulation 
 # Validation
 
   - [`ConicEntropicValueatRiskView`](@ref) needs coefficients of one sign, an operator other than `<=`, and, for an equality, a target at or above the prior value of the left hand side.
-  - [`GridEntropicValueatRiskView`](@ref) needs one asset. It also needs at least one grid point whose row is finite and, if the view has an upper-bound half, whose bound is positive. [`ep_evar_grid_row`](@ref) overflows at a dual variable near zero, and its bound underflows to zero there. Part of the grid is near zero when `pct` goes near one. All of the grid is near zero when `alpha * T` is less than one, because the minimiser of [`ep_evar`](@ref) is then at the end of its bracket. The function drops these points, and raises an error if it keeps no point.
+  - [`GridTailView`](@ref) needs one asset. It also needs at least one grid point whose row is finite and, if the view has an upper-bound half, whose bound is positive. [`ep_evar_grid_row`](@ref) overflows at a dual variable near zero, and its bound underflows to zero there. Part of the grid is near zero when `pct` goes near one. All of the grid is near zero when `alpha * T` is less than one, because the minimiser of [`ep_evar`](@ref) is then at the end of its bracket. The function drops these points, and raises an error if it keeps no point.
 
 # Returns
 
@@ -765,8 +765,8 @@ Lower one entropic value-at-risk view into the constraints that its formulation 
 # Related
 
   - [`ConicEntropicValueatRiskView`](@ref)
-  - [`GridEntropicValueatRiskView`](@ref)
-  - [`SequentialEntropicValueatRiskView`](@ref)
+  - [`GridTailView`](@ref)
+  - [`SequentialTailView`](@ref)
   - [`ep_evar_grid`](@ref)
   - [`ep_evar_grid_row`](@ref)
   - [`ep_sequential_sides`](@ref)
@@ -778,21 +778,21 @@ function ep_add_evar_view!(epc::AbstractDict, tvs::AbstractVector,
                            zstar::VecNum, pv::Number, eqn::AbstractString; args::Tuple = (),
                            kwargs::NamedTuple = (;), zlo_frac::Option{<:Number} = nothing)
     @argcheck(all(>(zero(eltype(coef))), coef),
-              ArgumentError("View `$(eqn)` carries coefficients of both signs. `ConicEntropicValueatRiskView` writes a positive combination of EVaRs, whose upper level set is convex; a relative view needs `SequentialEntropicValueatRiskView`."))
+              ArgumentError("View `$(eqn)` carries coefficients of both signs. `ConicEntropicValueatRiskView` writes a positive combination of EVaRs, whose upper level set is convex; a relative view needs `SequentialTailView`."))
     @argcheck(op != :leq,
-              ArgumentError("View `$(eqn)` is an upper bound. `ConicEntropicValueatRiskView` bounds the EVaR from below only; use `GridEntropicValueatRiskView` for a single asset, or `SequentialEntropicValueatRiskView`."))
+              ArgumentError("View `$(eqn)` is an upper bound. `ConicEntropicValueatRiskView` bounds the EVaR from below only; use `GridTailView` for a single asset, or `SequentialTailView`."))
     @argcheck(op != :eq || rhs >= pv,
-              ArgumentError("View `$(eqn)` targets $(rhs), below the prior EVaR $(pv). `ConicEntropicValueatRiskView` writes an equality as a lower bound, which is slack at the prior and would leave the view unmet; use `GridEntropicValueatRiskView` for a single asset, or `SequentialEntropicValueatRiskView`."))
+              ArgumentError("View `$(eqn)` targets $(rhs), below the prior EVaR $(pv). `ConicEntropicValueatRiskView` writes an equality as a lower bound, which is slack at the prior and would leave the view unmet; use `GridTailView` for a single asset, or `SequentialTailView`."))
     push!(tvs, ConicEntropicValueatRiskViewConstraint(x, coef, alpha, rhs))
     return nothing
 end
-function ep_add_evar_view!(epc::AbstractDict, tvs::AbstractVector,
-                           alg::GridEntropicValueatRiskView, x::AbstractVector{<:VecNum},
-                           coef::VecNum, alpha::Number, op::Symbol, rhs::Number, w::VecNum,
-                           zstar::VecNum, pv::Number, eqn::AbstractString; args::Tuple = (),
-                           kwargs::NamedTuple = (;), zlo_frac::Option{<:Number} = nothing)
+function ep_add_evar_view!(epc::AbstractDict, tvs::AbstractVector, alg::GridTailView,
+                           x::AbstractVector{<:VecNum}, coef::VecNum, alpha::Number,
+                           op::Symbol, rhs::Number, w::VecNum, zstar::VecNum, pv::Number,
+                           eqn::AbstractString; args::Tuple = (), kwargs::NamedTuple = (;),
+                           zlo_frac::Option{<:Number} = nothing)
     @argcheck(isone(length(x)),
-              ArgumentError("View `$(eqn)` names $(length(x)) assets. `GridEntropicValueatRiskView` writes the EVaR of a single asset; use `ConicEntropicValueatRiskView` for a lower bound on a positive combination, and `SequentialEntropicValueatRiskView` for an upper bound or a relative view."))
+              ArgumentError("View `$(eqn)` names $(length(x)) assets. `GridTailView` writes the EVaR of a single asset; use `ConicEntropicValueatRiskView` for a lower bound on a positive combination, and `SequentialTailView` for an upper bound or a relative view."))
     (; pct, K, M, iters, tol, tilt_iters) = alg
     x = x[1]
     wi = w ./ sum(w)
@@ -814,8 +814,7 @@ function ep_add_evar_view!(epc::AbstractDict, tvs::AbstractVector,
     end
     return nothing
 end
-function ep_add_evar_view!(epc::AbstractDict, tvs::AbstractVector,
-                           alg::SequentialEntropicValueatRiskView,
+function ep_add_evar_view!(epc::AbstractDict, tvs::AbstractVector, alg::SequentialTailView,
                            x::AbstractVector{<:VecNum}, coef::VecNum, alpha::Number,
                            op::Symbol, rhs::Number, w::VecNum, zstar::VecNum, pv::Number,
                            eqn::AbstractString; args::Tuple = (), kwargs::NamedTuple = (;),
@@ -833,7 +832,7 @@ end
 
 Keep the usable points of a tail view grid, and add the rows of its lower-bound half.
 
-[`GridEntropicValueatRiskView`](@ref) and [`GridRelativisticValueatRiskView`](@ref) share `ep_add_grid_tail_view!`. Both build a grid of points, drop the points whose row is not usable, and add one linear row for each kept point. They differ in what a point is and in how they build its row. Each gives its row builder to this function as `row`.
+The entropic and the relativistic methods of [`GridTailView`](@ref) share `ep_add_grid_tail_view!`. Both build a grid of points, drop the points whose row is not usable, and add one linear row for each kept point. They differ in what a point is and in how they build its row. Each gives its row builder to this function as `row`.
 
 The function drops a point whose row is not finite, because a coefficient that is not finite goes to the solver as `NaN * x[j]`. The message `msg` of the caller names the setting that put the whole grid at such points.
 
@@ -892,7 +891,7 @@ function ep_add_grid_tail_view!(epc::AbstractDict, grid::AbstractVector, op::Sym
 end
 """
     ep_add_rlvar_view!(epc::AbstractDict, tvs::AbstractVector,
-                       alg::AbstractRelativisticValueatRiskViewFormulation,
+                       alg::RLVaRVF,
                        x::AbstractVector{<:VecNum}, coef::VecNum, alpha::Number,
                        kappa::Number, op::Symbol, rhs::Number, w::VecNum, zstar::VecNum,
                        pv::Number, eqn::AbstractString; args::Tuple = (),
@@ -901,17 +900,17 @@ end
 
 Lower one relativistic value-at-risk view into the constraints that its formulation needs.
 
-[`ConicRelativisticValueatRiskView`](@ref) and [`SequentialRelativisticValueatRiskView`](@ref) each make one tail view constraint. [`GridRelativisticValueatRiskView`](@ref) makes linear rows on the posterior probabilities for the lower-bound half of the view, and a tail view constraint for the upper-bound half. So an equality view gets both.
+[`ConicRelativisticValueatRiskView`](@ref) and [`SequentialTailView`](@ref) each make one tail view constraint. [`GridTailView`](@ref) makes linear rows on the posterior probabilities for the lower-bound half of the view, and a tail view constraint for the upper-bound half. So an equality view gets both.
 
 # Algorithm
 
  1. [`ConicRelativisticValueatRiskView`](@ref) checks the three conditions of the `Validation` section. Then it appends one [`ConicRelativisticValueatRiskViewConstraint`](@ref) that holds `x`, `coef`, `alpha`, `kappa` and `rhs`.
- 2. [`GridRelativisticValueatRiskView`](@ref) checks that the view names one asset. It normalises `w` to sum to one, which gives `wi`.
+ 2. [`GridTailView`](@ref) checks that the view names one asset. It normalises `w` to sum to one, which gives `wi`.
  3. It builds the grid `t`, `z` of primal points with [`ep_rlvar_grid`](@ref).
  4. It keeps the points whose row is finite, as `keep`, and raises an error if `keep` is empty. For the upper-bound half, it keeps only the points whose bound is positive, and raises an error if no point has a positive bound.
  5. For the lower-bound half of the view, it builds the row of each kept point with [`ep_rlvar_grid_row`](@ref). It multiplies the row by minus one, so that the row has the `<=` sense of the key `:ineq`, and adds the row to `epc` under that key with [`add_ep_constraint!`](@ref).
  6. For the upper-bound half of the view, it appends one [`GridRelativisticValueatRiskViewConstraint`](@ref) that holds `x`, the kept grid, `alpha`, `kappa`, `rhs` and the big-M multiplier `M`.
- 7. [`SequentialRelativisticValueatRiskView`](@ref) orients the view and splits its assets with [`ep_sequential_sides`](@ref). It builds a [`SequentialRelativisticValueatRiskViewConstraint`](@ref) with an empty surrogate row. It reads the first row at the prior `w` with [`ep_sequential_start`](@ref), and appends the constraint.
+ 7. [`SequentialTailView`](@ref) orients the view and splits its assets with [`ep_sequential_sides`](@ref). It builds a [`SequentialRelativisticValueatRiskViewConstraint`](@ref) with an empty surrogate row. It reads the first row at the prior `w` with [`ep_sequential_start`](@ref), and appends the constraint.
 
 # Arguments
 
@@ -935,7 +934,7 @@ Lower one relativistic value-at-risk view into the constraints that its formulat
 # Validation
 
   - [`ConicRelativisticValueatRiskView`](@ref) needs coefficients of one sign, an operator other than `<=`, and, for an equality, a target at or above the prior value of the left hand side.
-  - [`GridRelativisticValueatRiskView`](@ref) needs one asset. It also needs at least one grid point whose row is finite and, if the view has an upper-bound half, whose bound is positive. [`ep_rlvar_tail`](@ref) overflows at a dual variable near zero, and the grid is near zero when `kappa` goes near one. The bound `rhs - t - z * ln_kappa(1 / (alpha * T))` of a point is at or below zero when the target is below the value that the point can reach. The function drops these points, and raises an error if it keeps no point.
+  - [`GridTailView`](@ref) needs one asset. It also needs at least one grid point whose row is finite and, if the view has an upper-bound half, whose bound is positive. [`ep_rlvar_tail`](@ref) overflows at a dual variable near zero, and the grid is near zero when `kappa` goes near one. The bound `rhs - t - z * ln_kappa(1 / (alpha * T))` of a point is at or below zero when the target is below the value that the point can reach. The function drops these points, and raises an error if it keeps no point.
 
 # Returns
 
@@ -944,8 +943,8 @@ Lower one relativistic value-at-risk view into the constraints that its formulat
 # Related
 
   - [`ConicRelativisticValueatRiskView`](@ref)
-  - [`GridRelativisticValueatRiskView`](@ref)
-  - [`SequentialRelativisticValueatRiskView`](@ref)
+  - [`GridTailView`](@ref)
+  - [`SequentialTailView`](@ref)
   - [`ep_rlvar_grid`](@ref)
   - [`ep_rlvar_grid_row`](@ref)
   - [`ep_rlvar_tail`](@ref)
@@ -959,23 +958,22 @@ function ep_add_rlvar_view!(epc::AbstractDict, tvs::AbstractVector,
                             eqn::AbstractString; args::Tuple = (), kwargs::NamedTuple = (;),
                             bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing)
     @argcheck(all(>(zero(eltype(coef))), coef),
-              ArgumentError("View `$(eqn)` carries coefficients of both signs. `ConicRelativisticValueatRiskView` writes a positive combination of RLVaRs, whose upper level set is convex; a relative view needs `SequentialRelativisticValueatRiskView`."))
+              ArgumentError("View `$(eqn)` carries coefficients of both signs. `ConicRelativisticValueatRiskView` writes a positive combination of RLVaRs, whose upper level set is convex; a relative view needs `SequentialTailView`."))
     @argcheck(op != :leq,
-              ArgumentError("View `$(eqn)` is an upper bound. `ConicRelativisticValueatRiskView` bounds the RLVaR from below only; use `GridRelativisticValueatRiskView` for a single asset, or `SequentialRelativisticValueatRiskView`."))
+              ArgumentError("View `$(eqn)` is an upper bound. `ConicRelativisticValueatRiskView` bounds the RLVaR from below only; use `GridTailView` for a single asset, or `SequentialTailView`."))
     @argcheck(op != :eq || rhs >= pv,
-              ArgumentError("View `$(eqn)` targets $(rhs), below the prior RLVaR $(pv). `ConicRelativisticValueatRiskView` writes an equality as a lower bound, which is slack at the prior and would leave the view unmet; use `GridRelativisticValueatRiskView` for a single asset, or `SequentialRelativisticValueatRiskView`."))
+              ArgumentError("View `$(eqn)` targets $(rhs), below the prior RLVaR $(pv). `ConicRelativisticValueatRiskView` writes an equality as a lower bound, which is slack at the prior and would leave the view unmet; use `GridTailView` for a single asset, or `SequentialTailView`."))
     push!(tvs, ConicRelativisticValueatRiskViewConstraint(x, coef, alpha, kappa, rhs))
     return nothing
 end
-function ep_add_rlvar_view!(epc::AbstractDict, tvs::AbstractVector,
-                            alg::GridRelativisticValueatRiskView,
+function ep_add_rlvar_view!(epc::AbstractDict, tvs::AbstractVector, alg::GridTailView,
                             x::AbstractVector{<:VecNum}, coef::VecNum, alpha::Number,
                             kappa::Number, op::Symbol, rhs::Number, w::VecNum,
                             zstar::VecNum, pv::Number, eqn::AbstractString;
                             args::Tuple = (), kwargs::NamedTuple = (;),
                             bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing)
     @argcheck(isone(length(x)),
-              ArgumentError("View `$(eqn)` names $(length(x)) assets. `GridRelativisticValueatRiskView` writes the RLVaR of a single asset; use `ConicRelativisticValueatRiskView` for a lower bound on a positive combination, and `SequentialRelativisticValueatRiskView` for an upper bound or a relative view."))
+              ArgumentError("View `$(eqn)` names $(length(x)) assets. `GridTailView` writes the RLVaR of a single asset; use `ConicRelativisticValueatRiskView` for a lower bound on a positive combination, and `SequentialTailView` for an upper bound or a relative view."))
     (; pct, K, M, iters, tol, tilt_iters) = alg
     x = x[1]
     wi = w ./ sum(w)
@@ -997,8 +995,7 @@ function ep_add_rlvar_view!(epc::AbstractDict, tvs::AbstractVector,
     end
     return nothing
 end
-function ep_add_rlvar_view!(epc::AbstractDict, tvs::AbstractVector,
-                            alg::SequentialRelativisticValueatRiskView,
+function ep_add_rlvar_view!(epc::AbstractDict, tvs::AbstractVector, alg::SequentialTailView,
                             x::AbstractVector{<:VecNum}, coef::VecNum, alpha::Number,
                             kappa::Number, op::Symbol, rhs::Number, w::VecNum,
                             zstar::VecNum, pv::Number, eqn::AbstractString;
@@ -1340,3 +1337,5 @@ function ep_tail_views!(tail_views::AbstractEntropyPoolingTailViewEstimator,
     end
     return nothing
 end
+
+public ep_add_cvar_view!, ep_add_evar_view!, ep_add_rlvar_view!

@@ -205,9 +205,9 @@ end
     # A grid of its own on the group.
     pr3 = prior(EntropyPoolingPrior(; sets = sets, opt = ep_mopt,
                                     rlvar_views = RelativisticValueatRiskView(;
-                                                                              alg = GridRelativisticValueatRiskView(;
-                                                                                                                    pct = 0.8,
-                                                                                                                    K = 21),
+                                                                              alg = GridTailView(;
+                                                                                                 pct = 0.8,
+                                                                                                 K = 21),
                                                                               views = LinearConstraintEstimator(;
                                                                                                                 val = "AAPL <= $tgt"))),
                 ep_srd)
@@ -223,7 +223,7 @@ end
     for opt in (OptimEntropyPooling(), JuMPEntropyPooling(; slv = slv))
         pr = prior(EntropyPoolingPrior(; sets = sets, opt = opt,
                                        rlvar_views = RelativisticValueatRiskView(;
-                                                                                 alg = GridRelativisticValueatRiskView(),
+                                                                                 alg = GridTailView(),
                                                                                  views = v)),
                    ep_srd)
         # The grid enforces the bound at its points alone, so the answer is approximate.
@@ -238,7 +238,7 @@ end
     # reaches the model divided by its bound, and the constant that releases it is the
     # largest scaled coefficient less one, which the data fix row by row. The default `M`
     # multiplies that constant by one.
-    dflt = GridRelativisticValueatRiskView()
+    dflt = GridTailView()
     @test dflt.pct == 0.5
     @test dflt.K == 11
     @test dflt.M == 1
@@ -270,9 +270,8 @@ end
         r = PO.ep_rlvar(x, ep_sw0, ep_a, kappa)
         epc = Dict{Any, Any}()
         tvs = Any[]
-        PO.ep_add_rlvar_view!(epc, tvs, GridRelativisticValueatRiskView(), [x], [1.0], ep_a,
-                              kappa, op, m * r.rlvar, ep_sw0, [r.z], r.rlvar,
-                              "AAPL <= $(m * r.rlvar)")
+        PO.ep_add_rlvar_view!(epc, tvs, GridTailView(), [x], [1.0], ep_a, kappa, op,
+                              m * r.rlvar, ep_sw0, [r.z], r.rlvar, "AAPL <= $(m * r.rlvar)")
         return epc, tvs
     end
     # The grid of each half, built again, and whether the row of each of its points is finite.
@@ -282,7 +281,7 @@ end
     # host (#1635), so each half is checked against its own grid, never against a count.
     grid(kappa, m, op) = begin
         r = PO.ep_rlvar(x, ep_sw0, ep_a, kappa)
-        alg = GridRelativisticValueatRiskView()
+        alg = GridTailView()
         t, z = PO.ep_rlvar_grid(x, ep_sw0 ./ sum(ep_sw0), ep_a, kappa, op, m * r.rlvar, r.z,
                                 r.rlvar, alg.pct, alg.K; iters = alg.iters, tol = alg.tol,
                                 tilt_iters = alg.tilt_iters)
@@ -292,7 +291,7 @@ end
     end
     # Nothing overflows here, so the grid keeps every point it built.
     _, tvs = add(0.7, 0.75, :leq)
-    @test length(only(tvs).z) == GridRelativisticValueatRiskView().K
+    @test length(only(tvs).z) == GridTailView().K
     # The upper-bound half keeps exactly the points of its grid whose row is finite and whose
     # bound is positive, and each kept row is finite.
     _, tvs = add(0.9, 0.75, :leq)
@@ -312,7 +311,7 @@ end
     epc, _ = add(0.9, 0.75, :geq)
     lhs, rhs = epc[:ineq]
     _, _, fin, _ = grid(0.9, 0.75, :geq)
-    @test 0 < count(fin) < GridRelativisticValueatRiskView().K
+    @test 0 < count(fin) < GridTailView().K
     @test size(lhs, 1) == length(rhs) == count(fin)
     @test all(isfinite, lhs)
     @test all(isfinite, rhs)
@@ -579,11 +578,11 @@ end
     # it out.
     pr = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
                                    evar_views = EntropicValueatRiskView(;
-                                                                        alg = GridEntropicValueatRiskView(),
+                                                                        alg = GridTailView(),
                                                                         views = v)), rd)
     pr2 = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
                                     evar_views = EntropicValueatRiskView(;
-                                                                         alg = GridEntropicValueatRiskView(),
+                                                                         alg = GridTailView(),
                                                                          views = v,
                                                                          args = (PO.Optim.Brent(),),
                                                                          zlo_frac = sqrt(eps(Float64)))),
@@ -594,7 +593,7 @@ end
     # grid is centred on in the last digits.
     pr3 = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
                                     evar_views = EntropicValueatRiskView(;
-                                                                         alg = GridEntropicValueatRiskView(),
+                                                                         alg = GridTailView(),
                                                                          views = v,
                                                                          zlo_frac = 1e-8)),
                 rd)
@@ -618,14 +617,14 @@ end
                              e.evar, "AAPL")
         tvs[1].z
     end
-    zanc = grid_of(GridEntropicValueatRiskView())
-    zone = grid_of(GridEntropicValueatRiskView(; iters = 1))
+    zanc = grid_of(GridTailView())
+    zone = grid_of(GridTailView(; iters = 1))
     @test zone == PO.ep_evar_grid(x, ep_w0, ep_a, :geq, tgt, e.z, 0.5, 11)
     @test zanc != zone
     @test isapprox(zanc[6] / e.z, 0.23115, rtol = 1e-4)
     # A tolerance the iteration cannot miss stops it at the first step, which lands short of
     # the anchor the default tolerance reaches.
-    @test grid_of(GridEntropicValueatRiskView(; tol = 1.0)) != zanc
+    @test grid_of(GridTailView(; tol = 1.0)) != zanc
 end
 
 @testset "a CVaR or EVaR view naming an asset the universe does not hold" begin
@@ -662,18 +661,18 @@ end
     add(pct, op; a = ep_a, ea = e) = begin
         epc = Dict{Symbol, Any}()
         tvs = Any[]
-        PO.ep_add_evar_view!(epc, tvs, GridEntropicValueatRiskView(; pct = pct), [x], [1.0],
-                             a, op, 0.7 * ea.evar, ep_sw0, [ea.z], ea.evar,
+        PO.ep_add_evar_view!(epc, tvs, GridTailView(; pct = pct), [x], [1.0], a, op,
+                             0.7 * ea.evar, ep_sw0, [ea.z], ea.evar,
                              "AAPL <= $(0.7 * ea.evar)")
         return epc, tvs
     end
     # Nothing overflows at the default half-width, so the grid keeps every point it built.
-    _, tvs = add(GridEntropicValueatRiskView().pct, :leq)
-    @test length(only(tvs).z) == GridEntropicValueatRiskView().K
+    _, tvs = add(GridTailView().pct, :leq)
+    @test length(only(tvs).z) == GridTailView().K
     # The lowest point overflows here, and the ones that remain carry finite rows.
     _, tvs = add(0.999, :leq)
     tv = only(tvs)
-    @test length(tv.z) < GridEntropicValueatRiskView().K
+    @test length(tv.z) < GridTailView().K
     for zk in tv.z
         c, isc = PO.ep_evar_grid_row(x, tv.rhs, zk)
         @test all(isfinite, c)
@@ -727,8 +726,8 @@ end
     # second order at its minimum, so a `tol` of `1e-10` on the value buys far less on `z`.
     epc = Dict{Symbol, Any}()
     tvs = Any[]
-    PO.ep_add_evar_view!(epc, tvs, GridEntropicValueatRiskView(; K = 1), [x], [1.0], ep_a,
-                         :leq, tgt, ep_w0, [e.z], e.evar, "AAPL <= $tgt")
+    PO.ep_add_evar_view!(epc, tvs, GridTailView(; K = 1), [x], [1.0], ep_a, :leq, tgt,
+                         ep_w0, [e.z], e.evar, "AAPL <= $tgt")
     @test isapprox(only(only(tvs).z), anc.z, rtol = 1e-6)
 end
 

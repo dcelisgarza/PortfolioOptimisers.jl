@@ -142,6 +142,7 @@
         :AbstractDetoneEstimator,
         :AbstractDiagonalConstruction,
         :AbstractEmptyPairAlgorithm,
+        :AbstractEntropyPoolingViewFormulation,
         :AbstractEstimatorValueAlgorithm,
         :AbstractExpectedReturnsEstimator,
         :AbstractExposureEstimator,

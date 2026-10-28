@@ -212,8 +212,7 @@ Each grid point is one binary variable of the mixed-integer program that an uppe
 
   - [`assert_resource_cap`](@ref)
   - [`RESOURCE_LIMITS`](@ref)
-  - [`GridEntropicValueatRiskView`](@ref)
-  - [`GridRelativisticValueatRiskView`](@ref)
+  - [`GridTailView`](@ref)
 """
 function assert_ep_grid_size(K::Integer)::Nothing
     @argcheck(K >= one(K) && isodd(K), DomainError(K, "K must be odd and >= 1"))

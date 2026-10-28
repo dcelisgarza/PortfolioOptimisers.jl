@@ -4,7 +4,7 @@
 
 Compute the sample entropic value at risk of a loss series and the dual variable that attains it.
 
-`ep_evar` minimises the convex scalar objective of the sample EVaR with [`Optim.jl`](https://julianlsolvers.github.io/Optim.jl/stable/). The entropy pooling views need the value and the minimiser. The value compares a view with its prior, and the minimiser is the centre of the grid of [`GridEntropicValueatRiskView`](@ref). [EPTail](@citet) states the formula and puts the centre of the grid at the minimiser `z`. It does not state how to find that minimiser, so the bracket and the search are the library's own.
+`ep_evar` minimises the convex scalar objective of the sample EVaR with [`Optim.jl`](https://julianlsolvers.github.io/Optim.jl/stable/). The entropy pooling views need the value and the minimiser. The value compares a view with its prior, and the minimiser is the centre of the grid of [`GridTailView`](@ref). [EPTail](@citet) states the formula and puts the centre of the grid at the minimiser `z`. It does not state how to find that minimiser, so the bracket and the search are the library's own.
 
 # Mathematical definition
 
@@ -39,7 +39,7 @@ Compute the sample entropic value at risk of a loss series and the dual variable
 
 # Related
 
-  - [`GridEntropicValueatRiskView`](@ref)
+  - [`GridTailView`](@ref)
   - [`ConicEntropicValueatRiskView`](@ref)
   - [`EntropicValueatRisk`](@ref)
   - [`EntropicValueatRiskView`](@ref)
@@ -96,7 +96,7 @@ Build one scaled row of the grid formulation of an entropic value-at-risk view.
 
 # Related
 
-  - [`GridEntropicValueatRiskView`](@ref)
+  - [`GridTailView`](@ref)
   - [`GridEntropicValueatRiskViewConstraint`](@ref)
   - [`add_ep_tail_view!`](@ref)
   - [`ep_add_grid_tail_view!`](@ref)
@@ -145,7 +145,7 @@ Where:
 
   - [`ep_rlvar`](@ref)
   - [`ep_rlvar_grid_row`](@ref)
-  - [`GridRelativisticValueatRiskView`](@ref)
+  - [`GridTailView`](@ref)
 
 # References
 
@@ -251,7 +251,7 @@ end
 
 Compute the sample relativistic value at risk of a loss series and the primal point that attains it.
 
-`ep_rlvar` minimises the primal objective of the sample RLVaR over its two variables. [`ep_rlvar_tail`](@ref) already minimises out the power cones of each observation. The entropy pooling views need the value and the minimiser. The value compares a view with its prior, and the minimiser is the centre of the grid of [`GridRelativisticValueatRiskView`](@ref). The objective is the primal programme of [EPRLVaR](@cite). [EPRLVaR](@citet) does not state how to search for the minimum, so the two searches and their brackets are the library's own.
+`ep_rlvar` minimises the primal objective of the sample RLVaR over its two variables. [`ep_rlvar_tail`](@ref) already minimises out the power cones of each observation. The entropy pooling views need the value and the minimiser. The value compares a view with its prior, and the minimiser is the centre of the grid of [`GridTailView`](@ref). The objective is the primal programme of [EPRLVaR](@cite). [EPRLVaR](@citet) does not state how to search for the minimum, so the two searches and their brackets are the library's own.
 
 # Mathematical definition
 
@@ -303,7 +303,7 @@ Where:
   - [`ep_rlvar_tail`](@ref)
   - [`ep_rlvar_shift`](@ref)
   - [`ConicRelativisticValueatRiskView`](@ref)
-  - [`GridRelativisticValueatRiskView`](@ref)
+  - [`GridTailView`](@ref)
   - [`RelativisticValueatRisk`](@ref)
   - [`RelativisticValueatRiskView`](@ref)
 
@@ -359,7 +359,7 @@ Build one scaled row of the grid formulation of a relativistic value-at-risk vie
 
 # Related
 
-  - [`GridRelativisticValueatRiskView`](@ref)
+  - [`GridTailView`](@ref)
   - [`GridRelativisticValueatRiskViewConstraint`](@ref)
   - [`add_ep_tail_view!`](@ref)
   - [`ep_add_grid_tail_view!`](@ref)
@@ -470,7 +470,7 @@ end
 
 Find the dual variable of the entropic value at risk that a posterior attains when it meets an upper-bound view.
 
-A grid point states the view as one row. A posterior that makes the row tight reaches the target only if that grid point is the point that the posterior attains. `ep_evar_anchor` finds the dual variable that meets both conditions, and the grid of [`GridEntropicValueatRiskView`](@ref) has this dual variable as its centre. The function calls no solver. [EPTail](@citet) puts the centre of the grid at the dual variable of the prior. The anchor at the dual variable of the posterior is the library's own.
+A grid point states the view as one row. A posterior that makes the row tight reaches the target only if that grid point is the point that the posterior attains. `ep_evar_anchor` finds the dual variable that meets both conditions, and the grid of [`GridTailView`](@ref) has this dual variable as its centre. The function calls no solver. [EPTail](@citet) puts the centre of the grid at the dual variable of the prior. The anchor at the dual variable of the posterior is the library's own.
 
 # Arguments
 
@@ -503,7 +503,7 @@ A grid point states the view as one row. A posterior that makes the row tight re
   - [`ep_row_tilt`](@ref)
   - [`ep_evar`](@ref)
   - [`ep_evar_grid`](@ref)
-  - [`GridEntropicValueatRiskView`](@ref)
+  - [`GridTailView`](@ref)
 
 # References
 
@@ -539,7 +539,7 @@ end
 
 Build the grid of dual variables on which an entropic value-at-risk view is written.
 
-[EPTail](@citet) builds a grid of an odd number `K` of equidistant points. It moves the dual variable of the prior up and down by a percentage, and `pct` is that percentage. The anchor is the library's own. For a view with an upper-bound half, the centre of the grid is the dual variable that [`ep_evar_anchor`](@ref) finds. For a lower-bound view, and for a view whose anchor does not converge, the centre is the dual variable of the prior. The grid of [`GridRelativisticValueatRiskView`](@ref) also translates its shift, but an EVaR grid does not need to. The shift of the primal programme of EVaR has a closed form in the target and the dual variable, and the row `exp((x - rhs) / z)` of [`ep_evar_grid_row`](@ref) already contains it.
+[EPTail](@citet) builds a grid of an odd number `K` of equidistant points. It moves the dual variable of the prior up and down by a percentage, and `pct` is that percentage. The anchor is the library's own. For a view with an upper-bound half, the centre of the grid is the dual variable that [`ep_evar_anchor`](@ref) finds. For a lower-bound view, and for a view whose anchor does not converge, the centre is the dual variable of the prior. The grid of [`GridTailView`](@ref) also translates its shift, but an EVaR grid does not need to. The shift of the primal programme of EVaR has a closed form in the target and the dual variable, and the row `exp((x - rhs) / z)` of [`ep_evar_grid_row`](@ref) already contains it.
 
 # Arguments
 
@@ -573,7 +573,7 @@ Build the grid of dual variables on which an entropic value-at-risk view is writ
   - [`ep_evar_anchor`](@ref)
   - [`ep_evar_grid_row`](@ref)
   - [`ep_add_evar_view!`](@ref)
-  - [`GridEntropicValueatRiskView`](@ref)
+  - [`GridTailView`](@ref)
 
 # References
 
@@ -617,7 +617,7 @@ end
 
 Find the primal point of the relativistic value at risk that a posterior attains when it meets an upper-bound view.
 
-A grid point states the view as one row. A posterior that makes the row tight reaches the target only if that grid point is the point that the posterior attains. `ep_rlvar_anchor` finds the pair that meets both conditions, and the grid of [`GridRelativisticValueatRiskView`](@ref) has this pair as its centre. The function calls no solver. [EPRLVaR](@citet) states no grid and no anchor, so both are the library's own, and both use the primal programme.
+A grid point states the view as one row. A posterior that makes the row tight reaches the target only if that grid point is the point that the posterior attains. `ep_rlvar_anchor` finds the pair that meets both conditions, and the grid of [`GridTailView`](@ref) has this pair as its centre. The function calls no solver. [EPRLVaR](@citet) states no grid and no anchor, so both are the library's own, and both use the primal programme.
 
 # Arguments
 
@@ -652,7 +652,7 @@ A grid point states the view as one row. A posterior that makes the row tight re
   - [`ep_row_tilt`](@ref)
   - [`ep_rlvar`](@ref)
   - [`ep_rlvar_grid`](@ref)
-  - [`GridRelativisticValueatRiskView`](@ref)
+  - [`GridTailView`](@ref)
 
 # References
 
@@ -729,7 +729,7 @@ For a view with an upper-bound half, the centre of the grid is the pair that [`e
   - [`ep_rlvar_anchor`](@ref)
   - [`ep_rlvar_shift`](@ref)
   - [`ep_add_rlvar_view!`](@ref)
-  - [`GridRelativisticValueatRiskView`](@ref)
+  - [`GridTailView`](@ref)
 
 # References
 
@@ -938,7 +938,7 @@ Arguments correspond to the fields above.
 # Related
 
   - [`AbstractEntropyPoolingTailView`](@ref)
-  - [`GridEntropicValueatRiskView`](@ref)
+  - [`GridTailView`](@ref)
   - [`add_ep_tail_view!`](@ref)
 
 # References
@@ -1037,7 +1037,7 @@ Arguments correspond to the fields above.
 # Related
 
   - [`AbstractEntropyPoolingTailView`](@ref)
-  - [`GridRelativisticValueatRiskView`](@ref)
+  - [`GridTailView`](@ref)
   - [`add_ep_tail_view!`](@ref)
 
 # References
@@ -1095,7 +1095,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Carries the two sides of a sequential conditional value-at-risk view, its surrogate row and its stopping rule.
 
-[`ep_add_cvar_view!`](@ref) makes one of these for each view that uses [`SequentialConditionalValueatRiskView`](@ref), and reads its first surrogate row with [`ep_sequential_start`](@ref). [`ep_refine_tail_view`](@ref) then reads the row again at each posterior that [`entropy_pooling`](@ref) finds. [EPTail](@citet) states the dual formulation of the dual side. The sequential formulation, the surrogate row and the later reads are the library's own.
+[`ep_add_cvar_view!`](@ref) makes one of these for each view that uses [`SequentialTailView`](@ref), and reads its first surrogate row with [`ep_sequential_start`](@ref). [`ep_refine_tail_view`](@ref) then reads the row again at each posterior that [`entropy_pooling`](@ref) finds. [EPTail](@citet) states the dual formulation of the dual side. The sequential formulation, the surrogate row and the later reads are the library's own.
 
 # Fields
 
@@ -1111,7 +1111,7 @@ Arguments and keywords correspond to the fields above.
 # Related
 
   - [`AbstractSequentialTailViewConstraint`](@ref)
-  - [`SequentialConditionalValueatRiskView`](@ref)
+  - [`SequentialTailView`](@ref)
   - [`add_ep_tail_view!`](@ref)
   - [`ep_refine_tail_view`](@ref)
 
@@ -1167,7 +1167,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Carries the two sides of a sequential entropic value-at-risk view, its surrogate row, its stopping rule, and the settings of the search for the dual variable.
 
-[`ep_add_evar_view!`](@ref) makes one of these for each view that uses [`SequentialEntropicValueatRiskView`](@ref), and reads its first surrogate row with [`ep_sequential_start`](@ref). [`ep_refine_tail_view`](@ref) then reads the row again at each posterior that [`entropy_pooling`](@ref) finds. Each read runs [`ep_evar`](@ref) once for each asset of the primal side, with `args`, `kwargs` and `zlo_frac`. [EPRLVaR](@citet) states the dual formulation of the dual side, and [EPTail](@citet) states the formula of the entropic value at risk that the primal side reads. The sequential formulation, the surrogate row and the later reads are the library's own.
+[`ep_add_evar_view!`](@ref) makes one of these for each view that uses [`SequentialTailView`](@ref), and reads its first surrogate row with [`ep_sequential_start`](@ref). [`ep_refine_tail_view`](@ref) then reads the row again at each posterior that [`entropy_pooling`](@ref) finds. Each read runs [`ep_evar`](@ref) once for each asset of the primal side, with `args`, `kwargs` and `zlo_frac`. [EPRLVaR](@citet) states the dual formulation of the dual side, and [EPTail](@citet) states the formula of the entropic value at risk that the primal side reads. The sequential formulation, the surrogate row and the later reads are the library's own.
 
 # Fields
 
@@ -1185,7 +1185,7 @@ Arguments and keywords correspond to the fields above.
 # Related
 
   - [`AbstractSequentialTailViewConstraint`](@ref)
-  - [`SequentialEntropicValueatRiskView`](@ref)
+  - [`SequentialTailView`](@ref)
   - [`add_ep_tail_view!`](@ref)
   - [`ep_refine_tail_view`](@ref)
   - [`ep_evar`](@ref)
@@ -1255,7 +1255,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Carries the two sides of a sequential relativistic value-at-risk view, its surrogate row, its stopping rule, and the settings of the search for the primal pair.
 
-[`ep_add_rlvar_view!`](@ref) makes one of these for each view that uses [`SequentialRelativisticValueatRiskView`](@ref), and reads its first surrogate row with [`ep_sequential_start`](@ref). [`ep_refine_tail_view`](@ref) then reads the row again at each posterior that [`entropy_pooling`](@ref) finds. Each read runs [`ep_rlvar`](@ref) once for each asset of the primal side, with `args`, `kwargs` and `bracket`. [EPRLVaR](@citet) states the dual and the primal formulations. The sequential formulation, the surrogate row and the later reads are the library's own.
+[`ep_add_rlvar_view!`](@ref) makes one of these for each view that uses [`SequentialTailView`](@ref), and reads its first surrogate row with [`ep_sequential_start`](@ref). [`ep_refine_tail_view`](@ref) then reads the row again at each posterior that [`entropy_pooling`](@ref) finds. Each read runs [`ep_rlvar`](@ref) once for each asset of the primal side, with `args`, `kwargs` and `bracket`. [EPRLVaR](@citet) states the dual and the primal formulations. The sequential formulation, the surrogate row and the later reads are the library's own.
 
 # Fields
 
@@ -1273,7 +1273,7 @@ Arguments and keywords correspond to the fields above.
 # Related
 
   - [`AbstractSequentialTailViewConstraint`](@ref)
-  - [`SequentialRelativisticValueatRiskView`](@ref)
+  - [`SequentialTailView`](@ref)
   - [`add_ep_tail_view!`](@ref)
   - [`ep_refine_tail_view`](@ref)
   - [`ep_rlvar`](@ref)
@@ -1522,7 +1522,7 @@ Where:
 # Related
 
   - [`ep_tail_surrogate_row`](@ref)
-  - [`SequentialConditionalValueatRiskView`](@ref)
+  - [`SequentialTailView`](@ref)
   - [`ValueatRisk`](@ref)
 """
 function ep_var_multiplier(x::VecNum, w::VecNum, alpha::Number)
@@ -1689,7 +1689,7 @@ Read the first surrogate row of a sequential tail view at probabilities under wh
 
 A linear upper bound is tight where the function reads it. But the value of the row cannot fall below the smallest value of the row over the simplex. If the target is further below the prior than that, the first solve has no feasible point.
 
-This happens with the relativistic value at risk. At the pair of the prior, its bound has a floor at the shift plus the deformed logarithm, and only the tail term above the floor can change. `ep_sequential_start` moves the multipliers toward the target with a chain of exponential tilts before a solver runs. The anchors of [`GridEntropicValueatRiskView`](@ref) and [`GridRelativisticValueatRiskView`](@ref) use the same method to find the centres of their grids. The function calls no solver.
+This happens with the relativistic value at risk. At the pair of the prior, its bound has a floor at the shift plus the deformed logarithm, and only the tail term above the floor can change. `ep_sequential_start` moves the multipliers toward the target with a chain of exponential tilts before a solver runs. The anchors of [`GridTailView`](@ref) use the same method to find the centres of their grids. The function calls no solver.
 
 # Algorithm
 

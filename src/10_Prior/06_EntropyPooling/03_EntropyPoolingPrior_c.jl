@@ -26,15 +26,15 @@ A `prior(...)` reference in a skewness or kurtosis view reads the sample statist
 
 A tail view needs auxiliary variables, so the estimator writes it in the JuMP model, not as rows that multiply the posterior probabilities. This has three effects on the solver:
 
-  - `opt` must be a [`JuMPEntropyPooling`](@ref) when `cvar_views` is set. It must also be one when an `evar_views` or `rlvar_views` entry is not a lower bound under [`GridEntropicValueatRiskView`](@ref) or [`GridRelativisticValueatRiskView`](@ref). These two grid formulations of a lower bound are the only tail formulations that are linear in the posterior probabilities alone.
-  - A view that needs a binary variable needs a solver for mixed-integer exponential cone programmes. Every [`IntegerConditionalValueatRiskView`](@ref) view needs a binary variable, and so does an upper bound or an equality under [`GridEntropicValueatRiskView`](@ref) or [`GridRelativisticValueatRiskView`](@ref).
-  - [`ConicRelativisticValueatRiskView`](@ref), and the dual side of [`SequentialRelativisticValueatRiskView`](@ref), write power cones. So their solver must also take the power cone, together with the exponential cone of the objective.
+  - `opt` must be a [`JuMPEntropyPooling`](@ref) when `cvar_views` is set. It must also be one when an `evar_views` or `rlvar_views` entry is not a lower bound under [`GridTailView`](@ref). The grid formulation of a lower bound is the only tail formulation that is linear in the posterior probabilities alone.
+  - A view that needs a binary variable needs a solver for mixed-integer exponential cone programmes. Every [`IntegerConditionalValueatRiskView`](@ref) view needs a binary variable, and so does an upper bound or an equality under [`GridTailView`](@ref).
+  - [`ConicRelativisticValueatRiskView`](@ref), and the dual side of a relativistic value-at-risk view under [`SequentialTailView`](@ref), write power cones. So their solver must also take the power cone, together with the exponential cone of the objective.
 
 The `alg` field of a view group selects the formulation. One formulation applies to every view of the group, and a vector gives one formulation for each view. With `nothing`, [`ep_cvar_formulation`](@ref), [`ep_evar_formulation`](@ref) and [`ep_rlvar_formulation`](@ref) select the formulation of each view, and their tables state the rules.
 
 A significance level is part of the statistic. The conditional value at risk at 1 % and at 10 % are two different numbers of the same series. So the level is a field of the view group, not of the estimator. `var_views`, `cvar_views`, `evar_views` and `rlvar_views` each take one [`ValueatRiskView`](@ref), [`ConditionalValueatRiskView`](@ref), [`EntropicValueatRiskView`](@ref) or [`RelativisticValueatRiskView`](@ref), or a vector of them. Each group holds the `alpha` of its equations, and a `prior(...)` reference in a group resolves to the prior value at the level of that group. A [`RelativisticValueatRiskView`](@ref) also holds a `kappa`, because the deformation parameter is also part of the statistic.
 
-A tail view group also holds `alg`, the formulation. For an [`EntropicValueatRiskView`](@ref) or a [`RelativisticValueatRiskView`](@ref), the grid formulation holds the grid of dual variables and the big-M multiplier. So a [`GridEntropicValueatRiskView`](@ref) in one group gives that group its own `pct`, `K` and `M`. [`ValueatRiskView`](@ref) has no such field. A value at risk view is linear in the posterior probabilities, so it has no formulation to select.
+A tail view group also holds `alg`, the formulation. For an [`EntropicValueatRiskView`](@ref) or a [`RelativisticValueatRiskView`](@ref), the grid formulation holds the grid of dual variables and the big-M multiplier. So a [`GridTailView`](@ref) in one group gives that group its own `pct`, `K` and `M`. [`ValueatRiskView`](@ref) has no such field. A value at risk view is linear in the posterior probabilities, so it has no formulation to select.
 
 !!! warning
 
@@ -189,9 +189,9 @@ This prior has no exact incremental recursion, and it takes the online step by a
   - [`LinearConditionalValueatRiskView`](@ref)
   - [`IntegerConditionalValueatRiskView`](@ref)
   - [`ConicEntropicValueatRiskView`](@ref)
-  - [`GridEntropicValueatRiskView`](@ref)
   - [`ConicRelativisticValueatRiskView`](@ref)
-  - [`GridRelativisticValueatRiskView`](@ref)
+  - [`SequentialTailView`](@ref)
+  - [`GridTailView`](@ref)
   - [`JuMPEntropyPooling`](@ref)
   - [`OptimEntropyPooling`](@ref)
   - [`AbstractEntropyPoolingAlgorithm`](@ref)

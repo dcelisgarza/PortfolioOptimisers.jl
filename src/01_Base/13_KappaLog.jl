@@ -48,7 +48,7 @@ julia> PortfolioOptimisers.kappa_log(0.5, 0.3)
   - [`set_relativistic_risk_constraints!`](@ref)
   - [`RelativisticValueatRisk`](@ref)
   - [`ConicRelativisticValueatRiskView`](@ref)
-  - [`GridRelativisticValueatRiskView`](@ref)
+  - [`GridTailView`](@ref)
   - [`EntropyBudget`](@ref)
   - [`assert_unit_interval`](@ref): the check that the constructors run on `kappa`.
 

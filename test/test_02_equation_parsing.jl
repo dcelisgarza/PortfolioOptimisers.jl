@@ -406,19 +406,17 @@ end
                                                     "b" => collect(1:10)]])
     end
     # K sizes a binary block of the mixed-integer program an upper-bound or equality
-    # tail view builds, so the grid formulations take a cap of their own. The parity
-    # check alone admitted a grid of ten million binaries from one view.
-    @test_throws DomainError GridEntropicValueatRiskView(; K = 10_000_001)
-    @test_throws DomainError GridRelativisticValueatRiskView(; K = 10_000_001)
+    # tail view builds, so the grid formulation takes a cap of its own. The parity check
+    # alone admitted a grid of ten million binaries from one view.
     kerr = try
-        GridRelativisticValueatRiskView(; K = 10_000_001)
+        GridTailView(; K = 10_000_001)
         nothing
     catch e
         e
     end
     @test kerr isa DomainError
     @test occursin("max_ep_grid", kerr.msg)
-    @test GridEntropicValueatRiskView(; K = 21).K == 21
+    @test GridTailView(; K = 21).K == 21
     # A raised ceiling is honoured, and scoped overrides restore on exit.
     pe.with_resource_limits(; max_n_sim = 20_000_000_000) do
         @test NormalUncertaintySet(; n_sim = 10_000_000_000).n_sim == 10_000_000_000
@@ -437,7 +435,7 @@ end
               10_000
     end
     pe.with_resource_limits(; max_ep_grid = 20_000_000) do
-        @test GridRelativisticValueatRiskView(; K = 10_000_001).K == 10_000_001
+        @test GridTailView(; K = 10_000_001).K == 10_000_001
     end
     @test pe.RESOURCE_LIMITS[].max_n_sim == 1_000_000
     # Preferences fail closed at load, like the equation caps.

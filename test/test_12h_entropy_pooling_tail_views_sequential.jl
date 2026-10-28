@@ -219,21 +219,38 @@ end
 # at the posterior until it is tight. Every posterior of the sequence meets the view.
 # --------------------------------------------------------------------------------------
 @testset "sequential formulation constructors" begin
-    for F in (SequentialConditionalValueatRiskView, SequentialEntropicValueatRiskView,
-              SequentialRelativisticValueatRiskView)
-        f = F()
-        @test f.iters == 20
-        @test f.tol == 1e-8
-        @test F(; iters = 0, tol = 1e-4).iters == 0
-        @test_throws DomainError F(; iters = -1)
-        @test_throws DomainError F(; tol = 0.0)
-    end
-    @test isa(SequentialConditionalValueatRiskView(),
-              PO.AbstractConditionalValueatRiskViewFormulation)
-    @test isa(SequentialEntropicValueatRiskView(),
-              PO.AbstractEntropicValueatRiskViewFormulation)
-    @test isa(SequentialRelativisticValueatRiskView(),
-              PO.AbstractRelativisticValueatRiskViewFormulation)
+    f = SequentialTailView()
+    @test f.iters == 20
+    @test f.tol == 1e-8
+    @test SequentialTailView(; iters = 0, tol = 1e-4).iters == 0
+    @test_throws DomainError SequentialTailView(; iters = -1)
+    @test_throws DomainError SequentialTailView(; tol = 0.0)
+    # One sequential formulation serves every measure, and the view group names the
+    # measure. Issue #1872.
+    @test isa(f, PO.AbstractEntropyPoolingViewFormulation)
+    v = LinearConstraintEstimator(; val = "AAPL <= 0.1")
+    @test ConditionalValueatRiskView(; views = v, alg = f).alg === f
+    @test EntropicValueatRiskView(; views = v, alg = f).alg === f
+    @test RelativisticValueatRiskView(; views = v, alg = f).alg === f
+    # A vector that mixes a formulation of the measure with the shared one keeps working,
+    # and an entry of another measure is refused at construction.
+    @test length(ConditionalValueatRiskView(; views = v,
+                                            alg = [LinearConditionalValueatRiskView(), f]).alg) ==
+          2
+    @test length(EntropicValueatRiskView(; views = v,
+                                         alg = [ConicEntropicValueatRiskView(), f,
+                                                GridTailView()]).alg) == 3
+    @test length(RelativisticValueatRiskView(; views = v,
+                                             alg = [ConicRelativisticValueatRiskView(), f,
+                                                    GridTailView()]).alg) == 3
+    @test_throws ArgumentError ConditionalValueatRiskView(; views = v,
+                                                          alg = [f, GridTailView()])
+    @test_throws ArgumentError EntropicValueatRiskView(; views = v,
+                                                       alg = [f,
+                                                              LinearConditionalValueatRiskView()])
+    @test_throws ArgumentError RelativisticValueatRiskView(; views = v,
+                                                           alg = [f,
+                                                                  ConicEntropicValueatRiskView()])
 end
 
 @testset "ep_sequential_sides orients the view as a lower bound and splits its assets" begin
@@ -348,8 +365,8 @@ end
     @test isapprox(ep_sevar(1, pr.w) - ep_sevar(size(ep_sX, 2), pr.w), tgt, rtol = 1e-5)
     pr0_ = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
                                      evar_views = EntropicValueatRiskView(;
-                                                                          alg = SequentialEntropicValueatRiskView(;
-                                                                                                                  iters = 0),
+                                                                          alg = SequentialTailView(;
+                                                                                                   iters = 0),
                                                                           views = v)),
                  ep_srd)
     @test isapprox(pr0_.kld, klds[1], rtol = 1e-6)
@@ -365,7 +382,7 @@ end
     v = LinearConstraintEstimator(; val = "AAPL <= $tgt")
     ps = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
                                    cvar_views = ConditionalValueatRiskView(;
-                                                                           alg = SequentialConditionalValueatRiskView(),
+                                                                           alg = SequentialTailView(),
                                                                            views = v)),
                ep_srd)
     pi_ = prior(EntropyPoolingPrior(; sets = sets, opt = ep_mopt,
@@ -380,7 +397,7 @@ end
     v2 = LinearConstraintEstimator(; val = "AAPL - $nN == $tgt2")
     ps2 = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
                                     cvar_views = ConditionalValueatRiskView(;
-                                                                            alg = SequentialConditionalValueatRiskView(),
+                                                                            alg = SequentialTailView(),
                                                                             views = v2)),
                 ep_srd)
     pi2 = prior(EntropyPoolingPrior(; sets = sets, opt = ep_mopt,
@@ -393,7 +410,7 @@ end
     v3 = LinearConstraintEstimator(; val = "AAPL >= $(ep_spcvar * 1.2)")
     ps3 = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
                                     cvar_views = ConditionalValueatRiskView(;
-                                                                            alg = SequentialConditionalValueatRiskView(),
+                                                                            alg = SequentialTailView(),
                                                                             views = v3)),
                 ep_srd)
     pl3 = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
@@ -438,7 +455,7 @@ end
     tgt4 = ep_spevar * 0.9
     pu = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
                                    evar_views = EntropicValueatRiskView(;
-                                                                        alg = SequentialEntropicValueatRiskView(),
+                                                                        alg = SequentialTailView(),
                                                                         views = LinearConstraintEstimator(;
                                                                                                           val = "AAPL <= $tgt4"))),
                ep_srd)
@@ -447,7 +464,7 @@ end
     pu2 = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
                                     rlvar_views = RelativisticValueatRiskView(;
                                                                               kappa = ep_k,
-                                                                              alg = SequentialRelativisticValueatRiskView(),
+                                                                              alg = SequentialTailView(),
                                                                               views = LinearConstraintEstimator(;
                                                                                                                 val = "AAPL <= $tgt5"))),
                 ep_srd)

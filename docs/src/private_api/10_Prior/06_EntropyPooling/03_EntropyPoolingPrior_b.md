@@ -14,10 +14,7 @@ ep_cvar_formulation
 ep_evar_formulation
 ep_rlvar_formulation
 ep_sequential_sides
-ep_add_cvar_view!
-ep_add_evar_view!
 ep_add_grid_tail_view!
-ep_add_rlvar_view!
 ep_tail_view_prior_args
 ep_normalise_tail_view
 ep_add_tail_view!
