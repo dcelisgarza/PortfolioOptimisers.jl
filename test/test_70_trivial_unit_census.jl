@@ -353,6 +353,7 @@ end
                                       :AbstractPipelineEstimator => "a second pipeline shape beside `Pipeline`",
                                       :AbstractPipelineResult => "the result of a second pipeline shape",
                                       :AbstractSearchCrossValidationResult => "carries an `# Interfaces` section: an Open Family",
+                                      :AbstractShrunkExpectedReturnsEstimator => "a second shrinkage estimator beside `ShrunkExpectedReturns`, kept by default by #1859 (ADR 0222)",
                                       :BaseClusteringOptimisationEstimator => "a second clustering optimiser beside `HierarchicalOptimiser`",
                                       :BaseGerberIQCovariance => "carries an `# Interfaces` section: an Open Family",
                                       :BaseHierarchicalOptimisationResult => "carries an `# Interfaces` section: an Open Family",

@@ -852,7 +852,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Makes every first-order expert of a mixture read its gradient at the blend that the mixture played, while it steps from its own iterate.
 
-This is the shared gradient of the improved Ader of Section 3.4 of [zhang2018ader](@cite): the meta-algorithm sends the gradient at the blend to every expert (Algorithm 3, Step 9, and Algorithm 4, Step 4). The experts of [zhao2020sword](@citet) read the gradient at their own iterates (Algorithms 2 and 4), and that work reads the gradient at the blend only for the linearised loss of its meta-algorithm (Equations 10 and 13). So the choice of this point for [`Sword`](@ref) is a choice of the library. [`Ader`](@ref) and [`Sword`](@ref) build the mixture on it. The mixture passes the blend through the seven-argument [`online_update!`](@ref). [`MirrorDescent`](@ref), [`OptimisticStep`](@ref) and [`AdaptiveSubgradient`](@ref) read it, and the hint of `OptimisticStep` stays the hint of its predictor. A rule with no gradient takes its six-argument update and ignores the point.
+This is the shared gradient of the improved Ader of Section 3.4 of [zhang2018ader](@cite): the meta-algorithm sends the gradient at the blend to every expert (Algorithm 3, Step 9, and Algorithm 4, Step 4). The experts of [zhao2020sword](@citet) read the gradient at their own iterates (Algorithms 2 and 4), and that work reads the gradient at the blend only for the linearised loss of its meta-algorithm (Equations 10 and 13). So the choice of this point for [`Sword`](@ref) is a choice of the library. [`Ader`](@ref) and [`Sword`](@ref) build the mixture on it. The mixture passes the blend through the seven-argument [`online_update!`](@ref). [`MirrorDescent`](@ref) and [`AdaptiveSubgradient`](@ref) read it. The hint of a [`MirrorDescent`](@ref) rule with a `predictor` stays the hint of its predictor. A rule with no gradient takes its six-argument update and ignores the point.
 
 # Mathematical definition
 
@@ -882,7 +882,6 @@ BlendPoint()
   - [`ExpertMixture`](@ref)
   - [`OwnPoint`](@ref)
   - [`MirrorDescent`](@ref)
-  - [`OptimisticStep`](@ref)
   - [`AdaptiveSubgradient`](@ref)
 
 # References

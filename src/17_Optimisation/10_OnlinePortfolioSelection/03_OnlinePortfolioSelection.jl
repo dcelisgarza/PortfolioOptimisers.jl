@@ -102,11 +102,12 @@ Keywords correspond to the struct's fields. `set`, `fees` and `fb` can hold a [`
 julia> OnlinePortfolioSelection()
 OnlinePortfolioSelection
      alg ┼ MirrorDescent
-         │     eta ┼ Float64: 0.05
-         │    proj ┼ EntropicProjection()
-         │   alpha ┼ Int64: 0
-         │     obj ┼ LogWealth()
-         │    grad ┴ nothing
+         │         eta ┼ Float64: 0.05
+         │        proj ┼ EntropicProjection()
+         │       alpha ┼ Int64: 0
+         │         obj ┼ LogWealth()
+         │        grad ┼ nothing
+         │   predictor ┴ nothing
      set ┼ BoundedAllocationSet
          │     wb ┼ WeightBounds
          │        │   lb ┼ Float64: 0.0

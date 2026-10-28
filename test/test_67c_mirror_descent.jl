@@ -490,9 +490,13 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         @test isapprox(oc.cache.st.s.B,
                        po.partial_fit!(OPS(; alg = MAEG(; etas = H, window = 3)),
                                        rows(rd, 1:12)).cache.st.s.B; atol = 1e-14)
-        # The optimistic wrapper and a mixture's weighting carry the schedule too.
+        # The optimistic step and a mixture's weighting carry the schedule too.
         oo = po.partial_fit!(OPS(;
-                                 alg = OptimisticStep(; alg = MAEG(; etas = H, window = 3))),
+                                 alg = ExponentiatedGradient(;
+                                                             eta = WindowedBestRate(;
+                                                                                    etas = H,
+                                                                                    window = 3),
+                                                             predictor = LastGradient())),
                              rows(rd, 1:6))
         @test oo.cache.st.s.n == 6 && isapprox(sum(oo.cache.w), 1; atol = 1e-12)
         vo = po.port_opt_view(oo.cache.st, [2, 4])
@@ -782,8 +786,8 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         wh2 = X[2, :] ./ sum(X[2, :])
         for mk in (o -> GradientProjection(; eta = 50, obj = o),
                    o -> AdaptiveSubgradient(; obj = o),
-                   o -> OptimisticStep(; alg = GradientProjection(; eta = 50, obj = o),
-                                       predictor = LastGradient(; at_played = false)))
+                   o -> GradientProjection(; eta = 50, obj = o,
+                                           predictor = LastGradient(; at_played = false)))
             walk(o) = optimise(OPS(; alg = mk(o)), rows(rd, 1:2)).w
             w_book = walk(trl(wq; fixed = false))
             @test maxerr(w_book, walk(trl(wh2; fixed = true))) < 1e-14
@@ -805,8 +809,8 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         whm = xg ./ sum(xg)
         for mk in (o -> GradientProjection(; eta = 50, obj = o),
                    o -> AdaptiveSubgradient(; obj = o),
-                   o -> OptimisticStep(; alg = GradientProjection(; eta = 50, obj = o),
-                                       predictor = LastGradient(; at_played = false)))
+                   o -> GradientProjection(; eta = 50, obj = o,
+                                           predictor = LastGradient(; at_played = false)))
             walk(o) = optimise(OPS(; alg = mk(o)), rdn2).w
             w_book = walk(trl(wq; fixed = false))
             @test iszero(w_book[4])
@@ -1079,7 +1083,7 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates
         # The sibling first-order rules read the point too: under the own point each equals
         # its own head to the ulp, and under the blend point the paths part after the
         # first row, where the blend leaves the expert's iterate.
-        for e in (OptimisticStep(; alg = GradientProjection(; eta = 0.2)),
+        for e in (GradientProjection(; eta = 0.2, predictor = LastGradient()),
                   AdaptiveSubgradient())
             mo = ExpertMixture(; experts = [e, GradientProjection(; eta = 0.4)])
             mb = ExpertMixture(; experts = [e, GradientProjection(; eta = 0.4)],

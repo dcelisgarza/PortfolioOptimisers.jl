@@ -1079,7 +1079,7 @@ The function reads the rule, the state `st` of the rule, the allocation `w` held
 
 Every rule makes the same two steps. It takes an unconstrained step to a raw vector, and it then calls [`project`](@ref) onto the set in its geometry. A rule that reads `w` continues from the allocation it gets, which is the Start Allocation on the first row.
 
-The seven-argument form names the **Gradient Point**. An [`ExpertMixture`](@ref) under [`BlendPoint`](@ref) gives every expert its played blend as `point`. A first-order rule then evaluates its gradient at that point and steps from its own iterate, so every expert reads the one gradient on which the dynamic-regret mixtures state their bounds. The generic method drops the point and runs the six-argument update. So a rule with no gradient ignores the point, and a `nothing` point, which the mixture gives under [`OwnPoint`](@ref), runs the six-argument update for every rule. [`MirrorDescent`](@ref), [`OptimisticStep`](@ref) and [`AdaptiveSubgradient`](@ref) read a given point.
+The seven-argument form names the **Gradient Point**. An [`ExpertMixture`](@ref) under [`BlendPoint`](@ref) gives every expert its played blend as `point`. A first-order rule then evaluates its gradient at that point and steps from its own iterate, so every expert reads the one gradient on which the dynamic-regret mixtures state their bounds. The generic method drops the point and runs the six-argument update. So a rule with no gradient ignores the point, and a `nothing` point, which the mixture gives under [`OwnPoint`](@ref), runs the six-argument update for every rule. [`MirrorDescent`](@ref), with or without a predictor, and [`AdaptiveSubgradient`](@ref) read a given point.
 
 # Mathematical definition
 
