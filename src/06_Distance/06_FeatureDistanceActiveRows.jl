@@ -81,13 +81,12 @@ Mark the assets that a collapse can read in a window, from the active mask of th
 
 The method that Julia selects is the algorithm.
 
- 1. [`LastObservation`](@ref) forwards to its rule.
- 2. Under [`LastRow`](@ref), an asset is readable when it is active at the last row.
- 3. Under every other rule and collapse, an asset is readable when it is active at one row of the window at least.
+ 1. Under [`LastRow`](@ref), an asset is readable when it is active at the last row.
+ 2. Under every other collapse, an asset is readable when it is active at one row of the window at least.
 
 # Arguments
 
-  - `alg`: The collapse algorithm, or the rule of a [`LastObservation`](@ref).
+  - `alg`: The collapse algorithm.
   - `A`: The active mask of the window, `observations × assets`.
 
 # Returns
@@ -99,14 +98,10 @@ The method that Julia selects is the algorithm.
   - [`assert_feature_readable`](@ref)
   - [`feature_readable_mask`](@ref)
 """
-function feature_readable(alg::LastObservation, A::AbstractMatrix{Bool})
-    return feature_readable(alg.alg, A)
-end
 function feature_readable(::LastRow, A::AbstractMatrix{Bool})
     return BitVector(view(A, size(A, 1), :))
 end
-function feature_readable(::Union{LastActiveRow, AbstractFeatureCollapseAlgorithm},
-                          A::AbstractMatrix{Bool})
+function feature_readable(::AbstractFeatureCollapseAlgorithm, A::AbstractMatrix{Bool})
     return BitVector(vec(any(A; dims = 1)))
 end
 """
@@ -200,7 +195,7 @@ State why a collapse has no value to read for an asset, and the remedy, for the 
 
 The method that Julia selects is the algorithm.
 
- 1. Under [`LastObservation`](@ref) with [`LastRow`](@ref), the cause is the last row. The remedies are a view of the returns data and [`LastActiveRow`](@ref).
+ 1. Under [`LastRow`](@ref), the cause is the last row. The remedies are a view of the returns data and [`LastActiveRow`](@ref).
  2. Under every other collapse, the cause is a window with no readable row. The remedy is a view of the returns data.
 
 # Arguments
@@ -219,8 +214,8 @@ The method that Julia selects is the algorithm.
 function unreadable_message(::AbstractFeatureCollapseAlgorithm)
     return "each has no readable row in the window: no row at which it is active and every value column of `sel` holds data, observed or filled. Inside a fit, the entry of the optimiser drops such an asset as a non-investable asset. A direct call has no entry of a fit. Pass a view of the returns data at the assets to cluster, `port_opt_view(rd, i)`."
 end
-function unreadable_message(::LastObservation{<:LastRow})
-    return "each is inactive at the last row of the window, or a value column of `sel` holds a placeholder there. Inside a fit, the entry of the optimiser drops such an asset as a non-investable asset. A direct call has no entry of a fit. Pass a view of the returns data at the assets to cluster, `port_opt_view(rd, i)`, or read each asset at its last readable row, `LastObservation(; alg = LastActiveRow())`."
+function unreadable_message(::LastRow)
+    return "each is inactive at the last row of the window, or a value column of `sel` holds a placeholder there. Inside a fit, the entry of the optimiser drops such an asset as a non-investable asset. A direct call has no entry of a fit. Pass a view of the returns data at the assets to cluster, `port_opt_view(rd, i)`, or read each asset at its last readable row, `LastActiveRow()`."
 end
 """
     asset_major(Z::Arr3Num, dims::Integer)
@@ -645,7 +640,7 @@ Under [`AggregateDistances`](@ref) and [`StackObservations`](@ref), an entry can
 
 # Mathematical definition
 
-Under [`LastObservation`](@ref) with [`LastActiveRow`](@ref), the collapse reads each asset at its last active row.
+Under [`LastActiveRow`](@ref), the collapse reads each asset at its last active row.
 
 ```math
 \\begin{align}
@@ -668,8 +663,8 @@ Under [`AggregateFeatures`](@ref), ``D_{i,\\,j}`` is the metric of the collapsed
 
 The type of `de.alg` selects one of four methods.
 
- 1. Under [`LastObservation`](@ref) with [`LastRow`](@ref), or when every asset is active at the last row, measure the last row.
- 2. Under [`LastObservation`](@ref) otherwise, read the features of each asset at its last active row, giving `zs`, and measure the stack of `zs`.
+ 1. Under [`LastRow`](@ref), or when every asset is active at the last row, measure the last row.
+ 2. Under [`LastActiveRow`](@ref) otherwise, read the features of each asset at its last active row, giving `zs`, and measure the stack of `zs`.
  3. Under [`AggregateFeatures`](@ref), resolve the weights with [`collapse_weights`](@ref). Collapse each asset over its own active rows with [`active_collapse`](@ref), giving `Zc`, and measure `Zc`.
  4. Under [`AggregateDistances`](@ref), resolve the weights, and measure each row into `Dt`. Add each entry of `Dt` to `D`, and the weight of the row to the weight total `S`, only for a pair whose two assets are active at the row, with [`accumulate_active_pairs!`](@ref).
  5. Then check that the weight total of each asset, on the diagonal of `S`, is not zero. Collect each pair with a zero total, giving `E`. Divide `D` by `S`, and give `E` to [`resolve_empty_pairs!`](@ref).
@@ -700,7 +695,7 @@ The type of `de.alg` selects one of four methods.
 function active_feature_distance(de::FeatureDistance{<:Any, <:LastObservation},
                                  win::NamedTuple)
     (; Z, dims, A) = win
-    if isa(de.alg.alg, LastRow) || all(view(A, size(A, 1), :))
+    if isa(de.alg, LastRow) || all(view(A, size(A, 1), :))
         return feature_distance(de.metric, view(Z, size(Z, 1), :, :), dims)
     end
     Zd = asset_major(Z, dims)
@@ -1052,13 +1047,12 @@ Name the rows that a collapse reads on the mask `R` of readable cells. [`LastAct
 
 The method that Julia selects is the algorithm.
 
- 1. [`LastObservation`](@ref) forwards to its rule.
- 2. Under [`LastActiveRow`](@ref), with a matrix `R` of a time-varying panel, name the rows with [`last_active_rows`](@ref) on `R`.
- 3. In every other case, a static panel and `R === nothing` included, name the rows with [`collapse_rows`](@ref).
+ 1. Under [`LastActiveRow`](@ref), with a matrix `R` of a time-varying panel, name the rows with [`last_active_rows`](@ref) on `R`.
+ 2. In every other case, a static panel and `R === nothing` included, name the rows with [`collapse_rows`](@ref).
 
 # Arguments
 
-  - `alg`: The collapse algorithm, or the rule of a [`LastObservation`](@ref).
+  - `alg`: The collapse algorithm.
   - `pnl`: The Asset Panel.
   - `R`: The mask of readable cells, `observations × assets` on a time-varying panel, one entry per asset on a static panel, or `nothing`.
 
@@ -1073,9 +1067,6 @@ The method that Julia selects is the algorithm.
 """
 function readable_window_rows(alg, pnl::AssetPanel, ::Any)
     return collapse_rows(alg, pnl)
-end
-function readable_window_rows(alg::LastObservation, pnl::AssetPanel, R)
-    return readable_window_rows(alg.alg, pnl, R)
 end
 function readable_window_rows(::LastActiveRow, ::AssetPanel, R::AbstractMatrix{Bool})
     return last_active_rows(R)

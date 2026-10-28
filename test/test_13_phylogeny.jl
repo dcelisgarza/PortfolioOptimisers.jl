@@ -470,8 +470,9 @@
                            DS.pairwise(AngularDist(), Z; dims = 1); atol = 1e-5)
             Z3 = rand(rng, Float32, 5, 4, 3)
             @test eltype(distance(FeatureDistance(), Z3[end, :, :])) === Float32
-            for alg in (LastObservation(), AggregateFeatures(), AggregateDistances(),
-                        StackObservations(), AggregateFeatures(; alg = MedianCollapse()))
+            for alg in
+                (LastRow(), AggregateFeatures(), AggregateDistances(), StackObservations(),
+                 AggregateFeatures(; alg = MedianCollapse()))
                 @test eltype(distance(FeatureDistance(; alg = alg), Z3)) === Float32
             end
         end
@@ -479,7 +480,7 @@
             Z = [1.0 0.0; 0.0 1.0; 1.0 1.0]
             de = FeatureDistance()
             @test de.metric === AngularDist()
-            @test de.alg === LastObservation()
+            @test de.alg === LastRow()
             # `sim` is defaulted from the metric, and `AngularDist` gets the exact inverse.
             @test de.sim === AngularSimilarity()
             @test FeatureDistance(; metric = DS.CosineDist()).sim === ComplementSimilarity()
@@ -534,7 +535,7 @@
         end
         @testset "Collapse algorithms" begin
             Z3 = abs.(randn(rng, 6, 5, 4))
-            algs = (LastObservation(), AggregateFeatures(), AggregateDistances(),
+            algs = (LastRow(), AggregateFeatures(), AggregateDistances(),
                     StackObservations(), AggregateFeatures(; alg = MedianCollapse()))
             Ds = [distance(FeatureDistance(; alg = alg), Z3) for alg in algs]
             for D in Ds
@@ -598,7 +599,7 @@
             @test fd.metric === AngularDist()
             @test fd.sim === AngularSimilarity()
             # The rules with no observation axis to weight ignore threaded weights.
-            @test factory(FeatureDistance(), w).alg === LastObservation()
+            @test factory(FeatureDistance(), w).alg === LastRow()
             # `FeatureDistance` must be `@propagatable`, or `ClustersEstimator`'s `@fprop de`
             # has nothing to recurse into.
             @test hasmethod(factory, Tuple{FeatureDistance, Vararg{Any}})
@@ -664,8 +665,8 @@
             Zc = abs.(randn(rng, 4, 5, 3)) .+ 0.1
             metric = DS.Euclidean()
             de(alg) = FeatureDistance(; metric = metric, alg = alg)
-            # `LastObservation` takes the last slice of the observation axis.
-            @test isapprox(distance(de(LastObservation()), Zc),
+            # `LastRow` takes the last slice of the observation axis.
+            @test isapprox(distance(de(LastRow()), Zc),
                            DS.pairwise(metric, Zc[4, :, :]; dims = 1))
             # `AggregateFeatures` collapses the features, then measures once.
             Zm = [mean(Zc[:, j, k]) for j in 1:5, k in 1:3]
@@ -693,8 +694,9 @@
             # `dims = 2` swaps the two trailing axes, for every rule and both kernels.
             Zp = permutedims(Zc, (1, 3, 2))
             @test size(PortfolioOptimisers.stack_observations(Zp, 2)) == (5, 12)
-            for alg in (LastObservation(), AggregateFeatures(), AggregateDistances(),
-                        StackObservations(), AggregateFeatures(; alg = MedianCollapse()))
+            for alg in
+                (LastRow(), AggregateFeatures(), AggregateDistances(), StackObservations(),
+                 AggregateFeatures(; alg = MedianCollapse()))
                 @test isapprox(distance(de(alg), Zp; dims = 2), distance(de(alg), Zc))
             end
         end
@@ -763,7 +765,7 @@
         @testset "cor_and_dist carries the distance this call produced" begin
             Zc = abs.(randn(rng, 4, 5, 3)) .+ 0.1
             for Zin in (Zc[4, :, :], Zc)
-                for alg in (LastObservation(), AggregateFeatures(), AggregateDistances(),
+                for alg in (LastRow(), AggregateFeatures(), AggregateDistances(),
                             StackObservations())
                     fde = FeatureDistance(; alg = alg)
                     S, D = cor_and_dist(fde, Zin)
@@ -803,7 +805,9 @@
             # It is a peer of `Distance`/`DistanceDistance`, not one of their algorithms:
             # every consumer types its `de` field as `AbstractDistanceEstimator`.
             @test FeatureDistance() isa PortfolioOptimisers.AbstractDistanceEstimator
-            @test LastObservation() isa PortfolioOptimisers.AbstractFeatureCollapseAlgorithm
+            @test PortfolioOptimisers.LastObservation <:
+                  PortfolioOptimisers.AbstractFeatureCollapseAlgorithm
+            @test LastRow() isa PortfolioOptimisers.LastObservation
             @test MeanCollapse() isa PortfolioOptimisers.AbstractCollapseAlgorithm
             @test AngularDist() isa DS.SemiMetric
         end

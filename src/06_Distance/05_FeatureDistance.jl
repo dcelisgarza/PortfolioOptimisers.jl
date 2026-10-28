@@ -202,13 +202,19 @@ abstract type AbstractFeatureCollapseAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the rules that name the row [`LastObservation`](@ref) reads for each asset.
+Abstract supertype for the collapse algorithms that discard the window and measure one row of each asset's features.
 
-A time-varying Asset Panel lists and delists assets, so an asset can be inactive at the last row of the window. A rule states which row of the window the collapse reads for each asset. It is the `alg` field of [`LastObservation`](@ref).
+The default member, [`LastRow`](@ref), is the default collapse of [`FeatureDistance`](@ref). The family is the cheapest of the collapse algorithms, and its result depends on no choice of aggregation. A time-varying Asset Panel lists and delists assets, so an asset can be inactive at the last row of the window. Each member states which row of the window the collapse reads for each asset. [`LastRow`](@ref) reads the last row of the window. [`LastActiveRow`](@ref) reads the last row at which each asset is readable, where the asset is active and each selected cell holds data, not a placeholder. The family is also the one that names its rows before the stack exists. [`readable_window_rows`](@ref) returns the rows that the member can read, so the kernel stacks those rows of an Asset Panel alone.
+
+# Algorithm
+
+ 1. Under [`LastRow`](@ref), or when every asset is readable at the last row, take the last slice of the observation axis, `view(Z, size(Z, 1), :, :)`. This is an `assets × features` matrix.
+ 2. Under [`LastActiveRow`](@ref), take for each asset the row of its last readable observation, to make an `assets × features` matrix.
+ 3. Apply the metric to that matrix once.
 
 # Interfaces
 
-To add a rule, subtype `AbstractLastObservationAlgorithm` and implement the two methods below.
+To add a rule, subtype `LastObservation` and implement the two methods below.
 
 ## `collapse_rows`
 
@@ -240,23 +246,26 @@ To add a rule, subtype `AbstractLastObservationAlgorithm` and implement the two 
 
   - [`LastRow`](@ref)
   - [`LastActiveRow`](@ref)
-  - [`LastObservation`](@ref)
+  - [`AbstractFeatureCollapseAlgorithm`](@ref)
+  - [`AggregateFeatures`](@ref)
+  - [`AggregateDistances`](@ref)
+  - [`StackObservations`](@ref)
+  - [`collapse_rows`](@ref)
 """
-abstract type AbstractLastObservationAlgorithm <: AbstractAlgorithm end
+abstract type LastObservation <: AbstractFeatureCollapseAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Reads every asset at the last row of the window, the default rule of [`LastObservation`](@ref).
+Reads every asset at the last row of the window. It is the default collapse of [`FeatureDistance`](@ref).
 
 An asset that is inactive at the last row has no value to read. Inside a fit, the entry of the optimiser drops the asset as a non-investable asset. A direct call refuses the asset and names it.
 
 # Related
 
-  - [`AbstractLastObservationAlgorithm`](@ref)
-  - [`LastActiveRow`](@ref)
   - [`LastObservation`](@ref)
+  - [`LastActiveRow`](@ref)
 """
-struct LastRow <: AbstractLastObservationAlgorithm end
+struct LastRow <: LastObservation end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -266,66 +275,10 @@ The rule reads an asset that delisted before the last row at the last row at whi
 
 # Related
 
-  - [`AbstractLastObservationAlgorithm`](@ref)
-  - [`LastRow`](@ref)
   - [`LastObservation`](@ref)
+  - [`LastRow`](@ref)
 """
-struct LastActiveRow <: AbstractLastObservationAlgorithm end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Discards the window and measures one row of each asset's features.
-
-It is the default of [`FeatureDistance`](@ref). It is the cheapest member of the family, and its result depends on no choice of aggregation. `alg` names the row of each asset. [`LastRow`](@ref) reads the last row of the window. [`LastActiveRow`](@ref) reads the last row at which each asset is readable, where the asset is active and each selected cell holds data, not a placeholder. It is also the one member that names its rows before the stack exists. [`readable_window_rows`](@ref) returns the rows that `alg` can read, so the kernel stacks those rows of an Asset Panel alone.
-
-# Algorithm
-
- 1. Under [`LastRow`](@ref), or when every asset is readable at the last row, take the last slice of the observation axis, `view(Z, size(Z, 1), :, :)`. This is an `assets × features` matrix.
- 2. Under [`LastActiveRow`](@ref), take for each asset the row of its last readable observation, to make an `assets × features` matrix.
- 3. Apply the metric to that matrix once.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    LastObservation(;
-        alg::AbstractLastObservationAlgorithm = LastRow()
-    ) -> LastObservation
-
-Keywords correspond to the struct's fields.
-
-# Examples
-
-```jldoctest
-julia> LastObservation()
-LastObservation
-  alg ┴ LastRow()
-```
-
-# Related
-
-  - [`AbstractFeatureCollapseAlgorithm`](@ref)
-  - [`AbstractLastObservationAlgorithm`](@ref)
-  - [`AggregateFeatures`](@ref)
-  - [`AggregateDistances`](@ref)
-  - [`StackObservations`](@ref)
-  - [`collapse_rows`](@ref)
-"""
-@concrete struct LastObservation <: AbstractFeatureCollapseAlgorithm
-    """
-    $(field_dict[:loalg])
-    """
-    alg
-    function LastObservation(alg::AbstractLastObservationAlgorithm)::LastObservation
-        return new{typeof(alg)}(alg)
-    end
-end
-function LastObservation(;
-                         alg::AbstractLastObservationAlgorithm = LastRow())::LastObservation
-    return LastObservation(alg)
-end
+struct LastActiveRow <: LastObservation end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -815,7 +768,7 @@ $(DocStringExtensions.FIELDS)
 
     FeatureDistance(;
         metric::Distances.SemiMetric = AngularDist(),
-        alg::AbstractFeatureCollapseAlgorithm = LastObservation(),
+        alg::AbstractFeatureCollapseAlgorithm = LastRow(),
         sim::AbstractSimilarityMatrixAlgorithm = default_similarity(metric),
         ape::Option{<:AbstractAssetPanelEstimator} = nothing,
         sel::Option{<:AbstractVector} = nothing,
@@ -841,8 +794,7 @@ Keywords correspond to the struct's fields. The constructor sets `sim` to [`defa
 julia> FeatureDistance()
 FeatureDistance
   metric ┼ AngularDist: AngularDist()
-     alg ┼ LastObservation
-         │   alg ┴ LastRow()
+     alg ┼ LastRow()
      sim ┼ AngularSimilarity()
      ape ┼ nothing
      sel ┼ nothing
@@ -851,8 +803,7 @@ FeatureDistance
 julia> FeatureDistance(; metric = PortfolioOptimisers.Distances.CosineDist())
 FeatureDistance
   metric ┼ Distances.CosineDist: Distances.CosineDist()
-     alg ┼ LastObservation
-         │   alg ┴ LastRow()
+     alg ┼ LastRow()
      sim ┼ ComplementSimilarity()
      ape ┼ nothing
      sel ┼ nothing
@@ -913,7 +864,7 @@ FeatureDistance
     end
 end
 function FeatureDistance(; metric::Distances.SemiMetric = AngularDist(),
-                         alg::AbstractFeatureCollapseAlgorithm = LastObservation(),
+                         alg::AbstractFeatureCollapseAlgorithm = LastRow(),
                          sim::AbstractSimilarityMatrixAlgorithm = default_similarity(metric),
                          ape::Option{<:AbstractAssetPanelEstimator} = nothing,
                          sel::Option{<:AbstractVector} = nothing,
@@ -1451,24 +1402,23 @@ Name the observation rows that a collapse algorithm reads, so that the kernel st
 
 The kernel stacks a time-varying Feature Matrix from an Asset Panel, and then collapses it along its observation axis. A collapse that reads one row does not need the other rows.
 
-  - [`LastObservation`](@ref) under [`LastRow`](@ref) reads the last row, so it names that row, and the kernel stacks a window of one observation. The kernel then reads a lifted static Panel Field, whose values are a [`RepeatedLeading`](@ref), once and not once per observation. Under the default collapse, the work of the kernel is the `assets × features` slice that it measures.
-  - Under [`LastActiveRow`](@ref), it names the rows from the earliest last active row of an asset to the last row. These rows hold the last active row of each asset that has one.
+  - [`LastRow`](@ref) reads the last row, so it names that row, and the kernel stacks a window of one observation. The kernel then reads a lifted static Panel Field, whose values are a [`RepeatedLeading`](@ref), once and not once per observation. Under the default collapse, the work of the kernel is the `assets × features` slice that it measures.
+  - [`LastActiveRow`](@ref) names the rows from the earliest last active row of an asset to the last row. These rows hold the last active row of each asset that has one.
   - Every other member returns `Colon()`, which names every row. The two aggregates resolve their weights against the stacked window, as [`collapse_weights`](@ref) states, so the rows that they could cut are not known before the stack exists. [`StackObservations`](@ref) reads the whole stack by definition.
 
-A static panel has no observation axis, so every member returns `Colon()` on it, and [`LastObservation`](@ref) does too.
+A static panel has no observation axis, so every member returns `Colon()` on it, and each member of [`LastObservation`](@ref) does too.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. [`LastObservation`](@ref) forwards to its rule.
- 2. [`LastRow`](@ref) on a time-varying panel: the last observation, `nobs:nobs`, where `nobs` is the observation count [`panel_axes`](@ref) reads.
- 3. [`LastActiveRow`](@ref) on a time-varying panel: the rows that [`last_active_rows`](@ref) names on the active mask.
- 4. Every other case: `Colon()`.
+ 1. [`LastRow`](@ref) on a time-varying panel: the last observation, `nobs:nobs`, where `nobs` is the observation count [`panel_axes`](@ref) reads.
+ 2. [`LastActiveRow`](@ref) on a time-varying panel: the rows that [`last_active_rows`](@ref) names on the active mask.
+ 3. Every other case: `Colon()`.
 
 # Arguments
 
-  - `alg`: The collapse algorithm, or the rule of a [`LastObservation`](@ref).
+  - `alg`: The collapse algorithm.
   - `pnl`: The Asset Panel the Feature Matrix is stacked from.
 
 # Returns
@@ -1486,9 +1436,6 @@ The method that Julia selects is the algorithm.
 function collapse_rows(::AbstractFeatureCollapseAlgorithm, ::AssetPanel)
     return Colon()
 end
-function collapse_rows(alg::LastObservation, pnl::AssetPanel)
-    return collapse_rows(alg.alg, pnl)
-end
 function collapse_rows(::LastRow, pnl::AssetPanel)
     ax = panel_axes(pnl)
     return length(ax) == 2 ? (ax[1]:ax[1]) : Colon()
@@ -1505,7 +1452,7 @@ One call resolves the panel. Under a `nothing` producer, `asset_panel(de.ape, pr
 
 The panel method of [`feature_matrix`](@ref) writes `NaN` at a placeholder by default. It gives the same matrix at `placeholder = 0`, over the same rows.
 
-The collapse algorithm names the rows through [`readable_window_rows`](@ref). Under [`LastObservation`](@ref) with [`LastRow`](@ref), a time-varying panel stacks its last observation alone, `1 × assets × features`, which is the slice that the collapse measures. With [`LastActiveRow`](@ref), it stacks the rows from the earliest last readable row of an asset to the last row. Every other collapse stacks every observation.
+The collapse algorithm names the rows through [`readable_window_rows`](@ref). Under [`LastRow`](@ref), a time-varying panel stacks its last observation alone, `1 × assets × features`, which is the slice that the collapse measures. With [`LastActiveRow`](@ref), it stacks the rows from the earliest last readable row of an asset to the last row. Every other collapse stacks every observation.
 
 # Algorithm
 
@@ -1767,7 +1714,7 @@ function cor_and_dist(de::FeatureDistance, ::Any, X; pr = nothing, rd = nothing,
     return cor_and_dist(de, Z; dims = 1, amsk = A, nx = feature_asset_names(pr, rd))
 end
 
-export AngularDist, MeanCollapse, MedianCollapse, LastObservation, AggregateFeatures,
-       AggregateDistances, StackObservations, FeatureDistance, LastRow, LastActiveRow,
-       RefusePair, DropFewerRows, FeatureFallback
-public AbstractLastObservationAlgorithm, AbstractEmptyPairAlgorithm, collapse_rows
+export AngularDist, MeanCollapse, MedianCollapse, AggregateFeatures, AggregateDistances,
+       StackObservations, FeatureDistance, LastRow, LastActiveRow, RefusePair,
+       DropFewerRows, FeatureFallback
+public LastObservation, AbstractEmptyPairAlgorithm, collapse_rows

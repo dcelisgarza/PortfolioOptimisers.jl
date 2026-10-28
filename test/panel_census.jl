@@ -449,7 +449,7 @@ function census_cases(rd::ReturnsResult)
     fd(alg; kwargs...) = FeatureDistance(; sel = fsel, alg = alg, kwargs...)
     # The assets readable at the last row: active, and observed in each selected field.
     function last_view(r)
-        keep = CENSUS_PO.feature_readable_mask(fd(LastObservation()), nothing, r)
+        keep = CENSUS_PO.feature_readable_mask(fd(LastRow()), nothing, r)
         return CENSUS_PO.port_opt_view(r, isnothing(keep) ? Colon() : findall(keep))
     end
     gap_view(r) = CENSUS_PO.port_opt_view(r, vcat(1:20, 61:80), :)
@@ -465,12 +465,12 @@ function census_cases(rd::ReturnsResult)
     append!(cases,
             Any[((:FeatureDistance,),
                  "FeatureDistance under LastRow, on the assets it reads",
-                 r -> fdist(fd(LastObservation()), last_view(r))),
+                 r -> fdist(fd(LastRow()), last_view(r))),
                 ((:FeatureDistance,),
                  "FeatureDistance under LastRow refuses the delisted asset",
-                 r -> fmsg(() -> fdist(fd(LastObservation()), r))),
+                 r -> fmsg(() -> fdist(fd(LastRow()), r))),
                 ((:FeatureDistance,), "FeatureDistance under LastActiveRow",
-                 r -> fdist(fd(LastObservation(; alg = LastActiveRow())), r)),
+                 r -> fdist(fd(LastActiveRow()), r)),
                 ((:FeatureDistance,), "FeatureDistance under AggregateFeatures",
                  r -> fdist(fd(AggregateFeatures()), r)),
                 ((:FeatureDistance,), "FeatureDistance under a weighted median",
@@ -521,9 +521,8 @@ function census_domain_cases(rd::ReturnsResult)
     jac = CENSUS_PO.Distances.Jaccard()
     fb = FeatureFallback()
     return Any[("LastRow refuses the delisted asset",
-                r -> fmsg(() -> fdist(fd(LastObservation(), chi), r))),
-               ("LastActiveRow",
-                r -> fdist(fd(LastObservation(; alg = LastActiveRow()), chi), r)),
+                r -> fmsg(() -> fdist(fd(LastRow(), chi), r))),
+               ("LastActiveRow", r -> fdist(fd(LastActiveRow(), chi), r)),
                ("AggregateFeatures", r -> fdist(fd(AggregateFeatures(), bray), r)),
                ("a median under AggregateFeatures",
                 r -> fdist(fd(AggregateFeatures(; alg = MedianCollapse()), jac), r)),

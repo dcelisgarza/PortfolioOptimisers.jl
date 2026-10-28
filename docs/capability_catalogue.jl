@@ -658,7 +658,8 @@ const CATALOGUE = [Section("Core abstractions",
                                                                         Cap(:NoDecay;
                                                                             label = "[`NoDecay`](@ref) gives the same score to every pair inside the budget. The budget still applies, and the result is the indicator of the neighbourhood")])])])]),
                                             Group("Collapsing a window of time-varying features",
-                                                  [Group(Cap(:LastObservation),
+                                                  [Group(Cap(:LastObservation;
+                                                             label = "Discard the window and measure one row of each asset's features"),
                                                          [Cap(:LastRow),
                                                           Cap(:LastActiveRow)]),
                                                    Group(Cap(:AggregateFeatures,

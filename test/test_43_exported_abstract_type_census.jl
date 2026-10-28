@@ -102,7 +102,10 @@
     section and its three members on 2026-10-21 (issue #1784, the maintainer's ruling).
     `AbstractHighOrderPriorEstimator`, the fifth family that `AbstractPriorEstimator`'s own
     section tells an author to subtype, joined with its `# Interfaces` section on 2026-10-22
-    (issue #531): `HighOrderPriorEstimator` subtypes it directly.
+    (issue #531): `HighOrderPriorEstimator` subtypes it directly. On 2026-10-28 the holder
+    `LastObservation` became the abstract family itself, with the `# Interfaces` section of
+    `AbstractLastObservationAlgorithm`, which left the list. `LastRow` and `LastActiveRow`
+    subtype it directly (issue #1861, the maintainer's ruling).
     They are held to their own list for the same reason — public is API too.
     =#
     #! format: off
@@ -153,7 +156,6 @@
         :AbstractHighOrderPriorEstimator,
         :AbstractHighOrderPriorEstimator_F,
         :AbstractIndefiniteBlockRule,
-        :AbstractLastObservationAlgorithm,
         :AbstractLearningRateSchedule,
         :AbstractLevelRecursion,
         :AbstractLeverageOneMask,
@@ -259,6 +261,7 @@
         :HierarchicalOptimisationResult,
         :ImpliedVolatilityAlgorithm,
         :JuMPWeightFinaliserFormulation,
+        :LastObservation,
         :NonFiniteAllocationOptimisationEstimator,
         :NonFiniteAllocationOptimisationResult,
         :NonJuMPOptimisationResult,

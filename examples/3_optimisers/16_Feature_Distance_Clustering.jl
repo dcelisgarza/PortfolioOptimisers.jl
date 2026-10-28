@@ -517,8 +517,7 @@ pnl_tv = asset_panel([NumericPanelInput(; name = "volatility", vals = Zvol),
                       NumericPanelInput(; name = "momentum", vals = Zmom)])
 Ztv = feature_matrix(pnl_tv)
 
-collapses = ["LastObservation()" => LastObservation(),
-             "AggregateFeatures()" => AggregateFeatures(),
+collapses = ["LastRow()" => LastRow(), "AggregateFeatures()" => AggregateFeatures(),
              "AggregateDistances()" => AggregateDistances(),
              "StackObservations()" => StackObservations()]
 
@@ -537,7 +536,7 @@ pretty_table(collapse_rows;
 #=
 The four rules give four different answers.
 
-  - [`LastObservation`](@ref), the default, uses the most recent slice and ignores the rest.
+  - [`LastRow`](@ref), the default, uses the most recent slice and ignores the rest.
   - [`AggregateFeatures`](@ref) averages the features first, then measures the distance once.
   - [`AggregateDistances`](@ref) measures each period, then averages the distance matrices. Its
     constructor refuses [`MedianCollapse`](@ref), because a convex combination of metrics is a

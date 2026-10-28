@@ -18,7 +18,7 @@ test below therefore asserts on the matrix that reached the kernel, through the 
 `RecordingDistance` instrument `test_13c_feature_views.jl` uses, and not on the weights.
 
 The kernel stacks the observation rows its collapse reads (#1064), so under the default
-`LastObservation` it would be handed the seam's last row alone. Every recorder below wraps
+`LastRow` it would be handed the seam's last row alone. Every recorder below wraps
 `StackObservations`, the collapse that reads the whole window, so the matrix it records
 is the whole panel the seam collapsed. `test_13b` pins the row rule itself.
 =#
@@ -332,7 +332,7 @@ end
         Site three is `reconstruct_rd`, inside the fold. Each fold collapses with its own
         weights, so a *static* source becomes genuinely time-varying: constant within a
         fold and different in the next. The row count matches `X` exactly because both are
-        built by the same stacking, and the outer default `LastObservation` then reduces it
+        built by the same stacking, and the outer default `LastRow` then reduces it
         to the most recent fold.
         =#
         n_folds = 3

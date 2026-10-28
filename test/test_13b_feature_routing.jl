@@ -462,9 +462,9 @@ const PO = PortfolioOptimisers
             @test PortfolioOptimisers.stacked_axes((Tt, Nt), Colon()) == (Tt, Nt)
             @test PortfolioOptimisers.stacked_axes((Nt,), Colon()) == (Nt,)
             @test PortfolioOptimisers.stacked_axes((Tt, Nt), 2:3) == (2, Nt)
-            # Only LastObservation names its rows, and only on a time-varying panel.
-            @test PortfolioOptimisers.collapse_rows(LastObservation(), tpnl) == Tt:Tt
-            @test PortfolioOptimisers.collapse_rows(LastObservation(), gpnl) === Colon()
+            # Only the LastObservation family names its rows, and only on a time-varying panel.
+            @test PortfolioOptimisers.collapse_rows(LastRow(), tpnl) == Tt:Tt
+            @test PortfolioOptimisers.collapse_rows(LastRow(), gpnl) === Colon()
             for alg in (AggregateFeatures(), AggregateDistances(), StackObservations())
                 @test PortfolioOptimisers.collapse_rows(alg, tpnl) === Colon()
             end
@@ -484,8 +484,9 @@ const PO = PortfolioOptimisers
                 catch e
                     sprint(showerror, e)
                 end
-            for alg in (LastObservation(), LastObservation(; alg = LastActiveRow()),
-                        AggregateFeatures(), AggregateDistances(), StackObservations())
+            for alg in
+                (LastRow(), LastActiveRow(), AggregateFeatures(), AggregateDistances(),
+                 StackObservations())
                 de_r = FeatureDistance(; sel = sel, alg = alg)
                 Zr = feature_matrix(de_r, nothing, trd, trd.X)
                 rr = PortfolioOptimisers.readable_window_rows(alg, tpnl, R)

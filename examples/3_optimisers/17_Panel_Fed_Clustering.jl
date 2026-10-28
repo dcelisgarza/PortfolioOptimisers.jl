@@ -405,13 +405,12 @@ The sector field of the time-varying panel is a static input among time-varying 
 [`asset_panel`](@ref) gives it the observation axis of the others and stores its values once.
 
 We cluster the time-varying panel under each of the four collapse rules. Then we backtest it
-with the default rule, [`LastObservation`](@ref), against the every-field hierarchy on the
+with the default rule, [`LastRow`](@ref), against the every-field hierarchy on the
 static panel of section 7.
 =#
 
 collapse_rows = DataFrame()
-for alg in
-    (LastObservation(), AggregateFeatures(), AggregateDistances(), StackObservations())
+for alg in (LastRow(), AggregateFeatures(), AggregateDistances(), StackObservations())
     de = FeatureDistance(; alg = alg)
     clr = clusterise(ClustersEstimator(; de = de, onc = onc), rd_tv)
     append!(collapse_rows,

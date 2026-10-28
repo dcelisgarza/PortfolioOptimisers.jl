@@ -101,7 +101,6 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :fdmetric => "`metric`: Distance metric applied to the rows of the feature matrix.",#
                  :fcalg => "`alg`: Feature collapse algorithm, which reduces a window of time-varying features to one distance matrix. It has no effect on a 2-D feature matrix.",#
                  :calg => "`alg`: Collapse algorithm, the aggregator applied along the observation axis.",#
-                 :loalg => "`alg`: Rule that names the row of the window that the collapse reads for each asset.",#
                  :fdpair => "`pair`: Rule for a pair of assets with no shared active row in the window.",#
                  :fdsim => "`sim`: Similarity matrix algorithm that computes the similarity matrix from the feature distance matrix.",#
                  :fdape => "`ape`: Asset Panel producer, or `nothing` to read the panel that the returns data holds. A producer is configuration. It builds a static panel at the point of use, from the prior result and the returns of the subproblem that runs it. So a view passes it through, and a fold refits it.",#
