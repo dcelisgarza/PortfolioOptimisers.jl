@@ -431,7 +431,7 @@ The two regime-adjusted estimators hold a debias rule, or `nothing` for the raw 
 
 # Interfaces
 
-A debias rule is a marker for dispatch, and it holds no data. A new rule needs a method of [`debiases`](@ref) and of [`reads_dependence`](@ref).
+A debias rule is a marker for dispatch, and it holds no data. A new rule needs a method of [`reads_dependence`](@ref). It needs no method of [`debiases`](@ref), because the method on this type returns `true` for every rule, and `nothing` spells the raw statistic.
 
 # Related
 

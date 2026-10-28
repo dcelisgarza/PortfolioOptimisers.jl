@@ -3,13 +3,14 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all rank-based covariance estimators.
 
-A subtype computes its correlation matrix from the ranks of the returns. [`KendallCovariance`](@ref) and [`SpearmanCovariance`](@ref) are its two subtypes, and no method of the library dispatches on this type.
+A subtype computes its correlation matrix from the ranks of the returns. [`KendallCovariance`](@ref) and [`SpearmanCovariance`](@ref) are its two subtypes. The method of [`show_fields`](@ref) on this type renders the field `ve` of each subtype and leaves out its `cache`.
 
 # Related
 
   - [`KendallCovariance`](@ref)
   - [`SpearmanCovariance`](@ref)
   - [`AbstractCovarianceEstimator`](@ref)
+  - [`show_fields`](@ref)
 """
 abstract type RankCovarianceEstimator <: AbstractCovarianceEstimator end
 """
@@ -246,13 +247,13 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Renders every field of a [`KendallCovariance`](@ref) or a [`SpearmanCovariance`](@ref) except `cache`.
+Renders every field of a [`RankCovarianceEstimator`](@ref), such as a [`KendallCovariance`](@ref) or a [`SpearmanCovariance`](@ref), except `cache`.
 
 A `cache` holds the state of an incremental fit. That state is not part of the configuration, and it prints under the estimator at each site that renders the estimator. Set `set_show_nothing_fields!(:KendallCovariance, true)` or `set_show_nothing_fields!(:SpearmanCovariance, true)` to render it for that type.
 
 # Arguments
 
-  - `::Union{KendallCovariance, SpearmanCovariance}`: The rank covariance estimator. The method reads only its type.
+  - `::RankCovarianceEstimator`: The rank covariance estimator. The method reads only its type.
 
 # Returns
 
@@ -265,7 +266,7 @@ A `cache` holds the state of an incremental fit. That state is not part of the c
   - [`show_fields`](@ref)
   - [`set_show_nothing_fields!`](@ref)
 """
-show_fields(::Union{KendallCovariance, SpearmanCovariance}) = (:ve,)
+show_fields(::RankCovarianceEstimator) = (:ve,)
 """
     Statistics.cor(::SpearmanCovariance, X::MatNum; dims::Int = 1, kwargs...)
 

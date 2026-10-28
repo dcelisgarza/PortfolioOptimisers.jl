@@ -51,7 +51,7 @@ LawDebias()
 """
 struct LawDebias <: AbstractRegimeDebias end
 """
-    debiases(::Union{ExactDebias, LawDebias}) -> Bool
+    debiases(::AbstractRegimeDebias) -> Bool
     debiases(::Nothing) -> Bool
 
 Whether the regime statistic corrects the bias of the estimate it reads.
@@ -60,8 +60,7 @@ With `debias = nothing`, the statistic is raw. Every observation above `min_obs`
 
 # Returns
 
-  - `flag::Bool`: `true` for [`ExactDebias`](@ref) and [`LawDebias`](@ref), `false` for
-    `nothing`.
+  - `flag::Bool`: `true` for every [`AbstractRegimeDebias`](@ref), such as [`ExactDebias`](@ref) and [`LawDebias`](@ref), and `false` for `nothing`.
 
 # Related
 
@@ -69,7 +68,7 @@ With `debias = nothing`, the statistic is raw. Every observation above `min_obs`
   - [`reads_dependence`](@ref)
   - [`regime_bias_open`](@ref)
 """
-function debiases(::Union{ExactDebias, LawDebias})
+function debiases(::AbstractRegimeDebias)
     return true
 end
 function debiases(::Nothing)

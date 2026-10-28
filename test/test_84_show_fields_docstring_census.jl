@@ -1,5 +1,5 @@
 @testset "show_fields docstring census: the Returns section names the tuple the method returns (#1800)" begin
-    using Test
+    using Test, InteractiveUtils
 
     #=
     Issue #1800. The `# Returns` section of a `show_fields` docstring names the field names
@@ -19,7 +19,8 @@
     The census builds each instance with the keyword constructor of the type. `KW` holds the
     keywords a constructor needs, and `ALT` holds the one that sets the optional field of a
     two-tuple docstring. The default for `ALT` is a coverage policy `cvg`. A docstring of a
-    `Union` signature is checked for each member of the union.
+    `Union` signature is checked for each member of the union, and a docstring of an abstract
+    signature for each concrete member that the package defines (#1875).
 
     A docstring that states its rule in prose and states no tuple in a `# Returns` section is
     named in `PROSE`, with the reason. A new docstring that states no rule the census reads is a red, so the census
@@ -59,6 +60,14 @@
                                  :Fees => "the `# Algorithm` section states the two tuples",
                                  :PricesToReturns => "the `cache` is shown only when it holds a state")
 
+    # The concrete members of a signature type. `subtypes` also sees the types that other test
+    # files declare in the same process, so a member must belong to the package.
+    function concrete_members(U)
+        W = Base.typename(U).wrapper
+        isabstracttype(Base.unwrap_unionall(W)) || return Any[U]
+        return Any[V for S in subtypes(W) if parentmodule(Base.unwrap_unionall(S)) === PO
+                   for V in concrete_members(S)]
+    end
     md = Base.Docs.meta(PO)[Base.Docs.Binding(PO, :show_fields)]
     tuple_re = r"`(\((?::\w+,\s*)*:\w+,?\))`"
     nocache_re = r"[Ee]very field(?: name)? (?:but|except) `:?cache`"
@@ -66,7 +75,7 @@
     prose_seen = Set{Symbol}()
     for (sig, ds) in md.docs
         T = sig.parameters[1]
-        Us = T === Any ? Any[Any] : Base.uniontypes(T)
+        Us = T === Any ? Any[Any] : reduce(vcat, concrete_members.(Base.uniontypes(T)))
         names = [T === Any ? :Any : nameof(Base.typename(U).wrapper) for U in Us]
         txt = join(filter(x -> x isa AbstractString, collect(ds.text)))
         m = match(r"\n# Returns\n(.*?)(?:\n# |\z)"s, txt)

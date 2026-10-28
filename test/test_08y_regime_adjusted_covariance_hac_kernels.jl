@@ -374,6 +374,8 @@ Issues #1548 and #1549, found by #1527. Under `EstimatedCentring()` the terms of
 share their location, and the next deviation reads it too. `ExactDebias()` reads the law of the
 estimate and the dependence of the deviation on it; `LawDebias()` reads the law alone (ADR 0190).
 =#
+# A debias rule that a caller writes, with no method of `debiases` of its own (#1875).
+struct ProbeRegimeDebias <: PO.AbstractRegimeDebias end
 @testset "under the estimated location the tables read the law of the shared deviations" begin
     # The estimate as the variance pass forms it: after K + 1 returns it is (1 - λ) xᵀ M x, and
     # the location is gᵀx, both read off the pass by polarisation on unit returns.
@@ -542,6 +544,9 @@ estimate and the dependence of the deviation on it; `LawDebias()` reads the law 
           !PO.reads_dependence(nothing)
     # `nothing` is the raw statistic, and the raw variance state on the separate path (#1867).
     @test !PO.debiases(nothing)
+    # Every rule debiases, because `nothing` spells the raw statistic, so the method on the
+    # family serves a rule that a caller writes (#1875).
+    @test PO.debiases(ExactDebias()) && PO.debiases(ProbeRegimeDebias())
     @test PO.correlation_variance(nothing, [0.5, 2.0], lam, [1, 3]) == [0.5, 2.0]
     @test RegimeAdjustedExpWeightedCovariance(; debias = nothing, cor_vol = nothing).debias ===
           nothing

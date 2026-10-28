@@ -78,6 +78,24 @@ keep it by default. Simplify a candidate only when all four checks fail:
 The maintainer then rules on each candidate. Nested structs and near duplicates are often features
 of the library. They give reuse and dispatch at no extra cost.
 
+### An abstract type, not a `Union` of its members
+
+A method or a bound names the abstract type where a `Union` would spell all its members. A caller
+can subtype an abstract type, but a caller cannot add a member to a `Union`. A `Union` stays in
+three cases:
+
+1. **An abstract type cannot state the set.** The set mixes families, as a field that takes an
+   estimator or a result does.
+2. **The abstract type has a method of its own.** The method is a fallback or a refusal, and the
+   `Union` method serves the known members. `cross_sectional_alive_folds` returns `false` on
+   `AbstractCrossSectionalRegressionEstimator` and reads the field `alg` of its two members.
+3. **It is a named alias for convenience**, or a set that a docstring closes on purpose, as
+   `AbstractLowOrderPriorEstimator_A_F_AF` does.
+
+A census of an abstract type with no dispatch reads a `Union` of all its members as a defect, not
+as a reason to remove the type
+([#1875](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1875)).
+
 ### A `Bool` or a `Symbol`
 
 A `Bool` or a `Symbol` is acceptable, mainly where it reads better than `nothing`, as in

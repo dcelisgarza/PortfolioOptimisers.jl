@@ -25,6 +25,9 @@ whole repository.
   `nothing`. The field takes `Option{<:AbstractX}`, and the method on `Nothing` holds the
   behaviour. A data-less type stays only when it names a rule with content of its own, or when
   `nothing` already means something else in the field. Keep every other type by default.
+  Dispatch and bound on the abstract type, not on a `Union` of all its members, because a caller
+  cannot add a member to a `Union`. A `Union` stays where the set mixes families (an estimator or
+  a result), where the abstract type has a fallback method of its own, or as a named alias.
   [ADR 0222](../docs/adr/0222-a-type-is-kept-by-default-and-nothing-spells-a-skipped-procedure.md)
   states the rule.
 - **Prefer a per-type method over a new dependency** for reflection-style work. Derive the field

@@ -106,8 +106,7 @@ $(DocStringExtensions.FIELDS)
     RiskBudgetingResult(;
         jr::JuMPOptimisationResult,
         r::BaseRM_VecBaseRM,
-        prb::Union{ProcessedAssetRiskBudgetingAttributes,
-                   ProcessedFactorRiskBudgetingAttributes},
+        prb::ProcessedRiskBudgetingAttributes,
         fb::Option{<:OptE_Opt_FbChain}
     ) -> RiskBudgetingResult
 
@@ -138,15 +137,13 @@ Keywords correspond to the struct's fields.
     """
     fb
     function RiskBudgetingResult(jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
-                                 prb::Union{ProcessedAssetRiskBudgetingAttributes,
-                                            ProcessedFactorRiskBudgetingAttributes},
+                                 prb::ProcessedRiskBudgetingAttributes,
                                  fb::Option{<:OptE_Opt_FbChain})
         return new{typeof(jr), typeof(r), typeof(prb), typeof(fb)}(jr, r, prb, fb)
     end
 end
 function RiskBudgetingResult(; jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
-                             prb::Union{ProcessedAssetRiskBudgetingAttributes,
-                                        ProcessedFactorRiskBudgetingAttributes},
+                             prb::ProcessedRiskBudgetingAttributes,
                              fb::Option{<:OptE_Opt_FbChain})::RiskBudgetingResult
     return RiskBudgetingResult(jr, r, prb, fb)
 end

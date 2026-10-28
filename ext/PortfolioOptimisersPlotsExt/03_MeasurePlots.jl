@@ -72,9 +72,7 @@ function PortfolioOptimisers.plot_measures(res_vec::AbstractVector{<:Optimisatio
                 kwargs...)
     end
 end
-function PortfolioOptimisers.plot_measures(ppred::Union{PredictionResult,
-                                                        MultiPeriodPredictionResult,
-                                                        PopulationPredictionResult};
+function PortfolioOptimisers.plot_measures(ppred::PortfolioOptimisers.AbstractPredictionResult;
                                            x::PortfolioOptimisers.BaseRM_VecBaseRM = ConditionalValueatRisk(),
                                            y::PortfolioOptimisers.BaseRM_VecBaseRM = MeanReturn(),
                                            z::Option{<:PortfolioOptimisers.BaseRM_VecBaseRM} = nothing,
