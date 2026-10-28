@@ -22,7 +22,6 @@ ExactDebias()
 
   - [`AbstractRegimeDebias`](@ref)
   - [`LawDebias`](@ref)
-  - [`RawStatistic`](@ref)
   - [`regime_bias_table`](@ref)
 """
 struct ExactDebias <: AbstractRegimeDebias end
@@ -52,40 +51,17 @@ LawDebias()
 """
 struct LawDebias <: AbstractRegimeDebias end
 """
-$(DocStringExtensions.TYPEDEF)
-
-Scores the raw regime statistic, with no correction of the bias of the estimated variance it reads.
-
-Every observation above `min_obs` is scored. The mean of the statistic is above the one the method assumes, by 7 % at a half-life of 10 and 1.7 % at a half-life of 40 for the root mean square, so the regime multiplier is too large on average.
-
-# Constructors
-
-    RawStatistic() -> RawStatistic
-
-# Examples
-
-```jldoctest
-julia> RegimeAdjustedExpWeightedVariance(; debias = RawStatistic()).debias
-RawStatistic()
-```
-
-# Related
-
-  - [`AbstractRegimeDebias`](@ref)
-  - [`ExactDebias`](@ref)
-  - [`LawDebias`](@ref)
-"""
-struct RawStatistic <: AbstractRegimeDebias end
-"""
     debiases(::Union{ExactDebias, LawDebias}) -> Bool
-    debiases(::RawStatistic) -> Bool
+    debiases(::Nothing) -> Bool
 
 Whether the regime statistic corrects the bias of the estimate it reads.
+
+With `debias = nothing`, the statistic is raw. Every observation above `min_obs` is scored. The mean of the statistic is above the one the method assumes, by 7 % at a half-life of 10 and 1.7 % at a half-life of 40 for the root mean square, so the regime multiplier is too large on average.
 
 # Returns
 
   - `flag::Bool`: `true` for [`ExactDebias`](@ref) and [`LawDebias`](@ref), `false` for
-    [`RawStatistic`](@ref).
+    `nothing`.
 
 # Related
 
@@ -96,12 +72,12 @@ Whether the regime statistic corrects the bias of the estimate it reads.
 function debiases(::Union{ExactDebias, LawDebias})
     return true
 end
-function debiases(::RawStatistic)
+function debiases(::Nothing)
     return false
 end
 """
     reads_dependence(::ExactDebias) -> Bool
-    reads_dependence(::Union{LawDebias, RawStatistic}) -> Bool
+    reads_dependence(::Option{<:LawDebias}) -> Bool
 
 Whether the bias of the regime statistic reads the dependence of the deviation on the estimate,
 which an estimated location puts in.
@@ -109,7 +85,7 @@ which an estimated location puts in.
 # Returns
 
   - `flag::Bool`: `true` for [`ExactDebias`](@ref), `false` for [`LawDebias`](@ref) and
-    [`RawStatistic`](@ref).
+    `nothing`.
 
 # Related
 
@@ -120,7 +96,7 @@ which an estimated location puts in.
 function reads_dependence(::ExactDebias)
     return true
 end
-function reads_dependence(::Union{LawDebias, RawStatistic})
+function reads_dependence(::Option{<:LawDebias})
     return false
 end
 """
@@ -248,7 +224,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Standardises each product of the separate correlation path by the bias-corrected variance. This is the default rule.
 
-The variance state is seeded at zero, so after ``K`` steps it holds ``1 - \\lambda^{K}`` times the variance. A product divided by the raw state thus carries the weight ``1 / (1 - \\lambda^{K})``, which falls with ``K``. The correlation cancels a scale that is the same for every product, but not this one, so in the warm-up the first products weigh more than the weights that the bias tables of [`PortfolioTarget`](@ref) assume. This rule divides the state by ``1 - \\lambda^{K}`` first. At 4 uncorrelated assets and 20 observations it moved the factor of `PortfolioTarget` from 3.5 % high to 0.05 %, and at 12 assets with a correlation of 0.5 from 8.0 % to 1.7 %. The steady state does not change.
+The variance state is seeded at zero, so after ``K`` steps it holds ``1 - \\lambda^{K}`` times the variance. A product divided by the raw state thus carries the weight ``1 / (1 - \\lambda^{K})``, which falls with ``K``. The correlation cancels a scale that is the same for every product, but not this one, so in the warm-up the first products weigh more than the weights that the bias tables of [`PortfolioTarget`](@ref) assume. This rule divides the state by ``1 - \\lambda^{K}`` first. At 4 uncorrelated assets and 20 observations it moved the factor of `PortfolioTarget` from 3.5 % high to 0.05 %, and at 12 assets with a correlation of 0.5 from 8.0 % to 1.7 %. The steady state does not change. `cor_vol = nothing` reads the raw state, the rule of the oracle.
 
 # Constructors
 
@@ -264,40 +240,16 @@ BiasCorrectedVolatility()
 # Related
 
   - [`AbstractCorrelationVolatility`](@ref)
-  - [`RawVolatility`](@ref)
   - [`correlation_variance`](@ref)
 """
 struct BiasCorrectedVolatility <: AbstractCorrelationVolatility end
 """
-$(DocStringExtensions.TYPEDEF)
-
-Standardises each product of the separate correlation path by the raw variance state, seeded at zero.
-
-This is the rule of the oracle. In the warm-up it weighs the first products of the correlation more than the bias tables of [`PortfolioTarget`](@ref) assume. The steady state is the same as under [`BiasCorrectedVolatility`](@ref).
-
-# Constructors
-
-    RawVolatility() -> RawVolatility
-
-# Examples
-
-```jldoctest
-julia> RegimeAdjustedExpWeightedCovariance(; cor_vol = RawVolatility()).cor_vol
-RawVolatility()
-```
-
-# Related
-
-  - [`AbstractCorrelationVolatility`](@ref)
-  - [`BiasCorrectedVolatility`](@ref)
-  - [`correlation_variance`](@ref)
-"""
-struct RawVolatility <: AbstractCorrelationVolatility end
-"""
     correlation_variance(::BiasCorrectedVolatility, v::VecNum, decay::Number, K::AbstractVector{<:Integer})
-    correlation_variance(::RawVolatility, v::VecNum, decay::Number, K::AbstractVector{<:Integer})
+    correlation_variance(::Nothing, v::VecNum, decay::Number, K::AbstractVector{<:Integer})
 
 The variance that standardises each product of the separate correlation path.
+
+With `cor_vol = nothing`, each product divides by the raw variance state, seeded at zero. This is the rule of the oracle. In the warm-up it weighs the first products of the correlation more than the bias tables of [`PortfolioTarget`](@ref) assume. The steady state is the same as under [`BiasCorrectedVolatility`](@ref).
 
 # Arguments
 
@@ -307,7 +259,7 @@ The variance that standardises each product of the separate correlation path.
 
 # Returns
 
-  - `v::VecNum`: `v` divided by its weight ``1 - \\lambda^{K}`` under [`BiasCorrectedVolatility`](@ref), and `v` unchanged under [`RawVolatility`](@ref).
+  - `v::VecNum`: `v` divided by its weight ``1 - \\lambda^{K}`` under [`BiasCorrectedVolatility`](@ref), and `v` unchanged under `nothing`.
 
 # Related
 
@@ -317,8 +269,7 @@ function correlation_variance(::BiasCorrectedVolatility, v::VecNum, decay::Numbe
                               K::AbstractVector{<:Integer})
     return v ./ max.(one(decay) .- decay .^ K, eps(decay))
 end
-function correlation_variance(::RawVolatility, v::VecNum, ::Number,
-                              ::AbstractVector{<:Integer})
+function correlation_variance(::Nothing, v::VecNum, ::Number, ::AbstractVector{<:Integer})
     return v
 end
 """
@@ -514,8 +465,8 @@ end
 function indefinite_block(::ScoreIndefiniteBlock, C::MatNum, ::Bool)
     return C
 end
-export ExactDebias, LawDebias, RawStatistic, PerTermHacFloor, VolatilityBeforeUpdate,
-       VolatilityAfterUpdate, BiasCorrectedVolatility, RawVolatility,
-       RefuseIndefiniteWarmUp, ClipIndefiniteBlock, ScoreIndefiniteBlock
+export ExactDebias, LawDebias, PerTermHacFloor, VolatilityBeforeUpdate,
+       VolatilityAfterUpdate, BiasCorrectedVolatility, RefuseIndefiniteWarmUp,
+       ClipIndefiniteBlock, ScoreIndefiniteBlock
 public debiases, reads_dependence, hac_floor!, volatility_before_update,
        correlation_variance, indefinite_block

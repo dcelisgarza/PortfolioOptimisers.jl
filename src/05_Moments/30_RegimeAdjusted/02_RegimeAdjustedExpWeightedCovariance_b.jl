@@ -143,7 +143,7 @@ The true ``R`` is not known, and the eigenvalues of its estimate ``\\hat{R}`` ar
 the law of ``\\hat{R}`` over-corrects by up to 1.3 % and 2.7 %. So
 [`diagonal_law_correlation`](@ref) shrinks ``\\hat{R}`` towards the identity until its dispersion
 is the unbiased one. The factor reads the correlation alone, so a scaled return leaves it
-unchanged. Under `debias = RawStatistic()` the factor is one, which is the raw statistic.
+unchanged. Under `debias = nothing` the factor is one, which is the raw statistic.
 
 # Arguments
 
@@ -158,7 +158,7 @@ unchanged. Under `debias = RawStatistic()` the factor is one, which is the raw s
 # Returns
 
   - `factor::Number`: The factor of the method's law, or one where `ce.debias` is
-    [`RawStatistic`](@ref).
+    `nothing`.
 
 # Related
 
@@ -1189,7 +1189,7 @@ throws when no ridge makes it factorise.
 A block with fewer observations than assets is singular. Where the estimator has
 `debias = ExactDebias()`, [`regime_target_statistic`](@ref) skips such a block before it reaches this
 function, so the ridge serves a block that is singular in the data, and the raw statistic of
-`debias = RawStatistic()`.
+`debias = nothing`.
 The regime statistic is one observation of a smoother rather than a result a caller reads, so a
 refusal skips that observation's regime update, and the fit continues.
 
@@ -1231,7 +1231,7 @@ estimated block that the regime method reads, where `ce.debias` is `ExactDebias(
 
 # Algorithm
 
- 1. Where `ce.debias` is `RawStatistic()`, the factor is one. Else take ``K``, the smallest count of
+ 1. Where `ce.debias` is `nothing`, the factor is one. Else take ``K``, the smallest count of
     observations among the contributing assets, and return `nothing` where
     [`regime_bias_open`](@ref) refuses it. Else read the decay of the correlation structure:
     `cor_decay` on the separate path, else `decay`. Find the factor of `ce.regime_method` with

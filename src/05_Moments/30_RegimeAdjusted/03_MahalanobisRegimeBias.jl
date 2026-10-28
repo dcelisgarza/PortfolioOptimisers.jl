@@ -1135,7 +1135,7 @@ and up to 3.7 s at a half-life of 250, five lags and 12 assets.
   - `hac_lags::Option{<:Union{Integer, VecNum}}`: Count of HAC lags, the weight of each lag, or
     `nothing`.
   - `centring::AbstractCentring`: The centring of the estimator, [`PreCentred`](@ref) by default.
-  - `debias::AbstractRegimeDebias`: The debias rule, [`ExactDebias`](@ref) by default.
+  - `debias::Option{<:AbstractRegimeDebias}`: The debias rule, [`ExactDebias`](@ref) by default.
   - `recursion::AbstractLevelRecursion`: The rule of the level recursion,
     [`MeanLevelRecursion`](@ref) by default. Each factor is multiplied by the ratio of
     [`mahalanobis_recursion_ratio`](@ref), on the pre-centred law at every centring.
@@ -1156,7 +1156,7 @@ and up to 3.7 s at a half-life of 250, five lags and 12 assets.
 function mahalanobis_bias_nodes(method::RegimeAdjustedMethod, decay::Number, n::Integer,
                                 hac_lags::Option{<:Union{Integer, VecNum}} = nothing,
                                 centring::AbstractCentring = PreCentred(),
-                                debias::AbstractRegimeDebias = ExactDebias(),
+                                debias::Option{<:AbstractRegimeDebias} = ExactDebias(),
                                 recursion::AbstractLevelRecursion = MeanLevelRecursion())
     start = mahalanobis_bias_start(decay, n, hac_lags)
     Ksat = max(mahalanobis_bias_saturation(decay, n), start)
@@ -1197,7 +1197,7 @@ interpolation the first time the state meets a count of assets.
   - `hac_lags::Option{<:Union{Integer, VecNum}}`: Count of HAC lags, the weight of each lag, or
     `nothing`.
   - `centring::AbstractCentring`: The centring of the estimator, [`PreCentred`](@ref) by default.
-  - `debias::AbstractRegimeDebias`: The debias rule, [`ExactDebias`](@ref) by default.
+  - `debias::Option{<:AbstractRegimeDebias}`: The debias rule, [`ExactDebias`](@ref) by default.
   - `recursion::AbstractLevelRecursion`: The rule of the level recursion,
     [`MeanLevelRecursion`](@ref) by default.
 
@@ -1217,7 +1217,7 @@ function mahalanobis_regime_bias!(store::AbstractDict, method::RegimeAdjustedMet
                                   decay::Number, K::Integer, n::Integer,
                                   hac_lags::Option{<:Union{Integer, VecNum}} = nothing,
                                   centring::AbstractCentring = PreCentred(),
-                                  debias::AbstractRegimeDebias = ExactDebias(),
+                                  debias::Option{<:AbstractRegimeDebias} = ExactDebias(),
                                   recursion::AbstractLevelRecursion = MeanLevelRecursion())
     nodes = get!(() -> mahalanobis_bias_nodes(method, decay, n, hac_lags, centring, debias,
                                               recursion), store, n)

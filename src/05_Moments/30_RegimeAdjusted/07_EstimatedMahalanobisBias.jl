@@ -234,7 +234,7 @@ under HAC, and 7.5 % at the first scored count of a half-life of 40.
   - `Ks::AbstractVector{<:Integer}`: Counts of observations, each above `n + 1`.
   - `n::Integer`: Count of assets that contribute to the statistic, at least two.
   - `hac_lags::Option{<:Integer}`: Count of HAC lags, or `nothing`.
-  - `debias::AbstractRegimeDebias`: The debias rule, read by [`reads_dependence`](@ref).
+  - `debias::Option{<:AbstractRegimeDebias}`: The debias rule, read by [`reads_dependence`](@ref).
 
 # Returns
 
@@ -250,7 +250,7 @@ under HAC, and 7.5 % at the first scored count of a half-life of 40.
 function estimated_mahalanobis_level_bias(method::RegimeAdjustedMethod, decay::Number,
                                           Ks::AbstractVector{<:Integer}, n::Integer,
                                           hac_lags::Option{<:Integer},
-                                          debias::AbstractRegimeDebias)
+                                          debias::Option{<:AbstractRegimeDebias})
     T = typeof(log(decay))
     x0 = log(eps(T)) + log1p(-decay)
     # The output grid reaches 50 at a normalisation of one, so `xf` does too, with one stencil.
@@ -526,7 +526,7 @@ this verb with `centring` bound to its own type. Without that method this method
   - `hac_lags::Option{<:Union{Integer, VecNum}}`: Count of HAC lags, the weight of each lag, or
     `nothing`.
   - `centring::AbstractCentring`: The centring of the estimator.
-  - `debias::AbstractRegimeDebias`: The debias rule, [`ExactDebias`](@ref) by default.
+  - `debias::Option{<:AbstractRegimeDebias}`: The debias rule, [`ExactDebias`](@ref) by default.
 
 # Returns
 
@@ -541,7 +541,7 @@ this verb with `centring` bound to its own type. Without that method this method
 function mahalanobis_level_bias(method::RegimeAdjustedMethod, decay::Number,
                                 Ks::AbstractVector{<:Integer}, n::Integer, hac_lags,
                                 centring::AbstractCentring,
-                                debias::AbstractRegimeDebias = ExactDebias())
+                                debias::Option{<:AbstractRegimeDebias} = ExactDebias())
     law = centring_law(centring)
     if law === centring
         throw(MethodError(mahalanobis_level_bias,
@@ -572,7 +572,7 @@ so a count takes the pre-centred factor times the ratio of the two at ``K_{h}``,
   - `hac_lags::Option{<:Union{Integer, VecNum}}`: Count of HAC lags, the weight of each lag
     (pre-centred law only), or `nothing`.
   - `centring`: The centring of the estimator.
-  - `debias::AbstractRegimeDebias`: The debias rule, [`ExactDebias`](@ref) by default.
+  - `debias::Option{<:AbstractRegimeDebias}`: The debias rule, [`ExactDebias`](@ref) by default.
 
 # Returns
 
@@ -587,13 +587,13 @@ so a count takes the pre-centred factor times the ratio of the two at ``K_{h}``,
 function mahalanobis_level_bias(method::RegimeAdjustedMethod, decay::Number,
                                 Ks::AbstractVector{<:Integer}, n::Integer,
                                 hac_lags::Option{<:Union{Integer, VecNum}}, ::PreCentred,
-                                ::AbstractRegimeDebias = ExactDebias())
+                                ::Option{<:AbstractRegimeDebias} = ExactDebias())
     return mahalanobis_level_bias(method, decay, Ks, n, hac_lags)
 end
 function mahalanobis_level_bias(method::RegimeAdjustedMethod, decay::Number,
                                 Ks::AbstractVector{<:Integer}, n::Integer,
                                 hac_lags::Option{<:Integer}, ::EstimatedCentring,
-                                debias::AbstractRegimeDebias = ExactDebias())
+                                debias::Option{<:AbstractRegimeDebias} = ExactDebias())
     Kh = ceil(Int, log(sqrt(eps(typeof(log(decay))))) / log(decay))
     lo = findall(<=(Kh), Ks)
     hi = findall(>(Kh), Ks)

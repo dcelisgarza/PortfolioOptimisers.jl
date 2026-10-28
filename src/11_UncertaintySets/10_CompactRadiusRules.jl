@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Sizes the compact radius from a chi-squared upper confidence bound on each idiosyncratic variance.
 
-The compact set adds no variance on the directions that the factors span. On the other directions it adds variance in proportion to ``\\mathbf{D}``, the idiosyncratic variances of the loadings block, and this rule sizes that addition from the estimation error of ``\\mathbf{D}``. Under the default [`InverseIdiosyncraticVarianceMetric`](@ref) the radius has no units. Under [`IdentityMetric`](@ref) it has the units of a variance. One formula serves every [`AbstractOrthogonalityMetric`](@ref), so no method dispatches on the metric.
+The compact set adds no variance on the directions that the factors span. On the other directions it adds variance in proportion to ``\\mathbf{D}``, the idiosyncratic variances of the loadings block, and this rule sizes that addition from the estimation error of ``\\mathbf{D}``. Under the default [`InverseIdiosyncraticVarianceMetric`](@ref) the radius has no units. Under `metric = nothing` it has the units of a variance. One formula serves every [`AbstractOrthogonalityMetric`](@ref) and `nothing`, so no method dispatches on the metric.
 
 The rule reads the sampling law of each variance off the block, because only the fit knows it. The `edof` field of the block is the degrees of freedom of each variance, and its `ediv` field is the divisor. [`FactorPrior`](@ref), [`FactorBlackLittermanPrior`](@ref) and a Cross-Sectional Factor Prior write both beside `esigma`, per asset, so a stepwise fit that keeps a different number of factors for each asset is priced per asset. A block that records no degrees of freedom is refused unless `dof` states them. That is a block built by hand, a block from a regression estimator that records no count, or a block whose variance estimator states no count through [`variance_count`](@ref). [`VarianceFraction`](@ref) assumes no sampling law, so it serves such a block.
 
@@ -31,7 +31,7 @@ Where:
   - ``\\chi^{2,\\,-1}_{\\nu}(q)``: Lower ``q`` quantile of the chi-squared distribution with ``\\nu`` degrees of freedom.
   - ``q``: Confidence level of the bound, which holds with probability ``1 - q``.
   - ``\\mathbf{D}``: Diagonal matrix of the idiosyncratic variances of the loadings block.
-  - ``\\mathbf{W}``: Diagonal cross-sectional metric, the identity under [`IdentityMetric`](@ref).
+  - ``\\mathbf{W}``: Diagonal cross-sectional metric, the identity under `metric = nothing`.
   - ``\\mathbf{P}``: Orthogonal projector onto the complement of the weighted factor span.
   - $(math_dict[:Q_cpt])
   - $(math_dict[:C_cpt])
@@ -290,10 +290,10 @@ function compact_reference_weights(w0::NonFiniteAllocationOptimisationEstimator,
     return w
 end
 """
-    k_compact(alg::ResidualInflation, q::Number, metric::AbstractOrthogonalityMetric,
+    k_compact(alg::ResidualInflation, q::Number, metric::Option{<:AbstractOrthogonalityMetric},
               pr::AbstractPriorResult, rr::AbstractLoadingsRegressionResult, C::VecNum,
               Q::MatNum, rd)
-    k_compact(alg::VarianceFraction, q::Number, metric::AbstractOrthogonalityMetric,
+    k_compact(alg::VarianceFraction, q::Number, metric::Option{<:AbstractOrthogonalityMetric},
               pr::AbstractPriorResult, rr::AbstractLoadingsRegressionResult, C::VecNum,
               Q::MatNum, rd)
     k_compact(kappa::Number, args...)
@@ -340,9 +340,9 @@ Radius of a [`CompactCovarianceUncertaintySet`](@ref), from the prior result and
 function k_compact(kappa::Number, args...)::Number
     return kappa
 end
-function k_compact(alg::ResidualInflation, q::Number, ::AbstractOrthogonalityMetric,
-                   ::AbstractPriorResult, rr::AbstractLoadingsRegressionResult, C::VecNum,
-                   Q::MatNum, ::Any)
+function k_compact(alg::ResidualInflation, q::Number,
+                   ::Option{<:AbstractOrthogonalityMetric}, ::AbstractPriorResult,
+                   rr::AbstractLoadingsRegressionResult, C::VecNum, Q::MatNum, ::Any)
     N = size(Q, 1)
     d = idiosyncratic_variances(rr)
     nu = isnothing(alg.dof) ? rr.edof : fill(alg.dof, N)
@@ -365,7 +365,7 @@ function k_compact(alg::ResidualInflation, q::Number, ::AbstractOrthogonalityMet
     P = LinearAlgebra.I - Q * transpose(Q)
     return LinearAlgebra.opnorm((sqrt.(rho .* d) ./ C) .* P)^2
 end
-function k_compact(alg::VarianceFraction, ::Number, ::AbstractOrthogonalityMetric,
+function k_compact(alg::VarianceFraction, ::Number, ::Option{<:AbstractOrthogonalityMetric},
                    pr::AbstractPriorResult, ::AbstractLoadingsRegressionResult, C::VecNum,
                    Q::MatNum, rd)
     N = size(Q, 1)

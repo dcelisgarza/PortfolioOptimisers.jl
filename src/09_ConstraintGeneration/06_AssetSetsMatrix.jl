@@ -316,9 +316,9 @@ function panel_input_name(sets::UniverseSets, key::AbstractString)
 end
 """
     panel_input(sets::UniverseSets, key::AbstractString; name = nothing, levels = nothing,
-                alg = NoPanelFill())
+                alg = nothing)
     panel_input(sets::UniverseSets, key::Pair; name = nothing, levels = nothing,
-                alg = NoPanelFill())
+                alg = nothing)
     panel_input(sets::UniverseSets, keys::AbstractVector)
 
 Convert a [`UniverseSets`](@ref) key into the raw Panel Field input that [`asset_panel`](@ref) reads.
@@ -396,7 +396,7 @@ julia> panel_feature_matrix(pnl)[1]
 function panel_input(sets::UniverseSets, key::AbstractString;
                      name::Option{<:AbstractString} = nothing,
                      levels::Option{<:VecStr} = nothing,
-                     alg::AbstractPanelFillAlgorithm = NoPanelFill())
+                     alg::Option{<:AbstractPanelFillAlgorithm} = nothing)
     vals = taxonomy_column(sets, key, "a `panel_input` bridge")
     return panel_input_build(panel_input_kind(vals, key), sets, key, vals, name, levels,
                              alg)
@@ -404,7 +404,7 @@ end
 function panel_input(sets::UniverseSets, key::Pair;
                      name::Option{<:AbstractString} = nothing,
                      levels::Option{<:VecStr} = nothing,
-                     alg::AbstractPanelFillAlgorithm = NoPanelFill())
+                     alg::Option{<:AbstractPanelFillAlgorithm} = nothing)
     k = first(key)
     vals = taxonomy_column(sets, k, "a `panel_input` bridge")
     return panel_input_build(last(key), sets, k, vals, name, levels, alg)
@@ -492,7 +492,7 @@ The method that Julia selects is the algorithm. Each method builds its own input
 function panel_input_build(::Type{CategoricalPanelInput}, sets::UniverseSets,
                            key::AbstractString, vals::AbstractVector,
                            name::Option{<:AbstractString}, levels::Option{<:VecStr},
-                           alg::AbstractPanelFillAlgorithm)
+                           alg::Option{<:AbstractPanelFillAlgorithm})
     return CategoricalPanelInput(; name = if isnothing(name)
                                      panel_input_name(sets, key)
                                  else
@@ -502,7 +502,7 @@ end
 function panel_input_build(::Type{NumericPanelInput}, sets::UniverseSets,
                            key::AbstractString, vals::AbstractVector,
                            name::Option{<:AbstractString}, levels::Option{<:VecStr},
-                           alg::AbstractPanelFillAlgorithm)
+                           alg::Option{<:AbstractPanelFillAlgorithm})
     @argcheck(isnothing(levels),
               ArgumentError("a numeric Panel Field declares no levels, so `levels` has no meaning for the UniverseSets key `$key`. Drop it, or force the categorical reading with `\"$key\" => CategoricalPanelInput`."))
     return NumericPanelInput(; name = if isnothing(name)

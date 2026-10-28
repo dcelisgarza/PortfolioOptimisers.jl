@@ -20,10 +20,12 @@ whole repository.
   defines. Every forced type closes the library to one of them. [`.github/instructions/julia-source-code.instructions.md`](../.github/instructions/julia-source-code.instructions.md)
   § *Numeric types come from the data* owns the rule, and
   `test/test_55_numeric_coercion_census.jl` gates it.
-- **Keep a type by default, and spell a skipped procedure with `nothing`.** Simplify a struct or
-  an abstract type only when it has no dispatch, no second site, no measured benefit and no ADR. A
-  descriptive singleton stays. A field takes `nothing` only where it skips a procedure, or for a
-  simple default such as `ohf`. [ADR 0222](../docs/adr/0222-a-type-is-kept-by-default-and-nothing-spells-a-skipped-procedure.md)
+- **Spell a skipped procedure or a trivial default with `nothing`, never with a singleton.** No
+  data-less type for "no slack", "the raw statistic" or "no scaling", and no named alias of
+  `nothing`. The field takes `Option{<:AbstractX}`, and the method on `Nothing` holds the
+  behaviour. A data-less type stays only when it names a rule with content of its own, or when
+  `nothing` already means something else in the field. Keep every other type by default.
+  [ADR 0222](../docs/adr/0222-a-type-is-kept-by-default-and-nothing-spells-a-skipped-procedure.md)
   states the rule.
 - **Prefer a per-type method over a new dependency** for reflection-style work. Derive the field
   list, write the constructor name once per type, and use the ordinary keyword constructor.

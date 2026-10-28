@@ -106,7 +106,7 @@ OnlinePortfolioSelection
          │    proj ┼ EntropicProjection()
          │   alpha ┼ Int64: 0
          │     obj ┼ LogWealth()
-         │    grad ┴ PlainGradient()
+         │    grad ┴ nothing
      set ┼ BoundedAllocationSet
          │     wb ┼ WeightBounds
          │        │   lb ┼ Float64: 0.0

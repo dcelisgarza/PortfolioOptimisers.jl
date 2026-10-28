@@ -56,7 +56,7 @@ julia> PortfolioOptimisers.min_active_assets(MyTarget())
 
 julia> X = [0.01 -0.02; -0.015 0.03; 0.02 -0.01; -0.005 0.012; 0.008 -0.02; -0.02 0.03];
 
-julia> kw = (; decay = 0.9, min_obs = 2, regime_min_obs = 1, debias = RawStatistic(),
+julia> kw = (; decay = 0.9, min_obs = 2, regime_min_obs = 1, debias = nothing,
              regime_method = RootMeanSquaredAdjusted());
 
 julia> cov(RegimeAdjustedExpWeightedCovariance(; regime_target = MyTarget(), kw...), X) ≈
@@ -156,7 +156,7 @@ Where:
     from a recursion over the ``n - 1`` other directions. The recursion is exact at one asset and
     at equal weights, and it is within 0.15 % of a Monte Carlo at half-lives of 10 and more.
 
-With `debias = RawStatistic()`, ``\\beta = 1``, and the target scores every observation above
+With `debias = nothing`, ``\\beta = 1``, and the target scores every observation above
 `min_obs`. A block that is not positive definite then takes the ridge of
 [`safe_regime_cholesky`](@ref). Its statistic can be about ``10^{12}``, and that one value holds
 the regime state for many half-lives.
@@ -271,9 +271,9 @@ Where:
   - ``u_{i,t}``: Deviation of the return of asset ``i`` at observation ``t``.
   - ``\\hat{C}_{ii}``: Bias-corrected variance of asset ``i`` before observation ``t``.
   - ``f_{i}``: Mean of the inverse of that estimated variance, from [`regime_bias_table`](@ref), or
-    one under [`RawStatistic`](@ref).
+    one under `debias = nothing`.
   - ``\\gamma``: Factor of [`diagonal_law_factor`](@ref) for the first-moment and the log methods,
-    and one for every other method and under [`RawStatistic`](@ref).
+    and one for every other method and under `debias = nothing`.
 
 With ``f_{i} = \\gamma = 1``, the root-mean-squared method reads ``d_{t}^{2} / n_{t}``, the
 square of the bias statistic of [menchero2011](@cite).
@@ -343,7 +343,7 @@ Where:
   - ``\\hat{\\mathbf{C}}``: Bias-corrected covariance block of ``\\mathcal{A}_{t}`` before
     observation ``t``.
   - ``f_{k}``: Bias factor of direction ``k``, which [`regime_target_statistic`](@ref) states, or
-    one under [`RawStatistic`](@ref).
+    one under `debias = nothing`.
 
 The target does not score an observation whose direction has a variance at or below `min_val`.
 It does not score an observation whose block the rule of `indefinite` refuses either, under
@@ -447,7 +447,7 @@ multiplier stays at one, and the estimator is the plain exponentially weighted r
 The statistic divides a realised square by an estimated variance, and the inverse of an estimate
 is too large on average (Jensen's inequality). With `debias = ExactDebias()`, the default, the
 statistic skips an estimate too young for a finite variance. It divides the other statistics by
-the known size of the bias, as each target states. `debias = RawStatistic()` scores the raw
+the known size of the bias, as each target states. `debias = nothing` scores the raw
 statistic.
 
 With `centring = EstimatedCentring()`, the default, each deviation is taken from the normalised
@@ -582,7 +582,7 @@ $(DocStringExtensions.FIELDS)
         hac_lags::Option{<:Integer}                           = nothing,
         hac_floor::Option{<:AbstractHacFloor}                 = nothing,
         hac_vol_before::AbstractHacVolatilityTiming           = VolatilityBeforeUpdate(),
-        cor_vol::AbstractCorrelationVolatility                = BiasCorrectedVolatility(),
+        cor_vol::Option{<:AbstractCorrelationVolatility}      = BiasCorrectedVolatility(),
         regime_method::Option{<:RegimeAdjustedMethod}         = FirstMomentRegimeAdjusted(),
         regime_decay::Number                                  = exp2(-2 / decay_half_life(decay)),
         regime_min_obs::Integer                               = round(Int, max(1, decay_half_life(decay) / 2)),
@@ -590,7 +590,7 @@ $(DocStringExtensions.FIELDS)
         regime_lohi_mult::Option{<:Tuple{Number, Number}}     = (0.7, 1.6),
         min_val::Number                                       = 1e-12,
         centring::AbstractCentring                            = EstimatedCentring(),
-        debias::AbstractRegimeDebias                          = ExactDebias(),
+        debias::Option{<:AbstractRegimeDebias}                = ExactDebias(),
         cache::Option{<:AbstractPartialFitState}              = nothing
     ) -> RegimeAdjustedExpWeightedCovariance
 
@@ -707,7 +707,7 @@ true
                                                  hac_lags::Option{<:Integer},
                                                  hac_floor::Option{<:AbstractHacFloor},
                                                  hac_vol_before::AbstractHacVolatilityTiming,
-                                                 cor_vol::AbstractCorrelationVolatility,
+                                                 cor_vol::Option{<:AbstractCorrelationVolatility},
                                                  regime_method::Option{<:RegimeAdjustedMethod},
                                                  regime_decay::Number,
                                                  regime_min_obs::Integer,
@@ -716,7 +716,7 @@ true
                                                                                   Number}},
                                                  min_val::Number,
                                                  centring::AbstractCentring,
-                                                 debias::AbstractRegimeDebias,
+                                                 debias::Option{<:AbstractRegimeDebias},
                                                  cache::Option{<:AbstractPartialFitState})
         assert_unit_interval(decay, :decay)
         if !isnothing(cor_decay)
@@ -767,7 +767,7 @@ function RegimeAdjustedExpWeightedCovariance(; decay::Number = exp2(-inv(40.0)),
                                              hac_lags::Option{<:Integer} = nothing,
                                              hac_floor::Option{<:AbstractHacFloor} = nothing,
                                              hac_vol_before::AbstractHacVolatilityTiming = VolatilityBeforeUpdate(),
-                                             cor_vol::AbstractCorrelationVolatility = BiasCorrectedVolatility(),
+                                             cor_vol::Option{<:AbstractCorrelationVolatility} = BiasCorrectedVolatility(),
                                              regime_method::Option{<:RegimeAdjustedMethod} = FirstMomentRegimeAdjusted(),
                                              regime_decay::Number = exp2(-2 /
                                                                          decay_half_life(decay)),
@@ -781,7 +781,7 @@ function RegimeAdjustedExpWeightedCovariance(; decay::Number = exp2(-inv(40.0)),
                                                                                           1.6),
                                              min_val::Number = 1e-12,
                                              centring::AbstractCentring = EstimatedCentring(),
-                                             debias::AbstractRegimeDebias = ExactDebias(),
+                                             debias::Option{<:AbstractRegimeDebias} = ExactDebias(),
                                              cache::Option{<:AbstractPartialFitState} = nothing)::RegimeAdjustedExpWeightedCovariance
     return RegimeAdjustedExpWeightedCovariance(decay, cor_decay, min_obs, hac_lags,
                                                hac_floor, hac_vol_before, cor_vol,
@@ -1013,7 +1013,7 @@ which is the constant the scalar case of [`RegimeAdjustedExpWeightedVariance`](@
 The squares of the diagonal target are correlated, so its sum is a ``\\chi^2(n)`` variate only
 at independent returns. There the constant is exact. The root of `n`, which is the root of the
 mean of the statistic, is too large at every correlation. The raw statistic of
-`debias = RawStatistic()` divides by this constant. The target first divides the debiased
+`debias = nothing` divides by this constant. The target first divides the debiased
 statistic by [`diagonal_law_factor`](@ref). Then this constant holds at the correlation of the
 assets and at the noise of each estimate, to the second order in that noise. That factor reads
 the constant, so the debiased statistic does not depend on it.

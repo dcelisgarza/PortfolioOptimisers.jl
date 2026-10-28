@@ -80,7 +80,7 @@ function oracle_estimator(; kwargs...)
                                                regime_min_obs = 2,
                                                regime_lohi_mult = (0.7, 1.6),
                                                centring = PreCentred(), min_val = 1e-12,
-                                               debias = RawStatistic(), kwargs...)
+                                               debias = nothing, kwargs...)
 end
 
 @testset "the port reproduces the oracle" begin
@@ -94,7 +94,7 @@ end
                                               regime_method = PO.RootMeanSquaredAdjusted(), hac_lags = 2),
                              ORACLE_DIAGONAL_RMS_HAC),
                             # The oracle divides each product by the raw variance state (#1729).
-                            ("separate corr", oracle_estimator(; cor_decay = 0.97, cor_vol = RawVolatility()),
+                            ("separate corr", oracle_estimator(; cor_decay = 0.97, cor_vol = nothing),
                              ORACLE_SEPARATE_CORR),
                             # The oracle's estimated location, `ZeroStartCentring()` since #1507.
                             ("uncentred", oracle_estimator(; centring = ZeroStartCentring()), ORACLE_UNCENTRED))

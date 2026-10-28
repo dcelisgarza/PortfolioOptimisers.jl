@@ -10,8 +10,6 @@ AbstractOrthogonalityMetric
 BenchmarkWeightMetric
 RegressionWeightMetric
 InverseIdiosyncraticVarianceMetric
-IdentityMetric
-IdentityScaling
 IdiosyncraticVarianceScaling
 OrthogonalUncertaintySet
 orthogonal_scaling

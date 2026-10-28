@@ -602,7 +602,7 @@ end
     end
 
     @testset "The block method reads the weight history the metric names" begin
-        # `IdentityMetric` resolves to no history, so the block method and the bare method
+        # A `nothing` metric resolves to no history, so the block method and the bare method
         # with no weights are the same call.
         fx = evaluation_fixture()
         rd, csfm = fx.rd, fx.csfm
@@ -2854,8 +2854,8 @@ end
 
     @testset "The two methods answer the same table" begin
         a = forecast_holding_period(fe, rd, csfm; n = 3, mt = OverlapMeanTest())
-        b = forecast_holding_period(fe, X, PO.cs_diagnostic_weights(IdentityMetric(), csfm);
-                                    n = 3, mt = OverlapMeanTest())
+        b = forecast_holding_period(fe, X, PO.cs_diagnostic_weights(nothing, csfm); n = 3,
+                                    mt = OverlapMeanTest())
         @test a.dates == b.dates
         @test isapprox(a.spearman_mean_ic, b.spearman_mean_ic)
         @test isapprox(a.pearson_mean_ic, b.pearson_mean_ic)
@@ -3154,8 +3154,8 @@ end
 
     @testset "The block method resolves the weights the metric names" begin
         c = forecast_calibration(fe, fx.csfm)
-        @test c.slope == forecast_calibration(fe,
-                               PO.cs_diagnostic_weights(PO.IdentityMetric(), fx.csfm)).slope
+        @test c.slope ==
+              forecast_calibration(fe, PO.cs_diagnostic_weights(nothing, fx.csfm)).slope
         @test c.curve == forecast_calibration(fe).curve
         cb = forecast_calibration(fe, fx.csfm;
                                   weighting = PO.InverseIdiosyncraticVarianceMetric(),

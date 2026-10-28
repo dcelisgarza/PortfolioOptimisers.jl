@@ -36,7 +36,7 @@ separate path is within 0.07 % of the multiplier of one decay on the same data o
 the factor holds no second order of the estimated correlation. Under the default
 `cor_vol = BiasCorrectedVolatility()`, at 12 assets, an equicorrelation of 0.5, half-lives of 10
 and 20 and 20 observations, the ratio is 1.0172, and 1.0095 at 40. At ``R = I`` it is within
-0.05 % at 20 observations. Under `RawVolatility()` the correlation state weights its first
+0.05 % at 20 observations. Under `cor_vol = nothing` the correlation state weights its first
 products by ``1 / (1 - \\lambda^{t})``, which the factor does not hold, and the same ratios read
 1.0802 and 1.0448. Under HAC the three tables and the weight sums read the Bartlett weights of
 `hac_lags`. At two lags and equal weights, on the same data, the separate path reads 0.06 % to

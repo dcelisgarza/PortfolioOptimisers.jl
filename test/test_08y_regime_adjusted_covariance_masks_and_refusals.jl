@@ -80,7 +80,7 @@ function oracle_estimator(; kwargs...)
                                                regime_min_obs = 2,
                                                regime_lohi_mult = (0.7, 1.6),
                                                centring = PreCentred(), min_val = 1e-12,
-                                               debias = RawStatistic(), kwargs...)
+                                               debias = nothing, kwargs...)
 end
 
 @testset "the two masks blank what they should" begin
@@ -213,7 +213,7 @@ function PO.regime_statistic(::MyTarget397, X::AbstractVector, C::AbstractMatrix
 end
 @testset "a method and a target of the caller's own (#397)" begin
     X = [0.01 -0.02; -0.015 0.03; 0.02 -0.01; -0.005 0.012; 0.008 -0.02; -0.02 0.03]
-    kw = (; decay = 0.9, min_obs = 2, regime_min_obs = 1, debias = RawStatistic())
+    kw = (; decay = 0.9, min_obs = 2, regime_min_obs = 1, debias = nothing)
     # The method answers what the root mean square answers, on every library target.
     for target in (PortfolioTarget(), DiagonalTarget())
         @test cov(RegimeAdjustedExpWeightedCovariance(;

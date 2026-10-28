@@ -70,7 +70,7 @@ The diagonal is ``f(0)``, the largest entry of ``\\mathbf{Z}``, because a decay 
 
 `decay` sets the fall-off, and `sep` on the source sets the budget. The budget is the only truncation. The two are separate because an exponential never reaches zero, so a fall-off cannot state a budget. Under the default [`LinearDecay`](@ref) and a [`HopCount`](@ref) budget of `n`, the asset itself scores `n + 1`, a direct neighbour scores `n`, and a pair `n` hops apart scores `1`. Under [`ExponentialDecay`](@ref) or [`ReciprocalDecay`](@ref) the diagonal is `1`, and the parameter of the decay sets the fall-off whatever the budget.
 
-[`NoDecay`](@ref) scores `1` at every separation, so `Proximity(; decay = NoDecay())` gives `1` inside the budget and `0` outside it. The result is the indicator of the neighbourhood that the budget selects, not a matrix of ones.
+`decay = nothing` scores `1` at every separation, so `Proximity(; decay = nothing)` gives `1` inside the budget and `0` outside it. The result is the indicator of the neighbourhood that the budget selects, not a matrix of ones.
 
 # Hop counts and path lengths
 
@@ -89,7 +89,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     Proximity(;
-        decay::AbstractSeparationDecayAlgorithm = LinearDecay()
+        decay::Option{<:AbstractSeparationDecayAlgorithm} = LinearDecay()
     ) -> Proximity
 
 Keywords correspond to the struct's fields.
@@ -111,20 +111,22 @@ Proximity
   - [`PathLength`](@ref)
   - [`AbstractSeparationDecayAlgorithm`](@ref)
   - [`LinearDecay`](@ref)
-  - [`NoDecay`](@ref)
+  - [`separation_decay`](@ref)
   - [`PhylogenyPanel`](@ref)
   - [`separation_matrix`](@ref)
+  - [`Option`](@ref)
 """
 @concrete struct Proximity <: AbstractPhylogenyFeatureAlgorithm
     """
     $(field_dict[:sdecay])
     """
     decay
-    function Proximity(decay::AbstractSeparationDecayAlgorithm)
+    function Proximity(decay::Option{<:AbstractSeparationDecayAlgorithm})
         return new{typeof(decay)}(decay)
     end
 end
-function Proximity(; decay::AbstractSeparationDecayAlgorithm = LinearDecay())::Proximity
+function Proximity(;
+                   decay::Option{<:AbstractSeparationDecayAlgorithm} = LinearDecay())::Proximity
     return Proximity(decay)
 end
 """
@@ -464,7 +466,7 @@ Keywords correspond to the struct's fields.
 
 # Why the diagonal includes self
 
-The diagonal selects between two different algorithms. The table measures a three-node path `1 - 2 - 3` under the default [`AngularDist`](@ref) and the default one-hop budget. The decay is [`NoDecay`](@ref), so the diagonal is the only difference between the two columns.
+The diagonal selects between two different algorithms. The table measures a three-node path `1 - 2 - 3` under the default [`AngularDist`](@ref) and the default one-hop budget. The decay is `nothing`, so the diagonal is the only difference between the two columns.
 
 | pair            | zero diagonal | self included |
 |:--------------- | -------------:| -------------:|

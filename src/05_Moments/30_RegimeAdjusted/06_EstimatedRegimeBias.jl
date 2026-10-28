@@ -561,7 +561,7 @@ this verb with `centring` bound to its own type. Without that method this method
   - `hac_lags::Option{<:Union{Integer, VecNum}}`: Count of HAC lags, the weight of each lag, or
     `nothing`.
   - `centring::AbstractCentring`: The centring of the estimator.
-  - `debias::AbstractRegimeDebias`: The debias rule, [`ExactDebias`](@ref) by default.
+  - `debias::Option{<:AbstractRegimeDebias}`: The debias rule, [`ExactDebias`](@ref) by default.
 
 # Returns
 
@@ -576,7 +576,7 @@ this verb with `centring` bound to its own type. Without that method this method
 """
 function regime_bias_table(method::Union{RegimeAdjustedMethod, RegimeTermMoments},
                            decay::Number, K::Integer, hac_lags, centring::AbstractCentring,
-                           debias::AbstractRegimeDebias = ExactDebias())
+                           debias::Option{<:AbstractRegimeDebias} = ExactDebias())
     law = centring_law(centring)
     if law === centring
         throw(MethodError(regime_bias_table,
@@ -602,7 +602,7 @@ weight matrix of the HAC lags.
   - `K::Integer`: Largest count of terms in the table.
   - `hac_lags::Option{<:Union{Integer, VecNum}}`: Count of HAC lags, the weight of each lag, or
     `nothing`.
-  - `::AbstractRegimeDebias`: Ignored debias rule: a pre-centred deviation does not depend on the
+  - `::Option{<:AbstractRegimeDebias}`: Ignored debias rule: a pre-centred deviation does not depend on the
     estimate.
 
 # Returns
@@ -616,12 +616,12 @@ weight matrix of the HAC lags.
 """
 function regime_bias_table(method::Union{RegimeAdjustedMethod, RegimeTermMoments},
                            decay::Number, K::Integer, ::Nothing, ::PreCentred,
-                           ::AbstractRegimeDebias = ExactDebias())
+                           ::Option{<:AbstractRegimeDebias} = ExactDebias())
     return regime_bias_table(method, decay, K)
 end
 function regime_bias_table(method::Union{RegimeAdjustedMethod, RegimeTermMoments},
                            decay::Number, K::Integer, hac_lags::Union{Integer, VecNum},
-                           ::PreCentred, ::AbstractRegimeDebias = ExactDebias())
+                           ::PreCentred, ::Option{<:AbstractRegimeDebias} = ExactDebias())
     return regime_bias_table(method, decay, K, hac_lags)
 end
 """
@@ -670,7 +670,7 @@ count costs 0.1 s at a half-life of 40 and two lags.
   - `K::Integer`: Largest count of terms in the table.
   - `hac_lags::Option{<:Integer}`: Count of HAC lags, or `nothing`.
   - `::EstimatedCentring`: The centring of the estimator.
-  - `debias::AbstractRegimeDebias`: The debias rule. [`ExactDebias`](@ref), the default, reads the
+  - `debias::Option{<:AbstractRegimeDebias}`: The debias rule. [`ExactDebias`](@ref), the default, reads the
     dependence of the deviation on the estimate, and [`LawDebias`](@ref) the law of the
     estimate alone.
 
@@ -691,7 +691,7 @@ count costs 0.1 s at a half-life of 40 and two lags.
 function regime_bias_table(method::Union{RegimeAdjustedMethod, RegimeTermMoments},
                            decay::Number, K::Integer, hac_lags::Option{<:Integer},
                            ::EstimatedCentring,
-                           debias::AbstractRegimeDebias = ExactDebias())
+                           debias::Option{<:AbstractRegimeDebias} = ExactDebias())
     base = regime_bias_table(method, decay, K, hac_lags, PreCentred())
     lat = estimated_bias_lattice(decay, hac_lags)
     Kh = min(K, ceil(Int, log(sqrt(eps(eltype(lat.s)))) / log(decay)))

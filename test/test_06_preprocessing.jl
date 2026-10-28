@@ -121,7 +121,7 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
             @test_throws ArgumentError ReturnsResult(; nx = nx, X = X,
                                                      pnl = matrix_panel(["f", "f"],
                                                                         rand(rng, 3, 2)))
-            # A blank never reaches a carrier: `NaN` is a blank, and the default `NoPanelFill`
+            # A blank never reaches a carrier: `NaN` is a blank, and the default fill `nothing`
             # refuses it at the build rather than letting it reach a metric that would map it
             # to a plausible wrong distance.
             @test_throws ArgumentError ReturnsResult(; nx = nx, X = X,

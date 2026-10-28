@@ -466,9 +466,14 @@ end
     @test PortfolioOptimisers.panel_fill(BackwardPanelFill(; val = 0.0), v, "f") ==
           [1.0, 1.0, 2.0, 2.0, 2.0, 0.0]
 
-    # NoPanelFill refuses a blank and passes a complete column through.
-    @test_throws ArgumentError PortfolioOptimisers.panel_fill(NoPanelFill(), v, "f")
-    @test PortfolioOptimisers.panel_fill(NoPanelFill(), [1.0, 2.0], "f") == [1.0, 2.0]
+    # The default `nothing` refuses a blank and passes a complete column through.
+    @test isnothing(NumericPanelInput(; name = "f", vals = [1.0, 2.0]).alg)
+    @test_throws "its fill policy is nothing, which refuses one" PortfolioOptimisers.panel_fill(nothing,
+                                                                                                v,
+                                                                                                "f")
+    @test PortfolioOptimisers.panel_fill(nothing, [1.0, 2.0], "f") == [1.0, 2.0]
+    @test PortfolioOptimisers.panel_fill(nothing, [1.0, 2.0], trues(2), "f") == [1.0, 2.0]
+    @test PortfolioOptimisers.panel_placeholder(nothing, v) == falses(length(v))
 end
 # A test-local input and a test-local policy that define only the methods an extension written
 # before #1413 defines: the builder reaches them through the fallbacks that drop the active mask.
@@ -557,7 +562,7 @@ end
     @test panel_field(asset_panel([ext]; amsk = amsk, emsk = amsk), "x").vals[8, 1] == 4.0
     own = NumericPanelInput(; name = "x", vals = x, alg = Test06bPanelFill())
     @test PortfolioOptimisers.panel_resolve(own, amsk)[1][8, 1] == 4.0
-    # A cell-wise policy reads no mask, and NoPanelFill names the position in the whole column.
+    # A cell-wise policy reads no mask, and `nothing` names the position in the whole column.
     c = panel_field(asset_panel([NumericPanelInput(; name = "x", vals = x,
                                                    alg = ConstantPanelFill(; val = -1.0))];
                                 amsk = amsk, emsk = amsk), "x")
@@ -656,7 +661,7 @@ end
     @test Z[:, :, 2] == [1.0 0.0; 1.0 1.0]
     @test Z[:, :, 5] == [1.0 3.0; 2.0 4.0]
     @test all(isfinite, Z)
-    # A NoPanelFill field carries no observed mask.
+    # A field with the fill policy `nothing` carries no observed mask.
     @test PortfolioOptimisers.panel_field(pnl, "sector").omsk === nothing
     @test PortfolioOptimisers.panel_field(pnl, "mcap").omsk == [true false; true true]
     @test pnl.amsk == trues(2, 2)

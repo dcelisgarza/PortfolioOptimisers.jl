@@ -497,7 +497,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the Gradient Transforms, which change the gradient of a first-order rule before its mirror step.
 
-A [`MirrorDescent`](@ref) rule applies its transform to the gradient of every period. The momentum transforms of Section 4.2 of [li2022egm](@cite) change the exponent of the multiplicative update, and do not change the form of the update.
+A [`MirrorDescent`](@ref) rule applies its transform to the gradient of every period. Its default `grad = nothing` applies no transform, so the mirror step reads the gradient of the period as it is. The momentum transforms of Section 4.2 of [li2022egm](@cite) change the exponent of the multiplicative update, and do not change the form of the update.
 
 # Interfaces
 
@@ -515,7 +515,6 @@ The head's state already slices and copies a transform state of the other three 
 
 # Related
 
-  - [`PlainGradient`](@ref)
   - [`GradientMomentum`](@ref)
   - [`RootMeanSquareGradient`](@ref)
   - [`AdaptiveMomentGradient`](@ref)
@@ -526,26 +525,6 @@ The head's state already slices and copies a transform state of the other three 
   - $(ref_dict[:li2022egm]) Section 4.2.
 """
 abstract type AbstractGradientTransform <: AbstractAlgorithm end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Leaves the gradient unchanged, so the mirror step reads the period's gradient as it is.
-
-It is the default Gradient Transform of [`MirrorDescent`](@ref).
-
-# Examples
-
-```jldoctest
-julia> PlainGradient()
-PlainGradient()
-```
-
-# Related
-
-  - [`AbstractGradientTransform`](@ref)
-  - [`MirrorDescent`](@ref)
-"""
-struct PlainGradient <: AbstractGradientTransform end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -790,21 +769,21 @@ function AdaptiveMomentGradient(; gamma1::Real = 0.99, gamma2::Real = 0,
     return AdaptiveMomentGradient(gamma1, gamma2, eps)
 end
 """
-    gradient_state_seed(grad::PlainGradient, w::AbstractVector)
+    gradient_state_seed(::Nothing, w::AbstractVector)
     gradient_state_seed(grad::GradientMomentum, w::AbstractVector)
     gradient_state_seed(grad::RootMeanSquareGradient, w::AbstractVector)
     gradient_state_seed(grad::AdaptiveMomentGradient, w::AbstractVector)
 
 Seeds the state that a Gradient Transform keeps on the Rule State before the first row.
 
-The seed is `nothing` for [`PlainGradient`](@ref), the zero average for [`GradientMomentum`](@ref), the zero squared average for [`RootMeanSquareGradient`](@ref), and the pair of both for [`AdaptiveMomentGradient`](@ref).
+The seed is `nothing` for no transform, `grad = nothing`, the zero average for [`GradientMomentum`](@ref), the zero squared average for [`RootMeanSquareGradient`](@ref), and the pair of both for [`AdaptiveMomentGradient`](@ref).
 
 # Related
 
   - [`AbstractGradientTransform`](@ref)
   - [`transform_gradient!`](@ref)
 """
-function gradient_state_seed(::PlainGradient, ::AbstractVector)
+function gradient_state_seed(::Nothing, ::AbstractVector)
     return nothing
 end
 function gradient_state_seed(::GradientMomentum, w::AbstractVector)
@@ -817,14 +796,14 @@ function gradient_state_seed(::AdaptiveMomentGradient, w::AbstractVector)
     return (zeros(eltype(w), length(w)), zeros(eltype(w), length(w)))
 end
 """
-    transform_gradient!(grad::PlainGradient, gs, g::AbstractVector)
+    transform_gradient!(::Nothing, ::Nothing, g::AbstractVector)
     transform_gradient!(grad::GradientMomentum, v::AbstractVector, g::AbstractVector)
     transform_gradient!(grad::RootMeanSquareGradient, m::AbstractVector, g::AbstractVector)
     transform_gradient!(grad::AdaptiveMomentGradient, gs::Tuple, g::AbstractVector)
 
 Computes the transformed gradient of the period, and writes the updated state of the transform in place.
 
-[`PlainGradient`](@ref) returns `g` itself. [`GradientMomentum`](@ref) returns a copy of the updated average `v`. [`RootMeanSquareGradient`](@ref) returns `g` over the root of the updated squared average `m`, plus `eps`. [`AdaptiveMomentGradient`](@ref) returns the updated `v` over that root plus `eps`. The type docstrings state the formulas.
+`grad = nothing` applies no transform and returns `g` itself. [`GradientMomentum`](@ref) returns a copy of the updated average `v`. [`RootMeanSquareGradient`](@ref) returns `g` over the root of the updated squared average `m`, plus `eps`. [`AdaptiveMomentGradient`](@ref) returns the updated `v` over that root plus `eps`. The type docstrings state the formulas.
 
 # Related
 
@@ -832,7 +811,7 @@ Computes the transformed gradient of the period, and writes the updated state of
   - [`gradient_state_seed`](@ref)
   - [`MirrorDescent`](@ref)
 """
-function transform_gradient!(::PlainGradient, ::Nothing, g::AbstractVector)
+function transform_gradient!(::Nothing, ::Nothing, g::AbstractVector)
     return g
 end
 function transform_gradient!(grad::GradientMomentum, v::AbstractVector, g::AbstractVector)
@@ -1363,7 +1342,7 @@ $(DocStringExtensions.FIELDS)
         proj::Union{EuclideanProjection, EntropicProjection, TsallisProjection, LogBarrierProjection} = EntropicProjection(),
         alpha::Real = 0,
         obj::AbstractOnlineObjective = LogWealth(),
-        grad::AbstractGradientTransform = PlainGradient()
+        grad::Option{<:AbstractGradientTransform} = nothing
     ) -> MirrorDescent
 
 Keywords correspond to the struct's fields. The `proj` slot takes only the geometries whose projection onto the default set is a scalar root. [`ExponentiatedGradient`](@ref) fills it with the entropic map, and [`GradientProjection`](@ref) with the Euclidean map.
@@ -1382,7 +1361,7 @@ MirrorDescent
    proj ┼ EntropicProjection()
   alpha ┼ Int64: 0
     obj ┼ LogWealth()
-   grad ┴ PlainGradient()
+   grad ┴ nothing
 ```
 
 # Related
@@ -1424,7 +1403,7 @@ MirrorDescent
     """
     obj
     """
-    The Gradient Transform applied before the mirror step.
+    The Gradient Transform applied before the mirror step, or `nothing` to apply none.
     """
     grad
     function MirrorDescent(eta::T1, proj::T2, alpha::T3, obj::T4,
@@ -1433,7 +1412,7 @@ MirrorDescent
                                             Union{EuclideanProjection, EntropicProjection,
                                                   TsallisProjection, LogBarrierProjection},
                                             T3 <: Real, T4 <: AbstractOnlineObjective,
-                                            T5 <: AbstractGradientTransform}
+                                            T5 <: Option{<:AbstractGradientTransform}}
         if isa(eta, Real)
             @argcheck(eta > zero(eta), DomainError(eta, "eta must be positive"))
         end
@@ -1446,7 +1425,7 @@ function MirrorDescent(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05,
                        proj::Union{EuclideanProjection, EntropicProjection,
                                    TsallisProjection, LogBarrierProjection} = EntropicProjection(),
                        alpha::Real = 0, obj::AbstractOnlineObjective = LogWealth(),
-                       grad::AbstractGradientTransform = PlainGradient())::MirrorDescent
+                       grad::Option{<:AbstractGradientTransform} = nothing)::MirrorDescent
     return MirrorDescent(eta, proj, alpha, obj, grad)
 end
 function rule_state_seed(alg::MirrorDescent, w::AbstractVector)
@@ -1605,7 +1584,7 @@ function reprojection(proj::AbstractProjectionGeometry, set::AbstractAllocationS
     return project(proj, set, q, w)
 end
 """
-    ExponentiatedGradient(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, alpha::Real = 0, obj::AbstractOnlineObjective = LogWealth(), grad::AbstractGradientTransform = PlainGradient())
+    ExponentiatedGradient(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, alpha::Real = 0, obj::AbstractOnlineObjective = LogWealth(), grad::Option{<:AbstractGradientTransform} = nothing)
 
 Builds the exponentiated gradient, a [`MirrorDescent`](@ref) rule under [`EntropicProjection`](@ref) (EG). It is the rule of Equation 3.3 of [helmbold1998](@cite). [helmbold1997](@citet) derive the same update for mixture estimation, as Equation 6 of that work.
 
@@ -1640,7 +1619,7 @@ MirrorDescent
    proj ┼ EntropicProjection()
   alpha ┼ Int64: 0
     obj ┼ LogWealth()
-   grad ┴ PlainGradient()
+   grad ┴ nothing
 ```
 
 # Related
@@ -1656,12 +1635,12 @@ MirrorDescent
 """
 function ExponentiatedGradient(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05,
                                alpha::Real = 0, obj::AbstractOnlineObjective = LogWealth(),
-                               grad::AbstractGradientTransform = PlainGradient())::MirrorDescent
+                               grad::Option{<:AbstractGradientTransform} = nothing)::MirrorDescent
     return MirrorDescent(; eta = eta, proj = EntropicProjection(), alpha = alpha, obj = obj,
                          grad = grad)
 end
 """
-    GradientProjection(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, alpha::Real = 0, obj::AbstractOnlineObjective = LogWealth(), grad::AbstractGradientTransform = PlainGradient())
+    GradientProjection(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, alpha::Real = 0, obj::AbstractOnlineObjective = LogWealth(), grad::Option{<:AbstractGradientTransform} = nothing)
 
 Builds the gradient projection, a [`MirrorDescent`](@ref) rule under [`EuclideanProjection`](@ref) (GP, OGD). It is the rule of Equation 5 of [helmbold1997](@cite).
 
@@ -1695,7 +1674,7 @@ MirrorDescent
    proj ┼ EuclideanProjection()
   alpha ┼ Int64: 0
     obj ┼ LogWealth()
-   grad ┴ PlainGradient()
+   grad ┴ nothing
 ```
 
 # Related
@@ -1711,7 +1690,7 @@ MirrorDescent
 """
 function GradientProjection(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05,
                             alpha::Real = 0, obj::AbstractOnlineObjective = LogWealth(),
-                            grad::AbstractGradientTransform = PlainGradient())::MirrorDescent
+                            grad::Option{<:AbstractGradientTransform} = nothing)::MirrorDescent
     return MirrorDescent(; eta = eta, proj = EuclideanProjection(), alpha = alpha,
                          obj = obj, grad = grad)
 end
@@ -1847,7 +1826,7 @@ MirrorDescent
    proj ┼ EntropicProjection()
   alpha ┼ Int64: 0
     obj ┼ LogWealth()
-   grad ┴ PlainGradient()
+   grad ┴ nothing
 ```
 
 # Related
@@ -1884,7 +1863,7 @@ MirrorDescent
    proj ┼ EntropicProjection()
   alpha ┼ Int64: 0
     obj ┼ LogWealth()
-   grad ┴ PlainGradient()
+   grad ┴ nothing
 ```
 
 # Related
@@ -1904,7 +1883,7 @@ function AEG(; etas::AbstractVector{<:Real} = 0.001:0.001:0.2,
 end
 export MirrorDescent, ExponentiatedGradient, GradientProjection, EGE, EGR, EGA, LogWealth,
        RiskLoss, InverseSquareRootRate, DoublingTrickRate, SelfConfidentRate,
-       WindowedBestRate, MAEG, AEG, PlainGradient, GradientMomentum, RootMeanSquareGradient,
+       WindowedBestRate, MAEG, AEG, GradientMomentum, RootMeanSquareGradient,
        AdaptiveMomentGradient
 public AbstractGradientTransform, gradient_state_seed, transform_gradient!,
        gradient_state_view, copy_gradient_state, AbstractOnlineObjective, loss_gradient

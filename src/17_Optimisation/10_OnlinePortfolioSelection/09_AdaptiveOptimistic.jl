@@ -921,11 +921,11 @@ $(DocStringExtensions.FIELDS)
         predictor::AbstractGradientPredictor = LastGradient()
     ) -> OptimisticStep
 
-Keywords correspond to the struct's fields. The Gradient Transform of the wrapped rule must be the identity. A transform keeps a state that one gradient writes each period, and the optimistic step reads two gradients a period.
+Keywords correspond to the struct's fields. The wrapped rule must apply no Gradient Transform, `grad = nothing`. A transform keeps a state that one gradient writes each period, and the optimistic step reads two gradients a period.
 
 ## Validation
 
-  - `alg.grad` is a [`PlainGradient`](@ref). An `ArgumentError` is thrown otherwise.
+  - `alg.grad` is `nothing`. An `ArgumentError` is thrown otherwise.
 
 # Examples
 
@@ -937,7 +937,7 @@ OptimisticStep
             │    proj ┼ EntropicProjection()
             │   alpha ┼ Int64: 0
             │     obj ┼ LogWealth()
-            │    grad ┴ PlainGradient()
+            │    grad ┴ nothing
   predictor ┼ LastGradient
             │   at_played ┴ Bool: true
 ```
@@ -967,8 +967,8 @@ OptimisticStep
     """
     predictor
     function OptimisticStep(alg::MirrorDescent, predictor::AbstractGradientPredictor)
-        @argcheck(isa(alg.grad, PlainGradient),
-                  ArgumentError("the optimistic step wraps a `MirrorDescent` whose Gradient Transform is the identity: a `$(typeof(alg.grad).name.name)` keeps a state written once a period from one gradient, and the optimistic step reads two. Wrap the rule with `grad = PlainGradient()`."))
+        @argcheck(isnothing(alg.grad),
+                  ArgumentError("the optimistic step wraps a `MirrorDescent` that applies no Gradient Transform: a `$(typeof(alg.grad).name.name)` keeps a state written once a period from one gradient, and the optimistic step reads two. Wrap the rule with `grad = nothing`."))
         return new{typeof(alg), typeof(predictor)}(alg, predictor)
     end
 end

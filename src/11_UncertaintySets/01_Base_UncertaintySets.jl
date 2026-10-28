@@ -226,7 +226,7 @@ Computes the radius ``\\kappa`` of a compact covariance uncertainty set from the
 
 The radius of a [`CompactCovarianceUncertaintySet`](@ref) then changes when the sample or the factor span changes. A member goes in the `kappa` field of an [`OrthogonalUncertaintySet`](@ref), whose type bound is [`Num_CptRad`](@ref). A plain number in that field is the radius, and [`k_compact`](@ref) returns it unchanged.
 
-**This family is separate from the Calibration Rules, and the two do not mix.** A **Calibration Rule** reads `(pr, w, slv, ctx)` and nothing more. These four inputs cannot size the compact radius, because its units change with a different field of the same estimator. The penalty is ``\\kappa \\lVert (\\mathbf{I} - \\mathbf{Q}\\mathbf{Q}^{\\intercal})\\mathbf{C}\\boldsymbol{w} \\rVert_{2}^{2}`` with ``\\mathbf{C} = \\mathbf{W}^{-1/2}``. Under [`IdentityMetric`](@ref), ``\\kappa`` has the units of a variance. Under [`InverseIdiosyncraticVarianceMetric`](@ref), it has no units.
+**This family is separate from the Calibration Rules, and the two do not mix.** A **Calibration Rule** reads `(pr, w, slv, ctx)` and nothing more. These four inputs cannot size the compact radius, because its units change with a different field of the same estimator. The penalty is ``\\kappa \\lVert (\\mathbf{I} - \\mathbf{Q}\\mathbf{Q}^{\\intercal})\\mathbf{C}\\boldsymbol{w} \\rVert_{2}^{2}`` with ``\\mathbf{C} = \\mathbf{W}^{-1/2}``. Under `metric = nothing`, ``\\kappa`` has the units of a variance. Under [`InverseIdiosyncraticVarianceMetric`](@ref), it has no units.
 
 A rule that reads only the Prior Result must select one of the two units, and it is wrong under the other. So a rule of this family computes the radius **inside the family**, which has the metric, the loadings block and the span. The mean radius of the same estimator follows the same pattern through [`k_norm_ball`](@ref) and the `method` field. A field that holds a radius also accepts the rule that computes it.
 
@@ -236,7 +236,7 @@ The name of a rule is the name of the **method** that it runs, and no other part
 
 ## `k_compact`
 
-  - `k_compact(alg::AbstractCompactRadiusAlgorithm, q::Number, metric::AbstractOrthogonalityMetric, pr::AbstractPriorResult, rr::AbstractLoadingsRegressionResult, C::VecNum, Q::MatNum, rd) -> Number`: Returns the radius, which is finite and `>= 0`. `rd` is the returns data of the fit, or `nothing`. The constructor of the estimator that holds the rule states the range, so a rule needs no range check.
+  - `k_compact(alg::AbstractCompactRadiusAlgorithm, q::Number, metric::Option{<:AbstractOrthogonalityMetric}, pr::AbstractPriorResult, rr::AbstractLoadingsRegressionResult, C::VecNum, Q::MatNum, rd) -> Number`: Returns the radius, which is finite and `>= 0`. `rd` is the returns data of the fit, or `nothing`. The constructor of the estimator that holds the rule states the range, so a rule needs no range check.
 
 # Related
 

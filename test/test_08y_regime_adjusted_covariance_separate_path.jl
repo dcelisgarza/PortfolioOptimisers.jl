@@ -80,7 +80,7 @@ function oracle_estimator(; kwargs...)
                                                regime_min_obs = 2,
                                                regime_lohi_mult = (0.7, 1.6),
                                                centring = PreCentred(), min_val = 1e-12,
-                                               debias = RawStatistic(), kwargs...)
+                                               debias = nothing, kwargs...)
 end
 
 #=
@@ -165,7 +165,7 @@ weights, and `mahalanobis_regime_bias!` interpolates it over the count of observ
     st = fit()
     @test st.bias.nodes isa AbstractDict && collect(keys(st.bias.nodes)) == [na]
     @test copy(st).bias !== st.bias && copy(st).bias == st.bias
-    @test isnothing(fit(; debias = RawStatistic()).bias)
+    @test isnothing(fit(; debias = nothing).bias)
 end
 
 #=
@@ -467,18 +467,18 @@ holds `1 - λ^K` times the variance. A product divided by the raw state carries 
     # Measured: 1.1e-15 under the raw rule and 1.3e-15 under the default. The two rules differ by
     # up to 5.1 relative on one cell at 30 rows, and not at all at 1200.
     @test isapprox(cov(sep(BiasCorrectedVolatility()), X), replica(X, true); rtol = 1e-12)
-    @test isapprox(cov(sep(RawVolatility()), X), replica(X, false); rtol = 1e-12)
+    @test isapprox(cov(sep(nothing), X), replica(X, false); rtol = 1e-12)
     # The two rules differ in the warm-up only.
-    @test !isapprox(cov(sep(BiasCorrectedVolatility()), X), cov(sep(RawVolatility()), X);
+    @test !isapprox(cov(sep(BiasCorrectedVolatility()), X), cov(sep(nothing), X);
                     rtol = 1e-4)
     Y = randn(StableRNG(1729), 1200, 5) .* transpose(1:5)
-    @test isapprox(cov(sep(BiasCorrectedVolatility()), Y), cov(sep(RawVolatility()), Y);
+    @test isapprox(cov(sep(BiasCorrectedVolatility()), Y), cov(sep(nothing), Y);
                    rtol = 1e-10)
     # The rule acts on the separate path alone.
     one_decay(rule) = RegimeAdjustedExpWeightedCovariance(; decay = lam, min_obs = 1,
                                                           regime_method = nothing,
                                                           cor_vol = rule)
-    @test cov(one_decay(BiasCorrectedVolatility()), X) == cov(one_decay(RawVolatility()), X)
+    @test cov(one_decay(BiasCorrectedVolatility()), X) == cov(one_decay(nothing), X)
     # Under `EstimatedCentring()`, the default, the first row of an asset gives no term, so the
     # weight of the variance state counts one step less (#1773). The replica takes each
     # deviation from the normalised location of the rows before it, divided by the root of its
@@ -509,11 +509,11 @@ holds `1 - λ^K` times the variance. A product divided by the raw state carries 
     csep(rule) = RegimeAdjustedExpWeightedCovariance(; decay = lam, cor_decay = lamc,
                                                      min_obs = 1, regime_method = nothing,
                                                      cor_vol = rule)
-    @test csep(RawVolatility()).centring === EstimatedCentring()
+    @test csep(nothing).centring === EstimatedCentring()
     Xm = X .+ transpose(0.5:0.5:2.5)
     @test isapprox(cov(csep(BiasCorrectedVolatility()), Xm), centred_replica(Xm, true);
                    rtol = 1e-12)
-    @test isapprox(cov(csep(RawVolatility()), Xm), centred_replica(Xm, false); rtol = 1e-12)
+    @test isapprox(cov(csep(nothing), Xm), centred_replica(Xm, false); rtol = 1e-12)
 end
 
 #=

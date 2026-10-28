@@ -54,7 +54,11 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
     @testset "Construction and the refusals" begin
         md = MirrorDescent()
         @test md.eta == 0.05 && isa(md.proj, EntropicProjection) && md.alpha == 0
-        @test isa(md.obj, LogWealth) && isa(md.grad, PlainGradient)
+        @test isa(md.obj, LogWealth) && isnothing(md.grad)
+        # `grad = nothing` applies no transform: no state, and the gradient itself (#1867).
+        @test isnothing(po.gradient_state_seed(nothing, [0.5, 0.5]))
+        g0 = [0.25, -0.5]
+        @test po.transform_gradient!(nothing, nothing, g0) === g0
         @test isa(ExponentiatedGradient(), MirrorDescent)
         @test isa(GradientProjection().proj, EuclideanProjection)
         @test_throws DomainError MirrorDescent(; eta = 0)

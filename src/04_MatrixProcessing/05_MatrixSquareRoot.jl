@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the algorithms that take a square root of a covariance matrix.
 
-A square root ``\\mathbf{L}`` of a covariance matrix ``\\mathbf{\\Sigma}`` satisfies ``\\mathbf{L} \\mathbf{L}^{\\intercal} = \\mathbf{\\Sigma}``. Each algorithm states what it does when ``\\mathbf{\\Sigma}`` has no Cholesky factor. [`PlainCholeskySquareRoot`](@ref) takes the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on such a matrix. `nothing` in the place of an algorithm is [`PlainCholeskySquareRoot`](@ref).
+A square root ``\\mathbf{L}`` of a covariance matrix ``\\mathbf{\\Sigma}`` satisfies ``\\mathbf{L} \\mathbf{L}^{\\intercal} = \\mathbf{\\Sigma}``. Each algorithm states what it does when ``\\mathbf{\\Sigma}`` has no Cholesky factor. `nothing` in the place of an algorithm takes the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on such a matrix.
 
 # Interfaces
 
@@ -40,7 +40,6 @@ julia> matrix_square_root(MyMatrixSquareRootAlgorithm(), [4.0 0.0; 0.0 9.0])
 
 # Related
 
-  - [`PlainCholeskySquareRoot`](@ref)
   - [`RidgeCholeskySquareRoot`](@ref)
   - [`EigenFallbackSquareRoot`](@ref)
   - [`matrix_square_root`](@ref)
@@ -48,48 +47,6 @@ julia> matrix_square_root(MyMatrixSquareRootAlgorithm(), [4.0 0.0; 0.0 9.0])
   - [`CrossSectionalFactorPrior`](@ref)
 """
 abstract type AbstractMatrixSquareRootAlgorithm <: AbstractAlgorithm end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Takes the plain lower Cholesky factor of a covariance matrix, and refuses a matrix that has none.
-
-The algorithm adds no ridge and has no fallback. A matrix that is not positive definite, such as a covariance of rank one, raises a `LinearAlgebra.PosDefException`. `nothing` in the place of an algorithm is this algorithm.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\mathbf{L} &= \\operatorname{chol}(\\mathbf{\\Sigma})\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\mathbf{L}``: Square root of ``\\mathbf{\\Sigma}``, with ``\\mathbf{L} \\mathbf{L}^{\\intercal} = \\mathbf{\\Sigma}``.
-  - ``\\operatorname{chol}``: Lower Cholesky factor.
-
-# Constructors
-
-    PlainCholeskySquareRoot() -> PlainCholeskySquareRoot
-
-# Examples
-
-```jldoctest
-julia> using LinearAlgebra
-
-julia> matrix_square_root(PlainCholeskySquareRoot(), [4.0 2.0; 2.0 3.0]) ==
-       cholesky([4.0 2.0; 2.0 3.0]).L
-true
-```
-
-# Related
-
-  - [`AbstractMatrixSquareRootAlgorithm`](@ref)
-  - [`RidgeCholeskySquareRoot`](@ref)
-  - [`EigenFallbackSquareRoot`](@ref)
-  - [`matrix_square_root`](@ref)
-"""
-struct PlainCholeskySquareRoot <: AbstractMatrixSquareRootAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -161,7 +118,6 @@ true
 # Related
 
   - [`AbstractMatrixSquareRootAlgorithm`](@ref)
-  - [`PlainCholeskySquareRoot`](@ref)
   - [`EigenFallbackSquareRoot`](@ref)
   - [`matrix_square_root`](@ref)
   - [`ridge_cholesky`](@ref)
@@ -227,7 +183,6 @@ true
 # Related
 
   - [`AbstractMatrixSquareRootAlgorithm`](@ref)
-  - [`PlainCholeskySquareRoot`](@ref)
   - [`RidgeCholeskySquareRoot`](@ref)
   - [`matrix_square_root`](@ref)
 """
@@ -286,23 +241,22 @@ function ridge_cholesky(alg::RidgeCholeskySquareRoot, sigma::MatNum)
     return nothing
 end
 """
-    matrix_square_root(alg::PlainCholeskySquareRoot, sigma::MatNum) -> MatNum
     matrix_square_root(::Nothing, sigma::MatNum) -> MatNum
     matrix_square_root(alg::RidgeCholeskySquareRoot, sigma::MatNum) -> MatNum
     matrix_square_root(alg::EigenFallbackSquareRoot, sigma::MatNum) -> MatNum
 
 Takes a square root ``\\mathbf{L}`` of a covariance matrix, with ``\\mathbf{L} \\mathbf{L}^{\\intercal} = \\mathbf{\\Sigma}``.
 
-[`PlainCholeskySquareRoot`](@ref) takes the plain lower Cholesky factor, and `nothing` is that algorithm. [`RidgeCholeskySquareRoot`](@ref) takes the Cholesky factor of the matrix with the first ridge that makes it positive definite. [`EigenFallbackSquareRoot`](@ref) takes the Cholesky factor where it exists, and the square root of the eigendecomposition of a positive semidefinite matrix otherwise. Each `mtx_sqrt` field of the library names the algorithm that this function reads, in the factor priors such as [`FactorPrior`](@ref) and [`CrossSectionalFactorPrior`](@ref), in the uncertainty sets, and in the risk measures that read a square root.
+`nothing` takes the plain lower Cholesky factor. [`RidgeCholeskySquareRoot`](@ref) takes the Cholesky factor of the matrix with the first ridge that makes it positive definite. [`EigenFallbackSquareRoot`](@ref) takes the Cholesky factor where it exists, and the square root of the eigendecomposition of a positive semidefinite matrix otherwise. Each `mtx_sqrt` field of the library names the algorithm that this function reads, in the factor priors such as [`FactorPrior`](@ref) and [`CrossSectionalFactorPrior`](@ref), in the uncertainty sets, and in the risk measures that read a square root.
 
 # Arguments
 
-  - `alg`: The square-root algorithm, or `nothing` for [`PlainCholeskySquareRoot`](@ref).
+  - `alg`: The square-root algorithm, or `nothing` for the plain Cholesky factor.
   - `sigma`: The covariance matrix, `assets × assets`.
 
 # Validation
 
-  - [`PlainCholeskySquareRoot`](@ref) and `nothing`: `sigma` has a Cholesky factor. Raises a `LinearAlgebra.PosDefException`.
+  - `nothing`: `sigma` has a Cholesky factor. Raises a `LinearAlgebra.PosDefException`.
   - [`RidgeCholeskySquareRoot`](@ref): one try of [`ridge_cholesky`](@ref) succeeds. Raises a `LinearAlgebra.PosDefException` with the `info` of the plain factorisation.
   - [`EigenFallbackSquareRoot`](@ref): a matrix that has no Cholesky factor is Hermitian, and its smallest eigenvalue is at least ``-N \\epsilon \\max_i \\lvert \\lambda_i \\rvert``. Here ``N`` is the number of rows and ``\\epsilon`` is the machine epsilon of the element type. Raises `LinearAlgebra.PosDefException(-1)` on a matrix that is not Hermitian, and `LinearAlgebra.PosDefException(1)` on a smaller eigenvalue.
 
@@ -312,7 +266,7 @@ Takes a square root ``\\mathbf{L}`` of a covariance matrix, with ``\\mathbf{L} \
 
 # Examples
 
-The three algorithms differ only on a matrix that has no Cholesky factor.
+The three choices of `alg` differ only on a matrix that has no Cholesky factor.
 
 ```jldoctest
 julia> using LinearAlgebra
@@ -320,7 +274,7 @@ julia> using LinearAlgebra
 julia> sigma = [1.0 1.0; 1.0 1.0];
 
 julia> try
-           matrix_square_root(PlainCholeskySquareRoot(), sigma)
+           matrix_square_root(nothing, sigma)
        catch err
            err isa PosDefException
        end
@@ -340,16 +294,12 @@ true
 # Related
 
   - [`AbstractMatrixSquareRootAlgorithm`](@ref)
-  - [`PlainCholeskySquareRoot`](@ref)
   - [`RidgeCholeskySquareRoot`](@ref)
   - [`EigenFallbackSquareRoot`](@ref)
   - [`ridge_cholesky`](@ref)
 """
-function matrix_square_root(::PlainCholeskySquareRoot, sigma::MatNum)
-    return LinearAlgebra.cholesky(sigma).L
-end
 function matrix_square_root(::Nothing, sigma::MatNum)
-    return matrix_square_root(PlainCholeskySquareRoot(), sigma)
+    return LinearAlgebra.cholesky(sigma).L
 end
 function matrix_square_root(alg::RidgeCholeskySquareRoot, sigma::MatNum)
     chol = ridge_cholesky(alg, sigma)
@@ -372,6 +322,5 @@ function matrix_square_root(::EigenFallbackSquareRoot, sigma::MatNum)
     return E.vectors * LinearAlgebra.Diagonal(sqrt.(max.(E.values, zero(eltype(E.values)))))
 end
 
-export PlainCholeskySquareRoot, RidgeCholeskySquareRoot, EigenFallbackSquareRoot,
-       matrix_square_root
+export RidgeCholeskySquareRoot, EigenFallbackSquareRoot, matrix_square_root
 public AbstractMatrixSquareRootAlgorithm

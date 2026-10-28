@@ -45,11 +45,10 @@ end
                "style2" => mpass("style2")]
     pe = EmpiricalPrior(; me = ExpWeightedExpectedReturns(),
                         ce = RegimeAdjustedExpWeightedCovariance(; centring = PreCentred(),
-                                                                 debias = RawStatistic(),
+                                                                 debias = nothing,
                                                                  regime_lohi_mult = (0.7,
                                                                                      1.6)))
-    ve = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(),
-                                           debias = RawStatistic(),
+    ve = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(), debias = nothing,
                                            regime_lohi_mult = (0.7, 1.6), min_val = 0.0)
     est(; kw...) = CrossSectionalFactorPrior(; lambda = 1, factors = factors, pe = pe,
                                              ve = ve, kw...)
@@ -369,7 +368,7 @@ end
         # leaves the whole history cold.
         rows(T) = PO.port_opt_view(fxs.rd, 1:T, :)
         ve60 = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(),
-                                                 debias = RawStatistic(),
+                                                 debias = nothing,
                                                  regime_lohi_mult = (0.7, 1.6),
                                                  min_val = 0.0, min_obs = 60)
         @test_throws PO.IsNonFiniteError prior(est(; minra = 5), rows(40))

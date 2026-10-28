@@ -795,7 +795,7 @@ end
                                 mt::AbstractMeanTestEstimator = WildBootstrapMeanTest()) -> ForecastSummaryResult
     forecast_evaluation_summary(fes::AbstractVector{<:ForecastEvaluationResult},
                                 csfm::CrossSectionalFactorModel;
-                                weighting::AbstractOrthogonalityMetric = IdentityMetric(),
+                                weighting::Option{<:AbstractOrthogonalityMetric} = nothing,
                                 kwargs...) -> ForecastSummaryResult
     forecast_evaluation_summary(fe::ForecastEvaluationResult,
                                 w::Option{<:MatNum} = nothing;
@@ -920,7 +920,7 @@ function forecast_evaluation_summary(fes::AbstractVector{<:ForecastEvaluationRes
 end
 function forecast_evaluation_summary(fes::AbstractVector{<:ForecastEvaluationResult},
                                      csfm::CrossSectionalFactorModel;
-                                     weighting::AbstractOrthogonalityMetric = IdentityMetric(),
+                                     weighting::Option{<:AbstractOrthogonalityMetric} = nothing,
                                      kwargs...)::ForecastSummaryResult
     return forecast_evaluation_summary(fes, cs_diagnostic_weights(weighting, csfm);
                                        kwargs...)

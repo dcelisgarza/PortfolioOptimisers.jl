@@ -366,7 +366,7 @@ end
     @test_throws ArgumentError RegimeAdjustedExpWeightedVariance(; regime_method = rm,
                                                                  debias = LawDebias())
     X = [0.01 -0.02; -0.015 0.03; 0.02 -0.01; -0.005 0.012; 0.008 -0.02; -0.02 0.03]
-    kw = (; decay = 0.9, min_obs = 2, regime_min_obs = 1, debias = RawStatistic())
+    kw = (; decay = 0.9, min_obs = 2, regime_min_obs = 1, debias = nothing)
     @test var(RegimeAdjustedExpWeightedVariance(; regime_method = rm, kw...), X) ≈
           var(RegimeAdjustedExpWeightedVariance(; regime_method = RootMeanSquaredAdjusted(),
                                                 kw...), X)

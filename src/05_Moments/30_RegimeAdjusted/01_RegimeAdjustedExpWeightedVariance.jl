@@ -17,7 +17,7 @@ methods below. [`RegimeAdjustedExpWeightedVariance`](@ref) calls `regime_multipl
 form of `get_regime_state`, and [`RegimeAdjustedExpWeightedCovariance`](@ref) calls
 `regime_multiplier` and the second form.
 
-A new method takes `debias = RawStatistic()`. [`ExactDebias`](@ref) and [`LawDebias`](@ref)
+A new method takes `debias = nothing`, the raw statistic. [`ExactDebias`](@ref) and [`LawDebias`](@ref)
 divide the statistic by the bias of the moment that the method reads. The library computes that
 bias for its own three methods alone, so the two constructors refuse a new method under either
 rule.
@@ -57,7 +57,7 @@ julia> function PortfolioOptimisers.get_regime_state(::MyRegimeMethod,
 
 julia> X = [0.01 -0.02; -0.015 0.03; 0.02 -0.01; -0.005 0.012; 0.008 -0.02; -0.02 0.03];
 
-julia> kw = (; decay = 0.9, min_obs = 2, regime_min_obs = 1, debias = RawStatistic());
+julia> kw = (; decay = 0.9, min_obs = 2, regime_min_obs = 1, debias = nothing);
 
 julia> var(RegimeAdjustedExpWeightedVariance(; regime_method = MyRegimeMethod(), kw...), X) ≈
        var(RegimeAdjustedExpWeightedVariance(; regime_method = RootMeanSquaredAdjusted(), kw...),
@@ -70,7 +70,7 @@ julia> cov(RegimeAdjustedExpWeightedCovariance(; regime_method = MyRegimeMethod(
 true
 
 julia> RegimeAdjustedExpWeightedVariance(; regime_method = MyRegimeMethod())
-ERROR: ArgumentError: `RegimeAdjustedExpWeightedVariance.regime_method` is a `MyRegimeMethod`, and `RegimeAdjustedExpWeightedVariance.debias` is `ExactDebias()`. That rule divides the regime statistic by the bias of the moment that the method reads, and the library computes that bias for `RootMeanSquaredAdjusted`, `FirstMomentRegimeAdjusted` and `LogRegimeAdjusted` alone. Set `debias = RawStatistic()` for this method.
+ERROR: ArgumentError: `RegimeAdjustedExpWeightedVariance.regime_method` is a `MyRegimeMethod`, and `RegimeAdjustedExpWeightedVariance.debias` is `ExactDebias()`. That rule divides the regime statistic by the bias of the moment that the method reads, and the library computes that bias for `RootMeanSquaredAdjusted`, `FirstMomentRegimeAdjusted` and `LogRegimeAdjusted` alone. Set `debias = nothing` for this method.
 [...]
 ```
 
@@ -408,13 +408,13 @@ Checks that the bias correction of `debias` can read the moment of `regime_metho
 
 [`ExactDebias`](@ref) and [`LawDebias`](@ref) divide the regime statistic by the bias of the
 moment that the method reads, and the library computes that bias for its own three methods
-alone. A regime method that a caller defines therefore takes [`RawStatistic`](@ref). The library
+alone. A regime method that a caller defines therefore takes `debias = nothing`. The library
 methods, and a `regime_method` of `nothing`, take every rule.
 
 # Arguments
 
   - `regime_method::Option{<:RegimeAdjustedMethod}`: Regime adjustment method of the estimator.
-  - `debias::AbstractRegimeDebias`: Bias correction of the estimator.
+  - `debias::Option{<:AbstractRegimeDebias}`: Bias correction of the estimator.
   - `name::Symbol`: Name of the estimator, for the message.
 
 # Validation
@@ -433,7 +433,7 @@ methods, and a `regime_method` of `nothing`, take every rule.
   - [`RegimeAdjustedExpWeightedCovariance`](@ref)
 """
 function assert_regime_debias(regime_method::Option{<:RegimeAdjustedMethod},
-                              debias::AbstractRegimeDebias, name::Symbol)
+                              debias::Option{<:AbstractRegimeDebias}, name::Symbol)
     # A `Union` whose members carry a `<:` bound is built again on every call, and an online
     # step reaches this check through the constructor. Each member here is a `UnionAll` over
     # all its parameters, so the plain `Union` admits the same methods (#1824).
@@ -442,7 +442,7 @@ function assert_regime_debias(regime_method::Option{<:RegimeAdjustedMethod},
                   Union{RootMeanSquaredAdjusted, FirstMomentRegimeAdjusted,
                         LogRegimeAdjusted}) ||
               !debiases(debias),
-              ArgumentError("`$name.regime_method` is a `$(nameof(typeof(regime_method)))`, and `$name.debias` is `$(nameof(typeof(debias)))()`. That rule divides the regime statistic by the bias of the moment that the method reads, and the library computes that bias for `RootMeanSquaredAdjusted`, `FirstMomentRegimeAdjusted` and `LogRegimeAdjusted` alone. Set `debias = RawStatistic()` for this method."))
+              ArgumentError("`$name.regime_method` is a `$(nameof(typeof(regime_method)))`, and `$name.debias` is `$(nameof(typeof(debias)))()`. That rule divides the regime statistic by the bias of the moment that the method reads, and the library computes that bias for `RootMeanSquaredAdjusted`, `FirstMomentRegimeAdjusted` and `LogRegimeAdjusted` alone. Set `debias = nothing` for this method."))
     return nothing
 end
 """
@@ -462,7 +462,7 @@ consumer that reads a volatility, and not a risk figure that the regime scales, 
 
 Under `debias = ExactDebias()`, the default, the estimator divides `z²` by the bias that the
 inverse of an estimated variance puts in the moment that the method reads. It does not score an
-estimate of four terms or fewer. Under `debias = RawStatistic()` it scores the raw `z²`.
+estimate of four terms or fewer. Under `debias = nothing` it scores the raw `z²`.
 
 Under `centring = EstimatedCentring()`, the default, the estimator takes each deviation from the
 normalised location of the returns before it. It divides each square by its exact factor, so the
@@ -535,7 +535,7 @@ Where:
   - $(math_dict[:z2_it_regime])
   - ``K_{i,t}``: Count of the terms in ``v_{i,t-1}``.
   - ``\\beta(K)``: Bias factor of [`regime_bias_table`](@ref) for the moment that the method
-    reads, or one under [`RawStatistic`](@ref). The inverse of an estimated variance is too large
+    reads, or one under `debias = nothing`. The inverse of an estimated variance is too large
     on average (Jensen's inequality). Without the factor, the mean of ``z_{i,t}^{2}`` is 1.07 at a
     half-life of 10 and 1.017 at a half-life of 40. The factor is exact for this statistic. Under
     [`ExactDebias`](@ref) the estimator does not score an estimate of four terms or fewer, because
@@ -576,7 +576,7 @@ $(DocStringExtensions.FIELDS)
         regime_lohi_mult::Option{<:Tuple{Number, Number}} = (0.7, 1.6),
         min_val::Number           = 1e-12,
         centring::AbstractCentring = EstimatedCentring(),
-        debias::AbstractRegimeDebias = ExactDebias(),
+        debias::Option{<:AbstractRegimeDebias} = ExactDebias(),
         cache::Option{<:AbstractPartialFitState} = nothing
     ) -> RegimeAdjustedExpWeightedVariance
 
@@ -678,7 +678,7 @@ julia> ce.min_obs
                                                regime_lohi_mult::Option{<:Tuple{Number,
                                                                                 Number}},
                                                min_val::Number, centring::AbstractCentring,
-                                               debias::AbstractRegimeDebias,
+                                               debias::Option{<:AbstractRegimeDebias},
                                                cache::Option{<:AbstractPartialFitState})
         assert_unit_interval(decay, :decay)
         assert_unit_interval(regime_decay, :regime_decay)
@@ -722,7 +722,7 @@ function RegimeAdjustedExpWeightedVariance(; decay::Number = exp2(-inv(40.0)),
                                                                                                 1.6),
                                            min_val::Number = 1e-12,
                                            centring::AbstractCentring = EstimatedCentring(),
-                                           debias::AbstractRegimeDebias = ExactDebias(),
+                                           debias::Option{<:AbstractRegimeDebias} = ExactDebias(),
                                            cache::Option{<:AbstractPartialFitState} = nothing)::RegimeAdjustedExpWeightedVariance
     return RegimeAdjustedExpWeightedVariance(decay, min_obs, hac_lags, hac_floor,
                                              regime_method, regime_decay, regime_min_obs,
@@ -1252,7 +1252,7 @@ rows thus makes the table once or a few times, and the table holds no more than
   - `centring::AbstractCentring`: The centring of the estimate. Under [`EstimatedCentring`](@ref)
     the table reads the exact law of the estimated deviations. The default, [`PreCentred`](@ref),
     reads the law of pre-centred terms.
-  - `debias::AbstractRegimeDebias`: Whether the table reads the dependence of the deviation on the
+  - `debias::Option{<:AbstractRegimeDebias}`: Whether the table reads the dependence of the deviation on the
     estimate, by [`reads_dependence`](@ref). [`ExactDebias`](@ref) by default.
 
 # Returns
@@ -1268,7 +1268,7 @@ function regime_bias!(bias::AbstractVector,
                       method::Union{RegimeAdjustedMethod, RegimeTermMoments}, decay::Number,
                       K::Integer, hac_lags::Option{<:Union{Integer, VecNum}} = nothing,
                       centring::AbstractCentring = PreCentred(),
-                      debias::AbstractRegimeDebias = ExactDebias())
+                      debias::Option{<:AbstractRegimeDebias} = ExactDebias())
     Ksat = ceil(Int, log(eps(eltype(eltype(bias)))) / log(decay))
     if K > length(bias) && length(bias) < Ksat
         table = regime_bias_table(method, decay, min(max(2 * K, 64), Ksat), hac_lags,
@@ -1286,7 +1286,7 @@ Returns one, the factor of a state that takes no bias correction.
 
 # Arguments
 
-  - `::Nothing`: The table of a state whose estimator has `debias = RawStatistic()` or no regime method.
+  - `::Nothing`: The table of a state whose estimator has `debias = nothing` or no regime method.
   - `::Any`: Ignored regime adjustment method.
   - `decay::Number`: Decay of the weights.
   - `::Integer`: Ignored count of observations.
@@ -1331,7 +1331,7 @@ gates it.
 
 # Arguments
 
-  - `debias::AbstractRegimeDebias`: Whether the estimator corrects the bias of its statistic.
+  - `debias::Option{<:AbstractRegimeDebias}`: Whether the estimator corrects the bias of its statistic.
   - `n::Integer`: Count of directions that the statistic reads.
   - `decay::Number`: Decay of the weights.
   - `K::Integer`: Count of the terms in the estimate.
@@ -1349,7 +1349,7 @@ gates it.
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
   - [`RegimeAdjustedExpWeightedCovariance`](@ref)
 """
-function regime_bias_open(debias::AbstractRegimeDebias, n::Integer, decay::Number,
+function regime_bias_open(debias::Option{<:AbstractRegimeDebias}, n::Integer, decay::Number,
                           K::Integer, hac_lags::Option{<:Union{Integer, VecNum}})
     return !debiases(debias) ||
            K > n + 3 && (isnothing(hac_lags) ||

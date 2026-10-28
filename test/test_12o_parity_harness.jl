@@ -168,7 +168,7 @@ stretch, and the regime statistic read an active asset outside the estimation un
     # one. This file measures the masks.
     pe = EmpiricalPrior(; me = ExpWeightedExpectedReturns(),
                         ce = RegimeAdjustedExpWeightedCovariance(; centring = PreCentred(),
-                                                                 debias = RawStatistic(),
+                                                                 debias = nothing,
                                                                  regime_lohi_mult = (0.7,
                                                                                      1.6)))
     load(c, o) = parity_load("CrossSectionalFactorPrior", c, o)
@@ -549,7 +549,7 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
     cases = [("Small", "Base"), ("Small", "Lag2"), ("Small", "FamOne"), ("Small", "FamTwo"),
              ("Small", "Currency"), ("Small", "Macro"), ("Large", "Base"),
              ("Large", "FamOne")]
-    weightings = (BenchmarkWeightMetric(), IdentityMetric(), RegressionWeightMetric())
+    weightings = (BenchmarkWeightMetric(), nothing, RegressionWeightMetric())
 
     @testset "The regression group, $(fix) $(c)" for (fix, c) in cases
         csfm = block(fix, c)

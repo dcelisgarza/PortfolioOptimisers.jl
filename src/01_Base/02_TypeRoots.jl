@@ -427,7 +427,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the debias rule of a regime statistic. The rule selects whether the statistic corrects the bias of the estimated variance that it reads.
 
-The two regime-adjusted estimators hold a debias rule in their `debias` field: [`RegimeAdjustedExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedCovariance`](@ref). This file declares the root with the other roots, because the estimators bind their field to it before the members load.
+The two regime-adjusted estimators hold a debias rule, or `nothing` for the raw statistic, in their `debias` field: [`RegimeAdjustedExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedCovariance`](@ref). This file declares the root with the other roots, because the estimators bind their field to it before the members load.
 
 # Interfaces
 
@@ -437,7 +437,7 @@ A debias rule is a marker for dispatch, and it holds no data. A new rule needs a
 
   - [`ExactDebias`](@ref)
   - [`LawDebias`](@ref)
-  - [`RawStatistic`](@ref)
+  - [`debiases`](@ref)
 """
 abstract type AbstractRegimeDebias <: AbstractAlgorithm end
 """
@@ -479,7 +479,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the variance that standardises each product of the separate correlation path. The rule selects whether the estimator divides the variance state by its weight before the product divides by the variance.
 
-[`RegimeAdjustedExpWeightedCovariance`](@ref) holds the rule in its `cor_vol` field. The rule acts only where `cor_decay` is not `nothing`, and only in the warm-up, where the weight of the variance state is below one. This file declares the root with the other roots, because the estimator binds its field to it before the members load.
+[`RegimeAdjustedExpWeightedCovariance`](@ref) holds the rule, or `nothing` for the raw variance state, in its `cor_vol` field. The rule acts only where `cor_decay` is not `nothing`, and only in the warm-up, where the weight of the variance state is below one. This file declares the root with the other roots, because the estimator binds its field to it before the members load.
 
 # Interfaces
 
@@ -488,7 +488,7 @@ A rule is a marker for dispatch, and it holds no data. A new rule needs a method
 # Related
 
   - [`BiasCorrectedVolatility`](@ref)
-  - [`RawVolatility`](@ref)
+  - [`correlation_variance`](@ref)
 """
 abstract type AbstractCorrelationVolatility <: AbstractAlgorithm end
 """

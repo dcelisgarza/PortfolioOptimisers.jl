@@ -80,7 +80,7 @@ function oracle_estimator(; kwargs...)
                                                regime_min_obs = 2,
                                                regime_lohi_mult = (0.7, 1.6),
                                                centring = PreCentred(), min_val = 1e-12,
-                                               debias = RawStatistic(), kwargs...)
+                                               debias = nothing, kwargs...)
 end
 
 #=
@@ -131,8 +131,8 @@ is `x_t² ≥ 0`, and the rule after the update stays (#1440).
         @test st.variance ≈ v rtol = 1e-14
         @test st.cor_state ≈ Q rtol = 1e-14
         # The oracle's rule reads the raw variance state.
-        raw = PO.regime_adjusted_covariance_pass!(rule(b; cor_vol = RawVolatility()), X, 1,
-                                                  nothing, nothing)
+        raw = PO.regime_adjusted_covariance_pass!(rule(b; cor_vol = nothing), X, 1, nothing,
+                                                  nothing)
         @test raw.cor_state ≈ by_hand(X, 0.8, 0.9, b, false)[2] rtol = 1e-14
     end
     # The two rules differ, and the default is the rule before the update.
@@ -539,7 +539,12 @@ estimate and the dependence of the deviation on it; `LawDebias()` reads the law 
     @test PO.debiases(LawDebias()) &&
           PO.reads_dependence(ExactDebias()) &&
           !PO.reads_dependence(LawDebias()) &&
-          !PO.reads_dependence(RawStatistic())
+          !PO.reads_dependence(nothing)
+    # `nothing` is the raw statistic, and the raw variance state on the separate path (#1867).
+    @test !PO.debiases(nothing)
+    @test PO.correlation_variance(nothing, [0.5, 2.0], lam, [1, 3]) == [0.5, 2.0]
+    @test RegimeAdjustedExpWeightedCovariance(; debias = nothing, cor_vol = nothing).debias ===
+          nothing
     # The state of an estimator holds the table of its rule.
     ce = RegimeAdjustedExpWeightedVariance(; decay = lam, hac_lags = 2, min_obs = 1,
                                            debias = LawDebias())

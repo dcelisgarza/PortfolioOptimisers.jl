@@ -351,7 +351,7 @@ end
 """
     exposure_correlation(B::Arr3Num, w::Option{<:MatNum} = nothing) -> Matrix{<:Real}
     exposure_correlation(csfm::CrossSectionalFactorModel;
-                         weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric()) -> FactorDiagnosticResult
+                         weighting::Option{<:AbstractOrthogonalityMetric} = BenchmarkWeightMetric()) -> FactorDiagnosticResult
 
 Return the time-averaged correlation between every pair of factor exposures.
 
@@ -390,7 +390,7 @@ Where:
   - `B`: Exposure history `observations × assets × factors`, unlagged.
   - `w`: Cross-sectional weight history `observations × assets`, or `nothing` for equal weights.
   - `csfm`: A cross-sectional factor model block.
-  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history that the verb reads off the block, and [`cs_diagnostic_weights`](@ref) resolves it over the whole observation axis.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), or `nothing` for equal weights. It names the weight history that the verb reads off the block, and [`cs_diagnostic_weights`](@ref) resolves it over the whole observation axis.
 
 # Validation
 
@@ -425,7 +425,7 @@ function exposure_correlation(B::Arr3Num, w::Option{<:MatNum} = nothing)
     return Cm
 end
 function exposure_correlation(csfm::CrossSectionalFactorModel;
-                              weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric())
+                              weighting::Option{<:AbstractOrthogonalityMetric} = BenchmarkWeightMetric())
     C = exposure_correlation(cs_diagnostic_exposures(csfm),
                              cs_diagnostic_weights(weighting, csfm))
     return FactorDiagnosticResult(C, csfm.nf, csfm.fam, (1, 2))
@@ -567,7 +567,7 @@ end
     exposure_stability(B::Arr3Num, w::Option{<:MatNum} = nothing;
                        step::Integer = 21) -> Matrix{<:Real}
     exposure_stability(csfm::CrossSectionalFactorModel; step::Integer = 21,
-                       weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric()) -> FactorDiagnosticResult
+                       weighting::Option{<:AbstractOrthogonalityMetric} = BenchmarkWeightMetric()) -> FactorDiagnosticResult
 
 Return the stability of every factor exposure, one row per pair of observations.
 
@@ -597,7 +597,7 @@ Where:
   - `w`: Cross-sectional weight history `observations × assets`, or `nothing` for equal weights.
   - `step`: Number of observations between the two cross-sections.
   - `csfm`: A cross-sectional factor model block.
-  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history that the verb reads off the block, and [`cs_diagnostic_weights`](@ref) resolves it over the whole observation axis.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), or `nothing` for equal weights. It names the weight history that the verb reads off the block, and [`cs_diagnostic_weights`](@ref) resolves it over the whole observation axis.
 
 # Validation
 
@@ -634,7 +634,7 @@ function exposure_stability(B::Arr3Num, w::Option{<:MatNum} = nothing; step::Int
     return S
 end
 function exposure_stability(csfm::CrossSectionalFactorModel; step::Integer = 21,
-                            weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric())
+                            weighting::Option{<:AbstractOrthogonalityMetric} = BenchmarkWeightMetric())
     S = exposure_stability(cs_diagnostic_exposures(csfm),
                            cs_diagnostic_weights(weighting, csfm); step = step)
     return FactorDiagnosticResult(S, csfm.nf, csfm.fam, (2,))
@@ -642,7 +642,7 @@ end
 """
     exposure_dispersion(B::Arr3Num, w::Option{<:MatNum} = nothing) -> Matrix{<:Real}
     exposure_dispersion(csfm::CrossSectionalFactorModel;
-                        weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric()) -> FactorDiagnosticResult
+                        weighting::Option{<:AbstractOrthogonalityMetric} = BenchmarkWeightMetric()) -> FactorDiagnosticResult
 
 Return the weighted cross-sectional standard deviation of every factor exposure, one row per observation.
 
@@ -669,7 +669,7 @@ Where:
   - `B`: Exposure history `observations × assets × factors`, unlagged.
   - `w`: Cross-sectional weight history `observations × assets`, or `nothing` for equal weights.
   - `csfm`: A cross-sectional factor model block.
-  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history that the verb reads off the block, and [`cs_diagnostic_weights`](@ref) resolves it over the whole observation axis.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), or `nothing` for equal weights. It names the weight history that the verb reads off the block, and [`cs_diagnostic_weights`](@ref) resolves it over the whole observation axis.
 
 # Validation
 
@@ -756,7 +756,7 @@ function exposure_cross_section_std(B::Arr3Num, u::MatNum, t::Integer, k::Intege
     return sqrt(v / ws)
 end
 function exposure_dispersion(csfm::CrossSectionalFactorModel;
-                             weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric())
+                             weighting::Option{<:AbstractOrthogonalityMetric} = BenchmarkWeightMetric())
     D = exposure_dispersion(cs_diagnostic_exposures(csfm),
                             cs_diagnostic_weights(weighting, csfm))
     return FactorDiagnosticResult(D, csfm.nf, csfm.fam, (2,))
@@ -764,7 +764,7 @@ end
 """
     exposure_coverage(B::Arr3Num, w::Option{<:MatNum} = nothing) -> Vector{<:Real}
     exposure_coverage(csfm::CrossSectionalFactorModel;
-                      weighting::AbstractOrthogonalityMetric = RegressionWeightMetric()) -> FactorDiagnosticResult
+                      weighting::Option{<:AbstractOrthogonalityMetric} = RegressionWeightMetric()) -> FactorDiagnosticResult
 
 Return the coverage of every factor exposure, one entry per factor.
 
@@ -792,7 +792,7 @@ Where:
   - `B`: Exposure history `observations × assets × factors`, unlagged.
   - `w`: Cross-sectional weight history `observations × assets`, or `nothing` for every asset.
   - `csfm`: A cross-sectional factor model block.
-  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history that sets the universe, and [`exposure_coverage_weights`](@ref) resolves it over the whole observation axis.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), or `nothing` for equal weights. It names the weight history that sets the universe, and [`exposure_coverage_weights`](@ref) resolves it over the whole observation axis.
 
 # Validation
 
@@ -884,13 +884,13 @@ function exposure_covered_count(B::Arr3Num, u::MatNum, t::Integer, k::Integer)
     return n
 end
 function exposure_coverage(csfm::CrossSectionalFactorModel;
-                           weighting::AbstractOrthogonalityMetric = RegressionWeightMetric())
+                           weighting::Option{<:AbstractOrthogonalityMetric} = RegressionWeightMetric())
     c = exposure_coverage(cs_diagnostic_exposures(csfm),
                           exposure_coverage_weights(weighting, csfm))
     return FactorDiagnosticResult(c, csfm.nf, csfm.fam, (1,))
 end
 """
-    exposure_coverage_weights(weighting::AbstractOrthogonalityMetric,
+    exposure_coverage_weights(weighting::Option{<:AbstractOrthogonalityMetric},
                               csfm::CrossSectionalFactorModel)
     exposure_coverage_weights(weighting::RegressionWeightMetric,
                               csfm::CrossSectionalFactorModel)
@@ -918,7 +918,7 @@ The regression weights state the estimation universe of the fit. A block that ca
   - [`cs_diagnostic_weights`](@ref)
   - [`RegressionWeightMetric`](@ref)
 """
-function exposure_coverage_weights(weighting::AbstractOrthogonalityMetric,
+function exposure_coverage_weights(weighting::Option{<:AbstractOrthogonalityMetric},
                                    csfm::CrossSectionalFactorModel)
     return cs_diagnostic_weights(weighting, csfm)
 end

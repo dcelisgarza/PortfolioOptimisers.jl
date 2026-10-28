@@ -518,3 +518,14 @@ answer on the clean and on the poisoned copy. Its last test set checks that a fi
 axes, the selected assets and every Panel Field with its labels or levels. `asset_panel(df, mf)`
 reads an Asset Panel back from a table that `panel_dataframe` wrote, in the long or the wide
 layout, with its active and estimation masks. The `AssetPanel` constructor checks the result.
+
+## Amendment (2026-10-28, #1867)
+
+**`alg = nothing` refuses a blank, and `NoPanelFill` is removed.** `NoPanelFill()` named no rule.
+It filled no cell, and ADR 0222 spells a skipped procedure as `nothing`. So the `alg` field of
+`NumericPanelInput`, `CategoricalPanelInput` and `TensorPanelInput` is bound to
+`Option{<:AbstractPanelFillAlgorithm}`, with the default `nothing`. `panel_fill(::Nothing, v, name)`
+throws the same `ArgumentError` on a blank cell, and names the Panel Field and the position of the
+first blank in the whole column. A Panel Field whose policy is `nothing` still carries no observed
+mask. The numbers do not move. Where the decision above names `NoPanelFill`, read `alg = nothing`.
+The removal is a clean break with no deprecation, as ADR 0044 and ADR 0213 set.

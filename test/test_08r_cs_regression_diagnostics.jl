@@ -700,7 +700,7 @@ using Statistics
 
         # Measured maxrel 3.5e-16, 6.6e-16 and 3.4e-16.
         @test exposure_agrees(exposure_correlation(csfm).X, ref_corr_bw)
-        @test exposure_agrees(exposure_correlation(csfm; weighting = IdentityMetric()).X,
+        @test exposure_agrees(exposure_correlation(csfm; weighting = nothing).X,
                               ref_corr_id)
         @test exposure_agrees(exposure_correlation(csfm;
                                                    weighting = RegressionWeightMetric()).X,
@@ -895,13 +895,12 @@ using Statistics
               rw
         @test PortfolioOptimisers.cs_diagnostic_weights(InverseIdiosyncraticVarianceMetric(),
                                                         csfm) == 1 ./ vs
-        @test isnothing(PortfolioOptimisers.cs_diagnostic_weights(IdentityMetric(), csfm))
+        @test isnothing(PortfolioOptimisers.cs_diagnostic_weights(nothing, csfm))
         # The answer under a member is the answer under the history it names.
         @test exposure_agrees(exposure_dispersion(csfm;
                                                   weighting = RegressionWeightMetric()).X,
                               exposure_dispersion(Ms, rw))
-        @test exposure_agrees(exposure_stability(csfm; step = 2,
-                                                 weighting = IdentityMetric()).X,
+        @test exposure_agrees(exposure_stability(csfm; step = 2, weighting = nothing).X,
                               exposure_stability(Ms; step = 2))
         # A block that carries no such field refuses, and the refusal names the field.
         bare = CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N), csr = csr,
@@ -922,14 +921,14 @@ using Statistics
         @test isnothing(PortfolioOptimisers.exposure_coverage_weights(RegressionWeightMetric(),
                                                                       bare))
         @test exposure_coverage(bare).X ==
-              exposure_coverage(bare; weighting = IdentityMetric()).X ==
+              exposure_coverage(bare; weighting = nothing).X ==
               exposure_coverage(Ms)
     end
 
     @testset "a block that carries no history refuses by name" begin
         empty_block = CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N))
         @test_throws PortfolioOptimisers.IsNothingError exposure_correlation(empty_block;
-                                                                             weighting = IdentityMetric())
+                                                                             weighting = nothing)
         @test_throws PortfolioOptimisers.IsNothingError exposure_ic(empty_block)
         no_fit = CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N), Ms = Ms,
                                            lag = 1)
@@ -1046,8 +1045,8 @@ using Statistics
         @test Kred == 2
         # The exposure group answers on the raw axis, because it reads the exposure history
         # and never the design of the fit.
-        @test size(exposure_correlation(blk; weighting = IdentityMetric()).X) == (Kr, Kr)
-        @test size(exposure_dispersion(blk; weighting = IdentityMetric()).X) == (Tr, Kr)
+        @test size(exposure_correlation(blk; weighting = nothing).X) == (Kr, Kr)
+        @test size(exposure_dispersion(blk; weighting = nothing).X) == (Tr, Kr)
         @test size(exposure_ic(blk).X) == (Tr - 1, Kr)
         # `reduced` is the one mode that maps the exposures through the re-basis first.
         @test size(exposure_ic(blk; reduced = true).X) == (Tr - 1, Kred)
@@ -1059,10 +1058,10 @@ using Statistics
         # Each answer carries the names and the families of its own axis: the raw axis, or
         # the reduced axis, which drops the second industry.
         PO = PortfolioOptimisers
-        raw = (exposure_correlation(blk; weighting = IdentityMetric()),
-               exposure_dispersion(blk; weighting = IdentityMetric()), exposure_ic(blk),
-               exposure_stability(blk; step = 2, weighting = IdentityMetric()),
-               exposure_coverage(blk; weighting = IdentityMetric()))
+        raw = (exposure_correlation(blk; weighting = nothing),
+               exposure_dispersion(blk; weighting = nothing), exposure_ic(blk),
+               exposure_stability(blk; step = 2, weighting = nothing),
+               exposure_coverage(blk; weighting = nothing))
         for r in raw
             @test r.nf == ["tech", "bank", "value"]
             @test r.fam == ["industry", "industry", "style"]
@@ -1402,7 +1401,8 @@ function exposure_hand_panel(fields::AbstractVector{<:Pair{String, <:AbstractMat
                              emsk::AbstractMatrix{Bool} = amsk,
                              bw::Union{Nothing, <:AbstractMatrix} = nothing,
                              sectors::Union{Nothing, <:AbstractMatrix} = nothing,
-                             sector_alg::PortfolioOptimisers.AbstractPanelFillAlgorithm = NoPanelFill())
+                             sector_alg::Union{Nothing,
+                                               <:PortfolioOptimisers.AbstractPanelFillAlgorithm} = nothing)
     inputs = Any[NumericPanelInput(; name = n, vals = v,
                                    alg = ForwardPanelFill(; val = 0.0))
                  for (n, v) in fields]
@@ -1734,10 +1734,9 @@ end
         rdf = ReturnsResult(; nx = rd.nx, X = zeros(Float32, 2, 2), pnl = rd.pnl)
         @test eltype(factor_exposure(ConstantExposure(), rdf)) == Float32
     end
-    @testset "A carrier with no Asset Panel is refused" begin
+    @testset "A carrier with no Asset Panel reads the mask of its returns" begin
         rdn = ReturnsResult(; nx = ["A1", "A2"], X = zeros(2, 2))
-        @test_throws PortfolioOptimisers.IsNothingError factor_exposure(ConstantExposure(),
-                                                                        rdn)
+        @test factor_exposure(ConstantExposure(), rdn) == ones(2, 2)
     end
 end
 
@@ -2226,8 +2225,7 @@ using Statistics
         ref_stability_id = [-0.4257338194977314, 0.11924492275222023, 0.18145249792020487]
         ref_stability_rw = [-0.25229769514274375, 0.0032308107079838436,
                             0.26713295230303086]
-        fs_id = factor_model_summary(csfmA; ppy = 252, step = 3,
-                                     weighting = IdentityMetric())
+        fs_id = factor_model_summary(csfmA; ppy = 252, step = 3, weighting = nothing)
         fs_rw = factor_model_summary(csfmA; ppy = 252, step = 3,
                                      weighting = RegressionWeightMetric())
         @test summary_agrees(fs_id.stability, ref_stability_id)
@@ -2353,7 +2351,7 @@ using Statistics
         fs = factor_model_summary(blk; ppy = 252, step = 3)
         @test fs.coverage == exposure_coverage(blk).X
         @test fs.coverage == exposure_coverage(MsA)
-        @test fs.coverage == exposure_coverage(blk; weighting = IdentityMetric()).X
+        @test fs.coverage == exposure_coverage(blk; weighting = nothing).X
     end
 
     @testset "a block with no exposure history carries five absent columns" begin

@@ -80,7 +80,7 @@ function oracle_estimator(; kwargs...)
                                                regime_min_obs = 2,
                                                regime_lohi_mult = (0.7, 1.6),
                                                centring = PreCentred(), min_val = 1e-12,
-                                               debias = RawStatistic(), kwargs...)
+                                               debias = nothing, kwargs...)
 end
 
 #=
@@ -145,8 +145,7 @@ correlation of the block (ADR 0190).
     end
     @test 0.99 < covariance_multiplier(PO.RootMeanSquaredAdjusted()) < 1.01
     @test 0.97 < covariance_multiplier(PO.FirstMomentRegimeAdjusted()) < 1.03
-    @test covariance_multiplier(PO.RootMeanSquaredAdjusted(); debias = RawStatistic()) >
-          1.08
+    @test covariance_multiplier(PO.RootMeanSquaredAdjusted(); debias = nothing) > 1.08
     @test 0.98 <
           covariance_multiplier(PO.RootMeanSquaredAdjusted(); cor_decay = 2.0^(-1 / 20)) <
           1.02
@@ -221,8 +220,7 @@ law, on the estimated spectrum shrunk until its dispersion is unbiased (ADR 0190
         # factor reads the moments of each term at the count of its asset (#1434).
         raw = RegimeAdjustedExpWeightedCovariance(; decay = lambda, min_obs = 5, extra...,
                                                   regime_target = PO.DiagonalTarget(),
-                                                  regime_method = FM,
-                                                  debias = RawStatistic())
+                                                  regime_method = FM, debias = nothing)
         m = [PO.regime_bias!(cache.bias.moments, PO.RegimeTermMoments(FM), lambda, k)
              for k in cache.obs_count[idx]]
         @test PO.diagonal_law_factor(PO.RootMeanSquaredAdjusted(), cache, ce, C, idx, m) ===
@@ -482,13 +480,13 @@ and `hac_floor = PerTermHacFloor()` keeps it (ADR 0190).
     for method in (RMS, FM)
         @test 0.97 < variance_multiplier(method) < 1.03
     end
-    @test variance_multiplier(RMS; debias = RawStatistic()) > 1.1
+    @test variance_multiplier(RMS; debias = nothing) > 1.1
     @test variance_multiplier(RMS; hac_floor = PerTermHacFloor()) < 0.9
     @test 0.97 < covariance_multiplier(fixed, RMS) < 1.03
-    @test covariance_multiplier(fixed, RMS; debias = RawStatistic()) > 1.1
+    @test covariance_multiplier(fixed, RMS; debias = nothing) > 1.1
     @test 0.97 < covariance_multiplier(PO.MahalanobisTarget(), RMS; min_obs = 17) < 1.03
     @test covariance_multiplier(PO.MahalanobisTarget(), RMS; min_obs = 17,
-                                debias = RawStatistic()) > 2
+                                debias = nothing) > 2
 end
 
 #=

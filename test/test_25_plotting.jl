@@ -600,7 +600,7 @@
             @test is_plot(plt(csfm_ex))
             @test is_plot(plt(pr_ex))
             @test is_plot(plt(csfm_ex; nf = ["a", "b", "c"]))
-            @test is_plot(plt(csfm_ex; weighting = IdentityMetric()))
+            @test is_plot(plt(csfm_ex; weighting = nothing))
         end
         @test is_plot(plot_exposure_stability(csfm_ex; step = 3))
         @test is_plot(plot_exposure_stability(pr_ex; step = 3))
@@ -617,7 +617,7 @@
         # A block that names no factor is labelled by position.
         bare_ex = CrossSectionalFactorModel(; M = Ms_ex[Te, :, :], b = zeros(Ne),
                                             csr = csr_ex, Ms = Ms_ex, lag = 1)
-        @test is_plot(plot_exposure_correlation(bare_ex; weighting = IdentityMetric()))
+        @test is_plot(plot_exposure_correlation(bare_ex; weighting = nothing))
         @test is_plot(plot_exposure_distribution(bare_ex))
         # A re-based block labels the cumulative information coefficient on the reduced
         # axis when it is asked for the reduced answer.
@@ -697,9 +697,8 @@
         @test is_plot(plot_factor_model_summary(csfm_fs; ppy = 252, step = 3))
         @test is_plot(plot_factor_model_summary(pr_fs; ppy = 252, step = 3))
         @test is_plot(plot_factor_model_summary(csfm_fs; ppy = 252, step = 3,
-                                                nf = ["a", "b", "c"],
-                                                weighting = IdentityMetric(),
-                                                coverage_weighting = IdentityMetric()))
+                                                nf = ["a", "b", "c"], weighting = nothing,
+                                                coverage_weighting = nothing))
         # A block with no exposure history draws its four factor return columns alone.
         bare_fs = CrossSectionalFactorModel(; M = Ms_fs[Tf, :, :], b = zeros(Nf),
                                             csr = csr_fs, lag = 1)

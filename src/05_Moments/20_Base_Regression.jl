@@ -212,22 +212,23 @@ A member of this family selects a weight vector that a fitted loadings block alr
 
 Two readers resolve a member to two different shapes, both from the same field of the block. `orthogonality_weights` reads the weights of the latest observation, one entry per asset. An uncertainty set reads them, because it applies to the next decision. `cs_diagnostic_weights` reads the whole observation history, one row per observation, for a diagnostic that scores every observation and not only the latest.
 
+`nothing` in the place of a member names no weight source, so every asset carries the same weight. It reads nothing from the loadings block, so it serves a block that carries neither a weight history nor an idiosyncratic variance. Both readers return `nothing` for it, and their caller takes `nothing` as a vector of ones.
+
 # Interfaces
 
 ## `orthogonality_weights`
 
-  - `orthogonality_weights(metric::AbstractOrthogonalityMetric, rr::AbstractLoadingsRegressionResult) -> Option{<:VecNum}`: Returns the weights of the latest observation, or `nothing` when the member is the unweighted one.
+  - `orthogonality_weights(metric::AbstractOrthogonalityMetric, rr::AbstractLoadingsRegressionResult) -> VecNum`: Returns the weights of the latest observation.
 
 ## `cs_diagnostic_weights`
 
-  - `cs_diagnostic_weights(metric::AbstractOrthogonalityMetric, csfm::CrossSectionalFactorModel) -> Option{<:MatNum}`: Returns the whole observation history the member names, or `nothing` when the member is the unweighted one.
+  - `cs_diagnostic_weights(metric::AbstractOrthogonalityMetric, csfm::CrossSectionalFactorModel) -> MatNum`: Returns the whole observation history the member names.
 
 # Related
 
   - [`BenchmarkWeightMetric`](@ref)
   - [`RegressionWeightMetric`](@ref)
   - [`InverseIdiosyncraticVarianceMetric`](@ref)
-  - [`IdentityMetric`](@ref)
   - [`AbstractCrossSectionalWeightsAlgorithm`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
 """
@@ -241,7 +242,7 @@ The `bw` field of a block carries the benchmark weight of every asset at every o
 
 The metric needs every investable asset in the latest fit. An asset can be in the Investable Mask and outside the estimation universe of the latest cross-section. Its return is finite, so the prior states a moment for it. But the fit drops the asset, so its benchmark weight is zero there.
 
-A zero weight has no inverse, so an uncertainty set on this metric refuses the block. On a point-in-time Asset Panel whose latest cross-section does not cover the whole Investable Mask, use [`InverseIdiosyncraticVarianceMetric`](@ref) or [`IdentityMetric`](@ref), which read no weight history.
+A zero weight has no inverse, so an uncertainty set on this metric refuses the block. On a point-in-time Asset Panel whose latest cross-section does not cover the whole Investable Mask, use [`InverseIdiosyncraticVarianceMetric`](@ref) or `nothing`, which read no weight history.
 
 # Examples
 
@@ -266,7 +267,7 @@ The `rw` field of a block carries the weight that the Cross-Sectional Regression
 
 The metric needs every investable asset in the latest fit. An asset can be in the Investable Mask and outside the estimation universe of the latest cross-section. Its return is finite, so the prior states a moment for it. But the fit drops the asset, so its regression weight is zero there.
 
-A zero weight has no inverse, so an uncertainty set on this metric refuses the block. On a point-in-time Asset Panel whose latest cross-section does not cover the whole Investable Mask, use [`InverseIdiosyncraticVarianceMetric`](@ref) or [`IdentityMetric`](@ref), which read no weight history.
+A zero weight has no inverse, so an uncertainty set on this metric refuses the block. On a point-in-time Asset Panel whose latest cross-section does not cover the whole Investable Mask, use [`InverseIdiosyncraticVarianceMetric`](@ref) or `nothing`, which read no weight history.
 
 # Examples
 
@@ -299,30 +300,9 @@ InverseIdiosyncraticVarianceMetric()
 # Related
 
   - [`AbstractOrthogonalityMetric`](@ref)
-  - [`IdentityMetric`](@ref)
   - [`idiosyncratic_variances`](@ref)
 """
 struct InverseIdiosyncraticVarianceMetric <: AbstractOrthogonalityMetric end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Names no weight source, so every asset carries the same weight.
-
-It is the only member that reads nothing from the loadings block, and it serves a block that carries neither a weight history nor an idiosyncratic variance. Both readers return `nothing` for this member, and their caller takes `nothing` as a vector of ones.
-
-# Examples
-
-```jldoctest
-julia> IdentityMetric()
-IdentityMetric()
-```
-
-# Related
-
-  - [`AbstractOrthogonalityMetric`](@ref)
-  - [`InverseIdiosyncraticVarianceMetric`](@ref)
-"""
-struct IdentityMetric <: AbstractOrthogonalityMetric end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -1880,7 +1860,7 @@ function pin_regression_choice(re::AbstractTimeSeriesRegressionEstimator, ::MatN
 end
 
 export regression, Regression, LinearModel, GeneralisedLinearModel, BenchmarkWeightMetric,
-       RegressionWeightMetric, InverseIdiosyncraticVarianceMetric, IdentityMetric
+       RegressionWeightMetric, InverseIdiosyncraticVarianceMetric
 public AbstractTimeSeriesRegressionEstimator, AbstractCrossSectionalRegressionEstimator
 # The `# Interfaces`-marked type of #1145 (ADR 0154): AbstractOrthogonalityMetric names the two
 # verbs an extension must implement, whose concrete methods live under

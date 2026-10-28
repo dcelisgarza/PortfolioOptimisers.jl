@@ -1621,7 +1621,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the Systematic Repair rule of a [`CrossSectionalFactorPrior`](@ref), the rule that says whether the lift repairs the systematic block before it adds the idiosyncratic block.
 
-[`cross_sectional_lift`](@ref) projects the factor covariance onto the investable assets. The result is the systematic block, whose rank is at most the number of factors. So the block is not positive definite when the investable assets outnumber the factors, and a repair under `mp.pdm` moves it by round-off alone. The lift then adds the idiosyncratic block and repairs the sum under the estimator that [`matrix_processing_posdef`](@ref) gives for `mp`, under every rule. The rule decides only which steps of `mp` run on the systematic block before the sum.
+[`cross_sectional_lift`](@ref) projects the factor covariance onto the investable assets. The result is the systematic block, whose rank is at most the number of factors. So the block is not positive definite when the investable assets outnumber the factors, and a repair under `mp.pdm` moves it by round-off alone. The lift then adds the idiosyncratic block and repairs the sum under the estimator that [`matrix_processing_posdef`](@ref) gives for `mp`, under every rule. The rule decides only which steps of `mp` run on the systematic block before the sum. `nothing` in the place of a rule is the default, and it does not repair the systematic block: it runs every step of `mp` except the `:pdm` step, as [`systematic_processing!`](@ref) states.
 
 # Interfaces
 
@@ -1646,7 +1646,6 @@ In order to implement a new concrete type that works seamlessly with the library
 # Related
 
   - [`SystematicRepair`](@ref)
-  - [`NoSystematicRepair`](@ref)
   - [`systematic_processing!`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
   - [`cross_sectional_lift`](@ref)
@@ -1731,7 +1730,7 @@ The answer states an entry exactly when the model determines it. An asset of ``\
 
  1. Take `Li`, the rows of `L` at the investable assets. Get `D` and `R` from [`cross_sectional_residual_block`](@ref).
  2. Project the factor mean through `Li`, giving `mui`, and the factor covariance, giving `si`, each with [`support_product`](@ref).
- 3. Process `si` under `srep` with [`systematic_processing!`](@ref). [`SystematicRepair`](@ref) runs every step of `mp`, as [`factor_lift`](@ref) does, and [`NoSystematicRepair`](@ref) runs every step except the `:pdm` step.
+ 3. Process `si` under `srep` with [`systematic_processing!`](@ref). [`SystematicRepair`](@ref) runs every step of `mp`, as [`factor_lift`](@ref) does, and `nothing` runs every step except the `:pdm` step.
  4. Add `D` to `si`, and make the sum positive definite under the estimator that [`matrix_processing_posdef`](@ref) gives for `mp`.
  5. Take the ready factors of `f_mu` and `f_sigma` with [`cross_sectional_ready_factors`](@ref), and `lf`, the ready factors whose column of `f_sigma` over the ready factors is not zero. Take the square root `Lf` of the block of `f_sigma` at `lf` under `mtx_sqrt`, and write it into the block at `lf` of a zero matrix `Cf`.
  6. Build `ci`, the low-rank square root `[Li * Cf  R]`.
@@ -1773,7 +1772,7 @@ The answer states an entry exactly when the model determines it. An asset of ``\
   - [`AbstractSystematicRepair`](@ref)
   - [`systematic_processing!`](@ref)
 """
-function cross_sectional_lift(srep::AbstractSystematicRepair,
+function cross_sectional_lift(srep::Option{<:AbstractSystematicRepair},
                               mp::AbstractMatrixProcessingEstimator, L::MatNum,
                               f_mu::VecNum, f_sigma::MatNum, esigma::VecNum_MatNum,
                               idx::AbstractVector{<:Integer}, Xs::MatNum;

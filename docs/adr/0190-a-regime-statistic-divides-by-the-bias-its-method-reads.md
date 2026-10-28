@@ -567,3 +567,15 @@ and `hac_floor!(::Nothing, X2, valid)` returns the squares unchanged. The defaul
 not move: no floor is still the default, and `PerTermHacFloor()` is still the oracle's rule. Where
 the decision above names `hac_floor = NoHacFloor()`, read `hac_floor = nothing`. The removal is a
 clean break with no deprecation, as ADR 0044 and ADR 0213 set.
+
+## Amendment (2026-10-28)
+
+**`debias = nothing` scores the raw statistic, and `RawStatistic` is removed (#1867).** The
+maintainer refined the rule of ADR 0222: a skipped procedure, or a trivial default, takes
+`nothing`, never a singleton that names it. `RawStatistic` skipped the debias and held no rule of
+its own, so the `debias` field of the two regime-adjusted estimators is bound to
+`Option{<:AbstractRegimeDebias}`. `debiases(::Nothing)` and `reads_dependence(::Nothing)` return
+`false`, as the methods on `RawStatistic` did. A regime method of a caller takes `debias = nothing`,
+and the refusal of the constructor names that spelling. The default `ExactDebias()` and the numbers
+do not move. Where the decision above names `debias = RawStatistic()`, read `debias = nothing`. The
+removal is a clean break with no deprecation, as ADR 0044 and ADR 0213 set.

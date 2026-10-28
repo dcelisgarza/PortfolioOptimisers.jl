@@ -342,7 +342,7 @@ $(DocStringExtensions.FIELDS)
                               pdm::AbstractPosdefEstimator = Posdef(; alg = ClippedNearestCorrelation()),
                               f_mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                               mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
-                              srep::AbstractSystematicRepair = NoSystematicRepair(),
+                              srep::Option{<:AbstractSystematicRepair} = nothing,
                               th::Real = 0.0, bp::Real = 1.0,
                               mcap::AbstractString = "market_cap",
                               bw::AbstractString = "benchmark_weights", lag::Integer = 1,
@@ -378,7 +378,7 @@ Keywords correspond to the struct's fields. `factors`, `neutralise` and `familie
   - A rule in `lambda` or in `c` that reads the Return Forecast history needs a fitted `rfe`, as [`assert_forecast_history_rule`](@ref) states. A rule of the wrong family is refused by the bound of the slot. The number a rule returns is checked when the prior resolves it.
   - [`OrthogonalPartCalibration`](@ref) in `ofit` needs a member that can fit the slope of the orthogonal part, as [`assert_orthogonal_forecast_fit`](@ref) states.
   - Under [`FoldOnly`](@ref) in `carry`, no part makes the cost of a step of the carry fold grow with the stream, as [`assert_carry_rule`](@ref) states.
-  - Under [`NoSystematicRepair`](@ref) in `srep`, `mp` is a [`MatrixProcessing`](@ref), as [`assert_systematic_repair`](@ref) states.
+  - Under `srep = nothing`, `mp` is a [`MatrixProcessing`](@ref), as [`assert_systematic_repair`](@ref) states.
   - `mp` states the estimator with which the lift repairs the asset covariance, see [`assert_matrix_processing_posdef`](@ref).
   - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref).
   - The `x_src` of `pe` is `nothing`, because the prior picks the returns that it reads, see [`assert_inner_reader`](@ref).
@@ -486,7 +486,7 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
     """
     @fprop mp
     """
-    $(field_dict[:srep]) The default is [`NoSystematicRepair`](@ref). The batch fit and the carry fold run the same lift when they read the prior, so the carry fold equals the batch fit under each rule.
+    $(field_dict[:srep]) The default is `nothing`. The batch fit and the carry fold run the same lift when they read the prior, so the carry fold equals the batch fit under each rule.
     """
     srep
     """
@@ -573,8 +573,8 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
                                        pdm::AbstractPosdefEstimator,
                                        f_mp::AbstractMatrixProcessingEstimator,
                                        mp::AbstractMatrixProcessingEstimator,
-                                       srep::AbstractSystematicRepair, th::Real, bp::Real,
-                                       mcap::AbstractString, bw::AbstractString,
+                                       srep::Option{<:AbstractSystematicRepair}, th::Real,
+                                       bp::Real, mcap::AbstractString, bw::AbstractString,
                                        lag::Integer, minra::Option{<:Integer},
                                        rfe::Option{<:AbstractReturnForecastEstimator},
                                        lambda::Num_SpanShrinkCal, c::Num_OrthFcScaleCal,
@@ -639,7 +639,7 @@ function CrossSectionalFactorPrior(; factors::Dict_VecPair,
                                                                          alg = ClippedNearestCorrelation()),
                                    f_mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                                    mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
-                                   srep::AbstractSystematicRepair = NoSystematicRepair(),
+                                   srep::Option{<:AbstractSystematicRepair} = nothing,
                                    th::Real = 0.0, bp::Real = 1.0,
                                    mcap::AbstractString = "market_cap",
                                    bw::AbstractString = "benchmark_weights",

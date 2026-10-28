@@ -11,7 +11,6 @@ MeanSquaredError
 AbstractShrunkExpectedReturnsIntensity
 UnitIntervalIntensity
 NonNegativeIntensity
-UnclampedIntensity
 shrinkage_intensity
 JamesStein
 BayesStein

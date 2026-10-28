@@ -146,7 +146,7 @@ panel that a [`ReturnsResult`](@ref) then holds. A [`NumericPanelInput`](@ref) h
 reported quantity. [`panel_input`](@ref) reads the sector classification off a
 [`UniverseSets`](@ref) and returns a [`CategoricalPanelInput`](@ref).
 
-Every input takes a fill policy, and the default [`NoPanelFill`](@ref) refuses a blank. That is
+Every input takes a fill policy, and the default `alg = nothing` refuses a blank. That is
 the right default, because a blank that reaches the panel becomes a zero in the matrix, and a
 zero in a standardised column is the mean rather than a gap. The build asks you what a gap
 means instead.
@@ -446,7 +446,7 @@ fields, so the shape of the input is not the only difference between the two row
 
   - [`asset_panel`](@ref) is where the panel is built. It takes the raw table, blanks and all,
     and returns the [`AssetPanel`](@ref) a [`ReturnsResult`](@ref) holds.
-  - A fill policy is compulsory. [`NoPanelFill`](@ref) refuses a blank rather than let it
+  - A fill policy is compulsory. The default `alg = nothing` refuses a blank rather than let it
     become a zero in the matrix. A static input takes [`ConstantPanelFill`](@ref), and the two
     directional policies need an observation axis and are refused without one.
   - You standardise the table, before the panel is built. The default [`AngularDist`](@ref)

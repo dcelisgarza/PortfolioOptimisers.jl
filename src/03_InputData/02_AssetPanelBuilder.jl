@@ -5,7 +5,7 @@ Supertype of the policies that resolve a blank cell of a raw Panel Field.
 
 All concrete types stating what a Panel Field's blank cell becomes should subtype `AbstractPanelFillAlgorithm`.
 
-A blank never reaches a `PricesResult` or a `ReturnsResult`. [`asset_panel`](@ref) resolves every one of them, so every Panel Field comes out finite. The policy gives the resolved value. The observed mask of the Panel Field records which cells the policy resolved. A value that the policy writes is data, and every reader reads it. The one exception is a placeholder, a value that the policy writes only because it has nothing to carry into the cell. The placeholder mask of the Panel Field marks it, and no reader reads it.
+A blank never reaches a `PricesResult` or a `ReturnsResult`. [`asset_panel`](@ref) resolves every one of them, so every Panel Field comes out finite. `nothing` in the place of a policy is the default. It fills no cell, so a blank cell throws an error that names the Panel Field. Use it for a Panel Field that has no blank by construction. The policy gives the resolved value. The observed mask of the Panel Field records which cells the policy resolved. A value that the policy writes is data, and every reader reads it. The one exception is a placeholder, a value that the policy writes only because it has nothing to carry into the cell. The placeholder mask of the Panel Field marks it, and no reader reads it.
 
 # Interfaces
 
@@ -46,41 +46,14 @@ An input checks the type of `val` against the type of its cells with `assert_pan
 
 # Related
 
-  - [`NoPanelFill`](@ref)
   - [`ConstantPanelFill`](@ref)
   - [`ForwardPanelFill`](@ref)
   - [`BackwardPanelFill`](@ref)
+  - [`panel_fill`](@ref)
   - [`panel_placeholder`](@ref)
   - [`asset_panel`](@ref)
 """
 abstract type AbstractPanelFillAlgorithm <: AbstractAlgorithm end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Refuses a blank cell instead of resolving one.
-
-This is the default, and it is the policy for a Panel Field that has no blank by construction. A Panel Field with this policy carries no observed mask. Every cell is observed or the build throws, so the mask would record nothing.
-
-# Constructors
-
-    NoPanelFill() -> NoPanelFill
-
-# Examples
-
-```jldoctest
-julia> NoPanelFill()
-NoPanelFill()
-```
-
-# Related
-
-  - [`AbstractPanelFillAlgorithm`](@ref)
-  - [`ConstantPanelFill`](@ref)
-  - [`ForwardPanelFill`](@ref)
-  - [`BackwardPanelFill`](@ref)
-  - [`asset_panel`](@ref)
-"""
-struct NoPanelFill <: AbstractPanelFillAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -115,7 +88,6 @@ ConstantPanelFill
 # Related
 
   - [`AbstractPanelFillAlgorithm`](@ref)
-  - [`NoPanelFill`](@ref)
   - [`ForwardPanelFill`](@ref)
   - [`asset_panel`](@ref)
 """
@@ -334,12 +306,12 @@ function is_panel_blank(x)::Bool
     return ismissing(x) || isnothing(x) || (isa(x, Number) && isnan(x))
 end
 """
-    panel_fill(alg::NoPanelFill, v::AbstractVector, name::AbstractString) -> Vector
+    panel_fill(::Nothing, v::AbstractVector, name::AbstractString) -> Vector
     panel_fill(alg::ConstantPanelFill, v::AbstractVector, name::AbstractString) -> Vector
     panel_fill(alg::ForwardPanelFill, v::AbstractVector, name::AbstractString) -> Vector
     panel_fill(alg::BackwardPanelFill, v::AbstractVector, name::AbstractString) -> Vector
     panel_fill(alg::Union{ForwardPanelFill, BackwardPanelFill}, v::AbstractVector, act::AbstractVector{Bool}, name::AbstractString) -> Vector
-    panel_fill(alg::AbstractPanelFillAlgorithm, v::AbstractVector, act::Option{<:AbstractVector{Bool}}, name::AbstractString) -> Vector
+    panel_fill(alg::Option{<:AbstractPanelFillAlgorithm}, v::AbstractVector, act::Option{<:AbstractVector{Bool}}, name::AbstractString) -> Vector
 
 Resolve the blanks of one asset's column of one raw Panel Field, along the observation axis.
 
@@ -349,7 +321,7 @@ The four-argument form reads the asset's column of the active mask. A directiona
 
 The method that Julia selects is the algorithm, and the four differ in where the replacement comes from.
 
- 1. [`NoPanelFill`](@ref) throws when a cell is blank, and names the Panel Field and the position of the first blank in the column. Otherwise it returns the column unchanged.
+ 1. `nothing` fills no cell. It throws when a cell is blank, and names the Panel Field and the position of the first blank in the column. Otherwise it returns the column unchanged.
  2. [`ConstantPanelFill`](@ref) replaces every blank by `alg.val`. The element type of the result is the union of the element types of `v` and `alg.val` for every column, so the columns of one Panel Field agree.
  3. [`ForwardPanelFill`](@ref) walks the observations in order and carries the last observed value. A blank at `t` takes the carried value from `s` when `t - s <= alg.lim`, and `alg.val` otherwise.
  4. [`BackwardPanelFill`](@ref) does the same walk in reverse order. This looks forward in time, and the docstring of the type states what that costs a fold.
@@ -357,14 +329,14 @@ The method that Julia selects is the algorithm, and the four differ in where the
 
 # Arguments
 
-  - `alg`: The fill policy.
+  - `alg`: The fill policy, or `nothing` to fill no cell.
   - `v`: One asset's raw values along the observation axis, blanks included.
   - `act`: The asset's column of the active mask, the same length as `v`, or `nothing` for no mask.
-  - `name`: The Panel Field's name, displayed in the [`NoPanelFill`](@ref) error message.
+  - `name`: The Panel Field's name, displayed in the error message of `nothing`.
 
 # Validation
 
-  - Under [`NoPanelFill`](@ref), `v` carries no blank. Raises an `ArgumentError`.
+  - Under `nothing`, `v` carries no blank. Raises an `ArgumentError`.
 
 # Returns
 
@@ -378,10 +350,10 @@ The method that Julia selects is the algorithm, and the four differ in where the
   - [`asset_panel`](@ref)
   - [`Option`](@ref)
 """
-function panel_fill(::NoPanelFill, v::AbstractVector, name::AbstractString)
+function panel_fill(::Nothing, v::AbstractVector, name::AbstractString)
     i = findfirst(is_panel_blank, v)
     @argcheck(isnothing(i),
-              ArgumentError("the Panel Field \"$name\" carries a blank cell at position $i, and its fill policy is NoPanelFill, which refuses one. A blank never reaches a PricesResult or a ReturnsResult, so give the field a fill policy — ForwardPanelFill is the one that is safe across a cross-validation fold — or remove the blank from the raw input."))
+              ArgumentError("the Panel Field \"$name\" carries a blank cell at position $i, and its fill policy is nothing, which refuses one. A blank never reaches a PricesResult or a ReturnsResult, so give the field a fill policy — ForwardPanelFill is the one that is safe across a cross-validation fold — or remove the blank from the raw input."))
     return collect(v)
 end
 function panel_fill(alg::ConstantPanelFill, v::AbstractVector, ::AbstractString)
@@ -393,7 +365,7 @@ end
 function panel_fill(alg::BackwardPanelFill, v::AbstractVector, ::AbstractString)
     return panel_directional_fill(v, alg.val, alg.lim, reverse(eachindex(v)))
 end
-function panel_fill(alg::AbstractPanelFillAlgorithm, v::AbstractVector,
+function panel_fill(alg::Option{<:AbstractPanelFillAlgorithm}, v::AbstractVector,
                     ::Option{<:AbstractVector{Bool}}, name::AbstractString)
     return panel_fill(alg, v, name)
 end
@@ -555,10 +527,10 @@ function panel_directional_placeholder(v::AbstractVector, lim::Option{<:Integer}
     return BitVector(iszero.(panel_directional_source(v, lim, order)))
 end
 """
-    panel_placeholder(alg::AbstractPanelFillAlgorithm, v::AbstractVector) -> AbstractVector{Bool}
+    panel_placeholder(alg::Option{<:AbstractPanelFillAlgorithm}, v::AbstractVector) -> AbstractVector{Bool}
     panel_placeholder(alg::ForwardPanelFill, v::AbstractVector) -> BitVector
     panel_placeholder(alg::BackwardPanelFill, v::AbstractVector) -> BitVector
-    panel_placeholder(alg::AbstractPanelFillAlgorithm, v::AbstractVector, act::Option{<:AbstractVector{Bool}}) -> AbstractVector{Bool}
+    panel_placeholder(alg::Option{<:AbstractPanelFillAlgorithm}, v::AbstractVector, act::Option{<:AbstractVector{Bool}}) -> AbstractVector{Bool}
     panel_placeholder(alg::Union{ForwardPanelFill, BackwardPanelFill}, v::AbstractVector, act::AbstractVector{Bool}) -> BitVector
 
 Mark the blanks of one asset's column that a fill policy resolves to a placeholder, a value that holds no data.
@@ -569,7 +541,7 @@ A value that a fill policy writes is data, and every reader reads it. [`Constant
 
 The method that Julia selects is the algorithm.
 
- 1. A policy that defines no method marks no cell, so every value that it writes is data. [`NoPanelFill`](@ref) writes no value, and [`ConstantPanelFill`](@ref) writes data.
+ 1. A policy that defines no method marks no cell, so every value that it writes is data. `nothing` writes no value, and [`ConstantPanelFill`](@ref) writes data.
  2. [`ForwardPanelFill`](@ref) and [`BackwardPanelFill`](@ref) mark the cells that [`panel_directional_placeholder`](@ref) marks, in their own order.
  3. With `act`, a directional policy marks each stretch of constant activity on its own, as [`panel_fill`](@ref) fills it. Every other policy, and a directional one given `act = nothing`, drops `act`.
 
@@ -591,7 +563,7 @@ The method that Julia selects is the algorithm.
   - [`panel_activity_stretches`](@ref)
   - [`Option`](@ref)
 """
-function panel_placeholder(::AbstractPanelFillAlgorithm, v::AbstractVector)
+function panel_placeholder(::Option{<:AbstractPanelFillAlgorithm}, v::AbstractVector)
     return falses(length(v))
 end
 function panel_placeholder(alg::ForwardPanelFill, v::AbstractVector)
@@ -600,7 +572,7 @@ end
 function panel_placeholder(alg::BackwardPanelFill, v::AbstractVector)
     return panel_directional_placeholder(v, alg.lim, reverse(eachindex(v)))
 end
-function panel_placeholder(alg::AbstractPanelFillAlgorithm, v::AbstractVector,
+function panel_placeholder(alg::Option{<:AbstractPanelFillAlgorithm}, v::AbstractVector,
                            ::Option{<:AbstractVector{Bool}})
     return panel_placeholder(alg, v)
 end
@@ -654,7 +626,7 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ## `panel_input_field`
 
-  - `panel_input_field(inp::AbstractPanelFieldInput, vals::AbstractArray, obs::BitArray) -> AbstractPanelField`: Build the Panel Field from the resolved values, with `obs` as its observed mask unless the fill policy is [`NoPanelFill`](@ref), which admits no blank and so records no mask.
+  - `panel_input_field(inp::AbstractPanelFieldInput, vals::AbstractArray, obs::BitArray) -> AbstractPanelField`: Build the Panel Field from the resolved values, with `obs` as its observed mask unless the fill policy is `nothing`, which admits no blank and so records no mask.
 
 ### Arguments
 
@@ -694,7 +666,7 @@ The fallback returns `nothing`, so every value that the input's fill writes is d
 """
 abstract type AbstractPanelFieldInput <: AbstractEstimator end
 """
-    assert_panel_fill_value(alg::AbstractPanelFillAlgorithm, T::Type, name::AbstractString) -> nothing
+    assert_panel_fill_value(alg::Option{<:AbstractPanelFillAlgorithm}, T::Type, name::AbstractString) -> nothing
     assert_panel_fill_value(alg::Union{ConstantPanelFill, ForwardPanelFill, BackwardPanelFill}, T::Type, name::AbstractString) -> nothing
 
 Check that the `val` of a fill policy has the type of the cells of its raw Panel Field.
@@ -705,7 +677,7 @@ Check that the `val` of a fill policy has the type of the cells of its raw Panel
 
 The method that Julia selects is the algorithm.
 
- 1. A policy that carries no `val`, such as [`NoPanelFill`](@ref) or a policy of the user, passes.
+ 1. `nothing`, and a policy that carries no `val`, such as a policy of the user, pass.
  2. A policy of the library that carries a `val` passes when `val isa T`, and throws otherwise.
 
 # Arguments
@@ -729,7 +701,7 @@ The method that Julia selects is the algorithm.
   - [`TensorPanelInput`](@ref)
   - [`AbstractPanelFillAlgorithm`](@ref)
 """
-function assert_panel_fill_value(::AbstractPanelFillAlgorithm, ::Type,
+function assert_panel_fill_value(::Option{<:AbstractPanelFillAlgorithm}, ::Type,
                                  ::AbstractString)::Nothing
     return nothing
 end
@@ -754,7 +726,7 @@ $(DocStringExtensions.FIELDS)
     NumericPanelInput(;
         name::AbstractString,
         vals::AbstractArray,
-        alg::AbstractPanelFillAlgorithm = NoPanelFill()
+        alg::Option{<:AbstractPanelFillAlgorithm} = nothing
     ) -> NumericPanelInput
 
 Keywords correspond to the struct's fields.
@@ -773,7 +745,7 @@ julia> NumericPanelInput(; name = \"mcap\", vals = [1.0 2.0; 3.0 4.0])
 NumericPanelInput
   name ┼ String: "mcap"
   vals ┼ 2×2 Matrix{Float64}
-   alg ┴ NoPanelFill()
+   alg ┴ nothing
 ```
 
 # Related
@@ -794,18 +766,18 @@ NumericPanelInput
     """
     vals
     """
-    The policy that resolves the blanks.
+    The policy that resolves the blanks, or `nothing` to refuse a blank.
     """
     alg
     function NumericPanelInput(name::AbstractString, vals::AbstractArray,
-                               alg::AbstractPanelFillAlgorithm)
+                               alg::Option{<:AbstractPanelFillAlgorithm})
         assert_panel_input(name, vals, 1, 2)
         assert_panel_fill_value(alg, Number, name)
         return new{typeof(name), typeof(vals), typeof(alg)}(name, vals, alg)
     end
 end
 function NumericPanelInput(; name::AbstractString, vals::AbstractArray,
-                           alg::AbstractPanelFillAlgorithm = NoPanelFill())::NumericPanelInput
+                           alg::Option{<:AbstractPanelFillAlgorithm} = nothing)::NumericPanelInput
     return NumericPanelInput(name, vals, alg)
 end
 """
@@ -823,7 +795,7 @@ $(DocStringExtensions.FIELDS)
         name::AbstractString,
         vals::AbstractArray,
         levels::Option{<:VecStr} = nothing,
-        alg::AbstractPanelFillAlgorithm = NoPanelFill()
+        alg::Option{<:AbstractPanelFillAlgorithm} = nothing
     ) -> CategoricalPanelInput
 
 Keywords correspond to the struct's fields.
@@ -844,7 +816,7 @@ CategoricalPanelInput
     name ┼ String: "sector"
     vals ┼ 2×2 Matrix{String}
   levels ┼ nothing
-     alg ┴ NoPanelFill()
+     alg ┴ nothing
 ```
 
 # Related
@@ -872,12 +844,12 @@ CategoricalPanelInput
     """
     levels
     """
-    The policy that resolves the blanks. When `levels` is given, a `val` that the policy writes must be one of them, or [`panel_input_field`](@ref) throws.
+    The policy that resolves the blanks, or `nothing` to refuse a blank. When `levels` is given, a `val` that the policy writes must be one of them, or [`panel_input_field`](@ref) throws.
     """
     alg
     function CategoricalPanelInput(name::AbstractString, vals::AbstractArray,
                                    levels::Option{<:VecStr},
-                                   alg::AbstractPanelFillAlgorithm)
+                                   alg::Option{<:AbstractPanelFillAlgorithm})
         assert_panel_input(name, vals, 1, 2)
         if !isnothing(levels)
             assert_panel_labels(levels, :levels)
@@ -889,7 +861,7 @@ CategoricalPanelInput
 end
 function CategoricalPanelInput(; name::AbstractString, vals::AbstractArray,
                                levels::Option{<:VecStr} = nothing,
-                               alg::AbstractPanelFillAlgorithm = NoPanelFill())::CategoricalPanelInput
+                               alg::Option{<:AbstractPanelFillAlgorithm} = nothing)::CategoricalPanelInput
     return CategoricalPanelInput(name, vals, levels, alg)
 end
 """
@@ -909,7 +881,7 @@ $(DocStringExtensions.FIELDS)
         axis::AbstractString,
         labels::VecStr,
         groups::Option{<:VecStr} = nothing,
-        alg::AbstractPanelFillAlgorithm = NoPanelFill()
+        alg::Option{<:AbstractPanelFillAlgorithm} = nothing
     ) -> TensorPanelInput
 
 Keywords correspond to the struct's fields.
@@ -933,7 +905,7 @@ TensorPanelInput
     axis ┼ String: "factor"
   labels ┼ Vector{String}: ["size"]
   groups ┼ nothing
-     alg ┴ NoPanelFill()
+     alg ┴ nothing
 ```
 
 # Related
@@ -968,12 +940,13 @@ TensorPanelInput
     """
     groups
     """
-    The policy that resolves the blanks.
+    The policy that resolves the blanks, or `nothing` to refuse a blank.
     """
     alg
     function TensorPanelInput(name::AbstractString, vals::AbstractArray,
                               axis::AbstractString, labels::VecStr,
-                              groups::Option{<:VecStr}, alg::AbstractPanelFillAlgorithm)
+                              groups::Option{<:VecStr},
+                              alg::Option{<:AbstractPanelFillAlgorithm})
         assert_panel_input(name, vals, 2, 3)
         @argcheck(size(vals, ndims(vals)) == length(labels),
                   DimensionMismatch("the tensor Panel Field \"$name\" needs one label per trailing-axis entry of vals, got $(size(vals, ndims(vals))) trailing entries and length(labels) = $(length(labels))"))
@@ -984,7 +957,7 @@ TensorPanelInput
 end
 function TensorPanelInput(; name::AbstractString, vals::AbstractArray, axis::AbstractString,
                           labels::VecStr, groups::Option{<:VecStr} = nothing,
-                          alg::AbstractPanelFillAlgorithm = NoPanelFill())::TensorPanelInput
+                          alg::Option{<:AbstractPanelFillAlgorithm} = nothing)::TensorPanelInput
     return TensorPanelInput(name, vals, axis, labels, groups, alg)
 end
 """
@@ -1071,7 +1044,7 @@ end
 
 Check that a static raw Panel Field does not carry a directional fill policy.
 
-[`ForwardPanelFill`](@ref) and [`BackwardPanelFill`](@ref) carry the last observed value along the observation axis, and a static Panel Field has none. A carry along the asset axis would give asset `k` the value of asset `k - 1`, which no observation supports. So this check refuses the two policies. [`NoPanelFill`](@ref) and [`ConstantPanelFill`](@ref) resolve each cell on its own, and the check admits them.
+[`ForwardPanelFill`](@ref) and [`BackwardPanelFill`](@ref) carry the last observed value along the observation axis, and a static Panel Field has none. A carry along the asset axis would give asset `k` the value of asset `k - 1`, which no observation supports. So this check refuses the two policies. `nothing` and [`ConstantPanelFill`](@ref) resolve each cell on its own, and the check admits them.
 
 # Algorithm
 
@@ -1101,11 +1074,11 @@ Check that a static raw Panel Field does not carry a directional fill policy.
 function assert_panel_input_fill(inp::AbstractPanelFieldInput)::Nothing
     @argcheck(!(panel_input_is_static(inp) &&
                 isa(inp.alg, Union{ForwardPanelFill, BackwardPanelFill})),
-              ArgumentError("the Panel Field \"$(inp.name)\" is static, so it has no observation axis to carry a value along, and its fill policy $(nameof(typeof(inp.alg))) is directional. Use NoPanelFill or ConstantPanelFill, or give the raw values an observation axis."))
+              ArgumentError("the Panel Field \"$(inp.name)\" is static, so it has no observation axis to carry a value along, and its fill policy $(nameof(typeof(inp.alg))) is directional. Use alg = nothing or ConstantPanelFill, or give the raw values an observation axis."))
     return nothing
 end
 """
-    panel_fill_array(vals::AbstractArray, alg::AbstractPanelFillAlgorithm, name::AbstractString, amsk::Option{<:AbstractMatrix{Bool}})
+    panel_fill_array(vals::AbstractArray, alg::Option{<:AbstractPanelFillAlgorithm}, name::AbstractString, amsk::Option{<:AbstractMatrix{Bool}})
 
 Resolve the blanks of one raw Panel Field, and return the filled array.
 
@@ -1139,11 +1112,11 @@ A static raw Panel Field has no observation axis. Its two admitted policies reso
   - [`asset_panel`](@ref)
   - [`Option`](@ref)
 """
-function panel_fill_array(vals::AbstractArray, alg::AbstractPanelFillAlgorithm,
+function panel_fill_array(vals::AbstractArray, alg::Option{<:AbstractPanelFillAlgorithm},
                           name::AbstractString, ::Nothing)
     return reshape(panel_fill(alg, vec(vals), name), size(vals))
 end
-function panel_fill_array(vals::AbstractArray, alg::AbstractPanelFillAlgorithm,
+function panel_fill_array(vals::AbstractArray, alg::Option{<:AbstractPanelFillAlgorithm},
                           name::AbstractString, amsk::AbstractMatrix{Bool})
     cols = CartesianIndices(size(vals)[2:end])
     first = panel_fill(alg, view(vals, :, cols[1]), view(amsk, :, cols[1][1]), name)
@@ -1296,7 +1269,7 @@ The method that Julia selects is the algorithm.
  2. [`CategoricalPanelInput`](@ref): a [`CategoricalPanelField`](@ref) over `inp.levels`. When `inp.levels` is `nothing`, the levels are the distinct resolved labels in sorted order. The function reads the resolved labels and not the raw ones, so a level that only a fill policy writes gets a code. Each label is then encoded to the position of its level.
  3. [`TensorPanelInput`](@ref): a [`TensorPanelField`](@ref) over the axis, the labels and the groups of the input.
 
-The Panel Field holds the observed mask only when the fill policy is not [`NoPanelFill`](@ref). A Panel Field that refuses a blank observed every cell, so its mask would record nothing.
+The Panel Field holds the observed mask only when the fill policy is not `nothing`. A Panel Field that refuses a blank observed every cell, so its mask would record nothing.
 
 # Arguments
 
@@ -1322,7 +1295,7 @@ The Panel Field holds the observed mask only when the fill policy is not [`NoPan
 function panel_input_field(inp::NumericPanelInput, vals::AbstractArray{<:Real},
                            obs::BitArray)
     return NumericPanelField(; name = inp.name, vals = vals,
-                             omsk = isa(inp.alg, NoPanelFill) ? nothing : obs)
+                             omsk = isnothing(inp.alg) ? nothing : obs)
 end
 function panel_input_field(inp::CategoricalPanelInput, vals::AbstractArray{String},
                            obs::BitArray)
@@ -1336,16 +1309,16 @@ function panel_input_field(inp::CategoricalPanelInput, vals::AbstractArray{Strin
         codes[i] = k
     end
     return CategoricalPanelField(; name = inp.name, levels = levels, codes = codes,
-                                 omsk = isa(inp.alg, NoPanelFill) ? nothing : obs)
+                                 omsk = isnothing(inp.alg) ? nothing : obs)
 end
 function panel_input_field(inp::TensorPanelInput, vals::AbstractArray{<:Real},
                            obs::BitArray)
     return TensorPanelField(; name = inp.name, axis = inp.axis, labels = inp.labels,
                             groups = inp.groups, vals = vals,
-                            omsk = isa(inp.alg, NoPanelFill) ? nothing : obs)
+                            omsk = isnothing(inp.alg) ? nothing : obs)
 end
 """
-    panel_placeholder_array(vals::AbstractArray, alg::AbstractPanelFillAlgorithm, amsk::Option{<:AbstractMatrix{Bool}}) -> BitArray
+    panel_placeholder_array(vals::AbstractArray, alg::Option{<:AbstractPanelFillAlgorithm}, amsk::Option{<:AbstractMatrix{Bool}}) -> BitArray
 
 Mark the placeholders of one raw Panel Field, the cells that [`panel_fill_array`](@ref) resolves to a value that holds no data.
 
@@ -1368,11 +1341,12 @@ The walk is the one of [`panel_fill_array`](@ref). A time-varying raw Panel Fiel
   - [`panel_input_placeholder`](@ref)
   - [`Option`](@ref)
 """
-function panel_placeholder_array(vals::AbstractArray, alg::AbstractPanelFillAlgorithm,
-                                 ::Nothing)
+function panel_placeholder_array(vals::AbstractArray,
+                                 alg::Option{<:AbstractPanelFillAlgorithm}, ::Nothing)
     return reshape(BitVector(panel_placeholder(alg, vec(vals), nothing)), size(vals))
 end
-function panel_placeholder_array(vals::AbstractArray, alg::AbstractPanelFillAlgorithm,
+function panel_placeholder_array(vals::AbstractArray,
+                                 alg::Option{<:AbstractPanelFillAlgorithm},
                                  amsk::AbstractMatrix{Bool})
     plc = falses(size(vals))
     for col in CartesianIndices(size(vals)[2:end])
@@ -1597,7 +1571,7 @@ A set of static inputs with no mask builds a static panel. A static input that m
   - The Panel Field names are non-empty and unique. See [`assert_panel_labels`](@ref).
   - A static input carries no directional fill policy. See [`assert_panel_input_fill`](@ref).
   - `size(amsk)` matches the first two axes of each time-varying input. See [`panel_input_mask`](@ref).
-  - An input whose fill policy is [`NoPanelFill`](@ref) carries no blank. See [`panel_fill`](@ref).
+  - An input whose fill policy is `nothing` carries no blank. See [`panel_fill`](@ref).
   - A numeric or a tensor input resolves to finite values. See [`assert_panel_finite`](@ref).
   - Each resolved label of a categorical input is one of its levels. See [`panel_input_field`](@ref).
   - The Panel Fields and the masks share one shape. See [`AssetPanel`](@ref).
@@ -1678,7 +1652,7 @@ The family is open. A producer that reads a source that no member of the library
 """
 abstract type AbstractAssetPanelEstimator <: AbstractEstimator end
 
-export asset_panel, NumericPanelInput, CategoricalPanelInput, TensorPanelInput, NoPanelFill,
+export asset_panel, NumericPanelInput, CategoricalPanelInput, TensorPanelInput,
        ConstantPanelFill, ForwardPanelFill, BackwardPanelFill
 public AbstractPanelFillAlgorithm, panel_fill, panel_placeholder, AbstractPanelFieldInput,
        panel_input_is_static, panel_resolve, panel_input_field, panel_input_placeholder

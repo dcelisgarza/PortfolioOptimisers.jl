@@ -180,3 +180,15 @@ observation.
   because the row before it is scored too.
 - Under `RefuseIndefiniteWarmUp()`, over 30 seeds of 40 rows of the same panel, the first scored
   row is row 10 at least, 15.5 in the median, and 21 at most.
+
+## Amendment (2026-10-28)
+
+**`cor_vol = nothing` reads the raw variance state, and `RawVolatility` is removed (#1867).** The
+maintainer refined the rule of ADR 0222: a skipped procedure, or a trivial default, takes
+`nothing`, never a singleton that names it. `RawVolatility` skipped the bias correction of the
+variance state, so the `cor_vol` field of `RegimeAdjustedExpWeightedCovariance` is bound to
+`Option{<:AbstractCorrelationVolatility}`, and `correlation_variance(::Nothing, v, decay, K)`
+returns `v` unchanged. The default `BiasCorrectedVolatility()` and the numbers do not move. Where
+the decision above names `cor_vol = RawVolatility()` or `debias = RawStatistic()`, read
+`cor_vol = nothing` or `debias = nothing`. The removal is a clean break with no deprecation, as ADR
+0044 and ADR 0213 set.

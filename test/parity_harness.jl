@@ -57,9 +57,9 @@ using Statistics
 const PARITY_PE = EmpiricalPrior(; me = ExpWeightedExpectedReturns(),
                                  ce = RegimeAdjustedExpWeightedCovariance(;
                                                                           centring = PreCentred(),
-                                                                          debias = RawStatistic()))
+                                                                          debias = nothing))
 const PARITY_VE = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(),
-                                                    debias = RawStatistic())
+                                                    debias = nothing)
 
 """
     parity_panel(; T, N, seed) -> NamedTuple

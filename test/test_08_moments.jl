@@ -1318,14 +1318,13 @@
     struct NoMethodGerberIQScaler <: PortfolioOptimisers.GerberIQScalerEstimator end
     struct NoMethodGerberIQEps <: PortfolioOptimisers.GerberIQEpsEstimator end
     struct NoMethodGerberIQGamma <: PortfolioOptimisers.GerberIQGammaEstimator end
-    @testset "Gerber IQ: the pair-mean scaler is named, and a subtype with no method raises (#1878)" begin
-        # `nothing` is `PairMeanGerberIQScaler`, so the default estimate does not move.
-        @test PortfolioOptimisers.gerber_iq_scaling(PairMeanGerberIQScaler(), 1.0, 3.0) ==
-              (2.0, 2.0)
+    @testset "Gerber IQ: `nothing` is the pair-mean scaler, and a subtype with no method raises (#1878, #1867)" begin
+        # `nothing` gives both assets of the pair the mean of their volatilities.
         @test PortfolioOptimisers.gerber_iq_scaling(nothing, 1.0, 3.0) == (2.0, 2.0)
         Xg = randn(StableRNG(1878), 60, 4)
         seq = PortfolioOptimisers.FLoops.SequentialEx()
-        @test cov(GerberIQCovariance(; sc = PairMeanGerberIQScaler(), ex = seq), Xg) ==
+        pair_mean = (sdi, sdj) -> ((sdi + sdj) / 2, (sdi + sdj) / 2)
+        @test cov(GerberIQCovariance(; sc = pair_mean, ex = seq), Xg) ==
               cov(GerberIQCovariance(; ex = seq), Xg)
         # `nothing` keeps the default delay and the default rate.
         @test PortfolioOptimisers.gerber_iq_eps(nothing, Xg) == 45
@@ -3362,8 +3361,8 @@ end
             @test a < -1000
             @test isapprox(js_mean(Xf, UnitIntervalIntensity()), mu)
             @test isapprox(js_mean(Xf, NonNegativeIntensity()), mu)
-            @test isapprox(js_mean(Xf, UnclampedIntensity()), (1 - a) * mu + a * b)
-            @test maximum(js_mean(Xf, UnclampedIntensity())) > 100 * maximum(abs, mu)
+            @test isapprox(js_mean(Xf, nothing), (1 - a) * mu + a * b)
+            @test maximum(js_mean(Xf, nothing)) > 100 * maximum(abs, mu)
             # Two assets: the raw intensity is negative, as the testset above states.
             mu, b, a = js_raw(X460[:, 1:2])
             @test a < 0
@@ -3376,28 +3375,25 @@ end
             @test a > 1
             @test isapprox(js_mean(Xb, UnitIntervalIntensity()), b)
             @test isapprox(js_mean(Xb, NonNegativeIntensity()), (1 - a) * mu + a * b)
-            @test isapprox(js_mean(Xb, UnclampedIntensity()), (1 - a) * mu + a * b)
+            @test isapprox(js_mean(Xb, nothing), (1 - a) * mu + a * b)
             # Inside the interval the three rules agree.
             mu, b, a = js_raw(X460)
             @test 0 < a < 1
-            @test isapprox(js_mean(X460, UnitIntervalIntensity()),
-                           js_mean(X460, UnclampedIntensity()))
-            @test isapprox(js_mean(X460, NonNegativeIntensity()),
-                           js_mean(X460, UnclampedIntensity()))
+            @test isapprox(js_mean(X460, UnitIntervalIntensity()), js_mean(X460, nothing))
+            @test isapprox(js_mean(X460, NonNegativeIntensity()), js_mean(X460, nothing))
             # The Bayes-Stein intensity lies in `(0, 1]` under a positive semidefinite
             # covariance, so no rule moves it.
             for rule in (UnitIntervalIntensity(), NonNegativeIntensity())
                 @test vec(mean(ShrunkExpectedReturns(;
                                                      alg = BayesStein(; intensity = rule)),
                                X460)) == vec(mean(ShrunkExpectedReturns(;
-                                                                        alg = BayesStein(;
-                                                                                         intensity = UnclampedIntensity())),
+                                                                        alg = BayesStein(; intensity = nothing)),
                                                   X460))
             end
             # Each rule on a scalar, and a `NaN` that stays a `NaN`.
             for (rule, lo, hi) in
                 ((UnitIntervalIntensity(), 0.0, 1.0), (NonNegativeIntensity(), 0.0, 2.5),
-                 (UnclampedIntensity(), -2.5, 2.5))
+                 (nothing, -2.5, 2.5))
                 @test PortfolioOptimisers.shrinkage_intensity(rule, -2.5) == lo
                 @test PortfolioOptimisers.shrinkage_intensity(rule, 2.5) == hi
                 @test PortfolioOptimisers.shrinkage_intensity(rule, 0.5) == 0.5
@@ -3433,7 +3429,7 @@ end
                                      E.vectors'))
                 @test isapprox((Nb + 2) / ((Nb + 2) + Tb * dot(d, S \ d)), a)
                 for (rule, ac) in ((UnitIntervalIntensity(), clamp(a, 0, 1)),
-                                   (NonNegativeIntensity(), max(a, 0)), (UnclampedIntensity(), a))
+                                   (NonNegativeIntensity(), max(a, 0)), (nothing, a))
                     @test isapprox(bs_mean(S, rule), (1 - ac) * mu + ac * b)
                 end
                 @test bs_mean(S, UnitIntervalIntensity()) ==

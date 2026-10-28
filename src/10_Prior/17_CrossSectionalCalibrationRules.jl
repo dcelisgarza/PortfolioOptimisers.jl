@@ -1112,76 +1112,31 @@ SystematicRepair()
 # Related
 
   - [`AbstractSystematicRepair`](@ref)
-  - [`NoSystematicRepair`](@ref)
   - [`systematic_processing!`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
 """
 struct SystematicRepair <: AbstractSystematicRepair end
 """
-$(DocStringExtensions.TYPEDEF)
-
-Does not repair the systematic block before the lift of a [`CrossSectionalFactorPrior`](@ref) adds the idiosyncratic block. This is the default rule.
-
-The lift runs every step of `mp` on the systematic block in the order of `mp.order`, except the `:pdm` step, and takes the symmetric part of the block. Then it adds the idiosyncratic block and repairs the sum under `mp.pdm`. That repair is the one repair of the asset covariance. A sum that is positive definite passes it unchanged, so the lift does no repair of a block that is positive semidefinite to round-off.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\mathbf{\\Sigma}_{\\mathcal{I}\\mathcal{I}} &= \\operatorname{pdm}\\left(\\operatorname{mp}_{\\setminus\\mathrm{pdm}}\\left(\\mathbf{B}_{T,\\,\\mathcal{I}} \\odot \\mathbf{F} \\odot \\mathbf{B}_{T,\\,\\mathcal{I}}^{\\intercal}\\right) + \\mathbf{D}_{\\mathcal{I}\\mathcal{I}}\\right)\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\mathbf{\\Sigma}``: Asset covariance.
-  - ``\\operatorname{mp}_{\\setminus\\mathrm{pdm}}``: Every step of `mp` except the `:pdm` step, in the order of `mp.order`, then the symmetric part of the block.
-  - ``\\operatorname{pdm}``: The repair under `mp.pdm`, from [`posdef!`](@ref).
-  - ``\\odot``: The product over the support of each row of loadings, from [`support_product`](@ref).
-  - ``\\mathbf{B}_{T,\\,\\mathcal{I}}``: The rows of ``\\mathbf{B}_{T}`` at the assets of ``\\mathcal{I}``.
-  - $(math_dict[:B_T_cs])
-  - $(math_dict[:F_patt])
-  - $(math_dict[:D_orth])
-  - $(math_dict[:I_inv])
-
-# Constructors
-
-    NoSystematicRepair() -> NoSystematicRepair
-
-# Examples
-
-```jldoctest
-julia> NoSystematicRepair()
-NoSystematicRepair()
-```
-
-# Related
-
-  - [`AbstractSystematicRepair`](@ref)
-  - [`SystematicRepair`](@ref)
-  - [`systematic_processing!`](@ref)
-  - [`CrossSectionalFactorPrior`](@ref)
-"""
-struct NoSystematicRepair <: AbstractSystematicRepair end
-"""
     systematic_processing!(srep::SystematicRepair, mp::AbstractMatrixProcessingEstimator,
                            sigma::MatNum, X::MatNum; kwargs...) -> MatNum
-    systematic_processing!(srep::NoSystematicRepair, mp::MatrixProcessing, sigma::MatNum,
+    systematic_processing!(::Nothing, mp::MatrixProcessing, sigma::MatNum,
                            X::MatNum; kwargs...) -> MatNum
 
 Processes the systematic block of the lift of a [`CrossSectionalFactorPrior`](@ref) in place, under the Systematic Repair rule `srep`.
+
+`nothing` is the default. It does not repair the systematic block before the lift adds the idiosyncratic block. The lift then repairs the sum under `mp.pdm`, and that repair is the one repair of the asset covariance. A sum that is positive definite passes it unchanged, so the lift does no repair of a block that is positive semidefinite to round-off.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
  1. [`SystematicRepair`](@ref): run [`matrix_processing!`](@ref) of `mp` on `sigma`, every step included.
- 2. [`NoSystematicRepair`](@ref): run [`matrix_processing_step!`](@ref) for each step of `mp.order` except `:pdm`, in that order. Then replace `sigma` by its symmetric part ``(\\boldsymbol{\\Sigma} + \\boldsymbol{\\Sigma}^{\\intercal}) / 2``. The product of the loadings and the factor covariance is symmetric only to rounding, and [`posdef!`](@ref) accepts the sum without a repair only when it is exactly symmetric.
+ 2. `nothing`: run [`matrix_processing_step!`](@ref) for each step of `mp.order` except `:pdm`, in that order. Then replace `sigma` by its symmetric part ``(\\boldsymbol{\\Sigma} + \\boldsymbol{\\Sigma}^{\\intercal}) / 2``. The product of the loadings and the factor covariance is symmetric only to rounding, and [`posdef!`](@ref) accepts the sum without a repair only when it is exactly symmetric.
 
 # Arguments
 
   - $(arg_dict[:srep])
-  - `mp`: Matrix processing estimator. [`NoSystematicRepair`](@ref) reads its steps one by one, so it takes a [`MatrixProcessing`](@ref) alone.
+  - `mp`: Matrix processing estimator. `nothing` reads its steps one by one, so it takes a [`MatrixProcessing`](@ref) alone.
   - `sigma`: The systematic block, `investable assets × investable assets`.
   - `X`: The asset return scenarios of the investable assets, `scenarios × investable assets`.
   - `kwargs...`: Additional keyword arguments passed to the steps of `mp`.
@@ -1200,8 +1155,8 @@ function systematic_processing!(::SystematicRepair, mp::AbstractMatrixProcessing
                                 sigma::MatNum, X::MatNum; kwargs...)
     return matrix_processing!(mp, sigma, X; kwargs...)
 end
-function systematic_processing!(::NoSystematicRepair, mp::MatrixProcessing, sigma::MatNum,
-                                X::MatNum; kwargs...)
+function systematic_processing!(::Nothing, mp::MatrixProcessing, sigma::MatNum, X::MatNum;
+                                kwargs...)
     for step in mp.order
         if step !== :pdm
             matrix_processing_step!(Val(step), mp, sigma, X; kwargs...)
@@ -1215,8 +1170,7 @@ end
 """
     assert_systematic_repair(srep::AbstractSystematicRepair,
                              mp::AbstractMatrixProcessingEstimator) -> nothing
-    assert_systematic_repair(srep::NoSystematicRepair,
-                             mp::AbstractMatrixProcessingEstimator) -> nothing
+    assert_systematic_repair(::Nothing, mp::AbstractMatrixProcessingEstimator) -> nothing
 
 Checks that the Systematic Repair rule of a [`CrossSectionalFactorPrior`](@ref) can process the systematic block under its matrix processing estimator.
 
@@ -1224,8 +1178,8 @@ Checks that the Systematic Repair rule of a [`CrossSectionalFactorPrior`](@ref) 
 
 The method that Julia selects is the algorithm.
 
- 1. Every rule but [`NoSystematicRepair`](@ref) accepts every `mp`. A rule of a caller states its own needs in its method of [`systematic_processing!`](@ref).
- 2. [`NoSystematicRepair`](@ref) reads the steps of `mp` one by one, so it accepts a [`MatrixProcessing`](@ref) alone. Without this check, another estimator fails at the fit with a `MethodError` of [`systematic_processing!`](@ref).
+ 1. Every rule accepts every `mp`. A rule of a caller states its own needs in its method of [`systematic_processing!`](@ref).
+ 2. `nothing` reads the steps of `mp` one by one, so it accepts a [`MatrixProcessing`](@ref) alone. Without this check, another estimator fails at the fit with a `MethodError` of [`systematic_processing!`](@ref).
 
 # Arguments
 
@@ -1234,7 +1188,7 @@ The method that Julia selects is the algorithm.
 
 # Validation
 
-  - Under [`NoSystematicRepair`](@ref), `mp` is a [`MatrixProcessing`](@ref).
+  - Under `nothing`, `mp` is a [`MatrixProcessing`](@ref).
 
 # Returns
 
@@ -1250,10 +1204,9 @@ function assert_systematic_repair(::AbstractSystematicRepair,
                                   ::AbstractMatrixProcessingEstimator)
     return nothing
 end
-function assert_systematic_repair(::NoSystematicRepair,
-                                  mp::AbstractMatrixProcessingEstimator)
+function assert_systematic_repair(::Nothing, mp::AbstractMatrixProcessingEstimator)
     @argcheck(isa(mp, MatrixProcessing),
-              ArgumentError("srep = NoSystematicRepair() runs the steps of mp one by one, so it takes a MatrixProcessing alone, and mp is a $(nameof(typeof(mp))). Use srep = SystematicRepair(), which runs matrix_processing! of mp on the systematic block, or pass a MatrixProcessing."))
+              ArgumentError("srep = nothing runs the steps of mp one by one, so it takes a MatrixProcessing alone, and mp is a $(nameof(typeof(mp))). Use srep = SystematicRepair(), which runs matrix_processing! of mp on the systematic block, or pass a MatrixProcessing."))
     return nothing
 end
 """
@@ -1508,6 +1461,6 @@ export PrecisionBlend, CurrentForecastError, ForecastHistoryError, SteinShrinkag
        ForecastCalibrationSlope, ThresholdWarmUp, PlugInWarmUp, PositivePartWarmUp
 public AbstractForecastErrorAlgorithm, AbstractForecastScaleWarmUpAlgorithm,
        spanned_forecast_sample, forecast_scale_warm_up
-export SystematicRepair, NoSystematicRepair, FoldOrRefit, FoldOnly
+export SystematicRepair, FoldOrRefit, FoldOnly
 public AbstractSystematicRepair, systematic_processing!, AbstractCarryRule,
        assert_carry_rule

@@ -1163,7 +1163,7 @@ end
 
         # The passive-aggressive step, Algorithm 1 of the paper, under the three step-length
         # rules, at thresholds below, at and above one.
-        steps = ((NoSlack(), (l, d) -> l / d),
+        steps = ((nothing, (l, d) -> l / d),
                  (LinearSlack(; C = 5), (l, d) -> min(5, l / d)),
                  (QuadraticSlack(; C = 5), (l, d) -> l / (d + 1 / 10)))
         for (slack, f) in steps, eps in (0.5, 1.0, 1.01)
@@ -1177,17 +1177,19 @@ end
             end
             @test maxerr(Wp, Hp) < 1e-13
         end
-        # Under NoSlack the raw step keeps the budget and earns exactly eps on the period.
+        # Under `slack = nothing` the raw step keeps the budget and earns exactly eps on the period.
         w4, x4 = [0.1, 0.2, 0.3, 0.4], [0.9, 1.0, 1.1, 1.2]
         d4 = x4 .- mean(x4)
         q4 = w4 .-
-             po.passive_aggressive_step(NoSlack(), dot(w4, x4) - 0.5, sum(abs2, d4)) .* d4
+             po.passive_aggressive_step(nothing, dot(w4, x4) - 0.5, sum(abs2, d4)) .* d4
         @test sum(q4) ≈ 1 && dot(q4, x4) ≈ 0.5
-        # NoSlack is the limit of the other two rules as C grows.
+        # `slack = nothing` is the limit of the other two rules as C grows.
         for s in (LinearSlack(; C = 1e12), QuadraticSlack(; C = 1e12))
             @test po.passive_aggressive_step(s, 0.3, 0.02) ≈
-                  po.passive_aggressive_step(NoSlack(), 0.3, 0.02)
+                  po.passive_aggressive_step(nothing, 0.3, 0.02)
         end
+        # The default step is PAMR, `slack = nothing` (#1867).
+        @test isnothing(PassiveAggressiveMeanReversion().slack)
         # Every asset moved alike: the step is zero.
         @test po.online_update!(PassiveAggressiveMeanReversion(; eps = 0.0), nothing, w4,
                                 fill(1.3, N), nothing, simplex)[2] ≈ w4

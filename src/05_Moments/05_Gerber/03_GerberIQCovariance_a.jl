@@ -401,7 +401,7 @@ A subtype sets the units of the thresholds of a pair of assets. The source names
   - The larger of the two volatilities.
   - The smaller of the two volatilities.
 
-The library ships the first choice as [`AssetVolatilityGerberIQScaler`](@ref), and the second as [`PairMeanGerberIQScaler`](@ref). `nothing` in the place of a scaler is [`PairMeanGerberIQScaler`](@ref). The `Function` arm of [`GerberIQScaler`](@ref) gives the other two.
+The library ships the first choice as [`AssetVolatilityGerberIQScaler`](@ref). `nothing` in the place of a scaler is the second choice, the default. The `Function` arm of [`GerberIQScaler`](@ref) gives the other two.
 
 # Interfaces
 
@@ -425,7 +425,6 @@ To add a scaler, subtype `GerberIQScalerEstimator` and implement this method:
   - [`GerberIQCovariance`](@ref)
   - [`GerberIQScaler`](@ref)
   - [`AssetVolatilityGerberIQScaler`](@ref)
-  - [`PairMeanGerberIQScaler`](@ref)
   - [`gerber_iq_scaling`](@ref)
 
 # References
@@ -445,7 +444,6 @@ The alias has no `Number` arm, because a scaler is a rule on the two standard de
   - [`GerberIQCovariance`](@ref)
   - [`GerberIQScalerEstimator`](@ref)
   - [`AssetVolatilityGerberIQScaler`](@ref)
-  - [`PairMeanGerberIQScaler`](@ref)
   - [`gerber_iq_scaling`](@ref)
 
 # References
@@ -458,7 +456,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Scales the thresholds of each asset by the volatility of that asset.
 
-Each asset keeps its own units. So the scaler measures asset ``i`` against ``\\sigma_i`` and asset ``j`` against ``\\sigma_j``. Kendall's tau and the Gerber statistic use the same convention. With this choice, the Gerber IQ statistic reduces to the Gerber statistic, and [`gerber_IQ`](@ref) states that reduction. [`PairMeanGerberIQScaler`](@ref) gives both assets the mean of the two volatilities.
+Each asset keeps its own units. So the scaler measures asset ``i`` against ``\\sigma_i`` and asset ``j`` against ``\\sigma_j``. Kendall's tau and the Gerber statistic use the same convention. With this choice, the Gerber IQ statistic reduces to the Gerber statistic, and [`gerber_IQ`](@ref) states that reduction. The default `nothing` gives both assets the mean of the two volatilities.
 
 # Mathematical definition
 
@@ -488,7 +486,6 @@ AssetVolatilityGerberIQScaler()
 
   - [`GerberIQScalerEstimator`](@ref)
   - [`GerberIQScaler`](@ref)
-  - [`PairMeanGerberIQScaler`](@ref)
   - [`GerberIQCovariance`](@ref)
   - [`gerber_iq_scaling`](@ref)
 
@@ -498,52 +495,7 @@ AssetVolatilityGerberIQScaler()
 """
 struct AssetVolatilityGerberIQScaler <: GerberIQScalerEstimator end
 """
-$(DocStringExtensions.TYPEDEF)
-
-Scales the thresholds of both assets of a pair by the mean of their two volatilities.
-
-Both assets of a pair have the same units, so a volatile asset and a quiet asset have the same absolute threshold. The scaler is not pair-separable, because the mean of the pair changes with the partner. `nothing` in the place of a scaler is this scaler, and it is the default of [`GerberIQCovariance`](@ref). [`AssetVolatilityGerberIQScaler`](@ref) gives each asset its own units.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-(s_i,\\, s_j) &= \\left(\\frac{\\sigma_i + \\sigma_j}{2},\\, \\frac{\\sigma_i + \\sigma_j}{2}\\right)\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``s_i``, ``s_j``: Threshold scaling factors of the pair.
-  - $(math_dict[:sigma_i_asset])
-
-# Constructors
-
-    PairMeanGerberIQScaler() -> PairMeanGerberIQScaler
-
-# Examples
-
-```jldoctest
-julia> PortfolioOptimisers.gerber_iq_scaling(PairMeanGerberIQScaler(), 1.0, 3.0)
-(2.0, 2.0)
-```
-
-# Related
-
-  - [`GerberIQScalerEstimator`](@ref)
-  - [`GerberIQScaler`](@ref)
-  - [`AssetVolatilityGerberIQScaler`](@ref)
-  - [`GerberIQCovariance`](@ref)
-  - [`gerber_iq_scaling`](@ref)
-
-# References
-
-  - $(ref_dict[:gerber2025squeezing]) Section 3.3.1, Section 4 and Table 2.
-"""
-struct PairMeanGerberIQScaler <: GerberIQScalerEstimator end
-"""
     gerber_iq_scaling(sca::AssetVolatilityGerberIQScaler, sdi::Number, sdj::Number) -> (Number, Number)
-    gerber_iq_scaling(sca::PairMeanGerberIQScaler, sdi::Number, sdj::Number) -> (Number, Number)
     gerber_iq_scaling(sca::Nothing, sdi::Number, sdj::Number) -> (Number, Number)
     gerber_iq_scaling(sca::Function, sdi::Number, sdj::Number) -> (Number, Number)
     gerber_iq_scaling(sca::GerberIQScalerEstimator, sdi::Number, sdj::Number)
@@ -552,7 +504,7 @@ Computes the scaling factors of the thresholds of a pair of assets in the Gerber
 
 The statistic multiplies each threshold of the pair by the factor that this function returns for the axis of the threshold. The thresholds are the noise threshold `c` and each boundary of the squeezing template. So the scaler sets the units in which a return is large.
 
-A scaler is pair-separable when its first factor uses `sdi` alone and its second factor uses `sdj` alone. The thresholds of an asset are then the same for every partner. [`AssetVolatilityGerberIQScaler`](@ref) is pair-separable. [`PairMeanGerberIQScaler`](@ref) is not, because the mean of the pair changes with `sdj`. A `Function` can be either. Every scaler is safe under every marker. [`Gerber2`](@ref) computes its denominator in the units of the pair through [`iq_add_diagonal`](@ref). So when a scaler changes the class of an asset, the numerator and the denominator change together.
+A scaler is pair-separable when its first factor uses `sdi` alone and its second factor uses `sdj` alone. The thresholds of an asset are then the same for every partner. [`AssetVolatilityGerberIQScaler`](@ref) is pair-separable. The default `nothing` is not, because the mean of the pair changes with `sdj`. A `Function` can be either. Every scaler is safe under every marker. [`Gerber2`](@ref) computes its denominator in the units of the pair through [`iq_add_diagonal`](@ref). So when a scaler changes the class of an asset, the numerator and the denominator change together.
 
 # Mathematical definition
 
@@ -560,7 +512,7 @@ A scaler is pair-separable when its first factor uses `sdi` alone and its second
 \\begin{align}
 (s_i,\\, s_j) &= \\begin{cases}
 (\\sigma_i,\\, \\sigma_j) & \\text{AssetVolatilityGerberIQScaler} \\\\
-\\left(\\dfrac{\\sigma_i + \\sigma_j}{2},\\, \\dfrac{\\sigma_i + \\sigma_j}{2}\\right) & \\text{PairMeanGerberIQScaler}
+\\left(\\dfrac{\\sigma_i + \\sigma_j}{2},\\, \\dfrac{\\sigma_i + \\sigma_j}{2}\\right) & \\text{nothing}
 \\end{cases}\\,.
 \\end{align}
 ```
@@ -570,12 +522,12 @@ Where:
   - ``s_i``, ``s_j``: Threshold scaling factors of the pair.
   - $(math_dict[:sigma_i_asset])
 
-[`PairMeanGerberIQScaler`](@ref) gives both assets the same units, so a volatile asset and a quiet asset have the same absolute threshold. [`AssetVolatilityGerberIQScaler`](@ref) gives each asset its own units. The source names both choices.
+`nothing` gives both assets the same units, so a volatile asset and a quiet asset have the same absolute threshold. [`AssetVolatilityGerberIQScaler`](@ref) gives each asset its own units. The source names both choices.
 
 # Algorithm
 
  1. Return `(sdi, sdj)` unchanged for [`AssetVolatilityGerberIQScaler`](@ref).
- 2. Compute `(sdi + sdj) / 2` once for [`PairMeanGerberIQScaler`](@ref) and for `nothing`, and return it for both axes.
+ 2. Compute `(sdi + sdj) / 2` once for `nothing`, and return it for both axes.
  3. Call `sca(sdi, sdj)` for a `Function`, and return its result.
  4. Throw an `ArgumentError` for any other [`GerberIQScalerEstimator`](@ref).
 
@@ -584,8 +536,7 @@ Where:
   - `sca`: The threshold scaler.
 
       + `::AssetVolatilityGerberIQScaler`: The method returns `sdi` and `sdj` unchanged, so each asset has the units of its own volatility.
-      + `::PairMeanGerberIQScaler`: The method returns the mean of `sdi` and `sdj` for both assets.
-      + `::Nothing`: The default, [`PairMeanGerberIQScaler`](@ref).
+      + `::Nothing`: The default. The method returns the mean of `sdi` and `sdj` for both assets.
       + `::Function`: A function that takes `sdi` and `sdj` and returns the two scaling factors.
       + `::GerberIQScalerEstimator`: The fallback of the family, for a subtype that implements no method of its own. It always throws.
 
@@ -607,7 +558,6 @@ Where:
   - [`GerberIQScaler`](@ref)
   - [`GerberIQScalerEstimator`](@ref)
   - [`AssetVolatilityGerberIQScaler`](@ref)
-  - [`PairMeanGerberIQScaler`](@ref)
   - [`GerberIQKernel`](@ref)
   - [`GerberIQCovariance`](@ref)
 
@@ -618,12 +568,9 @@ Where:
 function gerber_iq_scaling(::AssetVolatilityGerberIQScaler, sdi::Number, sdj::Number)
     return sdi, sdj
 end
-function gerber_iq_scaling(::PairMeanGerberIQScaler, sdi::Number, sdj::Number)
+function gerber_iq_scaling(::Nothing, sdi::Number, sdj::Number)
     res = (sdi + sdj) / 2
     return res, res
-end
-function gerber_iq_scaling(::Nothing, sdi::Number, sdj::Number)
-    return gerber_iq_scaling(PairMeanGerberIQScaler(), sdi, sdj)
 end
 function gerber_iq_scaling(sca::Function, sdi::Number, sdj::Number)
     return sca(sdi, sdj)
@@ -2193,7 +2140,7 @@ GerberIQCovariance
     """
     @fprop decay
     """
-    Threshold scaler, a [`GerberIQScaler`](@ref). It sets the units of the thresholds of each pair. `nothing` is [`PairMeanGerberIQScaler`](@ref), which gives both assets of a pair the mean of their two standard deviations.
+    Threshold scaler, a [`GerberIQScaler`](@ref). It sets the units of the thresholds of each pair. `nothing` gives both assets of a pair the mean of their two standard deviations.
     """
     sc
     """
@@ -2247,8 +2194,8 @@ function GerberIQCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance
     return GerberIQCovariance(ve, me, pdm, c, decay, sc, kind, alg, ex, cache)
 end
 
-export AssetVolatilityGerberIQScaler, PairMeanGerberIQScaler, BasicGerberIQ,
-       PartialGerberIQ, FullGerberIQ, ExpGerberIQDecay, GerberIQCovariance
+export AssetVolatilityGerberIQScaler, BasicGerberIQ, PartialGerberIQ, FullGerberIQ,
+       ExpGerberIQDecay, GerberIQCovariance
 public BaseGerberIQCovariance, GerberIQCovarianceAlgorithm, GerberIQEpsEstimator,
        GerberIQGammaEstimator, GerberIQScalerEstimator, GerberIQDecayEstimator,
        regenerate_decay, clamp_gerber_iq_n, gerber_iq_eps, gerber_iq_gamma,

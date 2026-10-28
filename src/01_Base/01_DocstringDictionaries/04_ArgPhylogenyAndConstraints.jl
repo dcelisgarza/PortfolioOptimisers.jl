@@ -36,7 +36,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :pler => "`pl`: Network estimator, phylogeny result, clustering estimator, or clustering result.",#
                  :plsrc => "`pl`: Network estimator or clustering estimator. The field refuses a precomputed `PhylogenyResult` or `Clusters`. It states how to build the phylogeny for the universe of each call, and a precomputed structure holds one fixed universe. To use a precomputed structure, pass the constraint result instead.",#
                  ## Separation and separation decay
-                 :sdecay => "`decay`: Separation decay algorithm, the rule by which the score falls off as two assets get further apart. Distinct from the exponentially weighted moment estimators' `decay`, which is a smoothing constant over observations.",#
+                 :sdecay => "`decay`: Separation decay algorithm, the rule by which the score falls off as two assets get further apart, or `nothing` for a flat score of one. Distinct from the exponentially weighted moment estimators' `decay`, which is a smoothing constant over observations.",#
                  :sdrate => "`rate`: Rate of the exponential fall-off, `exp(-rate * d)`. A larger rate makes the score fall faster. The retention form `ratio^d` is the same function at `rate = -log(ratio)`.",#
                  :sdpower => "`power`: Exponent of the reciprocal fall-off, `inv((1 + d)^power)`. A larger power makes the score fall faster.",#
                  ## DBHT

@@ -191,7 +191,7 @@ end
         end
         # The batch fit and the read-out of the carry fold run the same lift, so the carry
         # fold equals the batch fit under each Systematic Repair rule (#1576).
-        for srep in (NoSystematicRepair(), SystematicRepair())
+        for srep in (nothing, SystematicRepair())
             pe = CrossSectionalFactorPrior(; lambda = 1, srep = srep, style...)
             for (k, x) in enumerate(stream(pe, rd, e))
                 @test near(x.pr, batch(pe, k, rd, e))

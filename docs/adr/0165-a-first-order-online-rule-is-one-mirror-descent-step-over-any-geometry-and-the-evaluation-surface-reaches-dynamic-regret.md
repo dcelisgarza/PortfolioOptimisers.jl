@@ -489,3 +489,15 @@ Investable Mask but not the geometry, so `DiagonalProjection` and `GramProjectio
 Gram norm couples the assets, so its reduced programme projects
 `q_P + A_PP⁻¹ A_PZ q_Z` in the norm of `A_PP`, which is exact at the zero weights of the assets
 outside the mask.
+
+## Amendment (2026-10-28)
+
+Issue #1867: `PlainGradient` is removed. The `grad` slot of `MirrorDescent`,
+`ExponentiatedGradient` and `GradientProjection` is bound to `Option{<:AbstractGradientTransform}`,
+and its default is `nothing`, which applies no transform. `gradient_state_seed(::Nothing, w)`
+returns `nothing`, and `transform_gradient!(::Nothing, ::Nothing, g)` returns `g`, as the methods
+on `PlainGradient` did, so no number moves. `OptimisticStep` refuses a wrapped rule whose `grad`
+is not `nothing`, with the same `ArgumentError` as before.
+
+The identity transform is a skipped procedure. ADR 0222 spells such a slot with `nothing`, not
+with a singleton that names no rule of its own.

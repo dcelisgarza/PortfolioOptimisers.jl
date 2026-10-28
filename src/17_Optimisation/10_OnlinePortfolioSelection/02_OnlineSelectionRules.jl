@@ -383,7 +383,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the step-length rules of the passive aggressive mean reversion rule.
 
-The three variants of [li2012pamr](@cite), [`NoSlack`](@ref), [`LinearSlack`](@ref) and [`QuadraticSlack`](@ref), differ in one formula for the step length ``\\tau_t``. [`PassiveAggressiveMeanReversion`](@ref) holds one of them in its `slack` field.
+The three variants of [li2012pamr](@cite), PAMR, PAMR-1 and PAMR-2, differ in one formula for the step length ``\\tau_t``. [`PassiveAggressiveMeanReversion`](@ref) holds the rule in its `slack` field: `nothing` for PAMR, [`LinearSlack`](@ref) for PAMR-1 and [`QuadraticSlack`](@ref) for PAMR-2.
 
 # Interfaces
 
@@ -405,7 +405,7 @@ To implement a new step-length rule, subtype `AbstractPassiveAggressiveSlack` an
 
 # Examples
 
-A rule that takes half the step of `NoSlack`.
+A rule that takes half the step of PAMR, the step of `slack = nothing`.
 
 ```jldoctest
 julia> struct HalfSlack <: PortfolioOptimisers.AbstractPassiveAggressiveSlack end
@@ -423,7 +423,6 @@ HalfSlack()
 
 # Related
 
-  - [`NoSlack`](@ref)
   - [`LinearSlack`](@ref)
   - [`QuadraticSlack`](@ref)
   - [`PassiveAggressiveMeanReversion`](@ref)
@@ -437,50 +436,7 @@ abstract type AbstractPassiveAggressiveSlack <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Takes the full step that brings the hinge loss of the period to zero, the step-length rule of PAMR.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\tau_t &= \\frac{\\ell_t}{\\lVert \\boldsymbol{x}_t - \\bar{x}_t \\boldsymbol{1} \\rVert^2}\\,.
-\\end{align}
-```
-
-Where:
-
-  - $(math_dict[:tau_t_pa])
-  - $(math_dict[:ell_t_pa])
-  - $(math_dict[:xbar_t_pa])
-  - $(math_dict[:x_t_rel])
-  - $(math_dict[:w_t_iter])
-  - $(math_dict[:eps_cw])
-  - $(math_dict[:t_period])
-
-It is the limit of the steps of [`LinearSlack`](@ref) and [`QuadraticSlack`](@ref) as ``C \\to \\infty``. Section 3.3.2 of [lihoi2014](@cite) restates the problem of this step as Equation 7, with the closed form of ``\\tau_t``.
-
-# Examples
-
-```jldoctest
-julia> NoSlack()
-NoSlack()
-```
-
-# Related
-
-  - [`AbstractPassiveAggressiveSlack`](@ref)
-  - [`PassiveAggressiveMeanReversion`](@ref)
-
-# References
-
-  - $(ref_dict[:li2012pamr])
-  - $(ref_dict[:lihoi2014]) Section 3.3.2, Equation 7. $(ref_dict[:no_original_source])
-"""
-struct NoSlack <: AbstractPassiveAggressiveSlack end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Caps the step of `NoSlack` at the aggressiveness `C`, the step-length rule of PAMR-1.
+Caps the step of PAMR, the step of `slack = nothing`, at the aggressiveness `C`, the step-length rule of PAMR-1.
 
 # Mathematical definition
 
@@ -529,7 +485,7 @@ LinearSlack
 
   - [`AbstractPassiveAggressiveSlack`](@ref)
   - [`PassiveAggressiveMeanReversion`](@ref)
-  - [`NoSlack`](@ref): the limit as ``C \\to \\infty``.
+  - [`passive_aggressive_step`](@ref): the step of `nothing` is the limit as ``C \\to \\infty``.
 
 # References
 
@@ -551,7 +507,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Softens the step of `NoSlack` by adding `1 / (2C)` to its denominator, the step-length rule of PAMR-2.
+Softens the step of PAMR, the step of `slack = nothing`, by adding `1 / (2C)` to its denominator, the step-length rule of PAMR-2.
 
 # Mathematical definition
 
@@ -600,7 +556,7 @@ QuadraticSlack
 
   - [`AbstractPassiveAggressiveSlack`](@ref)
   - [`PassiveAggressiveMeanReversion`](@ref)
-  - [`NoSlack`](@ref): the limit as ``C \\to \\infty``.
+  - [`passive_aggressive_step`](@ref): the step of `nothing` is the limit as ``C \\to \\infty``.
 
 # References
 
@@ -620,17 +576,19 @@ function QuadraticSlack(; C::Real = 500)::QuadraticSlack
     return QuadraticSlack(C)
 end
 """
-    passive_aggressive_step(::NoSlack, loss::Real, denom::Real)
+    passive_aggressive_step(::Nothing, loss::Real, denom::Real)
     passive_aggressive_step(slack::LinearSlack, loss::Real, denom::Real)
     passive_aggressive_step(slack::QuadraticSlack, loss::Real, denom::Real)
 
 Returns the step length of a passive-aggressive update under each step-length rule.
 
+`nothing` takes the full step that brings the hinge loss of the period to zero, the step-length rule of PAMR. It is the limit of the steps of [`LinearSlack`](@ref) and [`QuadraticSlack`](@ref) as ``C \\to \\infty``. Section 3.3.2 of [lihoi2014](@cite) restates the problem of this step as Equation 7, with the closed form of ``\\tau_t``.
+
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\tau_t &= \\frac{\\ell_t}{\\lVert \\boldsymbol{x}_t - \\bar{x}_t \\boldsymbol{1} \\rVert^2} && \\text{under } \\mathrm{NoSlack}\\,, \\\\
+\\tau_t &= \\frac{\\ell_t}{\\lVert \\boldsymbol{x}_t - \\bar{x}_t \\boldsymbol{1} \\rVert^2} && \\text{under } \\mathrm{nothing}\\,, \\\\
 \\tau_t &= \\min\\left( C, \\frac{\\ell_t}{\\lVert \\boldsymbol{x}_t - \\bar{x}_t \\boldsymbol{1} \\rVert^2} \\right) && \\text{under } \\mathrm{LinearSlack}\\,, \\\\
 \\tau_t &= \\frac{\\ell_t}{\\lVert \\boldsymbol{x}_t - \\bar{x}_t \\boldsymbol{1} \\rVert^2 + \\frac{1}{2C}} && \\text{under } \\mathrm{QuadraticSlack}\\,.
 \\end{align}
@@ -649,13 +607,20 @@ Where:
 
 # Arguments
 
-  - `slack`: The step-length rule.
+  - `slack`: The step-length rule, or `nothing` for PAMR.
   - `loss`: ``\\ell_t``, the hinge loss of the period, non-negative.
   - `denom`: ``\\lVert \\boldsymbol{x}_t - \\bar{x}_t \\boldsymbol{1} \\rVert^2``, the squared norm of the centred price relative, positive.
 
 # Returns
 
   - `tau::Real`: The step length ``\\tau_t``.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.passive_aggressive_step(nothing, 0.2, 0.1)
+2.0
+```
 
 # Related
 
@@ -665,8 +630,9 @@ Where:
 # References
 
   - $(ref_dict[:li2012pamr]) Pages 221–258. $(ref_dict[:no_original_source])
+  - $(ref_dict[:lihoi2014]) Section 3.3.2, Equation 7.
 """
-function passive_aggressive_step(::NoSlack, loss::Real, denom::Real)
+function passive_aggressive_step(::Nothing, loss::Real, denom::Real)
     return loss / denom
 end
 function passive_aggressive_step(slack::LinearSlack, loss::Real, denom::Real)
@@ -708,9 +674,9 @@ Where:
 
 The step length ``\\tau_t`` is the step of the step-length rule. It is zero when every entry of ``\\boldsymbol{x}_t`` is equal, because then ``\\lVert \\boldsymbol{x}_t - \\bar{x}_t \\boldsymbol{1} \\rVert = 0``. [li2012pamr](@citet) set it to zero in that case too.
 
-The entries of ``\\boldsymbol{x}_t - \\bar{x}_t \\boldsymbol{1}`` sum to zero, so ``\\boldsymbol{q}`` keeps the budget of one. Under [`NoSlack`](@ref) with ``\\ell_t > 0``, the gross return of ``\\boldsymbol{q}`` over period ``t`` is exactly ``\\epsilon``. So, by Proposition 1 of [li2012pamr](@cite), ``\\boldsymbol{q}`` solves the first problem of [li2012pamr](@cite) without the non-negativity constraint. The projection onto the simplex is the normalisation step of Algorithm 1 of [li2012pamr](@cite).
+The entries of ``\\boldsymbol{x}_t - \\bar{x}_t \\boldsymbol{1}`` sum to zero, so ``\\boldsymbol{q}`` keeps the budget of one. Under `slack = nothing` with ``\\ell_t > 0``, the gross return of ``\\boldsymbol{q}`` over period ``t`` is exactly ``\\epsilon``. So, by Proposition 1 of [li2012pamr](@cite), ``\\boldsymbol{q}`` solves the first problem of [li2012pamr](@cite) without the non-negativity constraint. The projection onto the simplex is the normalisation step of Algorithm 1 of [li2012pamr](@cite).
 
-Section 3.3.2 of [lihoi2014](@cite) restates the problem of [`NoSlack`](@ref) as Equation 7, with ``0 \\leq \\epsilon \\leq 1``. [li2012pamr](@citet) take ``\\epsilon \\geq 0``. The experiments of [li2012pamr](@cite) choose ``\\epsilon \\leq 1`` because the gross return of a period is near one. With a threshold above one, the rule moves only after a period whose gross return is above the threshold.
+Section 3.3.2 of [lihoi2014](@cite) restates the problem of PAMR as Equation 7, with ``0 \\leq \\epsilon \\leq 1``. [li2012pamr](@citet) take ``\\epsilon \\geq 0``. The experiments of [li2012pamr](@cite) choose ``\\epsilon \\leq 1`` because the gross return of a period is near one. With a threshold above one, the rule moves only after a period whose gross return is above the threshold.
 
 # Algorithm
 
@@ -729,11 +695,11 @@ $(DocStringExtensions.FIELDS)
 
     PassiveAggressiveMeanReversion(;
         eps::Real = 0.5,
-        slack::AbstractPassiveAggressiveSlack = NoSlack(),
+        slack::Option{<:AbstractPassiveAggressiveSlack} = nothing,
         proj::EuclideanProjection = EuclideanProjection()
     ) -> PassiveAggressiveMeanReversion
 
-Keywords correspond to the struct's fields. `NoSlack()`, `LinearSlack(; C)` and `QuadraticSlack(; C)` are PAMR, PAMR-1 and PAMR-2 of [li2012pamr](@cite). The default `eps = 0.5` is the value of the experiments of [li2012pamr](@cite).
+Keywords correspond to the struct's fields. `nothing`, `LinearSlack(; C)` and `QuadraticSlack(; C)` are PAMR, PAMR-1 and PAMR-2 of [li2012pamr](@cite). The default `eps = 0.5` is the value of the experiments of [li2012pamr](@cite).
 
 ## Validation
 
@@ -745,7 +711,7 @@ Keywords correspond to the struct's fields. `NoSlack()`, `LinearSlack(; C)` and 
 julia> PassiveAggressiveMeanReversion()
 PassiveAggressiveMeanReversion
     eps ┼ Float64: 0.5
-  slack ┼ NoSlack()
+  slack ┼ nothing
    proj ┴ EuclideanProjection()
 ```
 
@@ -768,7 +734,7 @@ PassiveAggressiveMeanReversion
     """
     eps
     """
-    The step-length rule. It is one of the three variants of [li2012pamr](@cite).
+    The step-length rule, or `nothing` for PAMR. It is one of the three variants of [li2012pamr](@cite).
     """
     slack
     """
@@ -776,14 +742,14 @@ PassiveAggressiveMeanReversion
     """
     proj
     function PassiveAggressiveMeanReversion(eps::Real,
-                                            slack::AbstractPassiveAggressiveSlack,
+                                            slack::Option{<:AbstractPassiveAggressiveSlack},
                                             proj::EuclideanProjection)
         @argcheck(eps >= zero(eps), DomainError(eps, "eps must be non-negative"))
         return new{typeof(eps), typeof(slack), typeof(proj)}(eps, slack, proj)
     end
 end
 function PassiveAggressiveMeanReversion(; eps::Real = 0.5,
-                                        slack::AbstractPassiveAggressiveSlack = NoSlack(),
+                                        slack::Option{<:AbstractPassiveAggressiveSlack} = nothing,
                                         proj::EuclideanProjection = EuclideanProjection())::PassiveAggressiveMeanReversion
     return PassiveAggressiveMeanReversion(eps, slack, proj)
 end
@@ -1410,7 +1376,7 @@ function UniversalPortfolio(; N::Integer, n_experts::Integer = 2000, alpha::Num_
     experts = [ConstantRebalancedPortfolio(; w = B[:, k], proj = proj) for k in 1:n_experts]
     return ExpertMixture(; experts = experts, alg = alg, eset = eset)
 end
-export BuyAndHold, ConstantRebalancedPortfolio, NewtonStep, NoSlack, LinearSlack,
-       QuadraticSlack, PassiveAggressiveMeanReversion, OwnPoint, BlendPoint, ExpertMixture,
+export BuyAndHold, ConstantRebalancedPortfolio, NewtonStep, LinearSlack, QuadraticSlack,
+       PassiveAggressiveMeanReversion, OwnPoint, BlendPoint, ExpertMixture,
        UniversalPortfolio
 public AbstractPassiveAggressiveSlack, passive_aggressive_step

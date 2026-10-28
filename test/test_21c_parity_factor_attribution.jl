@@ -184,8 +184,7 @@ end
     ind = ["market" => ConstantExposure(),
            "industry" => OneHotExposure(; field = "industry", family = "industry"),
            "style1" => grid_pass("style1"), "style2" => grid_pass("style2")]
-    ve1 = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(),
-                                            debias = RawStatistic(),
+    ve1 = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(), debias = nothing,
                                             regime_lohi_mult = (0.7, 1.6), min_val = 1e-12,
                                             min_obs = 1)
     lz = KindwiseUnknown(; leverage = ZeroUnknown())

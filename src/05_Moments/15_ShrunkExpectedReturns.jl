@@ -215,7 +215,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Chooses the interval that holds the shrinkage intensity of a blend of the sample expected returns and the target.
 
-[`JamesStein`](@ref) and [`BayesStein`](@ref) hold a member of this family in their field `intensity`. Each computes the blend ``(1 - \\alpha) \\hat{\\boldsymbol{\\mu}} + \\alpha \\boldsymbol{b}``. The member takes the raw intensity ``\\alpha`` of the formula and returns the intensity that the blend uses. [`UnitIntervalIntensity`](@ref) keeps the blend on the segment that joins the sample mean and the target. [`NonNegativeIntensity`](@ref) keeps it on the ray that starts at the sample mean and goes through the target. [`UnclampedIntensity`](@ref) returns the raw intensity.
+[`JamesStein`](@ref) and [`BayesStein`](@ref) hold a member of this family, or `nothing`, in their field `intensity`. Each computes the blend ``(1 - \\alpha) \\hat{\\boldsymbol{\\mu}} + \\alpha \\boldsymbol{b}``. The member takes the raw intensity ``\\alpha`` of the formula and returns the intensity that the blend uses. [`UnitIntervalIntensity`](@ref) keeps the blend on the segment that joins the sample mean and the target. [`NonNegativeIntensity`](@ref) keeps it on the ray that starts at the sample mean and goes through the target. `nothing` applies no clamp, and the blend uses the raw intensity. It does not turn the shrinkage off.
 
 # Interfaces
 
@@ -238,7 +238,6 @@ To add a rule for the shrinkage intensity, subtype `AbstractShrunkExpectedReturn
 
   - [`UnitIntervalIntensity`](@ref)
   - [`NonNegativeIntensity`](@ref)
-  - [`UnclampedIntensity`](@ref)
   - [`shrinkage_intensity`](@ref)
   - [`JamesStein`](@ref)
   - [`BayesStein`](@ref)
@@ -280,7 +279,7 @@ julia> PortfolioOptimisers.shrinkage_intensity(UnitIntervalIntensity(), 1.5)
 
   - [`AbstractShrunkExpectedReturnsIntensity`](@ref)
   - [`NonNegativeIntensity`](@ref)
-  - [`UnclampedIntensity`](@ref)
+  - [`shrinkage_intensity`](@ref)
   - [`JamesStein`](@ref)
   - [`BayesStein`](@ref)
 
@@ -325,7 +324,7 @@ julia> PortfolioOptimisers.shrinkage_intensity(NonNegativeIntensity(), 1.5)
 
   - [`AbstractShrunkExpectedReturnsIntensity`](@ref)
   - [`UnitIntervalIntensity`](@ref)
-  - [`UnclampedIntensity`](@ref)
+  - [`shrinkage_intensity`](@ref)
   - [`JamesStein`](@ref)
   - [`BayesStein`](@ref)
 
@@ -337,39 +336,33 @@ julia> PortfolioOptimisers.shrinkage_intensity(NonNegativeIntensity(), 1.5)
 """
 struct NonNegativeIntensity <: AbstractShrunkExpectedReturnsIntensity end
 """
-$(DocStringExtensions.TYPEDEF)
+    shrinkage_intensity(rule::UnitIntervalIntensity, alpha::Number) -> Number
+    shrinkage_intensity(rule::NonNegativeIntensity, alpha::Number) -> Number
+    shrinkage_intensity(::Nothing, alpha::Number) -> Number
 
-Returns the shrinkage intensity of the formula unchanged.
+Return the intensity that a blend of the sample expected returns and the target uses, from the raw intensity `alpha`.
 
-This rule does not keep the intensity inside ``[0, 1]``, so the blend can move away from the target or go past it. The move can be large. A covariance matrix whose largest eigenvalue is more than half of its trace gives a negative James-Stein intensity. A small distance between the sample mean and the target makes the magnitude of that intensity large.
+[`UnitIntervalIntensity`](@ref) and [`NonNegativeIntensity`](@ref) state their formulas. `nothing` applies no clamp and returns `alpha` unchanged, so the blend can move away from the target or go past it. The move can be large. A covariance matrix whose largest eigenvalue is more than half of its trace gives a negative James-Stein intensity, and a small distance between the sample mean and the target makes the magnitude of that intensity large. Equation 6 of [james1961](@cite) does not clamp its factor. A `NaN` stays a `NaN` under each rule.
 
-# Mathematical definition
+# Arguments
 
-```math
-\\begin{align}
-\\alpha^{\\prime} &= \\alpha\\,.
-\\end{align}
-```
+  - `rule`: The member of [`AbstractShrunkExpectedReturnsIntensity`](@ref), or `nothing` for no clamp.
+  - `alpha`: The raw intensity of the formula of the algorithm.
 
-Where:
+# Returns
 
-  - ``\\alpha``: The raw intensity of the formula of the algorithm.
-  - ``\\alpha^{\\prime}``: The intensity that the blend uses.
-
-Equation 6 of [james1961](@cite) does not clamp its factor.
+  - `alpha::Number`: The intensity that the blend uses.
 
 # Examples
 
 ```jldoctest
-julia> PortfolioOptimisers.shrinkage_intensity(UnclampedIntensity(), -2.5)
+julia> PortfolioOptimisers.shrinkage_intensity(nothing, -2.5)
 -2.5
 ```
 
 # Related
 
   - [`AbstractShrunkExpectedReturnsIntensity`](@ref)
-  - [`UnitIntervalIntensity`](@ref)
-  - [`NonNegativeIntensity`](@ref)
   - [`JamesStein`](@ref)
   - [`BayesStein`](@ref)
 
@@ -377,38 +370,13 @@ julia> PortfolioOptimisers.shrinkage_intensity(UnclampedIntensity(), -2.5)
 
   - $(ref_dict[:james1961]) Section 2, Equation 6.
 """
-struct UnclampedIntensity <: AbstractShrunkExpectedReturnsIntensity end
-"""
-    shrinkage_intensity(rule::UnitIntervalIntensity, alpha::Number) -> Number
-    shrinkage_intensity(rule::NonNegativeIntensity, alpha::Number) -> Number
-    shrinkage_intensity(rule::UnclampedIntensity, alpha::Number) -> Number
-
-Return the intensity that a blend of the sample expected returns and the target uses, from the raw intensity `alpha`.
-
-[`UnitIntervalIntensity`](@ref), [`NonNegativeIntensity`](@ref) and [`UnclampedIntensity`](@ref) state their formulas. A `NaN` stays a `NaN` under each rule.
-
-# Arguments
-
-  - `rule`: The member of [`AbstractShrunkExpectedReturnsIntensity`](@ref).
-  - `alpha`: The raw intensity of the formula of the algorithm.
-
-# Returns
-
-  - `alpha::Number`: The intensity that the blend uses.
-
-# Related
-
-  - [`AbstractShrunkExpectedReturnsIntensity`](@ref)
-  - [`JamesStein`](@ref)
-  - [`BayesStein`](@ref)
-"""
 function shrinkage_intensity(::UnitIntervalIntensity, alpha::Number)
     return clamp(alpha, zero(alpha), one(alpha))
 end
 function shrinkage_intensity(::NonNegativeIntensity, alpha::Number)
     return max(alpha, zero(alpha))
 end
-function shrinkage_intensity(::UnclampedIntensity, alpha::Number)
+function shrinkage_intensity(::Nothing, alpha::Number)
     return alpha
 end
 """
@@ -426,10 +394,10 @@ $(DocStringExtensions.FIELDS)
 
     JamesStein(;
         tgt::AbstractShrunkExpectedReturnsTarget = GrandMean(),
-        intensity::AbstractShrunkExpectedReturnsIntensity = UnitIntervalIntensity()
+        intensity::Option{<:AbstractShrunkExpectedReturnsIntensity} = UnitIntervalIntensity()
     ) -> JamesStein
 
-Keywords correspond to the struct's fields. The default `intensity` keeps the blend on the segment that joins the sample mean and the target. The intensity of the formula is negative when the largest eigenvalue of the covariance matrix is more than half of its trace. [`UnclampedIntensity`](@ref) keeps that negative value.
+Keywords correspond to the struct's fields. The default `intensity` keeps the blend on the segment that joins the sample mean and the target. The intensity of the formula is negative when the largest eigenvalue of the covariance matrix is more than half of its trace. `intensity = nothing` applies no clamp, so it keeps that negative value.
 
 # Examples
 
@@ -466,12 +434,12 @@ JamesStein
     """
     intensity
     function JamesStein(tgt::AbstractShrunkExpectedReturnsTarget,
-                        intensity::AbstractShrunkExpectedReturnsIntensity)
+                        intensity::Option{<:AbstractShrunkExpectedReturnsIntensity})
         return new{typeof(tgt), typeof(intensity)}(tgt, intensity)
     end
 end
 function JamesStein(; tgt::AbstractShrunkExpectedReturnsTarget = GrandMean(),
-                    intensity::AbstractShrunkExpectedReturnsIntensity = UnitIntervalIntensity())::JamesStein
+                    intensity::Option{<:AbstractShrunkExpectedReturnsIntensity} = UnitIntervalIntensity())::JamesStein
     return JamesStein(tgt, intensity)
 end
 """
@@ -489,7 +457,7 @@ $(DocStringExtensions.FIELDS)
 
     BayesStein(;
         tgt::AbstractShrunkExpectedReturnsTarget = GrandMean(),
-        intensity::AbstractShrunkExpectedReturnsIntensity = UnitIntervalIntensity()
+        intensity::Option{<:AbstractShrunkExpectedReturnsIntensity} = UnitIntervalIntensity()
     ) -> BayesStein
 
 Keywords correspond to the struct's fields. The intensity of the formula lies in ``(0, 1]`` when the covariance matrix is positive definite. The field `intensity` therefore changes the result only for a covariance estimator that returns an indefinite matrix.
@@ -526,12 +494,12 @@ BayesStein
     """
     intensity
     function BayesStein(tgt::AbstractShrunkExpectedReturnsTarget,
-                        intensity::AbstractShrunkExpectedReturnsIntensity)
+                        intensity::Option{<:AbstractShrunkExpectedReturnsIntensity})
         return new{typeof(tgt), typeof(intensity)}(tgt, intensity)
     end
 end
 function BayesStein(; tgt::AbstractShrunkExpectedReturnsTarget = GrandMean(),
-                    intensity::AbstractShrunkExpectedReturnsIntensity = UnitIntervalIntensity())::BayesStein
+                    intensity::Option{<:AbstractShrunkExpectedReturnsIntensity} = UnitIntervalIntensity())::BayesStein
     return BayesStein(tgt, intensity)
 end
 """
@@ -793,7 +761,7 @@ end
 
 Compute the shrunk expected returns of the estimator `me`.
 
-The method moves the sample expected returns toward a target. The aim is a smaller estimation error of the mean when the number of assets is large compared with the number of observations. [`JamesStein`](@ref) and [`BayesStein`](@ref) return `(1 - alpha) * mu + alpha * b`. The member of [`AbstractShrunkExpectedReturnsIntensity`](@ref) in their field `intensity` sets the interval of `alpha`. The default [`UnitIntervalIntensity`](@ref) clamps `alpha` into ``[0, 1]``, so the result lies on the segment that joins the sample mean and the target. Under [`UnclampedIntensity`](@ref), the result can lie outside that segment. [`BodnarOkhrinParolya`](@ref) computes its two coefficients separately. They do not sum to one, and no rule clamps them.
+The method moves the sample expected returns toward a target. The aim is a smaller estimation error of the mean when the number of assets is large compared with the number of observations. [`JamesStein`](@ref) and [`BayesStein`](@ref) return `(1 - alpha) * mu + alpha * b`. The member of [`AbstractShrunkExpectedReturnsIntensity`](@ref) in their field `intensity` sets the interval of `alpha`. The default [`UnitIntervalIntensity`](@ref) clamps `alpha` into ``[0, 1]``, so the result lies on the segment that joins the sample mean and the target. Under `intensity = nothing`, no clamp applies, and the result can lie outside that segment. [`BodnarOkhrinParolya`](@ref) computes its two coefficients separately. They do not sum to one, and no rule clamps them.
 
 # Mathematical definition
 
@@ -821,7 +789,7 @@ Where:
 The form has these limits.
 
   - ``N \\bar{\\lambda}`` is the trace of the covariance matrix. Thus ``N \\bar{\\lambda} \\leq 2 \\lambda_{\\max}`` when ``N \\leq 2``. For any ``N``, it also holds when the largest eigenvalue is at least half of the trace, as with one dominant factor. The intensity ``\\alpha`` is then not positive.
-  - Under that condition, [`UnitIntervalIntensity`](@ref) and [`NonNegativeIntensity`](@ref) return the sample mean. Under [`UnclampedIntensity`](@ref), the blend moves away from the target. Theorem 1 of [bock1975](@cite) gives the same condition, ``\\mathrm{tr}(\\mathbf{D}) \\leq 2 d_L``. Under it, the only minimax estimator of its class is the sample mean.
+  - Under that condition, [`UnitIntervalIntensity`](@ref) and [`NonNegativeIntensity`](@ref) return the sample mean. Under `intensity = nothing`, the blend moves away from the target. Theorem 1 of [bock1975](@cite) gives the same condition, ``\\mathrm{tr}(\\mathbf{D}) \\leq 2 d_L``. Under it, the only minimax estimator of its class is the sample mean.
   - The denominator is zero when the target is equal to the sample mean. [`GrandMean`](@ref) and [`VolatilityWeighted`](@ref) are both equal to the sample mean at ``N = 1``, so a one-asset sample raises a `DomainError` under either of them. [`MeanSquaredError`](@ref) does not read the sample mean, so it stays finite there.
 
 Equation 6 of [james1961](@cite) shrinks a normal mean with an identity covariance matrix toward the origin by the factor ``1 - (N - 2) / \\lVert \\boldsymbol{x} \\rVert_2^2``. It does not clamp the factor. Theorem 2 of [bock1975](@cite) extends the minimax property to a known covariance matrix ``\\mathbf{D}`` that is not the identity, for ``N > 2`` and ``\\mathrm{tr}(\\mathbf{D}) \\geq 2 d_L``. The factor is ``1 - c / (\\boldsymbol{x}^\\intercal \\mathbf{D}^{-1} \\boldsymbol{x})``, with ``0 \\leq c \\leq 2 (\\mathrm{tr}(\\mathbf{D}) / d_L - 2)``, where ``d_L`` is the largest eigenvalue of ``\\mathbf{D}``.
@@ -1106,6 +1074,6 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinP
 end
 
 export GrandMean, VolatilityWeighted, MeanSquaredError, UnitIntervalIntensity,
-       NonNegativeIntensity, UnclampedIntensity, JamesStein, BayesStein,
-       BodnarOkhrinParolya, ShrunkExpectedReturns
+       NonNegativeIntensity, JamesStein, BayesStein, BodnarOkhrinParolya,
+       ShrunkExpectedReturns
 public AbstractShrunkExpectedReturnsIntensity, shrinkage_intensity

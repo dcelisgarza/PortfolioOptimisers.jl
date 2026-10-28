@@ -602,7 +602,6 @@ The fallback [`assert_separation_decay`](@ref) on this type probes a member and 
   - [`LinearDecay`](@ref)
   - [`ExponentialDecay`](@ref)
   - [`ReciprocalDecay`](@ref)
-  - [`NoDecay`](@ref)
   - [`separation_decay`](@ref)
   - [`assert_separation_decay`](@ref)
   - [`AbstractSeparationAlgorithm`](@ref)
@@ -804,55 +803,10 @@ function ReciprocalDecay(; power::Number = 1.0)::ReciprocalDecay
     return ReciprocalDecay(power)
 end
 """
-$(DocStringExtensions.TYPEDEF)
-
-Separation decay that does not fall off at all.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-f(d) &= 1\\,,
-\\end{align}
-```
-
-Where:
-
-  - $(math_dict[:d_sep])
-
-# The budget still truncates
-
-The name is about the fall-off alone. A pair outside the budget scores `0`, because the budget truncates and the decay does not. See "The contract" of [`AbstractSeparationDecayAlgorithm`](@ref). So the result is the indicator of the neighbourhood that the budget selects, not a matrix of ones.
-
-Under [`HopCount`](@ref), [`Proximity`](@ref) with this decay gives the indicator of the `n`-hop neighbourhood. Under [`PathLength`](@ref), it gives the indicator of the ball of radius `dmax`. Neither indicator needs a type of its own.
-
-It is the only member that is not strictly decreasing. The contract asks for a monotone non-increasing function, and a constant is one.
-
-# Examples
-
-```jldoctest
-julia> separation_decay.(Ref(NoDecay()), 0:3, 3)
-4-element Vector{Int64}:
- 1
- 1
- 1
- 1
-```
-
-# Related
-
-  - [`AbstractSeparationDecayAlgorithm`](@ref)
-  - [`LinearDecay`](@ref)
-  - [`separation_decay`](@ref)
-  - [`Proximity`](@ref)
-  - [`HopCount`](@ref)
-"""
-struct NoDecay <: AbstractSeparationDecayAlgorithm end
-"""
     separation_decay(dk::LinearDecay, d::Number, dmax::Number)
     separation_decay(dk::ExponentialDecay, d::Number, dmax::Number)
     separation_decay(dk::ReciprocalDecay, d::Number, dmax::Number)
-    separation_decay(dk::NoDecay, d::Number, dmax::Number)
+    separation_decay(::Nothing, d::Number, dmax::Number)
 
 Score a separation under a decay algorithm.
 
@@ -867,13 +821,17 @@ This function selects a method and runs no step of its own. It dispatches on `dk
 | [`LinearDecay`](@ref)      | Linear to the edge of the budget   | yes          |
 | [`ExponentialDecay`](@ref) | Exponential in `rate`              | no           |
 | [`ReciprocalDecay`](@ref)  | A power of `1 + d`, set by `power` | no           |
-| [`NoDecay`](@ref)          | Flat                               | no           |
+| `nothing`                  | Flat, ``f(d) = 1``                 | no           |
 
 [`LinearDecay`](@ref) is the only member that reads the budget. So the other three methods leave their third argument unnamed.
 
+# No decay
+
+`nothing` does not fall off at all, and it is the only decay that is not strictly decreasing. The contract asks for a monotone non-increasing function, and a constant is one. A pair outside the budget still scores `0`, because the budget truncates and the decay does not. So [`Proximity`](@ref) with `decay = nothing` gives the indicator of the neighbourhood that the budget selects, not a matrix of ones. Under [`HopCount`](@ref) it is the indicator of the `n`-hop neighbourhood, and under [`PathLength`](@ref) it is the indicator of the ball of radius `dmax`.
+
 # Arguments
 
-  - `dk`: Separation decay algorithm.
+  - `dk`: Separation decay algorithm, or `nothing` for no decay.
   - `d`: Separation between two assets, `d >= 0`. It is a real number, so it can be a weighted path length or a hop count.
   - `dmax`: Separation budget in scope. Only [`LinearDecay`](@ref) reads it, and the other members ignore it.
 
@@ -897,8 +855,15 @@ julia> separation_decay(ExponentialDecay(; rate = 2.0), 2, 3)
 julia> separation_decay(ReciprocalDecay(; power = 2.0), 2, 3)
 0.1111111111111111
 
-julia> separation_decay(NoDecay(), 2, 3)
+julia> separation_decay(nothing, 2, 3)
 1
+
+julia> separation_decay.(nothing, 0:3, 3)
+4-element Vector{Int64}:
+ 1
+ 1
+ 1
+ 1
 ```
 
 # Related
@@ -907,7 +872,6 @@ julia> separation_decay(NoDecay(), 2, 3)
   - [`LinearDecay`](@ref)
   - [`ExponentialDecay`](@ref)
   - [`ReciprocalDecay`](@ref)
-  - [`NoDecay`](@ref)
   - [`assert_separation_decay`](@ref)
   - [`Proximity`](@ref)
 """
@@ -921,13 +885,14 @@ end
 function separation_decay(dk::ReciprocalDecay, d::Number, ::Number)::Number
     return inv((one(d) + d)^dk.power)
 end
-function separation_decay(::NoDecay, d::Number, ::Number)::Number
+function separation_decay(::Nothing, d::Number, ::Number)::Number
     return one(d)
 end
 """
     assert_separation_decay(dk::AbstractSeparationDecayAlgorithm, ds, dmax::Number)
-    assert_separation_decay(dk::Union{LinearDecay, ExponentialDecay, ReciprocalDecay,
-                                      NoDecay}, ds, dmax::Number)
+    assert_separation_decay(dk::Union{LinearDecay, ExponentialDecay, ReciprocalDecay}, ds,
+                            dmax::Number)
+    assert_separation_decay(::Nothing, ds, dmax::Number)
 
 Check that a separation decay satisfies its contract over the separations that the caller will score.
 
@@ -938,7 +903,7 @@ The fallback probes the decay. It evaluates [`separation_decay`](@ref) over `ds`
   - The values are monotone non-increasing.
   - No value is negative.
 
-The four shipped members satisfy the contract by construction, and their method does nothing. So the probe costs nothing for a shipped member, and it checks each extension.
+The three shipped members and `nothing` satisfy the contract by construction, and their method does nothing. So the probe costs nothing for a shipped member, and it checks each extension.
 
 The probe is cheap where the library uses it, because `ds` is small and the loop after the probe is large. [`Proximity`](@ref) passes `0:dmax`. Under [`HopCount`](@ref), this range holds every separation that the `assets × assets` loop can score, in `dmax + 1` evaluations. Under a budget that is not an integer, the same range is a sample with a step of one. A continuum permits only a sample, and the checks below need no more.
 
@@ -946,7 +911,7 @@ The non-negativity check has one more evaluation at `d = dmax`, also when `ds` d
 
 # Algorithm
 
-These are the steps of the probe in the fallback. The method on the four shipped members runs none of them.
+These are the steps of the probe in the fallback. The method on the three shipped members and on `nothing` runs none of them.
 
  1. Score the separation `zero(dmax)` with [`separation_decay`](@ref), which gives `f0`, the top of the scale.
  2. Check that `f0` is finite and strictly positive.
@@ -1012,10 +977,13 @@ function assert_separation_decay(dk::AbstractSeparationDecayAlgorithm, ds,
 end
 # The shipped members satisfy the contract by construction, so the probe is turned off for
 # them and left on for anything an extension defines -- opt-out, not opt-in.
-function assert_separation_decay(::Union{LinearDecay, ExponentialDecay, ReciprocalDecay,
-                                         NoDecay}, ::Any, ::Number)::Nothing
+function assert_separation_decay(::Union{LinearDecay, ExponentialDecay, ReciprocalDecay},
+                                 ::Any, ::Number)::Nothing
+    return nothing
+end
+function assert_separation_decay(::Nothing, ::Any, ::Number)::Nothing
     return nothing
 end
 
-export HopCount, PathLength, LinearDecay, ExponentialDecay, ReciprocalDecay, NoDecay,
+export HopCount, PathLength, LinearDecay, ExponentialDecay, ReciprocalDecay,
        separation_decay

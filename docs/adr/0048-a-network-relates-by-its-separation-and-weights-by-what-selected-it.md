@@ -705,3 +705,14 @@ only the file that declares them did.
 `PhylogenyResult` stays in `06_Phylogeny.jl`. The construction chain this ADR describes is
 `19_NetworkGraph.jl`, and the decision is unchanged: the network is built at exactly one site, and
 neither branch is re-weighted.
+
+## Amendment (2026-10-28, #1867)
+
+**`decay = nothing` gives the flat score, and `NoDecay` is removed.** `NoDecay()` named no rule. It
+skipped the fall-off, and ADR 0222 spells a skipped procedure as `nothing`. So `Proximity.decay`
+is bound to `Option{<:AbstractSeparationDecayAlgorithm}`, and the default `LinearDecay()` does not
+move. `separation_decay(::Nothing, d, dmax)` returns `one(d)`, and `assert_separation_decay` skips
+the probe for `nothing`, as it does for the shipped members. The budget still truncates, so
+`Proximity(; decay = nothing)` is the indicator of the neighbourhood, not a matrix of ones. The
+numbers do not move. Where the decision above names `NoDecay`, read `decay = nothing`. The removal
+is a clean break with no deprecation, as ADR 0044 and ADR 0213 set.
