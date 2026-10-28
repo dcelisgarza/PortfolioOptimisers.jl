@@ -336,7 +336,7 @@ end
         to the most recent fold.
         =#
         n_folds = 3
-        cvopt = OptimisationCrossValidation(; cv = KFold(; n = n_folds))
+        cvopt = KFold(; n = n_folds)
         mk_st(de) = Stacking(;
                              opti = [plain_hrp(),
                                      HierarchicalEqualRiskContribution(;
@@ -385,7 +385,7 @@ end
         real universe depending on whether `cv` was set. That is the assertion below, and
         it is a deliberate behaviour change from `T x N x nassets`.
         =#
-        cvopt = OptimisationCrossValidation(; cv = KFold(; n = 3))
+        cvopt = KFold(; n = 3)
         ro = RecordingDistance(FeatureDistance(; alg = StackObservations()))
         st = Stacking(;
                       opti = [plain_hrp(),
@@ -735,7 +735,7 @@ end
         # Four optimisations whose outer problem reads the collapsed panel: each
         # meta-optimiser, with and without cross-validation. The cash rule divides by
         # nothing, so its fit is the reference that each mask and each rule must equal.
-        cvopt = OptimisationCrossValidation(; cv = KFold(; n = 3))
+        cvopt = KFold(; n = 3)
         outer() = HierarchicalRiskParity(;
                                          opt = hopt(FeatureDistance(;
                                                                     alg = StackObservations())))

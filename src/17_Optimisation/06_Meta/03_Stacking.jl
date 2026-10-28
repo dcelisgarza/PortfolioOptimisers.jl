@@ -37,7 +37,8 @@ $(DocStringExtensions.FIELDS)
         fees::Option{<:Fees},
         resi::AbstractVector{<:NonFiniteAllocationOptimisationResult},
         reso::OptimisationResult,
-        cv::Option{<:OptimisationCrossValidation},
+        cv::Option{<:OptCVE_Onl},
+        scorer::Option{<:PredictionCrossValScorer},
         retcode::OptRetCode_VecOptRetCode,
         w::VecNum_VecVecNum,
         imsk::Option{<:BitVector} = nothing,
@@ -80,9 +81,13 @@ Keywords correspond to the struct's fields. The keyword constructor expands `w` 
     """
     reso
     """
-    $(field_dict[:cv])
+    $(field_dict[:cv_meta])
     """
     cv
+    """
+    $(field_dict[:scorer_meta])
+    """
+    scorer
     """
     $(field_dict[:retcode])
     """
@@ -102,30 +107,24 @@ Keywords correspond to the struct's fields. The keyword constructor expands `w` 
     function StackingResult(pr::Option{<:AbstractPriorResult}, wb::Option{<:WeightBounds},
                             fees::Option{<:Fees},
                             resi::AbstractVector{<:NonFiniteAllocationOptimisationResult},
-                            reso::OptimisationResult,
-                            cv::Option{<:OptimisationCrossValidation},
+                            reso::OptimisationResult, cv::Option{<:OptCVE_Onl},
+                            scorer::Option{<:PredictionCrossValScorer},
                             retcode::OptRetCode_VecOptRetCode, w::VecNum_VecVecNum,
                             imsk::Option{<:BitVector}, fb::Option{<:OptE_Opt_FbChain})
         return new{typeof(pr), typeof(wb), typeof(fees), typeof(resi), typeof(reso),
-                   typeof(cv), typeof(retcode), typeof(w), typeof(imsk), typeof(fb)}(pr, wb,
-                                                                                     fees,
-                                                                                     resi,
-                                                                                     reso,
-                                                                                     cv,
-                                                                                     retcode,
-                                                                                     w,
-                                                                                     imsk,
-                                                                                     fb)
+                   typeof(cv), typeof(scorer), typeof(retcode), typeof(w), typeof(imsk),
+                   typeof(fb)}(pr, wb, fees, resi, reso, cv, scorer, retcode, w, imsk, fb)
     end
 end
 function StackingResult(; pr::Option{<:AbstractPriorResult}, wb::Option{<:WeightBounds},
                         fees::Option{<:Fees},
                         resi::AbstractVector{<:NonFiniteAllocationOptimisationResult},
-                        reso::OptimisationResult, cv::Option{<:OptimisationCrossValidation},
+                        reso::OptimisationResult, cv::Option{<:OptCVE_Onl},
+                        scorer::Option{<:PredictionCrossValScorer},
                         retcode::OptRetCode_VecOptRetCode, w::VecNum_VecVecNum,
                         imsk::Option{<:BitVector} = nothing,
                         fb::Option{<:OptE_Opt_FbChain})::StackingResult
-    return StackingResult(pr, wb, fees, resi, reso, cv, retcode,
+    return StackingResult(pr, wb, fees, resi, reso, cv, scorer, retcode,
                           expand_investable_weights(imsk, w), imsk, fb)
 end
 # The stacking family carries the mask on the result itself, so the fold reads it directly.
@@ -155,8 +154,8 @@ An outer efficient frontier gives the result one return code for each point, and
   - [`StackingResult`](@ref)
 """
 function set_retcode(res::StackingResult, retcode::OptRetCode_VecOptRetCode)
-    return StackingResult(res.pr, res.wb, res.fees, res.resi, res.reso, res.cv, retcode,
-                          res.w, res.imsk, res.fb)
+    return StackingResult(res.pr, res.wb, res.fees, res.resi, res.reso, res.cv, res.scorer,
+                          retcode, res.w, res.imsk, res.fb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -280,7 +279,8 @@ $(DocStringExtensions.FIELDS)
         scale::TD_Option{<:VecNum} = nothing,
         opti::Union{AbstractVector, TD_VecOptE_Opt},
         opto::OptE_TD,
-        cv::Option{<:OptimisationCrossValidation} = nothing,
+        cv::Option{<:OptCVE_Onl} = nothing,
+        scorer::Option{<:PredictionCrossValScorer} = nothing,
         wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
         fb::TDO_Option{<:OptE_Opt} = nothing,
@@ -306,6 +306,7 @@ Keywords correspond to the struct's fields.
   - When `opti` is a [`TimeDependent`](@ref): `opti.bind !== :nearest`. The constructor throws an `ArgumentError` otherwise.
   - When `scale` is a vector: `all(isfinite, scale)`, and `length(scale) == length(opti)` when `opti` is a vector. The constructor throws an `IsNonFiniteError` or a `DimensionMismatch` otherwise.
   - A schedule in `opto` or `fb` has `bind !== :nearest`. The constructor throws an `ArgumentError` otherwise.
+  - `scorer` is `nothing` unless `cv` is a [`CombinatorialCrossValidation`](@ref). The constructor throws an `ArgumentError` otherwise, through [`assert_meta_scorer`](@ref).
   - `opto` passes [`assert_external_optimiser`](@ref), and every element of `opti` passes it when `cv !== nothing`. The constructor throws an `ArgumentError` otherwise. Such an optimiser runs on the synthetic assets or on the training rows of a fold, which it does not know in advance. So it cannot hold a precomputed prior or a precomputed constraint.
   - When `wb` is a [`WeightBoundsEstimator`](@ref) or `fees` is a [`FeesEstimator`](@ref): `!isnothing(sets)`. The constructor throws an `IsNothingError` otherwise.
   - Each entry and the `default` of each schedule give a valid `Stacking`. [`assert_time_dependent_substitution`](@ref) runs the constructor on each of them.
@@ -376,9 +377,13 @@ Keywords correspond to the struct's fields.
     """
     @fprop opto
     """
-    $(field_dict[:cv])
+    $(field_dict[:cv_meta])
     """
     cv
+    """
+    $(field_dict[:scorer_meta])
+    """
+    scorer
     """
     $(field_dict[:wf])
     """
@@ -407,10 +412,12 @@ Keywords correspond to the struct's fields.
                       fees::TD_Option{<:FeesE_Fees}, sets::TD_Option{<:UniverseSets},
                       scale::TD_Option{<:VecNum},
                       opti::Union{VecOptE_Opt_TD, TD_VecOptE_Opt}, opto::OptE_TD,
-                      cv::Option{<:OptimisationCrossValidation}, wf::TD{<:WeightFinaliser},
-                      ex::FLoops.Transducers.Executor, fb::TDO_Option{<:OptE_Opt},
-                      strict::Bool, pcol::AbstractPanelCollapseAlgorithm,
+                      cv::Option{<:OptCVE_Onl}, scorer::Option{<:PredictionCrossValScorer},
+                      wf::TD{<:WeightFinaliser}, ex::FLoops.Transducers.Executor,
+                      fb::TDO_Option{<:OptE_Opt}, strict::Bool,
+                      pcol::AbstractPanelCollapseAlgorithm,
                       cache::Option{<:ReturnsBufferState})
+        assert_meta_scorer(cv, scorer)
         if isa(opti, TimeDependent)
             @argcheck(opti.bind !== :nearest,
                       ArgumentError("opti of Stacking cannot hold a `bind = :nearest` schedule at the field level: Stacking's inner cross-validation is entered per candidate (`cross_val_predict(opti[k], …)`), so the fold loop is handed the elements, never the field — and a per-fold candidate vector would change the number and identity of the returns-proxy columns opto sees. Schedule individual elements instead (`opti = [static, TimeDependent(…, :nearest; default = …)]`), or use `bind = :outermost` to vary the whole vector with the fold loop that reaches the Stacking."))
@@ -441,16 +448,26 @@ Keywords correspond to the struct's fields.
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
         assert_time_dependent_substitution(Stacking,
-                                           (; pe, wb, fees, sets, scale, opti, opto, cv, wf,
-                                            ex, fb, strict, pcol), stacking_td_defaults())
+                                           (; pe, wb, fees, sets, scale, opti, opto, cv,
+                                            scorer, wf, ex, fb, strict, pcol),
+                                           stacking_td_defaults())
         est = new{typeof(pe), typeof(wb), typeof(fees), typeof(sets), typeof(scale),
-                  typeof(opti), typeof(opto), typeof(cv), typeof(wf), typeof(ex),
-                  typeof(fb), typeof(strict), typeof(pcol), typeof(cache)}(pe, wb, fees,
-                                                                           sets, scale,
-                                                                           opti, opto, cv,
-                                                                           wf, ex, fb,
-                                                                           strict, pcol,
-                                                                           cache)
+                  typeof(opti), typeof(opto), typeof(cv), typeof(scorer), typeof(wf),
+                  typeof(ex), typeof(fb), typeof(strict), typeof(pcol), typeof(cache)}(pe,
+                                                                                       wb,
+                                                                                       fees,
+                                                                                       sets,
+                                                                                       scale,
+                                                                                       opti,
+                                                                                       opto,
+                                                                                       cv,
+                                                                                       scorer,
+                                                                                       wf,
+                                                                                       ex,
+                                                                                       fb,
+                                                                                       strict,
+                                                                                       pcol,
+                                                                                       cache)
         warn_raw_readers(est)
         return est
     end
@@ -461,14 +478,15 @@ function Stacking(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
                   sets::TD_Option{<:UniverseSets} = nothing,
                   scale::TD_Option{<:VecNum} = nothing,
                   opti::Union{AbstractVector, TD_VecOptE_Opt}, opto::OptE_TD,
-                  cv::Option{<:OptimisationCrossValidation} = nothing,
+                  cv::Option{<:OptCVE_Onl} = nothing,
+                  scorer::Option{<:PredictionCrossValScorer} = nothing,
                   wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
                   ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                   fb::TDO_Option{<:OptE_Opt} = nothing, strict::Bool = false,
                   pcol::AbstractPanelCollapseAlgorithm = RenormaliseActive(),
                   cache::Option{<:ReturnsBufferState} = nothing)::Stacking
-    return Stacking(pe, wb, fees, sets, scale, narrow_optimiser_vector(opti), opto, cv, wf,
-                    ex, fb, strict, pcol, cache)
+    return Stacking(pe, wb, fees, sets, scale, narrow_optimiser_vector(opti), opto, cv,
+                    scorer, wf, ex, fb, strict, pcol, cache)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -669,9 +687,9 @@ function port_opt_view(st::Stacking, i, X::MatNum, args...)::Stacking
     opti = port_opt_view(st.opti, i, X)
     opto = port_opt_view(st.opto, i, X)
     return Stacking(; pe = pe, wb = wb, fees = fees, sets = sets, scale = st.scale,
-                    opti = opti, opto = opto, cv = st.cv, wf = st.wf, ex = st.ex,
-                    fb = view_child(st.fb, i, X), strict = st.strict, pcol = st.pcol,
-                    cache = port_opt_view(st.cache, i))
+                    opti = opti, opto = opto, cv = st.cv, scorer = st.scorer, wf = st.wf,
+                    ex = st.ex, fb = view_child(st.fb, i, X), strict = st.strict,
+                    pcol = st.pcol, cache = port_opt_view(st.cache, i))
 end
 function non_investable_universe(st::Stacking, ni::VecStr)::Stacking
     return rebuild_estimator(st, (; sets = non_investable_sets(st.sets, ni)))
@@ -767,11 +785,12 @@ function _optimise(st::Stacking, rd::ReturnsResult; branchorder::Symbol = :optim
     retcode, w = outer_optimisation_finaliser(wb, st.wf, resi, reso.retcode,
                                               combination_weights(st.scale, reso.w), wi)
     return StackingResult(; pr = pr, wb = wb, fees = fees, resi = resi, reso = reso,
-                          cv = st.cv, retcode = retcode, w = w, imsk = imsk, fb = nothing)
+                          cv = st.cv, scorer = st.scorer, retcode = retcode, w = w,
+                          imsk = imsk, fb = nothing)
 end
 """
     optimise(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                     <:Any, <:Any, Nothing
+                     <:Any, <:Any, <:Any, Nothing
                  }, rd::ReturnsResult;
              branchorder::Symbol = :optimal, str_names::Bool = false,
              save::Bool = true, kwargs...) -> StackingResult
@@ -804,7 +823,7 @@ Run the stacking portfolio optimisation.
   - [`combination_weights`](@ref)
 """
 function optimise(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                               <:Any, <:Any, Nothing}, rd::ReturnsResult;
+                               <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult;
                   branchorder::Symbol = :optimal, str_names::Bool = false,
                   save::Bool = true, kwargs...)
     assert_batch_entry(st, "`optimise`")

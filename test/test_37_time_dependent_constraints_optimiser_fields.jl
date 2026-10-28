@@ -270,7 +270,7 @@ end
                                            l2 = L2Regularisation(; val = 1e-3)))
         res = optimise(iv, rd)
         cvw = IndexWalkForward(100, 50)  # 2 outer folds over the 200-row sample
-        cv3 = OptimisationCrossValidation(; cv = KFold(; n = 3))
+        cv3 = KFold(; n = 3)
         sex = PortfolioOptimisers.FLoops.SequentialEx()
         @testset "Construction: bind legality per position" begin
             # :nearest is legal on NestedClustered.opti — its inner CV is entered per

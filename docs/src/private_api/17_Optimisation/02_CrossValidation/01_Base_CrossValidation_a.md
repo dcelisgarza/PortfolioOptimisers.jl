@@ -13,7 +13,6 @@ NonSequentialCrossValidationEstimator
 OptimisationCrossValidationResult
 SequentialCrossValidationResult
 NonSequentialCrossValidationResult
-OptCVER
 NonSeqCVER
 SeqCVER
 NonOptimisationCrossValidationEstimator

@@ -667,7 +667,7 @@ end
     # inner or outer optimiser. The outer problem reads the raw returns of the
     # sub-portfolios, in the path without folds and in the cross-validated path
     # (ADR 0215, decision 3).
-    for cv in (nothing, OptimisationCrossValidation(; cv = KFold(; n = 5))),
+    for cv in (nothing, KFold(; n = 5)),
         mk in (s -> Stacking(; pe = EmpiricalPrior(; x_src = s), cv = cv,
                              opti = [MeanRisk(; opt = jo(nothing)), InverseVolatility()],
                              opto = MeanRisk(; opt = jo(nothing))),

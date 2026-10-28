@@ -92,6 +92,22 @@ Alias for a walk-forward cross-validation scheme, plain or online, or its result
 """
 const WFCVER = Union{WalkForward_Onl, WalkForwardResult}
 """
+    const OptCVE_Onl = Union{OptimisationCrossValidationEstimator, Online{<:WalkForwardEstimator}}
+
+Alias for the schemes that the `cv` field of a meta-optimiser takes: an optimisation cross-validation scheme, plain or an Online Scheme.
+
+[`NestedClustered`](@ref) and [`Stacking`](@ref) bind their `cv` field to it, and [`predict_outer_returns`](@ref) dispatches on it. It takes no split result, because an estimator holds no result. An Online Scheme is an [`Online`](@ref) around a walk-forward, so it is not an [`OptimisationCrossValidationEstimator`](@ref) by supertype, and the alias names it.
+
+# Related
+
+  - [`OptimisationCrossValidationEstimator`](@ref)
+  - [`WalkForward_Onl`](@ref)
+  - [`CVE_Onl`](@ref)
+  - [`predict_outer_returns`](@ref)
+"""
+const OptCVE_Onl = Union{OptimisationCrossValidationEstimator,
+                         Online{<:WalkForwardEstimator}}
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Implements index-based walk-forward cross-validation for time series, supporting purging and flexible train/test windowing.

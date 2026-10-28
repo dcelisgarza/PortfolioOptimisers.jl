@@ -85,6 +85,28 @@ assets is what keeps the JuMP families cheap.
         @test seen == 1:n
     end
 
+    @testset "A meta-optimiser steps its inner cross-validation under an Online Scheme" begin
+        # The `cv` field of a meta-optimiser takes an Online Scheme, and the outer problem
+        # reads the same returns as under the expanding batch scheme.
+        metas = (cv -> Stacking(; opti = [mr, InverseVolatility()],
+                                opto = InverseVolatility(), cv = cv),
+                 cv -> NestedClustered(; opti = mr, opto = InverseVolatility(), cv = cv))
+        for mk in metas
+            b = optimise(mk(batch_cv), rd)
+            o = optimise(mk(online_cv), rd)
+            @test o.cv === online_cv
+            @test isapprox(o.reso.w, b.reso.w; atol = weight_tol(mr))
+            @test isapprox(o.w, b.w; atol = weight_tol(mr))
+        end
+        # The inner Online Scheme is a scheme, not a sample buffer, so neither the batch
+        # entry nor the entry of an outer online arm refuses it.
+        st = first(metas)(online_cv)
+        @test isnothing(po.online_wrapper_path(st))
+        @test isnothing(po.online_unreached_path(st))
+        @test length(cross_val_predict(st, rd, OnlineIndexWalkForward(100, 30)).pred) ==
+              n_splits(OnlineIndexWalkForward(100, 30), rd)
+    end
+
     @testset "A benchmark-relative walk fits X - B at every fold (#1645, #1651)" begin
         # A prior that states `x_src = ExcessSource()` fits `X - B` at every fold. The step
         # folds `X - B` into the prior and keeps the raw rows, so the online walk reaches the

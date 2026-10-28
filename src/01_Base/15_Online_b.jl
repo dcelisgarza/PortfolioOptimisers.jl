@@ -396,17 +396,18 @@ end
 """
     online_wrapper_path(est)
     online_wrapper_path(::Online)
+    online_wrapper_path(::Online{<:CrossValidationEstimator})
     online_wrapper_path(::TimeDependent)
 
 Names the first field of an estimator tree that holds an [`Online`](@ref) declaration, or answers `nothing`.
 
-[`assert_batch_entry`](@ref) uses this walk. Only the warm-up of the online arm of the fold loop resolves a wrapper, with [`update_online_estimator`](@ref). Without the check, a batch fit that reaches a wrapper gets a `MethodError` at `prior(pe, X)`, not a refusal. The walk reads the fields of [`estimator_fields`](@ref), and the answer is the dotted path from the root. It is `"pe"` for a wrapped prior on a naive optimiser, and `"opt.pe"` for a wrapped prior under a JuMP head. The walk does not enter a field that holds a wrapper, because the warm-up resolves the wrappers below it. A wrapper at the root answers `""`, the empty path. A [`TimeDependent`](@ref) schedule answers `nothing`, because its constructor refuses a wrapper among its entries. A value that is not an estimator also answers `nothing`.
+[`assert_batch_entry`](@ref) uses this walk. Only the warm-up of the online arm of the fold loop resolves a wrapper, with [`update_online_estimator`](@ref). Without the check, a batch fit that reaches a wrapper gets a `MethodError` at `prior(pe, X)`, not a refusal. The walk reads the fields of [`estimator_fields`](@ref), and the answer is the dotted path from the root. It is `"pe"` for a wrapped prior on a naive optimiser, and `"opt.pe"` for a wrapped prior under a JuMP head. The walk does not enter a field that holds a wrapper, because the warm-up resolves the wrappers below it. A wrapper at the root answers `""`, the empty path. An Online Scheme answers `nothing`. It is a scheme in the `cv` field of a meta-optimiser, such as [`Stacking`](@ref), and not the declaration of a sample buffer, so the fold loop that runs it resolves it. A [`TimeDependent`](@ref) schedule answers `nothing`, because its constructor refuses a wrapper among its entries. A value that is not an estimator also answers `nothing`.
 
 # Algorithm
 
- 1. Answer `""` when `est` is an [`Online`](@ref).
- 2. Walk the fields of [`estimator_fields`](@ref) in order, and answer the name of the first field that holds a wrapper.
- 3. For a field that holds no wrapper, find the path in the field with this function, and answer it with the field name and a dot before it.
+ 1. Answer `""` when `est` is an [`Online`](@ref), and `nothing` when it is an Online Scheme.
+ 2. Walk the fields of [`estimator_fields`](@ref) in order, and find the path in each field with this function.
+ 3. Answer the first path found, with the field name before it, as [`tree_path`](@ref) joins them.
  4. Answer `nothing` when no field gives a path.
 
 # Arguments
@@ -426,19 +427,18 @@ Names the first field of an estimator tree that holds an [`Online`](@ref) declar
 """
 function online_wrapper_path(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator})
     for f in estimator_fields(est)
-        v = getfield(est, f)
-        if isa(v, Online)
-            return string(f)
-        end
-        path = online_wrapper_path(v)
+        path = online_wrapper_path(getfield(est, f))
         if !isnothing(path)
-            return string(f, ".", path)
+            return tree_path(f, path)
         end
     end
     return nothing
 end
 function online_wrapper_path(::Online)
     return ""
+end
+function online_wrapper_path(::Online{<:CrossValidationEstimator})
+    return nothing
 end
 function online_wrapper_path(::Any)
     return nothing

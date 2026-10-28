@@ -321,7 +321,6 @@ commit = "7a17d96d8e"
 "src/17_Optimisation/02_CrossValidation/05_MultipleRandomised.jl" = { code = 295, doc = 333, comment = 16, blank = 135, total = 779 }
 "src/17_Optimisation/02_CrossValidation/06_Validation.jl" = { code = 16, doc = 19, comment = 0, blank = 9, total = 44 }
 "src/17_Optimisation/02_CrossValidation/07_Scoring.jl" = { code = 59, doc = 172, comment = 0, blank = 86, total = 317 }
-"src/17_Optimisation/02_CrossValidation/08_OptimisationCrossValidation.jl" = { code = 14, doc = 33, comment = 0, blank = 13, total = 60 }
 "src/17_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl" = { code = 342, doc = 516, comment = 12, blank = 197, total = 1067 }
 "src/17_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { code = 102, doc = 184, comment = 22, blank = 54, total = 362 }
 "src/17_Optimisation/02_CrossValidation/11_RandomisedSearchCrossValidation.jl" = { code = 34, doc = 39, comment = 0, blank = 18, total = 91 }

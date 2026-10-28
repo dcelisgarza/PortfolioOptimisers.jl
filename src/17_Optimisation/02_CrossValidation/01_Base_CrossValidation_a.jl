@@ -131,21 +131,6 @@ function n_splits(res::OptimisationCrossValidationResult, ::Prices_RR)
     return n_splits(res)
 end
 """
-    OptCVER
-
-Union of all optimisation cross-validation estimators and results.
-
-# Related
-
-  - [`OptimisationCrossValidationEstimator`](@ref)
-  - [`OptimisationCrossValidationResult`](@ref)
-  - [`NonSeqCVER`](@ref)
-  - [`SeqCVER`](@ref)
-"""
-const OptCVER = Union{OptimisationCrossValidationEstimator,
-                      OptimisationCrossValidationResult}
-
-"""
     NonSeqCVER
 
 Union of all non-sequential cross-validation estimators and results.
@@ -260,10 +245,10 @@ cv_timestamps(pr::AbstractPricesResult) = TimeSeries.timestamp(pr.X)
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the cross-validation schemes that [`OptimisationCrossValidation`](@ref) does
+Abstract supertype for the cross-validation schemes that the `cv` field of a meta-optimiser does
 not take.
 
-The `cv` field of `OptimisationCrossValidation` is bound to [`OptCVER`](@ref), so a scheme of this
+The `cv` field of [`NestedClustered`](@ref) and [`Stacking`](@ref) is bound to [`OptCVE_Onl`](@ref), so a scheme of this
 branch reaches an optimiser through [`cross_val_predict`](@ref). [`MultipleRandomised`](@ref) is the one
 member. It draws random asset subsets, applies an inner walk-forward to each, and backtests an
 optimiser on every path.

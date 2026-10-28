@@ -150,6 +150,8 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :n_iter => "`n_iter`: Trial count, the count of the candidates that the randomised search draws. Each trial sets every key of one parameter set. When every value is a vector and the space holds fewer points, the search takes each point once.",#
                  :cv => "`cv`: Cross-validation estimator.",#
                  :scorer => "`scorer`: Scoring function. Given the orientation-normalised score matrix (rows = CV splits, columns = parameter sets), it returns the column index of the best parameter set. The matrix is normalised so that **higher is always better**, whatever the risk measure, so a scorer selects the largest aggregate score (see [`CrossValidationSearchScorer`](@ref)).",#
+                 :cv_meta => "`cv`: Inner cross-validation scheme of the sub-portfolios, an [`OptCVE_Onl`](@ref), or `nothing`. A scheme gives the outer optimiser the out-of-sample returns of each sub-portfolio. `nothing` gives it the returns of the solve over the full sample.",#
+                 :scorer_meta => "`scorer`: Selects one path from the population of each sub-portfolio under a [`CombinatorialCrossValidation`](@ref), a [`PredictionScorer`](@ref) or a function, or `nothing`. `nothing` selects with [`NearestQuantilePrediction`](@ref). The constructor refuses a value that is not `nothing` when `cv` is not a `CombinatorialCrossValidation`.",#
                  :train_score => "`train_score`: Whether to also compute the training set score.",#
                  :path_ids => "`path_ids`: Path identifiers for cross-validation splits.",#
                  :train_scores => "`train_scores`: Training set scores.",#

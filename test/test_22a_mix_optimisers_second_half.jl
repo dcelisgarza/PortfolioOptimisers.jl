@@ -99,58 +99,43 @@ include(joinpath(@__DIR__, "test22_setup.jl"))
                                                                                           opt = jopto),
                                                                           opto = MeanRisk(;
                                                                                           opt = jopto)))),
-            NestedClustered(; cv = OptimisationCrossValidation(; cv = KFold(; n = 10)),
-                            opti = MeanRisk(; opt = jopto), opto = MeanRisk(; opt = jopto)),
-            NestedClustered(;
-                            cv = OptimisationCrossValidation(;
-                                                             cv = IndexWalkForward(23, 11)),
-                            opti = MeanRisk(; opt = jopto), opto = MeanRisk(; opt = jopto)),
-            NestedClustered(; cv = OptimisationCrossValidation(; cv = KFold(; n = 10)),
-                            opti = Stacking(;
-                                            cv = OptimisationCrossValidation(;
-                                                                             cv = KFold(;
-                                                                                        n = 10)),
+            NestedClustered(; cv = KFold(; n = 10), opti = MeanRisk(; opt = jopto),
+                            opto = MeanRisk(; opt = jopto)),
+            NestedClustered(; cv = IndexWalkForward(23, 11), opti = MeanRisk(; opt = jopto),
+                            opto = MeanRisk(; opt = jopto)),
+            NestedClustered(; cv = KFold(; n = 10),
+                            opti = Stacking(; cv = KFold(; n = 10),
                                             opti = [MeanRisk(; opt = jopto),
                                                     HierarchicalRiskParity(; opt = hopto),
                                                     MeanRisk(; obj = MaximumRatio(),
                                                              opt = jopto)],
                                             opto = MeanRisk(; opt = jopto)),
-                            opto = Stacking(;
-                                            cv = OptimisationCrossValidation(;
-                                                                             cv = IndexWalkForward(23,
-                                                                                                   11)),
+                            opto = Stacking(; cv = IndexWalkForward(23, 11),
                                             opti = [MeanRisk(; opt = jopto),
                                                     HierarchicalRiskParity(; opt = hopto),
                                                     MeanRisk(; obj = MaximumRatio(),
                                                              opt = jopto)],
                                             opto = MeanRisk(; opt = jopto))),
             NestedClustered(;
-                            cv = OptimisationCrossValidation(;
-                                                             cv = CombinatorialCrossValidation(;
-                                                                                               n_folds = 4,
-                                                                                               n_test_folds = 3)),
+                            cv = CombinatorialCrossValidation(; n_folds = 4,
+                                                              n_test_folds = 3),
                             opti = Stacking(;
-                                            cv = OptimisationCrossValidation(;
-                                                                             cv = CombinatorialCrossValidation(;
-                                                                                                               n_folds = 4,
-                                                                                                               n_test_folds = 3)),
+                                            cv = CombinatorialCrossValidation(; n_folds = 4,
+                                                                              n_test_folds = 3),
                                             opti = [MeanRisk(; opt = jopto),
                                                     HierarchicalRiskParity(; opt = hopto),
                                                     MeanRisk(; obj = MaximumRatio(),
                                                              opt = jopto)],
                                             opto = MeanRisk(; opt = jopto)),
                             opto = Stacking(;
-                                            cv = OptimisationCrossValidation(;
-                                                                             cv = CombinatorialCrossValidation(;
-                                                                                                               n_folds = 4,
-                                                                                                               n_test_folds = 3)),
+                                            cv = CombinatorialCrossValidation(; n_folds = 4,
+                                                                              n_test_folds = 3),
                                             opti = [MeanRisk(; opt = jopto),
                                                     HierarchicalRiskParity(; opt = hopto),
                                                     MeanRisk(; obj = MaximumRatio(),
                                                              opt = jopto)],
                                             opto = MeanRisk(; opt = jopto))),
-            NestedClustered(; pe = pr, cle = clr,
-                            cv = OptimisationCrossValidation(; cv = KFold(; n = 10)),
+            NestedClustered(; pe = pr, cle = clr, cv = KFold(; n = 10),
                             opti = NestedClustered(; opti = MeanRisk(; opt = jopti),
                                                    opto = MeanRisk(; opt = jopto)),
                             opto = NestedClustered(; opti = MeanRisk(; opt = jopto),
@@ -161,23 +146,19 @@ include(joinpath(@__DIR__, "test22_setup.jl"))
                                                   MeanRisk(; obj = MaximumRatio(),
                                                            opt = jopto)]),
                      opto = MeanRisk(; opt = jopto)),
-            Stacking(; cv = OptimisationCrossValidation(; cv = KFold(; n = 10)),
+            Stacking(; cv = KFold(; n = 10),
                      opti = concrete_typed_array([resi,
                                                   HierarchicalRiskParity(; opt = hopto),
                                                   MeanRisk(; obj = MaximumRatio(),
                                                            opt = jopto)]),
                      opto = MeanRisk(; opt = jopto)),
-            Stacking(;
-                     cv = OptimisationCrossValidation(;
-                                                      cv = CombinatorialCrossValidation(;
-                                                                                        n_folds = 4,
-                                                                                        n_test_folds = 3)),
+            Stacking(; cv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 3),
                      opti = concrete_typed_array([resi,
                                                   HierarchicalRiskParity(; opt = hopto),
                                                   MeanRisk(; obj = MaximumRatio(),
                                                            opt = jopto)]),
                      opto = MeanRisk(; opt = jopto)),
-            Stacking(; cv = OptimisationCrossValidation(; cv = IndexWalkForward(23, 11)),
+            Stacking(; cv = IndexWalkForward(23, 11),
                      opti = concrete_typed_array([resi,
                                                   HierarchicalRiskParity(; opt = hopto),
                                                   MeanRisk(; obj = MaximumRatio(),

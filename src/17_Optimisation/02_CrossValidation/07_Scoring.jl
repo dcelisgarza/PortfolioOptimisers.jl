@@ -31,7 +31,7 @@ abstract type PredictionScorer <: AbstractCrossValidationScorer end
 """
     const PredictionCrossValScorer = Union{PredictionScorer, Function}
 
-Union of the values that the `scorer` field of [`OptimisationCrossValidation`](@ref) accepts: a [`PredictionScorer`](@ref) or a plain function.
+Union of the values that the `scorer` field of [`NestedClustered`](@ref) and [`Stacking`](@ref) accepts: a [`PredictionScorer`](@ref) or a plain function.
 
 The union exists so that a caller can select a path with a function and write no type. The function takes a [`PopulationPredictionResult`](@ref) and returns one of its members, as a [`PredictionScorer`](@ref) does.
 
@@ -39,7 +39,8 @@ The union exists so that a caller can select a path with a function and write no
 
   - [`PredictionScorer`](@ref)
   - [`NearestQuantilePrediction`](@ref)
-  - [`OptimisationCrossValidation`](@ref)
+  - [`NestedClustered`](@ref)
+  - [`Stacking`](@ref)
 """
 const PredictionCrossValScorer = Union{PredictionScorer, Function}
 """
@@ -47,7 +48,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Selects the path of a population whose risk is nearest to a target quantile of the population's risks.
 
-It is the default scorer of [`OptimisationCrossValidation`](@ref) under [`CombinatorialCrossValidation`](@ref). A path with a failed fold, or with a risk that is not finite, takes no part in the quantile, and the scorer never selects it.
+It is the scorer that [`NestedClustered`](@ref) and [`Stacking`](@ref) use under [`CombinatorialCrossValidation`](@ref) when their `scorer` is `nothing`. A path with a failed fold, or with a risk that is not finite, takes no part in the quantile, and the scorer never selects it.
 
 # Mathematical definition
 

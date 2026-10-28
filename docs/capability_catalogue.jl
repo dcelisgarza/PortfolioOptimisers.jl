@@ -1545,7 +1545,6 @@ const CATALOGUE = [Section("Core abstractions",
                                    Group(Cap(:CrossValidationSearchScorer;
                                              label = "Scoring a parameter set"),
                                          [Cap(:HighestMeanScore)])]),
-                            Cap(:OptimisationCrossValidation),
                             Cap(:NumberSubsetsEstimator, :SubsetSizeEstimator),
                             Cap(:WindowSizeEstimator),
                             Section("Covariance forecast evaluation",

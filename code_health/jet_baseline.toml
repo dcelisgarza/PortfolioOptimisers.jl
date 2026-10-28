@@ -326,7 +326,6 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/17_Optimisation/02_CrossValidation/05_MultipleRandomised.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/02_CrossValidation/06_Validation.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/02_CrossValidation/07_Scoring.jl" = { raw = 0, reviewed = 0 }
-"src/17_Optimisation/02_CrossValidation/08_OptimisationCrossValidation.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl" = { raw = 2, reviewed = 2 }
 "src/17_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { raw = 1, reviewed = 1 }
 "src/17_Optimisation/02_CrossValidation/11_RandomisedSearchCrossValidation.jl" = { raw = 0, reviewed = 0 }
@@ -744,7 +743,6 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/17_Optimisation/02_CrossValidation/05_MultipleRandomised.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/02_CrossValidation/06_Validation.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/02_CrossValidation/07_Scoring.jl" = { raw = 0, reviewed = 0 }
-"src/17_Optimisation/02_CrossValidation/08_OptimisationCrossValidation.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/02_CrossValidation/11_RandomisedSearchCrossValidation.jl" = { raw = 0, reviewed = 0 }
