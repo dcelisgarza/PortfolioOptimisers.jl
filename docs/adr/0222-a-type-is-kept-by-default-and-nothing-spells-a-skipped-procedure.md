@@ -85,6 +85,29 @@ section. Its interface is the verbs of its member that a second member needs, an
 body calls only those verbs dispatches on the abstract type
 ([#1874](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1874)).
 
+### A step on the output of a covariance estimator is the wrapper
+
+Matrix processing that runs on the output of a covariance estimator has one spelling: the wrapper
+`PortfolioOptimisersCovariance(ce, mp)`. A covariance estimator carries no `mp` of its own. The
+wrapper takes any `StatsBase.CovarianceEstimator`, also one that another package defines, so a
+field on the estimator is a second spelling of one step. `DenoiseCovariance`, `DetoneCovariance`
+and `ProcessedCovariance` are functions that build the wrapper, not a third spelling.
+
+An estimator carries `mp` or `pdm` as a field only when the step processes a matrix that the
+estimator assembles itself, so no wrapper can reach the matrix:
+
+1. **A step inside the algorithm.** `GerberCovariance`, `SmythBrobyCovariance` and
+   `GerberIQCovariance` repair the correlation with `pdm` before they rescale it.
+   `GeodesicShrinkageCovariance` repairs a block.
+2. **A matrix that a prior assembles.** `FactorPrior`, `CrossSectionalFactorPrior` and the
+   Black-Litterman priors process the posterior covariance that they build from parts.
+3. **A moment that is not a covariance.** `Coskewness`, `Cokurtosis` and `NegativeSkewness`
+   process a matrix of higher order.
+
+The wrapper passes the four checks. Many methods dispatch on it, and it is the default covariance
+estimator of the priors and of the uncertainty sets (ADR 0016). So it stays
+([#1865](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1865)).
+
 ### An abstract type, not a `Union` of its members
 
 A method or a bound names the abstract type where a `Union` would spell all its members. A caller
@@ -137,6 +160,7 @@ between two sources.
 | `PricesToReturns.gap_return_alg` | `nothing`, the simple default rule | none |
 | `PricesToReturns.ret_method`, `padding` | `Symbol`, `Bool` | none |
 | `DriftedWeights.wd` | the field is removed, so `DriftedWeights()` is a singleton | the field `wd`. It had one reader, and it had no effect when the scheme set it. `DriftedWeights` and `TargetWeights` stay, because methods dispatch on them and ADR 0110 names them. A new drift of the held weights is a new sibling ([#1860](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1860)). |
+| `ImpliedVolatility.mp` | the wrapper `PortfolioOptimisersCovariance(; ce = ImpliedVolatility(; …), mp)` | the field `mp`. It processed the last matrix, the same step as the wrapper ([#1865](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1865)). |
 
 `IdentityTarget`, `NoDefault`, `ZeroUnseenMember`, `ZeroUnknown`, `ZeroStartCentring`,
 `UnitIntervalIntensity`, `NonNegativeIntensity`, `NoRisk` and `NoReturn` stay, for the reasons
@@ -155,12 +179,18 @@ above. `ZeroStartCentring` is the location of the oracle, a rule with content of
   optional value in the whole library.
 - **A named leaf beside `nothing`, as an alias.** This was the ruling of #1878, and the maintainer
   reversed it. Two spellings of one setting is the defect that #1867 found.
+- **An `mp` field on every covariance estimator, in place of the wrapper.** This was rejected
+  (#1865). It adds a field to each plain covariance estimator, and it cannot reach an estimator
+  that another package defines.
 
 ## Consequences
 
 - A new field that can skip a procedure, or that has a trivial default, takes
   `Option{<:AbstractX}` with a method on `Nothing`. A family can have `nothing` as its only trivial
   member, beside its rules with content.
+- A new covariance estimator takes no `mp` field. A caller wraps it in
+  `PortfolioOptimisersCovariance` for matrix processing. A caller that set `mp` on an
+  `ImpliedVolatility` moves it to the wrapper.
 - A fallback method on the abstract family that refuses a subtype with no method of its own stays
   separate from the method on `Nothing`, as #1878 made it for the Gerber IQ verbs.
 - The removed names that v0.32 exported have a line in the migration guide. A caller replaces

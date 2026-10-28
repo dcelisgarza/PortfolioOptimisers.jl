@@ -28,6 +28,9 @@ whole repository.
   Dispatch and bound on the abstract type, not on a `Union` of all its members, because a caller
   cannot add a member to a `Union`. A `Union` stays where the set mixes families (an estimator or
   a result), where the abstract type has a fallback method of its own, or as a named alias.
+  A new covariance estimator takes no `mp` field: matrix processing on its output is the wrapper
+  `PortfolioOptimisersCovariance(ce, mp)`. An `mp` or `pdm` field stays only where the estimator
+  processes a matrix that it assembles itself, as a prior or a higher-order moment does.
   [ADR 0222](../docs/adr/0222-a-type-is-kept-by-default-and-nothing-spells-a-skipped-procedure.md)
   states the rule.
 - **Prefer a per-type method over a new dependency** for reflection-style work. Derive the field

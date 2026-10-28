@@ -676,10 +676,12 @@ end
                                                                     ve = SimpleVariance(;
                                                                                         corrected = false))),
                 (;)), (ImpliedVolatility(; ppy = 252, ce = SpearmanCovariance()), (;)),
-               (ImpliedVolatility(; ppy = 252,
-                                  mp = MatrixProcessing(;
-                                                        dn = Denoise(;
-                                                                     alg = SpectralDenoise()))),
+               # `ImpliedVolatility` carries no `mp`, so the wrapper applies the denoise
+               # step to its last matrix (#1865).
+               (PortfolioOptimisersCovariance(; ce = ImpliedVolatility(; ppy = 252),
+                                              mp = MatrixProcessing(;
+                                                                    dn = Denoise(;
+                                                                                 alg = SpectralDenoise()))),
                 (;)),
                (ImpliedVolatility(; ppy = 252, alg = ImpliedVolatilityPremium()),
                 (; ivpa = 1.2)),

@@ -183,6 +183,8 @@ Covariance estimator that scales a correlation matrix by the realised volatiliti
 
 `ImpliedVolatility` estimates the correlation matrix of the returns with a base estimator. It predicts the realised volatility of each asset from the implied volatilities, and scales the correlation matrix by those volatilities. Two algorithms make the prediction. [`ImpliedVolatilityRegression`](@ref) fits a regression of realised volatility on implied volatility. [`ImpliedVolatilityPremium`](@ref) divides the implied volatility by a factor that the caller gives.
 
+The estimator applies no matrix processing to its result. Wrap it in [`PortfolioOptimisersCovariance`](@ref) to repair, denoise or detone the matrix, as for every other covariance estimator.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -191,7 +193,6 @@ $(DocStringExtensions.FIELDS)
 
     ImpliedVolatility(;
         ce::StatsBase.CovarianceEstimator = Covariance(),
-        mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
         alg::ImpliedVolatilityAlgorithm = ImpliedVolatilityRegression(),
         ppy::Number,
         cache::Option{<:AbstractPartialFitState} = nothing
@@ -231,14 +232,6 @@ ImpliedVolatility
       │       │    w ┴ nothing
       │   alg ┼ FullMoment()
       │     w ┴ nothing
-   mp ┼ MatrixProcessing
-      │     pdm ┼ Posdef
-      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │      dn ┼ nothing
-      │      dt ┼ nothing
-      │     alg ┼ nothing
-      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
   alg ┼ ImpliedVolatilityRegression
       │   ve ┼ SimpleVariance
       │      │          me ┼ SimpleExpectedReturns
@@ -257,7 +250,7 @@ ImpliedVolatility
   - [`ImpliedVolatilityAlgorithm`](@ref)
   - [`ImpliedVolatilityRegression`](@ref)
   - [`ImpliedVolatilityPremium`](@ref)
-  - [`AbstractMatrixProcessingEstimator`](@ref)
+  - [`PortfolioOptimisersCovariance`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
 """
@@ -266,10 +259,6 @@ ImpliedVolatility
     $(field_dict[:ce])
     """
     @fprop @vprop ce
-    """
-    $(field_dict[:mp])
-    """
-    mp
     """
     Implied volatility algorithm that predicts the realised volatility of each asset.
     """
@@ -283,22 +272,17 @@ ImpliedVolatility
     """
     @fprop @vprop cache
     function ImpliedVolatility(ce::StatsBase.CovarianceEstimator,
-                               mp::AbstractMatrixProcessingEstimator,
                                alg::ImpliedVolatilityAlgorithm, ppy::Number,
                                cache::Option{<:AbstractPartialFitState})
         assert_gt0(ppy, :ppy)
-        return new{typeof(ce), typeof(mp), typeof(alg), typeof(ppy), typeof(cache)}(ce, mp,
-                                                                                    alg,
-                                                                                    ppy,
-                                                                                    cache)
+        return new{typeof(ce), typeof(alg), typeof(ppy), typeof(cache)}(ce, alg, ppy, cache)
     end
 end
 function ImpliedVolatility(; ce::StatsBase.CovarianceEstimator = Covariance(),
-                           mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                            alg::ImpliedVolatilityAlgorithm = ImpliedVolatilityRegression(),
                            ppy::Number,
                            cache::Option{<:AbstractPartialFitState} = nothing)::ImpliedVolatility
-    return ImpliedVolatility(ce, mp, alg, ppy, cache)
+    return ImpliedVolatility(ce, alg, ppy, cache)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -313,7 +297,7 @@ A `cache` holds the state of an incremental fit. That state is not part of the c
 
 # Returns
 
-  - `fields::Tuple`: The field names to render, which is `(:ce, :mp, :alg, :ppy)`.
+  - `fields::Tuple`: The field names to render, which is `(:ce, :alg, :ppy)`.
 
 # Related
 
@@ -321,7 +305,7 @@ A `cache` holds the state of an incremental fit. That state is not part of the c
   - [`show_fields`](@ref)
   - [`set_show_nothing_fields!`](@ref)
 """
-show_fields(::ImpliedVolatility) = (:ce, :mp, :alg, :ppy)
+show_fields(::ImpliedVolatility) = (:ce, :alg, :ppy)
 """
     realised_vol(ce::AbstractVarianceEstimator, X::MatNum, ws::Integer,
                  chunk::Option{<:Integer} = nothing, T::Option{<:Integer} = nothing,
@@ -767,7 +751,7 @@ end
 
 Returns the covariance matrix of `X`, scaled by the realised volatilities that `ce.alg` predicts from `iv`.
 
-This method computes the correlation matrix of `X` with the base estimator `ce.ce`. It predicts the realised volatilities from `iv` with the algorithm `ce.alg`, and converts the correlation matrix to a covariance matrix with those volatilities. The matrix processing estimator `ce.mp` then processes the result.
+This method computes the correlation matrix of `X` with the base estimator `ce.ce`. It predicts the realised volatilities from `iv` with the algorithm `ce.alg`, and converts the correlation matrix to a covariance matrix with those volatilities. The method applies no matrix processing. A [`PortfolioOptimisersCovariance`](@ref) that wraps the estimator applies it.
 
 # Mathematical definition
 
@@ -793,7 +777,6 @@ So each diagonal entry of ``\\hat{\\mathbf{\\Sigma}}`` is the square of the pred
  4. Divide `iv` by `sqrt(ce.ppy)`. This converts the annual implied volatility to the frequency of `X`.
  5. Call [`predict_realised_vols`](@ref) with `ce.alg`. The result replaces `iv`, and holds one predicted realised volatility for each asset. The implied volatilities are the second argument, and the returns are the third.
  6. Scale `sigma` in place with `StatsBase.cor2cov!`, which applies the closed form above.
- 7. Process `sigma` in place with [`matrix_processing!`](@ref) and `ce.mp`.
 
 # Arguments
 
@@ -803,7 +786,7 @@ So each diagonal entry of ``\\hat{\\mathbf{\\Sigma}}`` is the square of the pred
   - `mean`: Optional precomputed mean. The method gives it to the base estimator.
   - `iv`: Annual implied volatility matrix, with the orientation and the size of `X`.
   - `ivpa`: Optional implied volatility premium adjustment factor. [`ImpliedVolatilityPremium`](@ref) needs it.
-  - `kwargs...`: More keyword arguments for the base estimator and for [`matrix_processing!`](@ref).
+  - `kwargs...`: More keyword arguments for the base estimator.
 
 # Validation
 
@@ -837,7 +820,6 @@ function Statistics.cov(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = 
     iv = iv / sqrt(ce.ppy)
     iv = predict_realised_vols(ce.alg, iv, X, ivpa)
     StatsBase.cor2cov!(sigma, iv)
-    matrix_processing!(ce.mp, sigma, X; kwargs...)
     return sigma
 end
 """
@@ -846,11 +828,11 @@ end
 
 Returns the base correlation matrix of `X`, after the same checks as the covariance method.
 
-This method computes the correlation matrix of `X` with the base estimator `ce.ce`. It normalises the matrix, and processes it with the matrix processing estimator `ce.mp`.
+This method computes the correlation matrix of `X` with the base estimator `ce.ce`, and normalises it. The method applies no matrix processing. A [`PortfolioOptimisersCovariance`](@ref) that wraps the estimator applies it.
 
 A correlation has no scale, so the predicted realised volatilities cannot change it. The result is the base correlation of `X`. The volatility model runs in `cor` too, because `cor` must refuse each configuration that `cov` refuses. So a `ce.alg` that cannot answer the call raises an error here, as it does in `cov`. The method discards the prediction. It does not multiply `rho` by the prediction and then divide the prediction out again.
 
-That round trip is the identity only in exact arithmetic. In floating point, the round-off of one multiplication and one division moves an off-diagonal entry. A predicted volatility of zero also makes the division compute zero divided by zero. So one asset with a last implied volatility of zero turns a full row and column of the correlation into `NaN`. Then `matrix_processing!` raises an error on a matrix that has no defect of its own.
+That round trip is the identity only in exact arithmetic. In floating point, the round-off of one multiplication and one division moves an off-diagonal entry. A predicted volatility of zero also makes the division compute zero divided by zero. So one asset with a last implied volatility of zero turns a full row and column of the correlation into `NaN`. Then the matrix processing of a wrapper raises an error on a matrix that has no defect of its own.
 
 # Algorithm
 
@@ -858,8 +840,7 @@ That round trip is the identity only in exact arithmetic. In floating point, the
  2. Check that `X` and `iv` have the same size, so that row `t` of `iv` is the implied volatility of observation `t` of `X`. Refuse a gap in `X` with [`assert_finite_sample`](@ref). Refuse a gap or a negative entry in `iv` with [`assert_nonempty_nonneg_finite_val`](@ref).
  3. Call `Statistics.cor(library_covariance_estimator(ce.ce), X; dims = 1, mean = mean, iv = iv, kwargs...)`. The result is `rho`, the base correlation matrix. The call forwards the oriented `iv`, so a base estimator that reads its own implied volatility series receives it. A nested [`ImpliedVolatility`](@ref) is such an estimator.
  4. Call [`predict_realised_vols`](@ref) with `ce.alg` and `iv / sqrt(ce.ppy)`, and discard the result. The call runs only for its errors. It divides `iv` by `sqrt(ce.ppy)`, as `cov` does.
- 5. Normalise `rho` in place with `StatsBase.cov2cor!`. It divides the entry in row `i` and column `j` by the square roots of the diagonal entries `i` and `j`. It also copies the lower triangle into the upper triangle, clamps each off-diagonal entry into `[-1, 1]`, and sets each diagonal entry to one. Step 6 needs that diagonal of ones, because [`matrix_processing!`](@ref) reads the diagonal to find whether the matrix is a correlation matrix or a covariance matrix.
- 6. Process `rho` in place with [`matrix_processing!`](@ref) and `ce.mp`.
+ 5. Normalise `rho` in place with `StatsBase.cov2cor!`. It divides the entry in row `i` and column `j` by the square roots of the diagonal entries `i` and `j`. It also copies the lower triangle into the upper triangle, clamps each off-diagonal entry into `[-1, 1]`, and sets each diagonal entry to one. A wrapper needs that diagonal of ones, because [`matrix_processing!`](@ref) reads the diagonal to find whether the matrix is a correlation matrix or a covariance matrix.
 
 # Arguments
 
@@ -869,7 +850,7 @@ That round trip is the identity only in exact arithmetic. In floating point, the
   - `mean`: Optional precomputed mean. The method gives it to the base estimator.
   - `iv`: Annual implied volatility matrix, with the orientation and the size of `X`.
   - `ivpa`: Optional implied volatility premium adjustment factor. [`ImpliedVolatilityPremium`](@ref) needs it.
-  - `kwargs...`: More keyword arguments for the base estimator and for [`matrix_processing!`](@ref).
+  - `kwargs...`: More keyword arguments for the base estimator.
 
 # Validation
 
@@ -903,7 +884,6 @@ function Statistics.cor(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = 
     # The prediction is discarded. It runs so that `cor` refuses what `cov` refuses.
     predict_realised_vols(ce.alg, iv / sqrt(ce.ppy), X, ivpa)
     StatsBase.cov2cor!(rho)
-    matrix_processing!(ce.mp, rho, X; kwargs...)
     return rho
 end
 """
