@@ -245,6 +245,24 @@ factor risk contribution: `set_risk_constraints!` under `Variance`, which reads 
 `set_factor_risk_contribution_constraints!`, whose hedge constraint holds one row per entry of \
 `transpose(b2) * pr.sigma * w` (#1351). Approved by the maintainer on 2026-09-26 (#845)."""
 
+[rationale.a-form-its-package-recommends]
+text = """
+The code writes a construct in the form that a well-established dependency recommends, and JET \
+reports a call inside the machinery of that dependency. The developers of such a package analyse \
+it with JET themselves, and their best practice is reasoned with those reports in view. JET has \
+known false positives. Inference can narrow the element type of a container to `Union{}` through \
+a closure or an abstract type parameter, and JET then reports a call to an intrinsic or a builtin, \
+such as `getfield` or `getindex`, that the running code does not make. A JET report alone is \
+therefore not a reason to change the recommended form, and a change made only to silence such a \
+report is rejected. The Rationale covers only a form that the package documents as its \
+recommendation. It does not cover code that departs from that form, or code of this library \
+that JET reports. The maintainer stated the rule on 2026-10-28, in #1870, for the JuMP container \
+`JuMP.@constraint(model, [i = 1:N], ...)`, which the Constraints page of the JuMP manual gives for \
+an indexed family of rows. JET reads the container through `JuMP.Containers.container` and \
+reports `invalid builtin function call` on `getfield`. Issue #1883 restored the container at four \
+sites where a loop of scalar rows had replaced it to avoid the report. Affirmed against Julia \
+1.13.3, JET 0.13.1 and JuMP 1.32.1."""
+
 # --- exemptions ------------------------------------------------------------
 #
 # Keyed (path, definition, metric), dropped before the file's maximum is taken. An Exemption binds
@@ -795,6 +813,151 @@ path = "src/22_Plotting.jl"
 definition = "investable_plot_view"
 misses = 1
 rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
+
+# --- JET dismissals --------------------------------------------------------
+#
+# Keyed (file, kind, message), ADR 0071. A Dismissal matches every report of its fingerprint in
+# the file, and its count is for a human reader.
+#
+# Each entry below covers the two `getfield` reports that JET gives for each JuMP container
+# `[i = 1:N]` in the file. Issue #1883 measured every report of 18 of these files on 2026-10-28,
+# and each `getfield` report sat on a container line. The weight finalisers entered with #1870,
+# whose one container raised the file from 0 to 2. A file with a `getfield` report from other code
+# takes no entry here, because the entry would also cover that report. Those files are the
+# entropy pooling moment views, the tail view solve, the Meucci prior and the meta optimisation.
+
+[[dismissal]]
+file = "src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_a.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 14
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/01_Base_Optimisation/04_WeightFinalisers.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 2
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/02_CrossValidation/16_LogWealthRegret.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 10
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions/03_ReturnConstraints.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 4
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/05_JuMP/02_JuMPConstraints/03_BudgetConstraints.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 4
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/05_JuMP/02_JuMPConstraints/09_TurnoverConstraints.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 2
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/05_JuMP/02_JuMPConstraints/10_FeesConstraints.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 2
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/05_JuMP/02_JuMPConstraints/11_TrackingErrorConstraints.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 2
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/05_JuMP/02_JuMPConstraints/12_RegularisationConstraints.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 2
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/05_JuMP/02_JuMPConstraints/13_WeightNormConstraints.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 4
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/05_JuMP/06_NearOptimalCentering_a.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 4
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 2
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/05_JuMP/08_RelaxedRiskBudgeting.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 2
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/01_BaseRiskConstraints.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 2
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/03_MomentRiskMeasureConstraints.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 6
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/04_KurtosisConstraints.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 2
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/07_OWARiskMeasuresConstraints.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 2
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/16_TrackingRiskMeasureConstraints.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 2
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/10_OnlinePortfolioSelection/12_AllocationSetProgramme.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 2
+rationale = "a-form-its-package-recommends"
 
 # --- performance dismissals ------------------------------------------------
 #

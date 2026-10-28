@@ -759,11 +759,11 @@ function set_projection_objective!(model::JuMP.Model, proj::TsallisProjection,
                                    q::AbstractVector)::Nothing
     pos, w, sc, so = barrier_objective_entries(model, q)
     a = proj.alpha
-    JuMP.@variable(model, t_proj[1:length(pos)])
+    P = length(pos)
+    JuMP.@variable(model, t_proj[1:P])
     # `t_i ≤ w_i^α` is the power cone `w_i^α · 1^(1 − α) ≥ |t_i|`.
-    for (i, j) in enumerate(pos)
-        JuMP.@constraint(model, [sc * w[j], sc, sc * t_proj[i]] in JuMP.MOI.PowerCone(a))
-    end
+    JuMP.@constraint(model, [i = 1:P],
+                     [sc * w[pos[i]], sc, sc * t_proj[i]] in JuMP.MOI.PowerCone(a))
     # The bracket is `(1 − α)` times the divergence up to a constant. The division restores
     # the divergence, so a penalty weighs against it as under every other geometry.
     set_divergence_objective!(model,
@@ -893,7 +893,7 @@ It refuses a raw step with a negative entry or with no positive entry. It fixes 
 
 ## Constraints
 
-  - Under no name: ``s_c w_i = 0`` for each ``i`` with ``q_i = 0``.
+  - Under no name, one vector row: ``s_c w_i = 0`` for each ``i`` with ``q_i = 0``. A `q` with no zero entry writes no row.
 
 Where:
 
@@ -929,8 +929,9 @@ function barrier_objective_entries(model::JuMP.Model, q::AbstractVector)
                           "a barrier projection needs a positive entry: a raw step of zeros has no projection, because a zero stays zero under the potential"))
     w = get_w(model)
     sc = get_constraint_scale(model)
-    for i in findall(iszero, q)
-        JuMP.@constraint(model, sc * w[i] == 0)
+    zs = findall(iszero, q)
+    if !isempty(zs)
+        JuMP.@constraint(model, sc * view(w, zs) == 0)
     end
     return findall(x -> x > zero(x), q), w, sc, get_objective_scale(model)
 end

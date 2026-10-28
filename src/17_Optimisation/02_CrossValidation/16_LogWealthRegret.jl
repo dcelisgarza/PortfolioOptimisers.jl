@@ -545,18 +545,17 @@ The power-cone rows are exact. Each row gives ``r_j \\geq \\lvert x_j \\rvert^p 
   - [`norm_ball_dual_norm_epigraph!`](@ref)
 """
 function path_norm_epigraph!(model::JuMP.Model, t, x, p::Number)::Nothing
+    N = length(x)
     if p == 2
         JuMP.@constraint(model, [t; x] in JuMP.SecondOrderCone())
     elseif isone(p)
-        JuMP.@constraint(model, [t; x] in JuMP.MOI.NormOneCone(1 + length(x)))
+        JuMP.@constraint(model, [t; x] in JuMP.MOI.NormOneCone(N + 1))
     elseif isinf(p)
-        JuMP.@constraint(model, [t; x] in JuMP.MOI.NormInfinityCone(1 + length(x)))
+        JuMP.@constraint(model, [t; x] in JuMP.MOI.NormInfinityCone(N + 1))
     else
         p_inv = inv(p)
-        r = JuMP.@variable(model, [1:length(x)])
-        for j in eachindex(x)
-            JuMP.@constraint(model, [r[j], t, x[j]] in JuMP.MOI.PowerCone(p_inv))
-        end
+        r = JuMP.@variable(model, [1:N])
+        JuMP.@constraint(model, [j = 1:N], [r[j], t, x[j]] in JuMP.MOI.PowerCone(p_inv))
         JuMP.@constraint(model, sum(r) - t == 0)
     end
     return nothing
@@ -589,44 +588,45 @@ function row_bound_view(b::VecNum, m::AbstractVector{Bool})
     return view(b, m)
 end
 """
-    path_row_constraints!(model::JuMP.Model, u, z, x, m::AbstractVector{Bool}, wb::WeightBounds)
+    path_row_constraints!(model::JuMP.Model, u, z, X, msk::AbstractMatrix{Bool}, wb::WeightBounds)
 
-Writes one row of the budgeted path programme on the row's investable assets.
+Writes the rows of every period of the budgeted path programme on each period's investable assets.
 
-The budget, the finite bounds and the log wealth of the row read the assets that `m` keeps. The allocation of every other asset is fixed at zero, because a row with no price relative for an asset cannot hold it.
+The budget, the finite bounds and the log wealth of period ``t`` read the assets that row ``t`` of `msk` keeps. The allocation of every other asset is fixed at zero, because a row with no price relative for an asset cannot hold it. Each kind of row is one JuMP container over the periods, the form that the JuMP manual recommends for an indexed family of rows.
 
 # JuMP formulation
 
 ## Variables
 
-  - `u`: read. It is the row's allocations, one per asset. Every entry outside `m` is fixed at zero with `JuMP.fix`, which sets the variable's bounds and adds no row.
-  - `z`: read. It is the row's log-wealth variable.
+  - `u`: read. It is the `T × N` allocations, one row per period. Every entry outside `msk` is fixed at zero with `JuMP.fix`, which sets the variable's bounds and adds no row.
+  - `z`: read. It is the `T` log-wealth variables, one per period.
 
 ## Constraints
 
-Every row is registered under no name, and each reads the assets in ``m`` alone.
+Every row is registered under no name, and the row of period ``t`` reads the assets in ``\\mathcal{M}_t`` alone.
 
-  - ``\\sum_{i \\in m} u_i = 1``.
-  - ``u_i - l_i \\geq 0`` for each ``i \\in m``, when an entry of ``\\boldsymbol{l}`` is finite.
-  - ``u_i - h_i \\leq 0`` for each ``i \\in m``, when an entry of ``\\boldsymbol{h}`` is finite.
-  - The exponential cone row ``\\left(z, 1, \\sum_{i \\in m} x_i u_i\\right) \\in \\mathcal{K}_{\\exp}``, which holds when ``z \\leq \\log \\sum_{i \\in m} x_i u_i``.
+  - ``\\sum_{i \\in \\mathcal{M}_t} u_{t,i} = 1``, for ``t = 1, \\ldots, T``.
+  - ``u_{t,i} - l_i \\geq 0`` for each ``i \\in \\mathcal{M}_t``, for ``t = 1, \\ldots, T``, when an entry of ``\\boldsymbol{l}`` is finite.
+  - ``u_{t,i} - h_i \\leq 0`` for each ``i \\in \\mathcal{M}_t``, for ``t = 1, \\ldots, T``, when an entry of ``\\boldsymbol{h}`` is finite.
+  - The exponential cone rows ``\\left(z_t, 1, \\sum_{i \\in \\mathcal{M}_t} x_{t,i} u_{t,i}\\right) \\in \\mathcal{K}_{\\exp}``, for ``t = 1, \\ldots, T``, which hold when ``z_t \\leq \\log \\sum_{i \\in \\mathcal{M}_t} x_{t,i} u_{t,i}``.
 
 Where:
 
-  - ``u_i``: Allocation of asset ``i`` on the row.
-  - ``z``: Log-wealth variable of the row.
-  - ``x_i``: Price relative of asset ``i`` on the row, one plus its return.
-  - ``m``: Set of the assets in the row's Investable Mask.
+  - ``u_{t,i}``: Allocation of asset ``i`` in period ``t``.
+  - ``z_t``: Log-wealth variable of period ``t``.
+  - ``x_{t,i}``: Price relative of asset ``i`` in period ``t``, one plus its return.
+  - ``\\mathcal{M}_t``: Set of the assets in the Investable Mask of period ``t``.
   - ``l_i``, ``h_i``: Resolved lower and upper weight bounds of asset ``i``, the entries of ``\\boldsymbol{l}`` and ``\\boldsymbol{h}``.
   - ``\\mathcal{K}_{\\exp} = \\mathrm{cl}\\,\\{(a, b, c) : b\\, e^{a / b} \\leq c,\\, b > 0\\}``: Exponential cone.
+  - $(math_dict[:T])
 
 # Arguments
 
   - $(arg_dict[:model])
-  - `u`: The row's allocation variables, one per asset.
-  - `z`: The row's log-wealth variable.
-  - `x`: The row's price relatives, finite where `m` holds.
-  - `m`: The row's Investable Mask, the Coverage Universe of the one-row window.
+  - `u`: The `T × N` allocation variables, one row per period.
+  - `z`: The `T` log-wealth variables, one per period.
+  - `X`: The `T × N` price relatives, finite where `msk` holds.
+  - `msk`: The `T × N` Investable Masks, one row per period. Row ``t`` is the Coverage Universe of the one-row window of period ``t``.
   - $(arg_dict[:wb])
 
 # Returns
@@ -639,20 +639,23 @@ Where:
   - [`path_budget_constraint!`](@ref)
   - [`row_bound_view`](@ref)
 """
-function path_row_constraints!(model::JuMP.Model, u, z, x, m::AbstractVector{Bool},
+function path_row_constraints!(model::JuMP.Model, u, z, X, msk::AbstractMatrix{Bool},
                                wb::WeightBounds)::Nothing
-    ui = view(u, m)
-    JuMP.@constraint(model, sum(ui) == 1)
+    T = size(u, 1)
+    ms = eachrow(msk)
+    JuMP.@constraint(model, [t = 1:T], sum(view(u, t, ms[t])) == 1)
     if w_finite_flag(wb.lb)
-        JuMP.@constraint(model, ui ⊖ row_bound_view(wb.lb, m) >= 0)
+        JuMP.@constraint(model, [t = 1:T],
+                         view(u, t, ms[t]) ⊖ row_bound_view(wb.lb, ms[t]) >= 0)
     end
     if w_finite_flag(wb.ub)
-        JuMP.@constraint(model, ui ⊖ row_bound_view(wb.ub, m) <= 0)
+        JuMP.@constraint(model, [t = 1:T],
+                         view(u, t, ms[t]) ⊖ row_bound_view(wb.ub, ms[t]) <= 0)
     end
-    JuMP.@constraint(model,
-                     [z, 1, LinearAlgebra.dot(view(x, m), ui)] in
+    JuMP.@constraint(model, [t = 1:T],
+                     [z[t], 1, LinearAlgebra.dot(view(X, t, ms[t]), view(u, t, ms[t]))] in
                      JuMP.MOI.ExponentialCone())
-    for i in findall(!, m)
+    for i in findall(!, msk)
         JuMP.fix(u[i], 0; force = true)
     end
     return nothing
@@ -1149,12 +1152,7 @@ function _optimise(est::BudgetedHindsightPath, rd::ReturnsResult; kwargs...)
     JuMP.set_string_names_on_creation(model, false)
     u = JuMP.@variable(model, [1:T, 1:N])
     z = JuMP.@variable(model, [1:T])
-    # One scalar row per period rather than a JuMP container, which JET reads through the
-    # container closure and reports a builtin call on.
-    for t in 1:T
-        path_row_constraints!(model, view(u, t, :), z[t], view(X, t, :), view(msk, t, :),
-                              wb)
-    end
+    path_row_constraints!(model, u, z, X, msk, wb)
     path_budget_constraint!(model, u, est.L, est.p)
     JuMP.@objective(model, Max, sum(z))
     res = optimise_JuMP_model!(model, est.slv)

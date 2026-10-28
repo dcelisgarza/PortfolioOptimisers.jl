@@ -366,6 +366,7 @@ Where:
 function norm_ball_dual_norm_epigraph!(model::JuMP.Model, prefix::Symbol, i, x, p::Number)
     sc = get_constraint_scale(model)
     q = dual_norm_order(p)
+    N = length(x)
     t_nbucs = state_set!(model, prefix, :t_nbucs_, i, JuMP.@variable(model))
     if q == 2
         state_set!(model, prefix, :nbucs_cone_, i,
@@ -374,23 +375,19 @@ function norm_ball_dual_norm_epigraph!(model::JuMP.Model, prefix::Symbol, i, x, 
     elseif isone(q)
         state_set!(model, prefix, :nbucs_cone_, i,
                    JuMP.@constraint(model,
-                                    [sc * t_nbucs;
-                                     sc * x] in JuMP.MOI.NormOneCone(1 + length(x))))
+                                    [sc * t_nbucs; sc * x] in JuMP.MOI.NormOneCone(N + 1)))
     elseif isinf(q)
         state_set!(model, prefix, :nbucs_cone_, i,
                    JuMP.@constraint(model,
                                     [sc * t_nbucs;
-                                     sc * x] in JuMP.MOI.NormInfinityCone(1 + length(x))))
+                                     sc * x] in JuMP.MOI.NormInfinityCone(N + 1)))
     else
         q_inv = inv(q)
-        r_nbucs = state_set!(model, prefix, :r_nbucs_, i,
-                             JuMP.@variable(model, [1:length(x)]))
-        # One scalar row per entry rather than a JuMP container, which JET reads through
-        # the container closure and reports a builtin call on.
+        r_nbucs = state_set!(model, prefix, :r_nbucs_, i, JuMP.@variable(model, [1:N]))
         state_set!(model, prefix, :nbucs_cone_, i,
-                   [JuMP.@constraint(model,
-                                     [sc * r_nbucs[j], sc * t_nbucs, sc * x[j]] in
-                                     JuMP.MOI.PowerCone(q_inv)) for j in eachindex(x)])
+                   JuMP.@constraint(model, [j = 1:N],
+                                    [sc * r_nbucs[j], sc * t_nbucs, sc * x[j]] in
+                                    JuMP.MOI.PowerCone(q_inv)))
         state_set!(model, prefix, :nbucs_cone_sum_, i,
                    JuMP.@constraint(model, sc * (sum(r_nbucs) - t_nbucs) == 0))
     end

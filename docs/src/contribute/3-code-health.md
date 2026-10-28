@@ -149,6 +149,14 @@ For each JET report on the file, reach one of two verdicts.
 - **It is real.** Fix it. Reproduce the failure first, so you know what you fixed.
 - **It is a false positive.** Dismiss it. See [Dismissing a JET report](@ref code_health_dismissal) below.
 
+Do not change a form that a well-established dependency recommends only to silence JET. The
+developers of such a package analyse it with JET, and their best practice wins over a JET report.
+JET can report a call to an intrinsic, such as `getfield` or `getindex`, through the machinery of
+that package. Keep the form, and dismiss the report with the Rationale
+`a-form-its-package-recommends` in `code_health/rulings.toml`. The JuMP container
+`JuMP.@constraint(model, [i = 1:N], ...)` is the case that set the rule (#1870, #1883). A review
+rejects a change that replaces the form only to remove such a report.
+
 About 180 of the 315 reports measured at baseline belong to a single systematic noise class, so
 expect most reports on a file to end in a Dismissal rather than a fix.
 
