@@ -78,6 +78,13 @@ keep it by default. Simplify a candidate only when all four checks fail:
 The maintainer then rules on each candidate. Nested structs and near duplicates are often features
 of the library. They give reuse and dispatch at no extra cost.
 
+An entry on the `kept_types` allow-list of `test/test_70_trivial_unit_census.jl`, under ADR 0168,
+meets check 4. Its reason names the type deliberate, so the type stays. A kept type whose docstring
+tells a caller to subtype it is finished as a `public` extension point, with an `# Interfaces`
+section. Its interface is the verbs of its member that a second member needs, and a method whose
+body calls only those verbs dispatches on the abstract type
+([#1874](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1874)).
+
 ### An abstract type, not a `Union` of its members
 
 A method or a bound names the abstract type where a `Union` would spell all its members. A caller
@@ -95,6 +102,12 @@ three cases:
 A census of an abstract type with no dispatch reads a `Union` of all its members as a defect, not
 as a reason to remove the type
 ([#1875](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1875)).
+
+The rule holds inside a `Union` that mixes families too. Where some members of the `Union` are all
+the members of one abstract type, the `Union` names that type in their place. The online methods
+take `Union{JuMPOptimiser, BaseClusteringOptimisationEstimator, InverseVolatility, …}`, not
+`Union{JuMPOptimiser, HierarchicalOptimiser, InverseVolatility, …}`
+([#1874](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1874)).
 
 ### A `Bool` or a `Symbol`
 
