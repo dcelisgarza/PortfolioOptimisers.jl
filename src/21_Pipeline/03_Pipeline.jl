@@ -1014,7 +1014,7 @@ Check that a test window and the training window come from the same ingestion.
 
 The last weights use the asset axis of the training window. A test window with a different asset set, or with the same set from a different universe statement, misaligns the weights and the returns. This check reports that case with an error that names both universes. Without the check, the case shows as a dimension mismatch inside the risk calculation.
 
-The check reads two things. Equality of `nx` checks the asset axis. [`check_asset_panel`](@ref) binds the asset axis of an [`AssetPanel`](@ref) to the `nx` of the result that holds it, so equality of `nx` also compares the axes of the panels. Parity of panel presence checks where the universe was stated. A window with a panel and a fitted context without one, or the reverse, do not come from one ingestion.
+The check reads equality of `nx`, which checks the asset axis. [`check_asset_panel`](@ref) binds the asset axis of an [`AssetPanel`](@ref) to the `nx` of the result that holds it, so equality of `nx` also compares the axes of the panels. The check does not compare panel presence. The ingestion layer emits no panel for a window with no gap and no Panel Field, so a gapless training window and a gapped test window of one ingestion differ in panel presence.
 
 Two other parts of the library hold the rest of the alignment. The ingestion layer fixes the asset axis before the split, and [`port_opt_view`](@ref) slices it. So each window of each fold carries every asset, and no policy of the layer drops a row or a column. An asset that is present in both windows and not investable in one is a Held Gap, which `filter_held_gaps` reads from the weights and the returns under the strictness policy.
 
@@ -1029,7 +1029,6 @@ Two cases remain, and the error message names both. The first is returns data bu
 
   - When the fitted context has no `returns` slot, the check passes.
   - `rd.nx == train.nx`, where `train` is the `returns` slot of the fitted context. Raises an `ArgumentError`.
-  - Both `rd` and `train` carry an [`AssetPanel`](@ref), or neither does. Raises an `ArgumentError`.
 
 # Returns
 
@@ -1049,8 +1048,6 @@ function assert_universe_aligned(res::PipelineResult, rd::AbstractReturnsResult)
     end
     @argcheck(rd.nx == train.nx,
               ArgumentError("the pipeline's fitted steps produced a test-window universe $(rd.nx) that differs from the training universe $(train.nx), so the weights and the test returns would not be aligned. The ingestion layer fixes the asset axis before the split, so this reaches two situations only: returns data built outside it, and a step of your own that changes the asset set. Build the returns data with price_ingestion(PriceIngestion(), X)."))
-    @argcheck(isnothing(rd.pnl) == isnothing(train.pnl),
-              ArgumentError("the pipeline's fitted steps produced a test window that $(isnothing(rd.pnl) ? "states no universe" : "states a universe") while the training window $(isnothing(train.pnl) ? "states none" : "states one"), so the two did not come from one ingestion. A ReturnsResult the ingestion layer built always carries an Asset Panel, so pnl === nothing on one of them says that one was built outside it."))
     return nothing
 end
 """

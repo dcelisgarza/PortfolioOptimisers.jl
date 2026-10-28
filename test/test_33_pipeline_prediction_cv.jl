@@ -130,10 +130,9 @@ end
         # the T -> T-1 contraction: k price rows produce k-1 return rows
         @test size(pred.rd.X, 1) == length(test_idx) - 1
 
-        # the test window is subset to the *train* universe even when clean. It states the
-        # same calendar as the gapped one: a pipeline fitted on a span-stating carrier emits
-        # an Asset Panel, and `assert_universe_aligned` refuses a test window that states
-        # none, because the two did not come from one ingestion.
+        # the test window is subset to the *train* universe even when clean. A clean window
+        # with an all-true span emits no Asset Panel (#1882), and `assert_universe_aligned`
+        # reads the asset axis alone, so it passes beside a training window that holds one.
         pr_clean = PricesResult(; X = X, span = trues(size(values(X))))
         pred_clean = PortfolioOptimisers.predict(res, pr_clean, test_idx)
         @test size(pred_clean.rd.X, 2) == 1  # net portfolio returns column

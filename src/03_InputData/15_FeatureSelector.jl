@@ -513,7 +513,7 @@ The order of `sel` is the column order, so a caller decides it. A `nothing` sele
 
 # Validation
 
-  - `!isempty(pnl.pf)`. Raises an [`IsEmptyError`](@ref) naming the panel, the Feature Matrix and [`asset_panel`](@ref).
+  - `!isnothing(pnl.pf)`. Raises an [`IsNothingError`](@ref) naming the panel, the Feature Matrix and [`asset_panel`](@ref).
   - `sel` is well formed. See [`assert_feature_selector`](@ref).
   - No two entries resolve to one column. Raises an `ArgumentError`.
   - The selection is not empty. Raises an [`IsEmptyError`](@ref).
@@ -531,8 +531,8 @@ The order of `sel` is the column order, so a caller decides it. A `nothing` sele
   - [`assert_feature_selector`](@ref)
 """
 function select_fields(pnl::AssetPanel, sel, strict::Bool)
-    @argcheck(!isempty(pnl.pf),
-              IsEmptyError("a Feature Matrix stacks the Panel Fields of an Asset Panel, and this panel carries none: it states a universe and carries no feature data, which is what a ReturnsResult built from prices alone holds. Build the panel the Feature Matrix is to stack with `asset_panel(inputs)` and pass it as `ReturnsResult(; …, pnl = pnl)`, or set a producer on the estimator, `FeatureDistance(; ape = RegressionPanel())`, which builds one from the prior it is handed."))
+    @argcheck(!isnothing(pnl.pf),
+              IsNothingError("a Feature Matrix stacks the Panel Fields of an Asset Panel, and this panel carries none: it states a universe and carries no feature data, which is what a ReturnsResult built from prices alone holds. Build the panel the Feature Matrix is to stack with `asset_panel(inputs)` and pass it as `ReturnsResult(; …, pnl = pnl)`, or set a producer on the estimator, `FeatureDistance(; ape = RegressionPanel())`, which builds one from the prior it is handed."))
     assert_feature_selector(sel)
     return select_fields(Tuple{Int, Int, Symbol}[], pnl, sel, strict)
 end

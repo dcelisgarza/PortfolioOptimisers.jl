@@ -991,7 +991,7 @@ A static Panel Field that a time-varying panel lifts, see [`RepeatedLeading`](@r
 
  1. Read the axes and the Panel Field entries of the manifest with [`panel_manifest_axes`](@ref) and [`panel_manifest_fields`](@ref). Keep the entries that `fields` names with [`panel_manifest_select`](@ref).
  2. Tell the layout with [`panel_table_cells`](@ref). In the long layout, it finds the cell of each row. In the wide layout, it checks the row count: one row on a static panel, one row per observation on a time-varying one.
- 3. Read each Panel Field with [`panel_read_field`](@ref).
+ 3. Read each Panel Field with [`panel_read_field`](@ref). When no entry is kept, the panel holds `pf = nothing`.
  4. On a time-varying panel, read the masks. [`panel_active_mask`](@ref) reads the active mask. The estimation mask is the `"emsk"` column of a long table, and the `"emsk@<asset>"` columns of a wide one.
  5. Make the panel with the [`AssetPanel`](@ref) constructor, which checks it.
 
@@ -1061,7 +1061,11 @@ function asset_panel(df::DataFrames.DataFrame, mf::DataFrames.DataFrame; fields 
     sz = ax.static ? (length(ax.nx),) : (length(ax.ts), length(ax.nx))
     tab = (; df = df, nx = ax.nx)
     lin = panel_table_cells(df, ax)
-    pf = AbstractPanelField[panel_read_field(s, lin, tab, sz) for s in specs]
+    pf = if isempty(specs)
+        nothing
+    else
+        AbstractPanelField[panel_read_field(s, lin, tab, sz) for s in specs]
+    end
     if ax.static
         return AssetPanel(; pf = pf)
     end

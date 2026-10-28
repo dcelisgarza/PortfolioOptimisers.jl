@@ -1118,16 +1118,20 @@ end
         @test PortfolioOptimisers.assert_rolling_sign(1) === nothing
         @test PortfolioOptimisers.assert_rolling_sign(-1.0) === nothing
     end
-    @testset "A carrier without returns or without an Asset Panel is refused" begin
+    @testset "A carrier without returns is refused, and one without a panel reads finiteness" begin
         @test_throws PortfolioOptimisers.IsNothingError descriptor(Reversal(; window = 1),
                                                                    ReturnsResult())
         @test_throws PortfolioOptimisers.IsNothingError descriptor(MaxReturn(; window = 1),
                                                                    ReturnsResult())
-        rd = ReturnsResult(; nx = ["A", "B"], X = [0.1 0.1; 0.2 0.2])
-        @test_throws PortfolioOptimisers.IsNothingError descriptor(Reversal(; window = 1),
-                                                                   rd)
-        @test_throws PortfolioOptimisers.IsNothingError descriptor(MaxReturn(; window = 1),
-                                                                   rd)
+        # The ingestion layer emits no panel for a gapless table, so a carrier with no panel
+        # reads as every asset active (#1882).
+        X = [0.1 0.1; 0.2 0.2]
+        rd = ReturnsResult(; nx = ["A", "B"], X = X)
+        rdp = ReturnsResult(; nx = ["A", "B"], X = X,
+                            pnl = AssetPanel(; amsk = trues(2, 2), emsk = trues(2, 2)))
+        for d in (Reversal(; window = 1), MaxReturn(; window = 1))
+            @test isequal(descriptor(d, rd), descriptor(d, rdp))
+        end
     end
 end
 
@@ -1667,10 +1671,14 @@ end
         @test_throws Exception DaysToCover(; num = "", den = "b")
         @test_throws Exception EWVolatility(; mar = NaN)
     end
-    @testset "A Descriptor over the returns still refuses a carrier with no Asset Panel" begin
-        rd = ReturnsResult(; nx = ["A", "B"], X = [0.01 0.02; 0.03 0.04])
-        @test_throws Exception descriptor(EWMomentum(; half_life = 2, skip = 0), rd)
-        @test_throws Exception descriptor(EWVolatility(; half_life = 2), rd)
+    @testset "A Descriptor over the returns reads a carrier with no Asset Panel as all active" begin
+        X = [0.01 0.02; 0.03 0.04]
+        rd = ReturnsResult(; nx = ["A", "B"], X = X)
+        rdp = ReturnsResult(; nx = ["A", "B"], X = X,
+                            pnl = AssetPanel(; amsk = trues(2, 2), emsk = trues(2, 2)))
+        for d in (EWMomentum(; half_life = 2, skip = 0), EWVolatility(; half_life = 2))
+            @test isequal(descriptor(d, rd), descriptor(d, rdp))
+        end
     end
 end
 

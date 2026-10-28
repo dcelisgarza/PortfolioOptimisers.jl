@@ -71,10 +71,8 @@ function Base.vcat(a::AssetPanel, bs::AssetPanel...)
         assert_panel_concat(a, b, k + 1)
     end
     parts = (a, bs...)
-    #! A panel with no Panel Field keeps its own empty vector, as `port_opt_view` does, so
-    #! the field type it was made with stays.
-    pf = if isempty(a.pf)
-        a.pf
+    pf = if isnothing(a.pf)
+        nothing
     else
         [panel_field_vcat(f, [p.pf[i] for p in parts]) for (i, f) in pairs(a.pf)]
     end
@@ -130,11 +128,11 @@ function assert_panel_concat(a::AssetPanel, b::AssetPanel, k::Integer)::Nothing
     nb = panel_axes(b)[end]
     @argcheck(na == nb,
               DimensionMismatch("the parts of a concatenation of Asset Panels are one universe, so each has the asset count of the first part; got $nb assets in part $k against $na"))
-    fa = [f.name for f in a.pf]
-    fb = [f.name for f in b.pf]
+    fa = [f.name for f in each_panel_field(a)]
+    fb = [f.name for f in each_panel_field(b)]
     @argcheck(isequal(fa, fb),
               ArgumentError("the parts of a concatenation of Asset Panels hold the same Panel Fields in the same order; got $(pinned_repr(fb)) in part $k against $(pinned_repr(fa))"))
-    for (f, g) in zip(a.pf, b.pf)
+    for (f, g) in zip(each_panel_field(a), each_panel_field(b))
         assert_panel_field_concat(f, g, k)
     end
     return nothing
@@ -839,5 +837,85 @@ function buffer_asset_panel(::Nothing, state::SampleBufferState)
     end
     amsk = Matrix(msk.active_mask)
     emsk = haskey(msk, :estimation_mask) ? Matrix(msk.estimation_mask) : copy(amsk)
-    return AssetPanel(; pf = AbstractPanelField[], amsk = amsk, emsk = emsk)
+    return AssetPanel(; amsk = amsk, emsk = emsk)
+end
+"""
+    buffer_universe_masks(AM::Tuple, X::AbstractMatrix, rows, ref::Tuple) -> Tuple
+
+Write the universe masks of one side of a buffer fold that states no universe, when the other side states one.
+
+A block of returns data with no Asset Panel states no universe beyond the finiteness of its returns. The ingestion layer emits such a block when the window holds no gap and no Panel Field, and the online conversion decides it again for each block. So a gapped stream folds blocks with masks and blocks without them. The Coverage Universe of a block with no masks reads finiteness alone, and the masks `A = true` and `M = isfinite.(X)` give the same Coverage Universe. So the function writes them, and the fold keeps one mask for every row it holds. The estimation mask follows the convention of the layer, `emsk = amsk .& isfinite.(X)`.
+
+The function writes masks only for a side that states neither mask. A side that states one mask and not the other is a disagreement of the caller, and [`assert_buffer_presence_agreement`](@ref) refuses it.
+
+# Algorithm
+
+ 1. The side states a mask, or the other side states none: return `AM` unchanged.
+ 2. Write the active mask as `true` over the whole of `X` when the other side records an active mask, and `nothing` otherwise.
+ 3. Write the estimation mask as `isfinite.(X)` over `rows` and `false` elsewhere when the other side records an estimation mask, and `nothing` otherwise. The rows outside `rows` are spare capacity that holds no observation.
+
+# Arguments
+
+  - `AM`: The active mask and the estimation mask of the side to fill, each a matrix or `nothing`.
+  - `X`: The observations of the side to fill, oriented `observations × assets`. For a buffer, this is the backing matrix.
+  - `rows`: The rows of `X` that hold observations.
+  - `ref`: The active mask and the estimation mask of the other side, each a matrix or `nothing`.
+
+# Returns
+
+  - `(A′, M′)`: The masks of the side to fill.
+
+# Related
+
+  - [`buffer_universe_state`](@ref)
+  - [`SampleBufferState`](@ref)
+  - [`partial_fit!`](@ref)
+  - [`merge_states`](@ref)
+  - [`assert_buffer_presence_agreement`](@ref)
+"""
+function buffer_universe_masks(AM::Tuple, X::AbstractMatrix, rows, ref::Tuple)
+    writes = all(isnothing, AM) & any(!isnothing, ref)
+    if !writes
+        return AM
+    end
+    M = falses(size(X))
+    M[rows, :] .= isfinite.(view(X, rows, :))
+    return (isnothing(ref[1]) ? nothing : trues(size(X)), isnothing(ref[2]) ? nothing : M)
+end
+"""
+    buffer_universe_state(state::SampleBufferState, ref::Tuple) -> SampleBufferState
+
+Give a [`SampleBufferState`](@ref) the universe masks that its rows state, when it records no mask and the other side of a fold or a merge records masks.
+
+The fold and the merge of a buffer call it, so that a buffer seeded from blocks with no panel takes a later block with a mask-only panel. [`buffer_universe_masks`](@ref) writes the masks over the backing matrix of the buffer, and over its valid region alone for the estimation mask.
+
+# Algorithm
+
+ 1. Write the masks with [`buffer_universe_masks`](@ref) over the backing matrix `state.X` and the valid rows `off + 1:off + n`.
+ 2. Return `state` when the masks did not change. Otherwise rebuild the buffer with the new masks through the positional constructor.
+
+# Arguments
+
+  - `state`: The buffer.
+  - `ref`: The active mask and the estimation mask of the other side, each a matrix or `nothing`.
+
+# Returns
+
+  - `state′::SampleBufferState`: The buffer, with masks when it needed them.
+
+# Related
+
+  - [`buffer_universe_masks`](@ref)
+  - [`SampleBufferState`](@ref)
+  - [`partial_fit!`](@ref)
+  - [`merge_states`](@ref)
+"""
+function buffer_universe_state(state::SampleBufferState, ref::Tuple)::SampleBufferState
+    A, M = buffer_universe_masks((state.A, state.M), state.X,
+                                 (state.off + 1):(state.off + state.n), ref)
+    if A === state.A && M === state.M
+        return state
+    end
+    return SampleBufferState(state.n, state.off, state.X, A, M, state.F, state.ne, state.E,
+                             state.iv, state.ivpa, state.P, state.G, state.max_history)
 end

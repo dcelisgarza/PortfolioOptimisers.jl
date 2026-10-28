@@ -240,9 +240,10 @@ julia> describe(pnl; by = \"sector\")
 function DataFrames.describe(pnl::AssetPanel; by::Option{<:AbstractString} = nothing)
     act = panel_active_cells(pnl)
     if isnothing(by)
-        cs = [panel_field_coverage(f, act) for f in pnl.pf]
-        return DataFrames.DataFrame(; field = String[f.name for f in pnl.pf],
-                                    kind = Symbol[panel_field_kind(f) for f in pnl.pf],
+        cs = [panel_field_coverage(f, act) for f in each_panel_field(pnl)]
+        return DataFrames.DataFrame(; field = String[f.name for f in each_panel_field(pnl)],
+                                    kind = Symbol[panel_field_kind(f)
+                                                  for f in each_panel_field(pnl)],
                                     cells = Int[c.cells for c in cs],
                                     missing = Float64[c.missing / c.cells for c in cs],
                                     active_cells = Int[c.active for c in cs],
@@ -254,7 +255,7 @@ function DataFrames.describe(pnl::AssetPanel; by::Option{<:AbstractString} = not
     @argcheck(g isa CategoricalPanelField,
               ArgumentError("a missing-share report groups the cells by the levels of a categorical Panel Field, and \"$by\" is a $(panel_field_kind(g)) Panel Field"))
     rows = [(; field = f.name, level = l, panel_level_coverage(f, g, k, act)...)
-            for f in pnl.pf if f.name != by for (k, l) in pairs(g.levels)]
+            for f in each_panel_field(pnl) if f.name != by for (k, l) in pairs(g.levels)]
     return DataFrames.DataFrame(; field = String[r.field for r in rows],
                                 level = String[r.level for r in rows],
                                 cells = Int[r.cells for r in rows],
@@ -545,12 +546,12 @@ The numbers are the ones of [`DataFrames.describe(pnl::AssetPanel)`](@ref), with
   - [`panel_percent`](@ref)
 """
 function panel_info_fields(io::IO, pnl::AssetPanel, cs::AbstractVector)::Nothing
-    w = maximum(f -> textwidth(f.name), pnl.pf; init = 5)
+    w = maximum(f -> textwidth(f.name), each_panel_field(pnl); init = 5)
     println(io, "\nPanel Fields")
     println(io, "  ", rpad("field", w), "  ", rpad("kind", 11), lpad("cells", 7),
             lpad("missing %", 11), lpad("active cells", 14), lpad("active missing %", 18),
             lpad("assets missing", 16))
-    for (f, c) in zip(pnl.pf, cs)
+    for (f, c) in zip(each_panel_field(pnl), cs)
         println(io, "  ", rpad(f.name, w), "  ", rpad(string(panel_field_kind(f)), 11),
                 lpad(c.cells, 7), lpad(panel_percent(c.missing / c.cells), 11),
                 lpad(c.active, 14), lpad(panel_percent(c.active_missing / c.active), 18),
@@ -601,7 +602,7 @@ function panel_info_header(io::IO, pnl::AssetPanel, ts::Option{<:AbstractVector}
     println(io, "Asset Panel")
     println(io, "  observations : ", static ? "none, the panel is static" : "$(ax[1])$span")
     println(io, "  assets       : ", ax[end])
-    println(io, "  Panel Fields : ", length(pnl.pf))
+    println(io, "  Panel Fields : ", length(each_panel_field(pnl)))
     println(io, "  cells        : ", prod(ax), static ? "" : " (observations × assets)")
     println(io, "  missing      : ",
             panel_percent(sum(c.missing for c in cs; init = 0) /
@@ -693,7 +694,7 @@ categorical Panel Fields
 function panel_info(io::IO, pnl::AssetPanel;
                     ts::Option{<:AbstractVector} = nothing)::Nothing
     act = panel_active_cells(pnl)
-    cs = [panel_field_coverage(f, act) for f in pnl.pf]
+    cs = [panel_field_coverage(f, act) for f in each_panel_field(pnl)]
     panel_info_header(io, pnl, ts, cs)
     panel_info_mask(io, "active mask", pnl.amsk)
     if !panel_is_static(pnl) && isequal(pnl.emsk, pnl.amsk)
@@ -702,7 +703,7 @@ function panel_info(io::IO, pnl::AssetPanel;
         panel_info_mask(io, "estimation mask", pnl.emsk)
     end
     panel_info_fields(io, pnl, cs)
-    gs = filter(g -> g isa CategoricalPanelField, pnl.pf)
+    gs = filter(g -> g isa CategoricalPanelField, each_panel_field(pnl))
     if !isempty(gs)
         println(io, "\ncategorical Panel Fields")
     end

@@ -41,7 +41,7 @@ function step_active_mask(rd::ReturnsResult)
     if isnothing(pnl) || panel_is_static(pnl)
         return nothing
     end
-    @argcheck(isempty(pnl.pf),
+    @argcheck(isnothing(pnl.pf),
               ArgumentError("the online step carries a time-varying Asset Panel through its masks alone, and this one holds $(length(pnl.pf)) Panel Field(s): this fold reads no Panel Field and records none, so the step has nowhere to keep them and a call with no returns could not rebuild the panel. Drop the fields from the panel handed to the step, or fit in batch."))
     @argcheck(pnl.emsk == pnl.amsk,
               ArgumentError("the estimation mask does not travel the online step: the exact folds of the moment layer take an active mask and no estimation mask, so an estimation universe narrower than the active one cannot be honoured online. This panel's `emsk` differs from its `amsk` at $(count(pnl.emsk .!= pnl.amsk)) cell(s). Pass the active mask as both, or fit in batch."))

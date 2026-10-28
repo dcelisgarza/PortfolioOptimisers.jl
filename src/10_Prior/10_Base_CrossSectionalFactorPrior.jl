@@ -74,9 +74,9 @@ function cross_sectional_benchmark_returns(rd::ReturnsResult, name::AbstractStri
     pnl = rd.pnl
     @argcheck(!isnothing(pnl),
               IsNothingError("a Cross-Sectional Factor Prior reads its Factor Exposures off an Asset Panel, and rd.pnl is nothing. Build the ReturnsResult with the `pnl` that asset_panel returns."))
-    @argcheck(all(f -> f.name != name, pnl.pf),
+    @argcheck(all(f -> f.name != name, each_panel_field(pnl)),
               ArgumentError("a Cross-Sectional Factor Prior writes its benchmark weights onto the Panel Field \"$name\", and the Asset Panel already holds a field of that name. Rename the field of the panel, or set the bw of the prior to a name the panel does not use."))
-    pf = push!(Any[pnl.pf...], NumericPanelField(; name = name, vals = W))
+    pf = push!(Any[each_panel_field(pnl)...], NumericPanelField(; name = name, vals = W))
     return ReturnsResult(; nx = rd.nx, X = rd.X, nf = rd.nf, F = rd.F, nb = rd.nb, B = rd.B,
                          ne = rd.ne, E = rd.E, ts = rd.ts, iv = rd.iv, ivpa = rd.ivpa,
                          pnl = AssetPanel(; pf = identity.(pf), amsk = pnl.amsk,

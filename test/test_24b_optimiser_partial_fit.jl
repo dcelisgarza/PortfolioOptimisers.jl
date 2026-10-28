@@ -672,14 +672,15 @@ end
                                                 rows(rdn, 2:2))
         @test_throws ArgumentError partial_fit!(partial_fit!(InverseVolatility(), r1),
                                                 rows(rdv, 2:2))
-        # A mask that appears at a later step is refused by the buffer that holds the rows.
+        # A mask that appears at a later step joins the rows that came with none. Those rows
+        # state the universe of their finiteness, so they read as active (#1882).
         amsk = trues(T, N)
         amsk[1:10, 2] .= false
         Xg = copy(X)
         Xg[.!amsk] .= NaN
         rdg = ReturnsResult(; nx = nx, X = Xg, pnl = AssetPanel(; amsk = amsk, emsk = amsk))
-        @test_throws ArgumentError partial_fit!(partial_fit!(EqualWeighted(), r1),
-                                                rows(rdg, 2:2))
+        og = partial_fit!(partial_fit!(EqualWeighted(), r1), rows(rdg, 2:2))
+        @test Matrix(po.returns_result(og).pnl.amsk) == vcat(trues(1, N), amsk[2:2, :])
 
         # A head with no prior keeps the active mask alone. The estimation mask, a Panel
         # Field and the implied volatility are dropped, and the weights still equal batch.
@@ -694,7 +695,7 @@ end
         tv = AssetPanel(; pf = [NumericPanelField(; name = "cap", vals = ones(T, N))],
                         amsk = trues(T, N), emsk = trues(T, N))
         o = partial_fit!(EqualWeighted(), ReturnsResult(; nx = nx, X = X, pnl = tv))
-        @test isempty(po.returns_result(o).pnl.pf)
+        @test isnothing(po.returns_result(o).pnl.pf)
         o = partial_fit!(EqualWeighted(),
                          ReturnsResult(; nx = nx, X = X, iv = fill(0.2, T, N), ivpa = 1.0))
         # The surface travels with the rows, and the first step pins `ivpa` (#1632).

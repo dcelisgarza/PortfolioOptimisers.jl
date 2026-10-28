@@ -16,6 +16,9 @@ PortfolioOptimisers.MissingDataFilterState
 
 ```@docs
 PortfolioOptimisers.vcat_observations
+PortfolioOptimisers.vcat_returns_panel
+PortfolioOptimisers.finite_universe_panel
+PortfolioOptimisers.returns_with_universe
 PortfolioOptimisers.assert_pinned_value
 PortfolioOptimisers.vcat_optional
 PortfolioOptimisers.data_row_count

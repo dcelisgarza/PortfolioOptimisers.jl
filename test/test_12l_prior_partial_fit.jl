@@ -933,7 +933,7 @@ end
         # The buffer gives the panel that it records, or nothing.
         @test isnothing(po.buffer_asset_panel(steps(EmpiricalPrior(), r0).cache.buf))
         p = po.buffer_asset_panel(steps(EmpiricalPrior(), rd(tv)).cache.buf)
-        @test p.amsk == A && p.emsk == A && isempty(p.pf)
+        @test p.amsk == A && p.emsk == A && isnothing(p.pf)
         # A gapped sample: the plain method refuses it, the batch fit and the carry answer.
         for ce in (Covariance(; alg = SemiMoment()), StatsBase.SimpleCovariance()),
             horizon in (nothing, 5)

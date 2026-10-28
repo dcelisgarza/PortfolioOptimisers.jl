@@ -296,7 +296,9 @@ end
         rd = csfp_panel(; n_assets = 10, n_observations = 20, n_industries = 2).rd
         @test_throws PO.IsNothingError prior(pe, rd.X)
         @test_throws PO.IsNothingError prior(pe, rd.X, nothing, nothing)
-        @test_throws PO.IsNothingError prior(pe, ReturnsResult(; nx = rd.nx, X = rd.X))
+        # A carrier with no panel reads the universe of its finiteness (#1882), and the
+        # exposure that reads a Panel Field names the field it does not find.
+        @test_throws KeyError prior(pe, ReturnsResult(; nx = rd.nx, X = rd.X))
         # The residual declaration has no shape that can express this estimator's block.
         @test_throws ArgumentError PO.factor_residual_config(pe)
     end

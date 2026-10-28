@@ -164,7 +164,7 @@ end
 
 Read the Asset Panel a Descriptor needs out of a [`ReturnsResult`](@ref).
 
-[`descriptor_field_values`](@ref) refuses a `ReturnsResult` that holds no Asset Panel. A Descriptor over the returns reads no Panel Field, so it calls this function to get the same refusal and the active mask that [`descriptor_active_fill!`](@ref) reads.
+[`descriptor_field_values`](@ref) refuses a `ReturnsResult` that holds no Asset Panel. A Descriptor over the returns reads no Panel Field, so it calls this function to get the active mask that [`descriptor_active_fill!`](@ref) reads. A `ReturnsResult` with no panel gives the mask-only panel of [`returns_with_universe`](@ref), which the ingestion layer would have emitted.
 
 # Arguments
 
@@ -172,11 +172,11 @@ Read the Asset Panel a Descriptor needs out of a [`ReturnsResult`](@ref).
 
 # Validation
 
-  - `rd.pnl` is an [`AssetPanel`](@ref). Raises an [`IsNothingError`](@ref).
+  - `rd.pnl` is an [`AssetPanel`](@ref), or `rd.X` is not `nothing`. Raises an [`IsNothingError`](@ref).
 
 # Returns
 
-  - `pnl::AssetPanel`: The Asset Panel the `ReturnsResult` holds.
+  - `pnl::AssetPanel`: The Asset Panel the `ReturnsResult` holds, or the mask-only panel of its returns.
 
 # Related
 
@@ -186,9 +186,9 @@ Read the Asset Panel a Descriptor needs out of a [`ReturnsResult`](@ref).
   - [`AssetPanel`](@ref)
 """
 function descriptor_asset_panel(rd::ReturnsResult)::AssetPanel
-    pnl = rd.pnl
+    pnl = returns_with_universe(rd).pnl
     @argcheck(!isnothing(pnl),
-              IsNothingError("a Descriptor is `NaN` wherever the active mask of an Asset Panel is `false`, and rd.pnl is nothing. Build the ReturnsResult with the `pnl` that asset_panel returns."))
+              IsNothingError("a Descriptor is `NaN` wherever the active mask of an Asset Panel is `false`, and rd holds neither a panel nor asset returns. Build the ReturnsResult with its returns, or with the `pnl` that asset_panel returns."))
     return pnl
 end
 """

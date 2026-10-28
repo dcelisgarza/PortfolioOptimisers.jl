@@ -1386,7 +1386,7 @@ The method passes the fields of `rd` to the returns-matrix method above, which r
 # Arguments
 
   - `pe`: Cross-Sectional Factor Prior estimator.
-  - $(arg_dict[:rd]) It must carry asset returns in `rd.X` and a time-varying Asset Panel in `rd.pnl`.
+  - $(arg_dict[:rd]) It must carry asset returns in `rd.X`, and a time-varying Asset Panel in `rd.pnl` when an exposure reads a Panel Field. With no panel, the fit reads the mask-only panel of [`returns_with_universe`](@ref).
   - $(arg_dict[:strict_prior_rd])
   - $(arg_dict[:dims_rd])
   - $(arg_dict[:cache_reg])
@@ -1395,7 +1395,6 @@ The method passes the fields of `rd` to the returns-matrix method above, which r
 
   - `rd.X` is not `nothing`. Raises an [`IsNothingError`](@ref).
   - The rules of [`benchmark_relative_returns`](@ref).
-  - `rd.pnl` is not `nothing`. Raises an [`IsNothingError`](@ref).
   - The rules of the returns-matrix method.
 
 # Returns
@@ -1412,8 +1411,7 @@ function prior(pe::CrossSectionalFactorPrior, rd::ReturnsResult; strict::Bool = 
                dims::Int = 1, cache_reg::Bool = false)
     @argcheck(!isnothing(rd.X),
               IsNothingError("a Cross-Sectional Factor Prior regresses asset returns on their Factor Exposures, and rd.X is nothing"))
-    @argcheck(!isnothing(rd.pnl),
-              IsNothingError("a Cross-Sectional Factor Prior reads its Factor Exposures off an Asset Panel, and rd.pnl is nothing. Build the ReturnsResult with the `pnl` that asset_panel returns."))
+    rd = returns_with_universe(rd)
     T = size(rd.X, 1)
     rows = shared_series_rows(rd, pe.x_src, false)
     rd = shared_series_view(rd, pe.x_src, false)

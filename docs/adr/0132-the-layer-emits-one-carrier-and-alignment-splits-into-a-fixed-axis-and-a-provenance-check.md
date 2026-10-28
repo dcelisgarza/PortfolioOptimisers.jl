@@ -211,3 +211,40 @@ subselected now that the masks are its defining content, and what a square tenso
 label axis does under a layer that carries gaps rather than dropping the rows and columns holding
 them. Map #955 keeps both in its *Not yet specified* section, where they hang on the build rather
 than on a decision.
+
+## Amendment (2026-10-27)
+
+Issue #1882 reverses § *The layer always emits a panel*, and it removes the empty vector of Panel
+Fields from `AssetPanel`.
+
+**A panel that states nothing is `nothing`.** When a window holds no gap and the caller gives no
+Panel Field, both masks are all true. They then state nothing that the finiteness of the returns
+does not state: the Coverage Universe of no panel reads finiteness alone, and it is the same set.
+So `attach_universe_masks` gives `pnl = nothing` for that case. It dispatches on the all-true mask
+type of § *The all-true mask is a distinguished type*, so the test costs nothing. A window with a
+gap still gets a mask-only panel, because there an asset can be active and not estimable, and a
+window with Panel Fields still gets its panel with all-true masks. This makes the panel consistent
+with the other optional fields of a `ReturnsResult`, which are `nothing` when they carry nothing.
+
+**`pnl === nothing` loses its provenance meaning.** It now means *this carrier states no universe
+beyond the finiteness of its returns*: the layer did not build it, or the window held no gap and no
+Panel Field. So `assert_universe_aligned` drops the parity of panel presence and keeps the equality
+of `nx`. A gapless training window and a gapped test window of one ingestion differ in panel
+presence, and the parity check would refuse them.
+
+**The online seams read a missing panel as the universe of finiteness.** The online conversion
+decides "panel or `nothing`" for each block, so one gapped history streams as a mix of the two. A
+batch conversion of the same history gives one panel. Two seams join blocks, and both read a block
+with no masks as an all-true active mask and an estimation mask equal to the finiteness of its
+returns, which gives the same Coverage Universe:
+
+- `vcat_observations` of two `ReturnsResult` values, through `vcat_returns_panel`.
+- The fold and the merge of a `SampleBufferState`, through `buffer_universe_masks`. The mixture
+  rule of the buffer still refuses a side that states one mask and not the other.
+
+**`AssetPanel.pf` is `nothing` or a non-empty vector.** A mask-only panel holds `pf = nothing`, so
+its type is `AssetPanel{Nothing}` and a reader dispatches on it. The constructor refuses an empty
+vector with an `IsEmptyError`, as the library refuses an empty vector elsewhere. A report that
+iterates the fields, such as `panel_info` or `describe`, reads them through `each_panel_field`,
+which gives the empty tuple for a mask-only panel, so the panel itself never stores an empty
+container.

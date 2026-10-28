@@ -606,14 +606,16 @@ the same per-observation nature and the same silent failure.
         @test isnothing(alone.cache.A)
     end
     @testset "The mixture is refused" begin
-        # A buffer whose activity is known for some rows and not for others answers neither
-        # question, so a fold that disagrees with what the buffer records is refused in both
-        # directions.
+        # A side with no mask states the universe of the finiteness of its rows, so the fold
+        # writes that universe for it, in both directions (#1882): an all-true active mask.
         with = partial_fit!(po.update_online_estimator(Online(Covariance())), Y;
                             active_mask = M)
-        @test_throws ArgumentError partial_fit!(with, Y)
+        @test amask(partial_fit!(with, Y).cache) == vcat(M, trues(T, N))
         without = partial_fit!(po.update_online_estimator(Online(Covariance())), Y)
-        @test_throws ArgumentError partial_fit!(without, Y; active_mask = M)
+        @test amask(partial_fit!(without, Y; active_mask = M).cache) == vcat(trues(T, N), M)
+        # A buffer whose activity is known for some rows and not for others answers neither
+        # question, so a fold that gives one mask the buffer does not record, beside one it
+        # does, is refused.
         @test_throws ArgumentError partial_fit!(with, Y; active_mask = M,
                                                 estimation_mask = M)
         # A buffer holding no observations has nothing to disagree with, so it adopts.
@@ -634,8 +636,8 @@ the same per-observation nature and the same silent failure.
                                  active_mask = permutedims(M))
         @test isequal(po.sample_buffer(by_column), Y)
         @test amask(by_column) == M
-        # `merge_states` concatenates the masks with the rows they explain, and refuses two
-        # buffers that do not record the same masks.
+        # `merge_states` concatenates the masks with the rows they explain. A buffer that
+        # records no mask states the universe of its finiteness (#1882).
         a = partial_fit!(po.SampleBufferState(), view(Y, 1:10, :);
                          active_mask = view(M, 1:10, :))
         b = partial_fit!(po.SampleBufferState(), view(Y, 11:T, :);
@@ -643,9 +645,9 @@ the same per-observation nature and the same silent failure.
         merged = po.merge_states(a, b)
         @test isequal(po.sample_buffer(merged), Y)
         @test amask(merged) == M
-        @test_throws ArgumentError po.merge_states(a,
-                                                   partial_fit!(po.SampleBufferState(),
-                                                                view(Y, 11:T, :)))
+        @test amask(po.merge_states(a,
+                                    partial_fit!(po.SampleBufferState(), view(Y, 11:T, :)))) ==
+              vcat(M[1:10, :], trues(T - 10, N))
         # A capped merge keeps the last rows of the mask with the last rows of the sample.
         ac = partial_fit!(po.SampleBufferState(; max_history = w), view(Y, 1:10, :);
                           active_mask = view(M, 1:10, :))

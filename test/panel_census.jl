@@ -141,6 +141,7 @@ const CENSUS_EXEMPT = Dict{Symbol, String}(
                                            :check_asset_panel => "a check of the axes",
                                            :panel_axes => "reads the axes",
                                            :panel_is_static => "reads whether the masks exist",
+                                           :each_panel_field => "reads whether the Panel Fields exist",
                                            :attribution_active_mask => "reads the active mask of the panel",
                                            :panel_feature_names => "reads the names",
                                            :panel_column_label => "reads the names",

@@ -1866,8 +1866,13 @@ function panel_1399_active(A::AbstractArray, amsk::AbstractMatrix{Bool})
             for t in axes(A, 1), k in axes(A, 2) if amsk[t, k]]
 end
 function panel_1399_equal(p1::AssetPanel, p2::AssetPanel; active_only::Bool = false)
-    ok = length(p1.pf) == length(p2.pf) && p1.amsk == p2.amsk && p1.emsk == p2.emsk
-    for (f1, f2) in zip(p1.pf, p2.pf)
+    fs1 = PortfolioOptimisers.each_panel_field(p1)
+    fs2 = PortfolioOptimisers.each_panel_field(p2)
+    ok = isnothing(p1.pf) == isnothing(p2.pf) &&
+         length(fs1) == length(fs2) &&
+         p1.amsk == p2.amsk &&
+         p1.emsk == p2.emsk
+    for (f1, f2) in zip(fs1, fs2)
         ok &= panel_1399_schema(f1) == panel_1399_schema(f2)
         for (a1, a2) in
             ((panel_1399_values(f1), panel_1399_values(f2)), (f1.omsk, f2.omsk),
@@ -2041,7 +2046,7 @@ end
         pnl = AssetPanel(; amsk = amsk, emsk = amsk)
         for layout in (:long, :wide)
             p2 = panel_1399_trip(pnl; layout)
-            @test isempty(p2.pf) && p2.amsk == amsk && p2.emsk == amsk
+            @test isnothing(p2.pf) && p2.amsk == amsk && p2.emsk == amsk
         end
     end
     # A static input that a time-varying build lifts comes back as an ordinary array.

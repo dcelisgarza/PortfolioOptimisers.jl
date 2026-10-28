@@ -20,13 +20,14 @@ rather than assumed:
     was already scored against it.
 
   - The alignment guarantee has **split**. The asset axis is fixed before the split, so
-    `assert_universe_aligned` narrows to a provenance check: `nx` equality plus panel-presence
-    parity, reaching only a carrier built outside the layer or a step that changes the asset
-    set.
+    `assert_universe_aligned` narrows to a provenance check: `nx` equality, reaching only a
+    carrier built outside the layer or a step that changes the asset set. The amendment of
+    #1882 dropped the parity of panel presence.
 
-  - An `AssetPanel` with **no Panel Field** is the layer's common case. A caller holding only
-    prices has no market capitalisation and no sector, and the panel states a universe and
-    nothing else.
+  - An `AssetPanel` with **no Panel Field** is the layer's common case for gapped prices. A
+    caller holding only prices has no market capitalisation and no sector, and the panel
+    states a universe and nothing else. Its `pf` is `nothing`. A gapless table with no Panel
+    Field gives no panel at all.
 
 The closing test is the destination itself: a caller holding a gapped price table reaches a
 walk-forward fold with no hand-built `ReturnsResult` and no hand-built mask.
@@ -50,7 +51,8 @@ Pm59 = Matrix{Union{Missing, Float64}}(P59)
 Pm59[.!isfinite.(P59)] .= missing
 Xm59 = TimeArray(collect(ts59), Pm59, nx59)
 
-# A table with no gap at all, the case the layer must still emit a panel for.
+# A table with no gap at all, the case the layer emits no panel for when it holds no Panel
+# Field (#1882).
 Pg59 = 100.0 .+ cumsum(randn(StableRNG(9731), T59, N59) ./ 10; dims = 1)
 Xg59 = TimeArray(collect(ts59), Pg59, nx59)
 
@@ -453,8 +455,13 @@ end
     @testset "the compressions: two integers per asset, and none at all" begin
         # A gapped ingestion keeps ADR 0129's exact compression across the clock crossing.
         @test isa(rd.pnl.amsk, PortfolioOptimisers.ListingSpan)
-        # A gapless one says "all of them" in O(1) for both masks.
-        rdg = prices_to_returns(ptr59, price_ingestion(PriceIngestion(), Xg59))
+        # A gapless one with a Panel Field says "all of them" in O(1) for both masks. With no
+        # Panel Field it emits no panel at all (#1882).
+        @test isnothing(prices_to_returns(ptr59, price_ingestion(PriceIngestion(), Xg59)).pnl)
+        fld = NumericPanelField(; name = "m", vals = ones(N59))
+        rdg = prices_to_returns(ptr59,
+                                price_ingestion(PriceIngestion(), Xg59;
+                                                pnl = AssetPanel(; pf = [fld])))
         @test isa(rdg.pnl.amsk, PortfolioOptimisers.AllTrueMask)
         @test rdg.pnl.emsk === rdg.pnl.amsk
         @test all(rdg.pnl.amsk)
@@ -608,34 +615,50 @@ end
     e = copy(a)
     e[2, 2] = false
     pnl = AssetPanel(; amsk = a, emsk = e)
-    @test isempty(pnl.pf)
+    # Its Panel Fields are `nothing`, never an empty vector (#1882).
+    @test isnothing(pnl.pf)
+    @test pnl isa AssetPanel{Nothing}
     @test PortfolioOptimisers.panel_axes(pnl) == (5, 3)
     @test !PortfolioOptimisers.panel_is_static(pnl)
 
     # It slices like any other panel, and the slice is still field-less.
     v = PortfolioOptimisers.port_opt_view(pnl, 2:4, [1, 3])
-    @test isempty(v.pf)
+    @test isnothing(v.pf)
     @test size(v.amsk) == (3, 2)
 
-    # It derives a Feature Matrix with no column, because it holds no feature data.
-    nz, Z = PortfolioOptimisers.panel_feature_matrix(pnl)
-    @test isempty(nz)
-    @test size(Z) == (5, 3, 0)
-    @test isempty(PortfolioOptimisers.panel_feature_names(pnl))
+    # It derives no Feature Matrix, because it holds no feature data.
+    @test PortfolioOptimisers.panel_feature_matrix(pnl) === (nothing, nothing)
+    @test isnothing(PortfolioOptimisers.panel_feature_names(pnl))
+    @test_throws KeyError panel_field(pnl, "mcap")
+    @test isempty(PortfolioOptimisers.each_panel_field(pnl))
 
-    # A panel with neither a field nor a mask carries nothing at all and is refused.
+    # A panel with neither a field nor a mask carries nothing at all and is refused, and so
+    # is an empty vector of Panel Fields, with or without masks.
     @test_throws PortfolioOptimisers.IsEmptyError AssetPanel()
     @test_throws PortfolioOptimisers.IsEmptyError AssetPanel(;
                                                              pf = PortfolioOptimisers.AbstractPanelField[])
+    @test_throws PortfolioOptimisers.IsEmptyError AssetPanel(;
+                                                             pf = PortfolioOptimisers.AbstractPanelField[],
+                                                             amsk = a, emsk = e)
     # A static panel still needs a field: nothing else would state its asset axis.
     @test PortfolioOptimisers.panel_axes([NumericPanelField(; name = "m", vals = ones(3))],
                                          nothing) == (3,)
 end
 
 @testset "A carrier the layer did not build states no universe" begin
-    # No span and no gap: nothing to state, and no panel is emitted. This is what keeps
-    # `pnl === nothing` meaning one thing only.
+    # No span and no gap: nothing to state, and no panel is emitted.
     @test isnothing(prices_to_returns(ptr59, PricesResult(; X = Xg59)).pnl)
+    # A span and no gap: the masks are all true and state nothing that the finiteness of
+    # the returns does not state, so no panel is emitted either (#1882). A Panel Field
+    # keeps the panel, with all-true masks.
+    @test isnothing(prices_to_returns(ptr59, price_ingestion(PriceIngestion(), Xg59)).pnl)
+    @test isnothing(prices_to_returns(Xg59).pnl)
+    fld = NumericPanelField(; name = "m", vals = ones(size(values(Xg59), 2)))
+    rdk = prices_to_returns(ptr59,
+                            price_ingestion(PriceIngestion(), Xg59;
+                                            pnl = AssetPanel(; pf = [fld])))
+    @test rdk.pnl.amsk isa PortfolioOptimisers.AllTrueMask
+    @test length(rdk.pnl.pf) == 1
 
     # No span and gaps: still no universe, and still no panel. ADR 0133 deleted the
     # window-local derivation rather than rewording it -- a delisting straddling the window
@@ -680,10 +703,11 @@ end
     other = ReturnsResult(; nx = nx59[1:3], X = rd.X[:, 1:3])
     @test_throws ArgumentError PortfolioOptimisers.assert_universe_aligned(res, other)
 
-    # And so is one that states no universe where the fitted context states one, which is the
-    # half the check gained: the two did not come from one ingestion.
+    # A window with no panel passes where the fitted context holds one. The layer emits no
+    # panel for a gapless window, so a gapless test window and a gapped training window of
+    # one ingestion differ in panel presence (#1882).
     stripped = ReturnsResult(; nx = rd.nx, X = rd.X, ts = rd.ts)
-    @test_throws ArgumentError PortfolioOptimisers.assert_universe_aligned(res, stripped)
+    @test PortfolioOptimisers.assert_universe_aligned(res, stripped) === nothing
 
     # A fitted context with no returns slot has nothing to compare against, so the check
     # is silent rather than guessing.
@@ -767,12 +791,13 @@ end
     # a gap and the table is 26 of 39 rows, and the two dead names take 43% of the book
     # because nothing is left to say they are dead. Ingestion is the only door, so the
     # universe is still stated -- and what it states is the falsehood the deletion
-    # manufactured: every asset listed and estimable at every surviving observation.
+    # manufactured: every asset listed and estimable at every surviving observation. That
+    # universe states nothing beyond finiteness, so the layer emits no panel (#1882).
     kept = [t for t in 1:T if all(isfinite, view(P, t, :))]
     rdd = prices_to_returns(TimeArray(ts[kept], P[kept, :], nx))
     @test size(rdd.X, 1) == 26
-    @test all(rdd.pnl.amsk)
-    @test all(rdd.pnl.emsk)
+    @test isnothing(rdd.pnl)
+    @test all(isfinite, rdd.X)
     resd = optimise(MeanRisk(; obj = MinimumRisk(),
                              opt = JuMPOptimiser(; pe = prior(EmpiricalPrior(), rdd),
                                                  slv = slv985)))
@@ -1260,4 +1285,70 @@ using Dates, Statistics
         @test_throws ArgumentError currency_excess_index(fx, cash[:JPY], base)
         @test_throws DimensionMismatch currency_excess_index(fx, cash, cash)
     end
+end
+
+@testset "A block with no panel joins a block with a mask-only panel (#1882)" begin
+    PO59 = PortfolioOptimisers
+    pr = price_ingestion(PriceIngestion(), X59)
+    batch = prices_to_returns(ptr59, pr)
+
+    # The online conversion decides "panel or nothing" for each block. Rows 22:32 hold no gap,
+    # and the row before them is priced, so the middle block holds no panel. The concatenation
+    # of the three blocks is the batch conversion, values and masks.
+    est = ptr59
+    outs = ReturnsResult[]
+    for rows in (1:21, 22:32, 33:40)
+        est, r = PO59.partial_fit_transform(est, PO59.port_opt_view(pr, rows))
+        push!(outs, r)
+    end
+    @test map(o -> isnothing(o.pnl), outs) == [false, true, false]
+    c = reduce(PO59.vcat_observations, outs)
+    @test isequal(c.X, batch.X)
+    @test Matrix(c.pnl.amsk) == Matrix(batch.pnl.amsk)
+    @test Matrix(c.pnl.emsk) == Matrix(batch.pnl.emsk)
+    n2 = size(outs[2].X, 1)
+    @test isnothing(PO59.vcat_observations(PO59.port_opt_view(outs[2], 1:5, :),
+                                           PO59.port_opt_view(outs[2], 6:n2, :)).pnl)
+
+    # The sample buffer reads a block with no masks as the universe of its finiteness, in a
+    # fold and in a merge, in both orders.
+    g = outs[2]
+    m = outs[1]
+    kw = (; active_mask = Matrix(m.pnl.amsk), estimation_mask = Matrix(m.pnl.emsk))
+    emsk = vcat(trues(size(g.X)), kw.estimation_mask)
+    s = partial_fit!(partial_fit!(PO59.SampleBufferState(), g.X), m.X; kw...)
+    @test PO59.sample_buffer_kwargs(s).estimation_mask == emsk
+    @test PO59.sample_buffer_kwargs(s).active_mask == vcat(trues(size(g.X)), kw.active_mask)
+    s = partial_fit!(partial_fit!(PO59.SampleBufferState(), m.X; kw...), g.X)
+    @test PO59.sample_buffer_kwargs(s).estimation_mask ==
+          vcat(kw.estimation_mask, trues(size(g.X)))
+    sg = partial_fit!(PO59.SampleBufferState(), g.X)
+    sm = partial_fit!(PO59.SampleBufferState(), m.X; kw...)
+    @test PO59.sample_buffer_kwargs(PO59.merge_states(sg, sm)).estimation_mask == emsk
+    @test PO59.sample_buffer_kwargs(PO59.merge_states(sm, sg)).estimation_mask ==
+          vcat(kw.estimation_mask, trues(size(g.X)))
+    # A side that states one mask and not the other is still refused.
+    @test_throws ArgumentError partial_fit!(sm, g.X; active_mask = trues(size(g.X)))
+
+    # An online pipeline over the gapped table, whose test blocks mix panel presence, gives
+    # the weights of the expanding batch walk-forward.
+    hrpo = HierarchicalRiskParity(;
+                                  opt = HierarchicalOptimiser(;
+                                                              pe = Online(EmpiricalPrior())))
+    po = with_logger(NullLogger()) do
+        return cross_val_predict(Pipeline(; steps = (ptr59, hrpo)), pr,
+                                 OnlineIndexWalkForward(20, 4))
+    end
+    pb = with_logger(NullLogger()) do
+        return cross_val_predict(Pipeline(; steps = (ptr59, HierarchicalRiskParity())), pr,
+                                 IndexWalkForward(20, 4; expand_train = true))
+    end
+    @test [q.res.w for q in po.pred] == [q.res.w for q in pb.pred]
+
+    # A reader of the masks reads the universe of finiteness when the data holds no panel.
+    rdg = prices_to_returns(Xg59)
+    @test isnothing(rdg.pnl)
+    @test PO59.returns_with_universe(rdg).pnl.amsk isa PO59.AllTrueMask
+    @test PO59.returns_with_universe(batch) === batch
+    @test factor_exposure(ConstantExposure(), rdg) == ones(size(rdg.X))
 end

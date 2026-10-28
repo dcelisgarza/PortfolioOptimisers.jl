@@ -41,11 +41,13 @@ const PO = PortfolioOptimisers
     pr_fac = prior(FactorPrior(), rd)
     Zp = PO.panel_field(PO.asset_panel(ape, pr_fac, rd, rd.X), "loadings").vals
     pr_noz = prior(EmpiricalPrior(), rd)
-    # A carrier the ingestion layer did not build states no universe, and `pnl === nothing`
-    # is the one meaning ADR 0132 gives that. `rd0` runs through the layer, so it carries a
-    # panel — one with no Panel Field, which is the layer's common case — and the no-panel
-    # fixture is therefore built without the layer rather than taken from it.
+    # A carrier that states no universe beyond the finiteness of its returns holds no panel.
+    # `rd0` runs through the layer, and its prices hold no gap, so the layer emits none
+    # (ADR 0132, amended by #1882). The fixture with a mask-only panel is built by hand.
     rd_noz = ReturnsResult(; nx = rd0.nx, X = rd0.X, nf = rd0.nf, F = rd0.F, ts = rd0.ts)
+    rd_msk = ReturnsResult(; nx = rd0.nx, X = rd0.X, nf = rd0.nf, F = rd0.F, ts = rd0.ts,
+                           pnl = AssetPanel(; amsk = trues(size(rd0.X)),
+                                            emsk = trues(size(rd0.X))))
     fde = FeatureDistance()
     pde = FeatureDistance(; ape = ape)
     cde = Distance(; alg = CanonicalDistance())
@@ -149,40 +151,40 @@ const PO = PortfolioOptimisers
             @test occursin("asset_panel", e.msg)
         end
 
-        # 2b. A carrier the layer *did* build holds a panel with no Panel Field, which is
-        # the layer's common case: a caller holding only prices has no market
-        # capitalisation and no sector. Such a panel states a universe and carries no
-        # feature data, and the refusal names that cause — the panel, the Feature Matrix
-        # and `asset_panel` — rather than the emptiness of the matrix it would otherwise
-        # have derived. Issue #1003.
+        # 2b. A carrier of gapped prices holds a panel with no Panel Field, which is the
+        # layer's common case: a caller holding only prices has no market capitalisation
+        # and no sector. Such a panel states a universe and carries no feature data, and
+        # the refusal names that cause — the panel, the Feature Matrix and `asset_panel` —
+        # rather than the emptiness of the matrix it would otherwise have derived. Issue
+        # #1003. Its Panel Fields are `nothing`, never an empty vector (#1882).
+        @test isnothing(rd0.pnl)
+        @test isnothing(rd_msk.pnl.pf)
         e = try
-            clusterise(cle, rd0)
+            clusterise(cle, rd_msk)
         catch err
             err
         end
-        @test isa(e, PortfolioOptimisers.IsEmptyError)
-        @test isa(rd0.pnl, AssetPanel)
-        @test isempty(rd0.pnl.pf)
+        @test isa(e, PortfolioOptimisers.IsNothingError)
         @test occursin("Panel Field", e.msg)
         @test occursin("Feature Matrix", e.msg)
         @test occursin("asset_panel", e.msg)
         # The refusal is the resolution's, not the kernel's, so the labels a caller
         # rebuilds refuse with the same message.
         el = try
-            feature_labels(rd0.pnl)
+            feature_labels(rd_msk.pnl)
         catch err
             err
         end
-        @test isa(el, PortfolioOptimisers.IsEmptyError)
+        @test isa(el, PortfolioOptimisers.IsNothingError)
         @test el.msg == e.msg
         # And it outranks the selector's own emptiness diagnostic: a `sel` naming a Panel
         # Field a fieldless panel cannot hold is refused for the panel, not for the entry.
         es = try
-            feature_matrix(rd0.pnl, [nzd[1]])
+            feature_matrix(rd_msk.pnl, [nzd[1]])
         catch err
             err
         end
-        @test isa(es, PortfolioOptimisers.IsEmptyError)
+        @test isa(es, PortfolioOptimisers.IsNothingError)
         @test es.msg == e.msg
 
         # 3. A prior result alone carries no panel at all, and the message says so.

@@ -1296,14 +1296,14 @@ $(DocStringExtensions.TYPEDEF)
 
 The Asset Panel: the Panel Fields of one universe, and the two point-in-time universe masks.
 
-The two universe masks are the **defining content** of the panel, and the Panel Fields are optional payload. A panel with fields owns their values, so nothing else on a `PricesResult` or a `ReturnsResult` holds a feature matrix. [`feature_matrix`](@ref) derives the Feature Matrix that a distance measures from the panel, and nothing stores it. A panel with **no** field is the common case of the ingestion layer. A caller that holds only prices has no market capitalisation and no sector, and the panel states a universe and nothing else. The constructor refuses a panel with neither a field nor a mask, because it carries nothing.
+The two universe masks are the **defining content** of the panel, and the Panel Fields are optional payload. A panel with fields owns their values, so nothing else on a `PricesResult` or a `ReturnsResult` holds a feature matrix. [`feature_matrix`](@ref) derives the Feature Matrix that a distance measures from the panel, and nothing stores it. A panel with **no** field holds `pf = nothing`. It is the common case of the ingestion layer when the prices hold a gap. A caller that holds only prices has no market capitalisation and no sector, and the panel states a universe and nothing else. The constructor refuses a panel with neither a field nor a mask, because it carries nothing. It also refuses an empty vector of Panel Fields, because `nothing` states that the panel has no field.
 
 One panel takes one of two shapes, and its type parameters say which.
 
   - **Static**: every Panel Field is `assets` or `assets × labels`, and both masks are `nothing`. A fundamentals table or a sector classification with no history is this shape. It needs at least one Panel Field, because nothing else would state its asset axis.
   - **Time-varying**: every Panel Field prepends an observation axis, and both masks are `observations × assets`. A point-in-time panel is this shape.
 
-So `nothing` masks mean *static, or hand-built*, and never *gapless*. A panel that the ingestion layer emits always carries both masks, and they are all true where the price table held no gap.
+So `nothing` masks mean *static, or hand-built*, and never *gapless*. A panel that the ingestion layer emits always carries both masks. When the price table holds no gap and the caller gives no Panel Field, the masks are all true and state nothing that the finiteness of the returns does not state, so the layer emits no panel at all (see [`attach_universe_masks`](@ref)).
 
 # Fields
 
@@ -1311,12 +1311,13 @@ $(DocStringExtensions.FIELDS)
 
 # Constructor
 
-    AssetPanel(pf::AbstractVector{<:AbstractPanelField},
+    AssetPanel(; pf::Option{<:AbstractVector{<:AbstractPanelField}} = nothing,
                amsk::Option{<:AbstractMatrix{Bool}} = nothing,
                emsk::Option{<:AbstractMatrix{Bool}} = nothing)
 
 # Validation
 
+  - `pf` is `nothing` or a non-empty vector. Raises an [`IsEmptyError`](@ref).
   - The panel carries at least one Panel Field or an active mask. See [`panel_axes`](@ref).
   - The Panel Field names are non-empty and unique. See [`assert_panel_labels`](@ref).
   - No two columns of the derived Feature Matrix share a name. See [`assert_panel_feature_names`](@ref).
@@ -1407,7 +1408,7 @@ julia> edited.emsk
 """
 @concrete struct AssetPanel <: AbstractResult
     """
-    The Panel Fields, each owning its own values and its own observed mask.
+    The Panel Fields, each owning its own values and its own observed mask, or `nothing` when the panel states its two masks alone.
     """
     pf
     """
@@ -1418,11 +1419,13 @@ julia> edited.emsk
     The estimation mask (observations × assets): whether the asset enters the cross-sectional estimate at that observation. Always a subset of the active mask. `nothing` when the panel is static.
     """
     emsk
-    function AssetPanel(pf::AbstractVector{<:AbstractPanelField},
+    function AssetPanel(pf::Option{<:AbstractVector{<:AbstractPanelField}},
                         amsk::Option{<:AbstractMatrix{Bool}},
                         emsk::Option{<:AbstractMatrix{Bool}})
+        @argcheck(isnothing(pf) || !isempty(pf),
+                  IsEmptyError("the Panel Fields of an Asset Panel cannot be an empty vector: pass pf = nothing for a panel that states its two masks alone"))
         ax = panel_axes(pf, amsk)
-        if !isempty(pf)
+        if !isnothing(pf)
             assert_panel_labels([f.name for f in pf], "the Panel Field names")
             assert_panel_feature_names(pf)
             k = findfirst(f -> panel_field_axes(f) != ax, pf)
@@ -1433,7 +1436,7 @@ julia> edited.emsk
         return new{typeof(pf), typeof(amsk), typeof(emsk)}(pf, amsk, emsk)
     end
 end
-function AssetPanel(; pf::AbstractVector{<:AbstractPanelField} = AbstractPanelField[],
+function AssetPanel(; pf::Option{<:AbstractVector{<:AbstractPanelField}} = nothing,
                     amsk::Option{<:AbstractMatrix{Bool}} = nothing,
                     emsk::Option{<:AbstractMatrix{Bool}} = nothing)::AssetPanel
     return AssetPanel(pf, amsk, emsk)
@@ -1441,6 +1444,7 @@ end
 """
     panel_axes(pf::AbstractVector{<:AbstractPanelField},
                amsk::Option{<:AbstractMatrix{Bool}}) -> Tuple
+    panel_axes(pf::Nothing, amsk::Option{<:AbstractMatrix{Bool}}) -> Tuple
     panel_axes(pnl::AssetPanel) -> Tuple
 
 Read the axes one [`AssetPanel`](@ref) is stated on.
@@ -1451,21 +1455,21 @@ A panel with neither a Panel Field nor a mask carries nothing. The function refu
 
 # Algorithm
 
-The method that Julia selects is the algorithm. Both methods apply the same rule.
+The method that Julia selects is the algorithm. All methods apply the same rule.
 
- 1. `pf` is non-empty: return [`panel_field_axes`](@ref) of its first Panel Field. The constructor checks that every field agrees.
- 2. `pf` is empty: return `size(amsk)`.
+ 1. `pf` is a vector: return [`panel_field_axes`](@ref) of its first Panel Field. The constructor checks that the vector is non-empty and that every field agrees.
+ 2. `pf` is `nothing`: return `size(amsk)`.
  3. An [`AssetPanel`](@ref): apply steps 1 and 2 to its own Panel Fields and active mask. Every consumer calls this form. The constructor calls the form with two arguments, because it has no panel yet.
 
 # Arguments
 
-  - `pf`: The Panel Fields, possibly none.
+  - `pf`: The Panel Fields, or `nothing`.
   - `amsk`: The active mask, or `nothing`.
-  - `pnl`: The Asset Panel, for the second form.
+  - `pnl`: The Asset Panel, for the last form.
 
 # Validation
 
-  - `amsk` is not `nothing` when `pf` is empty. Raises an [`IsEmptyError`](@ref).
+  - `amsk` is not `nothing` when `pf` is `nothing`. Raises an [`IsEmptyError`](@ref).
 
 # Returns
 
@@ -1480,10 +1484,10 @@ The method that Julia selects is the algorithm. Both methods apply the same rule
   - [`Option`](@ref)
 """
 function panel_axes(pf::AbstractVector{<:AbstractPanelField},
-                    amsk::Option{<:AbstractMatrix{Bool}})::Tuple
-    if !isempty(pf)
-        return panel_field_axes(pf[1])
-    end
+                    ::Option{<:AbstractMatrix{Bool}})::Tuple
+    return panel_field_axes(pf[1])
+end
+function panel_axes(::Nothing, amsk::Option{<:AbstractMatrix{Bool}})::Tuple
     @argcheck(!isnothing(amsk),
               IsEmptyError("an Asset Panel with no Panel Field is stated by its two universe masks, so it needs them: a panel with neither carries nothing at all. Pass amsk and emsk, or pass at least one Panel Field."))
     return size(amsk)
@@ -1588,8 +1592,10 @@ This is the only supported route from the name of a Panel Field to its values. A
 
 # Algorithm
 
- 1. Find the first Panel Field whose name matches.
- 2. Throw a `KeyError` naming the nearest match and the whole panel when none does.
+The method that Julia selects is the algorithm.
+
+ 1. The panel holds no Panel Field (`pnl.pf === nothing`): throw a `KeyError`.
+ 2. Otherwise: find the first Panel Field whose name matches. Throw a `KeyError` naming the nearest match and the whole panel when none does.
 
 # Arguments
 
@@ -1610,6 +1616,9 @@ This is the only supported route from the name of a Panel Field to its values. A
   - [`AbstractPanelField`](@ref)
   - [`did_you_mean`](@ref)
 """
+function panel_field(::AssetPanel{Nothing}, name::AbstractString)
+    return throw(KeyError("the Asset Panel holds no Panel Field named `$name`. It holds no Panel Field: it states its two universe masks alone. Build the panel that holds the field with `asset_panel(inputs)`, and pass it as the `pnl` of the ReturnsResult."))
+end
 function panel_field(pnl::AssetPanel, name::AbstractString)
     i = findfirst(f -> f.name == name, pnl.pf)
     @argcheck(!isnothing(i),
@@ -1649,12 +1658,12 @@ function panel_claim!(nz::AbstractVector{String}, labels::AbstractVector{String}
     return cols
 end
 """
-    panel_feature_matrix(pnl::Nothing) -> Tuple{Nothing, Nothing}
+    panel_feature_matrix(pnl::Union{Nothing, AssetPanel{Nothing}}) -> Tuple{Nothing, Nothing}
     panel_feature_matrix(pnl::AssetPanel) -> Tuple{Vector{String}, Array}
 
 Derive the Feature Matrix an [`AssetPanel`](@ref)'s Panel Fields stack into, and name its columns.
 
-Input data that holds no panel derives nothing, so the `nothing` method answers with two of them and no consumer needs a branch of its own.
+Input data that holds no panel, or a panel with no Panel Field, derives nothing. So the first method answers with two `nothing` values, and no consumer needs a branch of its own.
 
 Nothing stores the result. A distance measures a Feature Matrix, so the distance builds it and drops it after the measure. The panel is the data, and the matrix is one view of it.
 
@@ -1685,7 +1694,7 @@ The method that Julia selects decides whether there is anything to derive.
   - [`panel_field_stack!`](@ref)
   - [`panel_claim!`](@ref)
 """
-function panel_feature_matrix(::Nothing)
+function panel_feature_matrix(::Union{Nothing, AssetPanel{Nothing}})
     return nothing, nothing
 end
 function panel_feature_matrix(pnl::AssetPanel)
@@ -1749,7 +1758,7 @@ Every Panel Field owns its values, so an asset view reaches all of them. The for
 
 # Algorithm
 
- 1. View each Panel Field with [`panel_field_view`](@ref). Pass a `Colon` for the observation index of a static panel, and pass `nx` for the square case. A panel with no Panel Field keeps its own empty vector.
+ 1. View each Panel Field with [`panel_field_view`](@ref). Pass a `Colon` for the observation index of a static panel, and pass `nx` for the square case. A panel with no Panel Field keeps `pf = nothing`.
  2. View both masks with [`panel_mask_view`](@ref), which keeps them `nothing` when the panel is static.
 
 # Arguments
@@ -1776,10 +1785,7 @@ function port_opt_view(pnl::AssetPanel, i)
 end
 function port_opt_view(pnl::AssetPanel, i, j, nx::Option{<:VecStr} = nothing)
     it = panel_is_static(pnl) ? Colon() : i
-    #! A panel with no Panel Field is the ingestion layer's shape. The comprehension
-    #! would answer an empty vector of an inferred element type; passing the panel's
-    #! own empty vector through keeps the field type it was built with.
-    pf = isempty(pnl.pf) ? pnl.pf : [panel_field_view(f, it, j, nx) for f in pnl.pf]
+    pf = isnothing(pnl.pf) ? nothing : [panel_field_view(f, it, j, nx) for f in pnl.pf]
     return AssetPanel(; pf = pf, amsk = panel_mask_view(pnl.amsk, i, j),
                       emsk = panel_mask_view(pnl.emsk, i, j))
 end

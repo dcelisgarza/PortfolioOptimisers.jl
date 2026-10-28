@@ -1346,7 +1346,7 @@ A buffer records the Panel Fields only for a prior whose tree reads them, as [`r
 
 # Validation
 
-  - `pnl.pf` is empty, or `reads_panel_fields(pe)` is `true`. An `ArgumentError` is thrown otherwise.
+  - `pnl.pf` is `nothing`, or `reads_panel_fields(pe)` is `true`. An `ArgumentError` is thrown otherwise.
 
 # Returns
 
@@ -1360,7 +1360,7 @@ A buffer records the Panel Fields only for a prior whose tree reads them, as [`r
 """
 function step_panel_fields(pe::AbstractPriorEstimator, pnl::AssetPanel,
                            route::AbstractString)::Bool
-    if isempty(pnl.pf)
+    if isnothing(pnl.pf)
         return false
     end
     @argcheck(reads_panel_fields(pe),

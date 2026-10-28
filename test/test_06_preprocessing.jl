@@ -1308,13 +1308,14 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test_throws MethodError prices_to_returns(Xc, Fc)
 
         # The bare call is exactly the two steps, and it is the layer's own path rather than
-        # a way around it, so it emits the `AssetPanel` the layer always emits. A carrier
-        # built by hand states no span, and therefore no universe.
+        # a way around it, so it emits the panel the layer emits: none for a gapless table
+        # with no Panel Field (#1882). A carrier built by hand states no span, and therefore
+        # no universe.
         pr = price_ingestion(PriceIngestion(), Xc)
         routed = prices_to_returns(Xc)
         @test isequal(routed.X, prices_to_returns(pr).X)
         @test routed.ts == tsc[2:end]
-        @test isa(routed.pnl, AssetPanel)
+        @test isequal(routed.pnl, prices_to_returns(pr).pnl)
         @test isnothing(prices_to_returns(PricesResult(; X = Xc)).pnl)
 
         # The three surviving keywords reach the carrier form unchanged.
@@ -1357,11 +1358,14 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test occursin("Asset Panel or Listing Span", err.msg)
 
         # A panel with its two masks and no Panel Field has an observation axis.
-        pm = AssetPanel(; pf = PortfolioOptimisers.AbstractPanelField[], amsk = trues(6, 3),
-                        emsk = trues(6, 3))
+        pm = AssetPanel(; amsk = trues(6, 3), emsk = trues(6, 3))
         @test !PortfolioOptimisers.panel_is_static(pm)
         @test PortfolioOptimisers.feature_row_indices(pm, ts[[6, 1]], ts) == [6, 1]
-        @test PortfolioOptimisers.panel_feature_names(pm) == String[]
+        @test isnothing(PortfolioOptimisers.panel_feature_names(pm))
+        @test PortfolioOptimisers.panel_feature_matrix(pm) === (nothing, nothing)
+        @test_throws IsEmptyError AssetPanel(;
+                                             pf = PortfolioOptimisers.AbstractPanelField[],
+                                             amsk = trues(6, 3), emsk = trues(6, 3))
 
         # The names follow the column order of the derived Feature Matrix, observed masks
         # after the values of their own field.
@@ -3010,8 +3014,7 @@ end
     a = AssetPanel(; amsk = [true true; false true], emsk = [true false; false true])
     b = AssetPanel(; amsk = [true false], emsk = [true false])
     c = vcat(a, b)
-    @test isempty(c.pf)
-    @test c.pf === a.pf
+    @test isnothing(c.pf)
     @test Matrix(c.amsk) == [true true; false true; true false]
     @test Matrix(c.emsk) == [true false; false true; true false]
 end

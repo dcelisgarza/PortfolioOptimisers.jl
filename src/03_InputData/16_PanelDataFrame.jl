@@ -73,7 +73,7 @@ The method that Julia selects is the algorithm.
 
 # Returns
 
-  - `fs`: The Panel Fields, in column order. With `fields = nothing` this is `pnl.pf` itself, not a copy.
+  - `fs`: The Panel Fields, in column order. With `fields = nothing` this is [`each_panel_field`](@ref) of the panel: `pnl.pf` itself, not a copy, or `()` for a panel with no Panel Field.
 
 # Related
 
@@ -82,7 +82,7 @@ The method that Julia selects is the algorithm.
   - [`panel_field`](@ref)
 """
 function panel_frame_fields(pnl::AssetPanel, ::Nothing)
-    return pnl.pf
+    return each_panel_field(pnl)
 end
 function panel_frame_fields(pnl::AssetPanel, fields)
     return [panel_field(pnl, String(name)) for name in fields]
