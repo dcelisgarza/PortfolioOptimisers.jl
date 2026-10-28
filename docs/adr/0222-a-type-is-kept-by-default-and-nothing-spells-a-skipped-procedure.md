@@ -85,6 +85,26 @@ section. Its interface is the verbs of its member that a second member needs, an
 body calls only those verbs dispatches on the abstract type
 ([#1874](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1874)).
 
+### A census stops a new dead abstract type
+
+`test/test_86_dead_abstract_type_census.jl` fails on an abstract type that no code under `src/` or
+`ext/` names outside its own declaration and the declarations of its subtypes. Such a type has no
+dispatch site, no bound site, no `Union` and no `isa`, so checks 1 to 3 fail by construction. The
+census does not remove the type. It asks for a verdict under the four checks, and it holds each
+type that stays on its kept list with one reason
+([#1868](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1868)):
+
+1. A `public` extension point carries an `# Interfaces` section, and a caller subtypes it. The
+   census checks the declaration and the section.
+2. A private type that an ADR names deliberate meets check 4. Its reason names the ADR.
+3. A private type that a verdict of the map
+   [#1852](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1852) kept names a concept
+   of the library. Its reason names the verdict.
+
+The census reads the reference counter of `code_health/CodeHealth.jl`, the counter that
+`test/test_70_trivial_unit_census.jl` reads too. A type with one concrete subtype is on both kept
+lists, because the two censuses gate two rules.
+
 ### A step on the output of a covariance estimator is the wrapper
 
 Matrix processing that runs on the output of a covariance estimator has one spelling: the wrapper
@@ -197,5 +217,8 @@ above. `ZeroStartCentring` is the location of the oracle, a rule with content of
   `X()` with `nothing`, and a method of a caller on `X` becomes a method on `Nothing`.
 - A verdict ticket of #1852 cites this ADR. For a type that is not a data-less setting, it records
   the four checks.
+- A new abstract type that nothing codes against fails `test/test_86_dead_abstract_type_census.jl`.
+  Its author adds a dispatch site, names the type in place of a `Union` of its members, removes
+  the type, or adds a kept entry with its reason.
 - Related: ADR 0044 prefers a named type over a flag. ADR 0154 states when an abstract type is
   `public`.

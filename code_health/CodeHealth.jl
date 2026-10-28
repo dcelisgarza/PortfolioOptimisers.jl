@@ -378,6 +378,176 @@ function declared_types(mod::Module)
     return declared
 end
 
+# --- the references to a name ------------------------------------------------
+#
+# **This is the one reference counter.** `test/test_70_trivial_unit_census.jl` finds a pure forward
+# with at most one caller with it, and `test/test_86_dead_abstract_type_census.jl` finds an abstract
+# type that nothing codes against with it, so the two censuses agree on what a use is.
+
+"""
+    signature_name(sig) -> Tuple{Union{Nothing, Symbol}, Bool}
+
+The name under a method signature, and whether it is module-qualified (`Base.show`). A functor
+`(r::T)(x)` has no name, so it gives `(nothing, false)`.
+"""
+function signature_name(sig)
+    while sig isa Expr && sig.head in (:where, :(::))
+        sig = sig.args[1]
+    end
+    if !(sig isa Expr && sig.head === :call)
+        return (nothing, false)
+    end
+    f = sig.args[1]
+    if f isa Symbol
+        return (f, false)
+    end
+    if f isa Expr && f.head === :. && f.args[end] isa QuoteNode
+        return (f.args[end].value, true)
+    end
+    if f isa Expr && f.head === :curly
+        return signature_name(Expr(:call, f.args[1]))
+    end
+    return (nothing, false)
+end
+
+"""
+    reference_counts(trees) -> Dict{Symbol, Int}
+
+Every `Symbol` in reference position in the parsed files `trees`, counted once per occurrence.
+
+These positions are not references: the prose of a docstring, an `export`, `public`, `import` or
+`using` line, the name and the argument names of a definition, the name of a keyword, the left side
+of an assignment, the name that `x::T` binds, the field names and the supertype of a struct, the
+name and the supertype of an abstract type, and the name of a function inside its own body.
+`Mod.name` counts `name`, and so does `x.field`, because the parser cannot tell the two apart. This
+errs on the side of a use. The bounds of the type parameters of a struct or of an abstract type
+count, because they are uses of the types that they name.
+"""
+function reference_counts(trees)
+    refs = Dict{Symbol, Int}()
+    for t in trees
+        count_refs!(refs, t, nothing)
+    end
+    return refs
+end
+
+count_ref!(refs, s::Symbol) = (refs[s] = get(refs, s, 0) + 1)
+
+function count_refs!(refs, e, self)
+    if e isa Symbol
+        if !(e === self)
+            count_ref!(refs, e)
+        end
+        return nothing
+    end
+    if !(e isa Expr)
+        return nothing
+    end
+    h = e.head
+    if h === :macrocall && isdocstring(e)
+        count_refs!(refs, e.args[end], self)
+    elseif h in (:export, :public, :import, :using, :inert)
+        nothing
+    elseif h === :abstract
+        count_head_bounds!(refs, e.args[1])
+    elseif h === :const
+        count_refs!(refs, e.args[1].args[end], self)
+    elseif h === :function || (h === :(=) && is_signature(e.args[1]))
+        name, _ = signature_name(e.args[1])
+        count_sig_refs!(refs, e.args[1], name)
+        length(e.args) >= 2 && count_refs!(refs, e.args[2], name)
+    elseif h === :struct
+        count_struct_refs!(refs, e)
+    elseif h === :kw
+        count_refs!(refs, e.args[2], self)
+    elseif h === :(=) &&
+           (e.args[1] isa Symbol || (e.args[1] isa Expr && e.args[1].head === :tuple))
+        count_refs!(refs, e.args[2], self)
+    elseif h === :(::) && length(e.args) == 2 && e.args[1] isa Symbol
+        count_refs!(refs, e.args[2], self)
+    elseif h === :.
+        count_refs!(refs, e.args[1], self)
+        if length(e.args) == 2
+            if e.args[2] isa QuoteNode
+                e.args[2].value isa Symbol && count_refs!(refs, e.args[2].value, self)
+            else
+                # A broadcast call `f.(args...)`: the tuple holds the arguments.
+                count_refs!(refs, e.args[2], self)
+            end
+        end
+    elseif h === :macrocall
+        foreach(a -> count_refs!(refs, a, self), e.args[2:end])
+    else
+        foreach(a -> count_refs!(refs, a, self), e.args)
+    end
+    return nothing
+end
+
+function count_sig_refs!(refs, sig, self)
+    while sig isa Expr && sig.head in (:where, :(::))
+        if sig.head === :(::)
+            count_refs!(refs, sig.args[end], self)
+        else
+            foreach(w -> count_refs!(refs, w, self), sig.args[2:end])
+        end
+        sig = sig.args[1]
+    end
+    if !(sig isa Expr && sig.head === :call)
+        return nothing
+    end
+    foreach(a -> count_arg_refs!(refs, a, self), sig.args[2:end])
+    return nothing
+end
+
+function count_arg_refs!(refs, a, self)
+    if a isa Symbol
+        nothing
+    elseif a isa Expr && a.head === :parameters
+        foreach(x -> count_arg_refs!(refs, x, self), a.args)
+    elseif a isa Expr && a.head === :kw
+        count_arg_refs!(refs, a.args[1], self)
+        count_refs!(refs, a.args[2], self)
+    elseif a isa Expr && a.head === :(...)
+        count_arg_refs!(refs, a.args[1], self)
+    elseif a isa Expr && a.head === :(::)
+        count_refs!(refs, a.args[end], self)
+    else
+        count_refs!(refs, a, self)
+    end
+    return nothing
+end
+
+# The bounds of the type parameters in the head `T{A <: B} <: S` of a struct or an abstract type.
+# The name `T` and the supertype `S` are not references.
+function count_head_bounds!(refs, head)
+    if head isa Expr && head.head === :<:
+        (head = head.args[1])
+    end
+    if head isa Expr && head.head === :curly
+        for a in head.args[2:end]
+            a isa Expr && a.head === :<: && count_refs!(refs, a.args[end], nothing)
+        end
+    end
+    return nothing
+end
+
+function count_struct_refs!(refs, e)
+    count_head_bounds!(refs, e.args[2])
+    for a in e.args[3].args
+        if !(a isa Expr)
+            continue
+        end
+        if a.head === :(::)
+            count_refs!(refs, a.args[end], nothing)
+        elseif a.head === :function ||
+               (a.head === :(=) && is_signature(a.args[1])) ||
+               a.head === :macrocall
+            count_refs!(refs, a, nothing)
+        end
+    end
+    return nothing
+end
+
 # --- the name a definition binds --------------------------------------------
 #
 # **This is the one resolver.** `code_health/coverage.jl` writes the `definition` key of a
