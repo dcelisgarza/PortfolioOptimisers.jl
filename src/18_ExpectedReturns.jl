@@ -936,8 +936,10 @@ end
 """
     homogeneity_degree(rt::JuMPReturnsEstimator, fees::Option{<:Fees} = nothing) -> Option{<:Integer}
     homogeneity_degree(rt::VecJRE, fees::Option{<:Fees} = nothing) -> Option{<:Integer}
-    homogeneity_degree(r::ExpectedReturn, fees::Option{<:Fees} = nothing) -> Option{<:Integer}
-    homogeneity_degree(r::ExpectedReturnRiskRatio, fees::Option{<:Fees} = nothing) -> Option{<:Integer}
+    homogeneity_degree(r::ExpectedReturn, fees::Option{<:Fees} = nothing,
+                       T::Option{<:Integer} = nothing) -> Option{<:Integer}
+    homogeneity_degree(r::ExpectedReturnRiskRatio, fees::Option{<:Fees} = nothing,
+                       T::Option{<:Integer} = nothing) -> Option{<:Integer}
 
 Return the degree of homogeneity of a return estimator in the portfolio weights, under the fees `fees`, and of the two measures that read one.
 
@@ -958,6 +960,7 @@ A term whose `settings.fee` is `true` subtracts the fees, through [`term_fees`](
   - `rt`: Return estimator, or a vector of them.
   - $(arg_dict[:r])
   - `fees`: The fees that the return pays, or `nothing`.
+  - `T`: The number of observations of the net returns, or `nothing` when it is not known. A return estimator does not read it, and the risk measure `rk` of a ratio does.
 
 # Returns
 
@@ -1001,15 +1004,17 @@ function homogeneity_degree(rt::VecJRE, fees::Option{<:Fees} = nothing)
         1
     end
 end
-function homogeneity_degree(r::ExpectedReturn, fees::Option{<:Fees} = nothing)
+function homogeneity_degree(r::ExpectedReturn, fees::Option{<:Fees} = nothing,
+                            ::Option{<:Integer} = nothing)
     return homogeneity_degree(r.rt, fees)
 end
-function homogeneity_degree(r::ExpectedReturnRiskRatio, fees::Option{<:Fees} = nothing)
+function homogeneity_degree(r::ExpectedReturnRiskRatio, fees::Option{<:Fees} = nothing,
+                            T::Option{<:Integer} = nothing)
     if !iszero(r.rf)
         return nothing
     end
     return degree_difference(homogeneity_degree(r.rt, fees),
-                             scalarised_degree(r.rk, r.sca, fees))
+                             scalarised_degree(r.rk, r.sca, fees, T))
 end
 """
     const PerfRM = Union{MeanReturn, MeanReturnRiskRatio, ExpectedReturn,

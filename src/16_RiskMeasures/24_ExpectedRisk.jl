@@ -938,7 +938,7 @@ Evaluate the risk at `w` with the homogeneity correction applied to each measure
 
 The risk of each measure comes from [`linearised_risk`](@ref). A measure whose value is a solve has the Worst-Case Distribution `q` at the unperturbed weights, and the function evaluates the expected loss under that distribution. That function has the same gradient at the unperturbed weights, and it holds no solver noise. Every other measure has `q = nothing`, and the function evaluates [`expected_risk`](@ref).
 
-[`adjust_risk_contribution`](@ref) divides the risk of a measure by its degree of homogeneity under `fees`. By Euler's theorem, the gradient of the divided risk, multiplied by the weights, then sums to the risk. A vector such as `[Variance(), ConditionalValueatRisk()]` holds a measure of degree 2 and a measure of degree 1, so the vector has no single degree. The function therefore corrects each element before it combines them. [`VarianceSkewKurtosis`](@ref) is a sum of three terms of the degrees 2, 3 and 4, so its method divides each term of [`variance_skew_kurtosis_terms`](@ref) by its own degree.
+[`adjust_risk_contribution`](@ref) divides the risk of a measure by its degree of homogeneity under `fees` on the observations of `X`. The count of the rows of `X` gives the sum of the weights of an OWA weight builder. By Euler's theorem, the gradient of the divided risk, multiplied by the weights, then sums to the risk. A vector such as `[Variance(), ConditionalValueatRisk()]` holds a measure of degree 2 and a measure of degree 1, so the vector has no single degree. The function therefore corrects each element before it combines them. [`VarianceSkewKurtosis`](@ref) is a sum of three terms of the degrees 2, 3 and 4, so its method divides each term of [`variance_skew_kurtosis_terms`](@ref) by its own degree.
 
 The chain-rule weights ``p_k`` come from [`scalariser_element_weights`](@ref), which the caller evaluates once at the unperturbed weights. The finite difference moves the risk of each element and keeps the weights, so a maximum or a minimum keeps the element that it picks at `w`. Under the sum, the maximum and the minimum, the gradient of ``A`` times the weights then sums to ``\\sum_k p_k s_k R_k(\\boldsymbol{w})``, which is the aggregate that [`expected_risk`](@ref) reports. Under the log-sum-exp scalariser the same sum is the softmax-weighted mean of the scaled risks, which is below the aggregate, because the log-sum-exp is not homogeneous.
 
@@ -985,7 +985,8 @@ Where:
 """
 function adjusted_risk(::Nothing, q, r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum,
                        fees::Option{<:Fees}; kwargs...)
-    return adjust_risk_contribution(r, linearised_risk(q, r, w, X, fees; kwargs...), fees)
+    return adjust_risk_contribution(r, linearised_risk(q, r, w, X, fees; kwargs...), fees,
+                                    size(X, 1))
 end
 function adjusted_risk(::Nothing, q, r::VarianceSkewKurtosis, w::VecNum, ::MatNum,
                        ::Option{<:Fees}; kwargs...)

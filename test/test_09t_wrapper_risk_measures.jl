@@ -413,10 +413,11 @@ end
                                                        settings = JuMPReturnsSettings(;
                                                                                       fee = false))),
                   fl, 1)]
+        T = size(_X607, 1)
         for (r, f, d) in cases
             rr = factory(r, prh)
-            @test isequal(hd(r, f), d)
-            @test isequal(hd(rr, f), d)
+            @test isequal(hd(r, f, T), d)
+            @test isequal(hd(rr, f, T), d)
             r1 = expected_risk(rr, _w607, prh, f)
             q2 = expected_risk(rr, 2 * _w607, prh, f) / r1
             q3 = expected_risk(rr, 3 * _w607, prh, f) / r1
@@ -450,30 +451,65 @@ end
             @test rc ≈ _w607 .* g rtol = 1e-6
             @test sum(rc) ≈ dot(_w607, g) rtol = 1e-6
         end
-        # A liquidation charge does not read the weights, so it falls on each period. A weight
-        # builder states its sum when the sum is zero at each observation count. A range whose
-        # `w2` is `reverse ∘ w1` holds the same sum in both tails.
+        # A liquidation charge does not read the weights, so it falls on each period.
         lq = Fees(; lq = Turnover(; w = [0.25], val = 0.01))
         @test PO.has_fixed_fee(lq, false)
         @test !PO.has_fixed_fee(lq, true)
         @test PO.has_fixed_fee(Fees(; flq = Turnover(; w = [0.25], val = 0.01)), true)
         @test !PO.has_fixed_fee(Fees(; tn = Turnover(; w = w0, val = 0.0)), false)
         @test !PO.has_fixed_fee(nothing, false)
-        for f in (owa_gmd, owa_rg, owa_cvarrg, owa_tgrg, owa_l_moment), T in (20, 57, 200)
-            @test PO.sums_to_zero(f) && PO.sums_to_zero(f(T))
+        for f in (owa_gmd, owa_rg, owa_cvarrg, owa_tgrg, owa_l_moment), t in (20, 57, 200)
+            @test PO.sums_to_zero(PO.resolve_owa_weights(f, t))
         end
-        @test !PO.sums_to_zero(owa_wr)
-        @test PO.cancels_constant_fee(OrderedWeightsArray())
+        @test !PO.sums_to_zero(PO.resolve_owa_weights(owa_wr, T))
+        @test PO.cancels_constant_fee(OrderedWeightsArray(), T)
         @test !PO.cancels_constant_fee(OrderedWeightsArray(;
-                                                           w = OrderedWeightsArrayConditionalValueatRisk()))
+                                                           w = OrderedWeightsArrayConditionalValueatRisk()),
+                                       T)
         @test PO.cancels_constant_fee(OrderedWeightsArrayRange(; w1 = owa_tg(200)))
         @test PO.cancels_constant_fee(OrderedWeightsArrayRange(;
-                                                               w1 = OrderedWeightsArrayTailGini()))
-        @test !PO.cancels_constant_fee(OrderedWeightsArrayRange(; w1 = owa_tg, w2 = owa_wr))
+                                                               w1 = OrderedWeightsArrayTailGini()),
+                                      T)
+        # `owa_tg` and `owa_wr` both sum to -1, so their range does not move. Without `T`,
+        # the sum of a builder is not known.
+        @test PO.cancels_constant_fee(OrderedWeightsArrayRange(; w1 = owa_tg, w2 = owa_wr),
+                                      T)
+        @test !PO.cancels_constant_fee(OrderedWeightsArrayRange(; w1 = owa_tg,
+                                                                w2 = owa_gmd), T)
+        @test !PO.cancels_constant_fee(OrderedWeightsArrayRange())
         @test PO.cancels_constant_fee(GenericValueatRiskRange())
         @test !PO.reads_fees(ValueatRisk(; alg = DistributionValueatRisk()))
         @test !PO.reads_fees(VarianceSkewKurtosis())
         @test PO.sums_to_zero([1 // 2, -1 // 2])
         @test !PO.sums_to_zero([1 // 2, -1 // 3])
+    end
+
+    @testset "An OWA weight builder sums at the observation count of the data" begin
+        # The sum of the weights of a builder can change with `T`, so `adjusted_risk` passes
+        # the row count of the returns to the degree (#1911). A user closure whose weights sum
+        # to zero keeps degree -1 on a side of a ratio under a fixed periodic fee, and its
+        # contributions sum to the risk. `LinearMoment` at `k = 3` sums to 0.00332 at `T` =
+        # 200, so the fee does not cancel, and the ratio has no degree.
+        hd = PO.homogeneity_degree
+        T = size(_X607, 1)
+        prh = prior(HighOrderPriorEstimator(), _X607)
+        tn = Fees(; tn = Turnover(; w = fill(0.2, 5), val = 0.001))
+        rr = factory(RiskRatio(; r1 = OrderedWeightsArray(; w = t -> owa_gmd(t)),
+                               r2 = Variance()), prh)
+        @test isnothing(hd(rr, tn))
+        @test hd(rr, tn, T) == -1
+        @test sum(risk_contribution(rr, _w607, prh, tn)) ≈ expected_risk(rr, _w607, prh, tn) rtol = 1e-5
+        @test PO.cancels_constant_fee(OrderedWeightsArray(; w = LinearMoment()), T)
+        lm3 = OrderedWeightsArray(; w = LinearMoment(; k = 3))
+        @test !PO.cancels_constant_fee(lm3, T)
+        rr = factory(RiskRatio(; r1 = lm3, r2 = Variance()), prh)
+        @test isnothing(hd(rr, tn, T))
+        g = risk_gradient(rr, _w607, prh, tn)
+        @test risk_contribution(rr, _w607, prh, tn) ≈ _w607 .* g rtol = 1e-6
+        # A range of two builders reads both tails at `T`, so a vector tail and a builder
+        # tail with the same sum cancel.
+        @test PO.cancels_constant_fee(OrderedWeightsArrayRange(; w1 = owa_tg(T),
+                                                               w2 = t -> reverse(owa_tg(t))),
+                                      T)
     end
 end
