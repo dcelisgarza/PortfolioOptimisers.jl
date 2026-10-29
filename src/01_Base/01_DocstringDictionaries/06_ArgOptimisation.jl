@@ -241,6 +241,8 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :rt_min => "`rt_min`: Return of the anchor of minimum risk.",#
                  :rt_ends => "`rt_ends`: The span of each return term that holds a [`Frontier`](@ref), as `i => (rt_min_i, rt_max_i)` pairs, or `nothing` when no return term holds one. The low end is the return of the term at the anchor of minimum risk. The high end is its return at the portfolio that maximises that term alone.",#
                  :rk_opt => "`rk_opt`: Risk ceiling ``\\epsilon_{2}`` of the near optimal region, or one for each point of a frontier sweep.",#
+                 :rk_delta => "`rk_delta`: Width of the near optimal region in risk, the slack of the risk ceiling `rk_opt` at the anchor of the objective.",#
+                 :rt_delta => "`rt_delta`: Width of the near optimal region in return, the slack of the return floor `rt_opt` at the anchor of the objective.",#
                  :noc_retcode => "`noc_retcode`: Return code of the centring solve, or one for each point of a frontier sweep.",#
                  # Discrete allocation result fields.
                  :l_model => "`l_model`: `JuMP` model for the long allocation.",#

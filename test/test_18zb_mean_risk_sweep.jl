@@ -411,6 +411,45 @@ end
     end
 end
 
+@testset "An EntropicValueatRisk ceiling holds under a constrained NOC (#1905)" begin
+    # The anchor cones of the barrier divide their slack by the width of the near optimal
+    # region. In the units of the risk, the 50 % level failed, and the 75 % level stopped at
+    # ALMOST_SOLVED, which allow_almost accepts, and broke the ceiling by 1.3 %.
+    pr = prior(HighOrderPriorEstimator(), MRS_X)
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 check_sol = (; allow_local = true, allow_almost = true),
+                 settings = Dict("verbose" => false))
+    opt = JuMPOptimiser(; pe = pr, slv = slv)
+    ev(; kwargs...) = EntropicValueatRisk(; slv = slv, kwargs...)
+    rk = factory(ev(), pr)
+    lo = expected_risk(rk, optimise(MeanRisk(; opt = opt, r = ev())).w, pr)
+    hi = expected_risk(rk, optimise(MeanRisk(; opt = opt, obj = MaximumReturn())).w, pr)
+    for f in (0.25, 0.5, 0.75)
+        ub = lo + f * (hi - lo)
+        res = optimise(NearOptimalCentering(;
+                                            r = ev(;
+                                                   settings = RiskMeasureSettings(;
+                                                                                  ub = ub)),
+                                            obj = MaximumReturn(), opt = opt,
+                                            alg = ConstrainedNearOptimalCentering()))
+        @test isa(res.retcode, PO.OptimisationSuccess)
+        @test expected_risk(rk, res.w, pr) <= ub * (1 + 1e-5)
+    end
+end
+
+@testset "An anchor cone takes the size of its bound when the region is degenerate" begin
+    # The width of the region divides the slack of the cone.
+    @test PO.anchor_cone_scale(5e-4, 0.03) == 5e-4
+    @test PO.anchor_cone_scale([2e-4, -5e-4], [0.01, 0.03]) == 5e-4
+    # A width of the order of the rounding error, as when the three anchors are one
+    # portfolio, gives way to the bound.
+    @test PO.anchor_cone_scale(-1e-13, 0.0073) == 0.0073
+    @test PO.anchor_cone_scale(0.0, [0.01, -0.02]) == 0.02
+    # The comparison has no float tolerance of its own, so a Rational keeps its type.
+    @test PO.anchor_cone_scale(1 // 10, 1 // 2) === 1 // 10
+    @test PO.anchor_cone_scale(0 // 1, 1 // 2) === 1 // 2
+end
+
 @testset "MeanRisk sweep: one measure with two bounds keeps both" begin
     pr = prior(HighOrderPriorEstimator(), MRS_X)
     opt = JuMPOptimiser(; pe = pr, slv = MRS_SLV)

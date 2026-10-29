@@ -357,8 +357,8 @@ commit = "3f6c9b3deb"
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_b.jl" = { cyc = 5, cog = 7, arg = 9, cyc_sum = 30, cog_sum = 25, arg_sum = 59, macros = [] }
 "src/17_Optimisation/05_JuMP/04_MeanRisk.jl" = { cyc = 5, cog = 5, arg = 7, cyc_sum = 42, cog_sum = 24, arg_sum = 85, macros = ["@pipe_delegates", "@pipe_route_sigma_ucs", "@propagatable"] }
 "src/17_Optimisation/05_JuMP/05_FactorRiskContribution.jl" = { cyc = 4, cog = 4, arg = 9, cyc_sum = 21, cog_sum = 16, arg_sum = 34, macros = ["@forward_properties", "@pipe_delegates", "@pipe_route_sigma_ucs", "@propagatable"] }
-"src/17_Optimisation/05_JuMP/06_NearOptimalCentering_a.jl" = { cyc = 12, cog = 12, arg = 14, cyc_sum = 59, cog_sum = 38, arg_sum = 134, macros = ["@propagatable"] }
-"src/17_Optimisation/05_JuMP/06_NearOptimalCentering_b.jl" = { cyc = 12, cog = 12, arg = 14, cyc_sum = 22, cog_sum = 13, arg_sum = 67, macros = ["@pipe_delegates", "@pipe_route_sigma_ucs"] }
+"src/17_Optimisation/05_JuMP/06_NearOptimalCentering_a.jl" = { cyc = 12, cog = 12, arg = 16, cyc_sum = 62, cog_sum = 40, arg_sum = 145, macros = ["@propagatable"] }
+"src/17_Optimisation/05_JuMP/06_NearOptimalCentering_b.jl" = { cyc = 12, cog = 12, arg = 16, cyc_sum = 22, cog_sum = 13, arg_sum = 71, macros = ["@pipe_delegates", "@pipe_route_sigma_ucs"] }
 "src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl" = { cyc = 4, cog = 3, arg = 6, cyc_sum = 46, cog_sum = 22, arg_sum = 75, macros = ["@forward_properties", "@pipe_delegates", "@pipe_route_rkb", "@pipe_route_sigma_ucs", "@propagatable"] }
 "src/17_Optimisation/05_JuMP/08_RelaxedRiskBudgeting.jl" = { cyc = 3, cog = 3, arg = 9, cyc_sum = 29, cog_sum = 20, arg_sum = 66, macros = ["@forward_properties", "@pipe_delegates", "@pipe_route_rkb", "@propagatable"] }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/01_BaseRiskConstraints.jl" = { cyc = 4, cog = 4, arg = 9, cyc_sum = 46, cog_sum = 24, arg_sum = 120, macros = [] }

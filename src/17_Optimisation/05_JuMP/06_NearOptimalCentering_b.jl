@@ -41,14 +41,14 @@ end
 function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:ConstrainedNearOptimalCentering},
-                    model::JuMP.Model, rk_opts::VecNum, rt_opts::VecNum,
-                    opt::BaseJuMPOptimisationEstimator,
+                    model::JuMP.Model, rk_opts::VecNum, rt_opts::VecNum, s_rk::Number,
+                    s_rt::Number, opt::BaseJuMPOptimisationEstimator,
                     attrs::ProcessedJuMPOptimiserAttributes, ::Any, ::Any, ::Any,
                     w_min::VecNum, w_max::VecNum, ::Val{false}, ::Val{true}, args...)
     risk_frontier = compute_risk_ubs(model, noc, opt.pe, opt.fees, w_min, w_max, args...)
     risk_axis = set_risk_frontier_parameters!(model, risk_frontier)
     p_rk, p_rt, rk_units, rt_units = set_noc_anchor_parameters!(model, noc, attrs, rk_opts,
-                                                                rt_opts)
+                                                                rt_opts, s_rk, s_rt)
     return frontier_sweep!(model, noc, eltype(opt.pe.X),
                            frontier_sweep_axes(nothing, risk_axis)) do i
         return set_noc_anchor!(p_rk, p_rt, rk_units, rt_units, i)
@@ -57,8 +57,8 @@ end
 function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:ConstrainedNearOptimalCentering},
-                    model::JuMP.Model, rk_opts::VecNum, rt_opts::VecNum,
-                    opt::BaseJuMPOptimisationEstimator,
+                    model::JuMP.Model, rk_opts::VecNum, rt_opts::VecNum, s_rk::Number,
+                    s_rt::Number, opt::BaseJuMPOptimisationEstimator,
                     attrs::ProcessedJuMPOptimiserAttributes, ::Any, ::Any,
                     rt_ends::Option{<:VecPair}, w_min::VecNum, w_max::VecNum, ::Val{true},
                     ::Val{true}, args...)
@@ -67,7 +67,7 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
     risk_axis = set_risk_frontier_parameters!(model, risk_frontier)
     ret_axis = set_ret_frontier_parameters!(model, ret_frontier)
     p_rk, p_rt, rk_units, rt_units = set_noc_anchor_parameters!(model, noc, attrs, rk_opts,
-                                                                rt_opts)
+                                                                rt_opts, s_rk, s_rt)
     return frontier_sweep!(model, noc, eltype(opt.pe.X),
                            frontier_sweep_axes(ret_axis, risk_axis)) do i
         return set_noc_anchor!(p_rk, p_rt, rk_units, rt_units, i)
@@ -194,6 +194,38 @@ function assemble_near_optimal_centering_model!(::ConstrainedNearOptimalCenterin
     return nothing
 end
 """
+    anchor_cone_scale(delta::Num_VecNum, anchor::Num_VecNum)
+
+Return the scale that divides the slack of an anchor cone of the barrier of [`NearOptimalCentering`](@ref).
+
+The scale is the width `delta` of the near optimal region, which is the slack of the cone at the anchor of the objective. When the width is negligible against the bound `anchor`, the scale is the [`bound_scale`](@ref) of the bound. The anchors of a degenerate region are one portfolio, so its width is of the order of the rounding error. A slack divided by that width puts the tolerance of the solver at the scale of the rounding error, and the solve stops without progress.
+
+# Algorithm
+
+ 1. Compute ``s = \\max_{i} |\\delta_{i}|`` and ``m``, the [`bound_scale`](@ref) of `anchor`.
+ 2. Return ``m`` when `isapprox(m + s, m)`, and ``s`` otherwise.
+
+# Arguments
+
+  - `delta::Num_VecNum`: The width, `rk_delta` or `rt_delta` of [`NearOptimalSetup`](@ref).
+  - `anchor::Num_VecNum`: The bound of the cone, `rk_opt` or `rt_opt`, or one for each point of a sweep.
+
+# Returns
+
+  - The scale, a positive number.
+
+# Related
+
+  - [`bound_scale`](@ref)
+  - [`set_near_optimal_centering_constraints!`](@ref)
+  - [`solve_near_optimal_centering!`](@ref)
+"""
+function anchor_cone_scale(delta::Num_VecNum, anchor::Num_VecNum)
+    s = maximum(abs, delta; init = abs(zero(eltype(delta))))
+    m = bound_scale(anchor)
+    return ifelse(isapprox(m + s, m), m, s)
+end
+"""
     solve_near_optimal_centering!(alg, model, noc, setup)
 
 Run the solve tail of the Near Optimal Centering variant `alg`.
@@ -201,7 +233,9 @@ Run the solve tail of the Near Optimal Centering variant `alg`.
 Reads the arguments each [`solve_noc!`](@ref) overload needs off `setup`, so the two variants
 share one `_optimise` head. The constrained variant sweeps both frontier registries, so it
 passes the two `Val` flags that select the sweeping overload; the unconstrained variant
-registers no frontier bound and passes neither.
+registers no frontier bound and passes neither. Both variants pass the
+[`anchor_cone_scale`](@ref) of the widths `rk_delta` and `rt_delta` of the near optimal
+region, which divide the anchor cones of the barrier.
 
 # Arguments
 
@@ -224,14 +258,16 @@ registers no frontier bound and passes neither.
 function solve_near_optimal_centering!(::UnconstrainedNearOptimalCentering,
                                        model::JuMP.Model, noc::NearOptimalCentering,
                                        setup::NearOptimalSetup)
-    (; rk_opt, rt_opt, opt, attrs) = setup
-    return solve_noc!(noc, model, rk_opt, rt_opt, opt, attrs)
+    (; rk_opt, rt_opt, rk_delta, rt_delta, opt, attrs) = setup
+    return solve_noc!(noc, model, rk_opt, rt_opt, anchor_cone_scale(rk_delta, rk_opt),
+                      anchor_cone_scale(rt_delta, rt_opt), opt, attrs)
 end
 function solve_near_optimal_centering!(::ConstrainedNearOptimalCentering, model::JuMP.Model,
                                        noc::NearOptimalCentering, setup::NearOptimalSetup)
-    (; rk_opt, rt_opt, opt, attrs, rt_min, rt_max, rt_ends, w_min, w_max) = setup
-    return solve_noc!(noc, model, rk_opt, rt_opt, opt, attrs, rt_min, rt_max, rt_ends,
-                      w_min, w_max, Val(shared_has(model, :ret_frontier)),
+    (; rk_opt, rt_opt, rk_delta, rt_delta, opt, attrs, rt_min, rt_max, rt_ends, w_min, w_max) = setup
+    return solve_noc!(noc, model, rk_opt, rt_opt, anchor_cone_scale(rk_delta, rk_opt),
+                      anchor_cone_scale(rt_delta, rt_opt), opt, attrs, rt_min, rt_max,
+                      rt_ends, w_min, w_max, Val(shared_has(model, :ret_frontier)),
                       Val(shared_has(model, :risk_frontier)))
 end
 function _optimise(noc::NearOptimalCentering, rd::ReturnsResult = ReturnsResult();
