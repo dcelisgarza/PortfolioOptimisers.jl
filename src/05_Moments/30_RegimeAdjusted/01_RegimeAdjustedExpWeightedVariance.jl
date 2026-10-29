@@ -104,8 +104,10 @@ This is the Short-Term Volatility Updating of [paleologo2025](@cite), Section 6.
 scales a correctly calibrated return by ``e^{x_{t}/2}``, so ``\\ln z^{2} - \\kappa`` is an
 unbiased observation of the latent log variance ratio ``x_{t}``. The smoothed state is the
 estimate ``\\hat{x}_{t}`` of the book, and the multiplier is its ``e^{\\hat{x}_{t}/2}``. The book
-reads the squared norm of the whole standardised vector of ``m`` returns, with
-``\\kappa = \\psi(m/2) + \\ln 2``. This method reads each asset at ``m = 1`` and takes the mean of
+reads the squared norm of the whole standardised vector of ``m`` returns. Its ``\\kappa`` is the
+expectation of the log of the squared norm of a standard normal vector of ``m`` entries. The book
+does not print a closed form, and the log of a ``\\chi^{2}_{m}`` variate has the expectation
+``\\psi(m/2) + \\ln 2``. This method reads each asset at ``m = 1`` and takes the mean of
 the values. [`RegimeAdjustedExpWeightedCovariance`](@ref) with a [`MahalanobisTarget`](@ref)
 reads the norm of the book.
 

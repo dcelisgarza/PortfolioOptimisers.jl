@@ -113,8 +113,9 @@ Volatility Updating of [paleologo2025](@cite), with
 ``\\boldsymbol{u}_{t} = \\mathbf{C}_{t}^{-1/2} \\mathbf{V}_{t}^{-1} \\boldsymbol{f}_{t}``. There,
 ``\\mathbf{C}_{t}`` is the correlation, ``\\mathbf{V}_{t}`` the diagonal of the volatilities and
 ``\\boldsymbol{f}_{t}`` the returns of the model. Under Model 6.8 it is ``e^{x_{t}}`` times a
-``\\chi^{2}_{n}`` variate, so [`regime_kappa`](@ref) is the ``\\kappa = \\psi(n/2) + \\ln 2`` of
-the book at the default law. The book reads the covariance of the model, and this target reads
+``\\chi^{2}_{n}`` variate. The book defines ``\\kappa`` as the expectation of the log of that
+variate and prints no closed form. At the default law, [`regime_kappa`](@ref) is that
+expectation, ``\\psi(n/2) + \\ln 2``. The book reads the covariance of the model, and this target reads
 the estimate before the observation.
 
 The statistic reads the inverse of an estimated block, and the inverse of an estimate is too
