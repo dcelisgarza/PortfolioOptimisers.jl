@@ -1590,11 +1590,13 @@ Look one Panel Field up in an [`AssetPanel`](@ref) by name.
 
 This is the only supported route from the name of a Panel Field to its values. A consumer that parses a derived column name reads a naming convention, not the panel. The parse gives a wrong field when the name of a Panel Field holds the `"="` or the `"::"` of that convention.
 
+A reader that gives returns data with no panel the mask-only panel of [`returns_with_universe`](@ref) also reaches the method on a panel with no Panel Field, as the fit and the online step of a [`CrossSectionalFactorPrior`](@ref) do. So the message of that method names both causes: the returns data carries no panel, or a panel of its two universe masks alone.
+
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. The panel holds no Panel Field (`pnl.pf === nothing`): throw a `KeyError`.
+ 1. The panel holds no Panel Field (`pnl.pf === nothing`): throw a `KeyError` that names both causes.
  2. Otherwise: find the first Panel Field whose name matches. Throw a `KeyError` naming the nearest match and the whole panel when none does.
 
 # Arguments
@@ -1617,7 +1619,7 @@ The method that Julia selects is the algorithm.
   - [`did_you_mean`](@ref)
 """
 function panel_field(::AssetPanel{Nothing}, name::AbstractString)
-    return throw(KeyError("the Asset Panel holds no Panel Field named `$name`. It holds no Panel Field: it states its two universe masks alone. Build the panel that holds the field with `asset_panel(inputs)`, and pass it as the `pnl` of the ReturnsResult."))
+    return throw(KeyError("no Panel Field named `$name` exists: the returns data carries no panel, or a panel that states its two universe masks alone and holds no Panel Field. Build the panel that holds the field with `asset_panel(inputs)`, and pass it as the `pnl` of the ReturnsResult."))
 end
 function panel_field(pnl::AssetPanel, name::AbstractString)
     i = findfirst(f -> f.name == name, pnl.pf)
