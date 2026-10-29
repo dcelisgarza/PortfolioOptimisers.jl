@@ -133,8 +133,8 @@ to `model`.
 
 The exact formulation fuses the two tails rather than duplicating them. It forms the single
 weight vector ``\\boldsymbol{\\omega}_{1} - \\boldsymbol{\\omega}_{2}`` and builds one assignment dual
-over it, so the range costs the same `T × T` block as a single tail. `r.w2` is already
-reversed by the constructor of [`OrderedWeightsArrayRange`](@ref), so the difference is the
+over it, so the range costs the same `T × T` block as a single tail. [`OrderedWeightsArrayRange`](@ref)
+holds `r.w2` reversed, so the difference is the
 range weight vector.
 
 # Mathematical definition
@@ -618,7 +618,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add JuMP risk constraints for `OrderedWeightsArrayRange` using the sorting-network formulation to `model`.
 
-The formulation fuses the two tails, as [`ExactOrderedWeightsArray`](@ref) does. It forms the single weight vector ``\\boldsymbol{\\omega}_{1} - \\boldsymbol{\\omega}_{2}`` and builds one network over it. `r.w2` is already reversed by the constructor of [`OrderedWeightsArrayRange`](@ref), so the difference is the range weight vector, and it is nondecreasing when both tails are.
+The formulation fuses the two tails, as [`ExactOrderedWeightsArray`](@ref) does. It forms the single weight vector ``\\boldsymbol{\\omega}_{1} - \\boldsymbol{\\omega}_{2}`` and builds one network over it. [`OrderedWeightsArrayRange`](@ref) holds `r.w2` reversed, so the difference is the range weight vector, and it is nondecreasing when both tails are.
 
 # Mathematical definition
 

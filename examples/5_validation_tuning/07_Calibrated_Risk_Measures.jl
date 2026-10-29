@@ -406,10 +406,15 @@ println("alpha = $(vrr_res.alpha), beta = $(vrr_res.beta)")
 #=
 Every Range measure that has a `beta` defaults it to `alpha`. The rule states the method and the
 slot states the end, so one rule serves both ends, and `beta` is the same object as `alpha`.
+
+An [`OrderedWeightsArrayRange`](@ref) has no `beta`. It mirrors its loss tail when you give no
+`w2`, so the gain tail is the reversal of the same builder and holds the same rule.
 =#
 
-owa_range = OrderedWeightsArrayConditionalValueatRiskRange(; alpha = count_rule.alpha)
-println("beta is a $(typeof(owa_range.beta).name.name), same rule = $(owa_range.beta === count_rule.alpha)")
+owa_range = OrderedWeightsArrayRange(;
+                                     w1 = OrderedWeightsArrayConditionalValueatRisk(;
+                                                                                    alpha = count_rule.alpha))
+println("w2 is a $(typeof(owa_range.w2).name.name), same rule = $(owa_range.w2.inner.alpha === count_rule.alpha)")
 
 #=
 ## 8. The slot bounds refuse a rule of the wrong family

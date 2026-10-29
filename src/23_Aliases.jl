@@ -506,30 +506,32 @@ function OWA_WR(; settings::RiskMeasureSettings = RiskMeasureSettings(),
 end
 """
     OWA_RG(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-             alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray()) -> OrderedWeightsArray
+             alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray()) -> OrderedWeightsArrayRange
 
-Alias for the Range (RG) [`OrderedWeightsArray`](@ref) risk measure with [`owa_rg`](@ref) weights.
+Alias for the Range (RG) [`OrderedWeightsArrayRange`](@ref) risk measure, with [`owa_wr`](@ref) weights in the loss tail and their reversal in the gain tail. Its value is that of [`owa_rg`](@ref).
 """
 function OWA_RG(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                 alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray())
-    return OrderedWeightsArray(; settings = settings, w = owa_rg, alg = alg)
+    return OrderedWeightsArrayRange(; settings = settings, w1 = owa_wr, alg = alg)
 end
 """
     OWA_CVaR_RG(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                   alpha::Number = 0.05,
                   beta::Number = alpha,
-                  alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray()) -> OrderedWeightsArray
+                  alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray()) -> OrderedWeightsArrayRange
 
-Alias for the Conditional Value at Risk Range (CVaR RG) [`OrderedWeightsArray`](@ref) risk measure with [`OrderedWeightsArrayConditionalValueatRiskRange`](@ref) weights.
+Alias for the Conditional Value at Risk Range (CVaR RG) [`OrderedWeightsArrayRange`](@ref) risk measure, with [`OrderedWeightsArrayConditionalValueatRisk`](@ref) weights at `alpha` in the loss tail and the reversed weights at `beta` in the gain tail. Its value is that of [`owa_cvarrg`](@ref).
 """
 function OWA_CVaR_RG(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                      alpha::Number = 0.05, beta::Number = alpha,
                      alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray())
-    return OrderedWeightsArray(; settings = settings,
-                               w = OrderedWeightsArrayConditionalValueatRiskRange(;
-                                                                                  alpha = alpha,
-                                                                                  beta = beta),
-                               alg = alg)
+    return OrderedWeightsArrayRange(; settings = settings,
+                                    w1 = OrderedWeightsArrayConditionalValueatRisk(;
+                                                                                   alpha = alpha),
+                                    w2 = reverse ∘
+                                         OrderedWeightsArrayConditionalValueatRisk(;
+                                                                                   alpha = beta),
+                                    alg = alg)
 end
 """
     OWA_TG_RG(; settings::RiskMeasureSettings = RiskMeasureSettings(),
@@ -539,22 +541,23 @@ end
                 beta_i::Number = alpha_i,
                 beta::Number = alpha,
                 b_sim::Integer = a_sim,
-                alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray()) -> OrderedWeightsArray
+                alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray()) -> OrderedWeightsArrayRange
 
-Alias for the Tail Gini Range (TG RG) [`OrderedWeightsArray`](@ref) risk measure with [`OrderedWeightsArrayTailGiniRange`](@ref) weights.
+Alias for the Tail Gini Range (TG RG) [`OrderedWeightsArrayRange`](@ref) risk measure, with [`OrderedWeightsArrayTailGini`](@ref) weights at `alpha_i`, `alpha` and `a_sim` in the loss tail and the reversed weights at `beta_i`, `beta` and `b_sim` in the gain tail. Its value is that of [`owa_tgrg`](@ref).
 """
 function OWA_TG_RG(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                    alpha_i::Number = 1e-4, alpha::Number = 0.05, a_sim::Integer = 100,
                    beta_i::Number = alpha_i, beta::Number = alpha, b_sim::Integer = a_sim,
                    alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray())
-    return OrderedWeightsArray(; settings = settings,
-                               w = OrderedWeightsArrayTailGiniRange(; alpha_i = alpha_i,
-                                                                    alpha = alpha,
-                                                                    a_sim = a_sim,
-                                                                    beta_i = beta_i,
-                                                                    beta = beta,
-                                                                    b_sim = b_sim),
-                               alg = alg)
+    return OrderedWeightsArrayRange(; settings = settings,
+                                    w1 = OrderedWeightsArrayTailGini(; alpha_i = alpha_i,
+                                                                     alpha = alpha,
+                                                                     a_sim = a_sim),
+                                    w2 = reverse ∘
+                                         OrderedWeightsArrayTailGini(; alpha_i = beta_i,
+                                                                     alpha = beta,
+                                                                     a_sim = b_sim),
+                                    alg = alg)
 end
 """
     OWA_LMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),

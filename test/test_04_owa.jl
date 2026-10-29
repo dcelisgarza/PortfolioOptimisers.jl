@@ -195,31 +195,37 @@
             w2 = owa_wcvarrg(100, alphas, w)
             @test isapprox(w1, w2)
 
+            # No `w2` mirrors `w1`. A given `w2` is stored as given, so the caller reverses it.
             w = owa_tg(100)
+            r = OrderedWeightsArrayRange(; w1 = w)
+            @test r.w2 == reverse(r.w1)
+            @test !hasfield(typeof(r), :rev)
             r = OrderedWeightsArrayRange(; w1 = w, w2 = w)
-            @test r.w1 == reverse(r.w2)
+            @test r.w2 === w
+            # The mirror and a caller's reversal give the same measure.
+            x = randn(StableRNG(1896), 100) / 50
+            @test OrderedWeightsArrayRange(; w1 = w)(x) ==
+                  OrderedWeightsArrayRange(; w1 = w, w2 = reverse(w))(x)
+            @test OrderedWeightsArrayRange(; w1 = owa_tg)(x) ≈
+                  OrderedWeightsArrayRange(; w1 = owa_tg, w2 = reverse ∘ owa_tg)(x)
+            # A positional rebuild from the stored fields reverses nothing a second time.
+            rb = OrderedWeightsArrayRange(r.settings, r.w1, r.w2, r.alg)
+            @test rb.w2 === r.w2
 
-            r = OrderedWeightsArrayRange(; w1 = w, w2 = w, rev = true)
-            @test r.w1 == r.w2
-
-            # The constructor must not reverse the caller's vector in place. The two cases
-            # above both pass `w1 === w2`, which was already non-mutating, so the two-vector
-            # call is the one that regressed.
+            # The constructor must not reverse the caller's vector in place, and building a
+            # second measure from the same vector must give the same measure.
             w1 = owa_tg(8)
-            w2 = owa_cvar(8, 0.05)
-            w2_before = copy(w2)
-            r1 = OrderedWeightsArrayRange(; w1 = w1, w2 = w2)
-            @test w2 == w2_before
-            @test r1.w2 == reverse(w2_before)
-
-            # Building a second measure from the same vector must give the same measure.
-            r2 = OrderedWeightsArrayRange(; w1 = w1, w2 = w2)
+            w1_before = copy(w1)
+            r1 = OrderedWeightsArrayRange(; w1 = w1)
+            @test w1 == w1_before
+            @test r1.w2 == reverse(w1_before)
+            r2 = OrderedWeightsArrayRange(; w1 = w1)
             @test r1.w2 == r2.w2
 
             # The builder branch must not reverse a cached vector underneath the caller.
             cached = owa_cvar(8, 0.05)
             cached_before = copy(cached)
-            r3 = OrderedWeightsArrayRange(; w1 = owa_tg, w2 = _ -> cached)
+            r3 = OrderedWeightsArrayRange(; w1 = _ -> cached)
             @test r3.w2(8) == reverse(cached_before)
             @test cached == cached_before
             @test r3.w2(8) == reverse(cached_before)
@@ -247,8 +253,8 @@
             # ArgumentError from `range` at the call, after the constructor accepted it.
             @test_throws DomainError owa_tg(T; a_sim = 1)
             @test_throws DomainError OrderedWeightsArrayTailGini(; a_sim = 1)
-            @test_throws DomainError OrderedWeightsArrayTailGiniRange(; a_sim = 1)
-            @test_throws DomainError OrderedWeightsArrayTailGiniRange(; b_sim = 1)
+            @test_throws DomainError OWA_TG_RG(; a_sim = 1)
+            @test_throws DomainError OWA_TG_RG(; b_sim = 1)
             @test isapprox(OrderedWeightsArrayTailGini(; a_sim = 2)(T),
                            owa_tg(T; a_sim = 2))
             # Each level needs one weight. `zip` dropped the extra levels with no error.
@@ -277,12 +283,21 @@
             @test isapprox(owa_gmd(7), [2 * (2 * t - 1 - 7) / (7 * 6) for t in 1:7])
             @test owa_wr(7) == [-1.0, 0, 0, 0, 0, 0, 0]
             @test owa_rg(7) == [-1.0, 0, 0, 0, 0, 0, 1]
+            # Each range alias has the value of its fused vector, with the levels in their
+            # tails. Asymmetric levels, so a swap of the two tails cannot pass.
+            @test isa(OWA_CVaR_RG(), OrderedWeightsArrayRange)
+            @test isapprox(OWA_CVaR_RG(; alpha = 0.1, beta = 0.2)(x),
+                           dot(owa_cvarrg(T; alpha = 0.1, beta = 0.2), sort(x));
+                           atol = 1e-15)
+            @test isapprox(OWA_TG_RG(; alpha = 0.2, beta = 0.3, a_sim = 5, b_sim = 7)(x),
+                           dot(owa_tgrg(T; alpha = 0.2, beta = 0.3, a_sim = 5, b_sim = 7),
+                               sort(x)); atol = 1e-15)
+            @test isapprox(OWA_TG_RG(; alpha_i = 0.01, alpha = 0.2, beta_i = 0.02,
+                                     beta = 0.3)(x),
+                           dot(owa_tgrg(T; alpha_i = 0.01, alpha = 0.2, beta_i = 0.02,
+                                        beta = 0.3), sort(x)); atol = 1e-15)
+            @test isapprox(OWA_RG()(x), dot(owa_rg(T), sort(x)); atol = 1e-15)
             # Each builder returns its closed form when it is called.
-            @test OrderedWeightsArrayConditionalValueatRiskRange(; alpha = 0.1, beta = 0.2)(T) ==
-                  owa_cvarrg(T; alpha = 0.1, beta = 0.2)
-            @test OrderedWeightsArrayTailGiniRange(; alpha = 0.2, beta = 0.3, a_sim = 5,
-                                                   b_sim = 7)(T) ==
-                  owa_tgrg(T; alpha = 0.2, beta = 0.3, a_sim = 5, b_sim = 7)
             @test LinearMoment(; k = 4)(T) == owa_l_moment_crm(T; k = 4)
             # A builder and its reversal hold calibration slots, and neither is a rule.
             @test !PO.is_calibration_rule(OrderedWeightsArrayTailGini())

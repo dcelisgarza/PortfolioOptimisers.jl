@@ -380,7 +380,8 @@ end
          (OrderedWeightsArray(; w = owacvar),
           "OrderedWeightsArrayConditionalValueatRisk.alpha"),
          (OrderedWeightsArrayRange(; w1 = owacvar,
-                                   w2 = OrderedWeightsArrayConditionalValueatRisk()),
+                                   w2 = reverse ∘
+                                        OrderedWeightsArrayConditionalValueatRisk()),
           "OrderedWeightsArrayConditionalValueatRisk.alpha"))
         msg = refusal(r)
         @test occursin("Calibration Rule", msg)
@@ -398,34 +399,35 @@ end
     ranges = (ValueatRiskRange(), ConditionalValueatRiskRange(),
               DistributionallyRobustConditionalValueatRiskRange(),
               EntropicValueatRiskRange(), RelativisticValueatRiskRange(),
-              PowerNormValueatRiskRange(), OrderedWeightsArrayConditionalValueatRiskRange(),
-              OrderedWeightsArrayTailGiniRange())
+              PowerNormValueatRiskRange())
     for r in ranges
         @test r.alpha === 0.05
         @test r.beta === 0.05
     end
 
-    # A stated number reaches the head slot, where six of the eight held a literal of their
-    # own. The head slot of a Range measure is now the tail slot's occupant in all eight.
+    # A stated number reaches the head slot, where each of the six held a literal of its own.
+    # The head slot of a Range measure is now the tail slot's occupant in all six.
     @test ValueatRiskRange(; alpha = 0.01).beta === 0.01
     @test ConditionalValueatRiskRange(; alpha = 0.01).beta === 0.01
     @test DistributionallyRobustConditionalValueatRiskRange(; alpha = 0.01).beta === 0.01
     @test EntropicValueatRiskRange(; alpha = 0.01).beta === 0.01
     @test RelativisticValueatRiskRange(; alpha = 0.01).beta === 0.01
     @test PowerNormValueatRiskRange(; alpha = 0.01).beta === 0.01
-    @test OrderedWeightsArrayConditionalValueatRiskRange(; alpha = 0.01).beta === 0.01
-    @test OrderedWeightsArrayTailGiniRange(; alpha = 0.01).beta === 0.01
 
-    # A stated tail RULE crosses unchanged to the head slot, in all eight.
+    # A stated tail RULE crosses unchanged to the head slot, in all six.
     for r in (ValueatRiskRange(; alpha = sig), ConditionalValueatRiskRange(; alpha = sig),
               DistributionallyRobustConditionalValueatRiskRange(; alpha = sig),
               EntropicValueatRiskRange(; alpha = sig),
               RelativisticValueatRiskRange(; alpha = sig),
-              PowerNormValueatRiskRange(; alpha = sig),
-              OrderedWeightsArrayConditionalValueatRiskRange(; alpha = sig),
-              OrderedWeightsArrayTailGiniRange(; alpha = sig))
+              PowerNormValueatRiskRange(; alpha = sig))
         @test r.beta === RULE
     end
+    # The OWA range has no `beta`. With no `w2` it mirrors `w1`, so the gain tail holds the
+    # same rule.
+    @test OrderedWeightsArrayRange(;
+                                   w1 = OrderedWeightsArrayConditionalValueatRisk(;
+                                                                                  alpha = sig)).w2.inner.alpha ===
+          RULE
 
     # The deformation mirror has a caller in `src/`, and this is it. The gain-side pair of
     # the relativistic Range measure defaults to the loss-side pair, both halves of it.
@@ -434,9 +436,9 @@ end
     @test RelativisticValueatRiskRange(; kappa_a = 0.5).kappa_b === 0.5
 
     # The two norm orders take the same rule. They stay numbers, so they mirror by plain
-    # assignment, the way `beta_i` mirrors `alpha_i`.
+    # assignment, the way `beta_i` mirrors `alpha_i` in `OWA_TG_RG`.
     @test PowerNormValueatRiskRange(; pa = 3.0).pb === 3.0
-    @test OrderedWeightsArrayTailGiniRange(; alpha_i = 1e-3).beta_i === 1e-3
+    @test OWA_TG_RG(; alpha_i = 1e-3).w2.inner.alpha_i === 1e-3
 
     # An ambiguity rule names no end of the distribution, so neither ambiguity slot of the
     # range defaults from the other, and both keep the numbers they declare.
@@ -4880,17 +4882,18 @@ end
 
 #=
 A **significance level** is the tail probability a risk measure prices, and a **deformation
-parameter** is the shape the relativistic family reads that tail under. Forty slots across
-twenty-seven types hold one or the other, and each of them takes a **Calibration Rule** in
-place of the number.
+parameter** is the shape the relativistic family reads that tail under. Thirty-six slots across
+twenty-five types hold one or the other, and each of them takes a **Calibration Rule** in
+place of the number. Issue #583 surveyed forty slots across twenty-seven types, and #1896
+removed the two fused OWA range builders with their four slots.
 
 `test_09f_calibration_slot.jl` covers the mechanism, `test_09f_calibration_slot.jl` covers
 the three rules, and `test_09f_calibration_slot.jl` covers the ambiguity families. This
-file covers the forty slots of issue #583 and the resolution written beside each of them.
+file covers the slots of issue #583 and the resolution written beside each of them.
 
-Three of the forty-three surveyed slots do NOT widen. `alpha_i` on `OrderedWeightsArrayTailGini`
-and on its Range twin, and `beta_i` on the Range twin, are the starting points of the inner
-tail-Gini integration. They are not quantities to estimate, so they keep `::Number`.
+One surveyed slot does NOT widen. `alpha_i` on `OrderedWeightsArrayTailGini` is the starting
+point of the inner tail-Gini integration. It is not a quantity to estimate, so it keeps
+`::Number`.
 
 The joint `0 < alpha_i < alpha < 1` bound is the whole of the ordering validation. Only
 `alpha` moves, so a rule that returns a value at or below the stated `alpha_i` is refused
@@ -4972,10 +4975,6 @@ const CENSUS = [(; T = ValueatRisk, tail = (:alpha,), head = (), dtail = (), dhe
                  head = (), dtail = (), dhead = ()),
                 (; T = OrderedWeightsArrayTailGini, tail = (:alpha,), head = (), dtail = (),
                  dhead = ()),
-                (; T = OrderedWeightsArrayConditionalValueatRiskRange, tail = (:alpha,),
-                 head = (:beta,), dtail = (), dhead = ()),
-                (; T = OrderedWeightsArrayTailGiniRange, tail = (:alpha,), head = (:beta,),
-                 dtail = (), dhead = ()),
                 (; T = PowerNormValueatRisk, tail = (:alpha,), head = (), dtail = (),
                  dhead = ()),
                 (; T = PowerNormValueatRiskRange, tail = (:alpha,), head = (:beta,),
@@ -5000,17 +4999,18 @@ const ORDERED = [ValueatRisk, ValueatRiskRange,
 
 kw(slot, val) = NamedTuple{(slot,)}((val,))
 
-@testset "Significance calibration: the census is twenty-seven types and forty slots" begin
-    # The counts #352 surveyed, re-derived from the rows above rather than restated.
-    @test length(CENSUS) == 27
-    @test sum(row -> length(row.tail), CENSUS) == 27
-    @test sum(row -> length(row.head), CENSUS) == 8
+@testset "Significance calibration: the census is twenty-five types and thirty-six slots" begin
+    # The counts #352 surveyed, re-derived from the rows above rather than restated. #1896
+    # removed the two fused OWA range builders, a tail and a head slot each.
+    @test length(CENSUS) == 25
+    @test sum(row -> length(row.tail), CENSUS) == 25
+    @test sum(row -> length(row.head), CENSUS) == 6
     @test sum(row -> length(row.dtail), CENSUS) == 4
     @test sum(row -> length(row.dhead), CENSUS) == 1
     @test sum(row -> length(row.tail) +
                      length(row.head) +
                      length(row.dtail) +
-                     length(row.dhead), CENSUS) == 40
+                     length(row.dhead), CENSUS) == 36
 
     for row in CENSUS
         slots = (row.tail..., row.head..., row.dtail..., row.dhead...)
@@ -5033,13 +5033,10 @@ kw(slot, val) = NamedTuple{(slot,)}((val,))
         @test own == (row.T in ORDERED)
     end
 
-    # The three inner starting points do NOT widen, so no rule may stand in them.
+    # The inner starting point does NOT widen, so no rule may stand in it.
     @test_throws TypeError OrderedWeightsArrayTailGini(; alpha_i = sig_tail())
-    @test_throws TypeError OrderedWeightsArrayTailGiniRange(; alpha_i = sig_tail())
-    @test_throws TypeError OrderedWeightsArrayTailGiniRange(; beta_i = sig_head())
-    # They are not declared either, so nothing recurses into them.
+    # It is not declared either, so nothing recurses into it.
     @test PO.calibration_slots(OrderedWeightsArrayTailGini()) == (; alpha = 0.05)
-    @test keys(PO.calibration_slots(OrderedWeightsArrayTailGiniRange())) == (:alpha, :beta)
 end
 
 @testset "Significance calibration: each slot's bound refuses the other family" begin
@@ -5230,19 +5227,19 @@ end
 @testset "Significance calibration: the ordered-weights builders and their containers" begin
     rule = ScenarioCount(; n = 4)
 
-    # `beta = alpha` is the default on the two Range types: a number crosses unchanged, and
-    # so does a rule, because the slot is what names the end.
-    cr = OrderedWeightsArrayConditionalValueatRiskRange(; alpha = rule)
-    @test cr.beta === rule
-    tg = OrderedWeightsArrayTailGiniRange(; alpha = rule)
-    @test tg.beta === rule
-    # `beta_i = alpha_i` is untouched, because neither side widens.
-    @test tg.beta_i == tg.alpha_i
-    # A stated number still defaults across, so no existing default moved.
-    @test OrderedWeightsArrayConditionalValueatRiskRange(; alpha = 0.07).beta == 0.07
-    # A caller who states `beta` gets their own occupant.
-    @test OrderedWeightsArrayConditionalValueatRiskRange(; alpha = rule, beta = 0.09).beta ==
-          0.09
+    # With no `w2`, the Range container mirrors `w1`: the gain tail is the reversal of the
+    # same builder, so a rule crosses unchanged, because the slot is what names the end.
+    cr = OrderedWeightsArrayRange(;
+                                  w1 = OrderedWeightsArrayConditionalValueatRisk(;
+                                                                                 alpha = rule))
+    @test cr.w2.inner === cr.w1
+    @test cr.w2.inner.alpha === rule
+    # A caller who states `w2` gets their own occupant.
+    own = OrderedWeightsArrayRange(; w1 = cr.w1,
+                                   w2 = reverse ∘
+                                        OrderedWeightsArrayConditionalValueatRisk(;
+                                                                                  alpha = 0.09))
+    @test own.w2.inner.alpha == 0.09
 
     # A builder carries no observation weights of its own, so the rule reads `pr.w`.
     b = PO.resolve_deferred_quantities(OrderedWeightsArrayConditionalValueatRisk(;
@@ -5266,11 +5263,10 @@ end
     vec = OrderedWeightsArray(; w = owa_gmd(120))
     @test PO.factory(vec, PR120_S) === vec
 
-    # The Range container wraps `w2` as `reverse ∘ w2`, so the builder a rule sits in is the
-    # composition's inner half. Without a method for the composition the gain-side rule
-    # would never resolve while the loss-side one did.
-    rg = OrderedWeightsArrayRange(; w1 = OrderedWeightsArrayTailGini(; alpha = rule),
-                                  w2 = OrderedWeightsArrayTailGini(; alpha = rule))
+    # The Range container stores a missing `w2` as `reverse ∘ w1`, so the builder a rule sits
+    # in is the composition's inner half. Without a method for the composition the gain-side
+    # rule would never resolve while the loss-side one did.
+    rg = OrderedWeightsArrayRange(; w1 = OrderedWeightsArrayTailGini(; alpha = rule))
     @test isa(rg.w2, ComposedFunction)
     @test PO.calibration_slots(rg) == (; w1 = rg.w1, w2 = rg.w2)
     @test PO.calibration_slots(rg.w2) == (; inner = rg.w2.inner)
@@ -5278,9 +5274,16 @@ end
     @test org.w1.alpha ≈ 4 / 120
     @test isa(org.w2, ComposedFunction)
     @test org.w2.inner.alpha ≈ 4 / 120
-    # `rev` is stored as a done flag, so the positional rebuild reverses nothing twice.
-    @test org.rev === true
+    # The stored `w2` is never `nothing`, so the positional rebuild reverses nothing twice.
+    @test !hasfield(typeof(org), :rev)
     @test org.w2(120) ≈ reverse(org.w1(120))
+    # A reversed builder that the caller states resolves the same way, on its own end only.
+    rg2 = OrderedWeightsArrayRange(; w1 = OrderedWeightsArrayTailGini(),
+                                   w2 = reverse ∘
+                                        OrderedWeightsArrayTailGini(; alpha = rule))
+    org2 = PO.factory(rg2, PR120_S)
+    @test org2.w1 === rg2.w1
+    @test org2.w2.inner.alpha ≈ 4 / 120
 
     # The resolved container evaluates, and it reports the number a caller who states the
     # calibrated `alpha` themselves gets.
@@ -5306,12 +5309,13 @@ end
     # An `alpha_i` outside the unit interval is still refused at construction, so the rule
     # branch checks the inner bound on its own rather than skipping it.
     @test_throws DomainError OrderedWeightsArrayTailGini(; alpha_i = 1.5, alpha = rule)
-    @test_throws DomainError OrderedWeightsArrayTailGiniRange(; beta_i = 1.5, alpha = rule)
 
-    # The Range twin refuses on whichever end breaks the pair.
-    lateb = OrderedWeightsArrayTailGiniRange(; alpha_i = 1e-4, alpha = rule, beta_i = 0.04,
-                                             beta = sig_head(3))
-    @test PO.resolve_deferred_quantities(lateb, PR60_S).beta ≈ 0.05
+    # A Range container refuses on whichever end breaks the pair.
+    lateb = OrderedWeightsArrayRange(; w1 = OrderedWeightsArrayTailGini(; alpha = rule),
+                                     w2 = reverse ∘
+                                          OrderedWeightsArrayTailGini(; alpha_i = 0.04,
+                                                                      alpha = sig_head(3)))
+    @test PO.resolve_deferred_quantities(lateb, PR60_S).w2.inner.alpha ≈ 0.05
     @test_throws DomainError PO.resolve_deferred_quantities(lateb, PR120_S)
 
     # A stated pair keeps the check it always had.
@@ -5428,21 +5432,31 @@ end
 
 @testset "Significance calibration: the rebuild keeps every field the rule did not move" begin
     # The rebuild is derived from the type, so a field the resolution never names survives
-    # it. The two Range builders carry four such fields between them, and each was retyped
-    # by hand at the rebuild before the channel went through `rebuild_with_slots`.
+    # it. Each tail-Gini builder carries two such fields, and the Range container carries its
+    # settings and its formulation beside the two builders.
     rule = sig_tail(3)
-    tg = OrderedWeightsArrayTailGiniRange(; alpha_i = 1e-4, alpha = rule, beta_i = 2e-4,
-                                          beta = sig_head(3), a_sim = 77, b_sim = 88)
+    st = RiskMeasureSettings(; scale = 2.0)
+    tg = OrderedWeightsArrayRange(; settings = st,
+                                  w1 = OrderedWeightsArrayTailGini(; alpha_i = 1e-4,
+                                                                   alpha = rule,
+                                                                   a_sim = 77),
+                                  w2 = reverse ∘
+                                       OrderedWeightsArrayTailGini(; alpha_i = 2e-4,
+                                                                   alpha = sig_head(3),
+                                                                   a_sim = 88),
+                                  alg = ExactOrderedWeightsArray())
     out = PO.resolve_deferred_quantities(tg, PR60_S)
-    @test out.alpha ≈ 0.05
-    @test out.beta ≈ 0.05
-    @test out.alpha_i === tg.alpha_i
-    @test out.beta_i === tg.beta_i
-    @test out.a_sim === tg.a_sim
-    @test out.b_sim === tg.b_sim
+    @test out.w1.alpha ≈ 0.05
+    @test out.w2.inner.alpha ≈ 0.05
+    @test out.w1.alpha_i === tg.w1.alpha_i
+    @test out.w2.inner.alpha_i === tg.w2.inner.alpha_i
+    @test out.w1.a_sim === tg.w1.a_sim
+    @test out.w2.inner.a_sim === tg.w2.inner.a_sim
+    @test out.settings === tg.settings
+    @test out.alg === tg.alg
 
     # A measure whose slots all resolved to themselves is the object the caller passed in,
     # so the common case allocates nothing.
-    stated = OrderedWeightsArrayTailGiniRange(; alpha = 0.05, beta = 0.05)
+    stated = OrderedWeightsArrayRange(; w1 = OrderedWeightsArrayTailGini(; alpha = 0.05))
     @test PO.resolve_deferred_quantities(stated, PR60_S) === stated
 end

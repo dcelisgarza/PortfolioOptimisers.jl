@@ -304,25 +304,29 @@ end
                                           alg = FourthMoment(; alg = SemiMoment()),
                                           ve = ve))
 
-        # The eight OWA aliases. Three take a weight FUNCTION and five a weight ESTIMATOR,
-        # and both reach the same `w` slot of `OrderedWeightsArray`.
+        # The eight OWA aliases. Five build an `OrderedWeightsArray` with a weight FUNCTION or
+        # a weight ESTIMATOR in its `w` slot. The three range aliases build an
+        # `OrderedWeightsArrayRange` with one per tail, the gain tail reversed.
         @test alias_equal(OWA_GMD(; settings = st, alg = ex),
                           OrderedWeightsArray(; settings = st, w = PO.owa_gmd, alg = ex))
         @test alias_equal(OWA_WR(; settings = st, alg = ex),
                           OrderedWeightsArray(; settings = st, w = PO.owa_wr, alg = ex))
         @test alias_equal(OWA_RG(; settings = st, alg = ex),
-                          OrderedWeightsArray(; settings = st, w = PO.owa_rg, alg = ex))
+                          OrderedWeightsArrayRange(; settings = st, w1 = PO.owa_wr,
+                                                   w2 = reverse ∘ PO.owa_wr, alg = ex))
         @test alias_equal(OWA_CVaR(; settings = st, alpha = 0.1, alg = ex),
                           OrderedWeightsArray(; settings = st,
                                               w = OrderedWeightsArrayConditionalValueatRisk(;
                                                                                             alpha = 0.1),
                                               alg = ex))
         @test alias_equal(OWA_CVaR_RG(; settings = st, alpha = 0.1, beta = 0.2, alg = ex),
-                          OrderedWeightsArray(; settings = st,
-                                              w = OrderedWeightsArrayConditionalValueatRiskRange(;
-                                                                                                 alpha = 0.1,
-                                                                                                 beta = 0.2),
-                                              alg = ex))
+                          OrderedWeightsArrayRange(; settings = st,
+                                                   w1 = OrderedWeightsArrayConditionalValueatRisk(;
+                                                                                                  alpha = 0.1),
+                                                   w2 = reverse ∘
+                                                        OrderedWeightsArrayConditionalValueatRisk(;
+                                                                                                  alpha = 0.2),
+                                                   alg = ex))
         @test alias_equal(OWA_TG(; settings = st, alpha_i = 1e-3, alpha = 0.1, a_sim = 50,
                                  alg = ex),
                           OrderedWeightsArray(; settings = st,
@@ -334,15 +338,17 @@ end
         @test alias_equal(OWA_TG_RG(; settings = st, alpha_i = 1e-3, alpha = 0.1,
                                     a_sim = 50, beta_i = 2e-3, beta = 0.2, b_sim = 40,
                                     alg = ex),
-                          OrderedWeightsArray(; settings = st,
-                                              w = OrderedWeightsArrayTailGiniRange(;
-                                                                                   alpha_i = 1e-3,
-                                                                                   alpha = 0.1,
-                                                                                   a_sim = 50,
-                                                                                   beta_i = 2e-3,
-                                                                                   beta = 0.2,
-                                                                                   b_sim = 40),
-                                              alg = ex))
+                          OrderedWeightsArrayRange(; settings = st,
+                                                   w1 = OrderedWeightsArrayTailGini(;
+                                                                                    alpha_i = 1e-3,
+                                                                                    alpha = 0.1,
+                                                                                    a_sim = 50),
+                                                   w2 = reverse ∘
+                                                        OrderedWeightsArrayTailGini(;
+                                                                                    alpha_i = 2e-3,
+                                                                                    alpha = 0.2,
+                                                                                    a_sim = 40),
+                                                   alg = ex))
         @test alias_equal(OWA_LMoment(; settings = st,
                                       method = NormalisedConstantRelativeRiskAversion(;
                                                                                       g = 0.4),

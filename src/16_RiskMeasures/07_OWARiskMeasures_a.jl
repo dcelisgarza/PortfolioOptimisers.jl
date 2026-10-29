@@ -1553,6 +1553,10 @@ Compute the OWA weight vector of the range of the returns.
 
 The vector weights the largest return by ``1`` and the smallest by ``-1``, so the risk is the largest return less the smallest. It gives the value of [`Range`](@ref). A sample of one observation has a range of zero, and its vector is ``(0)``.
 
+!!! note
+
+    Under [`ApproxOrderedWeightsArray`](@ref), an [`OrderedWeightsArray`](@ref) over this fused vector is a looser relaxation than the two tails of `OrderedWeightsArrayRange(; w1 = owa_wr)`, which [`OWA_RG`](@ref) builds. In a minimum-risk [`MeanRisk`](@ref) on seeded returns with ``T = 100`` and ``N = 8``, the fused optimum has an exact risk 9.6 % above the exact optimum, and the two tails reach the exact optimum. Under [`ExactOrderedWeightsArray`](@ref) and [`SortingNetworkOrderedWeightsArray`](@ref), the two spellings give the same model.
+
 # Mathematical definition
 
 ```math
@@ -1605,6 +1609,10 @@ Compute the OWA weight vector of the conditional value at risk range.
 
 The vector is the loss-tail vector at level `alpha` less the reversed loss-tail vector at level `beta`. The reversal moves the second tail to the largest returns, and the subtraction makes its weights positive. So the risk is the conditional value at risk of the losses plus the mean of the `beta` share of the largest returns, a sum of the two tails. The vector sums to zero.
 
+!!! note
+
+    Under [`ApproxOrderedWeightsArray`](@ref), an [`OrderedWeightsArray`](@ref) over this fused vector is a looser relaxation than the two tails of an [`OrderedWeightsArrayRange`](@ref), which [`OWA_CVaR_RG`](@ref) builds. In a minimum-risk [`MeanRisk`](@ref) on seeded returns with ``T = 100``, ``N = 8`` and ``\\alpha = \\beta = 0.05``, the fused optimum has an exact risk 4.6 % above the exact optimum, and the two tails reach the exact optimum. Under [`ExactOrderedWeightsArray`](@ref) and [`SortingNetworkOrderedWeightsArray`](@ref), the two spellings give the same model.
+
 # Mathematical definition
 
 ```math
@@ -1648,80 +1656,6 @@ function owa_cvarrg(T::Integer; alpha::Number = 0.05, beta::Number = alpha)
     return owa_cvar(T, alpha) - reverse!(owa_cvar(T, beta))
 end
 """
-$(DocStringExtensions.TYPEDEF)
-
-Builds the OWA weight vector of the conditional value at risk range at the levels `alpha` and `beta`.
-
-Called as `r(T)`, it returns [`owa_cvarrg`](@ref)`(T; alpha, beta)`, whose docstring states the closed form. `alpha` is the level of the loss tail and `beta` the level of the gain tail. A Calibration Rule in either slot resolves against the prior before the call.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    OrderedWeightsArrayConditionalValueatRiskRange(;
-        alpha::Num_SigCal = 0.05,
-        beta::Num_SigCal = alpha
-    ) -> OrderedWeightsArrayConditionalValueatRiskRange
-
-Keywords correspond to the struct's fields.
-
-## Validation
-
-  - $(val_dict[:alpha])
-  - $(val_dict[:beta])
-
-# Examples
-
-```jldoctest
-julia> OrderedWeightsArrayConditionalValueatRiskRange()
-OrderedWeightsArrayConditionalValueatRiskRange
-  alpha ┼ Float64: 0.05
-   beta ┴ Float64: 0.05
-```
-
-# Related
-
-  - [`AbstractOrderedWeightsArrayFunction`](@ref)
-  - [`owa_cvarrg`](@ref)
-  - [`OWA_Func_VecNum`](@ref)
-
-# References
-
-  - $(ref_dict[:cvar])
-  - $(ref_dict[:owa1])
-  - $(ref_dict[:cajas2025]) Section 7.2.3.
-"""
-@concrete struct OrderedWeightsArrayConditionalValueatRiskRange <:
-                 AbstractOrderedWeightsArrayFunction
-    """
-    $(field_dict[:alpha])
-    """
-    alpha
-    """
-    $(field_dict[:beta])
-    """
-    beta
-    function OrderedWeightsArrayConditionalValueatRiskRange(alpha::Num_SigCal,
-                                                            beta::Num_SigCal)
-        assert_unit_interval(alpha, :alpha)
-        assert_unit_interval(beta, :beta)
-        return new{typeof(alpha), typeof(beta)}(alpha, beta)
-    end
-end
-function OrderedWeightsArrayConditionalValueatRiskRange(; alpha::Num_SigCal = 0.05,
-                                                        beta::Num_SigCal = alpha)
-    return OrderedWeightsArrayConditionalValueatRiskRange(alpha, beta)
-end
-# Calibration slots — see `calibration_slots`. One slot per tail, each with its own role.
-function calibration_slots(x::OrderedWeightsArrayConditionalValueatRiskRange)
-    return (; alpha = x.alpha, beta = x.beta)
-end
-function (r::OrderedWeightsArrayConditionalValueatRiskRange)(T::Integer)
-    return owa_cvarrg(T; alpha = r.alpha, beta = r.beta)
-end
-"""
     owa_wcvarrg(T::Integer, alphas::VecNum, weights_a::VecNum,
                 betas::VecNum = alphas,
                 weights_b::VecNum = weights_a)
@@ -1729,6 +1663,10 @@ end
 Compute the OWA weight vector of the range of two weighted sums of conditional values at risk.
 
 The vector is the loss-tail vector of [`owa_wcvar`](@ref) at `alphas` and `weights_a`, less the reversed vector at `betas` and `weights_b`. As in [`owa_cvarrg`](@ref), the reversal and the subtraction make the risk a sum of the two tails.
+
+!!! note
+
+    Under [`ApproxOrderedWeightsArray`](@ref), an [`OrderedWeightsArray`](@ref) over this fused vector is a looser relaxation than an [`OrderedWeightsArrayRange`](@ref) with `w1 = T -> owa_wcvar(T, alphas, weights_a)` and `w2 = reverse ∘ (T -> owa_wcvar(T, betas, weights_b))`. The note of [`owa_cvarrg`](@ref) gives the measured gap of the same mechanism. Under [`ExactOrderedWeightsArray`](@ref) and [`SortingNetworkOrderedWeightsArray`](@ref), the two spellings give the same model.
 
 # Mathematical definition
 
@@ -1786,6 +1724,10 @@ Compute the OWA weight vector of the tail Gini range.
 
 The vector is the tail Gini vector of [`owa_tg`](@ref) at `alpha_i`, `alpha` and `a_sim`, less the reversed tail Gini vector at `beta_i`, `beta` and `b_sim`. As in [`owa_cvarrg`](@ref), the reversal and the subtraction make the risk a sum of the two tails. The vector sums to zero.
 
+!!! note
+
+    Under [`ApproxOrderedWeightsArray`](@ref), an [`OrderedWeightsArray`](@ref) over this fused vector is a looser relaxation than the two tails of an [`OrderedWeightsArrayRange`](@ref), which [`OWA_TG_RG`](@ref) builds. In a minimum-risk [`MeanRisk`](@ref) on seeded returns with ``T = 100``, ``N = 8`` and the default levels, the fused optimum has an exact risk 2.1 % above the exact optimum, and the two tails come to 0.2 % above it. Under [`ExactOrderedWeightsArray`](@ref) and [`SortingNetworkOrderedWeightsArray`](@ref), the two spellings give the same model.
+
 # Mathematical definition
 
 ```math
@@ -1838,129 +1780,6 @@ function owa_tgrg(T::Integer; alpha_i::Number = 0.0001, alpha::Number = 0.05,
         reverse!(owa_tg(T; alpha_i = beta_i, alpha = beta, a_sim = b_sim))
 
     return w
-end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Builds the OWA weight vector of the tail Gini range.
-
-Called as `r(T)`, it returns [`owa_tgrg`](@ref)`(T; alpha_i, alpha, a_sim, beta_i, beta, b_sim)`, whose docstring states the closed form. The `alpha` fields set the loss tail and the `beta` fields the gain tail. A Calibration Rule in `alpha` or `beta` resolves against the prior before the call.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    OrderedWeightsArrayTailGiniRange(;
-        alpha_i::Number = 1e-4,
-        alpha::Num_SigCal = 0.05,
-        a_sim::Integer = 100,
-        beta_i::Number = alpha_i,
-        beta::Num_SigCal = alpha,
-        b_sim::Integer = a_sim
-    ) -> OrderedWeightsArrayTailGiniRange
-
-Keywords correspond to the struct's fields.
-
-## Validation
-
-  - $(val_dict[:alpha_i_alpha])
-  - $(val_dict[:a_sim_ge2])
-  - $(val_dict[:beta_i_beta])
-  - $(val_dict[:b_sim_ge2])
-
-# Examples
-
-```jldoctest
-julia> OrderedWeightsArrayTailGiniRange()
-OrderedWeightsArrayTailGiniRange
-  alpha_i ┼ Float64: 0.0001
-    alpha ┼ Float64: 0.05
-    a_sim ┼ Int64: 100
-   beta_i ┼ Float64: 0.0001
-     beta ┼ Float64: 0.05
-    b_sim ┴ Int64: 100
-```
-
-# Related
-
-  - [`AbstractOrderedWeightsArrayFunction`](@ref)
-  - [`owa_tgrg`](@ref)
-  - [`OWA_Func_VecNum`](@ref)
-
-# References
-
-  - $(ref_dict[:tgini])
-  - $(ref_dict[:owa1])
-  - $(ref_dict[:owa3])
-  - $(ref_dict[:cajas2025]) Section 7.2.3.
-"""
-@concrete struct OrderedWeightsArrayTailGiniRange <: AbstractOrderedWeightsArrayFunction
-    """
-    $(field_dict[:alpha_i])
-    """
-    alpha_i
-    """
-    $(field_dict[:alpha])
-    """
-    alpha
-    """
-    $(field_dict[:a_sim])
-    """
-    a_sim
-    """
-    $(field_dict[:beta_i])
-    """
-    beta_i
-    """
-    $(field_dict[:beta])
-    """
-    beta
-    """
-    $(field_dict[:b_sim])
-    """
-    b_sim
-    function OrderedWeightsArrayTailGiniRange(alpha_i::Number, alpha::Num_SigCal,
-                                              a_sim::Integer, beta_i::Number,
-                                              beta::Num_SigCal, b_sim::Integer)
-        # Each joint bound runs where its outer level is a number, on the terms the scalar
-        # tail-Gini type states. A rule states no value at construction, so its inner bound
-        # is checked on its own here and the pair is checked at fold time.
-        if isa(alpha, Number)
-            @argcheck(0 < alpha_i < alpha < 1,
-                      DomainError((alpha_i, alpha),
-                                  "`alpha_i` is $alpha_i and `alpha` is $alpha. The tail Gini integrates the CVaR from the inner level `alpha_i` to the outer level `alpha`, so `0 < alpha_i < alpha < 1` must hold."))
-        else
-            assert_unit_interval(alpha_i, :alpha_i)
-        end
-        @argcheck(2 <= a_sim,
-                  DomainError(a_sim, "`a_sim` is $a_sim, and the grid needs `a_sim >= 2`."))
-        if isa(beta, Number)
-            @argcheck(0 < beta_i < beta < 1,
-                      DomainError((beta_i, beta),
-                                  "`beta_i` is $beta_i and `beta` is $beta. The upper tail Gini integrates the CVaR from the inner level `beta_i` to the outer level `beta`, so `0 < beta_i < beta < 1` must hold."))
-        else
-            assert_unit_interval(beta_i, :beta_i)
-        end
-        @argcheck(2 <= b_sim,
-                  DomainError(b_sim, "`b_sim` is $b_sim, and the grid needs `b_sim >= 2`."))
-        return new{typeof(alpha_i), typeof(alpha), typeof(a_sim), typeof(beta_i),
-                   typeof(beta), typeof(b_sim)}(alpha_i, alpha, a_sim, beta_i, beta, b_sim)
-    end
-end
-function OrderedWeightsArrayTailGiniRange(; alpha_i::Number = 1e-4,
-                                          alpha::Num_SigCal = 0.05, a_sim::Integer = 100,
-                                          beta_i::Number = alpha_i,
-                                          beta::Num_SigCal = alpha, b_sim::Integer = a_sim)
-    return OrderedWeightsArrayTailGiniRange(alpha_i, alpha, a_sim, beta_i, beta, b_sim)
-end
-# Calibration slots — see `calibration_slots`. The two inner starting points are not
-# quantities to estimate, so neither is one of them.
-calibration_slots(x::OrderedWeightsArrayTailGiniRange) = (; alpha = x.alpha, beta = x.beta)
-function (r::OrderedWeightsArrayTailGiniRange)(T::Integer)
-    return owa_tgrg(T; alpha_i = r.alpha_i, alpha = r.alpha, a_sim = r.a_sim,
-                    beta_i = r.beta_i, beta = r.beta, b_sim = r.b_sim)
 end
 """
     owa_l_moment(T::Integer, k::Integer = 2)
@@ -2511,6 +2330,5 @@ export MaximumEntropy, ExponentialConeEntropy, RelativeEntropy, MinimumSquaredDi
        owa_cvar, owa_wcvar, owa_tg, owa_wr, owa_rg, owa_cvarrg, owa_wcvarrg, owa_tgrg,
        owa_l_moment, owa_l_moment_crm, ExactOrderedWeightsArray, ApproxOrderedWeightsArray,
        OrderedWeightsArray, LinearMoment, OrderedWeightsArrayConditionalValueatRisk,
-       OrderedWeightsArrayTailGini, OrderedWeightsArrayConditionalValueatRiskRange,
-       OrderedWeightsArrayTailGiniRange
+       OrderedWeightsArrayTailGini
 public AbstractOrderedWeightsArrayFunction

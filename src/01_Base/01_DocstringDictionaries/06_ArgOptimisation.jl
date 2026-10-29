@@ -254,15 +254,12 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :g_rm => "`g`: Risk aversion parameter.",#
                  :max_phi => "`max_phi`: Maximum allowed value for any OWA weight.",#
                  :w1_owa => "`w1`: Optional first OWA weight vector.",#
-                 :w2_owa => "`w2`: Optional second OWA weight vector.",#
-                 :rev_owa => "`rev`: Whether `w2` is *already* reversed. It is a done-flag, not an instruction: the constructor reverses `w2` when `rev == false`, and leaves it as-is when `rev == true`. The field is stored as `true` whatever the caller passes, because `w2` is reversed by the time the object exists, so rebuilding an instance from its own fields does not reverse twice. A default-constructed instance therefore prints `rev` as `true`.",#
+                 :w2_owa => "`w2`: Second OWA weight vector, held reversed. The constructor stores the reversal of `w1` when it receives `nothing`, and stores a given `w2` as given.",#
                  :owa_w => "`w`: Optional OWA weight vector.",#
                  :owa_method => "`method`: OWA weight estimation method.",#
                  :lm_k => "`k`: L-moment order.",#
                  :alpha_i => "`alpha_i`: Lower integration bound for the tail Gini approximation.",#
                  :a_sim => "`a_sim`: Number of integration points for the tail Gini approximation.",#
-                 :beta_i => "`beta_i`: Lower integration bound for the upper tail Gini approximation.",#
-                 :b_sim => "`b_sim`: Number of integration points for the upper tail Gini approximation.",#
                  # Portfolio summary statistics.
                  :ps_n_periods => "`n_periods`: Number of observations in the return series.",#
                  :ps_ppy => "`ppy`: Periods per year, the annualisation factor. 252 for daily, 52 for weekly, 12 for monthly returns, and 1 states each figure per period.",#
