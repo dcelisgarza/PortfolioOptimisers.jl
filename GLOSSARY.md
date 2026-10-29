@@ -372,7 +372,7 @@ Builds a factor model that maps factor returns to asset returns. Factor priors u
 
 - **StepwiseRegression**: greedy feature selection, `ForwardSelection` or `BackwardElimination`, under a criterion (`PValue`, or one of the symbols `:aic`, `:aicc`, `:bic`, `:r2`, `:adjr2`).
 - **DimensionReductionRegression**: regression on reduced factors, with the targets `PCA` and `PPCA`.
-- **Regression target** models: `LinearModel`, `GeneralisedLinearModel` (GLM), and the elastic net `ElasticNet`, a Penalised Regression Target (below). The unpenalised targets subtype `AbstractUnpenalisedRegressionTarget`, and a target that the user writes subtypes that branch or `AbstractPenalisedRegressionTarget`. `StepwiseRegression` accepts an unpenalised target alone.
+- **Regression target** models: `LinearModel`, `GeneralisedLinearModel` (GLM), and the elastic net `ElasticNet`, a Penalised Regression Target (below). The unpenalised targets subtype `AbstractUnpenalisedRegressionTarget`, and a target that the user writes subtypes that branch or `AbstractPenalisedRegressionTarget`. `StepwiseRegression` accepts a penalised target under `:aic`, `:aicc` and `:bic` alone.
 
 **Penalised Regression Target**
 A regression target whose fit adds a penalty on the size of its coefficients, such as the elastic net. Its fit has no valid p-values, and it has fewer effective degrees of freedom than coefficients. The column of ones that an estimator adds for the intercept is not penalised. ADR 0223.
@@ -382,6 +382,11 @@ In code it subtypes `AbstractPenalisedRegressionTarget`, and `ElasticNet` is the
 **Penalty Strength**
 The weight of the penalty of a Penalised Regression Target. A rule chooses it: the middle of the regularisation path, or a value that the user gives. ADR 0223.
 In code the rule subtypes `AbstractPenaltyStrength`: `MiddleOfPath` reads the strength off the data, and `FixedStrength` takes it from the user.
+
+**Effective Degrees of Freedom**
+The number of parameters that a fit spends, measured as the sensitivity of its fitted values to the observations. A Penalised Regression Target spends fewer than its coefficients. Its residuals keep fewer degrees of freedom than the observations less that number, because a penalised fit is not a projection. ADR 0223.
+A Penalty Strength that reads the data spends a little more, the Strength Divergence. In code a field of the target holds a rule that adds that part, and the default `nothing` leaves it out. ADR 0223 names the rule.
+*Avoid*: effective count, which names the Effective Observation Count of a weighted moment.
 
 **Cross-Sectional Regression**
 A regression of one observation's asset returns on the lagged Factor Exposures across the assets, one fit per observation.
