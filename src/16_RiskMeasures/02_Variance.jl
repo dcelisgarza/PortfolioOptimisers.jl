@@ -382,6 +382,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
+  - $(val_dict[:sigma_cov])
   - If `sigma` is a matrix, `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
   - If `chol` is a matrix, `!isempty(chol)`.
   - `chol` is `nothing` when `sigma` is `nothing` or a **Deferred Quantity**.
@@ -500,6 +501,7 @@ julia> r(w)
                       alg::VarianceFormulation,
                       mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm},
                       ratio_alg::RatioFormulation, corner::Option{<:Number})::Variance
+        assert_covariance_estimator(sigma, :sigma)
         if isa(sigma, MatNum)
             @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
             assert_matrix_issquare(sigma, :sigma)
@@ -621,6 +623,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
+  - $(val_dict[:sigma_cov])
   - If `sigma` is a matrix, `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
   - If `chol` is a matrix, `!isempty(chol)`.
   - `chol` is `nothing` when `sigma` is `nothing` or a **Deferred Quantity**.
@@ -703,6 +706,7 @@ julia> r(w)
     function StandardDeviation(settings::RiskMeasureSettings, sigma::Option{<:SigmaSlot},
                                chol::Option{<:MatNum},
                                mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm})::StandardDeviation
+        assert_covariance_estimator(sigma, :sigma)
         if isa(sigma, MatNum)
             @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
             assert_matrix_issquare(sigma, :sigma)
@@ -836,6 +840,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
+  - $(val_dict[:sigma_cov])
   - If `sigma` is a matrix, `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
   - If `corner` is a number, `isfinite(corner)` and `corner > 0`, [`assert_lift_corner`](@ref).
 
@@ -969,6 +974,7 @@ julia> r(w)
                                     sigma::Option{<:SigmaSlot},
                                     mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm},
                                     ratio_alg::RatioFormulation, corner::Option{<:Number})
+        assert_covariance_estimator(sigma, :sigma)
         if isa(sigma, MatNum)
             @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
             assert_matrix_issquare(sigma, :sigma)

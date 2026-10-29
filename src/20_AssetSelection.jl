@@ -970,6 +970,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
+  - $(val_dict[:ce_cov])
   - `-1 <= t <= 1`. [`assert_correlation_threshold`](@ref) checks it.
 
 # Related
@@ -997,6 +998,7 @@ Keywords correspond to the struct's fields.
     measure
     function PairwiseCorrelation(ce::StatsBase.CovarianceEstimator, t::Number,
                                  absolute::Bool, measure::Num_VecToScaM)
+        assert_covariance_estimator(ce, :ce)
         assert_correlation_threshold(t)
         return new{typeof(ce), typeof(t), typeof(absolute), typeof(measure)}(ce, t,
                                                                              absolute,
@@ -1096,6 +1098,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
+  - $(val_dict[:ce_cov])
   - `-1 <= t <= 1`. [`assert_correlation_threshold`](@ref) checks it.
 
 # Related
@@ -1123,6 +1126,7 @@ Keywords correspond to the struct's fields.
     measure
     function CorrelationComponents(ce::StatsBase.CovarianceEstimator, t::Number,
                                    absolute::Bool, measure::Num_VecToScaM)
+        assert_covariance_estimator(ce, :ce)
         assert_correlation_threshold(t)
         return new{typeof(ce), typeof(t), typeof(absolute), typeof(measure)}(ce, t,
                                                                              absolute,

@@ -202,6 +202,8 @@ To implement a new variance estimator, subtype `AbstractVarianceEstimator`. Keep
 
 `Statistics.cov(ve::AbstractVarianceEstimator, X::MatNum; kwargs...)` and `Statistics.cor(ve::AbstractVarianceEstimator, X::MatNum; kwargs...)` always throw a `MethodError`. A variance estimator computes one marginal variance for each asset and no relation between two assets, so it cannot compute either matrix.
 
+A slot of the library that calls `cov` or `cor` refuses a variance estimator in its constructor, with the `ArgumentError` of `assert_covariance_estimator`. A slot that calls only `var` or `std` accepts one.
+
 ## Factory
 
   - `PortfolioOptimisers.factory(ve::AbstractVarianceEstimator, w::PortfolioOptimisers.ObsWeights) -> AbstractVarianceEstimator`: Builds a copy of the estimator that holds the new observation weights.
@@ -297,6 +299,48 @@ MyVarianceEstimator
   - [`Statistics.cor(ve::AbstractVarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 abstract type AbstractVarianceEstimator <: AbstractCovarianceEstimator end
+"""
+    assert_covariance_estimator(ce, name::Symbol) -> nothing
+    assert_covariance_estimator(ce::AbstractVarianceEstimator, name::Symbol)
+
+Refuses a variance estimator in a slot that calls `Statistics.cov` or `Statistics.cor`.
+
+[`AbstractVarianceEstimator`](@ref) subtypes [`AbstractCovarianceEstimator`](@ref), so a field bound to `StatsBase.CovarianceEstimator` accepts it. But a variance estimator computes one marginal variance for each asset and no relation between two assets, and its `cov` and `cor` throw a `MethodError`. The configuration alone decides that every call of the slot fails. So the inner constructor of each such slot calls this function, and the refusal comes at the construction.
+
+A slot that calls only `Statistics.var` or `Statistics.std` does not call this function, because a variance estimator is the estimator that it reads.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. Every value that is not an [`AbstractVarianceEstimator`](@ref) passes. A covariance estimator, a matrix and `nothing` are examples.
+ 2. An [`AbstractVarianceEstimator`](@ref) raises an `ArgumentError`.
+
+# Arguments
+
+  - `ce`: The value of the slot.
+  - `name`: The name of the slot, for the error message.
+
+# Validation
+
+  - `ce` is not an [`AbstractVarianceEstimator`](@ref). Otherwise, the function raises an `ArgumentError` that names the slot and the type of `ce`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`AbstractVarianceEstimator`](@ref)
+  - [`Statistics.cov(ve::AbstractVarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+  - [`Statistics.cor(ve::AbstractVarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+"""
+function assert_covariance_estimator(::Any, ::Symbol)
+    return nothing
+end
+function assert_covariance_estimator(ce::AbstractVarianceEstimator, name::Symbol)
+    return throw(ArgumentError("`$(name)` needs a covariance estimator, and `$(nameof(typeof(ce)))` is a variance estimator. A variance estimator computes one marginal variance for each asset and no relation between two assets, so it has no `cov` or `cor`. Use a covariance estimator, for example `Covariance()`."))
+end
 @define_pretty_show(AbstractCovarianceEstimator)
 function factory_child(v::AbstractCovarianceEstimator, args...; kwargs...)
     return factory(v, args...; kwargs...)
@@ -927,284 +971,6 @@ function gap_fill_value(::StatsBase.CovarianceEstimator)
     return 0
 end
 """
-    densify(X::MatNum) -> MatNum
-
-Materialise a lazy or sparse observation matrix as a dense `Matrix`.
-
-The weighted moment methods of `StatsBase` take a `DenseMatrix`. A `Transpose`, an `Adjoint`, a `SubArray` or a sparse matrix does not match them. Without a `mean`, the call raises a `MethodError`, and the caller can recover from it. With a `mean`, the caller cannot recover. `cov(::SimpleCovariance, X, w; mean = mu)` forwards four positional arguments as `covm(X, mu, w, dims)`. When the `DenseMatrix` method does not match, that call resolves to `Statistics.covm(x, xmean, y, ymean, vardim)`, which is the cross-covariance of `X` and the weight vector. It returns an `N × 1` matrix in place of an `N × N` matrix, and raises no error. [`robust_cov`](@ref) and [`robust_cor`](@ref) densify `X` before every weighted call, so neither failure can happen.
-
-# Algorithm
-
- 1. When `X` is a `DenseMatrix` of numbers or of `JuMP` scalars, return it unchanged.
- 2. Otherwise return `Matrix(X)`, a dense copy.
-
-# Arguments
-
-  - $(arg_dict[:X])
-
-# Returns
-
-  - `X::MatNum`: `X` itself when it is already a dense `Matrix`, and `Matrix(X)` otherwise.
-
-# Related
-
-  - [`MatNum`](@ref)
-  - [`robust_cov`](@ref)
-  - [`robust_cor`](@ref)
-"""
-function densify(X::DenseMatrix{<:Union{Number, JuMP.AbstractJuMPScalar}})
-    return X
-end
-function densify(X::MatNum)
-    return Matrix(X)
-end
-"""
-    compat_cov(
-        ce::StatsBase.CovarianceEstimator,
-        X::MatNum,
-        [w::StatsBase.AbstractWeights];
-        dims::Int = 1,
-        mean = nothing,
-        kwargs...
-    ) -> MatNum
-
-Compute the covariance matrix with the estimator `ce`, and pass the extra keyword arguments only when the method of `ce` accepts them.
-
-# Algorithm
-
- 1. When the caller passed extra keyword arguments, and `hasmethod` reports that `Statistics.cov` takes `dims`, `mean` and those keys for this estimator and these arguments, call `Statistics.cov` with all of them and return the result.
- 2. When step 1 raises a `MethodError`, drop the extra keyword arguments and continue. A method whose signature ends in a `kwargs...` slurp satisfies `hasmethod` and can still reject a key further down its call chain. Any other error propagates to the caller.
- 3. Call `Statistics.cov(ce, X, args...; dims = dims, mean = mean)`, and return the result.
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - $(arg_dict[:X])
-  - $(arg_dict[:oow])
-  - $(arg_dict[:dims])
-  - $(arg_dict[:omean])
-  - `kwargs...`: More keyword arguments for `cov`.
-
-# Returns
-
-  - $(ret_dict[:sigma])
-
-# Related
-
-  - [`MatNum`](@ref)
-  - [`robust_cov`](@ref)
-  - [`compat_cor`](@ref)
-  - [`Statistics.cov`](https://juliastats.org/StatsBase.jl/stable/cov/)
-"""
-function compat_cov(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix, args...;
-                    dims::Int = 1, mean = nothing, kwargs...)
-    if !isempty(kwargs) &&
-       hasmethod(Statistics.cov, Tuple{typeof(ce), typeof(X), typeof.(args)...},
-                 (:dims, :mean, keys(kwargs)...))
-        try
-            return Statistics.cov(ce, X, args...; dims = dims, mean = mean, kwargs...)
-        catch err
-            # A method with a `kwargs...` slurp satisfies `hasmethod` but can still
-            # reject the keyword arguments further down its call chain.
-            if !(err isa MethodError)
-                rethrow()
-            end
-        end
-    end
-    return Statistics.cov(ce, X, args...; dims = dims, mean = mean)
-end
-"""
-    robust_cov(
-        ce::StatsBase.CovarianceEstimator,
-        X::MatNum,
-        [w::StatsBase.AbstractWeights];
-        dims::Int = 1,
-        mean = nothing,
-        kwargs...
-    ) -> MatNum
-
-Computes the weighted or unweighted covariance with [`compat_cov`](@ref) on dense observations. The unweighted method retries once with a densified `Matrix` after a `MethodError`. The weighted method calls [`densify`](@ref) before the estimator.
-
-# Algorithm
-
- 1. Without `w`, call [`compat_cov`](@ref) on `X` as the caller gave it. When that call raises a `MethodError`, call [`compat_cov`](@ref) once more on `Matrix(X)`. Any other error propagates to the caller.
- 2. With `w`, densify `X` with [`densify`](@ref), then call [`compat_cov`](@ref) once. The method does no retry, because [`densify`](@ref) already removes the only failure that the retry handles.
- 3. Return the matrix that [`compat_cov`](@ref) returned.
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - $(arg_dict[:X])
-  - $(arg_dict[:oow])
-  - $(arg_dict[:dims])
-  - $(arg_dict[:omean])
-  - `kwargs...`: More keyword arguments for `compat_cov`.
-
-# Validation
-
-  - $(val_dict[:dims])
-
-# Returns
-
-  - $(ret_dict[:sigma])
-
-# Related
-
-  - [`MatNum`](@ref)
-  - [`densify`](@ref)
-  - [`compat_cov`](@ref)
-  - [`Statistics.cov`](https://juliastats.org/StatsBase.jl/stable/cov/)
-"""
-function robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
-                    mean = nothing, kwargs...)
-    assert_dims(dims)
-    return try
-        compat_cov(ce, X; dims = dims, mean = mean, kwargs...)
-    catch err
-        if !(err isa MethodError)
-            rethrow()
-        end
-        compat_cov(ce, Matrix(X); dims = dims, mean = mean, kwargs...)
-    end
-end
-function robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum,
-                    w::StatsBase.AbstractWeights; dims::Int = 1, mean = nothing, kwargs...)
-    assert_dims(dims)
-    return compat_cov(ce, densify(X), w; dims = dims, mean = mean, kwargs...)
-end
-"""
-    compat_cor(
-        ce::StatsBase.CovarianceEstimator,
-        X::MatNum,
-        [w::StatsBase.AbstractWeights];
-        dims::Int = 1,
-        mean = nothing,
-        kwargs...
-    ) -> MatNum
-
-Compute the correlation matrix with the estimator `ce`, and fall back to its covariance matrix when `ce` has no `cor` method for these arguments.
-
-# Algorithm
-
- 1. When `hasmethod` reports that `Statistics.cor` takes `dims` and `mean` for this estimator and these arguments, take steps 2 and 3. Otherwise take step 4.
- 2. When the caller passed extra keyword arguments, and `hasmethod` reports that `Statistics.cor` takes those keys too, call `Statistics.cor` with all of them and return the result. When that call raises a `MethodError`, drop the extra keyword arguments and continue. A method whose signature ends in a `kwargs...` slurp satisfies `hasmethod` and can still reject a key further down its call chain.
- 3. Call `Statistics.cor(ce, X, args...; dims = dims, mean = mean)`, and return the result. When that call raises a `MethodError`, continue to step 4. Any other error propagates to the caller.
- 4. The estimator has no `cor` method for these arguments, so compute the covariance matrix `sigma` with [`robust_cov`](@ref).
- 5. When `sigma` is mutable, convert it to a correlation matrix in place with `StatsBase.cov2cor!` and the square roots of its own diagonal. Otherwise convert a dense copy with `StatsBase.cov2cor`.
- 6. Return `sigma`.
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - $(arg_dict[:X])
-  - $(arg_dict[:oow])
-  - $(arg_dict[:dims])
-  - $(arg_dict[:omean])
-  - `kwargs...`: More keyword arguments for `cor`.
-
-# Returns
-
-  - $(ret_dict[:rho])
-
-# Related
-
-  - [`MatNum`](@ref)
-  - [`robust_cov`](@ref)
-  - [`Statistics.cor`](https://juliastats.org/StatsBase.jl/stable/cov/)
-"""
-function compat_cor(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix, args...;
-                    dims::Int = 1, mean = nothing, kwargs...)
-    if hasmethod(Statistics.cor, Tuple{typeof(ce), typeof(X), typeof.(args)...},
-                 (:dims, :mean))
-        if !isempty(kwargs) &&
-           hasmethod(Statistics.cor, Tuple{typeof(ce), typeof(X), typeof.(args)...},
-                     (:dims, :mean, keys(kwargs)...))
-            try
-                return Statistics.cor(ce, X, args...; dims = dims, mean = mean, kwargs...)
-            catch err
-                # A method with a `kwargs...` slurp satisfies `hasmethod` but can still
-                # reject the keyword arguments further down its call chain.
-                if !(err isa MethodError)
-                    rethrow()
-                end
-            end
-        end
-        try
-            return Statistics.cor(ce, X, args...; dims = dims, mean = mean)
-        catch err
-            if !(err isa MethodError)
-                rethrow()
-            end
-        end
-    end
-    sigma = robust_cov(ce, X, args...; dims = dims, mean = mean, kwargs...)
-    if ismutable(sigma)
-        StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
-    else
-        sigma = StatsBase.cov2cor(Matrix(sigma))
-    end
-    return sigma
-end
-"""
-    robust_cor(
-        ce::StatsBase.CovarianceEstimator,
-        X::MatNum,
-        [w::StatsBase.AbstractWeights];
-        dims::Int = 1,
-        mean = nothing,
-        kwargs...
-    ) -> MatNum
-
-Computes the weighted or unweighted correlation with [`compat_cor`](@ref) on dense observations. The unweighted method retries once with a densified `Matrix` after a `MethodError`. The weighted method calls [`densify`](@ref) before the estimator.
-
-# Algorithm
-
- 1. Without `w`, call [`compat_cor`](@ref) on `X` as the caller gave it. When that call raises a `MethodError`, call [`compat_cor`](@ref) once more on `Matrix(X)`. Any other error propagates to the caller.
- 2. With `w`, densify `X` with [`densify`](@ref), then call [`compat_cor`](@ref) once. The method does no retry, because [`densify`](@ref) already removes the only failure that the retry handles.
- 3. Return the matrix that [`compat_cor`](@ref) returned.
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - $(arg_dict[:X])
-  - $(arg_dict[:oow])
-  - $(arg_dict[:dims])
-  - $(arg_dict[:omean])
-  - `kwargs...`: More keyword arguments for `compat_cor`.
-
-# Validation
-
-  - $(val_dict[:dims])
-
-# Returns
-
-  - $(ret_dict[:rho])
-
-# Related
-
-  - [`MatNum`](@ref)
-  - [`densify`](@ref)
-  - [`compat_cor`](@ref)
-  - [`Statistics.cor`](https://juliastats.org/StatsBase.jl/stable/cov/)
-"""
-function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
-                    mean = nothing, kwargs...)
-    assert_dims(dims)
-    return try
-        compat_cor(ce, X; dims = dims, mean = mean, kwargs...)
-    catch err
-        if !(err isa MethodError)
-            rethrow()
-        end
-        compat_cor(ce, Matrix(X); dims = dims, mean = mean, kwargs...)
-    end
-end
-function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum,
-                    w::StatsBase.AbstractWeights; dims::Int = 1, mean = nothing, kwargs...)
-    assert_dims(dims)
-    return compat_cor(ce, densify(X), w; dims = dims, mean = mean, kwargs...)
-end
-"""
     moment_window_and_weights(
         X::VecNum_MatNum,
         w::Option{<:ObsWeights},
@@ -1598,6 +1364,41 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Build the check that the inner constructor of a generated windowed estimator runs on its inner estimator.
+
+A windowed estimator that forwards `cov` or `cor` calls them on its inner estimator, and a variance estimator has neither. So its inner constructor refuses a variance estimator with [`assert_covariance_estimator`](@ref). A windowed estimator that forwards only `mean`, `var`, `std` or a higher moment needs no such check. [`WindowedVariance`](@ref) holds a variance estimator on purpose.
+
+# Algorithm
+
+ 1. Read the last name of the generic of each entry of `specs`. For `Statistics.cov`, it is `cov`. For a bare name, it is the name itself.
+ 2. When one of these names is `cov` or `cor`, return the call `assert_covariance_estimator(field, :field)`.
+ 3. Otherwise, return `nothing`, which adds no statement to the constructor.
+
+# Arguments
+
+  - `field::Symbol`: Name of the inner estimator's field.
+  - `specs`: The parsed `forward` entries, as [`windowed_parse_forward`](@ref) returns them.
+
+# Returns
+
+  - `check::Option{Expr}`: The call to put in the inner constructor, or `nothing`.
+
+# Related
+
+  - [`@windowed_estimator`](@ref)
+  - [`assert_covariance_estimator`](@ref)
+"""
+function windowed_relation_check(field::Symbol, specs)
+    for (gen, _, _, _) in specs
+        if (Meta.isexpr(gen, :.) ? gen.args[2].value : gen) in (:cov, :cor)
+            return :(assert_covariance_estimator($field, $(QuoteNode(field))))
+        end
+    end
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Render the `generic(field::Name, X::Input)` reference to one generated forwarding method. The
 `# Related` sections of the type and of the other generated methods use it.
 
@@ -1832,7 +1633,7 @@ The `DocStringExtensions` abbreviations and the dictionary lookups stay live, as
 
  1. Read the name of the inner estimator from `default` into `inner_ref`. For a call such as `SimpleVariance()`, the name is the head of the call. For a bare name, it is the name itself.
  2. Start `parts` with the live `DocStringExtensions.TYPEDEF` abbreviation, the two summary sentences, the `# Fields` heading, and the live `DocStringExtensions.FIELDS` abbreviation.
- 3. Push the `# Constructors` section and the keyword signature built from `name`, `field`, `ftype` and `default`. Then push the `## Validation` subsection, with the live `val_dict[:oow]` lookup and the window rule.
+ 3. Push the `# Constructors` section and the keyword signature built from `name`, `field`, `ftype` and `default`. Then push the `## Validation` subsection, with the live `val_dict[:oow]` lookup and the window rule. When `refuses_variance` is `true`, the live `val_dict[:ce_cov]` lookup comes first.
  4. Push the three propagation subsections, `## Propagated parameters`, `## View parameters` and `## Observation weight parameters`. Each one names `field`, `w` and `cache` as the tags of the generated struct declare them.
  5. Push the `# Examples` section, fencing `doctest` as a `jldoctest` block.
  6. Push the `# Related` heading, the supertype, `inner_ref`, every entry of `methods`, the two window rules, and the four shared functions that the type implements: `factory`, `port_opt_view`, `obs_weights_view` and `windowed_preamble`.
@@ -1848,6 +1649,7 @@ The `DocStringExtensions` abbreviations and the dictionary lookups stay live, as
   - `noun::AbstractString`: The capitalised noun phrase of the moment. The generated prose uses it.
   - `doctest::AbstractString`: The body of the `jldoctest` block of the `# Examples` section, without its fences.
   - `methods::Vector{String}`: Cross-references to the generated methods of the type, from [`windowed_method_ref`](@ref).
+  - `refuses_variance::Bool`: `true` when the type forwards `cov` or `cor`, so its inner constructor refuses a variance estimator through [`assert_covariance_estimator`](@ref).
 
 # Returns
 
@@ -1859,14 +1661,19 @@ The `DocStringExtensions` abbreviations and the dictionary lookups stay live, as
 """
 function windowed_type_doc(name::Symbol, super, field::Symbol, ftype, default,
                            noun::AbstractString, doctest::AbstractString,
-                           methods::Vector{String})
+                           methods::Vector{String}, refuses_variance::Bool)
     lc = lowercasefirst(noun)
     inner_ref = Meta.isexpr(default, :call) ? default.args[1] : default
+    validation = if refuses_variance
+        Any[:(val_dict[:ce_cov]), "\n  - ", :(val_dict[:oow])]
+    else
+        Any[:(val_dict[:oow])]
+    end
     parts = Any["\n", :(DocStringExtensions.TYPEDEF),
                 "\n\nFits an inner $(lc) estimator on a rolling or indexed window of observations.\n\n`$(name)` holds another $(lc) estimator, and applies it to the observations of a window, with optional observation weights. So the estimate can follow the most recent observations, or give them more weight.\n\n# Fields\n\n",
                 :(DocStringExtensions.FIELDS),
                 "\n\n# Constructors\n\n    $(name)(;\n        $(field)::$(ftype) = $(default),\n        w::Option{<:ObsWeights} = nothing,\n        window::Option{<:Int_VecInt} = nothing,\n        rule::AbstractWindowRule = RollingWindow(),\n        cache::Option{<:AbstractPartialFitState} = nothing\n    ) -> $(name)\n\nEach keyword sets the struct field of the same name.\n\n## Validation\n\n  - ",
-                :(val_dict[:oow]),
+                validation...,
                 "\n  - If `window` is not `nothing`, it must be nonempty, nonnegative and finite.\n\n## Propagated parameters\n\n[`factory`](@ref) passes its arguments on to these `@fprop` fields:\n\n  - `$(field)`: Recursively updated through [`factory`](@ref).\n  - `w`: Replaced with the incoming [`ObsWeights`](@ref).\n  - `cache`: Carried unchanged through [`factory`](@ref).\n\n## View parameters\n\n[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:\n\n  - `$(field)`: Recursively viewed through [`port_opt_view`](@ref).\n  - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).\n\n## Observation weight parameters\n\n[`obs_weights_view`](@ref) indexes these fields to the selected observations:\n\n  - `$(field)`: Recursively indexed through [`obs_weights_view`](@ref).\n  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).\n\n# Examples\n\n```jldoctest\n$(strip(doctest))\n```\n\n# Related\n\n  - [`$(super)`](@ref)\n  - [`$(inner_ref)`](@ref)\n"]
     for m in methods
         push!(parts, "  - ", m, "\n")
@@ -1930,7 +1737,7 @@ unknown key of `field_dict` or `ret_dict`. The error for an unknown key ends wit
  3. Parse every entry of `forward` with [`windowed_parse_forward`](@ref), giving `specs`. Append one `:AssetPanel` copy of each `MatNum` entry, so every matrix generic also gets its Asset Panel method.
  4. Render one cross-reference per entry of `specs` with [`windowed_method_ref`](@ref), giving `refs`.
  5. For each entry of `specs`, build one documented forwarding method: [`windowed_method_doc`](@ref) writes its docstring, and [`windowed_method_def`](@ref) writes its body. Each method's `# Related` section lists the `refs` of its siblings and not its own.
- 6. Build `structexpr`, the `@concrete` struct. It declares the inner estimator tagged `@fprop @vprop`, `w` tagged `@wprop`, `window` and `rule` with no tag, and `cache` tagged `@fprop @vprop`, each with its live [`field_dict`](@ref) lookup, and the inner constructor that validates `w` and `window`.
+ 6. Build `structexpr`, the `@concrete` struct. It declares the inner estimator tagged `@fprop @vprop`, `w` tagged `@wprop`, `window` and `rule` with no tag, and `cache` tagged `@fprop @vprop`, each with its live [`field_dict`](@ref) lookup, and the inner constructor that validates `w` and `window`. When an entry of `specs` forwards `cov` or `cor`, the inner constructor also refuses a variance estimator as the inner estimator, with the check that [`windowed_relation_check`](@ref) builds.
  7. Build `kwctor`, the keyword constructor, whose defaults are `default`, `nothing`, `nothing`, [`RollingWindow`](@ref)`()` and `nothing`.
  8. Write the type's docstring with [`windowed_type_doc`](@ref), and attach it to `structexpr` wrapped in `@propagatable @concrete`.
  9. Return the escaped block: the documented struct, `kwctor`, the forwarding methods, and the `export` of `name`.
@@ -2041,6 +1848,7 @@ macro windowed_estimator(head, body)
     # The inner estimator and `cache` are both tagged `@fprop @vprop`.
     tagged(f) = Expr(:macrocall, Symbol("@fprop"), LineNumberNode(@__LINE__),
                      Expr(:macrocall, Symbol("@vprop"), LineNumberNode(@__LINE__), f))
+    relation_check = windowed_relation_check(field, specs)
     structexpr = Expr(:struct, false, Expr(:<:, name, super),
                       Expr(:block, Expr(:string, :(field_dict[$(QuoteNode(field))])),
                            tagged(field), Expr(:string, :(field_dict[:oow])),
@@ -2055,6 +1863,7 @@ macro windowed_estimator(head, body)
                                      :(rule::AbstractWindowRule),
                                      :(cache::Option{<:AbstractPartialFitState})),
                                 quote
+                                    $(relation_check)
                                     assert_nonempty_nonneg_finite_val(w, :w)
                                     assert_nonempty_nonneg_finite_val(window, :window)
                                     return $(Expr(:call,
@@ -2078,7 +1887,7 @@ macro windowed_estimator(head, body)
                     Expr(:macrocall, GlobalRef(Core, Symbol("@doc")),
                          LineNumberNode(@__LINE__),
                          windowed_type_doc(name, super, field, ftype, default, noun,
-                                           doctest, refs),
+                                           doctest, refs, !isnothing(relation_check)),
                          Expr(:macrocall, Symbol("@propagatable"),
                               LineNumberNode(@__LINE__),
                               Expr(:macrocall, Symbol("@concrete"),

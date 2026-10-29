@@ -1,22 +1,18 @@
 ```@meta
-Description = "Base moments, private API of PortfolioOptimisers.jl: AbstractExpectedReturnsAlgorithm, AbstractMomentAlgorithm, gap_fill_value, densify, robust_cov, …"
+Description = "Base moments, private API of PortfolioOptimisers.jl: AbstractExpectedReturnsAlgorithm, AbstractMomentAlgorithm, assert_covariance_estimator, gap_fill_value, …"
 ```
 
 # Base moments: private API
 
 ## Abstract moment types and fallbacks
 
-The abstract types below are the roots of the moment estimators. The functions are the steps that many moment estimators share, such as the calls to a `StatsBase` covariance estimator, the choice of the observation window and its weights, and the centring of the returns.
+The abstract types below are the roots of the moment estimators. The functions are the steps that many moment estimators share, such as the refusal of a variance estimator in a covariance slot, the choice of the observation window and its weights, and the centring of the returns.
 
 ```@docs
 AbstractExpectedReturnsAlgorithm
 AbstractMomentAlgorithm
+assert_covariance_estimator
 gap_fill_value(::StatsBase.CovarianceEstimator)
-densify
-robust_cov
-robust_cor
-compat_cov
-compat_cor
 moment_window_and_weights
 weighted_centre
 demean_returns
@@ -34,6 +30,7 @@ WINDOWED_ESTIMATOR_INPUTS
 @windowed_estimator
 windowed_parse_field
 windowed_parse_forward
+windowed_relation_check
 windowed_estimator_check_key
 windowed_estimator_suggest
 windowed_estimator_error

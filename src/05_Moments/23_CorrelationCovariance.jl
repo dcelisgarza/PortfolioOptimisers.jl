@@ -18,6 +18,10 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Validation
+
+  - $(val_dict[:ce_cov])
+
 ## Propagated parameters
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
@@ -65,6 +69,7 @@ CorrelationCovariance
     @fprop @vprop cache
     function CorrelationCovariance(ce::StatsBase.CovarianceEstimator,
                                    cache::Option{<:AbstractPartialFitState})
+        assert_covariance_estimator(ce, :ce)
         return new{typeof(ce), typeof(cache)}(ce, cache)
     end
 end

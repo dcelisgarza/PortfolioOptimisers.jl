@@ -2174,6 +2174,53 @@
         @test_throws MethodError cov(SimpleVariance(), Xsm)
         @test_throws MethodError cor(SimpleVariance(), Xsm)
         @test std(StdFromVarProbe(), Xsm) == sqrt.(var(StdFromVarProbe(), Xsm))
+        # --- #1914: a slot that calls `cov` or `cor` refuses a variance estimator by name ---
+        for ve in
+            (SimpleVariance(), ExpWeightedVariance(), RegimeAdjustedExpWeightedVariance(),
+             WindowedVariance())
+            for ctor in (() -> Covariance(; ce = ve), () -> GeneralCovariance(; ce = ve),
+                         () -> PortfolioOptimisersCovariance(; ce = ve),
+                         () -> DenoiseCovariance(; ce = ve), () -> DetoneCovariance(; ce = ve),
+                         () -> ProcessedCovariance(; ce = ve),
+                         () -> CorrelationCovariance(; ce = ve),
+                         () -> GeodesicShrinkageCovariance(; ce = ve),
+                         () -> ImpliedVolatility(; ce = ve, ppy = 252),
+                         () -> WindowedCovariance(; ce = ve),
+                         () -> ShrunkExpectedReturns(; ce = ve),
+                         () -> EquilibriumExpectedReturns(; ce = ve),
+                         () -> EmpiricalPrior(; ce = ve),
+                         () -> CrossSectionalFactorPrior(;
+                                                         factors = ["market" => ConstantExposure()],
+                                                         ce = ve),
+                         () -> ClustersEstimator(; ce = ve), () -> NetworkEstimator(; ce = ve),
+                         () -> ARCHUncertaintySet(; ce = ve), () -> PairwiseCorrelation(; ce = ve),
+                         () -> CorrelationComponents(; ce = ve))
+                err = try
+                    ctor()
+                catch e
+                    e
+                end
+                @test err isa ArgumentError
+                @test occursin("`ce` needs a covariance estimator", err.msg)
+                @test occursin("`$(nameof(typeof(ve)))` is a variance estimator", err.msg)
+            end
+            for ctor in
+                (() -> Variance(; sigma = ve), () -> StandardDeviation(; sigma = ve),
+                 () -> UncertaintySetVariance(; sigma = ve),
+                 () -> DistributionValueatRisk(; sigma = ve))
+                @test_throws "`sigma` needs a covariance estimator" ctor()
+            end
+            # A slot that calls only `var` or `std` keeps the variance estimator.
+            @test GerberCovariance(; ve = ve).ve === ve
+            @test SmythBrobyCovariance(; ve = ve).ve === ve
+            @test StandardDeviationExpectedReturns(; ce = ve).ce === ve
+            @test VarianceExpectedReturns(; ce = ve).ce === ve
+            @test CrossSectionalFactorPrior(; factors = ["market" => ConstantExposure()],
+                                            ve = ve).ve === ve
+        end
+        # A matrix and a covariance estimator still pass the `sigma` slot.
+        @test Variance(; sigma = [1.0 0.0; 0.0 1.0]).sigma == [1.0 0.0; 0.0 1.0]
+        @test Variance(; sigma = Covariance()).sigma isa Covariance
         # --- the wrappers compose `ce` and then `mp`, in the order their row declares ---
         rng453 = StableRNG(11223344)
         X453 = randn(rng453, 6, 10)
@@ -2842,11 +2889,30 @@ end
                                                    :(StatsBase.CovarianceEstimator),
                                                    :(PortfolioOptimisersCovariance()),
                                                    "Covariance", "julia> 1 + 1\n2\n",
-                                                   ["[`m`](@ref)"])
+                                                   ["[`m`](@ref)"], true)
         @test Meta.isexpr(td, :string)
         # `TYPEDEF`/`FIELDS` must survive as abbreviations; a rendered string would freeze
         # the field list at macro-expansion time.
         @test filter(x -> !isa(x, String), td.args) ==
+              Any[:(DocStringExtensions.TYPEDEF), :(DocStringExtensions.FIELDS),
+                  :(val_dict[:ce_cov]), :(val_dict[:oow])]
+        # The inner constructor checks the inner estimator only under a `cov` or `cor` entry.
+        cov_specs = [PortfolioOptimisers.windowed_parse_forward(:(Statistics.cov(::MatNum;
+                                                                                 mean) =>
+                                                                      :sigma))]
+        var_specs = [PortfolioOptimisers.windowed_parse_forward(:(var(::MatNum; mean) =>
+                                                                      :vararr))]
+        @test PortfolioOptimisers.windowed_relation_check(:ce, cov_specs) ==
+              :(assert_covariance_estimator(ce, :ce))
+        @test isnothing(PortfolioOptimisers.windowed_relation_check(:ve, var_specs))
+        # A type that forwards no `cov` or `cor` states no refusal of a variance estimator.
+        tdv = PortfolioOptimisers.windowed_type_doc(:WindowedVariance,
+                                                    :AbstractVarianceEstimator, :ve,
+                                                    :AbstractVarianceEstimator,
+                                                    :(SimpleVariance()), "Variance",
+                                                    "julia> 1 + 1\n2\n", ["[`m`](@ref)"],
+                                                    false)
+        @test filter(x -> !isa(x, String), tdv.args) ==
               Any[:(DocStringExtensions.TYPEDEF), :(DocStringExtensions.FIELDS),
                   :(val_dict[:oow])]
 

@@ -671,6 +671,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
+  - $(val_dict[:ce_cov])
   - `x_src in ALL_RETURNS_SOURCES`. [`assert_returns_source`](@ref) throws an `ArgumentError` otherwise.
 
 ## Propagated parameters
@@ -755,6 +756,7 @@ ClustersEstimator
                                alg::AbstractClustersAlgorithm,
                                onc::AbstractOptimalNumberClustersEstimator,
                                x_src::Option{<:AbstractReturnsSource})
+        assert_covariance_estimator(ce, :ce)
         assert_returns_source(x_src, ALL_RETURNS_SOURCES, :ClustersEstimator)
         return new{typeof(ce), typeof(de), typeof(alg), typeof(onc), typeof(x_src)}(ce, de,
                                                                                     alg,

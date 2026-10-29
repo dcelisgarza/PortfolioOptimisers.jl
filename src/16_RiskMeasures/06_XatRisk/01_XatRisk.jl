@@ -410,6 +410,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `mu` is not `nothing`: `!isempty(mu)`.
+  - $(val_dict[:sigma_cov])
   - If `sigma` is not `nothing`: `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
   - If `chol` is not `nothing`: `!isempty(chol)`, and `sigma` is a matrix rather than `nothing` or a Deferred Quantity.
 
@@ -487,6 +488,7 @@ DistributionValueatRisk
                                      pe::Option{<:AbstractPriorEstimator},
                                      dist::Distributions.Distribution,
                                      mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm})
+        assert_covariance_estimator(sigma, :sigma)
         if isa(mu, VecNum)
             @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
         end

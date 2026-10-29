@@ -6,6 +6,8 @@ unique_key_dict!(err_name_dict, :err_name_dict, :kt => "cokurtosis", :sk => "cos
                  :V => "negative spectral coskewness", :D2 => "duplication matrix",
                  :L2 => "elimination matrix", :S2 => "summation matrix")
 unique_key_dict!(val_dict, :val_dict, :oow => "If `w` is not `nothing`, `!isempty(w)`.",
+                 :ce_cov => "`ce` is not an [`AbstractVarianceEstimator`](@ref). A variance estimator has no `cov` or `cor`, so [`assert_covariance_estimator`](@ref) raises an `ArgumentError` that names `ce`.",#
+                 :sigma_cov => "If `sigma` is an estimator, it is not an [`AbstractVarianceEstimator`](@ref). A variance estimator has no `cov`, so [`assert_covariance_estimator`](@ref) raises an `ArgumentError` that names `sigma`.",#
                  :oow_rm => "If `w` is a `StatsBase.AbstractWeights`, it is not empty, each entry is finite and `>= 0`, and `sum(w) > 0`, through [`assert_observation_weights`](@ref). A [`DynamicAbstractWeights`](@ref) holds no weights until it reads the data, so [`checked_observation_weights`](@ref) checks it at evaluation, and also checks there that the weights have one entry for each observation.",#
                  :gerbt => "`0 <= t`.",#
                  :t => "`0 < t < 1`.",#

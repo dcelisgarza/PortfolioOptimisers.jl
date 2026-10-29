@@ -19,6 +19,10 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Validation
+
+  - $(val_dict[:ce_cov]) [`DenoiseCovariance`](@ref), [`DetoneCovariance`](@ref) and [`ProcessedCovariance`](@ref) build this type, so they refuse one too.
+
 ## The incremental fit
 
 The composite folds by composition. The state in `cache` selects one of two routes.
@@ -90,6 +94,7 @@ PortfolioOptimisersCovariance
     function PortfolioOptimisersCovariance(ce::StatsBase.CovarianceEstimator,
                                            mp::AbstractMatrixProcessingEstimator,
                                            cache::Option{<:AbstractPartialFitState})
+        assert_covariance_estimator(ce, :ce)
         return new{typeof(ce), typeof(mp), typeof(cache)}(ce, mp, cache)
     end
 end

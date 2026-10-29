@@ -5,7 +5,7 @@
 julia = "1.13.3"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "86aa5bb378"
+commit = "f6ce89ba70"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { cyc = 5, cog = 7, arg = 8, cyc_sum = 53, cog_sum = 57, arg_sum = 99, macros = [] }
@@ -88,9 +88,9 @@ commit = "86aa5bb378"
 "src/04_MatrixProcessing/03_Detone.jl" = { cyc = 4, cog = 4, arg = 2, cyc_sum = 9, cog_sum = 5, arg_sum = 8, macros = [] }
 "src/04_MatrixProcessing/04_MatrixProcessing.jl" = { cyc = 5, cog = 5, arg = 6, cyc_sum = 38, cog_sum = 11, arg_sum = 100, macros = [] }
 "src/04_MatrixProcessing/05_MatrixSquareRoot.jl" = { cyc = 6, cog = 7, arg = 2, cyc_sum = 13, cog_sum = 10, arg_sum = 12, macros = [] }
-"src/05_Moments/01_Base_Moments.jl" = { cyc = 19, cog = 26, arg = 8, cyc_sum = 126, cog_sum = 140, arg_sum = 139, macros = ["@define_pretty_show"] }
+"src/05_Moments/01_Base_Moments.jl" = { cyc = 19, cog = 26, arg = 9, cyc_sum = 109, cog_sum = 118, arg_sum = 110, macros = ["@define_pretty_show"] }
 "src/05_Moments/02_SimpleExpectedReturns.jl" = { cyc = 5, cog = 8, arg = 6, cyc_sum = 41, cog_sum = 33, arg_sum = 62, macros = ["@propagatable"] }
-"src/05_Moments/03_Covariance.jl" = { cyc = 5, cog = 8, arg = 9, cyc_sum = 70, cog_sum = 41, arg_sum = 157, macros = ["@propagatable"] }
+"src/05_Moments/03_Covariance.jl" = { cyc = 9, cog = 18, arg = 9, cyc_sum = 97, cog_sum = 75, arg_sum = 197, macros = ["@propagatable"] }
 "src/05_Moments/04_SimpleVariance.jl" = { cyc = 5, cog = 8, arg = 9, cyc_sum = 61, cog_sum = 42, arg_sum = 131, macros = ["@propagatable"] }
 "src/05_Moments/05_Gerber/01_GerberCovariance.jl" = { cyc = 1, cog = 1, arg = 6, cyc_sum = 10, cog_sum = 1, arg_sum = 29, macros = ["@propagatable"] }
 "src/05_Moments/05_Gerber/02_SmythBrobyCovariance.jl" = { cyc = 13, cog = 10, arg = 10, cyc_sum = 52, cog_sum = 25, arg_sum = 129, macros = ["@propagatable"] }

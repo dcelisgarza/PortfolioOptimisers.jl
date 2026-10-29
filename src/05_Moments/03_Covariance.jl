@@ -22,6 +22,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
+  - $(val_dict[:ce_cov])
   - $(val_dict[:oow])
 
 ## Propagated parameters
@@ -89,6 +90,7 @@ GeneralCovariance
     @fprop @vprop cache
     function GeneralCovariance(ce::StatsBase.CovarianceEstimator, w::Option{<:ObsWeights},
                                cache::Option{<:AbstractPartialFitState})
+        assert_covariance_estimator(ce, :ce)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(ce), typeof(w), typeof(cache)}(ce, w, cache)
     end
@@ -122,6 +124,284 @@ A `cache` holds the state of an incremental fit. That state is not part of the c
   - [`set_show_nothing_fields!`](@ref)
 """
 show_fields(::GeneralCovariance) = (:ce, :w)
+"""
+    densify(X::MatNum) -> MatNum
+
+Materialise a lazy or sparse observation matrix as a dense `Matrix`.
+
+The weighted moment methods of `StatsBase` take a `DenseMatrix`. A `Transpose`, an `Adjoint`, a `SubArray` or a sparse matrix does not match them. Without a `mean`, the call raises a `MethodError`, and the caller can recover from it. With a `mean`, the caller cannot recover. `cov(::SimpleCovariance, X, w; mean = mu)` forwards four positional arguments as `covm(X, mu, w, dims)`. When the `DenseMatrix` method does not match, that call resolves to `Statistics.covm(x, xmean, y, ymean, vardim)`, which is the cross-covariance of `X` and the weight vector. It returns an `N × 1` matrix in place of an `N × N` matrix, and raises no error. [`robust_cov`](@ref) and [`robust_cor`](@ref) densify `X` before every weighted call, so neither failure can happen.
+
+# Algorithm
+
+ 1. When `X` is a `DenseMatrix` of numbers or of `JuMP` scalars, return it unchanged.
+ 2. Otherwise return `Matrix(X)`, a dense copy.
+
+# Arguments
+
+  - $(arg_dict[:X])
+
+# Returns
+
+  - `X::MatNum`: `X` itself when it is already a dense `Matrix`, and `Matrix(X)` otherwise.
+
+# Related
+
+  - [`MatNum`](@ref)
+  - [`robust_cov`](@ref)
+  - [`robust_cor`](@ref)
+"""
+function densify(X::DenseMatrix{<:Union{Number, JuMP.AbstractJuMPScalar}})
+    return X
+end
+function densify(X::MatNum)
+    return Matrix(X)
+end
+"""
+    compat_cov(
+        ce::StatsBase.CovarianceEstimator,
+        X::MatNum,
+        [w::StatsBase.AbstractWeights];
+        dims::Int = 1,
+        mean = nothing,
+        kwargs...
+    ) -> MatNum
+
+Compute the covariance matrix with the estimator `ce`, and pass the extra keyword arguments only when the method of `ce` accepts them.
+
+# Algorithm
+
+ 1. When the caller passed extra keyword arguments, and `hasmethod` reports that `Statistics.cov` takes `dims`, `mean` and those keys for this estimator and these arguments, call `Statistics.cov` with all of them and return the result.
+ 2. When step 1 raises a `MethodError`, drop the extra keyword arguments and continue. A method whose signature ends in a `kwargs...` slurp satisfies `hasmethod` and can still reject a key further down its call chain. Any other error propagates to the caller.
+ 3. Call `Statistics.cov(ce, X, args...; dims = dims, mean = mean)`, and return the result.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:X])
+  - $(arg_dict[:oow])
+  - $(arg_dict[:dims])
+  - $(arg_dict[:omean])
+  - `kwargs...`: More keyword arguments for `cov`.
+
+# Returns
+
+  - $(ret_dict[:sigma])
+
+# Related
+
+  - [`MatNum`](@ref)
+  - [`robust_cov`](@ref)
+  - [`compat_cor`](@ref)
+  - [`Statistics.cov`](https://juliastats.org/StatsBase.jl/stable/cov/)
+"""
+function compat_cov(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix, args...;
+                    dims::Int = 1, mean = nothing, kwargs...)
+    if !isempty(kwargs) &&
+       hasmethod(Statistics.cov, Tuple{typeof(ce), typeof(X), typeof.(args)...},
+                 (:dims, :mean, keys(kwargs)...))
+        try
+            return Statistics.cov(ce, X, args...; dims = dims, mean = mean, kwargs...)
+        catch err
+            # A method with a `kwargs...` slurp satisfies `hasmethod` but can still
+            # reject the keyword arguments further down its call chain.
+            if !(err isa MethodError)
+                rethrow()
+            end
+        end
+    end
+    return Statistics.cov(ce, X, args...; dims = dims, mean = mean)
+end
+"""
+    robust_cov(
+        ce::StatsBase.CovarianceEstimator,
+        X::MatNum,
+        [w::StatsBase.AbstractWeights];
+        dims::Int = 1,
+        mean = nothing,
+        kwargs...
+    ) -> MatNum
+
+Computes the weighted or unweighted covariance with [`compat_cov`](@ref) on dense observations. The unweighted method retries once with a densified `Matrix` after a `MethodError`. The weighted method calls [`densify`](@ref) before the estimator.
+
+# Algorithm
+
+ 1. Without `w`, call [`compat_cov`](@ref) on `X` as the caller gave it. When that call raises a `MethodError`, call [`compat_cov`](@ref) once more on `Matrix(X)`. Any other error propagates to the caller.
+ 2. With `w`, densify `X` with [`densify`](@ref), then call [`compat_cov`](@ref) once. The method does no retry, because [`densify`](@ref) already removes the only failure that the retry handles.
+ 3. Return the matrix that [`compat_cov`](@ref) returned.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:X])
+  - $(arg_dict[:oow])
+  - $(arg_dict[:dims])
+  - $(arg_dict[:omean])
+  - `kwargs...`: More keyword arguments for `compat_cov`.
+
+# Validation
+
+  - $(val_dict[:dims])
+
+# Returns
+
+  - $(ret_dict[:sigma])
+
+# Related
+
+  - [`MatNum`](@ref)
+  - [`densify`](@ref)
+  - [`compat_cov`](@ref)
+  - [`Statistics.cov`](https://juliastats.org/StatsBase.jl/stable/cov/)
+"""
+function robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
+                    mean = nothing, kwargs...)
+    assert_dims(dims)
+    return try
+        compat_cov(ce, X; dims = dims, mean = mean, kwargs...)
+    catch err
+        if !(err isa MethodError)
+            rethrow()
+        end
+        compat_cov(ce, Matrix(X); dims = dims, mean = mean, kwargs...)
+    end
+end
+function robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum,
+                    w::StatsBase.AbstractWeights; dims::Int = 1, mean = nothing, kwargs...)
+    assert_dims(dims)
+    return compat_cov(ce, densify(X), w; dims = dims, mean = mean, kwargs...)
+end
+"""
+    compat_cor(
+        ce::StatsBase.CovarianceEstimator,
+        X::MatNum,
+        [w::StatsBase.AbstractWeights];
+        dims::Int = 1,
+        mean = nothing,
+        kwargs...
+    ) -> MatNum
+
+Compute the correlation matrix with the estimator `ce`, and fall back to its covariance matrix when `ce` has no `cor` method for these arguments.
+
+# Algorithm
+
+ 1. When `hasmethod` reports that `Statistics.cor` takes `dims` and `mean` for this estimator and these arguments, take steps 2 and 3. Otherwise take step 4.
+ 2. When the caller passed extra keyword arguments, and `hasmethod` reports that `Statistics.cor` takes those keys too, call `Statistics.cor` with all of them and return the result. When that call raises a `MethodError`, drop the extra keyword arguments and continue. A method whose signature ends in a `kwargs...` slurp satisfies `hasmethod` and can still reject a key further down its call chain.
+ 3. Call `Statistics.cor(ce, X, args...; dims = dims, mean = mean)`, and return the result. When that call raises a `MethodError`, continue to step 4. Any other error propagates to the caller.
+ 4. The estimator has no `cor` method for these arguments, so compute the covariance matrix `sigma` with [`robust_cov`](@ref).
+ 5. When `sigma` is mutable, convert it to a correlation matrix in place with `StatsBase.cov2cor!` and the square roots of its own diagonal. Otherwise convert a dense copy with `StatsBase.cov2cor`.
+ 6. Return `sigma`.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:X])
+  - $(arg_dict[:oow])
+  - $(arg_dict[:dims])
+  - $(arg_dict[:omean])
+  - `kwargs...`: More keyword arguments for `cor`.
+
+# Returns
+
+  - $(ret_dict[:rho])
+
+# Related
+
+  - [`MatNum`](@ref)
+  - [`robust_cov`](@ref)
+  - [`Statistics.cor`](https://juliastats.org/StatsBase.jl/stable/cov/)
+"""
+function compat_cor(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix, args...;
+                    dims::Int = 1, mean = nothing, kwargs...)
+    if hasmethod(Statistics.cor, Tuple{typeof(ce), typeof(X), typeof.(args)...},
+                 (:dims, :mean))
+        if !isempty(kwargs) &&
+           hasmethod(Statistics.cor, Tuple{typeof(ce), typeof(X), typeof.(args)...},
+                     (:dims, :mean, keys(kwargs)...))
+            try
+                return Statistics.cor(ce, X, args...; dims = dims, mean = mean, kwargs...)
+            catch err
+                # A method with a `kwargs...` slurp satisfies `hasmethod` but can still
+                # reject the keyword arguments further down its call chain.
+                if !(err isa MethodError)
+                    rethrow()
+                end
+            end
+        end
+        try
+            return Statistics.cor(ce, X, args...; dims = dims, mean = mean)
+        catch err
+            if !(err isa MethodError)
+                rethrow()
+            end
+        end
+    end
+    sigma = robust_cov(ce, X, args...; dims = dims, mean = mean, kwargs...)
+    if ismutable(sigma)
+        StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
+    else
+        sigma = StatsBase.cov2cor(Matrix(sigma))
+    end
+    return sigma
+end
+"""
+    robust_cor(
+        ce::StatsBase.CovarianceEstimator,
+        X::MatNum,
+        [w::StatsBase.AbstractWeights];
+        dims::Int = 1,
+        mean = nothing,
+        kwargs...
+    ) -> MatNum
+
+Computes the weighted or unweighted correlation with [`compat_cor`](@ref) on dense observations. The unweighted method retries once with a densified `Matrix` after a `MethodError`. The weighted method calls [`densify`](@ref) before the estimator.
+
+# Algorithm
+
+ 1. Without `w`, call [`compat_cor`](@ref) on `X` as the caller gave it. When that call raises a `MethodError`, call [`compat_cor`](@ref) once more on `Matrix(X)`. Any other error propagates to the caller.
+ 2. With `w`, densify `X` with [`densify`](@ref), then call [`compat_cor`](@ref) once. The method does no retry, because [`densify`](@ref) already removes the only failure that the retry handles.
+ 3. Return the matrix that [`compat_cor`](@ref) returned.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:X])
+  - $(arg_dict[:oow])
+  - $(arg_dict[:dims])
+  - $(arg_dict[:omean])
+  - `kwargs...`: More keyword arguments for `compat_cor`.
+
+# Validation
+
+  - $(val_dict[:dims])
+
+# Returns
+
+  - $(ret_dict[:rho])
+
+# Related
+
+  - [`MatNum`](@ref)
+  - [`densify`](@ref)
+  - [`compat_cor`](@ref)
+  - [`Statistics.cor`](https://juliastats.org/StatsBase.jl/stable/cov/)
+"""
+function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
+                    mean = nothing, kwargs...)
+    assert_dims(dims)
+    return try
+        compat_cor(ce, X; dims = dims, mean = mean, kwargs...)
+    catch err
+        if !(err isa MethodError)
+            rethrow()
+        end
+        compat_cor(ce, Matrix(X); dims = dims, mean = mean, kwargs...)
+    end
+end
+function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum,
+                    w::StatsBase.AbstractWeights; dims::Int = 1, mean = nothing, kwargs...)
+    assert_dims(dims)
+    return compat_cor(ce, densify(X), w; dims = dims, mean = mean, kwargs...)
+end
 """
     Statistics.cov(
         ce::GeneralCovariance,
@@ -312,6 +592,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
+  - $(val_dict[:ce_cov])
   - $(val_dict[:oow])
 
 ## Propagated parameters
@@ -409,6 +690,7 @@ Covariance
                         ce::StatsBase.CovarianceEstimator, alg::AbstractMomentAlgorithm,
                         w::Option{<:ObsWeights}, cvg::Option{<:CoveragePolicy},
                         cache::Option{<:AbstractPartialFitState})
+        assert_covariance_estimator(ce, :ce)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(me), typeof(ce), typeof(alg), typeof(w), typeof(cvg),
                    typeof(cache)}(me, ce, alg, w, cvg, cache)

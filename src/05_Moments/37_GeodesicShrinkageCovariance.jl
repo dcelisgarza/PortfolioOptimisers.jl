@@ -410,6 +410,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
+  - $(val_dict[:ce_cov])
   - `0 <= alpha <= 1`.
   - A matrix `tgt` is square, finite, symmetric and positive definite, as [`assert_shrinkage_target`](@ref) states.
 
@@ -492,6 +493,7 @@ true
                                          pdm::Option{<:AbstractPosdefEstimator},
                                          tgt::GeodesicShrinkageTarget, alpha::Number,
                                          cache::Option{<:AbstractPartialFitState})
+        assert_covariance_estimator(ce, :ce)
         assert_shrinkage_target(tgt)
         assert_closed_unit_interval(alpha, :alpha)
         return new{typeof(ce), typeof(pdm), typeof(tgt), typeof(alpha), typeof(cache)}(ce,

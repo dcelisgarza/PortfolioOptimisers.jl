@@ -84,6 +84,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
+  - $(val_dict[:ce_cov]) The tree route under [`VariationInfoDistance`](@ref) reads no correlation, and the constructor refuses a variance estimator on it too, because `ce` holds a covariance estimator on every route.
   - `x_src in ALL_RETURNS_SOURCES`, see [`assert_returns_source`](@ref). The constructor throws an `ArgumentError` otherwise.
 
 ## Propagated parameters
@@ -175,6 +176,7 @@ NetworkEstimator
                               de::AbstractDistanceEstimator, alg::Tree_SimMat,
                               sep::AbstractSeparationAlgorithm,
                               x_src::Option{<:AbstractReturnsSource})
+        assert_covariance_estimator(ce, :ce)
         assert_returns_source(x_src, ALL_RETURNS_SOURCES, :NetworkEstimator)
         return new{typeof(ce), typeof(de), typeof(alg), typeof(sep), typeof(x_src)}(ce, de,
                                                                                     alg,

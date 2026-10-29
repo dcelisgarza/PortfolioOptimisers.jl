@@ -27,6 +27,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
+  - $(val_dict[:ce_cov])
   - $(val_dict[:oow])
 
 ## Propagated parameters
@@ -101,6 +102,7 @@ EquilibriumExpectedReturns
     l
     function EquilibriumExpectedReturns(ce::StatsBase.CovarianceEstimator,
                                         w::Option{<:VecNum}, l::Number)
+        assert_covariance_estimator(ce, :ce)
         assert_nonempty_finite_val(w, :w)
         return new{typeof(ce), typeof(w), typeof(l)}(ce, w, l)
     end

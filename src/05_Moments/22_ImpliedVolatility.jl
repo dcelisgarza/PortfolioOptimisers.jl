@@ -202,6 +202,7 @@ Keywords correspond to the struct's fields. `ppy` has no default. The implied vo
 
 ## Validation
 
+  - $(val_dict[:ce_cov])
   - `ppy > 0`.
 
 ## Propagated parameters
@@ -274,6 +275,7 @@ ImpliedVolatility
     function ImpliedVolatility(ce::StatsBase.CovarianceEstimator,
                                alg::ImpliedVolatilityAlgorithm, ppy::Number,
                                cache::Option{<:AbstractPartialFitState})
+        assert_covariance_estimator(ce, :ce)
         assert_gt0(ppy, :ppy)
         return new{typeof(ce), typeof(alg), typeof(ppy), typeof(cache)}(ce, alg, ppy, cache)
     end

@@ -8,7 +8,7 @@ jet = "0.13.1"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "StatsPlots"]
-commit = "fe13f523b6"
+commit = "f6ce89ba70"
 
 [run.main]
 load_set = ["GraphRecipes", "StatsPlots"]
@@ -94,9 +94,9 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/04_MatrixProcessing/03_Detone.jl" = { raw = 0, reviewed = 0 }
 "src/04_MatrixProcessing/04_MatrixProcessing.jl" = { raw = 0, reviewed = 0 }
 "src/04_MatrixProcessing/05_MatrixSquareRoot.jl" = { raw = 0, reviewed = 0 }
-"src/05_Moments/01_Base_Moments.jl" = { raw = 3, reviewed = 3 }
+"src/05_Moments/01_Base_Moments.jl" = { raw = 1, reviewed = 1 }
 "src/05_Moments/02_SimpleExpectedReturns.jl" = { raw = 0, reviewed = 0 }
-"src/05_Moments/03_Covariance.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/03_Covariance.jl" = { raw = 2, reviewed = 2 }
 "src/05_Moments/04_SimpleVariance.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/05_Gerber/01_GerberCovariance.jl" = { raw = 1, reviewed = 1 }
 "src/05_Moments/05_Gerber/02_SmythBrobyCovariance.jl" = { raw = 1, reviewed = 1 }

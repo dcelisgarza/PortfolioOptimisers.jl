@@ -363,6 +363,7 @@ Keywords correspond to the struct's fields. `factors`, `neutralise` and `familie
 
 ## Validation
 
+  - $(val_dict[:ce_cov]) `ve` reads only `var`, so it accepts a variance estimator.
   - `factors` is not empty and repeats no factor name.
   - No Factor Family holds both estimated and observed factors, and `families` constrains no observed family, as [`assert_cross_sectional_observed_families`](@ref) states.
   - `lx`, when it is stated, is not empty, and `factors` holds an observed factor, because the prior reads net returns only under observed factors.
@@ -588,6 +589,7 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
                                        x_src::Option{<:AbstractReturnsSource})
         assert_returns_source(x_src, DATA_RETURNS_SOURCES, :CrossSectionalFactorPrior)
         assert_inner_reader(pe, :pe, :CrossSectionalFactorPrior)
+        assert_covariance_estimator(ce, :ce)
         assert_closed_unit_interval(th, :th)
         assert_finite(bp, :bp)
         assert_nonneg(bp, :bp)

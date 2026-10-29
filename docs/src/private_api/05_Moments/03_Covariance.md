@@ -1,5 +1,5 @@
 ```@meta
-Description = "Covariance, private API of PortfolioOptimisers.jl: show_fields, library_covariance_estimator, covariance_centre_and_estimator, CovarianceState, Base.copy, …"
+Description = "Covariance, private API of PortfolioOptimisers.jl: show_fields, densify, robust_cov, robust_cor, compat_cov, compat_cor, library_covariance_estimator, …"
 ```
 
 # Covariance: private API
@@ -8,8 +8,15 @@ The weights of a portfolio and the covariance matrix of its assets give the port
 
 ## General covariance
 
+[`GeneralCovariance`](@ref) calls a `StatsBase` covariance estimator through the functions below. They retry a call without the keywords that the estimator does not take, and they make a lazy observation matrix dense before a weighted call.
+
 ```@docs
 show_fields(::GeneralCovariance)
+densify
+robust_cov
+robust_cor
+compat_cov
+compat_cor
 library_covariance_estimator
 ```
 

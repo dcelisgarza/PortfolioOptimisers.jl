@@ -266,6 +266,7 @@ The keywords are the fields of the struct.
 
 ## Validation
 
+  - $(val_dict[:ce_cov])
   - `n_sim > 0`.
   - `n_sim > 1` if `alg` is an [`EllipsoidalUncertaintySetAlgorithm`](@ref) or a [`NormBallUncertaintySetAlgorithm`](@ref). Both shapes read the covariance of the bootstrap deviations, and one resample has no covariance. [`BoxUncertaintySetAlgorithm`](@ref) reads quantiles, so it accepts one resample.
   - `block_size > 0`.
@@ -395,6 +396,7 @@ ARCHUncertaintySet
                                 block_size::Integer, q::Number, rng::Random.AbstractRNG,
                                 seed::Option{<:Integer}, bootstrap::ARCHBootstrapSet,
                                 kwargs::NamedTuple)
+        assert_covariance_estimator(ce, :ce)
         @argcheck(n_sim > zero(n_sim), DomainError(n_sim, "n_sim must be > 0"))
         if alg isa
            Union{EllipsoidalUncertaintySetAlgorithm, NormBallUncertaintySetAlgorithm}

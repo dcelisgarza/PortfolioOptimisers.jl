@@ -25,6 +25,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
+  - $(val_dict[:ce_cov])
   - If `horizon` is not `nothing`, `horizon > 0`.
   - If `fill_limit` is not `nothing`, `0 < fill_limit <= 1`. The constructor refuses zero. Where no arm states a coverage floor, `nothing` already names every fill. The fit refuses a value above `1 - min_coverage` of the binding floor of the arms, because such a value can never fire.
   - If `max_scenarios` is not `nothing`, `max_scenarios > 0`.
@@ -140,6 +141,7 @@ EmpiricalPrior
                             fill_limit::Option{<:Real}, max_scenarios::Option{<:Integer},
                             cache::Option{<:AbstractPartialFitState},
                             x_src::Option{<:AbstractReturnsSource})
+        assert_covariance_estimator(ce, :ce)
         assert_returns_source(x_src, DATA_RETURNS_SOURCES, :EmpiricalPrior)
         if !isnothing(horizon)
             @argcheck(horizon > 0, DomainError(horizon, "horizon must be > 0"))
