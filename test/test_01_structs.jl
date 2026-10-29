@@ -529,8 +529,9 @@ end
         owj = OWAJuMP(; slv = Solver(; solver = nothing))
         @test owj.slv == Solver(; solver = nothing)
         @test owj.max_phi == 0.5
-        @test owj.sc == 1.0
-        @test owj.so == 1.0
+        # Each objective gives the scale that is `nothing` (#1907).
+        @test isnothing(owj.sc)
+        @test isnothing(owj.so)
         @test owj.alg == MaximumEntropy()
 
         owj = OWAJuMP(; slv = Solver(; solver = nothing, name = "Foo"), max_phi = 0.25,

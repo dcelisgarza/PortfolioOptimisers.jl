@@ -14,10 +14,11 @@
             owas = [NormalisedConstantRelativeRiskAversion(; g = 0.75),
                     NormalisedConstantRelativeRiskAversion(),
                     NormalisedConstantRelativeRiskAversion(; g = 0.25),
-                    # MaximumEntropy needs a small objective scale to solve (#1834).
-                    OWAJuMP(; alg = MaximumEntropy(), max_phi = 0.75, so = 1e-3, slv = slv),
-                    OWAJuMP(; alg = MaximumEntropy(), so = 1e-3, slv = slv),
-                    OWAJuMP(; alg = MaximumEntropy(), max_phi = 0.25, so = 1e-3, slv = slv),
+                    # MaximumEntropy needs a small objective scale to solve (#1834), and
+                    # the default `so = nothing` gives it 1e-3 (#1907).
+                    OWAJuMP(; alg = MaximumEntropy(), max_phi = 0.75, slv = slv),
+                    OWAJuMP(; alg = MaximumEntropy(), slv = slv),
+                    OWAJuMP(; alg = MaximumEntropy(), max_phi = 0.25, slv = slv),
                     OWAJuMP(; alg = MinimumSumSquares(), max_phi = 0.75, slv = slv),
                     OWAJuMP(; alg = MinimumSumSquares(), slv = slv),
                     OWAJuMP(; alg = MinimumSumSquares(), max_phi = 0.25, slv = slv),
@@ -25,11 +26,11 @@
                     OWAJuMP(; alg = MinimumSquaredDistance(), slv = slv),
                     OWAJuMP(; alg = MinimumSquaredDistance(), max_phi = 0.25, slv = slv)]
             owas_entr = [OWAJuMP(; alg = MaximumEntropy(; alg = ExponentialConeEntropy()),
-                                 max_phi = 0.75, so = 1e-3, slv = slv),
+                                 max_phi = 0.75, slv = slv),
                          OWAJuMP(; alg = MaximumEntropy(; alg = ExponentialConeEntropy()),
-                                 so = 1e-3, slv = slv),
+                                 slv = slv),
                          OWAJuMP(; alg = MaximumEntropy(; alg = ExponentialConeEntropy()),
-                                 max_phi = 0.25, so = 1e-3, slv = slv)]
+                                 max_phi = 0.25, slv = slv)]
             owas_sum_sq_sqsoc = [OWAJuMP(;
                                          alg = MinimumSumSquares(;
                                                                  alg = SquaredSOCRiskExpr()),
@@ -356,10 +357,8 @@
                     MinimumSquaredDistance(; alg = RSOCRiskExpr()), MinimumSumSquares(),
                     MinimumSumSquares(; alg = SquaredSOCRiskExpr()),
                     MinimumSumSquares(; alg = RSOCRiskExpr()))
-            thetas = [owa_l_moment_crm(T,
-                                       OWAJuMP(; slv = slv, alg = alg,
-                                               so = alg isa MaximumEntropy ? 1e-3 : 1.0);
-                                       k = k) for alg in algs]
+            thetas = [owa_l_moment_crm(T, OWAJuMP(; slv = slv, alg = alg); k = k)
+                      for alg in algs]
             for theta in thetas
                 # Every answer is in the feasible set of owa_model_setup.
                 phi = W \ theta
@@ -383,6 +382,32 @@
             @test minimum(ss[6:8]) < (1 - 1e-3) * minimum(ss[1:5])
             @test argmin(sd) in 3:5
             @test minimum(sd[3:5]) < 0.95 * minimum(sd[[1, 2, 6, 7, 8]])
+        end
+        @testset "L-moment programme: each objective gives the default scales (#1907)" begin
+            for alg in (MaximumEntropy(), MaximumEntropy(; alg = ExponentialConeEntropy()),
+                        MinimumSquaredDistance(), MinimumSumSquares())
+                @test PortfolioOptimisers.owa_constraint_scale(nothing, alg) == 1.0
+                @test PortfolioOptimisers.owa_constraint_scale(2, alg) === 2
+                @test PortfolioOptimisers.owa_objective_scale(nothing, alg) ==
+                      (alg isa MaximumEntropy ? 1e-3 : 1.0)
+                @test PortfolioOptimisers.owa_objective_scale(2, alg) === 2
+            end
+            slv = Solver(; solver = Clarabel.Optimizer, settings = Dict("verbose" => false))
+            # The default OWAJuMP solved 4 of 15 programmes at so = 1 (#1907). Its default
+            # scale now solves, and it returns the answer of the stated so = 1e-3.
+            for (T, k) in ((200, 5), (500, 4), (1000, 6))
+                w = @test_logs min_level = Logging.Warn owa_l_moment_crm(T,
+                                                                         OWAJuMP(;
+                                                                                 slv = slv);
+                                                                         k = k)
+                @test w ≈ owa_l_moment_crm(T, OWAJuMP(; slv = slv, so = 1e-3); k = k)
+            end
+            # A stated scale wins over the default of the objective.
+            @test_logs (:warn, r"Reverting to ncrra_weights") match_mode = :any owa_l_moment_crm(200,
+                                                                                                 OWAJuMP(;
+                                                                                                         slv = slv,
+                                                                                                         so = 1.0);
+                                                                                                 k = 5)
         end
         @testset "L-moment programme: a failed solve warns and falls back" begin
             slv = Solver(; solver = Clarabel.Optimizer, settings = Dict("verbose" => false))

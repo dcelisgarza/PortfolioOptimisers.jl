@@ -155,7 +155,7 @@ The objective is the Shannon entropy of the coefficients ``\\boldsymbol{\\phi}``
 
 !!! warning
 
-    Set the objective scale `so` of [`OWAJuMP`](@ref) near `1e-3` for this objective. The default `so = 1` makes the solver stop short of optimal, and [`owa_l_moment_crm`](@ref) then warns and returns the fallback weights. The steps of ``\\boldsymbol{\\theta}`` are of order ``1/T^{2}``, the entropy is of order one, and the maximiser touches the rows ``\\theta_{t+1} \\geq \\theta_{t}`` tangentially. With `max_phi = 0.75`, ``T`` from 30 to 5000 and the highest order from 4 to 10, Clarabel solved 8 of 39 programmes at `so = 1` and all 39 at `so = 1e-3`. On a grid of 20 of these programmes, `so = 1e-2` solved 17 or 18, by encoding, and `so = 1e-5` solved 19. The scale does not change the maximiser.
+    Keep the objective scale `so` of [`OWAJuMP`](@ref) near `1e-3` for this objective. The default `so = nothing` gives `1e-3` through [`owa_objective_scale`](@ref). A stated `so = 1` makes the solver stop short of optimal, and [`owa_l_moment_crm`](@ref) then warns and returns the fallback weights. The steps of ``\\boldsymbol{\\theta}`` are of order ``1/T^{2}``, the entropy is of order one, and the maximiser touches the rows ``\\theta_{t+1} \\geq \\theta_{t}`` tangentially. With `max_phi = 0.75`, ``T`` from 30 to 5000 and the highest order from 4 to 10, Clarabel solved 8 of 39 programmes at `so = 1` and all 39 at `so = 1e-3`. On a grid of 20 of these programmes, `so = 1e-2` solved 17 or 18, by encoding, and `so = 1e-5` solved 19. The scale does not change the maximiser.
 
 Equation 13 of [owa2](@cite) maximises ``\\sum_{t} \\ln \\psi_{t}`` over a vector ``\\boldsymbol{\\psi}`` subject to ``\\psi_{t} \\geq \\lvert \\theta_{t} \\rvert`` alone, and that objective has no maximum. Its intent, the entropy of the absolute OWA weights, does not select one vector either, and it is not a convex programme in the normalised form. The L-moment weight vector of order ``k`` has entries of absolute value at most ``1/T`` once ``T > k (k - 1) / 2``, measured for every order up to `10` and every ``T`` up to 600. So every feasible ``\\boldsymbol{\\theta}`` has ``\\lvert \\theta_{t} \\rvert \\leq 1/T``, and the uniform ``\\psi_{t} = 1/T`` bounds it. A probability vector ``\\boldsymbol{\\psi}`` that bounds ``\\lvert \\boldsymbol{\\theta} \\rvert`` from above then has the largest entropy ``\\log T`` at every feasible point. The library puts the entropy on the coefficients for this reason.
 
@@ -526,7 +526,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Solves a programme for the risk aversion coefficients of an L-moment OWA weight vector.
 
-`alg` selects the objective, and every objective solves over the same feasible set. [`owa_l_moment_crm`](@ref) states the programme. `sc` scales the rows and `so` scales the objective, and neither changes the solution. [`MaximumEntropy`](@ref) needs a small `so` to solve, as its docstring states.
+`alg` selects the objective, and every objective solves over the same feasible set. [`owa_l_moment_crm`](@ref) states the programme. `sc` scales the rows and `so` scales the objective, and neither changes the solution. A stated scale wins. When a scale is `nothing`, the objective gives it through [`owa_constraint_scale`](@ref) and [`owa_objective_scale`](@ref). So the default `so` is `1e-3` under [`MaximumEntropy`](@ref), which needs a small `so` to solve, as its docstring states, and `1.0` under the other objectives.
 
 When the solver fails, [`owa_model_solve`](@ref) warns and returns the weights of `NormalisedConstantRelativeRiskAversion(; g = 0.5)`. The programme is infeasible for some `max_phi` and some orders: the coefficients sum to one and each is at most `max_phi`, and the OWA weights must be nondecreasing. At `k = 2` it is always infeasible, because its one coefficient must equal one. The fallback then returns the weights of the second L-moment, which is the only answer whose coefficients sum to one. At `k = 3` with the default `max_phi = 0.5`, the rows leave the one choice ``\\boldsymbol{\\phi} = (0.5, 0.5)``, and its OWA weights decrease near the largest return, so the programme is infeasible too.
 
@@ -539,8 +539,8 @@ $(DocStringExtensions.FIELDS)
     OWAJuMP(;
         slv::Slv_VecSlv,
         max_phi::Number = 0.5,
-        sc::Number = 1.0,
-        so::Number = 1.0,
+        sc::Option{<:Number} = nothing,
+        so::Option{<:Number} = nothing,
         alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy(),
     ) -> OWAJuMP
 
@@ -550,8 +550,8 @@ Keyword arguments correspond to the struct's fields.
 
   - `!isempty(slv)`.
   - `0 < max_phi < 1`.
-  - `isfinite(sc)` and `sc > 0`.
-  - `isfinite(so)` and `so > 0`.
+  - If `sc` is not `nothing`, `isfinite(sc)` and `sc > 0`.
+  - If `so` is not `nothing`, `isfinite(so)` and `so > 0`.
 
 # Examples
 
@@ -565,8 +565,8 @@ OWAJuMP
           │     check_sol ┼ @NamedTuple{}: NamedTuple()
           │   add_bridges ┴ Bool: true
   max_phi ┼ Float64: 0.5
-       sc ┼ Float64: 1.0
-       so ┼ Float64: 1.0
+       sc ┼ nothing
+       so ┼ nothing
       alg ┼ MaximumEntropy
           │   alg ┴ RelativeEntropy()
 ```
@@ -606,8 +606,8 @@ OWAJuMP
     $(field_dict[:alg])
     """
     alg
-    function OWAJuMP(slv::Slv_VecSlv, max_phi::Number, sc::Number, so::Number,
-                     alg::AbstractOrderedWeightsArrayAlgorithm)
+    function OWAJuMP(slv::Slv_VecSlv, max_phi::Number, sc::Option{<:Number},
+                     so::Option{<:Number}, alg::AbstractOrderedWeightsArrayAlgorithm)
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -621,10 +621,96 @@ OWAJuMP
                                                                                       alg)
     end
 end
-function OWAJuMP(; slv::Slv_VecSlv, max_phi::Number = 0.5, sc::Number = 1.0,
-                 so::Number = 1.0,
+function OWAJuMP(; slv::Slv_VecSlv, max_phi::Number = 0.5, sc::Option{<:Number} = nothing,
+                 so::Option{<:Number} = nothing,
                  alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy())::OWAJuMP
     return OWAJuMP(slv, max_phi, sc, so, alg)
+end
+"""
+    owa_constraint_scale(sc::Option{<:Number}, alg::AbstractOrderedWeightsArrayAlgorithm)
+
+Return the constraint scale of the L-moment programme of [`OWAJuMP`](@ref).
+
+A stated `sc` wins. When `sc` is `nothing`, the objective `alg` gives the scale, so each objective can set the value that its programme solves at. Every objective gives `1.0` now.
+
+# Arguments
+
+  - `sc`: The `sc` field of [`OWAJuMP`](@ref).
+  - `alg`: The objective of the programme.
+
+# Returns
+
+  - `sc::Number`: The constraint scale.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.owa_constraint_scale(nothing, MaximumEntropy())
+1.0
+
+julia> PortfolioOptimisers.owa_constraint_scale(2.0, MaximumEntropy())
+2.0
+```
+
+# Related
+
+  - [`OWAJuMP`](@ref)
+  - [`AbstractOrderedWeightsArrayAlgorithm`](@ref)
+  - [`owa_objective_scale`](@ref)
+  - [`owa_model_setup`](@ref)
+"""
+function owa_constraint_scale(sc::Number, ::AbstractOrderedWeightsArrayAlgorithm)
+    return sc
+end
+function owa_constraint_scale(::Nothing, ::AbstractOrderedWeightsArrayAlgorithm)
+    return 1.0
+end
+"""
+    owa_objective_scale(so::Option{<:Number}, alg::AbstractOrderedWeightsArrayAlgorithm)
+
+Return the objective scale of the L-moment programme of [`OWAJuMP`](@ref).
+
+A stated `so` wins. When `so` is `nothing`, the objective `alg` gives the scale, so each objective can set the value that its programme solves at. [`MaximumEntropy`](@ref) gives `1e-3`, and its docstring states why. The other objectives give `1.0`.
+
+# Arguments
+
+  - `so`: The `so` field of [`OWAJuMP`](@ref).
+  - `alg`: The objective of the programme.
+
+# Returns
+
+  - `so::Number`: The objective scale.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.owa_objective_scale(nothing, MaximumEntropy())
+0.001
+
+julia> PortfolioOptimisers.owa_objective_scale(nothing, MinimumSumSquares())
+1.0
+
+julia> PortfolioOptimisers.owa_objective_scale(2.0, MaximumEntropy())
+2.0
+```
+
+# Related
+
+  - [`OWAJuMP`](@ref)
+  - [`AbstractOrderedWeightsArrayAlgorithm`](@ref)
+  - [`MaximumEntropy`](@ref)
+  - [`owa_constraint_scale`](@ref)
+  - [`owa_l_moment_crm_entropy`](@ref)
+  - [`owa_l_moment_crm_sumsq_obj`](@ref)
+"""
+function owa_objective_scale(so::Number, ::AbstractOrderedWeightsArrayAlgorithm)
+    return so
+end
+function owa_objective_scale(::Nothing, ::AbstractOrderedWeightsArrayAlgorithm)
+    return 1.0
+end
+function owa_objective_scale(::Nothing, ::MaximumEntropy)
+    return 1e-3
 end
 """
     ncrra_weights(weights::MatNum, g::Number = 0.5)
@@ -736,7 +822,7 @@ Every row is registered under no name.
 
 Where:
 
-  - $(math_dict[:sc_scale]) It is the `sc` field of `method`.
+  - $(math_dict[:sc_scale]) [`owa_constraint_scale`](@ref) gives it from the `sc` field of `method`.
   - $(math_dict[:theta_owa])
   - $(math_dict[:phi_k_lmom])
   - $(math_dict[:phi_max_owa])
@@ -747,7 +833,7 @@ Where:
 
 # Arguments
 
-  - `method`: Programme of the coefficients. The function reads `max_phi` and `sc`.
+  - `method`: Programme of the coefficients. The function reads `max_phi`, `sc` and `alg`.
   - `weights`: Signed L-moment weight matrix ``T \\times (K - 1)``.
 
 # Returns
@@ -769,7 +855,7 @@ function owa_model_setup(method::OWAJuMP, weights::MatNum)
     T, N = size(weights)
     model = JuMP.Model()
     max_phi = method.max_phi
-    sc = method.sc
+    sc = owa_constraint_scale(method.sc, method.alg)
     JuMP.@variables(model, begin
                         theta[1:T]
                         phi[1:N]
@@ -869,7 +955,7 @@ Every row is registered under no name. Under [`MaximumEntropy`](@ref) the method
 
 Where:
 
-  - $(math_dict[:sc_scale]) It is the `sc` field of `method`.
+  - $(math_dict[:sc_scale]) [`owa_constraint_scale`](@ref) gives it from the `sc` field of `method`.
   - $(math_dict[:theta_owa])
   - ``\\boldsymbol{d}``: Differences of adjacent OWA weights, ``d_{t} = \\theta_{t+1} - \\theta_{t}`` for ``t = 1, \\ldots, T - 1``.
   - $(math_dict[:K_q_norm])
@@ -937,8 +1023,8 @@ Where:
 
   - $(math_dict[:phi_k_lmom])
   - $(math_dict[:theta_owa])
-  - $(math_dict[:sc_scale]) It is the `sc` field of `method`.
-  - $(math_dict[:so_scale]) It is the `so` field of `method`.
+  - $(math_dict[:sc_scale]) [`owa_constraint_scale`](@ref) gives it from the `sc` field of `method`.
+  - $(math_dict[:so_scale]) [`owa_objective_scale`](@ref) gives it from the `so` field of `method`.
   - ``\\mathcal{K}_{\\mathrm{rel}} = \\{(u, \\boldsymbol{v}, \\boldsymbol{z}) : u \\geq \\sum_{i} z_{i} \\log(z_{i} / v_{i}),\\, \\boldsymbol{v}, \\boldsymbol{z} \\geq 0\\}``: Relative entropy cone.
   - $(math_dict[:K_exp])
   - $(math_dict[:K_lmom])
@@ -968,8 +1054,8 @@ Where:
 function owa_l_moment_crm_entropy(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
                                                   <:MaximumEntropy{<:RelativeEntropy}},
                                   model::JuMP.Model)
-    sc = method.sc
-    so = method.so
+    sc = owa_constraint_scale(method.sc, method.alg)
+    so = owa_objective_scale(method.so, method.alg)
     phi = model[:phi]
     N = length(phi)
     ovec = range(sc, sc; length = N)
@@ -982,8 +1068,8 @@ end
 function owa_l_moment_crm_entropy(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
                                                   <:MaximumEntropy{<:ExponentialConeEntropy}},
                                   model::JuMP.Model)
-    sc = method.sc
-    so = method.so
+    sc = owa_constraint_scale(method.sc, method.alg)
+    so = owa_objective_scale(method.so, method.alg)
     phi = model[:phi]
     N = length(phi)
     JuMP.@variable(model, t[1:N])
@@ -1020,7 +1106,7 @@ Set the objective of a [`SquaredOrderedWeightsArrayAlgorithm`](@ref) programme o
 
 Where:
 
-  - $(math_dict[:so_scale]) It is the `so` field of `method`.
+  - $(math_dict[:so_scale]) [`owa_objective_scale`](@ref) gives it from the `so` field of `method`.
 
 # Arguments
 
@@ -1047,21 +1133,21 @@ Where:
 function owa_l_moment_crm_sumsq_obj(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
                                                     <:SquaredOrderedWeightsArrayAlgorithm{<:UnionRSOCSOCRiskExpr}},
                                     model::JuMP.Model)
-    so = method.so
+    so = owa_objective_scale(method.so, method.alg)
     t = model[:t]
     JuMP.@objective(model, Min, so * t)
 end
 function owa_l_moment_crm_sumsq_obj(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
                                                     <:SquaredOrderedWeightsArrayAlgorithm{<:SquaredSOCRiskExpr}},
                                     model::JuMP.Model)
-    so = method.so
+    so = owa_objective_scale(method.so, method.alg)
     t = model[:t]
     JuMP.@objective(model, Min, so * t^2)
 end
 function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
                                           <:MinimumSquaredDistance{<:UnionSOCRiskExpr}},
                           weights::MatNum)
-    sc = method.sc
+    sc = owa_constraint_scale(method.sc, method.alg)
     model = owa_model_setup(method, weights)
     theta = model[:theta]
     JuMP.@variable(model, t)
@@ -1074,7 +1160,7 @@ end
 function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
                                           <:MinimumSquaredDistance{<:RSOCRiskExpr}},
                           weights::MatNum)
-    sc = method.sc
+    sc = owa_constraint_scale(method.sc, method.alg)
     model = owa_model_setup(method, weights)
     theta = model[:theta]
     JuMP.@variable(model, t)
@@ -1087,7 +1173,7 @@ end
 function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
                                           <:MinimumSumSquares{<:UnionSOCRiskExpr}},
                           weights::MatNum)
-    sc = method.sc
+    sc = owa_constraint_scale(method.sc, method.alg)
     model = owa_model_setup(method, weights)
     theta = model[:theta]
     JuMP.@variable(model, t)
@@ -1098,7 +1184,7 @@ end
 function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
                                           <:MinimumSumSquares{<:RSOCRiskExpr}},
                           weights::MatNum)
-    sc = method.sc
+    sc = owa_constraint_scale(method.sc, method.alg)
     model = owa_model_setup(method, weights)
     theta = model[:theta]
     JuMP.@variable(model, t)
