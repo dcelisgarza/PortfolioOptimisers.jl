@@ -9,6 +9,10 @@ The coefficient is the limit ``\\lambda_L = \\lim_{v \\to 0^{+}} \\Pr[U_1 \\leq 
 
 The library counts the joint exceedances and divides the count by ``k = \\lceil T \\alpha \\rceil``. This is the rank form of the empirical lower tail copula at ``(1,\\, 1)`` in Equations 12 and 16 of Section 4 of [schmidt2006](@cite). [luca2011](@cite) estimates the coefficient from a fitted Archimedean copula, so it does not state this estimator. `alpha` sets the tail fraction ``k / T``, so `alpha` is the threshold of that estimator.
 
+!!! warning
+
+    The estimate is biased, not only noisy. At a fixed `alpha`, it converges to the ratio ``C(\\alpha,\\, \\alpha) / \\alpha`` as ``T`` grows, and not to the limit ``\\lambda_L``. A Gaussian copula has ``\\lambda_L = 0`` at each correlation below `1`, but at correlation `0.6` and `alpha = 0.05` its ratio is about `0.31`. So a Gaussian sample shows a strong lower tail dependence that its model does not have. To compare a model with an estimate, compare the ratio of the model at the same `alpha`, not its limit. [`lower_tail_dependence`](@ref) gives the ratio at more levels.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -154,6 +158,18 @@ Where:
 
 The function clamps each entry of the symmetric result to ``[\\sqrt{\\varepsilon},\\, 1]``, where ``\\varepsilon`` is the machine epsilon of `eltype(X)`. The floor is not zero. A pair whose tails never coincide gets `1.4901161193847656e-8` for a `Float64` input, so a caller can divide by an entry or take its logarithm.
 
+!!! warning
+
+    The estimate is biased, not only noisy, and the bias decreases slowly with `alpha`. At a fixed `alpha`, the joint count over ``k`` converges to ``C(\\alpha,\\, \\alpha) / \\alpha`` as ``T`` grows, where ``C`` is the copula of the pair. That ratio is the conditional probability at the level `alpha`, and not its limit ``\\lambda_L`` at zero. The multivariate normal distribution is lower tail independent, so a Gaussian copula with a correlation ``\\rho < 1`` has ``\\lambda_L = 0``. But its ratio is far from zero at the levels that a sample of returns can support:
+
+    | ``\\rho`` | `alpha = 0.05` | `alpha = 0.01` | `alpha = 0.001` |
+    |:--------- | --------------:| --------------:| ---------------:|
+    | `0.3`     | `0.143`        | `0.056`        | `0.015`         |
+    | `0.6`     | `0.310`        | `0.188`        | `0.095`         |
+    | `0.8`     | `0.495`        | `0.377`        | `0.263`         |
+
+    A smaller `alpha` decreases the bias, but it also decreases ``k``, so the variance of the estimate increases. The choice of ``k`` is thus a variance-bias problem, and the finite-sample bias increases with the correlation. Do not read a positive estimate as evidence of tail dependence. A Gaussian sample with correlation `0.6` gives about `0.31` at `alpha = 0.05`. To compare a model with an estimate, compare the ratio of the model at the same `alpha`, not its limit.
+
 # Algorithm
 
  1. Set ``k = \\lceil T \\alpha \\rceil``, the number of observations in the lower tail. Allocate the result as a matrix of zeros. The allocation is `zeros` and not `undef`, so the caller gets zeros and not uninitialised memory when `k` is not positive.
@@ -182,6 +198,10 @@ The function clamps each entry of the symmetric result to ``[\\sqrt{\\varepsilon
 
   - [`LowerTailDependenceCovariance`](@ref)
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-ex)
+
+# References
+
+  - $(ref_dict[:schmidt2006]) Section 2, the tail independence of the multivariate normal distribution. Section 4, the variance-bias problem of the choice of ``k``. Section 7.1, Table 1, the finite-sample bias.
 """
 function lower_tail_dependence(X::MatNum, alpha::Number = 0.05,
                                ex::FLoops.Transducers.Executor = FLoops.SequentialEx())

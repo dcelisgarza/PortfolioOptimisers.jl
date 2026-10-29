@@ -1708,7 +1708,7 @@ Every test below pins a CLAIM the documentation makes, computed a second way. #4
 condition 2 is "checked with real numbers. Not read -- run", and a claim no test holds is a
 claim the next reader has to re-derive.
 
-THREE FACTS SHAPE THE PROBES.
+FOUR FACTS SHAPE THE PROBES.
 
 1. `StatsBase.corspearman` and `StatsBase.corkendall` are TIE-CORRECTED. The textbook closed
    forms -- Spearman's `1 - 6 sum(d^2) / (T(T^2-1))` and Kendall's `(C-D)/binomial(T,2)` --
@@ -1725,8 +1725,14 @@ THREE FACTS SHAPE THE PROBES.
    of any positive real is at least 1, so `alpha = nextfloat(0.0)` on a non-empty matrix
    still selects one observation. The cases that do reach it are `alpha <= 0` on a direct
    call, and a matrix with no observation. The docstring said otherwise before #458.
+
+4. `lower_tail_dependence` is BIASED at a fixed `alpha`. It converges to `C(alpha, alpha) /
+   alpha`, not to the limit at zero, so a Gaussian copula, whose limit is 0, measures about
+   0.31 at correlation 0.6 and `alpha = 0.05`. Both docstrings carry that warning since #1093,
+   and the testset below holds the number against the closed form of the Gaussian copula.
 =#
 using Test, PortfolioOptimisers, Statistics, StatsBase, LinearAlgebra, StableRNGs, FLoops
+using Distributions: Distributions
 
 @testset "Distance covariance: the doubly-centred statistic" begin
     rng = StableRNG(987654321)
@@ -1888,6 +1894,35 @@ end
     # The estimator rules the first case out at construction.
     @test_throws DomainError LowerTailDependenceCovariance(; alpha = 0.0)
     @test_throws DomainError LowerTailDependenceCovariance(; alpha = 1.0)
+end
+
+@testset "Lower tail dependence: the bias at a fixed alpha, #1093" begin
+    # C(a, a) / a for the Gaussian copula, by the trapezoid rule on the conditional form
+    # Phi_2(q, q; rho) = int_{-Inf}^{q} phi(x) Phi((q - rho x) / sqrt(1 - rho^2)) dx.
+    function gaussian_ratio(rho, alpha; n = 100_000)
+        nd = Distributions.Normal()
+        q = Distributions.quantile(nd, alpha)
+        s = sqrt(1 - rho^2)
+        f(x) = Distributions.pdf(nd, x) * Distributions.cdf(nd, (q - rho * x) / s)
+        xs = range(-12.0, q; length = n + 1)
+        return step(xs) * (sum(f, xs) - (f(first(xs)) + f(last(xs))) / 2) / alpha
+    end
+    # The table of the docstring of `lower_tail_dependence`.
+    @test round(gaussian_ratio(0.3, 0.05); digits = 3) == 0.143
+    @test round(gaussian_ratio(0.6, 0.05); digits = 3) == 0.310
+    @test round(gaussian_ratio(0.6, 0.001); digits = 3) == 0.095
+    @test round(gaussian_ratio(0.8, 0.01); digits = 3) == 0.377
+
+    # A Gaussian sample: the limit is 0, and the estimate sits on the ratio instead.
+    rho = 0.6
+    Z = randn(StableRNG(1093), 200_000, 2)
+    X = hcat(Z[:, 1], rho * Z[:, 1] + sqrt(1 - rho^2) * Z[:, 2])
+    for (alpha, atol) in ((0.05, 0.015), (0.01, 0.03))
+        est = PortfolioOptimisers.lower_tail_dependence(X, alpha)[1, 2]
+        @test isapprox(est, gaussian_ratio(rho, alpha); atol = atol)
+    end
+    ce = LowerTailDependenceCovariance(; ex = FLoops.SequentialEx())
+    @test cor(ce, X)[1, 2] > 0.29
 end
 
 @testset "Rank covariances: the tie correction" begin
