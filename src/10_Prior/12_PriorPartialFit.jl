@@ -1785,10 +1785,10 @@ The equality holds for `mu`, `sigma`, `X` and `eoc`, with and without a horizon,
  1. Read the carry state with [`partial_fit_cache`](@ref), giving `state`.
  2. Resolve the fill limit against the coverage floor of the members with [`resolve_fill_limit`](@ref), as the batch method does, giving `fill_limit`.
  3. Drop the carried rows of a Shared Series gap with [`shared_series_buffer`](@ref), and read the rows that remain with [`sample_buffer`](@ref), giving `X`. Under the horizon method, take `log1p` of the rows, giving `Xl`.
- 4. Read `mu` and `sigma` through [`read_member`](@ref), which refits a member that did not fold over `X`, or over `Xl` under the horizon method. A member that it refits also takes the panel of [`buffer_asset_panel`](@ref), and the implied volatilities and `ivpa` that [`implied_volatility_buffer_kwargs`](@ref) reads from the carried buffer, as the batch verb gives `rd.pnl`, `rd.iv` and `rd.ivpa` to both members. A covariance that it refits is the [`library_covariance_estimator`](@ref) of `pe.ce`, as in the batch verb. An [`ImpliedVolatility`](@ref) has no fold, so it is such a member.
+ 4. Read `mu` and `sigma` through [`read_member`](@ref), which refits a member that did not fold over `X`, or over `Xl` under the horizon method. The mean comes from [`mean_with_count`](@ref), with the count `T_mu` that its fit states. A member that it refits also takes the panel of [`buffer_asset_panel`](@ref), and the implied volatilities and `ivpa` that [`implied_volatility_buffer_kwargs`](@ref) reads from the carried buffer, as the batch verb gives `rd.pnl`, `rd.iv` and `rd.ivpa` to both members. A covariance that it refits is the [`library_covariance_estimator`](@ref) of `pe.ce`, as in the batch verb. An [`ImpliedVolatility`](@ref) has no fold, so it is such a member.
  5. Under the horizon method, convert `mu` and `sigma` with [`horizon_moments!`](@ref).
  6. Cut the carried rows to `pe.max_scenarios` with [`scenario_window`](@ref), and copy them into a new matrix `Xs`, because the next fold writes into the storage of the buffer.
- 7. Fill `Xs` with [`scenario_fill`](@ref), and build a [`LowOrderPrior`](@ref) whose `eoc` [`scenario_moment_counts`](@ref) reads from the rows before the cut, the log-returns under a horizon.
+ 7. Fill `Xs` with [`scenario_fill`](@ref), and build a [`LowOrderPrior`](@ref) whose `eoc` [`scenario_moment_counts`](@ref) reads from `T_mu` and the rows before the cut, the log-returns under a horizon.
  8. Record the observations of the buffer that step 3 dropped with [`shared_series_record`](@ref), and return the prior.
 
 # Arguments
@@ -1826,7 +1826,7 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any,
     X = sample_buffer(buf)
     pnl = buffer_asset_panel(buf)
     vols = implied_volatility_buffer_kwargs(buf)
-    mu = vec(read_member(Statistics.mean, pe.me, X, pnl; vols..., kwargs...))
+    mu, T_mu = read_member(mean_with_count, pe.me, X, pnl; vols..., kwargs...)
     # A raw `StatsBase` estimator has no Coverage Policy, so it peels nothing and takes no
     # `strict`.
     shared = isa(pe.ce, AbstractCovarianceEstimator) ? (; strict = strict) : (;)
@@ -1838,7 +1838,8 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any,
     Xs = Matrix(scenario_window(pe.max_scenarios, X))
     pr = LowOrderPrior(; X = scenario_fill(Xs, mu, sigma, strict, fill_limit, state.named),
                        mu = mu, sigma = sigma,
-                       eoc = scenario_moment_counts(pe, X, size(Xs, 1)), x_src = pe.x_src)
+                       eoc = scenario_moment_counts(pe, X, size(Xs, 1), T_mu),
+                       x_src = pe.x_src)
     return shared_series_record(pr, state.buf)
 end
 function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
@@ -1853,7 +1854,7 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
     Xl = log1p.(X)
     pnl = buffer_asset_panel(buf)
     vols = implied_volatility_buffer_kwargs(buf)
-    mu = vec(read_member(Statistics.mean, pe.me, Xl, pnl; vols..., kwargs...))
+    mu, T_mu = read_member(mean_with_count, pe.me, Xl, pnl; vols..., kwargs...)
     # A raw `StatsBase` estimator has no Coverage Policy, so it peels nothing and takes no
     # `strict`.
     shared = isa(pe.ce, AbstractCovarianceEstimator) ? (; strict = strict) : (;)
@@ -1864,7 +1865,8 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
     Xs = Matrix(scenario_window(pe.max_scenarios, X))
     pr = LowOrderPrior(; X = scenario_fill(Xs, mu, sigma, strict, fill_limit, state.named),
                        mu = mu, sigma = sigma,
-                       eoc = scenario_moment_counts(pe, Xl, size(Xs, 1)), x_src = pe.x_src)
+                       eoc = scenario_moment_counts(pe, Xl, size(Xs, 1), T_mu),
+                       x_src = pe.x_src)
     return shared_series_record(pr, state.buf)
 end
 """

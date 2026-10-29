@@ -318,7 +318,7 @@ This method takes the arithmetic moments of `X`. It applies no log transform, so
 
 # The counts of the moments
 
-The result states in `eoc` the effective number of observations of `mu` and of `sigma`, through [`scenario_moment_counts`](@ref). `pe.me` and `pe.ce` each state the count of their own moment with [`effective_observation_count`](@ref). An unweighted estimator is worth `size(X, 1)` observations, and a weighted one, such as an exponentially weighted covariance, is worth the count of its weights. When the cap cuts, the count of an unweighted moment is the number of observations that the moments read. A consumer that prices a sample size reads these counts and not the number of carried rows. An entry equal to the number of carried rows stays `nothing`.
+The result states in `eoc` the effective number of observations of `mu` and of `sigma`, through [`scenario_moment_counts`](@ref). `pe.me` and `pe.ce` each state the count of their own moment with [`effective_observation_count`](@ref). A [`PriorExpectedReturns`](@ref) in `pe.me` states the count that its prior states for the mean, and [`mean_with_count`](@ref) reads it from the one fit of that prior. An unweighted estimator is worth `size(X, 1)` observations, and a weighted one, such as an exponentially weighted covariance, is worth the count of its weights. When the cap cuts, the count of an unweighted moment is the number of observations that the moments read. A consumer that prices a sample size reads these counts and not the number of carried rows. An entry equal to the number of carried rows stays `nothing`.
 
 # The scenario fill
 
@@ -371,7 +371,7 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any}, X::MatNum,
     # constructor. A limit looser than admission refuses here (see
     # [`resolve_fill_limit`](@ref)).
     fill_limit = resolve_fill_limit(pe.fill_limit, coverage_floor(pe))
-    mu = vec(Statistics.mean(pe.me, X, pnl; dims = 1, kwargs...))
+    mu, T_mu = mean_with_count(pe.me, X, pnl; dims = 1, kwargs...)
     sigma = Statistics.cov(library_covariance_estimator(pe.ce), X, pnl; dims = 1,
                            strict = strict, kwargs...)
     # The Scenario Cap cuts the rows the result carries and leaves the moments above it
@@ -382,7 +382,8 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any}, X::MatNum,
     # investable and its column still carries the gap. The fill is paid once, here, because
     # every consumer of the result reads that column (see [`scenario_fill`](@ref)).
     return LowOrderPrior(; X = scenario_fill(Xs, mu, sigma, strict, fill_limit), mu = mu,
-                         sigma = sigma, eoc = scenario_moment_counts(pe, X, size(Xs, 1)))
+                         sigma = sigma,
+                         eoc = scenario_moment_counts(pe, X, size(Xs, 1), T_mu))
 end
 """
     prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any}, X::MatNum,
@@ -440,7 +441,7 @@ Steps 5 to 7 must run in this order. Step 6 reads the `mu` that step 5 left, whi
 
 # The counts of the moments
 
-The result states in `eoc` the effective number of observations of `mu` and of `sigma`, through [`scenario_moment_counts`](@ref). `pe.me` and `pe.ce` each state the count of their own moment with [`effective_observation_count`](@ref). An unweighted estimator is worth `size(X, 1)` observations, and a weighted one, such as an exponentially weighted covariance, is worth the count of its weights. When the cap cuts, the count of an unweighted moment is the number of observations that the moments read. A consumer that prices a sample size reads these counts and not the number of carried rows. An entry equal to the number of carried rows stays `nothing`.
+The result states in `eoc` the effective number of observations of `mu` and of `sigma`, through [`scenario_moment_counts`](@ref). `pe.me` and `pe.ce` each state the count of their own moment with [`effective_observation_count`](@ref). A [`PriorExpectedReturns`](@ref) in `pe.me` states the count that its prior states for the mean, and [`mean_with_count`](@ref) reads it from the one fit of that prior. An unweighted estimator is worth `size(X, 1)` observations, and a weighted one, such as an exponentially weighted covariance, is worth the count of its weights. When the cap cuts, the count of an unweighted moment is the number of observations that the moments read. A consumer that prices a sample size reads these counts and not the number of carried rows. An entry equal to the number of carried rows stays `nothing`.
 
 # The scenario fill
 
@@ -483,7 +484,7 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any}, X::MatNum,
     X = dims_oriented(dims, X)
     fill_limit = resolve_fill_limit(pe.fill_limit, coverage_floor(pe))
     X_log = log1p.(X)
-    mu = vec(Statistics.mean(pe.me, X_log, pnl; dims = 1, kwargs...))
+    mu, T_mu = mean_with_count(pe.me, X_log, pnl; dims = 1, kwargs...)
     sigma = Statistics.cov(library_covariance_estimator(pe.ce), X_log, pnl; dims = 1,
                            strict = strict, kwargs...)
     horizon_moments!(mu, sigma, pe.horizon)
@@ -492,7 +493,7 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any}, X::MatNum,
     # because the Investable Mask is read off the arithmetic moments the result carries.
     return LowOrderPrior(; X = scenario_fill(Xs, mu, sigma, strict, fill_limit), mu = mu,
                          sigma = sigma,
-                         eoc = scenario_moment_counts(pe, X_log, size(Xs, 1)))
+                         eoc = scenario_moment_counts(pe, X_log, size(Xs, 1), T_mu))
 end
 
 function factor_residual_config(::EmpiricalPrior)

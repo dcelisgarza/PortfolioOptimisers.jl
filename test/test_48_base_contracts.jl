@@ -1260,6 +1260,69 @@ struct PlainCokurtosis1893 <: PortfolioOptimisers.CokurtosisEstimator end
               pe.sample_matrix_processing!(dn, kM * hf.fpr.kt * transpose(kM), hf.X, kish)
     end
 end
+# A stand-in prior that counts its batch fits, so a test can see how often a mean fits it.
+struct CountingPrior1913 <: PortfolioOptimisers.AbstractLowOrderPriorEstimator
+    pe::Any
+    n::Base.RefValue{Int}
+end
+function PortfolioOptimisers.prior(pe::CountingPrior1913, X::PortfolioOptimisers.MatNum,
+                                   F = nothing, pnl = nothing; kwargs...)
+    pe.n[] += 1
+    return prior(pe.pe, X, F, pnl; kwargs...)
+end
+PortfolioOptimisers.needs_factor_returns(::CountingPrior1913) = false
+@testset "A mean that a prior fits states the count of the prior (#1913)" begin
+    pe = PortfolioOptimisers
+    rng = StableRNG(1913)
+    X = randn(rng, 200, 4) .* 0.01
+    T = size(X, 1)
+    em = ExpWeightedExpectedReturns(; decay = 0.98)
+    Tm = pe.effective_observation_count(em, X)
+    inner = EmpiricalPrior(; me = em)
+    me = PriorExpectedReturns(; pe = inner)
+    @testset "The verb reads entry 1 of the eoc of the prior" begin
+        @test Tm < T
+        @test pe.effective_observation_count(me, X) ≈ Tm
+        @test pe.effective_observation_count(ShrunkExpectedReturns(; me = me), X) ≈ Tm
+        @test pe.effective_observation_count(PriorExpectedReturns(), X) === T
+        # The fold keeps every row it read, so the form with no data counts all of them.
+        f = partial_fit!(partial_fit!(me, X[1:150, :]), X[151:end, :])
+        @test pe.effective_observation_count(f) ≈ Tm
+        @test pe.mean_with_count(f)[2] ≈ Tm
+        @test pe.mean_with_count(f)[1] ≈ vec(mean(f))
+    end
+    @testset "An EmpiricalPrior states the count, and fits the inner prior once" begin
+        @test pe.mean_with_count(em, X, nothing) == (vec(mean(em, X)), nothing)
+        pr = prior(EmpiricalPrior(; me = me), X)
+        @test pr.eoc[1] ≈ Tm
+        @test isnothing(pr.eoc[2])
+        @test pr.mu ≈ prior(inner, X).mu
+        @test prior(EmpiricalPrior(; me = me, horizon = 2), X).eoc[1] ≈ Tm
+        @test prior(EmpiricalPrior(; me = me, max_scenarios = 50), X).eoc == (Tm, T)
+        @test prior(EmpiricalPrior(; me = PriorExpectedReturns()), X).eoc ==
+              (nothing, nothing)
+        # A pooling prior knows its count only after the fit: the Kish count of its weights.
+        ep = EntropyPoolingPrior(;
+                                 sets = UniverseSets(;
+                                                     dict = Dict("nx" =>
+                                                                     ["A", "B", "C", "D"])),
+                                 mu_views = LinearConstraintEstimator(; val = "A == 0.002"))
+        w = prior(ep, X).w
+        kish = sum(w)^2 / sum(abs2, w)
+        @test kish < T
+        @test prior(EmpiricalPrior(; me = PriorExpectedReturns(; pe = ep)), X).eoc[1] ≈ kish
+        n = Ref(0)
+        cp = PriorExpectedReturns(; pe = CountingPrior1913(inner, n))
+        @test prior(EmpiricalPrior(; me = cp), X).eoc[1] ≈ Tm
+        @test n[] == 1
+        # The carry route refits the mean from its buffer, and reads the count of that fit.
+        fe = partial_fit!(partial_fit!(EmpiricalPrior(; me = cp), X[1:150, :]),
+                          X[151:end, :])
+        n[] = 0
+        @test prior(fe).eoc[1] ≈ Tm
+        @test n[] == 1
+    end
+end
 @testset "A rolling window has no fold, and a seed window folds" begin
     pe = PortfolioOptimisers
     rng = StableRNG(2)

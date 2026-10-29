@@ -1046,12 +1046,15 @@ function assert_scenario_model(pe::CrossSectionalFactorPrior)
     return assert_scenario_model(pe.pe)
 end
 """
-    scenario_moment_counts(pe::EmpiricalPrior, X::MatNum, t::Integer)
+    scenario_moment_counts(pe::EmpiricalPrior, X::MatNum, t::Integer,
+                           T_mu::Option{<:Real} = nothing)
         -> Tuple{Option{<:Real}, Option{<:Real}}
 
 State the effective number of observations of the mean and of the covariance of an empirical Prior Result, in the form of its field `eoc`.
 
 `pe.me` fits `mu` and `pe.ce` fits `sigma` over every row of `X`. Each estimator states the number of observations that its moment is worth with [`effective_observation_count`](@ref). That is `size(X, 1)` for an unweighted estimator, and the count of its weights for a weighted one, such as the Kish count of an exponentially weighted covariance. The two estimators can carry different weights, so each moment has its own count.
+
+`T_mu` is the count of the mean that the fit of `mu` stated, from [`mean_with_count`](@ref). A [`PriorExpectedReturns`](@ref) states it, because its count is known only after the fit of its prior. When `T_mu` is `nothing`, the function reads the count of `pe.me` with [`effective_observation_count`](@ref).
 
 A Scenario Cap cuts the rows that the result carries to the last `t`, and leaves the moments fitted over every row. [`scenario_window`](@ref) makes the cut. A consumer that reads `size(pr.X, 1)` then reads `t` rows for moments fitted over `size(X, 1)`. So an entry of `eoc` states the count whenever it is not `t`, and `nothing` otherwise, through [`moment_count_entry`](@ref). A fit with no cap and no weights states `(nothing, nothing)`.
 
@@ -1062,6 +1065,7 @@ It is the same function in batch and in `prior(pe)` with no data after a fold, a
   - `pe`: Empirical prior estimator.
   - `X`: The returns that the moments were fitted over, `observations × assets`, **before** the cut. Under a horizon they are the log-returns.
   - `t`: The number of rows that the result carries, after the cut.
+  - `T_mu`: The count of the mean that the fit of `mu` stated, or `nothing`.
 
 # Returns
 
@@ -1071,13 +1075,65 @@ It is the same function in batch and in `prior(pe)` with no data after a fold, a
 
   - [`scenario_window`](@ref)
   - [`effective_observation_count`](@ref)
+  - [`mean_with_count`](@ref)
   - [`moment_count_entry`](@ref)
   - [`EmpiricalPrior`](@ref)
   - [`LowOrderPrior`](@ref)
 """
-function scenario_moment_counts(pe::EmpiricalPrior, X::MatNum, t::Integer)
-    return (moment_count_entry(effective_observation_count(pe.me, X), t),
+function scenario_moment_counts(pe::EmpiricalPrior, X::MatNum, t::Integer,
+                                T_mu::Option{<:Real} = nothing)
+    # The count of a mean that a fit states wins, so the second fit of a prior is not paid.
+    T_mu = isnothing(T_mu) ? effective_observation_count(pe.me, X) : T_mu
+    return (moment_count_entry(T_mu, t),
             moment_count_entry(effective_observation_count(pe.ce, X), t))
+end
+"""
+    mean_with_count(me::AbstractExpectedReturnsEstimator, X::MatNum,
+                    pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    mean_with_count(me::AbstractExpectedReturnsEstimator; kwargs...)
+
+Fit the mean of `me` as a vector, and return it with the count of the mean that the fit states.
+
+An [`EmpiricalPrior`](@ref) reads its mean through this function, and gives the count to [`scenario_moment_counts`](@ref). Most mean estimators state their count before the fit, with [`effective_observation_count`](@ref), so the function returns `nothing` as their count. A [`PriorExpectedReturns`](@ref) reads the `mu` of a prior that it fits, and a pooling prior knows its count only after its fit. So its method returns entry 1 of the `eoc` of that prior result, and the prior is fitted once.
+
+The form with no data reads a folded estimator, as `Statistics.mean(me)` does.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. On a mean estimator with no method of its own, fit `mu` with `Statistics.mean`, and return `vec(mu)` with the count `nothing`.
+ 2. On [`PriorExpectedReturns`](@ref), fit the prior result `pr` with [`prior`](@ref), with no factor returns. Return `vec(pr.mu)` with the count of the mean of `pr`, from [`moment_observation_count`](@ref). The form with no data reads `prior(me.pe)`.
+
+# Arguments
+
+  - `me`: The expected returns estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:pnl_moment])
+  - $(arg_dict[:dims])
+  - `kwargs...`: Forwarded to the fit of the mean.
+
+# Validation
+
+  - Everything the fit of the mean refuses.
+
+# Returns
+
+  - `(mu, T_mu)::Tuple`: The mean vector `mu`, and its count `T_mu`, a `Real` or `nothing`.
+
+# Related
+
+  - [`scenario_moment_counts`](@ref)
+  - [`effective_observation_count`](@ref)
+  - [`PriorExpectedReturns`](@ref)
+  - [`EmpiricalPrior`](@ref)
+"""
+function mean_with_count(me::AbstractExpectedReturnsEstimator, X::MatNum,
+                         pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    return vec(Statistics.mean(me, X, pnl; dims = dims, kwargs...)), nothing
+end
+function mean_with_count(me::AbstractExpectedReturnsEstimator; kwargs...)
+    return vec(Statistics.mean(me; kwargs...)), nothing
 end
 """
     scenario_fill_report(filled, ::Nothing)

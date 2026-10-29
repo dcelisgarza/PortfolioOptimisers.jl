@@ -46,7 +46,12 @@ the exact count of the variance of a weighted mean of independent draws.
    default on `AbstractExpectedReturnsEstimator`, `CoskewnessEstimator` and `CokurtosisEstimator`,
    and methods on the members that weight their rows. `EmpiricalPrior` writes the counts of `me`
    and of `ce`. The two can carry different weights, so one number cannot hold both. A count equal
-   to the rows that the result carries is written as `nothing`.
+   to the rows that the result carries is written as `nothing`. A `PriorExpectedReturns` states
+   entry 1 of the `eoc` of the prior that it fits, because its mean is the `mu` of that prior. A
+   pooling prior knows that count only after its fit, so `effective_observation_count` fits the
+   prior. `EmpiricalPrior` reads its mean through the internal `mean_with_count`, which returns
+   the mean and the count of one fit. Its default gives `nothing` as the count, and
+   `EmpiricalPrior` then reads `effective_observation_count`.
 4. **A Scenario Cap writes its count in `eoc`, and `ens` is a diagnostic of `w` alone.** The cap
    fits every moment over every row, so each entry is the number of observations of the fit.
 5. **A pooling prior keeps the counts of its refit.** It refits its prior under its weights `w`, so
@@ -78,6 +83,11 @@ the exact count of the variance of a weighted mean of independent draws.
   When every estimator reads `w`, the two rules give the same number.
 - **A calibration rule reads the count of the covariance.** Rejected for the smallest count, which
   never prices more information than the result holds.
+- **`EmpiricalPrior` reads the count of a `PriorExpectedReturns` from `effective_observation_count`
+  alone.** Rejected. The verb fits the prior a second time, once for `mu` and once for the count.
+- **The count of a `PriorExpectedReturns` forwards to the `me` of an inner `EmpiricalPrior`, and is
+  `size(X, 1)` for any other prior.** Rejected. It is wrong for a pooling prior, whose count comes
+  from its refit.
 
 ## Consequences
 
