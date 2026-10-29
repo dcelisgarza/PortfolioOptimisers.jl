@@ -604,3 +604,25 @@ end
         @test all(isapprox.(S32, fit(Float64, method); rtol = 1e-4))
     end
 end
+
+@testset "the estimated Mahalanobis lattice starts at its seed on a BigFloat" begin
+    # The lattice seeds at ln(eps) + ln(1 - decay), and the grid that shares its points began at
+    # -61 + ln(1 - decay). An epsilon below e^-61 put the seed below the grid, so the offset of
+    # the seed was negative and the fit raised a BoundsError (R11 of #1817). A precision of 96
+    # bits has an epsilon of 2.5e-29, below e^-61 = 3.2e-27. Measured: each factor is within
+    # 1.6e-14 of the Float64 factor.
+    setprecision(BigFloat, 96) do
+        for (mb, m64) in ((PO.FirstMomentRegimeAdjusted(; x = sqrt(2 / big(pi))),
+                           PO.FirstMomentRegimeAdjusted(; x = sqrt(2 / pi))),
+                          (PO.LogRegimeAdjusted(; x = big(0.5), y = big(2.0)),
+                           PO.LogRegimeAdjusted(; x = 0.5, y = 2.0)))
+            fb = PO.mahalanobis_level_bias(mb, big(0.9), [20], 4, nothing,
+                                           EstimatedCentring())
+            @test eltype(fb) == BigFloat
+            @test all(isfinite, fb)
+            @test isapprox(Float64.(fb),
+                           PO.mahalanobis_level_bias(m64, 0.9, [20], 4, nothing,
+                                                     EstimatedCentring()); rtol = 1e-12)
+        end
+    end
+end

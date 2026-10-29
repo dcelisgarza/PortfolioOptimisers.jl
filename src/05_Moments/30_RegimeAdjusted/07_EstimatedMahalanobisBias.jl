@@ -256,7 +256,9 @@ function estimated_mahalanobis_level_bias(method::RegimeAdjustedMethod, decay::N
     # The output grid reaches 50 at a normalisation of one, so `xf` does too, with one stencil.
     lat = estimated_bias_lattice(decay, hac_lags, x0, 51 * one(T), Complex{T})
     hf = lat.h
-    j0 = ceil(Int, (x0 - (-61 + log1p(-decay))) / hf)
+    # `xf` starts at the seed when the seed is below its usual start, as it is for a type whose
+    # epsilon is below e^-61, such as a BigFloat. Otherwise `j0` is negative.
+    j0 = max(0, ceil(Int, (x0 - (-61 + log1p(-decay))) / hf))
     grid = mahalanobis_bias_grid(decay, hf, x0 - j0 * hf, 50 + 8 * hf)
     NF = length(grid.xf)
     cols = (; g = zeros(T, NF), r = zeros(T, NF), vt = zeros(T, NF), rt = zeros(T, NF))
