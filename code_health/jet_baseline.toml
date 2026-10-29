@@ -8,7 +8,7 @@ jet = "0.13.1"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "StatsPlots"]
-commit = "9f7e0ac503"
+commit = "3f6c9b3deb"
 
 [run.main]
 load_set = ["GraphRecipes", "StatsPlots"]
@@ -77,7 +77,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/03_InputData/08_PriceGapFill.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/09_PriceFilters.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/10_ReturnsResult.jl" = { raw = 0, reviewed = 0 }
-"src/03_InputData/11_PricesToReturns.jl" = { raw = 1, reviewed = 1 }
+"src/03_InputData/11_PricesToReturns.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/12_TrainTestSplit.jl" = { raw = 1, reviewed = 1 }
 "src/03_InputData/13_Base_AssetSelection.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/14_CrossSectionalTransforms.jl" = { raw = 0, reviewed = 0 }
@@ -290,7 +290,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/16_RiskMeasures/06_XatRisk/03_EntropicXatRisk.jl" = { raw = 2, reviewed = 2 }
 "src/16_RiskMeasures/06_XatRisk/04_RelativisticXatRisk.jl" = { raw = 21, reviewed = 21 }
 "src/16_RiskMeasures/06_XatRisk/05_PowerNormXatRisk.jl" = { raw = 4, reviewed = 4 }
-"src/16_RiskMeasures/07_OWARiskMeasures_a.jl" = { raw = 4, reviewed = 4 }
+"src/16_RiskMeasures/07_OWARiskMeasures_a.jl" = { raw = 2, reviewed = 2 }
 "src/16_RiskMeasures/07_OWARiskMeasures_b.jl" = { raw = 0, reviewed = 0 }
 "src/16_RiskMeasures/08_AverageDrawdown.jl" = { raw = 0, reviewed = 0 }
 "src/16_RiskMeasures/09_UlcerIndex.jl" = { raw = 0, reviewed = 0 }
@@ -533,9 +533,9 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/17_ExcessExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/18_Coskewness.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/19_Cokurtosis.jl" = { raw = 0, reviewed = 0 }
-"src/05_Moments/20_Base_Regression.jl" = { raw = 4, reviewed = 4 }
+"src/05_Moments/20_Base_Regression.jl" = { raw = 18, reviewed = 18 }
 "src/05_Moments/21_TimeSeriesRegression/01_StepwiseRegression.jl" = { raw = 0, reviewed = 0 }
-"src/05_Moments/21_TimeSeriesRegression/02_DimensionReductionRegression.jl" = { raw = 27, reviewed = 27 }
+"src/05_Moments/21_TimeSeriesRegression/02_DimensionReductionRegression.jl" = { raw = 13, reviewed = 13 }
 "src/05_Moments/22_ImpliedVolatility.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/23_CorrelationCovariance.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/24_AbstractCovarianceVariance.jl" = { raw = 0, reviewed = 0 }
@@ -705,7 +705,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/16_RiskMeasures/06_XatRisk/01_XatRisk.jl" = { raw = 0, reviewed = 0 }
 "src/16_RiskMeasures/06_XatRisk/02_ConditionalXatRisk.jl" = { raw = 0, reviewed = 0 }
 "src/16_RiskMeasures/06_XatRisk/03_EntropicXatRisk.jl" = { raw = 10, reviewed = 10 }
-"src/16_RiskMeasures/06_XatRisk/04_RelativisticXatRisk.jl" = { raw = 12, reviewed = 12 }
+"src/16_RiskMeasures/06_XatRisk/04_RelativisticXatRisk.jl" = { raw = 9, reviewed = 9 }
 "src/16_RiskMeasures/06_XatRisk/05_PowerNormXatRisk.jl" = { raw = 0, reviewed = 0 }
 "src/16_RiskMeasures/07_OWARiskMeasures_a.jl" = { raw = 0, reviewed = 0 }
 "src/16_RiskMeasures/07_OWARiskMeasures_b.jl" = { raw = 0, reviewed = 0 }
