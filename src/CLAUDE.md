@@ -3,6 +3,14 @@
 These rules bind every file under `src/` and `ext/`. The root `CLAUDE.md` holds the rules for the
 whole repository.
 
+- **The design that is mathematically and internally consistent wins over the one that keeps an
+  interface.** Give a fix the form that the mathematics and the precedents of the library state,
+  and change with it every site that the same mechanism reaches. A breaking change to an
+  interface, a public verb among them, is the cost of that form. It is not a reason to take a
+  weaker design, and it is not by itself the maintainer's decision. Name the break in the commit,
+  and in the docstring of each changed verb that a method of a user implements. Ask the maintainer
+  only when the mathematics and the precedents leave two designs open. #1900 is the case: both
+  cross-sectional solve verbs return the residual count of their fit.
 - **Estimators never hold Results internally.** Enforce it with the field's *type bound*, not a
   runtime check. Put precomputed structure on the Result type. The rule has one exception, and
   [ADR 0106](../docs/adr/0106-a-partial-fit-state-is-the-one-result-an-estimator-holds.md) states it.

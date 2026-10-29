@@ -778,26 +778,14 @@ end
 
 Degrees of freedom and divisor of each idiosyncratic variance of a Cross-Sectional Factor Prior.
 
-A cross-sectional fit spends its parameters on the assets of each period, not on the observations of each asset. Observation ``t`` regresses ``n_{t}`` eligible assets on ``K`` factors, and on an intercept when the fit has one. So the ``\\sum_{t} n_{t}`` residuals keep the fraction ``\\phi`` of their degrees of freedom, and the variance of each asset takes that fraction of the effective count that its variance estimator reads.
+A cross-sectional fit spends its parameters on the assets of each period, not on the observations of each asset. The variance of each asset takes the fraction of its degrees of freedom that the fits leave, and [`cross_sectional_residual_dof`](@ref) states the fraction. It reads the residual count that the fit of each period records in `csr.edof`, because only the fit knows the parameters that it spent: the number of columns overstates the spend of a rank-deficient period and of a penalised fit. Under the default exponentially weighted variance, the law of the variance is an approximation, so the level of a bound that reads these counts is also approximate.
 
-# Mathematical definition
+# Algorithm
 
-```math
-\\begin{align}
-\\phi &= \\dfrac{\\sum_{t} \\left(n_{t} - p\\right)}{\\sum_{t} n_{t}}\\,, \\\\
-\\nu_{i} &= \\phi \\, n_{i}^{\\mathrm{eff}}\\,.
-\\end{align}
-```
+The method that Julia selects is the algorithm.
 
-Where:
-
-  - ``\\phi``: Fraction of the degrees of freedom that the fit leaves.
-  - ``n_{t}``: Number of eligible assets at observation ``t``, `csr.n`.
-  - ``p``: Number of parameters of each period, the columns of `csr.f` plus one when `csr.b` is set.
-  - ``\\nu_{i}``: Degrees of freedom of the idiosyncratic variance of asset ``i``.
-  - ``n_{i}^{\\mathrm{eff}}``: Effective count of the observations of asset ``i``, `cnt.n`.
-
-The fraction spreads the spend evenly over the assets. On a balanced panel of ``T`` observations and ``N`` assets with no intercept, ``\\nu_{i} = T (N - K) / N`` when ``n_{i}^{\\mathrm{eff}} = T``. Under the default exponentially weighted variance, the law of the variance is an approximation, so the level of a bound that reads these counts is also approximate.
+ 1. `cnt` is `nothing`: the variance estimator states no count, so neither count is known.
+ 2. `cnt` is a count: scale the effective count `cnt.n` of each asset with [`cross_sectional_residual_dof`](@ref), and take the divisor `cnt.m`. A fit that records no count states no degrees of freedom.
 
 # Arguments
 
@@ -806,22 +794,21 @@ The fraction spreads the spend evenly over the assets. On a balanced panel of ``
 
 # Returns
 
-  - `(; edof, ediv)::NamedTuple`: The degrees of freedom and the divisor of each variance, both `nothing` when the variance estimator states no count.
+  - `(; edof, ediv)::NamedTuple`: The degrees of freedom and the divisor of each variance. Both are `nothing` when the variance estimator states no count, and `edof` alone is `nothing` when the fit records no count.
 
 # Related
 
   - [`CrossSectionalFactorPrior`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
   - [`variance_count`](@ref)
+  - [`cross_sectional_residual_dof`](@ref)
   - [`ResidualInflation`](@ref)
 """
 function cross_sectional_variance_counts(::Nothing, ::CrossSectionalRegression)
     return (; edof = nothing, ediv = nothing)
 end
 function cross_sectional_variance_counts(cnt::NamedTuple, csr::CrossSectionalRegression)
-    p = size(csr.f, 2) + !isnothing(csr.b)
-    phi = sum(nt - p for nt in csr.n) / sum(csr.n)
-    return (; edof = phi * cnt.n, ediv = cnt.m)
+    return (; edof = cross_sectional_residual_dof(csr.edof, csr.n, cnt.n), ediv = cnt.m)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

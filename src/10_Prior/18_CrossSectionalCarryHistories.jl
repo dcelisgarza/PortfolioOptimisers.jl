@@ -45,7 +45,9 @@ function cross_sectional_fold_append(a::CrossSectionalRegression,
                                      b::CrossSectionalRegression)
     return CrossSectionalRegression(; f = cross_sectional_fold_append(a.f, b.f),
                                     eps = cross_sectional_fold_append(a.eps, b.eps),
-                                    n = cross_sectional_fold_append(a.n, b.n), b = nothing,
+                                    n = cross_sectional_fold_append(a.n, b.n),
+                                    edof = cross_sectional_fold_append(a.edof, b.edof),
+                                    b = nothing,
                                     h1 = cross_sectional_fold_append(a.h1, b.h1),
                                     dc = cross_sectional_fold_append(a.dc, b.dc))
 end
@@ -532,7 +534,8 @@ function cross_sectional_rebase_state(pe::CrossSectionalFactorPrior,
     cb = cross_sectional_observed_block(st.obs, 1:Tf, r,
                                         buffer_fit_count(st.buf) - size(st.Ms, 1))
     fo = cross_sectional_fold_factor_returns(f, marks.lv, cb)
-    (; eps, n, b, h1) = st.csr
+    # A move solves an observation again on the same span, so its residuals and its count stay.
+    (; eps, n, edof, b, h1) = st.csr
     return cross_sectional_carry_with(st,
                                       (;
                                        families = cross_sectional_dropped_names(pe.families,
@@ -541,7 +544,8 @@ function cross_sectional_rebase_state(pe::CrossSectionalFactorPrior,
                                        Z = reduce_exposures(factor_basis_slice(fcb, z),
                                                             st.Ms[z, :, :]),
                                        csr = CrossSectionalRegression(; f = f, eps = eps,
-                                                                      n = n, b = b, h1 = h1,
+                                                                      n = n, edof = edof,
+                                                                      b = b, h1 = h1,
                                                                       dc = cross_sectional_bit_mask(dc)),
                                        lv1 = marks.lv1, lv = marks.lv,
                                        pe = cross_sectional_refold_factors(pe.pe, fo,

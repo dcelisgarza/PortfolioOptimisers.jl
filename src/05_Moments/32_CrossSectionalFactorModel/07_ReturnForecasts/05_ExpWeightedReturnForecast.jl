@@ -154,7 +154,7 @@ Solve the ridge stabilised normal equations of an [`ExpWeightedReturnForecast`](
 # Algorithm
 
  1. When `ridge` is positive, add `ridge` times the mean absolute diagonal entry of `A` to that diagonal, with the floor `eps` on the mean, so an empty normal matrix still gets a positive penalty.
- 2. Solve through [`cross_sectional_solve`](@ref) under [`PseudoInverseFallback`](@ref), which takes the plain solve on a full rank matrix and the minimum-norm solution on a rank deficient one.
+ 2. Solve through [`cross_sectional_solve`](@ref) under [`PseudoInverseFallback`](@ref), which takes the plain solve on a full rank matrix and the minimum-norm solution on a rank deficient one, and keep its factor returns. The normal matrix is square, so the residual count of the solve has no meaning here.
 
 # Arguments
 
@@ -188,7 +188,7 @@ function ew_forecast_solve(A::MatNum, c::VecNum, ridge::Real, t::Integer)::VecNu
             Ar[k, k] += r
         end
     end
-    return cross_sectional_solve(PseudoInverseFallback(), Ar, c, t)
+    return cross_sectional_solve(PseudoInverseFallback(), Ar, c, t).f
 end
 """
     ew_forecast_state(fs::Nothing, Td::Type, K::Integer) -> NamedTuple

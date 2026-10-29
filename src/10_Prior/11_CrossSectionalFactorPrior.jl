@@ -1749,8 +1749,8 @@ function cross_sectional_live_regression(cre::AbstractCrossSectionalRegressionEs
     f = zeros(eltype(csl.f), size(csl.f, 1), size(Z, 3))
     f[:, lv] = csl.f
     return (;
-            csr = CrossSectionalRegression(; f = f, eps = csl.eps, n = csl.n, b = csl.b,
-                                           h1 = csl.h1,
+            csr = CrossSectionalRegression(; f = f, eps = csl.eps, n = csl.n,
+                                           edof = csl.edof, b = csl.b, h1 = csl.h1,
                                            dc = cross_sectional_live_dropped(csl.dc, lv),
                                            lv = lv), lv = lv)
 end

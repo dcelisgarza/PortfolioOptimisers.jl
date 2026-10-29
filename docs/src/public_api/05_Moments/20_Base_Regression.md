@@ -17,6 +17,7 @@ regression_target_weights(tgt::AbstractRegressionTarget)
 regression_target_weights(tgt::Union{LinearModel, GeneralisedLinearModel})
 is_basis_invariant
 residual_count(::Any, A::MatNum)
+residual_count(m::GLM.LinearModel, A::MatNum)
 LinearModel
 GeneralisedLinearModel
 Regression

@@ -122,13 +122,14 @@ julia> cross_sectional_regression(MyCrossSectionalRegressionEstimator(),
                                   reshape([1.0, 0.0, 0.5, 0.0, 1.0, 0.5], 1, 3, 2), [1.0 2.0 1.5],
                                   ones(1, 3))
 CrossSectionalRegression
-    f ┼ 1×2 Matrix{Float64}
-  eps ┼ 1×3 Matrix{Float64}
-    n ┼ Vector{Int64}: [3]
-    b ┼ nothing
-   h1 ┼ nothing
-   dc ┼ nothing
-   lv ┴ nothing
+     f ┼ 1×2 Matrix{Float64}
+   eps ┼ 1×3 Matrix{Float64}
+     n ┼ Vector{Int64}: [3]
+  edof ┼ nothing
+     b ┼ nothing
+    h1 ┼ nothing
+    dc ┼ nothing
+    lv ┴ nothing
 ```
 
 # Related
@@ -414,7 +415,7 @@ To add a regression target, subtype [`AbstractUnpenalisedRegressionTarget`](@ref
 
 | Estimator                                | Methods it reads                                                                                                                                                                                               |
 |:---------------------------------------- |:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`CrossSectionalTargetRegression`](@ref) | `factory`, `StatsAPI.fit`, `StatsAPI.coef`, `is_basis_invariant`                                                                                                                                               |
+| [`CrossSectionalTargetRegression`](@ref) | `factory`, `StatsAPI.fit`, `StatsAPI.coef`, `is_basis_invariant`, `residual_count`                                                                                                                             |
 | [`TargetReturnForecast`](@ref)           | `StatsAPI.fit`, `StatsAPI.predict`, and `factory` with an [`InterceptColumn`](@ref) under `intercept = true`                                                                                                   |
 | [`ImpliedVolatilityRegression`](@ref)    | `factory` with an [`InterceptColumn`](@ref), `StatsAPI.fit`, `StatsAPI.predict`                                                                                                                                |
 | [`StepwiseRegression`](@ref)             | `factory` with an [`InterceptColumn`](@ref), `StatsAPI.fit`, `StatsAPI.coef`, `residual_count`, and `StatsAPI.coeftable` under [`PValue`](@ref) or the score verb of its criterion under every other criterion |
@@ -1277,7 +1278,7 @@ end
 
 Return the residual degrees of freedom of a fitted regression target that states no count of its own, the number of rows of the design less its number of columns.
 
-A fit with no penalty spends one parameter for each column, so the count is the count of a projection. [`StepwiseRegression`](@ref) and [`DimensionReductionRegression`](@ref) read it, and write it into `edof` of [`Regression`](@ref). The method does not read `GLM.dof_residual`. Under weights, `GLM` counts the observations as the sum of the frequency weights, and the count of the library counts the rows. A penalised fit spends fewer parameters than it has columns, so it states its own count, as [`residual_count(::ElasticNetFit, ::MatNum)`](@ref) does.
+A fit with no penalty on a design of full rank spends one parameter for each column, so the count is the count of a projection. [`StepwiseRegression`](@ref) and [`DimensionReductionRegression`](@ref) read it, and write it into `edof` of [`Regression`](@ref). [`CrossSectionalTargetRegression`](@ref) reads it for each observation, on the columns that its solve algorithm keeps, and writes it into `edof` of [`CrossSectionalRegression`](@ref). The method does not read `GLM.dof_residual`. Under weights, `GLM` counts the observations as the sum of the frequency weights, and the count of the library counts the rows. A penalised fit spends fewer parameters than it has columns, so it states its own count, as [`residual_count(::ElasticNetFit, ::MatNum)`](@ref) does.
 
 # Arguments
 
@@ -1296,6 +1297,35 @@ A fit with no penalty spends one parameter for each column, so the count is the 
 """
 function residual_count(::Any, A::MatNum)
     return size(A, 1) - size(A, 2)
+end
+"""
+    residual_count(m::GLM.LinearModel, A::MatNum) -> Integer
+    residual_count(m::GLM.GeneralizedLinearModel, A::MatNum) -> Integer
+
+Return the residual degrees of freedom of a `GLM` fit, the number of rows of the design less the rank that the fit identified.
+
+`GLM` fits a rank-deficient design through a pivoted Cholesky factorisation, and gives each column that its pivot drops a coefficient of zero. The fit then spends its rank, not its number of columns, so the count of [`residual_count(::Any, ::MatNum)`](@ref) is too low. `StatsAPI.dof` of a `GLM` fit counts the rank and the dispersion parameter of the family, which a `LinearModel` always has, so the method subtracts the dispersion parameter. On a design of full rank the count is the count of the fallback. The method reads no weights, for the reason that the fallback states. [`CrossSectionalTargetRegression`](@ref) under [`UncheckedSolve`](@ref) gives `GLM` a rank-deficient design, and so can [`StepwiseRegression`](@ref) on a dependent candidate set.
+
+# Arguments
+
+  - `m`: The fitted model of [`LinearModel`](@ref) or of [`GeneralisedLinearModel`](@ref).
+  - `A`: The design of the fit, `observations × columns`.
+
+# Returns
+
+  - `nu::Integer`: `size(A, 1)` less the rank of the fit.
+
+# Related
+
+  - [`residual_count`](@ref)
+  - [`LinearModel`](@ref)
+  - [`GeneralisedLinearModel`](@ref)
+"""
+function residual_count(m::GLM.LinearModel, A::MatNum)
+    return size(A, 1) - (StatsAPI.dof(m) - 1)
+end
+function residual_count(m::GLM.GeneralizedLinearModel, A::MatNum)
+    return size(A, 1) - (StatsAPI.dof(m) - GLM.dispersion_parameter(m.rr.d))
 end
 """
     MIN_VAL_STEPWISE_REGRESSION_CRITERIA

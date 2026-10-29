@@ -114,7 +114,8 @@ change to a file under `src/` or `ext/`.
   work from the issue alone.
 - **A name or an interface that a library precedent settles is not the maintainer's decision.**
   Follow the precedent. A case that the same mechanism reaches belongs to the fix in hand: list
-  every such case in the plan, before the first test run.
+  every such case in the plan, before the first test run. A breaking change is not the
+  maintainer's decision either, and `src/CLAUDE.md` states the rule.
 - **Link the issue to the work that found it.** Name the issue in the pull request, the commit, or
   the report for that work, and name that work in the issue.
 

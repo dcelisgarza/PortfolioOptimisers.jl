@@ -104,6 +104,7 @@ silence. A contradiction between two standards files is a defect.
 | A link from a page, a docstring or the README to an external package | [`CLAUDE.md`](CLAUDE.md) § *Repo etiquette* | `test/test_64_docs_page_metadata_census.jl` refuses a URL of a GitHub repository outside `dcelisgarza`'s. The link goes to the docs site of the package |
 | An `@docs` entry's placement in the mirrored public/private API trees ADR 0128 decides, or the classification a name earns | [ADR 0128](docs/adr/0128-the-docs-split-into-mirrored-public-and-private-api-trees-and-a-census-gates-placement.md), and [`docs/api_classification.jl`](docs/api_classification.jl) for the classifier | `test/test_65_docs_public_private_placement_census.jl` |
 | The `<title>` or the description of a docs page. The description is the `Description` line of the `@meta` block of a hand-written page, the derived line of a mirror page, the label of the landing page in `docs/make.jl`, or the site-wide fallback | [ADR 0128](docs/adr/0128-the-docs-split-into-mirrored-public-and-private-api-trees-and-a-census-gates-placement.md) § *Amendment (2026-09-17)*, and [`docs/page_metadata.jl`](docs/page_metadata.jl) for the derivation | `test/test_64_docs_page_metadata_census.jl` |
+| A choice between two designs of a change, or a change that breaks an interface | [`src/CLAUDE.md`](src/CLAUDE.md), by which the design that is mathematically and internally consistent wins over the one that keeps an interface | Review |
 | A private name's promotion to `public` | [`src/CLAUDE.md`](src/CLAUDE.md), by which a name that users extend is `public` without approval, and [ADR 0154](docs/adr/0154-a-private-abstract-type-earns-a-public-declaration-when-its-interfaces-section-names-the-seam.md) § *Amendment (2026-10-05)*, by which an `# Interfaces` section forces the declaration | `test/test_66_public_declaration_census.jl`, and `test/test_43_exported_abstract_type_census.jl` for an abstract type |
 | The paper's code listing | the recipe comment at the top of [`docs/paper/main.typ`](docs/paper/main.typ) | `.github/workflows/Paper.yml` |
 | A decision worth recording | [`docs/adr/README.md`](docs/adr/README.md) | none — unenforced |
@@ -123,7 +124,7 @@ silence. A contradiction between two standards files is a defect.
 | `CODING_STANDARDS.md` | this map | the repository |
 | `GLOSSARY.md` | the domain glossary, with terms and one or two sentences for each | the repository |
 | `CLAUDE.md` | working agreements for an agent in this checkout | the repository |
-| `src/CLAUDE.md` | the design rules for library code: Results, numeric types, docstring text, `public` and `export` | `src/` and `ext/` |
+| `src/CLAUDE.md` | the design rules for library code: the consistent design over the convenient one, Results, numeric types, docstring text, `public` and `export` | `src/` and `ext/` |
 | `docs/paper/CLAUDE.md` | who owns the prose of the paper | `docs/paper/` |
 | `docs/adr/` | decisions and their reasoning, one file per decision | named per ADR |
 | `.github/copilot-instructions.md` | architecture orientation and the before-you-commit checklist | the repository |

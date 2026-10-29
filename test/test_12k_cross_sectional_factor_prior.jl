@@ -1755,6 +1755,29 @@ end
                                                                             intercept = true))
         @test_throws ArgumentError prior(pe, rd)
     end
+    @testset "Each period spends the parameters that its fit spent (#1900)" begin
+        rdc = csfp_panel(; n_assets = 20, n_observations = 60, n_industries = 3,
+                         seed = 1_900).rd
+        mk(cre) = prior(CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors(),
+                                                  minra = 5, cre = cre), rdc)
+        pl = mk(CrossSectionalTargetRegression(; alg = DependentColumnDrop()))
+        en = ElasticNet(; strength = FixedStrength(; gamma = 0.05))
+        pn = mk(CrossSectionalTargetRegression(; tgt = en, alg = DependentColumnDrop()))
+        cl, cn = pl.rr.csr, pn.rr.csr
+        K = size(cl.f, 2)
+        # The market column is the sum of the industry columns, so a least-squares period
+        # spends K - 1 parameters, not the K columns that the count read before #1900.
+        @test cl.n .- cl.edof == fill(K - 1, length(cl.n))
+        # The linear member and a least-squares target spend the same.
+        @test mk(CrossSectionalLinearRegression()).rr.csr.edof == cl.edof
+        # The penalised fit spends less, and the prior scales the same count of its variance
+        # estimator by the fraction of each fit, which `test_08j_cross_sectional_regression_sweep`
+        # checks period by period against a refit.
+        @test all(cn.edof .> cl.edof)
+        @test pn.rr.edof ./ pl.rr.edof ≈
+              fill((sum(cn.edof) / sum(cn.n)) / (sum(cl.edof) / sum(cl.n)),
+                   length(pl.rr.edof))
+    end
 end
 
 #=
@@ -1825,15 +1848,19 @@ allocated the exposure history in the element type of the returns, so integer re
         nT, nN, nK = 12, 7, 3
         n = rand(rng, 5:7, nT)
         cnt = (; n = 10 .* rand(rng, nN), m = rand(rng, nN))
+        # The fraction reads the residual count that the fit of each period records, a real
+        # count for a penalised fit (#1900).
+        nu = n .- nK .+ rand(rng, nT)
         csr = PO.CrossSectionalRegression(; f = randn(rng, nT, nK),
-                                          eps = randn(rng, nT, nN), n = n)
+                                          eps = randn(rng, nT, nN), n = n, edof = nu)
         c = PO.cross_sectional_variance_counts(cnt, csr)
-        @test c.edof ≈ (sum(n .- nK) / sum(n)) .* cnt.n
+        @test c.edof ≈ (sum(nu) / sum(n)) .* cnt.n
         @test c.ediv == cnt.m
-        # An intercept is one more parameter of each period.
-        csrb = PO.CrossSectionalRegression(; f = csr.f, eps = csr.eps, n = n, b = zeros(nT))
-        @test PO.cross_sectional_variance_counts(cnt, csrb).edof ≈
-              (sum(n .- nK .- 1) / sum(n)) .* cnt.n
+        # A fit that records no count, as one built by hand, states no degrees of freedom, as
+        # a time-series block with no `edof` does.
+        csr0 = PO.CrossSectionalRegression(; f = csr.f, eps = csr.eps, n = n)
+        @test PO.cross_sectional_variance_counts(cnt, csr0) ==
+              (; edof = nothing, ediv = cnt.m)
         @test PO.cross_sectional_variance_counts(nothing, csr) ==
               (; edof = nothing, ediv = nothing)
     end

@@ -48,6 +48,8 @@ function forecast_history_block(csfm::CrossSectionalFactorModel,
                                          CrossSectionalRegression(; f = csr.f[1:tb, :],
                                                                   eps = csr.eps[1:tb, :],
                                                                   n = csr.n[1:tb],
+                                                                  edof = nothing_scalar_array_getindex(csr.edof,
+                                                                                                       1:tb),
                                                                   b = if isnothing(csr.b)
                                                                       nothing
                                                                   else

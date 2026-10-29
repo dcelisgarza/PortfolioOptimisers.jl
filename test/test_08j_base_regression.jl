@@ -1677,10 +1677,10 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
         w = Wc[1, :]
         tgt = PO.factory(LinearModel(), StatsBase.aweights(w))
         plain = PO.StatsAPI.coef(PO.StatsAPI.fit(tgt, A, y))
-        @test PO.cross_sectional_target_coef(tgt, A, y, A .* sqrt.(w)) ≈ plain
+        @test PO.cross_sectional_target_coef(tgt, A, y, A .* sqrt.(w)).f ≈ plain
         # A target that is not basis-invariant fits the design itself.
         own = PO.factory(PinvTestTarget(nothing), StatsBase.aweights(w))
-        @test PO.cross_sectional_target_coef(own, A, y, A .* sqrt.(w)) ==
+        @test PO.cross_sectional_target_coef(own, A, y, A .* sqrt.(w)).f ==
               PO.StatsAPI.coef(PO.StatsAPI.fit(own, A, y))
         # On an exactly dependent design every member of a GLM target means what it means
         # for the linear member, and so does a caller's own target.
@@ -2013,6 +2013,12 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
                                                                                b = Float64[])
         @test_throws DimensionMismatch CrossSectionalRegression(; f = f, eps = eps, n = n,
                                                                 b = [1.0, 2.0, 3.0])
+        # The residual count has one entry per observation, and a view keeps it (#1900).
+        @test isnothing(CrossSectionalRegression(; f = f, eps = eps, n = n).edof)
+        @test_throws DimensionMismatch CrossSectionalRegression(; f = f, eps = eps, n = n,
+                                                                edof = [1, 1, 1])
+        csre = CrossSectionalRegression(; f = f, eps = eps, n = n, edof = [1.5, 1.0])
+        @test PortfolioOptimisers.port_opt_view(csre, [1, 3]).edof === csre.edof
     end
 
     @testset "The cache of a refit: the live mask, the active mask and the forecast history (#1751)" begin

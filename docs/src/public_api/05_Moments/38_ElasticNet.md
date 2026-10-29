@@ -35,6 +35,7 @@ factory(tgt::ElasticNet, ic::InterceptColumn)
 PortfolioOptimisers.regression_target_weights(tgt::ElasticNet)
 PortfolioOptimisers.StatsAPI.fit(tgt::ElasticNet, X::MatNum, y::VecNum)
 PortfolioOptimisers.StatsAPI.predict(m::PortfolioOptimisers.ElasticNetFit, X::MatNum)
+PortfolioOptimisers.residual_count(m::PortfolioOptimisers.ElasticNetFit, ::MatNum)
 ```
 
 ## References

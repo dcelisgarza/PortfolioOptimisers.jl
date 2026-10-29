@@ -385,6 +385,7 @@ In code the rule subtypes `AbstractPenaltyStrength`: `MiddleOfPath` reads the st
 
 **Effective Degrees of Freedom**
 The number of parameters that a fit spends, measured as the sensitivity of its fitted values to the observations. A Penalised Regression Target spends fewer than its coefficients. Its residuals keep fewer degrees of freedom than the observations less that number, because a penalised fit is not a projection. ADR 0223.
+A fit with no penalty is a projection, so it spends the rank of its design, which is fewer than its columns on a rank-deficient design. A Cross-Sectional Regression records the residual count that the fit of each observation leaves, and a Cross-Sectional Factor Prior reads it. ADR 0223.
 A Penalty Strength that reads the data spends a little more, the Strength Divergence. In code a field of the target holds a rule that adds that part, and the default `nothing` leaves it out. ADR 0223 names the rule.
 *Avoid*: effective count, which names the Effective Observation Count of a weighted moment.
 

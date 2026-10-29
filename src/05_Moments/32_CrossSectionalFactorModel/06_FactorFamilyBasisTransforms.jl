@@ -987,8 +987,8 @@ function unseen_member_returns(csr::CrossSectionalRegression, P)
     for (t, Pt) in P
         LinearAlgebra.mul!(view(f, t, :), Pt, view(csr.f, t, :))
     end
-    return CrossSectionalRegression(; f = f, eps = csr.eps, n = csr.n, b = csr.b,
-                                    h1 = csr.h1, dc = csr.dc, lv = csr.lv)
+    return CrossSectionalRegression(; f = f, eps = csr.eps, n = csr.n, edof = csr.edof,
+                                    b = csr.b, h1 = csr.h1, dc = csr.dc, lv = csr.lv)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

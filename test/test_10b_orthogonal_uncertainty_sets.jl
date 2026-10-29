@@ -1172,7 +1172,11 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
             prp = prior(pe, rdp)
             csr = prp.rr.csr
             cnt = PO.variance_count(pe.ve, csr.eps)
-            p = size(csr.f, 2) + !isnothing(csr.b)
+            # The market column is the sum of the industry columns, so each period spends the
+            # rank of its design, one less than its columns. The count read the columns before
+            # #1900, and charged each period one parameter too many.
+            p = size(csr.f, 2) - 1
+            @test csr.n .- csr.edof == fill(p, length(csr.n))
             phi = sum(csr.n .- p) / sum(csr.n)
             @test prp.rr.edof ≈ phi * cnt.n
             @test prp.rr.ediv == cnt.m

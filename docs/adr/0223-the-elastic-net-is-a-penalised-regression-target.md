@@ -91,9 +91,20 @@ the parameters that a penalised fit spends.
    `DimensionReductionRegression`, and the per-period count of `CrossSectionalTargetRegression`.
    The count follows from `E[RSS] = σ² tr((I − H)ᵀ(I − H)) + ‖(I − H)μ‖²`, so it is the count
    whose chi-squared law has the correct mean, which `ResidualInflation` reads. For a projection,
-   `HᵀH = H`, and the count is `N − p`. So no result of an unpenalised target changes. The
-   docstring states the derivation. Section 3.5 of hastie1990 states the count. No copy was found,
-   and #1552 lists it.
+   `HᵀH = H`, and the count is `N` less the rank of the design. The two time-series estimators fit
+   designs of full rank, so the count of an unpenalised target stays `N − p` there. The docstring
+   states the derivation. Section 3.5 of hastie1990 states the count. No copy was found, and #1552
+   lists it.
+
+   A cross-sectional fit reads the count of each period off the fit of that period, for every
+   target (#1900). `cross_sectional_solve` and `cross_sectional_target_solve` return `(; f, edof)`,
+   because only the fit knows the parameters that it spent, and `CrossSectionalRegression` records
+   `edof` per observation. A least-squares period spends the rank of its weighted design, as
+   `cs_regression_t_stats` counts it, so a rank-deficient period of an unpenalised target changes
+   too. The intercept spends one more parameter at a period with an eligible asset. The two
+   interface verbs change their return value. That break is the cost of the consistent count:
+   a second verb that counts apart from the fit would fit the target twice, or count the columns
+   of a user's member.
 10. **`ElasticNet` gates the term of a strength that reads the data.** `MiddleOfPath` reads `γ` off
     `y`, so `tr(H)` misses the term `∇γᵀ ∂μ̂/∂γ` of the divergence of the fit. The field
     `sdiv::Option{<:AbstractStrengthDivergence} = nothing` holds the gate. `nothing` keeps
@@ -171,7 +182,9 @@ the parameters that a penalised fit spends.
   writes it into a `Vector{Int}`, so the build derives the element type from the counts. The
   `edof` of `LinearModel` keeps its value `N − p` in each estimator.
 - `DimensionReductionRegression` and `CrossSectionalTargetRegression` with an `ElasticNet` change
-  their `edof`, because item 9 corrects a count that overstated the spent parameters.
+  their `edof`, because item 9 corrects a count that overstated the spent parameters. A
+  Cross-Sectional Factor Prior also changes its `edof` on every rank-deficient period, such as a
+  period with an Unseen Member under `SolvedUnseenMember`.
 - [#1899](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1899) builds items 6 and 8
   to 11.
 - Related: hastie1990 is not in `References.bib`, and no copy is in the sources folder. #1552

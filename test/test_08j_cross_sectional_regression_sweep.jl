@@ -103,7 +103,85 @@ end
         # coefficients of the weighted least squares.
         tgt = PO.factory(LinearModel(), PO.StatsBase.aweights(w))
         y = randn(rng, 20)
-        @test PO.cross_sectional_target_coef(tgt, A, y, D) ≈ pinv(D) * (y .* sqrt.(w))
+        fit = PO.cross_sectional_target_coef(tgt, A, y, D)
+        @test fit.f ≈ pinv(D) * (y .* sqrt.(w))
+        # The change of basis keeps the span, so the fit spends the four columns.
+        @test fit.edof == 20 - 4
+    end
+
+    @testset "The residual count is the trace of the residual maker of each fit" begin
+        # The oracle is `n_t - tr(H_t)` with the hat matrix written out through `pinv`, with the
+        # column `sqrt.(w)` in front under an intercept. A least-squares fit is a projection,
+        # so the trace is the rank of the design, and a dependent column spends nothing.
+        function trace_count(Z, W, t; intercept)
+            idx = findall(W[t, :] .> 0)
+            D = Z[t, idx, :] .* sqrt.(W[t, idx])
+            D = intercept ? hcat(sqrt.(W[t, idx]), D) : D
+            return length(idx) - round(Int, tr(D * pinv(D)))
+        end
+        Zd = copy(Z)
+        Zd[:, :, 3] = Zd[:, :, 1] .- 2 .* Zd[:, :, 2]
+        for Zc in (Z, Zd), intercept in (false, true),
+            alg in
+            (PseudoInverseFallback(), DependentColumnDrop(), RankDeficiencyRefusal(),
+             UncheckedSolve(), MinimumNormSolve()),
+            mk in (a -> CrossSectionalLinearRegression(; alg = a, intercept = intercept),
+                   a -> CrossSectionalTargetRegression(; alg = a, intercept = intercept),
+                   a -> CrossSectionalTargetRegression(; tgt = GeneralisedLinearModel(), alg = a,
+                                                       intercept = intercept))
+
+            # The target refuses `MinimumNormSolve`, and a rank-deficient design refuses under
+            # `RankDeficiencyRefusal`. Unchecked, the pivot of `GLM` drops the dependent
+            # column, and the fit of `GLM` counts the rank that the pivot keeps.
+            if (mk(PseudoInverseFallback()) isa CrossSectionalTargetRegression &&
+                alg isa MinimumNormSolve) || (Zc === Zd && alg isa RankDeficiencyRefusal)
+                continue
+            end
+            cre = mk(alg)
+            csr = cross_sectional_regression(cre, Zc, X, W)
+            @test csr.edof == [trace_count(Zc, W, t; intercept = intercept) for t in 1:T]
+            @test eltype(csr.edof) == eltype(csr.f)
+        end
+        @test cross_sectional_regression(CrossSectionalLinearRegression(), Zd, X, W).edof ==
+              [N, N - 4, N, N, N] .- 2
+        # A fit of `GLM` spends the rank that its pivot keeps, with a dispersion parameter of
+        # its family, as a `LinearModel` has, and with none, as a Poisson fit has.
+        w1 = PO.StatsBase.aweights(W[1, :])
+        for tgt in (LinearModel(), GeneralisedLinearModel(),
+                    GeneralisedLinearModel(; args = (PO.Distributions.Poisson(),)))
+            m = PO.StatsAPI.fit(PO.factory(tgt, w1), Zd[1, :, :],
+                                round.(abs.(10 .* X[1, :])))
+            @test PO.residual_count(m, Zd[1, :, :]) === N - 2
+        end
+        # An observation with no eligible asset spends nothing, the intercept included.
+        W0 = copy(W)
+        W0[3, :] .= 0.0
+        csr0 = cross_sectional_regression(CrossSectionalLinearRegression(;
+                                                                         intercept = true),
+                                          Z, X, W0)
+        @test csr0.edof[3] == 0
+        @test csr0.edof[[1, 2, 4, 5]] == [N, N - 4, N, N] .- (K + 1)
+        # A penalised period spends the count that its own fit states, read off a refit of
+        # the centred observation, and the intercept spends one more (#1900).
+        tgt = ElasticNet(; strength = FixedStrength(; gamma = 0.05))
+        for intercept in (false, true), alg in (DependentColumnDrop(), UncheckedSolve())
+            cre = CrossSectionalTargetRegression(; tgt = tgt, alg = alg,
+                                                 intercept = intercept)
+            csr = cross_sectional_regression(cre, Z, X, W)
+            for t in 1:T
+                idx = findall(W[t, :] .> 0)
+                w, A, y = W[t, idx], Z[t, idx, :], X[t, idx]
+                if intercept
+                    A = A .- (A' * w / sum(w))'
+                    y = y .- dot(w, y) / sum(w)
+                end
+                m = PO.StatsAPI.fit(PO.factory(tgt, PO.StatsBase.aweights(w)), A, y)
+                @test csr.edof[t] ≈ PO.residual_count(m, A) - intercept
+                @test csr.f[t, :] ≈ PO.StatsAPI.coef(m)
+                # The penalty spends less than the columns and the intercept.
+                @test csr.edof[t] > length(idx) - K - intercept
+            end
+        end
     end
 
     @testset "The rank test is the one of a pivoted QR" begin
