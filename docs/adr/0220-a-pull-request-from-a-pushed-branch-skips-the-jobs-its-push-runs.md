@@ -107,7 +107,9 @@ tree of the head, so the push runs test the tree that the merge writes.
 
 ## Consequences
 
-- One push to `dev` runs each check once while a pull request from `dev` is open.
+- One push to `dev` runs each check once while a pull request from `dev` is open. The one
+  exception is the `Documentation` job of `Docs.yml`, which runs twice: the push run builds the
+  docs, and the pull-request run builds them again to deploy the preview.
 - No run tests the merge commit of a pull request from `dev*` or `agents/**`. This is the trade that
   the maintainer chose over a second run of each check (#1783, option 1). Into `main`, the rule
   that the head contains `main` closes the gap: the push runs test the tree of the merge.

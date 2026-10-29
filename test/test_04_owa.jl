@@ -150,8 +150,10 @@
                     # the solver leaves more digits to the host than in the quadratic cases.
                     1e-5
                 elseif i in (7, 8, 11)
-                    # Iteration 11 measures rtol = 1e-7 on a Linux host and passes 5e-8 on CI.
-                    # The solver sets the last digits, so the host does (#1709).
+                    # Iteration 11 measured rtol = 1e-7 on a Linux host under Julia 1.13.1
+                    # (#1709), and a miss of 3.3e-8 under 1.13.3. No CI run of 199 from
+                    # 2026-10-14 to 2026-10-24 missed 5e-8. The solver sets the last digits, so
+                    # the host does.
                     1e-6
                 else
                     1e-9

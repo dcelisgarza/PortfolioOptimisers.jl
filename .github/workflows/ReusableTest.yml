@@ -132,9 +132,11 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       # A run that trips publishes the Refresh Artifact: the baseline as `refresh --accept-rise`
       # would write it. A contributor drops it in place and commits it with no Julia at all.
-      # ADR 0075.
+      # ADR 0075. The guard reads the outcome of the ratchet step. `failure()` is never true here,
+      # because `continue-on-error` keeps the job green, so that guard published no artifact from
+      # 2026-09-15 to 2026-10-29 (#1912).
       - name: Publish the Refresh Artifact
-        if: failure()
+        if: ${{ steps.ratchet.outcome == 'failure' }}
         uses: actions/upload-artifact@v7
         with:
           name: coverage-refresh
