@@ -102,8 +102,12 @@ with `CodeHealth.algorithm_sections`, the function the test calls, and every row
 the measured count. Paste that row. Do not count the sections by hand.
 A swept file also carries no performance trap, the fifth condition of #404 (ADR 0175).
 
-**A new file has no coverage row yet.** The gate ratchets `misses` per file, so a file with no row
-enters at zero misses. Write the tests, or write the Coverage Exemption with its rationale.
+**A new file has no coverage row yet.** The gate ratchets `misses` per file, and a new file enters
+at zero misses. Write the tests, or write the Coverage Exemption with its rationale. Then add the
+row `"<path>" = { lines = N, misses = 0 }` to `code_health/coverage_baseline.toml` in path order,
+with `N` from a `run_files.jl --coverage=<worktree>/src/<dir>` run of the tests that reach the file.
+`coverage.jl check` fails on a file with no row, and the `Coverage ratchet` job of CI runs it only
+when the tests are green, so a missing row stays hidden while `Test` is red.
 
 ## Land the branch
 

@@ -281,6 +281,13 @@
             @test isapprox(owa_cvar(7, 0.3), [-1 / 2.1, -1 / 2.1, -1 + 2 / 2.1, 0, 0, 0, 0])
             @test owa_cvar(7, 0.1) == [-1.0, 0, 0, 0, 0, 0, 0]
             @test isapprox(owa_gmd(7), [2 * (2 * t - 1 - 7) / (7 * 6) for t in 1:7])
+            # One observation has no pair of distinct observations, so the Gini mean difference
+            # is refused. Before R13 of #1817, `owa_gmd(1)` returned the range `NaN:Inf:NaN`,
+            # and a model on it stopped at a `NaN` coefficient.
+            @test owa_gmd(2) == [-1.0, 1.0]
+            @test_throws DomainError owa_gmd(1)
+            @test_throws DomainError owa_gmd(0)
+            @test_throws DomainError OrderedWeightsArray()([0.01])
             @test owa_wr(7) == [-1.0, 0, 0, 0, 0, 0, 0]
             @test owa_rg(7) == [-1.0, 0, 0, 0, 0, 0, 1]
             # Each range alias has the value of its fused vector, with the levels in their

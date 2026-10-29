@@ -1133,6 +1133,10 @@ Where:
 
   - `T`: Number of observations, `T >= 2`.
 
+# Validation
+
+  - `T >= 2`. Raises a `DomainError`. The mean difference averages over the pairs of distinct observations, and one observation has none.
+
 # Returns
 
   - `w::VecNum`: Vector of OWA weights of length `T`. It is a lazy range, and its entries sum to zero.
@@ -1152,6 +1156,9 @@ Where:
   - $(ref_dict[:cajas2025]) Section 7.2.1.2.
 """
 function owa_gmd(T::Integer)
+    @argcheck(T >= 2,
+              DomainError(T,
+                          "`T` is $T. The Gini mean difference averages over the pairs of distinct observations, so `T >= 2` must hold."))
     return (4 * (1:T) .- 2 * (T + 1)) / (T * (T - 1))
 end
 """
