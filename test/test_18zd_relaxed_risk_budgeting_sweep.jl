@@ -116,7 +116,11 @@ end
     b = [0.3, 0.7]
     kw = (; sbgt = BudgetRange(; lb = 0, ub = nothing), bgt = 1,
           wb = WeightBounds(; lb = nothing, ub = nothing))
-    opt = JuMPOptimiser(; pe = RRS_PR, slv = RRS_SLV, kw...)
+    # The objective of RiskBudgeting is a variance of 2.4e-4, and Clarabel reads an
+    # absolute gap on a cost below one. At so = 1 the solve stops 1.3e-5 short of the
+    # budget under flag = false (#1906). At so = 1000 the largest share error is below
+    # 5e-7 in each form. The warning of RiskBudgeting states the measured grid.
+    opt = JuMPOptimiser(; pe = RRS_PR, slv = RRS_SLV, so = 1000, kw...)
     rv = factory(Variance(), RRS_PR, RRS_SLV)
     algs = (BasicRelaxedRiskBudgeting(), RegularisedRelaxedRiskBudgeting(),
             RegularisedPenalisedRelaxedRiskBudgeting())

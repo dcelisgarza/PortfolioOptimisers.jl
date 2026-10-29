@@ -519,6 +519,10 @@ Optimises the portfolio whose assets, or whose factors, take stated shares of th
 
 `rba` selects the budget and its formulation, `r` gives the risk measures, and `opt` gives the prior, the solver and every other constraint. A row of `opt` that binds at the solution changes the optimality conditions, so the shares then miss the budget. With `bgt = nothing` no row fixes ``k``, and the scale of the weights is the scale that the solver returns. ``k \\geq 0``, so the sign of each weight is the sign of its unscaled weight. `kmin` sets the floor of ``k``, see [`risk_budgeting_scale_floor`](@ref).
 
+!!! warning
+
+    A small objective stops the solve short of the budget. Clarabel divides its duality gap by the larger of one and the cost, so on a cost far below one it reads an absolute gap. Measured on five assets with [`Variance`](@ref), a variance of `2.4e-4` at the optimum, and Clarabel at `tol_gap_abs = tol_gap_rel = tol_feas = 1e-11`: under [`FactorRiskBudgeting`](@ref) with `flag = false`, the largest gap between a share of the risk and its budget was `1.3e-5` at `so = 1`, `1.6e-6` at `so = 10`, `1.8e-7` at `so = 100` and `6.1e-10` at `so = 1000`. Under [`AssetRiskBudgeting`](@ref) it was `2.9e-6` at `so = 1` and `3.9e-8` at `so = 1000`. Tighter tolerances at `so = 1` stopped the solve at `ALMOST_OPTIMAL`, with a gap of `8.8e-6`. Scale the objective through the `so` field of [`JuMPOptimiser`](@ref).
+
 # Mathematical definition
 
 The risk of a positively homogeneous risk measure splits into the contributions of the assets, which is the Euler decomposition. The risk budgeting condition states the share of each contribution:
