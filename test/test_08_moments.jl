@@ -40,7 +40,7 @@
             success = isapprox(vec(mu), df[!, i])
             if !success
                 println("Counter: $i")
-                find_tol(mu, df[!, i])
+                find_tol(vec(mu), df[!, i])
             end
             @test success
         end

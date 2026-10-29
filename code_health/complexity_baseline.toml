@@ -5,7 +5,7 @@
 julia = "1.13.3"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "f6ce89ba70"
+commit = "8aa2c7fca4"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { cyc = 5, cog = 7, arg = 8, cyc_sum = 53, cog_sum = 57, arg_sum = 99, macros = [] }
@@ -105,7 +105,7 @@ commit = "f6ce89ba70"
 "src/05_Moments/12_DetoneCovariance.jl" = { cyc = 1, cog = 1, arg = 0, cyc_sum = 2, cog_sum = 1, arg_sum = 0, macros = [] }
 "src/05_Moments/13_ProcessedCovariance.jl" = { cyc = 1, cog = 1, arg = 0, cyc_sum = 2, cog_sum = 1, arg_sum = 0, macros = [] }
 "src/05_Moments/14_PortfolioOptimisersCovariance.jl" = { cyc = 9, cog = 14, arg = 6, cyc_sum = 40, cog_sum = 41, arg_sum = 45, macros = ["@propagatable"] }
-"src/05_Moments/15_ShrunkExpectedReturns.jl" = { cyc = 3, cog = 3, arg = 6, cyc_sum = 26, cog_sum = 14, arg_sum = 44, macros = ["@propagatable"] }
+"src/05_Moments/15_ShrunkExpectedReturns.jl" = { cyc = 3, cog = 4, arg = 6, cyc_sum = 26, cog_sum = 17, arg_sum = 45, macros = ["@propagatable"] }
 "src/05_Moments/16_EquilibriumExpectedReturns.jl" = { cyc = 1, cog = 1, arg = 4, cyc_sum = 6, cog_sum = 2, arg_sum = 15, macros = ["@propagatable"] }
 "src/05_Moments/17_ExcessExpectedReturns.jl" = { cyc = 1, cog = 1, arg = 4, cyc_sum = 4, cog_sum = 2, arg_sum = 8, macros = ["@propagatable"] }
 "src/05_Moments/18_Coskewness.jl" = { cyc = 7, cog = 8, arg = 7, cyc_sum = 24, cog_sum = 11, arg_sum = 65, macros = ["@propagatable"] }
@@ -116,7 +116,7 @@ commit = "f6ce89ba70"
 "src/05_Moments/22_ImpliedVolatility.jl" = { cyc = 4, cog = 2, arg = 9, cyc_sum = 32, cog_sum = 12, arg_sum = 76, macros = ["@propagatable"] }
 "src/05_Moments/23_CorrelationCovariance.jl" = { cyc = 1, cog = 1, arg = 4, cyc_sum = 6, cog_sum = 2, arg_sum = 12, macros = ["@propagatable"] }
 "src/05_Moments/24_AbstractCovarianceVariance.jl" = { cyc = 3, cog = 3, arg = 4, cyc_sum = 20, cog_sum = 9, arg_sum = 39, macros = [] }
-"src/05_Moments/25_StandardDeviationExpectedReturns.jl" = { cyc = 1, cog = 1, arg = 4, cyc_sum = 6, cog_sum = 2, arg_sum = 10, macros = ["@propagatable"] }
+"src/05_Moments/25_StandardDeviationExpectedReturns.jl" = { cyc = 1, cog = 1, arg = 4, cyc_sum = 8, cog_sum = 4, arg_sum = 16, macros = ["@propagatable"] }
 "src/05_Moments/26_Windowed/01_WindowedExpectedReturns.jl" = { cyc = 1, cog = 1, arg = 3, cyc_sum = 1, cog_sum = 1, arg_sum = 3, macros = ["@windowed_estimator"] }
 "src/05_Moments/26_Windowed/02_WindowedCovariance.jl" = { cyc = 1, cog = 1, arg = 5, cyc_sum = 3, cog_sum = 1, arg_sum = 11, macros = ["@windowed_estimator"] }
 "src/05_Moments/26_Windowed/03_WindowedVariance.jl" = { cyc = 1, cog = 1, arg = 5, cyc_sum = 3, cog_sum = 1, arg_sum = 11, macros = ["@windowed_estimator"] }

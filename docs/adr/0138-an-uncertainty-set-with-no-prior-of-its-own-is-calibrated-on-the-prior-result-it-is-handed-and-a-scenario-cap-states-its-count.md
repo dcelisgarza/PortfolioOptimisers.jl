@@ -226,7 +226,8 @@ slot, and the key does not say which quantity the slot prices:
   `DimensionalRateRadius`. A ball that is too small gives a portfolio that is robust to less than the
   caller asked for, and the optimisation shows no sign of it.
 - **The regularisation slots, `:l1`, `:linf`, `:l2reg_val` and `:lpreg_val`.** The radius prices the
-  error of `pr.mu`, which the cap fits over every observation. So `ens` is the right count there.
+  error of `pr.mu`, which the cap fits over every observation. So the count of the moments is the
+  right count there. The amendment of 2026-10-29 moves that count from `ens` to `eoc`.
 
 So the site states the count. `CalibrationContext` gains a field `n::Option{<:Number}`, in the same
 way as it carries `series` and `p`. The three robust measures set it in every context that they

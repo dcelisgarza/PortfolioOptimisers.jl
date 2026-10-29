@@ -682,7 +682,7 @@ end
         mu::ArrNum,
         sigma::MatNum,
         args...;
-        T::Integer,
+        T::Real,
         kwargs...
     ) -> StepRangeLen
 
@@ -716,7 +716,7 @@ Each method accepts, through `args...` and `kwargs...`, the arguments that only 
 
   - `isigma`: The inverse covariance matrix. The [`VolatilityWeighted`](@ref) method takes it as a positional argument. If it is `nothing`, that method computes `sigma \\ LinearAlgebra.I`. The other two methods accept it in `args...` and do not read it.
 
-  - `T`: The number of observations. The [`MeanSquaredError`](@ref) method needs it as a keyword. The other two methods accept it in `kwargs...` and do not read it.
+  - `T`: The effective number of observations of the sample mean, from [`effective_observation_count`](@ref). The [`MeanSquaredError`](@ref) method needs it as a keyword. The other two methods accept it in `kwargs...` and do not read it.
 
   - `kwargs...`: More keyword arguments. The function does not read them.
 
@@ -756,7 +756,7 @@ function target_mean(::VolatilityWeighted, mu::ArrNum, sigma::MatNum,
     val = sum(isigma * mu) / sum(isigma)
     return range(val, val; length = length(mu))
 end
-function target_mean(::MeanSquaredError, mu::ArrNum, sigma::MatNum, args...; T::Integer,
+function target_mean(::MeanSquaredError, mu::ArrNum, sigma::MatNum, args...; T::Real,
                      kwargs...)
     val = LinearAlgebra.tr(sigma) / T
     return range(val, val; length = length(mu))
@@ -767,6 +767,8 @@ end
 Compute the shrunk expected returns of the estimator `me`.
 
 The method moves the sample expected returns toward a target. The aim is a smaller estimation error of the mean when the number of assets is large compared with the number of observations. [`JamesStein`](@ref) and [`BayesStein`](@ref) return `(1 - alpha) * mu + alpha * b`. The member of [`AbstractShrunkExpectedReturnsIntensity`](@ref) in their field `intensity` sets the interval of `alpha`. The default [`UnitIntervalIntensity`](@ref) clamps `alpha` into ``[0, 1]``, so the result lies on the segment that joins the sample mean and the target. Under `intensity = nothing`, no clamp applies, and the result can lie outside that segment. [`BodnarOkhrinParolya`](@ref) computes its two coefficients separately. They do not sum to one, and no rule clamps them.
+
+Every formula below reads ``T`` as the number of observations that the mean of `me.me` is worth, from [`effective_observation_count`](@ref). An unweighted mean is worth the rows of `X`. A weighted mean is worth the count of its weights, because the variance of a weighted mean of independent draws is the covariance divided by that count.
 
 # Mathematical definition
 
@@ -864,11 +866,12 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein}, 
                          dims::Int = 1, kwargs...)
     mu = Statistics.mean(me.me, X; dims = dims, kwargs...)
     sigma = Statistics.cov(library_covariance_estimator(me.ce), X; dims = dims, kwargs...)
-    T, N = size(X)
+    # The mean of `me.me` is worth its own count, which is `size(X, 1)` when it is unweighted.
+    # The count reads the keywords of the fit, with the mask turned as `X` is (#1915).
+    Xo, amsk = dims_oriented(dims, X, get(kwargs, :active_mask, nothing))
+    kw = isnothing(amsk) ? values(kwargs) : merge(values(kwargs), (; active_mask = amsk))
+    T, N = effective_observation_count(me.me, Xo; kw...), size(Xo, 2)
     flag = isone(dims)
-    if !flag
-        N, T = T, N
-    end
     b = target_mean(me.alg.tgt, mu, sigma; T = T)
     if flag
         b = transpose(b)
@@ -945,11 +948,12 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein}, 
                          dims::Int = 1, kwargs...)
     mu = Statistics.mean(me.me, X; dims = dims, kwargs...)
     sigma = Statistics.cov(library_covariance_estimator(me.ce), X; dims = dims, kwargs...)
-    T, N = size(X)
+    # The mean of `me.me` is worth its own count, which is `size(X, 1)` when it is unweighted.
+    # The count reads the keywords of the fit, with the mask turned as `X` is (#1915).
+    Xo, amsk = dims_oriented(dims, X, get(kwargs, :active_mask, nothing))
+    kw = isnothing(amsk) ? values(kwargs) : merge(values(kwargs), (; active_mask = amsk))
+    T, N = effective_observation_count(me.me, Xo; kw...), size(Xo, 2)
     flag = isone(dims)
-    if !flag
-        N, T = T, N
-    end
     isigma = sigma \ LinearAlgebra.I
     b = target_mean(me.alg.tgt, mu, sigma, isigma; T = T)
     if flag
@@ -1047,11 +1051,12 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinP
                          X::MatNum; dims::Int = 1, kwargs...)
     mu = Statistics.mean(me.me, X; dims = dims, kwargs...)
     sigma = Statistics.cov(library_covariance_estimator(me.ce), X; dims = dims, kwargs...)
-    T, N = size(X)
+    # The mean of `me.me` is worth its own count, which is `size(X, 1)` when it is unweighted.
+    # The count reads the keywords of the fit, with the mask turned as `X` is (#1915).
+    Xo, amsk = dims_oriented(dims, X, get(kwargs, :active_mask, nothing))
+    kw = isnothing(amsk) ? values(kwargs) : merge(values(kwargs), (; active_mask = amsk))
+    T, N = effective_observation_count(me.me, Xo; kw...), size(Xo, 2)
     flag = isone(dims)
-    if !flag
-        N, T = T, N
-    end
     @argcheck(T > N,
               DomainError((T, N),
                           "the Bodnar-Okhrin-Parolya coefficients contain `N / (T - N)`, so they need more observations than assets. The term is undefined at T == N and negative below it, got T = $T, N = $N"))

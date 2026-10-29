@@ -107,4 +107,6 @@ Each old value of the returns has a name that states what it is:
   `UnstandardisedLowOrderMomentMeasureAlgorithm`. Such code names the parent
   `HighOrderMomentMeasureAlgorithm` or `LowOrderMomentMeasureAlgorithm`. The last row of the table
   gives its replacement. `homogeneity_degree` reads the type of `ve`: a `HighOrderMoment` with
-  `ve = nothing` has degree 3 or 4, and one with a variance estimator has degree 0.
+  `ve = nothing` has degree 3 or 4, and one with a variance estimator has degree 0. Under a fixed
+  target that is not zero, neither has a degree
+  ([#1909](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1909)).

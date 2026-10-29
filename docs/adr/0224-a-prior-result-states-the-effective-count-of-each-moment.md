@@ -44,8 +44,9 @@ the exact count of the variance of a weighted mean of independent draws.
    means `size(X, 1)`. `moment_observation_count(pr, k)` reads entry `k`.
 3. **Each estimator of a moment states its own count.** `effective_observation_count` gains a
    default on `AbstractExpectedReturnsEstimator`, `CoskewnessEstimator` and `CokurtosisEstimator`,
-   and methods on the members that weight their rows. `EmpiricalPrior` writes the counts of `me`
-   and of `ce`. The two can carry different weights, so one number cannot hold both. A count equal
+   and methods on the members that weight their rows. A mean read off a covariance
+   (`EquilibriumExpectedReturns`, `StandardDeviationExpectedReturns`, `VarianceExpectedReturns`)
+   states the count of its `ce`. `EmpiricalPrior` writes the counts of `me` and of `ce`. The two can carry different weights, so one number cannot hold both. A count equal
    to the rows that the result carries is written as `nothing`. A `PriorExpectedReturns` states
    entry 1 of the `eoc` of the prior that it fits, because its mean is the `mu` of that prior. A
    pooling prior knows that count only after its fit, so `effective_observation_count` fits the
@@ -64,6 +65,9 @@ the exact count of the variance of a weighted mean of independent draws.
    - The default `tau = 1/T` of the four Black-Litterman priors reads the count of the prior mean.
      The augmented prior blends two priors with one `tau`, so it reads the smaller count of the two
      means, and its denoiser the smaller count of the two covariances.
+   - `ShrunkExpectedReturns` reads the count of its `me` in the intensity and the target of
+     `JamesStein`, `BayesStein` and `BodnarOkhrinParolya`, because each prices the error of the
+     sample mean, whose covariance is the covariance of the returns divided by that count.
    - A normal uncertainty set reads entry 1 for its mean set and entry 2 for its covariance set. A
      joint set reads each count for its own half.
    - A calibration rule does not know which moment it prices. With no weights it reads the smaller
@@ -97,6 +101,8 @@ the exact count of the variance of a weighted mean of independent draws.
   of `w` in place of the perplexity. The Kish count is smaller, so these sets are wider.
 - The normal uncertainty sets, the calibration rules, the Black-Litterman `tau` and the denoisers
   of an `EmpiricalPrior` with a weighted `me` or `ce` read the count of its weights.
+- A `ShrunkExpectedReturns` over a weighted `me` shrinks by the count of the weights, not by the
+  rows. An unweighted one gives the number it gave before, bit for bit.
 - `systematic_processing!` gains a positional argument. A user member of `AbstractSystematicRepair`
   must accept it.
 - `scenario_ens` is replaced by `scenario_moment_counts`.

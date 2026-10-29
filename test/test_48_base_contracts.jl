@@ -1188,6 +1188,16 @@ struct PlainCokurtosis1893 <: PortfolioOptimisers.CokurtosisEstimator end
                                              X) == Tm
         @test pe.effective_observation_count(ShrunkExpectedReturns(; me = em), X) == Tm
         @test pe.effective_observation_count(EquilibriumExpectedReturns(; ce = ew), X) == Ts
+        # A mean read off a covariance is worth the count of that covariance (R16 of #1817).
+        @test pe.effective_observation_count(VarianceExpectedReturns(; ce = ew), X) == Ts
+        @test pe.effective_observation_count(StandardDeviationExpectedReturns(; ce = ew),
+                                             X) == Ts
+        @test pe.effective_observation_count(StandardDeviationExpectedReturns(), X) === T
+        # Each forward takes the keywords of the fit (#1915).
+        @test pe.effective_observation_count(VarianceExpectedReturns(; ce = ew), X;
+                                             active_mask = nothing) == Ts
+        @test pe.effective_observation_count(StandardDeviationExpectedReturns(; ce = ew), X;
+                                             active_mask = nothing) == Ts
         @test pe.effective_observation_count(WindowedExpectedReturns(; me = em,
                                                                      window = 50), X) ≈
               pe.exp_weighted_kish_count(0.98, 50)
@@ -1258,6 +1268,22 @@ struct PlainCokurtosis1893 <: PortfolioOptimisers.CokurtosisEstimator end
         @test getfield(hf, :eoc)[2] ≈ kish
         @test hf.kt ≈
               pe.sample_matrix_processing!(dn, kM * hf.fpr.kt * transpose(kM), hf.X, kish)
+    end
+    @testset "A shrunk mean shrinks by the count of its mean (R16 of #1817)" begin
+        # Frequency weights `f` on `X` are the unweighted fit on `X` with row `t` repeated
+        # `f[t]` times, so the shrunk mean of the two must agree. Before the fix, the weighted
+        # fit read `T = size(X, 1)` in place of `sum(f)`, and each of the four missed.
+        f = rand(StableRNG(4), 1:3, T)
+        fw = StatsBase.fweights(f)
+        Xe = reduce(vcat, [repeat(X[t:t, :], f[t]) for t in 1:T])
+        for alg in (JamesStein(), JamesStein(; tgt = MeanSquaredError()), BayesStein(),
+                    BodnarOkhrinParolya())
+            wme = ShrunkExpectedReturns(; me = SimpleExpectedReturns(; w = fw),
+                                        ce = Covariance(; w = fw), alg = alg)
+            ume = ShrunkExpectedReturns(; alg = alg)
+            @test mean(wme, X) ≈ mean(ume, Xe) rtol = 1e-12
+            @test vec(mean(wme, Matrix(transpose(X)); dims = 2)) ≈ vec(mean(wme, X)) rtol = 1e-14
+        end
     end
 end
 # A stand-in prior that counts its batch fits, so a test can see how often a mean fits it.

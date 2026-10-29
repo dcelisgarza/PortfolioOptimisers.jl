@@ -126,6 +126,12 @@ function Statistics.mean(me::StandardDeviationExpectedReturns, X::MatNum; dims::
     assert_dims(dims)
     return Statistics.std(library_covariance_estimator(me.ce), X; dims = dims, kwargs...)
 end
+# The mean is read off the diagonal of the covariance of `me.ce`, so it is worth the count of
+# that covariance.
+function effective_observation_count(me::StandardDeviationExpectedReturns, X::MatNum;
+                                     kwargs...)
+    return effective_observation_count(me.ce, X; kwargs...)
+end
 
 """
 $(DocStringExtensions.TYPEDEF)
@@ -252,6 +258,11 @@ Where:
 function Statistics.mean(me::VarianceExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
     assert_dims(dims)
     return Statistics.var(library_covariance_estimator(me.ce), X; dims = dims, kwargs...)
+end
+# The mean is the diagonal of the covariance of `me.ce`, so it is worth the count of that
+# covariance.
+function effective_observation_count(me::VarianceExpectedReturns, X::MatNum; kwargs...)
+    return effective_observation_count(me.ce, X; kwargs...)
 end
 
 export StandardDeviationExpectedReturns, VarianceExpectedReturns
