@@ -384,6 +384,20 @@ end
     # Nothing close enough still draws no suggestion, at either threshold.
     @test pe.suggest_declared_key("zzzz", (:noun, :axis)) == ""
     @test pe.did_you_mean("APL", String[]) == ""
+    # A caller passes its own configuration in `sd`, with no scope (#1839). The constructor
+    # of the configuration is still the one check of the threshold.
+    @test pe.did_you_mean("nuon", ["noun", "axis"];
+                          sd = pe.StringDistanceConfig(SD.DamerauLevenshtein(), 0.5)) ==
+          " (did you mean `noun`?)"
+    @test_throws ArgumentError pe.did_you_mean("APL", ["AAPL"];
+                                               sd = pe.StringDistanceConfig(SD.Levenshtein(),
+                                                                            0))
+    # The declaration-key configuration overrides a scope of the caller, as the scoped
+    # override did before #1839.
+    pe.with_string_distance(; min_score = 1.5) do
+        @test pe.did_you_mean("nuon", ["noun", "axis"]) == ""
+        @test pe.suggest_declared_key(:nuon, (:noun, :axis)) == " (did you mean `noun`?)"
+    end
 end
 @testset "The message builders name a size, never a universe" begin
     pe = PortfolioOptimisers

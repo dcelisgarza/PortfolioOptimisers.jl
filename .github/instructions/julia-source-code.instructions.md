@@ -461,6 +461,51 @@ application, and the allow-list is where that application is named.
 the list fails the build. An entry whose name is no longer flagged is stale and fails too, so the
 list can only shrink.
 
+## The simple form wins
+
+Write the simplest code that does the work. A layer, a closure, a type, a macro or a generated
+method is a cost: the reader must follow it, and a test must reach it. Add one only when it buys
+at least one of these gains:
+
+- a useful abstraction for a known future development,
+- performance,
+- architecture,
+- ergonomics,
+- maintainability,
+- usability.
+
+A form that buys none of them is needless complexity. Replace it with the simple form. When you
+review a complex form, name the gain that it buys. If you cannot name one, the simple form wins.
+
+### A function argument is passed only when the callee controls the call
+
+A `do` block or a lambda passes a function, not a value. Pass a function only when the callee must
+decide when the function runs, how many times it runs, or inside what it runs:
+
+- **Zero times or once, by a decision of the callee.** A memoise verb such as `state_build!` runs
+  the builder only when its key is not registered. `get!` builds a default only when the key is
+  missing, and a lazy message is built only when the check fails.
+- **Many times.** `map`, `sum`, `findall`, `stencil_table` and `finite_difference_gradient` call
+  the function once for each item.
+- **Between steps of the callee.** A hook such as the one of `frontier_sweep!` or
+  `exp_weighted_pass!` runs inside a loop that the callee owns.
+- **Inside a scope.** `with_projection_step` and `with_config` set a `ScopedValue` for the time
+  that the function runs.
+
+If the callee calls the function once, with no condition and with nothing around it, pass the
+value. A scope that a caller opens only to give settings to one call is the same case. Give the
+call a keyword instead. For example, `suggest_declared_key` passes its configuration to
+`did_you_mean` in the keyword `sd`. It does not open a `with_string_distance` scope for that one
+call (#1839).
+
+A `do` block that a memoise verb takes is not a candidate. In
+`state_build!(model, prefix, :W1_vr_sk_kt) do … end`, the value form builds the variables and the
+`PSDCone` constraint before `state_build!` looks at the key. Each call that finds the key
+registered then adds an unused copy to the model. The `do` block returns the registered entry and
+builds nothing (ADR 0037).
+
+The rule holds by review.
+
 ## Branches that share an outcome are one branch
 
 When two branches do the same thing, write one branch whose condition joins theirs. Each branch

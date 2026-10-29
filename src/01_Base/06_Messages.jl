@@ -1,23 +1,24 @@
 """
-    did_you_mean(name::AbstractString, candidates) -> String
+    did_you_mean(name::AbstractString, candidates;
+                 sd::StringDistanceConfig = STRING_DISTANCE[]) -> String
 
-Return a "did you mean" suffix that names the closest match to `name` in `candidates`. Return an empty string when `candidates` is empty, or when no candidate reaches the `min_score` threshold of [`STRING_DISTANCE`](@ref). The suffix is `" (did you mean X?)"`, with the match in the place of X.
+Return a "did you mean" suffix that names the closest match to `name` in `candidates`. Return an empty string when `candidates` is empty, or when no candidate reaches the `min_score` threshold of `sd`. The suffix is `" (did you mean X?)"`, with the match in the place of X.
 
 Do not put the suffix in a code span that also holds escaped backticks. `JuliaFormatter` pairs the backticks wrongly and deletes the spaces around the code spans next to it, and the docstring then renders wrongly.
 
-[`unknown_variable_msg`](@ref) adds this suffix to a "variable not in asset universe" message, to suggest the correct name for a typo. The function reads the distance and the threshold from the active [`STRING_DISTANCE`](@ref) configuration. [`set_string_distance!`](@ref) sets the global default, and [`with_string_distance`](@ref) sets a task-scoped override. A cluster or a subset of a meta-optimiser can correctly omit a name, and that name has no close neighbour, so the threshold gives it no suggestion.
+[`unknown_variable_msg`](@ref) adds this suffix to a "variable not in asset universe" message, to suggest the correct name for a typo. By default, the function reads the distance and the threshold from the active [`STRING_DISTANCE`](@ref) configuration. A caller with settings of its own passes them in `sd`, as [`suggest_declared_key`](@ref) does. The constructor of [`StringDistanceConfig`](@ref) checks `min_score`, so `sd` cannot hold a threshold that echoes every name. [`set_string_distance!`](@ref) sets the global default, and [`with_string_distance`](@ref) sets a task-scoped override. A cluster or a subset of a meta-optimiser can correctly omit a name, and that name has no close neighbour, so the threshold gives it no suggestion.
 
 # Algorithm
 
  1. Return an empty string when `candidates` is empty, because the function has nothing to search.
- 2. Read the active [`STRING_DISTANCE`](@ref) configuration into `sd`.
- 3. Find `match`, the entry of `candidates` nearest to `name` under `sd.dist`. Keep it only when its normalised similarity reaches `sd.min_score`.
- 4. Return an empty string when step 3 finds no match. Otherwise return the suffix that names `match`.
+ 2. Find `match`, the entry of `candidates` nearest to `name` under `sd.dist`. Keep it only when its normalised similarity reaches `sd.min_score`.
+ 3. Return an empty string when step 2 finds no match. Otherwise return the suffix that names `match`.
 
 # Arguments
 
   - `name::AbstractString`: The unknown name that the caller wrote.
   - `candidates`: The collection of valid names to search.
+  - `sd::StringDistanceConfig`: The distance and the threshold. The default is the active [`STRING_DISTANCE`](@ref) configuration.
 
 # Returns
 
@@ -29,11 +30,11 @@ Do not put the suffix in a code span that also holds escaped backticks. `JuliaFo
   - [`set_string_distance!`](@ref)
   - [`unknown_variable_msg`](@ref)
 """
-function did_you_mean(name::AbstractString, candidates)
+function did_you_mean(name::AbstractString, candidates;
+                      sd::StringDistanceConfig = STRING_DISTANCE[])
     if isempty(candidates)
         return ""
     end
-    sd = STRING_DISTANCE[]
     match, _ = StringDistances.findnearest(name, candidates, sd.dist;
                                            min_score = sd.min_score)
     return isnothing(match) ? "" : " (did you mean `$(match)`?)"
@@ -43,7 +44,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Suggest the entry of `candidates` nearest to a mistyped declaration key. A declaration key is a macro block key, a dictionary key, a struct field name, or a keyword of a generated constructor.
 
-The function calls [`did_you_mean`](@ref) under a scoped configuration that admits more matches than the global default. It uses Damerau-Levenshtein, where a transposed pair costs one edit and not two, at `min_score = 0.5`. The global default is strict so that a guessed name near a real asset name does not get the real name back. That risk does not apply here. The candidates are constants of the code, such as block keys, dictionary keys and field names, and they leak no data. At the default `0.7` under plain Levenshtein, a short key never matches. `nuon` scores 0.5 against `noun`, so the suggestion never shows.
+The function passes [`did_you_mean`](@ref) a configuration that admits more matches than the global default. It overrides any scoped configuration of the caller. It uses Damerau-Levenshtein, where a transposed pair costs one edit and not two, at `min_score = 0.5`. The global default is strict so that a guessed name near a real asset name does not get the real name back. That risk does not apply here. The candidates are constants of the code, such as block keys, dictionary keys and field names, and they leak no data. At the default `0.7` under plain Levenshtein, a short key never matches. `nuon` scores 0.5 against `noun`, so the suggestion never shows.
 
 # Arguments
 
@@ -52,20 +53,19 @@ The function calls [`did_you_mean`](@ref) under a scoped configuration that admi
 
 # Returns
 
-  - `msg::String`: The suffix that [`did_you_mean`](@ref) returns under the scoped configuration.
+  - `msg::String`: The suffix that [`did_you_mean`](@ref) returns under this configuration.
 
 # Related
 
   - [`did_you_mean`](@ref)
-  - [`with_string_distance`](@ref)
+  - [`StringDistanceConfig`](@ref)
   - [`windowed_estimator_suggest`](@ref)
   - [`check_propagatable_contracts`](@ref)
 """
 function suggest_declared_key(key, candidates)
-    return with_string_distance(; dist = StringDistances.DamerauLevenshtein(),
-                                min_score = 0.5) do
-        return did_you_mean(string(key), string.(collect(candidates)))
-    end
+    return did_you_mean(string(key), string.(collect(candidates));
+                        sd = StringDistanceConfig(StringDistances.DamerauLevenshtein(),
+                                                  0.5))
 end
 """
     unknown_variable_msg(v, nx, key; candidates = nx, axis::AbstractString = "asset",
