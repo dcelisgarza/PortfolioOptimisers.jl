@@ -263,7 +263,7 @@ Where:
 
   - ``\\boldsymbol{\\omega}``: Is the OWA weight vector, `r.w` if it is a vector, `r.w(T)` if it is a callable.
   - ``\\hat{\\boldsymbol{r}}``: Is the vector of net portfolio returns, negated when `loss` is `false`.
-  - ``S``: Is the set of p-norm orders, `r.alg.p`.
+  - ``S``: Is the set of p-norm orders, `r.alg.p`, or the empty set when at most one entry of ``\\boldsymbol{\\omega}`` lies strictly between its minimum and its maximum. `## Relaxation` gives the reason.
   - ``t``: Is the scalar auxiliary variable, `owa_t`.
   - ``\\boldsymbol{\\nu},\\, \\boldsymbol{\\eta}``: Are the `T × 1` non-negative auxiliary variables, `owa_nu` and `owa_eta`.
   - ``\\boldsymbol{\\varepsilon},\\, \\boldsymbol{\\psi}``: Are the `T × M` auxiliary variables, `owa_epsilon` and `owa_psi`.
@@ -303,7 +303,7 @@ Where:
 $(val_dict[:relax])
 
   - The bounded quantity is `aowa_risk_`. At its minimum over the auxiliary variables, it lies at or **above** the exact OWA risk of the same portfolio, ``\\boldsymbol{\\omega}^{\\intercal} \\mathrm{sort}(\\hat{\\boldsymbol{r}})``. The dual of the programme maximises over every vector with the minimum, the maximum, the sum and the p-norms of ``-\\boldsymbol{\\omega}``, and every reordering of ``-\\boldsymbol{\\omega}`` is such a vector.
-  - The bound is exact when the weight vector takes two values only, its minimum and its maximum, as the vectors of [`owa_wr`](@ref) and of [`owa_cvar`](@ref) at an integer ``\\alpha T`` do. The box and the sum then describe the convex hull of the reorderings. For other vectors the gap closes as the vector approaches a line, and the gaps above give its size.
+  - The bound is exact when at most one entry of the weight vector lies strictly between its minimum and its maximum, as the vectors of [`owa_wr`](@ref) and of [`owa_cvar`](@ref) at every ``\\alpha`` do. The box and the sum then describe the convex hull of the reorderings, and every p-norm constraint is redundant. The method then sets ``S`` to the empty set, so ``M = 0`` and the model is a linear programme. The redundant cones would put the optimum at the apex of every cone, ``\\boldsymbol{\\varepsilon} = \\boldsymbol{0}`` and ``\\boldsymbol{y} = \\boldsymbol{0}``, where an interior point solver can stall. For other vectors the gap closes as the vector approaches a line, and the gaps above give its size.
   - The bound holds while the objective or a bound pulls `aowa_risk_` down, as a minimum-risk objective does. Under [`MaximumReturn`](@ref) with no risk bound, nothing pulls, and the value of `aowa_risk_` can lie further above. Read the exact figure back with [`expected_risk`](@ref).
 
 # Arguments
@@ -349,7 +349,13 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     if !loss
         net_X = -net_X
     end
-    owa_p = r.alg.p
+    owa_w = isa(r.w, VecNum) ? -r.w : -r.w(T)
+    owa_s = sum(owa_w)
+    owa_l, owa_h = extrema(owa_w)
+    # With at most one entry strictly inside the box, the box and the sum describe the convex
+    # hull of the reorderings. The p-norm cones are then redundant, and they put the optimum
+    # at the apex of every cone, where the interior point solver can stall (#1895).
+    owa_p = count(x -> owa_l < x < owa_h, owa_w) <= 1 ? empty(r.alg.p) : r.alg.p
     M = length(owa_p)
     owa_t, owa_nu, owa_eta, owa_epsilon, owa_psi, owa_z, owa_y = JuMP.@variables(model,
                                                                                  begin
@@ -373,10 +379,6 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     state_set!(model, prefix, :owa_psi_, i, owa_psi)
     state_set!(model, prefix, :owa_z_, i, owa_z)
     state_set!(model, prefix, :owa_y_, i, owa_y)
-    owa_w = isa(r.w, VecNum) ? -r.w : -r.w(T)
-    owa_s = sum(owa_w)
-    owa_l = minimum(owa_w)
-    owa_h = maximum(owa_w)
     owa_d = [LinearAlgebra.norm(owa_w, p) for p in owa_p]
     aowa_risk, neg_owa_z_owa_p, owa_p_o_owa_pm1 = JuMP.@expressions(model,
                                                                     begin

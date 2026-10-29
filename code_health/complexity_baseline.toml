@@ -371,7 +371,7 @@ commit = "9f7e0ac503"
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/03_EntropicXatRiskConstraints.jl" = { cyc = 3, cog = 3, arg = 9, cyc_sum = 6, cog_sum = 3, arg_sum = 34, macros = [] }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/04_RelativisticXatRiskConstraints.jl" = { cyc = 2, cog = 2, arg = 9, cyc_sum = 5, cog_sum = 2, arg_sum = 34, macros = [] }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/05_PowerNormXatRiskConstraints.jl" = { cyc = 2, cog = 2, arg = 9, cyc_sum = 5, cog_sum = 2, arg_sum = 34, macros = [] }
-"src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/07_OWARiskMeasuresConstraints.jl" = { cyc = 3, cog = 4, arg = 9, cyc_sum = 18, cog_sum = 18, arg_sum = 57, macros = [] }
+"src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/07_OWARiskMeasuresConstraints.jl" = { cyc = 4, cog = 5, arg = 9, cyc_sum = 19, cog_sum = 20, arg_sum = 57, macros = [] }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/08_AverageDrawdownConstraints.jl" = { cyc = 2, cog = 2, arg = 8, cyc_sum = 2, cog_sum = 2, arg_sum = 8, macros = [] }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/09_UlcerIndexConstraints.jl" = { cyc = 2, cog = 2, arg = 8, cyc_sum = 2, cog_sum = 2, arg_sum = 8, macros = [] }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/10_MaximumDrawdownConstraints.jl" = { cyc = 1, cog = 0, arg = 8, cyc_sum = 1, cog_sum = 0, arg_sum = 8, macros = [] }

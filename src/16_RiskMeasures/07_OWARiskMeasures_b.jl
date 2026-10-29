@@ -646,7 +646,7 @@ Under [`ApproxOrderedWeightsArray`](@ref) this type approximates each tail on it
 
 !!! warning
 
-    A `w2` that you give is stored as given, so you must give it already reversed: `reverse(v)` for a vector `v`, and `reverse ∘ f` for a callable `f`. The constructor does not check the orientation. An unreversed `w2` weighs the same lower tail as `w1`, so `w1 - w2` cancels the two tails instead of adding them, and the measure is not a range.
+    A `w2` that you give is stored as given, so you must give it already reversed: `reverse(v)` for a vector `v`, and `reverse ∘ f` for a callable `f`. The constructor does not check the orientation. An unreversed `w2` weighs the same lower tail as `w1`, so `w1 - w2` cancels the two tails instead of adding them, and the measure is not a range. [`ApproxOrderedWeightsArray`](@ref) builds each tail from properties of its weight vector that a reordering leaves unchanged, so its model still optimises the range. The functor and [`expected_risk`](@ref) read `w1 - w2`, so the risk that they report then differs from the model.
 
 # Mathematical definition
 

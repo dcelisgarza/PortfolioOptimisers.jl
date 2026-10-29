@@ -441,5 +441,45 @@
                 @test lo <= approx / exact - 1 <= hi
             end
         end
+        @testset "Approximate OWA formulation: no p-norm cones for at most one inner entry (#1895)" begin
+            # With at most one entry strictly inside the box, the redundant cones put the
+            # optimum at the apex of every cone. Clarabel then stopped with SLOW_PROGRESS on
+            # the first two ranges at these tolerances and with the defaults.
+            slv = Solver(; name = :c, solver = Clarabel.Optimizer,
+                         settings = Dict("verbose" => false, "tol_gap_abs" => 1e-10,
+                                         "tol_gap_rel" => 1e-10, "tol_feas" => 1e-10),
+                         check_sol = (; allow_local = true, allow_almost = true))
+            T, N = 100, 8
+            rng = StableRNG(295)
+            X = 0.01 * (randn(rng, T, N) .* (1 .+ 0.5 * rand(rng, 1, N)) .+
+                        0.3 * randn(rng, T, 1) .* rand(rng, 1, N)) .+ 0.0005
+            X .= X .* (1 .+ (rand(rng, T, N) .< 0.05) .* 2)
+            pr = prior(EmpiricalPrior(), ReturnsResult(; nx = string.('A':'H'), X = X))
+            opt = JuMPOptimiser(; pe = pr, slv = slv)
+            # αT = 7 + 1 ulp gives a third entry of -2.2e-16, 0.075 a fractional entry.
+            for (a, b) in ((0.07, 0.07), (0.05, 0.1), (0.075, 0.13))
+                w1 = OrderedWeightsArrayConditionalValueatRisk(; alpha = a)
+                w2 = reverse ∘ OrderedWeightsArrayConditionalValueatRisk(; alpha = b)
+                ra = optimise(MeanRisk(;
+                                       r = OrderedWeightsArrayRange(; w1 = w1, w2 = w2,
+                                                                    alg = ApproxOrderedWeightsArray()),
+                                       obj = MinimumRisk(), opt = opt))
+                re = optimise(MeanRisk(;
+                                       r = OrderedWeightsArrayRange(; w1 = w1, w2 = w2,
+                                                                    alg = ExactOrderedWeightsArray()),
+                                       obj = MinimumRisk(), opt = opt))
+                @test isa(ra.retcode, OptimisationSuccess)
+                @test size(ra.model[:owa_epsilon_loss_1]) == (T, 0)
+                @test size(ra.model[:owa_epsilon_gain_1]) == (T, 0)
+                @test isapprox(JuMP.value(ra.model[:aowa_range_risk_1]),
+                               JuMP.value(re.model[:owa_range_risk_1]); rtol = 1e-6)
+            end
+            # A vector with many inner entries keeps one cone block for each order of `p`.
+            ra = optimise(MeanRisk(;
+                                   r = OrderedWeightsArray(; w = owa_gmd,
+                                                           alg = ApproxOrderedWeightsArray()),
+                                   obj = MinimumRisk(), opt = opt))
+            @test size(ra.model[:owa_epsilon_1]) == (T, 5)
+        end
     end
 end
