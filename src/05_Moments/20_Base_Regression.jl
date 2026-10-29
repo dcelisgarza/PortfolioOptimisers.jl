@@ -410,16 +410,16 @@ A target is the model that a regression estimator fits. The family has two branc
 
 # Interfaces
 
-To add a regression target, subtype [`AbstractUnpenalisedRegressionTarget`](@ref) or [`AbstractPenalisedRegressionTarget`](@ref), keep its parameters in the fields of the struct, and add the methods below. Each estimator reads only some of them, so a target needs only the methods of the estimators that it runs under. [`StepwiseRegression`](@ref) accepts an unpenalised target alone, because its criteria do not hold for a penalised fit.
+To add a regression target, subtype [`AbstractUnpenalisedRegressionTarget`](@ref) or [`AbstractPenalisedRegressionTarget`](@ref), keep its parameters in the fields of the struct, and add the methods below. Each estimator reads only some of them, so a target needs only the methods of the estimators that it runs under. [`StepwiseRegression`](@ref) accepts a penalised target under `:aic`, `:aicc` and `:bic` alone, and its docstring states the reason of each refused pair.
 
-| Estimator                                | Methods it reads                                                                                                               |
-|:---------------------------------------- |:------------------------------------------------------------------------------------------------------------------------------ |
-| [`CrossSectionalTargetRegression`](@ref) | `factory`, `StatsAPI.fit`, `StatsAPI.coef`, `is_basis_invariant`                                                               |
-| [`TargetReturnForecast`](@ref)           | `StatsAPI.fit`, `StatsAPI.predict`, and `factory` with an [`InterceptColumn`](@ref) under `intercept = true`                   |
-| [`ImpliedVolatilityRegression`](@ref)    | `factory` with an [`InterceptColumn`](@ref), `StatsAPI.fit`, `StatsAPI.predict`                                                |
-| [`StepwiseRegression`](@ref)             | `StatsAPI.fit`, and `StatsAPI.coeftable` under [`PValue`](@ref) or the score verb of its criterion under every other criterion |
-| [`DimensionReductionRegression`](@ref)   | `factory` with an [`InterceptColumn`](@ref), `StatsAPI.fit`, `StatsAPI.coef`, `regression_target_weights`                      |
-| [`KernelTrendPattern`](@ref)             | `StatsAPI.fit`, `StatsAPI.predict`                                                                                             |
+| Estimator                                | Methods it reads                                                                                                                                                                                               |
+|:---------------------------------------- |:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`CrossSectionalTargetRegression`](@ref) | `factory`, `StatsAPI.fit`, `StatsAPI.coef`, `is_basis_invariant`                                                                                                                                               |
+| [`TargetReturnForecast`](@ref)           | `StatsAPI.fit`, `StatsAPI.predict`, and `factory` with an [`InterceptColumn`](@ref) under `intercept = true`                                                                                                   |
+| [`ImpliedVolatilityRegression`](@ref)    | `factory` with an [`InterceptColumn`](@ref), `StatsAPI.fit`, `StatsAPI.predict`                                                                                                                                |
+| [`StepwiseRegression`](@ref)             | `factory` with an [`InterceptColumn`](@ref), `StatsAPI.fit`, `StatsAPI.coef`, `residual_count`, and `StatsAPI.coeftable` under [`PValue`](@ref) or the score verb of its criterion under every other criterion |
+| [`DimensionReductionRegression`](@ref)   | `factory` with an [`InterceptColumn`](@ref), `StatsAPI.fit`, `StatsAPI.coef`, `residual_count`, `regression_target_weights`                                                                                    |
+| [`KernelTrendPattern`](@ref)             | `StatsAPI.fit`, `StatsAPI.predict`                                                                                                                                                                             |
 
 The three time-series estimators carry their target through [`factory`](@ref), so each of them also reads `factory` when it gets observation weights.
 
@@ -510,7 +510,7 @@ An estimator that adds a column of ones to the design calls this method before t
 
   - `StatsAPI.aic(m::MyRegressionFit) -> Number`, and the same signature for `StatsAPI.aicc`, `StatsAPI.bic`, `StatsAPI.r2` and `StatsAPI.adjr2`: Return the score of the fit that the criterion of the same name in [`STEPWISE_REGRESSION_CRITERIA`](@ref) reads.
 
-[`StepwiseRegression`](@ref) reads the verb of its own criterion and no other, so a target implements only the verbs of the criteria that it runs under. If the verb of the criterion has no method for the fit, the first fit raises a `MethodError`.
+[`StepwiseRegression`](@ref) reads the verb of its own criterion and no other, so a target implements only the verbs of the criteria that it runs under. If the verb of the criterion has no method for the fit, the first fit raises a `MethodError`. A penalised fit reads its effective degrees of freedom in `StatsAPI.dof`, as [`ElasticNetFit`](@ref) does.
 
 ### Arguments
 
@@ -519,6 +519,21 @@ An estimator that adds a column of ones to the design calls this method before t
 ### Returns
 
   - `s::Number`: The score of the fit. The criterion states whether a smaller or a larger score is better.
+
+## `residual_count`
+
+  - `residual_count(m::MyRegressionFit, A::MatNum) -> Real`: Return the residual degrees of freedom of the fit, which the estimator writes into `edof` of [`Regression`](@ref).
+
+[`residual_count(::Any, ::MatNum)`](@ref) counts one spent parameter for each column of `A`, which is the count of an unpenalised fit, so such a target needs no method. A penalised fit spends fewer, and adds a method that returns its own count, as [`ElasticNetFit`](@ref) does.
+
+### Arguments
+
+  - `m`: The fitted model that `StatsAPI.fit` returns.
+  - `A`: The design of the fit.
+
+### Returns
+
+  - `nu::Real`: The residual degrees of freedom of the fit.
 
 ## `regression_target_weights`
 
@@ -568,6 +583,7 @@ A fit that minimises a loss of the fitted values alone, such as the weighted squ
   - [`factory`](@ref)
   - [`regression_target_weights`](@ref)
   - [`is_basis_invariant`](@ref)
+  - [`residual_count`](@ref)
 """
 abstract type AbstractRegressionTarget <: AbstractRegressionAlgorithm end
 """
@@ -575,7 +591,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the regression targets that fit their coefficients with no penalty.
 
-[`LinearModel`](@ref) and [`GeneralisedLinearModel`](@ref) subtype it. A target of this branch fits every coefficient by its loss alone, so the inference of the fit counts one degree of freedom for each coefficient. [`StepwiseRegression`](@ref) binds its target to this branch, because its p-values and its information criteria read that count.
+[`LinearModel`](@ref) and [`GeneralisedLinearModel`](@ref) subtype it. A target of this branch fits every coefficient by its loss alone, so the inference of the fit counts one degree of freedom for each coefficient. [`StepwiseRegression`](@ref) binds its target to this branch under [`PValue`](@ref), `:r2` and `:adjr2`, because these criteria read p-values or a residual count that no source states for a penalised fit.
 
 # Interfaces
 
@@ -615,7 +631,7 @@ Abstract supertype for the regression targets that add a penalty on their coeffi
 
 # Interfaces
 
-To add a penalised regression target, subtype `AbstractPenalisedRegressionTarget`, and add the methods that the `# Interfaces` section of [`AbstractRegressionTarget`](@ref) names for the estimators that the target runs under. Add the method below too, so that the penalty leaves the intercept alone.
+To add a penalised regression target, subtype `AbstractPenalisedRegressionTarget`, and add the methods that the `# Interfaces` section of [`AbstractRegressionTarget`](@ref) names for the estimators that the target runs under. Add the method below too, so that the penalty leaves the intercept alone. Add `residual_count` for the fit too, because its fallback counts one spent parameter for each column.
 
 ## `factory`
 
@@ -808,8 +824,9 @@ function factory(re::LinearModel, w::ObsWeights)::LinearModel
 end
 """
     glm_weights(w::StatsBase.AbstractWeights) -> StatsBase.FrequencyWeights
+    glm_weights(w::Nothing) -> Nothing
 
-Return the frequency weights that `GLM` reads as the observation weights `w`.
+Return the frequency weights that `GLM` reads as the observation weights `w`, or `nothing` for a fit with no weights.
 
 `GLM` reads every weight vector as frequency weights, so the number of observations of a weighted fit is ``\\sum_t w_t``. `StatsBase.FrequencyWeights` state a count, so the method returns them unchanged. Every other kind of weights states the relative weight of each observation and no count. For example, `GLM` reads probability weights that sum to one as one observation. The fit then has a residual degree of freedom at or below zero, and a p-value of one for every coefficient. To prevent this, the method scales the other kinds to sum to their Kish effective sample size.
 
@@ -834,11 +851,11 @@ Where:
 
 # Arguments
 
-  - `w`: The resolved observation weights, one per row of the design.
+  - `w`: The resolved observation weights, one per row of the design, or `nothing`.
 
 # Returns
 
-  - `w::StatsBase.FrequencyWeights`: `w` itself when it is `StatsBase.FrequencyWeights`, otherwise ``\\tilde{w}``.
+  - `w::Option{StatsBase.FrequencyWeights}`: `w` itself when it is `StatsBase.FrequencyWeights` or `nothing`, otherwise ``\\tilde{w}``.
 
 # Related
 
@@ -851,6 +868,9 @@ function glm_weights(w::StatsBase.FrequencyWeights)
 end
 function glm_weights(w::StatsBase.AbstractWeights)
     return StatsBase.fweights(w .* (sum(w) / sum(abs2, w)))
+end
+function glm_weights(::Nothing)
+    return nothing
 end
 """
     glm_fit_kwargs(kwargs::NamedTuple, X::MatNum) -> NamedTuple
@@ -1251,6 +1271,31 @@ function is_basis_invariant(::Union{LinearModel, GeneralisedLinearModel})::Bool
 end
 function is_basis_invariant(::AbstractRegressionTarget)::Bool
     return false
+end
+"""
+    residual_count(m, A::MatNum) -> Integer
+
+Return the residual degrees of freedom of a fitted regression target that states no count of its own, the number of rows of the design less its number of columns.
+
+A fit with no penalty spends one parameter for each column, so the count is the count of a projection. [`StepwiseRegression`](@ref) and [`DimensionReductionRegression`](@ref) read it, and write it into `edof` of [`Regression`](@ref). The method does not read `GLM.dof_residual`. Under weights, `GLM` counts the observations as the sum of the frequency weights, and the count of the library counts the rows. A penalised fit spends fewer parameters than it has columns, so it states its own count, as [`residual_count(::ElasticNetFit, ::MatNum)`](@ref) does.
+
+# Arguments
+
+  - `m`: The fitted model, which the method does not read.
+  - `A`: The design of the fit, `observations × columns`.
+
+# Returns
+
+  - `nu::Integer`: `size(A, 1) - size(A, 2)`.
+
+# Related
+
+  - [`AbstractRegressionTarget`](@ref)
+  - [`ElasticNetFit`](@ref)
+  - [`Regression`](@ref)
+"""
+function residual_count(::Any, A::MatNum)
+    return size(A, 1) - size(A, 2)
 end
 """
     MIN_VAL_STEPWISE_REGRESSION_CRITERIA
@@ -2030,7 +2075,8 @@ public AbstractOrthogonalityMetric, orthogonality_weights, cs_diagnostic_weights
 # verbs its section names are `factory`, which is exported, `StatsAPI` verbs, and
 # `regression_target_weights`, which #1441 added for the time-series estimators, and
 # `is_basis_invariant`, which #1614 added for the carry fold of the cross-sectional prior.
-public AbstractRegressionTarget, regression_target_weights, is_basis_invariant
+public AbstractRegressionTarget, regression_target_weights, is_basis_invariant,
+       residual_count
 # The two branches of #1885 (ADR 0223): a caller's own target subtypes one of them.
 public AbstractUnpenalisedRegressionTarget, AbstractPenalisedRegressionTarget
 export InterceptColumn

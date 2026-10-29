@@ -233,6 +233,7 @@
         :AbstractSpannedShrinkageCalibrationAlgorithm,
         :AbstractSparsePortfolioAlgorithm,
         :AbstractStepWeighting,
+        :AbstractStrengthDivergence,
         :AbstractSystematicRepair,
         :AbstractTimeSeriesRegressionEstimator,
         :AbstractTrackingAlgorithm,

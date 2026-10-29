@@ -302,4 +302,8 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :hill1975 => "[hill1975](@cite) B. M. Hill. *A simple general approach to inference about the tail of a distribution*. The Annals of Statistics 3, 1163–1174 (1975).",#
                  :kish1965 => "[kish1965](@cite) L. Kish. *Survey Sampling* (John Wiley & Sons, 1965).",#
                  :blanchet2019 => "[blanchet2019](@cite) J. Blanchet, Y. Kang and K. Murthy. *Robust Wasserstein profile inference and applications to machine learning*. Journal of Applied Probability 56, 830–857 (2019).",#
-                 :fournier2015 => "[fournier2015](@cite) N. Fournier and A. Guillin. *On the rate of convergence in Wasserstein distance of the empirical measure*. Probability Theory and Related Fields 162, 707–738 (2015).")
+                 :fournier2015 => "[fournier2015](@cite) N. Fournier and A. Guillin. *On the rate of convergence in Wasserstein distance of the empirical measure*. Probability Theory and Related Fields 162, 707–738 (2015).",#
+                 :tibshirani2012 => "[tibshirani2012](@cite) R. J. Tibshirani and J. Taylor. *Degrees of freedom in lasso problems*. The Annals of Statistics 40, 1198–1232 (2012).",#
+                 :hurvich1998 => "[hurvich1998](@cite) C. M. Hurvich, J. S. Simonoff and C.-L. Tsai. *Smoothing parameter selection in nonparametric regression using an improved Akaike information criterion*. Journal of the Royal Statistical Society: Series B (Statistical Methodology) 60, 271–293 (1998).",#
+                 :zou2007 => "[zou2007](@cite) H. Zou, T. Hastie and R. Tibshirani. *On the \"degrees of freedom\" of the lasso*. The Annals of Statistics 35, 2173–2192 (2007).",#
+                 :hastie2009 => "[hastie2009](@cite) T. Hastie, R. Tibshirani and J. Friedman. *The Elements of Statistical Learning: Data Mining, Inference, and Prediction*. 2nd edition (Springer, 2009).")

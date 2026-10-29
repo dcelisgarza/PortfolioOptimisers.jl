@@ -807,6 +807,7 @@ KernelTrendPattern
          │      theta ┼ Float64: 0.99
          │   strength ┼ MiddleOfPath
          │            │   ratio ┴ Float64: 0.001
+         │       sdiv ┼ nothing
          │         ve ┼ nothing
          │      iters ┼ Int64: 10000
          │        tol ┼ Float64: 1.0e-10

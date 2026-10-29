@@ -221,8 +221,157 @@ the worked step the paper prints for five assets at its defaults.
         @test po.penalty_strength(fx, [1.0, -5.0], 0.5) == 2.0
         @test po.penalty_strength(MiddleOfPath(; ratio = 0.25), [1.0, -5.0], 0.5) == 5.0
         @test po.penalty_strength(MiddleOfPath(), Float64[], 0.5) == 0
-        # The stepwise search refuses a penalised target by its bound.
-        @test_throws TypeError StepwiseRegression(; tgt = ElasticNet())
+    end
+
+    @testset "A penalised fit states its degrees of freedom (#1899)" begin
+        rng5 = StableRNG(7)
+        n = 60
+        Xd = [ones(n) randn(rng5, n, 5)]
+        beta = [0.5, 1, -0.5, 0, 0, 0.25]
+        yd = Xd * beta .+ randn(rng5, n)
+        aw = StatsBase.aweights(rand(rng5, n))
+        ic1 = InterceptColumn(1)
+        # At theta = 0 and a strength near zero, the fit is the least-squares fit, and its
+        # scores are the scores of `LinearModel` under the same weights.
+        for w in (nothing, aw)
+            en = factory(ElasticNet(; theta = 0, strength = FixedStrength(; gamma = 1e-10),
+                                    w = w), ic1)
+            lm = isnothing(w) ? LinearModel() : factory(LinearModel(), w)
+            m = S.fit(en, Xd, yd)
+            g = S.fit(lm, Xd, yd)
+            @test isapprox(S.dof(m), S.dof(g); atol = 1e-8)
+            @test S.nobs(m) ≈ S.nobs(g) &&
+                  isapprox(S.deviance(m), S.deviance(g); rtol = 1e-9)
+            for f in (S.loglikelihood, S.aic, S.aicc, S.bic)
+                @test isapprox(f(m), f(g); atol = 1e-8)
+            end
+            @test isapprox(po.residual_count(m, Xd), n - 6; atol = 1e-8)
+            @test po.residual_count(g, Xd) === n - 6
+        end
+        # The counts against the smoother built by hand, on standardised, weighted columns.
+        tgt = factory(factory(ElasticNet(; theta = 0.6,
+                                         strength = FixedStrength(; gamma = 5.0),
+                                         ve = SimpleVariance()), aw), ic1)
+        m = S.fit(tgt, Xd, yd)
+        sd = vec(std(tgt.ve, Xd; dims = 1))
+        sd[1] = 1
+        P = Xd ./ sd'
+        v = po.glm_weights(aw)
+        A = findall(.!iszero.(S.coef(m)))
+        DA = Diagonal([k == 1 ? 0.0 : 1.0 for k in A])
+        H = P[:, A] *
+            ((P[:, A]' * (v .* P[:, A]) + m.gamma * 0.4 * DA) \ (P[:, A]' * Diagonal(v)))
+        Sm = Diagonal(sqrt.(v)) * H * Diagonal(1 ./ sqrt.(v))
+        @test m.df ≈ tr(H)
+        @test m.rdof ≈ n - tr(2Sm - Sm' * Sm)
+        @test m.rss ≈ sum(v .* (yd .- Xd * S.coef(m)) .^ 2) && m.nobs ≈ sum(v)
+        # A ridge spends fewer parameters than its columns, and its residual count is below
+        # the count of `N − tr(H)`, which overstates it.
+        rg = S.fit(ElasticNet(; theta = 0, strength = FixedStrength(; gamma = 30.0)), Xd,
+                   yd)
+        Hr = Xd * ((Xd' * Xd + 30.0I) \ Xd')
+        @test rg.df ≈ tr(Hr) && rg.df < 6
+        @test rg.rdof ≈ n - tr(2Hr - Hr' * Hr) && rg.rdof < n - rg.df
+        # At theta = 1, an active set with more columns than rows has the rank as its count.
+        Xw = randn(StableRNG(3), 5, 8)
+        mw = S.fit(ElasticNet(; theta = 1.0, strength = FixedStrength(; gamma = 1e-4),
+                              iters = 2000), Xw, randn(StableRNG(4), 5))
+        @test count(!iszero, S.coef(mw)) == 8
+        @test mw.df ≈ 5 && isapprox(mw.rdof, 0; atol = 1e-10)
+        # A zero active set spends nothing.
+        m0 = S.fit(ElasticNet(; strength = FixedStrength(; gamma = 1e12)), Xd[:, 2:end], yd)
+        @test m0.df == 0 && m0.rdof == n
+        # The gradient of the strength against a central difference in `g`.
+        mp = MiddleOfPath()
+        g = [0.3, -1.2, 0.5]
+        hg = 1e-6
+        fd = [(po.penalty_strength(mp, g .+ hg .* (1:3 .== k), 0.7) -
+               po.penalty_strength(mp, g .- hg .* (1:3 .== k), 0.7)) / (2hg) for k in 1:3]
+        @test po.penalty_strength_gradient(mp, g, 0.7) ≈ fd
+        @test po.penalty_strength_gradient(FixedStrength(; gamma = 1.0), g, 0.7) == zeros(3)
+        @test isempty(po.penalty_strength_gradient(mp, Float64[], 0.7))
+        # The divergence of the fit by central differences. Under `MiddleOfPath` the count
+        # with `StrengthDivergence()` is the divergence at each draw, and the trace alone is
+        # above it. Under `FixedStrength` the trace is the divergence, and the rule adds zero.
+        function divergence(tgt, X, y; h = 1e-6)
+            return sum(eachindex(y)) do i
+                e = h .* (eachindex(y) .== i)
+                (S.predict(S.fit(tgt, X, y .+ e), X)[i] -
+                 S.predict(S.fit(tgt, X, y .- e), X)[i]) / (2h)
+            end
+        end
+        rng6 = StableRNG(11)
+        for theta in (0.5, 0.99), _ in 1:3
+            yy = Xd * beta .+ randn(rng6, n)
+            plain = factory(ElasticNet(; theta = theta), ic1)
+            full = factory(ElasticNet(; theta = theta, sdiv = StrengthDivergence()), ic1)
+            d = divergence(plain, Xd, yy)
+            @test isapprox(S.fit(full, Xd, yy).df, d; atol = 1e-6)
+            @test S.fit(plain, Xd, yy).df > d
+            @test S.fit(full, Xd, yy).rdof == S.fit(plain, Xd, yy).rdof
+        end
+        wve = factory(factory(ElasticNet(; theta = 0.7, ve = SimpleVariance()), aw), ic1)
+        wvs = factory(factory(ElasticNet(; theta = 0.7, ve = SimpleVariance(),
+                                         sdiv = StrengthDivergence()), aw), ic1)
+        @test isapprox(S.fit(wvs, Xd, yd).df, divergence(wve, Xd, yd); atol = 1e-6)
+        nic = ElasticNet(; theta = 0.7, sdiv = StrengthDivergence())
+        @test isapprox(S.fit(nic, Xd, yd).df, divergence(ElasticNet(; theta = 0.7), Xd, yd);
+                       atol = 1e-6)
+        fx = FixedStrength(; gamma = 3.0)
+        fx0 = factory(ElasticNet(; theta = 0.7, strength = fx), ic1)
+        fx1 = factory(ElasticNet(; theta = 0.7, strength = fx, sdiv = StrengthDivergence()),
+                      ic1)
+        @test S.fit(fx1, Xd, yd).df == S.fit(fx0, Xd, yd).df
+        @test isapprox(S.fit(fx0, Xd, yd).df, divergence(fx0, Xd, yd); atol = 1e-6)
+        # `factory` keeps the rule.
+        @test factory(factory(fx1, aw), ic1).sdiv === StrengthDivergence()
+    end
+
+    @testset "The stepwise search reads a penalised fit under aic, aicc and bic (#1899)" begin
+        rng7 = StableRNG(5)
+        n = 60
+        F = randn(rng7, n, 5)
+        Xs = hcat(F * [1.0, -0.5, 0, 0, 0.25] .+ randn(rng7, n),
+                  F * [0.3, 0, 0, 1.0, 0] .+ randn(rng7, n))
+        # The valid pairs construct, and a refused pair is a `MethodError`, through the
+        # keyword and the positional constructor alike.
+        for c in (:aic, :aicc, :bic)
+            @test StepwiseRegression(; crit = c, tgt = ElasticNet()).tgt == ElasticNet()
+        end
+        for c in (:r2, :adjr2, PValue())
+            @test_throws MethodError StepwiseRegression(; crit = c, tgt = ElasticNet())
+            @test StepwiseRegression(; crit = c).tgt == LinearModel()
+        end
+        @test_throws MethodError StepwiseRegression(; tgt = ElasticNet())
+        @test_throws MethodError StepwiseRegression(Val(:r2), ForwardSelection(),
+                                                    ElasticNet(), BatchChoice(), nothing,
+                                                    nothing)
+        # Each search runs, names the intercept to the target, and writes the residual count
+        # of the fit of each asset into `edof`, a real count.
+        for c in (:aic, :aicc, :bic), alg in (ForwardSelection(), BackwardElimination())
+            re = StepwiseRegression(; crit = c, alg = alg, tgt = ElasticNet())
+            r = regression(re, Xs, F)
+            @test eltype(r.edof) == Float64
+            for i in 1:2
+                inc = po.stepwise_factor_set(re, Xs[:, i], F, i)
+                m = S.fit(factory(ElasticNet(), InterceptColumn(1)), [ones(n) F[:, inc]],
+                          Xs[:, i])
+                @test r.edof[i] ≈ m.rdof &&
+                      n - 1 - length(inc) <= r.edof[i] <= n - m.df + 1e-10
+                @test r.b[i] ≈ S.coef(m)[1]
+            end
+        end
+        # An unpenalised target keeps its integer count.
+        rl = regression(StepwiseRegression(; crit = :aic), Xs, F)
+        @test eltype(rl.edof) == Int &&
+              rl.edof == [n - 1 - count(!iszero, rl.M[i, :]) for i in 1:2]
+        # A selected factor that the penalty sets to zero keeps its place in the set, with a
+        # zero in its row, and the intercept stays at the mean of the asset.
+        big = ElasticNet(; strength = FixedStrength(; gamma = 1e10))
+        rb = regression(StepwiseRegression(; crit = :bic, tgt = big,
+                                           included = [[1, 2], [4]]), Xs, F)
+        @test all(iszero, rb.M) && rb.b ≈ vec(mean(Xs; dims = 1))
+        @test rb.edof ≈ [n - 1, n - 1]
     end
 
     @testset "The trend-reverting fraction" begin

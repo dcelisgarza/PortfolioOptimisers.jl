@@ -7,7 +7,7 @@ The strength scales the penalty against the weighted squared residuals. [`Middle
 
 # Interfaces
 
-To add a strength rule, subtype `AbstractPenaltyStrength`, keep its parameters in the fields of the struct, and add the method below.
+To add a strength rule, subtype `AbstractPenaltyStrength`, keep its parameters in the fields of the struct, and add the methods below. A target with `sdiv = nothing` does not read `penalty_strength_gradient`, so a rule that runs under that target alone needs only `penalty_strength`.
 
 ## `penalty_strength`
 
@@ -25,12 +25,30 @@ To add a strength rule, subtype `AbstractPenaltyStrength`, keep its parameters i
 
   - `gamma::Real`: The regularisation strength, non-negative.
 
+## `penalty_strength_gradient`
+
+  - `penalty_strength_gradient(s::MyPenaltyStrength, g::VecNum, theta::Real) -> VecNum`: Return the gradient of the strength that `penalty_strength` returns, with respect to `g`.
+
+[`StrengthDivergence`](@ref) reads it, because a strength that reads the response adds a term to the divergence of the fit. A rule that does not read `g` returns zeros.
+
+### Arguments
+
+  - `s`: The new strength rule.
+  - `g`: The vector that `penalty_strength` reads.
+  - `theta`: The share of the ``L_1`` penalty.
+
+### Returns
+
+  - `dg::VecNum`: The partial derivative of ``\\gamma`` with respect to each entry of `g`, one entry per entry of `g`.
+
 # Related
 
   - [`ElasticNet`](@ref)
   - [`MiddleOfPath`](@ref)
   - [`FixedStrength`](@ref)
   - [`penalty_strength`](@ref)
+  - [`penalty_strength_gradient`](@ref)
+  - [`StrengthDivergence`](@ref)
 """
 abstract type AbstractPenaltyStrength <: AbstractAlgorithm end
 """
@@ -201,6 +219,174 @@ function penalty_strength(s::FixedStrength, ::AbstractVector, ::Real)
     return s.gamma
 end
 """
+    penalty_strength_gradient(s::MiddleOfPath, g::AbstractVector, theta::Real) -> VecNum
+    penalty_strength_gradient(s::FixedStrength, g::AbstractVector, theta::Real) -> VecNum
+
+Return the gradient of the regularisation strength of an [`ElasticNet`](@ref) with respect to the vector that [`penalty_strength`](@ref) reads.
+
+[`StrengthDivergence`](@ref) chains it to the gradient with respect to the response. The `# Interfaces` section of [`AbstractPenaltyStrength`](@ref) states the method that a rule of the caller adds.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\frac{\\partial \\gamma}{\\partial g_{j}} &= \\frac{\\sqrt{\\rho}}{\\vartheta} \\operatorname{sign}(g_{k^{*}})\\, \\mathbb{1}[j = k^{*}]\\,,\\quad k^{*} = \\underset{k}{\\arg\\max} \\lvert g_{k} \\rvert\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:gamma_enet])
+  - ``g_{k}``: Entry ``k`` of `g`, the product of penalised column ``k`` with the residual of the start point.
+  - ``\\rho``: Floor of the path as a fraction of ``\\gamma_{\\max}``, the `ratio` field of [`MiddleOfPath`](@ref).
+  - $(math_dict[:theta_enet])
+
+The form is the derivative of ``\\gamma = \\sqrt{\\rho} \\max_{k} \\lvert g_{k} \\rvert / \\vartheta``, at a point where one entry holds the largest absolute value.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. [`MiddleOfPath`](@ref): return the empty `g` when `g` is empty. Otherwise find the index `k` of the largest absolute entry of `g`, and return a vector of zeros with `sign(g[k]) * sqrt(s.ratio) / theta` at `k`.
+ 2. [`FixedStrength`](@ref): return zeros, because the strength does not read `g`.
+
+# Arguments
+
+  - `s`: The strength rule.
+  - `g`: The product of each penalised column with the residual of the start point.
+  - `theta`: The share of the ``L_1`` penalty.
+
+# Returns
+
+  - `dg::VecNum`: The gradient, one entry per entry of `g`.
+
+# Related
+
+  - [`AbstractPenaltyStrength`](@ref)
+  - [`penalty_strength`](@ref)
+  - [`StrengthDivergence`](@ref)
+"""
+function penalty_strength_gradient(s::MiddleOfPath, g::AbstractVector, theta::Real)
+    if isempty(g)
+        return g
+    end
+    k = argmax(abs.(g))
+    val = sign(g[k]) * sqrt(s.ratio) / theta
+    dg = zeros(typeof(val), length(g))
+    dg[k] = val
+    return dg
+end
+function penalty_strength_gradient(::FixedStrength, g::AbstractVector, ::Real)
+    return zero(g)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the rules that add the term of a strength that reads the response to the effective degrees of freedom of an [`ElasticNet`](@ref).
+
+The trace of the smoother on the active set is the effective degrees of freedom of a fit at a fixed strength, Remark (The elastic net) after Equation (28) of [tibshirani2012](@cite). [`MiddleOfPath`](@ref) reads the strength off the response, so the divergence of its fit has one more term. [`StrengthDivergence`](@ref) adds it. The `sdiv` field of [`ElasticNet`](@ref) holds the rule, and `nothing`, the default, leaves the term out.
+
+# Interfaces
+
+To add a rule, subtype `AbstractStrengthDivergence`, and add the method below.
+
+## `strength_divergence`
+
+  - `strength_divergence(sdiv::MyStrengthDivergence, tgt::ElasticNet, sys::NamedTuple) -> Real`: Return the term that the rule adds to the trace of the smoother.
+
+[`StatsAPI.fit(::ElasticNet, ::MatNum, ::VecNum)`](@ref) calls it once, after the fit, through `elastic_net_counts`. The term changes `df` of [`ElasticNetFit`](@ref) alone, not the residual count `rdof`.
+
+### Arguments
+
+  - `sdiv`: The new rule.
+
+  - `tgt`: The regression target.
+
+  - `sys::NamedTuple`: The fit, `(; P, Q, y, z, pen, ridge, g, lam, nrm2, w, A, Mi)`:
+
+      + `P`, `Q`: The standardised design and the weighted design, as `elastic_net_design` returns them.
+      + `y`: The response.
+      + `z`: The coefficients of the fit on the columns of `P`.
+      + `pen`: Whether each column is penalised.
+      + `ridge`: The ridge term of each column.
+      + `g`, `lam`: The vector that [`penalty_strength`](@ref) read, and the strength that it returned.
+      + `nrm2`: The weighted squared norm of each column.
+      + `w`: The frequency weights of the rows, or `nothing`.
+      + `A`: The indices of the active set.
+      + `Mi`: The pseudo-inverse of the matrix of the equations of the active set.
+
+### Returns
+
+  - `t::Real`: The term.
+
+# Related
+
+  - [`StrengthDivergence`](@ref)
+  - [`ElasticNet`](@ref)
+  - [`penalty_strength_gradient`](@ref)
+  - [`strength_divergence`](@ref)
+
+# References
+
+  - $(ref_dict[:tibshirani2012]) Remark (The elastic net) after Equation (28).
+"""
+abstract type AbstractStrengthDivergence <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Adds the term of a strength that reads the response to the effective degrees of freedom of an [`ElasticNet`](@ref).
+
+The degrees of freedom of a fit ``\\hat{\\boldsymbol{\\mu}}`` is the expected divergence ``\\sum_{i} \\partial \\hat{\\mu}_{i} / \\partial y_{i}``, Equations (10) and (11) of [tibshirani2012](@cite). On a fixed active set, the fit at a fixed strength is linear in the response, and its divergence is the trace of the smoother. A strength that reads the response adds the chain term below. Under [`FixedStrength`](@ref) the gradient of the strength is zero, so the rule adds zero.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\operatorname{div} \\hat{\\boldsymbol{\\mu}} &= \\operatorname{tr}(\\mathbf{H}) + \\nabla_{\\boldsymbol{y}} \\gamma^{\\intercal} \\frac{\\partial \\hat{\\boldsymbol{\\mu}}}{\\partial \\gamma}\\,,\\\\
+\\frac{\\partial \\hat{\\boldsymbol{\\mu}}}{\\partial \\gamma} &= -\\mathbf{P}_{\\mathcal{A}} \\mathbf{M}^{-1} \\left((1 - \\vartheta) \\mathbf{D}_{\\mathcal{A}} \\boldsymbol{z}_{\\mathcal{A}} + \\vartheta \\boldsymbol{s}\\right)\\,,\\\\
+\\nabla_{\\boldsymbol{y}} \\gamma &= (\\mathbf{I} - \\mathbf{H}_{0})^{\\intercal} \\mathbf{V} \\mathbf{P}_{\\mathcal{K}} \\frac{\\partial \\gamma}{\\partial \\boldsymbol{g}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\boldsymbol{\\mu}}``: Fitted response, ``\\mathbf{P} \\hat{\\boldsymbol{z}}``.
+  - ``\\mathbf{H}``: Smoother of the fit on its active set, which [`ElasticNetFit`](@ref) states.
+  - ``\\mathbf{M}``: Matrix of the equations of the active set, ``\\mathbf{P}_{\\mathcal{A}}^\\intercal \\mathbf{V} \\mathbf{P}_{\\mathcal{A}} + \\gamma (1 - \\vartheta) \\mathbf{D}_{\\mathcal{A}}``.
+  - ``\\mathbf{P}_{\\mathcal{A}}``, ``\\boldsymbol{z}_{\\mathcal{A}}``: Columns of the regressors and coefficients of the active set.
+  - ``\\mathbf{D}_{\\mathcal{A}}``: Diagonal matrix with one for each penalised column of the active set and zero for the intercept column.
+  - ``\\boldsymbol{s}``: Signs of the coefficients of the active set, zero for the intercept column.
+  - ``\\mathbf{H}_{0}``: Weighted projection onto the intercept column, the zero matrix when the design has none. The start point of [`penalty_strength`](@ref) is the residual ``(\\mathbf{I} - \\mathbf{H}_{0}) \\boldsymbol{y}``.
+  - ``\\mathbf{P}_{\\mathcal{K}}``: Penalised columns of the design.
+  - ``\\partial \\gamma / \\partial \\boldsymbol{g}``: Gradient of the strength rule, [`penalty_strength_gradient`](@ref).
+  - $(math_dict[:P_enet])
+  - $(math_dict[:V_enet])
+  - $(math_dict[:gamma_enet])
+  - $(math_dict[:theta_enet])
+  - $(math_dict[:K_enet])
+
+The second line differentiates the equations of [`elastic_net_polish`](@ref) in ``\\gamma`` on the fixed active set. On the design of [`ElasticNet`](@ref) that states the gap, the count with the term matches the mean finite-difference divergence of the fit.
+
+# Examples
+
+```jldoctest
+julia> StrengthDivergence()
+StrengthDivergence()
+```
+
+# Related
+
+  - [`AbstractStrengthDivergence`](@ref)
+  - [`ElasticNet`](@ref)
+  - [`penalty_strength_gradient`](@ref)
+  - [`strength_divergence`](@ref)
+
+# References
+
+  - $(ref_dict[:tibshirani2012]) Equations (10) and (11), and Remark (The elastic net) after Equation (28).
+"""
+struct StrengthDivergence <: AbstractStrengthDivergence end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Fits each response by the elastic net, a least-squares fit with a penalty on the ``L_1`` norm and on the squared ``L_2`` norm of the coefficients.
@@ -213,7 +399,9 @@ The observation weights enter as the frequency weights of [`glm_weights`](@ref),
 
 When the columns are almost collinear, for example the levels of consecutive periods in [`KernelTrendPattern`](@ref), the coordinate sweeps converge slowly. Each sweep therefore ends with an exact solve on the sign pattern that it leaves, see [`elastic_net_polish`](@ref). The sweeps must still find the sign pattern of the optimum. On the 4 × 5 window of the test fixture of [`KernelTrendPattern`](@ref) they find it after between 2000 and 5000 sweeps, and a cap of 1000 stops more than 0.5 from the optimum in one coefficient. When the sweeps stop at `tol` or at `iters` before that, the result is the last sweep, which is not the optimum.
 
-The penalty depends on the units of each column, so the fit is not invariant to the basis of the design, and [`is_basis_invariant`](@ref) returns `false`. [`StepwiseRegression`](@ref) refuses the target, because its criteria count one degree of freedom for each coefficient.
+The penalty depends on the units of each column, so the fit is not invariant to the basis of the design, and [`is_basis_invariant`](@ref) returns `false`. [`StepwiseRegression`](@ref) accepts the target under `:aic`, `:aicc` and `:bic` alone, because these criteria read the effective degrees of freedom that [`ElasticNetFit`](@ref) states.
+
+The effective degrees of freedom is the trace of the smoother on the active set of the fit. That trace is exact at a fixed strength. [`MiddleOfPath`](@ref) reads the strength off the response, so the divergence of its fit has one more term, and `sdiv` gates it. With `sdiv = nothing`, the default, the count leaves the term out. The gap was measured on 2000 draws of a design of 60 observations, an intercept and 5 factors, with the coefficients `[0.5, 1, -0.5, 0, 0, 0.25]` and a unit noise. There the trace was above the mean finite-difference divergence of the fit by 0.06 at `theta = 0.5` and by 0.03 at `theta = 0.99`, with a standard error of 0.014. One factor costs about one degree of freedom, so the gap did not change a comparison of two models. [`StrengthDivergence`](@ref) adds the term. Under [`FixedStrength`](@ref) the term is zero, so `StrengthDivergence()` adds zero.
 
 # Mathematical definition
 
@@ -247,6 +435,7 @@ $(DocStringExtensions.FIELDS)
     ElasticNet(;
         theta::Real = 0.99,
         strength::AbstractPenaltyStrength = MiddleOfPath(),
+        sdiv::Option{<:AbstractStrengthDivergence} = nothing,
         ve::Option{<:AbstractVarianceEstimator} = nothing,
         iters::Integer = 10_000,
         tol::Real = 1e-10,
@@ -273,6 +462,7 @@ ElasticNet
      theta ┼ Float64: 0.99
   strength ┼ MiddleOfPath
            │   ratio ┴ Float64: 0.001
+      sdiv ┼ nothing
         ve ┼ nothing
      iters ┼ Int64: 10000
        tol ┼ Float64: 1.0e-10
@@ -300,6 +490,9 @@ true
   - [`InterceptColumn`](@ref)
   - [`LinearModel`](@ref)
   - [`KernelTrendPattern`](@ref)
+  - [`StrengthDivergence`](@ref)
+  - [`ElasticNetFit`](@ref)
+  - [`StepwiseRegression`](@ref)
   - [`StatsAPI.fit(::ElasticNet, ::MatNum, ::VecNum)`](@ref)
 
 # References
@@ -307,6 +500,7 @@ true
   - $(ref_dict[:friedman2010]) Section 2.5, Equations (1), (2) and (10).
   - $(ref_dict[:zouhastie2005]) Equation (3).
   - $(ref_dict[:lai2018ktpt]) Equation (15).
+  - $(ref_dict[:tibshirani2012]) Remark (The elastic net) after Equation (28).
 """
 @concrete struct ElasticNet <: AbstractPenalisedRegressionTarget
     """
@@ -317,6 +511,10 @@ true
     The rule that sets the regularisation strength.
     """
     strength
+    """
+    The rule that adds the term of a strength that reads the response to the effective degrees of freedom of the fit, or `nothing` to leave the term out.
+    """
+    sdiv
     """
     $(field_dict[:ve]) It standardises each penalised column, or `nothing` to fit the columns as they are.
     """
@@ -338,6 +536,7 @@ true
     """
     ic
     function ElasticNet(theta::Real, strength::AbstractPenaltyStrength,
+                        sdiv::Option{<:AbstractStrengthDivergence},
                         ve::Option{<:AbstractVarianceEstimator}, iters::Integer, tol::Real,
                         w::Option{<:ObsWeights}, ic::Option{<:Integer})
         @argcheck(zero(theta) <= theta <= one(theta),
@@ -353,17 +552,18 @@ true
         if !isnothing(ic)
             @argcheck(ic >= 1, DomainError(ic, "ic must be at least 1"))
         end
-        return new{typeof(theta), typeof(strength), typeof(ve), typeof(iters), typeof(tol),
-                   typeof(w), typeof(ic)}(theta, strength, ve, iters, tol, w, ic)
+        fs = (theta, strength, sdiv, ve, iters, tol, w, ic)
+        return new{map(typeof, fs)...}(fs...)
     end
 end
 function ElasticNet(; theta::Real = 0.99,
                     strength::AbstractPenaltyStrength = MiddleOfPath(),
+                    sdiv::Option{<:AbstractStrengthDivergence} = nothing,
                     ve::Option{<:AbstractVarianceEstimator} = nothing,
                     iters::Integer = 10_000, tol::Real = 1e-10,
                     w::Option{<:ObsWeights} = nothing,
                     ic::Option{<:Integer} = nothing)::ElasticNet
-    return ElasticNet(theta, strength, factory(ve, w), iters, tol, w, ic)
+    return ElasticNet(theta, strength, sdiv, factory(ve, w), iters, tol, w, ic)
 end
 """
     factory(tgt::ElasticNet, w::ObsWeights) -> ElasticNet
@@ -390,8 +590,8 @@ Return a new [`ElasticNet`](@ref) whose fit weighs the observations by `w`.
   - [`regression_target_weights(::ElasticNet)`](@ref)
 """
 function factory(tgt::ElasticNet, w::ObsWeights)::ElasticNet
-    return ElasticNet(; theta = tgt.theta, strength = tgt.strength, ve = tgt.ve,
-                      iters = tgt.iters, tol = tgt.tol, w = w, ic = tgt.ic)
+    return ElasticNet(; theta = tgt.theta, strength = tgt.strength, sdiv = tgt.sdiv,
+                      ve = tgt.ve, iters = tgt.iters, tol = tgt.tol, w = w, ic = tgt.ic)
 end
 """
     factory(tgt::ElasticNet, ic::InterceptColumn) -> ElasticNet
@@ -418,8 +618,8 @@ Return a new [`ElasticNet`](@ref) whose fit leaves the column of ones that an es
   - [`factory(::AbstractRegressionTarget, ::InterceptColumn)`](@ref)
 """
 function factory(tgt::ElasticNet, ic::InterceptColumn)::ElasticNet
-    return ElasticNet(; theta = tgt.theta, strength = tgt.strength, ve = tgt.ve,
-                      iters = tgt.iters, tol = tgt.tol, w = tgt.w, ic = ic.k)
+    return ElasticNet(; theta = tgt.theta, strength = tgt.strength, sdiv = tgt.sdiv,
+                      ve = tgt.ve, iters = tgt.iters, tol = tgt.tol, w = tgt.w, ic = ic.k)
 end
 """
     regression_target_weights(tgt::ElasticNet)
@@ -448,9 +648,47 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Holds the coefficients of a fitted [`ElasticNet`](@ref) and the strength at which the fit ran.
+Holds the coefficients of a fitted [`ElasticNet`](@ref), the strength at which the fit ran, and the counts that its scores read.
 
-[`StatsAPI.fit(::ElasticNet, ::MatNum, ::VecNum)`](@ref) returns it. `StatsAPI.coef` returns `b`, and `StatsAPI.predict` multiplies a design by `b`.
+[`StatsAPI.fit(::ElasticNet, ::MatNum, ::VecNum)`](@ref) returns it. `StatsAPI.coef` returns `b`, and `StatsAPI.predict` multiplies a design by `b`. `StatsAPI.dof`, `StatsAPI.nobs`, `StatsAPI.deviance`, `StatsAPI.loglikelihood`, `StatsAPI.aic`, `StatsAPI.aicc` and `StatsAPI.bic` read the counts, in the forms that `GLM` uses for a fitted [`LinearModel`](@ref). [`residual_count`](@ref) returns `rdof`.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathbf{H} &= \\mathbf{P}_{\\mathcal{A}} \\left(\\mathbf{P}_{\\mathcal{A}}^\\intercal \\mathbf{V} \\mathbf{P}_{\\mathcal{A}} + \\gamma (1 - \\vartheta) \\mathbf{D}_{\\mathcal{A}}\\right)^{-1} \\mathbf{P}_{\\mathcal{A}}^\\intercal \\mathbf{V}\\,,\\\\
+\\widehat{\\mathrm{df}} &= \\operatorname{tr}(\\mathbf{H}) + \\delta\\,,\\\\
+\\nu &= T - \\operatorname{tr}\\left(2 \\mathbf{S} - \\mathbf{S}^\\intercal \\mathbf{S}\\right)\\,,\\quad \\mathbf{S} = \\mathbf{V}^{1/2} \\mathbf{H} \\mathbf{V}^{-1/2}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{H}``: Smoother of the fit on its active set. The fitted response is ``\\mathbf{H} \\boldsymbol{y}`` while the active set and the strength do not move.
+  - ``\\mathbf{P}_{\\mathcal{A}}``: Columns of the active set ``\\mathcal{A}``, the columns whose coefficient is nonzero and the intercept column.
+  - ``\\mathbf{D}_{\\mathcal{A}}``: Diagonal matrix with one for each penalised column of the active set and zero for the intercept column.
+  - $(math_dict[:V_enet])
+  - $(math_dict[:gamma_enet])
+  - $(math_dict[:theta_enet])
+  - ``\\widehat{\\mathrm{df}}``: Effective degrees of freedom of the fit, `df`.
+  - ``\\delta``: Term of a strength that reads the response, which the `sdiv` field of the target adds through [`strength_divergence`](@ref). It is zero under `sdiv = nothing`.
+  - ``\\nu``: Residual count, `rdof`.
+  - ``\\mathbf{S}``: Smoother of the weighted rows. It is ``\\mathbf{H}`` itself without weights, and it is symmetric.
+  - $(math_dict[:T])
+
+Remark (The elastic net) after Equation (28) of [tibshirani2012](@cite) states the trace of ``\\mathbf{H}`` as an unbiased estimate of the degrees of freedom at a fixed strength. Remark (The lasso with intercept) after it extends the result to an unpenalised intercept.
+
+The residual count follows from the mean of the weighted residual sum of squares. With ``\\boldsymbol{y} = \\boldsymbol{\\mu} + \\boldsymbol{\\varepsilon}`` and ``\\mathbf{V}^{1/2} \\boldsymbol{\\varepsilon}`` of covariance ``\\sigma^{2} \\mathbf{I}``,
+
+```math
+\\begin{align}
+\\mathbb{E}\\left[\\mathrm{RSS}\\right] &= \\sigma^{2} \\operatorname{tr}\\left((\\mathbf{I} - \\mathbf{S})^\\intercal (\\mathbf{I} - \\mathbf{S})\\right) + \\lVert \\mathbf{V}^{1/2} (\\mathbf{I} - \\mathbf{H}) \\boldsymbol{\\mu} \\rVert^{2}\\,.
+\\end{align}
+```
+
+So when the bias term is small, ``\\mathrm{RSS} / \\sigma^{2}`` has the mean ``\\nu``, and ``\\nu`` is the count of the chi-squared law that [`ResidualInflation`](@ref) reads. For a projection, ``\\mathbf{S}^\\intercal \\mathbf{S} = \\mathbf{S}``, and ``\\nu = T - p``, the count of a fitted [`LinearModel`](@ref) with ``p`` columns. A ridge part shrinks ``\\mathbf{S}``, so ``\\nu`` is below ``T - \\operatorname{tr}(\\mathbf{H})``, and the count ``T - \\operatorname{tr}(\\mathbf{H})`` overstates the residual count. The term ``\\delta`` does not enter ``\\nu``, because no source states the residual law of a fit whose strength reads the response.
+
+The scores take the residual variance at its maximum-likelihood value ``\\mathrm{RSS} / n``, with ``n`` the sum of the frequency weights of [`glm_weights`](@ref). `StatsAPI.dof` adds one to ``\\widehat{\\mathrm{df}}`` for that variance, as `GLM` adds one to the rank of a fitted [`LinearModel`](@ref). Equation (2.5) of [hurvich1998](@cite) states AICc of a linear smoother with ``\\operatorname{tr}(\\mathbf{H})`` in place of the number of columns, and `StatsAPI.aicc` with this `dof` is ``n`` times that form plus a constant. Equation (2.16) of [zou2007](@cite) proposes BIC with the effective degrees of freedom for the lasso, and does not derive it.
 
 # Fields
 
@@ -461,6 +699,17 @@ $(DocStringExtensions.FIELDS)
   - [`ElasticNet`](@ref)
   - [`StatsAPI.coef(::ElasticNetFit)`](@ref)
   - [`StatsAPI.predict(::ElasticNetFit, ::MatNum)`](@ref)
+  - [`StatsAPI.dof(::ElasticNetFit)`](@ref)
+  - [`residual_count`](@ref)
+  - [`elastic_net_counts`](@ref)
+  - [`StepwiseRegression`](@ref)
+
+# References
+
+  - $(ref_dict[:tibshirani2012]) Remark (The elastic net) after Equation (28), and Remark (The lasso with intercept).
+  - $(ref_dict[:hurvich1998]) Equation (2.5). Page 273 cites Section 3.5 of Hastie and Tibshirani (1990), *Generalized Additive Models*, for the effective degrees of freedom of a linear smoother, and the residual count above follows the derivation of this docstring. $(ref_dict[:no_original_source])
+  - $(ref_dict[:zou2007]) Equation (2.16).
+  - $(ref_dict[:hastie2009]) Section 7.6, Equation (7.32).
 """
 @concrete struct ElasticNetFit <: AbstractResult
     """
@@ -471,6 +720,122 @@ $(DocStringExtensions.FIELDS)
     The regularisation strength ``\\gamma`` that the strength rule gave, on the standardised columns when the target has a `ve`.
     """
     gamma
+    """
+    The effective degrees of freedom of the fit, the trace of the smoother on the active set plus the term of `sdiv`.
+    """
+    df
+    """
+    The weighted residual sum of squares of the fit, under the frequency weights of [`glm_weights`](@ref).
+    """
+    rss
+    """
+    The number of observations, the sum of the frequency weights, or the number of rows without weights.
+    """
+    nobs
+    """
+    The residual count, the number of rows less ``\\operatorname{tr}(2 \\mathbf{S} - \\mathbf{S}^\\intercal \\mathbf{S})``.
+    """
+    rdof
+end
+"""
+    StatsAPI.dof(m::ElasticNetFit) -> Real
+    StatsAPI.nobs(m::ElasticNetFit) -> Real
+    StatsAPI.deviance(m::ElasticNetFit) -> Real
+    StatsAPI.loglikelihood(m::ElasticNetFit) -> Real
+    StatsAPI.aic(m::ElasticNetFit) -> Real
+    StatsAPI.aicc(m::ElasticNetFit) -> Real
+    StatsAPI.bic(m::ElasticNetFit) -> Real
+
+Return the counts and the scores of a fitted [`ElasticNet`](@ref).
+
+[`ElasticNetFit`](@ref) is not a `StatsAPI.StatisticalModel`, so each score has a method of its own, in the form of `StatsAPI`. The forms match `GLM` for a fitted [`LinearModel`](@ref) under the same weights, with the effective degrees of freedom in place of the rank.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+k &= \\widehat{\\mathrm{df}} + 1\\,,\\\\
+\\ln \\hat{L} &= -\\frac{n}{2} \\left(\\ln \\frac{2 \\pi\\, \\mathrm{RSS}}{n} + 1\\right)\\,,\\\\
+\\mathrm{AIC} &= 2k - 2\\ln\\hat{L}\\,,\\\\
+\\mathrm{AICC} &= \\mathrm{AIC} + \\frac{2k(k+1)}{n - k - 1}\\,,\\\\
+\\mathrm{BIC} &= k\\ln n - 2\\ln\\hat{L}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``k``: `StatsAPI.dof`, the effective degrees of freedom plus one for the residual variance.
+  - ``\\widehat{\\mathrm{df}}``: `m.df`.
+  - ``\\hat{L}``: Maximum of the Gaussian likelihood, at the residual variance ``\\mathrm{RSS} / n``.
+  - ``\\mathrm{RSS}``: `StatsAPI.deviance`, the weighted residual sum of squares `m.rss`.
+  - ``n``: `StatsAPI.nobs`, `m.nobs`.
+
+# Arguments
+
+  - `m`: The fitted model.
+
+# Returns
+
+  - `x::Real`: The count or the score.
+
+# Related
+
+  - [`ElasticNetFit`](@ref)
+  - [`STEPWISE_REGRESSION_CRITERIA`](@ref)
+  - [`regression_criterion_func`](@ref)
+
+# References
+
+  - $(ref_dict[:hurvich1998]) Equation (2.5).
+  - $(ref_dict[:zou2007]) Equation (2.16).
+"""
+function StatsAPI.dof(m::ElasticNetFit)
+    return m.df + 1
+end
+function StatsAPI.nobs(m::ElasticNetFit)
+    return m.nobs
+end
+function StatsAPI.deviance(m::ElasticNetFit)
+    return m.rss
+end
+function StatsAPI.loglikelihood(m::ElasticNetFit)
+    n = m.nobs
+    return -n / 2 * (log(2 * pi * m.rss / n) + 1)
+end
+function StatsAPI.aic(m::ElasticNetFit)
+    return -2 * StatsAPI.loglikelihood(m) + 2 * StatsAPI.dof(m)
+end
+function StatsAPI.aicc(m::ElasticNetFit)
+    k = StatsAPI.dof(m)
+    n = m.nobs
+    return StatsAPI.aic(m) + 2 * k * (k + 1) / (n - k - 1)
+end
+function StatsAPI.bic(m::ElasticNetFit)
+    return -2 * StatsAPI.loglikelihood(m) + StatsAPI.dof(m) * log(m.nobs)
+end
+"""
+    residual_count(m::ElasticNetFit, X::MatNum) -> Real
+
+Return the residual count of a fitted [`ElasticNet`](@ref), `m.rdof`.
+
+[`ElasticNetFit`](@ref) states the count and its derivation. The design does not change it, because the fit already holds the count of its own design.
+
+# Arguments
+
+  - `m`: The fitted model.
+  - `X`: The design of the fit, which the method does not read.
+
+# Returns
+
+  - `nu::Real`: `m.rdof`.
+
+# Related
+
+  - [`residual_count`](@ref)
+  - [`ElasticNetFit`](@ref)
+"""
+function residual_count(m::ElasticNetFit, ::MatNum)
+    return m.rdof
 end
 """
     StatsAPI.coef(m::ElasticNetFit) -> VecNum
@@ -518,13 +883,13 @@ end
 """
     elastic_net_design(tgt::ElasticNet, X::MatNum) -> Tuple
 
-Return the standardised design of an [`ElasticNet`](@ref), the design with each row weighted, and the scale of the columns.
+Return the standardised design of an [`ElasticNet`](@ref), the design with each row weighted, the scale of the columns, and the weights of the rows.
 
 # Algorithm
 
  1. When `tgt.ve` is `nothing`, set the scale `s` to `nothing`. Otherwise take the standard deviation of each column of `X` under `tgt.ve`, and put one in place of a zero and in place of the intercept column `tgt.ic`. That is `s`.
  2. Divide each column of `X` by its entry of `s`, which gives `P`. When `s` is `nothing`, `P` is `X`.
- 3. Resolve `tgt.w` against `X` with [`get_observation_weights`](@ref). When it is `nothing`, `Q` is `P`. Otherwise scale it with [`glm_weights`](@ref), and multiply each row of `P` by its weight, which gives `Q`.
+ 3. Resolve `tgt.w` against `X` with [`get_observation_weights`](@ref), and scale it with [`glm_weights`](@ref), which gives `v`. When `v` is `nothing`, `Q` is `P`. Otherwise multiply each row of `P` by its entry of `v`, which gives `Q`.
 
 # Arguments
 
@@ -533,7 +898,7 @@ Return the standardised design of an [`ElasticNet`](@ref), the design with each 
 
 # Returns
 
-  - `(P, Q, s)::Tuple`: The standardised design ``\\mathbf{P}``, the weighted design ``\\mathbf{V} \\mathbf{P}``, and the scale of the columns or `nothing`.
+  - `(P, Q, s, v)::Tuple`: The standardised design ``\\mathbf{P}``, the weighted design ``\\mathbf{V} \\mathbf{P}``, the scale of the columns or `nothing`, and the frequency weights of the rows or `nothing`.
 
 # Related
 
@@ -551,9 +916,9 @@ function elastic_net_design(tgt::ElasticNet, X::MatNum)
         sd
     end
     P = isnothing(s) ? X : X ./ transpose(s)
-    w = get_observation_weights(tgt.w, X)
-    Q = isnothing(w) ? P : glm_weights(w) .* P
-    return P, Q, s
+    v = glm_weights(get_observation_weights(tgt.w, X))
+    Q = isnothing(v) ? P : v .* P
+    return P, Q, s, v
 end
 """
     StatsAPI.fit(tgt::ElasticNet, X::MatNum, y::VecNum) -> ElasticNetFit
@@ -564,12 +929,13 @@ Fit an [`ElasticNet`](@ref) to the design `X` and the response `y` by cyclic coo
 
 # Algorithm
 
- 1. Build the standardised design `P`, the weighted design `Q` and the scale `s` with [`elastic_net_design`](@ref).
+ 1. Build the standardised design `P`, the weighted design `Q`, the scale `s` and the weights `v` with [`elastic_net_design`](@ref).
  2. Mark the penalised columns in `pen`: every column but `tgt.ic`. Compute `nrm2`, the weighted squared norm of each column.
  3. Start from the coefficients `z` at zero and the residual `r` equal to `y`. With an intercept column, fit that column alone first, and take its residual as `r`.
- 4. Compute `g`, the product of each penalised column of `Q` with `r`, and the strength `lam` with [`penalty_strength`](@ref).
- 5. When every entry of `g` is zero, the start point is the optimum. Otherwise compute the threshold `a` and the ridge term `ridge` of each column, both zero at the intercept column, and run [`elastic_net_sweeps`](@ref) from the start point.
- 6. Divide the coefficients by `s`, and return them with `lam` in an [`ElasticNetFit`](@ref).
+ 4. Compute `g`, the product of each penalised column of `Q` with `r`, the strength `lam` with [`penalty_strength`](@ref), and the ridge term `ridge` of each column, zero at the intercept column.
+ 5. When every entry of `g` is zero, the start point is the optimum. Otherwise compute the threshold `a` of each column, zero at the intercept column, and run [`elastic_net_sweeps`](@ref) from the start point.
+ 6. Compute the counts of the fit with [`elastic_net_counts`](@ref).
+ 7. Divide the coefficients by `s`, and return them with `lam` and the counts in an [`ElasticNetFit`](@ref).
 
 # Arguments
 
@@ -587,9 +953,10 @@ Fit an [`ElasticNet`](@ref) to the design `X` and the response `y` by cyclic coo
   - [`ElasticNetFit`](@ref)
   - [`elastic_net_design`](@ref)
   - [`elastic_net_sweeps`](@ref)
+  - [`elastic_net_counts`](@ref)
 """
 function StatsAPI.fit(tgt::ElasticNet, X::MatNum, y::VecNum)
-    P, Q, s = elastic_net_design(tgt, X)
+    P, Q, s, v = elastic_net_design(tgt, X)
     n = size(P, 2)
     pen = trues(n)
     if !isnothing(tgt.ic)
@@ -604,12 +971,132 @@ function StatsAPI.fit(tgt::ElasticNet, X::MatNum, y::VecNum)
     end
     g = [LinearAlgebra.dot(view(Q, :, k), r) for k in findall(pen)]
     lam = penalty_strength(tgt.strength, g, tgt.theta)
+    ridge = (lam * (one(tgt.theta) - tgt.theta)) .* pen
     if !all(iszero, g)
         a = (lam * tgt.theta) .* pen
-        ridge = (lam * (one(tgt.theta) - tgt.theta)) .* pen
         z = elastic_net_sweeps(tgt, P, Q, y, z, r, nrm2, a, ridge, pen)
     end
-    return ElasticNetFit(isnothing(s) ? z : z ./ s, lam)
+    cnt = elastic_net_counts(tgt,
+                             (; P = P, Q = Q, y = y, z = z, pen = pen, ridge = ridge, g = g,
+                              lam = lam, nrm2 = nrm2, w = v))
+    return ElasticNetFit(isnothing(s) ? z : z ./ s, lam, cnt.df, cnt.rss, cnt.nobs,
+                         cnt.rdof)
+end
+"""
+    elastic_net_counts(tgt::ElasticNet, sys::NamedTuple) -> NamedTuple
+
+Return the effective degrees of freedom, the weighted residual sum of squares, the number of observations and the residual count of a fitted [`ElasticNet`](@ref).
+
+[`ElasticNetFit`](@ref) states the counts and their derivation. The method reads them off the equations of the active set that [`elastic_net_polish`](@ref) solves, so it needs the pseudo-inverse of one matrix with one row per active column.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathbf{B} &= \\mathbf{M}^{-1} \\mathbf{P}_{\\mathcal{A}}^\\intercal \\mathbf{V} \\mathbf{P}_{\\mathcal{A}}\\,,\\quad \\mathbf{M} = \\mathbf{P}_{\\mathcal{A}}^\\intercal \\mathbf{V} \\mathbf{P}_{\\mathcal{A}} + \\gamma (1 - \\vartheta) \\mathbf{D}_{\\mathcal{A}}\\,,\\\\
+\\operatorname{tr}(\\mathbf{H}) &= \\operatorname{tr}(\\mathbf{B})\\,,\\quad \\operatorname{tr}(\\mathbf{S}^\\intercal \\mathbf{S}) = \\operatorname{tr}(\\mathbf{B}^{2})\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{B}``: Matrix with one row and one column per active column. It has the nonzero eigenvalues of ``\\mathbf{H}``.
+  - ``\\mathbf{M}``: Matrix of the equations of the active set.
+  - ``\\mathbf{H}``, ``\\mathbf{S}``: Smoother of the fit and smoother of the weighted rows, as [`ElasticNetFit`](@ref) states them.
+  - ``\\mathbf{P}_{\\mathcal{A}}``: Columns of the active set.
+  - ``\\mathbf{D}_{\\mathcal{A}}``: Diagonal matrix with one for each penalised column of the active set and zero for the intercept column.
+  - $(math_dict[:V_enet])
+  - $(math_dict[:gamma_enet])
+  - $(math_dict[:theta_enet])
+
+The trace is invariant under a cyclic permutation, so ``\\operatorname{tr}(\\mathbf{H}) = \\operatorname{tr}(\\mathbf{B})``. ``\\mathbf{S}`` is symmetric, and ``\\mathbf{S}^{2}`` has the trace of ``\\mathbf{B}^{2}`` for the same reason.
+
+# Algorithm
+
+ 1. Find `A`, the indices of the nonzero coefficients of `sys.z` and of the column that `sys.pen` does not penalise.
+ 2. Build the matrix of the equations of the active set, and take its pseudo-inverse `Mi`. For `theta < 1` the matrix is positive definite, and `Mi` is its inverse. At `theta = 1` the matrix is singular when the active set holds more columns than there are observations, and `B` is then the projection onto the row space of the active columns, whose trace is their rank. An LU solve of such a matrix does not always fail, and it returns rounding noise in place of the rank.
+ 3. Multiply `Mi` by the weighted Gram matrix of the active set, which gives `B`. Take `tH`, the trace of `B`.
+ 4. Add the term of `tgt.sdiv` to `tH` with [`strength_divergence`](@ref), which gives `df`.
+ 5. Compute the weighted residual sum of squares `rss` and the number of observations `nobs` under `sys.w`.
+ 6. Take the residual count `rdof`, the number of rows less `2 tH - tr(B^2)`.
+
+# Arguments
+
+  - `tgt`: The regression target.
+  - `sys`: The fit, as the `# Interfaces` section of [`AbstractStrengthDivergence`](@ref) states it, without `A` and `Mi`.
+
+# Returns
+
+  - `(; df, rss, nobs, rdof)::NamedTuple`: The counts that [`ElasticNetFit`](@ref) holds.
+
+# Related
+
+  - [`ElasticNetFit`](@ref)
+  - [`StatsAPI.fit(::ElasticNet, ::MatNum, ::VecNum)`](@ref)
+  - [`strength_divergence`](@ref)
+  - [`elastic_net_polish`](@ref)
+"""
+function elastic_net_counts(tgt::ElasticNet, sys::NamedTuple)
+    (; P, Q, y, z, pen, ridge, w) = sys
+    A = findall(.!iszero.(z) .| .!pen)
+    G = transpose(view(Q, :, A)) * view(P, :, A)
+    Mi = LinearAlgebra.pinv(G + LinearAlgebra.Diagonal(ridge[A]))
+    B = Mi * G
+    tH = LinearAlgebra.tr(B)
+    df = tH + strength_divergence(tgt.sdiv, tgt, (; sys..., A = A, Mi = Mi))
+    res = y - P * z
+    rss = isnothing(w) ? sum(abs2, res) : LinearAlgebra.dot(w, abs2.(res))
+    nobs = isnothing(w) ? size(P, 1) : sum(w)
+    rdof = size(P, 1) - (2 * tH - LinearAlgebra.dot(B, transpose(B)))
+    return (; df = df, rss = rss, nobs = nobs, rdof = rdof)
+end
+"""
+    strength_divergence(sdiv::Nothing, tgt::ElasticNet, sys::NamedTuple) -> Real
+    strength_divergence(sdiv::StrengthDivergence, tgt::ElasticNet, sys::NamedTuple) -> Real
+
+Return the term that a strength rule which reads the response adds to the effective degrees of freedom of an [`ElasticNet`](@ref).
+
+[`StrengthDivergence`](@ref) states the term. The `# Interfaces` section of [`AbstractStrengthDivergence`](@ref) states `sys` and the method that a rule of the caller adds.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `nothing`: return zero, so the count is the trace of the smoother.
+ 2. [`StrengthDivergence`](@ref): take `dg`, the gradient of the strength with [`penalty_strength_gradient`](@ref). Multiply the pseudo-inverse `sys.Mi` by `(1 - theta) z + theta sign(z)` on the penalised columns of the active set, zero at the intercept column, and negate it, which gives the derivative of the active coefficients in the strength. Multiply the active columns of `P` by it, which gives `v`, the derivative of the fitted response. With an intercept column, remove from `v` its weighted projection onto that column. Return the product of `dg` with the penalised columns of `Q` and `v`.
+
+# Arguments
+
+  - `sdiv`: The rule, or `nothing`.
+  - `tgt`: The regression target.
+  - `sys`: The fit.
+
+# Returns
+
+  - `t::Real`: The term, ``\\nabla_{\\boldsymbol{y}} \\gamma^{\\intercal} \\partial \\hat{\\boldsymbol{\\mu}} / \\partial \\gamma``.
+
+# Related
+
+  - [`AbstractStrengthDivergence`](@ref)
+  - [`StrengthDivergence`](@ref)
+  - [`elastic_net_counts`](@ref)
+  - [`penalty_strength_gradient`](@ref)
+"""
+function strength_divergence(::Nothing, ::ElasticNet, sys::NamedTuple)
+    return zero(eltype(sys.z))
+end
+function strength_divergence(::StrengthDivergence, tgt::ElasticNet, sys::NamedTuple)
+    (; P, Q, z, pen, g, nrm2, A, Mi) = sys
+    dg = penalty_strength_gradient(tgt.strength, g, tgt.theta)
+    zA = z[A]
+    pA = pen[A]
+    dz = -(Mi * (((one(tgt.theta) - tgt.theta) .* zA .+ tgt.theta .* sign.(zA)) .* pA))
+    v = view(P, :, A) * dz
+    if !isnothing(tgt.ic)
+        v .-= (LinearAlgebra.dot(view(Q, :, tgt.ic), v) / nrm2[tgt.ic]) .*
+              view(P, :, tgt.ic)
+    end
+    return LinearAlgebra.dot(dg, transpose(view(Q, :, pen)) * v)
 end
 """
     elastic_net_sweeps(tgt::ElasticNet, P::MatNum, Q::MatNum, y::VecNum, z::VecNum,
@@ -793,5 +1280,6 @@ function elastic_net_polish(P::MatNum, Q::MatNum, y::VecNum, z::VecNum, a::VecNu
     end
     return zp
 end
-export ElasticNet, MiddleOfPath, FixedStrength
-public AbstractPenaltyStrength, penalty_strength
+export ElasticNet, MiddleOfPath, FixedStrength, StrengthDivergence
+public AbstractPenaltyStrength, penalty_strength, penalty_strength_gradient
+public AbstractStrengthDivergence, strength_divergence

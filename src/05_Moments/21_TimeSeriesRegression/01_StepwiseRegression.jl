@@ -100,7 +100,18 @@ Estimates a loadings matrix by selecting a factor subset per asset, one factor a
 
 `crit` scores a candidate model, `alg` sets the direction in which the factor set moves, and `tgt` fits each model. Each asset gets its own subset, so a factor that an asset does not select has an exact zero in the row of that asset in the loadings matrix.
 
-`tgt` is an [`AbstractUnpenalisedRegressionTarget`](@ref), so the keyword constructor refuses an [`ElasticNet`](@ref) with a `TypeError`. The criteria do not hold for a penalised fit. [`PValue`](@ref) reads p-values that a penalty makes invalid. `:aic`, `:aicc`, `:bic` and `:adjr2` count one degree of freedom for each coefficient, and a penalised fit has fewer. The ``L_1`` penalty also selects the factors itself.
+A penalised target, such as [`ElasticNet`](@ref), runs under `:aic`, `:aicc` and `:bic` alone. These criteria read the effective degrees of freedom that the fit states in `StatsAPI.dof`, see [`ElasticNetFit`](@ref). The check of the inner constructor, [`assert_stepwise_regression`](@ref), has two methods, one for a [`MinValStepwiseRegressionCriterion`](@ref) with any target, and one for every other criterion with an [`AbstractUnpenalisedRegressionTarget`](@ref). So a refused pair is a `MethodError`.
+
+| Criterion                 | Unpenalised target | Penalised target | Reason                                                                                                                                                                                         |
+|:------------------------- |:------------------ |:---------------- |:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `:aic`, `:aicc`           | Valid              | Valid            | Equation (2.5) of [hurvich1998](@cite) states both for a linear smoother, with the effective degrees of freedom in place of the number of columns.                                             |
+| `:bic`                    | Valid              | Valid            | Equation (2.16) of [zou2007](@cite) proposes BIC with the effective degrees of freedom when sparsity is the aim, and does not derive it.                                                       |
+| `:r2`                     | Valid              | Refused          | It reads no count, so it gives no penalty for the size of the model. Under [`MiddleOfPath`](@ref) each candidate has its own strength. No source treats it as a criterion for a penalised fit. |
+| `:adjr2`                  | Valid              | Refused          | It needs the residual count of the fit, and no source states it for this criterion under a penalty.                                                                                            |
+| [`PValue`](@ref)          | Valid              | Refused          | A penalty makes the p-values of the coefficients invalid.                                                                                                                                      |
+| A criterion of the caller | Valid              | Refused          | The library cannot tell whether the criterion reads a count that a penalty changes.                                                                                                            |
+
+The search names its first column, the column of ones, to the target with `factory(tgt, InterceptColumn(1))`, so a penalised target does not shrink the intercept. An unpenalised target ignores the call. The penalty of a fit can set the coefficient of a factor that the search selected to zero. That factor stays in the factor set of the asset, because the factor set records the search and not the active set of the last fit, and the row of `M` holds the zero. A ridge, `ElasticNet(; theta = 0, strength = FixedStrength(; gamma))`, sets no coefficient to zero, so for it the search is the only selection. The effective degrees of freedom ignores the search, as the count of a [`LinearModel`](@ref) does.
 
 The search reads every observation, so a fit over more observations can choose another factor set. `included` fixes the factor set of each asset, and the fit then runs no search for that asset. `choice` states whether the online step of a prior that fits this regression writes the factor set of the first fit into `included`. A batch fit gives the same answer under both rules.
 
@@ -114,7 +125,7 @@ $(DocStringExtensions.FIELDS)
         crit::Union{Symbol, MinMaxValStepwiseRegressionCriterion,
                     AbstractStepwiseRegressionCriterion} = PValue(),
         alg::AbstractStepwiseRegressionAlgorithm = ForwardSelection(),
-        tgt::AbstractUnpenalisedRegressionTarget = LinearModel(),
+        tgt::AbstractRegressionTarget = LinearModel(),
         choice::AbstractChoiceRule = BatchChoice(),
         included::Option{<:AbstractVector{<:Option{<:AbstractVector{<:Integer}}}} = nothing,
         x_src::Option{<:AbstractReturnsSource} = nothing
@@ -125,9 +136,8 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `crit` is a `Symbol`, `crit in STEPWISE_REGRESSION_CRITERIA`. The constructor stores `Val(crit)`.
-  - If `crit` is `Val(:adjr2)`, `tgt` is a [`GeneralisedLinearModel`](@ref) and `tgt.variant` is set, `tgt.variant in ADJUSTED_PSEUDO_R2_VARIANTS`.
-  - If `tgt` is a [`LinearModel`](@ref) or a [`GeneralisedLinearModel`](@ref) and `tgt.kwargs` holds a `weights` entry, the entry must be an `ObsWeights`. When it is a vector, `!isempty(tgt.kwargs.weights)`. The constructor does not check a target that the caller defines. The fit reads the weights of that target through its own `factory` and `StatsAPI.fit` methods, and the `# Interfaces` section of [`AbstractRegressionTarget`](@ref) states those methods.
-  - The rules of [`assert_stepwise_included`](@ref) for `included` alone. An entry can be empty, and the asset then gets an intercept-only model.
+  - If `crit` is not a [`MinValStepwiseRegressionCriterion`](@ref), `tgt` is an [`AbstractUnpenalisedRegressionTarget`](@ref). A `MethodError` is thrown otherwise. The table above states the reason of each refused pair.
+  - The rules of [`assert_stepwise_regression`](@ref) for `crit`, `tgt` and `included`.
   - `x_src in ALL_RETURNS_SOURCES`, as [`assert_returns_source`](@ref) checks. A regression reader admits every source.
 
 ## Propagated parameters
@@ -168,10 +178,15 @@ StepwiseRegression
   - [`AbstractReturnsSource`](@ref)
   - [`resolve_factor_regression`](@ref)
   - [`factory`](@ref)
+  - [`ElasticNet`](@ref)
+  - [`ElasticNetFit`](@ref)
+  - [`assert_stepwise_regression`](@ref)
 
 # References
 
   - $(ref_dict[:efroymson1960]) Pages 191-203. $(ref_dict[:no_original_source])
+  - $(ref_dict[:hurvich1998]) Equation (2.5).
+  - $(ref_dict[:zou2007]) Equation (2.16).
 """
 @propagatable @concrete struct StepwiseRegression <: AbstractTimeSeriesRegressionEstimator
     """
@@ -201,34 +216,19 @@ StepwiseRegression
     function StepwiseRegression(crit::Union{MinMaxValStepwiseRegressionCriterion,
                                             AbstractStepwiseRegressionCriterion},
                                 alg::AbstractStepwiseRegressionAlgorithm,
-                                tgt::AbstractUnpenalisedRegressionTarget,
-                                choice::AbstractChoiceRule,
+                                tgt::AbstractRegressionTarget, choice::AbstractChoiceRule,
                                 included::Option{<:AbstractVector{<:Option{<:AbstractVector{<:Integer}}}},
                                 x_src::Option{<:AbstractReturnsSource})
-        if isa(crit, Val{:adjr2}) &&
-           isa(tgt, GeneralisedLinearModel) &&
-           !isnothing(tgt.variant)
-            @argcheck(tgt.variant in ADJUSTED_PSEUDO_R2_VARIANTS,
-                      "The :adjr2 criterion reads StatsAPI.adjr2, which accepts a variant in $ADJUSTED_PSEUDO_R2_VARIANTS. Got\ntgt.variant => $(tgt.variant)")
-        end
-        if isa(tgt, Union{LinearModel, GeneralisedLinearModel}) &&
-           haskey(tgt.kwargs, :weights)
-            @argcheck(isa(tgt.kwargs.weights, ObsWeights),
-                      ArgumentError("tgt.kwargs.weights must be a vector of observation weights, one element per observation, of type ObsWeights = Union{DynamicAbstractWeights, StatsBase.AbstractWeights}. Got\ntgt.kwargs.weights => $(typeof(tgt.kwargs.weights))"))
-            if isa(tgt.kwargs.weights, AbstractVector)
-                @argcheck(!isempty(tgt.kwargs.weights), IsEmptyError)
-            end
-        end
-        assert_stepwise_included(included)
-        return new{typeof(crit), typeof(alg), typeof(tgt), typeof(choice), typeof(included),
-                   typeof(x_src)}(crit, alg, tgt, choice, included, x_src)
+        assert_stepwise_regression(crit, tgt, included)
+        fs = (crit, alg, tgt, choice, included, x_src)
+        return new{map(typeof, fs)...}(fs...)
     end
 end
 function StepwiseRegression(;
                             crit::Union{Symbol, MinMaxValStepwiseRegressionCriterion,
                                         AbstractStepwiseRegressionCriterion} = PValue(),
                             alg::AbstractStepwiseRegressionAlgorithm = ForwardSelection(),
-                            tgt::AbstractUnpenalisedRegressionTarget = LinearModel(),
+                            tgt::AbstractRegressionTarget = LinearModel(),
                             choice::AbstractChoiceRule = BatchChoice(),
                             included::Option{<:AbstractVector{<:Option{<:AbstractVector{<:Integer}}}} = nothing,
                             x_src::Option{<:AbstractReturnsSource} = nothing)::StepwiseRegression
@@ -239,6 +239,104 @@ function StepwiseRegression(;
         crit = Val(crit)
     end
     return StepwiseRegression(crit, alg, tgt, choice, included, x_src)
+end
+"""
+    assert_stepwise_regression(crit::MinValStepwiseRegressionCriterion,
+                               tgt::AbstractRegressionTarget,
+                               included::Option{<:AbstractVector})
+    assert_stepwise_regression(crit::Union{MaxValStepwiseRegressionCriterion,
+                                           AbstractStepwiseRegressionCriterion},
+                               tgt::AbstractUnpenalisedRegressionTarget,
+                               included::Option{<:AbstractVector})
+
+Checks the criterion, the target and the factor sets of a [`StepwiseRegression`](@ref).
+
+The inner constructor calls it. The two methods state the valid pairs of criterion and target in their signatures, so a refused pair, a penalised target under a criterion other than a [`MinValStepwiseRegressionCriterion`](@ref), finds no method and throws a `MethodError`. The pair rule sits here and not in two methods of the inner constructor, because `@concrete` adds a generic positional constructor, and a call that matches no inner method reaches that constructor with no check.
+
+# Algorithm
+
+The two methods run the same steps, through [`assert_stepwise_regression_fields`](@ref), so they hold the same rules.
+
+# Arguments
+
+  - `crit`: The criterion, as the `crit` field holds it.
+  - `tgt`: The regression target.
+  - `included`: The factor sets, one entry per asset, or `nothing`.
+
+# Validation
+
+  - If `crit` is `Val(:adjr2)`, `tgt` is a [`GeneralisedLinearModel`](@ref) and `tgt.variant` is set, `tgt.variant in ADJUSTED_PSEUDO_R2_VARIANTS`.
+  - If `tgt` is a [`LinearModel`](@ref) or a [`GeneralisedLinearModel`](@ref) and `tgt.kwargs` holds a `weights` entry, the entry must be an `ObsWeights`, or an `ArgumentError` is thrown. When it is a vector, `!isempty(tgt.kwargs.weights)`. The check does not read a target that the caller defines. The fit reads the weights of that target through its own `factory` and `StatsAPI.fit` methods, and the `# Interfaces` section of [`AbstractRegressionTarget`](@ref) states those methods.
+  - The rules of [`assert_stepwise_included`](@ref) for `included` alone. An entry can be empty, and the asset then gets an intercept-only model.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`StepwiseRegression`](@ref)
+  - [`assert_stepwise_included`](@ref)
+"""
+function assert_stepwise_regression(crit::MinValStepwiseRegressionCriterion,
+                                    tgt::AbstractRegressionTarget,
+                                    included::Option{<:AbstractVector})::Nothing
+    return assert_stepwise_regression_fields(crit, tgt, included)
+end
+function assert_stepwise_regression(crit::Union{MaxValStepwiseRegressionCriterion,
+                                                AbstractStepwiseRegressionCriterion},
+                                    tgt::AbstractUnpenalisedRegressionTarget,
+                                    included::Option{<:AbstractVector})::Nothing
+    return assert_stepwise_regression_fields(crit, tgt, included)
+end
+"""
+    assert_stepwise_regression_fields(crit, tgt::AbstractRegressionTarget,
+                                      included::Option{<:AbstractVector})
+
+Checks the fields of a [`StepwiseRegression`](@ref) whose pair of criterion and target is valid.
+
+Both methods of [`assert_stepwise_regression`](@ref) call it, after their signatures accept the pair.
+
+# Algorithm
+
+ 1. Check the variant of a [`GeneralisedLinearModel`](@ref) under `:adjr2`.
+ 2. Check the `weights` entry of the `kwargs` of a [`LinearModel`](@ref) or a [`GeneralisedLinearModel`](@ref).
+ 3. Check `included` with [`assert_stepwise_included`](@ref).
+
+# Arguments
+
+  - `crit`: The criterion, as the `crit` field holds it.
+  - `tgt`: The regression target.
+  - `included`: The factor sets, one entry per asset, or `nothing`.
+
+# Validation
+
+  - The rules of [`assert_stepwise_regression`](@ref), except the rule on the pair.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_stepwise_regression`](@ref)
+  - [`StepwiseRegression`](@ref)
+"""
+function assert_stepwise_regression_fields(crit, tgt::AbstractRegressionTarget,
+                                           included::Option{<:AbstractVector})::Nothing
+    if isa(crit, Val{:adjr2}) && isa(tgt, GeneralisedLinearModel) && !isnothing(tgt.variant)
+        @argcheck(tgt.variant in ADJUSTED_PSEUDO_R2_VARIANTS,
+                  "The :adjr2 criterion reads StatsAPI.adjr2, which accepts a variant in $ADJUSTED_PSEUDO_R2_VARIANTS. Got\ntgt.variant => $(tgt.variant)")
+    end
+    if isa(tgt, Union{LinearModel, GeneralisedLinearModel}) && haskey(tgt.kwargs, :weights)
+        @argcheck(isa(tgt.kwargs.weights, ObsWeights),
+                  ArgumentError("tgt.kwargs.weights must be a vector of observation weights, one element per observation, of type ObsWeights = Union{DynamicAbstractWeights, StatsBase.AbstractWeights}. Got\ntgt.kwargs.weights => $(typeof(tgt.kwargs.weights))"))
+        if isa(tgt.kwargs.weights, AbstractVector)
+            @argcheck(!isempty(tgt.kwargs.weights), IsEmptyError)
+        end
+    end
+    assert_stepwise_included(included)
+    return nothing
 end
 """
     add_best_factor_after_pval_failure!(tgt::AbstractRegressionTarget,
@@ -426,11 +524,11 @@ The starting score is the worst value that the criterion can take, so the first 
 
 # Algorithm
 
- 1. Set `included` empty and `excluded` to every factor index, in ascending order.
+ 1. Set `included` empty and `excluded` to every factor index, in ascending order. Name the first column of each design, the column of ones, to the target with `factory(re.tgt, InterceptColumn(1))`, and call the result `tgt`.
  2. Read the criterion from `re.crit` and `re.tgt` with [`regression_criterion_func`](@ref), and call it `criterion_func`. Read the starting score from [`regression_threshold`](@ref), and call it `t`.
  3. Fill `value` with that same worst score, one entry per factor.
  4. Do steps 5 to 7 at most once per observation.
- 5. For each `i` of `excluded`, fit `re.tgt` to an intercept column and the columns `[included; i]`, and write `criterion_func` of that fit into `value[i]`.
+ 5. For each `i` of `excluded`, fit `tgt` to an intercept column and the columns `[included; i]`, and write `criterion_func` of that fit into `value[i]`.
  6. Call [`get_forward_reg_incl_excl!`](@ref), which moves the best factor and returns the new `t`.
  7. Stop when step 6 moved no factor.
 
@@ -459,6 +557,7 @@ function _regression(re::StepwiseRegression{<:MinMaxValStepwiseRegressionCriteri
     T, N = size(F)
     ovec = range(one(eltype(F)), one(eltype(F)); length = T)
     indices = 1:N
+    tgt = factory(re.tgt, InterceptColumn(1))
     criterion_func = regression_criterion_func(re.crit, re.tgt)
     t = regression_threshold(re.crit)
     included = Vector{eltype(indices)}(undef, 0)
@@ -471,7 +570,7 @@ function _regression(re::StepwiseRegression{<:MinMaxValStepwiseRegressionCriteri
             append!(empty!(factors), included)
             push!(factors, i)
             f1 = [ovec view(F, :, factors)]
-            fri = StatsAPI.fit(re.tgt, f1, x)
+            fri = StatsAPI.fit(tgt, f1, x)
             value[i] = criterion_func(fri)
         end
         t = get_forward_reg_incl_excl!(re.crit, value, excluded, included, t)
@@ -593,12 +692,12 @@ Shrinks a factor set from full, removing the factor whose reduced model scores b
 
 # Algorithm
 
- 1. Set `included` to every factor index, in ascending order.
+ 1. Set `included` to every factor index, in ascending order. Name the first column of each design, the column of ones, to the target with `factory(re.tgt, InterceptColumn(1))`, and call the result `tgt`.
  2. Read the criterion from `re.crit` and `re.tgt` with [`regression_criterion_func`](@ref), and call it `criterion_func`.
- 3. Fit `re.tgt` to an intercept column and every column of `F`, and set `t` to `criterion_func` of that full model.
+ 3. Fit `tgt` to an intercept column and every column of `F`, and set `t` to `criterion_func` of that full model.
  4. Fill `value` with the worst score the criterion can take, one entry per factor.
  5. Do steps 6 to 8 at most once per observation.
- 6. For each factor of `included`, fit `re.tgt` to an intercept column and the other columns of `included`, and write `criterion_func` of that fit into that factor's entry of `value`. Fit the intercept column alone when `included` holds one factor.
+ 6. For each factor of `included`, fit `tgt` to an intercept column and the other columns of `included`, and write `criterion_func` of that fit into that factor's entry of `value`. Fit the intercept column alone when `included` holds one factor.
  7. Call [`get_backward_reg_incl!`](@ref), which removes the best factor and returns the new `t`.
  8. Stop when step 7 removed no factor.
 
@@ -627,7 +726,8 @@ function _regression(re::StepwiseRegression{<:MinMaxValStepwiseRegressionCriteri
     ovec = range(one(eltype(F)), one(eltype(F)); length = T)
     included = collect(1:N)
     factors = similar(included)
-    fri = StatsAPI.fit(re.tgt, [ovec F], x)
+    tgt = factory(re.tgt, InterceptColumn(1))
+    fri = StatsAPI.fit(tgt, [ovec F], x)
     criterion_func = regression_criterion_func(re.crit, re.tgt)
     t = criterion_func(fri)
     value = fill(regression_polarity(re.crit).worst(promote_type(eltype(F), eltype(x))), N)
@@ -641,7 +741,7 @@ function _regression(re::StepwiseRegression{<:MinMaxValStepwiseRegressionCriteri
             else
                 f1 = reshape(ovec, :, 1)
             end
-            fri = StatsAPI.fit(re.tgt, f1, x)
+            fri = StatsAPI.fit(tgt, f1, x)
             value[factor] = criterion_func(fri)
         end
         t = get_backward_reg_incl!(re.crit, value, included, t)
@@ -755,12 +855,9 @@ Each asset has its own search. The search of one asset reads only the column of 
 # Algorithm
 
  1. Allocate `rr`, a dense `assets × (factors + 1)` buffer of zeros. A factor that an asset does not select keeps its zero.
- 2. For each asset `i`, do steps 3 to 6.
- 3. Take the factor set of asset `i` with [`stepwise_factor_set`](@ref), and call it `included`.
- 4. Fit `re.tgt` to an intercept column and the columns `included` of `F`, and read its coefficients. Call them `params`. Fit the intercept column alone when `included` is empty.
- 5. Write `params[1]` into `rr[i, 1]`, and the remaining coefficients into the columns of `rr` that `included` names, in the order of `included`.
- 6. Write the number of observations less the number of columns of the fit of step 4 into `edof[i]`. This is the number of degrees of freedom that the fit leaves in the residuals of the asset.
- 7. Build a [`Regression`](@ref) from the first column of `rr`, its remaining columns, and `edof`.
+ 2. Name the first column of each design, the column of ones, to the target with `factory(re.tgt, InterceptColumn(1))`, and call the result `tgt`.
+ 3. For each asset `i`, fit it with [`stepwise_asset_fit!`](@ref), which writes row `i` of `rr` and returns the residual count of the asset. Collect the counts in `edof`, whose element type is the type of the counts.
+ 4. Build a [`Regression`](@ref) from the first column of `rr`, its remaining columns, and `edof`.
 
 # Arguments
 
@@ -779,7 +876,7 @@ Each asset has its own search. The search of one asset reads only the column of 
       + `b`: Intercept of each asset, a view of the first column of `rr`.
       + `M`: Coefficient of each asset and factor, a view of the remaining columns of `rr`. A factor that the asset does not use has an exact zero. A whole row is zero when the asset uses no factor. An empty entry of `re.included` gives such a row with no warning. A search that selects no factor gives it too, and [`stepwise_factor_set`](@ref) warns. Only [`BackwardElimination`](@ref) under a [`MinMaxValStepwiseRegressionCriterion`](@ref) can select no factor.
       + `L`: Not set. The regression runs in the original factor basis, so `reg.L` returns `reg.M` through the `swap(L, M)` property rule of the result, and `size(reg.L, 2)` is the number of columns of `F`.
-      + `edof`: Degrees of freedom of the residuals of each asset, the number of observations less the intercept and the factors that the search selected for that asset. The count reads the selected factors alone, and not the search that selected them.
+      + `edof`: Degrees of freedom of the residuals of each asset, which [`residual_count`](@ref) reads off the fit of the asset. Under an unpenalised target it is the number of observations less the intercept and the factors that the search selected for that asset, an integer. Under a penalised target it is the real count that [`ElasticNetFit`](@ref) states. The count reads the selected factors alone, and not the search that selected them.
 
 # Related
 
@@ -795,20 +892,54 @@ function regression(re::StepwiseRegression, X::MatNum, F::MatNum)
     assert_finite_factor_rows(F)
     assert_stepwise_included(re.included, X, F)
     cols = size(F, 2) + 1
-    N, rows = size(X)
-    ovec = range(one(eltype(F)), one(eltype(F)); length = N)
-    rr = zeros(promote_type(eltype(F), eltype(X)), rows, cols)
-    edof = Vector{Int}(undef, rows)
-    for i in axes(rr, 1)
-        included = stepwise_factor_set(re, view(X, :, i), F, i)
-        x1 = !isempty(included) ? [ovec view(F, :, included)] : reshape(ovec, :, 1)
-        fri = StatsAPI.fit(re.tgt, x1, view(X, :, i))
-        params = StatsAPI.coef(fri)
-        rr[i, 1] = params[1]
-        view(rr, i, 2:cols)[included] = view(params, 2:lastindex(params))
-        edof[i] = N - size(x1, 2)
-    end
+    rr = zeros(promote_type(eltype(F), eltype(X)), size(X, 2), cols)
+    tgt = factory(re.tgt, InterceptColumn(1))
+    edof = [stepwise_asset_fit!(rr, re, tgt, view(X, :, i), F, i) for i in axes(rr, 1)]
     return Regression(; b = view(rr, :, 1), M = view(rr, :, 2:cols), edof = edof)
+end
+"""
+    stepwise_asset_fit!(rr::MatNum, re::StepwiseRegression, tgt::AbstractRegressionTarget,
+                        x::VecNum, F::MatNum, i::Integer)
+
+Fits one asset of a [`StepwiseRegression`](@ref), writes its coefficients into row `i` of `rr`, and returns its residual count.
+
+# Algorithm
+
+ 1. Take the factor set of asset `i` with [`stepwise_factor_set`](@ref), and call it `included`.
+ 2. Fit `tgt` to a column of ones and the columns `included` of `F`, and read its coefficients. Call them `params`. Fit the intercept column alone when `included` is empty.
+ 3. Write `params[1]` into `rr[i, 1]`, and the remaining coefficients into the columns of `rr` that `included` names, in the order of `included`. A selected factor whose coefficient the penalty of a penalised target set to zero writes that zero.
+ 4. Return [`residual_count`](@ref) of the fit and its design. This is the number of degrees of freedom that the fit leaves in the residuals of the asset.
+
+# Arguments
+
+  - `rr`: The buffer `assets × (factors + 1)` of [`regression`](@ref). The function writes into row `i`.
+  - `re`: Stepwise regression estimator, which gives the factor set.
+  - `tgt`: The target of `re`, with its first column named by `factory(re.tgt, InterceptColumn(1))`.
+  - `x`: Returns of asset `i`, `observations × 1`.
+  - $(arg_dict[:F])
+  - `i`: Index of the asset.
+
+# Returns
+
+  - `nu::Real`: The residual count of the fit of the asset.
+
+# Related
+
+  - [`regression`](@ref)
+  - [`stepwise_factor_set`](@ref)
+  - [`residual_count`](@ref)
+"""
+function stepwise_asset_fit!(rr::MatNum, re::StepwiseRegression,
+                             tgt::AbstractRegressionTarget, x::VecNum, F::MatNum,
+                             i::Integer)
+    ovec = range(one(eltype(F)), one(eltype(F)); length = length(x))
+    included = stepwise_factor_set(re, x, F, i)
+    x1 = !isempty(included) ? [ovec view(F, :, included)] : reshape(ovec, :, 1)
+    fri = StatsAPI.fit(tgt, x1, x)
+    params = StatsAPI.coef(fri)
+    rr[i, 1] = params[1]
+    view(rr, i, 2:size(rr, 2))[included] = view(params, 2:lastindex(params))
+    return residual_count(fri, x1)
 end
 """
     pin_regression_choice(re::StepwiseRegression{<:Any, <:Any, <:Any, <:PinnedChoice},

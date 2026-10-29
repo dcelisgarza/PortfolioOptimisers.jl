@@ -547,6 +547,7 @@ Where:
  3. Map `beta_pc` through `Vp` and divide by `sigma`. Call the result `beta`, the coefficients in the original factor space.
  4. Subtract the `mu`-weighted sum of `beta` from `mean_y`, and call the result `beta0`.
  5. Prepend `beta0` to `beta`.
+ 6. Read the residual count of the fit of step 2 with [`residual_count`](@ref), and call it `edof`.
 
 # Arguments
 
@@ -559,13 +560,17 @@ Where:
 
 # Returns
 
-  - `beta::VecNum`: Regression coefficients in the original factor space, with the intercept as the first element.
+  - `(; beta, edof)::NamedTuple`:
+
+      + `beta::VecNum`: Regression coefficients in the original factor space, with the intercept as the first element.
+      + `edof::Real`: Residual count of the fit in the reduced space, the number of rows of `x1` less its number of columns under an unpenalised target.
 
 # Related
 
   - [`DimensionReductionRegression`](@ref)
   - [`prep_dim_red_reg`](@ref)
   - [`regression_target_weights`](@ref)
+  - [`residual_count`](@ref)
 
 # References
 
@@ -580,7 +585,7 @@ function _regression(re::DimensionReductionRegression, y::VecNum, mu::VecNum, si
     beta = Vp * beta_pc ./ sigma
     beta0 = mean_y - LinearAlgebra.dot(beta, mu)
     pushfirst!(beta, beta0)
-    return beta
+    return (; beta = beta, edof = residual_count(fit_result, x1))
 end
 """
     regression(re::DimensionReductionRegression, X::MatNum, F::MatNum)
@@ -593,12 +598,11 @@ The method fits the reduction on `F` alone. So the reduction does not depend on 
 
  1. Allocate `rr`, a dense `assets × (factors + 1)` buffer of zeros.
  2. Reduce `F` with [`prep_dim_red_reg`](@ref), and call the results `f1`, `Vp`, `mu` and `sigma`.
- 3. For each asset `i`, fit that column of `X` in the reduced basis, map the coefficients back, and write the result into row `i` of `rr`.
+ 3. For each asset `i`, fit that column of `X` in the reduced basis, map the coefficients back, and write the result into row `i` of `rr`. Write the residual count of the fit into `edof[i]`.
  4. Take the first column of `rr` as `b` and its remaining columns as `M`.
  5. Undo the rescaling and the projection of `M` in turn. Call the result `L`, the coefficients in the reduced basis.
  6. Negate each column of `L` whose sum is negative. The sign of a component is arbitrary, and a build flag such as `--check-bounds=yes` can flip it. After this step, the equal-weight portfolio has a non-negative exposure to each component. `M` does not change, because a component and its coefficient change sign together.
- 7. Set `edof`, the degrees of freedom of the residuals, to the number of rows of `f1` less its number of columns, for every asset.
- 8. Build a [`Regression`](@ref) from `b`, `M`, `L` and `edof`.
+ 7. Build a [`Regression`](@ref) from `b`, `M`, `L` and `edof`.
 
 # Arguments
 
@@ -617,7 +621,7 @@ The method fits the reduction on `F` alone. So the reduction does not depend on 
       + `b`: Intercept of each asset, a view of the first column of `rr`.
       + `M`: Coefficient of each asset and factor in the original factor space, a view of the remaining columns of `rr`. Every asset keeps every factor, so `M` has no structural zero.
       + `L`: Coefficient of each asset and retained component, ``(\\mathbf{M} \\odot \\boldsymbol{\\sigma}^{\\intercal}) \\mathbf{V}_p^{+\\intercal}``. It reproduces the coefficients of the fits of step 3 in the reduced space, up to the sign of each component that step 6 sets. On a 200×5 sample the two agreed to `2.2e-16`. `size(L, 2)` is the number of retained components, which is the width of a risk decomposition.
-      + `edof`: Degrees of freedom of the residuals of each asset, the number of observations less the intercept and the retained components. The count is the same for every asset.
+      + `edof`: Degrees of freedom of the residuals of each asset, which [`residual_count`](@ref) reads off the fit of the asset. Under an unpenalised target it is the number of observations less the intercept and the retained components, the same integer for every asset. Under a penalised target it is the real count of each asset that [`ElasticNetFit`](@ref) states.
 
 # Related
 
@@ -635,15 +639,16 @@ function regression(re::DimensionReductionRegression, X::MatNum, F::MatNum)
     rows = size(X, 2)
     rr = zeros(promote_type(eltype(F), eltype(X)), rows, cols)
     f1, Vp, mu, sigma = prep_dim_red_reg(re, F)
-    for i in axes(rr, 1)
-        rr[i, :] = _regression(re, view(X, :, i), mu, sigma, f1, Vp)
+    fits = [_regression(re, view(X, :, i), mu, sigma, f1, Vp) for i in axes(rr, 1)]
+    for (i, fi) in pairs(fits)
+        rr[i, :] = fi.beta
     end
+    edof = [fi.edof for fi in fits]
     b = view(rr, :, 1)
     M = view(rr, :, 2:cols)
     L = transpose(LinearAlgebra.pinv(Vp) * transpose(M .* transpose(sigma)))
     # The sign of a component is arbitrary, and the last bits of the fit decide it (#1756).
     L = L .* transpose(map(c -> ifelse(sum(c) < zero(eltype(L)), -1, 1), eachcol(L)))
-    edof = fill(size(f1, 1) - size(f1, 2), rows)
     return Regression(; b = b, M = M, L = L, edof = edof)
 end
 """

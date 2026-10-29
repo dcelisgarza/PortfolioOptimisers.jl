@@ -62,10 +62,13 @@ the parameters that a penalised fit spends.
 6. **`StepwiseRegression` accepts a penalised target under `:aic`, `:aicc` and `:bic` alone.**
    These three criteria read the effective degrees of freedom of item 8. `PValue` reads p-values
    that a penalty makes invalid. `:r2` reads no count, and `:adjr2` needs a residual count that no
-   source states for it. The inner constructor has two methods, so the type system states the valid
-   pairs. A `MinValStepwiseRegressionCriterion` takes `tgt::AbstractRegressionTarget`. `PValue`, a
-   `MaxValStepwiseRegressionCriterion` and a criterion of the user take
-   `tgt::AbstractUnpenalisedRegressionTarget`. A refused pair is a `MethodError`. The docstring of
+   source states for it. The check of the inner constructor, `assert_stepwise_regression`, has two
+   methods, so the dispatch states the valid pairs. A `MinValStepwiseRegressionCriterion` takes
+   `tgt::AbstractRegressionTarget`. `PValue`, a `MaxValStepwiseRegressionCriterion` and a
+   criterion of the user take `tgt::AbstractUnpenalisedRegressionTarget`. A refused pair is a
+   `MethodError`. The two methods are on the check and not on the inner constructor, because
+   `@concrete` appends a generic positional constructor. A call that matches no inner method goes to
+   that constructor with no check, so two inner methods refused no pair (measured on #1899). The docstring of
    `StepwiseRegression` holds the table of the valid and the refused pairs, and it states that
    zou2007 proposes BIC with the effective count and does not derive it. A ridge,
    `ElasticNet(; theta = 0, strength = FixedStrength(; gamma))`, selects no factor, so for it the

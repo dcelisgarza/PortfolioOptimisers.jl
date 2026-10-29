@@ -16,6 +16,7 @@ factory(tgt::AbstractRegressionTarget, w::ObsWeights)
 regression_target_weights(tgt::AbstractRegressionTarget)
 regression_target_weights(tgt::Union{LinearModel, GeneralisedLinearModel})
 is_basis_invariant
+residual_count(::Any, A::MatNum)
 LinearModel
 GeneralisedLinearModel
 Regression

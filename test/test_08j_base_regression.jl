@@ -1107,7 +1107,7 @@ end
         w = pweights(range(0.5, 1.5; length = T))
         function roundtrip(re)
             x1, Vp, mu, sigma = PO.prep_dim_red_reg(re, F)
-            beta = PO._regression(re, y, mu, sigma, x1, Vp)
+            beta = PO._regression(re, y, mu, sigma, x1, Vp).beta
             pred = beta[1] .+ F * beta[2:end]
             pred_pc = StatsAPI.predict(StatsAPI.fit(re.retgt, x1, y))
             return maximum(abs, pred .- pred_pc)
@@ -1132,7 +1132,7 @@ end
         # Equations 4.18 to 4.20 computed by hand against `_regression`.
         re = DimensionReductionRegression()
         x1, Vp, mu, sigma = PO.prep_dim_red_reg(re, F)
-        beta = PO._regression(re, y, mu, sigma, x1, Vp)
+        beta = PO._regression(re, y, mu, sigma, x1, Vp).beta
         beta_pc = StatsAPI.coef(StatsAPI.fit(re.retgt, x1, y))[2:end]
         @test isapprox(beta[2:end], Vp * beta_pc ./ sigma)
         @test isapprox(beta[1], mean(y) - dot(beta[2:end], mu))
@@ -3131,7 +3131,7 @@ end
     function gap(re, y)
         x1, Vp, mu, sigma = PO.prep_dim_red_reg(re, F)
         fitted = S.predict(S.fit(factory(re.retgt, InterceptColumn(1)), x1, y), x1)
-        beta = PO._regression(re, y, mu, sigma, x1, Vp)
+        beta = PO._regression(re, y, mu, sigma, x1, Vp).beta
         return maximum(abs.(fitted .- (beta[1] .+ F * beta[2:end])))
     end
     weighted(tgt) = factory(DimensionReductionRegression(; retgt = tgt), aw)
@@ -3155,4 +3155,20 @@ end
           norm(regression(DimensionReductionRegression(), X, F).M)
     # An unpenalised target ignores the call, so the default fit does not move.
     @test factory(LinearModel(), InterceptColumn(1)) === LinearModel()
+    # #1899: the residual count of each asset is the count of its own fit. A least-squares
+    # fit keeps the integer count of a projection for every asset, and a penalised fit
+    # spends fewer parameters than its columns.
+    rl = regression(DimensionReductionRegression(), X, F)
+    x1, Vp, mu, sigma = PO.prep_dim_red_reg(DimensionReductionRegression(), F)
+    @test eltype(rl.edof) == Int && rl.edof == fill(size(x1, 1) - size(x1, 2), N)
+    re = DimensionReductionRegression(; retgt = ElasticNet())
+    rn = regression(re, X, F)
+    x1, Vp, mu, sigma = PO.prep_dim_red_reg(re, F)
+    counts = [S.fit(factory(ElasticNet(), InterceptColumn(1)), x1, X[:, i]).rdof
+              for i in 1:N]
+    @test eltype(rn.edof) == Float64 && rn.edof ≈ counts
+    # On this fixture the penalty sets one component of one asset to zero, so that asset
+    # spends one parameter fewer than the others.
+    p = size(x1, 1) - size(x1, 2)
+    @test all(>=(p), rn.edof) && count(>(p + 0.5), rn.edof) == 1
 end
