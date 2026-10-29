@@ -91,11 +91,15 @@ The ingestion layer emits no panel for a block with no gap and no Panel Field, a
   - [`attach_universe_masks`](@ref)
 """
 function vcat_returns_panel(a::ReturnsResult, b::ReturnsResult)
-    if isnothing(a.pnl) && isnothing(b.pnl)
-        return nothing
-    end
-    pa = isnothing(a.pnl) ? finite_universe_panel(a.X) : a.pnl
-    pb = isnothing(b.pnl) ? finite_universe_panel(b.X) : b.pnl
+    return vcat_returns_panel(a, b, a.pnl, b.pnl)
+end
+function vcat_returns_panel(::ReturnsResult, ::ReturnsResult, ::Nothing, ::Nothing)
+    return nothing
+end
+function vcat_returns_panel(a::ReturnsResult, b::ReturnsResult, pnl_a::Option{<:AssetPanel},
+                            pnl_b::Option{<:AssetPanel})
+    pa = isnothing(pnl_a) ? finite_universe_panel(a.X) : pnl_a
+    pb = isnothing(pnl_b) ? finite_universe_panel(b.X) : pnl_b
     return vcat(pa, pb)
 end
 """

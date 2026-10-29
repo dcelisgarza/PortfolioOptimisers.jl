@@ -1360,11 +1360,16 @@ A buffer records the Panel Fields only for a prior whose tree reads them, as [`r
 """
 function step_panel_fields(pe::AbstractPriorEstimator, pnl::AssetPanel,
                            route::AbstractString)::Bool
-    if isnothing(pnl.pf)
-        return false
-    end
+    return step_panel_fields(pe, pnl, route, pnl.pf)
+end
+function step_panel_fields(::AbstractPriorEstimator, ::AssetPanel, ::AbstractString,
+                           ::Nothing)::Bool
+    return false
+end
+function step_panel_fields(pe::AbstractPriorEstimator, ::AssetPanel, route::AbstractString,
+                           pf::AbstractVector{<:AbstractPanelField})::Bool
     @argcheck(reads_panel_fields(pe),
-              ArgumentError("$route reads no Panel Field, and this Asset Panel holds $(length(pnl.pf)) Panel Field(s). A prior's buffer records the Panel Fields only when its estimator tree reads them, so the step has nowhere to keep these, and `optimise(opt)` with no returns could not rebuild the panel. Drop the fields from the panel handed to the step, or fit in batch."))
+              ArgumentError("$route reads no Panel Field, and this Asset Panel holds $(length(pf)) Panel Field(s). A prior's buffer records the Panel Fields only when its estimator tree reads them, so the step has nowhere to keep these, and `optimise(opt)` with no returns could not rebuild the panel. Drop the fields from the panel handed to the step, or fit in batch."))
     return true
 end
 """

@@ -855,9 +855,12 @@ Where:
   - [`budget_upper_bound`](@ref)
 """
 function risk_budgeting_scale_floor(rb::RiskBudgeting)
-    if !isnothing(rb.kmin)
-        return rb.kmin
-    end
+    return risk_budgeting_scale_floor(rb, rb.kmin)
+end
+function risk_budgeting_scale_floor(::RiskBudgeting, kmin::Number)
+    return kmin
+end
+function risk_budgeting_scale_floor(rb::RiskBudgeting, ::Nothing)
     bg = abs(budget_upper_bound(rb.opt.bgt))
     kmin = 1e-4 / bg
     return ifelse(iszero(bg), zero(kmin), kmin)
