@@ -132,11 +132,45 @@ const ScaleFreeRiskMeasures = Union{EqualRisk,
                                     HighOrderMoment{<:Any, <:Any, <:Any, <:Any,
                                                     <:AbstractVarianceEstimator}}
 """
+    const RelativeDrawdownRiskMeasures = Union{RelativeAverageDrawdown,
+                                               RelativeConditionalDrawdownatRisk,
+                                               RelativeDrawdownatRisk,
+                                               RelativeEntropicDrawdownatRisk,
+                                               RelativeMaximumDrawdown,
+                                               RelativePowerNormDrawdownatRisk,
+                                               RelativeRelativisticDrawdownatRisk,
+                                               RelativeUlcerIndex}
+
+Union of the risk measures of the drawdowns of the compounded cumulative returns. [`homogeneity_degree`](@ref) returns `nothing` for each member.
+
+The compounded wealth ``\\prod_{t} (1 + \\boldsymbol{x}_t^{\\intercal} \\boldsymbol{w})`` is not homogeneous in the weights, so no member has a degree. The measure of the drawdowns of the uncompounded cumulative returns, such as [`MaximumDrawdown`](@ref), has degree 1.
+
+# Related
+
+  - [`RelativeAverageDrawdown`](@ref)
+  - [`RelativeConditionalDrawdownatRisk`](@ref)
+  - [`RelativeDrawdownatRisk`](@ref)
+  - [`RelativeEntropicDrawdownatRisk`](@ref)
+  - [`RelativeMaximumDrawdown`](@ref)
+  - [`RelativePowerNormDrawdownatRisk`](@ref)
+  - [`RelativeRelativisticDrawdownatRisk`](@ref)
+  - [`RelativeUlcerIndex`](@ref)
+  - [`homogeneity_degree`](@ref)
+"""
+const RelativeDrawdownRiskMeasures = Union{RelativeAverageDrawdown,
+                                           RelativeConditionalDrawdownatRisk,
+                                           RelativeDrawdownatRisk,
+                                           RelativeEntropicDrawdownatRisk,
+                                           RelativeMaximumDrawdown,
+                                           RelativePowerNormDrawdownatRisk,
+                                           RelativeRelativisticDrawdownatRisk,
+                                           RelativeUlcerIndex}
+"""
     homogeneity_degree(r::AbstractBaseRiskMeasure) -> Option{<:Integer}
 
 Return the degree of homogeneity of the risk measure `r` in the portfolio weights, or `nothing` when `r` has no degree.
 
-[`adjust_risk_contribution`](@ref) divides a risk by this degree, so that the risk contributions of [`risk_contribution`](@ref) sum to the risk. A measure that no other method names has degree 1.
+[`adjust_risk_contribution`](@ref) divides a risk by this degree, so that the risk contributions of [`risk_contribution`](@ref) sum to the risk. A measure that no other method names has degree 1, unless it measures a distance to a fixed target that is not zero. [`has_fixed_target`](@ref) finds such a target, and the measure then has no degree, because ``|x - c|`` with a fixed ``c \\neq 0`` is not homogeneous in ``x``.
 
 # Mathematical definition
 
@@ -158,11 +192,13 @@ Where:
 
 # Algorithm
 
- 1. Return `2` for a member of [`SquaredRiskMeasures`](@ref), `3` for a member of [`CubedRiskMeasures`](@ref), `4` for a member of [`FourthPowerRiskMeasures`](@ref), and `0` for a member of [`ScaleFreeRiskMeasures`](@ref).
- 2. For [`RiskRatio`](@ref) and [`NonOptimisationRiskRatio`](@ref), get the degree of each side with [`scalarised_degree`](@ref), and subtract the degree of `r2` from the degree of `r1` with [`degree_difference`](@ref).
- 3. For [`MeanReturnRiskRatio`](@ref), return `nothing` when `rf` is not zero. Otherwise subtract the degree of `rk` from the degree of `rt`, in the same way.
- 4. Return `nothing` for [`VarianceSkewKurtosis`](@ref), whose three terms have the degrees 2, 3 and 4.
- 5. Return `1` for every other measure.
+ 1. Return `nothing` when [`has_fixed_target`](@ref) is `true`. This applies to each step from 2 to 6.
+ 2. Return `2` for a member of [`SquaredRiskMeasures`](@ref), `3` for a member of [`CubedRiskMeasures`](@ref), `4` for a member of [`FourthPowerRiskMeasures`](@ref), and `0` for a member of [`ScaleFreeRiskMeasures`](@ref).
+ 3. For [`RiskTrackingRiskMeasure`](@ref), return the degree of its measure `r`. The benchmark weights are zero at this step, so the measure tracks `r` itself.
+ 4. For [`RiskRatio`](@ref) and [`NonOptimisationRiskRatio`](@ref), get the degree of each side with [`scalarised_degree`](@ref), and subtract the degree of `r2` from the degree of `r1` with [`degree_difference`](@ref).
+ 5. For [`MeanReturnRiskRatio`](@ref) and [`ExpectedReturnRiskRatio`](@ref), return `nothing` when `rf` is not zero. Otherwise subtract the degree of `rk` from the degree of `rt`, in the same way. [`ExpectedReturn`](@ref) has the degree of its return estimator `rt`.
+ 6. Return `nothing` for [`VarianceSkewKurtosis`](@ref), whose three terms have the degrees 2, 3 and 4, and for a member of [`RelativeDrawdownRiskMeasures`](@ref).
+ 7. Return `1` for every other measure.
 
 # Arguments
 
@@ -188,33 +224,48 @@ julia> PortfolioOptimisers.homogeneity_degree(NonOptimisationRiskRatio(;
 
 julia> PortfolioOptimisers.homogeneity_degree(EqualRisk())
 0
+
+julia> PortfolioOptimisers.homogeneity_degree(LowOrderMoment(; mu = 0.01))
+
+julia> PortfolioOptimisers.homogeneity_degree(TurnoverRiskMeasure(; w = [0.5, 0.5]))
+
+julia> PortfolioOptimisers.homogeneity_degree(TurnoverRiskMeasure(; w = [0.0, 0.0]))
+1
 ```
 
 # Related
 
   - [`adjust_risk_contribution`](@ref)
   - [`risk_contribution`](@ref)
+  - [`has_fixed_target`](@ref)
   - [`SquaredRiskMeasures`](@ref)
   - [`CubedRiskMeasures`](@ref)
   - [`FourthPowerRiskMeasures`](@ref)
   - [`ScaleFreeRiskMeasures`](@ref)
+  - [`RelativeDrawdownRiskMeasures`](@ref)
 """
-function homogeneity_degree(::AbstractBaseRiskMeasure)
-    return 1
+function homogeneity_degree(r::AbstractBaseRiskMeasure)
+    return has_fixed_target(r) ? nothing : 1
 end
-function homogeneity_degree(::SquaredRiskMeasures)
-    return 2
+function homogeneity_degree(r::SquaredRiskMeasures)
+    return has_fixed_target(r) ? nothing : 2
 end
-function homogeneity_degree(::CubedRiskMeasures)
-    return 3
+function homogeneity_degree(r::CubedRiskMeasures)
+    return has_fixed_target(r) ? nothing : 3
 end
-function homogeneity_degree(::FourthPowerRiskMeasures)
-    return 4
+function homogeneity_degree(r::FourthPowerRiskMeasures)
+    return has_fixed_target(r) ? nothing : 4
 end
-function homogeneity_degree(::ScaleFreeRiskMeasures)
-    return 0
+function homogeneity_degree(r::ScaleFreeRiskMeasures)
+    return has_fixed_target(r) ? nothing : 0
 end
-function homogeneity_degree(::VarianceSkewKurtosis)
+function homogeneity_degree(r::RiskTrackingRiskMeasure)
+    if has_fixed_target(r)
+        return nothing
+    end
+    return homogeneity_degree(r.r)
+end
+function homogeneity_degree(::Union{VarianceSkewKurtosis, RelativeDrawdownRiskMeasures})
     return nothing
 end
 function homogeneity_degree(r::RiskRatio)
@@ -229,6 +280,80 @@ function homogeneity_degree(r::MeanReturnRiskRatio)
         return nothing
     end
     return degree_difference(homogeneity_degree(r.rt), scalarised_degree(r.rk, r.sca))
+end
+"""
+    has_fixed_target(r::AbstractBaseRiskMeasure) -> Bool
+    has_fixed_target(target) -> Bool
+
+Return `true` when the risk measure `r` measures a distance to a target that is not zero and does not scale with the portfolio weights.
+
+Such a measure is not homogeneous in the weights, so [`homogeneity_degree`](@ref) gives it no degree. A target that scales with the weights, such as the expected portfolio return ``\\boldsymbol{\\mu}^{\\intercal} \\boldsymbol{w}``, keeps the degree of the measure. The second form reads one target value.
+
+# Algorithm
+
+ 1. For a [`LowOrderMoment`](@ref), a [`HighOrderMoment`](@ref), a [`ThirdCentralMoment`](@ref) and a [`MedianAbsoluteDeviation`](@ref), read the Moment Target `mu`. A number is fixed when it is not zero. A [`VecScalar`](@ref) is fixed when its offset `s` is not zero.
+ 2. For a [`TrackingRiskMeasure`](@ref) and a [`RiskTrackingRiskMeasure`](@ref), read the benchmark `tr`. The weights of a [`WeightsTracking`](@ref) and the series of a [`ReturnsTracking`](@ref) are fixed when they are not zero. A vector `B` of a [`DataBenchmarkTracking`](@ref) is fixed when it is not zero, and so is an unbound `B`, whose target is not known. A matrix `B` gives the series ``\\mathbf{B} \\boldsymbol{w}``, which scales with the weights.
+ 3. For a [`TurnoverRiskMeasure`](@ref), the reference weights `w` are fixed when they are not zero.
+ 4. Return `false` for every other measure and every other target value.
+
+# Arguments
+
+  - $(arg_dict[:r])
+  - `target`: The target value of a measure.
+
+# Returns
+
+  - `flag::Bool`: `true` when the target is fixed and not zero.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.has_fixed_target(LowOrderMoment(; mu = 0.01))
+true
+
+julia> PortfolioOptimisers.has_fixed_target(LowOrderMoment(; mu = [0.01, 0.02]))
+false
+
+julia> PortfolioOptimisers.has_fixed_target(TrackingRiskMeasure(;
+                                                                tr = WeightsTracking(;
+                                                                                     w = [0.5,
+                                                                                          0.5])))
+true
+```
+
+# Related
+
+  - [`homogeneity_degree`](@ref)
+  - [`calc_moment_target`](@ref)
+  - [`tracking_benchmark`](@ref)
+"""
+function has_fixed_target(r::Union{LoHiOrderMoment, ThirdCentralMoment,
+                                   MedianAbsoluteDeviation})
+    return has_fixed_target(r.mu)
+end
+function has_fixed_target(r::Union{TrackingRiskMeasure, RiskTrackingRiskMeasure})
+    return has_fixed_target(r.tr)
+end
+function has_fixed_target(r::TurnoverRiskMeasure)
+    return !iszero(r.w)
+end
+function has_fixed_target(mu::Number)
+    return !iszero(mu)
+end
+function has_fixed_target(mu::VecScalar)
+    return !iszero(mu.s)
+end
+function has_fixed_target(tr::Union{WeightsTracking, ReturnsTracking})
+    return !iszero(tr.w)
+end
+function has_fixed_target(tr::DataBenchmarkTracking)
+    return isnothing(tr.B) || !iszero(tr.B)
+end
+function has_fixed_target(::DataBenchmarkTracking{<:MatNum})
+    return false
+end
+function has_fixed_target(::Any)
+    return false
 end
 """
     scalarised_degree(r::BaseRM_VecBaseRM, sca::Scalariser) -> Option{<:Integer}

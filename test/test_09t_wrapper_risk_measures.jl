@@ -272,4 +272,96 @@ end
         end
         @test iszero(risk_contribution(EqualRisk(), _w607, prh))
     end
+
+    @testset "A measure with a fixed target has no degree" begin
+        # `|x - c|` with a fixed `c ≠ 0` is not homogeneous in `w` (#1909). Each pair names a
+        # measure and its degree. The loop checks the degree by its definition,
+        # `R(c w) = c^d R(w)` at `c = 2` and `c = 3`. A measure with no degree fails the
+        # definition for every `d`.
+        hd = PO.homogeneity_degree
+        w0 = fill(0.2, 5)
+        mu = vec(mean(_X607; dims = 1))
+        prh = prior(HighOrderPriorEstimator(), _X607)
+        sv = SimpleVariance(; me = nothing)
+        cases = [LowOrderMoment(; mu = 0.01) => nothing, LowOrderMoment(; mu = 0.0) => 1,
+                 LowOrderMoment(; mu = mu) => 1,
+                 LowOrderMoment(; mu = VecScalar(; v = mu, s = 0.01)) => nothing,
+                 LowOrderMoment(; mu = VecScalar(; v = mu, s = 0.0)) => 1,
+                 LowOrderMoment(; mu = 0.01, alg = SecondMoment()) => nothing,
+                 LowOrderMoment(; mu = 0.01, alg = EvenMoment(; p = 3)) => nothing,
+                 HighOrderMoment(; mu = 0.01) => nothing,
+                 HighOrderMoment(; mu = 0.01, alg = FourthMoment()) => nothing,
+                 HighOrderMoment(; mu = 0.01, ve = sv) => nothing,
+                 HighOrderMoment(; mu = mu, alg = FourthMoment()) => 4,
+                 ThirdCentralMoment(; mu = 0.01) => nothing,
+                 ThirdCentralMoment(; mu = 0.01, ve = SimpleVariance()) => nothing,
+                 ThirdCentralMoment(; mu = mu) => 3,
+                 MedianAbsoluteDeviation(; mu = 0.01) => nothing,
+                 MedianAbsoluteDeviation(; mu = mu) => 1, MedianAbsoluteDeviation() => 1,
+                 TrackingRiskMeasure(; tr = WeightsTracking(; w = w0)) => nothing,
+                 TrackingRiskMeasure(; tr = WeightsTracking(; w = w0),
+                                     alg = SquaredL2Norm()) => nothing,
+                 TrackingRiskMeasure(; tr = WeightsTracking(; w = zeros(5)),
+                                     alg = SquaredL2Norm()) => 2,
+                 TrackingRiskMeasure(; tr = ReturnsTracking(; w = _X607 * w0)) => nothing,
+                 TrackingRiskMeasure(; tr = ReturnsTracking(; w = zeros(200))) => 1,
+                 TrackingRiskMeasure(; tr = DataBenchmarkTracking(; B = _X607 * w0)) =>
+                     nothing,
+                 # A matrix benchmark gives the series `B * w`, which scales with `w`.
+                 TrackingRiskMeasure(; tr = DataBenchmarkTracking(; B = 0.5 * _X607)) => 1,
+                 RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = w0)) => nothing,
+                 # With zero benchmark weights, the measure tracks its inner measure.
+                 RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = zeros(5))) => 2,
+                 RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = zeros(5)),
+                                         r = ConditionalValueatRisk(),
+                                         alg = DependentVariableTracking()) => 1,
+                 TurnoverRiskMeasure(; w = w0) => nothing,
+                 TurnoverRiskMeasure(; w = zeros(5)) => 1,
+                 # A relative drawdown compounds the returns.
+                 RelativeMaximumDrawdown() => nothing, RelativeAverageDrawdown() => nothing,
+                 RelativeConditionalDrawdownatRisk() => nothing,
+                 RelativeDrawdownatRisk() => nothing, RelativeUlcerIndex() => nothing,
+                 MaximumDrawdown() => 1, ExpectedReturn() => 1,
+                 ExpectedReturn(; rt = LogarithmicReturn()) => nothing,
+                 ExpectedReturn(; rt = [ArithmeticReturn(), LogarithmicReturn()]) =>
+                     nothing, ExpectedReturnRiskRatio() => -1,
+                 ExpectedReturnRiskRatio(; rk = StandardDeviation()) => 0,
+                 ExpectedReturnRiskRatio(; rf = 0.01) => nothing,
+                 ExpectedReturnRiskRatio(; rt = LogarithmicReturn()) => nothing,
+                 NonOptimisationRiskRatio(; r1 = Kurtosis(; alg = QuadRiskExpr()),
+                                          r2 = TurnoverRiskMeasure(; w = w0)) => nothing]
+        for (r, d) in cases
+            rr = factory(r, prh)
+            @test isequal(hd(r), d)
+            @test isequal(hd(rr), d)
+            r1 = expected_risk(rr, _w607, prh)
+            q2 = expected_risk(rr, 2 * _w607, prh) / r1
+            q3 = expected_risk(rr, 3 * _w607, prh) / r1
+            if isnothing(d)
+                d2 = log(abs(q2)) / log(2)
+                d3 = log(abs(q3)) / log(3)
+                @test !(isapprox(d2, d3; atol = 1e-6) &&
+                        isapprox(d2, round(d2); atol = 1e-6))
+            else
+                @test q2 ≈ 2.0^d rtol = 1e-6
+                @test q3 ≈ 3.0^d rtol = 1e-6
+            end
+        end
+        # The solver measures of the relative drawdowns need no evaluation for their degree.
+        for r in (RelativeEntropicDrawdownatRisk(), RelativePowerNormDrawdownatRisk(),
+                  RelativeRelativisticDrawdownatRisk())
+            @test isnothing(hd(r))
+        end
+        # An unbound data benchmark has no known target, so it claims no degree.
+        @test PO.has_fixed_target(DataBenchmarkTracking())
+        @test !PO.has_fixed_target(DataBenchmarkTracking(; B = zeros(200)))
+        @test !PO.has_fixed_target(MeanCentering())
+        # A ratio with no degree gives the plain marginal contributions. The old degree
+        # `4 - 1 = 3` divided them by 3.
+        r = factory(NonOptimisationRiskRatio(; r1 = Kurtosis(; alg = QuadRiskExpr()),
+                                             r2 = TurnoverRiskMeasure(; w = w0)), prh)
+        rc = risk_contribution(r, _w607, prh)
+        @test rc ≈ _w607 .* risk_gradient(r, _w607, prh) rtol = 1e-6
+        @test sum(rc) ≈ dot(_w607, risk_gradient(r, _w607, prh)) rtol = 1e-6
+    end
 end

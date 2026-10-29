@@ -10,7 +10,9 @@ QuadExpressionRiskMeasures
 CubedRiskMeasures
 FourthPowerRiskMeasures
 ScaleFreeRiskMeasures
+RelativeDrawdownRiskMeasures
 homogeneity_degree
+has_fixed_target
 scalarised_degree
 degree_difference
 adjust_risk_contribution
