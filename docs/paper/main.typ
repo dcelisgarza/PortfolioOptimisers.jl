@@ -459,7 +459,7 @@ By being so thorough with our standards and automatic checks, we have found grea
 
 = Availability
 
-#po is registered under an MIT license in the Julia General registry, so `Pkg.add("PortfolioOptimisers")` is all that is needed. The listings in this paper are executed when it is built, so the paper is checked by the same standard as the rest of the project. The library is under active development, the issue tracker keeps ideas and roadmaps for new features, maintenance tasks, bug reports, and more. Contributions are very much appreciated and welcome.
+#po is registered under an EUPL-1.2 license in the Julia General registry, so `Pkg.add("PortfolioOptimisers")` is all that is needed. The listings in this paper are executed when it is built, so the paper is checked by the same standard as the rest of the project. The library is under active development, the issue tracker keeps ideas and roadmaps for new features, maintenance tasks, bug reports, and more. Contributions are very much appreciated and welcome.
 
 We hope readers will find in #po an interesting, valuable, and trustworthy tool for their needs.
 
