@@ -418,6 +418,54 @@ rel_dd(x) = cumprod(1 .+ x) ./ accumulate(max, cumprod(1 .+ x); init = one(eltyp
                        expected_risk(factory(ValueatRiskRange(; alg = vd.alg), pr), sol.w,
                                      pr); rtol = 1e-6)
     end
+    @testset "Two parametric tails of a generic range share one cone (#1901)" begin
+        rng = StableRNG(5)
+        X = 0.01 .* randn(rng, 300, 6) .+ range(-0.0005, 0.002; length = 6)'
+        pr = prior(EmpiricalPrior(), X)
+        cslv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                      settings = Dict("verbose" => false))
+        opt = JuMPOptimiser(; pe = pr, slv = cslv)
+        nsoc(m) = JuMP.num_constraints(m, Vector{JuMP.AffExpr}, JuMP.MOI.SecondOrderCone)
+        # A mean far from zero gives one tail a negative coefficient. With a cone for each
+        # tail the minimisation was unbounded, and one cone makes it the minimum of the range.
+        for dist in (Normal(2.0, 1.0), Normal(-2.0, 1.0), Normal(), TDist(5))
+            vd = ValueatRisk(; alg = DistributionValueatRisk(; dist = dist))
+            r = GenericValueatRiskRange(; loss = vd, gain = vd)
+            sol = optimise(MeanRisk(; r = r, obj = MinimumRisk(), opt = opt))
+            @test isa(sol.retcode, OptimisationSuccess)
+            @test nsoc(sol.model) == 1
+            @test isapprox(JuMP.value(sol.model[:risk]),
+                           expected_risk(factory(r, pr), sol.w, pr); rtol = 1e-6)
+            sv = optimise(MeanRisk(; r = ValueatRiskRange(; alg = vd.alg),
+                                   obj = MinimumRisk(), opt = opt))
+            @test isapprox(JuMP.value(sol.model[:risk]), JuMP.value(sv.model[:risk]);
+                           rtol = 1e-6)
+        end
+        # Tails that read different moments keep a cone each.
+        dist = Normal(0.5, 1.0)
+        a1 = DistributionValueatRisk(; dist = dist)
+        a2 = DistributionValueatRisk(; dist = dist, sigma = 2 .* pr.sigma)
+        for (alg, n) in
+            ((a1, 2), (DistributionValueatRisk(; dist = dist, sigma = 2 .* pr.sigma), 1))
+            r = GenericValueatRiskRange(; loss = ValueatRisk(; alpha = 0.05, alg = alg),
+                                        gain = ValueatRisk(; alpha = 0.1, alg = a2))
+            sol = optimise(MeanRisk(; r = r, obj = MinimumRisk(), opt = opt))
+            @test isa(sol.retcode, OptimisationSuccess)
+            @test nsoc(sol.model) == n
+            @test isapprox(JuMP.value(sol.model[:risk]),
+                           expected_risk(factory(r, pr), sol.w, pr); rtol = 1e-6)
+        end
+        # The bound of a tail still bounds the value of that tail.
+        vd = ValueatRisk(; alg = DistributionValueatRisk(; dist = Normal(2.0, 1.0)))
+        r = GenericValueatRiskRange(; loss = vd, gain = vd)
+        sol = optimise(MeanRisk(; r = r, obj = MaximumReturn(), opt = opt))
+        ub = expected_risk(factory(vd, pr), sol.w, pr) / 2
+        vb = ValueatRisk(; alg = vd.alg, settings = RiskMeasureSettings(; ub = ub))
+        sol = optimise(MeanRisk(; r = GenericValueatRiskRange(; loss = vb, gain = vd),
+                                obj = MaximumReturn(), opt = opt))
+        @test isa(sol.retcode, OptimisationSuccess)
+        @test isapprox(expected_risk(factory(vd, pr), sol.w, pr), ub; rtol = 1e-6)
+    end
     @testset "The parametric quantile against the empirical one" begin
         # The parametric functor of one asset at unit weight, with the sample moments.
         function par(x, alpha)
