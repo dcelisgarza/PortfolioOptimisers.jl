@@ -1193,10 +1193,16 @@ end
     @test RateSignificance(; c = 2)(:alpha, PR60, nothing, nothing, CalibrationContext()) ==
           2 * a60
 
-    # The rule reads the RAW row count, so the weights do not move it. That is the stated
-    # difference from `ScenarioCount`: a rate speaks of the length of the record.
-    @test rule(:alpha, PR60, pweights([fill(3.0, 30); fill(1.0, 30)]), nothing,
-               CalibrationContext()) == a60
+    # The tail holds `c * sqrt(T)` scenarios only when `T` counts the scenarios the measure
+    # prices, so the rule reads the count `ScenarioCount` reads: Kish's count of the weights
+    # when the measure states weights (#1908).
+    w60 = pweights([fill(3.0, 30); fill(1.0, 30)])
+    kish60 = sum(w60)^2 / sum(abs2, w60)
+    @test kish60 < 60
+    @test rule(:alpha, PR60, w60, nothing, CalibrationContext()) == inv(sqrt(kish60))
+    @test rule(:alpha, PR60, w60, nothing, CalibrationContext()) /
+          ScenarioCount(; n = 1)(:alpha, PR60, w60, nothing, CalibrationContext()) ≈
+          sqrt(kish60)
 
     # The key does not change the rate either.
     @test rule(:beta, PR60, nothing, nothing, CalibrationContext()) == a60
@@ -1420,8 +1426,7 @@ const PRSKEW = prior(EmpiricalPrior(), XSKEW)
 
     # A tail index is a statement about the shape of a series rather than about the count of
     # observations behind it, so the rule ignores the observation weights. `ScenarioCount`
-    # reads Kish's effective sample size and `RateSignificance` reads the raw row count;
-    # this rule reads neither.
+    # and `RateSignificance` read Kish's effective sample size; this rule reads no count.
     @test rule(:kappa, PRT4, pweights([fill(3.0, 500); fill(1.0, 500)]), nothing,
                CalibrationContext(; alpha = 0.01)) == k4
 
@@ -2504,15 +2509,18 @@ end
         @test PO.effective_sample_size(pu, nothing) == 1250
         @test PO.effective_sample_size(pc, nothing) == 1250
         @test PO.effective_sample_size(pc, StatsBase.pweights(ones(250))) == 250
-        # The two rate rules read the count behind the moments.
-        @test RateSignificance()(:alpha, pc, nothing, nothing, ctx) ==
-              RateSignificance()(:alpha, pu, nothing, nothing, ctx)
+        # A radius at a site that states no count prices the error of the moments, so it
+        # reads the count behind them.
         @test RateRadius()(:k, pc, nothing, nothing, ctx) ==
               RateRadius()(:k, pu, nothing, nothing, ctx)
-        # `ScenarioCount` and `EntropyBudget` price the scenarios the measure holds, which
-        # are the rows carried. A tail of `n / ens` would hold `n / 5` of the 250 rows, and
-        # the measure pays `kappa_log(inv(alpha * T), kappa)` at the `T` of its own rows.
+        # `ScenarioCount`, `RateSignificance` and `EntropyBudget` price the scenarios the
+        # measure holds, which are the rows carried. A tail of `n / ens` would hold `n / 5`
+        # of the 250 rows, a rate read at 1250 would hold `sqrt(5)` times fewer than
+        # `c * sqrt(250)` (#1908), and the measure pays `kappa_log(inv(alpha * T), kappa)` at
+        # the `T` of its own rows.
         @test ScenarioCount(; n = 25)(:alpha, pc, nothing, nothing, ctx) == 25 / 250
+        @test RateSignificance()(:alpha, pc, nothing, nothing, ctx) == inv(sqrt(250))
+        @test RateSignificance()(:alpha, pc, nothing, nothing, ctx) * 250 ≈ sqrt(250)
         actx = CalibrationContext(; alpha = 0.05)
         kappa = EntropyBudget(; target = -5.0)(:kappa, pc, nothing, nothing, actx)
         @test PO.kappa_log(inv(0.05 * 250), kappa) ≈ -5.0
@@ -2532,8 +2540,8 @@ end
     @testset "An `ens` or an `eoc` bound to a weighting is not the stated count of a rule with no weights" begin
         # An entropy-pooling prior writes `exp(entropy(w))` beside `w`, and the counts of the
         # moments that `w` weights in `eoc`. A rule handed the weights reads Kish's count of
-        # them, as before; a rule that reads the raw row count still does, because a count
-        # of weights it ignores is not a count it reads.
+        # them, as before; a read with no weights takes the row count, because a count of
+        # weights it ignores is not a count it reads.
         w = StatsBase.pweights(vcat(fill(0.5, 60), fill(1.5, 60)))
         kish = sum(w)^2 / sum(abs2, w)
         pw = LowOrderPrior(; X = pu.X[1:120, :], mu = pu.mu, sigma = pu.sigma, w = w,
@@ -2541,8 +2549,8 @@ end
         @test PO.effective_sample_size(pw, pw.w) == kish
         @test PO.effective_sample_size(pw, nothing) == 120
         @test ScenarioCount(; n = 25)(:alpha, pw, pw.w, nothing, ctx) == 25 / kish
-        @test RateSignificance()(:alpha, pw, pw.w, nothing, ctx) ==
-              RateSignificance()(:alpha, pu, nothing, nothing, ctx) * sqrt(1250 / 120)
+        @test RateSignificance()(:alpha, pw, pw.w, nothing, ctx) == inv(sqrt(kish))
+        @test RateRadius()(:k, pw, pw.w, nothing, ctx) == inv(sqrt(kish))
         # The normal set reads the count of the moments in `eoc`, the Kish count of `w`,
         # and not the perplexity in `ens` (#1893).
         @test PO.choose_scaling_parameter(NormalUncertaintySet(; pe = nothing), pw, 1) ==
@@ -2584,9 +2592,8 @@ end
         @test PO.scenario_sample_size(pc, wc) == kc
         # A stated count replaces `effective_sample_size`, so on the capped prior the ball
         # widens by the rate of each rule at the ratio `1250 / 250` of the two counts.
-        for (rule, ratio) in
-            ((ConcentrationRadius(), sqrt(5)), (DimensionalRateRadius(), 5^(1 / 5)),
-             (DualNormRadius(), sqrt(5)))
+        for (rule, ratio) in ((ConcentrationRadius(), sqrt(5)), (RateRadius(), sqrt(5)),
+                              (DimensionalRateRadius(), 5^(1 / 5)), (DualNormRadius(), sqrt(5)))
             @test rule(:r, pc, nothing, nothing, n250) /
                   rule(:r, pc, nothing, nothing, ctx) ≈ ratio
             # With no cap the two counts agree, so no number without a cap moves.
@@ -2614,11 +2621,25 @@ end
                                                            w = wc)
         @test PO.resolve_deferred_quantities(drw, pc).r ==
               ConcentrationRadius()(:r, pc, wc, nothing, CalibrationContext(; n = kc))
+        # `RateRadius` is a rate of the same concentration, so it reads the same count
+        # (#1908). The capped prior and the uncapped prior over the same 250 rows centre one
+        # ball, so they give one radius.
+        pl = prior(EmpiricalPrior(), X1015[1001:end, :])
+        drr1 = DistributionallyRobustConditionalValueatRisk(; r = RateRadius())
+        @test PO.resolve_deferred_quantities(drr1, pc).r ==
+              PO.resolve_deferred_quantities(drr1, pl).r ==
+              inv(sqrt(250))
+        drwr = DistributionallyRobustConditionalValueatRisk(; r = RateRadius(), w = wc)
+        @test PO.resolve_deferred_quantities(drwr, pc).r == inv(sqrt(kc))
         # The `JuMPOptimiser` sites of `l1` and `linf` hand over the default context, so
-        # their radius prices `ens`, and the capped prior gives the radius of the uncapped one.
+        # their radius prices the count in `eoc`, and the capped prior gives the radius of the
+        # uncapped one.
         for key in (:l1, :linf)
             @test PO.resolve_calibration_slot(DualNormRadius(), key, pc, pc.w) ≈
                   PO.resolve_calibration_slot(DualNormRadius(), key, pu, pu.w)
+            @test PO.resolve_calibration_slot(RateRadius(), key, pc, pc.w) ==
+                  PO.resolve_calibration_slot(RateRadius(), key, pu, pu.w) ==
+                  inv(sqrt(1250))
         end
     end
 end
@@ -2867,10 +2888,13 @@ end
     @test RateRadius().c == 1
     @test RateRadius()(:r, PR60_H, nothing, nothing, CalibrationContext()) ≈ inv(sqrt(60))
 
-    # The rule reads the raw row count, so stated weights change nothing. That is the one
-    # place it parts company with `ConcentrationRadius`.
-    @test alg(:r, PR60_H, WTS, nothing, CalibrationContext()) ==
-          alg(:r, PR60_H, nothing, nothing, CalibrationContext())
+    # The rule reads the count of `ConcentrationRadius` (#1908): Kish's count of stated
+    # weights, and the count that the site states in `n` before either.
+    kish = sum(WTS)^2 / sum(abs2, WTS)
+    @test kish < 60
+    @test alg(:r, PR60_H, WTS, nothing, CalibrationContext()) == 0.2 / sqrt(kish)
+    @test alg(:r, PR60_H, WTS, nothing, CalibrationContext(; n = 25)) == 0.2 / sqrt(25)
+    @test alg(:r, PR60_H, nothing, nothing, CalibrationContext(; n = 25)) == 0.2 / sqrt(25)
 
     # The key and the solver never select the value.
     @test alg(:r_b, PR60_H, nothing, Solver(; solver = nothing), CalibrationContext()) ==
@@ -2930,7 +2954,7 @@ end
           alg(:val, PR60_2, nothing, nothing, CalibrationContext())
 
     # Stated weights move `T` to Kish's effective sample size, on the same terms as
-    # `ConcentrationRadius` and unlike `RateRadius`. This rule is a concentration
+    # `ConcentrationRadius` and `RateRadius`. This rule is a concentration
     # statement, so it prices the record that Kish's count measures.
     kish = sum(WTS)^2 / sum(abs2, WTS)
     @test kish < 60
@@ -3007,7 +3031,7 @@ end
               CalibrationContext(; alpha = 0.05)) == l
 
     # Both scales are sample statistics rather than counts, so stated weights move them.
-    # That is where the rule parts company with `RateRadius`, which reads a raw row count.
+    # That is where the rule parts company with `RateRadius`, which reads only a count.
     mw = -sum(j -> dot(view(XDAY, :, j), WDAY), axes(XDAY, 2)) / (4 * sum(WDAY))
     cw = mean(j -> ConditionalValueatRisk(; alpha = 0.05, w = WDAY)(view(XDAY, :, j)),
               axes(XDAY, 2))

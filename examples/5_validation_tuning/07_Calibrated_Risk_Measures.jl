@@ -211,7 +211,8 @@ question about the sample.
   - [`RateSignificance`](@ref) answers *how fast may the tail move outwards*. `alpha = c / sqrt(T)`
     leaves `c * sqrt(T)` observations in the tail, which grows with the sample but more slowly
     than the sample does. That is the rate at which a sample mean's own error falls. It uses the
-    raw row count, because a rate is a statement about the length of the record.
+    same count as [`ScenarioCount`](@ref), because `c * sqrt(T)` counts the observations in the
+    tail only when `T` counts the observations that the measure prices.
   - [`EntropyBudget`](@ref) answers *what may the deformation cost*. Section 5 puts it on a
     ``\kappa`` slot.
 
@@ -241,10 +242,9 @@ pretty_table(rule_table; formatters = [numfmt])
 Under the scenario count the tail population `count_tail` is flat, and under the rate
 `rate_tail` grows with the square root of `T`.
 
-Observation weights separate the two rules a second time. A measure that has `w` passes those
-weights to the rule, and [`ScenarioCount`](@ref) divides by Kish's effective sample size rather
-than by the row count. The effective size is the smaller of the two, so the weighted level is the
-higher.
+Observation weights move both rules. A measure that has `w` passes those weights to the rule, and
+both rules divide by Kish's effective sample size rather than by the row count. The effective size
+is the smaller of the two, so each weighted level is the higher.
 =#
 
 obs_w = pweights(range(; start = 1, stop = 2, length = length(iwf_res.train_idx[1])))
@@ -260,7 +260,8 @@ weight_table = DataFrame(:rule => ["ScenarioCount", "RateSignificance"],
 pretty_table(weight_table; formatters = [numfmt])
 
 #=
-The rate is unchanged, because it does not use the weights.
+Both levels rise, because a weighted tail holds fewer independent observations than its rows.
+`ScenarioCount` rises in proportion to the count, and the rate rises with its square root.
 
 ## 5. The two slots that resolve together
 

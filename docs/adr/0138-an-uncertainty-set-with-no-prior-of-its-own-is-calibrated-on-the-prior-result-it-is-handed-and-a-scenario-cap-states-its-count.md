@@ -196,10 +196,20 @@ states is a property of those rows:
   relativistic measure pays, and the model forms that coefficient with the `T` of its own rows. On
   the same cap, `target = -5` solved at `T = 1250` and the model paid `-2.716`.
 
-With weights, `ScenarioCount` still reads the Kish count of the weights. The two rate rules,
-`RateSignificance` and `RateRadius`, keep `ens`, because their docstrings define the rate on the
-length of the record. The sweep of `06_CalibrationRules.jl`,
-[#638](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/638), found both defects.
+With weights, `ScenarioCount` still reads the Kish count of the weights. The sweep of
+`06_CalibrationRules.jl`, [#638](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/638),
+found both defects.
+
+**`RateSignificance` reads the count of `ScenarioCount`.**
+[#1908](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1908) corrected this
+amendment, which first kept the rule on the count behind the moments, "because its docstring
+defines the rate on the length of the record". That is a definition and not a reason. The rule
+states that the tail holds `c * sqrt(T)` scenarios, and the tail is a set of the rows of the
+measure. So the statement holds only when `T` counts those rows: `scenario_sample_size(pr, w)`,
+the row count, and the Kish count of the weights of the measure when it states weights. Under
+`max_scenarios = 250` over 1250 observations, the count behind the moments gave a tail `sqrt(5)`
+times smaller than `c * sqrt(250)`. A measure with observation weights and no cap now prices the
+Kish count of its weights, where it priced the row count, so its released numbers move.
 
 ### The site states the count that an ambiguity radius prices
 
@@ -228,7 +238,18 @@ rows share one definition. The regularisation sites state no `n`. The three radi
 
 Every number without a cap stays the same. With no cap and no weights, both counts are
 `size(pr.X, 1)`. With weights, both counts are the Kish count of the weights. A capped fit is
-`dev`-only. `RateRadius` keeps `ens` and ignores `n`, for the reason that its docstring states.
+`dev`-only.
+
+**`RateRadius` reads `n` as the three other rules do (#1908).** This amendment first kept it on
+the count behind the moments, for the reason that its docstring stated. The rate `1 / sqrt(T)` of
+a ball has its basis in the concentration of the empirical measure of the `T` draws on which the
+ball is centred, the bound that the three other rules follow. So `RateRadius` reads `ctx.n`, and
+`effective_sample_size(pr, w)` when it is `nothing`. Under the cap above, the old count made the
+ball `sqrt(5)` times too small, and in an online fit the ball shrank at each step while it kept
+250 rows. With observation weights and no cap, both counts are the Kish count of the weights, so
+a weighted robust measure, and a weighted regularisation slot, with `RateRadius` now prices that
+count and not the row count. That moves released numbers. The rule is mathematically consistent
+with its family only in this form, so the change is the cost of that form.
 
 ## Amendment (2026-10-29)
 
