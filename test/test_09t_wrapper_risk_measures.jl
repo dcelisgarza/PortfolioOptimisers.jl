@@ -364,4 +364,116 @@ end
         @test rc ≈ _w607 .* risk_gradient(r, _w607, prh) rtol = 1e-6
         @test sum(rc) ≈ dot(_w607, risk_gradient(r, _w607, prh)) rtol = 1e-6
     end
+
+    @testset "A fee that does not scale with the weights takes the degree" begin
+        # A fixed fee, a turnover fee against weights that are not zero, and a liquidation
+        # charge move the net returns by an amount that does not scale with `w` (#1910). A
+        # fee that every period pays cancels from a measure that a constant shift does not
+        # change. A one-off fee on the first observation cancels from no measure. Each
+        # triple names a measure, a fee and the degree. The loop checks the degree by its
+        # definition, and checks the contributions against the risk or the gradient.
+        hd = PO.homogeneity_degree
+        w0 = fill(0.2, 5)
+        mu = vec(mean(_X607; dims = 1))
+        prh = prior(HighOrderPriorEstimator(), _X607)
+        tn = Fees(; tn = Turnover(; w = w0, val = 0.001))
+        tn0 = Fees(; tn = Turnover(; w = zeros(5), val = 0.001))
+        fl = Fees(; fl = 0.0001)
+        fla = Fees(; fl = 0.0001, fa = AmortisedFees())
+        l = Fees(; l = fill(0.001, 5))
+        m2 = LowOrderMoment(; alg = SecondMoment())
+        m20 = LowOrderMoment(; alg = SecondMoment(), mu = 0.0)
+        cases = [(m2, tn, 2), (m2, fla, 2), (m2, fl, nothing), (m20, tn, nothing),
+                 (m20, fla, nothing), (m20, l, 2), (m20, tn0, 2),
+                 (LowOrderMoment(; alg = SecondMoment(), mu = mu), tn, 2),
+                 (ThirdCentralMoment(), tn, 3), (ThirdCentralMoment(), fl, nothing),
+                 (HighOrderMoment(; alg = FourthMoment()), tn, 4),
+                 (BrownianDistanceVariance(), tn, 2),
+                 (BrownianDistanceVariance(), fl, nothing), (Variance(), fl, 2),
+                 (Variance(), tn, 2), (ConditionalValueatRisk(), tn, nothing),
+                 (ConditionalValueatRisk(), tn0, 1), (MaximumDrawdown(), tn, nothing),
+                 (TrackingRiskMeasure(; tr = WeightsTracking(; w = zeros(5)),
+                                      alg = SquaredL2Norm()), tn, nothing),
+                 (RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = zeros(5)), r = m2),
+                  tn, 2),
+                 (RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = zeros(5)), r = m2),
+                  fl, nothing),
+                 (RiskRatio(; r1 = ConditionalValueatRisk(), r2 = Variance()), tn, nothing),
+                 (RiskRatio(; r1 = ConditionalValueatRiskRange(), r2 = Variance()), tn, -1),
+                 (OrderedWeightsArray(; w = owa_gmd(200)), tn, 1),
+                 (OrderedWeightsArray(; w = owa_cvar(200, 0.05)), tn, nothing),
+                 (RiskRatio(; r1 = OrderedWeightsArray(), r2 = Variance()), tn, -1),
+                 (RiskRatio(; r1 = OrderedWeightsArrayRange(), r2 = Variance()), tn, -1),
+                 (RiskRatio(;
+                            r1 = OrderedWeightsArray(;
+                                                     w = OrderedWeightsArrayConditionalValueatRisk()),
+                            r2 = Variance()), tn, nothing), (ExpectedReturn(), fl, nothing),
+                 (ExpectedReturn(;
+                                 rt = ArithmeticReturn(;
+                                                       settings = JuMPReturnsSettings(;
+                                                                                      fee = false))),
+                  fl, 1)]
+        for (r, f, d) in cases
+            rr = factory(r, prh)
+            @test isequal(hd(r, f), d)
+            @test isequal(hd(rr, f), d)
+            r1 = expected_risk(rr, _w607, prh, f)
+            q2 = expected_risk(rr, 2 * _w607, prh, f) / r1
+            q3 = expected_risk(rr, 3 * _w607, prh, f) / r1
+            if isnothing(d)
+                d2 = log(abs(q2)) / log(2)
+                d3 = log(abs(q3)) / log(3)
+                @test !(isapprox(d2, d3; atol = 1e-6) &&
+                        isapprox(d2, round(d2); atol = 1e-6))
+            else
+                @test q2 ≈ 2.0^d rtol = 1e-6
+                @test q3 ≈ 3.0^d rtol = 1e-6
+            end
+        end
+        # A measure with a degree under the fee decomposes its risk. A measure with none
+        # gives the plain marginal contributions, which the old degree 2 divided by 2.
+        for (r, f) in ((m2, tn), (m2, fla), (ThirdCentralMoment(), tn),
+                       (RiskRatio(; r1 = ConditionalValueatRiskRange(), r2 = Variance()), tn))
+            rr = factory(r, prh)
+            @test sum(risk_contribution(rr, _w607, prh, f)) ≈
+                  expected_risk(rr, _w607, prh, f) rtol = 1e-6
+        end
+        # An OWA measure sorts the returns, so its finite difference misses by 1.2e-6 here.
+        # With no degree, the sum is minus the risk.
+        rr = factory(RiskRatio(; r1 = OrderedWeightsArray(), r2 = Variance()), prh)
+        @test sum(risk_contribution(rr, _w607, prh, tn)) ≈ expected_risk(rr, _w607, prh, tn) rtol = 1e-5
+        for (r, f) in ((m2, fl), (m20, tn),
+                       (RiskRatio(; r1 = ConditionalValueatRisk(), r2 = Variance()), tn))
+            rr = factory(r, prh)
+            g = risk_gradient(rr, _w607, prh, f)
+            rc = risk_contribution(rr, _w607, prh, f)
+            @test rc ≈ _w607 .* g rtol = 1e-6
+            @test sum(rc) ≈ dot(_w607, g) rtol = 1e-6
+        end
+        # A liquidation charge does not read the weights, so it falls on each period. A weight
+        # builder states its sum when the sum is zero at each observation count. A range whose
+        # `w2` is `reverse ∘ w1` holds the same sum in both tails.
+        lq = Fees(; lq = Turnover(; w = [0.25], val = 0.01))
+        @test PO.has_fixed_fee(lq, false)
+        @test !PO.has_fixed_fee(lq, true)
+        @test PO.has_fixed_fee(Fees(; flq = Turnover(; w = [0.25], val = 0.01)), true)
+        @test !PO.has_fixed_fee(Fees(; tn = Turnover(; w = w0, val = 0.0)), false)
+        @test !PO.has_fixed_fee(nothing, false)
+        for f in (owa_gmd, owa_rg, owa_cvarrg, owa_tgrg, owa_l_moment), T in (20, 57, 200)
+            @test PO.sums_to_zero(f) && PO.sums_to_zero(f(T))
+        end
+        @test !PO.sums_to_zero(owa_wr)
+        @test PO.cancels_constant_fee(OrderedWeightsArray())
+        @test !PO.cancels_constant_fee(OrderedWeightsArray(;
+                                                           w = OrderedWeightsArrayConditionalValueatRisk()))
+        @test PO.cancels_constant_fee(OrderedWeightsArrayRange(; w1 = owa_tg(200)))
+        @test PO.cancels_constant_fee(OrderedWeightsArrayRange(;
+                                                               w1 = OrderedWeightsArrayTailGini()))
+        @test !PO.cancels_constant_fee(OrderedWeightsArrayRange(; w1 = owa_tg, w2 = owa_wr))
+        @test PO.cancels_constant_fee(GenericValueatRiskRange())
+        @test !PO.reads_fees(ValueatRisk(; alg = DistributionValueatRisk()))
+        @test !PO.reads_fees(VarianceSkewKurtosis())
+        @test PO.sums_to_zero([1 // 2, -1 // 2])
+        @test !PO.sums_to_zero([1 // 2, -1 // 3])
+    end
 end

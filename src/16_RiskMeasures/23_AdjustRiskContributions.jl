@@ -166,11 +166,43 @@ const RelativeDrawdownRiskMeasures = Union{RelativeAverageDrawdown,
                                            RelativeRelativisticDrawdownatRisk,
                                            RelativeUlcerIndex}
 """
-    homogeneity_degree(r::AbstractBaseRiskMeasure) -> Option{<:Integer}
+    const ShiftInvariantRiskMeasures = Union{Range, BrownianDistanceVariance,
+                                             ValueatRiskRange, ConditionalValueatRiskRange,
+                                             DistributionallyRobustConditionalValueatRiskRange,
+                                             EntropicValueatRiskRange,
+                                             RelativisticValueatRiskRange,
+                                             PowerNormValueatRiskRange}
 
-Return the degree of homogeneity of the risk measure `r` in the portfolio weights, or `nothing` when `r` has no degree.
+Union of the risk measures whose risk does not change when the same number is added to each net return. [`cancels_constant_fee`](@ref) returns `true` for each member.
+
+A range is the sum of the risk of the losses and the risk of the gains. Each tail moves by the number with an opposite sign, so the sum does not move. The distance variance of [`BrownianDistanceVariance`](@ref) reads only the differences between two returns. A fee that every period pays in the same amount is such a number, so it cancels from the risk of a member.
+
+# Related
+
+  - [`Range`](@ref)
+  - [`BrownianDistanceVariance`](@ref)
+  - [`ValueatRiskRange`](@ref)
+  - [`ConditionalValueatRiskRange`](@ref)
+  - [`DistributionallyRobustConditionalValueatRiskRange`](@ref)
+  - [`EntropicValueatRiskRange`](@ref)
+  - [`RelativisticValueatRiskRange`](@ref)
+  - [`PowerNormValueatRiskRange`](@ref)
+  - [`cancels_constant_fee`](@ref)
+"""
+const ShiftInvariantRiskMeasures = Union{Range, BrownianDistanceVariance, ValueatRiskRange,
+                                         ConditionalValueatRiskRange,
+                                         DistributionallyRobustConditionalValueatRiskRange,
+                                         EntropicValueatRiskRange,
+                                         RelativisticValueatRiskRange,
+                                         PowerNormValueatRiskRange}
+"""
+    homogeneity_degree(r::AbstractBaseRiskMeasure, fees::Option{<:Fees} = nothing) -> Option{<:Integer}
+
+Return the degree of homogeneity of the risk measure `r` in the portfolio weights, under the fees `fees`, or `nothing` when `r` has no degree.
 
 [`adjust_risk_contribution`](@ref) divides a risk by this degree, so that the risk contributions of [`risk_contribution`](@ref) sum to the risk. A measure that no other method names has degree 1, unless it measures a distance to a fixed target that is not zero. [`has_fixed_target`](@ref) finds such a target, and the measure then has no degree, because ``|x - c|`` with a fixed ``c \\neq 0`` is not homogeneous in ``x``.
+
+The degree is a property of the risk as a function of the weights, so it reads the fees that the risk pays. A fee that does not scale with the weights is a fixed target on the net returns. A turnover fee against previous weights that are not zero, a liquidation charge and a fixed fee are such fees, and [`has_fixed_fee`](@ref) finds them. A measure that reads the net returns then has no degree, unless the fee cancels from its risk. A proportional fee, and a turnover fee against zero weights, scale with the weights and keep the degree.
 
 # Mathematical definition
 
@@ -192,10 +224,10 @@ Where:
 
 # Algorithm
 
- 1. Return `nothing` when [`has_fixed_target`](@ref) is `true`. This applies to each step from 2 to 6.
+ 1. Return `nothing` when [`has_fixed_target`](@ref) of `r` and `fees` is `true`. This applies to steps 2 and 7.
  2. Return `2` for a member of [`SquaredRiskMeasures`](@ref), `3` for a member of [`CubedRiskMeasures`](@ref), `4` for a member of [`FourthPowerRiskMeasures`](@ref), and `0` for a member of [`ScaleFreeRiskMeasures`](@ref).
- 3. For [`RiskTrackingRiskMeasure`](@ref), return the degree of its measure `r`. The benchmark weights are zero at this step, so the measure tracks `r` itself.
- 4. For [`RiskRatio`](@ref) and [`NonOptimisationRiskRatio`](@ref), get the degree of each side with [`scalarised_degree`](@ref), and subtract the degree of `r2` from the degree of `r1` with [`degree_difference`](@ref).
+ 3. For [`RiskTrackingRiskMeasure`](@ref), return `nothing` when its benchmark is a fixed target. Otherwise return the degree of its measure `r` under `fees`. The benchmark weights are zero at this step, so the measure tracks `r` itself on the same net returns.
+ 4. For [`RiskRatio`](@ref) and [`NonOptimisationRiskRatio`](@ref), get the degree of each side under `fees` with [`scalarised_degree`](@ref), and subtract the degree of `r2` from the degree of `r1` with [`degree_difference`](@ref).
  5. For [`MeanReturnRiskRatio`](@ref) and [`ExpectedReturnRiskRatio`](@ref), return `nothing` when `rf` is not zero. Otherwise subtract the degree of `rk` from the degree of `rt`, in the same way. [`ExpectedReturn`](@ref) has the degree of its return estimator `rt`.
  6. Return `nothing` for [`VarianceSkewKurtosis`](@ref), whose three terms have the degrees 2, 3 and 4, and for a member of [`RelativeDrawdownRiskMeasures`](@ref).
  7. Return `1` for every other measure.
@@ -203,6 +235,7 @@ Where:
 # Arguments
 
   - $(arg_dict[:r])
+  - `fees`: The fees that the risk pays, or `nothing`.
 
 # Returns
 
@@ -231,6 +264,13 @@ julia> PortfolioOptimisers.homogeneity_degree(TurnoverRiskMeasure(; w = [0.5, 0.
 
 julia> PortfolioOptimisers.homogeneity_degree(TurnoverRiskMeasure(; w = [0.0, 0.0]))
 1
+
+julia> fees = Fees(; tn = Turnover(; w = [0.5, 0.5], val = 0.001));
+
+julia> PortfolioOptimisers.homogeneity_degree(LowOrderMoment(; mu = 0.0), fees)
+
+julia> PortfolioOptimisers.homogeneity_degree(LowOrderMoment(), fees)
+1
 ```
 
 # Related
@@ -238,67 +278,74 @@ julia> PortfolioOptimisers.homogeneity_degree(TurnoverRiskMeasure(; w = [0.0, 0.
   - [`adjust_risk_contribution`](@ref)
   - [`risk_contribution`](@ref)
   - [`has_fixed_target`](@ref)
+  - [`has_fixed_fee`](@ref)
   - [`SquaredRiskMeasures`](@ref)
   - [`CubedRiskMeasures`](@ref)
   - [`FourthPowerRiskMeasures`](@ref)
   - [`ScaleFreeRiskMeasures`](@ref)
   - [`RelativeDrawdownRiskMeasures`](@ref)
 """
-function homogeneity_degree(r::AbstractBaseRiskMeasure)
-    return has_fixed_target(r) ? nothing : 1
+function homogeneity_degree(r::AbstractBaseRiskMeasure, fees::Option{<:Fees} = nothing)
+    return has_fixed_target(r, fees) ? nothing : 1
 end
-function homogeneity_degree(r::SquaredRiskMeasures)
-    return has_fixed_target(r) ? nothing : 2
+function homogeneity_degree(r::SquaredRiskMeasures, fees::Option{<:Fees} = nothing)
+    return has_fixed_target(r, fees) ? nothing : 2
 end
-function homogeneity_degree(r::CubedRiskMeasures)
-    return has_fixed_target(r) ? nothing : 3
+function homogeneity_degree(r::CubedRiskMeasures, fees::Option{<:Fees} = nothing)
+    return has_fixed_target(r, fees) ? nothing : 3
 end
-function homogeneity_degree(r::FourthPowerRiskMeasures)
-    return has_fixed_target(r) ? nothing : 4
+function homogeneity_degree(r::FourthPowerRiskMeasures, fees::Option{<:Fees} = nothing)
+    return has_fixed_target(r, fees) ? nothing : 4
 end
-function homogeneity_degree(r::ScaleFreeRiskMeasures)
-    return has_fixed_target(r) ? nothing : 0
+function homogeneity_degree(r::ScaleFreeRiskMeasures, fees::Option{<:Fees} = nothing)
+    return has_fixed_target(r, fees) ? nothing : 0
 end
-function homogeneity_degree(r::RiskTrackingRiskMeasure)
+function homogeneity_degree(r::RiskTrackingRiskMeasure, fees::Option{<:Fees} = nothing)
     if has_fixed_target(r)
         return nothing
     end
-    return homogeneity_degree(r.r)
+    return homogeneity_degree(r.r, fees)
 end
-function homogeneity_degree(::Union{VarianceSkewKurtosis, RelativeDrawdownRiskMeasures})
+function homogeneity_degree(::Union{VarianceSkewKurtosis, RelativeDrawdownRiskMeasures},
+                            ::Option{<:Fees} = nothing)
     return nothing
 end
-function homogeneity_degree(r::RiskRatio)
-    return degree_difference(homogeneity_degree(r.r1), homogeneity_degree(r.r2))
+function homogeneity_degree(r::RiskRatio, fees::Option{<:Fees} = nothing)
+    return degree_difference(homogeneity_degree(r.r1, fees), homogeneity_degree(r.r2, fees))
 end
-function homogeneity_degree(r::NonOptimisationRiskRatio)
-    return degree_difference(scalarised_degree(r.r1, r.sca1),
-                             scalarised_degree(r.r2, r.sca2))
+function homogeneity_degree(r::NonOptimisationRiskRatio, fees::Option{<:Fees} = nothing)
+    return degree_difference(scalarised_degree(r.r1, r.sca1, fees),
+                             scalarised_degree(r.r2, r.sca2, fees))
 end
-function homogeneity_degree(r::MeanReturnRiskRatio)
+function homogeneity_degree(r::MeanReturnRiskRatio, fees::Option{<:Fees} = nothing)
     if !iszero(r.rf)
         return nothing
     end
-    return degree_difference(homogeneity_degree(r.rt), scalarised_degree(r.rk, r.sca))
+    return degree_difference(homogeneity_degree(r.rt, fees),
+                             scalarised_degree(r.rk, r.sca, fees))
 end
 """
     has_fixed_target(r::AbstractBaseRiskMeasure) -> Bool
+    has_fixed_target(r::AbstractBaseRiskMeasure, fees::Option{<:Fees}) -> Bool
     has_fixed_target(target) -> Bool
 
 Return `true` when the risk measure `r` measures a distance to a target that is not zero and does not scale with the portfolio weights.
 
-Such a measure is not homogeneous in the weights, so [`homogeneity_degree`](@ref) gives it no degree. A target that scales with the weights, such as the expected portfolio return ``\\boldsymbol{\\mu}^{\\intercal} \\boldsymbol{w}``, keeps the degree of the measure. The second form reads one target value.
+Such a measure is not homogeneous in the weights, so [`homogeneity_degree`](@ref) gives it no degree. A target that scales with the weights, such as the expected portfolio return ``\\boldsymbol{\\mu}^{\\intercal} \\boldsymbol{w}``, keeps the degree of the measure. The second form also reads the fees: a fee that does not scale with the weights moves the net returns by a fixed amount, so it is a fixed target of a measure that reads the net returns. The third form reads one target value. A [`Turnover`](@ref) fee is a distance to its previous weights.
 
 # Algorithm
 
  1. For a [`LowOrderMoment`](@ref), a [`HighOrderMoment`](@ref), a [`ThirdCentralMoment`](@ref) and a [`MedianAbsoluteDeviation`](@ref), read the Moment Target `mu`. A number is fixed when it is not zero. A [`VecScalar`](@ref) is fixed when its offset `s` is not zero.
  2. For a [`TrackingRiskMeasure`](@ref) and a [`RiskTrackingRiskMeasure`](@ref), read the benchmark `tr`. The weights of a [`WeightsTracking`](@ref) and the series of a [`ReturnsTracking`](@ref) are fixed when they are not zero. A vector `B` of a [`DataBenchmarkTracking`](@ref) is fixed when it is not zero, and so is an unbound `B`, whose target is not known. A matrix `B` gives the series ``\\mathbf{B} \\boldsymbol{w}``, which scales with the weights.
  3. For a [`TurnoverRiskMeasure`](@ref), the reference weights `w` are fixed when they are not zero.
- 4. Return `false` for every other measure and every other target value.
+ 4. For a [`Turnover`](@ref) fee, the previous weights `w` are fixed when an asset whose rate is not zero has a previous weight that is not zero.
+ 5. With `fees`, return `true` when step 1, 2 or 3 is `true`. Otherwise return `true` when `r` reads the fees, [`reads_fees`](@ref), and [`has_fixed_fee`](@ref) finds a fee that does not cancel from the risk of `r`, [`cancels_constant_fee`](@ref).
+ 6. Return `false` for every other measure and every other target value.
 
 # Arguments
 
   - $(arg_dict[:r])
+  - `fees`: The fees that the risk pays, or `nothing`.
   - `target`: The target value of a measure.
 
 # Returns
@@ -319,6 +366,12 @@ julia> PortfolioOptimisers.has_fixed_target(TrackingRiskMeasure(;
                                                                                      w = [0.5,
                                                                                           0.5])))
 true
+
+julia> PortfolioOptimisers.has_fixed_target(ConditionalValueatRisk(), Fees(; fl = 0.001))
+true
+
+julia> PortfolioOptimisers.has_fixed_target(Variance(), Fees(; fl = 0.001))
+false
 ```
 
 # Related
@@ -326,6 +379,9 @@ true
   - [`homogeneity_degree`](@ref)
   - [`calc_moment_target`](@ref)
   - [`tracking_benchmark`](@ref)
+  - [`has_fixed_fee`](@ref)
+  - [`reads_fees`](@ref)
+  - [`cancels_constant_fee`](@ref)
 """
 function has_fixed_target(r::Union{LoHiOrderMoment, ThirdCentralMoment,
                                    MedianAbsoluteDeviation})
@@ -336,6 +392,16 @@ function has_fixed_target(r::Union{TrackingRiskMeasure, RiskTrackingRiskMeasure}
 end
 function has_fixed_target(r::TurnoverRiskMeasure)
     return !iszero(r.w)
+end
+function has_fixed_target(r::AbstractBaseRiskMeasure, ::Nothing)
+    return has_fixed_target(r)
+end
+function has_fixed_target(r::AbstractBaseRiskMeasure, fees::Fees)
+    return has_fixed_target(r) ||
+           (reads_fees(r) && has_fixed_fee(fees, cancels_constant_fee(r)))
+end
+function has_fixed_target(tn::Turnover)
+    return !iszero(tn.val .* tn.w)
 end
 function has_fixed_target(mu::Number)
     return !iszero(mu)
@@ -356,9 +422,265 @@ function has_fixed_target(::Any)
     return false
 end
 """
-    scalarised_degree(r::BaseRM_VecBaseRM, sca::Scalariser) -> Option{<:Integer}
+    has_fixed_fee(fees::Option{<:Fees}, cancels::Bool) -> Bool
 
-Return the degree of homogeneity of one side of a ratio, which is one measure or a vector of measures that `sca` combines.
+Return `true` when `fees` holds a fee that does not scale with the portfolio weights and that does not cancel from the risk of a measure.
+
+A periodic fee falls on each observation. The term of a [`Turnover`](@ref) fee whose previous weights are not zero is such a fee, and so is the proportional liquidation charge `lq`, which does not read the weights at all. A one-off fee is a fixed fee `fl` or `fs`, or the fixed liquidation charge `flq`. It counts the positions, so it does not scale with the weights. The Fee Amortisation `fa` names its clock. [`AmortisedFees`](@ref) spreads it over each observation, so it is then a periodic fee. Otherwise it falls on the first observation alone.
+
+A periodic fee moves each net return by the same amount, so it cancels from the risk of a measure that a constant shift does not change. `cancels` states that property of the measure, from [`cancels_constant_fee`](@ref). A one-off fee on the first observation moves one return, and it cancels from no measure. A proportional fee `l` or `s`, and a turnover fee against zero weights, scale with the weights, so they are not fixed.
+
+# Algorithm
+
+ 1. Return `false` for a `nothing` `fees`.
+ 2. Get the flags `periodic` and `one_off` on the clock `fees.fa` with [`fixed_fee_terms`](@ref).
+ 3. Return `true` when `one_off` is `true`, or when `periodic` is `true` and `cancels` is `false`.
+
+# Arguments
+
+  - `fees`: The fees that the risk pays, or `nothing`.
+  - `cancels::Bool`: Whether a fee that every observation pays in the same amount cancels from the risk.
+
+# Returns
+
+  - `flag::Bool`: `true` when a fee that does not scale with the weights reaches the risk.
+
+# Examples
+
+```jldoctest
+julia> fees = Fees(; tn = Turnover(; w = [0.5, 0.5], val = 0.001));
+
+julia> PortfolioOptimisers.has_fixed_fee(fees, false),
+       PortfolioOptimisers.has_fixed_fee(fees, true)
+(true, false)
+
+julia> PortfolioOptimisers.has_fixed_fee(Fees(; fl = 0.001), true)
+true
+
+julia> PortfolioOptimisers.has_fixed_fee(Fees(; fl = 0.001, fa = AmortisedFees()), true)
+false
+
+julia> PortfolioOptimisers.has_fixed_fee(Fees(; l = 0.001), false)
+false
+```
+
+# Related
+
+  - [`has_fixed_target`](@ref)
+  - [`cancels_constant_fee`](@ref)
+  - [`fixed_fee_terms`](@ref)
+  - [`Fees`](@ref)
+  - [`AmortisedFees`](@ref)
+  - [`charge_fees`](@ref)
+"""
+function has_fixed_fee(::Nothing, ::Bool)
+    return false
+end
+function has_fixed_fee(fees::Fees, cancels::Bool)
+    periodic, one_off = fixed_fee_terms(fees, fees.fa)
+    return one_off || (!cancels && periodic)
+end
+"""
+    fixed_fee_terms(fees::Fees, fa::Option{<:AbstractFeeAmortisation}) -> Tuple{Bool, Bool}
+
+Return the pair `(periodic, one_off)`: whether `fees` holds a fee that does not scale with the portfolio weights and falls on each observation, and whether it holds one that falls on the first observation alone.
+
+[`has_fixed_fee`](@ref) reads the pair. The Fee Amortisation `fa` is the clock of the one-off terms, so it decides which flag they set.
+
+# Algorithm
+
+ 1. Set `periodic` when [`has_fixed_target`](@ref) of `fees.tn` is `true`, or when the charge of `fees.lq` from [`calc_liquidation_fees`](@ref) is not zero.
+ 2. Set `one_off` when a rate `fees.fl` or `fees.fs` is not zero, or when the charge of `fees.flq` from [`calc_fixed_liquidation_fees`](@ref) is not zero. A `nothing` rate is zero.
+ 3. Under [`AmortisedFees`](@ref), the one-off terms fall on each observation, so return `(periodic || one_off, false)`. Otherwise return `(periodic, one_off)`.
+
+# Arguments
+
+  - `fees::Fees`: The fees that the risk pays.
+  - `fa`: The Fee Amortisation of `fees`.
+
+# Returns
+
+  - `(periodic, one_off)::Tuple{Bool, Bool}`: The two flags.
+
+# Related
+
+  - [`has_fixed_fee`](@ref)
+  - [`AmortisedFees`](@ref)
+  - [`FirstObservationFees`](@ref)
+"""
+function fixed_fee_terms(fees::Fees, ::Union{Nothing, FirstObservationFees})
+    periodic = has_fixed_target(fees.tn) || !iszero(calc_liquidation_fees(fees.lq))
+    one_off = any(!iszero,
+                  (something(fees.fl, false), something(fees.fs, false),
+                   calc_fixed_liquidation_fees(fees.flq, fees.kwargs)))
+    return (periodic, one_off)
+end
+function fixed_fee_terms(fees::Fees, ::AmortisedFees)
+    periodic, one_off = fixed_fee_terms(fees, nothing)
+    return (periodic || one_off, false)
+end
+"""
+    reads_fees(r::AbstractBaseRiskMeasure) -> Bool
+    reads_fees(kind::RiskInputKind) -> Bool
+
+Return `true` when the risk of the measure `r` reads the fees.
+
+The input kind of `r`, from [`risk_input_kind`](@ref), gives the default. A [`WeightsInput`](@ref) measure reads the weights alone, so it does not read the fees. A [`NetReturnsInput`](@ref) and a [`WeightsReturnsFeesInput`](@ref) measure read them. Three measures take the fees and do not read them, because their risk reads the moments of a prior: [`VarianceSkewKurtosis`](@ref), and a [`ValueatRisk`](@ref) and a [`ValueatRiskRange`](@ref) with [`DistributionValueatRisk`](@ref). A [`GenericValueatRiskRange`](@ref) reads the fees when one of its tails reads them.
+
+# Arguments
+
+  - $(arg_dict[:r])
+  - `kind::RiskInputKind`: The input kind of a measure.
+
+# Returns
+
+  - `flag::Bool`: `true` when the risk reads the fees.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.reads_fees(ConditionalValueatRisk())
+true
+
+julia> PortfolioOptimisers.reads_fees(Variance())
+false
+```
+
+# Related
+
+  - [`has_fixed_target`](@ref)
+  - [`risk_input_kind`](@ref)
+  - [`RiskInputKind`](@ref)
+"""
+function reads_fees(r::AbstractBaseRiskMeasure)
+    return reads_fees(risk_input_kind(r))
+end
+function reads_fees(::RiskInputKind)
+    return true
+end
+function reads_fees(::WeightsInput)
+    return false
+end
+function reads_fees(::Union{VarianceSkewKurtosis,
+                            ValueatRisk{<:Any, <:Any, <:Any, <:DistributionValueatRisk},
+                            ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
+                                             <:DistributionValueatRisk}})
+    return false
+end
+function reads_fees(r::GenericValueatRiskRange)
+    return reads_fees(r.loss) || reads_fees(r.gain)
+end
+"""
+    cancels_constant_fee(r::AbstractBaseRiskMeasure) -> Bool
+
+Return `true` when the risk of the measure `r` does not change when the same number is added to each net return.
+
+A fee that every observation pays in the same amount is such a number, so it cancels from the risk, and [`has_fixed_fee`](@ref) does not count it. A measure that no other method names returns `false`. A tail measure, a drawdown and a tracking error move with the number.
+
+# Algorithm
+
+ 1. Return `true` for a member of [`ShiftInvariantRiskMeasures`](@ref).
+ 2. For a [`LowOrderMoment`](@ref), a [`HighOrderMoment`](@ref), a [`ThirdCentralMoment`](@ref) and a [`MedianAbsoluteDeviation`](@ref), return `true` when the Moment Target `mu` is not a number. The mean or the median of the net returns moves with the number. A per-asset target is net of the mean fee per period, [`moment_target_fees`](@ref), so it moves too. A number is a threshold on the net returns, and it does not move.
+ 3. For a [`GenericValueatRiskRange`](@ref), return `true` when both tails read the fees, [`reads_fees`](@ref). A tail with [`DistributionValueatRisk`](@ref) does not move, so the other tail does not cancel.
+ 4. For an [`OrderedWeightsArray`](@ref), return `true` when its weights sum to zero, from [`sums_to_zero`](@ref). A number ``c`` moves the risk by ``c`` times the sum of the weights. For an [`OrderedWeightsArrayRange`](@ref), return `true` when `w2` is `reverse ∘ w1`, the default of a weight function, because the two tails then hold the same sum. Otherwise apply the vector rule to `w1 - w2`. A weight function gives the weights of the observation count, which this function does not read, so a range of two other weight functions returns `false`.
+ 5. Return `false` for every other measure.
+
+# Arguments
+
+  - $(arg_dict[:r])
+
+# Returns
+
+  - `flag::Bool`: `true` when a constant shift of the net returns cancels from the risk.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.cancels_constant_fee(LowOrderMoment())
+true
+
+julia> PortfolioOptimisers.cancels_constant_fee(LowOrderMoment(; mu = 0.0))
+false
+
+julia> PortfolioOptimisers.cancels_constant_fee(ConditionalValueatRiskRange())
+true
+
+julia> PortfolioOptimisers.cancels_constant_fee(ConditionalValueatRisk())
+false
+```
+
+# Related
+
+  - [`has_fixed_fee`](@ref)
+  - [`ShiftInvariantRiskMeasures`](@ref)
+  - [`moment_target_fees`](@ref)
+"""
+function cancels_constant_fee(::AbstractBaseRiskMeasure)
+    return false
+end
+function cancels_constant_fee(::ShiftInvariantRiskMeasures)
+    return true
+end
+function cancels_constant_fee(r::Union{LoHiOrderMoment, ThirdCentralMoment,
+                                       MedianAbsoluteDeviation})
+    return !isa(r.mu, Number)
+end
+function cancels_constant_fee(r::GenericValueatRiskRange)
+    return reads_fees(r.loss) && reads_fees(r.gain)
+end
+function cancels_constant_fee(r::OrderedWeightsArray)
+    return sums_to_zero(r.w)
+end
+function cancels_constant_fee(r::OrderedWeightsArrayRange)
+    return r.w2 == reverse ∘ r.w1 || sums_to_zero(r.w1, r.w2)
+end
+"""
+    sums_to_zero(w::VecNum) -> Bool
+    sums_to_zero(f) -> Bool
+    sums_to_zero(w1, w2) -> Bool
+
+Return `true` when the OWA weights `w`, or the weights that the builder `f` gives at each observation count, sum to zero. The third form tests `w1 - w2` when both are vectors, and returns `false` otherwise.
+
+The vector test is `isapprox(s + sum(w), s)` with `s = sum(abs, w)`, so it takes the default tolerance of the element type. A floating point vector passes at a sum near the rounding error of `s`, and an exact type, such as a `Rational`, passes only at an exact zero.
+
+A builder gives the weights of the observation count ``T``, and this function does not read ``T``. [`owa_gmd`](@ref), [`owa_rg`](@ref), [`owa_cvarrg`](@ref), [`owa_tgrg`](@ref) and [`owa_l_moment`](@ref), called with ``T`` alone, give weights whose sum is zero at each ``T``. Every other builder returns `false`, because its sum can be a number that is not zero, or can change with ``T``.
+
+# Arguments
+
+  - `w::VecNum`: The weights.
+  - `f`: A weight builder.
+  - `w1`, `w2`: The weights of the two tails of a range, or their builders.
+
+# Returns
+
+  - `flag::Bool`: `true` when the weights sum to zero.
+
+# Related
+
+  - [`cancels_constant_fee`](@ref)
+  - [`OWA_Func_VecNum`](@ref)
+"""
+function sums_to_zero(w::VecNum)
+    s = sum(abs, w)
+    return isapprox(s + sum(w), s)
+end
+function sums_to_zero(::Union{typeof(owa_gmd), typeof(owa_rg), typeof(owa_cvarrg),
+                              typeof(owa_tgrg), typeof(owa_l_moment)})
+    return true
+end
+function sums_to_zero(::Any)
+    return false
+end
+function sums_to_zero(w1::VecNum, w2::VecNum)
+    return sums_to_zero(w1 - w2)
+end
+function sums_to_zero(::Any, ::Any)
+    return false
+end
+"""
+    scalarised_degree(r::BaseRM_VecBaseRM, sca::Scalariser, fees::Option{<:Fees} = nothing) -> Option{<:Integer}
+
+Return the degree of homogeneity of one side of a ratio, which is one measure or a vector of measures that `sca` combines, under the fees `fees`.
 
 A single measure ignores `sca`. A vector has the common degree of its elements under [`SumScalariser`](@ref), [`MaxScalariser`](@ref) and [`MinScalariser`](@ref). It has no degree when two elements have different degrees, or under [`LogSumExpScalariser`](@ref), which is not homogeneous.
 
@@ -366,6 +688,7 @@ A single measure ignores `sca`. A vector has the common degree of its elements u
 
   - $(arg_dict[:r])
   - `sca::Scalariser`: Scalariser of the side.
+  - `fees`: The fees that the risk pays, or `nothing`.
 
 # Returns
 
@@ -376,15 +699,16 @@ A single measure ignores `sca`. A vector has the common degree of its elements u
   - [`homogeneity_degree`](@ref)
   - [`degree_difference`](@ref)
 """
-function scalarised_degree(r::AbstractBaseRiskMeasure, ::Scalariser)
-    return homogeneity_degree(r)
+function scalarised_degree(r::AbstractBaseRiskMeasure, ::Scalariser,
+                           fees::Option{<:Fees} = nothing)
+    return homogeneity_degree(r, fees)
 end
-function scalarised_degree(::VecBaseRM, ::LogSumExpScalariser)
+function scalarised_degree(::VecBaseRM, ::LogSumExpScalariser, ::Option{<:Fees} = nothing)
     return nothing
 end
-function scalarised_degree(rs::VecBaseRM, ::Scalariser)
-    d = homogeneity_degree(first(rs))
-    return all(r -> homogeneity_degree(r) == d, rs) ? d : nothing
+function scalarised_degree(rs::VecBaseRM, ::Scalariser, fees::Option{<:Fees} = nothing)
+    d = homogeneity_degree(first(rs), fees)
+    return all(r -> homogeneity_degree(r, fees) == d, rs) ? d : nothing
 end
 """
     degree_difference(d1, d2) -> Option{<:Integer}
@@ -414,9 +738,9 @@ function degree_difference(::Any, ::Any)
     return nothing
 end
 """
-    adjust_risk_contribution(r::AbstractBaseRiskMeasure, val::Number) -> Number
+    adjust_risk_contribution(r::AbstractBaseRiskMeasure, val::Number, fees::Option{<:Fees} = nothing) -> Number
 
-Divide the risk `val` of the measure `r` by the degree of homogeneity of `r`.
+Divide the risk `val` of the measure `r` by the degree of homogeneity of `r` under the fees `fees`.
 
 By Euler's theorem, the gradient of the divided risk, multiplied by the weights, sums to the risk. [`adjusted_risk`](@ref) calls this function, and [`risk_contribution`](@ref) differentiates the result. A measure of degree 0, and a measure with no degree, keep `val` unchanged.
 
@@ -443,6 +767,7 @@ Where:
 
   - $(arg_dict[:r])
   - `val::Number`: Risk of `r` at the weights.
+  - `fees`: The fees that the risk pays, or `nothing`.
 
 # Returns
 
@@ -464,8 +789,9 @@ julia> PortfolioOptimisers.adjust_risk_contribution(EqualRisk(), 0.5)
   - [`adjusted_risk`](@ref)
   - [`risk_contribution`](@ref)
 """
-function adjust_risk_contribution(r::AbstractBaseRiskMeasure, val::Number)
-    d = homogeneity_degree(r)
+function adjust_risk_contribution(r::AbstractBaseRiskMeasure, val::Number,
+                                  fees::Option{<:Fees} = nothing)
+    d = homogeneity_degree(r, fees)
     if isnothing(d) || iszero(d)
         return val
     end

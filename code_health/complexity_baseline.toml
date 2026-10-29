@@ -5,7 +5,7 @@
 julia = "1.13.3"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "3f6c9b3deb"
+commit = "104a451b4f"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { cyc = 5, cog = 7, arg = 8, cyc_sum = 53, cog_sum = 57, arg_sum = 99, macros = [] }
@@ -301,7 +301,7 @@ commit = "3f6c9b3deb"
 "src/16_RiskMeasures/20_EqualRiskMeasure.jl" = { cyc = 1, cog = 1, arg = 1, cyc_sum = 4, cog_sum = 1, arg_sum = 3, macros = [] }
 "src/16_RiskMeasures/21_MedianAbsoluteDeviationRisk.jl" = { cyc = 3, cog = 3, arg = 4, cyc_sum = 24, cog_sum = 6, arg_sum = 48, macros = ["@propagatable"] }
 "src/16_RiskMeasures/22_NonOptimisationRiskMeasures.jl" = { cyc = 3, cog = 3, arg = 5, cyc_sum = 31, cog_sum = 12, arg_sum = 50, macros = ["@propagatable"] }
-"src/16_RiskMeasures/23_AdjustRiskContributions.jl" = { cyc = 3, cog = 2, arg = 2, cyc_sum = 19, cog_sum = 7, arg_sum = 21, macros = [] }
+"src/16_RiskMeasures/23_AdjustRiskContributions.jl" = { cyc = 3, cog = 3, arg = 3, cyc_sum = 68, cog_sum = 37, arg_sum = 76, macros = [] }
 "src/16_RiskMeasures/24_ExpectedRisk.jl" = { cyc = 3, cog = 4, arg = 10, cyc_sum = 95, cog_sum = 48, arg_sum = 349, macros = [] }
 "src/16_RiskMeasures/25_RiskMeasureTools.jl" = { cyc = 2, cog = 2, arg = 3, cyc_sum = 31, cog_sum = 9, arg_sum = 43, macros = [] }
 "src/16_RiskMeasures/26_WorstCaseDistribution.jl" = { cyc = 2, cog = 3, arg = 7, cyc_sum = 36, cog_sum = 16, arg_sum = 155, macros = [] }

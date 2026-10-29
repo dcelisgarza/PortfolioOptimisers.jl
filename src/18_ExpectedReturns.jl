@@ -934,26 +934,30 @@ function needs_previous_weights(r::ExpectedReturnRiskRatio)
     return needs_previous_weights(r.rk)
 end
 """
-    homogeneity_degree(rt::JuMPReturnsEstimator) -> Option{<:Integer}
-    homogeneity_degree(rt::VecJRE) -> Option{<:Integer}
-    homogeneity_degree(r::ExpectedReturn) -> Option{<:Integer}
-    homogeneity_degree(r::ExpectedReturnRiskRatio) -> Option{<:Integer}
+    homogeneity_degree(rt::JuMPReturnsEstimator, fees::Option{<:Fees} = nothing) -> Option{<:Integer}
+    homogeneity_degree(rt::VecJRE, fees::Option{<:Fees} = nothing) -> Option{<:Integer}
+    homogeneity_degree(r::ExpectedReturn, fees::Option{<:Fees} = nothing) -> Option{<:Integer}
+    homogeneity_degree(r::ExpectedReturnRiskRatio, fees::Option{<:Fees} = nothing) -> Option{<:Integer}
 
-Return the degree of homogeneity of a return estimator in the portfolio weights, and of the two measures that read one.
+Return the degree of homogeneity of a return estimator in the portfolio weights, under the fees `fees`, and of the two measures that read one.
 
 The arithmetic return ``\\boldsymbol{\\mu}^{\\intercal} \\boldsymbol{w}`` has degree 1. The logarithmic return ``\\mathbb{E}[\\log(1 + \\boldsymbol{x}^{\\intercal} \\boldsymbol{w})]`` is not homogeneous, so it has no degree. A vector of return estimators sums its terms whose `settings.rte` is `true`, so it has no degree when one of those terms has none.
 
+A term whose `settings.fee` is `true` subtracts the fees, through [`term_fees`](@ref). A fee that does not scale with the weights, from [`has_fixed_fee`](@ref), then takes the degree from the term. A constant shift moves the return, so no such fee cancels. [`NoReturn`](@ref) charges no fee.
+
 # Algorithm
 
- 1. Return `nothing` for [`LogarithmicReturn`](@ref), and `1` for every other return estimator.
- 2. For a vector, return `nothing` when a term whose `settings.rte` is `true` has no degree. Otherwise return `1`.
- 3. For [`ExpectedReturn`](@ref), return the degree of `rt`.
- 4. For [`ExpectedReturnRiskRatio`](@ref), return `nothing` when `rf` is not zero. Otherwise subtract the degree of `rk`, from [`scalarised_degree`](@ref), from the degree of `rt` with [`degree_difference`](@ref).
+ 1. Return `nothing` for [`LogarithmicReturn`](@ref), and `1` for [`NoReturn`](@ref).
+ 2. For every other return estimator, return `nothing` when `settings.fee` is `true` and [`has_fixed_fee`](@ref) finds a fee. Otherwise return `1`.
+ 3. For a vector, return `nothing` when a term whose `settings.rte` is `true` has no degree. Otherwise return `1`.
+ 4. For [`ExpectedReturn`](@ref), return the degree of `rt`.
+ 5. For [`ExpectedReturnRiskRatio`](@ref), return `nothing` when `rf` is not zero. Otherwise subtract the degree of `rk`, from [`scalarised_degree`](@ref), from the degree of `rt` with [`degree_difference`](@ref).
 
 # Arguments
 
   - `rt`: Return estimator, or a vector of them.
   - $(arg_dict[:r])
+  - `fees`: The fees that the return pays, or `nothing`.
 
 # Returns
 
@@ -963,6 +967,8 @@ The arithmetic return ``\\boldsymbol{\\mu}^{\\intercal} \\boldsymbol{w}`` has de
 
 ```jldoctest
 julia> PortfolioOptimisers.homogeneity_degree(ExpectedReturn(; rt = LogarithmicReturn()))
+
+julia> PortfolioOptimisers.homogeneity_degree(ExpectedReturn(), Fees(; fl = 0.001))
 
 julia> PortfolioOptimisers.homogeneity_degree(ExpectedReturnRiskRatio())
 -1
@@ -974,27 +980,36 @@ julia> PortfolioOptimisers.homogeneity_degree(ExpectedReturnRiskRatio(; rk = Sta
 # Related
 
   - [`homogeneity_degree`](@ref)
+  - [`has_fixed_fee`](@ref)
   - [`expected_return`](@ref)
   - [`ExpectedReturn`](@ref)
   - [`ExpectedReturnRiskRatio`](@ref)
 """
-function homogeneity_degree(::JuMPReturnsEstimator)
+function homogeneity_degree(rt::JuMPReturnsEstimator, fees::Option{<:Fees} = nothing)
+    return rt.settings.fee && has_fixed_fee(fees, false) ? nothing : 1
+end
+function homogeneity_degree(::NoReturn, ::Option{<:Fees} = nothing)
     return 1
 end
-function homogeneity_degree(::LogarithmicReturn)
+function homogeneity_degree(::LogarithmicReturn, ::Option{<:Fees} = nothing)
     return nothing
 end
-function homogeneity_degree(rt::VecJRE)
-    return any(r -> r.settings.rte && isnothing(homogeneity_degree(r)), rt) ? nothing : 1
+function homogeneity_degree(rt::VecJRE, fees::Option{<:Fees} = nothing)
+    return if any(r -> r.settings.rte && isnothing(homogeneity_degree(r, fees)), rt)
+        nothing
+    else
+        1
+    end
 end
-function homogeneity_degree(r::ExpectedReturn)
-    return homogeneity_degree(r.rt)
+function homogeneity_degree(r::ExpectedReturn, fees::Option{<:Fees} = nothing)
+    return homogeneity_degree(r.rt, fees)
 end
-function homogeneity_degree(r::ExpectedReturnRiskRatio)
+function homogeneity_degree(r::ExpectedReturnRiskRatio, fees::Option{<:Fees} = nothing)
     if !iszero(r.rf)
         return nothing
     end
-    return degree_difference(homogeneity_degree(r.rt), scalarised_degree(r.rk, r.sca))
+    return degree_difference(homogeneity_degree(r.rt, fees),
+                             scalarised_degree(r.rk, r.sca, fees))
 end
 """
     const PerfRM = Union{MeanReturn, MeanReturnRiskRatio, ExpectedReturn,
