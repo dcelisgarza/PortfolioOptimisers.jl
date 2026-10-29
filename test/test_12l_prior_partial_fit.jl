@@ -615,16 +615,17 @@ end
         end
         @test pe.sample_buffer(partial_fit!(pe.PriorCarryState(), permutedims(X); dims = 2)) ==
               X
-        # The identity holds for `ens` under a Scenario Cap, on both arms: it reads the
+        # The identity holds for `eoc` under a Scenario Cap, on both arms: it reads the
         # number of observations folded, not the number of rows carried.
         for est in (EmpiricalPrior(; max_scenarios = 25),
                     EmpiricalPrior(; horizon = 21, max_scenarios = 25))
             o = prior(fold(est, X))
             b = prior(est, X)
-            @test o.ens == b.ens == 80
+            @test o.eoc == b.eoc == (80, 80)
             @test o.X == b.X
         end
-        @test isnothing(prior(fold(EmpiricalPrior(; max_scenarios = 500), X)).ens)
+        @test prior(fold(EmpiricalPrior(; max_scenarios = 500), X)).eoc ==
+              (nothing, nothing)
         # The horizon arm refits a member that does not fold on the log rows it would have
         # folded, and carries the arithmetic rows.
         semi = EmpiricalPrior(; horizon = 21,

@@ -328,7 +328,7 @@ Compute Bayesian Black-Litterman prior moments for asset returns.
 
 `prior` fits the wrapped factor prior, and it updates the factor distribution with the factor views by Bayes' rule. The asset moments are the posterior predictive distribution of the factor model.
 
-When `pe.tau` is `nothing`, the blending parameter is `1/T`, where `T` is the number of observations of the oriented `F`. `pe.rf` reaches the result once, on the posterior asset expected returns. [`apply_rf`](@ref) owns that rule, and the factor block never carries the rate. This is the one Black-Litterman member that does not call [`vanilla_posteriors`](@ref). Its update is the conditional posterior of the factor parameter. The asset moments are a posterior predictive distribution, not a second run of the master equations.
+When `pe.tau` is `nothing`, the blending parameter is `1/T`, where `T` is the effective number of observations of the factor mean, `pr.fpr.eoc[1]` of the wrapped prior. It is the number of observations of the oriented `F` when the factor prior states no count. `pe.rf` reaches the result once, on the posterior asset expected returns. [`apply_rf`](@ref) owns that rule, and the factor block never carries the rate. This is the one Black-Litterman member that does not call [`vanilla_posteriors`](@ref). Its update is the conditional posterior of the factor parameter. The asset moments are a posterior predictive distribution, not a second run of the master equations.
 
 # Mathematical definition
 
@@ -392,13 +392,13 @@ The estimator checks the width of ``\\mathbf{P}``. A precomputed [`BlackLitterma
  3. Fit the wrapped prior `pe.pe` on `(X, F)`. The result is `prior_result`. [`bbl_posterior`](@ref) does the rest of this step and steps 4 to 16. So the refit of [`scenario_prior`](@ref) under new scenario weights uses the same code to blend the views into the refit `prior_result`. Check that `prior_result` carries a regression with [`assert_prior_regression`](@ref).
  4. Find the Investable Mask with [`investable_mask`](@ref), and view the fitted prior at the mask with [`investable_prior`](@ref). This step uses the mask alone, not [`investable_views`](@ref). The views apply to the factors, so this member needs no Non-Investable Axis and reads no asset universe.
  5. Read `posterior_X`, `prior_sigma`, `fpr` and `rr` from the *reduced* prior. Refuse an `rr` that states a re-based Factor Family through [`has_family_rebasis`](@ref).
- 6. Make the views and their uncertainty with [`bl_preroll`](@ref), over the **factor** prior covariance and `size(F, 1)` observations. Read `P`, `Q` and `omega` from the result with [`bl_view_block`](@ref). The axis is `:tfkey`, because these views apply to the factors. A view set with no row left gives a `0 × K` block. The steps below then give the moments of the factor model of this member, and these are *not* the moments of the wrapped prior. See the note under `bl_view_block`.
+ 6. Make the views and their uncertainty with [`bl_preroll`](@ref), over the **factor** prior covariance and the count of the factor mean from [`moment_observation_count`](@ref). Read `P`, `Q` and `omega` from the result with [`bl_view_block`](@ref). The axis is `:tfkey`, because these views apply to the factors. A view set with no row left gives a `0 × K` block. The steps below then give the moments of the factor model of this member, and these are *not* the moments of the wrapped prior. See the note under `bl_view_block`.
  7. Build the posterior factor precision ``\\mathbf{H}`` as `sigma_hat`.
  8. Solve `sigma_hat` against the sum of the two precision-weighted means. The result is `mu_hat`, the posterior factor mean ``\\bar{\\boldsymbol{\\Pi}}_f``.
  9. Build the posterior asset covariance `posterior_sigma` from ``\\mathbf{H}``, the loadings and `prior_sigma`.
 10. Build the posterior asset mean from the same quantities, add `rr.b`, and add `pe.rf` with [`apply_rf`](@ref). This is the one site that adds the rate.
-11. Process `posterior_sigma` in place with [`matrix_processing!`](@ref), under `pe.mp` and `posterior_X`. This step comes after step 10, so `pe.mp` does not change the mean.
-12. Invert `sigma_hat` for the posterior factor covariance ``\\bar{\\mathbf{\\Sigma}}_f``, and process it in place under `pe.f_mp` and `F`.
+11. Process `posterior_sigma` in place with [`sample_matrix_processing!`](@ref), under `pe.mp`, `posterior_X` and the count of the covariance of the prior from [`moment_observation_count`](@ref). This step comes after step 10, so `pe.mp` does not change the mean.
+12. Invert `sigma_hat` for the posterior factor covariance ``\\bar{\\mathbf{\\Sigma}}_f``, and process it in place under `pe.f_mp`, `F` and the count of the factor covariance.
 13. Forward the factor block with [`forward_prior`](@ref). Replace `mu` and `sigma` with the posterior factor pair, and drop `chol`. Do not expand the block, because the reduction did not change the factor axis.
 14. Announce the departures once with [`announce_bl_departures`](@ref). [`investable_universe_names`](@ref) gives their names.
 15. Write both asset posteriors back onto the full asset universe with [`expand_moment`](@ref). A non-investable asset then carries `NaN` in `mu` and on the diagonal of `sigma`.
@@ -542,8 +542,10 @@ function bbl_posterior(pe::BayesianBlackLittermanPrior, prior_result::AbstractPr
     # `pe.sets` goes through unreduced and unminted: the views resolve against `tfkey`, and
     # the reduction took asset columns, which that universe does not describe. No ledger
     # either — nothing on this path can drop a view row.
-    blp = bl_preroll(pe.views, pe.sets, pe.views_conf, f_sigma, pe.tau, size(F, 1),
-                     eltype(posterior_X), strict, :tfkey)
+    # The default `tau` is one over the count of the factor mean, which the factor prior
+    # states, and not one over the rows of `F` (#1893).
+    blp = bl_preroll(pe.views, pe.sets, pe.views_conf, f_sigma, pe.tau,
+                     moment_observation_count(fpr, 1), eltype(posterior_X), strict, :tfkey)
     # A view set with no row left takes an empty block rather than the prior pair, and this
     # is the one member where that is the *right* answer rather than a stacking convenience.
     # The update below is a precision sum — `sigma_hat = inv(f_sigma) + P'Ω⁻¹P` — so a
@@ -569,7 +571,10 @@ function bbl_posterior(pe::BayesianBlackLittermanPrior, prior_result::AbstractPr
     posterior_mu = apply_rf(pe.rf, posterior_sigma * v1 * (v2 \ sigma_hat) * mu_hat + b)
     # The mean reads the unprocessed covariance, as in the other three members, so `pe.mp`
     # changes the covariance alone and `mu == rr.M * fpr.mu + rr.b + rf` holds under it.
-    matrix_processing!(pe.mp, posterior_sigma, posterior_X; kwargs...)
+    # The posterior is assembled from the moments of the prior, so the denoiser reads the
+    # count of the covariance of the prior (#1893).
+    sample_matrix_processing!(pe.mp, posterior_sigma, posterior_X,
+                              moment_observation_count(prior_result, 2); kwargs...)
     # The views land on the *factors*, so `mu_hat` and `sigma_hat` are the posterior factor
     # moments — `sigma_hat` is a precision (`inv(f_sigma) + P'Ω⁻¹P`), so the covariance is its
     # inverse. Reporting them rather than the prior ones is what makes this prior result
@@ -579,7 +584,8 @@ function bbl_posterior(pe::BayesianBlackLittermanPrior, prior_result::AbstractPr
     # `pe.f_mp` processes the factor block for the same reason `pe.mp` processes the asset one,
     # and is separate for the same reason `FactorBlackLittermanPrior` keeps the two apart.
     f_posterior_sigma = sigma_hat \ LinearAlgebra.I
-    matrix_processing!(pe.f_mp, f_posterior_sigma, F; kwargs...)
+    sample_matrix_processing!(pe.f_mp, f_posterior_sigma, F,
+                              moment_observation_count(fpr, 2); kwargs...)
     # `chol` is the factor block's only drop — `f_posterior_sigma` supersedes the covariance it
     # factorises. The views do not touch the observation axis, so the factor prior's `w` and
     # that weighting's diagnostics forward untouched (ADR 0046).

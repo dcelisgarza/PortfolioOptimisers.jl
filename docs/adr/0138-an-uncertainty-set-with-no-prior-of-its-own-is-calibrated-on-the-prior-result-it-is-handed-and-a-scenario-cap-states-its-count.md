@@ -229,3 +229,15 @@ rows share one definition. The regularisation sites state no `n`. The three radi
 Every number without a cap stays the same. With no cap and no weights, both counts are
 `size(pr.X, 1)`. With weights, both counts are the Kish count of the weights. A capped fit is
 `dev`-only. `RateRadius` keeps `ens` and ignores `n`, for the reason that its docstring states.
+
+## Amendment (2026-10-29)
+
+[#1893](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1893) moved the count of a
+Scenario Cap out of `ens`. ADR 0224 states the decision. A prior result now states the effective
+count of each moment in a new field `eoc`, and `ens` is a diagnostic of the weights `w` alone.
+`EmpiricalPrior` writes the number of observations of the fit in each entry of `eoc` when
+`max_scenarios` cuts, through `scenario_moment_counts`, which replaces `scenario_ens`.
+`effective_sample_size` reads the smaller count of the mean and of the covariance in `eoc` beside
+no `w`, where it read `ens` beside no `w`. `choose_scaling_parameter` of the normal set reads the
+count of the moment of the set in `eoc`, and no longer reads `pr.ens`. With no cap and no weights,
+every number stays the same.

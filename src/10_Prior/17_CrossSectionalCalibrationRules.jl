@@ -1118,9 +1118,10 @@ SystematicRepair()
 struct SystematicRepair <: AbstractSystematicRepair end
 """
     systematic_processing!(srep::SystematicRepair, mp::AbstractMatrixProcessingEstimator,
-                           sigma::MatNum, X::MatNum; kwargs...) -> MatNum
+                           sigma::MatNum, X::MatNum, T::Real = size(X, 1);
+                           kwargs...) -> MatNum
     systematic_processing!(::Nothing, mp::MatrixProcessing, sigma::MatNum,
-                           X::MatNum; kwargs...) -> MatNum
+                           X::MatNum, T::Real = size(X, 1); kwargs...) -> MatNum
 
 Processes the systematic block of the lift of a [`CrossSectionalFactorPrior`](@ref) in place, under the Systematic Repair rule `srep`.
 
@@ -1130,8 +1131,8 @@ Processes the systematic block of the lift of a [`CrossSectionalFactorPrior`](@r
 
 The method that Julia selects is the algorithm.
 
- 1. [`SystematicRepair`](@ref): run [`matrix_processing!`](@ref) of `mp` on `sigma`, every step included.
- 2. `nothing`: run [`matrix_processing_step!`](@ref) for each step of `mp.order` except `:pdm`, in that order. Then replace `sigma` by its symmetric part ``(\\boldsymbol{\\Sigma} + \\boldsymbol{\\Sigma}^{\\intercal}) / 2``. The product of the loadings and the factor covariance is symmetric only to rounding, and [`posdef!`](@ref) accepts the sum without a repair only when it is exactly symmetric.
+ 1. [`SystematicRepair`](@ref): run [`sample_matrix_processing!`](@ref) of `mp` on `sigma` with `T`, every step included.
+ 2. `nothing`: run [`matrix_processing_step!`](@ref) with `T` for each step of `mp.order` except `:pdm`, in that order. Then replace `sigma` by its symmetric part ``(\\boldsymbol{\\Sigma} + \\boldsymbol{\\Sigma}^{\\intercal}) / 2``. The product of the loadings and the factor covariance is symmetric only to rounding, and [`posdef!`](@ref) accepts the sum without a repair only when it is exactly symmetric.
 
 # Arguments
 
@@ -1139,6 +1140,7 @@ The method that Julia selects is the algorithm.
   - `mp`: Matrix processing estimator. `nothing` reads its steps one by one, so it takes a [`MatrixProcessing`](@ref) alone.
   - `sigma`: The systematic block, `investable assets × investable assets`.
   - `X`: The asset return scenarios of the investable assets, `scenarios × investable assets`.
+  - `T`: The effective number of observations of the factor covariance that the block projects, which the denoising step reads. [`cross_sectional_lift`](@ref) passes the count that the factor prior states. It is `size(X, 1)` by default.
   - `kwargs...`: Additional keyword arguments passed to the steps of `mp`.
 
 # Returns
@@ -1152,13 +1154,11 @@ The method that Julia selects is the algorithm.
   - [`matrix_processing!`](@ref)
 """
 function systematic_processing!(::SystematicRepair, mp::AbstractMatrixProcessingEstimator,
-                                sigma::MatNum, X::MatNum; kwargs...)
-    return matrix_processing!(mp, sigma, X; kwargs...)
+                                sigma::MatNum, X::MatNum, T::Real = size(X, 1); kwargs...)
+    return sample_matrix_processing!(mp, sigma, X, T; kwargs...)
 end
-function systematic_processing!(::Nothing, mp::MatrixProcessing, sigma::MatNum, X::MatNum;
-                                kwargs...)
-    # The block is assembled from a model, so its count is the row count of `X` (#1893).
-    T = size(X, 1)
+function systematic_processing!(::Nothing, mp::MatrixProcessing, sigma::MatNum, X::MatNum,
+                                T::Real = size(X, 1); kwargs...)
     for step in mp.order
         if step !== :pdm
             matrix_processing_step!(Val(step), mp, sigma, X, T; kwargs...)

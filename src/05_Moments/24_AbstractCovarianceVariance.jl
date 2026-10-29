@@ -351,13 +351,16 @@ function variance_count(::AbstractVarianceEstimator, ::MatNum)::Nothing
 end
 """
     effective_observation_count(ce::StatsBase.CovarianceEstimator, X::MatNum) -> Real
+    effective_observation_count(me::AbstractExpectedReturnsEstimator, X::MatNum) -> Real
     effective_observation_count(ce) -> Real
     effective_observation_count(ce, state::AbstractPartialFitState) -> Real
     effective_observation_count(ce, state::SampleBufferState) -> Real
 
-Return the number of observations that the covariance of `ce` is worth, as one number for the whole matrix.
+Return the number of observations that the covariance of `ce`, or the mean of `me`, is worth, as one number for the whole moment.
 
 The denoising step of [`MatrixProcessing`](@ref) reads the ratio `T / N` of the sample. An unweighted moment reads every row of `X` with the same weight, so `T` is `size(X, 1)`. A weighted moment is worth fewer observations than `X` has rows. A denoiser that reads `size(X, 1)` then gets a ratio that is too large, and it removes too little noise. So [`PortfolioOptimisersCovariance`](@ref) reads `T` from this function.
+
+[`EmpiricalPrior`](@ref) reads the count of its mean estimator and of its covariance estimator, and states them in the field `eoc` of its result. A normal uncertainty set, a calibration rule and the denoiser of a matrix that a prior assembles read that field.
 
 The form with `X` is the batch fit. Its default is `size(X, 1)`, so an unweighted estimator pays nothing. The form with no data is the fit from a fold. It reads the state of `ce` with [`partial_fit_cache`](@ref), and the form with a state reads the count from it. The default of a state is the folded row count of [`observation_count`](@ref). A [`SampleBufferState`](@ref) holds the observations, so it reads the batch form over the rows of the buffer.
 
@@ -386,16 +389,18 @@ The count is ``T`` under equal weights. Frequency weights count replicated obser
 
 The method that Julia selects is the algorithm.
 
- 1. On a covariance estimator with no method of its own, return `size(X, 1)`.
- 2. On [`Covariance`](@ref), [`GeneralCovariance`](@ref) and [`DistanceCovariance`](@ref), return the count of the observation weights with [`observation_weight_count`](@ref). A [`Covariance`](@ref) with no weights reads the count of its inner estimator, because the inner estimator can hold weights of its own.
- 3. On [`ExpWeightedCovariance`](@ref), return the count of [`exp_weighted_covariance_count`](@ref) over the rows of `X`. On [`RegimeAdjustedExpWeightedCovariance`](@ref), do the same with the decay and the centring of its correlation. The denoising step processes the correlation, so it reads the count of the correlation.
- 4. On [`WindowedCovariance`](@ref), apply the window and the weights of the wrapper with [`windowed_preamble`](@ref). Then return the count of the inner estimator over the rows that the window keeps.
- 5. On [`PortfolioOptimisersCovariance`](@ref), [`CorrelationCovariance`](@ref), [`GeodesicShrinkageCovariance`](@ref) and [`ImpliedVolatility`](@ref), return the count of the inner estimator, because these estimators pass `X` to it without change.
- 6. With no data, read the state of `ce`, and return the count of the state. A composite that keeps no state of its own reads its inner estimator, as [`observation_count`](@ref) does. The two exponentially weighted states return the count of step 3 over the folded rows.
+ 1. On a covariance estimator or a mean estimator with no method of its own, return `size(X, 1)`.
+ 2. On [`Covariance`](@ref), [`GeneralCovariance`](@ref) and [`DistanceCovariance`](@ref), return the count of the observation weights with [`observation_weight_count`](@ref). A [`Covariance`](@ref) with no weights reads the count of its inner estimator, because the inner estimator can hold weights of its own. [`SimpleExpectedReturns`](@ref) and [`MedianExpectedReturns`](@ref) do the same with their weights. [`ExpWeightedExpectedReturns`](@ref) returns the Kish count of its weights over the rows of `X`, from [`exp_weighted_kish_count`](@ref).
+ 3. On [`GerberIQCovariance`](@ref), return the count that the rule `ce.oc` states for the temporal weights of the decay, through [`gerber_iq_observation_count`](@ref). `ce.oc = nothing` gives `size(X, 1)`.
+ 4. On [`ExpWeightedCovariance`](@ref), return the count of [`exp_weighted_covariance_count`](@ref) over the rows of `X`. On [`RegimeAdjustedExpWeightedCovariance`](@ref), do the same with the decay and the centring of its correlation. The denoising step processes the correlation, so it reads the count of the correlation.
+ 5. On [`WindowedCovariance`](@ref) and [`WindowedExpectedReturns`](@ref), apply the window and the weights of the wrapper with [`windowed_preamble`](@ref). Then return the count of the inner estimator over the rows that the window keeps.
+ 6. On [`PortfolioOptimisersCovariance`](@ref), [`CorrelationCovariance`](@ref), [`GeodesicShrinkageCovariance`](@ref) and [`ImpliedVolatility`](@ref), return the count of the inner estimator, because these estimators pass `X` to it without change. [`ExcessExpectedReturns`](@ref) and [`ShrunkExpectedReturns`](@ref) return the count of their mean estimator `me.me`, and [`EquilibriumExpectedReturns`](@ref) returns the count of its covariance estimator `me.ce`.
+ 7. With no data, read the state of `ce`, and return the count of the state. A composite that keeps no state of its own reads its inner estimator, as [`observation_count`](@ref) does. The two exponentially weighted states return the count of step 4 over the folded rows.
 
 # Arguments
 
   - $(arg_dict[:ce])
+  - `me`: The expected returns estimator.
   - `X`: The data matrix, of shape `observations × assets`.
   - `state`: The partial-fit state of `ce`.
 
@@ -415,6 +420,9 @@ The method that Julia selects is the algorithm.
   - $(ref_dict[:kish1965]) Whole book. $(ref_dict[:no_original_source])
 """
 function effective_observation_count(::StatsBase.CovarianceEstimator, X::MatNum)
+    return size(X, 1)
+end
+function effective_observation_count(::AbstractExpectedReturnsEstimator, X::MatNum)
     return size(X, 1)
 end
 function effective_observation_count(ce::Union{AbstractEstimator,

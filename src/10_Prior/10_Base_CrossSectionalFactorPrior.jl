@@ -637,7 +637,7 @@ The method over `pr` takes the factor prior already fitted on the factors that a
 
  1. Take the columns of `f` at `lv`, giving `fl`. When every factor is in `lv`, `fl` is `f`.
  2. Fit `pe` on `fl`, giving `pr`. The method over `pr` starts at step 3.
- 3. Process the covariance of `pr` in place with `f_mp`, over `fl`, with [`matrix_processing_block!`](@ref). A factor prior with a warm-up can state `NaN` for one factor and finite moments for the others, so the processing reads the block of the finite variances, and every entry outside it keeps its `NaN`. A covariance with no finite variance has no block, and is not processed.
+ 3. Process the covariance of `pr` in place with `f_mp`, over `fl`, with [`matrix_processing_block!`](@ref). The denoising step reads the count of the covariance of `pr` from [`moment_observation_count`](@ref), and not the number of rows of `fl`. A factor prior with a warm-up can state `NaN` for one factor and finite moments for the others, so the processing reads the block of the finite variances, and every entry outside it keeps its `NaN`. A covariance with no finite variance has no block, and is not processed.
  4. When every factor is in `lv`, return the scenarios, the mean and the covariance of `pr`. Otherwise, write them into the columns at `lv` of a zero scenario matrix `X`, the entries at `lv` of a zero mean `mu`, and the block at `lv` of a zero covariance `sigma`.
  5. Divide the scenario weights of `pr` by their sum with [`cross_sectional_scenario_weights`](@ref).
 
@@ -663,7 +663,7 @@ The method over `pr` takes the factor prior already fitted on the factors that a
   - `mu::VecNum`: The expected factor returns on the whole factor axis. A mean that `pr` does not state is `NaN`.
   - `sigma::MatNum`: The processed factor covariance on the whole factor axis. The row and the column of a factor that the factor prior states no variance for are `NaN`.
   - `w`: The scenario weights of `pr` divided by their sum, or `nothing`.
-  - `ens`, `kld`, `ow`: The effective number of scenarios, the Kullback-Leibler divergence and the original weights of `pr`.
+  - `ens`, `eoc`, `kld`, `ow`: The effective number of scenarios, the effective counts of the moments, the Kullback-Leibler divergence and the original weights of `pr`.
 
 # Related
 
@@ -692,7 +692,8 @@ function cross_sectional_factor_moments(pr::LowOrderPrior,
     # the finite variances, and the `NaN` frame around it stays as it is. With no finite
     # variance there is no block, and the assembly refuses the fit by name (#1510).
     if any(isfinite, LinearAlgebra.diag(pr.sigma))
-        matrix_processing_block!(f_mp, pr.sigma, fl; kwargs...)
+        matrix_processing_block!(f_mp, pr.sigma, fl, moment_observation_count(pr, 2);
+                                 kwargs...)
     end
     if live
         X, mu, sigma = pr.X, pr.mu, pr.sigma
@@ -706,7 +707,8 @@ function cross_sectional_factor_moments(pr::LowOrderPrior,
         sigma[lv, lv] = pr.sigma
     end
     return (; X = X, mu = mu, sigma = sigma, w = cross_sectional_scenario_weights(pr.w),
-            ens = pr.ens, kld = pr.kld, ow = pr.ow, pc = opinion_pooling_cache(pr))
+            ens = pr.ens, eoc = pr.eoc, kld = pr.kld, ow = pr.ow,
+            pc = opinion_pooling_cache(pr))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1629,7 +1631,7 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ## `systematic_processing!`
 
-  - `systematic_processing!(srep::MySystematicRepair, mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum; kwargs...) -> MatNum`: Processes the systematic block `sigma` in place under `mp`, and returns it.
+  - `systematic_processing!(srep::MySystematicRepair, mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, T::Real; kwargs...) -> MatNum`: Processes the systematic block `sigma` in place under `mp`, and returns it. A denoising step reads the ratio of `T` to the number of columns of `X`.
 
 ### Arguments
 
@@ -1637,6 +1639,7 @@ In order to implement a new concrete type that works seamlessly with the library
   - `mp`: The matrix processing estimator of the prior.
   - `sigma`: The systematic block, `investable assets × investable assets`.
   - `X`: The asset return scenarios of the investable assets, `scenarios × investable assets`.
+  - `T`: The effective number of observations of the factor covariance that the block projects.
   - `kwargs...`: Additional keyword arguments passed to the steps of `mp`.
 
 ### Returns
@@ -1730,7 +1733,7 @@ The answer states an entry exactly when the model determines it. An asset of ``\
 
  1. Take `Li`, the rows of `L` at the investable assets. Get `D` and `R` from [`cross_sectional_residual_block`](@ref).
  2. Project the factor mean through `Li`, giving `mui`, and the factor covariance, giving `si`, each with [`support_product`](@ref).
- 3. Process `si` under `srep` with [`systematic_processing!`](@ref). [`SystematicRepair`](@ref) runs every step of `mp`, as [`factor_lift`](@ref) does, and `nothing` runs every step except the `:pdm` step.
+ 3. Process `si` under `srep` with [`systematic_processing!`](@ref), at the count `T` of the factor covariance. [`SystematicRepair`](@ref) runs every step of `mp`, as [`factor_lift`](@ref) does, and `nothing` runs every step except the `:pdm` step.
  4. Add `D` to `si`, and make the sum positive definite under the estimator that [`matrix_processing_posdef`](@ref) gives for `mp`.
  5. Take the ready factors of `f_mu` and `f_sigma` with [`cross_sectional_ready_factors`](@ref), and `lf`, the ready factors whose column of `f_sigma` over the ready factors is not zero. Take the square root `Lf` of the block of `f_sigma` at `lf` under `mtx_sqrt`, and write it into the block at `lf` of a zero matrix `Cf`.
  6. Build `ci`, the low-rank square root `[Li * Cf  R]`.
@@ -1747,6 +1750,7 @@ The answer states an entry exactly when the model determines it. An asset of ``\
   - `esigma`: The idiosyncratic variances, or the idiosyncratic covariance.
   - `idx`: The investable assets.
   - `Xs`: The asset return scenarios, `scenarios × assets`, which the processing reads.
+  - `T`: The effective number of observations of `f_sigma`, which the denoising step reads. It is `size(Xs, 1)` by default.
   - $(arg_dict[:mtx_sqrt])
 
 # Validation
@@ -1775,7 +1779,8 @@ The answer states an entry exactly when the model determines it. An asset of ``\
 function cross_sectional_lift(srep::Option{<:AbstractSystematicRepair},
                               mp::AbstractMatrixProcessingEstimator, L::MatNum,
                               f_mu::VecNum, f_sigma::MatNum, esigma::VecNum_MatNum,
-                              idx::AbstractVector{<:Integer}, Xs::MatNum;
+                              idx::AbstractVector{<:Integer}, Xs::MatNum,
+                              T::Real = size(Xs, 1);
                               mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
                               kwargs...)
     @argcheck(size(L, 2) == length(f_mu) == size(f_sigma, 1),
@@ -1786,7 +1791,7 @@ function cross_sectional_lift(srep::Option{<:AbstractSystematicRepair},
     # so each product reads the factor moments on the support of the loadings alone (#1510).
     mui = support_product(Li, f_mu)
     si = support_product(Li, f_sigma, Li)
-    systematic_processing!(srep, mp, si, view(Xs, :, idx); kwargs...)
+    systematic_processing!(srep, mp, si, view(Xs, :, idx), T; kwargs...)
     si .+= D
     posdef!(matrix_processing_posdef(mp), si)
     rdy = cross_sectional_ready_factors(f_mu, f_sigma)

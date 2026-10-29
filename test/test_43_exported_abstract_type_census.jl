@@ -175,6 +175,7 @@
         :AbstractMissingDataFilterAlgorithm,
         :AbstractNeutralisationWeights,
         :AbstractNormCeilingCalibrationAlgorithm,
+        :AbstractObservationCountAlgorithm,
         :AbstractObservedExposureEstimator,
         :AbstractOnlineObjective,
         :AbstractOnlinePortfolioSelectionAlgorithm,

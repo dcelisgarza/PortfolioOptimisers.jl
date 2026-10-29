@@ -196,6 +196,117 @@ function observation_weight_count(w::StatsBase.FrequencyWeights, ::Integer)
     return sum(w)
 end
 function observation_weight_count(w::AbstractVector, ::Integer)
+    return weight_observation_count(KishObservationCount(), w)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all rules that count the observations that a vector of weights is worth.
+
+Most estimators weight their observations with observation weights, and [`observation_weight_count`](@ref) counts those weights. Some estimators weight their observations with a rule of their own, such as the temporal decay of [`GerberIQCovariance`](@ref). Their statistic is not a weighted moment, so no count follows from it. Such an estimator holds a field of this type, and the rule states the count of the weights that the estimator builds. `nothing` in that field reads every row as one observation.
+
+[`effective_observation_count`](@ref) reads the count, and the denoising step of a [`MatrixProcessing`](@ref) reads it through that function.
+
+# Interfaces
+
+To add a rule, subtype `AbstractObservationCountAlgorithm` and implement this method:
+
+## `weight_observation_count`
+
+  - `weight_observation_count(alg::MyObservationCount, w::AbstractVector) -> Real`: The number of observations that the weights `w` are worth. A subtype that implements no method raises an `ArgumentError` that names the subtype.
+
+### Arguments
+
+  - `alg`: The instance of the subtype.
+  - `w`: The weights of the observations, one entry for each row.
+
+### Returns
+
+  - `T_e::Real`: The effective number of observations.
+
+# Related
+
+  - [`KishObservationCount`](@ref)
+  - [`weight_observation_count`](@ref)
+  - [`effective_observation_count`](@ref)
+  - [`GerberIQCovariance`](@ref)
+"""
+abstract type AbstractObservationCountAlgorithm <: AbstractAlgorithm end
+"""
+    KishObservationCount()
+
+Counts the observations that a vector of weights is worth with the Kish count.
+
+The Kish count is the number of equally weighted observations that give the precision of the weighted sample. It is `T` under equal weights on `T` rows, and `k` under equal weights on `k` of the rows and zero on the others. [`weight_observation_count`](@ref) states the formula.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.weight_observation_count(KishObservationCount(), [1.0, 1.0, 0.0])
+2.0
+```
+
+# Related
+
+  - [`AbstractObservationCountAlgorithm`](@ref)
+  - [`weight_observation_count`](@ref)
+  - [`observation_weight_count`](@ref)
+
+# References
+
+  - $(ref_dict[:kish1965]) Whole book. $(ref_dict[:no_original_source])
+"""
+struct KishObservationCount <: AbstractObservationCountAlgorithm end
+"""
+    weight_observation_count(alg::KishObservationCount, w::AbstractVector) -> Real
+    weight_observation_count(alg::AbstractObservationCountAlgorithm, w::AbstractVector)
+
+Return the number of observations that the weights `w` are worth, under the rule `alg`.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+T_{e} &= \\dfrac{\\left(\\sum_{t} w_{t}\\right)^{2}}{\\sum_{t} w_{t}^{2}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:cal_T_e])
+  - $(math_dict[:w_t_obs])
+
+# Arguments
+
+  - `alg`: The rule of the count.
+      + `::KishObservationCount`: The Kish count.
+      + `::AbstractObservationCountAlgorithm`: The fallback of the family, for a subtype that implements no method of its own. It always throws.
+  - `w`: The weights of the observations, one entry for each row.
+
+# Validation
+
+  - A subtype of [`AbstractObservationCountAlgorithm`](@ref) that implements no method raises an `ArgumentError` that names the subtype.
+
+# Returns
+
+  - `T_e::Real`: The effective number of observations.
+
+# Related
+
+  - [`AbstractObservationCountAlgorithm`](@ref)
+  - [`KishObservationCount`](@ref)
+  - [`observation_weight_count`](@ref)
+
+# References
+
+  - $(ref_dict[:kish1965]) Whole book. $(ref_dict[:no_original_source])
+"""
+function weight_observation_count(::KishObservationCount, w::AbstractVector)
     return sum(w)^2 / sum(abs2, w)
 end
+function weight_observation_count(alg::AbstractObservationCountAlgorithm, ::AbstractVector)
+    return throw(ArgumentError("$(typeof(alg)) subtypes AbstractObservationCountAlgorithm but does not implement weight_observation_count. Extension authors: a count rule must implement weight_observation_count(alg, w) -> Real, the number of observations that the weights w are worth."))
+end
+export KishObservationCount
+public AbstractObservationCountAlgorithm, weight_observation_count
 public get_observation_weights

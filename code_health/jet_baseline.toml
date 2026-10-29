@@ -63,7 +63,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/02_Tools/03_TypeUtilities.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools/04_Factory.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools/05_Propagatable.jl" = { raw = 1, reviewed = 1 }
-"src/02_Tools/06_ForwardProperties.jl" = { raw = 4, reviewed = 4 }
+"src/02_Tools/06_ForwardProperties.jl" = { raw = 8, reviewed = 8 }
 "src/02_Tools/07_VectorToScalarMeasures.jl" = { raw = 2, reviewed = 2 }
 "src/02_Tools/08_MeanTest.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools/09_MeanTestDraws.jl" = { raw = 0, reviewed = 0 }

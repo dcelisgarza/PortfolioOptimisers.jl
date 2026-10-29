@@ -463,6 +463,11 @@ function Statistics.mean(me::ExpWeightedExpectedReturns, X::MatNum; dims::Int = 
     cache = exp_weighted_pass!(me, X, dims, active_mask)
     return exp_weighted_moment(cache, me)
 end
+# The weights of the mean are proportional to `decay^k` over the rows, so the count is their
+# Kish count, the closed form of `exp_weighted_kish_count`.
+function effective_observation_count(me::ExpWeightedExpectedReturns, X::MatNum)
+    return exp_weighted_kish_count(me.decay, size(X, 1))
+end
 """
     Statistics.mean(
         me::ExpWeightedExpectedReturns,

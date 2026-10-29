@@ -16,6 +16,10 @@ prior_regression_remedy
 prior_field_values
 prior_result_property_pool
 bound_field_is_stale
+PortfolioOptimisers.field_states_nothing
+PortfolioOptimisers.assert_moment_counts
+PortfolioOptimisers.moment_observation_count
+PortfolioOptimisers.moment_count_entry
 investable_mask
 investable_views
 investable_prior

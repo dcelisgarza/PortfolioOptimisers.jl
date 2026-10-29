@@ -25,7 +25,7 @@ PortfolioOptimisers.cross_sectional_stored_cache
 PortfolioOptimisers.kept_scenarios
 PortfolioOptimisers.scenario_count
 PortfolioOptimisers.assert_cross_sectional_lag_rows
-PortfolioOptimisers.scenario_ens
+PortfolioOptimisers.scenario_moment_counts
 PortfolioOptimisers.scenario_fill_report
 PortfolioOptimisers.scenario_fill_remember!
 scenario_fill

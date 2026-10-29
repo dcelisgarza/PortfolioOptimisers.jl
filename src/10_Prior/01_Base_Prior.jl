@@ -73,6 +73,7 @@ LowOrderPrior
      chol ┼ nothing
         w ┼ nothing
       ens ┼ nothing
+      eoc ┼ Tuple{Nothing, Nothing}: (nothing, nothing)
       kld ┼ nothing
        ow ┼ nothing
        rr ┼ nothing
@@ -595,7 +596,7 @@ Forward a wrapped prior result, and name only the fields that the wrapper estima
 
 This function applies the composition rule of the prior results. A wrapper forwards a field when the value stays correct. It drops a field only when the forwarded value would state something false. The docstring of the estimator names every field that it drops.
 
-The default is to forward, and the caller writes nothing for it. A wrapper cannot return fewer fields than the result that it wraps by mistake. The call site names every change. A new value is `field = value`, and a drop is `field = nothing`. A search of the source finds every drop. A hand-written call to the constructor names all fourteen fields of a [`LowOrderPrior`](@ref), and does not show which of them it changes.
+The default is to forward, and the caller writes nothing for it. A wrapper cannot return fewer fields than the result that it wraps by mistake. The call site names every change. A new value is `field = value`, and a drop is `field = nothing`. A search of the source finds every drop. A hand-written call to the constructor names all fifteen fields of a [`LowOrderPrior`](@ref), and does not show which of them it changes.
 
 The rebuild goes through the keyword constructor of `pr`, see [`reconstruct_prior`](@ref). Every `@argcheck` runs, and a forward that leaves the result inconsistent raises the same error as a hand-written constructor call. A caller can name only a field of `pr`. A forwarded or computed property is a view of a nested value, so a value for it can mean only a value for the field that holds it.
 
@@ -604,7 +605,7 @@ The rebuild goes through the keyword constructor of `pr`, see [`reconstruct_prio
 Three fields are bound to the value of another field. To forward one of them past a change to its field states something false. The function enforces each binding. When the caller names the field on the left, the caller must also name the fields on the right, with a rebuilt value or with `nothing`.
 
   - `sigma` binds `chol`. When `chol` is present, every consumer reads it in place of `sigma`. A stale `chol` makes the optimisation ignore the posterior covariance with no error.
-  - `w` binds `ens`, `kld` and `ow`. These are diagnostics of `w`, so they are false for a different `w`.
+  - `w` binds `ens`, `eoc`, `kld` and `ow`. These are diagnostics of `w` and the counts of the moments that `w` weights, so they are false for a different `w`.
   - `rr` binds `o_X`. `o_X` says that `X` is a reconstruction, and `rr` records the projection that made it, so the constructor refuses one without the other. A drop of the factor block also drops the original returns.
 
 A binding has no effect when the bound field is `nothing`, or when `pr` has no such field. No stale value is then present.
@@ -621,7 +622,7 @@ The constructor checks the rest. `rr` and `fpr` must be given together or not at
  2. Compare the names of `patch` with the fields of `typeof(pr)`. Call the names that are not fields `extra`. When `extra` is not empty, raise an `ArgumentError` that names the fields of `pr`.
  3. Enforce the binding of `chol` to `sigma`. When `patch` names `sigma` and not `chol`, and [`bound_field_is_stale`](@ref) says that `pr` holds a `chol`, raise a [`ConflictingArgumentError`](@ref).
  4. Enforce the binding of `o_X` to `rr` with the same three tests. A failure raises the second [`ConflictingArgumentError`](@ref).
- 5. Enforce the binding of `ens`, `kld` and `ow` to `w`. When `patch` names `w`, collect into `stale` each of the three that `patch` does not name and that `pr` holds. Raise when `stale` is not empty.
+ 5. Enforce the binding of `ens`, `eoc`, `kld` and `ow` to `w`. When `patch` names `w`, collect into `stale` each of the four that `patch` does not name and that `pr` holds. Raise when `stale` is not empty.
  6. Rebuild `pr` through [`reconstruct_prior`](@ref). It merges `patch` over [`prior_field_values`](@ref) and calls the keyword constructor, so every `@argcheck` of `typeof(pr)` runs on the result.
 
 # Arguments
@@ -632,7 +633,7 @@ The constructor checks the rest. `rr` and `fpr` must be given together or not at
 # Validation
 
   - When `overrides` names `sigma`, it also names `chol`, unless `pr.chol` is `nothing`.
-  - When `overrides` names `w`, it also names each of `ens`, `kld` and `ow` that is not `nothing` in `pr`.
+  - When `overrides` names `w`, it also names each of `ens`, `eoc`, `kld` and `ow` that `pr` states.
   - When `overrides` names `rr`, it also names `o_X`, unless `pr.o_X` is `nothing`.
   - Every name in `overrides` is a field of `typeof(pr)`.
   - Every `@argcheck` of the constructor of `typeof(pr)`.
@@ -686,7 +687,7 @@ function forward_prior(pr::AbstractPriorResult; overrides...)::AbstractPriorResu
     end
     if haskey(patch, :w)
         stale = filter(sym -> !haskey(patch, sym) && bound_field_is_stale(pr, sym),
-                       (:ens, :kld, :ow))
+                       (:ens, :eoc, :kld, :ow))
         @argcheck(isempty(stale),
                   ConflictingArgumentError("forwarding $(stale) past a change to `w` would state something false: they are diagnostics of the weights they were computed with, and diagnostics follow their weights. Pass each as `nothing` to drop it, or a value recomputed alongside the new `w`."))
     end
@@ -719,7 +720,33 @@ A field that `pr` does not have, or that holds `nothing`, cannot become stale. T
   - [`AbstractPriorResult`](@ref)
 """
 function bound_field_is_stale(pr::AbstractPriorResult, sym::Symbol)::Bool
-    return hasfield(typeof(pr), sym) && !isnothing(getfield(pr, sym))
+    return hasfield(typeof(pr), sym) && !field_states_nothing(getfield(pr, sym))
+end
+"""
+    field_states_nothing(v) -> Bool
+
+Return `true` when a field value of a prior result states nothing.
+
+A field states nothing when it holds `nothing`, or a tuple whose every entry is `nothing`. The tuple is the form of `eoc`, which holds one count for each moment, and `(nothing, nothing)` is its default.
+
+# Arguments
+
+  - `v`: The value of the field.
+
+# Returns
+
+  - `flag::Bool`: `true` when `v` states nothing.
+
+# Related
+
+  - [`bound_field_is_stale`](@ref)
+  - [`forward_prior`](@ref)
+"""
+function field_states_nothing(v)
+    return isnothing(v)
+end
+function field_states_nothing(v::Tuple)
+    return all(isnothing, v)
 end
 """
     prior(pr::AbstractPriorResult, args...; kwargs...)
@@ -807,6 +834,7 @@ $(DocStringExtensions.FIELDS)
         chol::Option{<:MatNum} = nothing,
         w::Option{<:ObsWeights} = nothing,
         ens::Option{<:Number} = nothing,
+        eoc::Tuple{Option{<:Real}, Option{<:Real}} = (nothing, nothing),
         kld::Option{<:Num_VecNum} = nothing,
         ow::Option{<:VecNum} = nothing,
         rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
@@ -820,7 +848,7 @@ Keywords correspond to the struct's fields.
 
 ## The factor block
 
-A prior that a factor model fits carries two distributions. The fields of the `LowOrderPrior` hold the distribution over the assets. The field `fpr` holds the distribution over the factors, as a nested `LowOrderPrior`. A nested result, and not a set of flat fields with an `f_` prefix, gives the factor distribution every field of a `LowOrderPrior`. These are `w`, `ens`, `kld` and `ow` as well as `mu` and `sigma`. A field added later also applies to it with no second edit. Its `X` is the factor returns matrix, over the same observations as the asset `X`.
+A prior that a factor model fits carries two distributions. The fields of the `LowOrderPrior` hold the distribution over the assets. The field `fpr` holds the distribution over the factors, as a nested `LowOrderPrior`. A nested result, and not a set of flat fields with an `f_` prefix, gives the factor distribution every field of a `LowOrderPrior`. These are `w`, `ens`, `eoc`, `kld` and `ow` as well as `mu` and `sigma`. A field added later also applies to it with no second edit. Its `X` is the factor returns matrix, over the same observations as the asset `X`.
 
 `fpr` and `rr` are the factor block, and the constructor requires them together or not at all. `rr` projects the block onto the assets, `mu ≈ rr.M * fpr.mu + rr.b`. A factor distribution with no loadings has no relation to this asset axis.
 
@@ -834,7 +862,7 @@ The flat names read the nested block, so code written for the old shape still wo
 
 Read the factor block as `pr.fpr.mu`. The flat names with the `f_` prefix stay so that code written for the old shape still works. They also help where a read must return a value or `nothing` with no branch.
 
-The flat names do not cover the block, and the set does not grow. There are six flat names for fourteen fields. `fpr.X`, the factor returns matrix, has no flat name, and neither have `fpr.chol` and `fpr.rr`. The set has six names here, and seven on [`HighOrderPrior`](@ref). A field added to `LowOrderPrior` later is available as `pr.fpr.<name>`, and gets no flat name, so no field needs an edit in two places.
+The flat names do not cover the block, and the set does not grow. There are six flat names for fifteen fields. `fpr.X`, the factor returns matrix, has no flat name, and neither have `fpr.chol`, `fpr.eoc` and `fpr.rr`. The set has six names here, and seven on [`HighOrderPrior`](@ref). A field added to `LowOrderPrior` later is available as `pr.fpr.<name>`, and gets no flat name, so no field needs an edit in two places.
 
 The two reads are different when there is no factor block. `pr.f_mu` returns `nothing`, but `pr.fpr.mu` raises an error, because `fpr` is `nothing`. First check the block with [`assert_prior_regression`](@ref), and then read through `fpr`. The check reads `rr` only, which is enough, because `rr` and `fpr` are present together or not at all.
 
@@ -845,7 +873,7 @@ Most prior estimators wrap another, and build their prior result from the result
 The returned result must be consistent. A wrapper must not remove a value that the caller computed to get that consistency. The default is to forward, and the docstring of each estimator lists the fields that it drops and the reasons. Three bindings tie a field to another, so a wrapper never forwards the bound fields alone:
 
   - `sigma` binds `chol`. When `chol` is present, every consumer reads it in place of `sigma`, and a stale `chol` replaces the changed covariance with no error.
-  - `w` binds `ens`, `kld` and `ow`. These are diagnostics of the weights.
+  - `w` binds `ens`, `eoc`, `kld` and `ow`. These are diagnostics and counts of the weights.
   - `rr` binds `o_X`. `rr` records the projection that made `X` from `o_X`.
 
 `forward_prior` refuses a forward that breaks a binding.
@@ -877,6 +905,7 @@ A reader that holds the returns data that the prior read pairs its rows with the
   - `size(X, 2) == length(mu) == size(sigma, 1)`.
   - Every entry of `sigma` between two investable assets is finite. An investable asset has a finite `mu` and a finite variance. Raises an `IsNonFiniteError`.
   - If `w` is not `nothing`, `!isempty(w)` and `length(w) == size(X, 1)`.
+  - Each entry of `eoc` that is not `nothing` is finite and positive, through [`assert_moment_counts`](@ref).
   - If `kld` is an `AbstractVector`, `!isempty(kld)`.
   - If `ow` is not `nothing`, `!isempty(ow)`.
   - `rr` and `fpr` must be provided together or not at all.
@@ -893,7 +922,7 @@ A reader that holds the returns data that the prior read pairs its rows with the
   - It reads no argument after `i`. It takes and ignores more positional arguments.
   - `rr` recurses through [`port_opt_view`](@ref) with `i`, which cuts the loadings on their asset axis.
   - `X`, `o_X`, `mu`, `sigma` and `chol` are cut to `i` on the asset axis. `o_X` takes the same cut as `X`, so the original returns of a subproblem are the returns of the caller for the assets of that subproblem.
-  - `w`, `ens`, `kld` and `ow` pass through unchanged. They are on the observation axis, and `i` indexes assets.
+  - `w`, `ens`, `eoc`, `kld` and `ow` pass through unchanged. They are on the observation axis, and `i` indexes assets.
   - `fpr` passes through unchanged, because it is a distribution over factors and not over assets. The view thus keeps `rr` and `fpr` together, as the rule of the factor block requires.
   - `ss_gaps` passes through unchanged. It is on the observation axis.
   - `pc` is dropped. Its rows hold every asset, and a fit of the subset of assets has no cache of its own.
@@ -911,6 +940,7 @@ LowOrderPrior
      chol ┼ nothing
         w ┼ nothing
       ens ┼ nothing
+      eoc ┼ Tuple{Nothing, Nothing}: (nothing, nothing)
       kld ┼ nothing
        ow ┼ nothing
        rr ┼ nothing
@@ -960,6 +990,10 @@ LowOrderPrior
     """
     ens
     """
+    $(field_dict[:eoc_prior])
+    """
+    eoc
+    """
     $(field_dict[:kld])
     """
     kld
@@ -989,8 +1023,9 @@ LowOrderPrior
     pc
     function LowOrderPrior(X::MatNum, o_X::Option{<:MatNum}, mu::VecNum, sigma::MatNum,
                            chol::Option{<:MatNum}, w::Option{<:ObsWeights},
-                           ens::Option{<:Number}, kld::Option{<:Num_VecNum},
-                           ow::Option{<:VecNum},
+                           ens::Option{<:Number},
+                           eoc::Tuple{Option{<:Real}, Option{<:Real}},
+                           kld::Option{<:Num_VecNum}, ow::Option{<:VecNum},
                            rr::Option{<:AbstractLoadingsRegressionResult},
                            fpr::Option{<:LowOrderPrior},
                            x_src::Option{<:AbstractReturnsSource},
@@ -1051,9 +1086,10 @@ LowOrderPrior
             @argcheck(length(mu) == size(chol, 2),
                       DimensionMismatch("length(mu) ($(length(mu))) must match size(chol, 2) ($(size(chol, 2)))"))
         end
+        assert_moment_counts(eoc)
         assert_shared_series_gaps(ss_gaps, size(X, 1))
         assert_pool_cache(pc, size(X, 1))
-        fs = (X, o_X, mu, sigma, chol, w, ens, kld, ow, rr, fpr, x_src, ss_gaps, pc)
+        fs = (X, o_X, mu, sigma, chol, w, ens, eoc, kld, ow, rr, fpr, x_src, ss_gaps, pc)
         return new{map(typeof, fs)...}(fs...)
     end
 end
@@ -1097,14 +1133,91 @@ end
 function LowOrderPrior(; X::MatNum, o_X::Option{<:MatNum} = nothing, mu::VecNum,
                        sigma::MatNum, chol::Option{<:MatNum} = nothing,
                        w::Option{<:ObsWeights} = nothing, ens::Option{<:Number} = nothing,
+                       eoc::Tuple{Option{<:Real}, Option{<:Real}} = (nothing, nothing),
                        kld::Option{<:Num_VecNum} = nothing, ow::Option{<:VecNum} = nothing,
                        rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
                        fpr::Option{<:LowOrderPrior} = nothing,
                        x_src::Option{<:AbstractReturnsSource} = nothing,
                        ss_gaps::Option{<:AbstractVector{Bool}} = nothing,
                        pc::Option{<:NamedTuple} = nothing)::LowOrderPrior
-    return LowOrderPrior(X, o_X, mu, sigma, chol, w, ens, kld, ow, rr, fpr, x_src, ss_gaps,
-                         pc)
+    return LowOrderPrior(X, o_X, mu, sigma, chol, w, ens, eoc, kld, ow, rr, fpr, x_src,
+                         ss_gaps, pc)
+end
+"""
+    assert_moment_counts(eoc::Tuple) -> Nothing
+
+Check the effective counts of the moments that a prior result states in `eoc`.
+
+# Arguments
+
+  - `eoc`: The tuple of counts, one entry for each moment. An entry is a count or `nothing`.
+
+# Validation
+
+  - Each entry that is not `nothing` is finite and positive, through [`assert_nonempty_gt0_finite_val`](@ref).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`LowOrderPrior`](@ref)
+  - [`HighOrderPrior`](@ref)
+  - [`moment_observation_count`](@ref)
+"""
+function assert_moment_counts(eoc::Tuple)::Nothing
+    foreach(c -> assert_nonempty_gt0_finite_val(c, :eoc), eoc)
+    return nothing
+end
+"""
+    moment_observation_count(pr::AbstractPriorResult, k::Integer) -> Real
+
+Return the effective number of observations of moment `k` of a prior result.
+
+The index follows `pr.eoc`: `1` is `mu`, `2` is `sigma`, `3` is the coskewness and `4` is the cokurtosis. An entry of `nothing` means `size(pr.X, 1)`, so a result that states no count gives the number of its rows. A consumer that needs the sample size of one moment reads this function, and not `size(pr.X, 1)`.
+
+# Arguments
+
+  - $(arg_dict[:pr])
+  - `k`: The index of the moment.
+
+# Returns
+
+  - `T_e::Real`: The effective number of observations of the moment.
+
+# Related
+
+  - [`LowOrderPrior`](@ref)
+  - [`HighOrderPrior`](@ref)
+  - [`effective_observation_count`](@ref)
+"""
+function moment_observation_count(pr::AbstractPriorResult, k::Integer)
+    return something(pr.eoc[k], size(pr.X, 1))
+end
+"""
+    moment_count_entry(T_e::Real, T::Integer) -> Option{<:Real}
+
+Return the entry of `eoc` for a moment that is worth `T_e` observations, in a prior result that carries `T` rows.
+
+An entry of `nothing` means the number of rows of the result, so a count equal to `T` is written as `nothing`. An unweighted fit with no Scenario Cap then states no count, as it did before the field existed.
+
+# Arguments
+
+  - `T_e`: The effective number of observations of the moment.
+  - `T`: The number of rows that the prior result carries in `X`.
+
+# Returns
+
+  - `nothing` when `T_e == T`, and `T_e` otherwise.
+
+# Related
+
+  - [`moment_observation_count`](@ref)
+  - [`EmpiricalPrior`](@ref)
+"""
+function moment_count_entry(T_e::Real, T::Integer)
+    return T_e == T ? nothing : T_e
 end
 # The flat `f_`-prefixed names are virtual reads of the nested factor block, so code written
 # against the pre-nesting shape is unaffected, and `f_ens`/`f_kld`/`f_ow` come for free.
@@ -1141,7 +1254,7 @@ The view forwards the factor block with no cut, because `i` indexes assets and `
 
  1. Cut the Cholesky factor to `i` on its column axis. Call it `chol`. A prior result that holds none keeps `nothing`.
  2. Cut the original returns matrix to `i` on its asset axis. Call it `o_X`. A prior result that holds none keeps `nothing`. `o_X` takes the same cut as `X` in the next step, because the two have the same observations and the same assets.
- 3. Rebuild the prior result through its keyword constructor. Cut `X` and `mu` to `i`, and `sigma` to `i` on both axes. Take `chol` and `o_X` from the two steps above. Recurse `rr` through [`port_opt_view`](@ref) with `i`. Forward `w`, `ens`, `kld`, `ow`, `fpr`, `x_src` and `ss_gaps` unchanged, and drop `pc`. Every `@argcheck` of the constructor thus runs on the view.
+ 3. Rebuild the prior result through its keyword constructor. Cut `X` and `mu` to `i`, and `sigma` to `i` on both axes. Take `chol` and `o_X` from the two steps above. Recurse `rr` through [`port_opt_view`](@ref) with `i`. Forward `w`, `ens`, `eoc`, `kld`, `ow`, `fpr`, `x_src` and `ss_gaps` unchanged, and drop `pc`. Every `@argcheck` of the constructor thus runs on the view.
 
 # Arguments
 
@@ -1165,8 +1278,9 @@ function port_opt_view(pr::LowOrderPrior, i, args...)::LowOrderPrior
     o_X = isnothing(pr.o_X) ? nothing : view(pr.o_X, :, i)
     return LowOrderPrior(; X = view(pr.X, :, i), o_X = o_X, mu = view(pr.mu, i),
                          sigma = view(pr.sigma, i, i), chol = chol, w = pr.w, ens = pr.ens,
-                         kld = pr.kld, ow = pr.ow, rr = port_opt_view(pr.rr, i),
-                         fpr = pr.fpr, x_src = pr.x_src, ss_gaps = pr.ss_gaps)
+                         eoc = pr.eoc, kld = pr.kld, ow = pr.ow,
+                         rr = port_opt_view(pr.rr, i), fpr = pr.fpr, x_src = pr.x_src,
+                         ss_gaps = pr.ss_gaps)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1464,10 +1578,15 @@ $(DocStringExtensions.FIELDS)
         sk::Option{<:MatNum} = nothing,
         V::Option{<:MatNum} = nothing,
         skmp::Option{<:AbstractMatrixProcessingEstimator} = nothing,
+        eoc::Tuple{Option{<:Real}, Option{<:Real}} = (nothing, nothing),
         fpr::Option{<:HighOrderPrior} = nothing
     ) -> HighOrderPrior
 
 Keywords correspond to the struct's fields.
+
+## The counts of the moments
+
+The field `eoc` holds the effective number of observations of the coskewness and of the cokurtosis. The property `pr.eoc` reads four counts. The first two are the `eoc` of `pr`, the counts of `mu` and `sigma`. So `pr.eoc[k]` is the count of moment `k` on both result types, and [`moment_observation_count`](@ref) reads it. A read of the field itself, with `getfield`, gives the pair. [`reconstruct_prior`](@ref) reads the fields so, and keeps the pair.
 
 ## The factor block
 
@@ -1503,6 +1622,7 @@ Let `N = length(pr.mu)`.
   - `V` is computed again from the cut `sk`, and is not cut. It is a spectral quantity of the coskewness matrix, so the submatrix of `V` is not the `V` of the submatrix.
   - `D2`, `L2` and `S2` are built again for the number of assets of the subproblem, and are not cut. They depend only on that number, and hold no data of a specific asset.
   - `skmp` passes through unchanged. It is the matrix processing estimator that the new computation of `V` reads.
+  - `eoc` passes through unchanged. It is on the observation axis, and `i` indexes assets.
   - `fpr` passes through unchanged, because it holds co-moments over factors and not over assets. The view forwards the same object, so `fpr.pr === pr.fpr` stays true. The low order view forwards its own factor block in the same way.
 
 # Examples
@@ -1524,6 +1644,7 @@ HighOrderPrior
        │      chol ┼ nothing
        │         w ┼ nothing
        │       ens ┼ nothing
+       │       eoc ┼ Tuple{Nothing, Nothing}: (nothing, nothing)
        │       kld ┼ nothing
        │        ow ┼ nothing
        │        rr ┼ nothing
@@ -1538,6 +1659,7 @@ HighOrderPrior
     sk ┼ 2×4 Matrix{Float64}
      V ┼ 2×2 Matrix{Float64}
   skmp ┼ nothing
+   eoc ┼ NTuple{4, Nothing}: (nothing, nothing, nothing, nothing)
    fpr ┴ nothing
 ```
 
@@ -1585,6 +1707,10 @@ HighOrderPrior
     """
     skmp
     """
+    $(field_dict[:eoc_hop])
+    """
+    eoc
+    """
     $(field_dict[:fpr])
     """
     fpr
@@ -1592,6 +1718,7 @@ HighOrderPrior
                             D2::Option{<:MatNum}, L2::Option{<:MatNum},
                             S2::Option{<:MatNum}, sk::Option{<:MatNum}, V::Option{<:MatNum},
                             skmp::Option{<:AbstractMatrixProcessingEstimator},
+                            eoc::Tuple{Option{<:Real}, Option{<:Real}},
                             fpr::Option{<:HighOrderPrior})
         N = length(pr.mu)
         sk_flag = isa(sk, MatNum)
@@ -1652,9 +1779,9 @@ HighOrderPrior
             @argcheck(fpr.pr === inner,
                       ConflictingArgumentError("the factor low order prior is reachable two ways, as `fpr.pr` and as `pr.fpr`, and they must be the same object, but they differ. `fpr.pr` is the distribution the factor co-moments were computed against, so a mismatch would make `hop.fpr.mu` and `hop.f_mu` disagree with no way to tell which is right. Build the nested block from the wrapped prior's own factor block: `HighOrderPrior(; pr = pr.fpr, kt = ...)`."))
         end
-        return new{typeof(pr), typeof(kt), typeof(D2), typeof(L2), typeof(S2), typeof(sk),
-                   typeof(V), typeof(skmp), typeof(fpr)}(pr, kt, D2, L2, S2, sk, V, skmp,
-                                                         fpr)
+        assert_moment_counts(eoc)
+        fs = (pr, kt, D2, L2, S2, sk, V, skmp, eoc, fpr)
+        return new{map(typeof, fs)...}(fs...)
     end
 end
 function HighOrderPrior(; pr::AbstractPriorResult, kt::Option{<:MatNum} = nothing,
@@ -1662,8 +1789,9 @@ function HighOrderPrior(; pr::AbstractPriorResult, kt::Option{<:MatNum} = nothin
                         S2::Option{<:MatNum} = nothing, sk::Option{<:MatNum} = nothing,
                         V::Option{<:MatNum} = nothing,
                         skmp::Option{<:AbstractMatrixProcessingEstimator} = nothing,
+                        eoc::Tuple{Option{<:Real}, Option{<:Real}} = (nothing, nothing),
                         fpr::Option{<:HighOrderPrior} = nothing)::HighOrderPrior
-    return HighOrderPrior(pr, kt, D2, L2, S2, sk, V, skmp, fpr)
+    return HighOrderPrior(pr, kt, D2, L2, S2, sk, V, skmp, eoc, fpr)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1676,9 +1804,9 @@ The view forwards the factor block with no cut, as on [`LowOrderPrior`](@ref), b
 
  1. Make `idx` with [`fourth_moment_index_generator`](@ref) against the full number of assets of `pr`. `idx` is the fourth-moment index that addresses the co-moment matrices of the assets at `i`.
  2. Cut the coskewness matrix to `i` on its asset axis and to `idx` on its pair axis, with [`nothing_scalar_array_view_odd_order`](@ref). Call it `sk`. A prior result that holds none keeps `nothing`.
- 3. Compute `V` again from the `sk` of step 2 and the cut returns matrix, with [`negative_spectral_coskewness`](@ref) and the `skmp` of `pr`. `V` is a spectral quantity of the coskewness matrix, so the step builds it again and does not cut it. When step 2 gave `nothing`, `V` is `nothing`.
+ 3. Compute `V` again from the `sk` of step 2 and the cut returns matrix, with [`negative_spectral_coskewness`](@ref), the `skmp` of `pr` and the count of the coskewness from [`moment_observation_count`](@ref). `V` is a spectral quantity of the coskewness matrix, so the step builds it again and does not cut it. When step 2 gave `nothing`, `V` is `nothing`.
  4. Build `D2`, `L2` and `S2` again for the number of assets of the subproblem with [`dup_elim_sum_view`](@ref), and do not cut them. When `pr` holds `D2`, take all three. When it holds `S2` and no `D2`, take `L2` and `S2`, and keep `D2` as `nothing`. When it holds neither, take none.
- 5. Rebuild the prior result through its keyword constructor. Recurse `pr` through [`port_opt_view`](@ref) with `i`, index `kt` by `idx`, take the values of steps 2 to 4, and forward `skmp` and `fpr` unchanged. Every `@argcheck` of the constructor thus runs on the view.
+ 5. Rebuild the prior result through its keyword constructor. Recurse `pr` through [`port_opt_view`](@ref) with `i`, index `kt` by `idx`, take the values of steps 2 to 4, and forward `skmp`, the field `eoc` and `fpr` unchanged. Every `@argcheck` of the constructor thus runs on the view.
 
 # Arguments
 
@@ -1706,7 +1834,8 @@ function port_opt_view(pr::HighOrderPrior, i, args...)
     skmp = pr.skmp
     sk = nothing_scalar_array_view_odd_order(sk, i, idx)
     if !isnothing(sk)
-        V = negative_spectral_coskewness(sk, view(pr.X, :, i), skmp)
+        V = negative_spectral_coskewness(sk, view(pr.X, :, i), skmp,
+                                         moment_observation_count(pr, 3))
     else
         V = nothing
     end
@@ -1720,7 +1849,8 @@ function port_opt_view(pr::HighOrderPrior, i, args...)
     end
     return HighOrderPrior(; pr = port_opt_view(pr.pr, i),
                           kt = nothing_scalar_array_view(kt, idx), D2 = D2, L2 = L2,
-                          S2 = S2, sk = sk, V = V, skmp = skmp, fpr = pr.fpr)
+                          S2 = S2, sk = sk, V = V, skmp = skmp, eoc = getfield(pr, :eoc),
+                          fpr = pr.fpr)
 end
 # The flat `f_`-prefixed names are virtual reads of the nested factor block, mirroring
 # [`LowOrderPrior`](@ref): code written against the pre-nesting shape is unaffected, and
@@ -1737,7 +1867,13 @@ end
 #
 # ForwardSelection of the remaining unknown property names to the embedded `pr` prior gives
 # transparent access to the low-order moment fields (see [`@forward_properties`](@ref)).
+#
+# `eoc` is a `swap`: the field holds the counts of the two higher moments, and the property
+# reads the four counts of the result, with the two of the low order result first. So
+# `pr.eoc[k]` indexes moment `k` on either result type. A rebuild reads the field with
+# `getfield`, so it keeps the pair.
 @forward_properties HighOrderPrior begin
+    swap(eoc, obj -> (obj.pr.eoc..., getfield(obj, :eoc)...))
     compute(f_kt, obj -> isnothing(obj.fpr) ? nothing : obj.fpr.kt)
     compute(f_sk, obj -> isnothing(obj.fpr) ? nothing : obj.fpr.sk)
     compute(f_V, obj -> isnothing(obj.fpr) ? nothing : obj.fpr.V)

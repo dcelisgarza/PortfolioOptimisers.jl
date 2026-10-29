@@ -361,24 +361,26 @@ function commutation_matrix(X::MatNum)
     return SparseArrays.sparse(row, col, data, mn, mn)
 end
 """
-    choose_scaling_parameter(ue, pr)
+    choose_scaling_parameter(ue, pr, k::Integer)
 
-Returns ``T``, the effective number of observations. The covariance divided by ``T`` is the asymptotic covariance of the mean.
+Returns ``T``, the effective number of observations of moment `k` of the prior. The covariance divided by ``T`` is the asymptotic covariance of the mean.
 
-The function reads three sources in order, and it returns the first that is not `nothing`. The sources are the `ens` of the estimator, the `ens` of the prior, and the row count of the returns matrix of the prior. A weighted or shrunk prior has fewer effective observations than rows. A prior under a Scenario Cap has fewer rows than the observations of its moments, and it states the larger count in `ens`. The first two sources are for these two cases.
+The index `k` follows the field `eoc` of the prior: `1` is the mean and `2` is the covariance. A set of the mean reads `k = 1`, and a set of the covariance reads `k = 2`. A set of both reads each count for its own half, see [`normal_sigma_scaling`](@ref).
 
-Each set of this estimator scales with ``T``. The width of a set is proportional to ``T^{-1/2}``, so a prior with fewer effective scenarios than rows gives a wider set. A division of ``T`` by four doubles the width of the mean box.
+The function reads two sources in order. The first is the `ens` of the estimator, a count that the caller states for every moment. The second is the count of the moment that the prior states, from [`moment_observation_count`](@ref). A weighted prior has fewer effective observations than rows, and a prior under a Scenario Cap has fewer rows than the observations of its moments. The prior states both counts in `eoc`, and `nothing` there means the number of rows. The `ens` of the prior is a diagnostic of its weights, and the function does not read it.
+
+Each set of this estimator scales with ``T``. The width of a set is proportional to ``T^{-1/2}``, so a prior with fewer effective observations than rows gives a wider set. A division of ``T`` by four doubles the width of the mean box.
 
 # Algorithm
 
  1. If `ue.ens` is not `nothing`, return it. It is the effective count that the estimator states.
- 2. Otherwise, if `pr.ens` is not `nothing`, return it. It is the effective count that the prior holds.
- 3. Otherwise, return `size(pr.X, 1)`, the row count of the returns matrix of the prior.
+ 2. Otherwise, return [`moment_observation_count`](@ref) of `pr` and `k`.
 
 # Arguments
 
   - `ue`: [`NormalUncertaintySet`](@ref) estimator.
   - `pr`: Prior Result.
+  - `k`: The index of the moment, `1` for the mean and `2` for the covariance.
 
 # Returns
 
@@ -388,15 +390,41 @@ Each set of this estimator scales with ``T``. The width of a set is proportional
 
   - [`NormalUncertaintySet`](@ref)
   - [`mu_asymptotic_cov`](@ref)
+  - [`moment_observation_count`](@ref)
 """
-function choose_scaling_parameter(ue::NormalUncertaintySet, pr::AbstractPriorResult)
-    return if !isnothing(ue.ens)
-        ue.ens
-    elseif !isnothing(pr.ens)
-        pr.ens
-    else
-        size(pr.X, 1)
-    end
+function choose_scaling_parameter(ue::NormalUncertaintySet, pr::AbstractPriorResult,
+                                  k::Integer)
+    return isnothing(ue.ens) ? moment_observation_count(pr, k) : ue.ens
+end
+"""
+    normal_sigma_scaling(ue::NormalUncertaintySet, pr::AbstractPriorResult, sigma::MatNum,
+                         T_mu::Number, sigma_mu::MatNum) -> Tuple
+
+Returns the scaling parameter of the covariance half of a joint set, and the mean asymptotic covariance at that parameter.
+
+A joint method of [`ucs`](@ref) builds the mean half at the count of the mean, `T_mu`. The covariance half reads the count of the covariance from [`choose_scaling_parameter`](@ref), and its shape reads the mean asymptotic covariance at that count. The two counts differ when the mean estimator and the covariance estimator of the prior carry different weights. When they are equal, the function returns `sigma_mu` itself, so the usual case computes nothing again.
+
+# Arguments
+
+  - `ue`: Normal uncertainty set estimator.
+  - `pr`: Prior Result that the set fits on.
+  - `sigma`: The covariance of `pr` on the investable assets.
+  - `T_mu`: The scaling parameter of the mean half.
+  - `sigma_mu`: The mean asymptotic covariance at `T_mu`.
+
+# Returns
+
+  - `(T, sigma_mu)`: The scaling parameter of the covariance half, and the mean asymptotic covariance at it.
+
+# Related
+
+  - [`choose_scaling_parameter`](@ref)
+  - [`mu_asymptotic_cov`](@ref)
+"""
+function normal_sigma_scaling(ue::NormalUncertaintySet, pr::AbstractPriorResult,
+                              sigma::MatNum, T_mu::Number, sigma_mu::MatNum)
+    T = choose_scaling_parameter(ue, pr, 2)
+    return T == T_mu ? (T, sigma_mu) : (T, mu_asymptotic_cov(ue.pdm, sigma, T))
 end
 """
     mu_asymptotic_cov(pdm, sigma, T)
@@ -707,17 +735,17 @@ function sigma_normal_box_set(ue::NormalUncertaintySet, pr::AbstractPriorResult,
     return BoxUncertaintySet(; lb = sigma_l, ub = sigma_u, val = sigma)
 end
 """
-    normal_box_preamble(ue::NormalUncertaintySet, pr::AbstractPriorResult)
+    normal_box_preamble(ue::NormalUncertaintySet, pr::AbstractPriorResult, k::Integer)
 
 Does the first steps that the three box methods of a [`NormalUncertaintySet`](@ref) have in common.
 
-The function finds the scaling parameter from the Prior Result, and then it makes the two values that the two boxes use. The box methods of [`ucs`](@ref), [`mu_ucs`](@ref) and [`sigma_ucs`](@ref) all call it first.
+The function finds the scaling parameter of moment `k` from the Prior Result, and then it makes the two values that the box of that moment uses. The box methods of [`ucs`](@ref), [`mu_ucs`](@ref) and [`sigma_ucs`](@ref) all call it first. The mean box reads `k = 1` and the covariance box reads `k = 2`, so [`ucs`](@ref) calls it once for each box.
 
 The returned `q` is half of `ue.q`, and the ellipsoidal route does not halve the level. A box bounds each entry on two sides, so each tail gets half of the significance level. An ellipsoid cuts only the upper tail of a non-negative distance. So one cut at the ``1 - q`` quantile covers ``1 - q``.
 
 # Algorithm
 
- 1. Resolve the scaling parameter with [`choose_scaling_parameter`](@ref) to get `T`.
+ 1. Resolve the scaling parameter of moment `k` with [`choose_scaling_parameter`](@ref) to get `T`.
  2. Build the mean asymptotic covariance with [`mu_asymptotic_cov`](@ref) to get `sigma_mu`.
  3. Halve `ue.q` to get `q`, the significance level of one tail.
  4. Return `T`, `sigma_mu` and `q` as a tuple.
@@ -726,6 +754,7 @@ The returned `q` is half of `ue.q`, and the ellipsoidal route does not halve the
 
   - `ue`: Normal uncertainty set estimator.
   - `pr`: Prior Result that the set fits on.
+  - `k`: The index of the moment of the box, `1` for the mean and `2` for the covariance.
 
 # Returns
 
@@ -739,8 +768,8 @@ The returned `q` is half of `ue.q`, and the ellipsoidal route does not halve the
   - [`mu_normal_box_set`](@ref)
   - [`sigma_normal_box_set`](@ref)
 """
-function normal_box_preamble(ue::NormalUncertaintySet, pr::AbstractPriorResult)
-    T = choose_scaling_parameter(ue, pr)
+function normal_box_preamble(ue::NormalUncertaintySet, pr::AbstractPriorResult, k::Integer)
+    T = choose_scaling_parameter(ue, pr, k)
     return T, mu_asymptotic_cov(ue.pdm, pr.sigma, T), ue.q * 0.5
 end
 """
@@ -962,9 +991,10 @@ function ucs(ue::NormalUncertaintySet{Nothing, <:BoxUncertaintySetAlgorithm, <:A
                                       <:Any}, pr::AbstractPriorResult; rd = nothing,
              kwargs...)
     imsk, prr, _ = investable_ucs_reduction(pr, rd)
-    T, sigma_mu, q = normal_box_preamble(ue, prr)
+    _, sigma_mu, q = normal_box_preamble(ue, prr, 1)
+    Ts, sigma_mu_s, _ = normal_box_preamble(ue, prr, 2)
     mu_set, sigma_set = mu_normal_box_set(prr.mu, sigma_mu, q),
-                        sigma_normal_box_set(ue, prr, T, sigma_mu, q)
+                        sigma_normal_box_set(ue, prr, Ts, sigma_mu_s, q)
     return expand_investable_ucs(mu_set, imsk, pr),
            expand_investable_ucs(sigma_set, imsk, pr)
 end
@@ -1023,7 +1053,7 @@ function mu_ucs(ue::NormalUncertaintySet{Nothing, <:BoxUncertaintySetAlgorithm, 
                                          <:Any, <:Any}, pr::AbstractPriorResult;
                 rd = nothing, kwargs...)
     imsk, prr, _ = investable_ucs_reduction(pr, rd)
-    _, sigma_mu, q = normal_box_preamble(ue, prr)
+    _, sigma_mu, q = normal_box_preamble(ue, prr, 1)
     set = mu_normal_box_set(prr.mu, sigma_mu, q)
     return expand_investable_ucs(set, imsk, pr)
 end
@@ -1086,7 +1116,7 @@ function sigma_ucs(ue::NormalUncertaintySet{Nothing, <:BoxUncertaintySetAlgorith
                                             <:Any, <:Any}, pr::AbstractPriorResult;
                    rd = nothing, kwargs...)
     imsk, prr, _ = investable_ucs_reduction(pr, rd)
-    T, sigma_mu, q = normal_box_preamble(ue, prr)
+    T, sigma_mu, q = normal_box_preamble(ue, prr, 2)
     set = sigma_normal_box_set(ue, prr, T, sigma_mu, q)
     return expand_investable_ucs(set, imsk, pr)
 end
@@ -1186,12 +1216,13 @@ function ucs(ue::NormalUncertaintySet{Nothing,
     imsk, prr, _ = investable_ucs_reduction(pr, rd)
     (; mu, sigma) = prr
     N = size(prr.X, 2)
-    T = choose_scaling_parameter(ue, prr)
+    T = choose_scaling_parameter(ue, prr, 1)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
+    Ts, sigma_mu_s = normal_sigma_scaling(ue, prr, sigma, T, sigma_mu)
     rng = resolve_rng(ue.rng, ue.seed)
     X_mu = normal_mu_error_sample(ue, rng, mu, sigma_mu)
-    X_sigma = normal_sigma_error_sample(ue, rng, sigma, sigma_mu, T, N)
-    sigma_sigma = normal_sigma_shape(ue, sigma_mu, sigma, T)
+    X_sigma = normal_sigma_error_sample(ue, rng, sigma, sigma_mu_s, Ts, N)
+    sigma_sigma = normal_sigma_shape(ue, sigma_mu_s, sigma, Ts)
     mu_set, sigma_set = ellipsoidal_set(ue.alg, ue.q, X_mu, sigma_mu,
                                         MuUncertaintySetClass(), prr.mu),
                         ellipsoidal_set(ue.alg, ue.q, X_sigma, sigma_sigma,
@@ -1271,9 +1302,10 @@ function ucs(ue::NormalUncertaintySet{Nothing,
              rd = nothing, kwargs...)
     imsk, prr, _ = investable_ucs_reduction(pr, rd)
     sigma = prr.sigma
-    T = choose_scaling_parameter(ue, prr)
+    T = choose_scaling_parameter(ue, prr, 1)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
-    sigma_sigma = normal_sigma_shape(ue, sigma_mu, sigma, T)
+    Ts, sigma_mu_s = normal_sigma_scaling(ue, prr, sigma, T, sigma_mu)
+    sigma_sigma = normal_sigma_shape(ue, sigma_mu_s, sigma, Ts)
     mu_set, sigma_set = ellipsoidal_set(ue.alg, ue.q, nothing, sigma_mu,
                                         MuUncertaintySetClass(), prr.mu),
                         ellipsoidal_set(ue.alg, ue.q, nothing, sigma_sigma,
@@ -1344,7 +1376,7 @@ function mu_ucs(ue::NormalUncertaintySet{Nothing,
                 rd = nothing, kwargs...)
     imsk, prr, _ = investable_ucs_reduction(pr, rd)
     (; mu, sigma) = prr
-    T = choose_scaling_parameter(ue, prr)
+    T = choose_scaling_parameter(ue, prr, 1)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     rng = resolve_rng(ue.rng, ue.seed)
     X_mu = normal_mu_error_sample(ue, rng, mu, sigma_mu)
@@ -1413,7 +1445,7 @@ function mu_ucs(ue::NormalUncertaintySet{Nothing,
                 rd = nothing, kwargs...)
     imsk, prr, _ = investable_ucs_reduction(pr, rd)
     sigma = prr.sigma
-    T = choose_scaling_parameter(ue, prr)
+    T = choose_scaling_parameter(ue, prr, 1)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     set = ellipsoidal_set(ue.alg, ue.q, nothing, sigma_mu, MuUncertaintySetClass(), prr.mu)
     return expand_investable_ucs(set, imsk, pr)
@@ -1488,7 +1520,7 @@ function sigma_ucs(ue::NormalUncertaintySet{Nothing,
     imsk, prr, _ = investable_ucs_reduction(pr, rd)
     sigma = prr.sigma
     N = size(prr.X, 2)
-    T = choose_scaling_parameter(ue, prr)
+    T = choose_scaling_parameter(ue, prr, 2)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     rng = resolve_rng(ue.rng, ue.seed)
     X_sigma = normal_sigma_error_sample(ue, rng, sigma, sigma_mu, T, N)
@@ -1564,7 +1596,7 @@ function sigma_ucs(ue::NormalUncertaintySet{Nothing,
                    rd = nothing, kwargs...)
     imsk, prr, _ = investable_ucs_reduction(pr, rd)
     sigma = prr.sigma
-    T = choose_scaling_parameter(ue, prr)
+    T = choose_scaling_parameter(ue, prr, 2)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     sigma_sigma = normal_sigma_shape(ue, sigma_mu, sigma, T)
     set = ellipsoidal_set(ue.alg, ue.q, nothing, sigma_sigma, SigmaUncertaintySetClass(),
@@ -1631,12 +1663,13 @@ function ucs(ue::NormalUncertaintySet{Nothing,
     imsk, prr, _ = investable_ucs_reduction(pr, rd)
     (; mu, sigma) = prr
     N = size(prr.X, 2)
-    T = choose_scaling_parameter(ue, prr)
+    T = choose_scaling_parameter(ue, prr, 1)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
+    Ts, sigma_mu_s = normal_sigma_scaling(ue, prr, sigma, T, sigma_mu)
     rng = resolve_rng(ue.rng, ue.seed)
     X_mu = normal_mu_error_sample(ue, rng, mu, sigma_mu)
-    X_sigma = normal_sigma_error_sample(ue, rng, sigma, sigma_mu, T, N)
-    sigma_sigma = normal_sigma_shape(ue, sigma_mu, sigma, T)
+    X_sigma = normal_sigma_error_sample(ue, rng, sigma, sigma_mu_s, Ts, N)
+    sigma_sigma = normal_sigma_shape(ue, sigma_mu_s, sigma, Ts)
     mu_set, sigma_set = norm_ball_set(ue.alg, ue.q, X_mu, sigma_mu, MuUncertaintySetClass(),
                                       prr.mu),
                         norm_ball_set(ue.alg, ue.q, X_sigma, sigma_sigma,
@@ -1701,9 +1734,10 @@ function ucs(ue::NormalUncertaintySet{Nothing,
              kwargs...)
     imsk, prr, _ = investable_ucs_reduction(pr, rd)
     sigma = prr.sigma
-    T = choose_scaling_parameter(ue, prr)
+    T = choose_scaling_parameter(ue, prr, 1)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
-    sigma_sigma = normal_sigma_shape(ue, sigma_mu, sigma, T)
+    Ts, sigma_mu_s = normal_sigma_scaling(ue, prr, sigma, T, sigma_mu)
+    sigma_sigma = normal_sigma_shape(ue, sigma_mu_s, sigma, Ts)
     mu_set, sigma_set = norm_ball_set(ue.alg, ue.q, nothing, sigma_mu,
                                       MuUncertaintySetClass(), prr.mu),
                         norm_ball_set(ue.alg, ue.q, nothing, sigma_sigma,
@@ -1764,7 +1798,7 @@ function mu_ucs(ue::NormalUncertaintySet{Nothing,
                 rd = nothing, kwargs...)
     imsk, prr, _ = investable_ucs_reduction(pr, rd)
     (; mu, sigma) = prr
-    T = choose_scaling_parameter(ue, prr)
+    T = choose_scaling_parameter(ue, prr, 1)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     rng = resolve_rng(ue.rng, ue.seed)
     X_mu = normal_mu_error_sample(ue, rng, mu, sigma_mu)
@@ -1823,7 +1857,7 @@ function mu_ucs(ue::NormalUncertaintySet{Nothing,
                 rd = nothing, kwargs...)
     imsk, prr, _ = investable_ucs_reduction(pr, rd)
     sigma = prr.sigma
-    T = choose_scaling_parameter(ue, prr)
+    T = choose_scaling_parameter(ue, prr, 1)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     set = norm_ball_set(ue.alg, ue.q, nothing, sigma_mu, MuUncertaintySetClass(), prr.mu)
     return expand_investable_ucs(set, imsk, pr)
@@ -1884,7 +1918,7 @@ function sigma_ucs(ue::NormalUncertaintySet{Nothing,
     imsk, prr, _ = investable_ucs_reduction(pr, rd)
     sigma = prr.sigma
     N = size(prr.X, 2)
-    T = choose_scaling_parameter(ue, prr)
+    T = choose_scaling_parameter(ue, prr, 2)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     rng = resolve_rng(ue.rng, ue.seed)
     X_sigma = normal_sigma_error_sample(ue, rng, sigma, sigma_mu, T, N)
@@ -1947,7 +1981,7 @@ function sigma_ucs(ue::NormalUncertaintySet{Nothing,
                    rd = nothing, kwargs...)
     imsk, prr, _ = investable_ucs_reduction(pr, rd)
     sigma = prr.sigma
-    T = choose_scaling_parameter(ue, prr)
+    T = choose_scaling_parameter(ue, prr, 2)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     sigma_sigma = normal_sigma_shape(ue, sigma_mu, sigma, T)
     set = norm_ball_set(ue.alg, ue.q, nothing, sigma_sigma, SigmaUncertaintySetClass(),

@@ -12,6 +12,7 @@ iq_add_neutral
 iq_add_diagonal
 iq_crossed
 gerber_IQ
+gerber_iq_observation_count
 ```
 
 ## References

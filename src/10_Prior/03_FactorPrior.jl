@@ -305,7 +305,7 @@ end
 """
     factor_lift(mp::AbstractMatrixProcessingEstimator, ve::AbstractVarianceEstimator,
                 rsd::Bool, rr::AbstractLoadingsRegressionResult, f_mu::VecNum, f_sigma::MatNum,
-                X::MatNum, posterior_X::MatNum;
+                X::MatNum, posterior_X::MatNum, T::Real = size(posterior_X, 1);
                 mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
                 kwargs...) -> NamedTuple
 
@@ -343,7 +343,7 @@ The identity ``\\mathtt{chol}^\\intercal \\mathtt{chol} = \\hat{\\mathbf{\\Sigma
  1. Read the loadings `M` and the intercepts `b` off `rr`.
  2. Project the factor mean through the loadings to get `posterior_mu`.
  3. Project the factor covariance through the loadings to get `posterior_sigma`, the systematic block.
- 4. Process `posterior_sigma` in place with [`matrix_processing!`](@ref), under `mp` and `posterior_X`.
+ 4. Process `posterior_sigma` in place with [`sample_matrix_processing!`](@ref), under `mp`, `posterior_X` and `T`. The matrix is assembled from the factor moments, so the denoising step reads the count of the factor covariance, and not the number of rows of `posterior_X`.
  5. Take the square root of `f_sigma` under `mtx_sqrt` with [`matrix_square_root`](@ref), and multiply it by the loadings to get `posterior_csigma`. This reads the `f_sigma` that the caller passed, which step 4 does not change.
  6. When `rsd` is `true`, take the reconstruction error `err = X - posterior_X`. Measure `esigma`, the column variances of `err`, with `ve`. Read the counts of those variances with [`variance_count`](@ref), and combine them with the `edof` of `rr` through [`residual_variance_counts`](@ref) to get `edof` and `ediv`. Let `err_sigma` be the diagonal matrix of the variances. When `rsd` is `false`, `esigma` and `ediv` are `nothing`, and `edof` is the `edof` of `rr`.
  7. Under `rsd`, add `err_sigma` to `posterior_sigma`, and re-condition the sum with [`posdef!`](@ref) under the estimator that [`matrix_processing_posdef`](@ref) gives for `mp`. This is the only explicit [`posdef!`](@ref) call of the function. For a [`MatrixProcessing`](@ref) that estimator is `mp.pdm`, and it also acts on `posterior_sigma` inside step 4 when `:pdm` is a member of `mp.order`.
@@ -360,6 +360,7 @@ The identity ``\\mathtt{chol}^\\intercal \\mathtt{chol} = \\hat{\\mathbf{\\Sigma
   - `f_sigma`: Factor covariance matrix, `factors × factors`.
   - $(arg_dict[:X])
   - `posterior_X`: Reconstructed asset returns from [`factor_reconstruction`](@ref).
+  - `T`: The effective number of observations of `f_sigma`, which the denoising step of `mp` reads. A caller passes the count that the factor prior states, from [`moment_observation_count`](@ref). It is `size(posterior_X, 1)` by default.
   - $(arg_dict[:mtx_sqrt])
   - `kwargs...`: Additional keyword arguments passed to matrix processing.
 
@@ -378,13 +379,14 @@ The identity ``\\mathtt{chol}^\\intercal \\mathtt{chol} = \\hat{\\mathbf{\\Sigma
 """
 function factor_lift(mp::AbstractMatrixProcessingEstimator, ve::AbstractVarianceEstimator,
                      rsd::Bool, rr::AbstractLoadingsRegressionResult, f_mu::VecNum,
-                     f_sigma::MatNum, X::MatNum, posterior_X::MatNum;
+                     f_sigma::MatNum, X::MatNum, posterior_X::MatNum,
+                     T::Real = size(posterior_X, 1);
                      mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
                      kwargs...)
     (; b, M) = rr
     posterior_mu = M * f_mu + b
     posterior_sigma = M * f_sigma * transpose(M)
-    matrix_processing!(mp, posterior_sigma, posterior_X; kwargs...)
+    sample_matrix_processing!(mp, posterior_sigma, posterior_X, T; kwargs...)
     posterior_csigma = M * matrix_square_root(mtx_sqrt, f_sigma)
     esigma = nothing
     edof = rr.edof
@@ -566,7 +568,7 @@ Where:
  1. Orient `X` and `F` with [`dims_oriented`](@ref), to `observations × assets` and `observations × factors`.
  2. Fit the wrapped prior `pe.pe` on `F` to get `f_prior`, the factor-axis prior result. The method passes `strict` to it, because `pe.pe` can be a [`BlackLittermanPrior`](@ref) or an [`EntropyPoolingPrior`](@ref), which resolve view names against a universe. The method also passes `cache_reg`, so that such a prior stores the cache that a refit under new scenario weights reads from `fpr`.
  3. Reduce `X` to its Coverage Universe with [`coverage_reduction`](@ref). When the caller gives `active_mask`, the reduction reads it in place of the active mask of `pnl`. Take the view of `pe.re` at the Coverage Universe with [`coverage_regression`](@ref). Fit the loadings and rebuild the asset returns with [`factor_reconstruction`](@ref) to get `rr` and `posterior_X`.
- 4. Project `f_prior.mu` and `f_prior.sigma` through `rr` with [`factor_lift`](@ref) to get `mu`, `sigma`, `chol`, `esigma`, `edof` and `ediv`.
+ 4. Project `f_prior.mu` and `f_prior.sigma` through `rr` with [`factor_lift`](@ref) to get `mu`, `sigma`, `chol`, `esigma`, `edof` and `ediv`. The lift processes the covariance at the count of `f_prior.sigma`, from [`moment_observation_count`](@ref).
  5. Write `esigma`, `edof` and `ediv` onto `rr` with [`set_idiosyncratic_covariance`](@ref). Under `pe.rsd = true` the fields hold the residual variances that the lift measured and their counts. Under `pe.rsd = false`, `esigma` and `ediv` hold `nothing`, because the lift added no residual block.
  6. Let `r` be the rows that `f_prior.X` carries, which are the last `size(f_prior.X, 1)` observations. A Scenario Cap of `pe.pe` keeps only the last rows of `F`. The asset side keeps the same rows, so the two blocks describe the same observations. With no cap, `r` is every observation. Steps 2 to 4 fit the moments over every observation, so the cut changes no moment.
  7. Write `r` and `ts[r]` onto `rr` as its row key with [`set_row_key`](@ref), or `nothing` for `ts` when `ts` is `nothing`.
@@ -626,7 +628,9 @@ function prior(pe::FactorPrior, X::MatNum, F::MatNum, pnl::Option{<:AssetPanel} 
     rr, posterior_X = factor_reconstruction(coverage_regression(pe.re, cmsk), Xc, F)
     (; mu, sigma, chol, esigma, edof, ediv) = factor_lift(pe.mp, pe.ve, pe.rsd, rr,
                                                           f_prior.mu, f_prior.sigma, Xc,
-                                                          posterior_X;
+                                                          posterior_X,
+                                                          moment_observation_count(f_prior,
+                                                                                   2);
                                                           mtx_sqrt = pe.mtx_sqrt, kwargs...)
     # The lift already measured the residual variances, so the block carries them instead of
     # making every consumer recompute them from the reconstruction error. Under `rsd = false`
@@ -651,14 +655,14 @@ function prior(pe::FactorPrior, X::MatNum, F::MatNum, pnl::Option{<:AssetPanel} 
     # The asset-side `w` is the factor prior's: this estimator wraps only a factor prior, and
     # `posterior_X = F*M' + b'` has exactly `F`'s rows, so it is the only weighting in
     # existence and it is over the right observation axis. Its `ens`/`kld`/`ow` travel with it
-    # — a weighting with no provenance cannot be interrogated (ADR 0046), and `ens` is what
-    # sizes every uncertainty set built on this result.
+    # — a weighting with no provenance cannot be interrogated (ADR 0046) — and so does `eoc`,
+    # the count of the moments that sizes every uncertainty set built on this result.
     return LowOrderPrior(; X = expand_columns(scenario_window(n, posterior_X), cmsk),
                          o_X = scenario_window(n, X), mu = expand_vector(mu, cmsk),
                          sigma = expand_moment(sigma, cmsk),
                          chol = expand_columns(chol, cmsk), w = f_prior.w,
-                         ens = f_prior.ens, kld = f_prior.kld, ow = f_prior.ow,
-                         rr = expand_regression(rr, cmsk), fpr = f_prior)
+                         ens = f_prior.ens, eoc = f_prior.eoc, kld = f_prior.kld,
+                         ow = f_prior.ow, rr = expand_regression(rr, cmsk), fpr = f_prior)
 end
 """
     prior(pe::FactorPrior, rd::ReturnsResult; strict::Bool = false, dims::Int = 1,

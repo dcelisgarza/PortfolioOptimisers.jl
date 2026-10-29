@@ -1033,7 +1033,7 @@ Resolves the Spanned Shrinkage `lambda` and the Orthogonal Forecast Scale `c` of
 function cross_sectional_calibration(pe::CrossSectionalFactorPrior, f_pr::NamedTuple,
                                      csfm::CrossSectionalFactorModel, sp::NamedTuple)
     pr = LowOrderPrior(; X = f_pr.X, mu = f_pr.mu, sigma = f_pr.sigma, w = f_pr.w,
-                       ens = f_pr.ens, kld = f_pr.kld, ow = f_pr.ow)
+                       ens = f_pr.ens, eoc = f_pr.eoc, kld = f_pr.kld, ow = f_pr.ow)
     ctx = CalibrationContext(;
                              cs = (; g = sp.g, ap = sp.ap, csfm = csfm, hist = sp.hist,
                                    cre = pe.cre))

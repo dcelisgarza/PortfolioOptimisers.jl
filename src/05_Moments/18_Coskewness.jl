@@ -741,6 +741,14 @@ end
 function coskewness(::Nothing, args...; kwargs...)
     return nothing, nothing
 end
+# A coskewness estimator with no weights of its own reads every row with the same weight. A
+# weighted `Coskewness` is worth the count of its weights, the count that its denoiser reads.
+function effective_observation_count(::CoskewnessEstimator, X::MatNum)
+    return size(X, 1)
+end
+function effective_observation_count(ske::Coskewness, X::MatNum)
+    return observation_weight_count(get_observation_weights(ske.w, X), size(X, 1))
+end
 
 export Coskewness, coskewness
 public CoskewnessEstimator

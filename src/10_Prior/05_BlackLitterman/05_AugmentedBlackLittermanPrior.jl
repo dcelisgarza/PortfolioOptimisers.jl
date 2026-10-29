@@ -447,7 +447,7 @@ Compute augmented Black-Litterman prior moments for asset returns.
 
 `prior` fits the asset prior and the factor prior, and it stacks them into one joint prior. It applies the asset views and the factor views to the joint prior with the Black-Litterman master equations.
 
-When `pe.tau` is `nothing`, the blending parameter is `1/T`, where `T` is the number of observations of the oriented `X`. The update gets a **total** return as its mean, and both halves have that scale. `pe.rf` reaches the update only when `pe.l` is set. There it converts the equilibrium risk premium, and it goes on the whole stack. Let ``\\mathbf{G}`` be the augmented update gain, and let ``\\mathbf{1}`` be the vector of ones. Against the same estimator at `rf = 0`, the result moves by `rf * (I - G P_aug) * 1` on each half. When `pe.l` is `nothing`, no step reads the field, and two fits that differ only in `rf` are equal on both halves.
+When `pe.tau` is `nothing`, the blending parameter is `1/T`, where `T` is the smaller of the effective numbers of observations of the two prior means, from [`moment_observation_count`](@ref). It is the number of observations of the oriented `X` when neither prior states a count. The update gets a **total** return as its mean, and both halves have that scale. `pe.rf` reaches the update only when `pe.l` is set. There it converts the equilibrium risk premium, and it goes on the whole stack. Let ``\\mathbf{G}`` be the augmented update gain, and let ``\\mathbf{1}`` be the vector of ones. Against the same estimator at `rf = 0`, the result moves by `rf * (I - G P_aug) * 1` on each half. When `pe.l` is `nothing`, no step reads the field, and two fits that differ only in `rf` are equal on both halves.
 
 # Arguments
 
@@ -486,9 +486,9 @@ When `pe.tau` is `nothing`, the blending parameter is `1/T`, where `T` is the nu
 10. Stack ``\\mathbf{P}_{aug}`` block-diagonally, and stack ``\\boldsymbol{q}_{aug}`` and ``\\boldsymbol{\\Omega}_{aug}`` to match. The asset rows are above the factor rows.
 11. Put the stacked prior mean on the total-return scale of the views. The result is `aug_prior_mu`. When `pe.l` is `nothing`, it stacks the wrapped means, which are on that scale already. When `pe.l` is set, it is the equilibrium mean of [`equilibrium_mu`](@ref), plus `pe.rf` from [`apply_rf`](@ref), plus `rr.b` on the asset half. The equilibrium mean is a risk premium, and it reads `pe.w` sliced to the reduced axis by [`investable_weights_view`](@ref).
 12. Run the master equations with [`vanilla_posteriors`](@ref) over the augmented space. The result is the augmented posterior pair. When **neither** half has a view row left, [`bl_posteriors`](@ref) gives back the joint prior. The master equations with an empty ``\\mathbf{P}_{aug}`` add ``\\tau\\boldsymbol{\\Sigma}_{aug}``, and that makes the joint covariance wider with no view to cause it.
-13. Process the augmented posterior covariance in place with [`matrix_processing!`](@ref), under `pe.mp` and `hcat(posterior_X, F)`.
+13. Process the augmented posterior covariance in place with [`sample_matrix_processing!`](@ref), under `pe.mp`, `hcat(posterior_X, F)` and the smaller of the counts of the two prior covariances.
 14. Truncate the asset half from `1:N`. Add nothing to it. The intercept and the rate went into the prior mean at step 11, and the update is affine in that mean.
-15. Let `n` be the smaller of the row counts of `a_prior.X` and `f_prior.X`. A Scenario Cap in one nested prior keeps only the last rows of its own returns. The two blocks of the result must describe the same observations, so the result keeps the last `n` rows. Cut the nested prior with more rows with [`scenario_tail`](@ref). It refuses to cut a prior that carries weights, and it gives the count of the moments in `ens`. With no cap, `n` is the count of all observations, and the step cuts nothing. The fit of the moments used every observation, so the cut changes no moment.
+15. Let `n` be the smaller of the row counts of `a_prior.X` and `f_prior.X`. A Scenario Cap in one nested prior keeps only the last rows of its own returns. The two blocks of the result must describe the same observations, so the result keeps the last `n` rows. Cut the nested prior with more rows with [`scenario_tail`](@ref). It refuses to cut a prior that carries weights, and it gives the count of the moments in `eoc`. With no cap, `n` is the count of all observations, and the step cuts nothing. The fit of the moments used every observation, so the cut changes no moment.
 16. Truncate the factor half from `N+1:N+K`. Forward the factor block with [`forward_prior`](@ref), and drop `chol`. The factor half gets no intercept, because the intercept belongs to the regression and to the asset axis alone. It gets no rate, because the stack had the rate before the update. It gets no second processing pass, because it is a principal submatrix of the matrix that step 13 processed. Do not expand the block, because the reduction did not change the factor axis.
 17. Announce the departures once with [`announce_bl_departures`](@ref).
 18. Build the prior result directly. It takes `w`, its diagnostics and `pc` from `a_prior`. It takes the last `n` rows of the reconstruction as `X` and of the oriented `X` as `o_X`, both cut by [`scenario_window`](@ref). It writes each block on the asset axis back onto the full universe. [`expand_moment`](@ref) writes the moment pair, [`expand_columns`](@ref) writes the reconstruction, and [`expand_regression`](@ref) writes the regression.
@@ -550,7 +550,12 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
                                             reduce_columns(X, imsk), F)
     (; b, M) = rr
     dt = eltype(posterior_X)
-    T = size(X, 1)
+    # The joint system blends the moments of two priors with one `tau`, so `tau` reads the
+    # smaller count of the two means, and the denoiser the smaller count of the two
+    # covariances. The joint estimate is worth no more than its less informed half (#1893).
+    T = min(moment_observation_count(a_prior, 1), moment_observation_count(f_prior, 1))
+    T_sigma = min(moment_observation_count(a_prior, 2),
+                  moment_observation_count(f_prior, 2))
     N = size(a_prior_sigma, 1)
     ledger = String[]
     # One sets, two axes: the asset views take the default `:xkey`, the factor views `:tfkey`.
@@ -622,7 +627,7 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
     else
         vanilla_posteriors(tau, aug_prior_mu, aug_prior_sigma, aug_omega, aug_P, aug_Q)
     end
-    matrix_processing!(pe.mp, aug_posterior_sigma, hcat(posterior_X, F))
+    sample_matrix_processing!(pe.mp, aug_posterior_sigma, hcat(posterior_X, F), T_sigma)
     # Nothing is added here. `aug_prior_mu` reached the update on the scale this estimator
     # returns, and the update is affine in it, so the asset half comes off that scale with
     # the intercept and the rate already in it. Truncation is the whole of the step.
@@ -673,8 +678,8 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
                          o_X = scenario_window(n, X),
                          mu = expand_moment(posterior_mu, imsk, 1),
                          sigma = expand_moment(posterior_sigma, imsk), w = a_kept.w,
-                         ens = a_kept.ens, kld = a_kept.kld, ow = a_kept.ow,
-                         rr = expand_regression(rr, imsk), fpr = fpr,
+                         ens = a_kept.ens, eoc = a_kept.eoc, kld = a_kept.kld,
+                         ow = a_kept.ow, rr = expand_regression(rr, imsk), fpr = fpr,
                          pc = opinion_pooling_cache(a_kept))
 end
 

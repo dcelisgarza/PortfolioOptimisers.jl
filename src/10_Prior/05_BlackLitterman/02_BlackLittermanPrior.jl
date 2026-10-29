@@ -300,7 +300,7 @@ The returned `omega` includes ``\\tau``, so a caller passes it to [`vanilla_post
   - $(arg_dict[:views_conf])
   - `prior_sigma::MatNum`: The prior covariance matrix of the distribution that the views update, `n × n` over that axis.
   - `pe_tau::Option{<:Number}`: The `tau` of the estimator, or `nothing`. If `nothing`, the function uses `1/T`.
-  - `T::Integer`: The number of observations, for the default `tau = 1/T`.
+  - `T::Real`: The effective number of observations of the prior mean, for the default `tau = 1/T`.
   - $(arg_dict[:datatype])
   - $(arg_dict[:strict])
   - $(arg_dict[:bl_axis])
@@ -840,7 +840,7 @@ end
 
 Fit the Black-Litterman posterior of the asset returns.
 
-When `pe.tau` is `nothing`, `tau` is `1/T`, where `T` is the number of rows of `X` in the result of the wrapped prior. `pe.rf` changes the result once, on the posterior asset expected returns. [`apply_rf`](@ref) states that rule.
+When `pe.tau` is `nothing`, `tau` is `1/T`, where `T` is the effective number of observations of the mean of the wrapped prior, `eoc[1]` of its result. It is the number of rows of `X` in that result when the result states no count. `pe.rf` changes the result once, on the posterior asset expected returns. [`apply_rf`](@ref) states that rule.
 
 # Mathematical definition
 
@@ -877,7 +877,7 @@ Where:
  6. Assemble the views and their uncertainty with [`bl_preroll`](@ref), over the reduced `prior_sigma`, with `T` equal to the number of rows of `prior_model.X`. The result is `P`, `Q`, `tau` and `omega`, or `nothing` when no view is left. The axis keeps its default, `:xkey`, because these views update the assets.
  7. Run the master equations with [`bl_posteriors`](@ref). The result is `posterior_mu` and `posterior_sigma` over the investable assets.
  8. Add `pe.rf` to `posterior_mu` with [`apply_rf`](@ref). This is the one site that adds it.
- 9. Process `posterior_sigma` in place with [`matrix_processing!`](@ref), under `pe.mp` and `posterior_X`. Do this before the expansion, because a factorisation exists only for the reduced block.
+ 9. Process `posterior_sigma` in place with [`sample_matrix_processing!`](@ref), under `pe.mp`, `posterior_X` and the count of the covariance of the wrapped prior from [`moment_observation_count`](@ref). Do this before the expansion, because a factorisation exists only for the reduced block.
 10. Report the departures once with [`announce_bl_departures`](@ref).
 11. Write both posteriors back onto the full asset universe with [`expand_moment`](@ref), so a non-investable asset carries `NaN` in `mu` and on the diagonal of `sigma`.
 12. Forward the whole of `prior_model` with [`forward_prior`](@ref), replacing `mu` and `sigma` by the expanded pair and dropping `chol`.
@@ -968,7 +968,7 @@ This function holds each step of the estimator after the wrapped prior gives its
  3. View the prior result at the mask with [`investable_prior`](@ref), and read `posterior_X`, `prior_mu` and `prior_sigma` from it.
  4. Assemble `P`, `Q`, `tau` and `omega` with [`bl_preroll`](@ref). Its `T` is the number of rows of `prior_model.X`.
  5. Run the update with [`bl_posteriors`](@ref), and add `pe.rf` once with [`apply_rf`](@ref).
- 6. Process the reduced covariance with [`matrix_processing!`](@ref), before the expansion, because a frame with `NaN` entries has no factorisation.
+ 6. Process the reduced covariance with [`sample_matrix_processing!`](@ref), at the count of the covariance of the wrapped prior, before the expansion, because a frame with `NaN` entries has no factorisation.
  7. Report the departures once with [`announce_bl_departures`](@ref).
  8. Expand both moments to the universe of the caller with [`expand_moment`](@ref).
  9. Forward each field of the wrapped result with [`forward_prior`](@ref), and drop only `chol`.
@@ -1004,8 +1004,11 @@ function bl_posterior(pe::BlackLittermanPrior, prior_model::AbstractPriorResult,
     vpr = investable_prior(imsk, prior_model)
     posterior_X, prior_mu, prior_sigma = vpr.X, vpr.mu, vpr.sigma
     ledger = String[]
+    # The default `tau` is one over the count of the prior mean, which the prior states in
+    # `eoc`, and not one over the rows that it carries (#1893).
     blp = bl_preroll(pe.views, vsets, pe.views_conf, prior_sigma, pe.tau,
-                     size(prior_model.X, 1), eltype(posterior_X), strict; ledger = ledger)
+                     moment_observation_count(prior_model, 1), eltype(posterior_X), strict;
+                     ledger = ledger)
     # `nothing` is a view set with no row left, whatever emptied it, and the pair is then the
     # prior's own.
     posterior_mu, posterior_sigma = bl_posteriors(blp, prior_mu, prior_sigma)
@@ -1014,8 +1017,11 @@ function bl_posterior(pe::BlackLittermanPrior, prior_model::AbstractPriorResult,
     # answer and is used as it stands, so a rate that prior applied internally is left alone.
     posterior_mu = apply_rf(pe.rf, posterior_mu)
     # Processed on the reduced covariance, before the expansion: `posdef!` and the denoise
-    # and detone steps all read every entry, and a `NaN` frame has no factorisation.
-    matrix_processing!(pe.mp, posterior_sigma, posterior_X; kwargs...)
+    # and detone steps all read every entry, and a `NaN` frame has no factorisation. The
+    # posterior is assembled from the moments of the prior, so the denoiser reads the count of
+    # its covariance (#1893).
+    sample_matrix_processing!(pe.mp, posterior_sigma, posterior_X,
+                              moment_observation_count(prior_model, 2); kwargs...)
     announce_bl_departures(ni, ledger, isnothing(blp))
     # The expansion. The contract is that a prior result lives on the FULL asset universe
     # with a `NaN` in `mu` and on the diagonal of `sigma` for an asset that is not

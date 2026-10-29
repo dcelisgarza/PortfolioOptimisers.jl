@@ -11,7 +11,7 @@ A `cache` holds the state of an incremental fit, not a part of the configuration
 
 # Returns
 
-  - `fields::Tuple`: The field names to render, which is `(:ve, :me, :pdm, :c, :decay, :sc, :kind, :alg, :ex)`.
+  - `fields::Tuple`: The field names to render, which is `(:ve, :me, :pdm, :c, :decay, :oc, :sc, :kind, :alg, :ex)`.
 
 # Related
 
@@ -19,7 +19,7 @@ A `cache` holds the state of an incremental fit, not a part of the configuration
   - [`show_fields`](@ref)
   - [`set_show_nothing_fields!`](@ref)
 """
-show_fields(::GerberIQCovariance) = (:ve, :me, :pdm, :c, :decay, :sc, :kind, :alg, :ex)
+show_fields(::GerberIQCovariance) = (:ve, :me, :pdm, :c, :decay, :oc, :sc, :kind, :alg, :ex)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -512,4 +512,50 @@ function Statistics.cov(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, kwargs
     X = demean_returns(X, ce.me; dims = 1, kwargs...)
     sigma = gerber_IQ(ce, X, sd)
     return StatsBase.cor2cov!(sigma, sd)
+end
+function effective_observation_count(ce::GerberIQCovariance, X::MatNum)
+    return gerber_iq_observation_count(ce.oc, ce, X)
+end
+"""
+    gerber_iq_observation_count(oc::Nothing, ce::GerberIQCovariance, X::MatNum) -> Integer
+    gerber_iq_observation_count(oc::AbstractObservationCountAlgorithm,
+                                ce::GerberIQCovariance, X::MatNum) -> Real
+
+Return the effective number of observations of a [`GerberIQCovariance`](@ref) over `X`, under the rule `oc` of its field.
+
+[`effective_observation_count`](@ref) calls this function, and the denoising step of a [`PortfolioOptimisersCovariance`](@ref) reads the count. The decay gives the observation of index `k` the weight `decay(T, k)`. A rule counts that vector of weights.
+
+# Algorithm
+
+ 1. With `oc = nothing`, return `size(X, 1)`. The function then reads no data.
+ 2. Otherwise, centre `X` with `ce.me` through [`demean_returns`](@ref), as the batch verbs do.
+ 3. Resolve the decay against the centred returns with [`regenerate_decay`](@ref), as [`gerber_IQ`](@ref) does. A rule in the delay or the rate then reads the same matrix as in the fit.
+ 4. Return [`weight_observation_count`](@ref) of `oc` over the weights `decay(T, k)`, ``k = 1, \\ldots, T``.
+
+# Arguments
+
+  - `oc`: The rule of the count, from `ce.oc`.
+  - `ce`: Gerber IQ covariance estimator.
+  - `X`: Returns matrix, `observations × assets`.
+
+# Returns
+
+  - `T_e::Real`: The effective number of observations of the matrix.
+
+# Related
+
+  - [`GerberIQCovariance`](@ref)
+  - [`effective_observation_count`](@ref)
+  - [`AbstractObservationCountAlgorithm`](@ref)
+  - [`regenerate_decay`](@ref)
+"""
+function gerber_iq_observation_count(::Nothing, ::GerberIQCovariance, X::MatNum)
+    return size(X, 1)
+end
+function gerber_iq_observation_count(oc::AbstractObservationCountAlgorithm,
+                                     ce::GerberIQCovariance, X::MatNum)
+    X = demean_returns(X, ce.me; dims = 1)
+    T = size(X, 1)
+    decay = regenerate_decay(ce.decay, X)
+    return weight_observation_count(oc, decay.(T, 1:T))
 end

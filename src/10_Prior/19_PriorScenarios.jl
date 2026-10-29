@@ -156,13 +156,13 @@ Cut a nested Prior Result to the last `n` scenarios that it carries.
 
 [`AugmentedBlackLittermanPrior`](@ref) fits two nested priors, one on the asset returns and one on the factor returns. A Scenario Cap in one of them keeps the last rows of its own returns alone. The two blocks of the result describe the same observations, so the result keeps the rows that both nested priors keep, and this function cuts the nested prior that carries more rows. The moments of `pr` are fitted over every observation, so the cut changes no moment.
 
-A Prior Result with `ens = nothing` states `size(pr.X, 1)` as the count of the observations that its moments read. The cut makes `X` shorter, so it writes that count in `ens`, as [`scenario_ens`](@ref) does for the cap itself.
+An entry of `nothing` in the `eoc` of a Prior Result states `size(pr.X, 1)` as the count of the observations that its moment reads. The cut makes `X` shorter, so it writes that count in each such entry, as [`scenario_moment_counts`](@ref) does for the cap itself.
 
 # Algorithm
 
  1. Take `t = size(pr.X, 1)`. When `n >= t`, return `pr`.
  2. Refuse a `pr` that carries weights, per `# Validation`.
- 3. Forward `pr` with [`forward_prior`](@ref), with `X` and `o_X` cut by [`scenario_window`](@ref), and with `ens` set to `t` when it is `nothing`.
+ 3. Forward `pr` with [`forward_prior`](@ref), with `X` and `o_X` cut by [`scenario_window`](@ref), and with each entry of `eoc` set to `t` when it is `nothing`.
 
 # Arguments
 
@@ -181,7 +181,7 @@ A Prior Result with `ens = nothing` states `size(pr.X, 1)` as the count of the o
 # Related
 
   - [`scenario_window`](@ref)
-  - [`scenario_ens`](@ref)
+  - [`scenario_moment_counts`](@ref)
   - [`AugmentedBlackLittermanPrior`](@ref)
 """
 function scenario_tail(pr::LowOrderPrior, n::Integer, name::Symbol)
@@ -193,7 +193,7 @@ function scenario_tail(pr::LowOrderPrior, n::Integer, name::Symbol)
               DimensionMismatch("`$name` answered $t weighted scenarios, and the other nested prior keeps the last $n. The two blocks of the result describe the same observations, so the result keeps $n rows, and the weights of `$name` have no meaning on fewer rows than they weigh. Put the same Scenario Cap inside `$name`, in the prior that it reweights, so that its weights state the same $n scenarios."))
     o_X = isnothing(pr.o_X) ? nothing : scenario_window(n, pr.o_X)
     return forward_prior(pr; X = scenario_window(n, pr.X), o_X = o_X,
-                         ens = something(pr.ens, t))
+                         eoc = map(c -> something(c, t), pr.eoc))
 end
 """
     keeps_observations(pe::AbstractPriorEstimator) -> false
@@ -887,14 +887,18 @@ function cross_sectional_moment_prior(pe::CrossSectionalFactorPrior, f_pr::Named
     # the last rows of each history, so the factor returns keep the rows the scenarios keep
     # (#1384).
     rs = (T - size(Xs, 1) + 1):T
-    lift = cross_sectional_lift(pe.srep, pe.mp, L, f_mu, f_pr.sigma, csfm.esigma, idx, Xs;
+    # The systematic block is assembled from the factor covariance, so its denoiser reads the
+    # count of that covariance (#1893).
+    lift = cross_sectional_lift(pe.srep, pe.mp, L, f_mu, f_pr.sigma, csfm.esigma, idx, Xs,
+                                something(f_pr.eoc[2], size(f_pr.X, 1));
                                 mtx_sqrt = pe.mtx_sqrt, kwargs...)
     fX = something(csfm.fr, cross_sectional_factor_returns(csfm))
     fpr = LowOrderPrior(; X = fX[rs, :], mu = ex.mu, sigma = ex.sigma, w = f_pr.w,
-                        ens = f_pr.ens, kld = f_pr.kld, ow = f_pr.ow, pc = f_pr.pc)
+                        ens = f_pr.ens, eoc = f_pr.eoc, kld = f_pr.kld, ow = f_pr.ow,
+                        pc = f_pr.pc)
     return LowOrderPrior(; X = Xs, o_X = oX, mu = lift.mu + rr.b, sigma = lift.sigma,
-                         chol = lift.chol, w = f_pr.w, ens = f_pr.ens, kld = f_pr.kld,
-                         ow = f_pr.ow, rr = rr, fpr = fpr)
+                         chol = lift.chol, w = f_pr.w, ens = f_pr.ens, eoc = f_pr.eoc,
+                         kld = f_pr.kld, ow = f_pr.ow, rr = rr, fpr = fpr)
 end
 """
     cross_sectional_stored_cache(csfm::CrossSectionalFactorModel, cache_reg::Bool,
@@ -1042,37 +1046,38 @@ function assert_scenario_model(pe::CrossSectionalFactorPrior)
     return assert_scenario_model(pe.pe)
 end
 """
-    scenario_ens(::Nothing, X::MatNum)
-    scenario_ens(max_scenarios::Integer, X::MatNum)
+    scenario_moment_counts(pe::EmpiricalPrior, X::MatNum, t::Integer)
+        -> Tuple{Option{<:Real}, Option{<:Real}}
 
-State the number of observations the moments of a capped Prior Result were fitted over, or `nothing` when the cap cuts nothing.
+State the effective number of observations of the mean and of the covariance of an empirical Prior Result, in the form of its field `eoc`.
 
-The count a Scenario Cap owes its readers. [`scenario_window`](@ref) cuts the rows the result carries and leaves `mu` and `sigma` fitted over every observation, so a consumer that prices a sample size off `size(pr.X, 1)` — an uncertainty set's `T`, a calibration rule's count — would read `w` rows for moments fitted over `t`, and mis-price every count by `t / w`. The result therefore states `t` in `ens` exactly when the cap cuts, and every count reader takes `ens` before the shape. When the cap does not cut, or there is no cap, the rows carried *are* the observations fitted over, and `ens` stays `nothing`, so a fit without a cap is bit-identical to what it was.
+`pe.me` fits `mu` and `pe.ce` fits `sigma` over every row of `X`. Each estimator states the number of observations that its moment is worth with [`effective_observation_count`](@ref). That is `size(X, 1)` for an unweighted estimator, and the count of its weights for a weighted one, such as the Kish count of an exponentially weighted covariance. The two estimators can carry different weights, so each moment has its own count.
 
-It is the same verb in batch and in `prior(pe)` with no data after a fold, as [`scenario_window`](@ref) is, and the two agree by construction: both read the same `t` off the same matrix.
+A Scenario Cap cuts the rows that the result carries to the last `t`, and leaves the moments fitted over every row. [`scenario_window`](@ref) makes the cut. A consumer that reads `size(pr.X, 1)` then reads `t` rows for moments fitted over `size(X, 1)`. So an entry of `eoc` states the count whenever it is not `t`, and `nothing` otherwise, through [`moment_count_entry`](@ref). A fit with no cap and no weights states `(nothing, nothing)`.
+
+It is the same function in batch and in `prior(pe)` with no data after a fold, as [`scenario_window`](@ref) is. The fold keeps the rows in its buffer, so both routes read the same counts over the same rows.
 
 # Arguments
 
-  - `max_scenarios`: The number of observations carried, or `nothing`.
-  - `X`: Asset returns the moments were fitted over, `observations × assets`, **before** the cut.
+  - `pe`: Empirical prior estimator.
+  - `X`: The returns that the moments were fitted over, `observations × assets`, **before** the cut. Under a horizon they are the log-returns.
+  - `t`: The number of rows that the result carries, after the cut.
 
 # Returns
 
-  - `ens::Option{<:Integer}`: `size(X, 1)` when `max_scenarios` cuts it, `nothing` otherwise.
+  - `eoc::Tuple`: The entries `(T_mu, T_sigma)` of the field `eoc`.
 
 # Related
 
   - [`scenario_window`](@ref)
+  - [`effective_observation_count`](@ref)
+  - [`moment_count_entry`](@ref)
   - [`EmpiricalPrior`](@ref)
   - [`LowOrderPrior`](@ref)
-  - [`effective_sample_size`](@ref)
 """
-function scenario_ens(::Nothing, ::MatNum)
-    return nothing
-end
-function scenario_ens(max_scenarios::Integer, X::MatNum)
-    t = size(X, 1)
-    return max_scenarios >= t ? nothing : t
+function scenario_moment_counts(pe::EmpiricalPrior, X::MatNum, t::Integer)
+    return (moment_count_entry(effective_observation_count(pe.me, X), t),
+            moment_count_entry(effective_observation_count(pe.ce, X), t))
 end
 """
     scenario_fill_report(filled, ::Nothing)

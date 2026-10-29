@@ -672,10 +672,10 @@ Returns the number of observations behind the moments of `pr`, weighted by `w`.
 A calibration rule that prices the sample size of the moments divides by this count, so those rules use one definition of it. The function reads three sources in order, and the first that gives a count wins:
 
  1. With weights, it is the effective sample size of [kish1965](@cite). That is the number of equally weighted observations that gives the precision of the weighted sample.
- 2. With no weights, it is the count that the result **states** in `ens`, when the result states one and has no weights of its own. A Scenario Cap states there the number of observations over which it fitted the moments. The result then holds fewer rows than the observations behind its moments.
+ 2. With no weights, it is the count that the result **states** in `eoc`, when the result has no weights of its own. It is the smaller of the counts of the mean and of the covariance, because a rule does not know which moment it prices, and the sample is worth no more than its less informed moment. A Scenario Cap states there the number of observations over which it fitted the moments, and a weighted estimator of an [`EmpiricalPrior`](@ref) states the count of its weights. An entry of `nothing` is the row count of `pr.X`.
  3. Otherwise, it is the row count of `pr.X`, which is then the sample.
 
-This function does not read an `ens` that is next to a `w`. That `ens` is a diagnostic of `w`, because an entropy-pooling prior writes `exp(entropy(w))` there. So a rule that reads no weights reads no diagnostic of them either. Only a cap writes an `ens` with no `w`.
+This function does not read an `eoc` that is next to a `w`. The weights `w` bind that `eoc`, because a pooling prior refits its moments under them. So a rule that reads no weights reads no count of them either. The function never reads `ens`, which is a diagnostic of `w`.
 
 A rule that prices a property of the scenarios of the measure does not read this count. [`ScenarioCount`](@ref) and [`EntropyBudget`](@ref) read the rows that the measure holds when no weights are stated. A distributionally robust measure states the count of its rows, from [`scenario_sample_size`](@ref), in the `n` of its [`CalibrationContext`](@ref), and a radius rule reads that count in place of this one.
 
@@ -686,7 +686,7 @@ The function reads the weights through [`get_observation_weights`](@ref), so it 
 ```math
 T_{e} = \\begin{cases}
 \\dfrac{\\left(\\sum\\limits_{t=1}^{T} w_{t}\\right)^{2}}{\\sum\\limits_{t=1}^{T} w_{t}^{2}} & \\textrm{if } w \\textrm{ is given}\\\\
-T_{\\mathrm{ens}} & \\textrm{if } w \\textrm{ is } \\texttt{nothing} \\textrm{ and the result states } T_{\\mathrm{ens}} \\textrm{ beside no weighting}\\\\
+\\min\\left(T_{\\mu},\\, T_{\\Sigma}\\right) & \\textrm{if } w \\textrm{ is } \\texttt{nothing} \\textrm{ and the result states no weighting}\\\\
 T & \\textrm{otherwise}
 \\end{cases}\\,.
 ```
@@ -696,13 +696,13 @@ Where:
   - $(math_dict[:T])
   - $(math_dict[:cal_T_e])
   - $(math_dict[:w_t_obs])
-  - ``T_{\\mathrm{ens}}``: The effective sample size that the result states in `ens`.
+  - ``T_{\\mu}``, ``T_{\\Sigma}``: The effective numbers of observations of the mean and of the covariance that the result states in `eoc`. An entry of `nothing` is ``T``.
 
 # Algorithm
 
  1. Resolve `w` against the first column of `pr.X` through [`get_observation_weights`](@ref), which gives `ws`.
- 2. When `ws` is not `nothing`, return the count of Kish for it.
- 3. Otherwise, return [`stated_sample_size`](@ref) of the `w`, the `ens` and the `X` of the result. That is `pr.ens` when the result states it next to no `pr.w`, and `size(pr.X, 1)` otherwise.
+ 2. When `ws` is not `nothing`, return the count of Kish for it, through [`weight_observation_count`](@ref).
+ 3. Otherwise, return [`stated_sample_size`](@ref) of the `w`, the `eoc` and the `X` of the result. That is the smaller of the counts of the mean and of the covariance when the result has no `pr.w`, and `size(pr.X, 1)` otherwise.
 
 # Arguments
 
@@ -735,37 +735,38 @@ Where:
 function effective_sample_size(pr::AbstractPriorResult, w::Option{<:ObsWeights})
     ws = get_observation_weights(w, view(pr.X, :, 1))
     return if isnothing(ws)
-        stated_sample_size(pr.w, pr.ens, pr.X)
+        stated_sample_size(pr.w, pr.eoc, pr.X)
     else
-        sum(ws)^2 / sum(abs2, ws)
+        weight_observation_count(KishObservationCount(), ws)
     end
 end
 """
-    stated_sample_size(::Nothing, ens::Number, X::MatNum)
-    stated_sample_size(w, ens, X::MatNum)
+    stated_sample_size(::Nothing, eoc::Tuple, X::MatNum)
+    stated_sample_size(w, eoc, X::MatNum)
 
-Returns the count that a Prior Result states in `ens` next to no weights, and the row count of `X` otherwise.
+Returns the count that a Prior Result states in `eoc` next to no weights, and the row count of `X` otherwise.
 
-It is the branch of [`effective_sample_size`](@ref) for no weights, and it dispatches on the `w` and the `ens` of the result. A Scenario Cap writes a result with no `w` and an `ens`, and that count is the number of observations behind its moments. An `ens` next to a `w` is a diagnostic of those weights, and a read with no weights does not take it. A result that states no `ens` holds its sample in `X`.
+It is the branch of [`effective_sample_size`](@ref) for no weights, and it dispatches on the `w` of the result. With no `w`, the count is the smaller of the counts of the mean and of the covariance, `eoc[1]` and `eoc[2]`, and an entry of `nothing` is `size(X, 1)`. A Scenario Cap writes there the number of observations behind its moments, and a weighted estimator the count of its weights. The weights `w` bind an `eoc` next to them, and a read with no weights does not take it. A result that states no count holds its sample in `X`.
 
 # Arguments
 
   - `w`: The observation weights of the result, or `nothing`.
-  - `ens`: The count that the result states, or `nothing`.
+  - `eoc`: The counts that the result states. A [`HighOrderPrior`](@ref) states four, and the function reads the first two.
   - `X`: The returns matrix of the result, `observations × assets`.
 
 # Returns
 
-  - `T::Number`: `ens` when the result states it next to no `w`, and `size(X, 1)` otherwise.
+  - `T::Number`: The smaller count of the mean and the covariance when the result has no `w`, and `size(X, 1)` otherwise.
 
 # Related
 
   - [`effective_sample_size`](@ref)
-  - [`scenario_ens`](@ref)
+  - [`moment_observation_count`](@ref)
   - [`LowOrderPrior`](@ref)
 """
-function stated_sample_size(::Nothing, ens::Number, ::MatNum)
-    return ens
+function stated_sample_size(::Nothing, eoc::Tuple, X::MatNum)
+    T = size(X, 1)
+    return min(something(eoc[1], T), something(eoc[2], T))
 end
 function stated_sample_size(::Any, ::Any, X::MatNum)
     return size(X, 1)
@@ -777,7 +778,7 @@ Returns the count of the empirical measure of the rows that `pr` holds, weighted
 
 A risk measure prices the rows of `pr.X`, and not the observations behind the moments. With weights, the measure is the weighted empirical measure of those rows, so the count is the effective sample size of [kish1965](@cite), as in [`effective_sample_size`](@ref). With no weights, the measure gives each row the same mass, so the count is the row count of `pr.X`.
 
-The two counts differ only under a Scenario Cap. A cap fits the moments over every observation, states that number in `ens`, and holds fewer rows. [`effective_sample_size`](@ref) reads `ens` there, and this function reads the rows. The `ens` that an entropy-pooling prior writes is next to a `w`, so neither count reads it.
+The two counts differ under a Scenario Cap, and under a weighted estimator of the moments. A cap fits the moments over every observation, states that number in `eoc`, and holds fewer rows. [`effective_sample_size`](@ref) reads `eoc` there, and this function reads the rows. The `eoc` of an entropy-pooling prior is next to a `w`, so neither count reads it.
 
 The function resolves `w` through [`get_observation_weights`](@ref), as the programme of a measure does. So a [`DynamicAbstractWeights`](@ref) that resolves to `nothing` gives the row count, which is the count of the measure that the programme then prices.
 
@@ -932,7 +933,7 @@ Computes a significance level that decreases with the square root of the sample 
 
 The tail probability is `c / sqrt(T)`, so the expected count of the tail is `c * sqrt(T)`. The count increases with the sample, but more slowly than the sample. The error of a sample mean decreases at the same rate. So a longer sample moves the tail further out and also puts more scenarios in it. [`ScenarioCount`](@ref) keeps the count fixed.
 
-The rule reads no observation weights. The rate is a property of the length of the record, and a count of scenarios is a property of the tail. The length of the record is [`effective_sample_size`](@ref) with no weights. That is the count that the result states in `ens` when a Scenario Cap holds fewer rows than the observations of its fit, and the row count otherwise.
+The rule reads no observation weights. The rate is a property of the length of the record, and a count of scenarios is a property of the tail. The length of the record is [`effective_sample_size`](@ref) with no weights. That is the count that the result states in `eoc` when a Scenario Cap holds fewer rows than the observations of its fit, or when a weighted estimator states the count of its weights, and the row count otherwise.
 
 The rule does not check the range of its value, for the reason that [`ScenarioCount`](@ref) states.
 
@@ -989,14 +990,14 @@ Where:
 
   - $(math_dict[:alpha_rm])
   - ``c``: Rate coefficient.
-  - $(math_dict[:T]) Under a Scenario Cap, it is the count that the result states in `ens`.
+  - $(math_dict[:T]) Under a Scenario Cap, it is the count that the result states in `eoc`.
 
 # Arguments
 
   - `alg`: The rule.
   - `key`: Name of the slot that the call resolves. The rate is the same for every key.
   - `pr`: Prior result from which the rule reads the sample length.
-  - `w`: Effective observation weights. The rule reads the length of the record, so it does not read them. Under a Scenario Cap, the length is the count that the result states in `ens`.
+  - `w`: Effective observation weights. The rule reads the length of the record, so it does not read them. Under a Scenario Cap, the length is the count that the result states in `eoc`.
   - `slv`: Effective solver. This rule needs none.
   - `ctx`: The [`CalibrationContext`](@ref) of the site. This rule reads no field of it.
 
@@ -2129,7 +2130,7 @@ Computes an ambiguity radius that decreases with the square root of the sample l
 
 The radius is `c / sqrt(T)`. The rate has a theoretical basis, and the coefficient does not. So calibrate `c` with a cross-validation, and use this rule as the form of the radius over a grid of `c`.
 
-The rule reads the length of the record and no observation weights, as [`RateSignificance`](@ref) does. The length of the record is [`effective_sample_size`](@ref) with no weights. That is the count that a Scenario Cap states in `ens`, and the row count otherwise. [`ConcentrationRadius`](@ref) reads the effective sample size of the weights instead.
+The rule reads the length of the record and no observation weights, as [`RateSignificance`](@ref) does. The length of the record is [`effective_sample_size`](@ref) with no weights. That is the count that a Scenario Cap or a weighted estimator states in `eoc`, and the row count otherwise. [`ConcentrationRadius`](@ref) reads the effective sample size of the weights instead.
 
 `c` has the units of the returns, because the rate has no units.
 
@@ -2190,14 +2191,14 @@ Where:
 
   - $(math_dict[:cal_r_radius])
   - ``c``: Rate coefficient, in the units of the returns.
-  - $(math_dict[:T]) Under a Scenario Cap, it is the count that the result states in `ens`.
+  - $(math_dict[:T]) Under a Scenario Cap, it is the count that the result states in `eoc`.
 
 # Arguments
 
   - `alg`: The rule.
   - `key`: Name of the slot that the call resolves. The rate is the same for every key.
   - `pr`: Prior result from which the rule reads the sample length.
-  - `w`: Effective observation weights. The rule reads the length of the record, so it does not read them. Under a Scenario Cap, the length is the count that the result states in `ens`.
+  - `w`: Effective observation weights. The rule reads the length of the record, so it does not read them. Under a Scenario Cap, the length is the count that the result states in `eoc`.
   - `slv`: Effective solver. This rule needs none.
   - `ctx`: The [`CalibrationContext`](@ref) of the site. This rule reads no field of it.
 

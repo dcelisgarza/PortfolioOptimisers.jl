@@ -206,6 +206,9 @@ function Statistics.mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1,
                          active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     return coverage_mean(me, me.cvg, X; dims = dims, active_mask = active_mask, kwargs...)
 end
+function effective_observation_count(me::SimpleExpectedReturns, X::MatNum)
+    return observation_weight_count(get_observation_weights(me.w, X; dims = 1), size(X, 1))
+end
 """
     coverage_mean(me, cvg, X; dims::Int = 1, active_mask = nothing, kwargs...) -> ArrNum
 

@@ -840,7 +840,8 @@ function prior(pe::HighOrderPriorEstimator, X::MatNum, F::Option{<:MatNum} = not
     X, pnl = scenario_rows(w, X, pnl)
     kt = cokurtosis(factory(pe.kte, w), X, pnl; kwargs...)
     sk, V = coskewness(factory(pe.ske, w), X, pnl; kwargs...)
-    return assemble_high_order_prior(pe, pr, kt, sk, V)
+    eoc = high_order_moment_counts(pe.ske, pe.kte, w, X, size(pr.X, 1))
+    return assemble_high_order_prior(pe, pr, kt, sk, V, eoc)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -854,7 +855,7 @@ The function sizes `D2`, `L2` and `S2` from the **full** width of `pr.X`, which 
 # Algorithm
 
  1. Build `D2`, `L2` and `S2` when both co-moments are present. Build `L2` and `S2` alone when only the cokurtosis is present.
- 2. Build the [`HighOrderPrior`](@ref). When the coskewness is present, set `skmp` to the processor of `pe.ske`, from [`coskewness_processor`](@ref).
+ 2. Build the [`HighOrderPrior`](@ref) with the counts `eoc`. When the coskewness is present, set `skmp` to the processor of `pe.ske`, from [`coskewness_processor`](@ref).
  3. Warn with [`assert_matched_coverage`](@ref) when the co-moments hold fewer assets than the low order block.
 
 # Arguments
@@ -864,6 +865,7 @@ The function sizes `D2`, `L2` and `S2` from the **full** width of `pr.X`, which 
   - `kt`: The square cokurtosis matrix, or `nothing`.
   - `sk`: The coskewness matrix, or `nothing`.
   - `V`: The negative spectral coskewness of `sk`, or `nothing`.
+  - `eoc`: The effective counts `(T_sk, T_kt)` of the two co-moments, from [`high_order_moment_counts`](@ref). It is `(nothing, nothing)` by default.
 
 # Validation
 
@@ -882,7 +884,8 @@ The function sizes `D2`, `L2` and `S2` from the **full** width of `pr.X`, which 
   - [`assert_matched_coverage`](@ref)
 """
 function assemble_high_order_prior(pe::HighOrderPriorEstimator, pr::AbstractPriorResult,
-                                   kt::Option{<:MatNum}, sk::Option{<:MatNum}, V)
+                                   kt::Option{<:MatNum}, sk::Option{<:MatNum}, V,
+                                   eoc::Tuple = (nothing, nothing))
     D2 = nothing
     L2 = nothing
     S2 = nothing
@@ -892,9 +895,69 @@ function assemble_high_order_prior(pe::HighOrderPriorEstimator, pr::AbstractPrio
         L2, S2 = dup_elim_sum_matrices(size(pr.X, 2))[2:3]
     end
     hop = HighOrderPrior(; pr = pr, kt = kt, D2 = D2, L2 = L2, S2 = S2, sk = sk, V = V,
-                         skmp = isnothing(sk) ? nothing : coskewness_processor(pe.ske))
+                         skmp = isnothing(sk) ? nothing : coskewness_processor(pe.ske),
+                         eoc = eoc)
     assert_matched_coverage(hop)
     return hop
+end
+"""
+    high_order_moment_counts(ske, kte, w, X::MatNum, t::Integer)
+        -> Tuple{Option{<:Real}, Option{<:Real}}
+
+State the effective number of observations of the coskewness and of the cokurtosis of a high order prior, in the form of the field `eoc` of a [`HighOrderPrior`](@ref).
+
+The co-moments are fitted by `factory(ske, w)` and `factory(kte, w)` over the rows `X`, so each is worth the count that its estimator states, through [`high_order_observation_count`](@ref). A weighted estimator is worth the count of its weights, which are the weights `w` of the prior when the prior states them. The denoising step of each co-moment reads the same count. An entry equal to the `t` rows of the result is written as `nothing`, through [`moment_count_entry`](@ref).
+
+# Arguments
+
+  - `ske`: The coskewness estimator, or `nothing`.
+  - `kte`: The cokurtosis estimator, or `nothing`.
+  - `w`: The observation weights of the prior result, or `nothing`.
+  - `X`: The rows that the co-moments read, `observations × assets`.
+  - `t`: The number of rows that the prior result carries in `X`.
+
+# Returns
+
+  - `eoc::Tuple`: The entries `(T_sk, T_kt)` of the field `eoc`.
+
+# Related
+
+  - [`HighOrderPrior`](@ref)
+  - [`high_order_observation_count`](@ref)
+  - [`moment_count_entry`](@ref)
+"""
+function high_order_moment_counts(ske, kte, w, X::MatNum, t::Integer)
+    return (moment_count_entry(high_order_observation_count(ske, w, X), t),
+            moment_count_entry(high_order_observation_count(kte, w, X), t))
+end
+"""
+    high_order_observation_count(est::Nothing, w, X::MatNum) -> Integer
+    high_order_observation_count(est::AbstractEstimator, w, X::MatNum) -> Real
+
+Return the effective number of observations of a co-moment that `factory(est, w)` fits over the rows `X`.
+
+A high order prior gives the weights `w` of its low order result to its co-moment estimators, so the count reads the estimator after that substitution, with [`effective_observation_count`](@ref). With no estimator the prior fits no co-moment, and the count is `size(X, 1)`.
+
+# Arguments
+
+  - `est`: The coskewness or cokurtosis estimator, or `nothing`.
+  - `w`: The observation weights of the prior result, or `nothing`.
+  - `X`: The rows that the co-moment reads, `observations × assets`.
+
+# Returns
+
+  - `T_e::Real`: The effective number of observations of the co-moment.
+
+# Related
+
+  - [`high_order_moment_counts`](@ref)
+  - [`effective_observation_count`](@ref)
+"""
+function high_order_observation_count(::Nothing, w, X::MatNum)
+    return size(X, 1)
+end
+function high_order_observation_count(est::AbstractEstimator, w, X::MatNum)
+    return effective_observation_count(factory(est, w), X)
 end
 """
     scenario_rows(w::Nothing, X::MatNum, pnl::Option{<:AssetPanel})
@@ -1270,7 +1333,9 @@ function prior(pe::HighOrderPriorEstimator; kwargs...)
     pnl = buffer_asset_panel(buf)
     kt = read_comoment(cokurtosis, pe.kte, pr.w, X, pnl; kwargs...)
     sk, V = read_comoment(coskewness, pe.ske, pr.w, X, pnl; kwargs...)
-    return stamp_returns_source(assemble_high_order_prior(pe, pr, kt, sk, V), pe)
+    eoc = high_order_moment_counts(pe.ske, pe.kte, pr.w, scenario_rows(pr.w, X, pnl)[1],
+                                   size(pr.X, 1))
+    return stamp_returns_source(assemble_high_order_prior(pe, pr, kt, sk, V, eoc), pe)
 end
 
 export HighOrderPriorEstimator

@@ -707,7 +707,7 @@ Where:
 
  1. Orient `X` and `F` to `observations × variables` with [`dims_oriented`](@ref).
  2. Compute the low order block `pr` with `pe.pe`, and check that it holds a regression result. Derive the Investable Mask from it with [`investable_mask`](@ref). Cut the whole prior result to the investable universe with [`port_opt_view`](@ref), and call the result `rpr`. `X` is an argument and not a block of the prior result, so cut it in the same way, and call it `Xr`. Take the reconstructed returns `posterior_X = rpr.X` and the loadings `M = rpr.rr.M`. When every asset is investable, the mask is `nothing`, the method cuts nothing, and the steps below run on `pr`. The cut comes **before** the lift, because the lift spreads a non-investable asset much further. One `NaN` row of loadings makes a full `NaN` band of `kron(M, M)`, and the projection spreads it over most of the cokurtosis. [`posdef!`](@ref) then refuses the matrix with a LAPACK error that does not name the asset.
- 3. Read the probabilities `w = pr.w` of the scenarios. Cut `F` to the rows `Fw` that `w` weighs, with [`scenario_rows`](@ref). Compute the factor square cokurtosis `f_kt` with `factory(pe.kte, w)` on `Fw`. When `f_kt` is not `nothing`, build `kM = kron(M, M)`, and project `posterior_kt = kM * f_kt * transpose(kM)`. Process `posterior_kt` with the estimator that [`cokurtosis_processor`](@ref)`(pe.kte)` gives.
+ 3. Read the probabilities `w = pr.w` of the scenarios. Cut `F` to the rows `Fw` that `w` weighs, with [`scenario_rows`](@ref). Read the counts `T_sk` and `T_kt` of `factory(pe.ske, w)` and `factory(pe.kte, w)` over `Fw` with [`high_order_observation_count`](@ref). Compute the factor square cokurtosis `f_kt` with `factory(pe.kte, w)` on `Fw`. When `f_kt` is not `nothing`, build `kM = kron(M, M)`, and project `posterior_kt = kM * f_kt * transpose(kM)`. Process `posterior_kt` with the estimator that [`cokurtosis_processor`](@ref)`(pe.kte)` gives, through [`sample_matrix_processing!`](@ref) at the count `T_kt`.
  4. Compute the factor coskewness `f_sk` and its negative spectral form `f_V` with `factory(pe.ske, w)` on `Fw`. When `f_sk` is not `nothing`, build `kM` if step 3 did not, and project `posterior_sk = M * f_sk * transpose(kM)`.
  5. Build the structure matrices with [`dup_elim_sum_matrices`](@ref) two times. Build `D2`, `L2` and `S2` at the **full** asset count, and `f_D2`, `f_L2` and `f_S2` at the factor count. The asset count is the full count, because step 12 expands the co-moments, and the constructor checks the matrices against `length(pr.mu)`. At both dimensions, the method selects the matrices by the rule of `prior(::HighOrderPriorEstimator, …)`.
  6. When `pe.rsd` is `true`, take the reconstruction error `err = Xr - posterior_X`. Under a Scenario Cap, `posterior_X` holds only the last rows. Then the method uses `F * transpose(M) .+ transpose(b)` over every row in place of `posterior_X`, as the residual block of `sigma` does.
@@ -715,10 +715,10 @@ Where:
  8. Under `pe.rsd`, when step 3 gave a `posterior_kt`, read the declaration of the residual block of the wrapped estimator with [`factor_residual_config`](@ref). Check its shape with [`assert_factor_residual_config`](@ref).
  9. Get the systematic covariance `sigma` from `rpr.sigma`. A `nothing` declaration, or a declaration whose `rsd` is `false`, means that the wrapped estimator added no residual block. Then `sigma` is `rpr.sigma` with no change. Otherwise, read the block with [`idiosyncratic_variances`](@ref) of `rpr.rr`, and call it `err_sigma`. These are the residual variances that the wrapped estimator added, under the weights of its own fit. A variance of `err` under `rsd_cfg.ve` does not read these weights. Subtract the diagonal matrix of `err_sigma` from `rpr.sigma`. When an entry of `err_sigma` is larger than the diagonal entry of `rpr.sigma` that matches it, the subtraction gives a negative variance. Then the step warns, and keeps `rpr.sigma` whole. This happens when the covariance of the wrapped estimator does not hold the block, such as a posterior that shrinks the sum of the lift. In both cases, repair the result with [`posdef!`](@ref) under `rsd_cfg.pdm`.
 10. Under `pe.rsd`, add [`cokurtosis_residuals`](@ref)`(sigma, err, me, pe.ex)` to `posterior_kt`. `me` comes from [`cokurtosis_expected_returns`](@ref)`(pe.kte)`. Repair the sum with [`posdef!`](@ref), under the estimator that [`matrix_processing_posdef`](@ref) gives for the processor of step 3.
-11. When step 4 gave a `posterior_sk`, compute `posterior_V` from it with [`negative_spectral_coskewness`](@ref). `V` then describes the corrected coskewness, and not the projected coskewness.
+11. When step 4 gave a `posterior_sk`, compute `posterior_V` from it with [`negative_spectral_coskewness`](@ref), at the count `T_sk`. `V` then describes the corrected coskewness, and not the projected coskewness.
 12. Expand `posterior_kt`, `posterior_sk` and `posterior_V` to the full asset universe with [`expand_moment`](@ref). The entries outside the investable block are `NaN`. The method expands `V` and does not compute it again, because `V` is a spectral value of the cut coskewness, and the full frame holds no cut returns. A `nothing` mask needs no branch of its own. For a `nothing` mask, [`expand_moment`](@ref) returns the block with no change, for each count of arguments.
 13. Build the nested factor prior result `fpr` over `pr.fpr`, from the factor moments of steps 3 to 5. When `f_kt` and `f_sk` are both `nothing`, `fpr` is `nothing`. Steps 2 and 12 do not change the factor block, because the mask is on the asset axis and these co-moments are on the factor axis.
-14. Build the asset [`HighOrderPrior`](@ref) with its keyword constructor, over the **full** `pr` and not the cut `rpr`, because every prior result covers the full asset universe.
+14. Build the asset [`HighOrderPrior`](@ref) with its keyword constructor, over the **full** `pr` and not the cut `rpr`, because every prior result covers the full asset universe. Both it and `fpr` state the counts `(T_sk, T_kt)` of step 3 in `eoc`.
 15. Warn with [`assert_matched_coverage`](@ref) when the co-moments hold fewer assets than the low order block.
 
 The order of steps 9 and 10 is necessary. [`cokurtosis_residuals`](@ref) reads the systematic covariance. So step 9 must remove the residual block that the lift of the wrapped estimator added, before step 10 adds the residual cokurtosis.
@@ -808,12 +808,18 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
     # the model, as the residual block of `sigma` does (ADR 0205).
     w = pr.w
     Fw = scenario_rows(w, F, nothing)[1]
+    # The asset co-moments are lifted from the factor co-moments, so each is worth the count
+    # of the estimator that fits its factor co-moment, and its denoiser reads that count
+    # (#1893).
+    T_sk = high_order_observation_count(pe.ske, w, Fw)
+    T_kt = high_order_observation_count(pe.kte, w, Fw)
+    eoc = map(c -> moment_count_entry(c, size(pr.X, 1)), (T_sk, T_kt))
     f_kt = cokurtosis(factory(pe.kte, w), Fw; kwargs...)
     if !isnothing(f_kt)
         kM = kron(M, M)
         posterior_kt = kM * f_kt * transpose(kM)
-        matrix_processing!(cokurtosis_processor(pe.kte), posterior_kt, posterior_X;
-                           kwargs...)
+        sample_matrix_processing!(cokurtosis_processor(pe.kte), posterior_kt, posterior_X,
+                                  T_kt; kwargs...)
     end
     f_sk, f_V = coskewness(factory(pe.ske, w), Fw; kwargs...)
     if !isnothing(f_sk)
@@ -888,7 +894,7 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
     end
     if !isnothing(f_sk)
         posterior_V = negative_spectral_coskewness(posterior_sk, posterior_X,
-                                                   coskewness_processor(pe.ske))
+                                                   coskewness_processor(pe.ske), T_sk)
     end
     # The expansion, the second half of the contract. Every asset-side co-moment goes back
     # into a `NaN` frame of the full width through the same [`expand_moment`](@ref) the
@@ -913,12 +919,13 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
     else
         HighOrderPrior(; pr = pr.fpr, kt = f_kt, D2 = f_D2, L2 = f_L2, S2 = f_S2, sk = f_sk,
                        V = f_V,
-                       skmp = isnothing(f_sk) ? nothing : coskewness_processor(pe.ske))
+                       skmp = isnothing(f_sk) ? nothing : coskewness_processor(pe.ske),
+                       eoc = eoc)
     end
     hop = HighOrderPrior(; pr = pr, kt = posterior_kt, D2 = D2, L2 = L2, S2 = S2,
                          sk = posterior_sk, V = posterior_V,
                          skmp = isnothing(f_sk) ? nothing : coskewness_processor(pe.ske),
-                         fpr = fpr)
+                         eoc = eoc, fpr = fpr)
     # The posterior co-moments run through this estimator's own `ske` and `kte`, so a policy
     # set on the low order alone narrows the Investable Mask here exactly as it does for a
     # plain high order prior. The fit is the one place that says so.

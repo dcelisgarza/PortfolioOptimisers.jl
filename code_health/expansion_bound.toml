@@ -6,11 +6,11 @@
 julia = "1.13.3"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "c68dd196ed"
+commit = "a27b34d955"
 
 [macro]
 "@define_pretty_show" = { cyc = 26, cog = 40, arg = 2 }
-"@forward_properties" = { cyc = 15, cog = 29, arg = 2 }
+"@forward_properties" = { cyc = 16, cog = 30, arg = 2 }
 "@pipe_delegates" = { cyc = 1, cog = 1, arg = 3 }
 "@pipe_route_rkb" = { cyc = 1, cog = 0, arg = 3 }
 "@pipe_route_sigma_ucs" = { cyc = 1, cog = 0, arg = 3 }

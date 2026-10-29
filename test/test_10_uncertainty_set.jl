@@ -1055,7 +1055,7 @@ end
             ue = NormalUncertaintySet(; alg = BoxUncertaintySetAlgorithm(), q = 0.05,
                                       n_sim = 4_000, seed = 1)
             pr_b = prior(ue.pe, Xd)
-            Tb, sigma_mu, q = PortfolioOptimisers.normal_box_preamble(ue, pr_b)
+            Tb, sigma_mu, q = PortfolioOptimisers.normal_box_preamble(ue, pr_b, 1)
             @test q == ue.q * 0.5
             @test Tb == size(Xd, 1)
             mset, sset = ucs(ue, Xd)
@@ -1090,28 +1090,52 @@ end
             # The per-entry box is not a joint region: over N entries it covers less.
             @test mean(vec(all(abs.(E) .<= z .* sd; dims = 1))) < 1 - ue.q
         end
-        @testset "The scaling parameter reads three sources in order" begin
+        @testset "The scaling parameter reads two sources in order, one moment at a time" begin
             rng = StableRNG(2468)
             N, T = 3, 400
             Xd = randn(rng, T, N) * 0.01
             base = NormalUncertaintySet(; alg = BoxUncertaintySetAlgorithm(), q = 0.05,
                                         n_sim = 2_000, seed = 3)
             pr_s = prior(base.pe, Xd)
-            @test isnothing(pr_s.ens)
-            @test PortfolioOptimisers.choose_scaling_parameter(base, pr_s) == size(Xd, 1)
+            @test pr_s.eoc == (nothing, nothing)
+            @test PortfolioOptimisers.choose_scaling_parameter(base, pr_s, 1) == size(Xd, 1)
+            @test PortfolioOptimisers.choose_scaling_parameter(base, pr_s, 2) == size(Xd, 1)
             # The estimator's own `ens` wins over the row count, and a prior that reports
-            # fewer effective scenarios widens the set: the width scales as T^(-1/2).
+            # fewer effective observations widens the set: the width scales as T^(-1/2).
             quarter = NormalUncertaintySet(; alg = BoxUncertaintySetAlgorithm(), q = 0.05,
                                            n_sim = 2_000, seed = 3, ens = T / 4)
-            @test PortfolioOptimisers.choose_scaling_parameter(quarter, pr_s) == T / 4
+            @test PortfolioOptimisers.choose_scaling_parameter(quarter, pr_s, 1) == T / 4
             m1, _ = ucs(base, Xd)
             m2, _ = ucs(quarter, Xd)
             @test m2.ub ≈ 2 * m1.ub
-            # The prior's own `ens` wins over the row count when the estimator states none.
-            pr_ens = PortfolioOptimisers.LowOrderPrior(; X = pr_s.X, mu = pr_s.mu,
-                                                       sigma = pr_s.sigma, ens = T / 9)
-            @test PortfolioOptimisers.choose_scaling_parameter(base, pr_ens) == T / 9
-            @test PortfolioOptimisers.choose_scaling_parameter(quarter, pr_ens) == T / 4
+            # The count of each moment that the prior states in `eoc` wins over the row
+            # count when the estimator states none (#1893). The `ens` of the prior is a
+            # diagnostic of its weights, and no set reads it.
+            pr_eoc = PortfolioOptimisers.LowOrderPrior(; X = pr_s.X, mu = pr_s.mu,
+                                                       sigma = pr_s.sigma, ens = T / 2,
+                                                       eoc = (T / 9, T / 16))
+            @test PortfolioOptimisers.choose_scaling_parameter(base, pr_eoc, 1) == T / 9
+            @test PortfolioOptimisers.choose_scaling_parameter(base, pr_eoc, 2) == T / 16
+            @test PortfolioOptimisers.choose_scaling_parameter(quarter, pr_eoc, 2) == T / 4
+            # A joint box reads each count for its own half, so it equals the two
+            # single boxes over the same prior. A set with no prior of its own reads the
+            # prior result that it is given.
+            onpr = NormalUncertaintySet(; pe = nothing, alg = BoxUncertaintySetAlgorithm(),
+                                        q = 0.05, n_sim = 2_000, seed = 3)
+            mj, sj = ucs(onpr, pr_eoc)
+            mb = mu_ucs(onpr, pr_eoc)
+            sb = sigma_ucs(onpr, pr_eoc)
+            @test mj.ub == mb.ub
+            @test sj.lb == sb.lb
+            @test sj.ub == sb.ub
+            # Each half reads its own count, so the mean box is the box at T / 9, and the
+            # covariance box differs from the box at T / 9.
+            pr_9 = PortfolioOptimisers.LowOrderPrior(; X = pr_s.X, mu = pr_s.mu,
+                                                     sigma = pr_s.sigma,
+                                                     eoc = (T / 9, T / 9))
+            m9, s9 = ucs(onpr, pr_9)
+            @test m9.ub == mj.ub
+            @test s9.ub != sj.ub
         end
         @testset "Both verbs read the asset count from the prior" begin
             # `ucs` and `sigma_ucs` both take N from `size(pr.X, 2)`, so a factor prior

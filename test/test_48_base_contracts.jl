@@ -1130,6 +1130,136 @@ end
     @test pe.matrix_processing_block!(dn, copy(sigma), X, kish) ≈
           pe.matrix_processing_block!(dn, copy(sigma), kish, N)
 end
+# Stand-ins for a member of each family that states no method of its own (#1893).
+struct NoCountRule1893 <: PortfolioOptimisers.AbstractObservationCountAlgorithm end
+struct PlainCoskewness1893 <: PortfolioOptimisers.CoskewnessEstimator end
+struct PlainCokurtosis1893 <: PortfolioOptimisers.CokurtosisEstimator end
+@testset "A Gerber IQ count rule, and the count of each moment of a prior (#1893)" begin
+    using Statistics
+    pe = PortfolioOptimisers
+    rng = StableRNG(1893)
+    X = randn(rng, 240, 3) * randn(rng, 3, 8) .* 0.01 .+ randn(rng, 240, 8) .* 0.01
+    F = randn(rng, 240, 3) .* 0.01
+    T, N = size(X)
+    dn = MatrixProcessing(; dn = Denoise())
+    wv = StatsBase.pweights(collect(range(0.2, 1.0; length = T)))
+    kish = sum(wv)^2 / sum(abs2, wv)
+    @testset "Case 1: the count rule of a Gerber IQ covariance" begin
+        @test pe.weight_observation_count(KishObservationCount(), [1.0, 1.0, 0.0]) == 2.0
+        @test_throws ArgumentError pe.weight_observation_count(NoCountRule1893(), [1.0])
+        # Equation 5 of the source, with the default delay and rate of the library.
+        e, y = round(Int, T - T / N), log(2) / N
+        wd = [exp(-y * max(0, T - k - e)) for k in 1:T]
+        Tk = sum(wd)^2 / sum(abs2, wd)
+        g0 = GerberIQCovariance()
+        g1 = GerberIQCovariance(; oc = KishObservationCount())
+        @test pe.effective_observation_count(g0, X) === T
+        @test pe.effective_observation_count(g1, X) ≈ Tk
+        @test Tk < T
+        # The rule changes the count alone, and not the matrix.
+        @test cov(g1, X) == cov(g0, X)
+        # A rule in the delay reads the centred returns, as the fit does.
+        g2 = GerberIQCovariance(; decay = ExpGerberIQDecay(; e = Xc -> 100),
+                                oc = KishObservationCount())
+        w2 = [exp(-y * max(0, T - k - 100)) for k in 1:T]
+        @test pe.effective_observation_count(g2, X) ≈ sum(w2)^2 / sum(abs2, w2)
+        # The denoiser of the wrapper reads the count of the rule. A spectral denoiser reads
+        # `T / N` only through the eigenvalues above its threshold, so the decay is strong
+        # enough here to move the count from 240 to about 40.
+        g3 = GerberIQCovariance(; decay = ExpGerberIQDecay(; e = 0, y = 0.05),
+                                oc = KishObservationCount())
+        T3 = pe.effective_observation_count(g3, X)
+        @test T3 ≈ pe.exp_weighted_kish_count(exp(-0.05), T)
+        pc = PortfolioOptimisersCovariance(; ce = g3, mp = dn)
+        S = Matrix(cov(g3, X))
+        @test cov(pc, X) ≈ pe.denoise!(Denoise(), pe.posdef!(Posdef(), copy(S)), T3 / N)
+        @test cov(pc, X) != pe.denoise!(Denoise(), pe.posdef!(Posdef(), copy(S)), T / N)
+    end
+    ew = PortfolioOptimisersCovariance(; ce = ExpWeightedCovariance(; decay = 0.97))
+    em = ExpWeightedExpectedReturns(; decay = 0.98)
+    Ts = pe.effective_observation_count(ew, X)
+    Tm = pe.effective_observation_count(em, X)
+    @testset "Each moment estimator states its own count" begin
+        @test Tm ≈ pe.exp_weighted_kish_count(0.98, T)
+        @test pe.effective_observation_count(VarianceExpectedReturns(), X) === T
+        @test pe.effective_observation_count(SimpleExpectedReturns(; w = wv), X) ≈ kish
+        @test pe.effective_observation_count(MedianExpectedReturns(; w = wv), X) ≈ kish
+        @test pe.effective_observation_count(ExcessExpectedReturns(; me = em, rf = 0.0),
+                                             X) == Tm
+        @test pe.effective_observation_count(ShrunkExpectedReturns(; me = em), X) == Tm
+        @test pe.effective_observation_count(EquilibriumExpectedReturns(; ce = ew), X) == Ts
+        @test pe.effective_observation_count(WindowedExpectedReturns(; me = em,
+                                                                     window = 50), X) ≈
+              pe.exp_weighted_kish_count(0.98, 50)
+        @test pe.effective_observation_count(Coskewness(; w = wv), X) ≈ kish
+        @test pe.effective_observation_count(Cokurtosis(; w = wv), X) ≈ kish
+        @test pe.effective_observation_count(WindowedCoskewness(; window = 50), X) == 50
+        @test pe.effective_observation_count(WindowedCokurtosis(; window = 50), X) == 50
+        @test pe.effective_observation_count(PlainCoskewness1893(), X) === T
+        @test pe.effective_observation_count(PlainCokurtosis1893(), X) === T
+        @test pe.high_order_observation_count(nothing, nothing, X) === T
+    end
+    @testset "A prior states the count of each moment in `eoc`" begin
+        pr = prior(EmpiricalPrior(; me = em, ce = ew), X)
+        @test pr.eoc == (Tm, Ts)
+        @test isnothing(pr.ens)
+        @test pe.moment_observation_count(pr, 1) == Tm
+        @test pe.moment_observation_count(prior(EmpiricalPrior(), X), 2) === T
+        @test pe.port_opt_view(pr, 1:3).eoc == pr.eoc
+        @test_throws DomainError LowOrderPrior(; X = X, mu = pr.mu, sigma = pr.sigma,
+                                               eoc = (0.0, nothing))
+        # A high order prior states the counts of its two co-moments, and reads the four.
+        hpe = HighOrderPriorEstimator(; pe = EmpiricalPrior(; me = em, ce = ew),
+                                      kte = Cokurtosis(; w = wv),
+                                      ske = Coskewness(; w = wv))
+        hop = prior(hpe, X)
+        @test getfield(hop, :eoc)[1] ≈ kish
+        @test getfield(hop, :eoc)[2] ≈ kish
+        @test hop.eoc[1:2] == (Tm, Ts)
+        @test pe.moment_observation_count(hop, 4) ≈ kish
+        @test pe.port_opt_view(hop, 1:3).eoc == hop.eoc
+        @test pe.reconstruct_prior(hop, (;)).eoc == hop.eoc
+        # The weights bind the counts, because a pooling prior refits its moments under them.
+        @test_throws PortfolioOptimisers.ConflictingArgumentError pe.forward_prior(pr;
+                                                                                   w = wv)
+        @test pe.forward_prior(prior(EmpiricalPrior(), X); w = wv).w == wv
+        @test pe.field_states_nothing((nothing, nothing))
+        @test !pe.field_states_nothing((nothing, 1.0))
+        # A rule with no weights prices the smaller count.
+        @test pe.effective_sample_size(pr, nothing) == min(Tm, Ts)
+    end
+    @testset "A matrix that a prior assembles is denoised at the count of its moments" begin
+        # The factor lift reads the count of the factor covariance.
+        prf = prior(FactorPrior(; pe = EmpiricalPrior(; ce = ew), mp = dn, rsd = false), X,
+                    F)
+        M = prf.rr.M
+        Tf = pe.effective_observation_count(ew, F)
+        @test prf.eoc == (nothing, Tf)
+        @test prf.sigma ≈
+              pe.sample_matrix_processing!(dn, M * prf.fpr.sigma * transpose(M), prf.X, Tf)
+        # The default `tau` of Black-Litterman is one over the count of the prior mean.
+        sets = UniverseSets(; dict = Dict("nx" => ["A$i" for i in 1:N]))
+        views = LinearConstraintEstimator(; val = "A1 == 0.002")
+        blm = BlackLittermanPrior(; pe = EmpiricalPrior(; me = em), sets = sets,
+                                  views = views)
+        blt = BlackLittermanPrior(; pe = EmpiricalPrior(; me = em), sets = sets,
+                                  views = views, tau = inv(Tm))
+        @test prior(blm, X).mu ≈ prior(blt, X).mu
+        # The systematic block of a cross-sectional lift reads the count that it is given.
+        S = cov(X)
+        @test pe.systematic_processing!(SystematicRepair(), dn, copy(S), X, kish) ≈
+              pe.sample_matrix_processing!(dn, copy(S), X, kish)
+        # The factor cokurtosis is lifted and denoised at the count of its estimator.
+        kte = Cokurtosis(; w = wv, mp = dn)
+        hf = prior(HighOrderFactorPriorEstimator(; pe = FactorPrior(; rsd = false),
+                                                 kte = kte, ske = nothing, rsd = false), X,
+                   F)
+        kM = kron(hf.rr.M, hf.rr.M)
+        @test getfield(hf, :eoc)[2] ≈ kish
+        @test hf.kt ≈
+              pe.sample_matrix_processing!(dn, kM * hf.fpr.kt * transpose(kM), hf.X, kish)
+    end
+end
 @testset "A rolling window has no fold, and a seed window folds" begin
     pe = PortfolioOptimisers
     rng = StableRNG(2)

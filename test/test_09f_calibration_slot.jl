@@ -2462,10 +2462,10 @@ end
     @test EntropyBudget(-1.3).target == -1.3
 end
 
-@testset "Calibration rules: a Scenario Cap states its count in `ens`, and the count readers take it (#1015)" begin
+@testset "Calibration rules: a Scenario Cap states its count in `eoc`, and the count readers take it (#1015, #1893)" begin
     # ADR 0138. `EmpiricalPrior(; max_scenarios = w)` fits the moments over every observation
     # and carries the last `w` rows, so a count read off the shape would price `w`
-    # observations for moments fitted over `t`. The result states `t` in `ens` exactly when
+    # observations for moments fitted over `t`. The result states `t` in `eoc` exactly when
     # the cap cuts, and `effective_sample_size` reads it before the shape.
     X1015 = randn(StableRNG(1015), 1250, 5) ./ 100
     pu = prior(EmpiricalPrior(), X1015)
@@ -2473,28 +2473,30 @@ end
     ctx = CalibrationContext()
 
     @testset "The cap states the count, in batch and after t folds, and only when it cuts" begin
-        @test isnothing(pu.ens)
-        @test pc.ens == 1250
+        @test pu.eoc == (nothing, nothing)
+        @test pc.eoc == (1250, 1250)
+        @test isnothing(pc.ens)
         @test size(pc.X, 1) == 250
         # A cap at or above the number of observations cuts nothing and states nothing.
-        @test isnothing(prior(EmpiricalPrior(; max_scenarios = 1250), X1015).ens)
-        @test isnothing(prior(EmpiricalPrior(; max_scenarios = 5000), X1015).ens)
+        @test prior(EmpiricalPrior(; max_scenarios = 1250), X1015).eoc == (nothing, nothing)
+        @test prior(EmpiricalPrior(; max_scenarios = 5000), X1015).eoc == (nothing, nothing)
         # The folded read-out states the same count off the same rows.
         o = EmpiricalPrior(; max_scenarios = 250)
         for i in 1:1250
             o = partial_fit!(o, X1015[i, :])
         end
         pf = prior(o)
-        @test pf.ens == 1250
+        @test pf.eoc == (1250, 1250)
         @test size(pf.X, 1) == 250
         @test pf.mu ≈ pc.mu
         # The horizon arm states it too.
-        @test prior(EmpiricalPrior(; horizon = 21, max_scenarios = 250), X1015).ens == 1250
-        @test isnothing(prior(EmpiricalPrior(; horizon = 21), X1015).ens)
-        # The verb itself: `nothing` when nothing is cut.
-        @test isnothing(PO.scenario_ens(nothing, X1015))
-        @test isnothing(PO.scenario_ens(1250, X1015))
-        @test PO.scenario_ens(1249, X1015) == 1250
+        @test prior(EmpiricalPrior(; horizon = 21, max_scenarios = 250), X1015).eoc ==
+              (1250, 1250)
+        @test prior(EmpiricalPrior(; horizon = 21), X1015).eoc == (nothing, nothing)
+        # The verb itself: `nothing` when the count equals the rows carried.
+        pe0 = EmpiricalPrior()
+        @test PO.scenario_moment_counts(pe0, X1015, 1250) == (nothing, nothing)
+        @test PO.scenario_moment_counts(pe0, X1015, 250) == (1250, 1250)
     end
 
     @testset "The count readers price t, not the rows carried" begin
@@ -2517,33 +2519,55 @@ end
         @test kappa == EntropyBudget(; target = -5.0)(:kappa,
                                                       prior(EmpiricalPrior(), X1015[1001:end, :]),
                                                       nothing, nothing, actx)
-        # The normal set's `T` reads `ens`, so its box over the capped prior is the box
+        # The normal set's `T` reads `eoc`, so its box over the capped prior is the box
         # over the uncapped one: the ellipsoid is not `√5 ≈ 2.24` times too wide.
         ue = NormalUncertaintySet(; pe = nothing)
-        @test PO.choose_scaling_parameter(ue, pc) == 1250
+        @test PO.choose_scaling_parameter(ue, pc, 1) == 1250
         @test mu_ucs(ue, pc).ub == mu_ucs(ue, pu).ub
         # The bootstrap can resample nothing but the rows carried, so it reads the cap.
         ab = ARCHUncertaintySet(; pe = nothing, seed = 3, n_sim = 20)
         @test mu_ucs(ab, pc).ub != mu_ucs(ab, pu).ub
     end
 
-    @testset "An `ens` bound to a weighting is a diagnostic of it, and is not the stated count" begin
-        # An entropy-pooling prior writes `exp(entropy(w))` beside `w`. A rule handed the
-        # weights reads Kish's count of them, as before; a rule that reads the raw row
-        # count still does, because a diagnostic of weights it ignores is not a count it
-        # reads. Neither released number moves.
+    @testset "An `ens` or an `eoc` bound to a weighting is not the stated count of a rule with no weights" begin
+        # An entropy-pooling prior writes `exp(entropy(w))` beside `w`, and the counts of the
+        # moments that `w` weights in `eoc`. A rule handed the weights reads Kish's count of
+        # them, as before; a rule that reads the raw row count still does, because a count
+        # of weights it ignores is not a count it reads.
         w = StatsBase.pweights(vcat(fill(0.5, 60), fill(1.5, 60)))
-        pw = LowOrderPrior(; X = pu.X[1:120, :], mu = pu.mu, sigma = pu.sigma, w = w,
-                           ens = exp(StatsBase.entropy(w / sum(w))))
         kish = sum(w)^2 / sum(abs2, w)
+        pw = LowOrderPrior(; X = pu.X[1:120, :], mu = pu.mu, sigma = pu.sigma, w = w,
+                           ens = exp(StatsBase.entropy(w / sum(w))), eoc = (kish, kish))
         @test PO.effective_sample_size(pw, pw.w) == kish
         @test PO.effective_sample_size(pw, nothing) == 120
         @test ScenarioCount(; n = 25)(:alpha, pw, pw.w, nothing, ctx) == 25 / kish
         @test RateSignificance()(:alpha, pw, pw.w, nothing, ctx) ==
               RateSignificance()(:alpha, pu, nothing, nothing, ctx) * sqrt(1250 / 120)
-        # The normal set reads `pr.ens` as it always did.
-        @test PO.choose_scaling_parameter(NormalUncertaintySet(; pe = nothing), pw) ==
-              pw.ens
+        # The normal set reads the count of the moments in `eoc`, the Kish count of `w`,
+        # and not the perplexity in `ens` (#1893).
+        @test PO.choose_scaling_parameter(NormalUncertaintySet(; pe = nothing), pw, 1) ==
+              kish
+        @test kish < pw.ens
+    end
+
+    @testset "A weighted estimator states its count, and a rule with no weights reads the smaller one (#1893)" begin
+        # An exponentially weighted covariance is worth fewer observations than its rows.
+        # The prior states the count of each moment, and a rule that reads no weights
+        # prices the smaller of the two, because it does not know which moment it prices.
+        ew = PortfolioOptimisersCovariance(; ce = ExpWeightedCovariance())
+        pe = prior(EmpiricalPrior(; ce = ew), X1015)
+        T_s = PO.effective_observation_count(ew, X1015)
+        @test T_s < 1250
+        @test pe.eoc == (nothing, T_s)
+        @test PO.effective_sample_size(pe, nothing) == T_s
+        @test PO.choose_scaling_parameter(NormalUncertaintySet(; pe = nothing), pe, 1) ==
+              1250
+        @test PO.choose_scaling_parameter(NormalUncertaintySet(; pe = nothing), pe, 2) ==
+              T_s
+        pm = prior(EmpiricalPrior(; ce = ew, me = ExpWeightedExpectedReturns()), X1015)
+        T_m = PO.effective_observation_count(ExpWeightedExpectedReturns(), X1015)
+        @test pm.eoc == (T_m, T_s)
+        @test PO.effective_sample_size(pm, nothing) == min(T_m, T_s)
     end
 
     @testset "A robust measure prices the rows of its ball, and a penalty prices the moments (#1833)" begin

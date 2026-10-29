@@ -2027,6 +2027,8 @@ The lookback duration ``\\tau`` of the source has no field. The estimator always
 
 [`Gerber1`](@ref) is Equation 4 of [gerber2025squeezing](@cite). Its numerator sums the signed, weighted and discounted contributions over the observations on which both assets leave the noise zone. Its denominator sums the weights over the observations on which at least one asset leaves it. Equation 5 is the discount. A direct evaluation of Equations 4 and 5 for [`BasicGerberIQ`](@ref) agrees with this estimator to machine precision.
 
+The field `oc` states the effective number of observations of the matrix. The library adds it, and the source has no such parameter. A denoiser in a [`PortfolioOptimisersCovariance`](@ref) reads the ratio `T / N`, and it gets `T` from [`effective_observation_count`](@ref). The decay gives the old rows less weight, so the matrix is worth fewer observations than `X` has rows. But the statistic is a ratio of weighted counts of co-movements over thresholds, and not a weighted moment, so no count follows from it. `oc = nothing` keeps `T = size(X, 1)`. [`KishObservationCount`](@ref) gives the Kish count of the temporal weights `decay(T, k)`, ``k = 1, \\ldots, T``.
+
 The library takes [`Gerber0`](@ref) and [`Gerber2`](@ref) from the classic Gerber family. The Internet Appendix of the source states a third form, which the library does not ship. Equation 1 of the source drops a return with ``\\lvert r^{*} \\rvert \\leq c``, so a return exactly at the threshold is noise there. The library lets that return cross, which is the closed rule of the Gerber statistic. The source centres the returns on a location ``r_0`` that the user chooses. The library centres them on the mean that `me` computes.
 
 # Fields
@@ -2039,6 +2041,7 @@ $(DocStringExtensions.FIELDS)
                          me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                          pdm::Option{<:AbstractPosdefEstimator} = Posdef(), c::Number = 0.5,
                          decay::GerberIQDecayEstimator = ExpGerberIQDecay(),
+                         oc::Option{<:AbstractObservationCountAlgorithm} = nothing,
                          sc::Option{<:GerberIQScaler} = nothing,
                          kind::GerberIQCovarianceAlgorithm = BasicGerberIQ(),
                          alg::GerberCovarianceAlgorithm = Gerber1(),
@@ -2093,6 +2096,7 @@ GerberIQCovariance
   decay ┼ ExpGerberIQDecay
         │   e ┼ nothing
         │   y ┴ nothing
+     oc ┼ nothing
      sc ┼ nothing
    kind ┼ BasicGerberIQ
         │   d ┼ Float64: 2.0
@@ -2107,6 +2111,7 @@ GerberIQCovariance
   - [`GerberIQCovarianceAlgorithm`](@ref)
   - [`GerberIQDecayEstimator`](@ref)
   - [`GerberIQScaler`](@ref)
+  - [`AbstractObservationCountAlgorithm`](@ref)
   - [`GerberCovarianceAlgorithm`](@ref)
   - [`gerber_IQ`](@ref)
   - [`cor(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
@@ -2140,6 +2145,10 @@ GerberIQCovariance
     """
     @fprop decay
     """
+    Rule of the effective number of observations, an [`AbstractObservationCountAlgorithm`](@ref), or `nothing`. A denoiser of the matrix reads the count through [`effective_observation_count`](@ref). The rule counts the temporal weights of `decay`. `nothing` reads every row as one observation, so the count is `size(X, 1)`.
+    """
+    oc
+    """
     Threshold scaler, a [`GerberIQScaler`](@ref). It sets the units of the thresholds of each pair. `nothing` gives both assets of a pair the mean of their two standard deviations.
     """
     sc
@@ -2162,7 +2171,9 @@ GerberIQCovariance
     function GerberIQCovariance(ve::StatsBase.CovarianceEstimator,
                                 me::AbstractExpectedReturnsEstimator,
                                 pdm::Option{<:AbstractPosdefEstimator}, c::Number,
-                                decay::GerberIQDecayEstimator, sc::Option{<:GerberIQScaler},
+                                decay::GerberIQDecayEstimator,
+                                oc::Option{<:AbstractObservationCountAlgorithm},
+                                sc::Option{<:GerberIQScaler},
                                 kind::GerberIQCovarianceAlgorithm,
                                 alg::GerberCovarianceAlgorithm,
                                 ex::FLoops.Transducers.Executor,
@@ -2170,15 +2181,8 @@ GerberIQCovariance
         assert_nonempty_nonneg_finite_val(c, :c)
         gerber_iq_assert_c_d(c, kind)
         kind = clamp_gerber_iq_n(kind, alg)
-        return new{typeof(ve), typeof(me), typeof(pdm), typeof(c), typeof(decay),
-                   typeof(sc), typeof(kind), typeof(alg), typeof(ex), typeof(cache)}(ve, me,
-                                                                                     pdm, c,
-                                                                                     decay,
-                                                                                     sc,
-                                                                                     kind,
-                                                                                     alg,
-                                                                                     ex,
-                                                                                     cache)
+        fs = (ve, me, pdm, c, decay, oc, sc, kind, alg, ex, cache)
+        return new{map(typeof, fs)...}(fs...)
     end
 end
 function GerberIQCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
@@ -2186,12 +2190,13 @@ function GerberIQCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance
                             pdm::Option{<:AbstractPosdefEstimator} = Posdef(),
                             c::Number = 0.5,
                             decay::GerberIQDecayEstimator = ExpGerberIQDecay(),
+                            oc::Option{<:AbstractObservationCountAlgorithm} = nothing,
                             sc::Option{<:GerberIQScaler} = nothing,
                             kind::GerberIQCovarianceAlgorithm = BasicGerberIQ(),
                             alg::GerberCovarianceAlgorithm = Gerber1(),
                             ex::FLoops.Transducers.Executor = FLoops.Transducers.ThreadedEx(),
                             cache::Option{<:AbstractPartialFitState} = nothing)
-    return GerberIQCovariance(ve, me, pdm, c, decay, sc, kind, alg, ex, cache)
+    return GerberIQCovariance(ve, me, pdm, c, decay, oc, sc, kind, alg, ex, cache)
 end
 
 export AssetVolatilityGerberIQScaler, BasicGerberIQ, PartialGerberIQ, FullGerberIQ,

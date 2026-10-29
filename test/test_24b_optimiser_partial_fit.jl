@@ -820,18 +820,18 @@ end
             @test isapprox(mo.ub, mb.ub; rtol = 1e-10)
         end
 
-        @testset "Under a Scenario Cap both routes read ens = t" begin
+        @testset "Under a Scenario Cap both routes read eoc = (t, t)" begin
             w = 30
             cap = mk(EmpiricalPrior(; max_scenarios = w), non_m, non_s)
             rb = optimise(cap, b)
-            @test rb.pr.ens == t
+            @test rb.pr.eoc == (t, t)
             @test size(rb.pr.X, 1) == w
             ro = optimise(step(cap, rd, t))
-            @test ro.pr.ens == t
+            @test ro.pr.eoc == (t, t)
             @test size(ro.pr.X, 1) == w
             # The normal set's `T` is the count behind the moments, so the capped set is the
             # uncapped set over the same observations.
-            @test po.choose_scaling_parameter(non_s, ro.pr) == t
+            @test po.choose_scaling_parameter(non_s, ro.pr, 1) == t
             unc = optimise(non, b).pr
             @test isapprox(ucs(non_s, rb.pr)[1].ub, ucs(non_s, unc)[1].ub; rtol = 1e-10)
             @test isapprox(ucs(non_s, ro.pr)[1].ub, ucs(non_s, unc)[1].ub; rtol = 1e-8)

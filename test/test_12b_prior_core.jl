@@ -2805,14 +2805,17 @@ end
     =#
     pool = PortfolioOptimisers.prior_result_property_pool()
     @test pool ==
-          [:X, :o_X, :mu, :sigma, :chol, :w, :ens, :kld, :ow, :rr, :fpr, :x_src, :ss_gaps,
-           :pc, :pr, :kt, :D2, :L2, :S2, :sk, :V, :skmp]
+          [:X, :o_X, :mu, :sigma, :chol, :w, :ens, :eoc, :kld, :ow, :rr, :fpr, :x_src,
+           :ss_gaps, :pc, :pr, :kt, :D2, :L2, :S2, :sk, :V, :skmp]
     @test allunique(pool)
-    # `fpr` is a field of both carriers, so the concatenation is not already unique.
+    # `eoc` and `fpr` are fields of both carriers, so the concatenation is not already
+    # unique.
     @test :fpr in fieldnames(LowOrderPrior)
     @test :fpr in fieldnames(HighOrderPrior)
+    @test :eoc in fieldnames(LowOrderPrior)
+    @test :eoc in fieldnames(HighOrderPrior)
     @test length(pool) ==
-          length(fieldnames(LowOrderPrior)) + length(fieldnames(HighOrderPrior)) - 1
+          length(fieldnames(LowOrderPrior)) + length(fieldnames(HighOrderPrior)) - 2
     # A fresh call rebuilds the vector, and rebuilds it the same way.
     @test pool == PortfolioOptimisers.prior_result_property_pool()
     @test pool !== PortfolioOptimisers.prior_result_property_pool()
@@ -3099,7 +3102,7 @@ end
         @test c.mu == u.mu
         @test c.sigma == u.sigma
         @test c.fpr.mu == u.fpr.mu
-        @test c.ens == c.fpr.ens == 60
+        @test c.eoc == c.fpr.eoc == (60, 60)
     end
     # A nested prior that carries weights cannot be cut to fewer rows than it weighs. The
     # cap inside it gives weights on the same scenarios.
@@ -3810,9 +3813,9 @@ end
     @test !(HighOrderPriorEstimator <: PO.AbstractHighOrderPriorEstimator_F)
     @test HighOrderFactorPriorEstimator <: PO.AbstractHighOrderPriorEstimator_F
     @test hasmethod(prior, Tuple{HighOrderPriorEstimator, Matrix{Float64}})
-    # `forward_prior` says that a hand-written constructor call names fourteen fields, and
-    # `LowOrderPrior` says that its six flat names cover fourteen fields.
-    @test fieldcount(LowOrderPrior) == 14
+    # `forward_prior` says that a hand-written constructor call names fifteen fields, and
+    # `LowOrderPrior` says that its six flat names cover fifteen fields.
+    @test fieldcount(LowOrderPrior) == 15
     # The pool holds field names only, so no computed property is in it.
     pool = PO.prior_result_property_pool()
     for k in (:f_mu, :f_sigma, :f_kt, :f_V, :original_X)

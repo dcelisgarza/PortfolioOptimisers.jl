@@ -1752,7 +1752,7 @@ Reads an [`EmpiricalPrior`](@ref) out of its fold, with no data matrix.
 
 `mu` comes from `pe.me`, `sigma` comes from `pe.ce`, and `X` is the matrix that the carry state already holds, less the observations that it marks with a Shared Series gap. The members never folded those observations, and [`shared_series_buffer`](@ref) drops them from the rows, so the result is the batch fit over the observations that the batch fit keeps. The method copies the rows, and does not refit a member that folded. The horizon method then applies the algebra of the batch method through [`horizon_moments!`](@ref), which holds that algebra once.
 
-`pe.max_scenarios` cuts the rows that the result carries, as it does in batch, and the fill runs over the rows that remain. When the cap cuts, `ens` holds the number of observations folded, through [`scenario_ens`](@ref), so a consumer that prices a sample size reads ``T`` and not the number of rows carried. The named-asset set of the carry state limits the notice of the fill, so a walk-forward names an asset at the first step whose fill reaches it, and at no later step.
+`pe.max_scenarios` cuts the rows that the result carries, as it does in batch, and the fill runs over the rows that remain. `eoc` holds the effective number of observations of `mu` and of `sigma` over the buffered rows, through [`scenario_moment_counts`](@ref). When the cap cuts, an unweighted moment counts the number of observations folded, so a consumer that prices a sample size reads ``T`` and not the number of rows carried. The named-asset set of the carry state limits the notice of the fill, so a walk-forward names an asset at the first step whose fill reaches it, and at no later step.
 
 A member that the method refits takes the [`AssetPanel`](@ref) that [`buffer_asset_panel`](@ref) rebuilds from the carried buffer, as the batch fit gives it `rd.pnl`. The buffer records the active mask of each step. So a member that the method refits answers on the Coverage Universe of a batch fit, on a gapped sample and under a time-varying panel. A member that folds read the active mask at each step of its fold, as the keyword form of its verb reads it.
 
@@ -1773,7 +1773,7 @@ Where:
   - $(math_dict[:x_t_obs])
   - $(math_dict[:T])
 
-The equality holds for `mu`, `sigma`, `X` and `ens`, with and without a horizon, and under a Scenario Cap. In floating point, the moments of a member that folds differ from the batch moments by rounding, and every other entry is equal.
+The equality holds for `mu`, `sigma`, `X` and `eoc`, with and without a horizon, and under a Scenario Cap. In floating point, the moments of a member that folds differ from the batch moments by rounding, and every other entry is equal.
 
 # Algorithm
 
@@ -1783,7 +1783,7 @@ The equality holds for `mu`, `sigma`, `X` and `ens`, with and without a horizon,
  4. Read `mu` and `sigma` through [`read_member`](@ref), which refits a member that did not fold over `X`, or over `Xl` under the horizon method. A member that it refits also takes the panel of [`buffer_asset_panel`](@ref), and the implied volatilities and `ivpa` that [`implied_volatility_buffer_kwargs`](@ref) reads from the carried buffer, as the batch verb gives `rd.pnl`, `rd.iv` and `rd.ivpa` to both members. A covariance that it refits is the [`library_covariance_estimator`](@ref) of `pe.ce`, as in the batch verb. An [`ImpliedVolatility`](@ref) has no fold, so it is such a member.
  5. Under the horizon method, convert `mu` and `sigma` with [`horizon_moments!`](@ref).
  6. Cut the carried rows to `pe.max_scenarios` with [`scenario_window`](@ref), and copy them into a new matrix `Xs`, because the next fold writes into the storage of the buffer.
- 7. Fill `Xs` with [`scenario_fill`](@ref), and build a [`LowOrderPrior`](@ref) whose `ens` [`scenario_ens`](@ref) reads from the rows before the cut.
+ 7. Fill `Xs` with [`scenario_fill`](@ref), and build a [`LowOrderPrior`](@ref) whose `eoc` [`scenario_moment_counts`](@ref) reads from the rows before the cut, the log-returns under a horizon.
  8. Record the observations of the buffer that step 3 dropped with [`shared_series_record`](@ref), and return the prior.
 
 # Arguments
@@ -1832,8 +1832,8 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any,
     # next fold, and a Result holding a view of it would change under its holder.
     Xs = Matrix(scenario_window(pe.max_scenarios, X))
     pr = LowOrderPrior(; X = scenario_fill(Xs, mu, sigma, strict, fill_limit, state.named),
-                       mu = mu, sigma = sigma, ens = scenario_ens(pe.max_scenarios, X),
-                       x_src = pe.x_src)
+                       mu = mu, sigma = sigma,
+                       eoc = scenario_moment_counts(pe, X, size(Xs, 1)), x_src = pe.x_src)
     return shared_series_record(pr, state.buf)
 end
 function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
@@ -1858,8 +1858,8 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
     horizon_moments!(mu, sigma, pe.horizon)
     Xs = Matrix(scenario_window(pe.max_scenarios, X))
     pr = LowOrderPrior(; X = scenario_fill(Xs, mu, sigma, strict, fill_limit, state.named),
-                       mu = mu, sigma = sigma, ens = scenario_ens(pe.max_scenarios, X),
-                       x_src = pe.x_src)
+                       mu = mu, sigma = sigma,
+                       eoc = scenario_moment_counts(pe, Xl, size(Xs, 1)), x_src = pe.x_src)
     return shared_series_record(pr, state.buf)
 end
 """

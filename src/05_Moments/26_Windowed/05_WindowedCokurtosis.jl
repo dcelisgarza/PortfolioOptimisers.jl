@@ -24,3 +24,7 @@
         rule ┴ RollingWindow()
     """
 end
+function effective_observation_count(kte::WindowedCokurtosis, X::MatNum)
+    inner, Xw, _ = windowed_preamble(kte.kte, kte.w, kte.window, X)
+    return effective_observation_count(inner, Xw)
+end
