@@ -508,7 +508,7 @@ Under a ratio objective the head divides the weights by ``k`` after the solve, s
 
 ## Constraints
 
-  - `<key>_ub`: ``s_c \\left(R(\\boldsymbol{w}) - u k\\right) \\leq 0`` when `flag` is `true`, and ``s_c \\left(u k - R(\\boldsymbol{w})\\right) \\leq 0`` when it is `false`, registered by the number method.
+  - `<key>_ub`: ``s_c \\left(R(\\boldsymbol{w}) - u k\\right) / m \\leq 0`` when `flag` is `true`, and ``s_c \\left(u k - R(\\boldsymbol{w})\\right) / m \\leq 0`` when it is `false`, registered by the number method.
 
 Where:
 
@@ -516,6 +516,7 @@ Where:
   - $(math_dict[:k_budget])
   - $(math_dict[:R_w])
   - ``u``: The bound, `ub`.
+  - ``m``: The [`bound_scale`](@ref) of `ub`. The division keeps the coefficients of the row of order one, so a bound of the size of a fourth moment holds.
 
 # Arguments
 
@@ -589,7 +590,9 @@ function set_risk_upper_bound!(model::JuMP.Model, ::RiskBoundOwner,
     k = get_k(model)
     sc = get_constraint_scale(model)
     d = ifelse(flag, 1, -1)
-    state_set!(model, key, :_ub, JuMP.@constraint(model, d * sc * (r_expr - ub * k) <= 0))
+    m = bound_scale(ub)
+    state_set!(model, key, :_ub,
+               JuMP.@constraint(model, d * sc * (r_expr - ub * k) / m <= 0))
     return nothing
 end
 """

@@ -385,6 +385,32 @@ end
     @test isapprox(only(b.w), a.w; atol = 1e-5)
 end
 
+@testset "A scalar ceiling of the size of a fourth moment holds under a constrained NOC" begin
+    # Each bound row divides its expression by the size of the bound. The undivided Kurtosis
+    # ceiling has coefficients near the cokurtosis, which the equilibration of Clarabel scales
+    # up only to its cap. At the default settings the centring then stopped at ALMOST_SOLVED
+    # and broke the ceiling by 1.45 %, 0.63 % and 0.085 % at the three levels below.
+    pr = prior(HighOrderPriorEstimator(), MRS_X)
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 check_sol = (; allow_local = true, allow_almost = true),
+                 settings = Dict("verbose" => false))
+    opt = JuMPOptimiser(; pe = pr, slv = slv)
+    rk = factory(Kurtosis(), pr)
+    lo = expected_risk(rk, optimise(MeanRisk(; opt = opt, r = Kurtosis())).w, pr)
+    hi = expected_risk(rk, optimise(MeanRisk(; opt = opt, obj = MaximumReturn())).w, pr)
+    for f in (0.25, 0.5, 0.75)
+        ub = lo + f * (hi - lo)
+        res = optimise(NearOptimalCentering(;
+                                            r = Kurtosis(;
+                                                         settings = RiskMeasureSettings(;
+                                                                                        ub = ub)),
+                                            obj = MaximumReturn(), opt = opt,
+                                            alg = ConstrainedNearOptimalCentering()))
+        @test isa(res.retcode, PO.OptimisationSuccess)
+        @test expected_risk(rk, res.w, pr) <= ub * (1 + 1e-5)
+    end
+end
+
 @testset "MeanRisk sweep: one measure with two bounds keeps both" begin
     pr = prior(HighOrderPriorEstimator(), MRS_X)
     opt = JuMPOptimiser(; pe = pr, slv = MRS_SLV)

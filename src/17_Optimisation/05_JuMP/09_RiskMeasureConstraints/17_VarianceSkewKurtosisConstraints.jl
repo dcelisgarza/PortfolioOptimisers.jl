@@ -51,12 +51,12 @@ Any prior result is accepted. Both tensors must resolve, on their child or on th
 ## Constraints
 
   - `M_vr_sk_kt_PSD`: ``s_c \\mathbf{M} \\succeq 0``.
-  - `vr_risk_<i>_ub`: ``s_c \\left(\\mathrm{Tr}(\\mathbf{\\Sigma} \\mathbf{W}_1) - u_{\\sigma^2} k\\right) \\leq 0``, when `vr.settings.ub` is a number.
-  - `sk_risk_<i>_ub`: ``-s_c \\left(\\mathrm{Tr}(\\mathbf{M}_3 \\mathbf{D}_2 \\mathbf{W}_2) - l_{\\mathrm{sk}} k\\right) \\leq 0``, when `sk.settings.lb` is a number.
-  - `kt_risk_<i>_ub`: ``s_c \\left(\\mathrm{Tr}(\\mathbf{S}_2 \\mathbf{K} \\mathbf{S}_2^\\intercal \\mathbf{W}_3) - u_{\\kappa} k\\right) \\leq 0``, when `kt.settings.ub` is a number.
+  - `vr_risk_<i>_ub`: ``s_c \\left(\\mathrm{Tr}(\\mathbf{\\Sigma} \\mathbf{W}_1) - u_{\\sigma^2} k\\right) / |u_{\\sigma^2}| \\leq 0``, when `vr.settings.ub` is a number.
+  - `sk_risk_<i>_ub`: ``-s_c \\left(\\mathrm{Tr}(\\mathbf{M}_3 \\mathbf{D}_2 \\mathbf{W}_2) - l_{\\mathrm{sk}} k\\right) / |l_{\\mathrm{sk}}| \\leq 0``, when `sk.settings.lb` is a number.
+  - `kt_risk_<i>_ub`: ``s_c \\left(\\mathrm{Tr}(\\mathbf{S}_2 \\mathbf{K} \\mathbf{S}_2^\\intercal \\mathbf{W}_3) - u_{\\kappa} k\\right) / |u_{\\kappa}| \\leq 0``, when `kt.settings.ub` is a number.
   - `vr_sk_kt_risk_<i>_ub`: the bound of `settings.ub` on `vr_sk_kt_risk_`, from [`set_risk_bounds_and_expression!`](@ref).
 
-[`set_risk_upper_bound!`](@ref) registers the four bound rows. A frontier in a bound replaces its row with the frontier variable of that function. Each name except those of the block carries the index `i` of the measure, and every name carries the namespace `prefix`.
+[`set_risk_upper_bound!`](@ref) registers the four bound rows. It divides each row by the [`bound_scale`](@ref) of its bound, the absolute value of the bound, or one for a zero bound, so the trace of the cokurtosis keeps coefficients of order one. A frontier in a bound replaces its row with the frontier variable of that function. Each name except those of the block carries the index `i` of the measure, and every name carries the namespace `prefix`.
 
 Where:
 

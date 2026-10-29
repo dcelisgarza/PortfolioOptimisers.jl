@@ -1115,11 +1115,11 @@ Register the risk ceiling and the return floor of a swept centring model as para
 
 `noc_rk` and `noc_rt` are the risk ceiling ``\\epsilon_{2}`` and the return floor ``\\epsilon_{1}`` of the near optimal region. A sweep moves them from point to point. So each one is a parameter times a constant, the model is built once, and only the values of the parameters change between solves.
 
-The constant is the [`parameter_scale`](@ref) of the bounds, so each parameter takes values in ``[-1, 1]``. A parameter with the size of a risk leaves the exponential cones of the barrier badly scaled.
+The constant is the [`bound_scale`](@ref) of the bounds, so each parameter takes values in ``[-1, 1]``. A parameter with the size of a risk leaves the exponential cones of the barrier badly scaled.
 
 # Algorithm
 
- 1. Compute the constants ``m_{R}`` and ``m_{\\mathrm{ret}}`` with [`parameter_scale`](@ref).
+ 1. Compute the constants ``m_{R}`` and ``m_{\\mathrm{ret}}`` with [`bound_scale`](@ref).
  2. Register the parameters `noc_rk_unit` and `noc_rt_unit`, and the expressions `noc_rk` ``= m_{R}`` `noc_rk_unit` and `noc_rt` ``= m_{\\mathrm{ret}}`` `noc_rt_unit`.
  3. Set the objective with [`set_near_optimal_objective_function!`](@ref).
  4. Divide the bounds by the constants.
@@ -1152,12 +1152,12 @@ The constant is the [`parameter_scale`](@ref) of the bounds, so each parameter t
   - [`set_noc_anchor!`](@ref)
   - [`set_near_optimal_objective_function!`](@ref)
   - [`solve_noc!`](@ref)
-  - [`parameter_scale`](@ref)
+  - [`bound_scale`](@ref)
 """
 function set_noc_anchor_parameters!(model::JuMP.Model, noc::NearOptimalCentering,
                                     attrs::ProcessedJuMPOptimiserAttributes,
                                     rk_opts::VecNum, rt_opts::VecNum)
-    m_rk, m_rt = parameter_scale(rk_opts), parameter_scale(rt_opts)
+    m_rk, m_rt = bound_scale(rk_opts), bound_scale(rt_opts)
     p_rk = JuMP.@variable(model, base_name = "noc_rk_unit",
                           set = JuMP.Parameter(zero(eltype(rk_opts))))
     p_rt = JuMP.@variable(model, base_name = "noc_rt_unit",

@@ -1,5 +1,5 @@
 ```@meta
-Description = "Frontier sweep, private API of PortfolioOptimisers.jl: frontier_point_count, frontier_sweep_points, assert_frontier_sweep_cap, frontier_axis, …"
+Description = "Frontier sweep, private API of PortfolioOptimisers.jl: frontier_point_count, frontier_sweep_points, assert_frontier_sweep_cap, frontier_axis, bound_scale, …"
 ```
 
 # [Frontier sweep: private API](@id private-api-frontier-sweep)
@@ -9,7 +9,7 @@ frontier_point_count
 frontier_sweep_points
 assert_frontier_sweep_cap
 frontier_axis
-parameter_scale
+bound_scale
 unit_frontier
 set_ret_frontier_parameters!
 set_risk_frontier_parameters!

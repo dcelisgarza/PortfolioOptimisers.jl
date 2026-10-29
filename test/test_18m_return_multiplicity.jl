@@ -568,12 +568,16 @@ end
 # A sweep parameter takes its points in the units of the largest absolute point, so its values
 # lie in [-1, 1] and its row keeps the size of the expression that it bounds.
 @testset "Frontier sweep units: a parameter takes its points in units of its scale" begin
-    @test PO.parameter_scale([1e-7, -3e-7, 2e-7]) == 3e-7
+    @test PO.bound_scale([1e-7, -3e-7, 2e-7]) == 3e-7
     # Every point zero: the scale is one, so the division is defined.
-    @test PO.parameter_scale([0.0, 0.0]) === 1.0
+    @test PO.bound_scale([0.0, 0.0]) === 1.0
     # The scale keeps the number type of the points.
-    @test PO.parameter_scale([1 // 4, -1 // 2]) === 1 // 2
-    @test PO.parameter_scale([2, 3]) === 3
+    @test PO.bound_scale([1 // 4, -1 // 2]) === 1 // 2
+    @test PO.bound_scale([2, 3]) === 3
+    # A scalar bound is its own only point.
+    @test PO.bound_scale(-2e-7) == 2e-7
+    @test PO.bound_scale(0.0) === 1.0
+    @test PO.bound_scale(-1 // 4) === 1 // 4
     two = [(:ret_lb_var_1, :ret_lb_1) => (nothing, [10.0, 20.0], 1),
            (:ret_lb_var_2, :ret_lb_2) => (nothing, [-30.0, 40.0, 50.0], 2)]
     units = PO.unit_frontier(two)

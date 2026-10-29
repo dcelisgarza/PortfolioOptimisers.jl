@@ -23,13 +23,14 @@ term can constrain the portfolio and stay out of the objective.
 
 ## Constraints
 
-  - `ret_lb_i`: ``s_c \\left(\\mathrm{ret}_i - \\mathrm{lb}_i\\, k\\right) \\geq 0``, for a number bound.
+  - `ret_lb_i`: ``s_c \\left(\\mathrm{ret}_i - \\mathrm{lb}_i\\, k\\right) / m_i \\geq 0``, for a number bound.
 
 Where:
 
   - $(math_dict[:k_budget])
   - $(math_dict[:ret_i_term])
   - ``\\mathrm{lb}_i``: The number bound of term ``i``.
+  - ``m_i``: The [`bound_scale`](@ref) of ``\\mathrm{lb}_i``, which keeps the coefficients of the row of order one.
   - $(math_dict[:sc_scale])
 
 # Arguments
@@ -55,8 +56,9 @@ end
 function set_return_bounds!(model::JuMP.Model, i, ret_expr, lb::Number)
     sc = get_constraint_scale(model)
     k = get_k(model)
+    m = bound_scale(lb)
     state_set!(model, Symbol(""), :ret_lb_, i,
-               JuMP.@constraint(model, sc * (ret_expr - lb * k) >= 0))
+               JuMP.@constraint(model, sc * (ret_expr - lb * k) / m >= 0))
     return nothing
 end
 function set_return_bounds!(model::JuMP.Model, i, ret_expr, lb::Front_NumVec)
