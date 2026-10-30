@@ -1231,3 +1231,28 @@ end
     sets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"]))
     @test_throws MethodError risk_budget_constraints(M, sets)
 end
+
+@testset "MIP indicator bundles and the big-M constant (#1912)" begin
+    pe = PortfolioOptimisers
+    @test pe.get_mip_ss(5.0, WeightBounds(; lb = 0.0, ub = 1.0)) == 5.0
+    # A bound that is absent adds no magnitude, and bounds that are all absent give 1000.
+    @test pe.get_mip_ss(nothing, WeightBounds(; lb = nothing, ub = [0.5, 0.25])) == 500.0
+    @test pe.get_mip_ss(nothing, WeightBounds(; lb = [-2.0, 0.5], ub = nothing)) == 2000.0
+    @test pe.get_mip_ss(nothing, WeightBounds(; lb = nothing, ub = nothing)) == 1000.0
+    ib = [1, 0, 1]
+    held = pe.HeldIndicators(ib, ib)
+    @test pe.long_bin(held) === ib
+    @test pe.short_bin(held) == [0, 1, 0]
+    ls = pe.LongShortIndicators([1, 0], [0, 1], [1, 0], [0, 1], [1, 1])
+    @test pe.held(ls) == [1, 1]
+    @test isnothing(pe.mip_wb(JuMP.Model(), pe.AssetMIPSpace(), nothing))
+end
+
+@testset "A vector of membership estimators is viewed estimator by estimator (#1912)" begin
+    smtx = [AssetSetsMatrixEstimator(; val = "clusters1"),
+            AssetSetsMatrixEstimator(; val = "clusters2")]
+    v = PortfolioOptimisers.port_opt_view(smtx, [1, 2])
+    @test length(v) == 2
+    @test all(x -> x isa AssetSetsMatrixEstimator, v)
+    @test [x.val for x in v] == ["clusters1", "clusters2"]
+end

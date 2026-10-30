@@ -329,3 +329,53 @@ red on the day it lands, because every later measurement of that file is wrong w
 - **A file's coverage number now means what it says.** Before this ruling a row could read
   `misses = 0` over a third of a file, and nothing in the baseline, the rulings or the manifest
   recorded the gap.
+
+## Amendment (2026-10-30): a tripped ratchet reds its own check, and it runs on a red suite
+
+### What the advisory verdict cost
+
+The amendment of 2026-08-27 accepted that "a rise can reach `dev` unnoticed by a contributor who
+does not open the run". That cost was measured in #1912. From 2026-10-20 to 2026-10-27, every green
+`Test` run of `dev` tripped the ratchet, and the count grew from 66 files to 69. In the last green
+run, 61 of the tripped files read `swept = true` in `code_health/sweep_manifest.toml`, so the
+manifest claimed condition 3 of #404 for files that CI measured with misses. Three faults hid it:
+
+1. The ratchet step carried `continue-on-error: true`, so no check turned red.
+2. The step `Publish the Refresh Artifact` read `if: failure()` from 2026-09-15, which is never
+   true after a step with `continue-on-error`. No run published the artifact.
+3. The `coverage` job ran only after a green test job. From 2026-10-27, each `Test` run was red for
+   reasons outside coverage, so the gate did not run at all while the misses rose.
+
+### The decision
+
+- **The ratchet step does not continue on an error.** A trip turns the `Coverage ratchet` check red.
+  The test check is a different job, `Julia 1 - …`, and it keeps the verdict of the suite alone. The
+  two claims stay two checks, which is what the amendment of 2026-08-27 asked for. The calling
+  workflow turns red, and this is the signal that was missing.
+- **The two steps after the ratchet read `failure() && steps.ratchet.outcome == 'failure'`.** A step
+  after a failed step runs only when its guard calls a status function. The outcome keeps the two
+  steps quiet when a step before the ratchet failed.
+- **The `coverage` job runs on a red suite.** `julia-processcoverage` and the upload of `lcov.info`
+  run unless the run was cancelled or the build skipped the tests. The test job exports the outcome
+  of the upload, and the `coverage` job runs when it is `success`. A test that stopped early can
+  leave lines uncounted, so the report step states in the summary that the suite was red. Codecov
+  still reads a green suite alone.
+- **`test/test_49_coverage_attribution_census.jl` pins these guards.** A Dependabot pull request into
+  `main` put back the broken guard in #488, in the hunk of a version bump. A test fails on the next
+  run of such a change.
+
+### Consequences
+
+- **A rise on `dev` turns the `Test` workflow red.** The `Coverage ratchet` job is still not a
+  required check of the ruleset of `main` (ADR 0220), so a trip does not block a release by itself.
+- **A red suite can show a false rise.** The summary names the state of the suite, so a reader can
+  tell a rise from the code from a rise from a test that stopped.
+- **The push guard asks for a `coverage` stamp.** A push to `dev` that changes the code under `src/`
+  or `ext/` needs a run of its targeted files under `test/run_files.jl --coverage=<dir>`. The run
+  reads each line that the branch adds the way CI reads it: a counter at zero is a miss, and so is
+  a body line with no counter, which is a method that no test compiled. The run records the stamp
+  when the files are green and no added line is a miss. A line that no test can reach takes a
+  Coverage Exemption and `gate_stamp.sh waive coverage <reason>`. A change to prose, a `jldoctest`
+  block or a string literal needs no stamp. The `sweep-conform` skill states the step. The local
+  run reads the targeted files alone, so a line that only a file outside them reaches reads as a
+  miss. Add that file to the run.

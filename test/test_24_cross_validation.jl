@@ -1063,6 +1063,10 @@
         @test PortfolioOptimisers.quantile_by_measure(ppred, MaximumDrawdown(), 0.5) isa
               MultiPeriodPredictionResult
 
+        # A single-fold member keeps itself when the population numbers it (#1912).
+        single = quiet.pred[1]
+        @test PortfolioOptimisers.with_position_id(single, 3) === single
+
         #=
         Issue #1250: a population built by hand from `cross_val_predict` streams numbers its
         members, so the path a scorer selects names its place instead of `nothing`.
@@ -1748,6 +1752,19 @@
         # Liveness: valid property and index paths still build working lenses.
         @test PortfolioOptimisers.parse_lens("opt.pe.ce") isa Base.Callable
         @test PortfolioOptimisers.parse_lens("a[2]") isa Base.Callable
+    end
+    @testset "Search grid keys, symbol indices and the empty grid (#1912)" begin
+        pe = PortfolioOptimisers
+        # A bare symbol is the base case of the lens chain, a symbol index is kept as is.
+        @test pe._expr_to_lens(:a) == PropertyLens(:a)
+        @test pe._eval_index(:b) === :b
+        @test pe.parse_lens("a[b]") isa Base.Callable
+        # A vector of dictionaries holds only String, Symbol or Integer keys.
+        gk = GridSearchCrossValidation([Dict("opt.l1" => [0.1, 0.2])])
+        @test length(gk.p) == 1
+        @test_throws ArgumentError GridSearchCrossValidation([Dict(1.5 => [0.1, 0.2])])
+        # An empty list of factors is a grid of one candidate, and passes the cap.
+        @test isnothing(pe.assert_search_grid_cap(Pair{String, Int}[]))
     end
     @testset "parse_lens recursion caps" begin
         # Same trust boundary as the equation parser (ADR 0027): an over-long / deeply

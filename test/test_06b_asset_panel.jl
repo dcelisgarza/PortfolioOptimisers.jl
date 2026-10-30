@@ -396,6 +396,31 @@ end
                                                                                    "prox"),
                                                    nothing)
 end
+@testset "Panel Fields without a placeholder mask, and panels without Panel Fields" begin
+    # The positional constructor with no placeholder mask states `pmsk = nothing`.
+    num = NumericPanelField("a", [1.0, 2.0], nothing)
+    @test (num.name, num.vals, num.omsk) == ("a", [1.0, 2.0], nothing)
+    @test isnothing(num.pmsk)
+    cat = CategoricalPanelField("s", ["x", "y"], [1, 2], nothing)
+    @test (cat.name, cat.levels, cat.codes, cat.omsk) == ("s", ["x", "y"], [1, 2], nothing)
+    @test isnothing(cat.pmsk)
+    ten = TensorPanelField("b", "f", ["u"], nothing, reshape([1.0, 2.0], 2, 1), nothing)
+    @test (ten.name, ten.axis, ten.labels, ten.vals) ==
+          ("b", "f", ["u"], reshape([1.0, 2.0], 2, 1))
+    @test isnothing(ten.pmsk)
+    # A panel with no Panel Fields, or no panel at all, derives no Feature Matrix.
+    @test panel_feature_matrix(nothing) == (nothing, nothing)
+    masks_only = AssetPanel(; amsk = trues(2, 2), emsk = trues(2, 2))
+    @test panel_feature_matrix(masks_only) == (nothing, nothing)
+    # A build of static inputs and an estimation mask alone reads its observation count off
+    # that mask.
+    p = asset_panel([NumericPanelInput(; name = "a", vals = [1.0, 2.0, 3.0])];
+                    emsk = trues(2, 3))
+    @test !PortfolioOptimisers.panel_is_static(p)
+    @test size(p.emsk) == (2, 3)
+    @test p.amsk == trues(2, 3)
+    @test PortfolioOptimisers.panel_build_observations(nothing, trues(2, 3)) == 2
+end
 @testset "Fill policies" begin
     @test PortfolioOptimisers.is_panel_blank(missing)
     @test PortfolioOptimisers.is_panel_blank(NaN)

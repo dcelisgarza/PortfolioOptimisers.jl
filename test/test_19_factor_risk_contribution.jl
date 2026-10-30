@@ -288,6 +288,20 @@ end
                                                                               p = 0.05)])
     @test !haskey(m, :sdp_plg_1) && haskey(m, :sdp_plg_2) && haskey(m, :sdp_plg_p_2)
 
+    # A lift of the objective that a minimised risk built holds the factor block of the same
+    # matrix, so the rows read it and the penalty is held down by the risk (#1912).
+    m = JuMP.Model()
+    PortfolioOptimisers.set_model_scales!(m, 1, 1)
+    JuMP.@variable(m, w1[1:3])
+    m[:k] = 1
+    PortfolioOptimisers.shared_set!(m, :risk_minimised, true)
+    PortfolioOptimisers.set_sdp_frc_objective_lift!(m, 1.0)
+    PortfolioOptimisers.set_sdp_frc_phylogeny_constraints!(m,
+                                                           SemiDefinitePhylogeny(; A = A,
+                                                                                 p = 0.05))
+    @test haskey(m, :frc_sdp_plg_1)
+    @test !haskey(m, :frc_sdp_plg_p_1)
+
     # An estimator resolves on the factor returns, and a keyword that the head does not read
     # does not reach it.
     res = optimise(FactorRiskContribution(; opt = opt,

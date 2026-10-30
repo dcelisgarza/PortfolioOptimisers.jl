@@ -106,8 +106,8 @@ A swept file also carries no performance trap, the fifth condition of #404 (ADR 
 at zero misses. Write the tests, or write the Coverage Exemption with its rationale. Then add the
 row `"<path>" = { lines = N, misses = 0 }` to `code_health/coverage_baseline.toml` in path order,
 with `N` from a `run_files.jl --coverage=<worktree>/src/<dir>` run of the tests that reach the file.
-`coverage.jl check` fails on a file with no row, and the `Coverage ratchet` job of CI runs it only
-when the tests are green, so a missing row stays hidden while `Test` is red.
+`coverage.jl check` fails on a file with no row, and the `Coverage ratchet` job of CI turns red.
+The job runs on a red suite too (ADR 0082, amendment of 2026-10-30).
 
 ## Land the branch
 
@@ -136,6 +136,12 @@ the tree you will push:
 5. Run the targeted tests bare, with `run_in_background`, through the driver. It wakes you when
    it ends, and `--done` leaves the verdict in a file:
    `julia -t 1 --project=test test/run_files.jl --done=<path> test_X.jl test_Y.jl`.
+   When `gate_stamp.sh reach` names `coverage` (a change to the code under `src/` or `ext/`), add
+   `--coverage=<absolute dir>`, the narrowest directory that holds every changed source file. The
+   run prints one `PATCH` line per changed file, with each added line that CI reads as a miss. A
+   method that no test compiled counts on every line of its body. Give each such line a test, or
+   a Coverage Exemption (ADR 0082) and `gate_stamp.sh waive coverage <reason>`. A clean run of
+   whole files records the `coverage` stamp that the push guard asks for.
    Run `bash code_health/gate_stamp.sh reach`. It parses your changed files in about a second,
    and names the gates the change reaches. When it names `doctest` or `doctest-files`, check the
    doctests of your files the same way:
@@ -157,8 +163,8 @@ the push in two cases, and the refusal names what to do:
   Your own pushed commits and a sibling's edit to a ledger file that a gate does not read do not
   count.
 - The push changes a `.jl` file under `src/` or `ext/`, and no stamp records a gate that the
-  change reaches: `size`, `complexity` and `perf` always, and `jet`, `doctest` or
-  `doctest-files` as `gate_stamp.sh reach` names them. Run the gate. If it cannot apply, record
+  change reaches: `size`, `complexity` and `perf` always, and `jet`, `doctest`, `doctest-files`
+  or `coverage` as `gate_stamp.sh reach` names them. Run the gate. If it cannot apply, record
   the reason with `code_health/gate_stamp.sh waive <gate> <reason>`.
 
 `code_health/gate_stamp.sh list` shows the stamps and the waivers.

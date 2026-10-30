@@ -270,6 +270,32 @@ end
         @test PO.buffer_gap_marks(copy(s)) == PO.buffer_gap_marks(s)
         @test PO.buffer_gap_marks(PO.port_opt_view(s, [2])) == PO.buffer_gap_marks(s)
         @test_throws DimensionMismatch partial_fit!(s, [1.0 1]; gaps = [true, false])
+        # A block whose marks are all false records none in a buffer that holds none.
+        e = partial_fit!(PO.SampleBufferState(; max_history = 4), [1.0 2; 3 4])
+        e = partial_fit!(e, [5.0 6; 7 8]; gaps = [false, false])
+        @test isnothing(e.G) && e.n == 4
+        # A block longer than the cap keeps the marks of the rows it keeps.
+        cap = partial_fit!(PO.SampleBufferState(; max_history = 2), [1.0 2; 3 4; 5 6; 7 8];
+                           gaps = [true, false, true, false])
+        @test PO.buffer_gap_marks(cap) == [true, false]
+        @test PO.sample_buffer(cap) == [5.0 6; 7 8]
+        # A block with no marks, appended to a buffer that holds them, marks its rows as no gap.
+        s = partial_fit!(s, [11.0 12])
+        @test PO.buffer_gap_marks(s) == [false, true, false, false]
+        @test PO.sample_buffer(s) == [5.0 6; 7 8; 9 10; 11 12]
+    end
+
+    @testset "The member rows of a gapped block carry the active mask" begin
+        Xg = [1.0 2; 3 4; 5 6]
+        Mg = Bool[1 1; 0 1; 1 0]
+        Xm, kw = PO.shared_series_member_rows(Xg, [false, true, false]; active_mask = Mg,
+                                              dims = 1)
+        @test Xm == Xg[[1, 3], :]
+        @test kw.active_mask == Mg[[1, 3], :]
+        @test kw.dims == 1
+        Xm, kw = PO.shared_series_member_rows(Xg, [false, true, false])
+        @test Xm == Xg[[1, 3], :]
+        @test !haskey(kw, :active_mask)
     end
 
     @testset "A fold of an empty block leaves a co-moment unchanged" begin
@@ -387,6 +413,9 @@ end
     @test all(isfinite, Statistics.cov(Covariance(), X0, nothing; iv = ivg))
     @test PO.reads_implied_volatility(pe)
     @test !PO.reads_implied_volatility(EmpiricalPrior())
+    # A pair reads the value it holds.
+    @test PO.reads_implied_volatility("iv" => ImpliedVolatility(; ppy = 252))
+    @test !PO.reads_implied_volatility("iv" => Covariance())
 end
 
 @testset "A collapse of the implied volatilities reads the finite active cells" begin

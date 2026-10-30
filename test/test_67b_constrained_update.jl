@@ -311,6 +311,21 @@ end
         @test_throws ArgumentError po.project(GramProjection(; slv = slv), bset, q, wh)
         @test_throws ArgumentError po.projection_solver(EuclideanProjection(), bset)
         @test po.projection_solver(EuclideanProjection(), pset) === slv
+        # A Gram geometry hands out its own solver on a bounded set, too (#1912).
+        @test po.projection_solver(g, bset) === slv
+        # A number budget is a row of equality: the short part of the projection is 0.2.
+        sset = resolve(ProgrammeAllocationSet(; slv = slv, sbgt = 0.2,
+                                              wb = WeightBounds(; lb = -1, ub = 1)), 3)
+        qs = [0.8, -0.5, 0.7]
+        ws = po.project(EuclideanProjection(), sset, qs, wh)
+        @test isapprox(sum(ws), 1; atol = 1e-6)
+        @test isapprox(sum(-min.(ws, 0)), 0.2; atol = 1e-5)
+        # A vector is calibrated when any member is.
+        @test po.calibrated([sset, pset]) == any(po.calibrated, [sset, pset])
+        @test !po.calibrated([sset, pset])
+        # A model with no budget adds no budget row.
+        mb = JuMP.Model()
+        @test isnothing(po.anonymous_budget_rows!(mb, 0, nothing))
         # The rule binds its Gram matrix at every step and runs solver-free at the default.
         rng = StableRNG(7)
         T, N = 20, 4
@@ -1989,4 +2004,36 @@ end
         td = TimeDependent([gset(), gset(; pe = EmpiricalPrior())])
         @test po.group_frames(OPS(; x_src = xs, set = td)).raw == ["set.val[2].pe"]
     end
+end
+
+@testset "Small seams of the online family (#1912)" begin
+    po = PortfolioOptimisers
+    OPS = po.OnlinePortfolioSelection
+    # An online member that is neither a prior estimator nor an Online wrapper is kept.
+    @test po.update_online_member(3) === 3
+    # A head that holds no returns window reads none from its state.
+    pw = PreviousWeights()
+    @test po.batch_from_state(pw)[1] === pw
+    @test po.batch_from_state(pw)[2] isa ReturnsResult
+    # The universe of a head that reads no names is the head itself.
+    ops = OPS()
+    @test po.non_investable_universe(ops, ["A"]) === ops
+    # A vector of slots reads rows when one of its entries does.
+    @test !po.exposure_keyed([1, 2])
+    @test !po.fitted_on_rows([1, 2])
+    @test po.fitted_on_rows([1, CentralityConstraint()])
+    # A forecaster copy keeps the prior, with or without a folded cache.
+    me = PriorExpectedReturns()
+    @test po.copy_forecaster(me) isa PriorExpectedReturns
+    @test po.copy_forecaster_prior(EmpiricalPrior()) isa EmpiricalPrior
+    X = reshape(collect(1.0:12.0) .^ 0.5, 6, 2)
+    pf = partial_fit!(EmpiricalPrior(), X)
+    cp = po.copy_forecaster_prior(pf)
+    @test cp isa EmpiricalPrior
+    @test !(cp.cache === pf.cache)
+    # Custom constraints append as one, two or many.
+    c1, c2 = FirstAtMost(0.5), FirstAtMost(0.4)
+    @test po.append_custom_constraint(nothing, c1) === c1
+    @test po.append_custom_constraint(c1, c2) == [c1, c2]
+    @test po.append_custom_constraint([c1, c2], c1) == [c1, c2, c1]
 end

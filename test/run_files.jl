@@ -83,6 +83,14 @@ counter files of the child. The other options are passed to the child. `<dir>` i
 directory to measure, such as `<worktree>/src/16_RiskMeasures`, because Julia counts only the files
 under it. A scratch directory holds no source file, so the run prints no `COVERAGE` line at all.
 
+The run then prints one `PATCH` line for each `.jl` file under `src/` or `ext/` that the working
+tree changes against its merge-base with `origin/dev`, with the added lines that CI reads as a miss.
+CI also reads as a miss each line of a method that no test compiled, which the `COVERAGE` line
+cannot show, so a `PATCH` line counts those too (#1912). When every file ran whole and green, every
+changed file lies under `<dir>`, and no added line is a miss, the run records the `coverage` stamp
+that the push guard asks of a change to the code. Use the narrowest directory that holds every
+changed file, such as `<worktree>/src`.
+
 `--ci` runs the files in a child process under the flags of `Pkg.test` on CI,
 `--check-bounds=yes --code-coverage=user`. A test that pins solver output can pass locally and fail
 on CI only, because the two flags change the compiled code. The coverage goes to one scratch
@@ -470,15 +478,7 @@ end
 
 Record a gate stamp for one test file. A failure to write it never fails the run.
 """
-function record_gate(path::AbstractString)
-    script = joinpath(REPO_ROOT, "code_health", "gate_stamp.sh")
-    try
-        cmd = Cmd(`bash $script record test/$(basename(path))`; dir = REPO_ROOT)
-        run(pipeline(cmd; stdout = devnull, stderr = devnull))
-    catch
-    end
-    return nothing
-end
+record_gate(path::AbstractString) = record_stamp("test/$(basename(path))")
 
 # ---------------------------------------------------------------------------------------------
 # `test/known_red.toml`: the reds that are known and open as issues.
@@ -585,25 +585,177 @@ The `.cov` file of one source file. Each line opens with a count nine characters
 space. `-` marks a line with no counter, `0` a line no test reached.
 """
 function coverage_lines(cov_path::AbstractString)
-    counted, missed = 0, Int[]
-    for (n, line) in enumerate(eachline(cov_path))
+    tags = coverage_tags(cov_path)
+    return count(!isnothing, tags), findall(==(0), tags)
+end
+
+"""
+    coverage_tags(cov_path) -> Vector{Union{Nothing, Int}}
+
+The count of each line of a `.cov` file, or `nothing` for a line with no counter. A count wider
+than its nine characters is read as a hit.
+"""
+function coverage_tags(cov_path::AbstractString)
+    tags = Union{Nothing, Int}[]
+    for line in eachline(cov_path)
         tag = strip(first(line, 9))
-        if tag == "-" || isempty(tag)
-            continue
+        push!(tags, tag == "-" || isempty(tag) ? nothing : something(tryparse(Int, tag), 1))
+    end
+    return tags
+end
+
+"""
+    is_method_definition(e) -> Bool
+
+Whether `e` defines a method: a `function` block, or a short form `f(x) = …`, also under `where`
+or a return type.
+"""
+function is_method_definition(e::Expr)
+    if e.head === :function
+        return true
+    elseif e.head === :(=)
+        lhs = e.args[1]
+        while lhs isa Expr && lhs.head in (:where, :(::))
+            lhs = lhs.args[1]
         end
-        counted += 1
-        if tag == "0"
-            push!(missed, n)
+        return lhs isa Expr && lhs.head === :call
+    end
+    return false
+end
+
+function body_lines!(out::Set{Int}, e, inside::Bool)
+    if e isa LineNumberNode
+        inside && push!(out, e.line)
+    elseif e isa Expr
+        inside = inside || is_method_definition(e)
+        for a in e.args
+            body_lines!(out, a, inside)
         end
     end
-    return counted, missed
+    return out
+end
+
+"""
+    function_body_lines(text) -> Set{Int}
+
+The lines of `text` that start a statement inside a method body. CI processes the `.cov` files with
+`CoverageTools.amend_coverage_from_src!`, which reads such a line as a miss when it has no counter.
+A method that no test compiled has no counter on any line, so CI counts every line of it as a miss,
+while the raw `.cov` file shows none (#1912).
+"""
+function function_body_lines(text::AbstractString)
+    return body_lines!(Set{Int}(), Meta.parseall(text), false)
+end
+
+"""
+    patch_misses(tags, body, added) -> Vector{Int}
+
+The lines of `added` that CI reads as a miss: a counter at zero, or a body line with no counter.
+`tags` comes from [`coverage_tags`](@ref), or is empty when no test loaded the file.
+"""
+function patch_misses(tags::AbstractVector, body::Set{Int}, added)
+    out = Int[]
+    for n in sort!(collect(added))
+        t = n <= length(tags) ? tags[n] : nothing
+        if t == 0 || (isnothing(t) && n in body)
+            push!(out, n)
+        end
+    end
+    return out
+end
+
+"""
+    added_lines(diff) -> Set{Int}
+
+The line numbers that a `git diff -U0` adds to the new side.
+"""
+function added_lines(diff::AbstractString)
+    out = Set{Int}()
+    for line in eachline(IOBuffer(diff))
+        m = match(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@", line)
+        if m === nothing
+            continue
+        end
+        start = parse(Int, m[1])
+        n = m[2] === nothing ? 1 : parse(Int, m[2])
+        union!(out, start:(start + n - 1))
+    end
+    return out
+end
+
+git_text(args...) = readchomp(Cmd(`git $args`; dir = REPO_ROOT))
+
+"""
+    patch_report(dir, tags) -> (lines, clean)
+
+One `PATCH` line for each `.jl` file under `src/` or `ext/` that the working tree changes against
+its merge-base with `origin/dev` (`GATE_STAMP_REF`), with the added lines that CI reads as a miss.
+`tags` maps a path relative to the repository to its [`coverage_tags`](@ref). `clean` is true when
+every changed file lies under `dir` and no added line is a miss.
+"""
+function patch_report(dir::AbstractString, tags::AbstractDict)
+    ref = get(ENV, "GATE_STAMP_REF", "origin/dev")
+    base = try
+        git_text("merge-base", ref, "HEAD")
+    catch
+        return ["PATCH skipped: no merge-base with $ref"], false
+    end
+    changed = vcat(split(git_text("diff", "--name-only", "--no-renames", base, "--", "src",
+                                  "ext")),
+                   split(git_text("ls-files", "--others", "--exclude-standard", "src",
+                                  "ext")))
+    untracked = Set(split(git_text("ls-files", "--others", "--exclude-standard", "src",
+                                   "ext")))
+    lines, clean = String[], true
+    for rel in sort!(unique(filter(f -> endswith(f, ".jl"), changed)))
+        full = joinpath(REPO_ROOT, rel)
+        if !(isfile(full))
+            continue
+        end
+        if !startswith(full, rstrip(dir, '/') * "/")
+            push!(lines, "PATCH $rel not measured: outside $dir")
+            clean = false
+            continue
+        end
+        text = read(full, String)
+        added = if rel in untracked
+            Set(1:countlines(IOBuffer(text)))
+        else
+            added_lines(git_text("diff", "-U0", "--no-color", "--no-ext-diff", base, "--",
+                                 rel))
+        end
+        missed = patch_misses(get(tags, rel, Union{Nothing, Int}[]),
+                              function_body_lines(text), added)
+        push!(lines, "PATCH $rel added=$(length(added)) missed=$(length(missed))")
+        if !isempty(missed)
+            push!(lines, "  missed lines: " * join(missed, ", "))
+            clean = false
+        end
+    end
+    return lines, clean
+end
+
+"""
+    record_stamp(gate)
+
+Record a stamp of `gate` through `code_health/gate_stamp.sh`. A failure never fails the run.
+"""
+function record_stamp(gate::AbstractString)
+    script = joinpath(REPO_ROOT, "code_health", "gate_stamp.sh")
+    try
+        run(pipeline(Cmd(`bash $script record $gate`; dir = REPO_ROOT); stdout = devnull,
+                     stderr = devnull))
+    catch
+    end
+    return nothing
 end
 
 """
     run_coverage(dir, rest) -> Int
 
 Run the driver again in a child process under `--code-coverage=@<dir>`, then report the counter
-files that child wrote and delete them.
+files that child wrote and delete them. Then print the [`patch_report`](@ref) of the change, and
+record a `coverage` stamp when every file ran whole and green and the report is clean.
 """
 function run_coverage(dir::AbstractString, rest::Vector{String})
     if !isabspath(dir)
@@ -616,6 +768,7 @@ function run_coverage(dir::AbstractString, rest::Vector{String})
     # A process that has exited has no PID to read, so read it before the wait.
     pid = getpid(p)
     wait(p)
+    tags = Dict{String, Vector{Union{Nothing, Int}}}()
     for (root, _, files) in walkdir(dir)
         for f in sort(files)
             m = match(r"^(.+\.jl)\.(\d+)\.cov$", f)
@@ -629,8 +782,18 @@ function run_coverage(dir::AbstractString, rest::Vector{String})
             if !(isempty(missed))
                 println("  missed lines: ", join(missed, ", "))
             end
+            tags[rel] = coverage_tags(cov)
             rm(cov)
         end
+    end
+    lines, clean = patch_report(dir, tags)
+    foreach(println, lines)
+    whole = !any(a -> startswith(a, "--testset=") || startswith(a, "--case="), rest)
+    if success(p) && whole && clean
+        record_stamp("coverage")
+        println("PATCH clean: recorded the `coverage` stamp.")
+    else
+        println("PATCH not clean, or a file was red or ran in part: no `coverage` stamp.")
     end
     # A child killed by its watchdog has no exit code, only a signal.
     return success(p) ? 0 : max(p.exitcode, 1)

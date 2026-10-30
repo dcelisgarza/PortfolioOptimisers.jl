@@ -547,6 +547,18 @@ end
         @test !isnothing(pe.mu_ucs(NormalUncertaintySet(; pe = ep_f), rdf))
     end
 
+    @testset "A capped buffer forgets the row positions of a high order prior, and an absent member folds to nothing (#1912)" begin
+        h = prior(HighOrderPriorEstimator(; pe = FactorPrior()), X, F)
+        k = pe.buffer_row_key(h, 50)
+        @test k isa pe.HighOrderPrior
+        @test isnothing(k.pr.rr.idx)
+        @test k.kt == h.kt
+        @test k.pr.mu == h.pr.mu
+        @test pe.buffer_row_key(h, nothing) === h
+        @test isnothing(pe.fold_member(nothing, X[1, :]))
+        @test isnothing(pe.fold_member(nothing))
+    end
+
     @testset "A read-out hands out no accumulator" begin
         # `mean` on a folded estimator copies the Welford accumulator. Before it did not, and
         # a prior that read its `mu` out and carried it into a Result found the Result

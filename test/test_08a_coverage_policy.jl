@@ -275,6 +275,51 @@ end
               (isa(whole.cvg.nu, AbstractMatrix) ? whole.cvg.nu[i, i] : whole.cvg.nu[i])
     end
 end
+@testset "A state under a policy merges an asset that neither block observed" begin
+    rng = StableRNG(1912)
+    X = randn(rng, 10, 3)
+    amsk = trues(10, 3)
+    amsk[:, 3] .= false
+    X[:, 3] .= NaN
+    cvg = CoveragePolicy()
+    for est in (SimpleExpectedReturns(; cvg = cvg), SimpleVariance(; cvg = cvg),
+                Covariance(; cvg = cvg))
+        a = partial_fit!(est, view(X, 1:5, :); active_mask = view(amsk, 1:5, :)).cache
+        b = partial_fit!(est, view(X, 6:10, :); active_mask = view(amsk, 6:10, :)).cache
+        m = PortfolioOptimisers.merge_states(a, b)
+        @test m.n == 10
+        # The asset with no observation in either block stays at the zero seed.
+        @test iszero(m.mu[3])
+        if hasproperty(m, :M)
+            @test if isa(m.M, AbstractMatrix)
+                all(iszero, m.M[3, :]) && all(iszero, m.M[:, 3])
+            else
+                iszero(m.M[3])
+            end
+        end
+    end
+end
+@testset "A state with no policy is given the counts of the policy of the estimator" begin
+    x = [1.0, 2.0, 3.0]
+    cvg = CoveragePolicy()
+    for (plain, seeded_est, seed) in
+        ((SimpleExpectedReturns(), SimpleExpectedReturns(; cvg = cvg),
+          PortfolioOptimisers.expected_returns_state_seed),
+         (SimpleVariance(), SimpleVariance(; cvg = cvg),
+          PortfolioOptimisers.variance_state_seed),
+         (Covariance(), Covariance(; cvg = cvg), PortfolioOptimisers.covariance_state_seed))
+        old = partial_fit!(plain, x).cache
+        @test isnothing(old.cvg)
+        @test seed(old, x) === old
+        s = seed(old, x, cvg)
+        @test !isnothing(s.cvg)
+        @test s.n == old.n && s.mu == old.mu
+        @test s !== old
+    end
+    # Every configuration of these estimators folds.
+    @test PortfolioOptimisers.supports_partial_fit(SimpleVariance())
+    @test PortfolioOptimisers.supports_partial_fit(PortfolioOptimisers.GeneralCovariance())
+end
 @testset "The Asset Panel seam hands a policed estimator the active mask" begin
     rng = StableRNG(777)
     T, N = 30, 3
@@ -306,6 +351,26 @@ end
     @test isfinite(series[end, 3])
     plain_series = PortfolioOptimisers.variance_series(SimpleVariance(), X, pnl)
     @test all(isnan, plain_series[:, 3])
+    cov_series = PortfolioOptimisers.variance_series(Covariance(), X, pnl)
+    @test size(cov_series) == size(plain_series)
+    @test all(isnan, cov_series[:, 3])
+    @test isapprox(cov_series, plain_series; nans = true)
+    # An estimator with no Asset Panel method of its own meets the generic roots, which reduce
+    # to the Coverage Universe, fit on it and expand with `NaN` for the asset left out.
+    wv = WindowedVariance(; window = T)
+    sv = var(SimpleVariance(), X[:, 1:2])
+    @test vec(var(wv, X, pnl))[1:2] ≈ vec(sv)
+    @test isnan(vec(var(wv, X, pnl))[3])
+    @test vec(std(wv, X, pnl))[1:2] ≈ sqrt.(vec(sv))
+    @test isnan(vec(std(wv, X, pnl))[3])
+    keep = [1, 2, 4, 5]
+    sk = first(coskewness(WindowedCoskewness(; window = T), X, pnl))
+    @test size(sk) == (3, 9)
+    @test all(isnan, sk[3, :])
+    @test sk[1:2, keep] ≈ first(coskewness(Coskewness(), X[:, 1:2]))
+    ku = cokurtosis(WindowedCokurtosis(; window = T), X, pnl)
+    @test size(ku) == (9, 9)
+    @test ku[keep, keep] ≈ cokurtosis(Cokurtosis(), X[:, 1:2])
 end
 @testset "An available-case fit refuses a centre and a weight it cannot reproduce" begin
     X = randn(StableRNG(5), 16, 3)

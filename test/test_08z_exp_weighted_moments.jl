@@ -317,6 +317,13 @@ end
     @test isequal(cov(fitted), cov(cc, Xg; active_mask = amsk))
     @test isequal(cor(fitted), cor(cc, Xg; active_mask = amsk))
     @test isequal(cov(cc, fitted.cache), cov(fitted))
+    @test isequal(cor(cc, fitted.cache), cor(fitted))
+    # One observation at a time, with and without the active mask, is the block fit.
+    by_row = foldl((c, i) -> partial_fit!(c, Xg[i, :]; active_mask = amsk[i, :]),
+                   axes(Xg, 1); init = cc)
+    @test isequal(cov(by_row), cov(fitted))
+    no_mask = foldl((c, i) -> partial_fit!(c, Xg[i, :]), axes(Xg, 1); init = cc)
+    @test size(cov(no_mask)) == size(cov(fitted))
 
     # A copy shares no array, so a fold on one leaves the other alone.
     original = fitted.cache

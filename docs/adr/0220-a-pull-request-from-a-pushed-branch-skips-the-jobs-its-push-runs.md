@@ -95,8 +95,8 @@ required check can read a skipped run.
 | `FormatCheck.yml` | `Format check - push` |
 | `LinkChecker.yml` | `Link checker - push` |
 
-The `Coverage ratchet` job is not required. Its steps continue on an error, so its check is green
-whatever it finds.
+The `Coverage ratchet` job is not required. A trip turns its check red (ADR 0082, amendment of
+2026-10-30), but the merge does not wait for it.
 
 The push trigger of `JET.yml` has no `paths:` filter. With the filter, a push to `dev` that touches no
 JET path leaves the head with no `JET - push` check, and the merge waits forever. From 2026-10-22 to

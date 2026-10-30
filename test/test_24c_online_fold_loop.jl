@@ -625,6 +625,15 @@ assets is what keeps the JuMP families cheap.
         @test_throws ArgumentError po.fit_and_predict(mr, rd; test_idx = cvr.test_idx[1])
     end
 
+    @testset "The context of a fold carries what the fold loop hands it (#1912)" begin
+        cvr = split(online_cv, rd)
+        ctx = po.fold_context(2, length(cvr.test_idx), rd, cvr.train_idx, cvr.test_idx,
+                              nothing, nothing)
+        @test ctx isa TimeDependentContext
+        @test ctx.i == 2 && ctx.n == length(cvr.test_idx)
+        @test ctx.test_idx == cvr.test_idx && isnothing(ctx.w_prev)
+    end
+
     @testset "The search and the Pipeline take the loop at their doors" begin
         # The search took the loop in #1020 and the Pipeline in #1022, so no door refuses a
         # Online Scheme any more; the Pipeline's identities are pinned in test_24f.

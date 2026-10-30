@@ -5508,3 +5508,13 @@ end
     stated = OrderedWeightsArrayRange(; w1 = OrderedWeightsArrayTailGini(; alpha = 0.05))
     @test PO.resolve_deferred_quantities(stated, PR60_S) === stated
 end
+
+@testset "A regularisation term resolves no calibration slot of its own (#1912)" begin
+    PO = PortfolioOptimisers
+    rdr = ReturnsResult(; nx = ["a", "b"], X = [0.1 -0.2; -0.1 0.2; 0.05 0.1; 0.02 0.0])
+    prr = prior(EmpiricalPrior(), rdr)
+    for reg in (L2Regularisation(; val = 0.1), LpRegularisation(; p = 3, val = 0.1))
+        @test PO.resolve_calibration_slots(reg, prr) == (;)
+        @test PO.resolve_calibration_slots(reg, prr, nothing) == (;)
+    end
+end

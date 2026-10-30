@@ -130,6 +130,36 @@ PortfolioOptimisers.keeps_observations(::RowKeyLyingDropResult) = true
         @test_throws DimensionMismatch prior(FactorPrior(), X, F; ts = ts[1:10])
     end
 
+    @testset "A fold that kept its held weights contributes their drifted path (#1912)" begin
+        wfd = IndexWalkForward(120, 40; wd = SelfFinancingDrift(), store_weight_path = true)
+        cvd = cross_val_predict(InverseVolatility(; pe = FactorPrior()), rdf, wfd)
+        p1 = first(cvd.pred)
+        @test p1.hw isa HeldWeightsResult
+        Wd = PO.attribution_fold_weights(p1)
+        @test size(Wd, 2) == N
+        @test Wd == PO.weight_path(p1.hw, p1.res.w)
+        # The first observation is held at the target weights, and the rows then drift.
+        @test Wd[1, :] ≈ p1.res.w
+        W, r = PO.attribution_prediction_history(cvd)
+        @test size(W, 1) == length(r)
+        @test factor_attribution(cvd, prior(FactorPrior(), rdf)).total.vol ≈ std(r)
+    end
+
+    @testset "A loadings result that records no row key answers none (#1912)" begin
+        @eval struct LoadingsWithoutKey1912 <:
+                     PortfolioOptimisers.AbstractLoadingsRegressionResult end
+        dyn = Ref{Any}(LoadingsWithoutKey1912())
+        @test PO.attribution_row_key(dyn[]) == (; idx = nothing, ts = nothing)
+    end
+
+    @testset "An exposure matrix is broadcast over the observations (#1912)" begin
+        B = [1.0 2.0; 3.0 4.0; 5.0 6.0]
+        Ms = PO.attribution_broadcast_exposures(B, 4)
+        @test size(Ms) == (4, 3, 2)
+        @test all(Ms[t, :, :] == B for t in 1:4)
+        @test PO.attribution_broadcast_exposures(Ms, 4) === Ms
+    end
+
     @testset "A Scenario Cap of the factor prior keeps the last rows on both sides" begin
         pft = prior(FactorPrior(), rdt)
         pc = prior(FactorPrior(; pe = EmpiricalPrior(; max_scenarios = 50)), rdt)

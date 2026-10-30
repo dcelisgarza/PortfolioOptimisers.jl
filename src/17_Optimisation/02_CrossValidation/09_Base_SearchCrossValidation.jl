@@ -932,7 +932,7 @@ function expr_to_lens_chain(ex)
     if !(ex isa Symbol)
         throw(Meta.ParseError("Unsupported expression: $ex"))
     end
-    push!(optics, Accessors.PropertyLens(ex))  # base case: Symbol
+    push!(optics, _expr_to_lens(ex))  # base case: Symbol
     return foldl(∘, optics)
 end
 """

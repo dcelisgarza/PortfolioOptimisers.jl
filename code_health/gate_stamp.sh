@@ -31,6 +31,10 @@
 #     reaches neither `jet` nor `doctest`. A changed `jldoctest` block needs only `doctest-files`,
 #     and a changed string literal needs `doctest` but not `jet`. `waive` records the reason a
 #     gate does not apply.
+#   - `coverage` is required of a `code` change alone. `test/run_files.jl --coverage=<dir>` records
+#     it when the targeted files ran green and no line that the branch adds is a line that CI
+#     reads as a miss (#1912, ADR 0082). A line that no test can reach carries a Coverage
+#     Exemption, and `waive coverage <reason>` names it.
 #
 # `code_health/CodeHealth.jl` records every check and refresh of the gate scripts, and
 # `test/run_files.jl` records every test file it runs. `docs/doctest_files.jl` records
@@ -44,7 +48,7 @@
 #   GATE_STAMP_REF       the ref a gate is measured against. Default: origin/dev.
 #   GATE_STAMP_BRANCH    the remote branch the guard protects. Default: refs/heads/dev.
 #   GATE_STAMP_REQUIRED  the gates a push that changes src/ or ext/ needs. Default:
-#                        "jet size complexity perf doctest". The tests set it empty.
+#                        "jet size complexity perf doctest coverage". The tests set it empty.
 #   GATE_STAMP_FORCE     any value acts outside .claude/worktrees/ too. The tests use it.
 #   PRE_COMMIT_FROM_REF, PRE_COMMIT_TO_REF, PRE_COMMIT_REMOTE_BRANCH
 #                        set by pre-commit for a pre-push hook: the remote tip, the pushed tip,
@@ -65,7 +69,7 @@ stamps="$gitdir/gate_stamps"
 waivers="$gitdir/gate_waivers"
 pushed="$gitdir/gate_pushed"
 ref=${GATE_STAMP_REF:-origin/dev}
-required=${GATE_STAMP_REQUIRED-jet size complexity perf doctest}
+required=${GATE_STAMP_REQUIRED-jet size complexity perf doctest coverage}
 
 acts() {
     case "$top" in
@@ -200,6 +204,7 @@ reached() {
     for gate in $1; do
         case "$2:$gate" in
         prose:jet | prose:doctest | block:jet | literal:jet) ;;
+        prose:coverage | block:coverage | literal:coverage) ;;
         block:doctest) echo doctest-files ;;
         *) echo "$gate" ;;
         esac

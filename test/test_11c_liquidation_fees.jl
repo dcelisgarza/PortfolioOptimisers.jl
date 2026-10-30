@@ -172,6 +172,13 @@
         v = PortfolioOptimisers.port_opt_view(fees, [1, 2, 4])
         @test collect(v.l) == [0.01, 0.02, 0.04]
         @test collect(v.lq.w) == w
+        # The estimator takes the same fallback (#1912).
+        fest = FeesEstimator(; l = [0.01, 0.02, 0.03, 0.04],
+                             lq = TurnoverEstimator(; w = w, val = 0.010))
+        ve = PortfolioOptimisers.port_opt_view(fest, [1, 2, 4])
+        @test ve isa FeesEstimator
+        @test collect(ve.l) == [0.01, 0.02, 0.04]
+        @test collect(ve.lq.w) == w
     end
 
     @testset "An Investable Mask drives the split, end to end" begin
@@ -446,6 +453,12 @@
         # states no fee at all.
         @test isnothing(PortfolioOptimisers.strip_liquidation_charges(nothing,
                                                                       BitVector([1, 0, 1])))
+        # A fee stated under a derived mask is handed back by the mask method, and a fee on
+        # no asset charges nothing, so the returns come back as they are (#1912).
+        @test PortfolioOptimisers.strip_liquidation_charges(fees, BitVector([1, 0, 1])) ===
+              fees
+        Rn = [0.01 0.02; 0.03 0.04]
+        @test PortfolioOptimisers.charge_asset_fees(Rn, [0.5, 0.5], nothing) === Rn
 
         hopt = HierarchicalOptimiser(; pe = EmpiricalPrior(), sets = sets, fees = fees)
         inner = HierarchicalRiskParity()

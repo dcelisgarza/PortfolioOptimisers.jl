@@ -730,6 +730,20 @@
         @test [x[:label] for x in p_cum.series_list] == csfm_fs.nf
         p_gap = plot_factor_cumulative_returns(gap_fs)
         @test p_gap.series_list[2][:y][4] == p_gap.series_list[2][:y][3]
+        # A re-based block carries the factor return history on its own axis, and the names
+        # follow it (#1912).
+        fcb_fs = FactorFamilyBasis(; fnm = ["ind"], fi = [[1, 2, 3]], di = [3],
+                                   ratios = [0.5 0.25; 0.25 2.0], K = 3)
+        fr_fs = 0.02 * randn(rng_fs, Tf, 2)
+        csr2_fs = CrossSectionalRegression(; f = fr_fs, eps = csr_fs.eps, n = csr_fs.n)
+        rebased_fs = CrossSectionalFactorModel(; M = Ms_fs[Tf, :, 1:2], L = Ms_fs[Tf, :, :],
+                                               b = zeros(Nf), csr = csr2_fs,
+                                               Ms = Ms_fs[:, :, 1:2],
+                                               nf = ["value", "size"], lag = 1,
+                                               fcb = fcb_fs, fr = fr_fs)
+        p_rb = plot_factor_cumulative_returns(rebased_fs)
+        @test is_plot(p_rb)
+        @test [x[:label] for x in p_rb.series_list] == rebased_fs.nf
         # A prior result that carries no factor block names the remedy.
         no_rr_fs = LowOrderPrior(; X = randn(rng_fs, Tf, Nf), mu = zeros(Nf),
                                  sigma = Matrix(1.0 * I, Nf, Nf))

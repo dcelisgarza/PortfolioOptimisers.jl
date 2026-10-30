@@ -2327,6 +2327,8 @@
         =#
         @test !isapprox(sc, fd; rtol = 0.1)
         @test sc > fd
+        # A constant sample has no range to bin, so the bin width is zero.
+        @test iszero(PO.bin_width(Knuth(), fill(2.0, 10)))
         # --- Knuth's rule maximises its own posterior ---
         # `bin_width` returns `range / M`, so recover M and score its neighbours.
         function knuth_f(x, M)

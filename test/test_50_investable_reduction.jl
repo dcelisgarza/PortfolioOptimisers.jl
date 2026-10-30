@@ -1190,6 +1190,49 @@ end
     @test grouped.w == goracle.w
 end
 
+@testset "A held member expands whatever shape it comes in (#1912)" begin
+    imsk = BitVector([1, 1, 0, 1, 1])
+    v = [0.1, 0.2, 0.3, 0.4]
+    M = [1.0 2.0 3.0 4.0; 5.0 6.0 7.0 8.0]
+    ev = PortfolioOptimisers.expand_investable_weights(imsk, v)
+    eM = PortfolioOptimisers.expand_investable_columns(imsk, M)
+    @test PortfolioOptimisers.expand_held_member(imsk, nothing) === nothing
+    @test PortfolioOptimisers.expand_held_member(imsk, v) == ev
+    @test PortfolioOptimisers.expand_held_member(imsk, M) == eM
+    @test PortfolioOptimisers.expand_held_member(imsk, [v, 2v]) ==
+          [ev, PortfolioOptimisers.expand_investable_weights(imsk, 2v)]
+    @test PortfolioOptimisers.expand_held_member(imsk, [M, 2M]) ==
+          [eM, PortfolioOptimisers.expand_investable_columns(imsk, 2M)]
+    @test all(iszero, ev[3:3])
+end
+
+@testset "A prior reference to a departed asset drops its row whole (#1912)" begin
+    # A mean view referring to the prior of a departed asset goes, as a written-out name does.
+    mref = prior(EntropyPoolingPrior(; pe = EmpiricalPrior(),
+                                     mu_views = LinearConstraintEstimator(;
+                                                                          val = "a == 1.5*prior(c)"),
+                                     sets = setsd), rdd)
+    @test mref.kld == 0
+    @test mref.w == fill(1 / T, T)
+    # So does a correlation view whose prior reference names one, singly or as a group.
+    for v in ("(a, b) == 0.5*prior(a, c)",)
+        cref = prior(EntropyPoolingPrior(; pe = EmpiricalPrior(),
+                                         rho_views = LinearConstraintEstimator(; val = v),
+                                         sets = setsd), rdd)
+        @test cref.kld == 0
+        @test cref.w == fill(1 / T, T)
+    end
+    setsgd = UniverseSets(;
+                          dict = Dict("nx" => nx, "gA" => [nx[k]], "gB" => [nx[2]],
+                                      "gC" => [nx[1]]))
+    gref = prior(EntropyPoolingPrior(; pe = EmpiricalPrior(),
+                                     rho_views = LinearConstraintEstimator(;
+                                                                           val = "(gC, gB) == 0.5*prior(gA, gB)"),
+                                     sets = setsgd), rdd)
+    @test gref.kld == 0
+    @test gref.w == fill(1 / T, T)
+end
+
 @testset "The door reports once, naming its own process and what the departure cost" begin
     # A standalone prior fit used to say nothing at all: only an optimisation door
     # announced. It now names itself, and the casualties its departures caused.
@@ -1478,6 +1521,12 @@ end
     @test isapprox(bg.sigma[keep, keep], bo.sigma; rtol = 1e-12)
     # The factor block is not expanded, because the reduction never touched the factor axis.
     @test bg.fpr.mu == bo.fpr.mu
+    # The wrapper forwards the residual declaration of its wrapped estimator (#1912).
+    @test PortfolioOptimisers.factor_residual_config(BayesianBlackLittermanPrior(;
+                                                                                 pe = FactorPrior(),
+                                                                                 views = blfview,
+                                                                                 sets = setsdf)) ==
+          PortfolioOptimisers.factor_residual_config(FactorPrior())
     @test length(bg.mu) == N
     @test isnan(bg.mu[k])
     @test PortfolioOptimisers.investable_mask(bg) == BitVector([1, 1, 0, 1, 1])
@@ -1558,6 +1607,20 @@ end
                                                                 BitVector([1, 1, 0, 1, 1])))
 end
 
+@testset "An augmented prior whose two view halves both resolve to nothing is the stacked prior (#1912)" begin
+    # Neither half keeps a row, so the joint posterior is the joint prior and not the
+    # empty-view algebra, which would widen the covariance by `tau`.
+    typo = LinearConstraintEstimator(; val = "zz == 0.002")
+    ftypo = LinearConstraintEstimator(; val = "zzf == 0.002")
+    pe = AugmentedBlackLittermanPrior(; a_views = typo, f_views = ftypo, sets = setsdf)
+    pa = prior(pe, rddf)
+    ref = prior(AugmentedBlackLittermanPrior(; a_views = blview, f_views = blfview,
+                                             sets = setsdf), rddf)
+    @test size(pa.mu) == size(ref.mu)
+    @test all(isfinite, filter(!isnan, pa.mu))
+    @test isnan(pa.mu[k])
+end
+
 @testset "The Black-Litterman collapse and the empty view block on their own terms" begin
     mu = [0.1, 0.2]
     sigma = [1.0 0.2; 0.2 1.0]
@@ -1619,6 +1682,13 @@ end
     @test PortfolioOptimisers.investable_weights_view(nothing, w) === w
     @test isnothing(PortfolioOptimisers.investable_weights_view(BitVector([1, 1, 0, 1, 1]),
                                                                 nothing))
+    # A vector of weight vectors is reduced and read member by member (#1912).
+    imsk = BitVector([1, 1, 0, 1, 1])
+    wv = [fill(0.2, 5), [0.25, 0.25, 0.0, 0.25, 0.25]]
+    @test PortfolioOptimisers.investable_weights_view(imsk, wv) ==
+          [fill(0.2, 4), fill(0.25, 4)]
+    @test PortfolioOptimisers.held_non_investable(imsk, wv) == [3]
+    @test isempty(PortfolioOptimisers.held_non_investable(imsk, wv[2:2]))
 end
 
 @testset "A view row that resolves and cancels is still dropped, and is not a typo" begin

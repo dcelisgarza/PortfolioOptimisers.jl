@@ -111,10 +111,16 @@ ratchet about 5 seconds, so you can run any of the three as often as you like. *
 
 The coverage check takes about 10 seconds, and it needs an `lcov.info` that it cannot make itself.
 In CI the `coverage` job of `.github/workflows/ReusableTest.yml` downloads the one the test job of
-the same run wrote, so the gate runs wherever the suite runs. The step that runs the ratchet carries
-`continue-on-error: true`, so a ratchet that trips annotates the run and leaves the test check
-green. Locally, run the suite with coverage on and process it, or download the `lcov`
-artifact from any green run of `Test.yml` and point `COVERAGE_LCOV` at it. ADR 0082.
+the same run wrote, so the gate runs wherever the suite runs, on a red suite too. A ratchet that
+trips annotates the run and turns the `Coverage ratchet` check red. The test check keeps the
+verdict of the suite alone. Locally, run the suite with coverage on and process it, or download the
+`lcov` artifact from any run of `Test.yml` and point `COVERAGE_LCOV` at it. ADR 0082.
+
+Before you push a change to a code line under `src/` or `ext/`, run its targeted test files with
+`test/run_files.jl --coverage=<absolute source dir>`. Each `PATCH` line names a line that your
+change added and that CI reads as a miss, also in a method that no test calls. Cover it, or give it
+a Coverage Exemption. A clean run records the `coverage` stamp that the push guard of
+`code_health/gate_stamp.sh` asks for.
 
 `coverage.jl` takes one more verb than the others. `terminal` answers #404's closing question
 for a child map's own files, and names the definitions that still hold an uncovered line.

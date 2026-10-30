@@ -268,6 +268,25 @@ end
     @test isempty(xd) && xp == [x1] && cp == [-1.0] && r == -0.03
 end
 
+@testset "the value at risk multiplier and the start of the tilt chain at their limits (#1912)" begin
+    # A level above the total mass is never reached, so the smallest loss answers.
+    @test PO.ep_var_multiplier([1.0, 2.0, 3.0], ones(3), 2.0) == 1.0
+    # A posterior on one scenario has no room to tilt: the target sits on the end of the
+    # support, no tilt exists, and the start returns the constraint it read at the prior.
+    x = -ep_sX[:, 1]
+    T = length(x)
+    tv = PO.SequentialConditionalValueatRiskViewConstraint([], Float64[], [x], [-1.0],
+                                                           zeros(T), 0.0, ep_a, 10.0, 20,
+                                                           1e-8)
+    wp = zeros(T)
+    wp[1] = 1.0
+    out = PO.ep_sequential_start(tv, wp)
+    @test out isa PO.SequentialConditionalValueatRiskViewConstraint
+    @test out.rhs == tv.rhs
+    @test length(out.c) == T
+    @test out.c == PO.ep_refine_tail_view(tv, wp)[1].c
+end
+
 @testset "the surrogate row is tight where it is read and bounds the measure elsewhere" begin
     x = -ep_sX[:, 1]
     T = length(x)

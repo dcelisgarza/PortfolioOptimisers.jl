@@ -100,6 +100,9 @@ const PO = PortfolioOptimisers
         for nte in (nte_t, nte_s)
             clr = clusterise(NetworkClustersEstimator(; nte = nte), rd)
             @test clr.D == distance(fde, Zd)
+            # The readable mask of the clustering is the one of the network it holds (#1912).
+            @test PO.feature_readable_mask(NetworkClustersEstimator(; nte = nte), nothing,
+                                           rd) == PO.feature_readable_mask(nte, nothing, rd)
         end
         # `logo!`'s `distance(je.de, S, X)`: the second positional is a *similarity
         # matrix*, which is why the three-argument method must not bound it. `logo!` is
@@ -687,6 +690,11 @@ const PO = PortfolioOptimisers
                                                                 strict = true)
                 @test occursin("carries no groups", err.value.msg)
             end
+            # Under `strict = false` the entry of a field with no groups warns and drops.
+            @test (@test_logs (:warn,) feature_labels(tpnl,
+                                                      ["mcap" => LabelGroup("momentum"),
+                                                       "expo" => LabelGroup("momentum")])) ==
+                  ["expo" => "mom12", "expo" => "mom6"]
         end
     end
 end

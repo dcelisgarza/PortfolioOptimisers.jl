@@ -18,6 +18,8 @@ include(joinpath(@__DIR__, "test18_setup.jl"))
     @test NoReturn(; settings = s).settings === s
     # The bounds helpers treat it like any other term.
     @test bounds_returns_estimator(r, 0.02).settings.lb == 0.02
+    # A bound that is already the bound returns the term itself.
+    @test bounds_returns_estimator(r, r.settings.lb) === r
     @test isnothing(PortfolioOptimisers.no_bounds_returns_estimator(NoReturn(;
                                                                              settings = s)).settings.lb)
     @test isa(PortfolioOptimisers.no_bounds_returns_estimator(NoReturn(; settings = s)),

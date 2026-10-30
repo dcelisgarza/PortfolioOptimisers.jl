@@ -313,6 +313,14 @@
             @test !PO.is_calibration_rule(OrderedWeightsArrayTailGini())
             @test !PO.is_calibration_rule(reverse ∘ OrderedWeightsArrayTailGini())
             @test PO.is_calibration_rule(t -> t)
+            # The same answers through a call that dispatch cannot fold, so that each method
+            # runs and a coverage run counts it (#1912).
+            for (x, ans) in ((OrderedWeightsArrayTailGini(), false),
+                             (reverse ∘ OrderedWeightsArrayTailGini(), false), (t -> t, true),
+                             (0.5, false), (PO.ScenarioCount(; n = 10), true))
+                dyn = Ref{Any}(x)
+                @test PO.is_calibration_rule(dyn[]) == ans
+            end
             # The L-moment weights against exact rational arithmetic, at a size whose
             # binomials overflowed an `Int` before the weights were computed in their own
             # element type.

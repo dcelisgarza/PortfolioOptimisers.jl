@@ -923,6 +923,17 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         @test occursin("no partial-fit state", e.value.msg)
         e = @test_throws ArgumentError po.forecast_location(PortfolioOptimisersCovariance())
         @test occursin("no partial-fit state", e.value.msg)
+        # A state that no method reads names the estimator and the state (#1912).
+        e = @test_throws ArgumentError po.forecast_state_location(Covariance(),
+                                                                  po.ForecasterState(nothing))
+        @test occursin("ForecasterState", e.value.msg)
+        # A correlation estimator with no processing reads the location of the one it holds,
+        # and a stepped estimator is read through `forecast_moments` with no window.
+        fitted = po.partial_fit!(Covariance(), X[1:10, :])
+        @test po.forecast_location(po.CorrelationCovariance(; ce = fitted)) ==
+              po.forecast_location(fitted)
+        sg, ct = po.forecast_moments(fitted, rd, nothing)
+        @test sg == cov(fitted) && ct == po.forecast_location(fitted)
         # The summary.
         r = cfe(Covariance(), rd, batch_cv)
         @test_throws po.IsEmptyError covariance_forecast_summary(CovarianceForecastEvaluationResult[])

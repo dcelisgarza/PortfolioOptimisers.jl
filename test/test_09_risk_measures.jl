@@ -1765,6 +1765,8 @@ end
         @test po.bind_data_benchmark(tw, rdv) === tw
         @test po.bind_data_benchmark(rs, rdv) === rs
         @test po.bind_data_benchmark(dt, nothing) === dt
+        # A plain vector of numbers is no estimator, and reaches the reader as it is (#1912).
+        @test po.bind_data_benchmark(wb, rdv) === wb
         # A tracking error, a measure, a vector, and the measure that a risk tracker tracks.
         tm = TrackingRiskMeasure(; tr = dt)
         @test po.bind_data_benchmark(TrackingError(; tr = dt, err = 0.01), rdv).tr.B ===

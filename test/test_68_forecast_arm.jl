@@ -115,6 +115,12 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
         @test po.port_opt_view(st, [2, 4]).stat == st.stat[[2, 4]]
         @test po.port_opt_view(rf, [1, 3]).cache.stat == st.stat[[1, 3]]
         @test_throws ArgumentError po.merge_states(st, c)
+        # The statistic of the levels is the forecast of the relatives, and a folding statistic
+        # has no window of its own.
+        @test isnothing(po.window_rows(rpr.alg))
+        @test po.price_level_statistic(rpr.alg, levels(X)) ≈ xhat(rpr.alg, R)
+        ktpa = KernelTrendPattern(; window = 3)
+        @test po.price_level_statistic(ktpa, levels(X)) ≈ xhat(ktpa, R)
         @test_throws DomainError ExponentialMovingAverage(; alpha = 0)
         @test_throws DomainError ReweightedPriceRelative(; theta = 0)
         # #1172: the default is the value of the authors' code, which seeds the forecast at
@@ -217,6 +223,12 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
                       vec(mean(emag, Rg, pnlg; dims = 1)))
         @test isequal(vec(mean(ktp, permutedims(Rg), pnlg; dims = 2)),
                       vec(mean(ktp, Rg, pnlg; dims = 1)))
+        # A mask the caller gives takes the place of the panel's: the unmasked panel with the
+        # mask as a keyword is the masked panel.
+        @test isequal(vec(mean(emag, Rg, nothing; active_mask = amskg)), vec(mean(gf)))
+        @test isequal(vec(mean(emag, Rg,
+                               AssetPanel(; amsk = trues(6, 2), emsk = trues(6, 2));
+                               active_mask = amskg)), vec(mean(gf)))
         @test isequal(vec(mean(maw, permutedims(Rg), pnlg; dims = 2)),
                       vec(mean(maw, Rg, pnlg; dims = 1)))
         # A composite is windowed even where it holds a folding member, so it keeps the

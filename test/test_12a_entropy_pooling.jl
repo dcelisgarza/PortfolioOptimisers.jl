@@ -2491,6 +2491,7 @@ end
     @test PO.opinion_pooling_cache(lp) === lp.pc
     # The count of the rows stands in for the data of a prior that reads no Asset Panel.
     for p in (EmpiricalPrior(), EmpiricalPrior(; max_scenarios = 30),
+              OpinionPoolingPrior(; pes = [EntropyPoolingPrior()]),
               OpinionPoolingPrior(; pes = [EntropyPoolingPrior()],
                                   pe1 = EmpiricalPrior(; max_scenarios = 30)))
         w0 = aweights(fill(inv(30), 30))
@@ -2498,6 +2499,16 @@ end
         b = PO.prior_probability_factory(p, w0, 30)
         @test prior(a, X[1:30, :], F[1:30, :]).mu == prior(b, X[1:30, :], F[1:30, :]).mu
     end
+    # An augmented Black-Litterman prior hands the scenario weights to both its priors (#1912).
+    w30 = aweights(fill(inv(30), 30))
+    qa = PO.prior_probability_factory(abl, w30, X[1:30, :], F[1:30, :], nothing)
+    @test isa(qa, AugmentedBlackLittermanPrior)
+    @test isapprox(prior(qa, X[1:30, :], F[1:30, :]).mu,
+                   prior(abl, X[1:30, :], F[1:30, :]).mu)
+    # A caller's weights on a pooling prior weigh the scenarios of the prior beneath it.
+    epw = EntropyPoolingPrior(; pe = EmpiricalPrior(), w = w30)
+    qe = PO.scenario_factory(epw, w30, nothing, X[1:30, :], F[1:30, :], nothing)
+    @test isa(qe, PO.AbstractPriorEstimator)
     # A pool in `pe2` reads its own pooled weights in the refit, not those of the pool that
     # holds it. The factor model of the inner `pe2` is fitted under the inner weights, so a
     # refit that read the outer weights moved `mu` by 76 % on these data.

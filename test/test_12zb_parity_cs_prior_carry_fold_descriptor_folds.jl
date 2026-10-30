@@ -630,6 +630,16 @@ end
                        message(() -> po.EWDownsideBetaState(; cd = [0.0, 0.0], n = [0],
                                                             vd = 0.0, t = 0)))
         @test po.show_fields(EWDownsideBeta()) == (:mcap, :decay, :min_obs, :mar, :min_val)
+        # Two states of the macro sensitivity do not merge: the second block starts from the first.
+        @test_throws ArgumentError po.merge_states(m, copy(m))
+        # A carried Descriptor pads the rows before its own with `NaN`, keeps them when they fill the returns.
+        Nd = length(rd.nx)
+        carried = po.CarriedDescriptor(ones(2, Nd))
+        padded = descriptor(carried, rows(rd, 1:5))
+        @test size(padded) == (5, Nd)
+        @test all(isnan, padded[1:3, :]) && padded[4:5, :] == ones(2, Nd)
+        @test descriptor(carried, rows(rd, 1:2)) == ones(2, Nd)
+        @test_throws DimensionMismatch descriptor(carried, rows(rd, 1:1))
         # On the carry fold each Descriptor counts as one row, so the carry keeps the rows of
         # the lag alone, and the exposures of every step equal those of the batch fit.
         ewb = ["market" => ConstantExposure(),

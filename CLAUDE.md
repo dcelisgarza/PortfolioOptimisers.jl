@@ -71,6 +71,10 @@ Rebase before you merge, so that you lower the number that is current.
   censuses that read what the commit touched. A file that only names a changed type is not
   targeted. After a rebase, run `bash code_health/gate_stamp.sh check`. Rerun the files it names
   that your change reaches, and paste the `drop` line it prints for the rest.
+- **Every line that your change adds to the code is covered before the push.** Run the targeted
+  files with `--coverage=<absolute dir>`. Each `PATCH` line names an added line that CI reads as a
+  miss, also in a method that no test calls. Test it, or exempt it (ADR 0082). The push guard asks
+  for the `coverage` stamp that a clean run records (#1912).
 - On a Revise world-age warning, **restart the session and cold-load**. If a session hangs, shut it
   down and start a new one. Do not try to recover it.
 

@@ -2060,8 +2060,7 @@ function assert_finite_factor_rows(F::MatNum)::Nothing
         return nothing
     end
     rows = findall(t -> !all(isfinite, view(F, t, :)), axes(F, 1))
-    throw(IsNonFiniteError("a factor return is a regressor of every asset, and the factor returns are not finite at observation(s) $(first(rows, 5)) of $(size(F, 1)), so no asset has a regressor there. Fit through a ReturnsResult, which drops those observations, or drop them from X and F before the call."))
-    return nothing
+    return throw(IsNonFiniteError("a factor return is a regressor of every asset, and the factor returns are not finite at observation(s) $(first(rows, 5)) of $(size(F, 1)), so no asset has a regressor there. Fit through a ReturnsResult, which drops those observations, or drop them from X and F before the call."))
 end
 """
     pin_regression_choice(re::AbstractTimeSeriesRegressionEstimator, X::MatNum, F::MatNum,

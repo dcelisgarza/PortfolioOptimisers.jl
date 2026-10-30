@@ -524,6 +524,13 @@ using Accessors: Accessors
         @test_throws DimensionMismatch PO.Regression(; M = M, esigma = zeros(3, 2))
     end
 
+    @testset "the idiosyncratic covariance view cuts a vector once and a matrix twice" begin
+        @test isnothing(PO.idiosyncratic_covariance_view(nothing, [1, 3]))
+        @test PO.idiosyncratic_covariance_view([1.0, 2.0, 3.0], [1, 3]) == [1.0, 3.0]
+        @test PO.idiosyncratic_covariance_view([1.0 0.5; 0.5 2.0], [2]) ==
+              reshape([2.0], 1, 1)
+    end
+
     @testset "port_opt_view cuts esigma on every axis it has" begin
         M = [1.0 2.0; 3.0 4.0; 5.0 6.0]
         i = [1, 3]
@@ -597,6 +604,14 @@ using Accessors: Accessors
         rm = PO.map_row_positions(rr, [10, 11, 12, 13, 14, 15, 16])
         @test rm.idx == [12, 14, 16]
         @test isnothing(getfield(rm, :L))
+        # The three ways a position meets the kept rows (#1912).
+        @test PO.kept_row_positions(nothing, [2, 3]) == [2, 3]
+        @test isnothing(PO.kept_row_positions(nothing, nothing))
+        @test isnothing(PO.kept_row_positions([5, 6, 7], nothing))
+        @test PO.kept_row_positions([5, 6, 7], [3, 1]) == [7, 5]
+        # A factor row that is not finite is a regressor of no asset (#1912).
+        @test isnothing(PO.assert_finite_factor_rows([1.0 2.0; 3.0 4.0]))
+        @test_throws PO.IsNonFiniteError PO.assert_finite_factor_rows([1.0 2.0; NaN 4.0])
     end
 end
 

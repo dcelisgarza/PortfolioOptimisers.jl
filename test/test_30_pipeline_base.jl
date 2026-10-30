@@ -3286,3 +3286,56 @@ end
         @test_throws PortfolioOptimisers.IsEmptyError weight_bounds_constraints(nothing)
     end
 end
+
+@testset "Pipeline step helpers on their small shapes (#1912)" begin
+    using Dates
+    PO = PortfolioOptimisers
+    rd = ReturnsResult(; nx = ["a", "b"], X = [0.1 -0.2; -0.1 0.2; 0.05 0.1; 0.01 0.02])
+    prs = PricesResult(;
+                       X = TimeArray(Date(2020, 1, 1) .+ Day.(0:2),
+                                     [1.0 2; 1.1 2.1; 1.2 2.2], ["a", "b"]))
+    pipe = Pipeline(; steps = ("prior" => EmpiricalPrior(), "opt" => InverseVolatility()))
+    ps = PipelineStep(; est = EmpiricalPrior(), writes = :prior)
+    pf = PipelineStep(; est = x -> x, reads = (:prices,), writes = :prices)
+    @testset "fitted steps keep the observations" begin
+        @test PO.fitted_step_keeps_observations(PO.AssetSelectorResult(rd.nx), prs)
+        @test PO.fitted_step_keeps_observations(fit(pipe, rd), rd)
+    end
+    @testset "a step that no schedule changes is the step itself" begin
+        ctx = TimeDependentContext(; i = 1, n = 2, rd = rd, train_idx = [1:2, 1:3],
+                                   test_idx = [3:3, 4:4])
+        @test PO.update_time_dependent_step(ps, ctx, false) === ps
+        @test PO.reset_time_dependent_step(ps) === ps
+        @test PO.pipeline_step_factory(ps, [0.5, 0.5]) === ps
+    end
+    @testset "constraint steps and slots" begin
+        c = PO.PipelineContext(; returns = rd)
+        @test PO.constraint_step_value(AssetSetsMatrixEstimator(; val = "nx"), c) ==
+              Bool[1 0; 0 1]
+        @test PO.pipe_writes(PricesToReturns()) == :returns
+        @test PO.pipe_writes(TrainTestSplit(; test_size = 0.2)) == :split
+        @test PO.pipe_target_paths((; a = 1), Val(:sigma_ucs)) == String[]
+        @test PO.pipe_target_paths((;
+                                    r = [UncertaintySetVariance(), Variance(),
+                                         UncertaintySetVariance()]), Val(:sigma_ucs)) ==
+              ["r[1].ucs", "r[3].ucs"]
+        @test isnothing(PO.group_returns_view(nothing, ExcessSource()))
+        @test PO.cut_children([EmpiricalPrior(), EmpiricalPrior()], "p", false, ["x"]) isa
+              Vector{PO.ReturnsFrames}
+    end
+    @testset "the online traits of a step" begin
+        @test !PO.is_universe_step(1)
+        @test PO.is_universe_step(CompleteAssetSelector())
+        @test !PO.is_row_owner(1)
+        @test PO.is_row_owner(EmpiricalPrior()) && PO.is_row_owner(InverseVolatility())
+        @test isnothing(PO.step_online_cap(1))
+        @test PO.update_online_step(3) === 3
+        @test PO.copy_step_states(3) === 3
+        @test PO.copy_step_states(pf) === pf
+        @test PO.copy_step_states(ps).est isa EmpiricalPrior
+        @test isnothing(PO.port_opt_view(PO.PipelineBufferState(), [1]).data)
+        @test PO.port_opt_view(PO.PipelineBufferState(; data = prs), [1]).data isa
+              PricesResult
+        @test isnothing(PO.assert_time_dependent_fold_count(Online(pipe), 3))
+    end
+end

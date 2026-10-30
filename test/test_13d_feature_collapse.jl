@@ -699,6 +699,34 @@ end
         @test_throws TypeError NestedClustered(; opti = ew, opto = ew, pcol = :cash)
     end
 
+    @testset "The read-cell collapse on its small shapes (#1912)" begin
+        Wt = [0.5 0.0; 0.25 1.0; 0.25 0.0]
+        alg = RenormaliseActive()
+        # A mask with no active mask of the panel is the mask of the observed cells.
+        @test PO.collapse_panel_mask(Bool[1, 0, 0], Wt, nothing) == Bool[1, 0]
+        @test PO.collapse_panel_mask(Bool[1, 0, 0], Wt, nothing) ==
+              PO.collapse_panel_mask(Bool[1, 0, 0], Wt)
+        @test isnothing(PO.read_cells(nothing, Bool[1, 1, 1]))
+        @test PO.read_cells(nothing, Bool[1, 0, 1]) == Bool[1, 0, 1]
+        # A static vector of values reads the cells of its own mask.
+        Av = [1.0, 2.0, 3.0]
+        @test PO.collapse_read_numeric(Av, Wt, Bool[1, 1, 1], alg) ≈ [1.75, 2.0]
+        @test PO.collapse_read_numeric(Av, Wt, Bool[1, 0, 1], alg) ≈ [5 / 3, 0.0]
+        # A static one-hot block collapses as the weighted membership of its levels.
+        Hv = [1.0 0.0; 0.0 1.0; 1.0 0.0]
+        @test PO.collapse_read_onehot(Hv, Wt, Bool[1, 1, 1], alg) ≈ [0.75 0.25; 0.0 1.0]
+        # A static tensor with a data mask that holds everywhere collapses without one.
+        Tv = [1.0 2.0; 3.0 4.0; 5.0 6.0]
+        @test PO.collapse_read_tensor(Tv, Wt, false, nothing, trues(3, 2), alg) ≈
+              [2.5 3.5; 3.0 4.0]
+        # A time-varying tensor whose data mask holds at every active cell does the same.
+        Tv3 = reshape(Tv, 1, 3, 2)
+        Cv3 = PO.collapse_read_tensor(Tv3, Wt, false, trues(1, 3), trues(1, 3, 2), alg)
+        @test Cv3[1, :, :] ≈ [2.5 3.5; 3.0 4.0]
+        # No rate collapses to no rate.
+        @test isnothing(PO.collapse_rate(nothing, Wt, trues(2, 3), alg))
+    end
+
     @testset "Every member active: both rules equal the plain collapse bit for bit" begin
         #=
         #1456 promised that a fit whose members are all active does not change. Where no

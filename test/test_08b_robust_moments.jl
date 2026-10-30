@@ -3035,3 +3035,23 @@ struct UnresolvedDecay <: PO.GerberIQDecayEstimator end
         @test !endswith(iq_ex, "..")
     end
 end
+
+struct SymmetricPanelProbe <: StatsBase.CovarianceEstimator end
+function Statistics.cov(::SymmetricPanelProbe, X::AbstractMatrix; dims::Int = 1,
+                        mean = nothing)
+    return Symmetric(Statistics.cov(X; dims = dims))
+end
+function Statistics.cor(::SymmetricPanelProbe, X::AbstractMatrix; dims::Int = 1,
+                        mean = nothing)
+    return Symmetric(Statistics.cor(X; dims = dims))
+end
+@testset "PortfolioOptimisersCovariance copies an immutable panel-arm answer before it processes it" begin
+    X = randn(StableRNG(1912), 30, 4)
+    ce = PortfolioOptimisersCovariance(; ce = SymmetricPanelProbe())
+    sigma = Statistics.cov(ce, X, nothing)
+    @test isa(sigma, Matrix)
+    @test isapprox(sigma, Statistics.cov(X))
+    rho = Statistics.cor(ce, X, nothing)
+    @test isa(rho, Matrix)
+    @test isapprox(rho, Statistics.cor(X))
+end

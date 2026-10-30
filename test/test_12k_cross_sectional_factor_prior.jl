@@ -239,6 +239,33 @@ end
         @test PO.rebuild_estimator(q, (; cache = nothing)).families === q.families
         @test PO.string_key_pairs([:a => 1]) == ["a" => 1]
     end
+    @testset "A pin has nothing to read from a buffer that fits nothing or holds no panel (#1912)" begin
+        fam = ["industry" => nothing]
+        mk(cache) = CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors(),
+                                              families = fam, cache = cache)
+        X3 = ones(3, 2)
+        # Every observation is a gap of the Shared Series, so a fit keeps none.
+        @test isnothing(PO.cross_sectional_pinned_families(mk(PO.SampleBufferState(; n = 3,
+                                                                                   X = X3,
+                                                                                   G = [true,
+                                                                                        true,
+                                                                                        true]))))
+        # The buffer records no Asset Panel, which the exposures are read from.
+        @test isnothing(PO.cross_sectional_pinned_families(mk(PO.SampleBufferState(; n = 3,
+                                                                                   X = X3))))
+        # A family that names its dropped member is already pinned.
+        pinned = CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors(),
+                                           families = ["industry" => "a"])
+        @test isnothing(PO.cross_sectional_pinned_families(pinned))
+    end
+    @testset "A carry state with no fit has no residual to standardise (#1912)" begin
+        pe0 = CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors())
+        st = PO.CrossSectionalCarryState()
+        dyn = Ref{Any}(st)
+        @test isnothing(st.csr)
+        @test PO.cross_sectional_carry_standardised(pe0, dyn[], true) === st
+        @test PO.cross_sectional_carry_standardised(pe0, dyn[], false) === st
+    end
     @testset "The scalar guards" begin
         f = csfp_factors()
         @test_throws DomainError CrossSectionalFactorPrior(; lambda = 1, factors = f,

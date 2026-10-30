@@ -392,6 +392,13 @@ both pick the best single asset and the parity test says nothing about the fixed
                                                 ReturnsResult())
     end
 
+    @testset "A fees estimator needs the sets of every naive head (#1912)" begin
+        fe = FeesEstimator(; l = Dict("A" => 0.01))
+        @test_throws po.IsNothingError InverseVolatility(; fees = fe)
+        @test_throws po.IsNothingError RandomWeighted(; fees = fe)
+        @test_throws po.IsNothingError BestConstantRebalancedPortfolio(; fees = fe)
+    end
+
     @testset "The Coverage Universe of the window" begin
         Xn = copy(X)
         Xn[7, 3] = NaN

@@ -221,6 +221,13 @@ end
         # A wrapper is not an estimator that folds: it must be resolved first.
         @test_throws ArgumentError po.assert_sample_buffer(Online(BufferProbe()))
         @test_throws ArgumentError partial_fit!(Online(BufferProbe()), X)
+        # A carry folds a block through `fold_buffer`, which seeds an empty buffer.
+        s = po.fold_buffer(nothing, X)
+        @test isequal(po.sample_buffer(s), X)
+        s = po.fold_buffer(s, permutedims(X[1:2, :]); dims = 2)
+        @test isequal(po.sample_buffer(s), vcat(X, X[1:2, :]))
+        # A member that the outer estimator does not hold folds vacuously.
+        @test po.supports_partial_fit(nothing)
     end
 
     @testset "A wrapper and a schedule compose in one direction" begin

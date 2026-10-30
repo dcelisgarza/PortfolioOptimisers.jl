@@ -190,6 +190,19 @@ what keeps the JuMP families cheap.
                              po.partial_fit!(PriceGapFill(), rows(pr, 71:160)).cache)
         @test isequal(gm.v, po.partial_fit!(PriceGapFill(), pr).cache.v)
         @test gm.te == ts[end]
+        # A copy of a state aliases nothing.
+        gs = po.partial_fit!(PriceGapFill(), pr).cache
+        gc = copy(gs)
+        @test isequal(gc.v, gs.v) && gc.held == gs.held && gc.te == gs.te
+        @test gc.v !== gs.v && gc.held !== gs.held && gc.nx !== gs.nx
+        # The gap counts of a filter add over blocks, and the copy aliases nothing.
+        fa = po.partial_fit!(MissingDataFilter(), rows(pr, 1:70)).cache
+        fb = po.partial_fit!(MissingDataFilter(), rows(pr, 71:160)).cache
+        fm = po.merge_states(fa, fb)
+        @test fm.miss == fa.miss .+ fb.miss && fm.n == fa.n + fb.n == 160
+        @test fm.miss == po.partial_fit!(MissingDataFilter(), pr).cache.miss
+        fc = copy(fm)
+        @test fc.miss == fm.miss && fc.miss !== fm.miss && fc.n == fm.n
         # The two window-valued configurations and a caller's algorithm answer `false`.
         @test !po.supports_partial_fit(PriceGapFill(; fill = MeanValue()))
         @test !po.supports_partial_fit(MissingDataFilter(; row_thr = 0.5))

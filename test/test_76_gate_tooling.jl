@@ -392,13 +392,15 @@ end
         guard(dir, from, to) = stamp(dir, "check"; PRE_COMMIT_FROM_REF = from,
                                      PRE_COMMIT_TO_REF = to,
                                      PRE_COMMIT_REMOTE_BRANCH = "refs/heads/dev",
-                                     GATE_STAMP_REQUIRED = "jet doctest")
+                                     GATE_STAMP_REQUIRED = "jet doctest coverage")
         demand(text) = guard(reach_repo(text)...)
         @test demand(reach_text(; doc = "Other prose.")) == (0, "")
+        # A changed literal moves no counter, so it needs no `coverage` stamp (#1912).
         code, out = demand(reach_text(; msg = "other"))
         @test occursin("(literal), and no stamp records these gates: doctest\n", out)
         code, out = demand(reach_text(; body = "x + 2"))
-        @test occursin("(code), and no stamp records these gates: jet doctest\n", out)
+        @test occursin("(code), and no stamp records these gates: jet doctest coverage\n",
+                       out)
         # A changed block needs the scoped run, and the full run covers it.
         dir, c0, c1 = reach_repo(reach_text(; out = "3"))
         code, out = guard(dir, c0, c1)
@@ -536,6 +538,23 @@ end
               "        - function f(x)\n        3     y = x\n        0     z = 1\n" *
               "        - end\n")
         @test RF.coverage_lines(cov) == (2, [3])
+        @test RF.coverage_tags(cov) == [nothing, 3, 0, nothing]
+
+        # A `PATCH` line reads the added lines as CI does (#1912). A method that no test compiled
+        # has no counter at all, and CI reads each line of its body as a miss.
+        text = "function f(x)\n    y = x\n    return y\nend\ng(x)::Int = 2x\nconst c = 1\n"
+        body = RF.function_body_lines(text)
+        @test issubset(Set([2, 3, 5]), body)
+        @test !(6 in body)
+        @test RF.function_body_lines("h(x) where {T} = x\nk = 1\n") == Set([1])
+        tags = [nothing, nothing, nothing, nothing, 3, nothing]
+        @test RF.patch_misses(tags, Set([2, 3, 5]), 1:6) == [2, 3]
+        @test RF.patch_misses(tags, Set([2, 3, 5]), [5, 6]) == Int[]
+        @test RF.patch_misses([nothing, 1, 0], Set([2, 3]), [3]) == [3]
+        # A file that no test loaded has no tags, so every body line it adds is a miss.
+        @test RF.patch_misses(Union{Nothing, Int}[], Set([2, 3]), [1, 2]) == [2]
+        diff = "@@ -1,0 +2,3 @@\n+a\n+b\n+c\n@@ -10 +14 @@\n-x\n+y\n@@ -20,2 +22,0 @@\n-p\n-q\n"
+        @test RF.added_lines(diff) == Set([2, 3, 4, 14])
         # Each of the two refusals of `--coverage` names its own cause.
         msg(f) =
             try

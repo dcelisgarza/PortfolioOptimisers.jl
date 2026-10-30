@@ -3,6 +3,10 @@ using PortfolioOptimisers, Test, NearestCorrelationMatrix, LinearAlgebra
 # Card 7 of the 2026-08-17 maintainability review: the out-of-place verbs are documented
 # as an optional part of the extension interface, so an estimator that declares only the
 # in-place form must inherit a copying fallback. These estimators declare nothing else.
+struct ShapeOnlyProbe <: PortfolioOptimisers.AbstractMatrixProcessingEstimator end
+function PortfolioOptimisers.assert_shape_only_matrix_processing(::ShapeOnlyProbe)
+    return nothing
+end
 struct Card7Posdef <: PortfolioOptimisers.AbstractPosdefEstimator end
 function PortfolioOptimisers.posdef!(::Card7Posdef, X::AbstractMatrix)
     X .= (X .+ transpose(X)) ./ 2
@@ -403,6 +407,16 @@ end
               zeros(3, 3)
         @test PortfolioOptimisers.matrix_processing_block!(mp, zeros(3, 3), 4, 3) ==
               zeros(3, 3)
+        # A matrix with no finite variance is handed to the plain method, which has no step to
+        # run, and comes back as it was.
+        none = MatrixProcessing(; pdm = nothing)
+        allnan = fill(NaN, 3, 3)
+        @test all(isnan, PortfolioOptimisers.matrix_processing_block!(none, allnan, 4, 3))
+        # A matrix processing estimator of a caller's, whose shape check passes, is returned as
+        # given by the plain method.
+        mine = ShapeOnlyProbe()
+        S3 = [1.0 0.5; 0.5 2.0]
+        @test matrix_processing!(mine, S3, 4, 2) === S3
         # A NaN frame stays as it is: the cell of a constant asset and an asset the fit left
         # out is still NaN, and the zero row is zero inside the finite rows alone.
         F = copy(S)

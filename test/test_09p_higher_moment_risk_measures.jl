@@ -216,6 +216,9 @@ end
         @test rf(w, X) ≈
               2.0 * dot(w, pr.sigma, w) - 0.5 * _m3_599(pr, w) + 3.0 * _m4_599(pr, w)
         @test !PO.supports_precomputed_returns(r)
+        # A call that dispatch cannot fold runs the method, which a coverage run counts (#1912).
+        dyn = Ref{Any}(r)
+        @test !PO.supports_precomputed_returns(dyn[])
         # The functors of the children give the raw terms, the kurtosis as its square root.
         _, s3, k4 = PO.variance_skew_kurtosis_terms(rf, w)
         @test 0.5 * rf.sk(w) ≈ s3
