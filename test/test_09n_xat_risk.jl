@@ -441,7 +441,25 @@ rel_dd(x) = cumprod(1 .+ x) ./ accumulate(max, cumprod(1 .+ x); init = one(eltyp
             @test isapprox(JuMP.value(sol.model[:risk]), JuMP.value(sv.model[:risk]);
                            rtol = 1e-6)
         end
-        # Tails that read different moments keep a cone each.
+        # The cone bounds the standard deviation, which does not read `mu`. So tails with
+        # different expected returns share it. With a cone each, the gain tail of a
+        # `Normal(2, 1)` had a negative coefficient, and the model was unbounded.
+        for dist in (Normal(2.0, 1.0), Normal())
+            r = GenericValueatRiskRange(;
+                                        loss = ValueatRisk(;
+                                                           alg = DistributionValueatRisk(;
+                                                                                         dist = dist)),
+                                        gain = ValueatRisk(;
+                                                           alg = DistributionValueatRisk(;
+                                                                                         dist = dist,
+                                                                                         mu = zeros(6))))
+            sol = optimise(MeanRisk(; r = r, obj = MinimumRisk(), opt = opt))
+            @test isa(sol.retcode, OptimisationSuccess)
+            @test nsoc(sol.model) == 1
+            @test isapprox(JuMP.value(sol.model[:risk]),
+                           expected_risk(factory(r, pr), sol.w, pr); rtol = 1e-6)
+        end
+        # Tails that read different covariance matrices keep a cone each.
         dist = Normal(0.5, 1.0)
         a1 = DistributionValueatRisk(; dist = dist)
         a2 = DistributionValueatRisk(; dist = dist, sigma = 2 .* pr.sigma)
