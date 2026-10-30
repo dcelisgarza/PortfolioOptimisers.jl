@@ -2387,7 +2387,7 @@ The slot also takes a weight vector and a caller's own plain function, and neith
 const OWA_CalOccupant = Union{AbstractOrderedWeightsArrayFunction, OWA_RevFunc}
 # A reversed builder is a `Function` and computes no quantity, so it withdraws itself from
 # the rule marker — see `is_calibration_rule`.
-is_calibration_rule(::OWA_CalOccupant) = false
+is_calibration_rule(::OWA_CalOccupant)::Bool = false
 # Calibration slots — see `calibration_slots`. The container states no quantity of its own;
 # it names the child, and the child names its own slots. Only a builder carries a slot, so
 # only a builder is named: a weight vector and a caller's own plain function carry none, and

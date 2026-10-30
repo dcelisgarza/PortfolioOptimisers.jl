@@ -483,7 +483,7 @@ function run_step(ce::AbstractConstraintEstimator, ctx::PipelineContext)
     return run_constraint_step(ce, nothing, ctx)
 end
 pipe_reads(::PricesToReturns) = (:prices,)
-pipe_writes(::PricesToReturns) = :returns
+pipe_writes(::PricesToReturns)::Symbol = :returns
 function run_step(ptr::PricesToReturns, ctx::PipelineContext)
     require_slot(ctx, :prices, ptr)
     return ptr, set_slot(ctx, :returns, apply_preprocessing(ptr, ctx.prices))
@@ -502,7 +502,7 @@ A [`TrainTestSplit`](@ref) narrows whichever data slot the pipeline input filled
   - [`assert_split_position`](@ref)
   - [`PIPELINE_SLOTS`](@ref)
 """
-pipe_writes(::TrainTestSplit) = :split
+pipe_writes(::TrainTestSplit)::Symbol = :split
 pipe_reads(::TrainTestSplit) = ()
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

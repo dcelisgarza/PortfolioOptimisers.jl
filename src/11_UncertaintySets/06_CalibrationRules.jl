@@ -137,9 +137,9 @@ Three functions read the trait:
   - [`resolve_calibration_slot`](@ref)
   - [`assert_calibrated_slots`](@ref)
 """
-is_calibration_rule(::Any) = false
-is_calibration_rule(::AbstractCalibrationAlgorithm) = true
-is_calibration_rule(::Function) = true
+is_calibration_rule(::Any)::Bool = false
+is_calibration_rule(::AbstractCalibrationAlgorithm)::Bool = true
+is_calibration_rule(::Function)::Bool = true
 """
     calibration_slots(x)
 

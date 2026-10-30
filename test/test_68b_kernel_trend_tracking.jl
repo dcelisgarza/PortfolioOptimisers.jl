@@ -114,6 +114,10 @@ the worked step the paper prints for five assets at its defaults.
         y = P[:, end] .* (1 .+ 0.03 .* randn(rng3, 4))
         lasso = ElasticNet(; theta = 1.0)
         @test isnothing(polish(P, y, ones(5), 1e-3, 1.0))
+        # Two identical columns and no ridge make the matrix of the equations exactly singular,
+        # whatever the rounding.
+        Pd = [1.0 1.0; 2.0 2.0; 3.0 3.0]
+        @test isnothing(polish(Pd, [1.0, 2.0, 3.0], [1.0, 1.0], 1e-3, 1.0))
         z = enet(lasso, P, y)
         lam = maximum(abs, P' * y) * sqrt(lasso.strength.ratio)
         corr = P' * (y .- P * z)

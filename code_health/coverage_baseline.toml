@@ -180,7 +180,7 @@ commit = "8610300"
 "src/05_Moments/32_CrossSectionalFactorModel/11_CrossSectionalIdiosyncraticDiagnostics.jl" = { lines = 182, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/12_CrossSectionalExposureIC.jl" = { lines = 130, misses = 0 }
 "src/05_Moments/33_CoverageUniverse.jl" = { lines = 143, misses = 0 }
-"src/05_Moments/34_PriceLevelExpectedReturns.jl" = { lines = 175, misses = 0 }
+"src/05_Moments/34_PriceLevelExpectedReturns.jl" = { lines = 218, misses = 1 }
 "src/05_Moments/35_CompositePriceLevelStatistics.jl" = { lines = 212, misses = 0 }
 "src/05_Moments/36_RankOneCovariance.jl" = { lines = 25, misses = 0 }
 "src/05_Moments/37_GeodesicShrinkageCovariance.jl" = { lines = 116, misses = 0 }
@@ -217,7 +217,7 @@ commit = "8610300"
 "src/08_Phylogeny/11_PhylogenyMatrix.jl" = { lines = 25, misses = 0 }
 "src/08_Phylogeny/12_AssetPhylogeny.jl" = { lines = 9, misses = 0 }
 "src/09_ConstraintGeneration/01_Base_ConstraintGeneration.jl" = { lines = 26, misses = 0 }
-"src/09_ConstraintGeneration/02_LinearConstraintGeneration_a.jl" = { lines = 265, misses = 1 }
+"src/09_ConstraintGeneration/02_LinearConstraintGeneration_a.jl" = { lines = 265, misses = 0 }
 "src/09_ConstraintGeneration/02_LinearConstraintGeneration_b.jl" = { lines = 235, misses = 0 }
 "src/09_ConstraintGeneration/03_RiskBudgetConstraintGeneration.jl" = { lines = 23, misses = 0 }
 "src/09_ConstraintGeneration/04_PhylogenyConstraintGeneration.jl" = { lines = 93, misses = 0 }

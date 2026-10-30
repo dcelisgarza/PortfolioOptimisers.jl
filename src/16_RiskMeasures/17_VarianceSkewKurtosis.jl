@@ -846,6 +846,6 @@ Return `false`: the functor of [`VarianceSkewKurtosis`](@ref) reads the weights 
   - [`supports_precomputed_returns`](@ref)
   - [`VarianceSkewKurtosis`](@ref)
 """
-supports_precomputed_returns(::VarianceSkewKurtosis) = false
+supports_precomputed_returns(::VarianceSkewKurtosis)::Bool = false
 
 export MaxRiskMeasureSettings, Skewness, VarianceSkewKurtosis

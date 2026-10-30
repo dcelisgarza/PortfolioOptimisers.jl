@@ -226,6 +226,11 @@ end
         @test isequal(po.sample_buffer(s), X)
         s = po.fold_buffer(s, permutedims(X[1:2, :]); dims = 2)
         @test isequal(po.sample_buffer(s), vcat(X, X[1:2, :]))
+        # The count of a mean over a buffer reads the rows of the buffer, as it reads the sample.
+        @test po.effective_observation_count(SimpleExpectedReturns(), s) ==
+              po.effective_observation_count(SimpleExpectedReturns(),
+                                             po.sample_buffer(s)) ==
+              size(X, 1) + 2
         # A member that the outer estimator does not hold folds vacuously.
         @test po.supports_partial_fit(nothing)
     end

@@ -788,11 +788,13 @@ definition = "optimal_number_clusters"
 misses = 1
 rationale = "a-cut-into-one-cluster-is-always-valid"
 
+# Run 41046186365 (#1912): the `function` line of this method reads 0 while every line of its body
+# carries hits, and the body is reached by each fold of a price-level statistic.
 [[coverage_exemption]]
-path = "src/09_ConstraintGeneration/02_LinearConstraintGeneration_a.jl"
-definition = "LinearConstraint"
+path = "src/05_Moments/34_PriceLevelExpectedReturns.jl"
+definition = "fold_statistic_row"
 misses = 1
-rationale = "a-signature-line-counter-the-test-job-cannot-reach"
+rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
 
 # Two constants of one shape, one row each. The `const` line of each holds the `map` closure that
 # builds the union, and the count of 1 is the synthetic zero that the line draws.

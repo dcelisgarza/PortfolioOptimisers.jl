@@ -371,6 +371,16 @@ end
         end
     end
 
+    @testset "A panel with no field collapses to a panel with masks alone (#1912)" begin
+        sz = size(rd_r.X)
+        rd_nf = ReturnsResult(; nx = rd_r.nx, X = rd_r.X, ts = rd_r.ts,
+                              pnl = AssetPanel(; amsk = trues(sz), emsk = trues(sz)))
+        nco = NestedClustered(; opti = plain_hrp(), opto = plain_hrp(), cv = KFold(; n = 3),
+                              ex = seq)
+        res = optimise(nco, rd_nf)
+        @test isapprox(sum(res.w), 1)
+    end
+
     @testset "A square carrier through a fold collapses onto the synthetic universe" begin
         #=
         This testset used to pin the opposite: a square carrier kept the *real* assets as

@@ -1619,3 +1619,14 @@ end
                             (dot(pr.mu, rmi[1].w) - mic(rmi[1].w)) /
                             sqrt(dot(rmi[1].w, pr.sigma, rmi[1].w)); rtol = 1e-5), rmi)
 end
+
+@testset "NoReturn: the degree of homogeneity is one beside any fee (#1912)" begin
+    hd = PortfolioOptimisers.homogeneity_degree
+    @test hd(NoReturn()) == 1
+    @test hd(ArithmeticReturn()) == 1
+    @test isnothing(hd(LogarithmicReturn()))
+    @test hd(NoReturn(), Fees(; fl = 0.0001)) == 1
+    # A vector has degree one when no term that enters the ratio has none.
+    @test hd([ArithmeticReturn(), NoReturn()]) == 1
+    @test isnothing(hd([ArithmeticReturn(), LogarithmicReturn()]))
+end

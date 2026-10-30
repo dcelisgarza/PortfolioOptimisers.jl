@@ -100,6 +100,9 @@ field of the target until #1428 moved it to the estimator.
     @test isapprox(PO.mahalanobis_bias(2.0^(-1 / 1e6), 30, 5), 30 / 24; rtol = 1e-9)
     # The fixed point has no solution where the mean of the statistic is not finite.
     @test isnothing(PO.mahalanobis_bias(0.9, 6, 5))
+    # The HAC form states the same refusal, and answers where the mean is finite.
+    @test isnothing(PO.mahalanobis_bias(0.9, 6, 5, 2))
+    @test isnothing(PO.mahalanobis_bias(0.9, 3, 5, [1.0, 0.5]))
     @test !isnothing(PO.mahalanobis_bias(0.9, 7, 5))
     # The factor solves the fixed point on the full sum, and the weights below the machine
     # epsilon, which the loop adds as mass, move it by no more than round-off.

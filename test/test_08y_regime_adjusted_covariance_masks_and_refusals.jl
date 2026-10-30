@@ -238,6 +238,9 @@ end
                                                            regime_target = DiagonalTarget(), kw...),
                        X)
     @test PO.min_active_assets(MyTarget397()) == 1
+    # A target of a caller's keeps no bias store, and the fallback names an empty one.
+    @test PO.regime_bias_store(MyTarget397(), 0.9, Float64) == Float64[]
+    @test eltype(PO.regime_bias_store(MyTarget397(), 0.9, Float32)) == Float32
 end
 @testset "the estimator refuses what it cannot fit" begin
     rng = StableRNG(8906)

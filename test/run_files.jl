@@ -78,8 +78,12 @@ rows whose test set ran are judged.
 
 `--coverage=<absolute dir>` runs the files in a child process under `--code-coverage=@<dir>`,
 because Julia writes the counters only when a process exits. The parent then prints one
-`COVERAGE` line per source file under `<dir>`, with the lines that no test reached, and deletes the
-counter files of the child. The other options are passed to the child. `<dir>` is the source
+`COVERAGE` line per source file that the child loaded under `<dir>`, with the lines that no test
+reached, and deletes the counter files of the child. It counts a miss the way CI does: a counter
+at zero, and also each body line of a method that no test compiled, which has no counter at all.
+A short-form method whose body is a literal, such as `f(::T) = true`, gets no counter even when a
+test calls it, so it reads as a miss here and on CI. A return type, `f(::T)::Bool = true`, gives it
+one. The other options are passed to the child. `<dir>` is the source
 directory to measure, such as `<worktree>/src/16_RiskMeasures`, because Julia counts only the files
 under it. A scratch directory holds no source file, so the run prints no `COVERAGE` line at all.
 
@@ -776,14 +780,18 @@ function run_coverage(dir::AbstractString, rest::Vector{String})
                 continue
             end
             cov = joinpath(root, f)
-            counted, missed = coverage_lines(cov)
             rel = relpath(joinpath(root, m[1]), REPO_ROOT)
+            tags[rel] = coverage_tags(cov)
+            rm(cov)
+            # The misses as CI reads them: a method that no test compiled has no counter, and CI
+            # counts each line of its body (#1912).
+            body = function_body_lines(read(joinpath(root, m[1]), String))
+            missed = patch_misses(tags[rel], body, 1:length(tags[rel]))
+            counted = length(union(findall(!isnothing, tags[rel]), body))
             println("COVERAGE $rel counted=$counted missed=$(length(missed))")
             if !(isempty(missed))
                 println("  missed lines: ", join(missed, ", "))
             end
-            tags[rel] = coverage_tags(cov)
-            rm(cov)
         end
     end
     lines, clean = patch_report(dir, tags)

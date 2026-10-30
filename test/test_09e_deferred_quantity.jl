@@ -1612,3 +1612,18 @@ end
     end
     @test isempty(offenders)
 end
+
+# A measure of a user holds its slots and a fan-out estimator, and reaches the general
+# `fan_out_pe`, because neither shipped measure that fans out is this type.
+struct FanOutProbe{T1, T2}
+    mu::T1
+    pe::T2
+end
+@testset "Deferred Quantity: the general fan-out fills the slots a measure leaves open (#1912)" begin
+    X = randn(StableRNG(11), 100, 3)
+    lop = prior(EmpiricalPrior(), X)
+    x = FanOutProbe(nothing, EmpiricalPrior())
+    out = PortfolioOptimisers.fan_out_pe(x, x.pe, lop, (; mu = nothing))
+    @test out.mu ≈ lop.mu
+    @test isnothing(out.pe)
+end

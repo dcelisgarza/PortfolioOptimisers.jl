@@ -23,6 +23,8 @@ function PortfolioOptimisers.add_custom_constraint!(model::JuMP.Model, c::FirstA
     JuMP.@constraint(model, sc * (w[1] - c.ub * k) <= 0)
     return nothing
 end
+# An allocation set of a user, which only the general method of `projection_solver` reaches.
+struct ProbeAllocationSet <: PortfolioOptimisers.AbstractAllocationSet end
 struct FirstCosts <: PortfolioOptimisers.CustomJuMPObjective
     c::Float64
 end
@@ -313,6 +315,8 @@ end
         @test po.projection_solver(EuclideanProjection(), pset) === slv
         # A Gram geometry hands out its own solver on a bounded set, too (#1912).
         @test po.projection_solver(g, bset) === slv
+        @test po.projection_solver(g, pset) === slv
+        @test po.projection_solver(g, ProbeAllocationSet()) === slv
         # A number budget is a row of equality: the short part of the projection is 0.2.
         sset = resolve(ProgrammeAllocationSet(; slv = slv, sbgt = 0.2,
                                               wb = WeightBounds(; lb = -1, ub = 1)), 3)
@@ -326,6 +330,12 @@ end
         # A model with no budget adds no budget row.
         mb = JuMP.Model()
         @test isnothing(po.anonymous_budget_rows!(mb, 0, nothing))
+        # A number budget adds one equality row on the expression, scaled by `k`.
+        po.set_model_scales!(mb, 1, 1)
+        JuMP.@variable(mb, xb[1:2])
+        mb[:k] = 1
+        @test isnothing(po.anonymous_budget_rows!(mb, sum(xb), 0.5))
+        @test JuMP.num_constraints(mb; count_variable_in_set_constraints = false) == 1
         # The rule binds its Gram matrix at every step and runs solver-free at the default.
         rng = StableRNG(7)
         T, N = 20, 4

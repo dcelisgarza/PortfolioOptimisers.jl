@@ -631,7 +631,9 @@ end
                                                             vd = 0.0, t = 0)))
         @test po.show_fields(EWDownsideBeta()) == (:mcap, :decay, :min_obs, :mar, :min_val)
         # Two states of the macro sensitivity do not merge: the second block starts from the first.
-        @test_throws ArgumentError po.merge_states(m, copy(m))
+        @test isa(m.st, po.EWMacroSensitivityState)
+        @test occursin("an EWMacroSensitivityState cannot merge",
+                       message(() -> po.merge_states(m.st, copy(m.st))))
         # A carried Descriptor pads the rows before its own with `NaN`, keeps them when they fill the returns.
         Nd = length(rd.nx)
         carried = po.CarriedDescriptor(ones(2, Nd))

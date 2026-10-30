@@ -226,8 +226,8 @@ A universe-only step folds nothing. In `fit(pipe)` with no data its batch verb r
   - [`AbstractAssetSelector`](@ref)
   - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{PipelineBufferState, ReturnsBufferState}}}, data::Prices_RR)`](@ref)
 """
-is_universe_step(::Any) = false
-is_universe_step(::AbstractAssetSelector) = true
+is_universe_step(::Any)::Bool = false
+is_universe_step(::AbstractAssetSelector)::Bool = true
 """
     is_row_owner(est) -> Bool
 
@@ -239,9 +239,9 @@ A prior estimator can, and so can an optimisation step of any form, a schedule i
 
   - [`pipeline_row_owner`](@ref)
 """
-is_row_owner(::Any) = false
-is_row_owner(::AbstractPriorEstimator) = true
-is_row_owner(::Union{OptE_Opt, TD_OptE_Opt}) = true
+is_row_owner(::Any)::Bool = false
+is_row_owner(::AbstractPriorEstimator)::Bool = true
+is_row_owner(::Union{OptE_Opt, TD_OptE_Opt})::Bool = true
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

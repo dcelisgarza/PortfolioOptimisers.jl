@@ -12,6 +12,25 @@ function PortfolioOptimisers.fold_inactive!(::AdmitEverything,
                                             ::AbstractVector{<:Bool})
     return state
 end
+using Statistics: Statistics
+# Estimators of a caller's, with no Asset Panel method of their own: they meet the generic roots.
+struct VarProbe <: PortfolioOptimisers.AbstractCovarianceEstimator end
+function Statistics.var(::VarProbe, X::PortfolioOptimisers.MatNum; dims::Int = 1, kwargs...)
+    return var(SimpleVariance(), X; dims = dims)
+end
+function Statistics.std(::VarProbe, X::PortfolioOptimisers.MatNum; dims::Int = 1, kwargs...)
+    return std(SimpleVariance(), X; dims = dims)
+end
+struct SkewProbe <: PortfolioOptimisers.CoskewnessEstimator end
+function PortfolioOptimisers.coskewness(::SkewProbe, X::PortfolioOptimisers.MatNum;
+                                        dims::Int = 1, kwargs...)
+    return coskewness(Coskewness(), X; dims = dims)
+end
+struct KurtProbe <: PortfolioOptimisers.CokurtosisEstimator end
+function PortfolioOptimisers.cokurtosis(::KurtProbe, X::PortfolioOptimisers.MatNum;
+                                        dims::Int = 1, kwargs...)
+    return cokurtosis(Cokurtosis(), X; dims = dims)
+end
 function coverage_panel(amsk)
     pf = [PortfolioOptimisers.NumericPanelField(; name = "mcap", vals = ones(size(amsk)...),
                                                 omsk = trues(size(amsk)...))]
@@ -371,6 +390,17 @@ end
     ku = cokurtosis(WindowedCokurtosis(; window = T), X, pnl)
     @test size(ku) == (9, 9)
     @test ku[keep, keep] ≈ cokurtosis(Cokurtosis(), X[:, 1:2])
+    # The same through estimators that state nothing of the panel.
+    @test vec(var(VarProbe(), X, pnl))[1:2] ≈ vec(sv)
+    @test isnan(vec(var(VarProbe(), X, pnl))[3])
+    @test vec(std(VarProbe(), X, pnl))[1:2] ≈ sqrt.(vec(sv))
+    @test isnan(vec(std(VarProbe(), X, pnl))[3])
+    pk = first(coskewness(SkewProbe(), X, pnl))
+    @test size(pk) == (3, 9) && all(isnan, pk[3, :])
+    @test pk[1:2, keep] ≈ first(coskewness(Coskewness(), X[:, 1:2]))
+    pku = cokurtosis(KurtProbe(), X, pnl)
+    @test size(pku) == (9, 9)
+    @test pku[keep, keep] ≈ cokurtosis(Cokurtosis(), X[:, 1:2])
 end
 @testset "An available-case fit refuses a centre and a weight it cannot reproduce" begin
     X = randn(StableRNG(5), 16, 3)

@@ -998,11 +998,8 @@ function homogeneity_degree(::LogarithmicReturn, ::Option{<:Fees} = nothing)
     return nothing
 end
 function homogeneity_degree(rt::VecJRE, fees::Option{<:Fees} = nothing)
-    return if any(r -> r.settings.rte && isnothing(homogeneity_degree(r, fees)), rt)
-        nothing
-    else
-        1
-    end
+    unbounded = any(r -> r.settings.rte && isnothing(homogeneity_degree(r, fees)), rt)
+    return unbounded ? nothing : 1
 end
 function homogeneity_degree(r::ExpectedReturn, fees::Option{<:Fees} = nothing,
                             ::Option{<:Integer} = nothing)
