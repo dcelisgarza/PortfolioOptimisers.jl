@@ -446,17 +446,19 @@ end
     end
 end
 
-@testset "An anchor cone takes the size of its bound when the region is degenerate" begin
+@testset "An anchor cone keeps its slack in the units of its bound when the region is degenerate" begin
     # The width of the region divides the slack of the cone.
     @test PO.anchor_cone_scale(5e-4, 0.03) == 5e-4
     @test PO.anchor_cone_scale([2e-4, -5e-4], [0.01, 0.03]) == 5e-4
     # A width of the order of the rounding error, as when the three anchors are one
-    # portfolio, gives way to the bound.
-    @test PO.anchor_cone_scale(-1e-13, 0.0073) == 0.0073
-    @test PO.anchor_cone_scale(0.0, [0.01, -0.02]) == 0.02
+    # portfolio, gives way to one. A division by the bound made the rounding error of the
+    # slack 137 times larger, and the constrained NOC of test_02:1216 stopped at
+    # NUMERICAL_ERROR under the flags of CI (R21 of #1817).
+    @test PO.anchor_cone_scale(-1e-13, 0.0073) === 1.0
+    @test PO.anchor_cone_scale(0.0, [0.01, -0.02]) === 1.0
     # The comparison has no float tolerance of its own, so a Rational keeps its type.
     @test PO.anchor_cone_scale(1 // 10, 1 // 2) === 1 // 10
-    @test PO.anchor_cone_scale(0 // 1, 1 // 2) === 1 // 2
+    @test PO.anchor_cone_scale(0 // 1, 1 // 2) === 1 // 1
 end
 
 @testset "MeanRisk sweep: one measure with two bounds keeps both" begin

@@ -198,12 +198,12 @@ end
 
 Return the scale that divides the slack of an anchor cone of the barrier of [`NearOptimalCentering`](@ref).
 
-The scale is the width `delta` of the near optimal region, which is the slack of the cone at the anchor of the objective. When the width is negligible against the bound `anchor`, the scale is the [`bound_scale`](@ref) of the bound. The anchors of a degenerate region are one portfolio, so its width is of the order of the rounding error. A slack divided by that width puts the tolerance of the solver at the scale of the rounding error, and the solve stops without progress.
+The scale is the width `delta` of the near optimal region, which is the slack of the cone at the anchor of the objective. When the width is negligible against the bound `anchor`, the scale is one, and the cone keeps its slack in the units of the bound. The anchors of a degenerate region are one portfolio, so its width is of the order of the rounding error. A slack divided by that width puts the tolerance of the solver at the scale of the rounding error, and the solve stops without progress. The width can also be negative by a rounding error, so the bound sits outside the region by that error. A scale below one makes the error larger. With the anchors of the factor exposure test of `test_02`, a width of `-1.1e-13` and a risk bound of `0.0073`, the slack divided by the bound stopped at `NUMERICAL_ERROR` under `--check-bounds=yes` and coverage, and the slack in the units of the bound solved.
 
 # Algorithm
 
  1. Compute ``s = \\max_{i} |\\delta_{i}|`` and ``m``, the [`bound_scale`](@ref) of `anchor`.
- 2. Return ``m`` when `isapprox(m + s, m)`, and ``s`` otherwise.
+ 2. Return ``1`` when `isapprox(m + s, m)`, and ``s`` otherwise.
 
 # Arguments
 
@@ -223,7 +223,7 @@ The scale is the width `delta` of the near optimal region, which is the slack of
 function anchor_cone_scale(delta::Num_VecNum, anchor::Num_VecNum)
     s = maximum(abs, delta; init = abs(zero(eltype(delta))))
     m = bound_scale(anchor)
-    return ifelse(isapprox(m + s, m), m, s)
+    return ifelse(isapprox(m + s, m), one(s), s)
 end
 """
     solve_near_optimal_centering!(alg, model, noc, setup)
