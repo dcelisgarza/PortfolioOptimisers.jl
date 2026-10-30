@@ -210,10 +210,14 @@ above. `ZeroStartCentring` is the location of the oracle, a rule with content of
   member, beside its rules with content.
 - A new covariance estimator takes no `mp` field. A caller wraps it in
   `PortfolioOptimisersCovariance` for matrix processing. A caller that set `mp` on an
-  `ImpliedVolatility` moves it to the wrapper.
+  `ImpliedVolatility` moves it to the wrapper. The default `mp` of the old field was
+  `MatrixProcessing()`, which repairs a matrix that is not positive definite. So a caller of the
+  default wraps the estimator too, to keep that repair: on 30 observations of 50 assets the
+  unwrapped matrix has a smallest eigenvalue of -2.3e-19, and the wrapped one 1.7e-16.
 - A fallback method on the abstract family that refuses a subtype with no method of its own stays
   separate from the method on `Nothing`, as #1878 made it for the Gerber IQ verbs.
-- The removed names that v0.32 exported have a line in the migration guide. A caller replaces
+- Each removed name that v0.33 exported gets a line in the section "From v0.33 to v0.34" of the
+  migration guide. A caller replaces
   `X()` with `nothing`, and a method of a caller on `X` becomes a method on `Nothing`.
 - A verdict ticket of #1852 cites this ADR. For a type that is not a data-less setting, it records
   the four checks.
