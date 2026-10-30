@@ -189,6 +189,11 @@ returns after the census refused `float(`, and each such repair was reverted.
 real quotient `a / b` takes `oftype(one(a) / one(b), NaN)`, because that value is a quotient.
 Neither is a repair of an integer input.
 
+**A threshold comes from the type too.** A test of whether a value is negligible against another
+takes its tolerance from the element type, never from a literal: the default tolerance of
+`isapprox`, or a multiple of `eps(T)`. A literal tolerance has a type of its own. It widens a
+narrower comparison, and it makes an exact one inexact.
+
 **Admit a concrete type only when the code needs that type**, and then only when no method
 converts internally. An index is the usual case.
 
@@ -560,6 +565,13 @@ of a `Dict` or a `Set`. That order follows the insertion history and the rehashe
 So one view set can stack its blocks in two orders, and two orders give two problems whose
 solutions differ in the last digits. A test that compares such a solution then passes alone and fails beside
 other test sets. The entropy pooling solve stacks its view blocks by sorted key since #1751.
+
+## The caller owns the settings of a solver
+
+The library does not write a tolerance, an iteration limit or any other setting of a solver. Each
+setting comes from the `Solver` that the caller gives. A problem that needs a tighter solve to
+hold its answer states that need, with the measured value, in the docstring that the caller
+reads. The caller then sets it.
 
 ## Code Organization
 
