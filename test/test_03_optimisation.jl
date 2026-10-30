@@ -431,6 +431,24 @@ end
                            rtol = 1e-6)
         end
     end
+    @testset "An LpNorm of order 2 or Inf reaches the optimum of the named norm" begin
+        # The order picks the cone of the norm (#1884). Before, an order of `Inf` wrote power
+        # cones at the exponent `1 / Inf`, which bound nothing: under the relative deviation
+        # the solve stopped at a norm of 3, where the optimum is 5 / 3.
+        w0c = [0.6, 0.25, 0.1, 0.05]
+        wbc = WeightBounds(; lb = fill(0.1, 4), ub = fill(0.3, 4))
+        fin(alg) = PortfolioOptimisers.opt_weight_bounds(JuMPWeightFinaliser(; slv = slv,
+                                                                             alg = alg),
+                                                         wbc, copy(w0c))
+        for dev in (RelativeWeightDeviation(), AbsoluteWeightDeviation()),
+            (p, named) in ((2, L2Norm()), (Inf, LInfNorm()))
+
+            res(w) = isa(dev, RelativeWeightDeviation) ? w ./ w0c .- 1 : w - w0c
+            wp = fin(ErrorWeightFinaliser(; alg = LpNorm(; p = p), dev = dev))
+            wn = fin(ErrorWeightFinaliser(; alg = named, dev = dev))
+            @test isapprox(norm(res(wp), p), norm(res(wn), p); rtol = 1e-6)
+        end
+    end
     @testset "A repaired vector keeps its budget and lands in the bounds" begin
         for wf in (IterativeWeightFinaliser(), EuclideanWeightFinaliser(),
                    EntropicWeightFinaliser(), JuMPWeightFinaliser(; slv = slv))
