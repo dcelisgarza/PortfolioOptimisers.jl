@@ -1348,14 +1348,31 @@ end
         q = po.ERM_worst_case(x, slv, 0.05)
         @test isapprox(risk_gradient(r, w, pr), -transpose(X) * q; rtol = 1e-8)
         # A compounded drawdown is not homogeneous, so its contributions do not sum to its
-        # risk. Its gradient still matches a finite difference whose step dwarfs the noise of
-        # the solver, to the truncation error of that step.
-        for r in (RelativeEntropicDrawdownatRisk(), RelativeRelativisticDrawdownatRisk(),
-                  RelativePowerNormDrawdownatRisk(; alpha = 0.2, p = 1.5))
-            r = factory(r, pr, slv)
-            g = risk_gradient(r, w, pr)
-            gfd = po.finite_difference_gradient(v -> expected_risk(r, v, pr), w, 1e-3)
-            @test isapprox(g, gfd; rtol = 1e-3)
+        # risk. Its gradient is the expected loss under the Worst-Case Distribution of one
+        # solve, through the Jacobian `J` of the drawdown series. `J` is in closed form, so
+        # the check solves at `w` alone. A finite difference of the measure solved at shifted
+        # weights, and a solve that fails returns `NaN` on some hosts (#1916).
+        J = similar(X)
+        cp = peak = one(eltype(x))
+        dcp = zeros(size(X, 2))
+        dpeak = zeros(size(X, 2))
+        for t in axes(X, 1)
+            cp *= 1 + x[t]
+            dcp .= dcp .* (1 + x[t]) .+ (cp / (1 + x[t])) .* view(X, t, :)
+            if cp > peak
+                peak = cp
+                dpeak .= dcp
+            end
+            J[t, :] .= dcp ./ peak .- (cp / peak^2) .* dpeak
+        end
+        dd = po.relative_drawdown_vec(x)
+        for (r, q) in
+            ((RelativeEntropicDrawdownatRisk(), po.ERM_worst_case(dd, slv, 0.05)),
+             (RelativeRelativisticDrawdownatRisk(), po.RRM_worst_case(dd, slv, 0.05, 0.3)),
+             (RelativePowerNormDrawdownatRisk(; alpha = 0.2, p = 1.5),
+              po.PRM_worst_case(dd, slv, 0.2, 1.5)))
+            @test isapprox(risk_gradient(factory(r, pr, slv), w, pr), -transpose(J) * q;
+                           rtol = 1e-6)
         end
     end
 
