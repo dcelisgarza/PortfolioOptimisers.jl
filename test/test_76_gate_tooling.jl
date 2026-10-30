@@ -553,6 +553,21 @@ end
         @test RF.patch_misses([nothing, 1, 0], Set([2, 3]), [3]) == [3]
         # A file that no test loaded has no tags, so every body line it adds is a miss.
         @test RF.patch_misses(Union{Nothing, Int}[], Set([2, 3]), [1, 2]) == [2]
+        # CoverageTools v1.4.2 amends a method only when no line of its body has a counter, and a
+        # `->` closure is a method (R23 of #1817). The tags are those of a run that called `p`
+        # and never called `h` or `q`: CI reads the lines of `h` as misses, and not those of `q`.
+        text = "const h = x -> begin\n    y = 2x\n    return y\nend\nfunction p(x)\n" *
+               "    q = y -> begin\n        z = 3y\n        return z\n    end\n" *
+               "    return x\nend\n"
+        tags = Union{Nothing, Int}[nothing, nothing, nothing, nothing, nothing, 1, nothing,
+                                   nothing, nothing, 1, nothing]
+        body = RF.function_body_lines(text, tags)
+        @test body == Set([1, 2, 3])
+        @test RF.patch_misses(tags, body, 1:11) == [1, 2, 3]
+        # The body block of a `function` opens with a line node of its first line.
+        @test RF.function_body_lines(text) == Set([1, 2, 3, 5, 6, 7, 8, 10])
+        # The location of a macro call is not a statement of its own.
+        @test RF.function_body_lines("f(x) = @inline g(x)\n") == Set([1])
         diff = "@@ -1,0 +2,3 @@\n+a\n+b\n+c\n@@ -10 +14 @@\n-x\n+y\n@@ -20,2 +22,0 @@\n-p\n-q\n"
         @test RF.added_lines(diff) == Set([2, 3, 4, 14])
         # Each of the two refusals of `--coverage` names its own cause.

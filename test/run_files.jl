@@ -81,16 +81,18 @@ because Julia writes the counters only when a process exits. The parent then pri
 `COVERAGE` line per source file that the child loaded under `<dir>`, with the lines that no test
 reached, and deletes the counter files of the child. It counts a miss the way CI does: a counter
 at zero, and also each body line of a method that no test compiled, which has no counter at all.
-A short-form method whose body is a literal, such as `f(::T) = true`, gets no counter even when a
-test calls it, so it reads as a miss here and on CI. A return type, `f(::T)::Bool = true`, gives it
-one. The other options are passed to the child. `<dir>` is the source
+An anonymous function is a method here, so a `const` closure that no test calls is a miss. A
+closure inside a method that ran is not, as on CI. A short-form method whose body is a literal,
+such as `f(::T) = true`, gets no counter even when a test calls it, so it reads as a miss here and
+on CI. A return type, `f(::T)::Bool = true`, gives it one. The other options are passed to the
+child. `<dir>` is the source
 directory to measure, such as `<worktree>/src/16_RiskMeasures`, because Julia counts only the files
 under it. A scratch directory holds no source file, so the run prints no `COVERAGE` line at all.
 
 The run then prints one `PATCH` line for each `.jl` file under `src/` or `ext/` that the working
-tree changes against its merge-base with `origin/dev`, with the added lines that CI reads as a miss.
-CI also reads as a miss each line of a method that no test compiled, which the `COVERAGE` line
-cannot show, so a `PATCH` line counts those too (#1912). When every file ran whole and green, every
+tree changes against its merge-base with `origin/dev`, with the added lines that CI reads as a miss,
+by the rule of the `COVERAGE` line (#1912). A changed file that no test loaded has no counter, so
+each body line that it adds is a miss. When every file ran whole and green, every
 changed file lies under `<dir>`, and no added line is a miss, the run records the `coverage` stamp
 that the push guard asks of a change to the code. Use the narrowest directory that holds every
 changed file, such as `<worktree>/src`.
@@ -611,11 +613,11 @@ end
 """
     is_method_definition(e) -> Bool
 
-Whether `e` defines a method: a `function` block, or a short form `f(x) = …`, also under `where`
-or a return type.
+Whether `e` defines a method: a `function` block, an anonymous function `x -> …`, or a short form
+`f(x) = …`, also under `where` or a return type.
 """
 function is_method_definition(e::Expr)
-    if e.head === :function
+    if e.head === :function || e.head === :->
         return true
     elseif e.head === :(=)
         lhs = e.args[1]
@@ -627,28 +629,50 @@ function is_method_definition(e::Expr)
     return false
 end
 
-function body_lines!(out::Set{Int}, e, inside::Bool)
+no_counter(tags::AbstractVector, l::Integer) = l > length(tags) || isnothing(tags[l])
+
+function body_lines!(out::Set{Int}, e, inside::Bool, tags::AbstractVector)
     if e isa LineNumberNode
         inside && push!(out, e.line)
+    elseif e isa Expr &&
+           is_method_definition(e) &&
+           length(e.args) >= 2 &&
+           e.args[2] isa Expr
+        # The body alone: a line node of the signature is not a statement. A method whose body
+        # holds a counter ran, so CI amends none of its lines, nor those of a closure inside it.
+        lines = Set{Int}()
+        for a in e.args[2].args
+            body_lines!(lines, a, true, tags)
+        end
+        if all(l -> no_counter(tags, l), lines)
+            union!(out, lines)
+        end
     elseif e isa Expr
-        inside = inside || is_method_definition(e)
-        for a in e.args
-            body_lines!(out, a, inside)
+        for (i, a) in enumerate(e.args)
+            # The second argument of a macro call records its location, not a statement.
+            if e.head === :macrocall && i == 2 && a isa LineNumberNode
+                continue
+            end
+            body_lines!(out, a, inside, tags)
         end
     end
     return out
 end
 
 """
-    function_body_lines(text) -> Set{Int}
+    function_body_lines(text, tags = []) -> Set{Int}
 
-The lines of `text` that start a statement inside a method body. CI processes the `.cov` files with
-`CoverageTools.amend_coverage_from_src!`, which reads such a line as a miss when it has no counter.
-A method that no test compiled has no counter on any line, so CI counts every line of it as a miss,
-while the raw `.cov` file shows none (#1912).
+The lines of `text` that CI amends to a miss. CI processes the `.cov` files with
+`CoverageTools.amend_coverage_from_src!` (v1.4.2), which reads each statement line of a method body
+as a miss when no line of that body has a counter in `tags`. A method that no test compiled has no
+counter on any line, so CI counts every line of it as a miss, while the raw `.cov` file shows none
+(#1912). An anonymous function `x -> …` is a method here too. A method that ran keeps the lines with
+no counter, also those of a closure inside it that never ran (R23 of #1817). With no `tags`, the
+result is every statement line of every method body.
 """
-function function_body_lines(text::AbstractString)
-    return body_lines!(Set{Int}(), Meta.parseall(text), false)
+function function_body_lines(text::AbstractString,
+                             tags::AbstractVector = Union{Nothing, Int}[])
+    return body_lines!(Set{Int}(), Meta.parseall(text), false, tags)
 end
 
 """
@@ -728,8 +752,8 @@ function patch_report(dir::AbstractString, tags::AbstractDict)
             added_lines(git_text("diff", "-U0", "--no-color", "--no-ext-diff", base, "--",
                                  rel))
         end
-        missed = patch_misses(get(tags, rel, Union{Nothing, Int}[]),
-                              function_body_lines(text), added)
+        file_tags = get(tags, rel, Union{Nothing, Int}[])
+        missed = patch_misses(file_tags, function_body_lines(text, file_tags), added)
         push!(lines, "PATCH $rel added=$(length(added)) missed=$(length(missed))")
         if !isempty(missed)
             push!(lines, "  missed lines: " * join(missed, ", "))
@@ -785,7 +809,7 @@ function run_coverage(dir::AbstractString, rest::Vector{String})
             rm(cov)
             # The misses as CI reads them: a method that no test compiled has no counter, and CI
             # counts each line of its body (#1912).
-            body = function_body_lines(read(joinpath(root, m[1]), String))
+            body = function_body_lines(read(joinpath(root, m[1]), String), tags[rel])
             missed = patch_misses(tags[rel], body, 1:length(tags[rel]))
             counted = length(union(findall(!isnothing, tags[rel]), body))
             println("COVERAGE $rel counted=$counted missed=$(length(missed))")

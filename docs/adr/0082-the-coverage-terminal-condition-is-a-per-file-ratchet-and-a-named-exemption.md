@@ -335,8 +335,9 @@ red on the day it lands, because every later measurement of that file is wrong w
 ### What the advisory verdict cost
 
 The amendment of 2026-08-27 accepted that "a rise can reach `dev` unnoticed by a contributor who
-does not open the run". That cost was measured in #1912. From 2026-10-20 to 2026-10-27, every green
-`Test` run of `dev` tripped the ratchet, and the count grew from 66 files to 69. In the last green
+does not open the run". That cost was measured in #1912 and in R23 of #1817. All 158 green `Test`
+runs of `dev` from 2026-09-01 (`d93567b1ba`) to 2026-10-27 tripped the ratchet, and the count grew
+from 1 file to 69. In the last green
 run, 61 of the tripped files read `swept = true` in `code_health/sweep_manifest.toml`, so the
 manifest claimed condition 3 of #404 for files that CI measured with misses. Three faults hid it:
 
@@ -368,12 +369,19 @@ manifest claimed condition 3 of #404 for files that CI measured with misses. Thr
 
 - **A rise on `dev` turns the `Test` workflow red.** The `Coverage ratchet` job is still not a
   required check of the ruleset of `main` (ADR 0220), so a trip does not block a release by itself.
+- **The census of `COV_EXCL` stays a test.** The second amendment of 2026-08-27 put it in
+  `test/test_49_coverage_attribution_census.jl` because the gate was advisory. The gate is not
+  advisory now, but its check is still not required, and the test check is. So a pair that arrives
+  in a pull request still turns a required check red only through the census.
 - **A red suite can show a false rise.** The summary names the state of the suite, so a reader can
   tell a rise from the code from a rise from a test that stopped.
 - **The push guard asks for a `coverage` stamp.** A push to `dev` that changes the code under `src/`
   or `ext/` needs a run of its targeted files under `test/run_files.jl --coverage=<dir>`. The run
-  reads each line that the branch adds the way CI reads it: a counter at zero is a miss, and so is
-  a body line with no counter, which is a method that no test compiled. The run records the stamp
+  reads each line that the branch adds the way CI reads it, by the rule of
+  `CoverageTools.amend_coverage_from_src!`: a counter at zero is a miss, and so is each statement
+  line of a method body in which no line has a counter, which is a method that no test compiled.
+  An anonymous function is a method under this rule. A closure inside a method that ran keeps its
+  lines with no counter, as on CI (R23 of #1817). The run records the stamp
   when the files are green and no added line is a miss. A line that no test can reach takes a
   Coverage Exemption and `gate_stamp.sh waive coverage <reason>`. A change to prose, a `jldoctest`
   block or a string literal needs no stamp. The `sweep-conform` skill states the step. The local

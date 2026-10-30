@@ -214,7 +214,7 @@ end
 
     @testset "The ratchet of `ReusableTest.yml` reds its check and runs on a red suite" begin
         #=
-        Issue #1912. From 2026-08-27 to 2026-10-30 the ratchet tripped on every green run of
+        Issue #1912. From 2026-09-01 to 2026-10-27 the ratchet tripped on all 158 green runs of
         `dev`, and nothing turned red: the step carried `continue-on-error: true`, the step that
         publishes the Refresh Artifact read `failure()` alone, and the `coverage` job waited for
         a green suite. A Dependabot pull request into `main` (#488) put back the broken guard in
