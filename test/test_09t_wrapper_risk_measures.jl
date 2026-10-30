@@ -517,4 +517,99 @@ end
                                                                w2 = t -> reverse(owa_tg(t))),
                                       T)
     end
+
+    @testset "A measure that reads the expected returns of a prior takes the risk path" begin
+        # `risk_contribution`, `risk_gradient` and each composite raised the `ArgumentError`
+        # of the default of `risk_input_kind` for `ExpectedReturn` and
+        # `ExpectedReturnRiskRatio` (#1917). The `factory` of the risk path fills `mu`, so
+        # the resolved measure reads `X`. Each contribution equals `w .* g / d`, with `g` an
+        # independent central difference of `expected_risk` on the prior and `d` the degree
+        # that `adjusted_risk` divides by.
+        prh = prior(HighOrderPriorEstimator(), _X607)
+        w = _w607
+        T = size(_X607, 1)
+        h = 1e-6
+        e(i) = (1:5) .== i
+        cdiff(r, pr, fe) = [(expected_risk(r, w .+ h .* e(i), pr, fe) -
+                             expected_risk(r, w .- h .* e(i), pr, fe)) / (2 * h)
+                            for i in 1:5]
+        degree(r, fe) = something(PO.homogeneity_degree(factory(r, prh), fe, T), 1)
+        tr = WeightsTracking(; w = fill(0.2, 5))
+        cv = ConditionalValueatRisk()
+        rs = (ExpectedReturn(), ExpectedReturnRiskRatio(; rk = cv),
+              NonOptimisationRiskRatio(; r1 = ExpectedReturn(), r2 = cv),
+              NonOptimisationRiskRatio(; r1 = [ExpectedReturn(), MeanReturn()], r2 = cv),
+              MeanReturnRiskRatio(; rk = ExpectedReturn()),
+              RiskTrackingRiskMeasure(; r = ExpectedReturn(), tr = tr),
+              ExpectedReturnRiskRatio(; rk = ExpectedReturn()),
+              ExpectedReturn(; rt = NoReturn()),
+              ExpectedReturn(;
+                             rt = [ArithmeticReturn(),
+                                   ArithmeticReturn(;
+                                                    settings = JuMPReturnsSettings(;
+                                                                                   rte = false))]))
+        for fe in (nothing, Fees(; l = 0.001)), r in rs
+            d = degree(r, fe)
+            d = iszero(d) ? 1 : d
+            g = cdiff(r, prh, fe)
+            @test isapprox(risk_contribution(r, w, prh, fe), w .* g ./ d; atol = 1e-9)
+            @test isapprox(risk_gradient(r, w, prh, fe), g; atol = 1e-9)
+        end
+        # A vector divides each element by its own degree, and both elements have degree 1.
+        rv = [ExpectedReturn(), cv]
+        @test isapprox(risk_contribution(rv, w, prh), w .* cdiff(rv, prh, nothing);
+                       atol = 1e-9)
+        # The degree of `ExpectedReturn` is 1, so its contributions sum to its value.
+        @test sum(risk_contribution(ExpectedReturn(), w, prh)) ≈ dot(w, prh.mu) rtol = 1e-8
+        # The route on `X` and the route on the prior read one ladder, bit for bit.
+        for r in (ExpectedReturn(), ExpectedReturnRiskRatio(; rk = cv)),
+            fe in (nothing, Fees(; l = 0.001))
+
+            @test expected_risk(factory(r, prh), w, prh.X, fe) ===
+                  expected_risk(r, w, prh, fe)
+        end
+        @test expected_risk(ExpectedReturn(), w, prh) === dot(w, prh.mu)
+        @test expected_risk(ExpectedReturnRiskRatio(; rk = cv), w, prh) ===
+              expected_ratio(cv, ArithmeticReturn(), w, prh)
+        # A population of weight vectors takes the generic route, one value for each.
+        w2 = fill(0.2, 5)
+        for r in (ExpectedReturn(), ExpectedReturnRiskRatio(; rk = cv))
+            @test expected_risk(r, [w, w2], prh) ==
+                  [expected_risk(r, w, prh), expected_risk(r, w2, prh)]
+        end
+        # A bare matrix and a returns result hold no `mu`, and a weight path is one row of
+        # weights per observation. Each refusal names its cause.
+        rd = ReturnsResult(; nx = ["A$i" for i in 1:5], X = _X607)
+        for data in (_X607, rd)
+            @test_throws PO.IsNothingError expected_risk(ExpectedReturn(), w, data)
+            @test_throws PO.IsNothingError expected_risk(ExpectedReturnRiskRatio(), w, data)
+        end
+        wp = repeat(transpose(w), T)
+        @test occursin("weight path",
+                       _msg607(() -> expected_risk(ExpectedReturn(), wp, prh)))
+        @test occursin("weight path",
+                       _msg607(() -> expected_risk(ExpectedReturnRiskRatio(), wp, prh)))
+    end
+
+    @testset "A logarithmic return reads the observation weights of the prior" begin
+        # The value twin of a `LogarithmicReturn` read its own `w` alone, and the model, after
+        # `factory`, reads `pr.w` when `w` is `nothing`. The two routes of a measure that holds
+        # the term now read the weights of the prior (#1917).
+        rd = ReturnsResult(; nx = ["A$i" for i in 1:5], X = _X607)
+        sets = UniverseSets(; dict = Dict("nx" => rd.nx))
+        views = LinearConstraintEstimator(; val = ["A1 == 0.003"])
+        pew = prior(EntropyPoolingPrior(; sets = sets, mu_views = views), rd)
+        w = _w607
+        @test !allequal(pew.w)
+        @test expected_return(LogarithmicReturn(), w, pew) ≈ mean(log1p.(_X607 * w), pew.w)
+        @test factory(LogarithmicReturn(), pew).w === pew.w
+        r = ExpectedReturn(; rt = LogarithmicReturn())
+        @test expected_risk(r, w, pew) === expected_risk(factory(r, pew), w, pew.X)
+        rr = ExpectedReturnRiskRatio(; rt = LogarithmicReturn(),
+                                     rk = ConditionalValueatRisk())
+        h = 1e-6
+        g = [(expected_risk(rr, w .+ h .* ((1:5) .== i), pew) -
+              expected_risk(rr, w .- h .* ((1:5) .== i), pew)) / (2 * h) for i in 1:5]
+        @test isapprox(risk_contribution(rr, w, pew), w .* g; atol = 1e-9)
+    end
 end

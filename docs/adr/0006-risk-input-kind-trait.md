@@ -126,3 +126,23 @@ the same qualified-access pattern already used for `<: PortfolioOptimisers.RiskM
   at runtime.
 - **Extends ADR 0001/0005.** Same "decide at the definition site" move `@prop` made for
   factory fields; sits alongside the typed/namespaced model-state interfaces.
+
+## Amendment (2026-10-30)
+
+`ExpectedReturn` declares `WeightsReturnsFeesInput` (#1917). It is no longer one of the explicit
+methods that the Consequences name. `ExpectedReturnRiskRatio` stays a composite, beside
+`MeanReturnRiskRatio`, with its own methods on `X::MatNum`.
+
+The two types read the expected returns `mu` of a prior, so they had methods on a prior result
+only, and they declared no kind. The risk path reduces every measure to `X` after `factory`, so
+`risk_contribution`, `risk_gradient` and each composite raised the `ArgumentError` of the default
+for them. But `factory` fills `mu` into the `ArithmeticReturn` of the measure, as it fills the
+moments of every other measure. The resolved measure then reads the weights, the returns matrix
+and the fees alone, which is the definition of `WeightsReturnsFeesInput`. A carrier of the prior
+through the path was the other design. It needed a seam in every method of the path, and the
+precedent of the library already gave the answer.
+
+The leaf reads `resolved_expected_return(rt, wd, w, X, fees)`, and `expected_return` on a prior
+calls it on `factory(rt, pr)`, so the two routes read one ladder. A bare matrix, or a
+`ReturnsResult`, gives the measure no `mu`, so the leaf throws an `IsNothingError` that names the
+cause.

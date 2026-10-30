@@ -16,7 +16,6 @@ minimum_track_record_length
 expected_max_sharpe_ratio
 deflated_sharpe_ratio
 implied_independent_trials
-expected_risk(r::PrRM, w::VecVecNum, pr::AbstractPriorResult, fees::Option{<:Fees} = nothing; kwargs...)
 expected_risk(r::PrRM, pred::PredictionResult{<:Any, <:PredictionReturnsResult{<:Any, <:VecNum}}; kwargs...)
 expected_return
 expected_ratio

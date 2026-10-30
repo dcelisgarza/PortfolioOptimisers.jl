@@ -647,6 +647,69 @@ function no_bounds_returns_estimator(r::VecJRE, args...)
     return [no_bounds_returns_estimator(ri, args...) for ri in r]
 end
 """
+    resolved_expected_return(rt::JRE_VecJRE, wd::VecNum, w::VecNum, X::MatNum,
+                             fees::Option{<:Fees}) -> Number
+
+Compute the expected return of the weights `wd` from a return estimator that [`factory`](@ref) resolved against a prior, net of the fee of the portfolio `w`.
+
+A resolved estimator holds every moment that it reads, so the returns matrix `X` is the only data that the function needs. [`expected_return`](@ref) on a prior calls it on `factory(rt, pr)` and `pr.X`, and [`ExpectedReturn`](@ref) and [`ExpectedReturnRiskRatio`](@ref) call it on the returns matrix of the risk path. Thus both routes read one ladder, the ladder of the model that [`set_return_constraints!`](@ref) builds.
+
+[`expected_return`](@ref) states the closed form of each estimator. The function reads the gross return of `wd` and the fee term of `w`. The two are the same vector, except in [`difference_risk`](@ref), where `wd` is the difference of `w` and a benchmark. The `mu` slot of an [`ArithmeticReturn`](@ref) and the `w` slot of a [`LogarithmicReturn`](@ref) take the place of the moments of the prior. A vector of estimators sums `settings.scale` times the return of each term whose `settings.rte` is `true`.
+
+# Arguments
+
+  - `rt`: Return estimator that [`factory`](@ref) resolved, or a vector of them.
+  - `wd`: The weights whose gross return the function computes, `assets × 1`.
+  - $(arg_dict[:pw])
+  - `X`: Asset returns matrix `observations × assets`.
+  - `fees`: Fee of the portfolio `w`, or `nothing`.
+
+# Validation
+
+  - The `mu` slot of an [`ArithmeticReturn`](@ref) holds no [`DeferredQuantity`](@ref), from [`assert_resolved_slots`](@ref), and it is not `nothing`. Otherwise the function throws an `ArgumentError` or an `IsNothingError`.
+
+# Returns
+
+  - `rt::Number`: The expected return of `wd`, net of the fee of `w`.
+
+# Related
+
+  - [`expected_return`](@ref)
+  - [`ExpectedReturn`](@ref)
+  - [`ExpectedReturnRiskRatio`](@ref)
+  - [`term_fees`](@ref)
+  - [`factory`](@ref)
+"""
+function resolved_expected_return(rt::ArithmeticReturn, wd::VecNum, w::VecNum, X::MatNum,
+                                  fees::Option{<:Fees})
+    assert_resolved_slots(rt)
+    @argcheck(!isnothing(rt.mu),
+              IsNothingError("an `ArithmeticReturn` reads the expected returns `mu` of a prior, and this one holds none. A returns matrix does not hold them. Pass the prior result, for example `expected_risk(r, w, pr)`, or resolve the measure first with `factory(r, pr)`, or state `mu` on the `ArithmeticReturn`."))
+    return LinearAlgebra.dot(wd, rt.mu) - term_fees(w, fees, size(X, 1), rt.settings.fee)
+end
+function resolved_expected_return(rt::LogarithmicReturn, wd::VecNum, w::VecNum, X::MatNum,
+                                  fees::Option{<:Fees})
+    x = X * wd
+    kret = isnothing(rt.w) ? Statistics.mean(log1p, x) : Statistics.mean(log1p.(x), rt.w)
+    return kret - term_fees(w, fees, size(X, 1), rt.settings.fee)
+end
+function resolved_expected_return(::NoReturn, wd::VecNum, ::VecNum, ::MatNum,
+                                  ::Option{<:Fees})
+    # No charge, exactly as `set_return_constraints!` applies none.
+    return zero(eltype(wd))
+end
+function resolved_expected_return(rt::VecJRE, wd::VecNum, w::VecNum, X::MatNum,
+                                  fees::Option{<:Fees})
+    ret = zero(eltype(wd))
+    for rt_i in rt
+        if !rt_i.settings.rte
+            continue
+        end
+        ret += rt_i.settings.scale * resolved_expected_return(rt_i, wd, w, X, fees)
+    end
+    return ret
+end
+"""
     bounds_returns_estimator(r, lb)
 
 Return a copy of return term `r` with its lower bound set to `lb`.

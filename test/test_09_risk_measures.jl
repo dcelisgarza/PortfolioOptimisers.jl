@@ -913,11 +913,11 @@ const _OLD_WEIGHTSRETURNSFEES = Any[LowOrderMoment, HighOrderMoment, TrackingRis
 const _OLD_WEIGHTS = Any[StandardDeviation, NegativeSkewness, TurnoverRiskMeasure, Variance,
                          UncertaintySetVariance, EqualRisk, Kurtosis, Skewness]
 
-# Composite / return-like measures handled by explicit `expected_risk` methods — they
-# orchestrate other measures and intentionally declare no input kind.
+# Composite measures handled by explicit `expected_risk` methods — they orchestrate other
+# measures and intentionally declare no input kind. `ExpectedReturn` declares one (#1917), so
+# the completeness test checks it.
 const _EXPLICIT = Set{Any}([RiskRatio, NonOptimisationRiskRatio, MeanReturnRiskRatio,
-                            ExpectedReturn, ExpectedReturnRiskRatio,
-                            RiskTrackingRiskMeasure])
+                            ExpectedReturnRiskRatio, RiskTrackingRiskMeasure])
 
 # The declared kind as a *type* — instance-free, since each method returns a singleton.
 # Undeclared types hit the erroring default (inferred `Union{}`).

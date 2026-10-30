@@ -39,14 +39,14 @@ Where:
   - $(math_dict[:mu_er])
   - $(math_dict[:x_t_obs])
   - $(math_dict[:T])
-  - ``v_{t}``: Observation weight of observation ``t``, the ``t``-th entry of the `w` field of a [`LogarithmicReturn`](@ref). Every weight is one when that field is `nothing`, and the quotient is then the unweighted mean.
+  - ``v_{t}``: Observation weight of observation ``t``, the ``t``-th entry of the `w` field of a [`LogarithmicReturn`](@ref), or of the observation weights `pr.w` of the prior when that field is `nothing`. Every weight is one when both are `nothing`, and the quotient is then the unweighted mean.
   - ``F(\\boldsymbol{w})``: Fee term of [`term_fees`](@ref). It is [`calc_fees`](@ref) of `w` and `fees` when the term's `settings.fee` is `true`, and zero otherwise.
 
 # Arguments
 
   - `ret`: Return estimator, or a vector of them on the fourth method.
   - `w`: Portfolio weights, or a vector of portfolio weight vectors on the fourth method.
-  - `pr`: Prior result. It resolves a Deferred Quantity of `ret`. It gives `mu` to an [`ArithmeticReturn`](@ref) whose own `mu` is `nothing`.
+  - `pr`: Prior result. It resolves a Deferred Quantity of `ret`, through [`factory`](@ref). It gives `mu` to an [`ArithmeticReturn`](@ref) whose own `mu` is `nothing`, and its observation weights to a [`LogarithmicReturn`](@ref) whose own `w` is `nothing`.
   - `fees`: Optional fees.
   - $(arg_dict[:strict_inv]) A [`NoReturn`](@ref) reads no weights, so `strict` has no effect on it.
   - `kwargs...`: Keyword arguments that the methods do not read.
@@ -82,24 +82,17 @@ function expected_return(r::ArithmeticReturn, w::VecNum, pr::AbstractPriorResult
     # is a no-op on a prior that is already reduced, which is what keeps a composite to one
     # diagnostic.
     _, pr, w, fees = investable_reduction(pr, w, fees, strict)
-    # The scalar twin of the `ret` expression `set_return_constraints!` builds, so it uses
-    # the same ladder. The prior is in hand, so a Deferred Quantity resolves here too.
-    r = resolve_deferred_quantities(r, pr)
-    mu = nothing_scalar_array_selector(r.mu, pr.mu)
-    return LinearAlgebra.dot(w, mu) - term_fees(w, fees, size(pr.X, 1), r.settings.fee)
+    # The scalar twin of the `ret` expression `set_return_constraints!` builds, so it takes
+    # the same ladder: the `factory` that the model calls resolves a Deferred Quantity and
+    # fills the slots from the prior.
+    return resolved_expected_return(factory(r, pr), w, w, pr.X, fees)
 end
 function expected_return(ret::LogarithmicReturn, w::VecNum, pr::AbstractPriorResult,
                          fees::Option{<:Fees} = nothing; strict::Bool = false, kwargs...)
-    # Reduce to the Investable Mask — see the note on the arithmetic twin above.
+    # Reduce to the Investable Mask, and take the ladder of the model, as the arithmetic twin
+    # above does. The ladder falls back to the observation weights of the prior.
     _, pr, w, fees = investable_reduction(pr, w, fees, strict)
-    rw = ret.w
-    X = pr.X
-    kret = if isnothing(rw)
-        Statistics.mean(log1p, X * w)
-    else
-        Statistics.mean(log1p.(X * w), rw)
-    end
-    return kret - term_fees(w, fees, size(X, 1), ret.settings.fee)
+    return resolved_expected_return(factory(ret, pr), w, w, pr.X, fees)
 end
 function expected_return(::NoReturn, w::VecNum, ::AbstractPriorResult,
                          ::Option{<:Fees} = nothing; kwargs...)
@@ -680,6 +673,16 @@ end
 # Deferrable slots — see `deferred_slots`. The return term carries its own `mu`, so both the
 # check and the derived recursion in `resolve_deferred_quantities` reach it through `rt`.
 deferred_slots(r::ExpectedReturn) = (; rt = r.rt)
+# Expected-risk input kind — see `risk_input_kind`. The `factory` of the risk path fills the
+# moments of the return term from the prior, so the resolved measure reads the weights, the
+# returns matrix and the fees alone, and every composite of that path reaches it.
+risk_input_kind(::ExpectedReturn) = WeightsReturnsFeesInput()
+function (r::ExpectedReturn)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
+    return resolved_expected_return(r.rt, w, w, X, fees)
+end
+function difference_risk(r::ExpectedReturn, wd::VecNum, w::VecNum, X::MatNum, fees::Fees)
+    return resolved_expected_return(r.rt, wd, w, X, fees)
+end
 """
     expected_risk(r::ExpectedReturn, w::VecNum, pr::AbstractPriorResult,
                   fees::Option{<:Fees} = nothing; kwargs...)
@@ -687,6 +690,8 @@ deferred_slots(r::ExpectedReturn) = (; rt = r.rt)
 Compute the value of an [`ExpectedReturn`](@ref), the expected return of a portfolio.
 
 The method calls [`expected_return`](@ref) on the `rt` field of the measure. [`ExpectedReturn`](@ref) states the closed form.
+
+The measure also has a route on a returns matrix. It declares [`WeightsReturnsFeesInput`](@ref), and its functor `r(w, X, fees)` calls [`resolved_expected_return`](@ref) on `rt`. That route needs the `mu` of an `rt` that [`factory`](@ref) resolved, and the prior route of [`risk_contribution`](@ref), [`risk_gradient`](@ref) and of each composite measure gives it. Both routes read one ladder, so they give the same value.
 
 # Arguments
 
@@ -901,6 +906,8 @@ The method calls [`expected_ratio`](@ref) with the fields of the measure. [`Expe
 
 The call puts `kwargs...` first and the `sca` and `rf` fields of the measure after it. So the fields take precedence over a `sca` or an `rf` that the caller gives at the call site. The figure of an [`ExpectedReturnRiskRatio`](@ref) is always the figure that the type names.
 
+The measure is also a composite on a returns matrix, as [`MeanReturnRiskRatio`](@ref) is. Its methods of [`expected_risk`](@ref), [`worst_case_distribution`](@ref) and [`linearised_risk`](@ref) on `X::MatNum` divide [`resolved_expected_return`](@ref) of `rt`, minus `rf`, by the risk of `rk`. They need an `rt` that [`factory`](@ref) resolved, and the prior route of [`risk_contribution`](@ref), [`risk_gradient`](@ref) and of each composite measure gives it. A weight path, `w::MatNum`, throws an `ArgumentError`.
+
 # Arguments
 
   - `r`: [`ExpectedReturnRiskRatio`](@ref) that holds a return estimator, a risk measure and a risk-free rate.
@@ -929,6 +936,25 @@ function expected_risk(r::ExpectedReturnRiskRatio, w::VecNum, pr::AbstractPriorR
     # call site loses to the one this wrapper holds. Without the order a caller's keyword would
     # flow through `expected_ratio` into the inner vector call and silently win.
     return expected_ratio(r.rk, r.rt, w, pr, fees; kwargs..., rf = r.rf, sca = r.sca)
+end
+function expected_risk(r::ExpectedReturnRiskRatio, w::VecNum, X::MatNum,
+                       fees::Option{<:Fees} = nothing; kwargs...)
+    return (resolved_expected_return(r.rt, w, w, X, fees) - r.rf) /
+           expected_risk(r.rk, w, X, fees; kwargs..., sca = r.sca)
+end
+function expected_risk(r::ExpectedReturnRiskRatio, w::MatNum, ::MatNum,
+                       ::Option{<:Fees} = nothing; kwargs...)
+    return throw(ArgumentError("`$(nameof(typeof(r)))` reads the expected return of one cross-section of weights. A `w::MatNum` is a weight path, one row of weights per observation, which is a different quantity.\nScore this measure against the target weight vector, `w::VecNum`, which is the first row of the path.\nGot\nsize(w) => $(size(w))"))
+end
+# The composite carries the distribution of its risk measure, as `MeanReturnRiskRatio` does.
+function worst_case_distribution(r::ExpectedReturnRiskRatio, w::VecNum, X::MatNum,
+                                 fees::Option{<:Fees})
+    return (worst_case_distribution(r.rk, w, X, fees),)
+end
+function linearised_risk(q::Tuple, r::ExpectedReturnRiskRatio, w::VecNum, X::MatNum,
+                         fees::Option{<:Fees}; kwargs...)
+    return (resolved_expected_return(r.rt, w, w, X, fees) - r.rf) /
+           linearised_risk(q[1], r.rk, w, X, fees; kwargs..., sca = r.sca)
 end
 function needs_previous_weights(r::ExpectedReturnRiskRatio)
     return needs_previous_weights(r.rk)
@@ -1037,9 +1063,8 @@ const PerfRM = Union{MeanReturn, MeanReturnRiskRatio, ExpectedReturn,
 
 Union of the return risk measures that read a prior result, and that refuse a [`PredictionResult`](@ref). On a prediction result, use [`MeanReturn`](@ref) or [`MeanReturnRiskRatio`](@ref) in their place.
 
-Both members read the **prior result** itself and not a returns matrix, so neither declares a [`risk_input_kind`](@ref). Each method that dispatches on the alias follows from that property:
+Both members read the expected returns `mu` of the **prior result**, which a return series does not hold. The [`factory`](@ref) of the risk path fills `mu` into the return estimator of the measure, so the resolved measure reads the weights, the returns matrix and the fees. [`ExpectedReturn`](@ref) declares [`WeightsReturnsFeesInput`](@ref), and [`ExpectedReturnRiskRatio`](@ref) is a composite with methods of its own, as [`MeanReturnRiskRatio`](@ref) is. Thus [`risk_contribution`](@ref), [`risk_gradient`](@ref) and every composite of the risk path take both members. Each method that dispatches on the alias follows from the need for a prior:
 
-  - The method for a vector of weight vectors resolves the measure once and keeps the prior.
   - The methods for a prediction result refuse the call.
   - [`supports_precomputed_returns`](@ref) gives `false`.
 
@@ -1049,7 +1074,7 @@ Both members read the **prior result** itself and not a returns matrix, so neith
   - [`ExpectedReturnRiskRatio`](@ref)
   - [`PerfRM`](@ref): The larger group that both members also belong to.
   - [`prrm_prediction_message`](@ref): It builds the message of the refusal of the prediction-result methods.
-  - [`risk_input_kind`](@ref): The declaration that neither member makes.
+  - [`resolved_expected_return`](@ref): The return of a resolved estimator on the returns matrix.
 """
 const PrRM = Union{ExpectedReturn, ExpectedReturnRiskRatio}
 """
@@ -1057,7 +1082,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return `false`, because a [`PrRM`](@ref) does not support precomputed returns.
 
-Both members read the **prior result**, and they multiply the expected returns of the prior by the portfolio weights. A bare series of net returns holds neither the expected returns nor the weights. So neither type defines `r(x::VecNum)`. This method gives the answer before the call gets to the default of [`risk_input_kind`](@ref). That default raises an error, and to a caller the error looks like an internal defect, not like a fact about the chosen measure.
+Both members multiply the expected returns of the prior by the portfolio weights. A bare series of net returns holds neither the expected returns nor the weights. So neither type defines `r(x::VecNum)`, and [`expected_risk_from_returns`](@ref) refuses both with a message that names the cause.
 
 To score a bare return series, use [`MeanReturn`](@ref) or [`MeanReturnRiskRatio`](@ref). [`prrm_prediction_message`](@ref) names the same replacement for a prediction result.
 
@@ -1065,59 +1090,10 @@ To score a bare return series, use [`MeanReturn`](@ref) or [`MeanReturnRiskRatio
 
   - [`PrRM`](@ref)
   - [`supports_precomputed_returns`](@ref)
-  - [`risk_input_kind`](@ref): The declaration that neither member makes.
   - [`MeanReturn`](@ref): The [`NetReturnsInput`](@ref) measure that scores a bare series.
   - [`expected_risk_from_returns`](@ref): The entry of the contract that this predicate controls.
 """
 supports_precomputed_returns(::PrRM)::Bool = false
-"""
-    expected_risk(r::PrRM, w::VecVecNum, pr::AbstractPriorResult,
-                  fees::Option{<:Fees} = nothing; strict::Bool = false, kwargs...)
-
-Compute a risk measure that reads a prior on each weight vector of `w`, for example on the
-points of a [`Frontier`](@ref).
-
-A [`PrRM`](@ref) reads the prior result itself and not a returns matrix. For that reason it
-declares no [`risk_input_kind`](@ref). The generic `VecVecNum` method resolves the measure and
-then gives `pr.X` to the loop. That is correct for a measure whose functor takes the matrix,
-but the matrix does not hold the moments of the prior, such as `mu`, that this family reads. So this method
-resolves the measure once, and it keeps the prior for each weight vector.
-
-# Algorithm
-
- 1. Reduce the prior, the weights and the fees to the Investable Mask once, with [`investable_reduction`](@ref). A held asset outside the mask gives one diagnostic, and not one for each weight vector.
- 2. Resolve the measure against the prior once, with [`factory`](@ref). The slots of the resolved measure are filled.
- 3. Compute the resolved measure on each weight vector `wi` of `w`. The input is the prior itself, and not `pr.X`.
- 4. Collect one expected risk for each weight vector, in the order of `w`.
-
-# Arguments
-
-  - `r`: [`ExpectedReturn`](@ref) or [`ExpectedReturnRiskRatio`](@ref).
-  - `w`: Vector of portfolio weight vectors.
-  - `pr`: Prior result.
-  - `fees`: Optional transaction fees.
-  - $(arg_dict[:strict_inv])
-  - `kwargs...`: Keyword arguments that go to the method for one weight vector.
-
-# Returns
-
-  - `risk::VecNum`: One expected risk for each weight vector.
-
-# Related
-
-  - [`PrRM`](@ref)
-  - [`expected_risk`](@ref)
-  - [`resolve_risk_inputs`](@ref)
-  - [`factory`](@ref)
-"""
-function expected_risk(r::PrRM, w::VecVecNum, pr::AbstractPriorResult,
-                       fees::Option{<:Fees} = nothing; strict::Bool = false, kwargs...)
-    # The population reduces once, so the diagnostic is raised once rather than once per
-    # member. Every member reduces again on the reduced prior, where the mask is `nothing`.
-    _, pr, w, fees = investable_reduction(pr, w, fees, strict)
-    r = factory(r, pr)
-    return [expected_risk(r, wi, pr, fees; kwargs...) for wi in w]
-end
 function bigger_is_better(::PerfRM)
     return true
 end

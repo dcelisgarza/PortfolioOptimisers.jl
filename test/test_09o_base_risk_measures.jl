@@ -143,9 +143,10 @@ end
             @test Bool <: reduce(typejoin, Base.return_types(f, (T,)); init = Union{})
         end
         # Every measure that a call with no arguments builds answers all three predicates.
-        # Five composites route through their own `expected_risk` methods and declare no
-        # input kind, so the fallback of `risk_input_kind` refuses them.
-        explicit = (:ExpectedReturn, :ExpectedReturnRiskRatio, :MeanReturnRiskRatio,
+        # Four composites route through their own `expected_risk` methods and declare no
+        # input kind, so the fallback of `risk_input_kind` refuses them. `ExpectedReturn`
+        # declares one (#1917).
+        explicit = (:ExpectedReturnRiskRatio, :MeanReturnRiskRatio,
                     :NonOptimisationRiskRatio, :RiskRatio)
         built = 0
         for T in Ts
