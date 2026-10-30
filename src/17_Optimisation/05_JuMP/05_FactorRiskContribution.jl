@@ -120,7 +120,7 @@ Under [`Variance`](@ref) the `rc` rows sit on the semidefinite relaxation of For
 
 A [`Variance`](@ref) always takes this semidefinite formulation here, with or without rows. Under [`MaximumRatio`](@ref) the `ratio_alg` of the variance selects the degree of its objective term, and so the ratio. The default gives the Sharpe ratio, and [`LinearRatio`](@ref) gives the excess return per unit of variance. The `# Mathematical definition` of [`MaximumRatio`](@ref) states the rule, and [`set_sdp_frc_objective_lift!`](@ref) states the lift.
 
-The optimiser solves its model once. A `settings.ub` on a risk measure logs a warning, and the model ignores the bound, see [`set_risk_upper_bound!`](@ref). A return term with a [`Frontier`](@ref) or a vector floor raises an `ArgumentError`, see [`assert_frontier_sweep_owner`](@ref). [`MeanRisk`](@ref) sweeps a frontier.
+The optimiser solves its model once. A number in `settings.ub` of a risk measure logs a warning, and the model ignores the bound. A [`Frontier`](@ref) or a vector in `settings.ub` raises an `ArgumentError`, see [`set_risk_upper_bound!`](@ref). A return term with a [`Frontier`](@ref) or a vector floor raises an `ArgumentError`, see [`assert_frontier_sweep_owner`](@ref). [`MeanRisk`](@ref) sweeps a frontier.
 
 # Mathematical definition
 

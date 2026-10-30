@@ -40,7 +40,7 @@ sweep loops created the parameter and the constraint under exactly those keys.
 ## Decision
 
 The sweep is one seam, and it lives in the Model State interface,
-`20_Optimisation/08_Base_JuMPOptimisation.jl`, beside the two frontier readers that were
+`src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/04_FrontierSweep.jl`, beside the two frontier readers that were
 already there (`frontier_point_count`, `frontier_sweep_points`).
 
 Register:
@@ -99,3 +99,25 @@ constraint, so this costs a few parameter writes and no solve.
 ADR 0037's rule 3 keeps its polarity and loses its only exemption. ADR 0008 (§3: the head and
 the tail stay per-optimiser) is untouched — the sweep sits inside the tail. Nothing in ADR
 0004 or 0005 is contradicted.
+
+## Amendment (2026-10-30)
+
+Three later changes keep the seam and change what it writes. R14 of #1817 found that the ADR
+did not record them.
+
+- **One method rebuilds the risk frontier of `MeanRisk` (#686).** The scalar-measure and the
+    vector-measure methods of `rebuild_risk_frontier` are one method. It solves the two corners
+    once, and `_rebuild_risk_frontier` rebuilds each entry from them, so the resolved registry
+    keeps the one shape that the Decision states. `NearOptimalCentering` keeps a method of its
+    own, and it shares `_rebuild_risk_frontier`.
+- **Each parameter of a sweep is in units of a fixed scale (#1841, #1843).**
+    `set_ret_frontier_parameters!` and `set_risk_frontier_parameters!` divide the bound row by
+    `bound_scale` of its points, and `unit_frontier` writes the points in the same units. The
+    row of a risk bound is `d * sc * (r_expr / m - ub * k) <= 0`, with the `k` of the Decision.
+    `set_noc_anchor!` now moves the parameters `noc_rk_unit` and `noc_rt_unit`. `noc_rk` and
+    `noc_rt` are expressions, the scale times each parameter.
+- **The corners of a `MaximumRatio` frontier come from a second model (#1848).** On the
+    homogenised model of `MaximumRatio`, a minimum-risk solve gives the maximum-ratio portfolio,
+    and a maximum-return solve is unbounded. `resolve_ratio_frontier!` builds a model that is not
+    homogenised, and solves the two corners on it. The span is then the span of the same
+    frontier under `MinimumRisk`.

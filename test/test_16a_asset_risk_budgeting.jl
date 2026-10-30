@@ -40,9 +40,19 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
         end
         @test success
 
-        # The pins were generated again after `k` gained its bound (#1844, #1845). A case
-        # takes a wider tolerance only when a host shows that it needs one.
-        rtol = 1e-6
+        # The pins were generated again after `k` gained its bound (#1844, #1845). They hold
+        # at 1e-6 on the host that made them. Each rtol is the largest `find_tol` over 20
+        # red CI runs of both host kinds (40536176678 to 40988847855) and over a local run
+        # under the CI flags (R14 of #1817).
+        rtol = if i ∈ (9, 11, 22, 24)
+            5e-4
+        elseif i == 20
+            1e-3
+        elseif i ∈ (17, 21)
+            5e-3
+        else
+            1e-4
+        end
         success = isapprox([res.w; rkc], df[!, "$i"]; rtol = rtol)
         if !success
             println("Weights and Contribution $i fails")
@@ -91,9 +101,19 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
         end
         @test success
 
-        # The pins were generated again after `k` gained its bound (#1844, #1845). A case
-        # takes a wider tolerance only when a host shows that it needs one.
-        rtol = 1e-6
+        # The pins were generated again after `k` gained its bound (#1844, #1845). They hold
+        # at 1e-6 on the host that made them. Each rtol is the largest `find_tol` over 20
+        # red CI runs of both host kinds (40536176678 to 40988847855) and over a local run
+        # under the CI flags (R14 of #1817).
+        rtol = if i ∈ (2, 17)
+            5e-4
+        elseif i ∈ (20, 22)
+            1e-3
+        elseif i == 21
+            5e-3
+        else
+            1e-4
+        end
         success = isapprox([res.w; rkc], df[!, "$i"]; rtol = rtol)
         if !success
             println("Weights and Contribution $i fails")

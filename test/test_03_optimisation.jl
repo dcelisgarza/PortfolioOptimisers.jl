@@ -1929,6 +1929,15 @@ end
         @test_throws ArgumentError JuMPOptimiser(; slv, bgt = nothing, gbgt = 1.5)
         @test_throws ArgumentError JuMPOptimiser(; slv, bgt = 1.0, sbgt = 0.3, gbgt = 1.6,
                                                  wb = WeightBounds(; lb = -1, ub = 1))
+        # Two numbers pin the gross budget of the model, not the realised gross exposure,
+        # which is smaller under `xbgt = false` (#685, R14 of #1817).
+        @test_throws "pin the gross budget at bgt + 2 * sbgt" JuMPOptimiser(; slv,
+                                                                            bgt = 1.0,
+                                                                            sbgt = 0.3,
+                                                                            gbgt = 1.6,
+                                                                            wb = WeightBounds(;
+                                                                                              lb = -1,
+                                                                                              ub = 1))
         for (k, v) in
             ((:cte, CentralityConstraint[]), (:tn, Turnover[]), (:tr, TrackingError[]),
              (:l2, L2Regularisation[]), (:lp, LpRegularisation[]),

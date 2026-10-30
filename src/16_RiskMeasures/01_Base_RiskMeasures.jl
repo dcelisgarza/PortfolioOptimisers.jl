@@ -911,7 +911,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Sweeps the efficient frontier by solving the model once at each of `N` evenly spaced bound values.
 
-Stand this in a risk measure's bound slot instead of a number. The optimisation then reads the span off two corner portfolios, divides it into `N` levels, and returns one portfolio per level. The corners are a minimum-risk solve and a maximum-return solve, so the span covers the whole attainable range of the bound.
+Stand this in a risk measure's bound slot instead of a number. The optimisation then reads the span off two corner portfolios, divides it into `N` levels, and returns one portfolio per level. The corners are a minimum-risk solve and a maximum-return solve of the whole model. When the bound is on the measure that the minimum-risk solve minimises, the span covers the whole attainable range of the bound. When the bound is on one term of a composite measure, or on one measure of several, the span runs between the values of the bound at the two corners, and the term can reach a lower value than its value at the minimum-risk corner.
 
 The levels are evenly spaced in the units of the **risk expression** the bound is applied to, which `bound` names, and not in the units of the measure. See [`SquareRootBound`](@ref) for the case where the two differ.
 
@@ -928,7 +928,7 @@ The levels are evenly spaced in the units of the **risk expression** the bound i
                  settings = Dict(\"verbose\" => false))
     ```
 
-    The span of a `Frontier` does not read the homogenised model. A minimum-risk solve on that model gives the maximum-ratio portfolio, and a maximum-return solve is unbounded. So the span comes from a second model that is not homogenised, with [`resolve_ratio_frontier!`](@ref), and it is the span of the same `Frontier` under [`MinimumRisk`](@ref). The second model costs one more model build.
+    The span of a `Frontier` does not read the homogenised model. A minimum-risk solve on that model gives the maximum-ratio portfolio, and a maximum-return solve is unbounded. So the span comes from a second model that is not homogenised, with [`resolve_ratio_frontier!`](@ref), and it is the span of the same `Frontier` under [`MinimumRisk`](@ref). The second model costs one more model build. A risk ceiling above the risk of the maximum-ratio portfolio does not bind, so every level above that risk returns the maximum-ratio portfolio.
 
     Under every other objective the ratio factor is the number `1`, and the sweep needs no wrapper. The [efficient frontier](@ref example-efficient-frontier) example sweeps a `MaximumRatio` frontier in this way.
 

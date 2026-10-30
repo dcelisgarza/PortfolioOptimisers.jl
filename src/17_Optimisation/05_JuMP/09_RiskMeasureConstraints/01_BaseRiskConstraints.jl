@@ -18,7 +18,7 @@ const NonFRCJuMPOpt = Union{MeanRisk, NearOptimalCentering, RiskBudgeting}
 
 Groups the owners of the risk constraints that a builder writes. An owner is a JuMP optimiser, whose programme the constraint joins, or a programme Allocation Set, whose projection the constraint joins.
 
-Every `set_risk_constraints!` and `set_risk!` method takes the owner in its `opt` slot. A builder reads the owner through three methods and no others. [`risk_constraint_solver`](@ref) gives the solver that resolves a Deferred Quantity. [`risk_contribution_constraints`](@ref) gives the risk contribution rows of a [`Variance`](@ref). [`set_risk_upper_bound!`](@ref) writes the bound on the risk expression. A [`RiskBoundOwner`](@ref) honours the bound, and a [`FactorRiskContribution`](@ref) ignores it with a warning.
+Every `set_risk_constraints!` and `set_risk!` method takes the owner in its `opt` slot. A builder reads the owner through three methods and no others. [`risk_constraint_solver`](@ref) gives the solver that resolves a Deferred Quantity. [`risk_contribution_constraints`](@ref) gives the risk contribution rows of a [`Variance`](@ref). [`set_risk_upper_bound!`](@ref) writes the bound on the risk expression. A [`RiskBoundOwner`](@ref) honours the bound. A [`FactorRiskContribution`](@ref) ignores a number bound with a warning, and refuses a frontier or a per-asset vector.
 
 # Related
 
@@ -529,7 +529,7 @@ Where:
 
 # Validation
 
-  - An owner outside [`RiskBoundOwner`](@ref), a [`FactorRiskContribution`](@ref), ignores a bound that is not `nothing`, and the method warns. Without the warning the bound has no effect and nothing says so.
+  - An owner outside [`RiskBoundOwner`](@ref), a [`FactorRiskContribution`](@ref), ignores a number bound, and the method warns. Without the warning the bound has no effect and nothing says so. It raises `ArgumentError` for a [`Front_NumVec`](@ref) bound, because it solves its model once, as [`assert_frontier_sweep_owner`](@ref) refuses a frontier of every other such optimiser.
   - A programme Allocation Set raises `ArgumentError` for a [`Front_NumVec`](@ref) bound. Its ceiling is one number. The constructor of the set refuses such a bound first, and this method refuses a set that reaches the builder without that check.
 
 # Returns
@@ -552,6 +552,10 @@ function set_risk_upper_bound!(::JuMP.Model, opt::JuMPOptimisationEstimator, r_e
                                key, flag::Bool = true)
     return @warn("Risk upper bound `settings.ub = $ub` ($key) is not supported by `$(typeof(opt).name.name)` and would be silently ignored. Remove `ub` from the risk measure settings, or use an optimiser that supports risk upper bounds (`MeanRisk`, `NearOptimalCentering`, `RiskBudgeting`).",
                  maxlog = log_limit(:warn), _id = @log_id(key, typeof(opt)))
+end
+function set_risk_upper_bound!(::JuMP.Model, opt::FactorRiskContribution, r_expr,
+                               ub::Front_NumVec, key, flag::Bool = true)
+    return throw(ArgumentError("`$(nameof(typeof(opt)))` solves its model once and does not sweep a frontier, so it cannot honour the bound `settings.ub = $ub` ($key), a frontier or a per-asset vector. Remove `ub`, or use `MeanRisk` or `NearOptimalCentering`, which sweep a frontier."))
 end
 function set_risk_upper_bound!(::JuMP.Model, set::AbstractProgrammeAllocationSet, r_expr,
                                ub::Front_NumVec, key, flag::Bool = true)

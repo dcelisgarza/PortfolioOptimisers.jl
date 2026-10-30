@@ -134,6 +134,22 @@ end
                                                       opt = JuMPOptimiser(; pe = FRS_PR,
                                                                           slv = FRS_SLV),
                                                       r = r), FRS_RD)
+    # FactorRiskContribution ignores a number ceiling with a warning, so the ceiling never
+    # reaches the frontier registry. It refuses a frontier or a vector ceiling at the
+    # builder (R14 of #1817).
+    opt0 = frs_free()
+    for ub in ([2e-5, 3e-5], Frontier(; N = 3))
+        frc = FactorRiskContribution(; opt = opt0,
+                                     r = Variance(;
+                                                  settings = RiskMeasureSettings(; ub = ub)))
+        @test_throws ArgumentError optimise(frc, FRS_RD)
+    end
+    frc = FactorRiskContribution(; opt = opt0,
+                                 r = Variance(;
+                                              settings = RiskMeasureSettings(; ub = 2e-5)))
+    res = @test_logs (:warn, r"not supported by `FactorRiskContribution`") match_mode=:any optimise(frc,
+                                                                                                    FRS_RD)
+    @test isa(res.retcode, PO.OptimisationSuccess)
     # The two optimisers that sweep a frontier keep their sweep.
     @test length(optimise(MeanRisk(; opt = opt), FRS_RD).w) == 2
     @test length(optimise(NearOptimalCentering(; opt = opt), FRS_RD).w) == 2
