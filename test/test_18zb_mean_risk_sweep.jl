@@ -414,11 +414,14 @@ end
 @testset "An EntropicValueatRisk ceiling holds under a constrained NOC (#1905)" begin
     # The anchor cones of the barrier divide their slack by the width of the near optimal
     # region. In the units of the risk, the 50 % level failed, and the 75 % level stopped at
-    # ALMOST_SOLVED, which allow_almost accepts, and broke the ceiling by 1.3 %.
+    # ALMOST_SOLVED, which allow_almost accepts, and broke the ceiling by 1.3 %. On the CI
+    # hosts the first solver can stop at INSUFFICIENT_PROGRESS, so fallback solvers with a
+    # shorter step follow it, as in test18_setup.jl.
     pr = prior(HighOrderPriorEstimator(), MRS_X)
-    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
-                 check_sol = (; allow_local = true, allow_almost = true),
-                 settings = Dict("verbose" => false))
+    slv = [Solver(; name = Symbol(:clarabel, i), solver = Clarabel.Optimizer,
+                  check_sol = (; allow_local = true, allow_almost = true),
+                  settings = Dict("verbose" => false, "max_step_fraction" => msf))
+           for (i, msf) in enumerate((0.99, 0.95, 0.9, 0.85))]
     opt = JuMPOptimiser(; pe = pr, slv = slv)
     ev(; kwargs...) = EntropicValueatRisk(; slv = slv, kwargs...)
     rk = factory(ev(), pr)
