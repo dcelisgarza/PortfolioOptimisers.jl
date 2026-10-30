@@ -1323,6 +1323,111 @@ PortfolioOptimisers.needs_factor_returns(::CountingPrior1913) = false
         @test n[] == 1
     end
 end
+# Weights with a half-life that the keywords of the fit set, so a count that drops the keywords
+# reads other weights than the fit (#1915).
+struct KeywordWeights1915 <: PortfolioOptimisers.DynamicAbstractWeights end
+function PortfolioOptimisers.get_observation_weights(::KeywordWeights1915,
+                                                     X::PortfolioOptimisers.MatNum;
+                                                     dims::Int = 1, hl = 40, kwargs...)
+    n = size(X, dims)
+    return StatsBase.pweights([2.0^((t - n) / hl) for t in 1:n])
+end
+@testset "The count reads the keywords of the fit (#1915)" begin
+    using Statistics
+    pe = PortfolioOptimisers
+    X = (randn(StableRNG(41), 150, 6) .+ 0.3 .* randn(StableRNG(42), 150)) .* 0.01
+    T, N = size(X)
+    m = fill(0.003, 1, N)
+    dn = MatrixProcessing(; dn = Denoise())
+    denoised(S, Te) = pe.denoise!(Denoise(), pe.posdef!(Posdef(), copy(S)), Te / N)
+    @testset "A Gerber IQ count centres the returns on the mean of the caller" begin
+        rule = Xc -> clamp(round(Int, 1e4 * abs(Xc[1, 1])), 0, 140)
+        g = GerberIQCovariance(; decay = ExpGerberIQDecay(; e = rule),
+                               oc = KishObservationCount())
+        y = log(2) / N
+        function kish(e)
+            w = [exp(-y * max(0, T - k - e)) for k in 1:T]
+            return sum(w)^2 / sum(abs2, w)
+        end
+        # The two centres give two delays, so a count on the wrong centre is another count.
+        @test rule(X .- mean(X; dims = 1)) == 55
+        @test rule(X .- m) == 93
+        @test pe.effective_observation_count(g, X) ≈ kish(55)
+        @test pe.effective_observation_count(g, X; mean = m) ≈ kish(93)
+        pc = PortfolioOptimisersCovariance(; ce = g, mp = dn)
+        @test pe.processing_observation_count(pc, X; mean = m) ≈ kish(93)
+        S = Matrix(cov(g, X; mean = m))
+        @test cov(pc, X; mean = m) ≈ denoised(S, kish(93))
+        @test !(cov(pc, X; mean = m) ≈ denoised(S, kish(55)))
+        R = Matrix(cor(g, X; mean = m))
+        @test cor(pc, X; mean = m) ≈ denoised(R, kish(93))
+        @test !(cor(pc, X; mean = m) ≈ denoised(R, kish(55)))
+    end
+    @testset "A count resolves the weights with the keywords of the fit" begin
+        kw = KeywordWeights1915()
+        function wcount(Y, hl)
+            w = pe.get_observation_weights(kw, Y; hl = hl)
+            return sum(w)^2 / sum(abs2, w)
+        end
+        @test !(wcount(X, 20) ≈ wcount(X, 40))
+        for est in (Covariance(; w = kw), Covariance(; ce = GeneralCovariance(; w = kw)),
+                    SimpleExpectedReturns(; w = kw), Coskewness(; w = kw), Cokurtosis(; w = kw),
+                    PortfolioOptimisersCovariance(; ce = Covariance(; w = kw)))
+            @test pe.effective_observation_count(est, X) ≈ wcount(X, 40)
+            @test pe.effective_observation_count(est, X; hl = 20) ≈ wcount(X, 20)
+        end
+        # The fit takes `mean` and `active_mask` by name, and the weights read the others.
+        @test pe.effective_observation_count(Covariance(; w = kw), X; mean = m,
+                                             active_mask = trues(T, N), hl = 20) ≈
+              wcount(X, 20)
+        # A window resolves its weights over the rows that it keeps, with the keywords.
+        for est in (WindowedCovariance(; ce = Covariance(), w = kw, window = 100),
+                    WindowedExpectedReturns(; me = SimpleExpectedReturns(), w = kw, window = 100),
+                    WindowedCoskewness(; ske = Coskewness(), w = kw, window = 100),
+                    WindowedCokurtosis(; kte = Cokurtosis(), w = kw, window = 100))
+            @test pe.effective_observation_count(est, X; mean = m, hl = 20) ≈
+                  wcount(X[51:end, :], 20)
+        end
+        # The denoiser of the wrapper reads the count of the weights that the fit reads.
+        cw = Covariance(; w = kw)
+        pc = PortfolioOptimisersCovariance(; ce = cw, mp = dn)
+        S = Matrix(cov(cw, X; hl = 20))
+        @test S ≈ cov(Covariance(; w = pe.get_observation_weights(kw, X; hl = 20)), X)
+        @test cov(pc, X; hl = 20) ≈ denoised(S, wcount(X, 20))
+        @test cov(pc, X; active_mask = trues(T, N), hl = 20) ≈ denoised(S, wcount(X, 20))
+        # A prior gives its keywords to the fits of its moments, and so to their counts.
+        ep = EmpiricalPrior(; me = SimpleExpectedReturns(; w = kw),
+                            ce = Covariance(; w = kw))
+        @test all(prior(ep, X).eoc .≈ wcount(X, 40))
+        @test all(prior(ep, X; hl = 20).eoc .≈ wcount(X, 20))
+        me = PriorExpectedReturns(; pe = ep)
+        @test pe.effective_observation_count(me, X; hl = 20) ≈ wcount(X, 20)
+        hpe = HighOrderPriorEstimator(; pe = EmpiricalPrior(), kte = Cokurtosis(; w = kw),
+                                      ske = Coskewness(; w = kw))
+        @test all(getfield(prior(hpe, X; hl = 20), :eoc)[1:2] .≈ wcount(X, 20))
+    end
+    @testset "A fold reads its count with the keywords of the read" begin
+        rule = Xc -> clamp(round(Int, 1e4 * abs(Xc[1, 1])), 0, 140)
+        g = GerberIQCovariance(; decay = ExpGerberIQDecay(; e = rule),
+                               oc = KishObservationCount())
+        pc = PortfolioOptimisersCovariance(; ce = g, mp = dn)
+        Tm = pe.effective_observation_count(g, X; mean = m)
+        @test !(Tm ≈ pe.effective_observation_count(g, X))
+        # The wrapper holds the buffer, and the read refits over it.
+        fb = partial_fit!(pe.update_online_estimator(Online(pc)), X)
+        @test isa(pe.partial_fit_cache(fb), pe.SampleBufferState)
+        @test pe.effective_observation_count(fb; mean = m) ≈ Tm
+        @test cov(fb; mean = m) ≈ cov(pc, X; mean = m)
+        # The wrapper holds no state, and folds through the buffer of `ce.ce`.
+        pcn = PortfolioOptimisersCovariance(; ce = pe.update_online_estimator(Online(g)),
+                                            mp = dn)
+        fn = partial_fit!(pcn, X)
+        @test pe.effective_observation_count(fn; mean = m) ≈ Tm
+        @test cov(fn; mean = m) ≈ cov(pc, X; mean = m)
+        @test cor(fn; mean = m) ≈ cor(pc, X; mean = m)
+        @test cov(fn) ≈ cov(pc, X)
+    end
+end
 @testset "A rolling window has no fold, and a seed window folds" begin
     pe = PortfolioOptimisers
     rng = StableRNG(2)

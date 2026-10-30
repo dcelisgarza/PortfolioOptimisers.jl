@@ -325,11 +325,12 @@ function regime_correlation_count(ce::RegimeAdjustedExpWeightedCovariance, n::In
         exp_weighted_covariance_count(ce.decay, n, ce.centring)
     end
 end
-function effective_observation_count(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum)
+function effective_observation_count(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum;
+                                     kwargs...)
     return regime_correlation_count(ce, size(X, 1))
 end
 function effective_observation_count(ce::RegimeAdjustedExpWeightedCovariance,
-                                     state::RegimeAdjustedCovarianceState)
+                                     state::RegimeAdjustedCovarianceState; kwargs...)
     return regime_correlation_count(ce, observation_count(state))
 end
 """

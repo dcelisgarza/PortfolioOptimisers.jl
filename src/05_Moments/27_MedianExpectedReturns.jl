@@ -177,7 +177,7 @@ function Statistics.mean(me::MedianExpectedReturns{<:ObsWeights}, X::MatNum; dim
     end
     return insertdims(Y; dims = dims)
 end
-function effective_observation_count(me::MedianExpectedReturns, X::MatNum)
+function effective_observation_count(me::MedianExpectedReturns, X::MatNum; kwargs...)
     return observation_weight_count(get_observation_weights(me.w, X), size(X, 1))
 end
 

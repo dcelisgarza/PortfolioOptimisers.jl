@@ -1838,8 +1838,8 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any,
     Xs = Matrix(scenario_window(pe.max_scenarios, X))
     pr = LowOrderPrior(; X = scenario_fill(Xs, mu, sigma, strict, fill_limit, state.named),
                        mu = mu, sigma = sigma,
-                       eoc = scenario_moment_counts(pe, X, size(Xs, 1), T_mu),
-                       x_src = pe.x_src)
+                       eoc = scenario_moment_counts(pe, X, size(Xs, 1), T_mu; vols...,
+                                                    kwargs...), x_src = pe.x_src)
     return shared_series_record(pr, state.buf)
 end
 function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
@@ -1865,8 +1865,8 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
     Xs = Matrix(scenario_window(pe.max_scenarios, X))
     pr = LowOrderPrior(; X = scenario_fill(Xs, mu, sigma, strict, fill_limit, state.named),
                        mu = mu, sigma = sigma,
-                       eoc = scenario_moment_counts(pe, Xl, size(Xs, 1), T_mu),
-                       x_src = pe.x_src)
+                       eoc = scenario_moment_counts(pe, Xl, size(Xs, 1), T_mu; vols...,
+                                                    kwargs...), x_src = pe.x_src)
     return shared_series_record(pr, state.buf)
 end
 """

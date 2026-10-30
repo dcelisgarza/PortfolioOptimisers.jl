@@ -840,7 +840,7 @@ function prior(pe::HighOrderPriorEstimator, X::MatNum, F::Option{<:MatNum} = not
     X, pnl = scenario_rows(w, X, pnl)
     kt = cokurtosis(factory(pe.kte, w), X, pnl; kwargs...)
     sk, V = coskewness(factory(pe.ske, w), X, pnl; kwargs...)
-    eoc = high_order_moment_counts(pe.ske, pe.kte, w, X, size(pr.X, 1))
+    eoc = high_order_moment_counts(pe.ske, pe.kte, w, X, size(pr.X, 1); kwargs...)
     return assemble_high_order_prior(pe, pr, kt, sk, V, eoc)
 end
 """
@@ -901,7 +901,7 @@ function assemble_high_order_prior(pe::HighOrderPriorEstimator, pr::AbstractPrio
     return hop
 end
 """
-    high_order_moment_counts(ske, kte, w, X::MatNum, t::Integer)
+    high_order_moment_counts(ske, kte, w, X::MatNum, t::Integer; kwargs...)
         -> Tuple{Option{<:Real}, Option{<:Real}}
 
 State the effective number of observations of the coskewness and of the cokurtosis of a high order prior, in the form of the field `eoc` of a [`HighOrderPrior`](@ref).
@@ -915,6 +915,7 @@ The co-moments are fitted by `factory(ske, w)` and `factory(kte, w)` over the ro
   - `w`: The observation weights of the prior result, or `nothing`.
   - `X`: The rows that the co-moments read, `observations × assets`.
   - `t`: The number of rows that the prior result carries in `X`.
+  - `kwargs...`: The keywords that the prior gives to the fits of the co-moments.
 
 # Returns
 
@@ -926,13 +927,13 @@ The co-moments are fitted by `factory(ske, w)` and `factory(kte, w)` over the ro
   - [`high_order_observation_count`](@ref)
   - [`moment_count_entry`](@ref)
 """
-function high_order_moment_counts(ske, kte, w, X::MatNum, t::Integer)
-    return (moment_count_entry(high_order_observation_count(ske, w, X), t),
-            moment_count_entry(high_order_observation_count(kte, w, X), t))
+function high_order_moment_counts(ske, kte, w, X::MatNum, t::Integer; kwargs...)
+    return (moment_count_entry(high_order_observation_count(ske, w, X; kwargs...), t),
+            moment_count_entry(high_order_observation_count(kte, w, X; kwargs...), t))
 end
 """
-    high_order_observation_count(est::Nothing, w, X::MatNum) -> Integer
-    high_order_observation_count(est::AbstractEstimator, w, X::MatNum) -> Real
+    high_order_observation_count(est::Nothing, w, X::MatNum; kwargs...) -> Integer
+    high_order_observation_count(est::AbstractEstimator, w, X::MatNum; kwargs...) -> Real
 
 Return the effective number of observations of a co-moment that `factory(est, w)` fits over the rows `X`.
 
@@ -943,6 +944,7 @@ A high order prior gives the weights `w` of its low order result to its co-momen
   - `est`: The coskewness or cokurtosis estimator, or `nothing`.
   - `w`: The observation weights of the prior result, or `nothing`.
   - `X`: The rows that the co-moment reads, `observations × assets`.
+  - `kwargs...`: The keywords of the fit of the co-moment, for [`effective_observation_count`](@ref).
 
 # Returns
 
@@ -953,11 +955,11 @@ A high order prior gives the weights `w` of its low order result to its co-momen
   - [`high_order_moment_counts`](@ref)
   - [`effective_observation_count`](@ref)
 """
-function high_order_observation_count(::Nothing, w, X::MatNum)
+function high_order_observation_count(::Nothing, w, X::MatNum; kwargs...)
     return size(X, 1)
 end
-function high_order_observation_count(est::AbstractEstimator, w, X::MatNum)
-    return effective_observation_count(factory(est, w), X)
+function high_order_observation_count(est::AbstractEstimator, w, X::MatNum; kwargs...)
+    return effective_observation_count(factory(est, w), X; kwargs...)
 end
 """
     scenario_rows(w::Nothing, X::MatNum, pnl::Option{<:AssetPanel})
@@ -1334,7 +1336,7 @@ function prior(pe::HighOrderPriorEstimator; kwargs...)
     kt = read_comoment(cokurtosis, pe.kte, pr.w, X, pnl; kwargs...)
     sk, V = read_comoment(coskewness, pe.ske, pr.w, X, pnl; kwargs...)
     eoc = high_order_moment_counts(pe.ske, pe.kte, pr.w, scenario_rows(pr.w, X, pnl)[1],
-                                   size(pr.X, 1))
+                                   size(pr.X, 1); kwargs...)
     return stamp_returns_source(assemble_high_order_prior(pe, pr, kt, sk, V, eoc), pe)
 end
 

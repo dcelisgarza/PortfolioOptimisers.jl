@@ -12,7 +12,7 @@
         rule ┴ RollingWindow()
     """
 end
-function effective_observation_count(me::WindowedExpectedReturns, X::MatNum)
-    inner, Xw, _ = windowed_preamble(me.me, me.w, me.window, X)
-    return effective_observation_count(inner, Xw)
+function effective_observation_count(me::WindowedExpectedReturns, X::MatNum; kwargs...)
+    inner, Xw, iv, kw = windowed_preamble(me.me, me.w, me.window, X; kwargs...)
+    return effective_observation_count(inner, Xw; iv = iv, kw...)
 end

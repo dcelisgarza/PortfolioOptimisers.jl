@@ -385,7 +385,7 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any}, X::MatNum,
     # every consumer of the result reads that column (see [`scenario_fill`](@ref)).
     return LowOrderPrior(; X = scenario_fill(Xs, mu, sigma, strict, fill_limit), mu = mu,
                          sigma = sigma,
-                         eoc = scenario_moment_counts(pe, X, size(Xs, 1), T_mu))
+                         eoc = scenario_moment_counts(pe, X, size(Xs, 1), T_mu; kwargs...))
 end
 """
     prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any}, X::MatNum,
@@ -495,7 +495,8 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any}, X::MatNum,
     # because the Investable Mask is read off the arithmetic moments the result carries.
     return LowOrderPrior(; X = scenario_fill(Xs, mu, sigma, strict, fill_limit), mu = mu,
                          sigma = sigma,
-                         eoc = scenario_moment_counts(pe, X_log, size(Xs, 1), T_mu))
+                         eoc = scenario_moment_counts(pe, X_log, size(Xs, 1), T_mu;
+                                                      kwargs...))
 end
 
 function factor_residual_config(::EmpiricalPrior)

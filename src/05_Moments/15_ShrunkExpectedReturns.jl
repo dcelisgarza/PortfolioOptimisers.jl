@@ -1079,8 +1079,8 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinP
 end
 # The estimator shrinks the mean of `me.me` over the rows of `X`, so the mean is worth the
 # count of that estimator.
-function effective_observation_count(me::ShrunkExpectedReturns, X::MatNum)
-    return effective_observation_count(me.me, X)
+function effective_observation_count(me::ShrunkExpectedReturns, X::MatNum; kwargs...)
+    return effective_observation_count(me.me, X; kwargs...)
 end
 
 export GrandMean, VolatilityWeighted, MeanSquaredError, UnitIntervalIntensity,

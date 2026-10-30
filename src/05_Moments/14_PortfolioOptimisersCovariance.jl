@@ -141,7 +141,7 @@ The composite does not change a gap. It passes `X` and `active_mask` to `ce.ce` 
  2. Refuse a gapped sample with [`assert_finite_sample`](@ref) when [`gap_fill_value`](@ref) on `ce` is finite, because then `ce.ce` is a plain estimator that cannot use a gapped sample.
  3. Compute `sigma` with `Statistics.cov(library_covariance_estimator(ce.ce), X; kwargs...)`. Pass `active_mask` too if it is given.
  4. When `sigma` is immutable, copy it into a `Matrix`, because step 5 writes in place.
- 5. Take the effective number of observations `T` with [`processing_observation_count`](@ref).
+ 5. Take the effective number of observations `T` with [`processing_observation_count`](@ref), with the keywords of step 3. A `mean` of the caller then centres the data of the count and of the fit.
  6. Apply [`sample_matrix_processing!`](@ref) with `ce.mp`, `X` and `T` to `sigma` in place. If `ce.ce` is gap-aware, apply [`matrix_processing_block!`](@ref) instead, so that an asset outside the Coverage Universe keeps its `NaN` row and column.
  7. Return `sigma`.
 
@@ -181,16 +181,14 @@ function Statistics.cov(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1,
     if plain
         assert_finite_sample(X)
     end
-    sigma = if isnothing(amsk)
-        Statistics.cov(library_covariance_estimator(ce.ce), X; kwargs...)
-    else
-        Statistics.cov(library_covariance_estimator(ce.ce), X; active_mask = amsk,
-                       kwargs...)
-    end
+    # The fit and the count read one set of keywords, so a count that reads the data reads the
+    # values of the fit (#1915).
+    kw = isnothing(amsk) ? (; kwargs...) : (; active_mask = amsk, kwargs...)
+    sigma = Statistics.cov(library_covariance_estimator(ce.ce), X; kw...)
     if !ismutable(sigma)
         sigma = Matrix(sigma)
     end
-    T = processing_observation_count(ce, X)
+    T = processing_observation_count(ce, X; kw...)
     if plain
         sample_matrix_processing!(ce.mp, sigma, X, T; kwargs...)
     else
@@ -209,6 +207,7 @@ Only the denoising step reads the count, so the function reads [`effective_obser
 
   - $(arg_dict[:ce])
   - `X`: The data matrix, oriented to `observations × assets`.
+  - `kwargs...`: The keywords that the fit gives to `ce.ce`, `active_mask` too when the caller gives it. The function passes them to [`effective_observation_count`](@ref).
 
 # Returns
 
@@ -220,9 +219,10 @@ Only the denoising step reads the count, so the function reads [`effective_obser
   - [`matrix_processing_reads_count`](@ref)
   - [`PortfolioOptimisersCovariance`](@ref)
 """
-function processing_observation_count(ce::PortfolioOptimisersCovariance, X::MatNum)
+function processing_observation_count(ce::PortfolioOptimisersCovariance, X::MatNum;
+                                      kwargs...)
     return if matrix_processing_reads_count(ce.mp)
-        effective_observation_count(ce.ce, X)
+        effective_observation_count(ce.ce, X; kwargs...)
     else
         size(X, 1)
     end
@@ -297,8 +297,8 @@ function Statistics.cov(ce::PortfolioOptimisersCovariance, X::MatNum,
     if !ismutable(sigma)
         sigma = Matrix(sigma)
     end
-    matrix_processing_block!(ce.mp, sigma, X, processing_observation_count(ce, X);
-                             kwargs...)
+    matrix_processing_block!(ce.mp, sigma, X,
+                             processing_observation_count(ce, X; kwargs...); kwargs...)
     return sigma
 end
 function Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum,
@@ -308,7 +308,8 @@ function Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum,
     if !ismutable(rho)
         rho = Matrix(rho)
     end
-    matrix_processing_block!(ce.mp, rho, X, processing_observation_count(ce, X); kwargs...)
+    matrix_processing_block!(ce.mp, rho, X, processing_observation_count(ce, X; kwargs...);
+                             kwargs...)
     return rho
 end
 """
@@ -360,16 +361,12 @@ function Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1,
     if plain
         assert_finite_sample(X)
     end
-    rho = if isnothing(amsk)
-        Statistics.cor(library_covariance_estimator(ce.ce), X; kwargs...)
-    else
-        Statistics.cor(library_covariance_estimator(ce.ce), X; active_mask = amsk,
-                       kwargs...)
-    end
+    kw = isnothing(amsk) ? (; kwargs...) : (; active_mask = amsk, kwargs...)
+    rho = Statistics.cor(library_covariance_estimator(ce.ce), X; kw...)
     if !ismutable(rho)
         rho = Matrix(rho)
     end
-    T = processing_observation_count(ce, X)
+    T = processing_observation_count(ce, X; kw...)
     if plain
         sample_matrix_processing!(ce.mp, rho, X, T; kwargs...)
     else
@@ -572,8 +569,12 @@ function Statistics.cov(ce::PortfolioOptimisersCovariance{<:Any, <:Any, Nothing}
         sigma = Matrix(sigma)
     end
     # The count is read only when a step reads it, so the default `mp` works over a state
-    # that records no count.
-    T = matrix_processing_reads_count(ce.mp) ? effective_observation_count(ce.ce) : nothing
+    # that records no count. It reads the keywords of the read of `ce.ce`.
+    T = if matrix_processing_reads_count(ce.mp)
+        effective_observation_count(ce.ce; kwargs...)
+    else
+        nothing
+    end
     matrix_processing_block!(ce.mp, sigma, T, size(sigma, 1); kwargs...)
     return sigma
 end
@@ -582,7 +583,11 @@ function Statistics.cor(ce::PortfolioOptimisersCovariance{<:Any, <:Any, Nothing}
     if !ismutable(rho)
         rho = Matrix(rho)
     end
-    T = matrix_processing_reads_count(ce.mp) ? effective_observation_count(ce.ce) : nothing
+    T = if matrix_processing_reads_count(ce.mp)
+        effective_observation_count(ce.ce; kwargs...)
+    else
+        nothing
+    end
     matrix_processing_block!(ce.mp, rho, T, size(rho, 1); kwargs...)
     return rho
 end
@@ -677,12 +682,13 @@ end
 # The composite passes `X` to `ce.ce` without change, and with no state of its own it folds
 # through `ce.ce`, so both forms read `ce.ce`. A nested composite then reads the innermost
 # weights.
-function effective_observation_count(ce::PortfolioOptimisersCovariance, X::MatNum)
-    return effective_observation_count(ce.ce, X)
+function effective_observation_count(ce::PortfolioOptimisersCovariance, X::MatNum;
+                                     kwargs...)
+    return effective_observation_count(ce.ce, X; kwargs...)
 end
 function effective_observation_count(ce::PortfolioOptimisersCovariance{<:Any, <:Any,
-                                                                       Nothing})
-    return effective_observation_count(ce.ce)
+                                                                       Nothing}; kwargs...)
+    return effective_observation_count(ce.ce; kwargs...)
 end
 
 export PortfolioOptimisersCovariance

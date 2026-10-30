@@ -571,11 +571,13 @@ function cokurtosis(::Nothing, args...; kwargs...)
     return nothing
 end
 # As for the coskewness: a weighted `Cokurtosis` is worth the count of its weights.
-function effective_observation_count(::CokurtosisEstimator, X::MatNum)
+function effective_observation_count(::CokurtosisEstimator, X::MatNum; kwargs...)
     return size(X, 1)
 end
-function effective_observation_count(kte::Cokurtosis, X::MatNum)
-    return observation_weight_count(get_observation_weights(kte.w, X), size(X, 1))
+function effective_observation_count(kte::Cokurtosis, X::MatNum; mean = nothing,
+                                     active_mask = nothing, kwargs...)
+    return observation_weight_count(get_observation_weights(kte.w, X; dims = 1, kwargs...),
+                                    size(X, 1))
 end
 
 export cokurtosis, Cokurtosis

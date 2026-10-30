@@ -187,8 +187,8 @@ function Statistics.cor(ce::CorrelationCovariance, X::MatNum; dims::Int = 1, kwa
     return Statistics.cor(library_covariance_estimator(ce.ce), X; dims = dims, kwargs...)
 end
 # The estimator passes `X` to `ce.ce` without change, so the count is the count of `ce.ce`.
-function effective_observation_count(ce::CorrelationCovariance, X::MatNum)
-    return effective_observation_count(ce.ce, X)
+function effective_observation_count(ce::CorrelationCovariance, X::MatNum; kwargs...)
+    return effective_observation_count(ce.ce, X; kwargs...)
 end
 
 export CorrelationCovariance

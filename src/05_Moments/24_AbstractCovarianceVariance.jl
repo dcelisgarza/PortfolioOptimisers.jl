@@ -350,11 +350,11 @@ function variance_count(::AbstractVarianceEstimator, ::MatNum)::Nothing
     return nothing
 end
 """
-    effective_observation_count(ce::StatsBase.CovarianceEstimator, X::MatNum) -> Real
-    effective_observation_count(me::AbstractExpectedReturnsEstimator, X::MatNum) -> Real
-    effective_observation_count(ce) -> Real
-    effective_observation_count(ce, state::AbstractPartialFitState) -> Real
-    effective_observation_count(ce, state::SampleBufferState) -> Real
+    effective_observation_count(ce::StatsBase.CovarianceEstimator, X::MatNum; kwargs...) -> Real
+    effective_observation_count(me::AbstractExpectedReturnsEstimator, X::MatNum; kwargs...) -> Real
+    effective_observation_count(ce; kwargs...) -> Real
+    effective_observation_count(ce, state::AbstractPartialFitState; kwargs...) -> Real
+    effective_observation_count(ce, state::SampleBufferState; kwargs...) -> Real
 
 Return the number of observations that the covariance of `ce`, or the mean of `me`, is worth, as one number for the whole moment.
 
@@ -362,13 +362,13 @@ The denoising step of [`MatrixProcessing`](@ref) reads the ratio `T / N` of the 
 
 [`EmpiricalPrior`](@ref) reads the count of its mean estimator and of its covariance estimator, and states them in the field `eoc` of its result. A normal uncertainty set, a calibration rule and the denoiser of a matrix that a prior assembles read that field.
 
-The form with `X` is the batch fit. Its default is `size(X, 1)`, so an unweighted estimator pays nothing. The form with no data is the fit from a fold. It reads the state of `ce` with [`partial_fit_cache`](@ref), and the form with a state reads the count from it. The default of a state is the folded row count of [`observation_count`](@ref). A [`SampleBufferState`](@ref) holds the observations, so it reads the batch form over the rows of the buffer.
+The form with `X` is the batch fit. Its default is `size(X, 1)`, so an unweighted estimator pays nothing. It takes the keywords of the fit, such as the `mean` of a covariance, so a count that reads the data reads the same values as the fit. A method passes them where its fit passes them: to its inner estimator, to [`get_observation_weights`](@ref), or to the centring. The form with no data is the fit from a fold. It reads the state of `ce` with [`partial_fit_cache`](@ref), and the form with a state reads the count from it. The default of a state is the folded row count of [`observation_count`](@ref). A [`SampleBufferState`](@ref) holds the observations, so it reads the batch form over the rows of the buffer, with the masks and the implied volatilities of the buffer, as the read of the moment does. The form with no data takes the keywords of the read of the moment too.
 
 The count covers every row of `X`, the rows with a `NaN` too, as `size(X, 1)` does. It does not count the rows of each asset.
 
 # Interfaces
 
-An estimator that weights its observations adds a method of the batch form. A method of the state form is necessary when the estimator folds into a state that holds no observations.
+An estimator that weights its observations adds a method of the batch form. That method takes `kwargs...`, because a caller passes the keywords of the fit to it. A method of the state form takes `kwargs...` for the same reason. A method with no keywords raises a `MethodError` when the caller passes a keyword, so a method that a user wrote for an earlier version of the library must add `kwargs...`. A method of the state form is necessary when the estimator folds into a state that holds no observations.
 
 # Mathematical definition
 
@@ -391,7 +391,7 @@ The method that Julia selects is the algorithm.
 
  1. On a covariance estimator or a mean estimator with no method of its own, return `size(X, 1)`.
  2. On [`Covariance`](@ref), [`GeneralCovariance`](@ref) and [`DistanceCovariance`](@ref), return the count of the observation weights with [`observation_weight_count`](@ref). A [`Covariance`](@ref) with no weights reads the count of its inner estimator, because the inner estimator can hold weights of its own. [`SimpleExpectedReturns`](@ref) and [`MedianExpectedReturns`](@ref) do the same with their weights. [`ExpWeightedExpectedReturns`](@ref) returns the Kish count of its weights over the rows of `X`, from [`exp_weighted_kish_count`](@ref).
- 3. On [`GerberIQCovariance`](@ref), return the count that the rule `ce.oc` states for the temporal weights of the decay, through [`gerber_iq_observation_count`](@ref). `ce.oc = nothing` gives `size(X, 1)`.
+ 3. On [`GerberIQCovariance`](@ref), return the count that the rule `ce.oc` states for the temporal weights of the decay, through [`gerber_iq_observation_count`](@ref). The keywords go to the centring, so a `mean` of the caller centres the returns that a rule of the decay reads. `ce.oc = nothing` gives `size(X, 1)`.
  4. On [`ExpWeightedCovariance`](@ref), return the count of [`exp_weighted_covariance_count`](@ref) over the rows of `X`. On [`RegimeAdjustedExpWeightedCovariance`](@ref), do the same with the decay and the centring of its correlation. The denoising step processes the correlation, so it reads the count of the correlation.
  5. On [`WindowedCovariance`](@ref) and [`WindowedExpectedReturns`](@ref), apply the window and the weights of the wrapper with [`windowed_preamble`](@ref). Then return the count of the inner estimator over the rows that the window keeps.
  6. On [`PortfolioOptimisersCovariance`](@ref), [`CorrelationCovariance`](@ref), [`GeodesicShrinkageCovariance`](@ref) and [`ImpliedVolatility`](@ref), return the count of the inner estimator, because these estimators pass `X` to it without change. [`ExcessExpectedReturns`](@ref) and [`ShrunkExpectedReturns`](@ref) return the count of their mean estimator `me.me`, and [`EquilibriumExpectedReturns`](@ref) returns the count of its covariance estimator `me.ce`. [`PriorExpectedReturns`](@ref) fits its prior, and returns the count of the mean of the prior result from [`moment_observation_count`](@ref). The form with no data reads the folded prior.
@@ -402,6 +402,7 @@ The method that Julia selects is the algorithm.
   - $(arg_dict[:ce])
   - `me`: The expected returns estimator.
   - `X`: The data matrix, of shape `observations × assets`.
+  - `kwargs...`: The keywords of the batch fit, or of the read of the folded moment. A method that reads no data ignores them.
   - `state`: The partial-fit state of `ce`.
 
 # Returns
@@ -419,25 +420,37 @@ The method that Julia selects is the algorithm.
 
   - $(ref_dict[:kish1965]) Whole book. $(ref_dict[:no_original_source])
 """
-function effective_observation_count(::StatsBase.CovarianceEstimator, X::MatNum)
+function effective_observation_count(::StatsBase.CovarianceEstimator, X::MatNum; kwargs...)
     return size(X, 1)
 end
-function effective_observation_count(::AbstractExpectedReturnsEstimator, X::MatNum)
+function effective_observation_count(::AbstractExpectedReturnsEstimator, X::MatNum;
+                                     kwargs...)
     return size(X, 1)
 end
 function effective_observation_count(ce::Union{AbstractEstimator,
-                                               StatsBase.CovarianceEstimator})
-    return effective_observation_count(ce, partial_fit_cache(ce))
+                                               StatsBase.CovarianceEstimator}; kwargs...)
+    return effective_observation_count(ce, partial_fit_cache(ce); kwargs...)
 end
 function effective_observation_count(::Union{AbstractEstimator,
                                              StatsBase.CovarianceEstimator},
-                                     state::AbstractPartialFitState)
+                                     state::AbstractPartialFitState; kwargs...)
     return observation_count(state)
 end
+# The read of a buffer refits over its rows with the masks and the implied volatilities that it
+# holds, as `cov(ce, state::SampleBufferState)` does, so the count reads the same keywords.
 function effective_observation_count(ce::Union{AbstractEstimator,
                                                StatsBase.CovarianceEstimator},
-                                     state::SampleBufferState)
-    return effective_observation_count(ce, sample_buffer(state))
+                                     state::SampleBufferState; kwargs...)
+    return effective_observation_count(ce, sample_buffer(state);
+                                       sample_buffer_kwargs(state)...,
+                                       implied_volatility_buffer_kwargs(state)...,
+                                       kwargs...)
+end
+# The read of a mean over a buffer passes the masks alone, as `mean(me, state)` does.
+function effective_observation_count(me::AbstractExpectedReturnsEstimator,
+                                     state::SampleBufferState; kwargs...)
+    return effective_observation_count(me, sample_buffer(state);
+                                       sample_buffer_kwargs(state)..., kwargs...)
 end
 """
     Statistics.cov(ce::AbstractCovarianceEstimator; kwargs...)

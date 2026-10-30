@@ -1047,7 +1047,7 @@ function assert_scenario_model(pe::CrossSectionalFactorPrior)
 end
 """
     scenario_moment_counts(pe::EmpiricalPrior, X::MatNum, t::Integer,
-                           T_mu::Option{<:Real} = nothing)
+                           T_mu::Option{<:Real} = nothing; kwargs...)
         -> Tuple{Option{<:Real}, Option{<:Real}}
 
 State the effective number of observations of the mean and of the covariance of an empirical Prior Result, in the form of its field `eoc`.
@@ -1066,6 +1066,7 @@ It is the same function in batch and in `prior(pe)` with no data after a fold, a
   - `X`: The returns that the moments were fitted over, `observations × assets`, **before** the cut. Under a horizon they are the log-returns.
   - `t`: The number of rows that the result carries, after the cut.
   - `T_mu`: The count of the mean that the fit of `mu` stated, or `nothing`.
+  - `kwargs...`: The keywords that the prior gives to the fits of `mu` and `sigma`. The function gives them to [`effective_observation_count`](@ref), so a count reads the same values as its fit.
 
 # Returns
 
@@ -1081,11 +1082,11 @@ It is the same function in batch and in `prior(pe)` with no data after a fold, a
   - [`LowOrderPrior`](@ref)
 """
 function scenario_moment_counts(pe::EmpiricalPrior, X::MatNum, t::Integer,
-                                T_mu::Option{<:Real} = nothing)
+                                T_mu::Option{<:Real} = nothing; kwargs...)
     # The count of a mean that a fit states wins, so the second fit of a prior is not paid.
-    T_mu = isnothing(T_mu) ? effective_observation_count(pe.me, X) : T_mu
+    T_mu = isnothing(T_mu) ? effective_observation_count(pe.me, X; kwargs...) : T_mu
     return (moment_count_entry(T_mu, t),
-            moment_count_entry(effective_observation_count(pe.ce, X), t))
+            moment_count_entry(effective_observation_count(pe.ce, X; kwargs...), t))
 end
 """
     mean_with_count(me::AbstractExpectedReturnsEstimator, X::MatNum,

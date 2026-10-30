@@ -519,8 +519,8 @@ function observation_count(est::SeedWindowed)
     return observation_count(getfield(est, 1))
 end
 # The inner estimator holds the state of the fold, as for `observation_count` above.
-function effective_observation_count(est::SeedWindowed)
-    return effective_observation_count(getfield(est, 1))
+function effective_observation_count(est::SeedWindowed; kwargs...)
+    return effective_observation_count(getfield(est, 1); kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

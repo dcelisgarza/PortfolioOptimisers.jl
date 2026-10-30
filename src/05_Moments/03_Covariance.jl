@@ -802,16 +802,21 @@ function covariance_centre_and_estimator(ce::Covariance, X::MatNum; dims::Int = 
                                             end)
 end
 # `ce.w` replaces the weights of `ce.ce` when it is set, as `covariance_centre_and_estimator`
-# does, so only an unweighted `Covariance` reads the count of its inner estimator.
-function effective_observation_count(ce::Covariance, X::MatNum)
+# does, so only an unweighted `Covariance` reads the count of its inner estimator. The fit takes
+# `mean` and `active_mask` by name, and the weights read the other keywords.
+function effective_observation_count(ce::Covariance, X::MatNum; mean = nothing,
+                                     active_mask = nothing, kwargs...)
     return if isnothing(ce.w)
-        effective_observation_count(ce.ce, X)
+        effective_observation_count(ce.ce, X; kwargs...)
     else
-        observation_weight_count(get_observation_weights(ce.w, X; dims = 1), size(X, 1))
+        observation_weight_count(get_observation_weights(ce.w, X; dims = 1, kwargs...),
+                                 size(X, 1))
     end
 end
-function effective_observation_count(ce::GeneralCovariance, X::MatNum)
-    return observation_weight_count(get_observation_weights(ce.w, X; dims = 1), size(X, 1))
+function effective_observation_count(ce::GeneralCovariance, X::MatNum; mean = nothing,
+                                     kwargs...)
+    return observation_weight_count(get_observation_weights(ce.w, X; dims = 1, kwargs...),
+                                    size(X, 1))
 end
 """
     Statistics.cov(

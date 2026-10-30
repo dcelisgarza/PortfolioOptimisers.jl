@@ -1053,9 +1053,10 @@ function Statistics.cor(ce::ImpliedVolatility, X::MatNum, pnl::Option{<:AssetPan
     return expand_moment(rho, cmsk)
 end
 # The correlation of `ce.ce` over `X` is the only part that the observations weight, so the
-# count is the count of `ce.ce`.
-function effective_observation_count(ce::ImpliedVolatility, X::MatNum)
-    return effective_observation_count(ce.ce, X)
+# count is the count of `ce.ce`. The fit keeps `ivpa` and gives every other keyword to `ce.ce`.
+function effective_observation_count(ce::ImpliedVolatility, X::MatNum; ivpa = nothing,
+                                     kwargs...)
+    return effective_observation_count(ce.ce, X; kwargs...)
 end
 
 export ImpliedVolatility, ImpliedVolatilityPremium, ImpliedVolatilityRegression

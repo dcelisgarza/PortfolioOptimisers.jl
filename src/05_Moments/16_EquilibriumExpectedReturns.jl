@@ -228,8 +228,8 @@ function Statistics.mean(me::EquilibriumExpectedReturns, X::MatNum; dims::Int = 
 end
 # The mean is a linear map of the covariance of `me.ce`, so it is worth the count of that
 # covariance.
-function effective_observation_count(me::EquilibriumExpectedReturns, X::MatNum)
-    return effective_observation_count(me.ce, X)
+function effective_observation_count(me::EquilibriumExpectedReturns, X::MatNum; kwargs...)
+    return effective_observation_count(me.ce, X; kwargs...)
 end
 
 export EquilibriumExpectedReturns

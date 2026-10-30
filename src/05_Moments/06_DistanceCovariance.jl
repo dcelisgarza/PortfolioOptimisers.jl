@@ -607,7 +607,7 @@ function Statistics.cov(ce::DistanceCovariance, X::MatNum; dims::Int = 1, kwargs
     w = get_observation_weights(ce.w, X)
     return cov_distance(ce, X, w)
 end
-function effective_observation_count(ce::DistanceCovariance, X::MatNum)
+function effective_observation_count(ce::DistanceCovariance, X::MatNum; kwargs...)
     return observation_weight_count(get_observation_weights(ce.w, X), size(X, 1))
 end
 

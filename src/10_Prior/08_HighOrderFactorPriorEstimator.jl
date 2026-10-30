@@ -811,8 +811,8 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
     # The asset co-moments are lifted from the factor co-moments, so each is worth the count
     # of the estimator that fits its factor co-moment, and its denoiser reads that count
     # (#1893).
-    T_sk = high_order_observation_count(pe.ske, w, Fw)
-    T_kt = high_order_observation_count(pe.kte, w, Fw)
+    T_sk = high_order_observation_count(pe.ske, w, Fw; kwargs...)
+    T_kt = high_order_observation_count(pe.kte, w, Fw; kwargs...)
     eoc = map(c -> moment_count_entry(c, size(pr.X, 1)), (T_sk, T_kt))
     f_kt = cokurtosis(factory(pe.kte, w), Fw; kwargs...)
     if !isnothing(f_kt)

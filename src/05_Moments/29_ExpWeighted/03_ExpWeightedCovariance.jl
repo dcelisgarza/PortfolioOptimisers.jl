@@ -1241,11 +1241,11 @@ function exp_weighted_covariance_count(decay::Number, n::Integer,
     return exp_weighted_kish_count(decay, centring_terms(centring, n)) +
            centring_lag(centring)
 end
-function effective_observation_count(ce::ExpWeightedCovariance, X::MatNum)
+function effective_observation_count(ce::ExpWeightedCovariance, X::MatNum; kwargs...)
     return exp_weighted_covariance_count(ce.decay, size(X, 1), ce.centring)
 end
 function effective_observation_count(ce::ExpWeightedCovariance,
-                                     state::ExpWeightedCovarianceState)
+                                     state::ExpWeightedCovarianceState; kwargs...)
     return exp_weighted_covariance_count(ce.decay, observation_count(state), ce.centring)
 end
 

@@ -743,11 +743,14 @@ function coskewness(::Nothing, args...; kwargs...)
 end
 # A coskewness estimator with no weights of its own reads every row with the same weight. A
 # weighted `Coskewness` is worth the count of its weights, the count that its denoiser reads.
-function effective_observation_count(::CoskewnessEstimator, X::MatNum)
+# The fit takes `mean` and `active_mask` by name, and the weights read the other keywords.
+function effective_observation_count(::CoskewnessEstimator, X::MatNum; kwargs...)
     return size(X, 1)
 end
-function effective_observation_count(ske::Coskewness, X::MatNum)
-    return observation_weight_count(get_observation_weights(ske.w, X), size(X, 1))
+function effective_observation_count(ske::Coskewness, X::MatNum; mean = nothing,
+                                     active_mask = nothing, kwargs...)
+    return observation_weight_count(get_observation_weights(ske.w, X; dims = 1, kwargs...),
+                                    size(X, 1))
 end
 
 export Coskewness, coskewness

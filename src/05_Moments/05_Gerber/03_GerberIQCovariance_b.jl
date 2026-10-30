@@ -513,13 +513,14 @@ function Statistics.cov(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, kwargs
     sigma = gerber_IQ(ce, X, sd)
     return StatsBase.cor2cov!(sigma, sd)
 end
-function effective_observation_count(ce::GerberIQCovariance, X::MatNum)
-    return gerber_iq_observation_count(ce.oc, ce, X)
+function effective_observation_count(ce::GerberIQCovariance, X::MatNum; kwargs...)
+    return gerber_iq_observation_count(ce.oc, ce, X; kwargs...)
 end
 """
-    gerber_iq_observation_count(oc::Nothing, ce::GerberIQCovariance, X::MatNum) -> Integer
+    gerber_iq_observation_count(oc::Nothing, ce::GerberIQCovariance, X::MatNum;
+                                kwargs...) -> Integer
     gerber_iq_observation_count(oc::AbstractObservationCountAlgorithm,
-                                ce::GerberIQCovariance, X::MatNum) -> Real
+                                ce::GerberIQCovariance, X::MatNum; kwargs...) -> Real
 
 Return the effective number of observations of a [`GerberIQCovariance`](@ref) over `X`, under the rule `oc` of its field.
 
@@ -528,7 +529,7 @@ Return the effective number of observations of a [`GerberIQCovariance`](@ref) ov
 # Algorithm
 
  1. With `oc = nothing`, return `size(X, 1)`. The function then reads no data.
- 2. Otherwise, centre `X` with `ce.me` through [`demean_returns`](@ref), as the batch verbs do.
+ 2. Otherwise, centre `X` with `ce.me` and `kwargs` through [`demean_returns`](@ref), as the batch verbs do. A `mean` of the caller is then the centre of the count and of the fit.
  3. Resolve the decay against the centred returns with [`regenerate_decay`](@ref), as [`gerber_IQ`](@ref) does. A rule in the delay or the rate then reads the same matrix as in the fit.
  4. Return [`weight_observation_count`](@ref) of `oc` over the weights `decay(T, k)`, ``k = 1, \\ldots, T``.
 
@@ -537,6 +538,7 @@ Return the effective number of observations of a [`GerberIQCovariance`](@ref) ov
   - `oc`: The rule of the count, from `ce.oc`.
   - `ce`: Gerber IQ covariance estimator.
   - `X`: Returns matrix, `observations × assets`.
+  - `kwargs...`: The keywords of the fit, for [`demean_returns`](@ref).
 
 # Returns
 
@@ -549,12 +551,12 @@ Return the effective number of observations of a [`GerberIQCovariance`](@ref) ov
   - [`AbstractObservationCountAlgorithm`](@ref)
   - [`regenerate_decay`](@ref)
 """
-function gerber_iq_observation_count(::Nothing, ::GerberIQCovariance, X::MatNum)
+function gerber_iq_observation_count(::Nothing, ::GerberIQCovariance, X::MatNum; kwargs...)
     return size(X, 1)
 end
 function gerber_iq_observation_count(oc::AbstractObservationCountAlgorithm,
-                                     ce::GerberIQCovariance, X::MatNum)
-    X = demean_returns(X, ce.me; dims = 1)
+                                     ce::GerberIQCovariance, X::MatNum; kwargs...)
+    X = demean_returns(X, ce.me; dims = 1, kwargs...)
     T = size(X, 1)
     decay = regenerate_decay(ce.decay, X)
     return weight_observation_count(oc, decay.(T, 1:T))

@@ -126,8 +126,8 @@ function Statistics.mean(me::ExcessExpectedReturns, X::MatNum; dims::Int = 1, kw
     assert_dims(dims)
     return Statistics.mean(me.me, X; dims = dims, kwargs...) .- me.rf
 end
-function effective_observation_count(me::ExcessExpectedReturns, X::MatNum)
-    return effective_observation_count(me.me, X)
+function effective_observation_count(me::ExcessExpectedReturns, X::MatNum; kwargs...)
+    return effective_observation_count(me.me, X; kwargs...)
 end
 
 export ExcessExpectedReturns

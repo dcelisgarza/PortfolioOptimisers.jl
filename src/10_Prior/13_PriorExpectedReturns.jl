@@ -167,11 +167,11 @@ end
 # The mean is the `mu` of the prior, so it is worth the count that the prior states for its
 # mean. A pooling prior knows that count only after its fit, so these methods fit the prior.
 # An `EmpiricalPrior` reads the count from its own fit through `mean_with_count`.
-function effective_observation_count(me::PriorExpectedReturns, X::MatNum)
-    return moment_observation_count(prior(me.pe, X), 1)
+function effective_observation_count(me::PriorExpectedReturns, X::MatNum; kwargs...)
+    return moment_observation_count(prior(me.pe, X, nothing, nothing; kwargs...), 1)
 end
-function effective_observation_count(me::PriorExpectedReturns)
-    return moment_observation_count(prior(me.pe), 1)
+function effective_observation_count(me::PriorExpectedReturns; kwargs...)
+    return moment_observation_count(prior(me.pe; kwargs...), 1)
 end
 function mean_with_count(me::PriorExpectedReturns, X::MatNum, pnl::Option{<:AssetPanel};
                          dims::Int = 1, kwargs...)
