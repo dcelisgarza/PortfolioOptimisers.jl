@@ -812,6 +812,20 @@ end
         @test isapprox(bdvar(Xb * res.w), ub; rtol = 1e-4)
         @test bdvar(Xb * res.w) <= ub * (1 + 1e-8)
     end
+    # Under a ratio objective the bound row multiplies the bound by k, and the risk expression
+    # has degree two, so the bound acts on its square root. A bound on the expression itself
+    # had no effect at the tangency portfolio.
+    tan = bdv(bdvar; obj = MaximumRatio())
+    ub = (bdvar(Xb * ref.w) + bdvar(Xb * tan.w)) / 2
+    @test bdvar(Xb * tan.w) > ub * (1 + 1e-3)
+    for (a1, a2) in algs
+        res = bdv(BrownianDistanceVariance(; alg1 = a1, alg2 = a2,
+                                           settings = RiskMeasureSettings(; ub = ub));
+                  obj = MaximumRatio())
+        @test isa(res.retcode, OptimisationSuccess)
+        @test isapprox(bdvar(Xb * res.w), ub; rtol = 1e-4)
+        @test haskey(res.model, :bdvariance_dev)
+    end
     res = bdv(BrownianDistanceVariance(; alg1 = RSOCRiskExpr()))
     @test haskey(res.model, :tsum_Dt) && haskey(res.model, :rsoc_sum_Dt)
     @test isapprox(JuMP.value(res.model[:tsum_Dt]),

@@ -194,7 +194,7 @@ Records which solvers failed, at which stage, and whether one of them succeeded.
 
 The constructor warns when `success` is `false`. [`failed_solve_msg`](@ref) writes the warning, with one line for each failed stage of each solver. A line holds the name of the solver, the stage and the first line of the error. The warning holds no settings and no full exception, and `trials` keeps them.
 
-`trials` records failures only. A solver that succeeds adds no entry, so an empty `trials` with `success = true` means that the first solver succeeded. The key of an entry is the `name` of the solver. The value is a dictionary from the failed stage, `:set_optimizer`, `:optimize!` or `:assert_is_solved_and_feasible`, to its exception. An entry of the last stage also holds the `settings` of the solver under `:settings`.
+`trials` records failures only. A solver that succeeds adds no entry, so an empty `trials` with `success = true` means that the first solver succeeded. The key of an entry is the `name` of the solver. The value is a dictionary from the failed stage, `:set_optimizer`, `:optimize!` or `:assert_is_solved_and_feasible`, to its exception. An entry of the last stage also holds the termination status of the solver under `:termination_status`, so the warning can state that the problem is infeasible or unbounded, and the `settings` of the solver under `:settings`.
 
 Two solvers that share a name share one entry. Every solver has the default name `\"\"`, so a vector of unnamed solvers keeps only its last failure.
 
@@ -343,7 +343,7 @@ Give each solver of a vector its own `name`. The name is the key of `trials`, an
      1. Attach the solver to `model` with `JuMP.set_optimizer`. When that raises, record the error under `:set_optimizer` in `trials[solver.name]`, and go to the next solver.
      2. Set the attributes of the solver from its `settings` with [`set_solver_attributes`](@ref).
      3. Solve with `JuMP.optimize!`. When that raises, record the error under `:optimize!`, and go to the next solver.
-     4. Check the solution with `JuMP.assert_is_solved_and_feasible` under the `check_sol` keywords of the solver. When the check passes, set `success` to `true` and stop the loop. Otherwise record the error under `:assert_is_solved_and_feasible` and the `settings` of the solver under `:settings`.
+     4. Check the solution with `JuMP.assert_is_solved_and_feasible` under the `check_sol` keywords of the solver. When the check passes, set `success` to `true` and stop the loop. Otherwise record the error under `:assert_is_solved_and_feasible`, the termination status of the solver under `:termination_status`, and the `settings` of the solver under `:settings`.
  2. Build the [`JuMPResult`](@ref) from `trials` and `success`. Its constructor warns when `success` is `false`.
 
 # Arguments
@@ -387,6 +387,8 @@ function optimise_JuMP_model!(model::JuMP.Model, slv::Slv_VecSlv)
             break
         catch err
             trials[solver.name] = Dict(:assert_is_solved_and_feasible => err,
+                                       :termination_status =>
+                                           JuMP.termination_status(model),
                                        :settings => solver.settings)
         end
     end

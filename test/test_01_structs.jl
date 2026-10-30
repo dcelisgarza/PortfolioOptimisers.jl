@@ -509,6 +509,51 @@ end
         @test occursin("…", long)
         @test length(long) < 500
     end
+    @testset "A failed solve states its termination status in words" begin
+        pe = PortfolioOptimisers
+        MOI = pe.JuMP.MOI
+        @test pe.solve_status_msg(MOI.INFEASIBLE) ==
+              "INFEASIBLE: no solution satisfies every constraint. Review the constraints and the input data."
+        @test startswith(pe.solve_status_msg(MOI.LOCALLY_INFEASIBLE),
+                         "LOCALLY_INFEASIBLE: no solution satisfies every constraint.")
+        @test startswith(pe.solve_status_msg(MOI.DUAL_INFEASIBLE),
+                         "DUAL_INFEASIBLE: the problem is unbounded if it is feasible")
+        @test startswith(pe.solve_status_msg(MOI.INFEASIBLE_OR_UNBOUNDED),
+                         "INFEASIBLE_OR_UNBOUNDED: the problem is infeasible or unbounded")
+        for st in (MOI.ALMOST_INFEASIBLE, MOI.ALMOST_DUAL_INFEASIBLE)
+            @test occursin("at reduced numerical accuracy", pe.solve_status_msg(st))
+        end
+        # Every other status is stated by its name alone.
+        @test pe.solve_status_msg(MOI.ITERATION_LIMIT) == "ITERATION_LIMIT"
+        # The first line of the error of `assert_is_solved_and_feasible` holds no status, so the
+        # status has a line of its own, and the many lines of a solution summary are left out.
+        slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                     settings = Dict("verbose" => false))
+        model = pe.JuMP.Model()
+        x = pe.JuMP.add_variable(model,
+                                 pe.JuMP.ScalarVariable(pe.JuMP.VariableInfo(true, 1.0,
+                                                                             true, 0.0,
+                                                                             false, NaN,
+                                                                             false, NaN,
+                                                                             false, false)))
+        pe.JuMP.set_objective(model, MOI.MIN_SENSE, x)
+        res = @test_logs (:warn, r"clarabel: termination_status → INFEASIBLE: no solution") match_mode = :any pe.optimise_JuMP_model!(model,
+                                                                                                                                      slv)
+        @test !res.success
+        @test res.trials[:clarabel][:termination_status] == MOI.INFEASIBLE
+        @test !occursin("solver_name",
+                        pe.failed_solve_msg(Dict(:s => Dict(:err =>
+                                                                pe.JuMP.solution_summary(model)))))
+        # The optimisation path writes the same warning. A floor of 0.5 on each of the three
+        # weights cannot meet a budget of one.
+        X = [0.01 0.02 -0.01; -0.02 0.01 0.03; 0.03 -0.01 0.02; 0.0 0.02 0.01]
+        pr = prior(EmpiricalPrior(), ReturnsResult(; nx = ["A", "B", "C"], X = X))
+        opt = JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = 0.5, ub = 1.0))
+        r = @test_logs (:warn, r"clarabel: termination_status → INFEASIBLE: no solution") match_mode = :any optimise(MeanRisk(;
+                                                                                                                              opt = opt))
+        @test isa(r.retcode, OptimisationFailure)
+        @test r.retcode.res[:clarabel][:termination_status] == MOI.INFEASIBLE
+    end
     @testset "OWA" begin
         @test_throws DomainError NormalisedConstantRelativeRiskAversion(; g = 0)
         @test_throws DomainError NormalisedConstantRelativeRiskAversion(; g = 1)

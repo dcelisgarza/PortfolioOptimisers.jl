@@ -150,5 +150,5 @@ plot_stacked_bar_composition(results, rd; xticks = (1:length(labels), labels))
 #src     rates need FeesEstimator, the estimator — easy to trip over, the error is a TypeError on
 #src     the `l` kwarg. Documented in §4.)
 #src   - Proportional l/s convex (Clarabel ok). FIXED fees fl/fs are MIP: Fees(fl=0.001) on
-#src     Clarabel "Failed to solve", returns NaN weights. Documented §5 with Pajarito/HiGHS pointer.
+#src     Clarabel "could not be solved satisfactorily", returns NaN weights. Documented §5 with Pajarito/HiGHS pointer.
 #src - Fees.tn ties holding cost to turnover (04) — noted, not re-demoed.

@@ -711,7 +711,8 @@ A measure whose settings hold no bound and set `rke` to `false` changes nothing,
  1. When `settings.ub` is `nothing` and `settings.rke` is `false`, return.
  2. When the presence flag `<name>_settings` is registered under `prefix`, log a warning that names the type of `r` and its settings, and return.
  3. Register the presence flag with [`mark_state!`](@ref).
- 4. Bound `r_expr` and add it to `risk_vec` with [`set_risk_bounds_and_expression!`](@ref), from `r.settings`.
+ 4. Bound `r_expr_ub` by `ub` with [`set_risk_upper_bound!`](@ref), under the key of `name`.
+ 5. Add `r_expr` times `settings.scale` to `risk_vec` with [`set_risk_expression!`](@ref).
 
 # JuMP formulation
 
@@ -730,6 +731,8 @@ A measure whose settings hold no bound and set `rke` to `false` changes nothing,
 # Keyword arguments
 
   - `prefix::Symbol`: Model State namespace for `name` (default: empty, i.e. the bare key).
+  - `r_expr_ub::JuMP.AbstractJuMPScalar`: The expression that the bound row acts on (default: `r_expr`). A builder whose risk has degree two passes its square root, of degree one, as [`set_variance_risk_bounds_and_expression!`](@ref) states.
+  - `ub`: The bound, in the units of `r_expr_ub` (default: `r.settings.ub`).
 
 # Returns
 
@@ -738,6 +741,8 @@ A measure whose settings hold no bound and set `rke` to `false` changes nothing,
 # Related
 
   - [`set_risk_bounds_and_expression!`](@ref)
+  - [`set_risk_upper_bound!`](@ref)
+  - [`set_risk_expression!`](@ref)
   - [`mark_state!`](@ref)
   - [`state_has`](@ref)
 """
@@ -745,7 +750,9 @@ function set_unindexed_risk_bounds_and_expression!(model::JuMP.Model,
                                                    opt::RiskConstraintOwner,
                                                    r_expr::JuMP.AbstractJuMPScalar,
                                                    r::RiskMeasure, name::Symbol;
-                                                   prefix::Symbol = Symbol(""))
+                                                   prefix::Symbol = Symbol(""),
+                                                   r_expr_ub::JuMP.AbstractJuMPScalar = r_expr,
+                                                   ub::Option{<:RkRtBounds} = r.settings.ub)
     settings = r.settings
     if isnothing(settings.ub) && !settings.rke
         return nothing
@@ -759,7 +766,8 @@ function set_unindexed_risk_bounds_and_expression!(model::JuMP.Model,
         return nothing
     end
     mark_state!(model, prefix, flag_name)
-    set_risk_bounds_and_expression!(model, opt, r_expr, settings, name; prefix = prefix)
+    set_risk_upper_bound!(model, opt, r_expr_ub, ub, state_key(prefix, name))
+    set_risk_expression!(model, r_expr, settings.scale, settings.rke)
     return nothing
 end
 """

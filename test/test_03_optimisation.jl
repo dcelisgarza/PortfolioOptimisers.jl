@@ -57,8 +57,10 @@ end
                                                               settings = Dict("verbose" =>
                                                                                   false)))
         @test !res.success
-        @test Set(keys(res.trials[:c])) == Set([:assert_is_solved_and_feasible, :settings])
+        @test Set(keys(res.trials[:c])) ==
+              Set([:assert_is_solved_and_feasible, :termination_status, :settings])
         @test res.trials[:c][:settings] == Dict("verbose" => false)
+        @test res.trials[:c][:termination_status] == JuMP.MOI.INFEASIBLE
         # Two unnamed solvers share one entry, and two named solvers keep two.
         nosolver = () -> error("no solver")
         res = PortfolioOptimisers.optimise_JuMP_model!(qpmodel(0.0),
@@ -97,8 +99,9 @@ end
         mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
         logger = SimpleLogger()
         with_logger(logger) do
-            @test_logs (:warn, r"Failed to solve") PortfolioOptimisers.optimise_JuMP_model!(testmodel(0.9),
-                                                                                            mr)
+            @test_logs (:warn,
+                        r"could not be solved satisfactorily(.|\n)*c1: termination_status → INFEASIBLE") PortfolioOptimisers.optimise_JuMP_model!(testmodel(0.9),
+                                                                                                                                                  mr)
         end
         retcode, sol = PortfolioOptimisers.optimise_JuMP_model!(testmodel(0.9), mr)
         @test isa(retcode, OptimisationFailure)
@@ -110,6 +113,7 @@ end
             @test haskey(trial, :assert_is_solved_and_feasible)
             @test haskey(trial, :err)
             @test haskey(trial, :settings)
+            @test trial[:termination_status] == JuMP.MOI.INFEASIBLE
         end
     end
     @testset "chain advances past a failing solver to a successful one" begin
@@ -1504,8 +1508,8 @@ struct HookObjective03d <: PortfolioOptimisers.CustomJuMPObjective end
         @test :w in propertynames(res) && :pa in propertynames(res)
         # Every solver fails, so the weights are `NaN`.
         all_bad = MeanRisk(; r = Variance(), opt = JuMPOptimiser(; slv = bad))
-        failed = @test_logs (:warn, r"Failed to solve") match_mode = :any optimise(all_bad,
-                                                                                   rd)
+        failed = @test_logs (:warn, r"bad: set_optimizer → no solver") match_mode = :any optimise(all_bad,
+                                                                                                  rd)
         @test failed.retcode isa OptimisationFailure
         @test length(failed.w) == 5 && all(isnan, failed.w)
     end

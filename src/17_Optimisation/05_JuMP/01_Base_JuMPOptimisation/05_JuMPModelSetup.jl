@@ -119,8 +119,8 @@ A solution is acceptable when JuMP reports it solved and feasible under the `che
      2. Set the attributes of the solver from its `settings`.
      3. Solve. When that raises, record the error and go to the next solver.
      4. Check the solution with `JuMP.assert_is_solved_and_feasible`, and read the weights. When every weight is finite and one weight is not zero, stop the loop.
-     5. Otherwise record the settings, the error of the check if there is one, and the solution summary under the name of the solver.
- 2. When a solver stopped the loop, the return code is an [`OptimisationSuccess`](@ref). Otherwise it is an [`OptimisationFailure`](@ref), and a warning points to its `res`.
+     5. Otherwise record the settings, the error of the check if there is one, the termination status and the solution summary under the name of the solver.
+ 2. When a solver stopped the loop, the return code is an [`OptimisationSuccess`](@ref). Otherwise it is an [`OptimisationFailure`](@ref). A warning from [`failed_solve_msg`](@ref) gives one line for each failed stage of each solver, and states in words a status that makes the problem infeasible or unbounded. It points to `res` for the full data.
  3. Read the weights with [`process_model`](@ref).
 
 # Returns
@@ -166,13 +166,15 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
         catch err
             trial[:assert_is_solved_and_feasible] = err
         end
+        trial[:termination_status] = JuMP.termination_status(model)
         trial[:err] = JuMP.solution_summary(model)
         trials[solver.name] = trial
     end
     retcode = if success
         OptimisationSuccess(; res = trials)
     else
-        @warn("Failed to solve optimisation problem.\nCheck `result.retcode.res` on the returned result for per-solver diagnostics.",
+        @warn(failed_solve_msg(trials) *
+              "\nCheck `result.retcode.res` on the returned result for per-solver diagnostics.",
               maxlog = log_limit(:warn), _id = @log_id(Set(keys(trials))))
         OptimisationFailure(; res = trials)
     end

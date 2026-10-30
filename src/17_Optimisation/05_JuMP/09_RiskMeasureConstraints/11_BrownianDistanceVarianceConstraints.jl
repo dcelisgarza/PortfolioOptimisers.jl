@@ -188,13 +188,15 @@ The build is keyed on `prefix` alone, with no measure index. A second call with 
  3. Create `Dt`, and register `Dx`, the matrix of the pairwise differences of `net_X`.
  4. Register the risk expression of `r.alg1` with [`set_brownian_distance_risk_constraint!`](@ref).
  5. Add the rows of `r.alg2` with [`set_brownian_distance_variance_constraints!`](@ref).
- 6. Add the bound in `r.settings` and the risk expression with [`set_unindexed_risk_bounds_and_expression!`](@ref), and return the risk expression.
+ 6. Convert the bound in `r.settings` to the units of a deviation with [`variance_risk_bounds_val`](@ref), and take the expression that it acts on from [`set_brownian_distance_bounds_expr!`](@ref). The risk expression has degree two in the weights, and the row of [`set_risk_upper_bound!`](@ref) multiplies the bound by ``k``, so under a ratio objective the bound holds only on an expression of degree one.
+ 7. Add the bound on the deviation and the risk expression with [`set_unindexed_risk_bounds_and_expression!`](@ref), and return the risk expression.
 
 # JuMP formulation
 
 ## Variables
 
   - `Dt`: created, the symmetric ``T \\times T`` matrix ``\\mathbf{D}``.
+  - `bdvariance_dev`: created by [`set_brownian_distance_bounds_expr!`](@ref) when `r.settings` holds a bound, the square root of the risk expression.
 
 ## Expressions
 
@@ -259,7 +261,99 @@ function set_risk_constraints!(model::JuMP.Model, ::Any, r::BrownianDistanceVari
         set_brownian_distance_variance_constraints!(model, r.alg2, Dt, Dx; prefix = prefix)
         return bdvariance_risk
     end
+    ub = variance_risk_bounds_val(SquareRootBound(), r.settings.ub)
+    r_expr_ub = set_brownian_distance_bounds_expr!(model, ub, bdvariance_risk;
+                                                   prefix = prefix)
     set_unindexed_risk_bounds_and_expression!(model, opt, bdvariance_risk, r,
-                                              :bdvariance_risk; prefix = prefix)
+                                              :bdvariance_risk; prefix = prefix,
+                                              r_expr_ub = r_expr_ub, ub = ub)
     return bdvariance_risk
+end
+"""
+    set_brownian_distance_bounds_expr!(model::JuMP.Model, ::Nothing, bdvariance_risk; prefix::Symbol = Symbol("")) -> bdvariance_risk
+    set_brownian_distance_bounds_expr!(model::JuMP.Model, ::RkRtBounds, bdvariance_risk; prefix::Symbol = Symbol("")) -> bdvariance_dev
+
+Return the expression that the bound of a [`BrownianDistanceVariance`](@ref) acts on, and build it when the measure has a bound.
+
+Without a bound, the method returns the risk expression and builds nothing. With a bound, it adds the square root of the risk expression to `model` and returns it. Both formulations of the risk expression state the same quantity, a sum of squares of the distances and of their sum. Its square root is the norm of one vector, so a second-order cone bounds it. The deviation has degree one in the weights and ``k``, and the bound of the measure acts on it. The bound must be in the units of a deviation, as [`variance_risk_bounds_val`](@ref) gives it.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{BDVar}(\\mathbf{D}) &= \\frac{1}{T^2} \\sum_{i, j} D_{ij}^2 + \\frac{1}{T^4} \\left(\\sum_{i, j} D_{ij}\\right)^2 = \\left\\lVert \\begin{bmatrix} \\frac{1}{T} \\operatorname{vec}(\\mathbf{D}) \\\\ \\frac{1}{T^2} \\sum_{i, j} D_{ij} \\end{bmatrix} \\right\\rVert_2^2\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{BDVar}(\\mathbf{D})``: The risk expression at the distance matrix ``\\mathbf{D}``.
+  - ``\\mathbf{D}``: Symmetric matrix variable of the distances between the portfolio returns.
+  - $(math_dict[:T])
+
+# JuMP formulation
+
+## Variables
+
+  - `bdvariance_dev`: ``\\sigma_{\\mathrm{BD}}``, the deviation.
+
+## Constraints
+
+  - `cbdvariance_dev_soc`: ``\\left(s_c \\sigma_{\\mathrm{BD}}, \\frac{s_c}{T} \\operatorname{vec}(\\mathbf{D}), \\frac{s_c}{T^2} \\sum_{i, j} D_{ij}\\right) \\in \\mathcal{K}_{2}``, which is ``\\sigma_{\\mathrm{BD}} \\geq \\sqrt{\\mathrm{BDVar}(\\mathbf{D})}``.
+
+Each name carries the namespace `prefix`.
+
+Where:
+
+  - ``\\sigma_{\\mathrm{BD}}``: The deviation variable.
+  - $(math_dict[:K_q_norm])
+  - $(math_dict[:sc_scale])
+
+## Relaxation
+
+$(val_dict[:relax])
+
+  - `bdvariance_dev` lies at or above ``\\sqrt{\\mathrm{BDVar}(\\mathbf{D})}``. A bound on it is exact, because the weights satisfy it when the square root of their risk expression is at most the bound.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `ub`: The bound in the units of a deviation, or `nothing`. The method reads only its type.
+  - `bdvariance_risk`: The risk expression.
+
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace of the build (default: empty, i.e. the bare key).
+
+# Returns
+
+  - `bdvariance_risk` without a bound.
+  - `bdvariance_dev` with a bound: the deviation variable. A second call with the same `prefix` returns the registered variable.
+
+# Related
+
+  - [`set_risk_constraints!`](@ref)
+  - [`set_brownian_distance_risk_constraint!`](@ref)
+  - [`variance_risk_bounds_val`](@ref)
+  - [`variance_risk_bounds_expr`](@ref)
+"""
+function set_brownian_distance_bounds_expr!(::JuMP.Model, ::Nothing,
+                                            bdvariance_risk::JuMP.AbstractJuMPScalar;
+                                            prefix::Symbol = Symbol(""))
+    return bdvariance_risk
+end
+function set_brownian_distance_bounds_expr!(model::JuMP.Model, ::RkRtBounds,
+                                            ::JuMP.AbstractJuMPScalar;
+                                            prefix::Symbol = Symbol(""))
+    return state_build!(model, prefix, :bdvariance_dev) do
+        sc = get_constraint_scale(model)
+        Dt = state_get(model, prefix, :Dt)
+        iT = inv(size(Dt, 1))
+        dev = JuMP.@variable(model)
+        state_set!(model, prefix, :cbdvariance_dev_soc,
+                   JuMP.@constraint(model,
+                                    [sc * dev; sc * iT * vec(Dt); sc * iT^2 * sum(Dt)] in
+                                    JuMP.SecondOrderCone()))
+        return dev
+    end
 end
