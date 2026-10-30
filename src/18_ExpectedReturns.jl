@@ -680,7 +680,8 @@ risk_input_kind(::ExpectedReturn) = WeightsReturnsFeesInput()
 function (r::ExpectedReturn)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
     return resolved_expected_return(r.rt, w, w, X, fees)
 end
-function difference_risk(r::ExpectedReturn, wd::VecNum, w::VecNum, X::MatNum, fees::Fees)
+function difference_risk(r::ExpectedReturn, wd::VecNum, w::VecNum, X::MatNum, fees::Fees;
+                         kwargs...)
     return resolved_expected_return(r.rt, wd, w, X, fees)
 end
 """
@@ -955,6 +956,22 @@ function linearised_risk(q::Tuple, r::ExpectedReturnRiskRatio, w::VecNum, X::Mat
                          fees::Option{<:Fees}; kwargs...)
     return (resolved_expected_return(r.rt, w, w, X, fees) - r.rf) /
            linearised_risk(q[1], r.rk, w, X, fees; kwargs..., sca = r.sca)
+end
+# The active weights of an independent tracking measure read the expected return of `wd` minus
+# the fee of `w`, as `difference_risk` of `ExpectedReturn` does.
+function difference_risk(r::ExpectedReturnRiskRatio, wd::VecNum, w::VecNum, X::MatNum,
+                         fees::Fees; kwargs...)
+    return (resolved_expected_return(r.rt, wd, w, X, fees) - r.rf) /
+           difference_risk(r.rk, wd, w, X, fees; kwargs..., sca = r.sca)
+end
+function difference_worst_case(r::ExpectedReturnRiskRatio, wd::VecNum, w::VecNum, X::MatNum,
+                               fees::Fees)
+    return (difference_worst_case(r.rk, wd, w, X, fees),)
+end
+function difference_linearised_risk(q::Tuple, r::ExpectedReturnRiskRatio, wd::VecNum,
+                                    w::VecNum, X::MatNum, fees::Fees; kwargs...)
+    return (resolved_expected_return(r.rt, wd, w, X, fees) - r.rf) /
+           difference_linearised_risk(q[1], r.rk, wd, w, X, fees; kwargs..., sca = r.sca)
 end
 function needs_previous_weights(r::ExpectedReturnRiskRatio)
     return needs_previous_weights(r.rk)

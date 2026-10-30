@@ -828,13 +828,23 @@ rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
 
 [[coverage_exemption]]
 path = "src/18_ExpectedReturns.jl"
-definition = "difference_risk"
+definition = "worst_case_distribution"
 misses = 1
+rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
+
+# The one-line `difference_worst_case` methods of #1918, measured over `test_09` and `test_09t`:
+# `test_09t` reaches the body of each one through `risk_gradient` of a tracked ratio under fees,
+# and the `PATCH` report names the `function` line of each one alone. The `difference_risk` row of
+# #1917 went with #1918: its method takes `kwargs...` now, and its `function` line reads a hit.
+[[coverage_exemption]]
+path = "src/16_RiskMeasures/26_WorstCaseDistribution.jl"
+definition = "difference_worst_case"
+misses = 3
 rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
 
 [[coverage_exemption]]
 path = "src/18_ExpectedReturns.jl"
-definition = "worst_case_distribution"
+definition = "difference_worst_case"
 misses = 1
 rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
 

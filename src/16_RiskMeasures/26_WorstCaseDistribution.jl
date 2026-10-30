@@ -495,7 +495,7 @@ Compute the Worst-Case Distribution of `r` on the active weights `wd`, on the se
 
 [`RiskTrackingRiskMeasure`](@ref) with [`IndependentVariableTracking`](@ref) measures the risk of the active weights, and charges the fees on the portfolio weights `w`. Without fees, the series is the net return series of `wd`, so the function reads the distribution on the weights. With fees, it reads the distribution of a measure of the kind [`NetReturnsInput`](@ref) on the series that [`difference_risk`](@ref) builds, and it returns `nothing` for every other kind.
 
-With fees, [`difference_risk`](@ref) decomposes a [`RiskRatio`](@ref) and a nested [`RiskTrackingRiskMeasure`](@ref) into the measures that they wrap. So the function returns a tuple of the distributions of those measures, as [`worst_case_distribution`](@ref) does without fees. The tuple of the dependent tracking measure also holds the risk of its benchmark.
+With fees, [`difference_risk`](@ref) decomposes each ratio and a nested [`RiskTrackingRiskMeasure`](@ref) into the measures that they wrap. So the function returns a tuple of the distributions of those measures, as [`worst_case_distribution`](@ref) does without fees. The tuple of the dependent tracking measure also holds the risk of its benchmark. The return side of [`MeanReturnRiskRatio`](@ref) and of [`ExpectedReturnRiskRatio`](@ref) is linear, so their tuple holds the distribution of the risk side alone. A vector side gives a vector of the distributions of its measures.
 
 # Mathematical definition
 
@@ -564,7 +564,7 @@ end
 
 Evaluate the risk of `r` on the active weights `wd`, or its expected loss under the fixed Worst-Case Distribution `q`, for a finite difference.
 
-This is [`linearised_risk`](@ref) on the series that [`difference_risk`](@ref) reads. Without a distribution, the function returns [`difference_risk`](@ref) itself. With one, it returns [`worst_case_risk`](@ref) of `r` on the series of the active weights that [`difference_worst_case`](@ref) states. With fees, a ratio and a nested tracking measure apply their formulas to the linearised values of the measures that they wrap, as [`difference_risk`](@ref) does to their values.
+This is [`linearised_risk`](@ref) on the series that [`difference_risk`](@ref) reads. Without a distribution, the function returns [`difference_risk`](@ref) itself. With one, it returns [`worst_case_risk`](@ref) of `r` on the series of the active weights that [`difference_worst_case`](@ref) states. With fees, a ratio and a nested tracking measure apply their formulas to the linearised values of the measures that they wrap, as [`difference_risk`](@ref) does to their values. A vector side scalarises the linearised values of its measures with the scalariser of the ratio.
 
 # Arguments
 
@@ -586,28 +586,55 @@ This is [`linearised_risk`](@ref) on the series that [`difference_risk`](@ref) r
   - [`linearised_risk`](@ref)
 """
 function difference_linearised_risk(q, r::AbstractBaseRiskMeasure, wd::VecNum, ::VecNum,
-                                    X::MatNum, ::Nothing)
-    return linearised_risk(q, r, wd, X, nothing)
+                                    X::MatNum, ::Nothing; kwargs...)
+    return linearised_risk(q, r, wd, X, nothing; kwargs...)
 end
 function difference_linearised_risk(::Nothing, r::AbstractBaseRiskMeasure, wd::VecNum,
-                                    w::VecNum, X::MatNum, fees::Fees)
-    return difference_risk(r, wd, w, X, fees)
+                                    w::VecNum, X::MatNum, fees::Fees; kwargs...)
+    return difference_risk(r, wd, w, X, fees; kwargs...)
 end
 function difference_linearised_risk(q, r::AbstractBaseRiskMeasure, wd::VecNum, w::VecNum,
-                                    X::MatNum, fees::Fees)
+                                    X::MatNum, fees::Fees; kwargs...)
     return worst_case_risk(r, charge_fees(X * wd, w, fees), q)
 end
 # With fees, a composite that `difference_risk` decomposes carries the distributions of the
-# measures that it wraps, as `worst_case_distribution` does without fees. A ratio declares no
-# input kind, so the generic method cannot read one for it.
-function difference_worst_case(r::RiskRatio, wd::VecNum, w::VecNum, X::MatNum, fees::Fees)
+# measures that it wraps, as `worst_case_distribution` does without fees. A composite declares
+# no input kind, so the generic method cannot read one for it. A vector side carries one
+# distribution per measure and scalarises their linearised values, as `linearised_risk` does.
+function difference_worst_case(rs::VecBaseRM, wd::VecNum, w::VecNum, X::MatNum, fees::Fees)
+    return map(r -> difference_worst_case(r, wd, w, X, fees), rs)
+end
+function difference_linearised_risk(qs::AbstractVector, rs::VecBaseRM, wd::VecNum,
+                                    w::VecNum, X::MatNum, fees::Fees;
+                                    sca::Scalariser = SumScalariser())
+    return scalarise(sca, zip(qs, rs)) do (q, r)
+        return difference_linearised_risk(q, r, wd, w, X, fees) * r.settings.scale
+    end
+end
+function difference_worst_case(r::RkRatioRM, wd::VecNum, w::VecNum, X::MatNum, fees::Fees)
     return (difference_worst_case(r.r1, wd, w, X, fees),
             difference_worst_case(r.r2, wd, w, X, fees))
 end
 function difference_linearised_risk(q::Tuple, r::RiskRatio, wd::VecNum, w::VecNum,
-                                    X::MatNum, fees::Fees)
+                                    X::MatNum, fees::Fees; kwargs...)
     return difference_linearised_risk(q[1], r.r1, wd, w, X, fees) /
            difference_linearised_risk(q[2], r.r2, wd, w, X, fees)
+end
+function difference_linearised_risk(q::Tuple, r::NonOptimisationRiskRatio, wd::VecNum,
+                                    w::VecNum, X::MatNum, fees::Fees; kwargs...)
+    return difference_linearised_risk(q[1], r.r1, wd, w, X, fees; kwargs..., sca = r.sca1) /
+           difference_linearised_risk(q[2], r.r2, wd, w, X, fees; kwargs..., sca = r.sca2)
+end
+# The return of `MeanReturnRiskRatio` is linear in the series, so its value needs no
+# distribution, as in `linearised_risk`.
+function difference_worst_case(r::MeanReturnRiskRatio, wd::VecNum, w::VecNum, X::MatNum,
+                               fees::Fees)
+    return (difference_worst_case(r.rk, wd, w, X, fees),)
+end
+function difference_linearised_risk(q::Tuple, r::MeanReturnRiskRatio, wd::VecNum, w::VecNum,
+                                    X::MatNum, fees::Fees; kwargs...)
+    return (difference_risk(r.rt, wd, w, X, fees) - r.rf) /
+           difference_linearised_risk(q[1], r.rk, wd, w, X, fees; kwargs..., sca = r.sca)
 end
 function difference_worst_case(r::RiskTrackingRiskMeasure{<:Any, <:Any, <:Any,
                                                           <:IndependentVariableTracking},
@@ -617,7 +644,7 @@ end
 function difference_linearised_risk(q::Tuple,
                                     r::RiskTrackingRiskMeasure{<:Any, <:Any, <:Any,
                                                                <:IndependentVariableTracking},
-                                    wd::VecNum, w::VecNum, X::MatNum, fees::Fees)
+                                    wd::VecNum, w::VecNum, X::MatNum, fees::Fees; kwargs...)
     return difference_linearised_risk(q[1], r.r, wd - r.tr.w, w, X, fees)
 end
 function difference_worst_case(r::RiskTrackingRiskMeasure{<:Any, <:Any, <:Any,
@@ -628,6 +655,6 @@ end
 function difference_linearised_risk(q::Tuple,
                                     r::RiskTrackingRiskMeasure{<:Any, <:Any, <:Any,
                                                                <:DependentVariableTracking},
-                                    wd::VecNum, w::VecNum, X::MatNum, fees::Fees)
+                                    wd::VecNum, w::VecNum, X::MatNum, fees::Fees; kwargs...)
     return abs(difference_linearised_risk(q[1], r.r, wd, w, X, fees) - q[2])
 end

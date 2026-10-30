@@ -1645,6 +1645,23 @@ end
         cvar10 = ConditionalValueatRisk(; alpha = 0.1)
         @test isapprox(track(RiskRatio(; r1 = cvar, r2 = cvar10))(w, X, fees),
                        cvar(x) / cvar10(x); rtol = 1e-12)
+        # Every other ratio decomposes the same way, and a vector side scalarises its scaled
+        # measures. The three raised the `ArgumentError` of `risk_input_kind` (#1918).
+        rf = 1e-4
+        @test isapprox(track(MeanReturnRiskRatio(; rk = cvar, rf = rf))(w, X, fees),
+                       (mean(x) - rf) / cvar(x); rtol = 1e-12)
+        mdd = MaximumDrawdown(; settings = RiskMeasureSettings(; scale = 2.0))
+        @test isapprox(track(MeanReturnRiskRatio(; rk = [cvar, mdd], sca = MaxScalariser()))(w,
+                                                                                             X,
+                                                                                             fees),
+                       mean(x) / max(cvar(x), 2 * mdd(x)); rtol = 1e-12)
+        @test isapprox(track(NonOptimisationRiskRatio(; r1 = [MeanReturn(), cvar10],
+                                                      sca1 = MaxScalariser(),
+                                                      r2 = [cvar, mdd]))(w, X, fees),
+                       max(mean(x), cvar10(x)) / (cvar(x) + 2 * mdd(x)); rtol = 1e-12)
+        errr = factory(ExpectedReturnRiskRatio(; rk = cvar, rf = rf), pr)
+        @test isapprox(track(errr)(w, X, fees),
+                       (dot(wd, pr.mu) - 0.002 * sum(w) - rf) / cvar(x); rtol = 1e-12)
         vsk = factory(VarianceSkewKurtosis(), prior(HighOrderPriorEstimator(), X))
         @test track(vsk)(w, X, fees) == vsk(wd, X)
         # Any other measure that reads weights and returns reads the series, or refuses.

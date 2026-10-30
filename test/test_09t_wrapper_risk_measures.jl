@@ -591,6 +591,53 @@ end
                        _msg607(() -> expected_risk(ExpectedReturnRiskRatio(), wp, prh)))
     end
 
+    @testset "An independent tracking measure with fees decomposes every ratio" begin
+        # With fees, the tracking measure with independent variables raised the
+        # `ArgumentError` of `risk_input_kind` for `MeanReturnRiskRatio`,
+        # `NonOptimisationRiskRatio` and `ExpectedReturnRiskRatio`, in `expected_risk`,
+        # `risk_contribution` and `risk_gradient` (#1918). Each ratio now decomposes onto the
+        # measures that it wraps, and a vector side scalarises them. `g` is an independent
+        # central difference of `expected_risk`. The EVaR side is a solve, so the tolerances of
+        # its solver are tight enough that the difference converges at the step `h`.
+        prh = prior(HighOrderPriorEstimator(), _X607)
+        w = _w607
+        T = size(_X607, 1)
+        h = 1e-4
+        e(i) = (1:5) .== i
+        cdiff(r, fe) = [(expected_risk(r, w .+ h .* e(i), prh, fe) -
+                         expected_risk(r, w .- h .* e(i), prh, fe)) / (2 * h) for i in 1:5]
+        slv = Solver(; solver = Clarabel.Optimizer,
+                     check_sol = (; allow_local = true, allow_almost = true),
+                     settings = Dict("verbose" => false, "tol_gap_abs" => 1e-12,
+                                     "tol_gap_rel" => 1e-12, "tol_feas" => 1e-12,
+                                     "max_iter" => 500))
+        cv = ConditionalValueatRisk()
+        ev = EntropicValueatRisk(; slv = slv)
+        tr = WeightsTracking(; w = fill(0.2, 5))
+        rs = (MeanReturnRiskRatio(; rk = cv),
+              MeanReturnRiskRatio(; rk = [cv, ev], sca = MaxScalariser(), rf = 1e-4),
+              NonOptimisationRiskRatio(; r1 = MeanReturn(), r2 = cv),
+              NonOptimisationRiskRatio(; r1 = [MeanReturn(), ExpectedReturn()],
+                                       sca1 = MaxScalariser(), r2 = [ev, cv]),
+              ExpectedReturnRiskRatio(; rk = cv),
+              ExpectedReturnRiskRatio(; rk = ev, rf = 1e-4))
+        for fe in (nothing, Fees(; l = 0.001)), ri in rs
+            r = RiskTrackingRiskMeasure(; r = ri, tr = tr)
+            d = something(PO.homogeneity_degree(factory(r, prh), fe, T), 1)
+            d = iszero(d) ? 1 : d
+            g = cdiff(r, fe)
+            @test isapprox(risk_gradient(r, w, prh, fe), g; atol = 1e-5)
+            @test isapprox(risk_contribution(r, w, prh, fe), w .* g ./ d; atol = 1e-5)
+        end
+        # The value with fees reads the series of the active weights, net of the fee of `w`.
+        fe = Fees(; l = 0.001)
+        x = _X607 * (w - tr.w) .- 0.001 * sum(w)
+        r = RiskTrackingRiskMeasure(;
+                                    r = NonOptimisationRiskRatio(; r1 = MeanReturn(),
+                                                                 r2 = cv), tr = tr)
+        @test isapprox(expected_risk(r, w, prh, fe), mean(x) / cv(x); rtol = 1e-12)
+    end
+
     @testset "A logarithmic return reads the observation weights of the prior" begin
         # The value twin of a `LogarithmicReturn` read its own `w` alone, and the model, after
         # `factory`, reads `pr.w` when `w` is `nothing`. The two routes of a measure that holds

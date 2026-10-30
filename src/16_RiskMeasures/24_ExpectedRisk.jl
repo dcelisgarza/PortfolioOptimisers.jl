@@ -740,7 +740,7 @@ Where:
  4. A moment measure resolves its observation weights against `X` with [`resolve_observation_weights`](@ref). It reads ``\\boldsymbol{x}`` and takes its target from `wd`. So a per-asset target is ``(\\boldsymbol{w} - \\boldsymbol{w}_b)^\\intercal \\boldsymbol{\\mu}`` minus the mean fee of the portfolio `w`, from [`moment_target_fees`](@ref), as in the model.
  5. A [`TrackingRiskMeasure`](@ref) takes the norm of ``\\boldsymbol{x}`` minus its own benchmark series.
  6. A nested [`RiskTrackingRiskMeasure`](@ref) recurses. The independent mode subtracts its own benchmark weights from `wd`. The dependent mode subtracts the risk of its own benchmark weights, which pay their own fee, as in the model.
- 7. A [`RiskRatio`](@ref) divides the results of its two measures. A [`VarianceSkewKurtosis`](@ref) reads `wd` and no fee. An [`ExpectedReturn`](@ref) reads the expected return of `wd`, minus the fee of the portfolio `w`, through [`resolved_expected_return`](@ref).
+ 7. A [`RiskRatio`](@ref) and a [`NonOptimisationRiskRatio`](@ref) divide the results of their two sides. A [`MeanReturnRiskRatio`](@ref) divides the mean of ``\\boldsymbol{x}``, minus `rf`, by the result of its risk side, and an [`ExpectedReturnRiskRatio`](@ref) does the same with the expected return of `wd` minus the fee of the portfolio `w`. A vector side scalarises the results of its measures, each times its `settings.scale`, with the scalariser of the ratio. A [`VarianceSkewKurtosis`](@ref) reads `wd` and no fee. An [`ExpectedReturn`](@ref) reads the expected return of `wd`, minus the fee of the portfolio `w`, through [`resolved_expected_return`](@ref).
  8. Any other [`WeightsReturnsFeesInput`](@ref) measure reads ``\\boldsymbol{x}`` through [`expected_risk_from_returns`](@ref), which refuses a measure that cannot read a series.
 
 # Arguments
@@ -763,11 +763,11 @@ Where:
   - [`risk_input_kind`](@ref)
 """
 function difference_risk(r::AbstractBaseRiskMeasure, wd::VecNum, ::VecNum, X::MatNum,
-                         ::Nothing)
-    return expected_risk(r, wd, X)
+                         ::Nothing; kwargs...)
+    return expected_risk(r, wd, X; kwargs...)
 end
 function difference_risk(r::AbstractBaseRiskMeasure, wd::VecNum, w::VecNum, X::MatNum,
-                         fees::Fees)
+                         fees::Fees; kwargs...)
     return difference_risk(risk_input_kind(r), r, wd, w, X, fees)
 end
 function difference_risk(::NetReturnsInput, r::AbstractBaseRiskMeasure, wd::VecNum,
@@ -784,7 +784,7 @@ function difference_risk(::WeightsReturnsFeesInput, r::AbstractBaseRiskMeasure, 
 end
 function difference_risk(r::Union{LoHiOrderMoment, ThirdCentralMoment,
                                   MedianAbsoluteDeviation}, wd::VecNum, w::VecNum,
-                         X::MatNum, fees::Fees)
+                         X::MatNum, fees::Fees; kwargs...)
     resolved = resolve_observation_weights(r, X)
     x = charge_fees(X * wd, w, fees)
     tgt = calc_moment_target(resolved, wd, x) -
@@ -792,25 +792,47 @@ function difference_risk(r::Union{LoHiOrderMoment, ThirdCentralMoment,
     return moment_risk(resolved, x .- tgt)
 end
 function difference_risk(r::TrackingRiskMeasure, wd::VecNum, w::VecNum, X::MatNum,
-                         fees::Fees)
+                         fees::Fees; kwargs...)
     return norm_error(r.alg, charge_fees(X * wd, w, fees),
                       collapse_benchmark(tracking_benchmark(r.tr, X), wd, nothing),
                       size(X, 1))
 end
 function difference_risk(r::RiskTrackingRiskMeasure{<:Any, <:Any, <:Any,
                                                     <:IndependentVariableTracking},
-                         wd::VecNum, w::VecNum, X::MatNum, fees::Fees)
+                         wd::VecNum, w::VecNum, X::MatNum, fees::Fees; kwargs...)
     return difference_risk(r.r, wd - r.tr.w, w, X, fees)
 end
 function difference_risk(r::RiskTrackingRiskMeasure{<:Any, <:Any, <:Any,
                                                     <:DependentVariableTracking},
-                         wd::VecNum, w::VecNum, X::MatNum, fees::Fees)
+                         wd::VecNum, w::VecNum, X::MatNum, fees::Fees; kwargs...)
     return abs(difference_risk(r.r, wd, w, X, fees) - expected_risk(r.r, r.tr.w, X, fees))
 end
-function difference_risk(r::RiskRatio, wd::VecNum, w::VecNum, X::MatNum, fees::Fees)
+# A composite declares no input kind, so each one decomposes onto the measures that it wraps,
+# as its `expected_risk` method does. Each pins its own scalariser last, so a `sca` from the
+# call site cannot beat the field. A vector side scalarises its scaled measures, as
+# `expected_risk` on a `VecBaseRM` does.
+function difference_risk(rs::VecBaseRM, wd::VecNum, w::VecNum, X::MatNum, fees::Fees;
+                         sca::Scalariser = SumScalariser())
+    return scalarise(sca, rs) do r
+        return difference_risk(r, wd, w, X, fees) * r.settings.scale
+    end
+end
+function difference_risk(r::RiskRatio, wd::VecNum, w::VecNum, X::MatNum, fees::Fees;
+                         kwargs...)
     return difference_risk(r.r1, wd, w, X, fees) / difference_risk(r.r2, wd, w, X, fees)
 end
-function difference_risk(r::VarianceSkewKurtosis, wd::VecNum, ::VecNum, X::MatNum, ::Fees)
+function difference_risk(r::NonOptimisationRiskRatio, wd::VecNum, w::VecNum, X::MatNum,
+                         fees::Fees; kwargs...)
+    return difference_risk(r.r1, wd, w, X, fees; kwargs..., sca = r.sca1) /
+           difference_risk(r.r2, wd, w, X, fees; kwargs..., sca = r.sca2)
+end
+function difference_risk(r::MeanReturnRiskRatio, wd::VecNum, w::VecNum, X::MatNum,
+                         fees::Fees; kwargs...)
+    return (difference_risk(r.rt, wd, w, X, fees) - r.rf) /
+           difference_risk(r.rk, wd, w, X, fees; kwargs..., sca = r.sca)
+end
+function difference_risk(r::VarianceSkewKurtosis, wd::VecNum, ::VecNum, X::MatNum, ::Fees;
+                         kwargs...)
     return r(wd, X)
 end
 """
