@@ -770,6 +770,8 @@ Where:
   - ``\\mathrm{RSS}``: `StatsAPI.deviance`, the weighted residual sum of squares `m.rss`.
   - ``n``: `StatsAPI.nobs`, `m.nobs`.
 
+Equation (2.5) of [hurvich1998](@cite) states AICc with the residual variance estimated, and `StatsAPI.aicc` is ``n`` times that form plus ``n \\ln 2\\pi``. Equation (2.16) of [zou2007](@cite) writes BIC with a known error variance ``\\sigma^{2}``, as ``\\mathrm{RSS} / (n \\sigma^{2}) + \\ln(n)\\, \\widehat{\\mathrm{df}} / n``. The form here puts the maximum-likelihood estimate ``\\mathrm{RSS} / n`` in place of ``\\sigma^{2}``, as `GLM` does for a fitted [`LinearModel`](@ref).
+
 # Arguments
 
   - `m`: The fitted model.

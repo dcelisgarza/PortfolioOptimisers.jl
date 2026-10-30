@@ -40,8 +40,9 @@ the parameters that a penalised fit spends.
 1. **The elastic net is a regression target.** `ElasticNet` replaces `ElasticNetPath`. It subtypes
    `AbstractPenalisedRegressionTarget`, and it has the methods of the `# Interfaces` section of
    `AbstractRegressionTarget` that its estimators read: `StatsAPI.fit`, `StatsAPI.coef`,
-   `StatsAPI.predict`, `factory` with observation weights, and `regression_target_weights`. Its
-   fields are `theta`, `strength`, `ve`, `iters` and `tol`, plus the observation weights and the
+   `StatsAPI.predict`, `factory` with observation weights, `factory` with an `InterceptColumn`,
+   `regression_target_weights`, and `residual_count` of its fit. Its fields are `theta`,
+   `strength`, `sdiv` (item 10), `ve`, `iters` and `tol`, plus the observation weights and the
    intercept column that `factory` sets.
 2. **The family has two branches.** `AbstractUnpenalisedRegressionTarget` holds `LinearModel` and
    `GeneralisedLinearModel`. `AbstractPenalisedRegressionTarget` holds `ElasticNet`. Both are
@@ -81,17 +82,22 @@ the parameters that a penalised fit spends.
    on its active set `A`, with the observation weights `V`, the design `P` and the penalty mask
    `D_A`: `H = P_A (P_Aᵀ V P_A + γ(1 − ϑ) D_A)⁻¹ P_Aᵀ V`. `StatsAPI.fit` writes into
    `ElasticNetFit` the model count `df̂ = tr(H)`, the weighted residual sum of squares and `nobs`.
-   It reads `H` off the system that `elastic_net_polish` already factors. `ElasticNetFit` gets
+   It reads `H` off the pseudo-inverse of the matrix of the equations that `elastic_net_polish`
+   solves, so a lasso with more active columns than rows counts their rank. `ElasticNetFit` gets
    `StatsAPI.dof = df̂ + 1`, because the residual variance counts, as GLM counts it for
    `LinearModel`. It gets `StatsAPI.nobs`, `StatsAPI.deviance` and `StatsAPI.loglikelihood` at
    `σ̂² = RSS / nobs`. `ElasticNetFit` is not a `StatisticalModel`, so it gets `StatsAPI.aic`,
    `StatsAPI.aicc` and `StatsAPI.bic` directly, in the `StatsAPI` forms.
-9. **The residual count of a penalised fit is `N − tr(2H − HᵀH)`.** Each estimator writes it into
+9. **The residual count of a penalised fit is `N − tr(2S − SᵀS)`, with `S = V^{1/2} H V^{-1/2}`.**
+   Without weights `S` is `H`. Each estimator writes the count into
    `edof` of `Regression` for a penalised target: `StepwiseRegression`,
    `DimensionReductionRegression`, and the per-period count of `CrossSectionalTargetRegression`.
-   The count follows from `E[RSS] = σ² tr((I − H)ᵀ(I − H)) + ‖(I − H)μ‖²`, so it is the count
-   whose chi-squared law has the correct mean, which `ResidualInflation` reads. For a projection,
-   `HᵀH = H`, and the count is `N` less the rank of the design. The two time-series estimators fit
+   The count follows from `E[RSS] = σ² tr((I − S)ᵀ(I − S)) + ‖V^{1/2}(I − H)μ‖²`, so it is the
+   count whose chi-squared law has the correct mean, which `ResidualInflation` reads. Under
+   weights `H` is not symmetric, and `N − tr(2H − HᵀH)` misses that mean: on a weighted ridge of
+   60 rows it gave 56.10, where `N − tr(2S − SᵀS)` gave 55.56 and 20 000 draws gave 55.57
+   (review R19 of #1817). For a projection, `SᵀS = S`, and the count is `N` less the rank of the
+   design. The two time-series estimators fit
    designs of full rank, so the count of an unpenalised target stays `N − p` there. The docstring
    states the derivation. Section 3.5 of hastie1990 states the count. No copy was found, and #1552
    lists it.
@@ -113,7 +119,7 @@ the parameters that a penalised fit spends.
     the term. The strength rule gives `∇γ` through `penalty_strength_gradient`, which the
     `# Interfaces` section of `AbstractPenaltyStrength` names, so it is `public`. It is zero for
     `FixedStrength`, so `StrengthDivergence()` with `FixedStrength` adds zero, and the docstring
-    states it. The fit gives `∂μ̂/∂γ` with one more solve on the factorisation that it holds. The
+    states it. The fit gives `∂μ̂/∂γ` with one more product by the pseudo-inverse of item 8. The
     term changes the model count `df̂` alone. The residual count of item 9 stays, because no
     source states the residual law of a fit whose strength reads the data.
 11. **A factor that the penalty sets to zero stays in `included`.** `included` records the factors
@@ -178,17 +184,18 @@ the parameters that a penalised fit spends.
   it is. `TargetReturnForecast` refits it at each step, because only `LinearModel` folds.
 - The `factory` call with `InterceptColumn` is a direct call on the target. It is not a field
   propagation of ADR 0001.
-- `edof` of `Regression` becomes a real count under a penalised target. `StepwiseRegression` now
-  writes it into a `Vector{Int}`, so the build derives the element type from the counts. The
-  `edof` of `LinearModel` keeps its value `N − p` in each estimator.
+- `edof` of `Regression` becomes a real count under a penalised target. `StepwiseRegression`
+  wrote it into a `Vector{Int}`, so the build now derives the element type from the counts. The
+  `edof` of `LinearModel` keeps its value `N − p` in each estimator on a design of full rank.
 - `DimensionReductionRegression` and `CrossSectionalTargetRegression` with an `ElasticNet` change
   their `edof`, because item 9 corrects a count that overstated the spent parameters. A
   Cross-Sectional Factor Prior also changes its `edof` on every rank-deficient period, such as a
   period with an Unseen Member under `SolvedUnseenMember`.
 - [#1899](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1899) builds items 6 and 8
-  to 11.
+  to 11, and [#1900](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1900) builds the
+  per-period count of item 9.
 - Related: hastie1990 is not in `References.bib`, and no copy is in the sources folder. #1552
-  lists it. tibshirani2012, hurvich1998, zou2007 and hastie2009 are in the sources folder, and the
-  build adds them to `References.bib` when a docstring cites them.
+  lists it. tibshirani2012, hurvich1998, zou2007 and hastie2009 are in the sources folder and in
+  `References.bib`.
 - Related: ADR 0221 (`ve` standardises), ADR 0222 (the keep rule), ADR 0158 and ADR 0172
   (`KernelTrendPattern`).
