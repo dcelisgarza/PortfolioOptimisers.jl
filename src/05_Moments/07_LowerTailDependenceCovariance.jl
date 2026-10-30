@@ -160,7 +160,7 @@ The function clamps each entry of the symmetric result to ``[\\sqrt{\\varepsilon
 
 !!! warning
 
-    The estimate is biased, not only noisy, and the bias decreases slowly with `alpha`. At a fixed `alpha`, the joint count over ``k`` converges to ``C(\\alpha,\\, \\alpha) / \\alpha`` as ``T`` grows, where ``C`` is the copula of the pair. That ratio is the conditional probability at the level `alpha`, and not its limit ``\\lambda_L`` at zero. The multivariate normal distribution is lower tail independent, so a Gaussian copula with a correlation ``\\rho < 1`` has ``\\lambda_L = 0``. But its ratio is far from zero at the levels that a sample of returns can support:
+    The estimate is biased, not only noisy, and the bias decreases slowly as `alpha` decreases. At a fixed `alpha`, the joint count over ``k`` converges to ``C(\\alpha,\\, \\alpha) / \\alpha`` as ``T`` grows, where ``C`` is the copula of the pair. That ratio is the conditional probability at the level `alpha`, and not its limit ``\\lambda_L`` at zero. The multivariate normal distribution is lower tail independent, so a Gaussian copula with a correlation ``\\rho < 1`` has ``\\lambda_L = 0``. But its ratio is far from zero at the levels that a sample of returns can support:
 
     | ``\\rho`` | `alpha = 0.05` | `alpha = 0.01` | `alpha = 0.001` |
     |:--------- | --------------:| --------------:| ---------------:|

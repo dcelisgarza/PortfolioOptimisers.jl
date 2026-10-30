@@ -46,13 +46,17 @@ the exact count of the variance of a weighted mean of independent draws.
    default on `AbstractExpectedReturnsEstimator`, `CoskewnessEstimator` and `CokurtosisEstimator`,
    and methods on the members that weight their rows. A mean read off a covariance
    (`EquilibriumExpectedReturns`, `StandardDeviationExpectedReturns`, `VarianceExpectedReturns`)
-   states the count of its `ce`. `EmpiricalPrior` writes the counts of `me` and of `ce`. The two can carry different weights, so one number cannot hold both. A count equal
-   to the rows that the result carries is written as `nothing`. A `PriorExpectedReturns` states
-   entry 1 of the `eoc` of the prior that it fits, because its mean is the `mu` of that prior. A
-   pooling prior knows that count only after its fit, so `effective_observation_count` fits the
-   prior. `EmpiricalPrior` reads its mean through the internal `mean_with_count`, which returns
-   the mean and the count of one fit. Its default gives `nothing` as the count, and
-   `EmpiricalPrior` then reads `effective_observation_count`.
+   states the count of its `ce`. `EmpiricalPrior` writes the counts of `me` and of `ce`. The two
+   can carry different weights, so one number cannot hold both. A count equal to the rows that the
+   result carries is written as `nothing`. A `PriorExpectedReturns` states entry 1 of the `eoc` of
+   the prior that it fits, because its mean is the `mu` of that prior. A pooling prior knows that
+   count only after its fit, so `effective_observation_count` fits the prior. `EmpiricalPrior`
+   reads its mean through the internal `mean_with_count`, which returns the mean and the count of
+   one fit. Its default gives `nothing` as the count, and `EmpiricalPrior` then reads
+   `effective_observation_count`. The count takes the keywords of the fit, so it reads the
+   weights, the centre and the masks that the fit reads
+   ([#1915](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1915)). A prior gives
+   the count of each moment the keywords that it gives the fit of that moment.
 4. **A Scenario Cap writes its count in `eoc`, and `ens` is a diagnostic of `w` alone.** The cap
    fits every moment over every row, so each entry is the number of observations of the fit.
 5. **A pooling prior keeps the counts of its refit.** It refits its prior under its weights `w`, so
@@ -105,4 +109,6 @@ the exact count of the variance of a weighted mean of independent draws.
   rows. An unweighted one gives the number it gave before, bit for bit.
 - `systematic_processing!` gains a positional argument. A user member of `AbstractSystematicRepair`
   must accept it.
+- A user method of `effective_observation_count`, in the batch form or the state form, must take
+  `kwargs...`. A method with no keywords raises a `MethodError` when a caller passes one.
 - `scenario_ens` is replaced by `scenario_moment_counts`.
