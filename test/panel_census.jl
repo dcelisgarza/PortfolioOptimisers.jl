@@ -157,6 +157,7 @@ const CENSUS_EXEMPT = Dict{Symbol, String}(
                                            :feature_row_indices => "reads the clock",
                                            :project_panel_clock => "moves a panel onto a new clock",
                                            :attach_universe_masks => "replaces the masks",
+                                           :vcat_returns_panel => "concatenates the panels of two blocks with vcat",
                                            # An export returns the stored cells by design, as the default read does.
                                            :panel_dataframe => "an export of the stored cells",
                                            :panel_frame_field => "a step of panel_dataframe",
@@ -194,6 +195,7 @@ const CENSUS_EXEMPT = Dict{Symbol, String}(
                                            :step_panel_fields => "passes or refuses the Panel Fields of a step",
                                            :assert_carry_step_panel => "a check of the masks and the fields that a carry honours",
                                            :ep_prior => "passes the panel to the prior it wraps",
+                                           :mean_with_count => "passes the panel to the mean of an EmpiricalPrior, or to the prior of a PriorExpectedReturns",
                                            :read_member => "passes the panel of a buffer to the batch moment, whose cases are below",
                                            :carried_location => "passes the panel of a carry to forecast_location, whose case is below",
                                            # The steps of the priors that rebuild a prior or read a co-moment: each passes the

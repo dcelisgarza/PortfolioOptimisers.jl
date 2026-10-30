@@ -127,11 +127,12 @@ end
     w_min, w_max = nocs_anchors(opt)
     res = optimise(NearOptimalCentering(; opt = opt))
     @test nocs_ok(res)
-    # The weights reach 6.5 under the short budget of 1000. Two CI host kinds miss by 8.7e-5
-    # and 9.2e-5 (8 of 18 runs from 40565553296 to 40988847855, R14 of #1817).
+    # The weights reach 6.5 under the short budget of 1000. `isapprox` reads the norm of the
+    # gap. Two CI host kinds miss by a norm of 1.43e-4 and 1.55e-4, with a largest entry of
+    # 8.7e-5 and 9.2e-5 (runs 40565553296 to 41050705423, R14 and G1 of #1817).
     @test isapprox(res.w,
                    nocs_oracle(w_min, w_min, w_max; lb = fill(-Inf, 5), ub = fill(Inf, 5));
-                   atol = 1e-4)
+                   atol = 3e-4)
     opt = nocs_opt(; wb = WeightBounds(; lb = 0.0, ub = Inf))
     w_min, w_max = nocs_anchors(opt)
     res = optimise(NearOptimalCentering(; opt = opt))

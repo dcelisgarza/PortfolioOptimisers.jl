@@ -707,7 +707,7 @@ $(DocStringExtensions.FIELDS)
 # References
 
   - $(ref_dict[:tibshirani2012]) Remark (The elastic net) after Equation (28), and Remark (The lasso with intercept).
-  - $(ref_dict[:hurvich1998]) Equation (2.5). Page 273 cites Section 3.5 of Hastie and Tibshirani (1990), *Generalized Additive Models*, for the effective degrees of freedom of a linear smoother, and the residual count above follows the derivation of this docstring. $(ref_dict[:no_original_source])
+  - $(ref_dict[:hurvich1998]) Equation (2.5). Page 273 cites Section 3.5 of [hastie1990](@cite) for the effective degrees of freedom of a linear smoother, and the residual count above follows the derivation of this docstring. $(ref_dict[:no_original_source])
   - $(ref_dict[:zou2007]) Equation (2.16).
   - $(ref_dict[:hastie2009]) Section 7.6, Equation (7.32).
 """
