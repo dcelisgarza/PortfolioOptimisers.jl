@@ -816,38 +816,6 @@ definition = "investable_plot_view"
 misses = 1
 rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
 
-# Three one-line methods of #1917, one row each. Measured over the 14 targeted files of #1917:
-# `test_09t` reaches the body of each one, through `ExpectedReturn(; rt = NoReturn())`, a tracked
-# `ExpectedReturn` under fees, and `risk_contribution` of an `ExpectedReturnRiskRatio`, and the
-# `PATCH` report names the `function` line of each one alone.
-[[coverage_exemption]]
-path = "src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions/01_ReturnEstimators.jl"
-definition = "resolved_expected_return"
-misses = 1
-rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
-
-[[coverage_exemption]]
-path = "src/18_ExpectedReturns.jl"
-definition = "worst_case_distribution"
-misses = 1
-rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
-
-# The one-line `difference_worst_case` methods of #1918, measured over `test_09` and `test_09t`:
-# `test_09t` reaches the body of each one through `risk_gradient` of a tracked ratio under fees,
-# and the `PATCH` report names the `function` line of each one alone. The `difference_risk` row of
-# #1917 went with #1918: its method takes `kwargs...` now, and its `function` line reads a hit.
-[[coverage_exemption]]
-path = "src/16_RiskMeasures/26_WorstCaseDistribution.jl"
-definition = "difference_worst_case"
-misses = 3
-rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
-
-[[coverage_exemption]]
-path = "src/18_ExpectedReturns.jl"
-definition = "difference_worst_case"
-misses = 1
-rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
-
 # --- JET dismissals --------------------------------------------------------
 #
 # Keyed (file, kind, message), ADR 0071. A Dismissal matches every report of its fingerprint in

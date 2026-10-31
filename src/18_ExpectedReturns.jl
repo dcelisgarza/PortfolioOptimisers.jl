@@ -171,10 +171,8 @@ Where:
 # Algorithm
 
  1. Reduce the prior, the weights and the fees to the Investable Mask once, with [`investable_reduction`](@ref). A held asset outside the mask gives one diagnostic, and not one for each term.
- 2. Set the accumulator `rt` to a zero of the element type of `w`.
- 3. Take the next term `ret_i` of `ret`. Skip it when its `settings.rte` is `false`.
- 4. Compute the value-level return of `ret_i` with [`expected_return`](@ref), multiply it by the `settings.scale` of the term, and add it to `rt`.
- 5. Repeat steps 3 and 4 for the other terms, then return `rt`.
+ 2. Resolve each term against the prior with [`factory`](@ref), as the model does.
+ 3. Return [`resolved_expected_return`](@ref) of the resolved terms. It skips each term whose `settings.rte` is `false`, and it sums the `settings.scale` of each other term times its return. The method for one term reads the same function, so the two give the same value.
 
 # Arguments
 
@@ -183,7 +181,7 @@ Where:
   - `pr`: Prior result.
   - `fees`: Optional fees.
   - $(arg_dict[:strict_inv])
-  - `kwargs...`: Keyword arguments that go to [`expected_return`](@ref) of each term.
+  - `kwargs...`: Keyword arguments that the method does not read.
 
 # Returns
 
@@ -198,16 +196,9 @@ Where:
 function expected_return(ret::VecJRE, w::VecNum, pr::AbstractPriorResult,
                          fees::Option{<:Fees} = nothing; strict::Bool = false, kwargs...)
     # The vector reduces once, so a held non-investable asset is named once and not once per
-    # term. Every term reduces again on the reduced prior, where the mask is `nothing`.
+    # term. The sum over the terms is the one of the risk path, so the two cannot drift.
     _, pr, w, fees = investable_reduction(pr, w, fees, strict)
-    rt = zero(eltype(w))
-    for ret_i in ret
-        if !ret_i.settings.rte
-            continue
-        end
-        rt += ret_i.settings.scale * expected_return(ret_i, w, pr, fees; kwargs...)
-    end
-    return rt
+    return resolved_expected_return(factory(ret, pr), w, w, pr.X, fees)
 end
 function expected_return(ret::JRE_VecJRE, w::VecVecNum, pr::AbstractPriorResult,
                          fees::Option{<:Fees} = nothing; strict::Bool = false, kwargs...)
@@ -1080,7 +1071,7 @@ const PerfRM = Union{MeanReturn, MeanReturnRiskRatio, ExpectedReturn,
 
 Union of the return risk measures that read a prior result, and that refuse a [`PredictionResult`](@ref). On a prediction result, use [`MeanReturn`](@ref) or [`MeanReturnRiskRatio`](@ref) in their place.
 
-Both members read the expected returns `mu` of the **prior result**, which a return series does not hold. The [`factory`](@ref) of the risk path fills `mu` into the return estimator of the measure, so the resolved measure reads the weights, the returns matrix and the fees. [`ExpectedReturn`](@ref) declares [`WeightsReturnsFeesInput`](@ref), and [`ExpectedReturnRiskRatio`](@ref) is a composite with methods of its own, as [`MeanReturnRiskRatio`](@ref) is. Thus [`risk_contribution`](@ref), [`risk_gradient`](@ref) and every composite of the risk path take both members. Each method that dispatches on the alias follows from the need for a prior:
+Both members read the **prior result** through their return estimator, which a return series does not hold: an [`ArithmeticReturn`](@ref) reads the expected returns `mu`, and a [`LogarithmicReturn`](@ref) reads the observation weights. The [`factory`](@ref) of the risk path fills them into the return estimator of the measure, so the resolved measure reads the weights, the returns matrix and the fees. [`ExpectedReturn`](@ref) declares [`WeightsReturnsFeesInput`](@ref), and [`ExpectedReturnRiskRatio`](@ref) is a composite with methods of its own, as [`MeanReturnRiskRatio`](@ref) is. Thus [`risk_contribution`](@ref), [`risk_gradient`](@ref) and every composite of the risk path take both members. Each method that dispatches on the alias follows from the need for a prior:
 
   - The methods for a prediction result refuse the call.
   - [`supports_precomputed_returns`](@ref) gives `false`.
@@ -1099,7 +1090,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return `false`, because a [`PrRM`](@ref) does not support precomputed returns.
 
-Both members multiply the expected returns of the prior by the portfolio weights. A bare series of net returns holds neither the expected returns nor the weights. So neither type defines `r(x::VecNum)`, and [`expected_risk_from_returns`](@ref) refuses both with a message that names the cause.
+Both members read the portfolio weights and the prior through their return estimator: an [`ArithmeticReturn`](@ref) multiplies the expected returns of the prior by the weights, and a [`LogarithmicReturn`](@ref) weights each observation by the observation weights of the prior and charges the fee of the weights once, after the mean. A bare series of net returns holds neither the prior nor the weights. So neither type defines `r(x::VecNum)`, and [`expected_risk_from_returns`](@ref) refuses both with a message that names the cause.
 
 To score a bare return series, use [`MeanReturn`](@ref) or [`MeanReturnRiskRatio`](@ref). [`prrm_prediction_message`](@ref) names the same replacement for a prediction result.
 
