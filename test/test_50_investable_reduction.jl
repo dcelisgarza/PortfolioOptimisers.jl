@@ -1218,11 +1218,14 @@ end
     hwp = predict(resp, rd; kw...).hw
     hwpk = predict(respk, rdk; kw...).hw
     @test length(hwp.w) == length(hwp.U) == length(hwp.w0) == 3
+    # The two solves read the same data through different paths, so the solver can stop at
+    # different iterates within its tolerance. One CI host misses by a relative norm of
+    # 4.03e-5 on the first member.
     for i in 1:3
-        @test hwp.w0[i][keep] == hwpk.w0[i]
-        @test hwp.w[i][keep] == hwpk.w[i]
+        @test isapprox(hwp.w0[i][keep], hwpk.w0[i]; rtol = 1e-4)
+        @test isapprox(hwp.w[i][keep], hwpk.w[i]; rtol = 1e-4)
         @test iszero(hwp.w[i][k])
-        @test hwp.U[i][:, keep] == hwpk.U[i]
+        @test isapprox(hwp.U[i][:, keep], hwpk.U[i]; rtol = 1e-4)
         @test all(iszero, hwp.U[i][:, k])
     end
     # A fold that stores no path has none to expand.

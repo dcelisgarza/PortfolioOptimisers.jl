@@ -2023,10 +2023,17 @@ end
     OPS = po.OnlinePortfolioSelection
     rdo = ReturnsResult(; nx = ["A", "B", "C"], X = 0.02 .* randn(StableRNG(5), 30, 3),
                         ts = Date(2020, 1, 1) .+ Day.(0:29))
-    # An online member that is neither a prior estimator nor an Online wrapper is kept, so
-    # the step refuses a prior result and a schedule with the reason that names them.
+    # The step refuses a prior result and a schedule with the reason that names them.
     pro = prior(EmpiricalPrior(), rdo)
     @test_throws r"holds a fitted" partial_fit!(InverseVolatility(; pe = pro), rdo)
+    # The online fold loop resolves the fallback of a head at its entry, before the warm-up.
+    # A prior result in the fallback is neither a prior estimator nor an Online wrapper, so
+    # the resolution keeps it, and the step refuses it with the same reason. A
+    # `cross_val_predict` refuses a prior result at the top of the estimator before the loop,
+    # so only a fallback reaches the resolution with one.
+    @test_throws r"holds a fitted" cross_val_predict(OPS(;
+                                                         fb = InverseVolatility(; pe = pro)),
+                                                     rdo, OnlineIndexWalkForward(10, 5))
     @test_throws r"holds a `TimeDependent` schedule" partial_fit!(InverseVolatility(;
                                                                                     pe = TimeDependent([EmpiricalPrior(),
                                                                                                         EmpiricalPrior()])),

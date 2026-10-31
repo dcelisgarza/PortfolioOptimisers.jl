@@ -269,13 +269,22 @@ end
 end
 
 @testset "the value at risk multiplier and the start of the tilt chain at their limits (#1912)" begin
-    # A level that the running mass never reaches answers the smallest loss. The 201 equal
-    # weights sum to a hair under one, so a level just below one is never reached.
+    # A level that the running mass never reaches answers the smallest loss. The 13 equal
+    # prior weights, normalised as the start of the chain normalises them, sum to a hair
+    # under one, so a level just below one is never reached. A sum of fewer than 16 entries
+    # is a plain loop, so every host gets the same mass. Over 201 entries `sum` adds in SIMD
+    # blocks, and one CI host reaches one.
     al = prevfloat(1.0)
-    @test foldl(+, ep_sw0 ./ sum(ep_sw0)) < al
+    X13 = ep_sX[(end - 12):end, :]
+    rd13 = ReturnsResult(; nx = rd.nx, X = X13)
+    w13 = StatsBase.pweights(fill(inv(13), 13))
+    wi = collect(range(inv(13), inv(13); length = 13))
+    wi = wi ./ sum(wi)
+    @test foldl(+, wi ./ sum(wi)) < al
     # At that level the measure is the mean loss, so the view fixes the mean of the posterior.
-    cv1 = ConditionalValueatRisk(; alpha = al, w = ep_sw0)(ep_sX[:, 1])
-    @test isapprox(cv1, -LinearAlgebra.dot(ep_sw0, ep_sX[:, 1]); rtol = 1e-10)
+    cv1 = ConditionalValueatRisk(; alpha = al, w = w13)(X13[:, 1])
+    @test isapprox(cv1, -LinearAlgebra.dot(w13, X13[:, 1]); rtol = 1e-10)
+    @test cv1 > 0
     tgt = cv1 * 0.85
     pr = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
                                    cvar_views = ConditionalValueatRiskView(;
@@ -283,9 +292,9 @@ end
                                                                            alpha = al,
                                                                            views = LinearConstraintEstimator(;
                                                                                                              val = "AAPL <= $tgt"))),
-               ep_srd)
-    @test isapprox(-LinearAlgebra.dot(pr.w, ep_sX[:, 1]), tgt; rtol = 1e-5)
-    @test isapprox(ConditionalValueatRisk(; alpha = al, w = pr.w)(ep_sX[:, 1]), tgt;
+               rd13)
+    @test isapprox(-LinearAlgebra.dot(pr.w, X13[:, 1]), tgt; rtol = 1e-5)
+    @test isapprox(ConditionalValueatRisk(; alpha = al, w = pr.w)(X13[:, 1]), tgt;
                    rtol = 1e-5)
     @test pr.kld > 0
     # An asset that no scenario tells apart has a constant row, so no tilt of the posterior
