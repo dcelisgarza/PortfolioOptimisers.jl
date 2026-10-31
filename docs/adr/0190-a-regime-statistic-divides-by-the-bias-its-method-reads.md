@@ -579,3 +579,12 @@ its own, so the `debias` field of the two regime-adjusted estimators is bound to
 and the refusal of the constructor names that spelling. The default `ExactDebias()` and the numbers
 do not move. Where the decision above names `debias = RawStatistic()`, read `debias = nothing`. The
 removal is a clean break with no deprecation, as ADR 0044 and ADR 0213 set.
+
+## Amendment (2026-10-31)
+
+**The HAC fixed point of the Mahalanobis factor is removed (#1919).** The decision above names
+`mahalanobis_bias(decay, K, n, hac_lags)`, which solved the fixed point from `ℓ'(t)` and `ℓ''(t)`.
+No code called it. `mahalanobis_bias_nodes` reads the exact factor of a HAC estimate from
+`mahalanobis_level_bias`, and it divides by the plain fixed point `mahalanobis_bias(decay, K, n)`
+only to interpolate the ratio between its nodes. The internal method and its tests are gone. The
+numbers do not move.

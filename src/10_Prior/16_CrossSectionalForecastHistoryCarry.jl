@@ -183,7 +183,7 @@ Under a threshold `th` above zero, the idiosyncratic correlation reads the rows 
 
 # Returns
 
-  - `st::CrossSectionalCarryState`: The state with `S` at every fitted observation. When the threshold `th` of the prior is not zero, it also holds the folded `ce`, or `Sc` at every fitted observation when `ce` does not fold. A state with no fit is returned as it is.
+  - `st::CrossSectionalCarryState`: The state with `S` at every fitted observation. When the threshold `th` of the prior is not zero, it also holds the folded `ce`, or `Sc` at every fitted observation when `ce` does not fold.
 
 # Related
 
@@ -197,11 +197,6 @@ Under a threshold `th` above zero, the idiosyncratic correlation reads the rows 
 function cross_sectional_carry_standardised(pe::CrossSectionalFactorPrior,
                                             st::CrossSectionalCarryState, stepped::Bool)
     return cross_sectional_carry_standardised(pe, st, st.csr, stepped)
-end
-# A state with no fit has no residual to standardise.
-function cross_sectional_carry_standardised(::CrossSectionalFactorPrior,
-                                            st::CrossSectionalCarryState, ::Nothing, ::Bool)
-    return st
 end
 function cross_sectional_carry_standardised(pe::CrossSectionalFactorPrior,
                                             st::CrossSectionalCarryState, csr,
@@ -488,7 +483,7 @@ A Return Forecast that computes its history one observation at a time, as [`fold
 
 # Algorithm
 
- 1. Return `st` unchanged when the forecast does not fold, or before the first fit.
+ 1. Return `st` unchanged when the forecast does not fold. The fold calls this function after a fit, so `st` always holds a regression.
  2. Keep the carried rows and the fold state when `stepped` is `true`, and none otherwise. Take the fitted observations after the kept rows, and the last `forecast_target_gap(pe.rfe)` kept rows before them, or every kept row when there are fewer.
  3. Build the block of those observations from the state, with [`cross_sectional_carry_append`](@ref). Take the member of the Orthogonal Forecast Fit `pe.ofit` with [`orthogonal_forecast_member`](@ref).
  4. Compute the rows of those observations and the new fold state with [`orthogonal_forecast_step`](@ref), from a copy of the scores that the state carries at the rows of [`cross_sectional_forecast_rows`](@ref) and from the kept fold state. A member that trains on the rows before the block reads them too.
@@ -516,7 +511,7 @@ A Return Forecast that computes its history one observation at a time, as [`fold
 """
 function cross_sectional_carry_forecast(pe::CrossSectionalFactorPrior,
                                         st::CrossSectionalCarryState, stepped::Bool)
-    if !folds_forecast_rows(pe.rfe) || isnothing(st.csr)
+    if !folds_forecast_rows(pe.rfe)
         return st
     end
     k = stepped && !isnothing(st.fh) ? size(st.fh, 1) : 0

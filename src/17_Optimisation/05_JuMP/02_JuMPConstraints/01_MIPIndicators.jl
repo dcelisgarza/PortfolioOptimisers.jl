@@ -291,9 +291,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Return the *held* indicator — the per-asset quantity that is 1 when the asset is in the
 portfolio. This is what cardinality counts and what integer phylogeny gates on.
 
-[`SignIndicators`](@ref) deliberately has no method: it carries no held bit, and the
-declaration step only chooses it when nothing in the model consumes one. A caller that would
-need a held indicator therefore fails at the call of `held` with a `MethodError`, rather than reading a
+Only [`HeldIndicators`](@ref) has a method. The threshold and fixed-fee constraints of
+[`LongShortIndicators`](@ref) read its long and short bits, and cardinality reads
+[`held_bin`](@ref). [`SignIndicators`](@ref) carries no held bit, and the declaration step only
+chooses it when nothing in the model consumes one. A caller that would need a held indicator of
+another bundle therefore fails at the call of `held` with a `MethodError`, rather than reading a
 sign bit and silently miscounting.
 
 # Related
@@ -301,9 +303,6 @@ sign bit and silently miscounting.
   - [`AbstractMIPIndicators`](@ref)
 """
 function held(ind::HeldIndicators)
-    return ind.i_mip
-end
-function held(ind::LongShortIndicators)
     return ind.i_mip
 end
 """
@@ -542,9 +541,6 @@ Where:
   - [`w_finite_flag`](@ref)
   - [`WeightBounds`](@ref)
 """
-function mip_wb(::JuMP.Model, ::AbstractMIPSpace, ::Nothing, args...)
-    return nothing
-end
 function mip_wb(model::JuMP.Model, sp::AbstractMIPSpace, wb::WeightBounds, wx::VecNum,
                 il::VecNum, is::VecNum)
     sc = get_constraint_scale(model)

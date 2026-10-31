@@ -379,14 +379,12 @@ the recursion itself, and the interpolation serves the rest (ADR 0190).
 
     # A Monte Carlo of four million draws of the Schur complement of the HAC estimate itself, at 12
     # assets, a half-life of 10, two lags and 520 observations, gave 2.4777, 2.3958 and 2.3165,
-    # each with a standard error of 5e-4. The recursion is 1.2e-3, 8e-4 and 3e-4 below, and the
-    # mean's fixed point 1.8 % above the first.
+    # each with a standard error of 5e-4. The recursion is 1.2e-3, 8e-4 and 3e-4 below.
     f = [PO.mahalanobis_level_bias(m, lam, [520], 12, 2)[1] for m in methods]
     for (fi, mc) in zip(f, (2.4777, 2.3958, 2.3165))
         @test isapprox(fi, mc; rtol = 2e-3)
     end
     @test f[1] > f[2] > f[3]
-    @test PO.mahalanobis_bias(lam, 520, 12, 2) > 1.015 * f[1]
     # Near the gate, at five assets, a half-life of 5, one lag and 12 observations, where 4e-4 of
     # draws are not positive definite, the Monte Carlo gave 2.9710 and 2.5881; the recursion is
     # 0.25 % and 0.03 % below. A hard cut gave infinite factors here, and at 390 observations and a

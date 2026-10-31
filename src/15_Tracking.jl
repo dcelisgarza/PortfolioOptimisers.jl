@@ -1010,7 +1010,6 @@ end
     bind_data_benchmark(x, rd)
     bind_data_benchmark(tr::DataBenchmarkTracking, rd::ReturnsResult)
     bind_data_benchmark(tr::TrackingError, rd)
-    bind_data_benchmark(v::VecNum, rd)
     bind_data_benchmark(v::AbstractVector, rd)
 
 Bind every [`DataBenchmarkTracking`](@ref) that `x` holds to the benchmark `B` of the returns data `rd`.
@@ -1032,7 +1031,7 @@ The function rebuilds an object through its keyword constructor only when a part
  1. When `x` holds no data benchmark, or `rd` is not a [`ReturnsResult`](@ref), return `x` unchanged. A data benchmark of a reader with no returns data stays unbound, and [`tracking_benchmark`](@ref) refuses it there.
  2. On a [`DataBenchmarkTracking`](@ref), refuse an `rd` that carries no benchmark. Otherwise return a new `DataBenchmarkTracking` that holds `rd.B`.
  3. On a [`TrackingError`](@ref), bind its `tr` field.
- 4. Return a vector of numbers unchanged. Bind each element of any other vector, and return the vector itself when no element changes.
+ 4. Bind each element of a vector, and return the vector itself when no element changes.
 
 # Arguments
 
@@ -1083,9 +1082,6 @@ end
 function bind_data_benchmark(tr::TrackingError, rd)
     bound = bind_data_benchmark(tr.tr, rd)
     return bound === tr.tr ? tr : rebuild_estimator(tr, (; tr = bound))
-end
-function bind_data_benchmark(v::VecNum, ::Any)
-    return v
 end
 function bind_data_benchmark(v::AbstractVector, rd)
     bound = [bind_data_benchmark(x, rd) for x in v]

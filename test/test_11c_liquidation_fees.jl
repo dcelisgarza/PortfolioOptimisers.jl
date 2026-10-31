@@ -447,19 +447,6 @@
         fees = Fees(; l = 0.001, lq = Turnover(; w = fill(0.2, 5), val = 0.01),
                     flq = Turnover(; w = fill(0.2, 5), val = 5.0))
 
-        # A stated `nothing` fee under a derived mask satisfies both the `nothing` fee
-        # method and the `BitVector` mask method. Without a third method naming that pair
-        # the call is ambiguous, so every family below fails on a delisting window that
-        # states no fee at all.
-        @test isnothing(PortfolioOptimisers.strip_liquidation_charges(nothing,
-                                                                      BitVector([1, 0, 1])))
-        # A fee stated under a derived mask is handed back by the mask method, and a fee on
-        # no asset charges nothing, so the returns come back as they are (#1912).
-        @test PortfolioOptimisers.strip_liquidation_charges(fees, BitVector([1, 0, 1])) ===
-              fees
-        Rn = [0.01 0.02; 0.03 0.04]
-        @test PortfolioOptimisers.charge_asset_fees(Rn, [0.5, 0.5], nothing) === Rn
-
         hopt = HierarchicalOptimiser(; pe = EmpiricalPrior(), sets = sets, fees = fees)
         inner = HierarchicalRiskParity()
         fams = ["HierarchicalRiskParity" => HierarchicalRiskParity(; opt = hopt),

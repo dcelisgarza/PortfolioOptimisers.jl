@@ -145,7 +145,7 @@ function charges_nothing(v)
     return isnothing(v) || isempty(v)
 end
 """
-    charge_asset_fees(R::MatNum, w::VecNum, fees::Option{<:Fees}, imsk::Option{<:BitVector} = nothing)
+    charge_asset_fees(R::MatNum, w::VecNum, fees::Fees, imsk::Option{<:BitVector} = nothing)
 
 Subtract a per asset fee from a per asset return matrix, on the clock the fee states and in the columns it was priced on.
 
@@ -155,16 +155,15 @@ A reduced [`Fees`](@ref) lives on **two** axes: the five per asset fields were s
 
 # Algorithm
 
- 1. A `nothing` `fees` returns `R` unchanged. It charges no fee rather than a zero fee.
- 2. Read the pair of pairs `((am_i, am_l), (ot_i, ot_l))` of [`calc_asset_fees`](@ref), over the row count of `R`. The weights it is handed are the investable ones, because that is the axis the five per asset fields were sliced to; `lq` and `flq` read `w` for its element type alone.
- 3. On a `nothing` `imsk`, charge the investable axis over the whole matrix, and refuse a `fees` that carries a liquidation: no mask says where the exits are, so the charge has nowhere to land, and dropping it would overstate the net return.
- 4. On a `BitVector` `imsk`, charge the investable axis in the `imsk` columns and the liquidation axis in the complement's, each by the same two steps: the per period vector on every observation, and the one-off vector on the first alone. Under an [`AmortisedFees`](@ref) the one-off vector is zero, because step 2 spread that cost into the per period one.
+ 1. Read the pair of pairs `((am_i, am_l), (ot_i, ot_l))` of [`calc_asset_fees`](@ref), over the row count of `R`. The weights it is handed are the investable ones, because that is the axis the five per asset fields were sliced to; `lq` and `flq` read `w` for its element type alone.
+ 2. On a `nothing` `imsk`, charge the investable axis over the whole matrix, and refuse a `fees` that carries a liquidation: no mask says where the exits are, so the charge has nowhere to land, and dropping it would overstate the net return.
+ 3. On a `BitVector` `imsk`, charge the investable axis in the `imsk` columns and the liquidation axis in the complement's, each by the same two steps: the per period vector on every observation, and the one-off vector on the first alone. Under an [`AmortisedFees`](@ref) the one-off vector is zero, because step 1 spread that cost into the per period one.
 
 # Arguments
 
   - `R`: Gross per asset return matrix (observations × assets), on the caller's universe.
   - `w`: Portfolio weights, on the same universe as `R`.
-  - `fees`: [`Fees`](@ref) structure, or `nothing`.
+  - `fees`: [`Fees`](@ref) structure.
   - `imsk`: The Investable Mask, or `nothing` when no asset left.
 
 # Validation
@@ -189,9 +188,6 @@ A reduced [`Fees`](@ref) lives on **two** axes: the five per asset fields were s
   - [`calc_asset_one_off_fees`](@ref)
   - [`charge_fees`](@ref)
 """
-function charge_asset_fees(R::MatNum, ::VecNum, ::Nothing, ::Option{<:BitVector} = nothing)
-    return R
-end
 function charge_asset_fees(R::MatNum, w::VecNum, fees::Fees, ::Nothing = nothing)
     (am_i, am_l), (ot_i, ot_l) = calc_asset_fees(w, size(R, 1), fees)
     # An unset term is `nothing` under an amortising clock and empty otherwise, and both mean

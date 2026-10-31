@@ -272,14 +272,6 @@ end
         @test only(refit(pinned, rows(rdp, 1:150)).families) == ("industry" => name)
         @test isequal(prior(refit(pinned, rows(rdp, 1:150))).mu, b.mu)
     end
-    @testset "A carry state with no fit has no residual to standardise (#1912)" begin
-        pe0 = CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors())
-        st = PO.CrossSectionalCarryState()
-        dyn = Ref{Any}(st)
-        @test isnothing(st.csr)
-        @test PO.cross_sectional_carry_standardised(pe0, dyn[], true) === st
-        @test PO.cross_sectional_carry_standardised(pe0, dyn[], false) === st
-    end
     @testset "The scalar guards" begin
         f = csfp_factors()
         @test_throws DomainError CrossSectionalFactorPrior(; lambda = 1, factors = f,

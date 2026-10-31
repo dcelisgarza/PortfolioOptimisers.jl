@@ -2666,8 +2666,6 @@ end
     ts = Date(2020, 1, 1):Day(1):(Date(2020, 1, 1) + Day(size(X, 1) - 1))
     bare = PricesResult(; X = TimeArray(collect(ts), copy(X), ["A", "B", "C", "D"]))
     @test isnothing(PortfolioOptimisers.prices_listing_span(bare))
-    # A carrier of another type states none either.
-    @test isnothing(PortfolioOptimisers.prices_listing_span(BarePricesResult()))
     res = fit_preprocessing(PriceGapFill(), bare)
     @test !res.strict
     out = @test_logs (:warn,) match_mode = :any apply_preprocessing(res, bare)

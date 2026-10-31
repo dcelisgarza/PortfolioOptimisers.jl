@@ -751,13 +751,13 @@ function needs_previous_weights(fe::FeesE_Fees)::Bool
            needs_previous_weights(fe.flq)
 end
 """
-    strip_liquidation_charges(fees, imsk)
+    strip_liquidation_charges(fees, imsk::Nothing)
 
 Drop the two liquidation charges, `lq` and `flq`, when no asset left the universe.
 
 A caller states `lq` and `flq` over the full universe, because the caller cannot know in advance which asset will delist. [`port_opt_view`](@ref) narrows them to the complement of the Investable Mask. But a window in which every asset is investable derives no mask. The `nothing` sentinel then skips `port_opt_view`, so that the all-investable path allocates nothing. Without this verb, `lq` and `flq` keep their full width, and the fee charges them in full for assets that never left.
 
-This verb drops `lq` and `flq` in that case. It does not take the view on the common path, so the `nothing` mask stays allocation-free. A `BitVector` mask means `port_opt_view` has already run and `lq` and `flq` are on the right axis, so the verb returns the fee untouched. A `nothing` mask means no asset exited, so the verb drops both liquidation charges. Under either mask, the verb returns unchanged a fee that holds neither liquidation charge. It allocates nothing for a caller who states no liquidation.
+This verb drops `lq` and `flq` in that case. It does not take the view on the common path, so the `nothing` mask stays allocation-free. It returns unchanged a fee that holds neither liquidation charge, so it allocates nothing for a caller who states no liquidation. A derived mask means that `port_opt_view` has already put `lq` and `flq` on the right axis, so the verb takes no mask but `nothing`.
 
 The verb does not check the mark `fees.imsk`. Under a `nothing` mask it drops `lq` and `flq` of any fee it receives. A hierarchical fit uses this when it prices the risk of a cluster from a fee that [`investable_fees_view`](@ref) has already reduced. Only the result charges the exit, so no sub-problem can charge it.
 
@@ -765,14 +765,14 @@ The verb does not check the mark `fees.imsk`. Under a `nothing` mask it drops `l
 
 # Algorithm
 
- 1. On a `nothing` `fees`, or a `BitVector` `imsk`, return `fees` unchanged. A stated `nothing` fee under a derived mask matches both, so a third method covers that pair and resolves the dispatch ambiguity.
- 2. On a `nothing` `imsk` with `lq` and `flq` already `nothing`, return `fees` unchanged, so the common case allocates nothing.
+ 1. On a `nothing` `fees`, return `nothing`.
+ 2. On a fee with `lq` and `flq` already `nothing`, return `fees` unchanged, so the common case allocates nothing.
  3. Otherwise rebuild the fee with `lq` and `flq` set to `nothing`, and keep every other field.
 
 # Arguments
 
   - `fees`: The fee to strip, or `nothing`.
-  - `imsk`: The Investable Mask, or `nothing` when every asset is investable.
+  - `imsk`: `nothing`, the Investable Mask of a window in which every asset is investable.
 
 # Returns
 
@@ -785,13 +785,7 @@ The verb does not check the mark `fees.imsk`. Under a `nothing` mask it drops `l
   - [`investable_mask`](@ref)
   - [`fees_constraints`](@ref)
 """
-function strip_liquidation_charges(fees, ::BitVector)
-    return fees
-end
-function strip_liquidation_charges(::Nothing, ::Any)
-    return nothing
-end
-function strip_liquidation_charges(::Nothing, ::BitVector)
+function strip_liquidation_charges(::Nothing, ::Nothing)
     return nothing
 end
 function strip_liquidation_charges(fees::Fees, ::Nothing)

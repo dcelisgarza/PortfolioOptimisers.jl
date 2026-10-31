@@ -1364,66 +1364,6 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Computes the bias factor of the squared Mahalanobis distance against a HAC-adjusted covariance
-estimate.
-
-A HAC estimate is ``\\hat{C} = Z^{\\top} A Z`` with the banded weight matrix ``A`` of
-[`regime_bias_table`](@ref), so it has the law of a plain estimate whose weights are the
-eigenvalues ``\\mu`` of ``A``, and the fixed point of [`mahalanobis_bias`](@ref) holds with ``\\mu``
-in place of the weights. Its sums are the derivatives of ``\\ell(t) = \\ln \\det(I + t A)``,
-so no eigenvalue is computed:
-
-```math
-\\begin{align}
-\\frac{1}{b} &= \\sum_{k} \\frac{\\mu_{k}}{1 + t \\mu_{k}} = \\ell'(t)\\,, \\quad t = (n + 1) b\\,.
-\\end{align}
-```
-
-Each term ``\\mu b / (1 + (n + 1) \\mu b)`` is concave in ``b`` where ``1 + t \\mu > 0``, also for a
-negative ``\\mu``, so Newton's method from ``b = 1`` rises to the root as in the plain case. A
-negative ``\\mu`` bounds ``t``: where a pivot of ``I + t A`` is not positive, or where the slope of
-the map is not positive, the map has passed its maximum below zero and no root exists. At 12
-assets, a half-life of 10 and two lags, the factor is 2.523 against a Monte Carlo of 2.479, and
-1.2654 against 1.2633 at a half-life of 40: the fixed point is a deterministic equivalent, and a
-HAC estimate has about half the degrees of freedom of a plain one.
-
-# Arguments
-
-  - `decay::Number`: Decay of the weights.
-  - `K::Integer`: Count of observations in the estimate.
-  - `n::Integer`: Count of assets that contribute to the statistic.
-  - `hac_lags::Union{Integer, VecNum}`: Count of HAC lags, or the weight of each lag.
-
-# Returns
-
-  - `b::Option{<:Number}`: The bias factor, or `nothing` where `K <= n + 1` or no root exists.
-
-# Related
-
-  - [`hac_log_det_slopes`](@ref)
-  - [`mahalanobis_bias`](@ref)
-  - [`MahalanobisTarget`](@ref)
-"""
-function mahalanobis_bias(decay::Number, K::Integer, n::Integer,
-                          hac_lags::Union{Integer, VecNum})
-    b = one(decay)
-    for _ in 1:(K > n + 1 ? 100 : 0)
-        slopes = hac_log_det_slopes(decay, K, (n + 1) * b, hac_lags)
-        if isnothing(slopes) || !(slopes[2] > zero(b))
-            return nothing
-        end
-        step = (b * slopes[1] - one(b)) / slopes[2]
-        b -= step
-        if abs(step) <= 4 * eps(b)
-            return b
-        end
-    end
-
-    return nothing
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
 Multiplies two values carried with their first two derivatives.
 
 # Arguments

@@ -400,20 +400,13 @@ and `hac_floor = PerTermHacFloor()` keeps it (ADR 0190).
     @test PO.exp_weight_cross_sum(0.9, 0.95, 17, nothing) ==
           PO.exp_weight_cross_sum(0.9, 0.95, 17)
 
-    # The two sums of the Mahalanobis fixed point, against the eigenvalues, and the fixed point.
+    # The two derivatives of `ln det(I + t A)`, against the eigenvalues.
     for K in (20, 600), L in (1, 5), t in (1.0, 30.0)
         mu = eigvals(Symmetric(hac_A(lam, L, K)))
         slopes = PO.hac_log_det_slopes(lam, K, t, L)
         @test isapprox(slopes[1], sum(mu ./ (1 .+ t .* mu)); rtol = 1e-12)
         @test isapprox(slopes[2], sum(mu ./ (1 .+ t .* mu) .^ 2); rtol = 1e-12)
     end
-    mu = eigvals(Symmetric(hac_A(lam, 2, 200)))
-    b = PO.mahalanobis_bias(lam, 200, 12, 2)
-    @test isapprox(inv(b), sum(mu ./ (1 .+ 13 .* mu .* b)); rtol = 1e-12)
-    # A Monte Carlo reads 2.479 there, and the plain fixed point 1.623. At 17 observations the
-    # estimate is not positive definite in 11 % of draws, and no root exists.
-    @test isapprox(b, 2.523; atol = 1e-3)
-    @test isnothing(PO.mahalanobis_bias(lam, 17, 12, 2))
 
     # The gate: 12 assets at a half-life of 10 and two lags first score at 54 observations;
     # at a half-life of 5 the steady state has 6.8 effective observations, and never scores.
