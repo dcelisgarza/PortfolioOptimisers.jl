@@ -816,6 +816,15 @@ definition = "investable_plot_view"
 misses = 1
 rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
 
+# Run 41195231259 (#1922): the `function` line of the `Val{:sigma_ucs}` method reads 0 while its
+# body runs 54 times through the `sigma` routes of a Pipeline. The one count it had came from a
+# direct call on a value with no field `r`, the branch that 2d2abb4c5f removed.
+[[coverage_exemption]]
+path = "src/21_Pipeline/02_StepExecution.jl"
+definition = "pipe_target_paths"
+misses = 1
+rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
+
 # --- JET dismissals --------------------------------------------------------
 #
 # Keyed (file, kind, message), ADR 0071. A Dismissal matches every report of its fingerprint in
