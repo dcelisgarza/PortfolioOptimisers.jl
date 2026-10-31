@@ -2505,10 +2505,43 @@ end
     @test isa(qa, AugmentedBlackLittermanPrior)
     @test isapprox(prior(qa, X[1:30, :], F[1:30, :]).mu,
                    prior(abl, X[1:30, :], F[1:30, :]).mu)
-    # A caller's weights on a pooling prior weigh the scenarios of the prior beneath it.
-    epw = EntropyPoolingPrior(; pe = EmpiricalPrior(), w = w30)
-    qe = PO.scenario_factory(epw, w30, nothing, X[1:30, :], F[1:30, :], nothing)
-    @test isa(qe, PO.AbstractPriorEstimator)
+    # Uneven weights reach both priors of the augmented one: each fits the weighted mean
+    # of its own returns. The pooled `f_pe` of `abl` has no such mean, so a plain pair serves.
+    wnu = aweights(LinearAlgebra.normalize(rand(rng, 30) .+ 0.2, 1))
+    abl_e = AugmentedBlackLittermanPrior(; a_views = lce("A2 == 0.001"),
+                                         f_views = lce("F2 == 0.001"), sets = sets2)
+    qn = PO.prior_probability_factory(abl_e, wnu, X[1:30, :], F[1:30, :], nothing)
+    @test prior(qn.a_pe, X[1:30, :]).mu ≈ vec(transpose(X[1:30, :]) * wnu)
+    @test prior(qn.f_pe, F[1:30, :]).mu ≈ vec(transpose(F[1:30, :]) * wnu)
+    # A caller's weights on a pooling prior weigh the scenarios of the prior beneath it, and
+    # they are the prior probabilities of the pool that holds it, whatever prior it wraps. A
+    # mean view moves the posterior from those probabilities alone, so the pool over the
+    # augmented prior lands where the pool over the empirical prior does.
+    epw = EntropyPoolingPrior(; pe = EmpiricalPrior(), w = wnu)
+    t4 = near(prior(EmpiricalPrior(), X[1:30, :])) + 0.001
+    ep_w = prior(EntropyPoolingPrior(; pe = epw, sets = sets, mu_views = lce("A1 == $t4")),
+                 X[1:30, :], F[1:30, :])
+    ep_ref = prior(EntropyPoolingPrior(; pe = EmpiricalPrior(), w = wnu, sets = sets,
+                                       mu_views = lce("A1 == $t4")), X[1:30, :], F[1:30, :])
+    ep_flat = prior(EntropyPoolingPrior(; pe = EmpiricalPrior(), sets = sets,
+                                        mu_views = lce("A1 == $t4")), X[1:30, :],
+                    F[1:30, :])
+    @test isapprox(LinearAlgebra.dot(ep_w.w, X[1:30, 1]), t4; rtol = 1e-6)
+    @test isapprox(ep_w.w, ep_ref.w; rtol = 1e-6)
+    @test isapprox(ep_w.mu, ep_ref.mu; rtol = 1e-6)
+    @test !isapprox(ep_w.w, ep_flat.w; rtol = 1e-3)
+    # The same holds over the augmented prior, whose reconstructed returns carry the view.
+    t5 = LinearAlgebra.dot(wnu, prior(abl_e, X[1:30, :], F[1:30, :]).X[:, 1]) + 5e-5
+    mk_abl(w) = EntropyPoolingPrior(; pe = abl_e, w = w, sets = sets,
+                                    mu_views = lce("A1 == $t5"))
+    ep_abl = prior(mk_abl(wnu), X[1:30, :], F[1:30, :])
+    ep_abl0 = prior(mk_abl(nothing), X[1:30, :], F[1:30, :])
+    @test isapprox(LinearAlgebra.dot(ep_abl.w, ep_abl.X[:, 1]), t5; rtol = 1e-6)
+    @test isapprox(LinearAlgebra.dot(ep_abl0.w, ep_abl0.X[:, 1]), t5; rtol = 1e-6)
+    @test !isapprox(ep_abl.w, ep_abl0.w; rtol = 1e-3)
+    # The refit under the posterior weights `w` holds scenarios weighted by `w`.
+    qe = PO.scenario_factory(epw, ep_w.w, nothing, X[1:30, :], F[1:30, :], nothing)
+    @test prior(qe, X[1:30, :], F[1:30, :]).mu ≈ vec(transpose(X[1:30, :]) * ep_w.w)
     # A pool in `pe2` reads its own pooled weights in the refit, not those of the pool that
     # holds it. The factor model of the inner `pe2` is fitted under the inner weights, so a
     # refit that read the outer weights moved `mu` by 76 % on these data.

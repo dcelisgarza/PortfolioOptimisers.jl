@@ -240,23 +240,37 @@ end
         @test PO.string_key_pairs([:a => 1]) == ["a" => 1]
     end
     @testset "A pin has nothing to read from a buffer that fits nothing or holds no panel (#1912)" begin
-        fam = ["industry" => nothing]
-        mk(cache) = CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors(),
-                                              families = fam, cache = cache)
-        X3 = ones(3, 2)
-        # Every observation is a gap of the Shared Series, so a fit keeps none.
-        @test isnothing(PO.cross_sectional_pinned_families(mk(PO.SampleBufferState(; n = 3,
-                                                                                   X = X3,
-                                                                                   G = [true,
-                                                                                        true,
-                                                                                        true]))))
-        # The buffer records no Asset Panel, which the exposures are read from.
-        @test isnothing(PO.cross_sectional_pinned_families(mk(PO.SampleBufferState(; n = 3,
-                                                                                   X = X3))))
-        # A family that names its dropped member is already pinned.
-        pinned = CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors(),
-                                           families = ["industry" => "a"])
-        @test isnothing(PO.cross_sectional_pinned_families(pinned))
+        # A pinned choice writes the dropped member of each family into `families` at the first
+        # fit of the refit route, and a step with nothing to fit leaves the family as written.
+        rdp = csfp_panel(; n_assets = 20, n_observations = 160, n_industries = 3,
+                         seed = 782_101).rd
+        rows(r, i) = PO.port_opt_view(r, i, :)
+        est(; kw...) = CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors(),
+                                                 families = ["industry" => nothing],
+                                                 choice = PinnedChoice(), minra = 5, kw...)
+        refit(e, r) = partial_fit!(PO.update_online_estimator(Online(e)), r)
+        # Too few rows follow the warm-up for a first fit, so there is nothing to pin yet.
+        @test only(refit(est(), rows(rdp, 1:2)).families) == ("industry" => nothing)
+        # The first fit pins the member, and the refit answers the batch fit.
+        o = refit(est(), rows(rdp, 1:150))
+        name = last(only(o.families))
+        @test startswith(name, "industry=")
+        b = prior(est(), rows(rdp, 1:150))
+        po = prior(o)
+        @test isequal(po.mu, b.mu)
+        @test isequal(po.sigma, b.sigma)
+        # Every observation is a gap of the Shared Series, so a fit keeps none: nothing pins.
+        rdg = ReturnsResult(; nx = rdp.nx, X = rdp.X, nb = ["BM"],
+                            B = fill(NaN, size(rdp.X, 1)), pnl = rdp.pnl, ts = rdp.ts)
+        og = refit(est(; x_src = ExcessSource()), rows(rdg, 1:50))
+        @test only(og.families) == ("industry" => nothing)
+        # The returns record no Asset Panel, which the exposures are read from.
+        rdn = ReturnsResult(; nx = rdp.nx, X = rdp.X)
+        @test only(refit(est(), rdn).families) == ("industry" => nothing)
+        # A family that names its dropped member is already pinned, and stays as written.
+        pinned = est(; families = ["industry" => name])
+        @test only(refit(pinned, rows(rdp, 1:150)).families) == ("industry" => name)
+        @test isequal(prior(refit(pinned, rows(rdp, 1:150))).mu, b.mu)
     end
     @testset "A carry state with no fit has no residual to standardise (#1912)" begin
         pe0 = CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors())

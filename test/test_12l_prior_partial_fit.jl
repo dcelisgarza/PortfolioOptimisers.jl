@@ -548,15 +548,30 @@ end
     end
 
     @testset "A capped buffer forgets the row positions of a high order prior, and an absent member folds to nothing (#1912)" begin
-        h = prior(HighOrderPriorEstimator(; pe = FactorPrior()), X, F)
-        k = pe.buffer_row_key(h, 50)
-        @test k isa pe.HighOrderPrior
-        @test isnothing(k.pr.rr.idx)
-        @test k.kt == h.kt
-        @test k.pr.mu == h.pr.mu
-        @test pe.buffer_row_key(h, nothing) === h
-        @test isnothing(pe.fold_member(nothing, X[1, :]))
-        @test isnothing(pe.fold_member(nothing))
+        # A fold that refits from a buffer with no cap keeps the positions of the rows of the
+        # factor model, and a capped one cannot count the rows it dropped, so it keeps none.
+        # Either way the moments are the batch fit over the rows the buffer holds.
+        w = 50
+        host(mh) = pe.Online(HighOrderFactorPriorEstimator(); max_history = mh)
+        capped = prior(fold_pair(pe.update_online_estimator(host(w)), X, F))
+        whole = prior(fold_pair(pe.update_online_estimator(host(nothing)), X, F))
+        hb = HighOrderFactorPriorEstimator()
+        b = prior(hb, X[(end - w + 1):end, :], F[(end - w + 1):end, :])
+        @test capped isa pe.HighOrderPrior
+        @test isnothing(capped.pr.rr.idx)
+        @test !isnothing(whole.pr.rr.idx)
+        @test isapprox(capped.pr.mu, b.pr.mu; rtol = 1e-10)
+        @test isapprox(capped.pr.sigma, b.pr.sigma; rtol = 1e-10)
+        @test isapprox(capped.kt, b.kt; rtol = 1e-10)
+        @test isapprox(whole.kt, prior(hb, X, F).kt; rtol = 1e-10)
+        # A co-moment the host does not hold folds to nothing, and the result has none.
+        hn = HighOrderPriorEstimator(; ske = nothing)
+        on = prior(fold(hn, X))
+        @test isnothing(on.sk)
+        @test isnothing(on.V)
+        @test isapprox(on.kt, prior(hn, X).kt; rtol = 1e-10)
+        @test isnothing(prior(HighOrderPriorEstimator(; kte = nothing), X).kt)
+        @test isnothing(prior(fold(HighOrderPriorEstimator(; kte = nothing), X)).kt)
     end
 
     @testset "A read-out hands out no accumulator" begin

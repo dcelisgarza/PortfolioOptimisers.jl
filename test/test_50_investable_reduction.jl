@@ -1191,19 +1191,42 @@ end
 end
 
 @testset "A held member expands whatever shape it comes in (#1912)" begin
-    imsk = BitVector([1, 1, 0, 1, 1])
-    v = [0.1, 0.2, 0.3, 0.4]
-    M = [1.0 2.0 3.0 4.0; 5.0 6.0 7.0 8.0]
-    ev = PortfolioOptimisers.expand_investable_weights(imsk, v)
-    eM = PortfolioOptimisers.expand_investable_columns(imsk, M)
-    @test PortfolioOptimisers.expand_held_member(imsk, nothing) === nothing
-    @test PortfolioOptimisers.expand_held_member(imsk, v) == ev
-    @test PortfolioOptimisers.expand_held_member(imsk, M) == eM
-    @test PortfolioOptimisers.expand_held_member(imsk, [v, 2v]) ==
-          [ev, PortfolioOptimisers.expand_investable_weights(imsk, 2v)]
-    @test PortfolioOptimisers.expand_held_member(imsk, [M, 2M]) ==
-          [eM, PortfolioOptimisers.expand_investable_columns(imsk, 2M)]
-    @test all(iszero, ev[3:3])
+    # The record of a fold lives on the caller's universe, because the next fold reads its held
+    # weights. The oracle is the same prediction over the hand-reduced universe.
+    kw = (; hwd = SelfFinancingDrift(), store_weight_path = true)
+    # A weight vector, and the path it drifts along.
+    res = optimise(InverseVolatility(; pe = prn), rd)
+    resk = optimise(InverseVolatility(; pe = prk), rdk)
+    hw = predict(res, rd; kw...).hw
+    hwk = predict(resk, rdk; kw...).hw
+    @test hw.w0 == res.w
+    @test hw.w0[keep] == hwk.w0
+    @test hw.w[keep] == hwk.w
+    @test iszero(hw.w[k])
+    @test hw.U[:, keep] == hwk.U
+    @test all(iszero, hw.U[:, k])
+    @test size(hw.U) == (T, N)
+    # A population of weight vectors expands member by member, and so do its paths.
+    lb = Frontier(; N = 3)
+    mk(pe) = MeanRisk(;
+                      opt = JuMPOptimiser(; pe = pe, slv = slv,
+                                          ret = ArithmeticReturn(;
+                                                                 settings = JuMPReturnsSettings(;
+                                                                                                lb = lb))))
+    resp = optimise(mk(prn), rd)
+    respk = optimise(mk(prk), rdk)
+    hwp = predict(resp, rd; kw...).hw
+    hwpk = predict(respk, rdk; kw...).hw
+    @test length(hwp.w) == length(hwp.U) == length(hwp.w0) == 3
+    for i in 1:3
+        @test hwp.w0[i][keep] == hwpk.w0[i]
+        @test hwp.w[i][keep] == hwpk.w[i]
+        @test iszero(hwp.w[i][k])
+        @test hwp.U[i][:, keep] == hwpk.U[i]
+        @test all(iszero, hwp.U[i][:, k])
+    end
+    # A fold that stores no path has none to expand.
+    @test isnothing(predict(res, rd; hwd = SelfFinancingDrift()).hw.U)
 end
 
 @testset "A prior reference to a departed asset drops its row whole (#1912)" begin
@@ -1521,12 +1544,26 @@ end
     @test isapprox(bg.sigma[keep, keep], bo.sigma; rtol = 1e-12)
     # The factor block is not expanded, because the reduction never touched the factor axis.
     @test bg.fpr.mu == bo.fpr.mu
-    # The wrapper forwards the residual declaration of its wrapped estimator (#1912).
-    @test PortfolioOptimisers.factor_residual_config(BayesianBlackLittermanPrior(;
-                                                                                 pe = FactorPrior(),
-                                                                                 views = blfview,
-                                                                                 sets = setsdf)) ==
-          PortfolioOptimisers.factor_residual_config(FactorPrior())
+    # The wrapper forwards the residual declaration of its wrapped estimator (#1912). The
+    # high order factor prior takes the residual block off the covariance before it forms
+    # the residual cokurtosis, so the cokurtosis does not depend on whether the wrapped
+    # factor prior added the block. Without the declaration, the block stays in the
+    # covariance and the two cokurtoses differ at order one.
+    hkt(rsd) = prior(HighOrderFactorPriorEstimator(;
+                                                   pe = BayesianBlackLittermanPrior(;
+                                                                                    pe = FactorPrior(;
+                                                                                                     rsd = rsd),
+                                                                                    views = blfview,
+                                                                                    sets = setsdf)),
+                     rd).kt
+    @test isapprox(hkt(true), hkt(false); rtol = 1e-4)
+    @test !isapprox(hkt(true),
+                    prior(HighOrderFactorPriorEstimator(;
+                                                        pe = BayesianBlackLittermanPrior(;
+                                                                                         pe = FactorPrior(),
+                                                                                         views = blfview,
+                                                                                         sets = setsdf),
+                                                        rsd = false), rd).kt; rtol = 0.1)
     @test length(bg.mu) == N
     @test isnan(bg.mu[k])
     @test PortfolioOptimisers.investable_mask(bg) == BitVector([1, 1, 0, 1, 1])
@@ -1617,8 +1654,18 @@ end
     ref = prior(AugmentedBlackLittermanPrior(; a_views = blview, f_views = blfview,
                                              sets = setsdf), rddf)
     @test size(pa.mu) == size(ref.mu)
-    @test all(isfinite, filter(!isnan, pa.mu))
     @test isnan(pa.mu[k])
+    # The oracle is the stack with no view at all: the asset prior, fitted on the hand-reduced
+    # returns, and the factor prior. The empty-view algebra would answer `(1 + tau) * sigma`.
+    ao = prior(EmpiricalPrior(), rddfk)
+    fo = prior(EmpiricalPrior(), F)
+    @test pa.mu[keep] ≈ ao.mu
+    @test pa.sigma[keep, keep] ≈ ao.sigma
+    @test pa.fpr.mu ≈ fo.mu
+    @test pa.fpr.sigma ≈ fo.sigma
+    @test !isapprox(pa.sigma[keep, keep], (1 + inv(T)) * ao.sigma)
+    # Views that resolve to rows do move the answer off this stack.
+    @test !isapprox(ref.sigma[keep, keep], ao.sigma)
 end
 
 @testset "The Black-Litterman collapse and the empty view block on their own terms" begin
@@ -1678,17 +1725,57 @@ end
     ag = prior(AugmentedBlackLittermanPrior(; a_views = blview, f_views = blfview,
                                             sets = setsdf, l = 1, w = w), rddf)
     @test ag.mu[keep] == ao.mu
-    # Both `nothing` sentinels answer the argument they were handed.
-    @test PortfolioOptimisers.investable_weights_view(nothing, w) === w
-    @test isnothing(PortfolioOptimisers.investable_weights_view(BitVector([1, 1, 0, 1, 1]),
-                                                                nothing))
-    # A vector of weight vectors is reduced and read member by member (#1912).
-    imsk = BitVector([1, 1, 0, 1, 1])
+    # No weights is no reduction: the equilibrium mean takes equal weights over the reduced
+    # axis, which is the hand-reduced fit's answer (#1912).
+    fo0 = prior(FactorBlackLittermanPrior(; views = blfview, sets = setsdfk, l = 1), rddfk)
+    fg0 = prior(FactorBlackLittermanPrior(; views = blfview, sets = setsdf, l = 1), rddf)
+    @test fg0.mu[keep] == fo0.mu
+    @test isnan(fg0.mu[k])
+end
+
+@testset "A value-level verb reduces a population and a weight path of weights (#1912)" begin
+    # The weights are viewed at the mask by shape: a population member by member, a path by
+    # columns. The oracle is the same verb on the hand-reduced prior and weights.
+    rm = ConditionalValueatRisk()
     wv = [fill(0.2, 5), [0.25, 0.25, 0.0, 0.25, 0.25]]
-    @test PortfolioOptimisers.investable_weights_view(imsk, wv) ==
-          [fill(0.2, 4), fill(0.25, 4)]
-    @test PortfolioOptimisers.held_non_investable(imsk, wv) == [3]
-    @test isempty(PortfolioOptimisers.held_non_investable(imsk, wv[2:2]))
+    wvk = [fill(0.2, 4), fill(0.25, 4)]
+    # A population holding the dead asset in one member is refused by name under `strict`,
+    # and warns otherwise; the held weight is dropped, so the figure is the oracle's.
+    err = try
+        expected_risk(rm, wv, prn; strict = true)
+        nothing
+    catch e
+        e
+    end
+    @test isa(err, ArgumentError)
+    @test occursin("Assets [3] are not investable", err.msg)
+    held = @test_logs (:warn,) expected_risk(rm, wv, prn)
+    @test held ≈ [expected_risk(rm, wvk[1], prk), expected_risk(rm, wvk[2], prk)]
+    # One weight vector reads the same rule.
+    wd = [0.25, 0.25, 0.1, 0.2, 0.2]
+    errd = try
+        expected_risk(rm, wd, prn; strict = true)
+        nothing
+    catch e
+        e
+    end
+    @test isa(errd, ArgumentError)
+    @test occursin("Assets [3] are not investable", errd.msg)
+    @test (@test_logs (:warn,) expected_risk(rm, wd, prn)) ≈
+          expected_risk(rm, wd[keep], prk)
+    # A member that holds nothing in the dead asset has nothing to refuse or to warn about.
+    clean = @test_logs expected_risk(rm, wv[2:2], prn; strict = true)
+    @test clean ≈ [expected_risk(rm, wvk[2], prk)]
+    # The same holds for a weight path, whose rows are observations: the mask selects its
+    # columns and every row keeps its observation.
+    W = repeat(transpose(wv[1]), T)
+    W[(T ÷ 2):end, :] .= transpose(wv[2])
+    Wk = W[:, keep]
+    @test_throws ArgumentError expected_risk(rm, W, prn; strict = true)
+    @test (@test_logs (:warn,) expected_risk(rm, W, prn)) ≈ expected_risk(rm, Wk, prk)
+    Wc = repeat(transpose(wv[2]), T)
+    @test (@test_logs expected_risk(rm, Wc, prn; strict = true)) ≈
+          expected_risk(rm, Wc[:, keep], prk)
 end
 
 @testset "A view row that resolves and cancels is still dropped, and is not a typo" begin

@@ -269,10 +269,43 @@ end
 end
 
 @testset "the value at risk multiplier and the start of the tilt chain at their limits (#1912)" begin
-    # A level above the total mass is never reached, so the smallest loss answers.
-    @test PO.ep_var_multiplier([1.0, 2.0, 3.0], ones(3), 2.0) == 1.0
+    # A level that the running mass never reaches answers the smallest loss. The 201 equal
+    # weights sum to a hair under one, so a level just below one is never reached.
+    al = prevfloat(1.0)
+    @test foldl(+, ep_sw0 ./ sum(ep_sw0)) < al
+    # At that level the measure is the mean loss, so the view fixes the mean of the posterior.
+    cv1 = ConditionalValueatRisk(; alpha = al, w = ep_sw0)(ep_sX[:, 1])
+    @test isapprox(cv1, -LinearAlgebra.dot(ep_sw0, ep_sX[:, 1]); rtol = 1e-10)
+    tgt = cv1 * 0.85
+    pr = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
+                                   cvar_views = ConditionalValueatRiskView(;
+                                                                           alg = SequentialTailView(),
+                                                                           alpha = al,
+                                                                           views = LinearConstraintEstimator(;
+                                                                                                             val = "AAPL <= $tgt"))),
+               ep_srd)
+    @test isapprox(-LinearAlgebra.dot(pr.w, ep_sX[:, 1]), tgt; rtol = 1e-5)
+    @test isapprox(ConditionalValueatRisk(; alpha = al, w = pr.w)(ep_sX[:, 1]), tgt;
+                   rtol = 1e-5)
+    @test pr.kld > 0
+    # An asset that no scenario tells apart has a constant row, so no tilt of the posterior
+    # reaches a target above it. The view that the prior meets leaves the posterior at the
+    # prior, and the view that no reweighting meets is refused by name.
+    X2 = copy(ep_sX[(end - 60):end, :])
+    X2[:, 1] .= 0.001
+    rd2 = ReturnsResult(; nx = rd.nx, X = X2)
+    mk(t) = EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
+                                cvar_views = ConditionalValueatRiskView(;
+                                                                        alg = SequentialTailView(),
+                                                                        views = LinearConstraintEstimator(;
+                                                                                                          val = "AAPL <= $t")))
+    flat = prior(mk(0.5), rd2)
+    @test isapprox(flat.w, fill(inv(size(X2, 1)), size(X2, 1)); rtol = 1e-6)
+    @test flat.kld < 1e-9
+    @test_throws DomainError prior(mk(-0.5), rd2)
     # A posterior on one scenario has no room to tilt: the target sits on the end of the
     # support, no tilt exists, and the start returns the constraint it read at the prior.
+    # No prior fits one scenario, so the method is read directly beside the verb.
     x = -ep_sX[:, 1]
     T = length(x)
     tv = PO.SequentialConditionalValueatRiskViewConstraint([], Float64[], [x], [-1.0],

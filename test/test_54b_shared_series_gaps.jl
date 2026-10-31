@@ -286,16 +286,31 @@ end
     end
 
     @testset "The member rows of a gapped block carry the active mask" begin
-        Xg = [1.0 2; 3 4; 5 6]
-        Mg = Bool[1 1; 0 1; 1 0]
-        Xm, kw = PO.shared_series_member_rows(Xg, [false, true, false]; active_mask = Mg,
-                                              dims = 1)
-        @test Xm == Xg[[1, 3], :]
-        @test kw.active_mask == Mg[[1, 3], :]
-        @test kw.dims == 1
-        Xm, kw = PO.shared_series_member_rows(Xg, [false, true, false])
-        @test Xm == Xg[[1, 3], :]
-        @test !haskey(kw, :active_mask)
+        # The members of a carry fold the unmarked rows of the block and the same rows of the
+        # active mask, so a block with a gap equals the block without it.
+        n = 20
+        Xg = X0[1:n, :]
+        gp = falses(n)
+        gp[7] = true
+        rk = findall(!, gp)
+        Mg = trues(n, N)
+        Mg[3, 2] = false
+        Mg[7, 1] = false
+        Mg[12, 3] = false
+        a = prior(partial_fit!(EmpiricalPrior(), Xg; gaps = gp, active_mask = Mg))
+        b = prior(partial_fit!(EmpiricalPrior(), Xg[rk, :]; active_mask = Mg[rk, :]))
+        # The asset whose only hole sits on the dropped row stays in the Coverage Universe,
+        # and the two with a hole on a kept row leave it.
+        @test isequal(isnan.(a.mu), [false, true, true])
+        @test isapprox(a.mu, b.mu; nans = true)
+        @test isapprox(a.sigma, b.sigma; nans = true)
+        # With no mask the keyword is absent from what the members get, and the rows still go.
+        c = prior(partial_fit!(EmpiricalPrior(), Xg; gaps = gp))
+        d = prior(partial_fit!(EmpiricalPrior(), Xg[rk, :]))
+        @test c.mu ≈ d.mu
+        @test c.sigma ≈ d.sigma
+        # The mask is read: the same rows without it keep every asset.
+        @test all(isfinite, c.mu)
     end
 
     @testset "A fold of an empty block leaves a co-moment unchanged" begin
@@ -411,9 +426,19 @@ end
     @test all(isnan, p3.sigma[2, :])
     # A fit that does not read the surface keeps the asset.
     @test all(isfinite, Statistics.cov(Covariance(), X0, nothing; iv = ivg))
-    @test PO.reads_implied_volatility(pe)
-    @test !PO.reads_implied_volatility(EmpiricalPrior())
-    # A pair reads the value it holds.
+    # The same holds for a prior over the plain default: its surface has a gap, and the
+    # asset stays, with the moments of the fit on the data without the surface.
+    rdg = ReturnsResult(; nx = nx, X = X0, iv = ivg, ivpa = [1.1, 1.2, 1.3])
+    p4 = prior(EmpiricalPrior(), rdg)
+    @test all(isfinite, p4.sigma)
+    @test p4.sigma ≈ prior(EmpiricalPrior(), ReturnsResult(; nx = nx, X = X0)).sigma
+    # The wrapped surface reads the gap in the surface through every wrapper above it.
+    ce2 = PortfolioOptimisersCovariance(; ce = ce)
+    p5 = prior(EmpiricalPrior(; ce = ce2), rdg)
+    @test all(isnan, p5.sigma[2, :])
+    @test p5.sigma[[1, 3], [1, 3]] ≈ p3.sigma[[1, 3], [1, 3]]
+    # No estimator of the library holds a pair, so no verb reaches the method for a pair
+    # (#1919). It reads the value the pair holds.
     @test PO.reads_implied_volatility("iv" => ImpliedVolatility(; ppy = 252))
     @test !PO.reads_implied_volatility("iv" => Covariance())
 end
