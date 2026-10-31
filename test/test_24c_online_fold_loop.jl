@@ -627,11 +627,33 @@ assets is what keeps the JuMP families cheap.
 
     @testset "The context of a fold carries what the fold loop hands it (#1912)" begin
         cvr = split(online_cv, rd)
-        ctx = po.fold_context(2, length(cvr.test_idx), rd, cvr.train_idx, cvr.test_idx,
-                              nothing, nothing)
-        @test ctx isa TimeDependentContext
-        @test ctx.i == 2 && ctx.n == length(cvr.test_idx)
-        @test ctx.test_idx == cvr.test_idx && isnothing(ctx.w_prev)
+        n = length(cvr.test_idx)
+        # A schedule that is a function of the context records what the online arm hands it.
+        seen = TimeDependentContext[]
+        function record(ctx)
+            push!(seen, ctx)
+            return mr
+        end
+        sched_fn = NestedClustered(; opti = TimeDependent(record), opto = mr)
+        res = cross_val_predict(sched_fn, rd, online_cv)
+        @test length(res.pred) == n
+        @test sort!(unique(c.i for c in seen)) == 1:n
+        @test all(c -> c.n == n && c.test_idx == cvr.test_idx, seen)
+        @test all(c -> c.train_idx == cvr.train_idx, seen)
+        @test all(c -> isnothing(c.path_id) && c.rd.nx == nx, seen)
+        # The first fold has no previous weights, and each later fold carries the weights
+        # that the fold before it gave.
+        for c in seen
+            if c.i == 1
+                @test isnothing(c.w_prev)
+            else
+                @test c.w_prev == res.pred[c.i - 1].res.w
+            end
+        end
+        # The fold loop inlines the constructor, so the line of its signature has no counter
+        # in a run through the verb. A direct call pins the same record the loop builds.
+        ctx = po.fold_context(2, n, rd, cvr.train_idx, cvr.test_idx, nothing, nothing)
+        @test ctx.i == 2 && ctx.n == n && ctx.test_idx == cvr.test_idx
     end
 
     @testset "The search and the Pipeline take the loop at their doors" begin

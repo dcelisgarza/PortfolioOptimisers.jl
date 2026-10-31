@@ -18,6 +18,10 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
 # A caller's covariance estimator with no location of its own, for the fallback. A struct is
 # declared at the top level because a testset body is a local scope.
 struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator end
+# One whose `cache` is a state that no `forecast_location` method reads.
+struct UnreadStateCovariance{T} <: PortfolioOptimisers.AbstractCovarianceEstimator
+    cache::T
+end
 @testset "Covariance forecast evaluation: one verb through the fold loop" begin
     using Test, PortfolioOptimisers, StableRNGs, Statistics, StatsBase, Dates, LinearAlgebra
     po = PortfolioOptimisers
@@ -924,14 +928,20 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         e = @test_throws ArgumentError po.forecast_location(PortfolioOptimisersCovariance())
         @test occursin("no partial-fit state", e.value.msg)
         # A state that no method reads names the estimator and the state (#1912).
-        e = @test_throws ArgumentError po.forecast_state_location(Covariance(),
-                                                                  po.ForecasterState(nothing))
-        @test occursin("ForecasterState", e.value.msg)
-        # A correlation estimator with no processing reads the location of the one it holds,
-        # and a stepped estimator is read through `forecast_moments` with no window.
+        unread = UnreadStateCovariance(po.ForecasterState(nothing))
+        e = @test_throws ArgumentError po.forecast_location(unread)
+        @test occursin("`UnreadStateCovariance` carries a `ForecasterState`", e.value.msg)
+        @test occursin("forecast_location(ce::UnreadStateCovariance)", e.value.msg)
+        # A correlation estimator that has no processing and holds no state of its own reads
+        # the location of the stepped estimator it holds. No evaluation steps one, because the
+        # loop refuses a bare correlation estimator without a buffer, so this is a direct call.
         fitted = po.partial_fit!(Covariance(), X[1:10, :])
         @test po.forecast_location(po.CorrelationCovariance(; ce = fitted)) ==
               po.forecast_location(fitted)
+        @test po.forecast_location(fitted) ≈ vec(mean(X[1:10, :]; dims = 1))
+        # The online loop reads a stepped estimator through `forecast_moments` with no window.
+        # The loop inlines the method, so the line of its signature has no counter in a run
+        # through the verb, and a direct call pins the same read.
         sg, ct = po.forecast_moments(fitted, rd, nothing)
         @test sg == cov(fitted) && ct == po.forecast_location(fitted)
         # The summary.

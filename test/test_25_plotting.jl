@@ -744,6 +744,10 @@
         p_rb = plot_factor_cumulative_returns(rebased_fs)
         @test is_plot(p_rb)
         @test [x[:label] for x in p_rb.series_list] == rebased_fs.nf
+        # The running sums are those of the raw factor return history, not of the reduced
+        # axis.
+        @test [collect(x[:y]) for x in p_rb.series_list] ≈
+              [cumsum(fr_fs[:, j]) for j in 1:2]
         # A prior result that carries no factor block names the remedy.
         no_rr_fs = LowOrderPrior(; X = randn(rng_fs, Tf, Nf), mu = zeros(Nf),
                                  sigma = Matrix(1.0 * I, Nf, Nf))

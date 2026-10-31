@@ -1065,7 +1065,11 @@
 
         # A single-fold member keeps itself when the population numbers it (#1912).
         single = quiet.pred[1]
-        @test PortfolioOptimisers.with_position_id(single, 3) === single
+        mixed = PopulationPredictionResult(;
+                                           pred = PortfolioOptimisers.PredRes_MultiPredRes[single,
+                                                                                           quiet])
+        @test mixed.pred[1] === single
+        @test mixed.pred[2].id == 2 && mixed.pred[2].pred === quiet.pred
 
         #=
         Issue #1250: a population built by hand from `cross_val_predict` streams numbers its
@@ -1755,15 +1759,30 @@
     end
     @testset "Search grid keys, symbol indices and the empty grid (#1912)" begin
         pe = PortfolioOptimisers
-        # A bare symbol is the base case of the lens chain, a symbol index is kept as is.
-        @test pe._expr_to_lens(:a) == PropertyLens(:a)
-        @test pe._eval_index(:b) === :b
-        @test pe.parse_lens("a[b]") isa Base.Callable
+        # A key reaches its field through a chain of lenses whose root is a bare symbol (`opt`),
+        # and a symbol index (`check_sol[allow_local]`) reads a field of a NamedTuple. The
+        # setting only decides whether a solution is accepted, so both candidates solve the
+        # same problem and score alike, and the winner carries the setting of its candidate.
+        sk = Solver(; name = :sk, solver = Clarabel.Optimizer,
+                    check_sol = (; allow_local = true, allow_almost = true),
+                    settings = "verbose" => false)
+        mk = MeanRisk(; opt = JuMPOptimiser(; slv = sk))
+        key = "opt.slv.check_sol[allow_local]"
+        res_k = search_cross_validation(mk,
+                                        GridSearchCrossValidation([key => [false, true]]),
+                                        rd)
+        @test res_k.val_grid == [(false,), (true,)]
+        @test size(res_k.test_scores, 2) == 2
+        @test res_k.test_scores[:, 1] == res_k.test_scores[:, 2]
+        @test res_k.opt.opt.slv.check_sol.allow_local == res_k.val_grid[res_k.idx][1]
+        @test res_k.opt.opt.slv.check_sol.allow_almost
         # A vector of dictionaries holds only String, Symbol or Integer keys.
         gk = GridSearchCrossValidation([Dict("opt.l1" => [0.1, 0.2])])
         @test length(gk.p) == 1
         @test_throws ArgumentError GridSearchCrossValidation([Dict(1.5 => [0.1, 0.2])])
-        # An empty list of factors is a grid of one candidate, and passes the cap.
+        # No grid is empty, the constructor refuses one, so no search reaches the empty list
+        # of factors. A direct call pins its branch: a grid of one candidate passes the cap.
+        @test_throws IsEmptyError GridSearchCrossValidation(Pair{String, Vector{Int}}[])
         @test isnothing(pe.assert_search_grid_cap(Pair{String, Int}[]))
     end
     @testset "parse_lens recursion caps" begin
