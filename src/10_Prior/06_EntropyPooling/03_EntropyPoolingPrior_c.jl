@@ -1134,8 +1134,10 @@ end
 function scenario_factory(pe::Union{EntropyPoolingPrior, MeucciEntropyPoolingPrior}, w,
                           pr::Option{<:AbstractPriorResult}, X::MatNum, F::Option{<:MatNum},
                           pnl::Option{<:AssetPanel}; kwargs...)
-    # A caller's `pe.w` weighs the scenarios. Under a Scenario Cap the regression and the
-    # residual block read more rows, so `factory` gave them too few weights.
+    # A caller's `pe.w` weighs the fit that the views read. The refit of a prior that holds
+    # its model keeps the weighted fields of that fit, such as the `ce` of a
+    # `CrossSectionalFactorPrior` under an `AugmentedBlackLittermanPrior`, so these fields
+    # take `pe.w` on the rows that each reads (#1927).
     inner = if isnothing(pe.w)
         pe.pe
     else

@@ -729,6 +729,50 @@ scenario mean.
         @test_throws ArgumentError EntropyPoolingPrior(; pe = pop1, sets = sets,
                                                        mu_views = views)
     end
+    @testset "A caller's w on a nested prior reaches the residual correlation of the refit (#1927)" begin
+        # A threshold above zero makes `ce` read the standardised idiosyncratic returns, and a
+        # `Covariance` reads observation weights. A nested entropy pooling prior fits the
+        # cross-sectional prior under its own `w`, so the `ce` of the fit that the views read
+        # carries `w`. An augmented Black-Litterman prior hands its asset prior to
+        # `scenario_factory`, whose refit holds `ce`, so the refit must carry `w` too. The
+        # refit without it reads a residual correlation that no view read, and moves `sigma`
+        # by 2.1e-5 against a largest entry of 6.7e-4.
+        PO = PortfolioOptimisers
+        F = randn(StableRNG(1927), size(rd.X, 1), 2) ./ 100
+        asets = UniverseSets(; xkey = "nx",
+                             dict = Dict("nx" => rd.nx, "nf" => ["F1", "F2"]))
+        v = collect(range(1, 3; length = T))
+        wn = StatsBase.aweights(v ./ sum(v))
+        csc(pe0, ce) = CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors(),
+                                                 minra = 5, th = 0.1, pe = pe0, ce = ce)
+        abl(a, f) = AugmentedBlackLittermanPrior(; a_pe = a, f_pe = f, sets = asets,
+                                                 re = DimensionReductionRegression(),
+                                                 a_views = LinearConstraintEstimator(;
+                                                                                     val = "$(rd.nx[2]) == 0.001"),
+                                                 f_views = LinearConstraintEstimator(;
+                                                                                     val = "F1 == 0.001"))
+        nested = EntropyPoolingPrior(; pe = csc(EmpiricalPrior(), Covariance()), w = wn)
+        av = LinearConstraintEstimator(; val = "$(rd.nx[1]) == 0.003")
+        for mk in (EntropyPoolingPrior, MeucciEntropyPoolingPrior)
+            pw = prior(mk(; pe = abl(nested, EmpiricalPrior()), sets = asets,
+                          mu_views = av), rd.X, F, rd.pnl)
+            w = pw.w
+            @test length(w) == T
+            # The reference states every weight of the refit. The factor prior of the asset
+            # prior reads the posterior `w`, and `ce` reads `wn`. The factor prior of the
+            # augmented prior reads every row of `F`, and the first row, which no scenario
+            # covers, takes a zero weight.
+            ref(ce) = prior(abl(csc(PO.factory(EmpiricalPrior(), w), ce),
+                                PO.factory(EmpiricalPrior(),
+                                           StatsBase.aweights(vcat(0.0, w)))), rd.X, F,
+                            rd.pnl)
+            pr1 = ref(PO.factory(Covariance(), wn))
+            @test isapprox(pw.mu, pr1.mu; rtol = 1e-12)
+            @test isapprox(pw.sigma, pr1.sigma; rtol = 1e-12)
+            pr0 = ref(Covariance())
+            @test !isapprox(pw.sigma, pr0.sigma; rtol = 1e-6)
+        end
+    end
 end
 
 @testset "A constrained Factor Family re-bases the fit" begin
