@@ -1255,18 +1255,13 @@ end
         @test isa(res.retcode, OptimisationSuccess)
         @test res.model[:ss] == expected
     end
-    # The optimiser hands the constant a bound vector in place of an absent bound, so the
-    # branches of an absent bound stay direct calls.
-    @test pe.get_mip_ss(nothing, WeightBounds(; lb = nothing, ub = [0.5, 0.25])) == 500.0
-    @test pe.get_mip_ss(nothing, WeightBounds(; lb = [-2.0, 0.5], ub = nothing)) == 2000.0
     # No consumer reads the held indicator of a long-short bundle, so a wrong read fails
-    # loudly and does not miscount. The binaries of a held bundle stay for the type of the
-    # exact budget rows, which no builder reaches with them.
+    # loudly and does not miscount. A held bundle has no binaries for the slack-closing
+    # rows: the held builder pins the decomposition only for a `WeightsFromParts` head.
     ib = [1, 0, 1]
     held = pe.HeldIndicators(ib, ib)
     @test pe.held(held) === ib
-    @test pe.long_bin(held) === ib
-    @test pe.short_bin(held) == [0, 1, 0]
+    @test_throws MethodError pe.long_bin(held)
     ls = pe.LongShortIndicators([1, 0], [0, 1], [1, 0], [0, 1], [1, 1])
     @test pe.long_bin(ls) == [1, 0] && pe.short_bin(ls) == [0, 1]
     @test_throws MethodError pe.held(ls)

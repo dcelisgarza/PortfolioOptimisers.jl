@@ -221,10 +221,10 @@ end
         # A wrapper is not an estimator that folds: it must be resolved first.
         @test_throws ArgumentError po.assert_sample_buffer(Online(BufferProbe()))
         @test_throws ArgumentError partial_fit!(Online(BufferProbe()), X)
-        # A carry folds a block through `fold_buffer`, which seeds an empty buffer.
-        s = po.fold_buffer(nothing, X)
+        # A buffer folds a block, in either orientation.
+        s = partial_fit!(po.SampleBufferState(), X)
         @test isequal(po.sample_buffer(s), X)
-        s = po.fold_buffer(s, permutedims(X[1:2, :]); dims = 2)
+        s = partial_fit!(s, permutedims(X[1:2, :]); dims = 2)
         @test isequal(po.sample_buffer(s), vcat(X, X[1:2, :]))
         # The count of a mean over a buffer reads the rows of the buffer, as it reads the sample.
         @test po.effective_observation_count(SimpleExpectedReturns(), s) ==

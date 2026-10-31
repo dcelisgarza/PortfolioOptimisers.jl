@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the forecaster of a forecast-reading rule, with the Partial Fit State of the rows that it folded.
 
-A rule seeds it as the state of the rule when its forecaster has an exact fold. [`SimpleExpectedReturns`](@ref), [`ExpWeightedExpectedReturns`](@ref), a [`PriceLevelExpectedReturns`](@ref) over a folding statistic and a [`PriorExpectedReturns`](@ref) over a prior that folds all have one. [`supports_partial_fit`](@ref) answers the question once, at the seed.
+A rule seeds it as the state of the rule when its forecaster has an exact fold. [`SimpleExpectedReturns`](@ref), [`ExpWeightedExpectedReturns`](@ref), a [`PriceLevelExpectedReturns`](@ref) over a folding statistic all have one. A [`PriorExpectedReturns`](@ref) has one when its prior does, and no prior of the library does: [`supports_partial_fit`](@ref) is `false` for each of them, so the rule fits the prior again. [`supports_partial_fit`](@ref) answers the question once, at the seed.
 
 The rule folds the forecaster on every row and reads the forecast from its state, so the head holds one row for it. The fold reads that row as the head received it, with its gaps and its active mask, and not the finite price relative of the step. The rule fits a forecaster with no exact fold again on the rows that the head holds, and the state of the rule is then `nothing`.
 
@@ -28,48 +28,12 @@ function merge_states(::ForecasterState, ::ForecasterState)
     return throw(ArgumentError("a `ForecasterState` is not merged on its own: it sits beside an allocation that is order-dependent, so the head's state refuses the merge, and the state of the rule follows it."))
 end
 function Base.copy(x::ForecasterState)
-    return ForecasterState(copy_forecaster(x.me))
+    # The forecaster tree carries the states, so the copy walks the tree, as `partial_fit`
+    # does. The copy shares no array with the original.
+    return ForecasterState(copy_states(x.me))
 end
 function port_opt_view(x::ForecasterState, i, args...)
     return ForecasterState(port_opt_view(x.me, i, args...))
-end
-"""
-    copy_forecaster(me::AbstractExpectedReturnsEstimator)
-    copy_forecaster(me::PriorExpectedReturns)
-
-Copies a folded forecaster, so that its state shares no array with the original.
-
-The first method copies the `cache` field through the [`Base.copy`](@ref) of the state, and returns an estimator with no `cache` unchanged. The second method copies the prior of the adapter with [`copy_forecaster_prior`](@ref).
-
-# Related
-
-  - [`ForecasterState`](@ref)
-"""
-function copy_forecaster(me::AbstractExpectedReturnsEstimator)
-    if hasfield(typeof(me), :cache) && !isnothing(getfield(me, :cache))
-        return rebuild_estimator(me, (; cache = copy(me.cache)))
-    end
-    return me
-end
-function copy_forecaster(me::PriorExpectedReturns)
-    return PriorExpectedReturns(; pe = copy_forecaster_prior(me.pe))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Copies a folded prior, so that its state shares no array with the original.
-
-[`copy_forecaster`](@ref) calls it for the prior of a [`PriorExpectedReturns`](@ref). It copies the `cache` field through the [`Base.copy`](@ref) of the state, and returns a prior with no `cache` unchanged.
-
-# Related
-
-  - [`copy_forecaster`](@ref)
-"""
-function copy_forecaster_prior(pe::AbstractPriorEstimator)
-    if hasfield(typeof(pe), :cache) && !isnothing(getfield(pe, :cache))
-        return rebuild_estimator(pe, (; cache = copy(pe.cache)))
-    end
-    return pe
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

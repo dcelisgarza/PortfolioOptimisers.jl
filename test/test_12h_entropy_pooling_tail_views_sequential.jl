@@ -305,7 +305,8 @@ end
     @test_throws DomainError prior(mk(-0.5), rd2)
     # A posterior on one scenario has no room to tilt: the target sits on the end of the
     # support, no tilt exists, and the start returns the constraint it read at the prior.
-    # No prior fits one scenario, so the method is read directly beside the verb.
+    # A prior whose worst scenario holds at least `alpha` reaches this exit through `prior`,
+    # and the fit then fails on a feasible view (#1923). The direct call stays until then.
     x = -ep_sX[:, 1]
     T = length(x)
     tv = PO.SequentialConditionalValueatRiskViewConstraint([], Float64[], [x], [-1.0],

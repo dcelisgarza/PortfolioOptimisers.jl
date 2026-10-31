@@ -1030,9 +1030,6 @@ function assert_search_grid_cap(total::Integer, detail::AbstractString)::Nothing
     return nothing
 end
 function assert_search_grid_cap(factors::AbstractVector{<:Pair})::Nothing
-    if isempty(factors)
-        return nothing
-    end
     for (key, n) in factors
         @argcheck(!iszero(n),
                   IsEmptyError("the search grid parameter `$key` holds no candidate value, so the grid is the product of an empty set and holds no candidate for the search to score. Give every tuned parameter at least one value."))

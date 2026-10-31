@@ -3322,9 +3322,6 @@ end
         end
         conv = Pipeline(; steps = (PricesToReturns(), EmpiricalPrior(), iv))
         @test predict(fit(conv, prs), rd, 2:3).idx == 2:3
-        # No verb hands a fitted step the prices of a window, so a direct call pins the
-        # method that answers for a returns step on prices data.
-        @test PO.fitted_step_keeps_observations(PO.AssetSelectorResult(rd.nx), prs)
     end
     @testset "a step that no schedule changes goes through every fold untouched" begin
         # The schedule on the optimisation step makes the Pipeline time-dependent, so each
@@ -3398,13 +3395,13 @@ end
                                                                                                               raw))
         @test_logs min_level = Logging.Warn Pipeline(;
                                                      steps = (prior_step, sigma_step, raw))
-        # The group of the Excess Frame has nothing to read without returns data, and no
-        # valid Pipeline reaches that: a prior step that reads prices cannot precede the
-        # step that converts them. A direct call pins the branch.
-        @test isnothing(PO.group_returns_view(nothing, ExcessSource()))
-        # No optimiser that can receive the `sigma` set lacks the field `r`, so a direct
-        # call pins the branch of a value with no `r`.
-        @test PO.pipe_target_paths((; a = 1), Val(:sigma_ucs)) == String[]
+        # The group of the Excess Frame has nothing to read when a Pipeline with no
+        # `PricesToReturns` step is fitted on prices. The view passes the empty slot on, so
+        # the step refuses it by name.
+        @test_throws PO.IsNothingError fit(Pipeline(;
+                                                    steps = (InverseVolatility(;
+                                                                               pe = pe(ex)),)),
+                                           prs)
     end
     @testset "the online steps of a Pipeline" begin
         # An asset selector folds nothing and is refitted at the read-out, the prior owns
@@ -3433,11 +3430,6 @@ end
         short = Pipeline(;
                          steps = (EmpiricalPrior(), TimeDependent([iv, ew]; default = iv)))
         @test_throws DimensionMismatch cross_val_predict(Online(short), rdl, online)
-        # A callable has no online form, so the direct calls pin what a callable step does
-        # under the warm-up and the copy of the state.
-        pf = PipelineStep(; est = x -> x, reads = (:prices,), writes = :prices)
-        @test PO.update_online_step(pf) === pf
-        @test PO.copy_step_states(pf) === pf
         # The walks above reach none of these fallbacks, so the direct calls pin them: a value
         # that is no step owns no rows, selects no universe, caps nothing, and passes through
         # the warm-up and the copy of the state. A wrapped prior is copied, and the view of a

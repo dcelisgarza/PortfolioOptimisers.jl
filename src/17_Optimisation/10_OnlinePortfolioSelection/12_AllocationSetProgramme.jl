@@ -1143,7 +1143,7 @@ end
     investable_geometry_view(imsk::Nothing, proj::AbstractProjectionGeometry, q::AbstractVector)
     investable_geometry_view(imsk::BitVector, proj::AbstractProjectionGeometry, q::AbstractVector)
     investable_geometry_view(imsk::BitVector, proj::DiagonalProjection, q::AbstractVector)
-    investable_geometry_view(imsk::BitVector, proj::GramProjection, q::AbstractVector)
+    investable_geometry_view(imsk::BitVector, proj::GramProjection{<:Any, <:AbstractMatrix}, q::AbstractVector)
 
 Reduces the Projection Geometry and the raw step `q` to the Investable Mask of a projection programme.
 
@@ -1169,7 +1169,7 @@ Where:
   - ``\\tilde{\\boldsymbol{q}}_P``: Raw step of the reduced programme.
   - ``c``: Term that does not depend on ``\\boldsymbol{w}_P``.
 
-So the reduced Gram geometry holds ``\\mathbf{A}_{PP}`` and projects ``\\tilde{\\boldsymbol{q}}_P``. A Gram geometry with no matrix keeps no matrix, and [`set_projection_objective!`](@ref) refuses it.
+So the reduced Gram geometry holds ``\\mathbf{A}_{PP}`` and projects ``\\tilde{\\boldsymbol{q}}_P``. The Gram method reads a bound matrix. [`NewtonStep`](@ref), the one rule that takes a [`GramProjection`](@ref), binds the matrix before the view through [`gram_geometry`](@ref).
 
 # Returns
 
@@ -1195,11 +1195,10 @@ function investable_geometry_view(imsk::BitVector, proj::DiagonalProjection,
                                   q::AbstractVector)
     return DiagonalProjection(proj.h[imsk]), investable_weights_view(imsk, q)
 end
-function investable_geometry_view(imsk::BitVector, proj::GramProjection, q::AbstractVector)
+function investable_geometry_view(imsk::BitVector,
+                                  proj::GramProjection{<:Any, <:AbstractMatrix},
+                                  q::AbstractVector)
     A = proj.A
-    if isnothing(A)
-        return proj, investable_weights_view(imsk, q)
-    end
     zmsk = .!imsk
     App = A[imsk, imsk]
     qp = q[imsk] .+ LinearAlgebra.Symmetric(App) \ (A[imsk, zmsk] * q[zmsk])

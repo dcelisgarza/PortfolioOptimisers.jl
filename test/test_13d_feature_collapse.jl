@@ -805,13 +805,26 @@ end
                                                   amsk = trues(T, N), emsk = trues(T, N))))
         @test size(Z) == (T, 2, 2)
         @test all(t -> Z[t, :, :] ≈ transpose(Wn) * A3[t, :, :], 1:T)
-        # No fit above reaches two shapes, so they stay direct calls: a static tensor whose
-        # data mask holds everywhere, which collapses with no mask, and no rate.
-        Wt = [0.5 0.0; 0.25 1.0; 0.25 0.0]
-        Tv = [1.0 2.0; 3.0 4.0; 5.0 6.0]
-        @test PO.collapse_read_tensor(Tv, Wt, false, nothing, trues(3, 2),
-                                      RenormaliseActive()) ≈ [2.5 3.5; 3.0 4.0]
-        @test isnothing(PO.collapse_rate(nothing, Wt, trues(2, 3), RenormaliseActive()))
+        # A static tensor field whose data mask holds everywhere collapses as the plain
+        # contraction.
+        Z, Wn = outer_features(rd_with(AssetPanel(;
+                                                  pf = [TensorPanelField(; name = "t",
+                                                                         axis = "factor",
+                                                                         labels = ["p",
+                                                                                   "q"],
+                                                                         vals = A,
+                                                                         omsk = trues(N, 2),
+                                                                         pmsk = falses(N,
+                                                                                       2))])))
+        @test Z ≈ transpose(Wn) * A
+        # Implied volatilities with no risk premium adjustment collapse to an outer problem
+        # with none. No reader of the default fit reads them, so the weights are those of
+        # the same returns with no implied volatilities.
+        nci = NestedClustered(; opti = plain_hrp(), opto = plain_hrp(), ex = seq)
+        rdiv = ReturnsResult(; nx = nx, X = X, ts = ts, iv = abs.(X) .* 10 .+ 0.1)
+        @test isnothing(rdiv.ivpa)
+        @test optimise(nci, rdiv).w ≈
+              optimise(nci, ReturnsResult(; nx = nx, X = X, ts = ts)).w
     end
 
     @testset "Every member active: both rules equal the plain collapse bit for bit" begin

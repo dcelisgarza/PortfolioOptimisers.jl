@@ -566,7 +566,6 @@ end
 function update_online_step(ps::PipelineStep)
     return PipelineStep(update_online_step(ps.est), ps.reads, ps.writes, ps.target)
 end
-update_online_step(ps::PipelineStep{<:Function}) = ps
 """
     update_online_estimator(p::Pipeline)
 
@@ -619,7 +618,6 @@ end
 function copy_step_states(ps::PipelineStep)
     return PipelineStep(copy_step_states(ps.est), ps.reads, ps.writes, ps.target)
 end
-copy_step_states(ps::PipelineStep{<:Function}) = ps
 """
     held_timestamps(p::Pipeline)
 

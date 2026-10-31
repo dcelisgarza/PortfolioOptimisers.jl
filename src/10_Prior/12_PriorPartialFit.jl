@@ -181,7 +181,7 @@ end
 
 Folds observations into a [`PriorCarryState`](@ref), and seeds an empty state where the prior carries none.
 
-It is [`fold_buffer`](@ref) with the named-asset set kept. The seed has no cap. The cap on the carried rows is the `max_scenarios` of an `EmpiricalPrior`, which `prior(pe)` with no data applies. A cap on the fit is the `max_history` of an [`Online`](@ref), which puts the prior on the refit route instead.
+The state folds its [`SampleBufferState`](@ref) and keeps the named-asset set. The seed has no cap. The cap on the carried rows is the `max_scenarios` of an `EmpiricalPrior`, which `prior(pe)` with no data applies. A cap on the fit is the `max_history` of an [`Online`](@ref), which puts the prior on the refit route instead.
 
 # Arguments
 
@@ -198,7 +198,7 @@ It is [`fold_buffer`](@ref) with the named-asset set kept. The seed has no cap. 
 # Related
 
   - [`PriorCarryState`](@ref)
-  - [`fold_buffer`](@ref)
+  - [`SampleBufferState`](@ref)
   - [`partial_fit!`](@ref)
 """
 function fold_carry(cache::Option{<:PriorCarryState}, x::VecNum; kwargs...)

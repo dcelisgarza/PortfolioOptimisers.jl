@@ -1780,10 +1780,8 @@
         gk = GridSearchCrossValidation([Dict("opt.l1" => [0.1, 0.2])])
         @test length(gk.p) == 1
         @test_throws ArgumentError GridSearchCrossValidation([Dict(1.5 => [0.1, 0.2])])
-        # No grid is empty, the constructor refuses one, so no search reaches the empty list
-        # of factors. A direct call pins its branch: a grid of one candidate passes the cap.
+        # No grid is empty: the constructor refuses one.
         @test_throws IsEmptyError GridSearchCrossValidation(Pair{String, Vector{Int}}[])
-        @test isnothing(pe.assert_search_grid_cap(Pair{String, Int}[]))
     end
     @testset "parse_lens recursion caps" begin
         # Same trust boundary as the equation parser (ADR 0027): an over-long / deeply

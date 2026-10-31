@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the big-M style scaling constant used by MIP constraints.
 
-When `ss` is a number it is returned directly. When `nothing`, the value is derived from the largest finite bound magnitude in `wb` multiplied by 1000, defaulting to `1000.0` when all bounds are infinite or absent.
+When `ss` is a number it is returned directly. When `nothing`, the value is derived from the largest finite bound magnitude in `wb` multiplied by 1000, defaulting to `1000.0` when all bounds are infinite. The optimiser expands an absent bound to a vector before the MIP builders run, so both sides of `wb` are vectors.
 
 # Arguments
 
@@ -23,22 +23,10 @@ function get_mip_ss(ss::Number, args...)
     return ss
 end
 function get_mip_ss(::Nothing, wb::WeightBounds)
-    lb = wb.lb
-    ub = wb.ub
-    lb_mag = if isnothing(lb)
-        0.0
-    else
-        idx = isfinite.(lb)
-        lbv = view(lb, idx)
-        isempty(lbv) ? 0.0 : maximum(abs, lbv)
-    end
-    ub_mag = if isnothing(ub)
-        0.0
-    else
-        idx = isfinite.(ub)
-        ubv = view(ub, idx)
-        isempty(ubv) ? 0.0 : maximum(abs, ubv)
-    end
+    lbv = view(wb.lb, isfinite.(wb.lb))
+    ubv = view(wb.ub, isfinite.(wb.ub))
+    lb_mag = isempty(lbv) ? 0.0 : maximum(abs, lbv)
+    ub_mag = isempty(ubv) ? 0.0 : maximum(abs, ubv)
     return (iszero(lb_mag) && iszero(ub_mag)) ? 1000.0 : max(lb_mag, ub_mag) * 1000.0
 end
 """
@@ -422,8 +410,9 @@ Return the gates and binaries the exact-decomposition constraints key on.
 are always the binaries themselves, because the slack-closing constraints must key on a bit
 that is exactly 0 or 1 even when the budget is free and the gates relax.
 
-For [`HeldIndicators`](@ref) the held bit doubles as the sign: this bundle is only asked for a
-decomposition under a long-only weight bound, where held and long coincide.
+For [`HeldIndicators`](@ref) the held bit doubles as the sign. This bundle is asked for a
+decomposition only under a [`WeightsFromParts`](@ref) head, whose sign pair reads the gates
+alone, so the bundle has gates and no binaries.
 
 # Related
 
@@ -446,6 +435,12 @@ counterpart of [`long_gate`](@ref), which carries the full explanation.
 function short_gate(ind::HeldIndicators)
     return 1 .- ind.ib
 end
+function long_gate(ind::LongShortIndicators)
+    return ind.il
+end
+function short_gate(ind::LongShortIndicators)
+    return ind.is
+end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -453,13 +448,17 @@ Return the long *binary* the slack-closing exact-decomposition constraints key o
 bit itself, never a continuous relaxation (see [`long_gate`](@ref) for why the binaries and
 gates differ).
 
+Only the long-short and the sign bundles have a method. The slack-closing rows belong to a
+[`PartsBoundWeights`](@ref) head, and the held builder pins the decomposition only for a
+[`WeightsFromParts`](@ref) head, see [`set_exact_budget_constraints!`](@ref).
+
 # Related
 
   - [`short_bin`](@ref)
   - [`long_gate`](@ref)
 """
-function long_bin(ind::HeldIndicators)
-    return ind.ib
+function long_bin(ind::LongShortIndicators)
+    return ind.ilb
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -468,23 +467,13 @@ Return the short *binary* the slack-closing exact-decomposition constraints key 
 bit itself, never a continuous relaxation (see [`long_gate`](@ref) for why the binaries and
 gates differ).
 
+Only the long-short and the sign bundles have a method, as for [`long_bin`](@ref).
+
 # Related
 
   - [`long_bin`](@ref)
   - [`long_gate`](@ref)
 """
-function short_bin(ind::HeldIndicators)
-    return 1 .- ind.ib
-end
-function long_gate(ind::LongShortIndicators)
-    return ind.il
-end
-function short_gate(ind::LongShortIndicators)
-    return ind.is
-end
-function long_bin(ind::LongShortIndicators)
-    return ind.ilb
-end
 function short_bin(ind::LongShortIndicators)
     return ind.isb
 end
@@ -847,7 +836,7 @@ Where:
   - $(arg_dict[:ss_arg])
   - $(arg_dict[:lt_flag_arg])
   - `ffl_flag::Bool`: Whether to add fixed fee expressions. Emitted by [`set_fixed_fees!`](@ref) against `ib`.
-  - $(arg_dict[:xbgt_flag_arg]) Under a long-only weight bound the held bit doubles as the sign, so this builder's `ib` can serve it.
+  - $(arg_dict[:xbgt_flag_arg]) [`run_mip_builder!`](@ref) sets it here only for a [`WeightsFromParts`](@ref) head, whose sign pair this builder's `ib` serves.
 
 # Returns
 

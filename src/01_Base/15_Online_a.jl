@@ -104,7 +104,6 @@ PortfolioOptimisers.SampleBufferState
   - [`sample_buffer`](@ref)
   - [`sample_buffer_kwargs`](@ref)
   - [`factor_buffer`](@ref)
-  - [`fold_buffer`](@ref)
   - [`partial_fit!`](@ref)
   - [`CoveragePolicy`](@ref)
   - [`needs_factor_returns`](@ref)
@@ -782,66 +781,6 @@ function assert_sample_buffer(est::Union{AbstractEstimator, StatsBase.Covariance
     @argcheck(isa(cache, SampleBufferState),
               ArgumentError("`$(typeof(est))` carries no sample buffer, so it has no incremental fold of its own to fall back on. Wrap it in `Online` and resolve the wrapper with `update_online_estimator` before folding, which seeds the buffer its refit reads."))
     return cache::SampleBufferState
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Returns the [`SampleBufferState`](@ref) a carry folds into, seeding an empty one when the estimator carries none.
-
-The seed has its own function, so the fold is one line and the branch on the `cache` field has one method. A family that carries its observations calls [`fold_buffer`](@ref), which is this seed followed by the fold. The seed has no cap, because a cap is configuration, and [`Online`](@ref) carries it.
-
-# Arguments
-
-  - `cache`: The buffer the estimator carries, or `nothing`.
-
-# Returns
-
-  - `state::SampleBufferState`: The buffer `cache` holds, or an empty uncapped buffer.
-
-# Related
-
-  - [`SampleBufferState`](@ref)
-  - [`fold_buffer`](@ref)
-  - [`Online`](@ref)
-"""
-function sample_buffer_seed(cache::Option{<:SampleBufferState})
-    return isnothing(cache) ? SampleBufferState() : cache
-end
-"""
-    fold_buffer(cache::Option{<:SampleBufferState}, x::VecNum, f::Option{<:VecNum} = nothing; kwargs...)
-    fold_buffer(cache::Option{<:SampleBufferState}, X::MatNum, F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-
-Folds observations into a sample buffer, seeding an empty one when the estimator carries none.
-
-A carry calls this function inside its own [`partial_fit!`](@ref) method. The carry folds its estimate exactly through its members, and it gives its observations to this function. The function is [`sample_buffer_seed`](@ref) followed by [`partial_fit!`](@ref). The carry gives the masks and the factor rows of the fold with the observations, and the buffer records them beside their rows.
-
-# Arguments
-
-  - `cache`: The buffer the estimator carries, or `nothing`.
-  - `x`: One observation, whose entries are the assets.
-  - `f`: The contemporaneous factor observation, whose entries are the factors, or `nothing`.
-  - $(arg_dict[:X])
-  - `F`: Factor observations to fold, oriented as `X` is, or `nothing`.
-  - $(arg_dict[:dims])
-  - `kwargs...`: The `active_mask`, the `estimation_mask`, the Exogenous Series `ne` and `E`, and the implied volatilities `iv` and `ivpa` of the fold, forwarded to [`partial_fit!`](@ref).
-
-# Returns
-
-  - `state::SampleBufferState`: The buffer after the last observation.
-
-# Related
-
-  - [`SampleBufferState`](@ref)
-  - [`sample_buffer_seed`](@ref)
-  - [`partial_fit!`](@ref)
-"""
-function fold_buffer(cache::Option{<:SampleBufferState}, x::VecNum,
-                     f::Option{<:VecNum} = nothing; kwargs...)
-    return partial_fit!(sample_buffer_seed(cache), x, f; kwargs...)
-end
-function fold_buffer(cache::Option{<:SampleBufferState}, X::MatNum,
-                     F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-    return partial_fit!(sample_buffer_seed(cache), X, F; dims = dims, kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

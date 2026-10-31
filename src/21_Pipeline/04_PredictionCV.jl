@@ -536,11 +536,11 @@ function pipeline_cross_val_predict(pipe::Pipeline_OnlPipe, data::Prices_RR, cv:
 end
 #! End: TimeDependent schedules as pipeline optimisation steps.
 """
-    fitted_step_keeps_observations(fitted, data::Prices_RR) -> Bool
+    fitted_step_keeps_observations(fitted, data::AbstractReturnsResult) -> Bool
 
-Return `true` when one fitted step of a pipeline keeps every observation of a data window.
+Return `true` when one fitted step of a pipeline keeps every observation of a returns window.
 
-It is the companion of [`apply_fitted_step`](@ref), and it reads the same data levels. A step whose data level is the level of `data` changes the window, so it keeps the observations exactly when [`keeps_observations`](@ref) says so. A preprocessing step of the other level, a [`PricesToReturns`](@ref) step on returns data, and the result of every other step, such as a prior or an optimisation result, return the window unchanged, so they keep the observations. A nested [`PipelineResult`](@ref) keeps them when each of its own steps does.
+It is the companion of [`apply_fitted_step`](@ref), and it reads the same data levels. The window is always returns data, because its one caller is the returns-data [`predict`](@ref) of a [`PipelineResult`](@ref), and no step converts returns to prices. A returns preprocessing step changes the window, so it keeps the observations exactly when [`keeps_observations`](@ref) says so. A prices preprocessing step, a [`PricesToReturns`](@ref) step, and the result of every other step, such as a prior or an optimisation result, return the window unchanged, so they keep the observations. A nested [`PipelineResult`](@ref) keeps them when each of its own steps does.
 
 # Arguments
 
@@ -557,12 +557,12 @@ It is the companion of [`apply_fitted_step`](@ref), and it reads the same data l
   - [`apply_fitted_step`](@ref)
   - [`apply_fitted_steps_keeping`](@ref)
 """
-function fitted_step_keeps_observations(::Any, ::Prices_RR)::Bool
+function fitted_step_keeps_observations(::Any, ::AbstractReturnsResult)::Bool
     return true
 end
 function fitted_step_keeps_observations(f::Union{AbstractPreprocessingEstimator,
                                                  AbstractPreprocessingResult},
-                                        ::Prices_RR)::Bool
+                                        ::AbstractReturnsResult)::Bool
     return keeps_observations(f)
 end
 function fitted_step_keeps_observations(::Union{AbstractPricesPreprocessingResult,
@@ -571,16 +571,12 @@ function fitted_step_keeps_observations(::Union{AbstractPricesPreprocessingResul
                                         ::AbstractReturnsResult)::Bool
     return true
 end
-function fitted_step_keeps_observations(::Union{AbstractReturnsPreprocessingResult,
-                                                AbstractReturnsPreprocessingEstimator},
-                                        ::AbstractPricesResult)::Bool
-    return true
-end
-function fitted_step_keeps_observations(f::PipelineResult, data::Prices_RR)::Bool
+function fitted_step_keeps_observations(f::PipelineResult,
+                                        data::AbstractReturnsResult)::Bool
     return last(apply_fitted_steps_keeping(f.results, data))
 end
 """
-    apply_fitted_steps_keeping(results::Tuple, data::Prices_RR) -> (data′, kept::Bool)
+    apply_fitted_steps_keeping(results::Tuple, data::AbstractReturnsResult) -> (data′, kept::Bool)
 
 Apply the fitted steps of a pipeline to a data window, in step order, and say whether the window kept its observations.
 
@@ -608,7 +604,7 @@ It is [`apply_fitted_steps`](@ref) with one more answer. The returns-data method
   - [`fitted_step_keeps_observations`](@ref)
   - [`pipeline_fold_prediction`](@ref)
 """
-function apply_fitted_steps_keeping(results::Tuple, data::Prices_RR)
+function apply_fitted_steps_keeping(results::Tuple, data::AbstractReturnsResult)
     kept = true
     for f in results
         kept = kept && fitted_step_keeps_observations(f, data)

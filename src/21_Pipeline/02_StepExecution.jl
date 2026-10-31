@@ -628,7 +628,7 @@ Internal machinery — not part of the user-facing API.
 
 # Algorithm
 
- 1. `:sigma_ucs` on a value with a field `r`: the path `"r.ucs"`, or `"r[i].ucs"` for each element `i` of a vector that is an `UncertaintySetVariance`.
+ 1. `:sigma_ucs`: the path `"r.ucs"`, or `"r[i].ucs"` for each element `i` of a vector that is an `UncertaintySetVariance`. Only an optimiser that [`@pipe_route_sigma_ucs`](@ref) declares accepts this target, and each one has a field `r`.
  2. A target with a field of the same name in `x`: the name of the field.
  3. Otherwise the paths in the configuration of `x`, after its field name, see [`pipe_config_paths`](@ref).
 
@@ -654,9 +654,8 @@ function pipe_target_paths(::JuMPOptimiser, ::Val{:mu_ucs})::Vector{String}
     return ["ret.ucs"]
 end
 function pipe_target_paths(x, t::Val{:sigma_ucs})::Vector{String}
-    if !hasfield(typeof(x), :r)
-        return pipe_config_paths(x, t)
-    end
+    # Only an optimiser that `@pipe_route_sigma_ucs` declares accepts the target, and each
+    # one holds the measures in its own field `r`.
     r = getfield(x, :r)
     return if isa(r, UncertaintySetVariance)
         ["r.ucs"]

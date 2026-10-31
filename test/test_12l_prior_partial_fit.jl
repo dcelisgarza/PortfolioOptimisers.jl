@@ -50,7 +50,9 @@ function ImmutableCovProbe(; cache = nothing)
 end
 function PortfolioOptimisers.partial_fit!(ce::ImmutableCovProbe,
                                           x::PortfolioOptimisers.VecNum; kwargs...)
-    return ImmutableCovProbe(PortfolioOptimisers.fold_buffer(ce.cache, x))
+    return ImmutableCovProbe(partial_fit!(something(ce.cache,
+                                                    PortfolioOptimisers.SampleBufferState()),
+                                          x))
 end
 function Statistics.cov(ce::ImmutableCovProbe)
     return LinearAlgebra.Symmetric(Statistics.cov(PortfolioOptimisers.sample_buffer(ce.cache)))

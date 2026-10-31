@@ -2055,21 +2055,10 @@ end
     @test mean(s1.cache.st.me) == m1
     @test vec(mean(s2.cache.st.me)) ≈ vec(mean(rdo.X[1:20, :]; dims = 1))
     @test vec(m1) ≈ vec(mean(rdo.X[1:10, :]; dims = 1))
-    # A forecaster state always holds a cache, so the copy of a cold forecaster, which is the
-    # forecaster itself, stays a direct call.
-    cold_me = SimpleExpectedReturns()
-    @test po.copy_forecaster(cold_me) === cold_me
-    # No library prior folds inside a `PriorExpectedReturns`, so the copy of the adapter
-    # stays a direct call. It copies the prior, and the copy shares no cache with it.
-    X = reshape(collect(1.0:12.0) .^ 0.5, 6, 2)
-    pf = partial_fit!(EmpiricalPrior(), X)
-    me = PriorExpectedReturns(; pe = pf)
-    cm = po.copy_forecaster(me)
-    cp = po.copy_forecaster_prior(pf)
-    @test !(cp === pf) && !(cp.cache === pf.cache) && !(cm.pe.cache === pf.cache)
-    @test prior(cp).mu == prior(pf).mu && prior(cm.pe).mu == prior(pf).mu
-    cold = EmpiricalPrior()
-    @test po.copy_forecaster_prior(cold) === cold
+    # No library prior folds inside a `PriorExpectedReturns`, so the rule fits the prior
+    # again and keeps no forecaster state.
+    fp = OPS(; alg = ForecastReversion(; me = PriorExpectedReturns()))
+    @test isnothing(partial_fit!(fp, vw(1, 10)).cache.st)
     # Custom constraints append as one, two or many.
     c1, c2 = FirstAtMost(0.5), FirstAtMost(0.4)
     @test po.append_custom_constraint(nothing, c1) === c1

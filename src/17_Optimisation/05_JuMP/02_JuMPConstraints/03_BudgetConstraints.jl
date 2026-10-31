@@ -950,6 +950,13 @@ gives `lw_i == sw_i == 0`, hence `w_i == 0`.
 Under [`WeightsFromParts`](@ref) the pair alone is enough and the slack-closing constraints are
 not emitted: `w = lw - sw` is an identity, so `sw_i = 0` already leaves `lw_i == w_i`.
 
+A [`HeldIndicators`](@ref) bundle takes the [`WeightsFromParts`](@ref) method alone. The held
+builder pins the decomposition only for that head, because [`run_mip_builder!`](@ref) gives an
+explicit `xbgt` on a model with a short side to the sign or the long-short builder. A held bundle
+under any other contract is a `TypeError`. So the [`PartsBoundWeights`](@ref) method, and the
+method that reads the contract off the model, take the two bundles that carry binaries:
+[`LongShortIndicators`](@ref) and [`SignIndicators`](@ref).
+
 # Arguments
 
   - $(arg_dict[:model])
@@ -984,8 +991,8 @@ function set_exact_budget_constraints!(model::JuMP.Model, sp::AbstractMIPSpace,
     return nothing
 end
 function set_exact_budget_constraints!(model::JuMP.Model, sp::AbstractMIPSpace,
-                                       ind::AbstractMIPIndicators, wx::VecNum, ss,
-                                       ::PartsBoundWeights)
+                                       ind::Union{LongShortIndicators, SignIndicators},
+                                       wx::VecNum, ss, ::PartsBoundWeights)
     lw = shared_get(model, :lw)
     sw = shared_get(model, :sw)
     sc = get_constraint_scale(model)
@@ -1005,9 +1012,18 @@ function set_exact_budget_constraints!(model::JuMP.Model, sp::AbstractMIPSpace,
     return nothing
 end
 function set_exact_budget_constraints!(model::JuMP.Model, sp::AbstractMIPSpace,
-                                       ind::AbstractMIPIndicators, wx::VecNum, ss)
+                                       ind::Union{LongShortIndicators, SignIndicators},
+                                       wx::VecNum, ss)
     return set_exact_budget_constraints!(model, sp, ind, wx, ss,
                                          decomposition_contract(model))
+end
+function set_exact_budget_constraints!(model::JuMP.Model, sp::AbstractMIPSpace,
+                                       ind::HeldIndicators, wx::VecNum, ss)
+    # The held builder pins the decomposition only for a `WeightsFromParts` head: an
+    # explicit `xbgt` on a model with a short side runs the sign or the long-short builder
+    # (`run_mip_builder!`). So the held bundle never meets the slack-closing rows.
+    return set_exact_budget_constraints!(model, sp, ind, wx, ss,
+                                         decomposition_contract(model)::WeightsFromParts)
 end
 
 export BudgetRange, BudgetCosts, BudgetMarketImpact
