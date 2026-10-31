@@ -271,6 +271,18 @@ end
         pinned = est(; families = ["industry" => name])
         @test only(refit(pinned, rows(rdp, 1:150)).families) == ("industry" => name)
         @test isequal(prior(refit(pinned, rows(rdp, 1:150))).mu, b.mu)
+        # A pin on a member that the fit does not choose stays as written too, and the refit
+        # answers the batch fit under that pin, not under the member the fit chooses (#1926).
+        # The basis honours a pinned member, so the exit for a set with every member pinned
+        # is a short cut: it gives the families that the steps after it give.
+        other = "industry=Banks"
+        @test other != name
+        pinned_other = est(; families = ["industry" => other])
+        o_other = refit(pinned_other, rows(rdp, 1:150))
+        @test only(o_other.families) == ("industry" => other)
+        b_other = prior(pinned_other, rows(rdp, 1:150))
+        @test isequal(prior(o_other).mu, b_other.mu)
+        @test !isequal(b_other.mu, b.mu)
     end
     @testset "The scalar guards" begin
         f = csfp_factors()

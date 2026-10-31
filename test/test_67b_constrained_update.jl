@@ -2043,6 +2043,9 @@ end
     # the batch verb refuses it for the missing returns.
     bhp = BudgetedHindsightPath(; L = 1.0, slv = Solver(; name = :none, solver = nothing))
     @test_throws po.IsNothingError optimise(bhp)
+    # The message names the missing returns, so the batch verb received the empty
+    # `ReturnsResult` and refused it, not a refusal of the state (#1926).
+    @test_throws r"rd.X cannot be nothing" optimise(bhp)
     # The universe of a head that reads no names is the head itself.
     ops = OPS()
     @test po.non_investable_universe(ops, ["A"]) === ops

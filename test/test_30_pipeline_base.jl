@@ -3287,6 +3287,14 @@ end
     end
 end
 
+# A returns-level step that drops the first observation of each window. It makes no promise
+# that it keeps them, so a prediction through it records no rows (#1926).
+struct HelperDropFirstRow <: PortfolioOptimisers.AbstractReturnsPreprocessingEstimator end
+PortfolioOptimisers.fit_preprocessing(est::HelperDropFirstRow, ::Any) = est
+function PortfolioOptimisers.apply_preprocessing(::HelperDropFirstRow,
+                                                 rd::PortfolioOptimisers.AbstractReturnsResult)
+    return PortfolioOptimisers.port_opt_view(rd, 2:size(rd.X, 1), :)
+end
 @testset "Pipeline step helpers on their small shapes (#1912)" begin
     using Dates, StableRNGs
     PO = PortfolioOptimisers
@@ -3322,6 +3330,10 @@ end
         end
         conv = Pipeline(; steps = (PricesToReturns(), EmpiricalPrior(), iv))
         @test predict(fit(conv, prs), rd, 2:3).idx == 2:3
+        # A returns step that drops an observation does not keep them, so the prediction
+        # records no rows (#1926).
+        drop = Pipeline(; steps = (HelperDropFirstRow(), EmpiricalPrior(), iv))
+        @test isnothing(predict(fit(drop, rd), rd, 2:4).idx)
     end
     @testset "a step that no schedule changes goes through every fold untouched" begin
         # The schedule on the optimisation step makes the Pipeline time-dependent, so each
@@ -3338,6 +3350,21 @@ end
             @test weights(res)[:, 1:2:end] == weights(bare_iv)[:, 1:2:end]
             @test weights(res)[:, 2:2:end] == weights(bare_ew)[:, 2:2:end]
             @test weights(bare_iv) != weights(bare_ew)
+            @test fit(td, rdl).ctx.opt.w == fixed.ctx.opt.w
+        end
+        # A step that wraps the schedule, or a nested Pipeline that holds it, resolves it for
+        # each fold, and the fold-less fit falls back on the default. A step that kept the
+        # schedule unresolved would run the default in every fold, or refuse the fit (#1926).
+        for step in (PipelineStep(; est = sched, writes = :opt),
+                     PipelineStep(; est = Pipeline(; steps = (EmpiricalPrior(), sched)), writes = :opt))
+            td = if isa(step.est, Pipeline)
+                Pipeline(; steps = (step,))
+            else
+                Pipeline(; steps = (EmpiricalPrior(), step))
+            end
+            res = cross_val_predict(td, rdl, wf)
+            @test weights(res)[:, 1:2:end] == weights(bare_iv)[:, 1:2:end]
+            @test weights(res)[:, 2:2:end] == weights(bare_ew)[:, 2:2:end]
             @test fit(td, rdl).ctx.opt.w == fixed.ctx.opt.w
         end
     end
@@ -3361,6 +3388,15 @@ end
             @test weights(res) == weights(bare)
             @test nets(res) == nets(bare)
         end
+        # A step that wraps the reader gives it the weights of the previous fold too. A step
+        # that kept the reader as written would read none, as the `fixed` turnover does
+        # (#1926).
+        res = cross_val_predict(Pipeline(;
+                                         steps = (EmpiricalPrior(),
+                                                  PipelineStep(; est = reads,
+                                                               writes = :opt))), rdl, cv)
+        @test nets(res) == nets(bare)
+        @test nets(res)[2] != nets(fixed)[2]
     end
     @testset "constraint steps and slots" begin
         step = PipelineStep(; est = AssetSetsMatrixEstimator(; val = "nx"),

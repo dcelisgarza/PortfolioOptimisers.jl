@@ -735,7 +735,11 @@
         fcb_fs = FactorFamilyBasis(; fnm = ["ind"], fi = [[1, 2, 3]], di = [3],
                                    ratios = [0.5 0.25; 0.25 2.0], K = 3)
         fr_fs = 0.02 * randn(rng_fs, Tf, 2)
-        csr2_fs = CrossSectionalRegression(; f = fr_fs, eps = csr_fs.eps, n = csr_fs.n)
+        # The regression holds factor returns other than `fr`, so a summary that read
+        # `csr.f` in place of the raw history draws other sums (#1926).
+        csr2_fs = CrossSectionalRegression(; f = 2 .* fr_fs .+ 0.01, eps = csr_fs.eps,
+                                           n = csr_fs.n)
+        @test csr2_fs.f != fr_fs
         rebased_fs = CrossSectionalFactorModel(; M = Ms_fs[Tf, :, 1:2], L = Ms_fs[Tf, :, :],
                                                b = zeros(Nf), csr = csr2_fs,
                                                Ms = Ms_fs[:, :, 1:2],
