@@ -904,7 +904,7 @@ end
         @test isfile(path)
 
         withenv("PO_JULIA_SLOT_DIR" => dir, "PO_JULIA_SLOTS" => "1",
-                "PO_JULIA_MIN_FREE_GB" => "0", "CI" => nothing,
+                "PO_JULIA_MIN_FREE_GB" => "0", "PO_JULIA_RUN_GB" => "0", "CI" => nothing,
                 "PO_JULIA_SLOT_HELD" => nothing) do
             rm(path)
             @test JS.active()
@@ -931,6 +931,47 @@ end
             JS.release(path)
         end
         @test JS.mem_available_gb() > 0
+    end
+
+    @testset "the slots follow the machine: a cap from the threads, a reserve for each holder" begin
+        JS = GateScopeSeam.CodeHealth.JuliaSlot
+        dir = mktempdir()
+        withenv("PO_JULIA_SLOTS" => nothing) do
+            @test JS.slots() == max(1, Sys.CPU_THREADS ÷ 2)
+        end
+        withenv("PO_JULIA_SLOTS" => "3") do
+            @test JS.slots() == 3
+        end
+        # A process that is gone holds nothing.
+        p = run(`true`; wait = false)
+        gone = getpid(p)
+        wait(p)
+        @test JS.rss_gb(gone) == 0
+        # A holder is found whatever its slot index, and a dead one is not.
+        write(joinpath(dir, "slot-7.pid"), "$(getpid()) self\n")
+        write(joinpath(dir, "slot-2.pid"), "$gone gone\n")
+        write(joinpath(dir, "admit.lock"), "not a slot\n")
+        @test JS.holders(dir) == [(getpid(), "self")]
+        withenv("PO_JULIA_SLOT_DIR" => dir, "PO_JULIA_SLOTS" => "1",
+                "PO_JULIA_MIN_FREE_GB" => "0") do
+            # A holder that holds all it can grow to is owed nothing.
+            withenv("PO_JULIA_RUN_GB" => "0") do
+                @test JS.reserve_gb(dir) == 0
+                path = JS.admit(dir, "fits")
+                @test path == joinpath(dir, "slot-1.pid")
+                JS.release(path)
+            end
+            if Sys.islinux()
+                # This process holds memory, and the reserve is what it can still grow into.
+                @test 0 < JS.rss_gb(getpid()) < 1000
+                withenv("PO_JULIA_RUN_GB" => "1000") do
+                    @test JS.reserve_gb(dir) ≈ 1000 - JS.rss_gb(getpid()) atol = 0.5
+                    # No machine has 1000 GB free, so the run waits and takes no slot.
+                    @test JS.admit(dir, "too big") === nothing
+                    @test !isfile(joinpath(dir, "slot-1.pid"))
+                end
+            end
+        end
     end
 
     @testset "doctest_files selects the docstrings of the named files" begin
