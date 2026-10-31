@@ -1650,4 +1650,33 @@ end
                                                     rt = [ArithmeticReturn(),
                                                           LogarithmicReturn()]), wc, prc),
                    mu_rc + log_rc; rtol = 1e-6)
+    # A return of degree one and a return of no degree give the same contributions above,
+    # because a division by one changes nothing. Over a variance the ratio has degree
+    # 1 - 2 = -1, or none, so the degree of the return decides the sign of each
+    # contribution (R25 of #1817). The reference is the analytic gradient of the ratio.
+    V = dot(wc, prc.sigma, wc)
+    gV = 2 .* (prc.sigma * wc)
+    ratio_g(f, gf) = gf ./ V .- f .* gV ./ V^2
+    A = dot(prc.mu, wc)
+    L = sum(log1p.(Xc * wc)) / 60
+    gL = Xc' * (1 ./ (1 .+ Xc * wc)) ./ 60
+    rr(rt) = ExpectedReturnRiskRatio(; rt = rt, rk = Variance())
+    nofee = ArithmeticReturn(; settings = JuMPReturnsSettings(; fee = false))
+    # Degree -1: the contributions are the gradient divided by -1, and they sum to the
+    # ratio by Euler's theorem.
+    for (rt, f) in ((ArithmeticReturn(), nothing), (nofee, fc),
+                    ([ArithmeticReturn(), NoReturn()], nothing), ([nofee, NoReturn()], fc))
+        rc = risk_contribution(rr(rt), wc, prc, f)
+        @test isapprox(rc, -wc .* ratio_g(A, prc.mu); rtol = 1e-6)
+        @test isapprox(sum(rc), A / V; rtol = 1e-6)
+    end
+    # No degree: a fixed fee on a term that pays it, or a log return. The contributions are
+    # the gradient unadjusted. The fixed fee of four held assets over 60 observations moves
+    # the value, not the gradient.
+    @test isapprox(risk_contribution(rr(ArithmeticReturn()), wc, prc, fc),
+                   wc .* ratio_g(A - 4 * 0.0001 / 60, prc.mu); rtol = 1e-6)
+    @test isapprox(risk_contribution(rr(LogarithmicReturn()), wc, prc),
+                   wc .* ratio_g(L, gL); rtol = 1e-6)
+    @test isapprox(risk_contribution(rr([ArithmeticReturn(), LogarithmicReturn()]), wc,
+                                     prc), wc .* ratio_g(A + L, prc.mu .+ gL); rtol = 1e-6)
 end
