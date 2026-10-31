@@ -1234,11 +1234,31 @@ end
 
 @testset "MIP indicator bundles and the big-M constant (#1912)" begin
     pe = PortfolioOptimisers
-    @test pe.get_mip_ss(5.0, WeightBounds(; lb = 0.0, ub = 1.0)) == 5.0
-    # A bound that is absent adds no magnitude, and bounds that are all absent give 1000.
+    # The big-M constant of a free budget is the largest finite bound times 1000. A stated
+    # `ss` is used as it is. A bound that is absent adds no magnitude, and bounds that are
+    # all absent give 1000. The model keeps the constant under `:ss`.
+    Xm = 0.01 .* randn(StableRNG(1919), 60, 5) .+ 0.001
+    rdm = ReturnsResult(; nx = string.('A':'E'), X = Xm)
+    prm = prior(EmpiricalPrior(), rdm)
+    slvm = Solver(; name = :highs,
+                  solver = optimizer_with_attributes(HiGHS.Optimizer,
+                                                     JuMP.MOI.Silent() => true),
+                  check_sol = (; allow_local = true, allow_almost = true))
+    for (ss, wb, expected) in ((nothing, WeightBounds(; lb = 0.0, ub = 1.0), 1000.0),
+                               (7.0, WeightBounds(; lb = 0.0, ub = 1.0), 7.0),
+                               (nothing, WeightBounds(; lb = nothing, ub = [0.5, 0.25, 0.5, 0.5, 0.5]), 500.0),
+                               (nothing, WeightBounds(; lb = [-2.0, 0.5, 0.0, 0.0, 0.0], ub = nothing), 2000.0),
+                               (nothing, WeightBounds(; lb = nothing, ub = nothing), 1000.0))
+        res = optimise(MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumRatio(),
+                                opt = JuMPOptimiser(; pe = prm, slv = slvm, card = 3,
+                                                    ss = ss, wb = wb)))
+        @test isa(res.retcode, OptimisationSuccess)
+        @test res.model[:ss] == expected
+    end
+    # The optimiser hands the constant a bound vector in place of an absent bound, so the
+    # branches of an absent bound stay direct calls.
     @test pe.get_mip_ss(nothing, WeightBounds(; lb = nothing, ub = [0.5, 0.25])) == 500.0
     @test pe.get_mip_ss(nothing, WeightBounds(; lb = [-2.0, 0.5], ub = nothing)) == 2000.0
-    @test pe.get_mip_ss(nothing, WeightBounds(; lb = nothing, ub = nothing)) == 1000.0
     ib = [1, 0, 1]
     held = pe.HeldIndicators(ib, ib)
     @test pe.long_bin(held) === ib

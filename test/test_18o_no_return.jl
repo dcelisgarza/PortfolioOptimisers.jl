@@ -1620,13 +1620,34 @@ end
                             sqrt(dot(rmi[1].w, pr.sigma, rmi[1].w)); rtol = 1e-5), rmi)
 end
 
-@testset "NoReturn: the degree of homogeneity is one beside any fee (#1912)" begin
-    hd = PortfolioOptimisers.homogeneity_degree
-    @test hd(NoReturn()) == 1
-    @test hd(ArithmeticReturn()) == 1
-    @test isnothing(hd(LogarithmicReturn()))
-    @test hd(NoReturn(), Fees(; fl = 0.0001)) == 1
-    # A vector has degree one when no term that enters the ratio has none.
-    @test hd([ArithmeticReturn(), NoReturn()]) == 1
-    @test isnothing(hd([ArithmeticReturn(), LogarithmicReturn()]))
+@testset "NoReturn: the contributions of an expected return beside any fee (#1912)" begin
+    # `risk_contribution` divides a contribution by the degree of homogeneity of the measure.
+    # A `NoReturn` term has degree one beside any fee, a `LogarithmicReturn` has none, and a
+    # vector of terms has none when one of its terms that enters the ratio has none.
+    Xc = 0.01 .* randn(StableRNG(1919), 60, 4) .+ 0.002
+    prc = prior(EmpiricalPrior(), ReturnsResult(; nx = string.('A':'D'), X = Xc))
+    wc = [0.1, 0.2, 0.3, 0.4]
+    fc = Fees(; fl = 0.0001)
+    mu_rc = prc.mu .* wc
+    # The log return has the contribution w_i mean(x_i / (1 + x w)) of its gradient.
+    log_rc = wc .* (Xc' * (1 ./ (1 .+ Xc * wc)) ./ 60)
+    # The arithmetic return has degree one, so its contributions sum to the return.
+    @test isapprox(risk_contribution(ExpectedReturn(), wc, prc), mu_rc)
+    @test isapprox(sum(risk_contribution(ExpectedReturn(), wc, prc)), dot(wc, prc.mu))
+    # `NoReturn` contributes nothing, with and without a fee.
+    nr = ExpectedReturn(; rt = NoReturn())
+    @test risk_contribution(nr, wc, prc) == zeros(4)
+    @test risk_contribution(nr, wc, prc, fc) == zeros(4)
+    # The log return has no degree, so its contribution is left as the gradient gives it.
+    lr = ExpectedReturn(; rt = LogarithmicReturn())
+    @test isapprox(risk_contribution(lr, wc, prc), log_rc; rtol = 1e-6)
+    # A vector adds the contributions of its terms. `NoReturn` adds none, and the log term
+    # leaves the sum unadjusted.
+    @test isapprox(risk_contribution(ExpectedReturn(;
+                                                    rt = [ArithmeticReturn(), NoReturn()]),
+                                     wc, prc), mu_rc)
+    @test isapprox(risk_contribution(ExpectedReturn(;
+                                                    rt = [ArithmeticReturn(),
+                                                          LogarithmicReturn()]), wc, prc),
+                   mu_rc + log_rc; rtol = 1e-6)
 end

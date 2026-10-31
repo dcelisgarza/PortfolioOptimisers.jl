@@ -1615,15 +1615,37 @@ end
 
 # A measure of a user holds its slots and a fan-out estimator, and reaches the general
 # `fan_out_pe`, because neither shipped measure that fans out is this type.
-struct FanOutProbe{T1, T2}
+struct FanOutProbe{T1, T2} <: PO.RiskMeasure
     mu::T1
     pe::T2
 end
+PortfolioOptimisers.risk_input_kind(::FanOutProbe) = PO.WeightsInput()
+PortfolioOptimisers.deferred_slots(r::FanOutProbe) = (; mu = r.mu, pe = r.pe)
+PortfolioOptimisers.functor_slots(r::FanOutProbe) = (; mu = r.mu)
+function PortfolioOptimisers.resolve_deferred_quantities(r::FanOutProbe,
+                                                         pr::PO.AbstractPriorResult,
+                                                         slv = nothing)
+    return PO.fan_out_pe(r, r.pe, pr, (; mu = PO.resolve_slot(r.mu, :mu, pr)))
+end
+function PortfolioOptimisers.factory(r::FanOutProbe, pr::PO.AbstractPriorResult, args...;
+                                     kwargs...)
+    return PO.resolve_deferred_quantities(r, pr)
+end
+(r::FanOutProbe)(w::AbstractVector{<:Number}) = dot(w, r.mu)
 @testset "Deferred Quantity: the general fan-out fills the slots a measure leaves open (#1912)" begin
     X = randn(StableRNG(11), 100, 3)
     lop = prior(EmpiricalPrior(), X)
-    x = FanOutProbe(nothing, EmpiricalPrior())
-    out = PortfolioOptimisers.fan_out_pe(x, x.pe, lop, (; mu = nothing))
-    @test out.mu ≈ lop.mu
-    @test isnothing(out.pe)
+    w = [0.2, 0.3, 0.5]
+    pe = EmpiricalPrior(; me = ShrunkExpectedReturns())
+    fanned = prior(pe, X).mu
+    @test !isapprox(fanned, lop.mu)
+    # An unstated `mu` takes the fit of the fan-out estimator, which is not the prior's.
+    @test expected_risk(FanOutProbe(nothing, pe), w, lop) ≈ dot(w, fanned)
+    # A stated `mu` wins over the fan-out.
+    mu = [0.1, -0.2, 0.3]
+    @test expected_risk(FanOutProbe(mu, pe), w, lop) ≈ dot(w, mu)
+    # Without a fan-out estimator the measure takes its resolved slots as they are.
+    @test expected_risk(FanOutProbe(mu, nothing), w, lop) ≈ dot(w, mu)
+    # The rebuilt measure holds no estimator, because the fit is done.
+    @test isnothing(factory(FanOutProbe(nothing, pe), lop).pe)
 end

@@ -313,14 +313,6 @@
             @test !PO.is_calibration_rule(OrderedWeightsArrayTailGini())
             @test !PO.is_calibration_rule(reverse ∘ OrderedWeightsArrayTailGini())
             @test PO.is_calibration_rule(t -> t)
-            # The same answers through a call that dispatch cannot fold, so that each method
-            # runs and a coverage run counts it (#1912).
-            for (x, ans) in ((OrderedWeightsArrayTailGini(), false),
-                             (reverse ∘ OrderedWeightsArrayTailGini(), false), (t -> t, true),
-                             (0.5, false), (PO.ScenarioCount(; n = 10), true))
-                dyn = Ref{Any}(x)
-                @test PO.is_calibration_rule(dyn[]) == ans
-            end
             # The L-moment weights against exact rational arithmetic, at a size whose
             # binomials overflowed an `Int` before the weights were computed in their own
             # element type.
@@ -522,6 +514,42 @@
                                                            alg = ApproxOrderedWeightsArray()),
                                    obj = MinimumRisk(), opt = opt))
             @test size(ra.model[:owa_epsilon_1]) == (T, 5)
+        end
+        @testset "A calibrated builder optimises as the number its rule returns (#1919)" begin
+            # The rule marker tells a rule from a number and from a builder. A builder and its
+            # reversal hold calibration slots and are no rule, so the walk reaches the slot of
+            # the child; a rule in that slot is called, and a number is carried as it is.
+            slv = Solver(; name = :c, solver = Clarabel.Optimizer,
+                         settings = Dict("verbose" => false),
+                         check_sol = (; allow_local = true, allow_almost = true))
+            X = 0.01 * randn(StableRNG(1919), 60, 4) .+ 0.0005
+            pr = prior(EmpiricalPrior(), ReturnsResult(; nx = string.('A':'D'), X = X))
+            opt = JuMPOptimiser(; pe = pr, slv = slv)
+            fn_rule(::Symbol, ::PortfolioOptimisers.AbstractPriorResult, ::Any, ::Any, ::PortfolioOptimisers.CalibrationContext) = 0.1
+            # `ScenarioCount(; n = 6)` is a rule with alpha = 6 / 60 = 0.1.
+            cv(a) = OrderedWeightsArray(;
+                                        w = OrderedWeightsArrayConditionalValueatRisk(;
+                                                                                      alpha = a))
+            resn = optimise(MeanRisk(; r = cv(0.1), obj = MinimumRisk(), opt = opt))
+            ref = optimise(MeanRisk(; r = cv(0.05), obj = MinimumRisk(), opt = opt))
+            @test !isapprox(resn.w, ref.w; rtol = 1e-3)
+            for alpha in (ScenarioCount(; n = 6), fn_rule)
+                res = optimise(MeanRisk(; r = cv(alpha), obj = MinimumRisk(), opt = opt))
+                @test isa(res.retcode, OptimisationSuccess)
+                @test isapprox(res.w, resn.w; rtol = 1e-6)
+            end
+            # The reversal of a builder in the Range container is no rule either, and its
+            # tail takes the rule of its own slot.
+            rg(a) = OrderedWeightsArrayRange(;
+                                             w1 = OrderedWeightsArrayConditionalValueatRisk(;
+                                                                                            alpha = a),
+                                             w2 = reverse ∘
+                                                  OrderedWeightsArrayConditionalValueatRisk(;
+                                                                                            alpha = a))
+            resr = optimise(MeanRisk(; r = rg(ScenarioCount(; n = 6)), obj = MinimumRisk(),
+                                     opt = opt))
+            resn = optimise(MeanRisk(; r = rg(0.1), obj = MinimumRisk(), opt = opt))
+            @test isapprox(resr.w, resn.w; rtol = 1e-6)
         end
     end
 end

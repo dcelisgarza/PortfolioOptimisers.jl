@@ -481,9 +481,11 @@ end
         @test !PO.reads_fees(ValueatRisk(; alg = DistributionValueatRisk()))
         @test !PO.reads_fees(VarianceSkewKurtosis())
         # A range reads the fees when one of its tails does.
-        gr = GenericValueatRiskRange()
-        @test PO.reads_fees(gr) == (PO.reads_fees(gr.loss) || PO.reads_fees(gr.gain))
         dvar = ValueatRisk(; alg = DistributionValueatRisk())
+        cvar = ConditionalValueatRisk()
+        @test PO.reads_fees(GenericValueatRiskRange(; loss = cvar, gain = cvar))
+        @test PO.reads_fees(GenericValueatRiskRange(; loss = dvar, gain = cvar))
+        @test PO.reads_fees(GenericValueatRiskRange(; loss = cvar, gain = dvar))
         @test !PO.reads_fees(GenericValueatRiskRange(; loss = dvar, gain = dvar))
         @test PO.sums_to_zero([1 // 2, -1 // 2])
         @test !PO.sums_to_zero([1 // 2, -1 // 3])
