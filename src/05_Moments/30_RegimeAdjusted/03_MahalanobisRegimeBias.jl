@@ -491,7 +491,7 @@ row, which no lag reads, so the path is that of the plain weights.
 """
 function hac_log_det_path!(g::VecNum, r::VecNum, s::Number, decay::Number,
                            hac_lags::Union{Integer, VecNum})
-    z = ntuple(_ -> zero(s), 3)
+    z = ntuple(_ -> zero(s), 2)
     k = hac_lag_weights(hac_lags, decay)
     Lb = max(length(k), 1)
     buf = (; l = fill(z, Lb, Lb), d = fill(z, Lb), row = fill(z, Lb), k)
@@ -522,7 +522,7 @@ Finds the cut of the HAC transform of one count, the point ``\\sigma^{*}`` where
 
 The derivative ``\\rho_{0}`` falls in ``\\sigma``, and it falls to ``-\\infty`` at the first zero of
 the determinant where ``B`` has a negative eigenvalue. The lattice brackets its zero, and a
-bisection on the exact derivative of [`hac_log_det_slopes`](@ref) finds it. A shift of the cut by
+bisection on the exact derivative of [`hac_log_det_slope`](@ref) finds it. A shift of the cut by
 one sixteenth in ``\\ln \\sigma`` moves the factor of the first moment by 0.3 % at two assets, a
 half-life of 5 and five lags, so the step of the lattice is too coarse. The value at the cut is the
 lattice value below it plus the integral of the exact derivative, by the 4-point Gauss–Legendre
@@ -539,7 +539,7 @@ rule.
   - `hac_lags::Union{Integer, VecNum}`: Count of HAC lags, or the weight of each lag.
   - `slope`: In place of `decay`, `K` and `hac_lags`, a function of ``\\sigma`` that gives the exact
     derivative, or a negative number past the first zero of the determinant. The first method
-    reads it from [`hac_log_det_slopes`](@ref) on the banded matrix.
+    reads it from [`hac_log_det_slope`](@ref) on the banded matrix.
 
 # Returns
 
@@ -551,15 +551,15 @@ rule.
 
   - [`mahalanobis_lattice`](@ref)
   - [`mahalanobis_cut!`](@ref)
-  - [`hac_log_det_slopes`](@ref)
+  - [`hac_log_det_slope`](@ref)
 """
 function hac_log_det_peak(gh::VecNum, rh::VecNum, xf::AbstractRange, decay::Number,
                           K::Integer, hac_lags::Union{Integer, VecNum})
     c = (one(decay) - decay) / (one(decay) - decay^K)
     return hac_log_det_peak(gh, rh, xf,
                             function (sigma)
-                                sl = hac_log_det_slopes(decay, K, sigma / c, hac_lags)
-                                return isnothing(sl) ? -one(sigma) : sl[1] / c
+                                sl = hac_log_det_slope(decay, K, sigma / c, hac_lags)
+                                return isnothing(sl) ? -one(sigma) : sl / c
                             end)
 end
 function hac_log_det_peak(gh::VecNum, rh::VecNum, xf::AbstractRange, slope)
@@ -586,66 +586,63 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Computes the two sums of the HAC fixed point of [`mahalanobis_bias`](@ref) from the banded LDLᵀ
-factorisation of ``I + t A``, with the first and second derivatives in ``t`` carried through it.
+Computes the slope ``\\ell'(t)`` of ``\\ell(t) = \\ln \\det(I + t A)`` from the banded LDLᵀ
+factorisation of ``I + t A``, with the first derivative in ``t`` carried through it.
 
-``\\ell(t) = \\sum_{m} \\ln d_{m}(t)`` over the pivots, so ``\\ell' = \\sum_{m} d_{m}' / d_{m}`` and
-``\\ell'' = \\sum_{m} (d_{m}'' / d_{m} - (d_{m}' / d_{m})^{2})``. A row whose diagonal
+``\\ell(t) = \\sum_{m} \\ln d_{m}(t)`` over the pivots, so ``\\ell' = \\sum_{m} d_{m}' / d_{m}``.
+[`hac_log_det_peak`](@ref) bisects on it to find the cut of a HAC transform. A row whose diagonal
 ``t\\, c\\, \\lambda^{m}`` falls below the machine epsilon of `decay` times ``1 - \\lambda`` enters
-both sums as its weight, so the loop stops there and adds the remaining mass, as
+the sum as its weight, so the loop stops there and adds the remaining mass, as
 [`mahalanobis_bias_sums`](@ref) does.
 
 # Arguments
 
   - `decay::Number`: Decay of the weights.
   - `K::Integer`: Count of observations in the estimate.
-  - `t::Number`: Argument, ``(n + 1) b``.
+  - `t::Number`: Argument of the log-determinant.
   - `hac_lags::Union{Integer, VecNum}`: Count of HAC lags, or the weight of each lag.
 
 # Returns
 
-  - `slopes::Option{<:Tuple{Number, Number}}`: ``(\\ell'(t), \\ell'(t) + t \\ell''(t))``, that is
-    ``\\sum_{k} \\mu_{k} / (1 + t \\mu_{k})`` and ``\\sum_{k} \\mu_{k} / (1 + t \\mu_{k})^{2}``, or
-    `nothing` where ``I + t A`` is not positive definite.
+  - `slope::Option{<:Number}`: ``\\ell'(t) = \\sum_{k} \\mu_{k} / (1 + t \\mu_{k})`` over the
+    eigenvalues ``\\mu`` of ``A``, or `nothing` where ``I + t A`` is not positive definite.
 
 # Related
 
   - [`hac_ldl_taylor_row!`](@ref)
-  - [`mahalanobis_bias`](@ref)
+  - [`hac_log_det_peak`](@ref)
 """
-function hac_log_det_slopes(decay::Number, K::Integer, t::Number,
-                            hac_lags::Union{Integer, VecNum})
+function hac_log_det_slope(decay::Number, K::Integer, t::Number,
+                           hac_lags::Union{Integer, VecNum})
     c = (one(decay) - decay) / (one(decay) - decay^K)
-    z = ntuple(_ -> zero(c * t), 3)
+    z = ntuple(_ -> zero(c * t), 2)
     k = hac_lag_weights(hac_lags, decay)
     L = length(k)
     buf = (; l = fill(z, L, L), d = fill(z, L), row = fill(z, L), k)
-    g1, g2 = zero(c * t), zero(c * t)
+    g1 = zero(c * t)
     lam = one(decay)
     for m in 0:(K - 1)
         if t * c * lam <= eps(decay) * (one(decay) - decay)
-            tail = c * lam * (one(decay) - decay^(K - m)) / (one(decay) - decay)
-            return g1 + tail, g1 + t * g2 + tail
+            return g1 + c * lam * (one(decay) - decay^(K - m)) / (one(decay) - decay)
         end
         dn = hac_ldl_taylor_row!(buf, t * c * lam, c * lam, decay, min(L, m))
         if !(dn[1] > zero(dn[1]))
             return nothing
         end
         g1 += dn[2] / dn[1]
-        g2 += dn[3] / dn[1] - (dn[2] / dn[1])^2
         lam *= decay
     end
 
-    return g1, g1 + t * g2
+    return g1
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Adds one row to the banded LDLᵀ factorisation of ``I + t A``, with each entry carried as its value
-and its first two derivatives in ``t``.
+and its first derivative in ``t``.
 
-The entries of ``I + t A`` are linear in ``t``, so the diagonal of the row is ``(1 + t a, a, 0)``
-and its entry at lag ``i`` is ``(t a_{i}, a_{i}, 0)``, with ``a_{i} = k_{i}\\, a / \\lambda^{i}``.
+The entries of ``I + t A`` are linear in ``t``, so the diagonal of the row is ``(1 + t a, a)`` and
+its entry at lag ``i`` is ``(t a_{i}, a_{i})``, with ``a_{i} = k_{i}\\, a / \\lambda^{i}``.
 The recursion is that of [`hac_ldl_row!`](@ref), in [`taylor_mul`](@ref) and
 [`taylor_div`](@ref).
 
@@ -661,11 +658,12 @@ The recursion is that of [`hac_ldl_row!`](@ref), in [`taylor_mul`](@ref) and
 
 # Returns
 
-  - `pivot::NTuple{3, <:Number}`: The new pivot and its two derivatives.
+  - `pivot::NTuple{2, <:Number}`: The new pivot and its derivative.
 
 # Related
 
-  - [`hac_log_det_slopes`](@ref)
+  - [`hac_log_det_slope`](@ref)
+  - [`hac_log_det_path!`](@ref)
 """
 function hac_ldl_taylor_row!(buf::NamedTuple, ta::Number, a::Number, decay::Number,
                              p::Integer)
@@ -673,13 +671,13 @@ function hac_ldl_taylor_row!(buf::NamedTuple, ta::Number, a::Number, decay::Numb
     L = length(d)
     for i in p:-1:1
         ki = k[i] / decay^i
-        num = (ta * ki, a * ki, zero(a))
+        num = (ta * ki, a * ki)
         for j in (i + 1):p
             num = num .- taylor_mul(taylor_mul(row[j], l[i, j - i]), d[j])
         end
         row[i] = taylor_div(num, d[i])
     end
-    pivot = (one(ta) + ta, a, zero(a))
+    pivot = (one(ta) + ta, a)
     for i in 1:p
         pivot = pivot .- taylor_mul(taylor_mul(row[i], row[i]), d[i])
     end

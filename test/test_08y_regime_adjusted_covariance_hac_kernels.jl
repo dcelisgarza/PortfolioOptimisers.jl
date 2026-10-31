@@ -196,8 +196,7 @@ tables at `cor_decay` read (ADR 0190).
         @test PO.regime_bias_table(m, lamc, 300, 2) ==
               PO.regime_bias_table(m, lamc, 300, k2)
     end
-    @test PO.hac_log_det_slopes(lam, 200, 3.0, 2) ==
-          PO.hac_log_det_slopes(lam, 200, 3.0, k2)
+    @test PO.hac_log_det_slope(lam, 200, 3.0, 2) == PO.hac_log_det_slope(lam, 200, 3.0, k2)
     @test PO.exp_weight_cross_sum(lam, lamc, 40, 2) ==
           PO.exp_weight_cross_sum(lam, lamc, 40, PO.hac_lag_weights(2, lam * lamc))
 

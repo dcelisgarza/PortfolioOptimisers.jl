@@ -1364,50 +1364,47 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Multiplies two values carried with their first two derivatives.
+Multiplies two values carried with their first derivatives.
 
 # Arguments
 
-  - `x::NTuple{3, <:Number}`: ``(x, x', x'')``.
-  - `y::NTuple{3, <:Number}`: ``(y, y', y'')``.
+  - `x::NTuple{2, <:Number}`: ``(x, x')``.
+  - `y::NTuple{2, <:Number}`: ``(y, y')``.
 
 # Returns
 
-  - `xy::NTuple{3, <:Number}`: ``(x y, x' y + x y', x'' y + 2 x' y' + x y'')``.
+  - `xy::NTuple{2, <:Number}`: ``(x y, x' y + x y')``.
 
 # Related
 
   - [`taylor_div`](@ref)
   - [`hac_ldl_taylor_row!`](@ref)
 """
-function taylor_mul(x::NTuple{3, <:Number}, y::NTuple{3, <:Number})
-    return (x[1] * y[1], x[2] * y[1] + x[1] * y[2],
-            x[3] * y[1] + 2 * x[2] * y[2] + x[1] * y[3])
+function taylor_mul(x::NTuple{2, <:Number}, y::NTuple{2, <:Number})
+    return (x[1] * y[1], x[2] * y[1] + x[1] * y[2])
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Divides two values carried with their first two derivatives.
+Divides two values carried with their first derivatives.
 
 # Arguments
 
-  - `x::NTuple{3, <:Number}`: ``(x, x', x'')``.
-  - `y::NTuple{3, <:Number}`: ``(y, y', y'')``, with ``y \\neq 0``.
+  - `x::NTuple{2, <:Number}`: ``(x, x')``.
+  - `y::NTuple{2, <:Number}`: ``(y, y')``, with ``y \\neq 0``.
 
 # Returns
 
-  - `q::NTuple{3, <:Number}`: ``(q, q', q'')`` of ``q = x / y``: ``q' = (x' - q y') / y`` and
-    ``q'' = (x'' - 2 q' y' - q y'') / y``.
+  - `q::NTuple{2, <:Number}`: ``(q, q')`` of ``q = x / y``, with ``q' = (x' - q y') / y``.
 
 # Related
 
   - [`taylor_mul`](@ref)
   - [`hac_ldl_taylor_row!`](@ref)
 """
-function taylor_div(x::NTuple{3, <:Number}, y::NTuple{3, <:Number})
+function taylor_div(x::NTuple{2, <:Number}, y::NTuple{2, <:Number})
     q = x[1] / y[1]
-    q1 = (x[2] - q * y[2]) / y[1]
-    return (q, q1, (x[3] - 2 * q1 * y[2] - q * y[3]) / y[1])
+    return (q, (x[2] - q * y[2]) / y[1])
 end
 """
     Statistics.cov(

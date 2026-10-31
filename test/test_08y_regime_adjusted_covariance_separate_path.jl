@@ -363,7 +363,7 @@ the recursion itself, and the interpolation serves the rest (ADR 0190).
     sigma, gs = peaks[1]
     c = (1 - d5) / (1 - d5^K)
     mu = eigvals(Symmetric(hac_B(d5, 5, K)))
-    @test abs(PO.hac_log_det_slopes(d5, K, sigma / c, 5)[1] / c) <
+    @test abs(PO.hac_log_det_slope(d5, K, sigma / c, 5) / c) <
           1e-9 * sum(abs.(mu) ./ abs.(1 .+ sigma .* mu))
     @test isapprox(gs, sum(log1p.(sigma .* mu)); rtol = 1e-10)
     # The continuation keeps the true lattice up to the cut for the last transform, and the lattice

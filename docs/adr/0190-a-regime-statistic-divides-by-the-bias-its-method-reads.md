@@ -587,4 +587,6 @@ removal is a clean break with no deprecation, as ADR 0044 and ADR 0213 set.
 No code called it. `mahalanobis_bias_nodes` reads the exact factor of a HAC estimate from
 `mahalanobis_level_bias`, and it divides by the plain fixed point `mahalanobis_bias(decay, K, n)`
 only to interpolate the ratio between its nodes. The internal method and its tests are gone. The
-numbers do not move.
+recursion now carries `ℓ'(t)` alone, because `ℓ''(t)` served only the Newton step of the removed
+method: the cut of a HAC transform bisects on `ℓ'`, and `hac_log_det_slopes` is
+`hac_log_det_slope`. The numbers do not move.

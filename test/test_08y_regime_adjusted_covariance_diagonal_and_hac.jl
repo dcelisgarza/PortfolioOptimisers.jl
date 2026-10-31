@@ -400,12 +400,11 @@ and `hac_floor = PerTermHacFloor()` keeps it (ADR 0190).
     @test PO.exp_weight_cross_sum(0.9, 0.95, 17, nothing) ==
           PO.exp_weight_cross_sum(0.9, 0.95, 17)
 
-    # The two derivatives of `ln det(I + t A)`, against the eigenvalues.
+    # The slope of `ln det(I + t A)`, against the eigenvalues.
     for K in (20, 600), L in (1, 5), t in (1.0, 30.0)
         mu = eigvals(Symmetric(hac_A(lam, L, K)))
-        slopes = PO.hac_log_det_slopes(lam, K, t, L)
-        @test isapprox(slopes[1], sum(mu ./ (1 .+ t .* mu)); rtol = 1e-12)
-        @test isapprox(slopes[2], sum(mu ./ (1 .+ t .* mu) .^ 2); rtol = 1e-12)
+        @test isapprox(PO.hac_log_det_slope(lam, K, t, L), sum(mu ./ (1 .+ t .* mu));
+                       rtol = 1e-12)
     end
 
     # The gate: 12 assets at a half-life of 10 and two lags first score at 54 observations;
