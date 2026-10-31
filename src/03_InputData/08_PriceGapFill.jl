@@ -237,19 +237,15 @@ $(DocStringExtensions.FIELDS)
     strict
 end
 """
-    prices_listing_span(pr::AbstractPricesResult) -> Nothing
     prices_listing_span(pr::PricesResult) -> Option{<:AbstractMatrix{Bool}}
 
 Read the Listing Span that the price data `pr` states, or `nothing` when it states none.
 
-The price data holds the Listing Span, so a step that needs a span reads it from `pr` and does not derive one. A [`PricesResult`](@ref) returns its `span` field. [`price_ingestion`](@ref) fills that field, and a `PricesResult` that a caller builds by hand leaves it `nothing`. Every other member of the family returns `nothing`, because it states no listing calendar. The step that asked then uses its fallback and reports it.
+The price data holds the Listing Span, so a step that needs a span reads it from `pr` and does not derive one. A [`PricesResult`](@ref) returns its `span` field. [`price_ingestion`](@ref) fills that field, and a `PricesResult` that a caller builds by hand leaves it `nothing`. The step that asked then uses its fallback and reports it.
 
 # Algorithm
 
-The method that Julia selects is the algorithm.
-
- 1. Any other subtype of `AbstractPricesResult`: return `nothing`, because the family states no span of its own.
- 2. A [`PricesResult`](@ref): return its `span` field.
+ 1. Return the `span` field of `pr`.
 
 # Arguments
 
@@ -267,9 +263,6 @@ The method that Julia selects is the algorithm.
   - [`PricesResult`](@ref)
   - [`Option`](@ref)
 """
-function prices_listing_span(::AbstractPricesResult)
-    return nothing
-end
 function prices_listing_span(pr::PricesResult)
     return pr.span
 end
@@ -320,7 +313,7 @@ end
 function gap_fill_span(::Nothing, X::AbstractMatrix, strict::Bool)
     if any(is_missing_value, X)
         strict_diagnostic("`PriceGapFill` is bounded by the Listing Span, and the price data states none, so nothing was filled. The window cannot supply one: a suspension straddling its edge reads there as an inception or a delisting, so a window-local derivation fills the wrong cells rather than fewer of them. Build the PricesResult through the ingestion layer, which states a span.",
-                          strict)
+                          strict; id = @log_id())
     end
     return falses(size(X))
 end

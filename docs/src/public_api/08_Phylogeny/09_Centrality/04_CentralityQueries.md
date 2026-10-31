@@ -8,3 +8,10 @@ Description = "Centrality Queries, public API of PortfolioOptimisers.jl: central
 centrality_vector
 average_centrality
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

@@ -384,6 +384,20 @@ end
     # Nothing close enough still draws no suggestion, at either threshold.
     @test pe.suggest_declared_key("zzzz", (:noun, :axis)) == ""
     @test pe.did_you_mean("APL", String[]) == ""
+    # A caller passes its own configuration in `sd`, with no scope (#1839). The constructor
+    # of the configuration is still the one check of the threshold.
+    @test pe.did_you_mean("nuon", ["noun", "axis"];
+                          sd = pe.StringDistanceConfig(SD.DamerauLevenshtein(), 0.5)) ==
+          " (did you mean `noun`?)"
+    @test_throws ArgumentError pe.did_you_mean("APL", ["AAPL"];
+                                               sd = pe.StringDistanceConfig(SD.Levenshtein(),
+                                                                            0))
+    # The declaration-key configuration overrides a scope of the caller, as the scoped
+    # override did before #1839.
+    pe.with_string_distance(; min_score = 1.5) do
+        @test pe.did_you_mean("nuon", ["noun", "axis"]) == ""
+        @test pe.suggest_declared_key(:nuon, (:noun, :axis)) == " (did you mean `noun`?)"
+    end
 end
 @testset "The message builders name a size, never a universe" begin
     pe = PortfolioOptimisers
@@ -441,18 +455,66 @@ end
     pe = PortfolioOptimisers
     # One function owns the policy: the same text throws under `strict` and warns otherwise,
     # and in both cases the offending term is dropped.
-    @test_throws ArgumentError pe.strict_diagnostic("term dropped", true)
+    # A macro resolves its module when the testset expands, before `pe` is bound.
+    id = PortfolioOptimisers.@log_id()
+    @test_throws ArgumentError pe.strict_diagnostic("term dropped", true; id = id)
     err = try
-        pe.strict_diagnostic("term dropped", true)
+        pe.strict_diagnostic("term dropped", true; id = id)
         nothing
     catch e
         e
     end
     @test err isa ArgumentError
     @test err.msg == "term dropped"
-    @test_logs (:warn, "term dropped") pe.strict_diagnostic("term dropped", false)
+    @test_logs (:warn, "term dropped") pe.strict_diagnostic("term dropped", false; id = id)
     @test isnothing(@test_logs (:warn, "term dropped") pe.strict_diagnostic("term dropped",
-                                                                            false))
+                                                                            false; id = id))
+    # The caller states the `_id`: the default would be the line inside the helper, which
+    # every caller shares, so a cap would hide the messages of every other caller.
+    @test_throws UndefKeywordError pe.strict_diagnostic("term dropped", false)
+    logs, = Test.collect_test_logs() do
+        return pe.strict_diagnostic("term dropped", false; id = id)
+    end
+    @test only(logs).id == id
+end
+@testset "Every log site of the library passes maxlog and _id (#1690)" begin
+    #=
+    A cross-validation, a walk-forward, an online selection and a meta-optimiser call the
+    same verb many times, and a log site repeats its message on each call. Each site passes
+    `maxlog = log_limit(level)`, so that the `max_warn`, `max_info` and `max_debug` caps of
+    `LOG_LIMITS` reach it, and an `_id` from `@log_id` over the stable parts of its message,
+    so that the cap counts each configuration on its own. The census reads the parsed
+    source, because a new site copies its neighbour.
+    =#
+    root = normpath(joinpath(@__DIR__, ".."))
+    levels = (Symbol("@warn"), Symbol("@info"), Symbol("@debug"), Symbol("@error"),
+              Symbol("@logmsg"))
+    sites = Tuple{String, Int, Bool, Bool}[]
+    function walk!(x::Expr, path::AbstractString, line::Ref{Int})
+        if x.head === :macrocall && x.args[1] in levels
+            if x.args[2] isa LineNumberNode
+                line[] = x.args[2].line
+            end
+            kws = [a.args[1] for a in x.args[3:end] if a isa Expr && a.head in (:(=), :kw)]
+            push!(sites, (relpath(path, root), line[], :maxlog in kws, :_id in kws))
+        end
+        for a in x.args
+            walk!(a, path, line)
+        end
+        return nothing
+    end
+    walk!(x::LineNumberNode, ::AbstractString, line::Ref{Int}) = (line[] = x.line; nothing)
+    walk!(::Any, ::AbstractString, ::Ref{Int}) = nothing
+    for dir in (joinpath(root, "src"), joinpath(root, "ext")), (dp, _, fns) in walkdir(dir)
+        for fn in fns
+            if endswith(fn, ".jl")
+                path = joinpath(dp, fn)
+                walk!(Meta.parseall(read(path, String); filename = path), path, Ref(0))
+            end
+        end
+    end
+    @test !isempty(sites)
+    @test filter(s -> !(s[3] && s[4]), sites) == Tuple{String, Int, Bool, Bool}[]
 end
 @testset "first_error_line truncates the content, not the line" begin
     pe = PortfolioOptimisers
@@ -850,4 +912,556 @@ end
     end
     @test derr isa ArgumentError
     @test occursin("different decay cannot be merged", derr.msg)
+end
+@testset "chan_merge is the merge in sums of Equation 2.1b, and is symmetric" begin
+    pe = PortfolioOptimisers
+    rng = StableRNG(13579)
+    x = randn(rng, 25) .+ 3.0
+    # The merge in sums of the Stanford report: S = S_A + S_B + n_A / (n_B n) (n_B / n_A T_A -
+    # T_B)^2, with the block sums T. `chan_merge` writes the same term in means.
+    nA, nB = 9, 16
+    xa, xb = view(x, 1:nA), view(x, (nA + 1):(nA + nB))
+    TA, TB = sum(xa), sum(xb)
+    SA = sum(abs2, xa .- TA / nA)
+    SB = sum(abs2, xb .- TB / nB)
+    n, mu, M = pe.chan_merge(nA, TA / nA, SA, nB, TB / nB, SB)
+    @test isapprox(M, SA + SB + nA / (nB * n) * (nB / nA * TA - TB)^2; rtol = 1e-14)
+    @test isapprox(mu, (TA + TB) / n; rtol = 1e-14)
+    # The two blocks enter the formula alike, so the order of the operands does not change the
+    # state.
+    X = randn(rng, 20, 3)
+    a = batch_state(view(X, 1:6, :))
+    b = batch_state(view(X, 7:20, :))
+    ab = pe.chan_merge(a..., b...)
+    ba = pe.chan_merge(b..., a...)
+    @test ab[1] == ba[1]
+    @test isapprox(ab[2], ba[2]; rtol = 1e-14)
+    @test isapprox(ab[3], ba[3]; rtol = 1e-14)
+    # One entry of the co-moment merge is Equation 3.1 of the Sandia report, the pairwise update
+    # of the co-moment of two variables u and v.
+    du = b[2][1] - a[2][1]
+    dv = b[2][3] - a[2][3]
+    @test isapprox(ab[3][1, 3], a[3][1, 3] + b[3][1, 3] + a[1] * b[1] / ab[1] * du * dv;
+                   rtol = 1e-14)
+end
+@testset "A Welford fold stays inside the updating bound of Table 1" begin
+    using Statistics
+    pe = PortfolioOptimisers
+    # The fixture of the partial-fit tests, shifted to a mean of 1000 and unit spread, so the
+    # condition number of each column is about 1000.
+    rng = StableRNG(987654321)
+    X = randn(rng, 50, 4) .+ 1000.0
+    N = size(X, 1)
+    u = eps(Float64) / 2
+    S = vec(sum(abs2, big.(X) .- mean(big.(X); dims = 1); dims = 1))
+    exact = Float64.(S / (N - 1))
+    # The condition number of Equation 2.1 of the American Statistician survey.
+    kappa = Float64.(sqrt.(1 .+ vec(mean(big.(X); dims = 1)) .^ 2 .* N ./ S))
+    @test all(>(500), kappa)
+    fold(est) = foldl(partial_fit!, eachrow(X); init = est)
+    relerr(v) = abs.(v .- exact) ./ exact
+    @test all(relerr(var(fold(SimpleVariance()))) .<= N .* kappa .* u)
+    C = cov(fold(Covariance()))
+    @test all(relerr([C[i, i] for i in axes(C, 1)]) .<= N .* kappa .* u)
+end
+@testset "assert_partial_fit_state refuses each quantity that cannot describe a sample" begin
+    pe = PortfolioOptimisers
+    @test isnothing(pe.assert_partial_fit_state(0, [1.0, 2.0]))
+    @test isnothing(pe.assert_partial_fit_state(0, [1.0, 2.0], zeros(2)))
+    @test isnothing(pe.assert_partial_fit_state(3, [1.0, 2.0], zeros(2, 2)))
+    @test_throws DomainError pe.assert_partial_fit_state(-1, [1.0])
+    @test_throws IsEmptyError pe.assert_partial_fit_state(1, Float64[])
+    @test_throws IsNonFiniteError pe.assert_partial_fit_state(1, [NaN])
+    @test_throws IsNonFiniteError pe.assert_partial_fit_state(1, [1.0], [Inf])
+    @test_throws DimensionMismatch pe.assert_partial_fit_state(1, [1.0, 2.0], zeros(3))
+    @test_throws DimensionMismatch pe.assert_partial_fit_state(1, [1.0, 2.0], zeros(2, 3))
+end
+@testset "observation_count reads the folded rows, and names a state that has no count" begin
+    using Statistics
+    pe = PortfolioOptimisers
+    rng = StableRNG(1)
+    X = randn(rng, 10, 3)
+    X[4, 2] = NaN
+    # A row that holds a NaN is still a row of the sample, as `size(X, 1)` counts it.
+    @test pe.observation_count(partial_fit!(Covariance(), X)) == 10
+    @test pe.observation_count(partial_fit!(SimpleVariance(), X)) == 10
+    @test pe.observation_count(partial_fit!(SimpleExpectedReturns(), X)) == 10
+    @test_throws ArgumentError pe.observation_count(Covariance())
+    # The two exponentially weighted covariance states count the rows in `rows`, because
+    # `obs_count` counts each asset alone and a reset sets it to zero (#1851).
+    @test pe.observation_count(partial_fit!(ExpWeightedCovariance(), X)) == 10
+    @test pe.observation_count(partial_fit!(RegimeAdjustedExpWeightedCovariance(), X)) == 10
+    act = trues(10, 3)
+    act[5:6, 1] .= false
+    ew = partial_fit!(ExpWeightedCovariance(), X; active_mask = act)
+    @test pe.observation_count(ew) == 10
+    # A fold of the copy does not count in the original.
+    st = copy(ew.cache)
+    @test st.rows !== ew.cache.rows
+    ew2 = partial_fit!(ExpWeightedCovariance(; cache = st), X)
+    @test pe.observation_count(ew2) == 20
+    @test pe.observation_count(ew) == 10
+    ra = partial_fit!(RegimeAdjustedExpWeightedCovariance(), X)
+    @test copy(ra.cache).rows !== ra.cache.rows
+    # A state that records no count still meets the named refusal.
+    err = try
+        pe.observation_count(partial_fit!(ExpWeightedVariance(), X))
+        nothing
+    catch e
+        e
+    end
+    @test err isa ArgumentError
+    @test occursin("`ExpWeightedVarianceState` records no count", err.msg)
+end
+@testset "A folded PortfolioOptimisersCovariance reads the count of its inner state (#1851)" begin
+    using Statistics
+    pe = PortfolioOptimisers
+    X = randn(StableRNG(1), 120, 3)
+    dn = MatrixProcessing(; dn = Denoise())
+    # The default `mp` repairs alone and reads no count. A denoiser reads `T = size(X, 1)` on
+    # the batch route, and the fold reads the same rows.
+    for ce in (ExpWeightedCovariance(), RegimeAdjustedExpWeightedCovariance(),
+               GeodesicShrinkageCovariance(; ce = ExpWeightedCovariance())),
+        mp in (MatrixProcessing(), dn)
+
+        pcb = PortfolioOptimisersCovariance(; ce = ce, mp = mp)
+        pc = partial_fit!(pcb, X)
+        @test pe.observation_count(pc) == 120
+        @test cov(pc) ≈ cov(pcb, X)
+        @test cor(pc) ≈ cor(pcb, X)
+    end
+    # A seed window folds the rows that the window kept. The default `mp` reads no count, so
+    # the fold equals the batch fit.
+    sw = WindowedCovariance(; window = 50, rule = SeedWindow(), ce = Covariance())
+    pc = partial_fit!(PortfolioOptimisersCovariance(; ce = sw), X)
+    @test pe.observation_count(pc) == 50
+    @test cov(pc) ≈ cov(PortfolioOptimisersCovariance(; ce = sw), X)
+    @test cor(pc) ≈ cor(PortfolioOptimisersCovariance(; ce = sw), X)
+    # `cor` and `std` with no data read the inner estimator too, as `cov` and `var` do.
+    @test cor(pc.ce) ≈ cor(sw, X)
+    wv = WindowedVariance(; window = 50, rule = SeedWindow())
+    @test std(partial_fit!(wv, X)) ≈ vec(std(wv, X))
+    pc = partial_fit!(pc, X[1:7, :])
+    @test pe.observation_count(pc) == 57
+    # The shape route reads no count where no step reads one, and a denoiser refuses a
+    # missing count by name.
+    @test !pe.matrix_processing_reads_count(MatrixProcessing())
+    @test pe.matrix_processing_reads_count(dn)
+    sigma = cov(X)
+    @test pe.matrix_processing_block!(MatrixProcessing(), copy(sigma), nothing, 3) ≈
+          pe.matrix_processing_block!(MatrixProcessing(), copy(sigma), 120, 3)
+    @test_throws ArgumentError pe.matrix_processing_block!(dn, copy(sigma), nothing, 3)
+end
+@testset "A denoiser of a weighted moment reads the effective sample size (#1892)" begin
+    using Statistics
+    pe = PortfolioOptimisers
+    rng = StableRNG(7)
+    X = randn(rng, 200, 3) * randn(rng, 3, 25) .* 0.01 .+ randn(rng, 200, 25) .* 0.01
+    T, N = size(X)
+    dn = MatrixProcessing(; dn = Denoise())
+    w = StatsBase.pweights(collect(range(0.2, 1.0; length = T)))
+    kish = sum(w)^2 / sum(abs2, w)
+    ew = ExpWeightedCovariance(; decay = 0.97)
+    # The Kish count of the weights `0.97^(T - t)`. The estimated centring spends one
+    # observation, as `exp_weighted_variance_count` states.
+    lw = [0.97^k for k in 0:(T - 2)]
+    Tew = sum(lw)^2 / sum(abs2, lw) + 1
+    # The counts. An unweighted estimator keeps `size(X, 1)`.
+    @test pe.effective_observation_count(Covariance(), X) === T
+    @test pe.effective_observation_count(ew, X) ≈ Tew
+    @test pe.effective_observation_count(Covariance(; w = w), X) ≈ kish
+    @test pe.effective_observation_count(Covariance(; ce = GeneralCovariance(; w = w)), X) ≈
+          kish
+    @test pe.effective_observation_count(Covariance(; w = StatsBase.fweights(fill(2, T))),
+                                         X) == 2T
+    @test pe.effective_observation_count(DistanceCovariance(; w = w), X) ≈ kish
+    @test pe.effective_observation_count(RegimeAdjustedExpWeightedCovariance(;
+                                                                             decay = 0.97),
+                                         X) ≈ Tew
+    # A separate correlation decay reads the pre-centred law of the correlation.
+    lc = [0.99^k for k in 0:(T - 1)]
+    @test pe.effective_observation_count(RegimeAdjustedExpWeightedCovariance(; decay = 0.97,
+                                                                             cor_decay = 0.99),
+                                         X) ≈ sum(lc)^2 / sum(abs2, lc)
+    wc = WindowedCovariance(; ce = ew, window = 50)
+    @test pe.effective_observation_count(wc, X) ≈
+          pe.effective_observation_count(ew, X[151:end, :])
+    for ce in
+        (PortfolioOptimisersCovariance(; ce = PortfolioOptimisersCovariance(; ce = ew)),
+         CorrelationCovariance(; ce = ew), GeodesicShrinkageCovariance(; ce = ew),
+         ImpliedVolatility(; ce = ew, ppy = 252))
+        @test pe.effective_observation_count(ce, X) ≈ Tew
+    end
+    # The batch route denoises at the ratio of the count, and a weighted moment moves.
+    S = Matrix(cov(ew, X))
+    ref = pe.denoise!(Denoise(), pe.posdef!(Posdef(), copy(S)), Tew / N)
+    pc = PortfolioOptimisersCovariance(; ce = ew, mp = dn)
+    @test cov(pc, X) ≈ ref
+    @test !isapprox(cov(pc, X),
+                    pe.denoise!(Denoise(), pe.posdef!(Posdef(), copy(S)), T / N))
+    @test cor(pc, X) ≈
+          pe.denoise!(Denoise(), pe.posdef!(Posdef(), Matrix(cor(ew, X))), Tew / N)
+    @test cov(pc, X, nothing) ≈ ref
+    # The fold reads the same count as the batch route.
+    for ce in (ew, RegimeAdjustedExpWeightedCovariance(; decay = 0.97, cor_decay = 0.99),
+               WindowedCovariance(; ce = ew, window = 50, rule = SeedWindow()),
+               pe.update_online_estimator(Online(wc)))
+        pcb = PortfolioOptimisersCovariance(; ce = ce, mp = dn)
+        pcf = partial_fit!(pcb, X)
+        @test pe.effective_observation_count(pcf) ≈ pe.processing_observation_count(pcb, X)
+        @test cov(pcf) ≈ cov(pcb, X)
+        @test cor(pcf) ≈ cor(pcb, X)
+    end
+    # A weighted cokurtosis and a weighted coskewness denoise at the count of their weights.
+    X6 = X[:, 1:6]
+    Y = X6 .- mean(X6, w; dims = 1)
+    o = transpose(ones(6))
+    z = kron(o, Y) .* kron(Y, o)
+    kt = transpose(w .* z) * z / sum(w)
+    @test cokurtosis(Cokurtosis(; w = w, mp = dn), X6) ≈
+          pe.denoise!(Denoise(), pe.posdef!(Posdef(), kt), kish / 6)
+    cs, V = coskewness(Coskewness(; w = w, mp = dn), X6)
+    @test V ≈ pe.negative_spectral_coskewness(cs, X6, dn, kish)
+    # A matrix processing estimator of the caller states only the sample form, so it gets `X`.
+    sigma = cov(X)
+    @test pe.sample_matrix_processing!(nothing, copy(sigma), X, kish) == sigma
+    @test pe.matrix_processing_block!(dn, copy(sigma), X) ≈
+          matrix_processing!(dn, copy(sigma), X)
+    @test pe.matrix_processing_block!(dn, copy(sigma), X, kish) ≈
+          pe.matrix_processing_block!(dn, copy(sigma), kish, N)
+end
+# Stand-ins for a member of each family that states no method of its own (#1893).
+struct NoCountRule1893 <: PortfolioOptimisers.AbstractObservationCountAlgorithm end
+struct PlainCoskewness1893 <: PortfolioOptimisers.CoskewnessEstimator end
+struct PlainCokurtosis1893 <: PortfolioOptimisers.CokurtosisEstimator end
+@testset "A Gerber IQ count rule, and the count of each moment of a prior (#1893)" begin
+    using Statistics
+    pe = PortfolioOptimisers
+    rng = StableRNG(1893)
+    X = randn(rng, 240, 3) * randn(rng, 3, 8) .* 0.01 .+ randn(rng, 240, 8) .* 0.01
+    F = randn(rng, 240, 3) .* 0.01
+    T, N = size(X)
+    dn = MatrixProcessing(; dn = Denoise())
+    wv = StatsBase.pweights(collect(range(0.2, 1.0; length = T)))
+    kish = sum(wv)^2 / sum(abs2, wv)
+    @testset "Case 1: the count rule of a Gerber IQ covariance" begin
+        @test pe.weight_observation_count(KishObservationCount(), [1.0, 1.0, 0.0]) == 2.0
+        @test_throws ArgumentError pe.weight_observation_count(NoCountRule1893(), [1.0])
+        # Equation 5 of the source, with the default delay and rate of the library.
+        e, y = round(Int, T - T / N), log(2) / N
+        wd = [exp(-y * max(0, T - k - e)) for k in 1:T]
+        Tk = sum(wd)^2 / sum(abs2, wd)
+        g0 = GerberIQCovariance()
+        g1 = GerberIQCovariance(; oc = KishObservationCount())
+        @test pe.effective_observation_count(g0, X) === T
+        @test pe.effective_observation_count(g1, X) ≈ Tk
+        @test Tk < T
+        # The rule changes the count alone, and not the matrix.
+        @test cov(g1, X) == cov(g0, X)
+        # A rule in the delay reads the centred returns, as the fit does.
+        g2 = GerberIQCovariance(; decay = ExpGerberIQDecay(; e = Xc -> 100),
+                                oc = KishObservationCount())
+        w2 = [exp(-y * max(0, T - k - 100)) for k in 1:T]
+        @test pe.effective_observation_count(g2, X) ≈ sum(w2)^2 / sum(abs2, w2)
+        # The denoiser of the wrapper reads the count of the rule. A spectral denoiser reads
+        # `T / N` only through the eigenvalues above its threshold, so the decay is strong
+        # enough here to move the count from 240 to about 40.
+        g3 = GerberIQCovariance(; decay = ExpGerberIQDecay(; e = 0, y = 0.05),
+                                oc = KishObservationCount())
+        T3 = pe.effective_observation_count(g3, X)
+        @test T3 ≈ pe.exp_weighted_kish_count(exp(-0.05), T)
+        pc = PortfolioOptimisersCovariance(; ce = g3, mp = dn)
+        S = Matrix(cov(g3, X))
+        @test cov(pc, X) ≈ pe.denoise!(Denoise(), pe.posdef!(Posdef(), copy(S)), T3 / N)
+        @test cov(pc, X) != pe.denoise!(Denoise(), pe.posdef!(Posdef(), copy(S)), T / N)
+    end
+    ew = PortfolioOptimisersCovariance(; ce = ExpWeightedCovariance(; decay = 0.97))
+    em = ExpWeightedExpectedReturns(; decay = 0.98)
+    Ts = pe.effective_observation_count(ew, X)
+    Tm = pe.effective_observation_count(em, X)
+    @testset "Each moment estimator states its own count" begin
+        @test Tm ≈ pe.exp_weighted_kish_count(0.98, T)
+        @test pe.effective_observation_count(VarianceExpectedReturns(), X) === T
+        @test pe.effective_observation_count(SimpleExpectedReturns(; w = wv), X) ≈ kish
+        @test pe.effective_observation_count(MedianExpectedReturns(; w = wv), X) ≈ kish
+        @test pe.effective_observation_count(ExcessExpectedReturns(; me = em, rf = 0.0),
+                                             X) == Tm
+        @test pe.effective_observation_count(ShrunkExpectedReturns(; me = em), X) == Tm
+        @test pe.effective_observation_count(EquilibriumExpectedReturns(; ce = ew), X) == Ts
+        # A mean read off a covariance is worth the count of that covariance (R16 of #1817).
+        @test pe.effective_observation_count(VarianceExpectedReturns(; ce = ew), X) == Ts
+        @test pe.effective_observation_count(StandardDeviationExpectedReturns(; ce = ew),
+                                             X) == Ts
+        @test pe.effective_observation_count(StandardDeviationExpectedReturns(), X) === T
+        # Each forward takes the keywords of the fit (#1915).
+        @test pe.effective_observation_count(VarianceExpectedReturns(; ce = ew), X;
+                                             active_mask = nothing) == Ts
+        @test pe.effective_observation_count(StandardDeviationExpectedReturns(; ce = ew), X;
+                                             active_mask = nothing) == Ts
+        @test pe.effective_observation_count(WindowedExpectedReturns(; me = em,
+                                                                     window = 50), X) ≈
+              pe.exp_weighted_kish_count(0.98, 50)
+        @test pe.effective_observation_count(Coskewness(; w = wv), X) ≈ kish
+        @test pe.effective_observation_count(Cokurtosis(; w = wv), X) ≈ kish
+        @test pe.effective_observation_count(WindowedCoskewness(; window = 50), X) == 50
+        @test pe.effective_observation_count(WindowedCokurtosis(; window = 50), X) == 50
+        @test pe.effective_observation_count(PlainCoskewness1893(), X) === T
+        @test pe.effective_observation_count(PlainCokurtosis1893(), X) === T
+        @test pe.high_order_observation_count(nothing, nothing, X) === T
+    end
+    @testset "A prior states the count of each moment in `eoc`" begin
+        pr = prior(EmpiricalPrior(; me = em, ce = ew), X)
+        @test pr.eoc == (Tm, Ts)
+        @test isnothing(pr.ens)
+        @test pe.moment_observation_count(pr, 1) == Tm
+        @test pe.moment_observation_count(prior(EmpiricalPrior(), X), 2) === T
+        @test pe.port_opt_view(pr, 1:3).eoc == pr.eoc
+        @test_throws DomainError LowOrderPrior(; X = X, mu = pr.mu, sigma = pr.sigma,
+                                               eoc = (0.0, nothing))
+        # A high order prior states the counts of its two co-moments, and reads the four.
+        hpe = HighOrderPriorEstimator(; pe = EmpiricalPrior(; me = em, ce = ew),
+                                      kte = Cokurtosis(; w = wv),
+                                      ske = Coskewness(; w = wv))
+        hop = prior(hpe, X)
+        @test getfield(hop, :eoc)[1] ≈ kish
+        @test getfield(hop, :eoc)[2] ≈ kish
+        @test hop.eoc[1:2] == (Tm, Ts)
+        @test pe.moment_observation_count(hop, 4) ≈ kish
+        @test pe.port_opt_view(hop, 1:3).eoc == hop.eoc
+        @test pe.reconstruct_prior(hop, (;)).eoc == hop.eoc
+        # The weights bind the counts, because a pooling prior refits its moments under them.
+        @test_throws PortfolioOptimisers.ConflictingArgumentError pe.forward_prior(pr;
+                                                                                   w = wv)
+        @test pe.forward_prior(prior(EmpiricalPrior(), X); w = wv).w == wv
+        @test pe.field_states_nothing((nothing, nothing))
+        @test !pe.field_states_nothing((nothing, 1.0))
+        # A rule with no weights prices the smaller count.
+        @test pe.effective_sample_size(pr, nothing) == min(Tm, Ts)
+    end
+    @testset "A matrix that a prior assembles is denoised at the count of its moments" begin
+        # The factor lift reads the count of the factor covariance.
+        prf = prior(FactorPrior(; pe = EmpiricalPrior(; ce = ew), mp = dn, rsd = false), X,
+                    F)
+        M = prf.rr.M
+        Tf = pe.effective_observation_count(ew, F)
+        @test prf.eoc == (nothing, Tf)
+        @test prf.sigma ≈
+              pe.sample_matrix_processing!(dn, M * prf.fpr.sigma * transpose(M), prf.X, Tf)
+        # The default `tau` of Black-Litterman is one over the count of the prior mean.
+        sets = UniverseSets(; dict = Dict("nx" => ["A$i" for i in 1:N]))
+        views = LinearConstraintEstimator(; val = "A1 == 0.002")
+        blm = BlackLittermanPrior(; pe = EmpiricalPrior(; me = em), sets = sets,
+                                  views = views)
+        blt = BlackLittermanPrior(; pe = EmpiricalPrior(; me = em), sets = sets,
+                                  views = views, tau = inv(Tm))
+        @test prior(blm, X).mu ≈ prior(blt, X).mu
+        # The systematic block of a cross-sectional lift reads the count that it is given.
+        S = cov(X)
+        @test pe.systematic_processing!(SystematicRepair(), dn, copy(S), X, kish) ≈
+              pe.sample_matrix_processing!(dn, copy(S), X, kish)
+        # The factor cokurtosis is lifted and denoised at the count of its estimator.
+        kte = Cokurtosis(; w = wv, mp = dn)
+        hf = prior(HighOrderFactorPriorEstimator(; pe = FactorPrior(; rsd = false),
+                                                 kte = kte, ske = nothing, rsd = false), X,
+                   F)
+        kM = kron(hf.rr.M, hf.rr.M)
+        @test getfield(hf, :eoc)[2] ≈ kish
+        @test hf.kt ≈
+              pe.sample_matrix_processing!(dn, kM * hf.fpr.kt * transpose(kM), hf.X, kish)
+    end
+    @testset "A shrunk mean shrinks by the count of its mean (R16 of #1817)" begin
+        # Frequency weights `f` on `X` are the unweighted fit on `X` with row `t` repeated
+        # `f[t]` times, so the shrunk mean of the two must agree. Before the fix, the weighted
+        # fit read `T = size(X, 1)` in place of `sum(f)`, and each of the four missed.
+        f = rand(StableRNG(4), 1:3, T)
+        fw = StatsBase.fweights(f)
+        Xe = reduce(vcat, [repeat(X[t:t, :], f[t]) for t in 1:T])
+        for alg in (JamesStein(), JamesStein(; tgt = MeanSquaredError()), BayesStein(),
+                    BodnarOkhrinParolya())
+            wme = ShrunkExpectedReturns(; me = SimpleExpectedReturns(; w = fw),
+                                        ce = Covariance(; w = fw), alg = alg)
+            ume = ShrunkExpectedReturns(; alg = alg)
+            @test mean(wme, X) ≈ mean(ume, Xe) rtol = 1e-12
+            @test vec(mean(wme, Matrix(transpose(X)); dims = 2)) ≈ vec(mean(wme, X)) rtol = 1e-14
+        end
+    end
+end
+# A stand-in prior that counts its batch fits, so a test can see how often a mean fits it.
+struct CountingPrior1913 <: PortfolioOptimisers.AbstractLowOrderPriorEstimator
+    pe::Any
+    n::Base.RefValue{Int}
+end
+function PortfolioOptimisers.prior(pe::CountingPrior1913, X::PortfolioOptimisers.MatNum,
+                                   F = nothing, pnl = nothing; kwargs...)
+    pe.n[] += 1
+    return prior(pe.pe, X, F, pnl; kwargs...)
+end
+PortfolioOptimisers.needs_factor_returns(::CountingPrior1913) = false
+@testset "A mean that a prior fits states the count of the prior (#1913)" begin
+    pe = PortfolioOptimisers
+    rng = StableRNG(1913)
+    X = randn(rng, 200, 4) .* 0.01
+    T = size(X, 1)
+    em = ExpWeightedExpectedReturns(; decay = 0.98)
+    Tm = pe.effective_observation_count(em, X)
+    inner = EmpiricalPrior(; me = em)
+    me = PriorExpectedReturns(; pe = inner)
+    @testset "The verb reads entry 1 of the eoc of the prior" begin
+        @test Tm < T
+        @test pe.effective_observation_count(me, X) ≈ Tm
+        @test pe.effective_observation_count(ShrunkExpectedReturns(; me = me), X) ≈ Tm
+        @test pe.effective_observation_count(PriorExpectedReturns(), X) === T
+        # The fold keeps every row it read, so the form with no data counts all of them.
+        f = partial_fit!(partial_fit!(me, X[1:150, :]), X[151:end, :])
+        @test pe.effective_observation_count(f) ≈ Tm
+        @test pe.mean_with_count(f)[2] ≈ Tm
+        @test pe.mean_with_count(f)[1] ≈ vec(mean(f))
+    end
+    @testset "An EmpiricalPrior states the count, and fits the inner prior once" begin
+        @test pe.mean_with_count(em, X, nothing) == (vec(mean(em, X)), nothing)
+        pr = prior(EmpiricalPrior(; me = me), X)
+        @test pr.eoc[1] ≈ Tm
+        @test isnothing(pr.eoc[2])
+        @test pr.mu ≈ prior(inner, X).mu
+        @test prior(EmpiricalPrior(; me = me, horizon = 2), X).eoc[1] ≈ Tm
+        @test prior(EmpiricalPrior(; me = me, max_scenarios = 50), X).eoc == (Tm, T)
+        @test prior(EmpiricalPrior(; me = PriorExpectedReturns()), X).eoc ==
+              (nothing, nothing)
+        # A pooling prior knows its count only after the fit: the Kish count of its weights.
+        ep = EntropyPoolingPrior(;
+                                 sets = UniverseSets(;
+                                                     dict = Dict("nx" =>
+                                                                     ["A", "B", "C", "D"])),
+                                 mu_views = LinearConstraintEstimator(; val = "A == 0.002"))
+        w = prior(ep, X).w
+        kish = sum(w)^2 / sum(abs2, w)
+        @test kish < T
+        @test prior(EmpiricalPrior(; me = PriorExpectedReturns(; pe = ep)), X).eoc[1] ≈ kish
+        n = Ref(0)
+        cp = PriorExpectedReturns(; pe = CountingPrior1913(inner, n))
+        @test prior(EmpiricalPrior(; me = cp), X).eoc[1] ≈ Tm
+        @test n[] == 1
+        # The carry route refits the mean from its buffer, and reads the count of that fit.
+        fe = partial_fit!(partial_fit!(EmpiricalPrior(; me = cp), X[1:150, :]),
+                          X[151:end, :])
+        n[] = 0
+        @test prior(fe).eoc[1] ≈ Tm
+        @test n[] == 1
+    end
+end
+# Weights with a half-life that the keywords of the fit set, so a count that drops the keywords
+# reads other weights than the fit (#1915).
+struct KeywordWeights1915 <: PortfolioOptimisers.DynamicAbstractWeights end
+function PortfolioOptimisers.get_observation_weights(::KeywordWeights1915,
+                                                     X::PortfolioOptimisers.MatNum;
+                                                     dims::Int = 1, hl = 40, kwargs...)
+    n = size(X, dims)
+    return StatsBase.pweights([2.0^((t - n) / hl) for t in 1:n])
+end
+@testset "The count reads the keywords of the fit (#1915)" begin
+    using Statistics
+    pe = PortfolioOptimisers
+    X = (randn(StableRNG(41), 150, 6) .+ 0.3 .* randn(StableRNG(42), 150)) .* 0.01
+    T, N = size(X)
+    m = fill(0.003, 1, N)
+    dn = MatrixProcessing(; dn = Denoise())
+    denoised(S, Te) = pe.denoise!(Denoise(), pe.posdef!(Posdef(), copy(S)), Te / N)
+    @testset "A Gerber IQ count centres the returns on the mean of the caller" begin
+        rule = Xc -> clamp(round(Int, 1e4 * abs(Xc[1, 1])), 0, 140)
+        g = GerberIQCovariance(; decay = ExpGerberIQDecay(; e = rule),
+                               oc = KishObservationCount())
+        y = log(2) / N
+        function kish(e)
+            w = [exp(-y * max(0, T - k - e)) for k in 1:T]
+            return sum(w)^2 / sum(abs2, w)
+        end
+        # The two centres give two delays, so a count on the wrong centre is another count.
+        @test rule(X .- mean(X; dims = 1)) == 55
+        @test rule(X .- m) == 93
+        @test pe.effective_observation_count(g, X) ≈ kish(55)
+        @test pe.effective_observation_count(g, X; mean = m) ≈ kish(93)
+        pc = PortfolioOptimisersCovariance(; ce = g, mp = dn)
+        @test pe.processing_observation_count(pc, X; mean = m) ≈ kish(93)
+        S = Matrix(cov(g, X; mean = m))
+        @test cov(pc, X; mean = m) ≈ denoised(S, kish(93))
+        @test !(cov(pc, X; mean = m) ≈ denoised(S, kish(55)))
+        R = Matrix(cor(g, X; mean = m))
+        @test cor(pc, X; mean = m) ≈ denoised(R, kish(93))
+        @test !(cor(pc, X; mean = m) ≈ denoised(R, kish(55)))
+    end
+    @testset "A count resolves the weights with the keywords of the fit" begin
+        kw = KeywordWeights1915()
+        function wcount(Y, hl)
+            w = pe.get_observation_weights(kw, Y; hl = hl)
+            return sum(w)^2 / sum(abs2, w)
+        end
+        @test !(wcount(X, 20) ≈ wcount(X, 40))
+        for est in (Covariance(; w = kw), Covariance(; ce = GeneralCovariance(; w = kw)),
+                    SimpleExpectedReturns(; w = kw), Coskewness(; w = kw), Cokurtosis(; w = kw),
+                    PortfolioOptimisersCovariance(; ce = Covariance(; w = kw)))
+            @test pe.effective_observation_count(est, X) ≈ wcount(X, 40)
+            @test pe.effective_observation_count(est, X; hl = 20) ≈ wcount(X, 20)
+        end
+        # The fit takes `mean` and `active_mask` by name, and the weights read the others.
+        @test pe.effective_observation_count(Covariance(; w = kw), X; mean = m,
+                                             active_mask = trues(T, N), hl = 20) ≈
+              wcount(X, 20)
+        # A window resolves its weights over the rows that it keeps, with the keywords.
+        for est in (WindowedCovariance(; ce = Covariance(), w = kw, window = 100),
+                    WindowedExpectedReturns(; me = SimpleExpectedReturns(), w = kw, window = 100),
+                    WindowedCoskewness(; ske = Coskewness(), w = kw, window = 100),
+                    WindowedCokurtosis(; kte = Cokurtosis(), w = kw, window = 100))
+            @test pe.effective_observation_count(est, X; mean = m, hl = 20) ≈
+                  wcount(X[51:end, :], 20)
+        end
+        # The denoiser of the wrapper reads the count of the weights that the fit reads.
+        cw = Covariance(; w = kw)
+        pc = PortfolioOptimisersCovariance(; ce = cw, mp = dn)
+        S = Matrix(cov(cw, X; hl = 20))
+        @test S ≈ cov(Covariance(; w = pe.get_observation_weights(kw, X; hl = 20)), X)
+        @test cov(pc, X; hl = 20) ≈ denoised(S, wcount(X, 20))
+        @test cov(pc, X; active_mask = trues(T, N), hl = 20) ≈ denoised(S, wcount(X, 20))
+        # A prior gives its keywords to the fits of its moments, and so to their counts.
+        ep = EmpiricalPrior(; me = SimpleExpectedReturns(; w = kw),
+                            ce = Covariance(; w = kw))
+        @test all(prior(ep, X).eoc .≈ wcount(X, 40))
+        @test all(prior(ep, X; hl = 20).eoc .≈ wcount(X, 20))
+        me = PriorExpectedReturns(; pe = ep)
+        @test pe.effective_observation_count(me, X; hl = 20) ≈ wcount(X, 20)
+        hpe = HighOrderPriorEstimator(; pe = EmpiricalPrior(), kte = Cokurtosis(; w = kw),
+                                      ske = Coskewness(; w = kw))
+        @test all(getfield(prior(hpe, X; hl = 20), :eoc)[1:2] .≈ wcount(X, 20))
+    end
+    @testset "A fold reads its count with the keywords of the read" begin
+        rule = Xc -> clamp(round(Int, 1e4 * abs(Xc[1, 1])), 0, 140)
+        g = GerberIQCovariance(; decay = ExpGerberIQDecay(; e = rule),
+                               oc = KishObservationCount())
+        pc = PortfolioOptimisersCovariance(; ce = g, mp = dn)
+        Tm = pe.effective_observation_count(g, X; mean = m)
+        @test !(Tm ≈ pe.effective_observation_count(g, X))
+        # The wrapper holds the buffer, and the read refits over it.
+        fb = partial_fit!(pe.update_online_estimator(Online(pc)), X)
+        @test isa(pe.partial_fit_cache(fb), pe.SampleBufferState)
+        @test pe.effective_observation_count(fb; mean = m) ≈ Tm
+        @test cov(fb; mean = m) ≈ cov(pc, X; mean = m)
+        # The wrapper holds no state, and folds through the buffer of `ce.ce`.
+        pcn = PortfolioOptimisersCovariance(; ce = pe.update_online_estimator(Online(g)),
+                                            mp = dn)
+        fn = partial_fit!(pcn, X)
+        @test pe.effective_observation_count(fn; mean = m) ≈ Tm
+        @test cov(fn; mean = m) ≈ cov(pc, X; mean = m)
+        @test cor(fn; mean = m) ≈ cor(pc, X; mean = m)
+        @test cov(fn) ≈ cov(pc, X)
+    end
+end
+@testset "A rolling window has no fold, and a seed window folds" begin
+    pe = PortfolioOptimisers
+    rng = StableRNG(2)
+    X = randn(rng, 12, 2)
+    @test_throws ArgumentError partial_fit!(WindowedVariance(; window = 5,
+                                                             rule = RollingWindow()), X)
+    sw = partial_fit!(WindowedVariance(; window = 5, rule = SeedWindow()), X)
+    @test sw isa WindowedVariance
+    # The declaration of each windowed type sets the inner estimator as the first field.
+    @test isnothing(pe.obs_weights_view(getfield(sw, 1).cache, 1:3))
 end

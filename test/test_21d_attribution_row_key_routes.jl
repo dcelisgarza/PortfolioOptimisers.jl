@@ -37,6 +37,30 @@ function PortfolioOptimisers.apply_preprocessing(::RowKeyLyingDropResult,
 end
 PortfolioOptimisers.keeps_observations(::RowKeyLyingDropResult) = true
 
+# A member of the loadings family that a user writes. It reads the block of a `Regression`
+# and records no row key.
+struct RowKeyLoadings{R <: Regression} <:
+       PortfolioOptimisers.AbstractLoadingsRegressionResult
+    rr::R
+end
+# The prior result reads the loadings and the fit weights off the block it holds.
+function Base.getproperty(x::RowKeyLoadings, s::Symbol)
+    return s === :rr ? getfield(x, :rr) : getproperty(getfield(x, :rr), s)
+end
+const RowKeyPrior = PortfolioOptimisers.AbstractPriorResult
+PortfolioOptimisers.attribution_exposures(x::RowKeyLoadings) = x.rr.M
+PortfolioOptimisers.attribution_lag(::RowKeyLoadings) = 0
+function PortfolioOptimisers.attribution_idiosyncratic_covariance(x::RowKeyLoadings)
+    return PortfolioOptimisers.attribution_idiosyncratic_covariance(x.rr)
+end
+function PortfolioOptimisers.attribution_idiosyncratic_returns(::RowKeyLoadings,
+                                                               pr::RowKeyPrior)
+    return pr.o_X - pr.X
+end
+function PortfolioOptimisers.attribution_factor_returns(::RowKeyLoadings, pr::RowKeyPrior)
+    return pr.fpr.X
+end
+
 @testset "The row key of a walk-forward attribution, by route (#1495)" begin
     PO = PortfolioOptimisers
     mpass(f) = CompositeExposure(; descriptors = [Passthrough(; field = f)],
@@ -128,6 +152,72 @@ PortfolioOptimisers.keeps_observations(::RowKeyLyingDropResult) = true
         @test_throws ArgumentError Regression(; M = M, idx = [2, 1])
         @test_throws DimensionMismatch Regression(; M = M, idx = 1:3, ts = ts[1:2])
         @test_throws DimensionMismatch prior(FactorPrior(), X, F; ts = ts[1:10])
+    end
+
+    @testset "A fold that kept its held weights contributes their drifted path (#1912)" begin
+        wfd = IndexWalkForward(120, 40; wd = SelfFinancingDrift(), store_weight_path = true)
+        cvd = cross_val_predict(InverseVolatility(; pe = FactorPrior()), rdf, wfd)
+        pfd = prior(FactorPrior(), rdf)
+        fad = factor_attribution(cvd, pfd)
+        # The weights drift by hand: the position of each asset compounds at its own
+        # return, and the first observation is held at the target weights.
+        function drifted(p)
+            P = transpose(p.res.w) .* cumprod(1 .+ X[p.idx, :]; dims = 1)
+            V = vec(sum(P; dims = 2))
+            return vcat(transpose(p.res.w), P[1:(end - 1), :] ./ V[1:(end - 1)])
+        end
+        Wd = reduce(vcat, drifted(p) for p in cvd.pred)
+        rows = reduce(vcat, p.idx for p in cvd.pred)
+        sys = [dot(Wd[k, :], pfd.rr.M * F[rows[k], :]) for k in eachindex(rows)]
+        ret = [dot(Wd[k, :], X[rows[k], :]) for k in eachindex(rows)]
+        @test fad.sys.vol ≈ std(sys) rtol = 1e-12
+        @test fad.total.vol ≈ std(ret) rtol = 1e-12
+        # The same walk-forward with no drift holds the target weights, and reads other numbers.
+        fat = factor_attribution(cross_val_predict(InverseVolatility(; pe = FactorPrior()),
+                                                   rdf, wf), pfd)
+        @test !isapprox(fat.total.vol, fad.total.vol; rtol = 1e-9)
+    end
+
+    @testset "A loadings result that records no row key answers none (#1912)" begin
+        # A block that records no row key lines the series up at its tail, so it needs a
+        # series that covers the block. The block of the last 130 rows and the hindsight
+        # series of those rows give the systematic series w' M f of each row.
+        pb = prior(FactorPrior(), PO.port_opt_view(rdf, 121:T, :))
+        nokey = PO.forward_prior(pb; rr = RowKeyLoadings(pb.rr), o_X = pb.o_X)
+        cvn = cross_val_predict(InverseVolatility(; pe = FactorPrior()), rdf,
+                                HindsightSplit(; start = 121))
+        sys = [dot(p.res.w, pb.rr.M * F[r, :]) for p in cvn.pred for r in p.idx]
+        @test length(sys) == T - 120
+        @test factor_attribution(cvn, nokey).sys.vol ≈ std(sys) rtol = 1e-12
+        # A series shorter than the block, with no key to place it, is refused, while the
+        # key places it.
+        pn = prior(FactorPrior(), rdf)
+        cvs = cross_val_predict(InverseVolatility(; pe = FactorPrior()), rdf, wf)
+        @test_throws DimensionMismatch factor_attribution(cvs,
+                                                          PO.forward_prior(pn;
+                                                                           rr = RowKeyLoadings(pn.rr),
+                                                                           o_X = pn.o_X))
+        @test factor_attribution(cvs, pn).total.vol > 0
+    end
+
+    @testset "An exposure matrix is broadcast over the observations (#1912)" begin
+        # The standard errors of a static block equal those of its exposures repeated at every
+        # observation, which is the history the sandwich reads.
+        Tn, Nn = 12, 5
+        rg = StableRNG(1912)
+        B = 1 .+ rand(rg, Nn, 2)
+        Fr = 0.01 .* randn(rg, Tn, 2)
+        E = 0.005 .* randn(rg, Tn, Nn)
+        wn = fill(1 / Nn, Nn)
+        retn = (Fr * transpose(B) + E) * wn
+        Bh = repeat(reshape(B, 1, Nn, 2), Tn, 1, 1)
+        rw = 1 .+ rand(rg, Tn, Nn)
+        vs = fill(1e-4, Tn, Nn)
+        a = factor_attribution(wn, B, Fr, E, retn; rw = rw, vs = vs, se = true)
+        b = factor_attribution(wn, Bh, Fr, E, retn; lag = 0, rw = rw, vs = vs, se = true)
+        @test a.sys.mu_se ≈ b.sys.mu_se rtol = 1e-12
+        @test a.fbd.mu_se ≈ b.fbd.mu_se rtol = 1e-12
+        @test all(isfinite, a.fbd.mu_se) && a.sys.mu_se > 0
     end
 
     @testset "A Scenario Cap of the factor prior keeps the last rows on both sides" begin

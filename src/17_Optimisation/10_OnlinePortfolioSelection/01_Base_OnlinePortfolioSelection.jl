@@ -189,7 +189,7 @@ EuclideanProjection()
 
 # References
 
-  - $(ref_dict[:duchi2008])
+  - $(ref_dict[:duchi2008]) Section 3, Equations 3 to 6 and Figure 1.
 """
 struct EuclideanProjection <: AbstractProjectionGeometry end
 """
@@ -235,7 +235,7 @@ EntropicProjection()
 
 # References
 
-  - $(ref_dict[:helmbold1998])
+  - $(ref_dict[:helmbold1998]) Section 3, Equations 3.2 and 3.3.
 """
 struct EntropicProjection <: AbstractProjectionGeometry end
 """
@@ -305,7 +305,7 @@ GramProjection
 
 # References
 
-  - $(ref_dict[:agarwal2006])
+  - $(ref_dict[:agarwal2006]) Section 3, Figure 1 and Theorem 1.
 """
 @concrete struct GramProjection <: AbstractProjectionGeometry
     """
@@ -389,10 +389,10 @@ Keywords correspond to the struct's fields.
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `wb`: Recursively viewed via [`port_opt_view`](@ref).
-  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `wb`: Recursively viewed through [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices through [`port_opt_view`](@ref).
 
 # Examples
 
@@ -414,7 +414,7 @@ BoundedAllocationSet
 
 # References
 
-  - $(ref_dict[:duchi2008])
+  - $(ref_dict[:duchi2008]) Section 3, Figure 1.
 """
 @propagatable @concrete struct BoundedAllocationSet <: AbstractAllocationSet
     """
@@ -1014,7 +1014,7 @@ The exact projection of such a vector lifts every zero entry by ``(1 - s) / N`` 
 
 # References
 
-  - $(ref_dict[:duchi2008])
+  - $(ref_dict[:duchi2008]) Section 3, Equations 3 to 6 and Figure 1.
 """
 function project_simplex(v::AbstractVector)
     s = sum(v)
@@ -1079,7 +1079,7 @@ The function reads the rule, the state `st` of the rule, the allocation `w` held
 
 Every rule makes the same two steps. It takes an unconstrained step to a raw vector, and it then calls [`project`](@ref) onto the set in its geometry. A rule that reads `w` continues from the allocation it gets, which is the Start Allocation on the first row.
 
-The seven-argument form names the **Gradient Point**. An [`ExpertMixture`](@ref) under [`BlendPoint`](@ref) gives every expert its played blend as `point`. A first-order rule then evaluates its gradient at that point and steps from its own iterate, so every expert reads the one gradient on which the dynamic-regret mixtures state their bounds. The generic method drops the point and runs the six-argument update. So a rule with no gradient ignores the point, and a `nothing` point, which the mixture gives under [`OwnPoint`](@ref), runs the six-argument update for every rule. [`MirrorDescent`](@ref), [`OptimisticStep`](@ref) and [`AdaptiveSubgradient`](@ref) read a given point.
+The seven-argument form names the **Gradient Point**. An [`ExpertMixture`](@ref) under [`BlendPoint`](@ref) gives every expert its played blend as `point`. A first-order rule then evaluates its gradient at that point and steps from its own iterate, so every expert reads the one gradient on which the dynamic-regret mixtures state their bounds. The generic method drops the point and runs the six-argument update. So a rule with no gradient ignores the point, and a `nothing` point, which the mixture gives under [`OwnPoint`](@ref), runs the six-argument update for every rule. [`MirrorDescent`](@ref), with or without a predictor, and [`AdaptiveSubgradient`](@ref) read a given point.
 
 # Mathematical definition
 
@@ -1430,7 +1430,8 @@ Records a Held Step on the current [`ProjectionStep`](@ref). Outside a step, it 
 function record_held_step!(reason::AbstractString, trials)
     step = PROJECTION_STEP[]
     if isnothing(step)
-        @warn("Held Step outside an Online Update: $reason")
+        @warn("Held Step outside an Online Update: $reason", maxlog = log_limit(:warn),
+              _id = @log_id())
         return nothing
     end
     push!(step.held, HeldStep(step.ts, reason, trials))
@@ -1818,7 +1819,7 @@ At a stage boundary the rule returns the Start Allocation for period `t + 1` and
   - [`AbstractLearningRateSchedule`](@ref)
   - [`DoublingTrickRate`](@ref)
 """
-function restart(::Union{<:Real, <:AbstractLearningRateSchedule}, ::Integer)
+function restart(::Union{Real, AbstractLearningRateSchedule}, ::Integer)
     return false
 end
 """
@@ -1832,8 +1833,7 @@ Returns the statistic that the state of a rule holds for its schedule before the
   - [`AbstractLearningRateSchedule`](@ref)
   - [`SelfConfidentRate`](@ref)
 """
-function schedule_state_seed(::Union{<:Real, <:AbstractLearningRateSchedule},
-                             ::AbstractVector)
+function schedule_state_seed(::Union{Real, AbstractLearningRateSchedule}, ::AbstractVector)
     return nothing
 end
 """
@@ -1849,8 +1849,8 @@ For a number, and for a schedule that reads no statistic, it returns `s` unchang
   - [`AbstractLearningRateSchedule`](@ref)
   - [`SelfConfidentRate`](@ref)
 """
-function schedule_update!(::Union{<:Real, <:AbstractLearningRateSchedule}, s,
-                          ::AbstractVector, ::AbstractVector)
+function schedule_update!(::Union{Real, AbstractLearningRateSchedule}, s, ::AbstractVector,
+                          ::AbstractVector)
     return s
 end
 """
@@ -1866,8 +1866,7 @@ It is the rule's own `alpha` under a number and under every schedule that does n
   - [`AbstractLearningRateSchedule`](@ref)
   - [`MirrorDescent`](@ref)
 """
-function mixing_share(::Union{<:Real, <:AbstractLearningRateSchedule}, ::Integer,
-                      alpha::Real)
+function mixing_share(::Union{Real, AbstractLearningRateSchedule}, ::Integer, alpha::Real)
     return alpha
 end
 """
@@ -1883,7 +1882,7 @@ It is `true` for a schedule that replays the period before it returns a rate, as
   - [`AbstractLearningRateSchedule`](@ref)
   - [`schedule_update!`](@ref)
 """
-function reads_period_row(::Union{<:Real, <:AbstractLearningRateSchedule})
+function reads_period_row(::Union{Real, AbstractLearningRateSchedule})
     return false
 end
 """

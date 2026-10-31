@@ -9,7 +9,7 @@
 
 Check that a lower bound does not exceed the corresponding upper bound.
 
-Seven methods split the work by the pair of argument types, and the pair alone decides which preconditions run. Two of the seven exist to catch a `nothing` on one side: they check that the vector side is non-empty and compare nothing. The catch-all closes the family and checks nothing at all, so `(nothing, nothing)`, `(::Number, nothing)` and `(nothing, ::Number)` are accepted without a comparison.
+The pair of argument types selects one of seven methods, and that method alone decides which preconditions run. Two of the seven take a `nothing` on one side. They check that the vector side is not empty, and they do not compare the two sides. The last method takes every other pair and checks nothing. It accepts `(nothing, nothing)`, `(::Number, nothing)` and `(nothing, ::Number)` with no comparison.
 
 # Arguments
 
@@ -18,15 +18,15 @@ Seven methods split the work by the pair of argument types, and the pair alone d
 
 # Validation
 
-Each bullet names the method that runs the check, the condition it demands and the error it raises.
+Each bullet names the method that does the check, the condition that the method needs and the error that it raises.
 
   - `(Number, Number)`: `lb <= ub`, `DomainError` otherwise.
   - `(VecNum, Number)`: `!isempty(lb)`, `IsEmptyError` otherwise. Every entry of `lb` is at most `ub`, `DomainError` otherwise.
   - `(Number, VecNum)`: `!isempty(ub)`, `IsEmptyError` otherwise. Every entry of `ub` is at least `lb`, `DomainError` otherwise.
   - `(VecNum, VecNum)`: `!isempty(lb)` and `!isempty(ub)`, `IsEmptyError` otherwise. `length(lb) == length(ub)`, `DimensionMismatch` otherwise. Entry by entry, `lb` is at most `ub`, `DomainError` otherwise. The length check runs first, so the entry-by-entry comparison never reads a truncated pair.
-  - `(VecNum, Any)`: `!isempty(lb)`, `IsEmptyError` otherwise. This method takes the `(vector, nothing)` pair, so it compares the two sides with nothing.
-  - `(Any, VecNum)`: `!isempty(ub)`, `IsEmptyError` otherwise. This method takes the `(nothing, vector)` pair, so it compares the two sides with nothing.
-  - `(args...)`: no precondition and no raise. This method takes every remaining pair, of which `(nothing, nothing)`, `(::Number, nothing)` and `(nothing, ::Number)` are the ones the two bound types reach.
+  - `(VecNum, Any)`: `!isempty(lb)`, `IsEmptyError` otherwise. This method takes the `(vector, nothing)` pair, so it does not compare the two sides.
+  - `(Any, VecNum)`: `!isempty(ub)`, `IsEmptyError` otherwise. This method takes the `(nothing, vector)` pair, so it does not compare the two sides.
+  - `(args...)`: no precondition and no raise. This method takes every other pair. The two bound types reach it with `(nothing, nothing)`, `(::Number, nothing)` and `(nothing, ::Number)`.
 
 # Returns
 
@@ -91,9 +91,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Bounds every portfolio weight between a lower and an upper limit.
+Holds the lower bound and the upper bound of every portfolio weight.
 
-A bound is a scalar shared by every asset, a vector of one limit per asset, or `nothing` for no limit in that direction. The bounds also serve the mixed-integer builders, which read them as the big-M that links a weight to its held indicator.
+A bound is a scalar that applies to every asset, a vector with one bound per asset, or `nothing` for no bound on that side. The mixed-integer builders also read the bounds as the big-M that links a weight to its held indicator.
 
 # Mathematical definition
 
@@ -106,11 +106,11 @@ A bound is a scalar shared by every asset, a vector of one limit per asset, or `
 Where:
 
   - $(math_dict[:w_port])
-  - ``\\boldsymbol{l}``: Lower bound vector ``N \\times 1``. An entry of ``-\\infty`` leaves that weight unbounded below, and an entry of ``+\\infty`` admits no weight at all.
-  - ``\\boldsymbol{u}``: Upper bound vector ``N \\times 1``. An entry of ``+\\infty`` leaves that weight unbounded above, and an entry of ``-\\infty`` admits no weight at all.
+  - ``\\boldsymbol{l}``: Lower bound vector ``N \\times 1``. An entry of ``-\\infty`` leaves that weight unbounded below. An entry of ``+\\infty`` admits no value of that weight.
+  - ``\\boldsymbol{u}``: Upper bound vector ``N \\times 1``. An entry of ``+\\infty`` leaves that weight unbounded above. An entry of ``-\\infty`` admits no value of that weight.
   - $(math_dict[:N])
 
-A scalar bound is the case in which every entry of the vector holds the same value, and a `nothing` bound is the case in which every entry of that side is the infinity that leaves the weight free.
+A scalar bound is a vector with the same value in every entry. A `nothing` bound is a vector with the free bound in every entry, ``-\\infty`` on the lower side and ``+\\infty`` on the upper side.
 
 # Fields
 
@@ -127,27 +127,27 @@ $(DocStringExtensions.FIELDS)
         ub::Option{<:Num_VecNum} = 1.0
     ) -> WeightBounds
 
-Keywords correspond to the struct's fields. Only the keyword form carries the defaults, and it forwards to the positional form, so both run the same checks.
+Keywords correspond to the struct's fields. Only the keyword form has the defaults. It calls the positional form, so the two forms run the same checks.
 
 ## Validation
 
-[`validate_bounds`](@ref) runs on the pair, and the pair of types decides which of the checks below runs.
+The constructor calls [`validate_bounds`](@ref) on the pair. The types of the pair decide which of the checks below run.
 
-  - A vector bound is non-empty, `IsEmptyError` otherwise.
-  - Two vector bounds have the same length, `DimensionMismatch` otherwise.
-  - `lb` is not above `ub`, entry by entry where both are vectors, `DomainError` otherwise.
-  - A `nothing` on one side leaves the other side's non-emptiness as the only check, because no comparison is possible.
-  - Two `nothing` bounds are checked by nothing.
-  - Two infinite scalar bounds of the same sign pass, because the comparison holds. `WeightBounds(; lb = Inf, ub = Inf)` and `WeightBounds(; lb = -Inf, ub = -Inf)` are both admitted, and both admit no weight.
+  - A vector bound must not be empty, `IsEmptyError` otherwise.
+  - Two vector bounds must have the same length, `DimensionMismatch` otherwise.
+  - `lb` must not be above `ub`, entry by entry if both are vectors, `DomainError` otherwise.
+  - If one side is `nothing`, the constructor does not compare the two sides. It checks only that a vector on the other side is not empty.
+  - If both sides are `nothing`, the constructor checks nothing.
+  - Two infinite scalar bounds of the same sign pass, because `lb <= ub` holds. The constructor accepts `WeightBounds(; lb = Inf, ub = Inf)` and `WeightBounds(; lb = -Inf, ub = -Inf)`, and no weight satisfies either pair.
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `lb`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `ub`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `lb`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `ub`: Sliced to the selected indices through [`port_opt_view`](@ref).
 
-A field that [`weight_bounds_constraints`](@ref) expanded to a constant `range` is sliced as any other vector is, and the slice is a view of that range.
+[`weight_bounds_constraints`](@ref) can expand a field to a constant `range`. [`port_opt_view`](@ref) slices that field like any other vector, and the slice is a view of the range.
 
 # Examples
 
@@ -171,7 +171,7 @@ WeightBounds
   - [`set_linear_weight_constraints!`](@ref)
   - [`WeightBoundsEstimator`](@ref)
   - [`weight_bounds_constraints`](@ref)
-  - [`validate_bounds`](@ref): the seven methods that carry this type's checks.
+  - [`validate_bounds`](@ref): the seven methods that do the checks of this type.
   - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct WeightBounds <: AbstractConstraintResult
@@ -197,7 +197,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Resolves weight bounds written in asset or group names against a universe.
 
-[`weight_bounds_constraints`](@ref) turns it into a [`WeightBounds`](@ref): every name is mapped to its indices in the universe, and an unnamed asset takes `dlb` or `dub`. A bound may also be a scalar, a vector, or an algorithmic rule such as [`UniformValues`](@ref). A `dlb` or a `dub` left at `nothing` is filled at resolution time, with `zero(datatype)` on the lower side and `one(datatype)` on the upper side.
+[`weight_bounds_constraints`](@ref) turns it into a [`WeightBounds`](@ref). It maps every name to its indices in the universe, and it gives an asset with no name in the bound the value `dlb` or `dub`. A bound can also be a scalar, a vector, or an algorithmic rule such as [`UniformValues`](@ref). If `dlb` is `nothing`, the resolution uses `zero(datatype)`. If `dub` is `nothing`, it uses `one(datatype)`.
 
 # Fields
 
@@ -206,8 +206,8 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     WeightBoundsEstimator(;
-        lb::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}} = 0.0,
-        ub::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}} = 1.0,
+        lb::Option{<:VectorEstValType} = 0.0,
+        ub::Option{<:VectorEstValType} = 1.0,
         dlb::Option{<:Number} = nothing,
         dub::Option{<:Number} = nothing
     ) -> WeightBoundsEstimator
@@ -216,20 +216,20 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `lb` or `ub` is a `AbstractDict` or `AbstractVector`, it must be non-empty, `IsEmptyError` otherwise.
-  - Two vector bounds must have the same length, `DimensionMismatch` otherwise, through [`validate_bounds`](@ref).
-  - Where both bounds are numbers or vectors of numbers, `lb` is not above `ub`, through [`validate_bounds`](@ref), `DomainError` otherwise.
-  - Where one side is a `AbstractDict`, a `Pair` or an algorithmic rule, the two sides are not compared here, because neither side is resolved yet. [`weight_bounds_constraints`](@ref) builds a [`WeightBounds`](@ref) from the resolved pair, and that constructor compares them.
-  - If neither `dlb` nor `dub` is `nothing`, `dlb <= dub`, `DomainError` otherwise.
+  - If `lb` or `ub` is an `AbstractDict` or an `AbstractVector`, it must not be empty, `IsEmptyError` otherwise.
+  - Two vector bounds must have the same length, `DimensionMismatch` otherwise. [`validate_bounds`](@ref) does this check.
+  - If both bounds are numbers or vectors of numbers, `lb` must not be above `ub`, `DomainError` otherwise. [`validate_bounds`](@ref) does this check.
+  - If one side is an `AbstractDict`, a `Pair` or an algorithmic rule, the constructor does not compare the two sides, because that side has no values yet. [`weight_bounds_constraints`](@ref) builds a [`WeightBounds`](@ref) from the resolved pair, and that constructor compares them.
+  - If neither `dlb` nor `dub` is `nothing`, `dlb <= dub` must hold, `DomainError` otherwise.
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `lb`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `ub`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `lb`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `ub`: Sliced to the selected indices through [`port_opt_view`](@ref).
 
-Only a vector bound is sliced. A bound that is a scalar, a `Dict`, a `Pair` or an algorithmic rule is not indexed by asset, so a view passes it through untouched and it resolves against the viewed universe when the estimator runs.
+[`port_opt_view`](@ref) slices only a vector bound. A scalar, a `Dict`, a `Pair` or an algorithmic rule has no index by asset. The view keeps such a bound unchanged, and the bound resolves against the universe of the view when the estimator runs.
 
 # Examples
 
@@ -254,7 +254,7 @@ WeightBoundsEstimator
 
   - [`WeightBounds`](@ref)
   - [`weight_bounds_constraints`](@ref)
-  - [`validate_bounds`](@ref): the checks this constructor runs on a pair of numbers or a pair of vectors.
+  - [`validate_bounds`](@ref): the checks that this constructor runs on a pair of numbers or a pair of vectors.
   - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct WeightBoundsEstimator <: AbstractConstraintEstimator
@@ -274,8 +274,8 @@ WeightBoundsEstimator
     $(field_dict[:dub])
     """
     dub
-    function WeightBoundsEstimator(lb::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}},
-                                   ub::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}},
+    function WeightBoundsEstimator(lb::Option{<:VectorEstValType},
+                                   ub::Option{<:VectorEstValType},
                                    dlb::Option{<:Number} = nothing,
                                    dub::Option{<:Number} = nothing)::WeightBoundsEstimator
         if isa(lb, Dict_Vec)
@@ -295,21 +295,20 @@ WeightBoundsEstimator
         return new{typeof(lb), typeof(ub), typeof(dlb), typeof(dub)}(lb, ub, dlb, dub)
     end
 end
-function WeightBoundsEstimator(;
-                               lb::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}} = 0.0,
-                               ub::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}} = 1.0,
+function WeightBoundsEstimator(; lb::Option{<:VectorEstValType} = 0.0,
+                               ub::Option{<:VectorEstValType} = 1.0,
                                dlb::Option{<:Number} = nothing,
                                dub::Option{<:Number} = nothing)::WeightBoundsEstimator
     return WeightBoundsEstimator(lb, ub, dlb, dub)
 end
 """
-    const WbE_Wb = Union{<:WeightBoundsEstimator, <:WeightBounds}
+    const WbE_Wb = Union{WeightBoundsEstimator, WeightBounds}
 
 Alias for a weight bounds estimator or result.
 
-Matches either a [`WeightBoundsEstimator`](@ref) (specifying how to generate weight bounds constraints) or a [`WeightBounds`](@ref) result. Used internally for dispatch in weight bounds constraint generation.
+The alias matches a [`WeightBoundsEstimator`](@ref) or a [`WeightBounds`](@ref). The library uses it for dispatch when it resolves weight bounds.
 
-There is no vector counterpart, and [`weight_bounds_constraints`](@ref) has no vector method. Weight bounds are one box over the whole universe, so an optimiser holds exactly one. See [`RkbE_Rkb`](@ref) for why some constraint families are singular and others are not.
+The alias has no vector counterpart, and [`weight_bounds_constraints`](@ref) has no vector method. Weight bounds are one box over the whole universe, so an optimiser holds one of them. [`RkbE_Rkb`](@ref) states why some constraint families are singular and others are not.
 
 # Related
 
@@ -317,36 +316,36 @@ There is no vector counterpart, and [`weight_bounds_constraints`](@ref) has no v
   - [`WeightBounds`](@ref)
   - [`weight_bounds_constraints`](@ref)
 """
-const WbE_Wb = Union{<:WeightBoundsEstimator, <:WeightBounds}
+const WbE_Wb = Union{WeightBoundsEstimator, WeightBounds}
 """
     weight_bounds_constraints(wb::WeightBoundsEstimator, sets::UniverseSets; strict::Bool = false,
                               datatype::DataType = Float64, kwargs...)
 
-Generate portfolio weight bounds constraints from a `WeightBoundsEstimator` and asset set.
+Resolve a `WeightBoundsEstimator` against a universe.
 
-`weight_bounds_constraints` constructs a [`WeightBounds`](@ref) object representing lower and upper portfolio weight bounds for the assets in `sets`, using the specifications in `wb`. A bound may be a scalar, a vector, a dictionary, a pair, or an algorithmic rule, so one estimator carries both a universe-wide limit and an asset-specific one. A bound that is `nothing` states no limit in that direction, and survives the resolution as `nothing`.
+`weight_bounds_constraints` builds the [`WeightBounds`](@ref) of the assets in `sets` from the bounds that `wb` states. A bound can be a scalar, a vector, a dictionary, a pair, or an algorithmic rule. So one estimator can state one bound for the whole universe and a different bound for each named asset. A `nothing` bound states no bound on that side, and the resolution keeps it as `nothing`.
 
 # Algorithm
 
- 1. Resolve the lower side with [`estimator_to_val`](@ref), giving `lb`. The fill value for an asset the estimator does not name is `wb.dlb`, or `zero(datatype)` when `wb.dlb` is `nothing`.
- 2. Resolve the upper side the same way, giving `ub`. The fill value is `wb.dub`, or `one(datatype)` when `wb.dub` is `nothing`.
- 3. Build `WeightBounds(; lb = lb, ub = ub)`. That constructor runs [`validate_bounds`](@ref) on the resolved pair, which is where a `AbstractDict` bound on one side and a scalar on the other are first compared.
+ 1. Resolve the lower side with [`estimator_to_val`](@ref). The result is `lb`. An asset that the estimator does not name gets `wb.dlb`, or `zero(datatype)` if `wb.dlb` is `nothing`.
+ 2. Resolve the upper side the same way. The result is `ub`. An asset that the estimator does not name gets `wb.dub`, or `one(datatype)` if `wb.dub` is `nothing`.
+ 3. Build `WeightBounds(; lb = lb, ub = ub)`. That constructor runs [`validate_bounds`](@ref) on the resolved pair. This is the first comparison of an `AbstractDict` bound on one side with a scalar on the other.
 
 # Arguments
 
-  - `wb`: [`WeightBoundsEstimator`](@ref) specifying lower and upper bounds.
-  - `sets`: [`UniverseSets`](@ref) containing asset names or indices.
-  - `strict`: If `true`, enforces strict matching between assets and bounds (throws error on mismatch); if `false`, issues a warning.
-  - `datatype`: Output data type for bounds.
-  - `kwargs...`: Additional keyword arguments passed to bound extraction routines.
+  - `wb`: [`WeightBoundsEstimator`](@ref) that states the lower and upper bounds.
+  - `sets`: [`UniverseSets`](@ref) that holds the asset names and the groups.
+  - $(arg_dict[:strict_opt])
+  - `datatype`: Number type of the resolved bounds, and of the fill values `zero(datatype)` and `one(datatype)`.
+  - $(arg_dict[:ignkwargs])
 
 # Validation
 
-  - The resolved pair passes [`validate_bounds`](@ref), through the [`WeightBounds`](@ref) constructor of step 3. A resolved `lb` above a resolved `ub` raises `DomainError` there, and a resolved vector of the wrong length raises `DimensionMismatch` inside [`estimator_to_val`](@ref).
+  - The resolved pair must pass [`validate_bounds`](@ref), which the [`WeightBounds`](@ref) constructor of step 3 runs. A resolved `lb` above a resolved `ub` raises `DomainError` there. [`estimator_to_val`](@ref) raises `DimensionMismatch` for a vector bound of the wrong length.
 
 # Returns
 
-  - `wb::WeightBounds`: Object containing lower and upper bounds aligned with `sets`.
+  - `wb::WeightBounds`: The resolved bounds, in the asset order of `sets`.
 
 # Examples
 
@@ -392,9 +391,9 @@ end
 """
     weight_bounds_constraints_side(::Nothing, N::Integer, val::Number)
 
-Generate a vector of portfolio weight bounds when no constraint is specified.
+Expand a `nothing` bound to a vector of free bounds.
 
-`weight_bounds_constraints_side` returns a vector of length `N` filled with the value `val` when the input bound is `nothing`. This is used to represent unconstrained portfolio weights (e.g., `-Inf` for lower bounds, `Inf` for upper bounds) in constraint generation routines.
+`weight_bounds_constraints_side` returns a vector of length `N` with `val` in every entry. The caller gives the free bound of the side as `val`, `-Inf` for a lower bound and `Inf` for an upper bound.
 
 # Algorithm
 
@@ -402,13 +401,13 @@ Generate a vector of portfolio weight bounds when no constraint is specified.
 
 # Arguments
 
-  - `::Nothing`: Indicates no constraint for this bound direction.
-  - `N`: Number of assets (length of the output vector).
-  - `val`: Value to fill (typically `-Inf` or `Inf`).
+  - `::Nothing`: No bound on this side.
+  - `N`: Number of assets, which is the length of the returned vector.
+  - `val`: Free bound of this side, `-Inf` for a lower bound and `Inf` for an upper bound.
 
 # Returns
 
-  - `wb::VecNum`: Vector of length `N` filled with `val`.
+  - `wb::VecNum`: Vector of length `N` with `val` in every entry.
 
 # Examples
 
@@ -431,9 +430,9 @@ end
 """
     weight_bounds_constraints_side(wb::Number, N::Integer, val::Number)
 
-Generate a vector of portfolio weight bounds from a scalar bound.
+Expand a scalar bound to one bound per asset.
 
-`weight_bounds_constraints_side` gives every asset the scalar bound `wb`. A finite `wb` becomes a constant `range` and an infinite one becomes a filled `Vector`, because `range(Inf, Inf; length = N)` collects to `NaN`. The value `val` is not read by this method: an infinite bound keeps its own sign, so a lower bound of `Inf` stays `Inf` and admits no weight rather than becoming the free bound `-Inf`.
+`weight_bounds_constraints_side` gives every asset the scalar bound `wb`. A finite `wb` becomes a constant `range`. An infinite `wb` becomes a `Vector`, because `range(Inf, Inf; length = N)` collects to `NaN`. This method does not read `val`. An infinite bound keeps its sign, so a lower bound of `Inf` stays `Inf` and admits no weight. It does not become the free bound `-Inf`.
 
 # Algorithm
 
@@ -442,13 +441,13 @@ Generate a vector of portfolio weight bounds from a scalar bound.
 
 # Arguments
 
-  - `wb::Number`: Scalar bound for portfolio weights (can be finite or infinite).
-  - `N::Integer`: Number of assets (length of the output vector).
-  - `val::Number`: Free bound of this side, `-Inf` for a lower bound and `Inf` for an upper one. This method does not read it, and it is present so that every method of the function takes the same three arguments.
+  - `wb::Number`: Scalar bound of every portfolio weight, finite or infinite.
+  - `N::Integer`: Number of assets, which is the length of the returned vector.
+  - `val::Number`: Free bound of this side, `-Inf` for a lower bound and `Inf` for an upper bound. This method does not read it. It is in the signature so that every method of the function takes the same three arguments.
 
 # Returns
 
-  - `wb::VecNum`: Vector or range of length `N`, every entry of which holds `wb`.
+  - `wb::VecNum`: Vector or range of length `N` with `wb` in every entry.
 
 # Examples
 
@@ -479,24 +478,24 @@ end
 """
     weight_bounds_constraints_side(wb::VecNum, N::Integer = 0, args...)
 
-Propagate asset-specific portfolio weight bounds from a vector.
+Return a vector bound unchanged, after a check of its length.
 
-`weight_bounds_constraints_side` returns the input vector `wb` unchanged when asset-specific bounds are provided as a vector. This method is used to propagate explicit per-asset bounds in constraint generation routines.
+A vector bound already holds one bound per asset, so `weight_bounds_constraints_side` returns `wb` unchanged. If the caller gives an asset count `N`, the function first checks the length of `wb` against it.
 
 # Algorithm
 
- 1. When `N` is not zero, check `length(wb) == N`.
+ 1. If `N` is not zero, check `length(wb) == N`.
  2. Return `wb`.
 
 # Arguments
 
-  - `wb`: Vector of bounds for portfolio weights (one per asset).
-  - `N`: Number of assets. A zero states that the caller knows no asset count, and then the length is not checked.
-  - `args...`: Additional positional arguments (ignored).
+  - `wb`: Vector with one bound per asset.
+  - `N`: Number of assets. A zero states that the caller knows no asset count, and the method then does not check the length.
+  - $(arg_dict[:ignargs])
 
 # Validation
 
-  - `iszero(N) || length(wb) == N`, `DimensionMismatch` otherwise. A reader of a bound compares it with the weights through `map`, which truncates to the shorter argument, so a bound shorter than the universe leaves every asset past `length(wb)` unchecked.
+  - `iszero(N) || length(wb) == N`, `DimensionMismatch` otherwise. A reader of a bound compares it with the weights through `map`, which stops at the end of the shorter argument. So a bound shorter than the universe leaves every asset past `length(wb)` with no check.
 
 # Returns
 
@@ -527,34 +526,34 @@ end
     weight_bounds_constraints(wb::WeightBounds{<:Any, <:Any}, args...; N::Integer = 0,
                               datatype::DataType = Float64, kwargs...)
 
-Expand portfolio weight bounds constraints from a `WeightBounds` object to length `N`.
+Expand each side of a `WeightBounds` to `N` bounds.
 
-`weight_bounds_constraints` expands a scalar, `nothing` or infinite bound to a vector or range of length `N` using [`weight_bounds_constraints_side`](@ref), so every bound reaches the model per asset. A vector bound is passed through unchanged, and its length is checked against `N`.
+[`weight_bounds_constraints_side`](@ref) expands a scalar or a `nothing` bound to a vector or range of length `N`, so the model gets one bound per asset. A vector bound stays unchanged, and its length must equal `N`.
 
-`N` is required in practice. The default `N = 0` builds two empty bound vectors, and [`WeightBounds`](@ref)'s own validation then throws `IsEmptyError: lb cannot be empty`.
+The caller must give `N`. With the default `N = 0`, every scalar or `nothing` side expands to an empty vector, and the [`WeightBounds`](@ref) constructor raises `IsEmptyError`.
 
 # Algorithm
 
- 1. Expand the lower side with `weight_bounds_constraints_side(wb.lb, N, -Inf)`, giving `lb`. The free bound is `-Inf` in `datatype`, so a side with no bound lands in the type of the data rather than in `Float64`.
- 2. Expand the upper side with `weight_bounds_constraints_side(wb.ub, N, Inf)`, giving `ub`, with the free bound `Inf` in `datatype`.
- 3. Build `WeightBounds(; lb = lb, ub = ub)`, which validates the expanded pair.
+ 1. Expand the lower side with `weight_bounds_constraints_side(wb.lb, N, -Inf)`. The result is `lb`. The free bound `-Inf` has the type `datatype`, so a side with no bound takes the number type of the data, not `Float64`.
+ 2. Expand the upper side with `weight_bounds_constraints_side(wb.ub, N, Inf)`. The result is `ub`, and its free bound `Inf` has the type `datatype`.
+ 3. Build `WeightBounds(; lb = lb, ub = ub)`. Its constructor checks the expanded pair.
 
 # Arguments
 
-  - `wb`: [`WeightBounds`](@ref) object containing lower and upper bounds.
-  - `args...`: Additional positional arguments (ignored).
-  - `N`: Number of assets, the length of the expansion.
-  - `datatype`: Type of the free bound a side with no bound expands to.
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `wb`: [`WeightBounds`](@ref) to expand.
+  - $(arg_dict[:ignargs])
+  - `N`: Number of assets, which is the length of each expanded side.
+  - `datatype`: Number type of the free bound that a `nothing` side expands to.
+  - $(arg_dict[:ignkwargs])
 
 # Validation
 
-  - A vector bound has length `N`, `DimensionMismatch` otherwise, through [`weight_bounds_constraints_side`](@ref).
-  - The expanded pair passes [`validate_bounds`](@ref), through the [`WeightBounds`](@ref) constructor of step 3. With the default `N = 0` both sides expand to an empty vector and that constructor raises `IsEmptyError`.
+  - A vector bound must have length `N`, `DimensionMismatch` otherwise. [`weight_bounds_constraints_side`](@ref) does this check.
+  - The expanded pair must pass [`validate_bounds`](@ref), which the [`WeightBounds`](@ref) constructor of step 3 runs. With the default `N = 0`, every scalar or `nothing` side expands to an empty vector, and that constructor raises `IsEmptyError`.
 
 # Returns
 
-  - `wb::WeightBounds`: Expanded bounds object.
+  - `wb::WeightBounds`: The expanded bounds.
 
 # Examples
 
@@ -588,21 +587,21 @@ end
     weight_bounds_constraints(wb::WeightBounds{<:VecNum, <:VecNum}, args...; N::Integer = 0,
                               kwargs...)
 
-Propagate asset-specific portfolio weight bounds constraints from a `WeightBounds` object with vector bounds.
+Return a `WeightBounds` with two vector sides unchanged, after a check of its length.
 
-`weight_bounds_constraints` returns the input [`WeightBounds`](@ref) object unchanged when both lower and upper bounds are provided as vectors. This method is used to propagate explicit per-asset bounds in constraint generation workflows, ensuring that asset-specific constraints are preserved.
+Both sides of `wb` already hold one bound per asset, so `weight_bounds_constraints` returns the [`WeightBounds`](@ref) unchanged. If the caller gives an asset count `N`, the method first checks the length of `wb.lb` against it.
 
 # Algorithm
 
- 1. When `N` is not zero, check `length(wb.lb) == N`. The constructor of `wb` already held the two sides to one length.
+ 1. If `N` is not zero, check `length(wb.lb) == N`. The constructor of `wb` already checked that the two sides have the same length.
  2. Return `wb`.
 
 # Arguments
 
-  - `wb`: [`WeightBounds`](@ref) object with vector lower and upper bounds.
-  - `args...`: Additional positional arguments (ignored).
-  - `N`: Number of assets. A zero states that the caller knows no asset count, and then the length is not checked.
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `wb`: [`WeightBounds`](@ref) with a vector on each side.
+  - $(arg_dict[:ignargs])
+  - `N`: Number of assets. A zero states that the caller knows no asset count, and the method then does not check the length.
+  - $(arg_dict[:ignkwargs])
 
 # Validation
 
@@ -610,7 +609,7 @@ Propagate asset-specific portfolio weight bounds constraints from a `WeightBound
 
 # Returns
 
-  - `wb::WeightBounds`: The input bounds object, unchanged.
+  - `wb::WeightBounds`: The input bounds, unchanged.
 
 # Examples
 
@@ -638,30 +637,30 @@ end
     weight_bounds_constraints(wb::Nothing, args...; N::Integer = 0,
                               datatype::DataType = Float64, kwargs...)
 
-Generate unconstrained portfolio weight bounds when no bounds are specified.
+Make free weight bounds for `N` assets.
 
-`weight_bounds_constraints` returns a [`WeightBounds`](@ref) object with lower bounds set to `-Inf` and upper bounds set to `Inf` for all assets when `wb` is `nothing`. `N` is required in practice. The default `N = 0` builds two empty vectors, and [`WeightBounds`](@ref)'s own validation then throws `IsEmptyError: lb cannot be empty`.
+`weight_bounds_constraints` returns a [`WeightBounds`](@ref) with `-Inf` in every entry of the lower side and `Inf` in every entry of the upper side. The caller must give `N`. With the default `N = 0`, both sides are empty, and the [`WeightBounds`](@ref) constructor raises `IsEmptyError: lb cannot be empty`.
 
 # Algorithm
 
- 1. Fill both sides to length `N`, `-Inf` on the lower side and `Inf` on the upper side, both in `datatype`, so the free bounds land in the type of the data rather than in `Float64`.
- 2. Build `WeightBounds(; lb = lb, ub = ub)`, which validates the pair.
+ 1. Fill the lower side with `-Inf` and the upper side with `Inf`, each to length `N`. Both free bounds have the type `datatype`, so they take the number type of the data, not `Float64`.
+ 2. Build `WeightBounds(; lb = lb, ub = ub)`. Its constructor checks the pair.
 
 # Arguments
 
-  - `wb::Nothing`: Indicates no constraint for portfolio weights.
-  - `args...`: Additional positional arguments (ignored).
-  - `N::Integer`: Number of assets, the length of the two bound vectors.
-  - `datatype`: Type of the two free bounds.
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `wb::Nothing`: No weight bounds.
+  - $(arg_dict[:ignargs])
+  - `N::Integer`: Number of assets, which is the length of each side.
+  - `datatype`: Number type of the two free bounds.
+  - $(arg_dict[:ignkwargs])
 
 # Validation
 
-  - The pair passes [`validate_bounds`](@ref), through the [`WeightBounds`](@ref) constructor of step 2. With the default `N = 0` both sides are empty and that constructor raises `IsEmptyError`.
+  - The pair must pass [`validate_bounds`](@ref), which the [`WeightBounds`](@ref) constructor of step 2 runs. With the default `N = 0`, both sides are empty, and that constructor raises `IsEmptyError`.
 
 # Returns
 
-  - `wb::WeightBounds`: Object with unconstrained lower and upper bounds.
+  - `wb::WeightBounds`: Free lower and upper bounds.
 
 # Examples
 

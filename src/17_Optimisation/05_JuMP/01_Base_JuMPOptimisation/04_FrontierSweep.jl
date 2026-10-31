@@ -94,6 +94,41 @@ function assert_frontier_sweep_cap(model::JuMP.Model)
     return nothing
 end
 """
+    assert_frontier_sweep_owner(model::JuMP.Model, optimiser::JuMPOptimisationEstimator)
+
+Check that the model holds no frontier when its optimiser solves the model once.
+
+A return term with a [`Frontier`](@ref) or a vector floor adds an entry to `:ret_frontier`, and a risk measure with a [`Frontier`](@ref) or a vector ceiling adds an entry to `:risk_frontier`. [`MeanRisk`](@ref) and [`NearOptimalCentering`](@ref) sweep these entries, and each has a method that returns `nothing`. Every other optimiser solves its model once, so the solve would ignore the bound and return one portfolio. [`assemble_jump_model!`](@ref) runs this check after [`assert_frontier_sweep_cap`](@ref).
+
+# Algorithm
+
+ 1. Count the points with [`frontier_sweep_points`](@ref), giving `factors`.
+ 2. Check that `factors` is empty.
+
+# Validation
+
+  - The model holds no entry in `:ret_frontier` or `:risk_frontier`. Otherwise an `ArgumentError` names the optimiser and the keys of the bounds.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_frontier_sweep_cap`](@ref)
+  - [`frontier_sweep_points`](@ref)
+  - [`assemble_jump_model!`](@ref)
+  - [`set_return_bounds!`](@ref)
+  - [`set_risk_upper_bound!`](@ref)
+"""
+function assert_frontier_sweep_owner(model::JuMP.Model,
+                                     optimiser::JuMPOptimisationEstimator)::Nothing
+    _, factors = frontier_sweep_points(model)
+    @argcheck(isempty(factors),
+              ArgumentError("`$(nameof(typeof(optimiser)))` solves its model once and does not sweep a frontier, so it cannot honour the bounds $(join((key for (key, _) in factors), ", ")). Give each of them one number, or use `MeanRisk` or `NearOptimalCentering`, which sweep a frontier."))
+    return nothing
+end
+"""
     frontier_axis(frontier::VecPair)
 
 Turn one resolved frontier registry into the sweep axis that it defines.
@@ -125,11 +160,66 @@ function frontier_axis(frontier::VecPair)
     return Iterators.product.(itrs...)
 end
 """
+    bound_scale(vals::Num_VecNum)
+
+Return the fixed scale of a bound: the largest absolute value of `vals`, or one when every value is zero. A number is its own only value, and a vector holds the points of a sweep.
+
+Each bound row divides its expression by this scale, so that its coefficients are of order one. Clarabel judges a residual against a norm of order one, so a row whose coefficients are of the size of a fourth moment, near `1e-7`, can pass with a residual that is a large share of the bound. The equilibration of the solver scales such a row up only to its cap, `1e4` by default. Under the exponential cones of [`ConstrainedNearOptimalCentering`](@ref), the solve then stops at `ALMOST_SOLVED`, and the row breaks. For that centring on 20 assets of the S&P 500, with Clarabel at its default settings, the undivided ceilings of [`EntropicValueatRisk`](@ref) and [`Kurtosis`](@ref) broke by up to `1.7 %` and `0.9 %`. The divided ceilings held to `5e-7`.
+
+A sweep writes its parameter in units of this scale, so the parameter takes the values `vals ./ bound_scale(vals)`, which lie in ``[-1, 1]``. A solver that does not take a parameter directly receives it through a bridge, as a variable that an equality row fixes. A parameter in the units of the point gives that row the coefficient `-1`, which stops the scale-up of a row whose other coefficients are small.
+
+# Arguments
+
+  - `vals::Num_VecNum`: The bound, or the points of a swept bound.
+
+# Returns
+
+  - The scale, of the type of `abs` of the element type of `vals`.
+
+# Related
+
+  - [`unit_frontier`](@ref)
+  - [`set_ret_frontier_parameters!`](@ref)
+  - [`set_risk_frontier_parameters!`](@ref)
+  - [`set_noc_anchor_parameters!`](@ref)
+  - [`set_risk_upper_bound!`](@ref)
+  - [`set_return_bounds!`](@ref)
+"""
+function bound_scale(vals::Num_VecNum)
+    s = maximum(abs, vals; init = abs(zero(eltype(vals))))
+    return ifelse(iszero(s), one(s), s)
+end
+"""
+    unit_frontier(frontier::VecPair)
+
+Return a copy of a resolved frontier registry with the points of each entry in the units of its [`bound_scale`](@ref).
+
+The parameters of the sweep take these values. The builders pass the copy to [`frontier_axis`](@ref), so [`set_frontier_point!`](@ref) writes each point in the units of the coefficient of its row.
+
+# Arguments
+
+  - `frontier::VecPair`: A resolved frontier registry. The bound of each entry is a vector of sweep points.
+
+# Returns
+
+  - A registry with the same keys and the same entries, where the second value of each entry is divided by its scale.
+
+# Related
+
+  - [`bound_scale`](@ref)
+  - [`frontier_axis`](@ref)
+"""
+function unit_frontier(frontier::VecPair)
+    return [entry.first =>
+                Base.setindex(entry.second, entry.second[2] ./ bound_scale(entry.second[2]),
+                              2) for entry in frontier]
+end
+"""
     set_ret_frontier_parameters!(model::JuMP.Model, ret_frontier::VecPair)
 
 Register one parameter and one floor row for each swept return term.
 
-The bound of each term acts on the expression of that term, so the return side is a product over the terms and not one ladder. `k` multiplies the bound, as it multiplies the scalar bound of [`set_return_bounds!`](@ref).
+The bound of each term acts on the expression of that term, so the return side is a product over the terms and not one ladder. `k` multiplies the bound, as it multiplies the scalar bound of [`set_return_bounds!`](@ref). Under [`MaximumRatio`](@ref), ``b_j k`` is the product of a parameter and a variable, so a conic solver needs a parametric wrapper, as the docstring of [`Frontier`](@ref) shows.
 
 # JuMP formulation
 
@@ -140,12 +230,13 @@ The bound of each term acts on the expression of that term, so the return side i
 
 ## Constraints
 
-  - `bound_key` of each entry: ``s_c \\left(\\mathrm{ret}_j - b_j k\\right) \\geq 0``.
+  - `bound_key` of each entry: ``s_c \\left(\\mathrm{ret}_j / m_j - b_j k\\right) \\geq 0``.
 
 Where:
 
   - ``\\mathrm{ret}_j``: The return expression of the ``j``-th swept return term, the first value of the entry.
-  - ``b_j``: The return floor of the ``j``-th swept return term, a parameter.
+  - ``b_j``: The return floor of the ``j``-th swept return term in units of ``m_j``, a parameter. A point ``p`` of the sweep writes ``p / m_j``.
+  - ``m_j``: The [`bound_scale`](@ref) of the points of the ``j``-th entry, a constant.
   - $(math_dict[:sc_scale])
   - $(math_dict[:k_budget])
 
@@ -168,18 +259,19 @@ function set_ret_frontier_parameters!(model::JuMP.Model, ret_frontier::VecPair)
     sc = get_constraint_scale(model)
     k = get_k(model)
     for (keys, vals) in ret_frontier
+        m = bound_scale(vals[2])
         lb = model[keys[1]] = JuMP.@variable(model,
                                              set = JuMP.Parameter(zero(eltype(vals[2]))))
-        model[keys[2]] = JuMP.@constraint(model, sc * (vals[1] - lb * k) >= 0)
+        model[keys[2]] = JuMP.@constraint(model, sc * (vals[1] / m - lb * k) >= 0)
     end
-    return frontier_axis(ret_frontier)
+    return frontier_axis(unit_frontier(ret_frontier))
 end
 """
     set_risk_frontier_parameters!(model::JuMP.Model, risk_frontier::VecPair)
 
 Register one parameter and one bound row for each swept risk measure.
 
-It is the twin of [`set_ret_frontier_parameters!`](@ref). The risk side adds the direction ``d`` of the bound, which turns the ceiling into a floor for a measure whose flag is `false`. `k` multiplies the bound, as it multiplies the scalar bound of [`set_risk_upper_bound!`](@ref). Two heads call this builder. Under [`MeanRisk`](@ref), `k` is the ratio variable for a [`MaximumRatio`](@ref) objective and the number `1` for any other objective. [`NearOptimalCentering`](@ref) minimises a barrier and registers `k = 1`, so the factor has no effect there. One builder for both heads keeps the two from drifting apart.
+It is the twin of [`set_ret_frontier_parameters!`](@ref). The risk side adds the direction ``d`` of the bound, which turns the ceiling into a floor for a measure whose flag is `false`. `k` multiplies the bound, as it multiplies the scalar bound of [`set_risk_upper_bound!`](@ref). Two heads call this builder. Under [`MeanRisk`](@ref), `k` is the ratio variable for a [`MaximumRatio`](@ref) objective and the number `1` for any other objective. Under `MaximumRatio`, ``u_j k`` is the product of a parameter and a variable, so a conic solver needs a parametric wrapper, as the docstring of [`Frontier`](@ref) shows. [`NearOptimalCentering`](@ref) minimises a barrier and registers `k = 1`, so the factor has no effect there. One builder for both heads keeps the two from drifting apart.
 
 # JuMP formulation
 
@@ -190,12 +282,13 @@ It is the twin of [`set_ret_frontier_parameters!`](@ref). The risk side adds the
 
 ## Constraints
 
-  - `bound_key` of each entry: ``d_j s_c \\left(R_j - u_j k\\right) \\leq 0``. With ``d_j = 1`` the row is the ceiling ``R_j \\leq u_j k``, and with ``d_j = -1`` it is the floor ``R_j \\geq u_j k``.
+  - `bound_key` of each entry: ``d_j s_c \\left(R_j / m_j - u_j k\\right) \\leq 0``. With ``d_j = 1`` the row is the ceiling ``R_j \\leq m_j u_j k``, and with ``d_j = -1`` it is the floor ``R_j \\geq m_j u_j k``.
 
 Where:
 
   - ``R_j``: The risk expression of the ``j``-th swept risk measure, the first value of the entry.
-  - ``u_j``: The bound of the ``j``-th swept risk measure, a parameter.
+  - ``u_j``: The bound of the ``j``-th swept risk measure in units of ``m_j``, a parameter. A point ``p`` of the sweep writes ``p / m_j``.
+  - ``m_j``: The [`bound_scale`](@ref) of the points of the ``j``-th entry, a constant. Without it, a bound of the size of a fourth moment breaks its row by a large share of the bound.
   - ``d_j``: ``1`` when the flag of the entry, its third value, is `true`, and ``-1`` otherwise.
   - $(math_dict[:sc_scale])
   - $(math_dict[:k_budget])
@@ -220,12 +313,13 @@ function set_risk_frontier_parameters!(model::JuMP.Model, risk_frontier::VecPair
     sc = get_constraint_scale(model)
     k = get_k(model)
     for (keys, vals) in risk_frontier
+        m = bound_scale(vals[2])
         ub = model[keys[1]] = JuMP.@variable(model,
                                              set = JuMP.Parameter(zero(eltype(vals[2]))))
         d = ifelse(vals[3], 1, -1)
-        model[keys[2]] = JuMP.@constraint(model, d * sc * (vals[1] - ub * k) <= 0)
+        model[keys[2]] = JuMP.@constraint(model, d * sc * (vals[1] / m - ub * k) <= 0)
     end
-    return frontier_axis(risk_frontier)
+    return frontier_axis(unit_frontier(risk_frontier))
 end
 """
     frontier_sweep_axes(ret_axis, risk_axis)
@@ -265,6 +359,8 @@ end
     set_frontier_point!(model::JuMP.Model, point::Tuple)
 
 Write the bounds of one sweep point into the frontier parameters.
+
+The bounds are in the units of the [`bound_scale`](@ref) of each entry, because the builders build the axis from [`unit_frontier`](@ref).
 
 # Algorithm
 

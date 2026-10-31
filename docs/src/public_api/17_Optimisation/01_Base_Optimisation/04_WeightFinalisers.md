@@ -1,14 +1,16 @@
 ```@meta
-Description = "Weight finalisers, public API of PortfolioOptimisers.jl: RelativeErrorWeightFinaliser, SquaredRelativeErrorWeightFinaliser, AbsoluteErrorWeightFinaliser, …"
+Description = "Weight finalisers, public API of PortfolioOptimisers.jl: ErrorWeightFinaliser, RelativeWeightDeviation, AbsoluteWeightDeviation, WeightDeviation, …"
 ```
 
 # Weight finalisers
 
 ```@docs
-RelativeErrorWeightFinaliser
-SquaredRelativeErrorWeightFinaliser
-AbsoluteErrorWeightFinaliser
-SquaredAbsoluteErrorWeightFinaliser
+ErrorWeightFinaliser
+RelativeWeightDeviation
+AbsoluteWeightDeviation
+WeightDeviation
+weight_deviation
+deviation_error_term
 IterativeWeightFinaliser
 JuMPWeightFinaliser
 JuMPWeightFinaliserFormulation

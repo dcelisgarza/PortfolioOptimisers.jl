@@ -317,6 +317,13 @@ end
     @test isequal(cov(fitted), cov(cc, Xg; active_mask = amsk))
     @test isequal(cor(fitted), cor(cc, Xg; active_mask = amsk))
     @test isequal(cov(cc, fitted.cache), cov(fitted))
+    @test isequal(cor(cc, fitted.cache), cor(fitted))
+    # One observation at a time, with and without the active mask, is the block fit.
+    by_row = foldl((c, i) -> partial_fit!(c, Xg[i, :]; active_mask = amsk[i, :]),
+                   axes(Xg, 1); init = cc)
+    @test isequal(cov(by_row), cov(fitted))
+    no_mask = foldl((c, i) -> partial_fit!(c, Xg[i, :]), axes(Xg, 1); init = cc)
+    @test size(cov(no_mask)) == size(cov(fitted))
 
     # A copy shares no array, so a fold on one leaves the other alone.
     original = fitted.cache
@@ -1089,7 +1096,7 @@ end
     # two estimated deviations has a non-zero mean. The factor reads it, so the recursion is
     # unbiased for returns independent in time, at one, two and five lags, with holidays. The
     # test reads the raw state: the report floors a negative HAC variance at zero, which is the
-    # floor of `NoHacFloor` and adds a positive bias to a young estimate.
+    # floor of `hac_floor = nothing` and adds a positive bias to a young estimate.
     rng = StableRNG(1509)
     μ, M, T = 0.3, 20_000, 30
     λ = 2.0^(-1 / 10)

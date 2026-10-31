@@ -10,12 +10,5 @@ PortfolioOptimisers.summary_quantile
 PortfolioOptimisers.covariance_forecast_names
 PortfolioOptimisers.covariance_diagonal_mean
 PortfolioOptimisers.covariance_exceedance
-PortfolioOptimisers.newey_west_variance
-```
-
-## References
-
-```@bibliography
-Pages = [@__FILE__]
-Canonical = false
+PortfolioOptimisers.loss_difference_test
 ```

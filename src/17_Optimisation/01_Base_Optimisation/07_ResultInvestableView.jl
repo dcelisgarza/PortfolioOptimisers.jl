@@ -259,7 +259,7 @@ A type whose value reads the weights of the previous fold adds a method that ret
 
   - [`needs_previous_weights`](@ref)
 """
-function needs_previous_weights(::Option{<:Union{<:AbstractEstimator, <:AbstractAlgorithm,
-                                                 <: AbstractResult}})
+function needs_previous_weights(::Option{<:Union{AbstractEstimator, AbstractAlgorithm,
+                                                 AbstractResult}})
     return false
 end

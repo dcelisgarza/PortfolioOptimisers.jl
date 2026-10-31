@@ -182,3 +182,84 @@ After `t` steps of `partial_fit!(opt, rd)`:
 - Two ESS formulas coexist for one weighting — the normal set reads `exp(entropy(w))` off `pr.ens`
   and the calibration rules read a Kish count off `w`. This ADR does not reconcile them; it is
   recorded so the next reader does not rediscover it.
+
+## Amendment (2026-10-26)
+
+Two count readers left the route of `effective_sample_size` when no observation weights are stated.
+They read `size(pr.X, 1)`, the rows that the measure carries, because the quantity that each one
+states is a property of those rows:
+
+- **`ScenarioCount`** fixes the number of scenarios that the tail of the measure holds. The measure
+  holds the rows carried, so `alpha = n / ens` left `n * w / t` of them in its tail. Under
+  `max_scenarios = 250` over 1250 observations, `n = 25` held 5.
+- **`EntropyBudget`** states the coefficient `kappa_log(inv(alpha * T), kappa)` that the model of a
+  relativistic measure pays, and the model forms that coefficient with the `T` of its own rows. On
+  the same cap, `target = -5` solved at `T = 1250` and the model paid `-2.716`.
+
+With weights, `ScenarioCount` still reads the Kish count of the weights. The sweep of
+`06_CalibrationRules.jl`, [#638](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/638),
+found both defects.
+
+**`RateSignificance` reads the count of `ScenarioCount`.**
+[#1908](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1908) corrected this
+amendment, which first kept the rule on the count behind the moments, "because its docstring
+defines the rate on the length of the record". That is a definition and not a reason. The rule
+states that the tail holds `c * sqrt(T)` scenarios, and the tail is a set of the rows of the
+measure. So the statement holds only when `T` counts those rows: `scenario_sample_size(pr, w)`,
+the row count, and the Kish count of the weights of the measure when it states weights. Under
+`max_scenarios = 250` over 1250 observations, the count behind the moments gave a tail `sqrt(5)`
+times smaller than `c * sqrt(250)`. A measure with observation weights and no cap now prices the
+Kish count of its weights, where it priced the row count, so its released numbers move.
+
+### The site states the count that an ambiguity radius prices
+
+[#1833](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1833) asked the same question
+for `ConcentrationRadius`, `DimensionalRateRadius` and `DualNormRadius`. The answer depends on the
+slot, and the key does not say which quantity the slot prices:
+
+- **The radius slots of a distributionally robust measure, `:r`, `:r_a` and `:r_b`.** The programme
+  centres its Wasserstein ball on the empirical measure of the rows of `pr.X`, weighted by the
+  observation weights of the measure. The concentration bound that each rule follows is a statement
+  about the empirical measure of `T` draws, so `T` is the count of those rows. Under
+  `max_scenarios = 250` over 1250 observations, a read of `ens` made the ball `sqrt(5)` times too
+  small for `ConcentrationRadius` and `DualNormRadius`, and `5^(1/5)` times too small for
+  `DimensionalRateRadius`. A ball that is too small gives a portfolio that is robust to less than the
+  caller asked for, and the optimisation shows no sign of it.
+- **The regularisation slots, `:l1`, `:linf`, `:l2reg_val` and `:lpreg_val`.** The radius prices the
+  error of `pr.mu`, which the cap fits over every observation. So the count of the moments is the
+  right count there. The amendment of 2026-10-29 moves that count from `ens` to `eoc`.
+
+So the site states the count. `CalibrationContext` gains a field `n::Option{<:Number}`, in the same
+way as it carries `series` and `p`. The three robust measures set it in every context that they
+build, to `scenario_sample_size(pr, ws)`: the Kish count of the weights of the measure when the
+measure states weights, and `size(pr.X, 1)` otherwise. That is the count of the measure that the
+programme prices, and it is the count that `ScenarioCount` now reads too, so the two readers of the
+rows share one definition. The regularisation sites state no `n`. The three radius rules read
+`ctx.n`, and `effective_sample_size(pr, w)` when it is `nothing`.
+
+Every number without a cap stays the same. With no cap and no weights, both counts are
+`size(pr.X, 1)`. With weights, both counts are the Kish count of the weights. A capped fit is
+`dev`-only.
+
+**`RateRadius` reads `n` as the three other rules do (#1908).** This amendment first kept it on
+the count behind the moments, for the reason that its docstring stated. The rate `1 / sqrt(T)` of
+a ball has its basis in the concentration of the empirical measure of the `T` draws on which the
+ball is centred, the bound that the three other rules follow. So `RateRadius` reads `ctx.n`, and
+`effective_sample_size(pr, w)` when it is `nothing`. Under the cap above, the old count made the
+ball `sqrt(5)` times too small, and in an online fit the ball shrank at each step while it kept
+250 rows. With observation weights and no cap, both counts are the Kish count of the weights, so
+a weighted robust measure, and a weighted regularisation slot, with `RateRadius` now prices that
+count and not the row count. That moves released numbers. The rule is mathematically consistent
+with its family only in this form, so the change is the cost of that form.
+
+## Amendment (2026-10-29)
+
+[#1893](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1893) moved the count of a
+Scenario Cap out of `ens`. ADR 0224 states the decision. A prior result now states the effective
+count of each moment in a new field `eoc`, and `ens` is a diagnostic of the weights `w` alone.
+`EmpiricalPrior` writes the number of observations of the fit in each entry of `eoc` when
+`max_scenarios` cuts, through `scenario_moment_counts`, which replaces `scenario_ens`.
+`effective_sample_size` reads the smaller count of the mean and of the covariance in `eoc` beside
+no `w`, where it read `ens` beside no `w`. `choose_scaling_parameter` of the normal set reads the
+count of the moment of the set in `eoc`, and no longer reads `pr.ens`. With no cap and no weights,
+every number stays the same.

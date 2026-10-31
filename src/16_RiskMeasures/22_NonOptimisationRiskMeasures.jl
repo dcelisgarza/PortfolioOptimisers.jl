@@ -1,13 +1,13 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents a simple mean return measure for use in non-optimisation contexts.
+Measures the mean of the portfolio returns, or the mean of their logarithmic returns.
 
-`MeanReturn` computes the arithmetic mean of portfolio returns, or the mean log return when `flag = true`. It is used as the numerator in risk-adjusted performance ratios such as `MeanReturnRiskRatio`.
+The measure is a [`NonOptimisationRiskMeasure`](@ref). It is a return and not a risk, so the type bound of every optimiser refuses it. An optimiser reads the expected return through its objective function, such as [`MaximumReturn`](@ref). A larger mean is better, so [`bigger_is_better`](@ref) returns `true`, and an asset selection or a parameter search keeps the largest mean. The measure is the numerator of [`MeanReturnRiskRatio`](@ref).
 
 # Mathematical definition
 
-For `flag = false` (arithmetic mean):
+For `flag = false`, the arithmetic mean:
 
 ```math
 \\begin{align}
@@ -21,7 +21,7 @@ Where:
   - $(math_dict[:xret])
   - $(math_dict[:T])
 
-For `flag = true` (log-return mean):
+For `flag = true`, the mean of the logarithmic returns:
 
 ```math
 \\begin{align}
@@ -31,11 +31,11 @@ For `flag = true` (log-return mean):
 
 Where:
 
-  - ``\\bar{x}_{\\log}``: Log-return mean portfolio return.
+  - ``\\bar{x}_{\\log}``: Mean of the logarithmic portfolio returns.
   - $(math_dict[:xret])
   - $(math_dict[:T])
 
-For observation-weighted samples, the weighted mean is used instead.
+When `w` holds observation weights ``\\omega_t``, each form takes the weighted mean. The first form is then ``\\sum_{t} \\omega_t x_t / \\sum_{t} \\omega_t``, and the second form puts ``\\log(1 + x_t)`` in place of ``x_t``.
 
 # Fields
 
@@ -59,11 +59,11 @@ Keywords correspond to the struct's fields.
 
     (r::MeanReturn)(x::VecNum)
 
-Computes the mean return of a portfolio returns vector `x`.
+Computes the mean return of the net portfolio returns `x`. [`expected_risk`](@ref) charges the fees before the call.
 
 ## Arguments
 
-  - `x::VecNum`: Portfolio returns vector.
+  - `x::VecNum`: Net portfolio returns.
 
 # Examples
 
@@ -80,6 +80,7 @@ MeanReturn
 
   - [`NonOptimisationRiskMeasure`](@ref)
   - [`MeanReturnRiskRatio`](@ref)
+  - [`ExpectedReturn`](@ref): the expected return of a prior, which a `JuMP` optimiser reads.
 """
 @propagatable @concrete struct MeanReturn <: NonOptimisationRiskMeasure
     """
@@ -91,7 +92,7 @@ MeanReturn
     """
     @pprop w
     """
-    $(field_dict[:flag])
+    If `true`, the measure takes the mean of `log1p.(x)`, the logarithmic returns. If `false`, it takes the mean of `x`.
     """
     flag
     function MeanReturn(settings::HierarchicalRiskMeasureSettings, w::Option{<:ObsWeights},
@@ -115,9 +116,11 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents a mean return to risk ratio measure.
+Measures the mean portfolio return in excess of a risk-free rate, per unit of risk.
 
-`MeanReturnRiskRatio` computes the ratio of the mean portfolio return (minus a risk-free rate) to a risk measure, used for performance analysis and comparison. It generalises the Sharpe ratio by allowing any risk measure in the denominator.
+The numerator is the mean of [`MeanReturn`](@ref) `rt` less the risk-free rate `rf`, and the denominator is the risk of `rk`. With a [`StandardDeviation`](@ref) in `rk` and the arithmetic mean in `rt`, the ratio is the reward-to-variability ratio of [sharpe1966](@cite), the Sharpe ratio. Another risk measure in `rk` gives a generalisation of that ratio.
+
+A larger ratio is better, so [`bigger_is_better`](@ref) returns `true`. The ratio is a [`NonOptimisationRiskMeasure`](@ref), because it is not a risk, and the type bound of every optimiser refuses it. The objective [`MaximumRatio`](@ref) of a `JuMP` optimiser maximises a ratio of this kind. The quotient follows IEEE division. A zero risk gives `Inf` for a positive numerator, `NaN` for a zero numerator and `-Inf` for a negative numerator. [`needs_previous_weights`](@ref) answers as `rk` does.
 
 # Mathematical definition
 
@@ -131,9 +134,9 @@ Where:
 
   - ``\\mathrm{MRRR}(\\boldsymbol{x})``: Mean return to risk ratio.
   - $(math_dict[:xret])
-  - ``\\bar{x}``: Mean portfolio return (computed by `rt`).
-  - ``r_f``: Risk-free rate.
-  - ``\\rho``: Base risk measure (computed by `rk`).
+  - ``\\bar{x}``: Mean portfolio return of `rt`.
+  - ``r_f``: Risk-free rate `rf`.
+  - ``\\rho(\\boldsymbol{x})``: Risk of `rk`. A vector `rk` gives one number through `sca`.
 
 # Fields
 
@@ -153,7 +156,7 @@ Keywords correspond to the struct's fields.
 
 ## Multiplicity
 
-`rk` takes one risk measure or a vector of them. A vector is scalarised into **one** number by `sca`, each element weighted by its own `settings.scale`. The field beats a caller's `sca` keyword, so a figure reported from this type is always the one the type names.
+`rk` takes one risk measure or a vector of them. `sca` scalarises a vector into **one** number, and weights each element by its own `settings.scale`. The field beats the `sca` keyword of a caller, so a value that this type reports always uses the scalariser that the type names.
 
 ## Validation
 
@@ -162,10 +165,10 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `rt`: Recursively updated via [`factory`](@ref).
-  - `rk`: Recursively updated via [`factory`](@ref).
+  - `rt`: Recursively updated through [`factory`](@ref).
+  - `rk`: Recursively updated through [`factory`](@ref).
 
 # Examples
 
@@ -195,6 +198,12 @@ MeanReturnRiskRatio
   - [`NonOptimisationRiskMeasure`](@ref)
   - [`MeanReturn`](@ref)
   - [`AbstractBaseRiskMeasure`](@ref)
+  - [`NonOptimisationRiskRatio`](@ref): a ratio of any two measures.
+  - [`MaximumRatio`](@ref)
+
+# References
+
+  - $(ref_dict[:sharpe1966]) Pages 122–123.
 """
 @propagatable @concrete struct MeanReturnRiskRatio <: NonOptimisationRiskMeasure
     """
@@ -271,9 +280,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return whether [`MeanReturnRiskRatio`](@ref) `r` requires previous portfolio weights.
+Return whether [`MeanReturnRiskRatio`](@ref) `r` reads the previous portfolio weights.
 
-Delegates to the inner risk measure `r.rk`.
+The method returns `needs_previous_weights(r.rk)`. The return side `rt` is a [`MeanReturn`](@ref), which never reads them. A vector `rk` reads them when one of its measures does, such as a [`TurnoverRiskMeasure`](@ref) whose `fixed` is `false`.
 
 # Related
 
@@ -286,29 +295,35 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Third Central Moment risk measure.
+Measures the third central moment of the portfolio returns, or the standardised skewness when `ve` is a variance estimator.
 
-`ThirdCentralMoment` computes the third central moment of portfolio returns about a specified centre. It is used as a measure of the asymmetry (skewness) of the return distribution in higher-order portfolio optimisation.
+The moment has the divisor ``T``. When `ve` is `nothing`, the measure reports the moment as it is. When `ve` is a variance estimator, the measure divides the moment by the cube of the standard deviation of the same deviations, so it reports the skewness coefficient, which has no units. The field `ve` of [`HighOrderMoment`](@ref) makes the same choice for the moments of order three and four. Both values measure the asymmetry of the returns, and a larger value is better, so [`bigger_is_better`](@ref) returns `true`.
+
+The measure is a [`NonOptimisationRiskMeasure`](@ref). The library has no `JuMP` model of it, so the type bound of every optimiser refuses it. Each value can be negative, so neither value is a risk that a hierarchical optimiser can allocate by. It serves reports, and the scores of an asset selection or a parameter search. [`Skewness`](@ref) reads the third moment from a coskewness matrix instead, which is the term that [`VarianceSkewKurtosis`](@ref) bounds.
 
 # Mathematical definition
 
-Let ``\\mu`` be the specified centre and ``\\delta_t = x_t - \\mu`` the centred deviations. The third central moment is:
-
 ```math
 \\begin{align}
-m_3(\\boldsymbol{x}) &= \\frac{1}{T} \\sum_{t=1}^{T} \\delta_t^3\\,.
+\\delta_t &= x_t - \\mu\\,, \\\\
+m_3(\\boldsymbol{x}) &= \\frac{1}{T} \\sum_{t=1}^{T} \\delta_t^3\\,, \\\\
+\\mathrm{Skew}(\\boldsymbol{x}) &= \\frac{m_3(\\boldsymbol{x})}{\\hat{\\sigma}^3}\\,, \\\\
+\\hat{\\sigma}^2 &= f \\sum_{t=1}^{T} \\delta_t^2\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``m_3(\\boldsymbol{x})``: Third central moment of portfolio returns.
+  - ``m_3(\\boldsymbol{x})``: Third central moment of the portfolio returns, the value when `ve` is `nothing`.
+  - ``\\mathrm{Skew}(\\boldsymbol{x})``: Standardised skewness of the portfolio returns, the value when `ve` is a variance estimator.
   - $(math_dict[:xret])
   - $(math_dict[:T])
-  - ``\\mu``: Specified centre of the distribution.
-  - ``\\delta_t = x_t - \\mu``: Centred deviation at period ``t``.
+  - ``\\mu``: Centre of the moment. [`calc_moment_target`](@ref) states it for each type of `mu`.
+  - ``\\delta_t``: Centred portfolio return at observation ``t``.
+  - ``\\hat{\\sigma}``: Standard deviation of the deviations about zero, from `ve`.
+  - $(math_dict[:f_ve_div])
 
-For observation-weighted samples, the weighted mean is used.
+When `w` holds observation weights ``\\omega_t``, the weighted mean ``\\sum_{t} \\omega_t \\delta_t^3 / \\sum_{t} \\omega_t`` replaces the mean, the centre takes the same weights, and so does `ve`. The default `SimpleVariance` sets `corrected = true`, so the standard deviation divides by ``T - 1`` and the moment by ``T``. The value is then ``((T - 1)/T)^{3/2}`` times the moment coefficient of skewness. Set `ve = SimpleVariance(; me = nothing, corrected = false)` for the moment coefficient.
 
 # Fields
 
@@ -319,37 +334,41 @@ $(DocStringExtensions.FIELDS)
     ThirdCentralMoment(;
         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
         w::Option{<:ObsWeights} = nothing,
-        mu::Option{<:MuSlot} = nothing
+        mu::Option{<:MuSlot} = nothing,
+        ve::Option{<:AbstractVarianceEstimator} = nothing
     ) -> ThirdCentralMoment
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. A `w` that is not `nothing` is passed to `ve` with [`factory`](@ref), so the variance estimator reads the same weights as the measure.
 
 ## Validation
 
-  - If `mu` is a `VecNum`: `!isempty(mu)`.
+  - If `mu` is a `VecNum`: `!isempty(mu)` and `all(isfinite, mu)`.
+  - If `mu` is a `Number`: `isfinite(mu)`.
   - $(val_dict[:oow_rm])
 
 !!! warning
 
-    A stated `mu` is pinned: it crosses a Cross-Validation fold or a subset view as the whole universe's answer, so it does not follow the refit the optimisation runs on. A caller who wants it to follow the fit names a **Deferred Quantity** in `mu`, or leaves the slot `nothing` and lets the prior supply it.
+    A stated `mu` is pinned. It crosses a Cross-Validation fold or a subset view as the value of the whole universe, so it does not follow the refit that the optimisation runs on. A caller who wants it to follow the fit names a **Deferred Quantity** in `mu`, or leaves the slot `nothing` and lets the prior supply it.
 
 # Functor
 
     (r::ThirdCentralMoment)(w::VecNum, X::MatNum, fees = nothing)
+    (r::ThirdCentralMoment)(x::VecNum)
 
-Computes the third central moment of the portfolio returns.
+Computes the third central moment, or the standardised skewness, of the portfolio returns `X * w` net of `fees`, or of the net portfolio returns `x`. The second form needs a centre that does not read the weights, which [`supports_precomputed_returns`](@ref) reports.
 
 ## Arguments
 
   - `w::VecNum`: Portfolio weights vector.
   - `X::MatNum`: Asset returns matrix (``T \\times N``).
   - `fees`: Optional fee structure.
+  - `x::VecNum`: Net portfolio returns.
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `mu`: A stated value is sliced to the selected indices via [`port_opt_view`](@ref). A **Deferred Quantity** passes through unsliced, and then fits on the subset.
+  - `mu`: A stated value is sliced to the selected indices through [`port_opt_view`](@ref). A **Deferred Quantity** passes through unsliced, and then fits on the subset.
 
 # Examples
 
@@ -359,13 +378,28 @@ ThirdCentralMoment
   settings ┼ HierarchicalRiskMeasureSettings
            │   scale ┴ Float64: 1.0
          w ┼ nothing
-        mu ┴ nothing
+        mu ┼ nothing
+        ve ┴ nothing
+
+julia> x = [0.02, -0.01, 0.03, -0.04, 0.01];
+
+julia> ThirdCentralMoment()(x)
+-9.504000000000004e-6
+
+julia> ThirdCentralMoment(; ve = SimpleVariance())(x)
+-0.44480569586797897
 ```
+
+The second value is the first divided by the cube of the standard deviation of `x`, with the divisor ``T - 1``.
 
 # Related
 
   - [`NonOptimisationRiskMeasure`](@ref)
-  - [`Skewness`](@ref)
+  - [`AbstractVarianceEstimator`](@ref)
+  - [`HighOrderMoment`](@ref): the same choice for the moments of order three and four, through its `ve`.
+  - [`Skewness`](@ref): the third moment read from a coskewness matrix.
+  - [`calc_moment_target`](@ref)
+  - [`bigger_is_better`](@ref)
 """
 @propagatable @concrete struct ThirdCentralMoment <: NonOptimisationRiskMeasure
     """
@@ -380,20 +414,30 @@ ThirdCentralMoment
     $(field_dict[:mu_slot])
     """
     @pprop @vprop mu
+    """
+    Variance estimator of the standard deviation that divides the moment, or `nothing` for the moment as it is. The estimator reads the deviations about zero, so its own `me` does not enter.
+    """
+    ve
     function ThirdCentralMoment(settings::HierarchicalRiskMeasureSettings,
-                                w::Option{<:ObsWeights}, mu::Option{<:MuSlot})
+                                w::Option{<:ObsWeights}, mu::Option{<:MuSlot},
+                                ve::Option{<:AbstractVarianceEstimator})
         assert_observation_weights(w, :w)
         if isa(mu, VecNum)
             @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
+            @argcheck(all(isfinite, mu),
+                      IsNonFiniteError("all elements of mu must be finite"))
+        elseif isa(mu, Number)
+            @argcheck(isfinite(mu), IsNonFiniteError("mu must be finite, got $mu"))
         end
-        return new{typeof(settings), typeof(w), typeof(mu)}(settings, w, mu)
+        return new{typeof(settings), typeof(w), typeof(mu), typeof(ve)}(settings, w, mu, ve)
     end
 end
 function ThirdCentralMoment(;
                             settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                             w::Option{<:ObsWeights} = nothing,
-                            mu::Option{<:MuSlot} = nothing)::ThirdCentralMoment
-    return ThirdCentralMoment(settings, w, mu)
+                            mu::Option{<:MuSlot} = nothing,
+                            ve::Option{<:AbstractVarianceEstimator} = nothing)::ThirdCentralMoment
+    return ThirdCentralMoment(settings, w, mu, factory(ve, w))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -418,73 +462,81 @@ end
 # Deferrable slots — see `deferred_slots`.
 deferred_slots(r::ThirdCentralMoment) = (; mu = r.mu)
 """
-    const TCM_Sk{T1, T2} = Union{<:ThirdCentralMoment{<:Any, T1, T2}, <:Skewness{<:Any, <:Any, <:Any, T1, T2}}
+    calc_moment_target(::ThirdCentralMoment{<:Any, Nothing, Nothing}, ::Any, x::VecNum)
+    calc_moment_target(r::ThirdCentralMoment{<:Any, <:StatsBase.AbstractWeights, Nothing}, ::Any, x::VecNum)
+    calc_moment_target(r::ThirdCentralMoment{<:Any, <:Any, <:VecNum}, w::VecNum, ::Any)
+    calc_moment_target(r::ThirdCentralMoment{<:Any, <:Any, <:VecScalar}, w::VecNum, ::Any)
+    calc_moment_target(r::ThirdCentralMoment{<:Any, <:Any, <:Number}, ::Any, ::Any)
 
-Parameterised union of [`ThirdCentralMoment`](@ref) and [`Skewness`](@ref) sharing the same observation-weight (`T1`) and target-mean (`T2`) type parameters.
+Compute the centre ``\\mu`` about which [`ThirdCentralMoment`](@ref) takes its moment.
 
-Used for unified dispatch on moment-target calculation methods.
+The method dispatches on the types of `r.w` and `r.mu`. Observation weights in `r.w` change the mean of `x`, and do not change a stated `mu`. A per-asset `mu` is gross, so [`calc_deviations_vec`](@ref) subtracts the mean fee per period from it.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mu &= \\begin{cases}
+  \\frac{1}{T} \\sum_{t=1}^{T} x_t & \\texttt{mu} \\text{ and } \\texttt{w} \\text{ are } \\texttt{nothing}\\,, \\\\
+  \\sum_{t=1}^{T} \\omega_t x_t \\Big/ \\sum_{t=1}^{T} \\omega_t & \\texttt{mu} \\text{ is } \\texttt{nothing} \\text{ and } \\texttt{w} \\text{ holds weights}\\,, \\\\
+  \\boldsymbol{w}^\\intercal \\boldsymbol{\\mu} & \\texttt{mu} \\text{ is a vector}\\,, \\\\
+  \\boldsymbol{w}^\\intercal \\boldsymbol{v} + s & \\texttt{mu} \\text{ is a } \\texttt{VecScalar}\\,, \\\\
+  \\mu_0 & \\texttt{mu} \\text{ is a number}\\,.
+\\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:xret])
+  - $(math_dict[:T])
+  - ``\\omega_t``: Observation weight of observation ``t``, from `r.w`.
+  - $(math_dict[:w_port])
+  - ``\\boldsymbol{\\mu}``: Vector `mu`, one centre for each asset.
+  - ``\\boldsymbol{v}``, ``s``: The fields `v` and `s` of a [`VecScalar`](@ref) `mu`.
+  - ``\\mu_0``: Number `mu`.
 
 # Related
 
   - [`ThirdCentralMoment`](@ref)
-  - [`Skewness`](@ref)
-  - [`calc_moment_target`](@ref)
-"""
-const TCM_Sk{T1, T2} = Union{<:ThirdCentralMoment{<:Any, T1, T2},
-                             <:Skewness{<:Any, <:Any, <:Any, T1, T2}}
-"""
-    calc_moment_target(::TCM_Sk{Nothing, Nothing}, ::Any, x::VecNum)
-    calc_moment_target(r::TCM_Sk{<:StatsBase.AbstractWeights, Nothing}, ::Any, x::VecNum)
-    calc_moment_target(r::TCM_Sk{<:Any, <:VecNum}, w::VecNum, ::Any)
-    calc_moment_target(r::TCM_Sk{<:Any, <:VecScalar}, w::VecNum, ::Any)
-    calc_moment_target(r::TCM_Sk{<:Any, <:Number}, ::Any, ::Any)
-
-Compute the centering target for [`ThirdCentralMoment`](@ref) and [`Skewness`](@ref) risk measures.
-
-Dispatches on the observation-weight type `T1` and mean type `T2` of [`TCM_Sk`](@ref):
-
-  - No weights, no mu: arithmetic mean of `x`.
-  - `AbstractWeights`, no mu: weighted mean of `x`.
-  - `VecNum` mu: dot product ``\\boldsymbol{w}^\\intercal \\boldsymbol{\\mu}``.
-  - `VecScalar` mu: ``\\boldsymbol{w}^\\intercal \\boldsymbol{\\mu}_v + \\mu_s``.
-  - `Number` mu: the scalar `r.mu` directly.
-
-# Related
-
-  - [`TCM_Sk`](@ref)
-  - [`ThirdCentralMoment`](@ref)
-  - [`Skewness`](@ref)
   - [`calc_moment_target`](@ref)
   - [`calc_deviations_vec`](@ref)
 """
-function calc_moment_target(::TCM_Sk{Nothing, Nothing}, ::Any, x::VecNum)
+function calc_moment_target(::ThirdCentralMoment{<:Any, Nothing, Nothing}, ::Any, x::VecNum)
     return Statistics.mean(x)
 end
-function calc_moment_target(r::TCM_Sk{<:StatsBase.AbstractWeights, Nothing}, ::Any,
-                            x::VecNum)
+function calc_moment_target(r::ThirdCentralMoment{<:Any, <:StatsBase.AbstractWeights,
+                                                  Nothing}, ::Any, x::VecNum)
     return Statistics.mean(x, r.w)
 end
-function calc_moment_target(r::TCM_Sk{<:Any, <:VecNum}, w::VecNum, ::Any)
+function calc_moment_target(r::ThirdCentralMoment{<:Any, <:Any, <:VecNum}, w::VecNum, ::Any)
     return LinearAlgebra.dot(w, r.mu)
 end
-function calc_moment_target(r::TCM_Sk{<:Any, <:VecScalar}, w::VecNum, ::Any)
+function calc_moment_target(r::ThirdCentralMoment{<:Any, <:Any, <:VecScalar}, w::VecNum,
+                            ::Any)
     return LinearAlgebra.dot(w, r.mu.v) + r.mu.s
 end
-function calc_moment_target(r::TCM_Sk{<:Any, <:Number}, ::Any, ::Any)
+function calc_moment_target(r::ThirdCentralMoment{<:Any, <:Any, <:Number}, ::Any, ::Any)
     return r.mu
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Compute the vector of deviations from the centering target for [`ThirdCentralMoment`](@ref) and [`Skewness`](@ref) risk measures.
+Compute the deviations ``\\delta_t`` of the net portfolio returns from the centre of a [`ThirdCentralMoment`](@ref) `r`.
+
+# Algorithm
+
+ 1. Compute `x`, the portfolio returns net of `fees`, with [`calc_net_returns`](@ref).
+ 2. Compute `tgt`, the centre of [`calc_moment_target`](@ref) less the mean fee per observation of [`moment_target_fees`](@ref). The fee is not zero only for a per-asset `mu`, which states a gross expected return.
+ 3. Return `x .- tgt`.
 
 # Related
 
-  - [`TCM_Sk`](@ref)
+  - [`ThirdCentralMoment`](@ref)
   - [`calc_deviations_vec`](@ref)
   - [`calc_moment_target`](@ref)
 """
-function calc_deviations_vec(r::TCM_Sk, w::VecNum, X::MatNum,
+function calc_deviations_vec(r::ThirdCentralMoment, w::VecNum, X::MatNum,
                              fees::Option{<:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     tgt = calc_moment_target(r, w, x) - moment_target_fees(r.mu, w, fees, length(x))
@@ -493,25 +545,30 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Compute the vector of deviations from the centering target for a precomputed returns series for [`ThirdCentralMoment`](@ref) and [`Skewness`](@ref) risk measures.
+Compute the deviations ``\\delta_t`` of a precomputed series of portfolio returns `x` from the centre of a [`ThirdCentralMoment`](@ref) `r`.
 
-Single-argument form used by the precomputed-returns functor `r(x::VecNum)`.
+The precomputed-returns functor `r(x::VecNum)` calls this method. The series carries no weights, so the centre is one that [`supports_precomputed_returns`](@ref) accepts: the mean of `x`, its weighted mean, or a number. A per-asset `mu` raises a `MethodError`.
 
 # Related
 
-  - [`TCM_Sk`](@ref)
   - [`ThirdCentralMoment`](@ref)
-  - [`Skewness`](@ref)
   - [`calc_deviations_vec`](@ref)
   - [`calc_moment_target`](@ref)
 """
-function calc_deviations_vec(r::TCM_Sk, x::VecNum)
+function calc_deviations_vec(r::ThirdCentralMoment, x::VecNum)
     return x .- calc_moment_target(r, nothing, x)
 end
-function moment_risk(r::ThirdCentralMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}},
-                     val::VecNum)
+function moment_risk(r::ThirdCentralMoment{<:Any, <:Option{<:StatsBase.AbstractWeights},
+                                           <:Any, Nothing}, val::VecNum)
     val .= val .^ 3
     return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
+end
+function moment_risk(r::ThirdCentralMoment{<:Any, <:Option{<:StatsBase.AbstractWeights},
+                                           <:Any, <:AbstractVarianceEstimator}, val::VecNum)
+    sigma = Statistics.std(r.ve, val; mean = zero(eltype(val)))
+    val .= val .^ 3
+    res = isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
+    return res / sigma^3
 end
 # Evaluation entry points — see `MomentRiskMeasures` in `25_RiskMeasureTools.jl`.
 
@@ -523,8 +580,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return whether [`ThirdCentralMoment`](@ref) `r` supports precomputed-return evaluation.
 
-Delegates to [`weight_independent_target`](@ref) on `r.mu`: `true` iff the target is
-`Nothing`, a `Number`, or a [`MedianCenteringFunction`](@ref); `false` for per-asset targets.
+The method returns [`weight_independent_target`](@ref) of `r.mu`. That is `true` when `mu` is `nothing` or a number, and `false` for a per-asset `mu`, which reads the asset weights.
 
 # Related
 
@@ -533,5 +589,20 @@ Delegates to [`weight_independent_target`](@ref) on `r.mu`: `true` iff the targe
   - [`ThirdCentralMoment`](@ref)
 """
 supports_precomputed_returns(r::ThirdCentralMoment) = weight_independent_target(r.mu)
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true`, because a larger third central moment is better, standardised or not.
+
+The moment has the sign of the skewness, and [`bigger_is_better`](@ref) of [`Skewness`](@ref) also returns `true`. The standard deviation is positive, so the standardised value has the sign of the moment. The generic method for an [`AbstractBaseRiskMeasure`](@ref) returns `false`. The asset selection, the parameter search and the ranking of cross-validation results read this trait to choose the direction of the score.
+
+# Related
+
+  - [`ThirdCentralMoment`](@ref)
+  - [`bigger_is_better`](@ref)
+"""
+function bigger_is_better(::ThirdCentralMoment)::Bool
+    return true
+end
 
 export MeanReturn, ThirdCentralMoment, MeanReturnRiskRatio

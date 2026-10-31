@@ -1,9 +1,9 @@
 """
     asset_phylogeny(w::VecNum, X::MatNum)
 
-Compute the asset phylogeny score for a set of weights and a phylogeny matrix.
+Compute the asset phylogeny score of the weights `w` on the phylogeny matrix `X`.
 
-This function computes the weighted sum of the phylogeny matrix, normalised by the sum of absolute weights. The asset phylogeny score quantifies the degree of phylogenetic (network or cluster-based) structure present in the portfolio allocation. It is the percentage invested in connected assets of [`NetworkEstimator`](@ref)'s Equation 13.7,
+The score is the share of the gross weight of all pairs that the related pairs hold. It is the percentage invested in connected assets of Equation 13.7 of [cajas2025](@cite),
 
 ```math
 \\begin{align}
@@ -18,17 +18,17 @@ Where:
   - ``\\boldsymbol{x}``: Portfolio weight vector.
   - ``\\boldsymbol{1}_n``: Column vector of ones of length ``n``.
 
-Two assets that are not related contribute nothing, and a pair contributes nothing when either weight is zero.
+A pair of assets that are not related adds nothing, and a pair adds nothing when either weight is zero. A `w` of zeros gives `NaN`, because the denominator is zero.
 
 # Algorithm
 
- 1. Take the outer product of `w` with itself and its absolute value, giving `aw`, the gross weight of every pair.
- 2. Take the dot product of `X` and `aw`, which adds up the gross weight of the related pairs alone.
- 3. Divide by the sum of `aw`, the gross weight of every pair, giving the share invested in related assets.
+ 1. Take the absolute value of the outer product of `w` with itself. The result `aw` is the gross weight of every pair.
+ 2. Take the dot product of `X` and `aw`, which adds up the gross weight of the related pairs.
+ 3. Divide by the sum of `aw`, and return the share invested in related assets.
 
 # Arguments
 
-  - `w`: Weights vector.
+  - `w`: Portfolio weight vector.
   - `X`: Phylogeny matrix.
 
 # Returns
@@ -39,6 +39,10 @@ Two assets that are not related contribute nothing, and a pair contributes nothi
 
   - [`phylogeny_matrix`](@ref)
   - [`asset_phylogeny`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 13.1.5.2, Equation 13.7.
 """
 function asset_phylogeny(w::VecNum, X::MatNum)
     aw = abs.(w * transpose(w))
@@ -50,16 +54,16 @@ end
     asset_phylogeny(pl::PhylogenyResult{<:MatNum}, w::VecNum, args...;
                     kwargs...)
 
-Compute the asset phylogeny score for a set of portfolio weights and a phylogeny matrix result, forwarding additional arguments.
+Compute the asset phylogeny score of the weights `w` on a precomputed phylogeny matrix.
 
-This method provides compatibility with workflows that pass extra positional or keyword arguments. It extracts the phylogeny matrix from the `PhylogenyResult` and delegates to `asset_phylogeny(w, pl)`, ignoring any additional arguments.
+The method calls `asset_phylogeny(w, pl.X)`. It accepts `args` and `kwargs` and does not read them, so a caller can pass a precomputed result where it passes an estimator and its data.
 
 # Arguments
 
-  - `pl::PhylogenyResult{<:MatNum}`: Phylogeny matrix result object.
-  - `w::VecNum`: Portfolio weights vector.
-  - `args...`: Additional positional arguments (ignored).
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `pl::PhylogenyResult{<:MatNum}`: Precomputed phylogeny matrix.
+  - `w::VecNum`: Portfolio weight vector.
+  - `args...`: Positional arguments. The method does not read them.
+  - `kwargs...`: Keyword arguments. The method does not read them.
 
 # Returns
 
@@ -77,9 +81,7 @@ end
     asset_phylogeny(cle::NwE_ClE_Cl,
                     w::VecNum, X::MatNum; dims::Int = 1, kwargs...)
 
-Compute the asset phylogeny score for a set of weights and a network or clustering estimator.
-
-This function computes the phylogeny matrix using the estimator and data, then computes the asset phylogeny score using the weights.
+Compute the asset phylogeny score of the weights `w` on the phylogeny matrix that `cle` builds from `X`.
 
 # Algorithm
 
@@ -88,9 +90,9 @@ This function computes the phylogeny matrix using the estimator and data, then c
 
 # Arguments
 
-  - `cle`: NetworkEstimator or clustering estimator.
-  - `w`: Weights vector.
-  - `X`: Data matrix (observations × assets).
+  - `cle`: Network estimator, clustering estimator, or clustering result.
+  - `w`: Portfolio weight vector.
+  - $(arg_dict[:X])
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments.
 

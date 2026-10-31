@@ -241,7 +241,7 @@ Give one sub-portfolio its own copy of the cross-validation scheme.
 
 The module cross-validates the sub-portfolios in parallel. A scheme that draws its splits from a random number generator holds mutable state, and two sub-portfolios that advance one generator at the same time get different folds on each run. So the method copies a scheme that has an `rng` field, and each copy starts from the same state. It returns a scheme with no `rng` field unchanged.
 
-No scheme that [`OptimisationCrossValidation`](@ref) accepts has an `rng` field, so every scheme a meta-optimiser runs today takes the second branch. A scheme with an `rng` field must implement `Base.copy`.
+No scheme that the `cv` field of a meta-optimiser accepts ([`OptCVE_Onl`](@ref)) has an `rng` field, so every scheme a meta-optimiser runs today takes the second branch. A scheme with an `rng` field must implement `Base.copy`.
 
 # Arguments
 
@@ -870,12 +870,13 @@ function rebuild_asset_panel(rd::ReturnsResult, predictions::VecMPredRes,
     ps = [fold_asset_panel(pnl, rd.nx, fold_weight_matrix(predictions, u, f, na), anchor,
                            alg)
           for (f, anchor) in enumerate(fold_feature_anchors(rd, pred1))]
-    #! A panel with no Panel Field is the ingestion layer's shape, and an untyped
-    #! comprehension over no field answers a `Vector{Any}` the panel's constructor refuses,
-    #! so the comprehension is typed: it answers the same vector empty or full.
-    pf = AbstractPanelField[panel_field_stack(concrete_typed_array_if_abstract([p.pf[k]
-                                                                                for p in ps]))
-                            for k in eachindex(ps[1].pf)]
+    pf = if isnothing(ps[1].pf)
+        nothing
+    else
+        AbstractPanelField[panel_field_stack(concrete_typed_array_if_abstract([p.pf[k]
+                                                                               for p in ps]))
+                           for k in eachindex(ps[1].pf)]
+    end
     return AssetPanel(; pf = pf, amsk = reduce(vcat, [p.amsk for p in ps]),
                       emsk = reduce(vcat, [p.emsk for p in ps]))
 end
@@ -952,7 +953,7 @@ Column `k` of the result is the out-of-sample prediction of sub-portfolio `k`, a
 
 `u` is positional and has no default. With a full-universe default, a two-argument call still runs. That is correct for [`Stacking`](@ref), but for [`NestedClustered`](@ref) it writes the weights of every cluster to the wrong rows and gives a wrong Asset Panel with no error. `alg` is the rule of the panel collapse, and it has no default for the same reason: the fold-less path reads the rule of the meta-optimiser, and this path must read the same one.
 
-The folds carry no Asset Panel. The method collapses the original `rd.pnl` again for each fold, with the same [`collapse_asset_panel`](@ref) call as [`prepare_outer_rd`](@ref) makes on the fold-less path, and stacks the fold results along the observation axis (see [`rebuild_asset_panel`](@ref)). The stack has the `observations × assets × features` shape of a time-varying panel, and a [`FeatureDistance`](@ref) with its default [`LastObservation`](@ref) reads the collapse of the last fold. The inner solves still see the panel of their own cluster. The collapse of the original panel also serves a square panel under [`NestedClustered`](@ref). Its folds see the returns of one cluster each, so their own panels have different feature axes and do not stack.
+The folds carry no Asset Panel. The method collapses the original `rd.pnl` again for each fold, with the same [`collapse_asset_panel`](@ref) call as [`prepare_outer_rd`](@ref) makes on the fold-less path, and stacks the fold results along the observation axis (see [`rebuild_asset_panel`](@ref)). The stack has the `observations × assets × features` shape of a time-varying panel, and a [`FeatureDistance`](@ref) with its default [`LastRow`](@ref) reads the collapse of the last fold. The inner solves still see the panel of their own cluster. The collapse of the original panel also serves a square panel under [`NestedClustered`](@ref). Its folds see the returns of one cluster each, so their own panels have different feature axes and do not stack.
 
 # Algorithm
 
@@ -1136,16 +1137,14 @@ function outer_returns_source(pr::AbstractPriorResult, rd::ReturnsResult, ::Exce
     return isa(rd.B, VecNum) ? pr.X .+ rd.B : pr.X + rd.B
 end
 """
-    predict_outer_returns(cv::Option{<:OptimisationCrossValidation}, opt,
-                          u::SubPortfolioUniverse, rd::ReturnsResult,
+    predict_outer_returns(cv::Nothing, opt, u::SubPortfolioUniverse, rd::ReturnsResult,
                           pr::AbstractPriorResult, fees::Option{<:Fees}, wi::MatNum,
                           resi::VecOpt)
-    predict_outer_returns(cv::OptimisationCrossValidation{<:NonCombOptCV}, opt,
+    predict_outer_returns(cv::OptCVE_Onl, opt, u::SubPortfolioUniverse,
+                          rd::ReturnsResult, pr::AbstractPriorResult,
+                          fees::Option{<:Fees}, wi::MatNum, resi::VecOpt)
+    predict_outer_returns(cv::CombinatorialCrossValidation, opt,
                           u::SubPortfolioUniverse, rd::ReturnsResult,
-                          pr::AbstractPriorResult, fees::Option{<:Fees}, wi::MatNum,
-                          resi::VecOpt)
-    predict_outer_returns(cv::OptimisationCrossValidation{<:CombinatorialCrossValidation},
-                          opt, u::SubPortfolioUniverse, rd::ReturnsResult,
                           pr::AbstractPriorResult, fees::Option{<:Fees}, wi::MatNum,
                           resi::VecOpt)
 
@@ -1156,8 +1155,8 @@ One module serves every meta-optimiser that owns an outer optimiser. The sub-por
 The methods dispatch on `cv`, which selects the prediction, so a custom cross-validation scheme is a method on the first argument:
 
   - Without folds, the column of each sub-portfolio is the net return of its own solve in `resi`, on the Prior Result and the Fees viewed onto it with [`sub_portfolio_view`](@ref).
-  - Non-combinatorial cross-validation predicts each sub-portfolio out of sample and stacks the folds with [`rebuild_returns_result`](@ref).
-  - Combinatorial cross-validation does the same, and first the `scorer` of the scheme selects one path from the population of each sub-portfolio. The default scorer is [`NearestQuantilePrediction`](@ref).
+  - A scheme of [`OptCVE_Onl`](@ref) predicts each sub-portfolio out of sample and stacks the folds with [`rebuild_returns_result`](@ref). An Online Scheme steps each sub-portfolio from fold to fold and does not refit it.
+  - A [`CombinatorialCrossValidation`](@ref) does the same, and first the `scorer` of the meta-optimiser selects one path from the population of each sub-portfolio. When `scorer` is `nothing`, [`NearestQuantilePrediction`](@ref) selects it.
 
 `wi` holds the weights of the inner optimisers alone. A Combination Weight acts at the combination after the outer solve, so no method applies it here (see [`combination_weights`](@ref)).
 
@@ -1190,14 +1189,14 @@ Without folds:
 
 With cross-validation:
 
- 1. Cross-validate every sub-portfolio with [`sub_portfolio_predictions`](@ref) under the scheme `cv.cv`, giving `predictions`.
- 2. On the combinatorial path, select one path of each population with `cv.scorer`, or with [`NearestQuantilePrediction`](@ref) when it is `nothing`.
+ 1. Cross-validate every sub-portfolio with [`sub_portfolio_predictions`](@ref) under the scheme `cv`, giving `predictions`.
+ 2. On the combinatorial path, select one path of each population with `opt.scorer`, or with [`NearestQuantilePrediction`](@ref) when it is `nothing`.
  3. Stack the predictions with [`rebuild_returns_result`](@ref) under the rule `opt.pcol`.
 
 # Arguments
 
-  - `cv`: The cross-validation scheme of the meta-optimiser.
-  - `opt`: The meta-optimiser. Every method reads its `pcol` field, the rule of the panel collapse. The method without folds also reads the source of its prior estimator `pe`, and the cross-validated methods read its `opti` and `ex` fields.
+  - `cv`: The cross-validation scheme of the meta-optimiser, or `nothing`.
+  - `opt`: The meta-optimiser. Every method reads its `pcol` field, the rule of the panel collapse. The method without folds also reads the source of its prior estimator `pe`. The cross-validated methods read its `opti` and `ex` fields, and the combinatorial method reads its `scorer` field.
   - `u`: Sub-portfolio enumeration.
   - `rd`: Returns data.
   - `pr`: Prior Result over the whole universe.
@@ -1218,8 +1217,7 @@ With cross-validation:
   - [`NestedClustered`](@ref)
   - [`Stacking`](@ref)
 """
-function predict_outer_returns(::Option{<:OptimisationCrossValidation}, opt,
-                               u::SubPortfolioUniverse, rd::ReturnsResult,
+function predict_outer_returns(::Nothing, opt, u::SubPortfolioUniverse, rd::ReturnsResult,
                                pr::AbstractPriorResult, fees::Option{<:Fees}, wi::MatNum,
                                resi::VecOpt)
     rd = outer_prior_rows(rd, pr)
@@ -1233,21 +1231,55 @@ function predict_outer_returns(::Option{<:OptimisationCrossValidation}, opt,
                          nb = nb, B = B, ne = rd.ne, E = rd.E, ts = rd.ts, iv = iv,
                          ivpa = ivpa, pnl = pnl)
 end
-function predict_outer_returns(cv::OptimisationCrossValidation{<:NonCombOptCV}, opt,
-                               u::SubPortfolioUniverse, rd::ReturnsResult,
-                               ::AbstractPriorResult, ::Option{<:Fees}, ::MatNum, ::VecOpt)
+function predict_outer_returns(cv::OptCVE_Onl, opt, u::SubPortfolioUniverse,
+                               rd::ReturnsResult, ::AbstractPriorResult, ::Option{<:Fees},
+                               ::MatNum, ::VecOpt)
     predictions = sub_portfolio_predictions(MultiPeriodPredictionResult, opt.opti, u, rd,
-                                            cv.cv, opt.ex)
+                                            cv, opt.ex)
     return rebuild_returns_result(rd, predictions, u, opt.pcol)
 end
-function predict_outer_returns(cv::OptimisationCrossValidation{<:CombinatorialCrossValidation},
-                               opt, u::SubPortfolioUniverse, rd::ReturnsResult,
+function predict_outer_returns(cv::CombinatorialCrossValidation, opt,
+                               u::SubPortfolioUniverse, rd::ReturnsResult,
                                ::AbstractPriorResult, ::Option{<:Fees}, ::MatNum, ::VecOpt)
-    predictions = sub_portfolio_predictions(PopulationPredictionResult, opt.opti, u, rd,
-                                            cv.cv, opt.ex)
-    scorer = isnothing(cv.scorer) ? NearestQuantilePrediction() : cv.scorer
+    predictions = sub_portfolio_predictions(PopulationPredictionResult, opt.opti, u, rd, cv,
+                                            opt.ex)
+    scorer = isnothing(opt.scorer) ? NearestQuantilePrediction() : opt.scorer
     return rebuild_returns_result(rd, [scorer(prediction) for prediction in predictions], u,
                                   opt.pcol)
+end
+"""
+    assert_meta_scorer(cv::Option{<:OptCVE_Onl},
+                       scorer::Option{<:PredictionCrossValScorer})
+
+Refuse a `scorer` that the cross-validation scheme of a meta-optimiser never reads.
+
+[`predict_outer_returns`](@ref) reads the scorer on the combinatorial path alone, where it selects one path from the population of each sub-portfolio. Under any other scheme, and with no scheme, a scorer has no effect. So the constructors of [`NestedClustered`](@ref) and [`Stacking`](@ref) refuse it, and the user learns at construction that the configuration does nothing.
+
+# Validation
+
+  - `isnothing(scorer) || isa(cv, CombinatorialCrossValidation)`. The function throws an `ArgumentError` otherwise.
+
+# Arguments
+
+  - `cv`: The `cv` field of the meta-optimiser.
+  - `scorer`: The `scorer` field of the meta-optimiser.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`NestedClustered`](@ref)
+  - [`Stacking`](@ref)
+  - [`predict_outer_returns`](@ref)
+  - [`PredictionCrossValScorer`](@ref)
+"""
+function assert_meta_scorer(cv::Option{<:OptCVE_Onl},
+                            scorer::Option{<:PredictionCrossValScorer})::Nothing
+    @argcheck(isnothing(scorer) || isa(cv, CombinatorialCrossValidation),
+              ArgumentError("`scorer` selects one path of a combinatorial cross-validation, so it needs `cv::CombinatorialCrossValidation`, got `cv::$(nameof(typeof(cv)))`. Set `scorer = nothing`, or use a `CombinatorialCrossValidation`."))
+    return nothing
 end
 public SubPortfolioUniverse, sub_portfolio_count, sub_portfolio_predict, sub_portfolio_view,
        fold_weight_matrix

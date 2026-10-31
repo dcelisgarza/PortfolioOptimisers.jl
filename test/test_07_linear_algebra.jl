@@ -3,6 +3,10 @@ using PortfolioOptimisers, Test, NearestCorrelationMatrix, LinearAlgebra
 # Card 7 of the 2026-08-17 maintainability review: the out-of-place verbs are documented
 # as an optional part of the extension interface, so an estimator that declares only the
 # in-place form must inherit a copying fallback. These estimators declare nothing else.
+struct ShapeOnlyProbe <: PortfolioOptimisers.AbstractMatrixProcessingEstimator end
+function PortfolioOptimisers.assert_shape_only_matrix_processing(::ShapeOnlyProbe)
+    return nothing
+end
 struct Card7Posdef <: PortfolioOptimisers.AbstractPosdefEstimator end
 function PortfolioOptimisers.posdef!(::Card7Posdef, X::AbstractMatrix)
     X .= (X .+ transpose(X)) ./ 2
@@ -247,6 +251,22 @@ end
         end
         @test_throws DomainError detone(Detone(; n = 11), C)
     end
+    @testset "Ticket 447: a detoned matrix is singular, never indefinite" begin
+        # The subtraction sets the `n` removed eigenvalues to zero and keeps the others, and the
+        # rescale to a unit diagonal is a congruence. So with no repair the result is positive
+        # semidefinite with `n` zero eigenvalues, as Section 2.6 of `mlp1` states.
+        rng = StableRNG(11223344)
+        f = randn(rng, 200)
+        Y = hcat([0.8 .* f .+ 0.6 .* randn(rng, 200) for _ in 1:10]...)
+        C = cor(Y)
+        for n in 1:3
+            Xt = detone(Detone(; pdm = nothing, n = n), C)
+            l = LinearAlgebra.eigvals(LinearAlgebra.Symmetric(Xt))
+            tol = 10 * length(l) * eps(eltype(l)) * maximum(abs, l)
+            @test count(x -> abs(x) <= tol, l) == n
+            @test minimum(l) >= -tol
+        end
+    end
     @testset "Ticket 447: find_max_eval and its fallback" begin
         #=
         On data drawn from an identity covariance the fitted edge sits at the theoretical
@@ -387,6 +407,16 @@ end
               zeros(3, 3)
         @test PortfolioOptimisers.matrix_processing_block!(mp, zeros(3, 3), 4, 3) ==
               zeros(3, 3)
+        # A matrix with no finite variance is handed to the plain method, which has no step to
+        # run, and comes back as it was.
+        none = MatrixProcessing(; pdm = nothing)
+        allnan = fill(NaN, 3, 3)
+        @test all(isnan, PortfolioOptimisers.matrix_processing_block!(none, allnan, 4, 3))
+        # A matrix processing estimator of a caller's, whose shape check passes, is returned as
+        # given by the plain method.
+        mine = ShapeOnlyProbe()
+        S3 = [1.0 0.5; 0.5 2.0]
+        @test matrix_processing!(mine, S3, 4, 2) === S3
         # A NaN frame stays as it is: the cell of a constant asset and an asset the fit left
         # out is still NaN, and the zero row is zero inside the finite rows alone.
         F = copy(S)
@@ -1208,6 +1238,7 @@ const PO = PortfolioOptimisers
 
 @testset "matrix_square_root: the three policies on a matrix of rank one" begin
     sigma = [1.0 1.0; 1.0 1.0]
+    # `nothing` takes the plain Cholesky factor, which refuses the matrix.
     @test_throws PosDefException matrix_square_root(nothing, sigma)
     L = matrix_square_root(RidgeCholeskySquareRoot(), sigma)
     @test L isa LowerTriangular
@@ -1237,6 +1268,15 @@ const PO = PortfolioOptimisers
     B = [1.0 1.0; 1.0 1.0 - 5e-11]
     @test isnothing(PO.ridge_cholesky(RidgeCholeskySquareRoot(; tries = 2), B))
     @test !isnothing(PO.ridge_cholesky(RidgeCholeskySquareRoot(; tries = 3), B))
+    # The ridge takes the type of the plain factor (#1442). A `Float64` ridge widened a `Float32`
+    # matrix to a `Float64` factor, and `eps` of a `Rational` threw a MethodError.
+    L = matrix_square_root(RidgeCholeskySquareRoot(), Float32.(sigma))
+    @test L isa LowerTriangular{Float32}
+    # The first ridge, 1e-12, is below the floor `eps s` of `Float32`.
+    @test maximum(abs, L * L' - sigma - eps(Float32) * I) <= 2 * eps(Float32)
+    @test matrix_square_root(RidgeCholeskySquareRoot(), Rational.(sigma)) ==
+          matrix_square_root(RidgeCholeskySquareRoot(), sigma)
+    @test PO.safe_regime_cholesky(Float32.(sigma), 0.0f0) isa Cholesky{Float32}
     @test RidgeCholeskySquareRoot(; ridge = 0) == RidgeCholeskySquareRoot(0, 3)
     @test_throws DomainError RidgeCholeskySquareRoot(; ridge = -1e-12)
     @test_throws DomainError RidgeCholeskySquareRoot(; ridge = Inf)

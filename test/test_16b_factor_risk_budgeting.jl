@@ -40,16 +40,16 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
         end
         @test success
 
-        rtol = if i ∈ (9, 15, 16, 17, 22, 27)
-            5e-3
-        elseif i == 14
-            5e-2
-        elseif i == 21
-            5e-3
-        elseif i ∈ (12, 18, 19)
+        # The pins were generated again after `k` gained its bound (#1844, #1845). They hold
+        # at 1e-6 on the host that made them. Each rtol is the largest `find_tol` over 20
+        # red CI runs of both host kinds (40536176678 to 40988847855) and over a local run
+        # under the CI flags (R14 of #1817).
+        rtol = if i ∈ (11, 18, 19, 22)
             5e-4
-        elseif i ∈ (10, 11)
-            5e-4
+        elseif i ∈ (10, 21)
+            1e-3
+        elseif i ∈ (9, 17)
+            5e-3
         else
             1e-4
         end
@@ -104,25 +104,18 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
         end
         @test success
 
-        rtol = if i ∈ (12, 18, 22) || Sys.isapple() && i == 20 || Sys.iswindows() && i == 10
-            # 12 is host-sensitive: reproduces at 1e-4 on a developer machine, needs 5e-4 on CI.
-            #
-            # 18 is host-sensitive too, and it is the reason this row is no longer keyed on
-            # the platform. It was granted 1e-3 on macOS alone and 5e-4 everywhere else, and
-            # it fails at 5e-4 on a Linux developer machine while CI passes at the same
-            # commit: the solve is a weight drift, not a failed solve, and the exported tip
-            # reproduces the drift to the last digit. So the threshold sits inside the
-            # spread of the hosts rather than on one platform's side of it. Issue #518.
+        # The pins were generated again after `k` gained its bound (#1844, #1845). They hold
+        # at 1e-6 on the host that made them. Each rtol is the largest `find_tol` over 20
+        # red CI runs of both host kinds (40536176678 to 40988847855) and over a local run
+        # under the CI flags (R14 of #1817). Before, cases 12 and 18 drifted between hosts
+        # at the same commit (#518).
+        rtol = if i ∈ (6, 10, 11, 20, 21, 22)
+            5e-4
+        elseif i == 18
             1e-3
-        elseif i ∈ (1, 10) || Sys.isapple() && i ∈ (2, 6)
-            5e-4
-        elseif i ∈ (15, 16, 17, 19, 27)
+        elseif i == 19
             5e-3
-        elseif i in (13, 14)
-            1e-2
-        elseif i ∈ (20, 24)
-            5e-4
-        elseif i == 21
+        elseif i == 17
             5e-2
         else
             1e-4

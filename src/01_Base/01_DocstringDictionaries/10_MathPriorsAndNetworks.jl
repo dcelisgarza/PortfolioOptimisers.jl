@@ -12,11 +12,11 @@ unique_key_dict!(math_dict, :math_dict,
                  # Entropy pooling.
                  :ep_prior_probs => "``\\boldsymbol{q}``: ``T \\times 1`` prior probabilities of the observations, summing to one.",#
                  :ep_post_probs => "``\\boldsymbol{p}``: ``T \\times 1`` posterior probabilities of the observations, summing to one. They are the unknown of the entropy pooling problem.",#
-                 :ep_mu_prior_i => "``\\mu_{i}``: Prior mean of asset ``i``. It is a constant of the view, and a lower moment view or a fixing row holds the posterior mean at it.",#
-                 :ep_sigma2_prior_i => "``\\sigma_{i}^{2}``: Prior variance of asset ``i``. It is a constant of the view, and a lower moment view or a fixing row holds the posterior variance at it.",#
-                 :ep_delta_i => "``\\delta_{i}``: Residual block variance of asset ``i``, the variance that the prior covariance carries and the scenarios do not, from [`scenario_residual_variances`](@ref). It is the idiosyncratic variance of a time-series factor prior with a residual block, zero for any other prior, and the posterior holds it.",#
+                 :ep_mu_prior_i => "``\\mu_{i}``: Prior mean of asset ``i``. It is a constant of the view, and a fixing row of [`fix_mu!`](@ref) holds the posterior mean at it.",#
+                 :ep_sigma2_prior_i => "``\\sigma_{i}^{2}``: Prior variance of asset ``i``. It is a constant of the view, and a fixing row of [`fix_sigma!`](@ref) holds the posterior variance at it.",#
+                 :ep_delta_i => "``\\delta_{i}``: Residual block variance of asset ``i``, which the prior covariance has and the scenarios do not, from [`scenario_residual_variances`](@ref). It is the idiosyncratic variance of a time-series factor prior with a residual block, and zero for any other prior. [`scenario_factory`](@ref) keeps it in the posterior.",#
                  :ep_sc1 => "``s_{c1}``: Constraint scale of the entropy pooling optimiser. It multiplies both sides of a row, so a positive value leaves the feasible set unchanged.",#
-                 :ep_sc2 => "``s_{c2}``: Slack penalty of the fixed equality rows. It weights the norm of the slack in the objective, so a larger value holds those rows tighter.",#
+                 :ep_sc2 => "``s_{c2}``: Slack penalty of the fixed equality rows. It is the weight of the norm of the slack in the objective, so a larger value makes the slack smaller.",#
                  :ep_so => "``s_{o}``: Objective scale of the entropy pooling optimiser. It multiplies the objective, so a positive value leaves the argument of the optimum unchanged.",#
                  # The rows of a phylogeny, and the factor weights they can act on.
                  :A_iplg => "``\\mathbf{A}``: Row set of an [`IntegerPhylogeny`](@ref), one row for each distinct neighbourhood or cluster, with one column for each position that the MIP space gates.",#
@@ -24,7 +24,7 @@ unique_key_dict!(math_dict, :math_dict,
                  :i_plg => "``i``: Position of the entry in `plgs`, or `1` for a single entry.",#
                  :B_loadings => "``\\mathbf{B}``: Loading matrix, of size ``N \\times N_{f}``.",#
                  :w_1_factor => "``\\boldsymbol{w}_1``: Factor weights of [`FactorRiskContribution`](@ref), one entry for each of the ``N_f`` factors. The asset weights are ``\\mathbf{B}_1 \\boldsymbol{w}_1``, with ``\\mathbf{B}_1`` the pseudoinverse of ``\\mathbf{B}^\\intercal``, plus an off-factor block when `flag = true`.",#
-                 :w_2_off_factor => "``\\boldsymbol{w}_2``: Off-factor weights, one entry for each of the ``N - N_f`` directions the loadings do not span.",#
+                 :w_2_off_factor => "``\\boldsymbol{w}_2``: Off-factor weights, one entry for each direction of the null space of ``\\mathbf{B}^\\intercal``. There are ``N - N_f`` of them when ``\\mathbf{B}`` has full column rank.",#
                  :lu_factor => "``\\boldsymbol{\\ell}_{f}``, ``\\boldsymbol{u}_{f}``: Factor weight bounds, the lower and the upper, one entry for each factor. [`factor_weight_bounds`](@ref) derives them from the asset weight bounds.",#
                  # Separation decay. The four members of
                  # `AbstractSeparationDecayAlgorithm` each state a closed form over the
@@ -57,10 +57,10 @@ unique_key_dict!(math_dict, :math_dict,
                  # Preselection. `20_AssetSelection.jl` states the admitted set of every
                  # selection rule and of every redundancy algorithm, so the four
                  # symbols below are each shared by two or more Units of that file.
-                 :s_i_score => "``s_{i}``: Score of asset ``i``, the risk measure evaluated on that asset's own return series.",#
-                 :K_keep_set => "``\\mathcal{K}``: Set of the assets a selector keeps.",#
-                 :k_tail_count => "``k``: Number of assets taken from one end of the score ordering.",#
-                 :t_corr_threshold => "``t``: Correlation at or above which two assets are redundant.",#
+                 :s_i_score => "``s_{i}``: The score of asset ``i``. It is the value of the risk measure on the return series of asset ``i`` alone.",#
+                 :K_keep_set => "``\\mathcal{K}``: The set of the assets that a selector keeps.",#
+                 :k_tail_count => "``k``: The number of assets that a rule takes from one end of the order of the scores.",#
+                 :t_corr_threshold => "``t``: The correlation at or above which two assets are redundant.",#
                  # The online step of the prior family. `12_PriorPartialFit.jl` states the
                  # result of `prior(pe)` with no data as the batch prior of the rows that
                  # `pe` folded.

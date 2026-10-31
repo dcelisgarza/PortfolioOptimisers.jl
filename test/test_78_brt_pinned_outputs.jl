@@ -1429,6 +1429,13 @@ Pipeline), which the decision tickets of the map can change.
                                              [7.035220273e-5, 0.01240283443,
                                               0.005672268152])
 
+    # `test/run_files.jl --case=<regex>` runs only the cases whose key the regex matches. The one
+    # interpolated name of the test set below is out of reach of `--testset`.
+    if haskey(ENV, "RUN_FILES_CASE")
+        filter!(c -> occursin(Regex(ENV["RUN_FILES_CASE"]), first(c)), cases)
+        @test !isempty(cases)
+    end
+
     @testset "$key" for (key, tol, f) in cases
         pin = pins[replace(key, r"^(online|the default x_src): " => "")]
         v = f()

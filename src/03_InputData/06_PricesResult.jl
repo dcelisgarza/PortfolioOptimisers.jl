@@ -39,7 +39,7 @@ A subtype that carries a panel subselects it together with `X`. A subtype that i
 """
 abstract type AbstractPricesResult <: AbstractResult end
 """
-    assert_nonneg_where_present(val::AbstractArray, sym::Union{Symbol, <:AbstractString} = :val) -> nothing
+    assert_nonneg_where_present(val::AbstractArray, sym::Union{Symbol, AbstractString} = :val) -> nothing
 
 Refuse a negative or an infinite value, and let an absence through.
 
@@ -108,7 +108,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `!isempty(X)`.
+  - `!isempty(X)`, and `allunique(TimeSeries.timestamp(X))`.
   - If `F` is not `nothing`: `!isempty(F)`.
   - If `B` is not `nothing`: `!isempty(B)`, and `size(values(B), 2) in (1, size(values(X), 2))`.
   - If `E` is not `nothing`: `!isempty(E)`.
@@ -117,7 +117,7 @@ Keywords correspond to the struct's fields.
   - If `pnl` is not `nothing`: its asset axis has the length `size(values(X), 2)`, and the observation axis of a time-varying panel has the length `size(values(X), 1)`. See [`check_asset_panel`](@ref).
   - If `span` is not `nothing`: `size(span) == size(values(X))`.
 
-An empty series or an empty `ivpa` raises an `IsEmptyError`. A wrong width or a wrong shape raises a `DimensionMismatch`. A value outside its domain raises a `DomainError`.
+An empty series or an empty `ivpa` raises an `IsEmptyError`. A repeated timestamp raises an `ArgumentError`. A wrong width or a wrong shape raises a `DimensionMismatch`. A value outside its domain raises a `DomainError`.
 
 # Examples
 
@@ -182,6 +182,9 @@ julia> size(values(pr.X))
                           iv::Option{<:TimeSeries.TimeArray}, ivpa::Option{<:Num_VecNum},
                           pnl::Option{<:AssetPanel}, span::Option{<:AbstractMatrix{Bool}})
         @argcheck(!isempty(X), IsEmptyError)
+        ts = TimeSeries.timestamp(X)
+        @argcheck(allunique(ts),
+                  ArgumentError("the timestamps of the asset prices (X) must be unique, because they key the observation axis. `port_opt_view` selects the rows of each series and of a time-varying Asset Panel by timestamp, so a repeated timestamp selects the row of its first occurrence. Got $(length(ts) - length(unique(ts))) repeated timestamp(s), and the first is $(ts[findfirst(i -> ts[i] in view(ts, 1:(i - 1)), eachindex(ts))])"))
         if !isnothing(F)
             @argcheck(!isempty(F), IsEmptyError)
         end
@@ -344,8 +347,8 @@ function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime}
                         span = span)
 end
 function port_opt_view(pr::PricesResult,
-                       i::Union{<:VecInt, <:AbstractRange{<:Integer}, Colon} = :,
-                       j::Union{<:VecInt, <:VecStr, <:AbstractRange{<:Integer}, Colon} = :)
+                       i::Union{VecInt, AbstractRange{<:Integer}, Colon} = :,
+                       j::Union{VecInt, VecStr, AbstractRange{<:Integer}, Colon} = :)
     return port_opt_view(pr, TimeSeries.timestamp(pr.X)[i], j)
 end
 function port_opt_view(pr::AbstractPricesResult, args...; kwargs...)

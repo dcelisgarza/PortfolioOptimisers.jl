@@ -34,7 +34,7 @@
     # The normalised inner weight matrix, written from its definition.
     wtilde(W) = abs.(W) ./ map(x -> iszero(x) ? one(x) : x, sum(abs.(W); dims = 1))
     opti = [InverseVolatility(), EqualWeighted(), InverseVolatility()]
-    cv = OptimisationCrossValidation(; cv = KFold(; n = 4))
+    cv = KFold(; n = 4)
 
     @testset "combination_weights is its closed form" begin
         s = [3.0, 1.0, 2.0]
@@ -132,7 +132,7 @@
     @testset "rebuild_returns_result stacks the predictions" begin
         st = Stacking(; opti = opti, opto = InverseVolatility(), cv = cv)
         preds = PO.sub_portfolio_predictions(PO.MultiPeriodPredictionResult, opti,
-                                             PO.FullUniverse(), rd, cv.cv, st.ex)
+                                             PO.FullUniverse(), rd, cv, st.ex)
         heights = [length(p.mrd.X) for p in preds]
         ro = PO.rebuild_returns_result(rd, preds, PO.FullUniverse(), RenormaliseActive())
         @test ro.X == hcat([p.mrd.X for p in preds]...)
@@ -172,7 +172,7 @@
         @test PO.sub_portfolio_view(PO.FullUniverse(), rn.pr, 1) === rn.pr
 
         preds = PO.sub_portfolio_predictions(PO.MultiPeriodPredictionResult, nco.opti, u,
-                                             rd, cv.cv, nco.ex)
+                                             rd, cv, nco.ex)
         W2 = PO.fold_weight_matrix(preds, u, 2, N)
         for k in eachindex(cls)
             @test W2[cls[k], k] == preds[k].pred[2].res.w
@@ -190,7 +190,7 @@
 
     @testset "the folds must agree" begin
         preds = PO.sub_portfolio_predictions(PO.MultiPeriodPredictionResult, opti,
-                                             PO.FullUniverse(), rd, cv.cv,
+                                             PO.FullUniverse(), rd, cv,
                                              PO.FLoops.SequentialEx())
         preds5 = PO.sub_portfolio_predictions(PO.MultiPeriodPredictionResult, opti,
                                               PO.FullUniverse(), rd, KFold(; n = 5),
@@ -198,7 +198,7 @@
         @test_throws DimensionMismatch PO.assert_fold_alignment([preds[1], preds5[2]])
         rd_shift = ReturnsResult(; nx = string.(1:N), X = X, ts = ts .+ PO.Dates.Day(1))
         preds_s = PO.sub_portfolio_predictions(PO.MultiPeriodPredictionResult, opti,
-                                               PO.FullUniverse(), rd_shift, cv.cv,
+                                               PO.FullUniverse(), rd_shift, cv,
                                                PO.FLoops.SequentialEx())
         @test_throws DimensionMismatch PO.assert_fold_alignment([preds[1], preds_s[2]])
         @test PO.assert_fold_alignment(preds) === preds[1].pred
@@ -214,8 +214,8 @@
     end
 
     @testset "a scheme with no rng is shared" begin
-        @test PO.sub_portfolio_cv(cv.cv) === cv.cv
-        # No scheme that `OptimisationCrossValidation` accepts has an `rng` field.
+        @test PO.sub_portfolio_cv(cv) === cv
+        # No scheme that the `cv` field of a meta-optimiser accepts has an `rng` field.
         function leaves(S, acc = Any[])
             for s in subtypes(S)
                 isabstracttype(s) ? leaves(s, acc) : push!(acc, s)
@@ -226,6 +226,39 @@
                    leaves(PO.OptimisationCrossValidationEstimator))
     end
 
+    @testset "cv and scorer are flat fields, and a scorer needs a combinatorial scheme" begin
+        ccv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
+        nqp = NearestQuantilePrediction()
+        ocv = OnlineIndexWalkForward(100, 50)
+        stack(c, s) = Stacking(; opti = opti, opto = InverseVolatility(), cv = c,
+                               scorer = s)
+        nest(c, s) = NestedClustered(; opti = InverseVolatility(),
+                                     opto = InverseVolatility(), cv = c, scorer = s)
+        for mk in (stack, nest)
+            @test mk(ccv, nqp).scorer === nqp
+            @test isnothing(mk(ccv, nothing).scorer)
+            @test mk(ocv, nothing).cv === ocv
+            # A scorer that the scheme never reads is refused at construction.
+            for c in (nothing, cv, ocv)
+                err = @test_throws ArgumentError mk(c, nqp)
+                @test occursin("CombinatorialCrossValidation", err.value.msg)
+            end
+            # A split result is not a scheme, and an estimator holds no result.
+            @test_throws TypeError mk(split(cv, rd), nothing)
+        end
+        # The combinatorial path selects each path with the scorer of the meta-optimiser,
+        # and `nothing` selects with `NearestQuantilePrediction`.
+        calls = Ref(0)
+        pick(p) = (calls[] += 1; nqp(p))
+        r0 = optimise(stack(ccv, nothing), rd)
+        r1 = optimise(stack(ccv, pick), rd)
+        @test calls[] == length(opti)
+        @test r1.w ≈ r0.w
+        @test r1.cv === ccv
+        @test r1.scorer === pick
+        @test isnothing(r0.scorer)
+    end
+
     @testset "a categorical field reaches the outer problem as a tensor field" begin
         lvl = ["Fin", "Tech"]
         pnl = asset_panel([CategoricalPanelInput(; name = "sector",
@@ -233,7 +266,7 @@
         rdc = ReturnsResult(; nx = string.(1:N), X = X, ts = ts, pnl = pnl)
         st = Stacking(; opti = opti, opto = InverseVolatility(), cv = cv)
         preds = PO.sub_portfolio_predictions(PO.MultiPeriodPredictionResult, opti,
-                                             PO.FullUniverse(), rdc, cv.cv, st.ex)
+                                             PO.FullUniverse(), rdc, cv, st.ex)
         ro = PO.rebuild_returns_result(rdc, preds, PO.FullUniverse(), RenormaliseActive())
         f = PO.panel_field(ro.pnl, "sector")
         @test f isa TensorPanelField
@@ -258,7 +291,7 @@
         rdf = ReturnsResult(; nx = nx, X = Matrix{Float64}(Xi))
         sets = UniverseSets(; dict = Dict("nx" => nx))
         fees = FeesEstimator(; l = ["A1" => 0.001], dl = 0.0005)
-        kcv = OptimisationCrossValidation(; cv = KFold(; n = 3))
+        kcv = KFold(; n = 3)
         ew = EqualWeighted()
         sti = [EqualWeighted(), InverseVolatility()]
         opts = [NestedClustered(; opti = ew, opto = ew),
@@ -317,7 +350,7 @@ end
     ew = EqualWeighted()
     ivo = InverseVolatility()
     opti = [ivo, ew]
-    cv = OptimisationCrossValidation(; cv = KFold(; n = 4))
+    cv = KFold(; n = 4)
     # The closed form of `InverseVolatility` on a returns matrix, the outer map `𝒪` here.
     inverse_volatility(R) = (v = 1 ./ vec(std(R; dims = 1)); v / sum(v))
     inner_weights(res) = hcat([x.w for x in res.resi]...)
@@ -400,7 +433,8 @@ end
         @test res.w[keep] ≈ ref.w
         # The positional constructor does not expand the weights a second time.
         @test PO.StackingResult(res.pr, res.wb, res.fees, res.resi, res.reso, res.cv,
-                                res.retcode, res.w, res.imsk, res.fb).w === res.w
+                                res.scorer, res.retcode, res.w, res.imsk, res.fb).w ===
+              res.w
     end
 
     @testset "the constructor validates its arguments" begin
@@ -704,7 +738,7 @@ end
         # The same optimisers pass with estimators in those slots.
         @test NestedClustered(; opti = HierarchicalRiskParity(),
                               opto = InverseVolatility()) isa NestedClustered
-        cv = OptimisationCrossValidation(; cv = KFold(; n = 2))
+        cv = KFold(; n = 2)
         @test NestedClustered(; opti = InverseVolatility(),
                               opto = NestedClustered(; opti = InverseVolatility(),
                                                      opto = InverseVolatility(), cv = cv)) isa

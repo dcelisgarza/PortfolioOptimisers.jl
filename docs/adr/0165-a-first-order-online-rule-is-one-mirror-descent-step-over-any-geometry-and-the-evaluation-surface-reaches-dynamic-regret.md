@@ -489,3 +489,42 @@ Investable Mask but not the geometry, so `DiagonalProjection` and `GramProjectio
 Gram norm couples the assets, so its reduced programme projects
 `q_P + A_PP⁻¹ A_PZ q_Z` in the norm of `A_PP`, which is exact at the zero weights of the assets
 outside the mask.
+
+## Amendment (2026-10-28)
+
+Issue #1867: `PlainGradient` is removed. The `grad` slot of `MirrorDescent`,
+`ExponentiatedGradient` and `GradientProjection` is bound to `Option{<:AbstractGradientTransform}`,
+and its default is `nothing`, which applies no transform. `gradient_state_seed(::Nothing, w)`
+returns `nothing`, and `transform_gradient!(::Nothing, ::Nothing, g)` returns `g`, as the methods
+on `PlainGradient` did, so no number moves. `OptimisticStep` refuses a wrapped rule whose `grad`
+is not `nothing`, with the same `ArgumentError` as before.
+
+The identity transform is a skipped procedure. ADR 0222 spells such a slot with `nothing`, not
+with a singleton that names no rule of its own.
+
+## Amendment (2026-10-28): the optimistic step is a field of `MirrorDescent`
+
+Issue #1864: the optimistic step is the `predictor` field of `MirrorDescent`, and the wrapper
+`OptimisticStep` is removed. `MirrorDescent(; eta, proj, alpha, obj, grad, predictor = nothing)`
+takes the plain step at `predictor = nothing`. With an `AbstractGradientPredictor`, it takes the
+two half-steps of Rakhlin and Sridharan (2013) that the section *The optimistic step is a wrapper
+rule carrying the secondary iterate* states. The mathematics, the predictors, `HintResidualRate`
+and the residual sums do not change.
+
+The keep rule of ADR 0222 decided the change. The wrapper took one rule, `MirrorDescent`, and
+added one option, so no second site reused it, and it gave no measured benefit. Its methods
+dispatch now on the type parameter of `predictor` or on the state, so no dispatch is lost. The
+constructor checks that `grad` is `nothing` inside one struct, where the wrapper checked it
+across two.
+
+The secondary iterate stays on its own state, now `OptimisticMirrorDescentState`. The plain rule
+keeps `MirrorDescentState`. The two field sets differ: the plain state holds the state of the
+Gradient Transform, and the optimistic state holds the secondary iterate, the last hint, the
+residual sums and the state of the predictor. `online_update!` dispatches on the state, and
+`HintResidualRate` refuses every other state by name.
+
+`ExponentiatedGradient` and `GradientProjection` take the `predictor` keyword. `EGE`, `EGR`,
+`EGA`, `MAEG` and `AEG` take only the parameters of their paper, as before. The migration is
+`OptimisticStep(; alg = GradientProjection(; eta), predictor)` to
+`GradientProjection(; eta, predictor)`, and `OptimisticStep()` to
+`MirrorDescent(; predictor = LastGradient())`.

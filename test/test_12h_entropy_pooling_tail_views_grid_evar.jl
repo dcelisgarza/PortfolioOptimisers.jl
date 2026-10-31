@@ -173,8 +173,8 @@ end
 
     # The grid reaches the bounds that the solver could not resolve at their own scale.
     tvs = Any[]
-    PO.ep_add_evar_view!(Dict{Any, Any}(), tvs, GridEntropicValueatRiskView(), [x], [1.0],
-                         ep_a, :leq, etgt, gw0, [e0.z], e0.evar, "A <= $etgt")
+    PO.ep_add_evar_view!(Dict{Any, Any}(), tvs, GridTailView(), [x], [1.0], ep_a, :leq,
+                         etgt, gw0, [e0.z], e0.evar, "A <= $etgt")
     tv = only(tvs)
     @test minimum(ep_a * PO.ep_evar_grid_row(x, etgt, z)[2] for z in tv.z) < 1e-10
 
@@ -182,9 +182,9 @@ end
     # largest scaled coefficient less one: the smallest constant that releases the row.
     rows = (M -> begin
                 tvs = Any[]
-                PO.ep_add_evar_view!(Dict{Any, Any}(), tvs,
-                                     GridEntropicValueatRiskView(; M = M), [x], [1.0], ep_a,
-                                     :leq, etgt, gw0, [e0.z], e0.evar, "A <= $etgt")
+                PO.ep_add_evar_view!(Dict{Any, Any}(), tvs, GridTailView(; M = M), [x],
+                                     [1.0], ep_a, :leq, etgt, gw0, [e0.z], e0.evar,
+                                     "A <= $etgt")
                 tv = only(tvs)
                 return tv, k -> begin
                            c, isc = PO.ep_evar_grid_row(x, etgt, tv.z[k])
@@ -193,9 +193,8 @@ end
             end,
             M -> begin
                 tvs = Any[]
-                PO.ep_add_rlvar_view!(Dict{Any, Any}(), tvs,
-                                      GridRelativisticValueatRiskView(; M = M), [x], [1.0],
-                                      ep_a, ep_k, :leq, rtgt, gw0, [r0.z], r0.rlvar,
+                PO.ep_add_rlvar_view!(Dict{Any, Any}(), tvs, GridTailView(; M = M), [x],
+                                      [1.0], ep_a, ep_k, :leq, rtgt, gw0, [r0.z], r0.rlvar,
                                       "A <= $rtgt")
                 tv = only(tvs)
                 return tv,
@@ -227,7 +226,7 @@ end
     fit = (key, v) -> prior(EntropyPoolingPrior(; sets = gsets, opt = ep_mopt,
                                                 (key => v,)...), grd)
     pr = fit(:evar_views,
-             EntropicValueatRiskView(; alpha = ep_a, alg = GridEntropicValueatRiskView(),
+             EntropicValueatRiskView(; alpha = ep_a, alg = GridTailView(),
                                      views = LinearConstraintEstimator(;
                                                                        val = "A <= $etgt")))
     @test PO.ep_evar(x, pr.w, ep_a).evar <= etgt * (1 + 1e-6)
@@ -236,8 +235,7 @@ end
     # The relativistic grid met this view before the fix, with its smallest bound at 1e-7.
     # It stays met.
     pr = fit(:rlvar_views,
-             RelativisticValueatRiskView(; alpha = ep_a, kappa = ep_k,
-                                         alg = GridRelativisticValueatRiskView(),
+             RelativisticValueatRiskView(; alpha = ep_a, kappa = ep_k, alg = GridTailView(),
                                          views = LinearConstraintEstimator(;
                                                                            val = "A <= $rtgt")))
     @test PO.ep_rlvar(x, pr.w, ep_a, ep_k).rlvar <= rtgt * (1 + 1e-5)

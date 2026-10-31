@@ -55,8 +55,19 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ### Examples
 
+A one-pass member that gives every eligible asset the same weight needs one method:
+
 ```jldoctest
 julia> struct MyWeights <: PortfolioOptimisers.AbstractCrossSectionalWeightsAlgorithm end
+
+julia> function PortfolioOptimisers.cs_weights_initial(::MyWeights, mcap,
+                                                       mask::AbstractMatrix{Bool})
+           return Matrix{Float64}(mask)
+       end
+
+julia> PortfolioOptimisers.cs_weights_initial(MyWeights(), nothing, [true false true])
+1×3 Matrix{Float64}:
+ 1.0  0.0  1.0
 
 julia> PortfolioOptimisers.needs_second_pass(MyWeights())
 false
@@ -111,7 +122,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Weights an asset by a power of its market capitalisation, in one pass.
 
-The power sets how concentrated the cross-section is: `0` gives every eligible asset the same weight, `1` gives raw capitalisation weights, and a value between the two shrinks the concentration of the largest assets.
+The power sets how concentrated the cross-section is. `0` gives every eligible asset the same weight, `1` gives the capitalisation itself, and a value between the two shrinks the share of the largest assets.
+
+The default `p = 1/2` is the weight of the weighted least squares of [menchero2011](@cite). That work assumes that the variance of the specific return of an asset is inversely proportional to the square root of its capitalisation, so the weight is the square root.
 
 # Mathematical definition
 
@@ -123,12 +136,12 @@ w_{t,i} &= \\begin{cases} m_{t,i}^{p} & \\text{if } (t, i) \\in \\mathcal{M} \\\
 
 Where:
 
-  - ``w_{t,i}``: Weight of asset ``i`` at observation ``t``.
-  - ``m_{t,i}``: Market capitalisation of asset ``i`` at observation ``t``.
-  - ``p``: Market capitalisation power.
-  - ``\\mathcal{M}``: Eligibility mask.
+  - $(math_dict[:w_ti_cs])
+  - $(math_dict[:m_ti_mcap])
+  - $(math_dict[:p_mcap])
+  - $(math_dict[:M_cs_mask])
 
-The weights are relative, so they need not sum to one. A weighted least squares is invariant to their scale.
+The weights do not sum to one. A weighted least squares gives the same fit for every positive multiple of its weights.
 
 # Fields
 
@@ -159,10 +172,14 @@ MarketCapWeights
   - [`BlendedInverseVarianceWeights`](@ref)
   - [`cs_weights_initial`](@ref)
   - [`cross_sectional_cap_weights`](@ref)
+
+# References
+
+  - $(ref_dict[:menchero2011]) Section 3.1, Page 13. $(ref_dict[:no_original_source])
 """
 @concrete struct MarketCapWeights <: AbstractCrossSectionalWeightsAlgorithm
     """
-    Exponent applied to the market capitalisation. A value of `0` needs no capitalisation matrix, because every eligible asset takes the same weight.
+    $(field_dict[:mcap_p])
     """
     p
     function MarketCapWeights(p::Real)
@@ -179,28 +196,37 @@ $(DocStringExtensions.TYPEDEF)
 
 Blends market capitalisation weights with inverse idiosyncratic variance weights, in two passes.
 
-The blend is a two-step feasible generalised least squares: a first fit under capitalisation weights gives the residuals, a variance estimated from those residuals gives the second component, and the caller fits again. The variance paired with observation `t` reads residuals up to `t - 1` only, so a weight never reads the return it multiplies.
+A first fit under the capitalisation weights gives the residuals. A variance estimated from those residuals gives the second component, and the caller fits again. The variance paired with observation `t` reads the residuals up to `t - 1` only, so a weight never reads the return it multiplies.
+
+The inverse variance is the weight of the generalised least squares of [aitken1935](@cite) when the specific returns are uncorrelated. So at ``\\lambda = 1``, with neither bound reached, the second pass is a two-step feasible generalised least squares. The two bounds are not part of that estimator. They keep the share of an asset with a very small estimated variance finite.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-u_{t,i} &= \\min\\left(\\mathrm{clip}\\left(\\frac{1}{v_{t-1,i}},\\, q_{t}^{\\mathrm{lo}},\\, q_{t}^{\\mathrm{hi}}\\right),\\, \\rho \\, \\mathrm{med}_{j}\\left(u_{t,j}\\right)\\right) \\\\
-w_{t,i} &= \\lambda \\frac{u_{t,i}}{\\sum_{j} u_{t,j}} + \\left(1 - \\lambda\\right) \\frac{m_{t,i}^{p}}{\\sum_{j} m_{t,j}^{p}}\\,.
+c_{t,i} &= \\mathrm{clip}\\left(\\frac{1}{v_{t-1,i}},\\, q_{t}^{\\mathrm{lo}},\\, q_{t}^{\\mathrm{hi}}\\right) \\\\
+u_{t,i} &= \\begin{cases} \\min\\left(c_{t,i},\\, \\rho \\, \\underset{j \\in \\mathcal{V}_{t}}{\\mathrm{med}}\\, c_{t,j}\\right) & \\text{if } i \\in \\mathcal{V}_{t} \\\\ 0 & \\text{otherwise} \\end{cases} \\\\
+w_{t,i} &= \\begin{cases} \\lambda \\dfrac{u_{t,i}}{\\sum_{j \\in \\mathcal{V}_{t}} u_{t,j}} + \\left(1 - \\lambda\\right) \\dfrac{m_{t,i}^{p}}{\\sum_{j \\in \\mathcal{M}_{t}} m_{t,j}^{p}} & \\text{if } (t, i) \\in \\mathcal{M} \\\\ 0 & \\text{otherwise} \\end{cases}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``w_{t,i}``: Weight of asset ``i`` at observation ``t``.
-  - ``v_{t-1,i}``: Idiosyncratic variance of asset ``i`` after observation ``t - 1``.
-  - ``q_{t}^{\\mathrm{lo}}``, ``q_{t}^{\\mathrm{hi}}``: Cross-sectional quantiles of the inverse variances at the levels `wins`.
+  - $(math_dict[:w_ti_cs])
+  - $(math_dict[:v_ti_idio])
+  - $(math_dict[:M_cs_mask])
+  - ``\\mathcal{M}_{t}``: Eligible assets of observation ``t``, those with ``(t, i) \\in \\mathcal{M}``.
+  - ``\\mathcal{V}_{t}``: Assets of ``\\mathcal{M}_{t}`` that carry a variance estimate ``v_{t-1,i}``.
+  - ``\\mathcal{E}_{t}``: Estimation universe of observation ``t``, the assets of ``\\mathcal{V}_{t}`` with ``m_{t,i}^{p} > 0``.
+  - ``q_{t}^{\\mathrm{lo}}``, ``q_{t}^{\\mathrm{hi}}``: Quantiles at the levels `wins` of the inverse variances of the assets of ``\\mathcal{E}_{t}``.
   - ``\\rho``: Median ratio cap.
   - ``\\lambda``: Blend coefficient.
-  - ``m_{t,i}``: Market capitalisation of asset ``i`` at observation ``t``.
-  - ``p``: Market capitalisation power.
+  - $(math_dict[:m_ti_mcap])
+  - $(math_dict[:p_mcap])
 
-Both components are normalised over the same eligible set before the blend, so the realised blend equals the nominal ``\\lambda``. An observation with no variance estimate yet takes the capitalisation weights alone.
+Both components sum to one over ``\\mathcal{M}_{t}``, so the share of the inverse variance component in ``w_{t,i}`` is ``\\lambda``. An observation with an empty ``\\mathcal{E}_{t}`` has no quantiles. It takes ``u_{t,i} = m_{t,i}^{p} / \\sum_{j \\in \\mathcal{M}_{t}} m_{t,j}^{p}``, so its weights are the capitalisation weights alone.
+
+An inverse variance is infinite where its variance is zero. The bounds then take the limit as those variances go to zero together, as [`cross_sectional_winsorise!`](@ref) and [`cross_sectional_median_cap!`](@ref) state.
 
 # Fields
 
@@ -212,7 +238,7 @@ $(DocStringExtensions.FIELDS)
         p::Real = 0.5,
         lambda::Real,
         ratio::Real = 20.0,
-        wins::Tuple{<:Real, <:Real} = (0.025, 0.975)
+        wins::Tuple{Real, Real} = (0.025, 0.975)
     ) -> BlendedInverseVarianceWeights
 
 Keywords correspond to the struct's fields. `lambda` takes no default, because naming this member is the request for the second pass. A caller that wants one pass writes [`MarketCapWeights`](@ref) instead.
@@ -242,14 +268,18 @@ BlendedInverseVarianceWeights
   - [`cs_weights_initial`](@ref)
   - [`cs_weights_refine`](@ref)
   - [`variance_series`](@ref)
+
+# References
+
+  - $(ref_dict[:aitken1935]) Section 3, Page 45.
 """
 @concrete struct BlendedInverseVarianceWeights <: AbstractCrossSectionalWeightsAlgorithm
     """
-    Exponent applied to the market capitalisation of the first blend component. A value of `0` needs no capitalisation matrix, because every eligible asset takes the same weight.
+    $(field_dict[:mcap_p]) It sets the capitalisation component of the blend and the first-pass weights.
     """
     p
     """
-    Blend coefficient. It is the share of the inverse variance component in the second-pass weights, so `0` recovers the capitalisation weights and `1` drops them.
+    Blend coefficient. It is the share of the inverse variance component in the second-pass weights, so `0` gives the capitalisation weights. `1` drops them on every observation that carries a variance estimate, and an observation with no estimate keeps them.
     """
     lambda
     """
@@ -261,7 +291,7 @@ BlendedInverseVarianceWeights
     """
     wins
     function BlendedInverseVarianceWeights(p::Real, lambda::Real, ratio::Real,
-                                           wins::Tuple{<:Real, <:Real})
+                                           wins::Tuple{Real, Real})
         assert_finite(p, :p)
         assert_nonneg(p, :p)
         assert_closed_unit_interval(lambda, :lambda)
@@ -275,7 +305,7 @@ BlendedInverseVarianceWeights
     end
 end
 function BlendedInverseVarianceWeights(; p::Real = 0.5, lambda::Real, ratio::Real = 20.0,
-                                       wins::Tuple{<:Real, <:Real} = (0.025, 0.975))::BlendedInverseVarianceWeights
+                                       wins::Tuple{Real, Real} = (0.025, 0.975))::BlendedInverseVarianceWeights
     return BlendedInverseVarianceWeights(p, lambda, ratio, wins)
 end
 function needs_second_pass(::BlendedInverseVarianceWeights)::Bool
@@ -286,12 +316,12 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the market capitalisation weights of an eligibility mask, raised to a power.
 
-The two members of the family share this body, so the formula is written once. A power of zero short-circuits, because the capitalisation matrix is then unread and a caller that owns no capitalisation data may pass `nothing`.
+The two members of the family share this body, so the formula is written once. A power of zero returns before it reads the capitalisation matrix, so a caller with no capitalisation data can pass `nothing`.
 
 # Algorithm
 
- 1. When `p` is zero, return the mask as a floating point matrix, giving every eligible pair the weight one.
- 2. Otherwise check `mcap` against the mask, and write `mcap[t, i]^p` into every eligible pair, leaving zero elsewhere.
+ 1. When `p` is zero, return the mask as a matrix with the type of `p`. Every eligible pair takes the weight one.
+ 2. Otherwise check `mcap` against the mask. Write `mcap[t, i]^p` into every eligible pair, and zero elsewhere. The element type promotes the type of `mcap` with the type of `p`.
 
 # Arguments
 
@@ -360,7 +390,7 @@ end
 
 Return the first-pass cross-sectional regression weights of a weight policy.
 
-Both members read the capitalisation the same way, so both call [`cross_sectional_cap_weights`](@ref). They part on what the caller does next: [`needs_second_pass`](@ref) is `false` for one and `true` for the other.
+Both members read the capitalisation the same way, so both call [`cross_sectional_cap_weights`](@ref). They differ in what the caller does next. [`needs_second_pass`](@ref) is `false` for [`MarketCapWeights`](@ref) and `true` for [`BlendedInverseVarianceWeights`](@ref).
 
 # Arguments
 
@@ -466,7 +496,7 @@ Row `t` reads row `t - 1` of the series. Row `1` is `NaN`, because no variance p
 
 # Algorithm
 
- 1. Fill the result with `NaN`, which is what row `1` and every pair outside `mask` keep. Both blend components then normalise over the same universe.
+ 1. Fill the result with `NaN`, which is what row `1` and every pair outside `mask` keep. Both blend components then normalise over the same universe. Integer data takes a float type, because an integer cannot hold `NaN`.
  2. Write the reciprocal of row `t - 1` of the series into every eligible pair of row `t`, for every later observation.
 
 # Arguments
@@ -490,7 +520,7 @@ Row `t` reads row `t - 1` of the series. Row `1` is `NaN`, because no variance p
 function cross_sectional_lagged_inverse(V::MatNum, mask::AbstractMatrix{Bool})::MatNum
     @argcheck(size(V) == size(mask),
               DimensionMismatch("V ($(size(V, 1))×$(size(V, 2))) must match mask ($(size(mask, 1))×$(size(mask, 2)))"))
-    Tf = real(eltype(V))
+    Tf = float_if_integer(real(eltype(V)))
     IV = fill(Tf(NaN), size(V))
     for t in 2:size(V, 1), i in axes(V, 2)
         if mask[t, i]
@@ -504,7 +534,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Clamp the inverse variance weights of each observation to two cross-sectional quantiles, in place.
 
-The clamp protects the blend from an asset whose estimated variance is very small, which would otherwise carry almost the whole cross-section. The quantiles come from the estimation universe, which is the set of pairs with a positive first-pass weight, and the clamp reaches the whole row, so a pair outside that universe still leaves inside the same bounds.
+The clamp protects the blend from an asset whose estimated variance is very small, which would otherwise carry almost the whole cross-section. The quantiles come from the estimation universe, which is the set of pairs with a positive first-pass weight. The clamp applies to the whole row, so it holds a pair outside that universe inside the same bounds.
 
 An entry is infinite where its variance is exactly zero. When every entry of the set is infinite, both quantiles are infinite, and the clamp lifts every entry of the row that is not `NaN` to infinity. That is the limit of the clamp as the variances of the set go to zero together, so [`cross_sectional_median_cap!`](@ref) then gives those entries equal shares.
 
@@ -519,7 +549,7 @@ An entry is infinite where its variance is exactly zero. When every entry of the
 
   - `IV::Matrix{<:Number}`: Inverse variances `observations × assets`, changed in place.
   - `W0::MatNum`: First-pass weights `observations × assets`. Only the sign of an entry is read, which names the estimation universe.
-  - `wins::Tuple{<:Real, <:Real}`: Lower and upper quantile levels of the clamp.
+  - `wins::Tuple{Real, Real}`: Lower and upper quantile levels of the clamp.
 
 # Validation
 
@@ -548,7 +578,7 @@ julia> IV
   - [`cross_sectional_median_cap!`](@ref)
 """
 function cross_sectional_winsorise!(IV::Matrix{<:Number}, W0::MatNum,
-                                    wins::Tuple{<:Real, <:Real})::Nothing
+                                    wins::Tuple{Real, Real})::Nothing
     @argcheck(size(IV) == size(W0),
               DimensionMismatch("IV ($(size(IV, 1))×$(size(IV, 2))) must match W0 ($(size(W0, 1))×$(size(W0, 2)))"))
     Tf = eltype(IV)
@@ -584,7 +614,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Cap the inverse variance weights of each observation at a multiple of their median, then normalise them, in place.
 
-The cap is the second of the two bounds, and it is what answers an asset whose estimated variance is exactly zero: its entry is infinite, and it leaves at `ratio` times the median, so the observation still returns a weight. The normalisation puts the row on the same scale as the capitalisation component, so the blend of the two realises the shrinkage the caller wrote.
+The cap is the second of the two bounds. An asset whose estimated variance is exactly zero has an infinite entry, and the cap lowers it to `ratio` times the median, so the observation still returns a weight. The normalisation puts the row on the same scale as the capitalisation component, so the blend of the two realises the shrinkage the caller wrote.
 
 When half or more of the entries are infinite, the median is infinite and the cap does not bind. The row then takes the limit of the normalised row as those variances go to zero together: each infinite entry gets an equal share, and each finite entry gets zero. A row whose entries are all infinite gets equal shares the same way.
 
@@ -653,7 +683,7 @@ end
 
 Return the second-pass cross-sectional regression weights of a weight policy.
 
-The verb takes the first-pass weights and residuals as arguments rather than reading them off the policy, because a weight policy is configuration and holds no fitted data. A caller runs it only when [`needs_second_pass`](@ref) answers `true`. An observation whose eligible first-pass weights sum to zero returns `NaN` rather than a weight, because both components are normalised. An eligible pair carries a positive weight whenever `alg.p` is zero or its market capitalisation is positive, so a caller reaches that state only by handing in a weight matrix that [`cs_weights_initial`](@ref) did not build.
+The verb takes the first-pass weights and residuals as arguments rather than reading them off the policy, because a weight policy is configuration and holds no fitted data. A caller runs it only when [`needs_second_pass`](@ref) answers `true`. An observation whose eligible first-pass weights sum to zero returns `NaN` for every eligible pair, because both components are normalised. When `alg.p` is not zero, [`cs_weights_initial`](@ref) builds such a row from a row whose eligible capitalisations are all zero. A single zero capitalisation leaves the row finite. Its pair takes no part in the quantiles, and its capitalisation component is zero.
 
 # Algorithm
 

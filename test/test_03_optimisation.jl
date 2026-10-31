@@ -20,6 +20,62 @@
     end
 end
 
+@testset "Solver chain records" begin
+    using PortfolioOptimisers, JuMP, Test, Clarabel
+    @testset "optimise_JuMP_model!" begin
+        function qpmodel(lb)
+            model = JuMP.Model()
+            JuMP.@variable(model, w[1:3])
+            JuMP.@constraint(model, sum(w) == 1)
+            JuMP.@constraint(model, w .>= lb)
+            JuMP.@objective(model, Min, sum(w .^ 2))
+            return model
+        end
+        # An optimizer attribute reaches the solver, and a single `Solver` is a vector of one.
+        model = qpmodel(0.0)
+        res = PortfolioOptimisers.optimise_JuMP_model!(model,
+                                                       Solver(; solver = Clarabel.Optimizer,
+                                                              settings = MOI.Silent() =>
+                                                                  true))
+        @test res.success
+        @test isempty(res.trials)
+        @test JuMP.get_attribute(model, MOI.Silent())
+        @test isapprox(JuMP.value.(model[:w]), fill(inv(3), 3); rtol = 1e-6)
+        # An attribute that the solver refuses raises out of the loop, and no later
+        # solver is tried.
+        @test_throws Exception PortfolioOptimisers.optimise_JuMP_model!(qpmodel(0.0),
+                                                                        [Solver(; name = :a,
+                                                                                solver = Clarabel.Optimizer,
+                                                                                settings = "no_such_attribute" =>
+                                                                                    1),
+                                                                         Solver(; name = :b,
+                                                                                solver = Clarabel.Optimizer)])
+        # The entry of a failed check also holds the settings of the solver.
+        res = PortfolioOptimisers.optimise_JuMP_model!(qpmodel(0.9),
+                                                       Solver(; name = :c,
+                                                              solver = Clarabel.Optimizer,
+                                                              settings = Dict("verbose" =>
+                                                                                  false)))
+        @test !res.success
+        @test Set(keys(res.trials[:c])) ==
+              Set([:assert_is_solved_and_feasible, :termination_status, :settings])
+        @test res.trials[:c][:settings] == Dict("verbose" => false)
+        @test res.trials[:c][:termination_status] == JuMP.MOI.INFEASIBLE
+        # Two unnamed solvers share one entry, and two named solvers keep two.
+        nosolver = () -> error("no solver")
+        res = PortfolioOptimisers.optimise_JuMP_model!(qpmodel(0.0),
+                                                       [Solver(; solver = nosolver),
+                                                        Solver(; solver = nosolver)])
+        @test length(res.trials) == 1
+        res = PortfolioOptimisers.optimise_JuMP_model!(qpmodel(0.0),
+                                                       [Solver(; name = :a,
+                                                               solver = nosolver),
+                                                        Solver(; name = :b,
+                                                               solver = nosolver)])
+        @test length(res.trials) == 2
+    end
+end
+
 @testset "Solver fallback chain robustness" begin
     using PortfolioOptimisers, JuMP, Test, Clarabel
     function testmodel(lb)
@@ -43,8 +99,9 @@ end
         mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
         logger = SimpleLogger()
         with_logger(logger) do
-            @test_logs (:warn, r"Failed to solve") PortfolioOptimisers.optimise_JuMP_model!(testmodel(0.9),
-                                                                                            mr)
+            @test_logs (:warn,
+                        r"could not be solved satisfactorily(.|\n)*c1: termination_status → INFEASIBLE") PortfolioOptimisers.optimise_JuMP_model!(testmodel(0.9),
+                                                                                                                                                  mr)
         end
         retcode, sol = PortfolioOptimisers.optimise_JuMP_model!(testmodel(0.9), mr)
         @test isa(retcode, OptimisationFailure)
@@ -56,6 +113,7 @@ end
             @test haskey(trial, :assert_is_solved_and_feasible)
             @test haskey(trial, :err)
             @test haskey(trial, :settings)
+            @test trial[:termination_status] == JuMP.MOI.INFEASIBLE
         end
     end
     @testset "chain advances past a failing solver to a successful one" begin
@@ -343,14 +401,21 @@ end
     w0 = [0.5, 0.3, 0.15, 0.05]
     wb = WeightBounds(; lb = fill(0.1, 4), ub = fill(0.4, 4))
     @testset "The objective is the norm the docstring states" begin
-        # Two of the four names say "Squared". The cone bounds the norm itself, so the
-        # objective value is the L2 norm and not its square; the minimiser is the same.
-        for (alg, obj) in
-            ((RelativeErrorWeightFinaliser(), w -> norm(w ./ w0 .- one(eltype(w0)), 1)),
-             (SquaredRelativeErrorWeightFinaliser(),
-              w -> norm(w ./ w0 .- one(eltype(w0)), 2)),
-             (AbsoluteErrorWeightFinaliser(), w -> norm(w - w0, 1)),
-             (SquaredAbsoluteErrorWeightFinaliser(), w -> norm(w - w0, 2)))
+        # The cone bounds the norm itself, so under a SquaredL2Norm the objective value is
+        # the L2 norm and not its square; the minimiser is the same.
+        rel = RelativeWeightDeviation()
+        abs_dev = AbsoluteWeightDeviation()
+        rel_res(w) = w ./ w0 .- one(eltype(w0))
+        for (alg, obj) in ((ErrorWeightFinaliser(), w -> norm(rel_res(w), 1)),
+                           (ErrorWeightFinaliser(; alg = L2Norm()), w -> norm(rel_res(w), 2)),
+                           (ErrorWeightFinaliser(; alg = SquaredL2Norm()), w -> norm(rel_res(w), 2)),
+                           (ErrorWeightFinaliser(; alg = LInfNorm()), w -> norm(rel_res(w), Inf)),
+                           (ErrorWeightFinaliser(; alg = LpNorm(; p = 3)), w -> norm(rel_res(w), 3)),
+                           (ErrorWeightFinaliser(; dev = abs_dev), w -> norm(w - w0, 1)),
+                           (ErrorWeightFinaliser(; alg = L2Norm(), dev = abs_dev), w -> norm(w - w0, 2)),
+                           (ErrorWeightFinaliser(; alg = LInfNorm(), dev = abs_dev), w -> norm(w - w0, Inf)),
+                           (ErrorWeightFinaliser(; alg = LpNorm(; p = 3), dev = abs_dev),
+                            w -> norm(w - w0, 3)))
             model = JuMP.Model()
             JuMP.@expression(model, sc, 1.0)
             JuMP.@expression(model, so, 1.0)
@@ -364,6 +429,24 @@ end
             JuMP.optimize!(model)
             @test isapprox(JuMP.objective_value(model), obj(JuMP.value.(model[:w]));
                            rtol = 1e-6)
+        end
+    end
+    @testset "An LpNorm of order 2 or Inf reaches the optimum of the named norm" begin
+        # The order picks the cone of the norm (#1884). Before, an order of `Inf` wrote power
+        # cones at the exponent `1 / Inf`, which bound nothing: under the relative deviation
+        # the solve stopped at a norm of 3, where the optimum is 5 / 3.
+        w0c = [0.6, 0.25, 0.1, 0.05]
+        wbc = WeightBounds(; lb = fill(0.1, 4), ub = fill(0.3, 4))
+        fin(alg) = PortfolioOptimisers.opt_weight_bounds(JuMPWeightFinaliser(; slv = slv,
+                                                                             alg = alg),
+                                                         wbc, copy(w0c))
+        for dev in (RelativeWeightDeviation(), AbsoluteWeightDeviation()),
+            (p, named) in ((2, L2Norm()), (Inf, LInfNorm()))
+
+            res(w) = isa(dev, RelativeWeightDeviation) ? w ./ w0c .- 1 : w - w0c
+            wp = fin(ErrorWeightFinaliser(; alg = LpNorm(; p = p), dev = dev))
+            wn = fin(ErrorWeightFinaliser(; alg = named, dev = dev))
+            @test isapprox(norm(res(wp), p), norm(res(wn), p); rtol = 1e-6)
         end
     end
     @testset "A repaired vector keeps its budget and lands in the bounds" begin
@@ -445,7 +528,9 @@ end
         wbj = WeightBounds(; lb = fill(0.1, 4), ub = fill(0.3, 4))
         wj = [0.6, 0.25, 0.1, 0.05]
         wq = PortfolioOptimisers.opt_weight_bounds(JuMPWeightFinaliser(; slv = slv,
-                                                                       alg = SquaredAbsoluteErrorWeightFinaliser()),
+                                                                       alg = ErrorWeightFinaliser(;
+                                                                                                  alg = L2Norm(),
+                                                                                                  dev = AbsoluteWeightDeviation())),
                                                    wbj, copy(wj))
         @test proj(wj, wbj) ≈ [0.3, 0.3, 0.225, 0.175]
         # Clarabel solves the cone to about `5e-6`.
@@ -1272,20 +1357,21 @@ struct HookObjective03d <: PortfolioOptimisers.CustomJuMPObjective end
         risk = [(:a_var, :a) => (1.0 * x, [1.0, 2.0], true, 0),
                 (:b_var, :b) => (1.0 * x, [3.0], false, 0)]
         rax = PO.set_risk_frontier_parameters!(model, risk)
-        # A `true` flag is the ceiling `x <= u k`, a `false` flag the floor `x >= u k`,
-        # and `s_c = 2` multiplies both.
+        # A `true` flag is the ceiling `x / m <= u k`, a `false` flag the floor `x / m >= u k`,
+        # and `s_c = 2` multiplies both. `m` is the largest absolute point of the entry: 2 for
+        # `a` and 3 for `b`. The expression takes the division, so the parameter keeps `s_c`.
         ca = JuMP.constraint_object(model[:a])
         cb = JuMP.constraint_object(model[:b])
         @test ca.set == JuMP.MOI.LessThan(0.0) && cb.set == JuMP.MOI.LessThan(0.0)
-        @test JuMP.coefficient(ca.func, x) == 2.0
+        @test JuMP.coefficient(ca.func, x) == 1.0
         @test JuMP.coefficient(ca.func, model[:a_var]) == -2.0
-        @test JuMP.coefficient(cb.func, x) == -2.0
+        @test JuMP.coefficient(cb.func, x) ≈ -2 / 3
         @test JuMP.coefficient(cb.func, model[:b_var]) == 2.0
         ret = [(:r_var, :r) => (3.0 * x, [0.5, 0.7, 0.9], 1)]
         tax = PO.set_ret_frontier_parameters!(model, ret)
         cr = JuMP.constraint_object(model[:r])
         @test cr.set == JuMP.MOI.GreaterThan(0.0)
-        @test JuMP.coefficient(cr.func, x) == 6.0
+        @test JuMP.coefficient(cr.func, x) ≈ 6 / 0.9
         @test JuMP.coefficient(cr.func, model[:r_var]) == -2.0
         # The product: two risk points, one risk point and three return points.
         pts = collect(PO.frontier_sweep_axes(tax, rax))
@@ -1293,14 +1379,45 @@ struct HookObjective03d <: PortfolioOptimisers.CustomJuMPObjective end
         @test length(collect(PO.frontier_sweep_axes(tax, nothing))) == 3
         @test length(collect(PO.frontier_sweep_axes(nothing, rax))) == 2
         @test length(collect(PO.frontier_sweep_axes(nothing, nothing))) == 1
-        # The risk axis changes fastest.
+        # The risk axis changes fastest. Each parameter holds its point in units of `m`.
         PO.set_frontier_point!(model, pts[2])
-        @test JuMP.parameter_value(model[:a_var]) == 2.0
-        @test JuMP.parameter_value(model[:r_var]) == 0.5
+        @test JuMP.parameter_value(model[:a_var]) == 2.0 / 2
+        @test JuMP.parameter_value(model[:r_var]) == 0.5 / 0.9
         PO.set_frontier_point!(model, pts[3])
-        @test JuMP.parameter_value(model[:a_var]) == 1.0
-        @test JuMP.parameter_value(model[:r_var]) == 0.7
-        @test JuMP.parameter_value(model[:b_var]) == 3.0
+        @test JuMP.parameter_value(model[:a_var]) == 1.0 / 2
+        @test JuMP.parameter_value(model[:r_var]) == 0.7 / 0.9
+        @test JuMP.parameter_value(model[:b_var]) == 3.0 / 3
+    end
+
+    @testset "scalar bound rows: the row is divided by the size of its bound" begin
+        model = JuMP.Model()
+        PO.set_model_scales!(model, 2.0, 1.0)
+        PO.set_maximum_ratio_factor_variables!(model, MinimumRisk())
+        JuMP.@variable(model, x)
+        mr = MeanRisk(; opt = JuMPOptimiser(; slv = Solver(; solver = Clarabel.Optimizer)))
+        # A ceiling of the size of a fourth moment: `s_c (x - u) / |u| <= 0`, so both terms
+        # are of order one. JuMP moves the constant into the set: `1e7 x <= 2`.
+        PO.set_risk_upper_bound!(model, mr, 1.0 * x, 2e-7, :kt_risk_1)
+        cu = JuMP.constraint_object(PO.state_get(model, :kt_risk_1, :_ub))
+        @test cu.set isa JuMP.MOI.LessThan
+        @test cu.set.upper ≈ 2
+        @test JuMP.coefficient(cu.func, x) ≈ 2 / 2e-7
+        # A `false` flag turns the row into a floor, and a negative bound keeps the sense:
+        # `-2 (x + 0.5) / 0.5 <= 0`, which is `-4 x <= 2`.
+        PO.set_risk_upper_bound!(model, mr, 1.0 * x, -0.5, :sk_risk_1, false)
+        cl = JuMP.constraint_object(PO.state_get(model, :sk_risk_1, :_ub))
+        @test JuMP.coefficient(cl.func, x) ≈ -4
+        @test cl.set.upper ≈ 2
+        # A zero bound takes the scale one.
+        PO.set_risk_upper_bound!(model, mr, 1.0 * x, 0.0, :zr_risk_1)
+        cz = JuMP.constraint_object(PO.state_get(model, :zr_risk_1, :_ub))
+        @test JuMP.coefficient(cz.func, x) == 2
+        # A return floor: `s_c (ret - l) / |l| >= 0`, which is `12 x >= 2`.
+        PO.set_return_bounds!(model, 1, 3.0 * x, 0.5)
+        cr = JuMP.constraint_object(PO.state_get(model, Symbol(""), :ret_lb_, 1))
+        @test cr.set isa JuMP.MOI.GreaterThan
+        @test cr.set.lower ≈ 2
+        @test JuMP.coefficient(cr.func, x) ≈ 12
     end
 
     @testset "weights, start values and the return series" begin
@@ -1409,8 +1526,8 @@ struct HookObjective03d <: PortfolioOptimisers.CustomJuMPObjective end
         @test :w in propertynames(res) && :pa in propertynames(res)
         # Every solver fails, so the weights are `NaN`.
         all_bad = MeanRisk(; r = Variance(), opt = JuMPOptimiser(; slv = bad))
-        failed = @test_logs (:warn, r"Failed to solve") match_mode = :any optimise(all_bad,
-                                                                                   rd)
+        failed = @test_logs (:warn, r"bad: set_optimizer → no solver") match_mode = :any optimise(all_bad,
+                                                                                                  rd)
         @test failed.retcode isa OptimisationFailure
         @test length(failed.w) == 5 && all(isnan, failed.w)
     end
@@ -1448,8 +1565,14 @@ struct HookObjective03d <: PortfolioOptimisers.CustomJuMPObjective end
         mu = vec(sum(X; dims = 1)) / size(X, 1)
         rets = [dot(mu, w) for w in res.w]
         @test issorted(rets)
-        # The last point binds its floor.
-        lb = JuMP.parameter_value(res.model[:ret_lb_var_1])
+        # The last point binds its floor. The parameter holds the floor in units of the fixed
+        # scale `m` of the row `s_c (ret / m - b) >= 0`, so the weight `w_1` of the row has the
+        # coefficient `s_c mu_1 / m`.
+        sc = PO.get_constraint_scale(res.model)
+        @test JuMP.normalized_coefficient(res.model[:ret_lb_1], res.model[:ret_lb_var_1]) ==
+              -sc
+        m = sc * mu[1] / JuMP.normalized_coefficient(res.model[:ret_lb_1], res.model[:w][1])
+        lb = m * JuMP.parameter_value(res.model[:ret_lb_var_1])
         @test rets[end] >= lb - 1e-8
         @test isapprox(rets[end], lb; rtol = 1e-6)
     end
@@ -1699,34 +1822,38 @@ end
         @test PO.time_dependent_candidate_fields(JuMPOptimiser(; slv = slv)) == ()
     end
 
-    @testset "the four JuMP formulations give their hand minimisers" begin
+    @testset "the JuMP formulations give their hand minimisers" begin
         # w0 = [0.7, 0.2, 0.1] under ub = 0.5 moves a mass of 0.2 to the two free weights.
         wb = WeightBounds(; lb = 0.0, ub = 0.5)
         w0 = [0.7, 0.2, 0.1]
         fin(alg) = PO.opt_weight_bounds(JuMPWeightFinaliser(; slv = slv, alg = alg), wb, w0)
+        abs_dev = AbsoluteWeightDeviation()
         # The L2 norm of the absolute deviation shifts the free weights by one constant.
-        @test isapprox(fin(SquaredAbsoluteErrorWeightFinaliser()), [0.5, 0.3, 0.2];
-                       atol = 1e-6)
+        @test isapprox(fin(ErrorWeightFinaliser(; alg = L2Norm(), dev = abs_dev)),
+                       [0.5, 0.3, 0.2]; atol = 1e-6)
         # The L1 norm of the relative deviation moves the mass to the largest free weight.
-        @test isapprox(fin(RelativeErrorWeightFinaliser()), [0.5, 0.4, 0.1]; atol = 1e-6)
+        @test isapprox(fin(ErrorWeightFinaliser()), [0.5, 0.4, 0.1]; atol = 1e-6)
         # The L2 norm of the relative deviation gives w0 + c w0², with c = 4.
-        @test isapprox(fin(SquaredRelativeErrorWeightFinaliser()), [0.5, 0.36, 0.14];
+        @test isapprox(fin(ErrorWeightFinaliser(; alg = L2Norm())), [0.5, 0.36, 0.14];
                        atol = 1e-6)
         # The L1 norm of the absolute deviation is not unique, and its value is twice the
         # moved mass.
-        wa = fin(AbsoluteErrorWeightFinaliser())
+        wa = fin(ErrorWeightFinaliser(; dev = abs_dev))
         @test isapprox(sum(abs, wa - w0), 0.4; atol = 1e-6)
         @test isapprox(sum(wa), 1.0; atol = 1e-8)
         @test all(x -> -1e-8 <= x <= 0.5 + 1e-8, wa)
         # The Euclidean projection is the minimiser of the absolute L2 norm.
         @test isapprox(PO.opt_weight_bounds(EuclideanWeightFinaliser(), wb, w0),
                        [0.5, 0.3, 0.2]; atol = 1e-12)
-        # A relative formulation does not change the weights of the caller.
+        # A relative deviation does not change the weights of the caller.
         wz = [0.7, 0.3, 0.0]
         PO.opt_weight_bounds(JuMPWeightFinaliser(; slv = slv,
-                                                 alg = SquaredRelativeErrorWeightFinaliser()),
+                                                 alg = ErrorWeightFinaliser(;
+                                                                            alg = L2Norm())),
                              wb, wz)
         @test wz == [0.7, 0.3, 0.0]
+        # A p-norm needs 1 < p for its power cone, so the constructor refuses p = 1.
+        @test_throws DomainError ErrorWeightFinaliser(; alg = LpNorm(; p = 1))
         # Weights in the bounds come back unchanged, with no solve.
         wi = [0.4, 0.4, 0.2]
         @test PO.opt_weight_bounds(JuMPWeightFinaliser(; slv = slv), wb, wi) === wi
@@ -1792,5 +1919,191 @@ end
         @test w == [0.5, 0.5]
         @test X == [1.0 2.0; 3.0 4.0]
         @test nx == ["a", "b"]
+    end
+end
+@testset "JuMP optimiser against its docstrings" begin
+    using PortfolioOptimisers, Test, JuMP, HiGHS, StableRNGs
+    PO = PortfolioOptimisers
+    slv = Solver(; solver = nothing)
+    N = 5
+    nx = ["A", "B", "C", "D", "E"]
+    rng = StableRNG(685)
+    X = randn(rng, 200, N) .* 0.01 .+ [0.001 0.0005 -0.0003 0.0008 -0.0006]
+    rd = ReturnsResult(; nx = nx, X = X)
+
+    @testset "the constructor raises as its Validation list states" begin
+        @test_throws IsEmptyError JuMPOptimiser(; slv = Solver[])
+        @test_throws IsNonFiniteError JuMPOptimiser(; slv, bgt = Inf)
+        @test_throws ConflictingArgumentError JuMPOptimiser(; slv,
+                                                            bgt = BudgetCosts(;
+                                                                              w = fill(1 /
+                                                                                       3,
+                                                                                       3)),
+                                                            sbgt = 0.2)
+        @test_throws DomainError JuMPOptimiser(; slv, sbgt = -0.1)
+        @test_throws DomainError JuMPOptimiser(; slv, bgt = nothing, gbgt = -1.0,
+                                               wb = WeightBounds(; lb = -1, ub = 1))
+        # A gross budget needs a negative bound, and it is over-determined by two numbers.
+        @test_throws ArgumentError JuMPOptimiser(; slv, bgt = nothing, gbgt = 1.5)
+        @test_throws ArgumentError JuMPOptimiser(; slv, bgt = 1.0, sbgt = 0.3, gbgt = 1.6,
+                                                 wb = WeightBounds(; lb = -1, ub = 1))
+        # Two numbers pin the gross budget of the model, not the realised gross exposure,
+        # which is smaller under `xbgt = false` (#685, R14 of #1817).
+        @test_throws "pin the gross budget at bgt + 2 * sbgt" JuMPOptimiser(; slv,
+                                                                            bgt = 1.0,
+                                                                            sbgt = 0.3,
+                                                                            gbgt = 1.6,
+                                                                            wb = WeightBounds(;
+                                                                                              lb = -1,
+                                                                                              ub = 1))
+        for (k, v) in
+            ((:cte, CentralityConstraint[]), (:tn, Turnover[]), (:tr, TrackingError[]),
+             (:l2, L2Regularisation[]), (:lp, LpRegularisation[]),
+             (:lpc, LpRegularisation[]))
+            @test_throws IsEmptyError JuMPOptimiser(; slv, k => v)
+        end
+        for k in (:card, :l2c, :linfc, :l1, :linf)
+            @test_throws DomainError JuMPOptimiser(; slv, k => (k === :card ? 0 : 0.0))
+        end
+        # A schedule passes the direct check, and the substitution checks each entry.
+        @test JuMPOptimiser(; slv, l1 = TimeDependent([0.1, 0.2])) isa JuMPOptimiser
+        @test_throws DomainError JuMPOptimiser(; slv, card = TimeDependent([2, 0]))
+        # A slot keyed by name, a fee estimator among them, needs `sets`.
+        sets = UniverseSets(; dict = Dict("nx" => nx))
+        for kw in ((; wb = WeightBoundsEstimator(; lb = Dict("A" => 0.1))),
+                   (; fees = FeesEstimator(; l = Dict("A" => 0.01))),
+                   (; smtx = [AssetSetsMatrixEstimator(; val = "x")],
+                    slt = [ThresholdEstimator(; val = Dict("A" => 0.1))]))
+            @test_throws IsNothingError JuMPOptimiser(; slv, kw...)
+            @test JuMPOptimiser(; slv, sets, kw...) isa JuMPOptimiser
+        end
+    end
+
+    @testset "two numbers fix the gross budget, and xbgt makes the weights reach it" begin
+        hs = Solver(; solver = HiGHS.Optimizer, settings = Dict("log_to_console" => false))
+        g = map((false, true)) do xb
+            res = optimise(MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(),
+                                    opt = JuMPOptimiser(; slv = hs,
+                                                        wb = WeightBounds(; lb = -1.0,
+                                                                          ub = 1.0),
+                                                        bgt = 1.0, sbgt = 0.3, xbgt = xb)),
+                           rd)
+            @test res.retcode isa OptimisationSuccess
+            @test isapprox(sum(res.w), 1.0; atol = 1e-6)
+            # The short budget of the model is pinned in both cases.
+            @test isapprox(JuMP.value(sum(res.model[:sw]) / res.model[:k]), 0.3;
+                           atol = 1e-6)
+            sum(abs, res.w)
+        end
+        # Without `xbgt` the realised gross exposure is below bgt + 2 * sbgt.
+        @test g[1] < 1.6 - 1e-3
+        @test isapprox(g[2], 1.6; atol = 1e-6)
+    end
+
+    @testset "the previous weights, factory and the view" begin
+        tnv = Turnover(; w = fill(0.2, N), val = 0.1)
+        o = JuMPOptimiser(; slv, tn = tnv)
+        @test !PO.needs_previous_weights(JuMPOptimiser(; slv))
+        @test PO.needs_previous_weights(o)
+        # A schedule that reads the previous weights counts, a plain vector does not.
+        @test PO.needs_previous_weights(JuMPOptimiser(; slv,
+                                                      bgt = TimeDependent(PreviousWeightsFunction(;
+                                                                                                  f = ctx -> 1.0))))
+        @test !PO.needs_previous_weights(JuMPOptimiser(; slv,
+                                                       bgt = TimeDependent([1.0, 0.9])))
+        w1 = [0.6, 0.1, 0.1, 0.1, 0.1]
+        f = PO.factory(o, w1)
+        @test f.tn.w == w1
+        @test f.tn.val == 0.1
+        @test all(n -> n in (:tn, :fees, :tr, :ccnt, :cobj) ||
+                       getfield(f, n) === getfield(o, n), fieldnames(JuMPOptimiser))
+
+        lt5 = Threshold(; val = [0.01, 0.02, 0.03, 0.04, 0.05])
+        st5 = Threshold(; val = [0.11, 0.12, 0.13, 0.14, 0.15])
+        sm = [1 1 0 0 0; 0 0 1 1 1]
+        idx = [2, 4, 5]
+        # Distinct objects in the pairs view one by one.
+        v = PO.port_opt_view(JuMPOptimiser(; slv, smtx = sm, sgmtx = sm, slt = lt5,
+                                           sglt = nothing, sst = st5,
+                                           sgst = Threshold(; val = fill(0.2, N)),
+                                           tn = Turnover(; w = fill(0.2, N),
+                                                         val = collect(0.1:0.1:0.5))), idx,
+                             X)
+        @test v.slt.val == [0.02, 0.04, 0.05]
+        @test isnothing(v.sglt)
+        @test v.sst.val == [0.12, 0.14, 0.15]
+        @test v.sgst.val == fill(0.2, 3)
+        @test v.smtx === v.sgmtx
+        @test v.smtx == [1 0 0; 0 1 1]
+        @test v.tn.val == [0.2, 0.4, 0.5]
+        # One object in a pair stays one object.
+        vs = PO.port_opt_view(JuMPOptimiser(; slv, smtx = sm, sgmtx = sm, slt = lt5,
+                                            sglt = lt5, sst = st5, sgst = st5), idx, X)
+        @test vs.slt === vs.sglt
+        @test vs.sst === vs.sgst
+        vm = PO.port_opt_view(JuMPOptimiser(; slv, smtx = sm, sgmtx = [1 0 1 0 1],
+                                            slt = lt5, sglt = lt5), idx, X)
+        @test vm.smtx == [1 0 0; 0 1 1]
+        @test vm.sgmtx == [0 0 1]
+        # After the view, the optimiser declares the departed names on its own sets, and it
+        # refuses a name that is still on the asset axis.
+        kept = UniverseSets(; dict = Dict("nx" => ["A", "B", "D", "E"]))
+        nv = PO.non_investable_universe(JuMPOptimiser(; slv, sets = kept), ["C"])
+        @test nv.sets.dict["ni"] == ["C"]
+        @test_throws ArgumentError PO.non_investable_universe(JuMPOptimiser(; slv,
+                                                                            sets = kept),
+                                                              ["A"])
+    end
+
+    @testset "the result expands the weights once" begin
+        pr = prior(EmpiricalPrior(),
+                   ReturnsResult(; nx = ["a", "b", "c"],
+                                 X = [0.1 -0.2 0.0; -0.1 0.2 0.01; 0.05 0.1 -0.02]))
+        function attrs(imsk)
+            return ProcessedJuMPOptimiserAttributes(; pr = pr, wb = nothing, lt = nothing,
+                                                    st = nothing, lcsr = nothing,
+                                                    ctr = nothing, gcardr = nothing,
+                                                    sgcardr = nothing, smtx = nothing,
+                                                    sgmtx = nothing, slt = nothing,
+                                                    sst = nothing, sglt = nothing,
+                                                    sgst = nothing, tn = nothing,
+                                                    fees = nothing, plr = nothing,
+                                                    ret = ArithmeticReturn(),
+                                                    sca = SumScalariser(), imsk = imsk)
+        end
+        pa = attrs(BitVector([1, 0, 1]))
+        sol = PO.JuMPOptimisationSolution(; w = [0.4, 0.6])
+        res = JuMPOptimisationResult(; pa, retcode = OptimisationSuccess(), sol,
+                                     model = nothing)
+        @test res.w == [0.4, 0.0, 0.6]
+        @test res.imsk == BitVector([1, 0, 1])
+        resv = JuMPOptimisationResult(; pa, retcode = OptimisationSuccess(),
+                                      sol = [sol,
+                                             PO.JuMPOptimisationSolution(; w = [1.0, 0.0])],
+                                      model = nothing)
+        @test resv.w == [[0.4, 0.0, 0.6], [1.0, 0.0, 0.0]]
+        @test JuMPOptimisationResult(; pa = attrs(nothing), retcode = OptimisationSuccess(),
+                                     sol, model = nothing).w == [0.4, 0.6]
+        # `set_retcode` keeps the expanded weights, and a second expansion raises.
+        @test PO.set_retcode(res, OptimisationFailure()).w == res.w
+        @test_throws DimensionMismatch JuMPOptimisationResult(; pa,
+                                                              retcode = OptimisationSuccess(),
+                                                              sol = res.sol,
+                                                              model = nothing)
+    end
+
+    @testset "the view of a head declares the departed names on its own sets" begin
+        sets = UniverseSets(; dict = Dict("nx" => nx))
+        rb = RiskBudgeting(;
+                           rba = AssetRiskBudgeting(; sets,
+                                                    rkb = RiskBudgetEstimator(;
+                                                                              val = Dict("A" =>
+                                                                                             0.5))),
+                           opt = JuMPOptimiser(; slv))
+        imsk = BitVector([1, 1, 0, 1, 1])
+        rbv, rdv = PO.investable_view(rb, rd, prior(EmpiricalPrior(), rd), imsk)
+        @test rbv.rba.sets.dict["ni"] == ["C"]
+        @test rbv.rba.sets.dict["nx"] == ["A", "B", "D", "E"]
+        @test rdv.nx == ["A", "B", "D", "E"]
     end
 end

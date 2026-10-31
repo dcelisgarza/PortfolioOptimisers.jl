@@ -18,12 +18,11 @@ drifted_held_weights
 assert_held_weights_shape
 assert_held_start_shape
 rebuild_weight_path
-held_weights_drift
 nan_held_member
 held_weights_member
 held_weights_result
 drift_observations
-investable_reduction(X::MatNum, w::Union{<:VecNum, <:VecVecNum, <:MatNum}, fees::Option{<:Fees}, strict::Bool)
+investable_reduction(X::MatNum, w::Union{VecNum, VecVecNum, MatNum}, fees::Option{<:Fees}, strict::Bool)
 investable_returns_view
 held_gap_pairs
 filter_held_gaps

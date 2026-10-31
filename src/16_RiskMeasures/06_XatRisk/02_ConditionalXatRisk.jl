@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Measures the Conditional Value-at-Risk (CVaR), the average loss over the worst `alpha` fraction of the portfolio returns.
 
-The measure is also called Expected Shortfall. It is a coherent risk measure, and it is never below the [`ValueatRisk`](@ref) at the same level.
+The measure is also called Expected Shortfall. It is a coherent risk measure, and it is never below the [`ValueatRisk`](@ref) at the same level. Corollaries 7 and 12 of [rockafellar2002](@cite) state both properties.
 
 # Mathematical definition
 
@@ -22,7 +22,7 @@ The minimum has a closed form on the sorted returns. The tail holds the ``k^{\\s
 \\end{align}
 ```
 
-The second line holds because ``\\nu = x_{(k^{\\star})} = -\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x})`` is a minimiser. ``\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x})`` is the [`ValueatRisk`](@ref) at the same level, the smallest loss of the minimisers, as Rockafellar and Uryasev define it. The functor reads ``k^{\\star}`` off the computed ``\\alpha W_{T}``, so where a rounding error puts that product under a cumulative weight, it reads the position before the one of [`ValueatRisk`](@ref), whose slack absorbs the error. That position is the other end of the minimisers, so the value does not change.
+The second line holds because ``\\nu = x_{(k^{\\star})} = -\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x})`` is a minimiser. ``\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x})`` is the [`ValueatRisk`](@ref) at the same level, the smallest loss of the minimisers, as Equation 7 of [cvar](@cite) defines it. Theorem 1 of [cvar](@cite) states the minimum, and Proposition 8 of [rockafellar2002](@cite) states the closed form for finitely many scenarios with their probabilities, which are the observation weights here. Both works write the level as a confidence, which is ``1 - \\alpha`` here. The functor reads ``k^{\\star}`` off the computed ``\\alpha W_{T}``, so where a rounding error puts that product under a cumulative weight, it reads the position before the one of [`ValueatRisk`](@ref), whose slack absorbs the error. That position is the other end of the minimisers, so the value does not change.
 
 Where:
 
@@ -113,8 +113,8 @@ ConditionalValueatRisk
 
 # References
 
-  - $(ref_dict[:cvar])
-  - $(ref_dict[:cajas2025]) Section 7.2.2.4.
+  - $(ref_dict[:cvar]) Theorem 1, Equations 5 and 7.
+  - $(ref_dict[:rockafellar2002]) Corollaries 7 and 12, and Proposition 8, Equation 25.
 """
 @propagatable @concrete struct ConditionalValueatRisk <: RiskMeasure
     """
@@ -172,7 +172,9 @@ The loss is the larger of two affine pieces ``b_{i} \\tau + a_{i} \\boldsymbol{w
 \\end{align}
 ```
 
-This is Equation 27 of [drcvar](@cite). Corollary 5.1 of [drcvar](@cite) gives it for the support ``C \\boldsymbol{\\xi} \\leq \\boldsymbol{d}`` with ``C = -I`` and ``\\boldsymbol{d} = \\boldsymbol{1}``. The infinity norm is the dual of the 1-norm of the transport cost.
+This is Equation 27 of [drcvar](@cite). Corollary 5.1 of [drcvar](@cite) gives it for the support ``C \\boldsymbol{\\xi} \\leq \\boldsymbol{d}`` with ``C = -I`` and ``\\boldsymbol{d} = \\boldsymbol{1}``. The infinity norm is the dual of the 1-norm of the transport cost. That work puts the weight ``1/T`` on each scenario, so the observation weights ``w_{t} / W_{T}`` are the library's extension. The CVaR inside the loss is the minimum of Theorem 1 of [cvar](@cite).
+
+The radius ``r`` is in the units of the returns. A distribution ``\\mathbb{Q}`` is in the ball when it moves the scenarios of ``\\hat{\\mathbb{P}}`` by a mean 1-norm distance of at most ``r``. The 1-norm adds the moves of the ``N`` assets. For example, the default ``r = 0.02`` lets the worst case move one asset by 0.02 in every scenario, or each of the ``N`` assets by ``0.02 / N``. The scale of a radius rule is in the same units.
 
 Where:
 
@@ -195,7 +197,7 @@ Three consequences follow. The first two contradict a reading of the measure as 
 
   - The robustness premium ``r \\lambda`` is not a constant. ``\\lambda`` depends on ``\\boldsymbol{w}``, so ``r`` cannot be factored out of the optimisation.
   - The loss carries a mean term that ``l`` does not scale. As ``r \\to 0`` the ball collapses to ``\\hat{\\mathbb{P}}``, and the measure goes to ``-\\mathbb{E}_{\\hat{\\mathbb{P}}}[\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi}] + l \\, \\mathrm{CVaR}_{\\alpha}(\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi})``, not to ``\\mathrm{CVaR}_{\\alpha}`` alone.
-  - As ``r`` grows, the long-only portfolio of minimum measure goes to the equally weighted portfolio. This is Proposition 7.2 of [drcvar](@cite), for this support.
+  - As ``r`` grows, the long-only, fully invested portfolio of minimum measure goes to the equally weighted portfolio. This is Proposition 7.2 of [drcvar](@cite), for this support.
 
 # Fields
 
@@ -257,7 +259,7 @@ DistributionallyRobustConditionalValueatRisk
 
 # References
 
-  - $(ref_dict[:cvar])
+  - $(ref_dict[:cvar]) Theorem 1, Equation 5.
   - $(ref_dict[:drcvar]) Section 7.1, Equation 27, Corollary 5.1 and Proposition 7.2.
 """
 @propagatable @concrete struct DistributionallyRobustConditionalValueatRisk <: RiskMeasure
@@ -315,16 +317,19 @@ Each of the three slots takes a Calibration Rule in place of a number. The rebui
 
 Both contexts also carry the series that the measure prices. For this measure it is the returns, which is the default of [`calibration_series`](@ref). The method passes it all the same, because the marker belongs to the measure, and a rule carries no marker of its own.
 
+Both contexts also carry `n`, the count of the empirical measure that the ball is centred on. The programme holds the rows of `pr.X`, weighted by `ws`, so [`scenario_sample_size`](@ref) gives that count. Under a Scenario Cap it is the rows the result carries, and not the observations behind the moments. A radius rule that reads a count reads this one, so the ball has the size that the concentration bound states for the rows it is drawn around.
+
 The measure holds no solver, so the rule receives the `slv` that the caller passes, which is `nothing` by default.
 
 # Algorithm
 
  1. Compute the effective observation weights `ws`, the measure's own `w` or else the weights of `pr`.
  2. Read `s`, the series marker, with [`calibration_series`](@ref).
- 3. Resolve `alpha` with [`resolve_calibration_slot`](@ref).
- 4. Resolve `l`, with a context that carries the resolved `alpha` and `s`.
- 5. Resolve `r`, with a context that carries `s` alone.
- 6. Rebuild the measure with [`rebuild_with_slots`](@ref). It returns `x` itself when all three slots already held numbers, so the common case allocates nothing.
+ 3. Compute `n`, the count of the rows that the programme prices, with [`scenario_sample_size`](@ref).
+ 4. Resolve `alpha` with [`resolve_calibration_slot`](@ref).
+ 5. Resolve `l`, with a context that carries the resolved `alpha`, `s` and `n`.
+ 6. Resolve `r`, with a context that carries `s` and `n`.
+ 7. Rebuild the measure with [`rebuild_with_slots`](@ref). It returns `x` itself when all three slots already held numbers, so the common case allocates nothing.
 
 # Related
 
@@ -340,10 +345,12 @@ function resolve_deferred_quantities(x::DistributionallyRobustConditionalValueat
                                      pr::AbstractPriorResult, slv = nothing)
     ws = sel(x.w, pr.w)
     s = calibration_series(x)
+    n = scenario_sample_size(pr, ws)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
     l = resolve_calibration_slot(x.l, :l, pr, ws, slv,
-                                 CalibrationContext(; alpha = alpha, series = s))
-    r = resolve_calibration_slot(x.r, :r, pr, ws, slv, CalibrationContext(; series = s))
+                                 CalibrationContext(; alpha = alpha, series = s, n = n))
+    r = resolve_calibration_slot(x.r, :r, pr, ws, slv,
+                                 CalibrationContext(; series = s, n = n))
     return rebuild_with_slots(x, (; alpha = alpha, l = l, r = r))
 end
 # Calibration slots — see `calibration_slots`. The significance level, the radius and the
@@ -363,9 +370,9 @@ The robust measure cannot evaluate its robust term on a return series, so it sha
   - [`ConditionalValueatRisk`](@ref)
   - [`DistributionallyRobustConditionalValueatRisk`](@ref)
 """
-const RMCVaR{T} = Union{<:ConditionalValueatRisk{<:Any, <:Any, T},
-                        <:DistributionallyRobustConditionalValueatRisk{<:Any, <:Any, <:Any,
-                                                                       <:Any, T}}
+const RMCVaR{T} = Union{ConditionalValueatRisk{<:Any, <:Any, T},
+                        DistributionallyRobustConditionalValueatRisk{<:Any, <:Any, <:Any,
+                                                                     <:Any, T}}
 function (r::RMCVaR{Nothing})(x::VecNum)
     if iszero(r.alpha)
         return worst_positive_weight_loss(x, nothing)
@@ -426,6 +433,8 @@ Where:
   - ``\\mathrm{CVaR}_{\\beta}(-\\boldsymbol{x})``: Upper-tail expected surplus at level ``\\beta``.
 
 $(math_dict[:negated_upper_tail]) Both tails read the same observation weights.
+
+Section 7.2.3.2 of [cajas2025](@cite) defines this range and names [owa1](@cite) as the source of the range measures. No copy of that work was found. Its Equation 7.75 prints a difference of the two tails, but its programme, Equation 7.77, minimises the sum above.
 
 # Algorithm
 
@@ -499,8 +508,10 @@ ConditionalValueatRiskRange
 
 # References
 
-  - $(ref_dict[:cvar])
-  - $(ref_dict[:cajas2025]) Section 7.2.3.
+  - $(ref_dict[:cvar]) Theorem 1, Equation 5.
+  - $(ref_dict[:rockafellar2002]) Proposition 8, Equation 25.
+  - $(ref_dict[:cajas2025]) Section 7.2.3.2, Equations 7.75 and 7.77. $(ref_dict[:no_original_source])
+  - $(ref_dict[:owa1])
 """
 @propagatable @concrete struct ConditionalValueatRiskRange <: RiskMeasure
     """
@@ -566,6 +577,8 @@ Where:
   - ``\\mathrm{DR\\text{-}CVaR}_{\\beta, l_b, r_b}(\\boldsymbol{w};\\, -\\boldsymbol{\\xi})``: Upper-tail DR-CVaR on the negated scenarios ``-\\boldsymbol{\\xi}_{t}``. Its support ``-\\boldsymbol{\\xi} \\geq -\\boldsymbol{1}`` says that no asset gains more than all of its value.
 
 $(math_dict[:negated_upper_tail]) The two tails have separate Wasserstein balls, and both read the same observation weights.
+
+Each radius is in the units of the returns, as the radius of [`DistributionallyRobustConditionalValueatRisk`](@ref) is. ``r_a`` bounds the mean 1-norm move of the scenarios that the lower tail reads, and ``r_b`` bounds the move of the negated scenarios that the upper tail reads.
 
 As both radii go to zero, the two mean terms cancel, and the measure goes to ``l_a \\, \\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x}) + l_b \\, \\mathrm{CVaR}_{\\beta}(-\\boldsymbol{x})``, with ``\\boldsymbol{x}`` the portfolio returns of the scenarios.
 
@@ -634,7 +647,7 @@ DistributionallyRobustConditionalValueatRiskRange
 
 # References
 
-  - $(ref_dict[:cvar])
+  - $(ref_dict[:cvar]) Theorem 1, Equation 5.
   - $(ref_dict[:drcvar]) Section 7.1, Equation 27.
 """
 @propagatable @concrete struct DistributionallyRobustConditionalValueatRiskRange <:
@@ -714,14 +727,17 @@ Each tail weight reads the level of its own tail. `l_a` reads `alpha` and `l_b` 
 
 Both tails price one series, the returns, so the same marker stands in all three contexts. The series belongs to the measure, and the level belongs to a tail.
 
+Both balls are centred on the empirical measure of the same rows, so the same count `n` stands in all three contexts too. [`scenario_sample_size`](@ref) gives it, for the reason that the scalar measure states.
+
 # Algorithm
 
  1. Compute the effective observation weights `ws`, the measure's own `w` or else the weights of `pr`.
  2. Read `se`, the series marker, with [`calibration_series`](@ref).
  3. Resolve `alpha` and `beta` with [`resolve_calibration_slot`](@ref).
- 4. Build three contexts: `cs` carries `se` alone, `ca` carries the resolved `alpha` and `se`, and `cb` carries the resolved `beta` and `se`.
- 5. Resolve `l_a` in `ca`, `r_a` in `cs`, `l_b` in `cb` and `r_b` in `cs`.
- 6. Rebuild the measure with [`rebuild_with_slots`](@ref), which returns `x` itself when every slot already held a number.
+ 4. Compute `n`, the count of the rows that the programme prices, with [`scenario_sample_size`](@ref).
+ 5. Build three contexts, each with `se` and `n`: `cs` carries them alone, `ca` carries the resolved `alpha` too, and `cb` carries the resolved `beta` too.
+ 6. Resolve `l_a` in `ca`, `r_a` in `cs`, `l_b` in `cb` and `r_b` in `cs`.
+ 7. Rebuild the measure with [`rebuild_with_slots`](@ref), which returns `x` itself when every slot already held a number.
 
 # Related
 
@@ -740,12 +756,14 @@ function resolve_deferred_quantities(x::DistributionallyRobustConditionalValueat
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
     beta = resolve_calibration_slot(x.beta, :beta, pr, ws, slv)
     # Each tail weight reads the probability of its OWN end, and the two radii read
-    # neither, so the four slots take three contexts. Both ends price one series, so the
-    # same marker stands in all three. The occupant itself is passed through untouched, so
-    # `rebuild_with_slots` compares each resolved value against the field of `x`.
-    cs = CalibrationContext(; series = se)
-    ca = CalibrationContext(; alpha = alpha, series = se)
-    cb = CalibrationContext(; alpha = beta, series = se)
+    # neither, so the four slots take three contexts. Both ends price one series over the
+    # same rows, so the same marker and the same count stand in all three. The occupant
+    # itself is passed through untouched, so `rebuild_with_slots` compares each resolved
+    # value against the field of `x`.
+    n = scenario_sample_size(pr, ws)
+    cs = CalibrationContext(; series = se, n = n)
+    ca = CalibrationContext(; alpha = alpha, series = se, n = n)
+    cb = CalibrationContext(; alpha = beta, series = se, n = n)
     l_a, r_a, l_b, r_b = map((slot, key, ctx) -> resolve_calibration_slot(slot, key, pr, ws,
                                                                           slv, ctx),
                              (x.l_a, x.r_a, x.l_b, x.r_b), (:l_a, :r_a, :l_b, :r_b),
@@ -784,11 +802,11 @@ The robust range cannot evaluate its robust terms on a return series, so it shar
   - [`ConditionalValueatRiskRange`](@ref)
   - [`DistributionallyRobustConditionalValueatRiskRange`](@ref)
 """
-const RMCVaRRg{T} = Union{<:ConditionalValueatRiskRange{<:Any, <:Any, <:Any, T},
-                          <:DistributionallyRobustConditionalValueatRiskRange{<:Any, <:Any,
-                                                                              <:Any, <:Any,
-                                                                              <:Any, <:Any,
-                                                                              <:Any, T}}
+const RMCVaRRg{T} = Union{ConditionalValueatRiskRange{<:Any, <:Any, <:Any, T},
+                          DistributionallyRobustConditionalValueatRiskRange{<:Any, <:Any,
+                                                                            <:Any, <:Any,
+                                                                            <:Any, <:Any,
+                                                                            <:Any, T}}
 function (r::RMCVaRRg{Nothing})(x::VecNum)
     x = copy(x)
     alpha = r.alpha
@@ -891,6 +909,8 @@ Where:
 
 The running peak starts at ``c_0 = 0``, so a series that falls from its first period is in drawdown from the start. The minimum has the sorted closed form that [`conditional_drawdown_at_risk`](@ref) states.
 
+Definition 3.4 of [cdar](@cite) defines the measure on one sample path, and Proposition 3.1 of that work states the convexity and the positive homogeneity of the drawdown. That work weighs each drawdown equally, so the observation weights follow Proposition 8 of [rockafellar2002](@cite).
+
 # Algorithm
 
  1. Compute the drawdown series with [`absolute_drawdown_vec`](@ref).
@@ -950,8 +970,8 @@ ConditionalDrawdownatRisk
 
 # References
 
-  - $(ref_dict[:cdar])
-  - $(ref_dict[:cvar])
+  - $(ref_dict[:cdar]) Section 3, Definition 3.4, Equation 3.11, and Proposition 3.1.
+  - $(ref_dict[:rockafellar2002]) Proposition 8, Equation 25.
 """
 @propagatable @concrete struct ConditionalDrawdownatRisk <: RiskMeasure
     """
@@ -1001,6 +1021,8 @@ The measure ``\\mathrm{DR\\text{-}CDaR}_{\\alpha, l, r}(\\boldsymbol{w})`` is th
 
   - The rows read the portfolio drawdown, so ``-d_{t}(\\boldsymbol{w})`` takes the place of ``\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi}_{t}``.
   - The transport cost reads the asset drawdowns, so ``\\mathbf{D}_{t}`` takes the place of ``\\boldsymbol{\\xi}_{t}``, so the support constraint is ``\\mathbf{D} \\geq -\\boldsymbol{1}``.
+
+The radius ``r`` is in the units of the uncompounded drawdowns, which are cumulative returns. The ball moves the asset drawdowns ``\\mathbf{D}_{t}`` by a mean 1-norm distance of at most ``r``, and the 1-norm adds the moves of the ``N`` assets. A drawdown adds many returns, so it is often larger than one return, and a radius that suits the returns can be small for the drawdowns.
 
 Where:
 
@@ -1080,9 +1102,8 @@ DistributionallyRobustConditionalDrawdownatRisk
 
 # References
 
-  - $(ref_dict[:cdar])
-  - $(ref_dict[:cvar])
-  - $(ref_dict[:drcvar]) Section 7.1, Equation 27.
+  - $(ref_dict[:cdar]) Section 3, Definition 3.4, Equation 3.11.
+  - $(ref_dict[:drcvar]) Section 7.1, Equation 27, and Corollary 5.1.
 """
 @propagatable @concrete struct DistributionallyRobustConditionalDrawdownatRisk <:
                                RiskMeasure
@@ -1136,16 +1157,17 @@ Resolve the significance level `alpha`, the tail weight `l` and the ambiguity ra
 
 The steps are those of the method for [`DistributionallyRobustConditionalValueatRisk`](@ref), except for the series. This measure prices drawdowns, so [`calibration_series`](@ref) gives [`AbsoluteDrawdownSeries`](@ref), and the marker reaches both the `l` slot and the `r` slot. [`TailTermParity`](@ref) then prices the mean drawdown of each column against the ``\\mathrm{CDaR}_{\\alpha}`` of that column, and a radius rule reads its scale off the drawdown sample. The keys `:l` and `:r` are the same on the two measures, so the marker is the only thing that tells a rule which quantity it prices.
 
-A drawdown series holds one entry per observation, so a rule reads the same sample size here as on the returns.
+A drawdown series holds one entry per row of `pr.X`, so both contexts carry the count `n` that [`scenario_sample_size`](@ref) gives, as on the returns.
 
 # Algorithm
 
  1. Compute the effective observation weights `ws`, the measure's own `w` or else the weights of `pr`.
  2. Read `s`, the series marker, which is [`AbsoluteDrawdownSeries`](@ref).
- 3. Resolve `alpha` with [`resolve_calibration_slot`](@ref).
- 4. Resolve `l`, with a context that carries the resolved `alpha` and `s`.
- 5. Resolve `r`, with a context that carries `s` alone.
- 6. Rebuild the measure with [`rebuild_with_slots`](@ref), which returns `x` itself when all three slots already held numbers.
+ 3. Compute `n`, the count of the rows that the programme prices, with [`scenario_sample_size`](@ref).
+ 4. Resolve `alpha` with [`resolve_calibration_slot`](@ref).
+ 5. Resolve `l`, with a context that carries the resolved `alpha`, `s` and `n`.
+ 6. Resolve `r`, with a context that carries `s` and `n`.
+ 7. Rebuild the measure with [`rebuild_with_slots`](@ref), which returns `x` itself when all three slots already held numbers.
 
 # Related
 
@@ -1162,10 +1184,12 @@ function resolve_deferred_quantities(x::DistributionallyRobustConditionalDrawdow
                                      pr::AbstractPriorResult, slv = nothing)
     ws = sel(x.w, pr.w)
     s = calibration_series(x)
+    n = scenario_sample_size(pr, ws)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
     l = resolve_calibration_slot(x.l, :l, pr, ws, slv,
-                                 CalibrationContext(; alpha = alpha, series = s))
-    r = resolve_calibration_slot(x.r, :r, pr, ws, slv, CalibrationContext(; series = s))
+                                 CalibrationContext(; alpha = alpha, series = s, n = n))
+    r = resolve_calibration_slot(x.r, :r, pr, ws, slv,
+                                 CalibrationContext(; series = s, n = n))
     return rebuild_with_slots(x, (; alpha = alpha, l = l, r = r))
 end
 # Calibration slots — see `calibration_slots`.
@@ -1190,10 +1214,9 @@ The robust measure cannot evaluate its robust term on a return series, so it sha
   - [`ConditionalDrawdownatRisk`](@ref)
   - [`DistributionallyRobustConditionalDrawdownatRisk`](@ref)
 """
-const RMCDaR{T} = Union{<:ConditionalDrawdownatRisk{<:Any, <:Any, <:T},
-                        <:DistributionallyRobustConditionalDrawdownatRisk{<:Any, <:Any,
-                                                                          <:Any, <:Any,
-                                                                          <:T}}
+const RMCDaR{T} = Union{ConditionalDrawdownatRisk{<:Any, <:Any, <:T},
+                        DistributionallyRobustConditionalDrawdownatRisk{<:Any, <:Any, <:Any,
+                                                                        <:Any, <:T}}
 """
     conditional_drawdown_at_risk(dd::VecNum, alpha::Real, ::Nothing) -> Number
     conditional_drawdown_at_risk(dd::VecNum, alpha::Real, w::VecNum) -> Number
@@ -1331,6 +1354,8 @@ Where:
 
 The running peak starts at ``C_0 = 1``, the initial wealth. The minimum has the sorted closed form that [`conditional_drawdown_at_risk`](@ref) states.
 
+Section 3 of [cdar](@cite) defines the drawdown of the uncompounded cumulative return only. It names the relative drawdown and states that it lacks the properties of the absolute drawdown, but it defines no measure on it. The relative drawdown series above, and the measure of Definition 3.4 of that work on it, are the library's extension.
+
 # Algorithm
 
  1. Compute the relative drawdown series with [`relative_drawdown_vec`](@ref).
@@ -1387,8 +1412,8 @@ RelativeConditionalDrawdownatRisk
 
 # References
 
-  - $(ref_dict[:cdar])
-  - $(ref_dict[:cvar])
+  - $(ref_dict[:cdar]) Section 3, Definition 3.4, Equation 3.11.
+  - $(ref_dict[:rockafellar2002]) Proposition 8, Equation 25.
 """
 @propagatable @concrete struct RelativeConditionalDrawdownatRisk <: HierarchicalRiskMeasure
     """

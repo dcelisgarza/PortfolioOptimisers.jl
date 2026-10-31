@@ -127,7 +127,7 @@ function parity_neutralise_prior(; neutralise = nothing,
                                             "style2" => parity_passthrough("style2")])
     pe = EmpiricalPrior(; me = ExpWeightedExpectedReturns(),
                         ce = RegimeAdjustedExpWeightedCovariance(; centring = PreCentred(),
-                                                                 debias = RawStatistic(),
+                                                                 debias = nothing,
                                                                  regime_lohi_mult = (0.7,
                                                                                      1.6)))
     return CrossSectionalFactorPrior(; lambda = 1, factors = factors,
@@ -462,7 +462,7 @@ const PARITY_CS_WEIGHT_CASES = ["Cap00" => (0.0, 0.0, 20.0, (0.025, 0.975)),
 # default. That default is #1383's to measure, and this file measures the weights.
 function parity_cs_weights(fx, (p, lambda, ratio, wins);
                            ve = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(),
-                                                                  debias = RawStatistic(),
+                                                                  debias = nothing,
                                                                   regime_lohi_mult = (0.7,
                                                                                       1.6)))
     alg = if iszero(lambda)
@@ -691,8 +691,7 @@ end
         cfg = ("Blend05" => (0.5, 0.5, 20.0, (0.025, 0.975)))[2]
         stored = parity_load("BlendedInverseVarianceWeights", "Blend05Tiny", "W1")
         # The floor of the variance is off, so the inverse is infinite, as in the oracle.
-        ve = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(),
-                                               debias = RawStatistic(),
+        ve = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(), debias = nothing,
                                                regime_lohi_mult = (0.7, 1.6), min_val = 0.0)
         wz = parity_cs_weights_fixture(; zero = true)
         IV = PortfolioOptimisers.cross_sectional_lagged_inverse_variance(ve, wz.eps, wz.msk;
@@ -755,8 +754,7 @@ end
 
         # The full weight step against the oracle, which refuses an infinity, on the residuals
         # `1e-100` times the shared series. Our answers at zero and at 1e-100 are both its limit.
-        ve = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(),
-                                               debias = RawStatistic(),
+        ve = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(), debias = nothing,
                                                regime_lohi_mult = (0.7, 1.6), min_val = 0.0)
         cfg = ("Blend05" => (0.5, 0.5, 20.0, (0.025, 0.975)))[2]
         hz = parity_cs_weights_half()
@@ -804,11 +802,10 @@ end
         pe = EmpiricalPrior(; me = ExpWeightedExpectedReturns(),
                             ce = RegimeAdjustedExpWeightedCovariance(;
                                                                      centring = PreCentred(),
-                                                                     debias = RawStatistic(),
+                                                                     debias = nothing,
                                                                      regime_lohi_mult = (0.7,
                                                                                          1.6)))
-        ve = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(),
-                                               debias = RawStatistic(),
+        ve = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(), debias = nothing,
                                                regime_lohi_mult = (0.7, 1.6), min_val = 0.0)
         # Asset 4 is in its warm-up at the latest observation: both sides state its mean and
         # its covariances, and neither states its variance (#1384).

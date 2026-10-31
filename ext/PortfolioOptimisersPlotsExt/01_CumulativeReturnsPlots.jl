@@ -63,8 +63,8 @@ function PortfolioOptimisers.plot_portfolio_cumulative_returns(res::Optimisation
                                                                  compound = compound,
                                                                  kwargs...)
 end
-function PortfolioOptimisers.plot_portfolio_cumulative_returns(pred::Union{<:PredictionResult,
-                                                                           <:MultiPeriodPredictionResult};
+function PortfolioOptimisers.plot_portfolio_cumulative_returns(pred::Union{PredictionResult,
+                                                                           MultiPeriodPredictionResult};
                                                                compound::Bool = false,
                                                                kwargs...)
     rd = isa(pred, PredictionResult) ? pred.rd : pred.mrd

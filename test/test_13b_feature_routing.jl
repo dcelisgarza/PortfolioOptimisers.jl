@@ -41,11 +41,13 @@ const PO = PortfolioOptimisers
     pr_fac = prior(FactorPrior(), rd)
     Zp = PO.panel_field(PO.asset_panel(ape, pr_fac, rd, rd.X), "loadings").vals
     pr_noz = prior(EmpiricalPrior(), rd)
-    # A carrier the ingestion layer did not build states no universe, and `pnl === nothing`
-    # is the one meaning ADR 0132 gives that. `rd0` runs through the layer, so it carries a
-    # panel — one with no Panel Field, which is the layer's common case — and the no-panel
-    # fixture is therefore built without the layer rather than taken from it.
+    # A carrier that states no universe beyond the finiteness of its returns holds no panel.
+    # `rd0` runs through the layer, and its prices hold no gap, so the layer emits none
+    # (ADR 0132, amended by #1882). The fixture with a mask-only panel is built by hand.
     rd_noz = ReturnsResult(; nx = rd0.nx, X = rd0.X, nf = rd0.nf, F = rd0.F, ts = rd0.ts)
+    rd_msk = ReturnsResult(; nx = rd0.nx, X = rd0.X, nf = rd0.nf, F = rd0.F, ts = rd0.ts,
+                           pnl = AssetPanel(; amsk = trues(size(rd0.X)),
+                                            emsk = trues(size(rd0.X))))
     fde = FeatureDistance()
     pde = FeatureDistance(; ape = ape)
     cde = Distance(; alg = CanonicalDistance())
@@ -98,6 +100,30 @@ const PO = PortfolioOptimisers
         for nte in (nte_t, nte_s)
             clr = clusterise(NetworkClustersEstimator(; nte = nte), rd)
             @test clr.D == distance(fde, Zd)
+            # A fit finds the `FeatureDistance` of the network that the clustering holds (#1912).
+            # Asset 1 holds a placeholder at every label, so no feature of it is readable,
+            # and the fit drops it as a non-investable asset: it gets no weight, and the
+            # others get the weights of the fit on the returns data without it.
+            o = trues(na, size(Zd, 2))
+            o[1, :] .= false
+            rd_hole = ReturnsResult(; nx = rd0.nx, X = rd0.X, nf = rd0.nf, F = rd0.F,
+                                    ts = rd0.ts,
+                                    pnl = AssetPanel(;
+                                                     pf = [TensorPanelField(; name = "z",
+                                                                            axis = "factor",
+                                                                            labels = nzd,
+                                                                            vals = Zd,
+                                                                            omsk = o,
+                                                                            pmsk = .!o)]))
+            hrp = HierarchicalRiskParity(;
+                                         opt = HierarchicalOptimiser(;
+                                                                     cle = NetworkClustersEstimator(;
+                                                                                                    nte = nte)))
+            res_hole = optimise(hrp, rd_hole)
+            res_view = optimise(hrp, PO.port_opt_view(rd_hole, 2:na))
+            @test iszero(res_hole.w[1])
+            @test isapprox(sum(res_hole.w), 1)
+            @test res_hole.w[2:end] ≈ res_view.w
         end
         # `logo!`'s `distance(je.de, S, X)`: the second positional is a *similarity
         # matrix*, which is why the three-argument method must not bound it. `logo!` is
@@ -149,40 +175,40 @@ const PO = PortfolioOptimisers
             @test occursin("asset_panel", e.msg)
         end
 
-        # 2b. A carrier the layer *did* build holds a panel with no Panel Field, which is
-        # the layer's common case: a caller holding only prices has no market
-        # capitalisation and no sector. Such a panel states a universe and carries no
-        # feature data, and the refusal names that cause — the panel, the Feature Matrix
-        # and `asset_panel` — rather than the emptiness of the matrix it would otherwise
-        # have derived. Issue #1003.
+        # 2b. A carrier of gapped prices holds a panel with no Panel Field, which is the
+        # layer's common case: a caller holding only prices has no market capitalisation
+        # and no sector. Such a panel states a universe and carries no feature data, and
+        # the refusal names that cause — the panel, the Feature Matrix and `asset_panel` —
+        # rather than the emptiness of the matrix it would otherwise have derived. Issue
+        # #1003. Its Panel Fields are `nothing`, never an empty vector (#1882).
+        @test isnothing(rd0.pnl)
+        @test isnothing(rd_msk.pnl.pf)
         e = try
-            clusterise(cle, rd0)
+            clusterise(cle, rd_msk)
         catch err
             err
         end
-        @test isa(e, PortfolioOptimisers.IsEmptyError)
-        @test isa(rd0.pnl, AssetPanel)
-        @test isempty(rd0.pnl.pf)
+        @test isa(e, PortfolioOptimisers.IsNothingError)
         @test occursin("Panel Field", e.msg)
         @test occursin("Feature Matrix", e.msg)
         @test occursin("asset_panel", e.msg)
         # The refusal is the resolution's, not the kernel's, so the labels a caller
         # rebuilds refuse with the same message.
         el = try
-            feature_labels(rd0.pnl)
+            feature_labels(rd_msk.pnl)
         catch err
             err
         end
-        @test isa(el, PortfolioOptimisers.IsEmptyError)
+        @test isa(el, PortfolioOptimisers.IsNothingError)
         @test el.msg == e.msg
         # And it outranks the selector's own emptiness diagnostic: a `sel` naming a Panel
         # Field a fieldless panel cannot hold is refused for the panel, not for the entry.
         es = try
-            feature_matrix(rd0.pnl, [nzd[1]])
+            feature_matrix(rd_msk.pnl, [nzd[1]])
         catch err
             err
         end
-        @test isa(es, PortfolioOptimisers.IsEmptyError)
+        @test isa(es, PortfolioOptimisers.IsNothingError)
         @test es.msg == e.msg
 
         # 3. A prior result alone carries no panel at all, and the message says so.
@@ -462,9 +488,9 @@ const PO = PortfolioOptimisers
             @test PortfolioOptimisers.stacked_axes((Tt, Nt), Colon()) == (Tt, Nt)
             @test PortfolioOptimisers.stacked_axes((Nt,), Colon()) == (Nt,)
             @test PortfolioOptimisers.stacked_axes((Tt, Nt), 2:3) == (2, Nt)
-            # Only LastObservation names its rows, and only on a time-varying panel.
-            @test PortfolioOptimisers.collapse_rows(LastObservation(), tpnl) == Tt:Tt
-            @test PortfolioOptimisers.collapse_rows(LastObservation(), gpnl) === Colon()
+            # Only the LastObservation family names its rows, and only on a time-varying panel.
+            @test PortfolioOptimisers.collapse_rows(LastRow(), tpnl) == Tt:Tt
+            @test PortfolioOptimisers.collapse_rows(LastRow(), gpnl) === Colon()
             for alg in (AggregateFeatures(), AggregateDistances(), StackObservations())
                 @test PortfolioOptimisers.collapse_rows(alg, tpnl) === Colon()
             end
@@ -484,8 +510,9 @@ const PO = PortfolioOptimisers
                 catch e
                     sprint(showerror, e)
                 end
-            for alg in (LastObservation(), LastObservation(; alg = LastActiveRow()),
-                        AggregateFeatures(), AggregateDistances(), StackObservations())
+            for alg in
+                (LastRow(), LastActiveRow(), AggregateFeatures(), AggregateDistances(),
+                 StackObservations())
                 de_r = FeatureDistance(; sel = sel, alg = alg)
                 Zr = feature_matrix(de_r, nothing, trd, trd.X)
                 rr = PortfolioOptimisers.readable_window_rows(alg, tpnl, R)
@@ -684,6 +711,11 @@ const PO = PortfolioOptimisers
                                                                 strict = true)
                 @test occursin("carries no groups", err.value.msg)
             end
+            # Under `strict = false` the entry of a field with no groups warns and drops.
+            @test (@test_logs (:warn,) feature_labels(tpnl,
+                                                      ["mcap" => LabelGroup("momentum"),
+                                                       "expo" => LabelGroup("momentum")])) ==
+                  ["expo" => "mom12", "expo" => "mom6"]
         end
     end
 end

@@ -50,6 +50,49 @@ function assert_risk_ceiling(rs::VecRM)::Nothing
     return nothing
 end
 """
+    assert_return_floor(ret::Nothing)
+    assert_return_floor(ret::JuMPReturnsEstimator)
+    assert_return_floor(rets::VecJRE)
+
+Refuses a return term whose floor a [`ProgrammeAllocationSet`](@ref) cannot hold.
+
+The floor of a term is its `settings.lb`. A [`Frontier`](@ref) or a vector of floors asks for one allocation at each floor, and a one-step projection returns one allocation. The model would hold the floors in `:ret_frontier`, and no solve would read them. So the function refuses both forms, as [`assert_risk_ceiling`](@ref) refuses them for a ceiling. A floor that is `nothing` or a number passes.
+
+# Arguments
+
+  - `ret`: The return floor of the set, `nothing`, or a vector of return terms.
+
+# Validation
+
+  - `settings.lb` of a term is `nothing` or a number. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ProgrammeAllocationSet`](@ref)
+  - [`assert_risk_ceiling`](@ref)
+  - [`set_return_bounds!`](@ref)
+  - [`assert_frontier_sweep_owner`](@ref): the same refusal for an optimiser that solves its model once.
+"""
+function assert_return_floor(::Nothing)::Nothing
+    return nothing
+end
+function assert_return_floor(ret::JuMPReturnsEstimator)::Nothing
+    lb = ret.settings.lb
+    @argcheck(!isa(lb, Front_NumVec),
+              ArgumentError("the floor of a `$(nameof(typeof(ret)))` on a ProgrammeAllocationSet is its `settings.lb`, `nothing` or a number; got `$lb`. A frontier or a vector of floors asks for many allocations, and a one-step projection returns one."))
+    return nothing
+end
+function assert_return_floor(rets::VecJRE)::Nothing
+    for ret in rets
+        assert_return_floor(ret)
+    end
+    return nothing
+end
+"""
     risk_reads_rows(r::Nothing)
     risk_reads_rows(r::Variance)
     risk_reads_rows(r::StandardDeviation)

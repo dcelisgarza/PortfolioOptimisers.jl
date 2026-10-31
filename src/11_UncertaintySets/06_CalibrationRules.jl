@@ -3,11 +3,11 @@ $(DocStringExtensions.TYPEDEF)
 
 Computes a significance level, the tail probability that an `alpha` or a `beta` slot holds.
 
-All concrete subtypes should subtype `AbstractSignificanceCalibrationAlgorithm`, and should be **callable**, because [`resolve_calibration_slot`](@ref) runs a rule by calling it. A plain `Function` of the same five arguments is therefore a rule as well, and needs no type at all. [`Num_SigCal`](@ref) is the bound of every significance slot, and it names this family. So a deformation rule in a significance slot is refused at construction, and the same rule serves the lower tail and the upper tail, because the slot names the end.
+A rule of this family is a callable subtype of `AbstractSignificanceCalibrationAlgorithm`. [`resolve_calibration_slot`](@ref) runs a rule when it calls it, so a plain `Function` of the same five arguments is also a rule. [`Num_SigCal`](@ref) is the bound of every significance slot, and it names this family. So a constructor refuses a deformation rule in a significance slot. The slot names the end of the distribution, so one rule serves the lower tail and the upper tail.
 
 # Interfaces
 
-In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractSignificanceCalibrationAlgorithm` and implement the following method:
+To add a significance rule, subtype `AbstractSignificanceCalibrationAlgorithm`, keep the parameters of the rule in the fields of the struct, and add the method below.
 
 ## The functor
 
@@ -15,11 +15,11 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ### Arguments
 
-  - `key`: Name of the slot that is being resolved.
-  - `pr`: Prior result the rule reads its sample size and moments off.
-  - `w`: Effective observation weights, or `nothing` when neither the measure nor the prior names any.
-  - `slv`: Effective solver, or `nothing` when the measure carries none.
-  - `ctx`: What the site knows and `key` does not, as a [`CalibrationContext`](@ref). A rule reads the fields it needs off it, and one that reads none writes `::CalibrationContext`.
+  - `key`: Name of the slot that the call resolves.
+  - `pr`: Prior result from which the rule reads its sample size and its moments.
+  - `w`: Effective observation weights, or `nothing` when neither the measure nor the prior gives any.
+  - `slv`: Effective solver, or `nothing` when the measure has none.
+  - `ctx`: The facts that the site knows and `key` does not give, as a [`CalibrationContext`](@ref). A rule reads the fields that it needs. A rule that reads no field writes `::CalibrationContext`.
 
 ### Returns
 
@@ -30,8 +30,8 @@ In order to implement a new concrete type that works seamlessly with the library
   - [`AbstractCalibrationAlgorithm`](@ref)
   - [`Num_SigCal`](@ref)
   - [`resolve_calibration_slot`](@ref)
-  - [`ScenarioCount`](@ref): the family's rule that keeps a stated count of tail scenarios.
-  - [`RateSignificance`](@ref): the family's rule that shrinks the level at a square-root rate.
+  - [`ScenarioCount`](@ref): the rule of the family that keeps a stated count of tail scenarios.
+  - [`RateSignificance`](@ref): the rule of the family that decreases the level at a square-root rate.
 """
 abstract type AbstractSignificanceCalibrationAlgorithm <: AbstractCalibrationAlgorithm end
 """
@@ -39,11 +39,11 @@ $(DocStringExtensions.TYPEDEF)
 
 Computes a deformation parameter, the Kaniadakis ``\\kappa`` that a `kappa` slot holds.
 
-All concrete subtypes should subtype `AbstractDeformationCalibrationAlgorithm`, and should be **callable**, on the same terms as the significance family. [`Num_DefCal`](@ref) is the bound of every deformation slot, and it names this family.
+A rule of this family is a callable subtype of `AbstractDeformationCalibrationAlgorithm`, as a rule of the significance family is. [`Num_DefCal`](@ref) is the bound of every deformation slot, and it names this family.
 
 # Interfaces
 
-In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractDeformationCalibrationAlgorithm` and implement the following method:
+To add a deformation rule, subtype `AbstractDeformationCalibrationAlgorithm`, keep the parameters of the rule in the fields of the struct, and add the method below.
 
 ## The functor
 
@@ -51,11 +51,11 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ### Arguments
 
-  - `key`: Name of the slot that is being resolved.
-  - `pr`: Prior result the rule reads its sample size and moments off.
-  - `w`: Effective observation weights, or `nothing` when neither the measure nor the prior names any.
-  - `slv`: Effective solver, or `nothing` when the measure carries none.
-  - `ctx`: What the site knows and `key` does not, as a [`CalibrationContext`](@ref). A rule reads the fields it needs off it, and one that reads none writes `::CalibrationContext`.
+  - `key`: Name of the slot that the call resolves.
+  - `pr`: Prior result from which the rule reads its sample size and its moments.
+  - `w`: Effective observation weights, or `nothing` when neither the measure nor the prior gives any.
+  - `slv`: Effective solver, or `nothing` when the measure has none.
+  - `ctx`: The facts that the site knows and `key` does not give, as a [`CalibrationContext`](@ref). A rule reads the fields that it needs. A rule that reads no field writes `::CalibrationContext`.
 
 ### Returns
 
@@ -63,7 +63,7 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ## The series
 
-A deformation slot sits on a measure of the return distribution and on a drawdown measure alike, and both resolve the key `:kappa`, so `key` does not say which quantity the owner prices. A rule whose answer moves with that quantity reads `ctx.series`, which each slot owner states in the [`CalibrationContext`](@ref) it hands over. A rule whose answer does not move with it reads no field of the context, and [`EntropyBudget`](@ref) is that case.
+A measure of the return distribution and a drawdown measure both have a deformation slot, and both resolve it under the key `:kappa`. So `key` does not tell which quantity the owner prices. A rule whose answer depends on that quantity reads `ctx.series`, which each slot owner sets in the [`CalibrationContext`](@ref) that it builds. A rule whose answer does not depend on it reads no field of the context. [`EntropyBudget`](@ref) is such a rule.
 
 # Related
 
@@ -72,20 +72,20 @@ A deformation slot sits on a measure of the return distribution and on a drawdow
   - [`CalibrationContext`](@ref)
   - [`Num_DefCal`](@ref)
   - [`kappa_log`](@ref)
-  - [`EntropyBudget`](@ref): the family's rule that spends a stated entropy budget.
-  - [`HillTailDecay`](@ref): the family's rule that reads the tail index of the series itself.
-  - [`RadialTailDecay`](@ref): the family's rule that reads the tail index of the radial series.
+  - [`EntropyBudget`](@ref): the rule of the family that spends a stated entropy budget.
+  - [`HillTailDecay`](@ref): the rule of the family that reads the tail index of the series.
+  - [`RadialTailDecay`](@ref): the rule of the family that reads the tail index of the radial series.
 """
 abstract type AbstractDeformationCalibrationAlgorithm <: AbstractCalibrationAlgorithm end
 """
-    const Num_SigCal = Union{<:AbstractSignificanceCalibrationAlgorithm, <:Function,
-                             <:Number}
+    const Num_SigCal = Union{AbstractSignificanceCalibrationAlgorithm, Function,
+                             Number}
 
-Field bound for a significance slot: the tail probability itself, a rule of the family, or a plain function of the same five arguments.
+Field bound for a significance slot: the tail probability, a rule of the family, or a plain function of the same five arguments.
 
-The slot names the end of the distribution it addresses, so the occupant does not. `alpha` names the lower tail and `beta` names the upper tail, and one rule serves both ends. One bound therefore serves every significance slot, and a Range measure defaults its head slot to whatever its tail slot holds.
+The slot names the end of the distribution, so the occupant does not have to. `alpha` names the lower tail and `beta` names the upper tail, and one rule serves both ends. So one bound serves every significance slot, and a Range measure sets its head slot to the occupant of its tail slot by default.
 
-A rule is run by calling it, so a function and a callable struct are the same thing to [`resolve_calibration_slot`](@ref). The struct earns its keep by carrying parameters and a name that a docstring can describe. The function is the shortest way to state a one-off rule, and a closure over a caller's own data is the case that has no type. A function carries no family, so this bound cannot refuse a deformation rule written as a closure. The name of the slot is what states the quantity there.
+[`resolve_calibration_slot`](@ref) calls a rule, so a function and a callable struct are the same to it. A struct holds parameters and has a name that a docstring can describe. A function is the shortest way to state a rule for one use, and a closure over the data of a caller has no type. A function has no family, so this bound cannot refuse a deformation rule that is a closure. Only the name of the slot states the quantity there.
 
 # Related
 
@@ -93,12 +93,12 @@ A rule is run by calling it, so a function and a callable struct are the same th
   - [`Num_DefCal`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-const Num_SigCal = Union{<:AbstractSignificanceCalibrationAlgorithm, <:Function, <:Number}
+const Num_SigCal = Union{AbstractSignificanceCalibrationAlgorithm, Function, Number}
 """
-    const Num_DefCal = Union{<:AbstractDeformationCalibrationAlgorithm, <:Function,
-                             <:Number}
+    const Num_DefCal = Union{AbstractDeformationCalibrationAlgorithm, Function,
+                             Number}
 
-Field bound for a deformation slot: the deformation parameter itself, a rule of the family, or a plain function of the same five arguments. It is the counterpart of [`Num_SigCal`](@ref), and carries its reading unchanged.
+Field bound for a deformation slot: the deformation parameter, a rule of the family, or a plain function of the same five arguments. It is the counterpart of [`Num_SigCal`](@ref) for the deformation family, and the description of that bound applies to it.
 
 # Related
 
@@ -106,21 +106,25 @@ Field bound for a deformation slot: the deformation parameter itself, a rule of 
   - [`Num_SigCal`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-const Num_DefCal = Union{<:AbstractDeformationCalibrationAlgorithm, <:Function, <:Number}
+const Num_DefCal = Union{AbstractDeformationCalibrationAlgorithm, Function, Number}
 """
     is_calibration_rule(x) -> Bool
 
-Answer whether the occupant `x` of a calibration slot is a **Calibration Rule**.
+Returns `true` when the occupant `x` of a calibration slot is a **Calibration Rule**.
 
-A rule is run by calling it, so the two things a slot may hold and call are an [`AbstractCalibrationAlgorithm`](@ref) and a plain function of the same five arguments. Both answer `true`, and everything else answers `false`: a stated number, `nothing`, and a child measure a container declares.
+A slot can hold and call two kinds of rule: an [`AbstractCalibrationAlgorithm`](@ref), and a plain function of the same five arguments. Both return `true`. All other occupants return `false`: a stated number, `nothing`, and a child measure that a container declares.
 
-**A callable is not a rule by being callable.** [`calibration_slots`](@ref) also declares the *children* of a container, and one such child is an ordered-weights builder wrapped in a reversal, which is a `Function` and computes no quantity. So the marker is this trait rather than the `Function` type, and a type that is callable for a reason of its own withdraws itself with one method here. [`OWA_CalOccupant`](@ref) is the one that does.
+A callable is not always a rule. [`calibration_slots`](@ref) also declares the children of a container. One such child is an ordered-weights builder in a reversal, which is a `Function` and computes no quantity. So this trait marks a rule, and the `Function` type does not. A type that is callable for a different purpose adds one method here that returns `false`. [`OWA_CalOccupant`](@ref) names the type that does this.
 
-The three readers are [`resolve_calibration_slot`](@ref), which calls a rule and returns anything else unchanged, [`assert_calibrated_slots`](@ref), which refuses a rule that reached a value-level entry point, and [`assert_declared_calibration_resolver`](@ref), which refuses a rule the library itself left unresolved.
+Three functions read the trait:
+
+  - [`resolve_calibration_slot`](@ref) calls a rule and returns every other occupant unchanged.
+  - [`assert_calibrated_slots`](@ref) refuses a rule that reached a value-level entry point.
+  - [`assert_declared_calibration_resolver`](@ref) refuses a rule that the library did not resolve.
 
 # Arguments
 
-  - `x`: The slot's occupant.
+  - `x`: The occupant of the slot.
 
 # Returns
 
@@ -133,19 +137,23 @@ The three readers are [`resolve_calibration_slot`](@ref), which calls a rule and
   - [`resolve_calibration_slot`](@ref)
   - [`assert_calibrated_slots`](@ref)
 """
-is_calibration_rule(::Any) = false
-is_calibration_rule(::AbstractCalibrationAlgorithm) = true
-is_calibration_rule(::Function) = true
+is_calibration_rule(::Any)::Bool = false
+is_calibration_rule(::AbstractCalibrationAlgorithm)::Bool = true
+is_calibration_rule(::Function)::Bool = true
 """
     calibration_slots(x)
 
-Declare the slots of `x` that may hold a **Calibration Rule**, as a `NamedTuple` mapping each slot's name to its current value. The default is empty: a type with no calibration slot needs no method.
+Declares the slots of `x` that can hold a **Calibration Rule**, as a `NamedTuple` from the name of each slot to its current value. The default is empty, so a type with no calibration slot needs no method.
 
-This is the parallel of [`deferred_slots`](@ref). Three consumers read it: [`assert_calibrated_slots`](@ref) refuses a rule that reached a value-level entry point, [`assert_declared_calibration_resolver`](@ref) refuses a rule the library itself left unresolved, and [`resolve_calibration_slots`](@ref) resolves the slots.
+It is the counterpart of [`deferred_slots`](@ref). Three functions read it:
 
-For most types the declaration is the whole statement, and the resolution is derived from it. A type whose slots carry an **order** between them writes its own [`resolve_deferred_quantities`](@ref) method instead, and a [`CalibrationContext`](@ref) built from a sibling's resolved number is what such an order looks like: the slot reads that number off the context, and no derivation can know which sibling. A slot that names a quantity under a key of its own also writes its own resolution, which is what the three regularisation keys do.
+  - [`assert_calibrated_slots`](@ref) refuses a rule that reached a value-level entry point.
+  - [`assert_declared_calibration_resolver`](@ref) refuses a rule that the library did not resolve.
+  - [`resolve_calibration_slots`](@ref) resolves the slots.
 
-A slot that holds a child measure is declared here too, so a container names its children and each child names its own slots. Such a slot is declared in [`deferred_slots`](@ref) as well, and the deferred recursion is what resolves the child. So a container's declaration is read by the two `assert_` walks alone, and it names a child **only where that child can carry a slot**: an occupant that carries none is not named here, because a plain function standing in a calibration slot is a rule. [`OWA_CalOccupant`](@ref) is the one bound in the library that states which occupants of a weight slot qualify.
+For most types, the library derives the resolution from this declaration. A type whose slots must resolve in an **order** writes its own [`resolve_deferred_quantities`](@ref) method instead. In such an order, one slot reads the resolved number of a sibling slot from a [`CalibrationContext`](@ref). A derivation cannot know which sibling to read. A slot that names its quantity under a key of its own also writes its own resolution. The three regularisation keys do this.
+
+A slot that holds a child measure is declared here too. So a container names its children, and each child names its own slots. Such a slot is also declared in [`deferred_slots`](@ref), and the deferred recursion resolves the child. So only the two `assert_` walks read the declaration of a container. It names a child **only when that child can hold a slot**. A plain function in a calibration slot is a rule, so an occupant that has no slot is not named here. [`OWA_CalOccupant`](@ref) is the one bound in the library that states which occupants of a weight slot are children.
 
 # Related
 
@@ -160,24 +168,24 @@ calibration_slots(::Any) = (;)
 """
     assert_calibrated_slots(x)
 
-Refuse a **Calibration Rule** that reached a value-level entry point, which has no prior result to resolve it against.
+Refuses a **Calibration Rule** that reached a value-level entry point, which has no prior result to resolve it against.
 
-[`expected_risk`](@ref) takes either a prior result or a plain returns matrix. Given the prior it resolves the measure through [`factory`](@ref) first. Given the matrix it cannot: a rule reads the sample size and the moments the prior carries, and it reads the effective observation weights, none of which a bare returns matrix supplies. So it refuses instead, and names the slot, the rule standing in it and the way out.
+[`expected_risk`](@ref) takes a prior result or a plain returns matrix. With a prior result, it first resolves the measure through [`factory`](@ref). With a matrix, it cannot. A rule reads the sample size, the moments and the effective observation weights of the prior, and a returns matrix gives none of them. So the function refuses the rule, and the message names the slot, the rule in it and the remedy.
 
-This is the shape [`assert_resolved_slots`](@ref) already uses on the Deferred-Quantity side, and the message names both types with `nameof` for the same reason: a printed type carries a module prefix wherever the name is not visible from `Main`, and the message must read the same in every process. A rule written as a plain function carries no name of its own, so the message names the slot alone there.
+[`assert_resolved_slots`](@ref) does the same check for a Deferred Quantity. Both messages name a type with `nameof`, because a printed type has a module prefix when its name is not visible from `Main`, and the message must be the same in every process. A rule that is a plain function has no name of its own, so the message then names the slot alone.
 
-The slots come from [`calibration_slots`](@ref) and the check recurses into whatever they hold, so a container is covered by its children's declarations.
+The slots come from [`calibration_slots`](@ref), and the check recurses into each occupant. So the declarations of its children cover a container.
 
 # Algorithm
 
- 1. Walk the pairs that [`calibration_slots`](@ref) declares for `x`, giving each slot's name `key` and its occupant `slot`.
- 2. Refuse an occupant that [`is_calibration_rule`](@ref) answers `true` for.
- 3. Recurse into the occupant, so a child measure's own slots are checked as well. A slot that holds a vector of children is walked element by element.
- 4. Return `nothing` once the walk is spent.
+ 1. Walk the pairs that [`calibration_slots`](@ref) declares for `x`. Each pair gives the name `key` of a slot and its occupant `slot`.
+ 2. Refuse an occupant for which [`is_calibration_rule`](@ref) returns `true`.
+ 3. Recurse into the occupant, so the check also reads the slots of a child measure. Walk a slot that holds a vector of children element by element.
+ 4. Return `nothing` at the end of the walk.
 
 # Validation
 
-  - Throws an `ArgumentError` when a slot of `x`, or of any child the walk reaches, holds a **Calibration Rule**. The message names the slot, the rule standing in it and the two ways out.
+  - Throws an `ArgumentError` when a slot of `x`, or of a child that the walk reaches, holds a **Calibration Rule**. The message names the slot, the rule in it and the two remedies.
 
 # Returns
 
@@ -199,8 +207,8 @@ function assert_calibrated_slots(x)
     end
     return nothing
 end
-function assert_calibrated_slots(xs::AbstractArray{<:Union{<:AbstractEstimator,
-                                                           <:AbstractAlgorithm}})
+function assert_calibrated_slots(xs::AbstractArray{<:Union{AbstractEstimator,
+                                                           AbstractAlgorithm}})
     for x in xs
         assert_calibrated_slots(x)
     end
@@ -210,32 +218,32 @@ end
     assert_declared_calibration_resolver(x, slots::NamedTuple)
     assert_declared_calibration_resolver(x)
 
-Refuse a type that declares a calibration slot and no way to resolve it.
+Refuses a type that declares a calibration slot and does not resolve it.
 
-`slots` is what the resolution produced. A **Calibration Rule** that survives it names a type that declared the slot in [`calibration_slots`](@ref) and then wrote no resolution for it, so the rule would reach the model builders and be multiplied as though it were a number. This is where the declaration and the resolver are paired.
+`slots` is the output of the resolution. If a **Calibration Rule** remains in it, the type declared the slot in [`calibration_slots`](@ref) and wrote no resolution for it. With no check, the rule goes to the model builders, and they multiply it as a number. This function checks that each declaration has a resolution.
 
-The two channels check alike. [`assert_declared_slot_resolver`](@ref) is the Deferred-Quantity half, and the two-argument method here carries its shape: the resolver holds the slots it produced and hands them over. The one-argument method reads them off `x` instead. A caller that holds a resolved value, and not the slots that made it, calls this method.
+[`assert_declared_slot_resolver`](@ref) does the same check for a Deferred Quantity, and the two-argument method here has its form: the resolver gives the slots that it made. The one-argument method reads the slots from `x`. A caller that holds a resolved value, and not the slots that made it, calls this method.
 
-The walk is the one [`assert_calibrated_slots`](@ref) makes, and the message is the other half of the pair. That one names a caller who reached a value-level entry point, and this one names a slot the library itself left unresolved. So one message never has to serve two failures.
+The walk is the walk of [`assert_calibrated_slots`](@ref), and the two messages are different. That message names a caller who reached a value-level entry point. This message names a slot that the library did not resolve. So each message serves one failure.
 
-The calibration channel derives no recursion of its own, which is why the pairing is a check and not a derivation: a rule that reads a sibling slot must be resolved after that sibling, and no derivation can know the order. So each type writes its resolution beside its declaration, and this refuses the pair that does not meet.
+The library derives no recursion for the calibration slots, so the pairing is a check and not a derivation. A rule that reads a sibling slot must resolve after that sibling, and a derivation cannot know the order. So each type writes its resolution next to its declaration, and this function refuses a declaration that has no resolution.
 
 # Algorithm
 
- 1. Walk the pairs of `slots`, giving each slot's name `key` and its occupant `slot`.
- 2. Refuse an occupant that [`is_calibration_rule`](@ref) answers `true` for.
- 3. Return `nothing` once the walk is spent.
+ 1. Walk the pairs of `slots`. Each pair gives the name `key` of a slot and its occupant `slot`.
+ 2. Refuse an occupant for which [`is_calibration_rule`](@ref) returns `true`.
+ 3. Return `nothing` at the end of the walk.
 
-The one-argument method reads `slots` from [`calibration_slots`](@ref), then recurses into each occupant, so a child measure's own declarations are paired as well. A slot that holds a vector of children is walked element by element.
+The one-argument method reads `slots` from [`calibration_slots`](@ref), and then recurses into each occupant, so it also checks the declarations of a child measure. It walks a slot that holds a vector of children element by element.
 
 # Arguments
 
   - `x`: The slot owner, whose type the message names.
-  - `slots`: The slots the resolution produced, or the declaration itself for the one-argument method.
+  - `slots`: The slots that the resolution made, or the declaration for the one-argument method.
 
 # Validation
 
-  - Throws an `ArgumentError` when an entry of `slots`, or of any child the walk reaches, still holds a **Calibration Rule**. The message names the type, the slot and the resolution to write beside the declaration.
+  - Throws an `ArgumentError` when an entry of `slots`, or of a child that the walk reaches, still holds a **Calibration Rule**. The message names the type, the slot and the resolution to write next to the declaration.
 
 # Returns
 
@@ -263,8 +271,8 @@ function assert_declared_calibration_resolver(x)
     end
     return nothing
 end
-function assert_declared_calibration_resolver(xs::AbstractArray{<:Union{<:AbstractEstimator,
-                                                                        <:AbstractAlgorithm}})
+function assert_declared_calibration_resolver(xs::AbstractArray{<:Union{AbstractEstimator,
+                                                                        AbstractAlgorithm}})
     for x in xs
         assert_declared_calibration_resolver(x)
     end
@@ -273,11 +281,16 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Names the series a calibration rule reads, so that a rule reads the quantity its slot owner prices.
+Names the series that a calibration rule reads, so that the rule reads the quantity that its slot owner prices.
 
-A rule gets no portfolio, which [`resolve_calibration_slot`](@ref) states, so it cannot form the loss series of a portfolio that does not exist until the solver returns. What it can form is the series of each **column** of `pr.X`. This family names which one: the column itself, or the drawdown series that column carries. [`calibration_series`](@ref) is the trait a slot owner answers, and the [`CalibrationContext`](@ref) carries the answer into the rule.
+A rule gets no portfolio, as [`resolve_calibration_slot`](@ref) states. So it cannot make the loss series of a portfolio, which exists only after the solver returns. A rule can make the series of each **column** of `pr.X`. This family names that series: the column, or the drawdown series of the column. A slot owner gives the series through the trait [`calibration_series`](@ref), and the [`CalibrationContext`](@ref) takes it to the rule.
 
-The marker states the **quantity** and not the estimator, so each rule reads it on its own terms. [`HillTailDecay`](@ref) forms the series and estimates its tail index. [`RadialTailDecay`](@ref) cannot form it, because a Mahalanobis distance carries no path, so it whitens the drawdown sample instead. The three radius rules read the per-asset dispersion of the series, which [`calibration_series_dispersion`](@ref) takes, and [`TailTermParity`](@ref) reads both terms of its ratio over it.
+The marker names a **quantity** and not an estimator, so each rule reads it in its own way:
+
+  - [`HillTailDecay`](@ref) makes the series of each column and estimates its tail index.
+  - [`RadialTailDecay`](@ref) cannot make a radial series of a path, because a Mahalanobis distance has no path. It whitens the rows of the drawdown sample instead.
+  - The three radius rules read the per-asset dispersion of the series, which [`calibration_series_dispersion`](@ref) gives.
+  - [`TailTermParity`](@ref) reads both terms of its ratio over the series.
 
 # Related
 
@@ -291,13 +304,13 @@ abstract type AbstractCalibrationSeries <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Names a drawdown series, the quantity a drawdown measure prices.
+Names a drawdown series, the quantity that a drawdown measure prices.
 
-A drawdown is a path functional of one series, so it is formed per column and never per row. The two members differ in how the path compounds, and they are the two series [`absolute_drawdown_vec`](@ref) and [`relative_drawdown_vec`](@ref) build.
+A drawdown is a function of the path of one series, so a rule makes it per column and never per row. The two members use different compounding of the path. They are the series that [`absolute_drawdown_vec`](@ref) and [`relative_drawdown_vec`](@ref) make.
 
-A drawdown series is non-positive, so it carries **one end**. A rule that answers per end therefore refuses a head key under this family, and the refusal is a statement about the quantity rather than about the sample.
+A drawdown series is not positive, so it has **one end**. So a rule that answers per end refuses a head key under this family. The refusal is a fact about the quantity and not about the sample.
 
-**What a drawdown reading says depends on the record.** A drawdown is a running functional, so its law over a finite record is not the law of one step, and a rule that reads the shape of a series reads a different shape here. A sample whose drift is strong enough for the drawdown process to settle reads **heavier** than its own returns, which is the reading a stationary drawdown carries. A sample whose drift is weak reads the range of the path over the record instead, and that range is **thinner** in the tail than the step law that made it. Both are readings of the series the measure prices over the record the measure prices it on, so a rule states the sample rather than a claim about drawdowns in general.
+**The tail of a drawdown series depends on the record.** A drawdown is a running function of the path, so its law over a finite record is not the law of one step. So a rule that reads the shape of a series reads a different shape here. A sample with a strong drift lets the drawdown process become stationary, and its drawdown series has a **heavier** tail than its returns. A sample with a weak drift gives the range of the path over the record, and that range has a **thinner** tail than the law of one step. Both are properties of the series that the measure prices over its record. So a rule describes the sample, and not drawdowns in general.
 
 # Related
 
@@ -310,9 +323,9 @@ abstract type AbstractDrawdownSeries <: AbstractCalibrationSeries end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Names the returns themselves, the columns of `pr.X` unchanged.
+Names the returns, the columns of `pr.X` with no change.
 
-It is the series every measure of the return distribution prices, and it is the default of every rule that carries a `series` field. A rule that never left this marker reads what it read before the family existed.
+Every measure of the return distribution prices this series, and [`calibration_series`](@ref) returns it for every owner that names no other series.
 
 # Related
 
@@ -326,7 +339,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Names the absolute drawdown series of a column, which [`absolute_drawdown_vec`](@ref) builds.
 
-The path is the cumulative sum of the column, and the series is the distance of that path below its own running peak. [`RelativisticDrawdownatRisk`](@ref) prices it, and [`DrawdownatRisk`](@ref) is the measure it takes its name from.
+The path is the cumulative sum of the column, and the series is the distance of that path below its running peak. [`RelativisticDrawdownatRisk`](@ref) prices it. [`DrawdownatRisk`](@ref) uses the same series.
 
 # Related
 
@@ -341,7 +354,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Names the relative drawdown series of a column, which [`relative_drawdown_vec`](@ref) builds.
 
-The path is the compounded value of the column, and the series is the fractional distance of that path below its own running peak. [`RelativeRelativisticDrawdownatRisk`](@ref) prices it, and [`RelativeDrawdownatRisk`](@ref) is the measure it takes its name from.
+The path is the compounded value of the column, and the series is the fractional distance of that path below its running peak. [`RelativeRelativisticDrawdownatRisk`](@ref) prices it. [`RelativeDrawdownatRisk`](@ref) uses the same series.
 
 # Related
 
@@ -354,19 +367,19 @@ struct RelativeDrawdownSeries <: AbstractDrawdownSeries end
 """
     calibration_series(x)
 
-Declare the series that `x` prices, so that a rule in one of its calibration slots reads that quantity.
+Declares the series that `x` prices, so that a rule in one of its calibration slots reads that quantity.
 
-The default is [`ReturnsSeries`](@ref), so a type that prices the return distribution needs no method. The two relativistic drawdown measures write one, because the series they price is not the sample they carry.
+The default is [`ReturnsSeries`](@ref), so a type that prices the return distribution needs no method. The two relativistic drawdown measures add a method, because they price a series that is not the sample that they hold.
 
-This is a trait on the **slot owner** and not a field on the rule, for the reason the [`CalibrationContext`](@ref) carries a norm order rather than a rule holding one: the quantity belongs to the measure, and a rule cannot know which measure it reached. No rule holds a marker of its own, so there is nothing for the owner's answer to overwrite, and a caller who runs a rule by hand states the marker in the context.
+This is a trait of the **slot owner** and not a field of the rule. The quantity belongs to the measure, and a rule cannot know which measure it reached. The [`CalibrationContext`](@ref) holds the norm order for the same reason. No rule holds a marker, so the answer of the owner overwrites nothing. A caller who runs a rule directly states the marker in the context.
 
 # Arguments
 
-  - `x`: The slot owner, a risk measure above all.
+  - `x`: The slot owner, usually a risk measure.
 
 # Returns
 
-  - `series::AbstractCalibrationSeries`: The series the owner prices.
+  - `series::AbstractCalibrationSeries`: The series that the owner prices.
 
 # Related
 
@@ -379,11 +392,11 @@ calibration_series(::Any) = ReturnsSeries()
 """
     calibration_series_vec(series::AbstractCalibrationSeries, x::VecNum)
 
-Return the univariate series that `series` names, built from one column of the sample.
+Returns the univariate series that `series` names, made from one column of the sample.
 
-A drawdown marker builds a fresh vector, and [`ReturnsSeries`](@ref) returns the column itself. So the returns reading allocates nothing and reads the sample it was always given.
+A drawdown marker makes a new vector. [`ReturnsSeries`](@ref) returns the column, so the returns series allocates nothing.
 
-The verb takes one column rather than the whole matrix because a drawdown is a path functional: it accumulates down a column and says nothing across a row. A caller that needs the pool walks the columns and calls this once per column.
+The function takes one column and not the whole matrix, because a drawdown is a function of a path. It accumulates down a column and does not read across a row. A caller that needs the pool walks the columns and calls this function once for each column.
 
 # Arguments
 
@@ -392,7 +405,7 @@ The verb takes one column rather than the whole matrix because a drawdown is a p
 
 # Returns
 
-  - `s::VecNum`: The series the marker names.
+  - `s::VecNum`: The series that the marker names.
 
 # Related
 
@@ -413,11 +426,11 @@ end
 """
     calibration_series_matrix(series::AbstractCalibrationSeries, X::AbstractMatrix)
 
-Return the sample that `series` names, one series per column of `X`.
+Returns the sample that `series` names, one series for each column of `X`.
 
-A drawdown series reaches the array builder of its own convention along `dims = 1`, which is the observations dimension: [`absolute_drawdown_arr`](@ref) for [`AbsoluteDrawdownSeries`](@ref), and [`relative_drawdown_arr`](@ref) for [`RelativeDrawdownSeries`](@ref). Those builders hold the running-peak convention, so the matrix reading and the vector reading state one definition of a drawdown and cannot drift apart. The result holds the same shape as `X`: a drawdown series carries one entry per observation, so no observation is lost and the count of a tail is the count the caller formed on `X`.
+A drawdown marker calls the array function of its convention along `dims = 1`, the dimension of the observations. [`AbsoluteDrawdownSeries`](@ref) calls [`absolute_drawdown_arr`](@ref), and [`RelativeDrawdownSeries`](@ref) calls [`relative_drawdown_arr`](@ref). Those functions hold the convention of the running peak, so the matrix form and the vector form use one definition of a drawdown. The result has the shape of `X`. A drawdown series has one entry for each observation, so no observation is lost, and the count of a tail that the caller made on `X` stays correct.
 
-[`ReturnsSeries`](@ref) returns `X` itself, so the returns reading allocates nothing. A rule that walks the columns one at a time should call [`calibration_series_vec`](@ref) instead, and allocate one column rather than a matrix.
+[`ReturnsSeries`](@ref) returns `X`, so the returns sample allocates nothing. A rule that walks the columns one at a time calls [`calibration_series_vec`](@ref) instead, and allocates one column and not a matrix.
 
 # Arguments
 
@@ -426,7 +439,7 @@ A drawdown series reaches the array builder of its own convention along `dims = 
 
 # Returns
 
-  - `Y::AbstractMatrix`: The sample the marker names, `T × N`.
+  - `Y::AbstractMatrix`: The sample that the marker names, `T × N`.
 
 # Related
 
@@ -448,18 +461,37 @@ end
 """
     calibration_series_dispersion(series::AbstractCalibrationSeries, pr::AbstractPriorResult)
 
-Return the per-asset dispersion of the series that `series` names, one entry per column of the sample.
+Returns the per-asset dispersion of the series that `series` names, one entry for each column of the sample.
 
-A [`ReturnsSeries`](@ref) reads it off `pr.sigma`, as the square root of that matrix's diagonal. That is the reading the radius family has always carried, so a prior that states a shrunk or a robust covariance matrix is read through it, and this verb leaves that untouched.
+A [`ReturnsSeries`](@ref) reads it from `pr.sigma`, as the square root of the diagonal of that matrix. So the dispersion of a prior that states a shrunk or a robust covariance matrix comes from that matrix.
 
-A drawdown series reads it off the **drawdown sample** instead, because a prior result states no drawdown moment. [`calibration_series_matrix`](@ref) builds the sample, and the dispersion is the sample dispersion of each of its columns. This is the reading [`radial_series_inputs`](@ref) takes a centre and a whitening factor by, and it parts from the returns reading for the same reason: `pr.sigma` is a moment of the returns, and no scaling of it states a moment of a drawdown.
+A drawdown series reads it from the **drawdown sample**, because a prior result states no moment of a drawdown. [`calibration_series_matrix`](@ref) makes the sample, and the dispersion is the sample standard deviation of each of its columns. [`radial_series_inputs`](@ref) reads its centre and its whitening factor from the drawdown sample for the same reason. `pr.sigma` is a moment of the returns, and no scaling of it gives a moment of a drawdown.
 
-A radius is a distance in the space of the scenarios the model prices, so this vector carries its units. [`ConcentrationRadius`](@ref) and [`DimensionalRateRadius`](@ref) average it into one scale, and [`DualNormRadius`](@ref) divides it by the square root of the effective sample size and takes a norm of the result.
+A radius is a distance in the space of the scenarios that the model prices, so this vector gives the radius its units. [`ConcentrationRadius`](@ref) and [`DimensionalRateRadius`](@ref) average it into one scale. [`DualNormRadius`](@ref) divides it by the square root of the count that the site prices and takes a norm of the result.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\hat{s}_{i} &= \\begin{cases}
+\\sqrt{\\hat{\\mathbf{\\Sigma}}_{ii}} & \\textrm{for the returns series}\\\\
+\\sqrt{\\dfrac{1}{T - 1} \\sum\\limits_{t=1}^{T} \\left(y_{ti} - \\bar{y}_{i}\\right)^{2}} & \\textrm{for a drawdown series}
+\\end{cases}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:cal_s_i_series])
+  - $(math_dict[:Sigma_hat_ii])
+  - ``y_{ti}``: Entry ``t`` of the drawdown series of column ``i``.
+  - ``\\bar{y}_{i}``: Sample mean of the drawdown series of column ``i``.
+  - $(math_dict[:T])
 
 # Arguments
 
-  - `series`: The series the slot owner prices.
-  - `pr`: Prior result the covariance matrix is read off on a returns series, and the sample on a drawdown series.
+  - `series`: The series that the slot owner prices.
+  - `pr`: Prior result. A returns series reads its covariance matrix, and a drawdown series reads its sample.
 
 # Returns
 
@@ -484,9 +516,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Carries what a calibration site knows and the slot's key does not, from [`resolve_calibration_slot`](@ref) into the rule it runs.
+Holds the facts that a calibration site knows and the key of the slot does not give, from [`resolve_calibration_slot`](@ref) into the rule that it runs.
 
-A rule is run by calling it, as `alg(key, pr, w, slv, ctx)`. `key` names the **slot** and not the quantity: `:kappa` serves both [`RelativisticValueatRisk`](@ref) and [`RelativisticDrawdownatRisk`](@ref), and those two price different series. The quantities below are therefore properties of the site rather than of the key, and this type is how the site states them.
+The site runs a rule as `alg(key, pr, w, slv, ctx)`. `key` names the **slot** and not the quantity. For example, [`RelativisticValueatRisk`](@ref) and [`RelativisticDrawdownatRisk`](@ref) both use `:kappa`, and they price different series. So the quantities below are properties of the site and not of the key, and the site states them in this type.
 
 | Field    | The site that states it                                                       | The rules that read it                                                                                                                                                 |
 |:-------- |:----------------------------------------------------------------------------- |:---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -494,14 +526,17 @@ A rule is run by calling it, as `alg(key, pr, w, slv, ctx)`. `key` names the **s
 | `series` | the slot owner, through [`calibration_series`](@ref)                          | [`HillTailDecay`](@ref), [`RadialTailDecay`](@ref), [`ConcentrationRadius`](@ref), [`DimensionalRateRadius`](@ref), [`DualNormRadius`](@ref), [`TailTermParity`](@ref) |
 | `p`      | the constraint or the penalty the quantity stands in                          | [`EffectiveAssetFloor`](@ref), [`DualNormRadius`](@ref)                                                                                                                |
 | `cs`     | a [`CrossSectionalFactorPrior`](@ref), after the split of its Return Forecast | [`PrecisionBlend`](@ref), [`SteinShrinkage`](@ref), [`ForecastCalibrationSlope`](@ref)                                                                                 |
+| `n`      | a site that prices the empirical measure of its own rows                      | [`ConcentrationRadius`](@ref), [`RateRadius`](@ref), [`DimensionalRateRadius`](@ref), [`DualNormRadius`](@ref)                                                         |
 
-**No rule holds a field for any of them.** Each belongs to the site, and a rule cannot know which site it reached, so there is no value on the rule for a site to overwrite and no precedence between the two to state. A caller who runs a rule outside a measure builds the context the site would have built, and that context is the only place these quantities are ever written.
+**No rule has a field for these quantities.** Each one belongs to the site, and a rule cannot know which site it reached. So a site overwrites no value of the rule, and no precedence between the two is necessary. A caller who runs a rule outside a measure builds the context that the site builds. That context is the only place where these quantities are written.
 
-**`cs` comes from the Cross-Sectional Factor Prior alone.** Its Spanned Shrinkage `lambda` and its Orthogonal Forecast Scale `c` resolve inside [`prior`](@ref), after the Return Forecast is split and before the mean is formed. The prior states `cs = (; g, ap, csfm, hist, cre)`: the spanned coefficients `g`, the unscaled orthogonal part `ap`, the factor-model block `csfm`, the Return Forecast history `hist` and the Cross-Sectional Regression Estimator `cre` of the prior. The block carries the idiosyncratic variance history `vs` and the regression weights `rw`, so a rule reads them off `csfm`. The block holds a zero `b` and no Return Forecast, because the scale is not resolved yet. No other site states `cs`.
+**Only the Cross-Sectional Factor Prior states `cs`.** Its Spanned Shrinkage `lambda` and its Orthogonal Forecast Scale `c` resolve inside [`prior`](@ref), after the prior splits the Return Forecast and before it makes the mean. The prior states `cs = (; g, ap, csfm, hist, cre)`. These are the spanned coefficients `g`, the unscaled orthogonal part `ap`, the factor-model block `csfm`, the Return Forecast history `hist` and the Cross-Sectional Regression Estimator `cre` of the prior. The block holds the idiosyncratic variance history `vs` and the regression weights `rw`, so a rule reads them from `csfm`. The block holds a zero `b` and no Return Forecast, because the scale is not resolved yet.
 
-The default is the context a site with nothing to say hands over: no sibling significance level, no norm order, no `cs`, and the [`ReturnsSeries`](@ref) that [`calibration_series`](@ref) answers for every owner that names no other. A rule that needs a field the default leaves at `nothing` refuses, and its message names the field it wanted.
+**The site states `n` because two sites price two different counts.** A distributionally robust measure centres its Wasserstein ball on the empirical measure of the rows of `pr.X` that its programme holds, weighted by its observation weights. The concentration bound of a radius is a statement about that measure, so its count is the count of those rows, which [`scenario_sample_size`](@ref) gives. A regularisation penalty prices the error of `pr.mu`, and that error decreases with the observations behind the moments, which [`effective_sample_size`](@ref) gives. The two counts differ under a Scenario Cap, which fits the moments over every observation and holds fewer rows. `key` cannot tell the rule which count it prices, so the site states it. A site that states no `n` prices the moments, and a rule then reads [`effective_sample_size`](@ref).
 
-**The order between two slots of one owner is what makes `alpha` reachable.** A deformation rule reads the significance level of a sibling slot, so the owner's own [`resolve_deferred_quantities`](@ref) method resolves `alpha` first and puts the number in the context of the slot that reads it. No derivation can find that order, which is the reason the resolution is written per type.
+The default is the context of a site that states nothing. It has no sibling significance level, no norm order, no `cs` and no count. Its series is the [`ReturnsSeries`](@ref) that [`calibration_series`](@ref) returns for every owner that names no other series. A rule that needs a field that the default leaves at `nothing` refuses, and its message names that field.
+
+**`alpha` is available only because the slots of one owner resolve in an order.** A deformation rule reads the significance level of a sibling slot. So the [`resolve_deferred_quantities`](@ref) method of the owner resolves `alpha` first, and puts the number in the context of the slot that reads it. No derivation can find that order, so each type writes its own resolution.
 
 # Fields
 
@@ -513,10 +548,11 @@ $(DocStringExtensions.FIELDS)
         alpha::Option{<:Number} = nothing,
         series::AbstractCalibrationSeries = ReturnsSeries(),
         p::Option{<:Number} = nothing,
-        cs::Option{<:NamedTuple} = nothing
+        cs::Option{<:NamedTuple} = nothing,
+        n::Option{<:Number} = nothing
     ) -> CalibrationContext
 
-Keywords correspond to the struct's fields. Every field defaults to the state a site that names nothing hands over.
+Keywords correspond to the fields of the struct. The default of each field is the value that a site that states nothing gives.
 
 # Related
 
@@ -545,58 +581,69 @@ Keywords correspond to the struct's fields. Every field defaults to the state a 
     $(field_dict[:cal_ctx_cs])
     """
     cs
+    """
+    $(field_dict[:cal_ctx_n])
+    """
+    n
     function CalibrationContext(alpha::Option{<:Number}, series::AbstractCalibrationSeries,
-                                p::Option{<:Number}, cs::Option{<:NamedTuple})
-        return new{typeof(alpha), typeof(series), typeof(p), typeof(cs)}(alpha, series, p,
-                                                                         cs)
+                                p::Option{<:Number}, cs::Option{<:NamedTuple},
+                                n::Option{<:Number})
+        return new{typeof(alpha), typeof(series), typeof(p), typeof(cs), typeof(n)}(alpha,
+                                                                                    series,
+                                                                                    p, cs,
+                                                                                    n)
     end
 end
 function CalibrationContext(; alpha::Option{<:Number} = nothing,
                             series::AbstractCalibrationSeries = ReturnsSeries(),
                             p::Option{<:Number} = nothing,
-                            cs::Option{<:NamedTuple} = nothing)
-    return CalibrationContext(alpha, series, p, cs)
+                            cs::Option{<:NamedTuple} = nothing,
+                            n::Option{<:Number} = nothing)
+    return CalibrationContext(alpha, series, p, cs, n)
 end
 """
     resolve_calibration_slot(slot, key::Symbol, pr::AbstractPriorResult, w, slv = nothing,
                              ctx::CalibrationContext = CalibrationContext())
 
-Resolve one calibration slot against prior result `pr`, the effective observation weights `w`, the effective solver `slv` and the site's context `ctx`, and return a plain number.
+Resolves one calibration slot against the prior result `pr`, the effective observation weights `w`, the effective solver `slv` and the context `ctx` of the site, and returns a plain number.
 
-A slot that holds a rule is **called** as `alg(key, pr, w, slv, ctx)`. So a callable rule and a plain function are the same thing here. Anything else, a stated number above all, is returned unchanged.
+The function calls a rule in a slot as `alg(key, pr, w, slv, ctx)`. So a callable rule and a plain function are the same here. It returns every other occupant, such as a stated number, unchanged.
 
-A rule gets no portfolio. A prior result carries no portfolio weight vector, so no rule can measure a portfolio's own loss series. What it can measure is the series of each **column** of the sample, and `ctx.series` tells it which series the slot owner prices. It does get the solver, on both of the routes that resolve a measure, so a rule may call [`ERM`](@ref) or [`RRM`](@ref). On the [`factory`](@ref) route [`@propagatable`](@ref) runs the `@cprop` selection before the resolution, so the solver is on the struct. On the `JuMP` route no selection runs, so [`set_risk_constraints!`](@ref) threads it into [`resolve_deferred_quantities`](@ref) and the owner settles it as `sel(x.slv, slv)`.
+A rule gets no portfolio. A prior result holds no portfolio weight vector, so no rule can measure the loss series of a portfolio. A rule can measure the series of each **column** of the sample, and `ctx.series` tells it which series the slot owner prices. A rule gets the solver on both routes that resolve a measure, so it can call [`ERM`](@ref) or [`RRM`](@ref):
 
-**The context is the whole of what the site says, and nothing is rebuilt here.** `key` names the slot rather than the quantity, so a rule that reads the shape of a series, the significance level of a sibling slot, or the norm order of the constraint it stands in reads it off `ctx`. No rule carries a field for any of the three, so no occupant is rebuilt on the way in and nothing a caller stated is overwritten. [`CalibrationContext`](@ref) states which rule reads which field.
+  - On the [`factory`](@ref) route, [`@propagatable`](@ref) runs the `@cprop` selection before the resolution, so the struct holds the solver.
+  - On the `JuMP` route, no selection runs. [`set_risk_constraints!`](@ref) passes the solver to [`resolve_deferred_quantities`](@ref), and the owner selects it as `sel(x.slv, slv)`.
 
-**A ceiling rule and a radius rule are checked here, and the three other families are not.** [`AbstractNormCeilingCalibrationAlgorithm`](@ref) and [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref) each take their own method, which runs [`assert_nonempty_gt0_finite_val`](@ref) on the number the rule returned, under the slot's own `key`. Both quantities reach a JuMP model from a bare field of [`JuMPOptimiser`](@ref) — `l2c` and `linfc` for the ceiling, `l1` and `linf` for the radius — where no term is rebuilt, so nothing downstream would state the range. The three other families stand only in slots their owner rebuilds, and the rebuild runs the owner's constructor on the calibrated number, so a second check here would restate a rule that file already owns. The cost is paid on the calibrated path alone: a stated number takes the first method and meets no check here at all.
+**The context holds all the facts of the site, and this function rebuilds nothing.** `key` names the slot and not the quantity. So a rule reads from `ctx` the shape of a series, the significance level of a sibling slot, the norm order of its constraint, or the count of the scenarios that the site prices. No rule has a field for these facts, so the function rebuilds no occupant and overwrites nothing that a caller stated. [`CalibrationContext`](@ref) states which rule reads which field.
 
-**A rule written as a plain function is checked by the site, not here.** A function carries no family, so no method here can read the quantity it computes. [`assemble_jump_model!`](@ref) is the one site that reads a calibrated number without rebuilding a term, and it states the range of each of its four norm slots itself.
+**This function checks the value of a ceiling rule and of a radius rule, and of no other family.** [`AbstractNormCeilingCalibrationAlgorithm`](@ref) and [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref) share one method. It runs [`assert_nonempty_gt0_finite_val`](@ref) on the number that the rule returned, under the `key` of the slot. Both quantities reach a JuMP model from a field of [`JuMPOptimiser`](@ref): the ceiling from `l2c` and `linfc`, and the radius from `l1` and `linf`. No term is rebuilt on that route, so nothing later checks the range. The three other families are only in slots that their owner rebuilds. The rebuild runs the constructor of the owner on the calibrated number, and that constructor checks the range. Only the calibrated path pays for the check, because a stated number takes the first method.
 
-This is the parallel of [`resolve_slot`](@ref), and it is a second verb rather than a widening of the first for two reasons. `resolve_slot`'s body is `deferred_quantity(fit_deferred_quantity(dq, pr), key)`, a fit followed by an extraction, and a rule fits nothing. `resolve_slot` also carries neither `w` nor `slv`, which a rule needs. So the rule families stay **out** of the [`DeferredQuantity`](@ref) union.
+**The site checks a rule that is a plain function.** A function has no family, so no method here can know the quantity that it computes. [`assemble_jump_model!`](@ref) is the one site that reads a calibrated number and rebuilds no term, and it checks the range of each of its four norm slots.
 
-The caller computes `w` itself, as `sel(r.w, pr.w)`, and threads it with the measure's own `slv`. A parent that carries no observation weights of its own passes `pr.w`, and one that carries no solver leaves `slv` at its default.
+This function is the counterpart of [`resolve_slot`](@ref). It is a second function, and not a wider method of the first, for two reasons. The body of `resolve_slot` is `deferred_quantity(fit_deferred_quantity(dq, pr), key)`, a fit and then an extraction, and a rule fits nothing. Also, `resolve_slot` takes neither `w` nor `slv`, and a rule needs both. So the rule families are **not** members of the [`DeferredQuantity`](@ref) union.
 
-**A [`TimeDependent`](@ref) reaches the estimator that holds the slot, and no further.** A schedule varies a *field of an estimator*, and it is consumed by [`update_time_dependent_fields`](@ref) before any prior is fitted. A rule is never standalone: it stands in a slot of an estimator, so that estimator is what a schedule swaps. Where the estimator is a [`JuMPOptimiser`](@ref) the four norm fields are themselves schedulable, and a schedule over them selects a rule per fold. Where the estimator is a risk measure the slot's own bound admits no schedule, and the caller varies the whole measure instead, through the schedulable risk-measure field of the optimiser. Both routes land in the same place, because the selection runs first and the rule then resolves against the prior of the period that was selected. A schedule *inside* a rule is therefore not a gap: it would name a fold the rule cannot see, and it would duplicate the channel the estimator already carries.
+The caller computes `w` as `sel(r.w, pr.w)`, and passes it with the `slv` of the measure. A parent that has no observation weights passes `pr.w`. A parent that has no solver leaves `slv` at its default.
+
+**A [`TimeDependent`](@ref) reaches the estimator that holds the slot, and does not go further.** A schedule changes a *field of an estimator*, and [`update_time_dependent_fields`](@ref) applies it before the fit of a prior. A rule is always in a slot of an estimator, so a schedule replaces that estimator. If the estimator is a [`JuMPOptimiser`](@ref), its four norm fields can each have a schedule, and the schedule selects a rule for each fold. If the estimator is a risk measure, the bound of the slot admits no schedule. The caller then changes the whole measure through the risk-measure field of the optimiser, which can have a schedule. On both routes the selection runs first, and the rule then resolves against the prior of the selected period. So a rule needs no schedule of its own. A schedule in a rule names a fold that the rule cannot see, and it repeats the schedule of the estimator.
 
 # Algorithm
 
- 1. Return `slot` unchanged when [`is_calibration_rule`](@ref) answers `false` for it. A stated number takes that arm.
- 2. Call the rule as `slot(key, pr, w, slv, ctx)`, and return the number it gives. A callable struct and a plain function are the same thing here.
- 3. A norm-ceiling rule or an ambiguity-radius rule takes a more specific method, which checks that number before it returns.
+ 1. Return `slot` unchanged when [`is_calibration_rule`](@ref) returns `false` for it. A stated number takes this branch.
+ 2. Call the rule as `slot(key, pr, w, slv, ctx)`, and return the number that it gives.
+ 3. A norm-ceiling rule or an ambiguity-radius rule takes a more specific method. That method checks the number before it returns it.
 
 # Arguments
 
-  - `slot`: The slot's occupant: a number, or a rule.
-  - `key`: Name of the slot that is being resolved.
-  - `pr`: Prior result the rule reads.
+  - `slot`: The occupant of the slot: a number or a rule.
+  - `key`: Name of the slot that the call resolves.
+  - `pr`: Prior result that the rule reads.
   - `w`: Effective observation weights, or `nothing`.
-  - `slv`: Effective solver, or `nothing` when the measure carries none.
-  - `ctx`: What the site knows and `key` does not, as a [`CalibrationContext`](@ref). The default names no sibling significance level, no norm order, and the returns series.
+  - `slv`: Effective solver, or `nothing` when the measure has none.
+  - `ctx`: The facts that the site knows and `key` does not give, as a [`CalibrationContext`](@ref). The default has no sibling significance level, no norm order, and the returns series.
 
 # Validation
 
-  - A norm-ceiling rule or an ambiguity-radius rule returns a number that is `> 0` and finite, checked by [`assert_nonempty_gt0_finite_val`](@ref) under `key`. Every other occupant is returned unchecked, and the owner of its slot states the range when it rebuilds.
+  - A norm-ceiling rule or an ambiguity-radius rule must return a number that is `> 0` and finite. [`assert_nonempty_gt0_finite_val`](@ref) checks it under `key`. The function returns every other occupant with no check, and the owner of its slot checks the range when it rebuilds.
 
 # Returns
 
@@ -620,20 +667,26 @@ end
 """
     effective_sample_size(pr::AbstractPriorResult, w::Option{<:ObsWeights})
 
-Return the number of observations behind the moments of `pr`, weighted by `w`.
+Returns the number of observations behind the moments of `pr`, weighted by `w`.
 
-This is the count a calibration rule divides by, so the rules that read a count read one definition of it. Three sources are read in order, and the first that answers wins. With weights it is Kish's effective sample size, which is the number of equally weighted observations that carries the information the weighted sample carries. Without weights it is the count the result **states** in `ens`, when it states one and carries no weighting of its own: a Scenario Cap states the number of observations its moments were fitted over there, because the rows the result carries are then fewer than the observations behind its moments, and a count read off the shape would price every rule by `t / w`. Otherwise it is the row count of `pr.X`, which is then the sample.
+A calibration rule that prices the sample size of the moments divides by this count, so those rules use one definition of it. The function reads three sources in order, and the first that gives a count wins:
 
-An `ens` beside a `w` is not read by this arm. `ens` is bound to `w` as a diagnostic of it — an entropy-pooling prior writes `exp(entropy(w))` there — so a reader that reads no weights reads no diagnostic of them either, and a rule that reads the raw row count under such a prior still does. The only `ens` a result states with no `w` is the one a cap writes.
+ 1. With weights, it is the effective sample size of [kish1965](@cite). That is the number of equally weighted observations that gives the precision of the weighted sample.
+ 2. With no weights, it is the count that the result **states** in `eoc`, when the result has no weights of its own. It is the smaller of the counts of the mean and of the covariance, because a rule does not know which moment it prices, and the sample is worth no more than its less informed moment. A Scenario Cap states there the number of observations over which it fitted the moments, and a weighted estimator of an [`EmpiricalPrior`](@ref) states the count of its weights. An entry of `nothing` is the row count of `pr.X`.
+ 3. Otherwise, it is the row count of `pr.X`, which is then the sample.
 
-The weights are read through [`get_observation_weights`](@ref), so the whole of the [`ObsWeights`](@ref) union that a rule's own `w` field admits is served here. A [`DynamicAbstractWeights`](@ref) that states no method for a column of the sample raises [`ObservationWeightsError`](@ref), which names the two signatures to write, rather than a bare `MethodError` off `sum`.
+This function does not read an `eoc` that is next to a `w`. The weights `w` bind that `eoc`, because a pooling prior refits its moments under them. So a rule that reads no weights reads no count of them either. The function never reads `ens`, which is a diagnostic of `w`.
+
+A rule that prices a property of the scenarios of the measure does not read this count. [`ScenarioCount`](@ref), [`RateSignificance`](@ref) and [`EntropyBudget`](@ref) read the rows that the measure holds when no weights are stated. A distributionally robust measure states the count of its rows, from [`scenario_sample_size`](@ref), in the `n` of its [`CalibrationContext`](@ref), and a radius rule reads that count in place of this one.
+
+The function reads the weights through [`get_observation_weights`](@ref), so it accepts all of the [`ObsWeights`](@ref) union that the `w` field of a rule admits. A [`DynamicAbstractWeights`](@ref) that has no method for a column of the sample raises [`ObservationWeightsError`](@ref), which names the two signatures to write.
 
 # Mathematical definition
 
 ```math
 T_{e} = \\begin{cases}
 \\dfrac{\\left(\\sum\\limits_{t=1}^{T} w_{t}\\right)^{2}}{\\sum\\limits_{t=1}^{T} w_{t}^{2}} & \\textrm{if } w \\textrm{ is given}\\\\
-T_{\\mathrm{ens}} & \\textrm{if } w \\textrm{ is } \\texttt{nothing} \\textrm{ and the result states } T_{\\mathrm{ens}} \\textrm{ beside no weighting}\\\\
+\\min\\left(T_{\\mu},\\, T_{\\Sigma}\\right) & \\textrm{if } w \\textrm{ is } \\texttt{nothing} \\textrm{ and the result states no weighting}\\\\
 T & \\textrm{otherwise}
 \\end{cases}\\,.
 ```
@@ -643,22 +696,22 @@ Where:
   - $(math_dict[:T])
   - $(math_dict[:cal_T_e])
   - $(math_dict[:w_t_obs])
-  - ``T_{\\mathrm{ens}}``: The effective sample size the result states in `ens`.
+  - ``T_{\\mu}``, ``T_{\\Sigma}``: The effective numbers of observations of the mean and of the covariance that the result states in `eoc`. An entry of `nothing` is ``T``.
 
 # Algorithm
 
- 1. Resolve `w` against the first column of `pr.X` through [`get_observation_weights`](@ref), giving `ws`.
- 2. When `ws` is not `nothing`, return Kish's count of it.
- 3. Otherwise return [`stated_sample_size`](@ref) of the result's own `w`, `ens` and `X`: `pr.ens` when it is stated beside no `pr.w`, else `size(pr.X, 1)`.
+ 1. Resolve `w` against the first column of `pr.X` through [`get_observation_weights`](@ref), which gives `ws`.
+ 2. When `ws` is not `nothing`, return the count of Kish for it, through [`weight_observation_count`](@ref).
+ 3. Otherwise, return [`stated_sample_size`](@ref) of the `w`, the `eoc` and the `X` of the result. That is the smaller of the counts of the mean and of the covariance when the result has no `pr.w`, and `size(pr.X, 1)` otherwise.
 
 # Arguments
 
-  - `pr`: Prior result the sample length is read off.
+  - `pr`: Prior result from which the function reads the sample length.
   - `w`: Effective observation weights, or `nothing`.
 
 # Validation
 
-  - `w` resolves through [`get_observation_weights`](@ref), which raises [`ObservationWeightsError`](@ref) for a [`DynamicAbstractWeights`](@ref) that states no method for a column of `pr.X`.
+  - `w` resolves through [`get_observation_weights`](@ref). That function raises [`ObservationWeightsError`](@ref) for a [`DynamicAbstractWeights`](@ref) that has no method for a column of `pr.X`.
 
 # Returns
 
@@ -669,59 +722,122 @@ Where:
   - [`get_observation_weights`](@ref)
   - [`stated_sample_size`](@ref)
   - [`ObsWeights`](@ref)
-  - [`ScenarioCount`](@ref)
-  - [`ConcentrationRadius`](@ref)
+  - [`scenario_sample_size`](@ref): the count of the rows that a measure prices.
+  - [`ScenarioCount`](@ref): reads this count only when observation weights are stated.
+  - [`ConcentrationRadius`](@ref): reads this count when the site states no `n`.
+  - [`RateRadius`](@ref)
   - [`DimensionalRateRadius`](@ref)
   - [`DualNormRadius`](@ref)
+
+# References
+
+  - $(ref_dict[:kish1965]) Whole book. $(ref_dict[:no_original_source])
 """
 function effective_sample_size(pr::AbstractPriorResult, w::Option{<:ObsWeights})
     ws = get_observation_weights(w, view(pr.X, :, 1))
     return if isnothing(ws)
-        stated_sample_size(pr.w, pr.ens, pr.X)
+        stated_sample_size(pr.w, pr.eoc, pr.X)
     else
-        sum(ws)^2 / sum(abs2, ws)
+        weight_observation_count(KishObservationCount(), ws)
     end
 end
 """
-    stated_sample_size(::Nothing, ens::Number, X::MatNum)
-    stated_sample_size(w, ens, X::MatNum)
+    stated_sample_size(::Nothing, eoc::Tuple, X::MatNum)
+    stated_sample_size(w, eoc, X::MatNum)
 
-Return the count a Prior Result states in `ens` beside no weighting, and the row count of `X` otherwise.
+Returns the count that a Prior Result states in `eoc` next to no weights, and the row count of `X` otherwise.
 
-The unweighted arm of [`effective_sample_size`](@ref), by dispatch on the result's own `w` and `ens`. A result that carries no `w` and states an `ens` is one a Scenario Cap wrote, and the count is the observations its moments were fitted over. An `ens` beside a `w` is a diagnostic of that weighting, which an unweighted read does not take, and a result that states no `ens` carries its sample in `X`.
+It is the branch of [`effective_sample_size`](@ref) for no weights, and it dispatches on the `w` of the result. With no `w`, the count is the smaller of the counts of the mean and of the covariance, `eoc[1]` and `eoc[2]`, and an entry of `nothing` is `size(X, 1)`. A Scenario Cap writes there the number of observations behind its moments, and a weighted estimator the count of its weights. The weights `w` bind an `eoc` next to them, and a read with no weights does not take it. A result that states no count holds its sample in `X`.
 
 # Arguments
 
-  - `w`: The result's own observation weights, or `nothing`.
-  - `ens`: The count the result states, or `nothing`.
-  - `X`: The returns matrix the result carries, `observations × assets`.
+  - `w`: The observation weights of the result, or `nothing`.
+  - `eoc`: The counts that the result states. A [`HighOrderPrior`](@ref) states four, and the function reads the first two.
+  - `X`: The returns matrix of the result, `observations × assets`.
 
 # Returns
 
-  - `T::Number`: `ens` when it is stated beside no `w`, `size(X, 1)` otherwise.
+  - `T::Number`: The smaller count of the mean and the covariance when the result has no `w`, and `size(X, 1)` otherwise.
 
 # Related
 
   - [`effective_sample_size`](@ref)
-  - [`scenario_ens`](@ref)
+  - [`moment_observation_count`](@ref)
   - [`LowOrderPrior`](@ref)
 """
-function stated_sample_size(::Nothing, ens::Number, ::MatNum)
-    return ens
+function stated_sample_size(::Nothing, eoc::Tuple, X::MatNum)
+    T = size(X, 1)
+    return min(something(eoc[1], T), something(eoc[2], T))
 end
 function stated_sample_size(::Any, ::Any, X::MatNum)
     return size(X, 1)
 end
 """
+    scenario_sample_size(pr::AbstractPriorResult, w::Option{<:ObsWeights})
+
+Returns the count of the empirical measure of the rows that `pr` holds, weighted by `w`.
+
+A risk measure prices the rows of `pr.X`, and not the observations behind the moments. With weights, the measure is the weighted empirical measure of those rows, so the count is the effective sample size of [kish1965](@cite), as in [`effective_sample_size`](@ref). With no weights, the measure gives each row the same mass, so the count is the row count of `pr.X`.
+
+The two counts differ under a Scenario Cap, and under a weighted estimator of the moments. A cap fits the moments over every observation, states that number in `eoc`, and holds fewer rows. [`effective_sample_size`](@ref) reads `eoc` there, and this function reads the rows. The `eoc` of an entropy-pooling prior is next to a `w`, so neither count reads it.
+
+The function resolves `w` through [`get_observation_weights`](@ref), as the programme of a measure does. So a [`DynamicAbstractWeights`](@ref) that resolves to `nothing` gives the row count, which is the count of the measure that the programme then prices.
+
+# Mathematical definition
+
+```math
+T_{n} = \\begin{cases}
+\\dfrac{\\left(\\sum\\limits_{t=1}^{T} w_{t}\\right)^{2}}{\\sum\\limits_{t=1}^{T} w_{t}^{2}} & \\textrm{if } w \\textrm{ is given}\\\\
+T & \\textrm{otherwise}
+\\end{cases}\\,.
+```
+
+Where:
+
+  - $(math_dict[:T]) It is the row count of the sample that the result holds.
+  - $(math_dict[:w_t_obs])
+  - $(math_dict[:cal_T_n])
+
+# Algorithm
+
+ 1. Resolve `w` against the first column of `pr.X` through [`get_observation_weights`](@ref), which gives `ws`.
+ 2. When `ws` is `nothing`, return `size(pr.X, 1)`.
+ 3. Otherwise, return the count of Kish for `ws`, through [`effective_sample_size`](@ref).
+
+# Arguments
+
+  - `pr`: Prior result whose rows the measure prices.
+  - `w`: Effective observation weights, or `nothing`.
+
+# Returns
+
+  - `T_n::Number`: The count of the scenarios.
+
+# Related
+
+  - [`effective_sample_size`](@ref)
+  - [`ScenarioCount`](@ref)
+  - [`CalibrationContext`](@ref)
+  - [`DistributionallyRobustConditionalValueatRisk`](@ref)
+
+# References
+
+  - $(ref_dict[:kish1965]) Whole book. $(ref_dict[:no_original_source])
+"""
+function scenario_sample_size(pr::AbstractPriorResult, w::Option{<:ObsWeights})
+    ws = get_observation_weights(w, view(pr.X, :, 1))
+    return isnothing(ws) ? size(pr.X, 1) : effective_sample_size(pr, ws)
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
-Computes a significance level from a count of observations, so that the tail keeps the same number of scenarios whatever the sample length becomes.
+Computes a significance level from a count of scenarios, so that the tail keeps the same number of scenarios at every sample length.
 
-A stated `alpha` fixes the tail's probability. A fold half as long then leaves half as many observations in the tail, and the measure it feeds grows noisier as the sample shrinks. This rule fixes the count instead and returns `n / T`, so `ceil(alpha * T) == n` at every sample length the resolution meets.
+A stated `alpha` fixes the probability of the tail. A fold of half the length then has half the scenarios in its tail, and the measure becomes less accurate as the sample becomes shorter. This rule fixes the count and returns `n / T`. So `alpha * T` is `n` at every sample length, and the tail of the measure holds `n` scenarios.
 
-`T` is the effective sample size when observation weights are stated, and the raw row count when they are not. Kish's effective sample size is the number of equally weighted observations that carries the same information as the weighted sample, so a weighted tail holds `n` observations in that sense rather than `n` rows. This is the only one of the three rules that reads the weights.
+`T` is the row count of `pr.X` when no observation weights are stated, because the measure prices those rows. Under a Scenario Cap, the rows are fewer than the observations behind the moments, and the rule reads the rows. When weights are stated, `T` is the effective sample size of the weights. That is the number of equally weighted observations that gives the precision of the weighted sample. So a weighted tail holds `n` observations in that sense, and not `n` rows.
 
-The rule carries no range check of its own. It returns the quantity of the slot it stands in, so the slot owner's constructor is the whole validation, and a count that produces a value outside the slot's range is refused there, at fold time.
+The rule does not check the range of its value. It returns the quantity of its slot, so the constructor of the slot owner does all the validation. That constructor refuses a value outside the range of the slot when the fold runs.
 
 # Fields
 
@@ -733,7 +849,7 @@ $(DocStringExtensions.FIELDS)
         n::Option{<:Number} = nothing
     ) -> ScenarioCount
 
-Keywords correspond to the struct's fields. `n` has no default a rule could use, because a scenario count that suits every sample does not exist. It stands at `nothing`, which is not a count, so a bare `ScenarioCount()` is refused with a message that names the count and says why the rule asks for one. This is the whole reason the keyword admits `nothing`: the field itself never holds it.
+Keywords correspond to the fields of the struct. No default of `n` suits every sample, so the default is `nothing`, which is not a count. So the constructor refuses `ScenarioCount()`, and the message names the count and tells why the rule needs it. The keyword admits `nothing` only for this refusal, and the field never holds it.
 
 ## Validation
 
@@ -765,30 +881,36 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Compute the significance level that leaves `alg.n` observations in the tail of the sample that `pr` carries.
+Computes the significance level that leaves `alg.n` scenarios in the tail of the sample of `pr`.
 
 # Mathematical definition
 
 ```math
-\\alpha = \\frac{n}{T_{e}}\\,.
+\\begin{align}
+\\alpha &= \\frac{n}{T_{n}}\\,,\\\\
+T_{n} &= \\begin{cases}
+\\dfrac{\\left(\\sum\\limits_{t=1}^{T} w_{t}\\right)^{2}}{\\sum\\limits_{t=1}^{T} w_{t}^{2}} & \\textrm{if } w \\textrm{ is given}\\\\
+T & \\textrm{otherwise}
+\\end{cases}\\,.
+\\end{align}
 ```
 
 Where:
 
   - $(math_dict[:alpha_rm])
-  - ``n``: Number of observations the tail is to hold.
-  - $(math_dict[:T])
-  - $(math_dict[:cal_T_e])
+  - ``n``: Number of scenarios that the tail must hold.
+  - $(math_dict[:cal_T_n])
+  - $(math_dict[:T]) It is the row count of the sample that the result holds.
   - $(math_dict[:w_t_obs])
 
 # Arguments
 
   - `alg`: The rule.
-  - `key`: Name of the slot that is being resolved. The count is the same for every key, so a tail slot and a head slot that carry one rule resolve to one number.
-  - `pr`: Prior result the sample length is read off.
+  - `key`: Name of the slot that the call resolves. The count is the same for every key, so a tail slot and a head slot that hold one rule resolve to one number.
+  - `pr`: Prior result from which the rule reads the sample length.
   - `w`: Effective observation weights, or `nothing`.
   - `slv`: Effective solver. This rule needs none.
-  - `ctx`: The site's [`CalibrationContext`](@ref). This rule reads no field of it.
+  - `ctx`: The [`CalibrationContext`](@ref) of the site. This rule reads no field of it.
 
 # Returns
 
@@ -797,24 +919,24 @@ Where:
 # Related
 
   - [`ScenarioCount`](@ref)
+  - [`scenario_sample_size`](@ref)
   - [`effective_sample_size`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
 function (alg::ScenarioCount)(::Symbol, pr::AbstractPriorResult, w, ::Any,
                               ::CalibrationContext)
-    T = effective_sample_size(pr, w)
-    return alg.n / T
+    return alg.n / scenario_sample_size(pr, w)
 end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Computes a significance level that shrinks with the square root of the sample length.
+Computes a significance level that decreases with the square root of the sample length.
 
-The tail probability is `c / sqrt(T)`, so the tail's expected count is `c * sqrt(T)`. It grows with the sample, but more slowly than the sample does, which is the rate at which a sample mean's own error falls. A longer sample therefore buys a further tail rather than only a fuller one, and [`ScenarioCount`](@ref) is the rule that buys neither.
+The tail probability is `c / sqrt(T)`, so the expected count of the tail is `c * sqrt(T)`. The count increases with the sample, but more slowly than the sample. The error of a sample mean decreases at the same rate. So a longer sample moves the tail further out and also puts more scenarios in it. [`ScenarioCount`](@ref) keeps the count fixed.
 
-The rule reads the raw row count, and not the effective sample size that [`ScenarioCount`](@ref) reads. The rate is a statement about the length of the record, whereas a scenario count is a statement about the observations the tail holds. The length of the record is the count the result states in `ens` when a Scenario Cap carries fewer rows than it fitted over, and the row count otherwise, which is [`effective_sample_size`](@ref) with no weights.
+**`T` is the count of the scenarios that the measure prices, as for [`ScenarioCount`](@ref).** The tail is a set of the rows of `pr.X`, so the expected count of the tail is `c * sqrt(T)` only when `T` counts those rows. That is [`scenario_sample_size`](@ref): the row count of `pr.X` when no observation weights are stated, and the effective sample size of the weights otherwise. Under a Scenario Cap, the rows are fewer than the observations behind the moments, and the rule reads the rows. A read of the count in `eoc` there gave a tail of `sqrt(5)` times fewer scenarios than `c * sqrt(T)`, for `max_scenarios = 250` over 1250 observations.
 
-The rule carries no range check of its own, on the same terms as [`ScenarioCount`](@ref).
+The rule does not check the range of its value, for the reason that [`ScenarioCount`](@ref) states.
 
 # Fields
 
@@ -826,7 +948,7 @@ $(DocStringExtensions.FIELDS)
         c::Number = 1
     ) -> RateSignificance
 
-Keywords correspond to the struct's fields. `c` defaults to `1`, which is the plain ``1/\\sqrt{T}`` rate.
+Keywords correspond to the fields of the struct. The default `c = 1` gives the rate ``1/\\sqrt{T}``.
 
 ## Validation
 
@@ -855,13 +977,17 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Compute the significance level at the square-root rate of the sample that `pr` carries.
+Computes the significance level at the square-root rate of the sample of `pr`.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\alpha &= \\frac{c}{\\sqrt{T}}\\,.
+\\alpha &= \\frac{c}{\\sqrt{T_{n}}}\\,,\\\\
+T_{n} &= \\begin{cases}
+\\dfrac{\\left(\\sum\\limits_{t=1}^{T} w_{t}\\right)^{2}}{\\sum\\limits_{t=1}^{T} w_{t}^{2}} & \\textrm{if } w \\textrm{ is given}\\\\
+T & \\textrm{otherwise}
+\\end{cases}\\,.
 \\end{align}
 ```
 
@@ -869,16 +995,18 @@ Where:
 
   - $(math_dict[:alpha_rm])
   - ``c``: Rate coefficient.
-  - $(math_dict[:T])
+  - $(math_dict[:cal_T_n])
+  - $(math_dict[:T]) It is the row count of the sample that the result holds.
+  - $(math_dict[:w_t_obs])
 
 # Arguments
 
   - `alg`: The rule.
-  - `key`: Name of the slot that is being resolved. The rate is the same for every key.
-  - `pr`: Prior result the sample length is read off.
-  - `w`: Effective observation weights. This rule reads the raw row count, so it ignores them; under a Scenario Cap the count is the one the result states in `ens`.
+  - `key`: Name of the slot that the call resolves. The rate is the same for every key.
+  - `pr`: Prior result from which the rule reads the sample length.
+  - `w`: Effective observation weights, or `nothing`.
   - `slv`: Effective solver. This rule needs none.
-  - `ctx`: The site's [`CalibrationContext`](@ref). This rule reads no field of it.
+  - `ctx`: The [`CalibrationContext`](@ref) of the site. This rule reads no field of it.
 
 # Returns
 
@@ -887,24 +1015,26 @@ Where:
 # Related
 
   - [`RateSignificance`](@ref)
+  - [`ScenarioCount`](@ref)
+  - [`scenario_sample_size`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-function (alg::RateSignificance)(::Symbol, pr::AbstractPriorResult, ::Any, ::Any,
+function (alg::RateSignificance)(::Symbol, pr::AbstractPriorResult, w, ::Any,
                                  ::CalibrationContext)
-    return alg.c / sqrt(effective_sample_size(pr, nothing))
+    return alg.c / sqrt(scenario_sample_size(pr, w))
 end
 """
 $(DocStringExtensions.TYPEDEF)
 
 Computes the Kaniadakis deformation parameter that makes a relativistic measure spend a stated entropy budget.
 
-[`RRM`](@ref) multiplies its dual variable by `kappa_log(inv(alpha * T), kappa)`, so that coefficient is the price the model pays for the deformation, and `target` states it directly. The rule returns the ``\\kappa`` that meets it. A stated `kappa` fixes the shape of the deformation and lets the price move with the sample; this rule fixes the price and lets the shape move.
+[`RRM`](@ref) multiplies its dual variable by `kappa_log(inv(alpha * T), kappa)`, where `T` is the row count of the sample of the measure. So that coefficient is the price that the model pays for the deformation, and `target` states it. The rule returns the ``\\kappa`` that gives it. A stated `kappa` fixes the shape of the deformation and lets the price change with the sample. This rule fixes the price and lets the shape change. The Kaniadakis logarithm is Equation 63 of [kaniadakis2001](@cite).
 
-The two quantities travel together. The rule reads its sibling `alpha` off `ctx.alpha`, so the owner's own resolution method resolves `alpha` first and puts the number in the context of the slot that reads it. A caller who runs the rule outside a measure states `alpha` in the context.
+The rule reads its sibling `alpha` from `ctx.alpha`. So the resolution method of the owner resolves `alpha` first and puts the number in the context of the slot that reads it. A caller who runs the rule outside a measure states `alpha` in the context.
 
-The inversion is monotone, and it is solved by bisection over ``(0, 1)``. Writing ``l = \\ln(u)``, the coefficient is ``l \\sinh(\\kappa l) / (\\kappa l)``, and ``\\sinh(x)/x`` rises with ``|x|``, so the coefficient walks once from ``l`` at ``\\kappa \\to 0`` to ``\\sinh(l)`` at ``\\kappa = 1``. There is no elementary inverse of ``\\sinh(x)/x``, so the solve is a fixed sweep of 64 halvings rather than a formula.
+The coefficient is monotone in ``\\kappa``, and the rule inverts it by bisection over ``(0, 1)``. Let ``l = \\ln(u)``. The coefficient is ``l \\sinh(\\kappa l) / (\\kappa l)``, and ``\\sinh(x)/x`` increases with ``|x|``. So the coefficient moves once from ``l`` at ``\\kappa \\to 0`` to ``\\sinh(l)`` at ``\\kappa = 1``. The function ``\\sinh(x)/x`` has no elementary inverse, so the rule runs a fixed sequence of 64 halvings.
 
-The band the coefficient reaches moves with the sample, and a target outside it is refused at fold time. This is the one check any of the three rules carries, and it is not a range check on the quantity the rule returns — the slot owner's constructor keeps that job, as it does for the two significance rules. It states that the equation has a root at all: a target the band does not reach leaves the sweep at an end of the interval, where ``\\kappa`` is far too small or too large to be the answer to the question the caller asked and yet still inside the range the slot owner admits.
+The band that the coefficient reaches changes with the sample, and the rule refuses a target outside the band when the fold runs. This check does not limit the range of the value that the rule returns. The constructor of the slot owner does that, as it does for the two significance rules. The check states that the equation has a root. With no check, a target outside the band stops the bisection at an end of the interval. That ``\\kappa`` is inside the range that the slot owner accepts, but it does not give the target.
 
 # Fields
 
@@ -916,12 +1046,12 @@ $(DocStringExtensions.FIELDS)
         target::Option{<:Number} = nothing
     ) -> EntropyBudget
 
-Keywords correspond to the struct's fields. `target` has no default a rule could use, because the budget is the whole content of the rule and the band it must lie in moves with the sample. It stands at `nothing`, which is not a budget, so a bare `EntropyBudget()` is refused with a message that names the budget and says why the rule asks for one. This is the whole reason the keyword admits `nothing`: the field itself never holds it.
+Keywords correspond to the fields of the struct. No default of `target` is useful, because the band of the target changes with the sample. So the default is `nothing`, which is not a budget, and the constructor refuses `EntropyBudget()`. The message names the budget and tells why the rule needs it. The keyword admits `nothing` only for this refusal, and the field never holds it.
 
 ## Validation
 
   - `target` is stated, else an `ArgumentError`.
-  - `target` is finite. The band the target must lie in moves with the sample, so the rule checks the band when it runs, not here.
+  - `target` is finite. The band of the target changes with the sample, so the rule checks the band when it runs, and not here.
 
 # Related
 
@@ -932,6 +1062,10 @@ Keywords correspond to the struct's fields. `target` has no default a rule could
   - [`kappa_log`](@ref)
   - [`RadialTailDecay`](@ref)
   - [`RRM`](@ref)
+
+# References
+
+  - $(ref_dict[:kaniadakis2001]) Equation 63.
 """
 @concrete struct EntropyBudget <: AbstractDeformationCalibrationAlgorithm
     """
@@ -951,7 +1085,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Compute the deformation parameter whose Kaniadakis logarithm meets `alg.target` on the sample that `pr` carries.
+Computes the deformation parameter whose Kaniadakis logarithm gives `alg.target` on the sample of `pr`.
 
 # Mathematical definition
 
@@ -967,33 +1101,33 @@ Where:
 
   - $(math_dict[:kappa_rm])
   - ``\\tau``: Target value of the Kaniadakis logarithm.
-  - ``u``: Argument of the Kaniadakis logarithm, the reciprocal of the tail's expected count.
+  - ``u``: Argument of the Kaniadakis logarithm, the reciprocal of the expected count of the tail.
   - $(math_dict[:alpha_rm])
-  - $(math_dict[:T])
+  - $(math_dict[:T]) It is the row count of the sample of the measure, and under a Scenario Cap it is the count of the rows that the result holds.
 
 # Algorithm
 
- 1. Read the sample length `T` with [`effective_sample_size`](@ref) and no weights: the count a Scenario Cap states, else the row count of `pr.X`.
- 2. Form the argument `u = inv(ctx.alpha * T)`, and its plain logarithm `l = log(u)`.
- 3. Form the band `(lo_b, hi_b)` as the ordered pair of `l` and `(u - inv(u)) / 2`, which are the values the Kaniadakis logarithm reaches at the two ends of ``\\kappa \\in (0,\\, 1)``. `# Validation` states the refusal this band carries.
- 4. Normalise the target as `target = alg.target / l`. The normalised coefficient rises once from `1`, so one comparison carries both signs of `l` and the sweep needs no sign branch.
- 5. Bracket the answer with `lo = 0` and `hi = 1`.
- 6. Halve the bracket 64 times. Take the midpoint `kappa` each time, and raise `lo` to it when `kappa_log(u, kappa) / l` is below `target`, or lower `hi` to it otherwise. Sixty-four halvings take the bracket below the resolution of a `Float64`.
+ 1. Read the sample length `T` as the row count of `pr.X`, the scenarios over which the model of the measure forms its coefficient.
+ 2. Make the argument `u = inv(ctx.alpha * T)` and its natural logarithm `l = log(u)`.
+ 3. Make the band `(lo_b, hi_b)` as the ordered pair of `l` and `(u - inv(u)) / 2`. These are the values of the Kaniadakis logarithm at the two ends of ``\\kappa \\in (0,\\, 1)``. `# Validation` states the refusal of this band.
+ 4. Normalise the target as `target = alg.target / l`. The normalised coefficient increases once from `1`, so one comparison serves both signs of `l`, and the bisection needs no branch for the sign.
+ 5. Set the bracket of the answer to `lo = 0` and `hi = 1`.
+ 6. Halve the bracket 64 times. Each time, take the midpoint `kappa`. Set `lo` to it when `kappa_log(u, kappa) / l` is below `target`, and set `hi` to it otherwise. After 64 halvings, the bracket is smaller than the resolution of a `Float64`.
  7. Return the midpoint of the last bracket.
 
 # Arguments
 
   - `alg`: The rule.
-  - `key`: Name of the slot that is being resolved. The budget is the same for every key.
-  - `pr`: Prior result the sample length is read off.
-  - `w`: Effective observation weights. This rule reads the raw row count, so it ignores them; under a Scenario Cap the count is the one the result states in `ens`.
-  - `slv`: Effective solver. This rule needs none, because the inversion is a scalar one.
-  - `ctx`: The site's [`CalibrationContext`](@ref). `ctx.alpha` is the sibling significance level, and it must hold a number.
+  - `key`: Name of the slot that the call resolves. The budget is the same for every key.
+  - `pr`: Prior result from which the rule reads the sample length.
+  - `w`: Effective observation weights. The coefficient of the model counts rows, so the rule does not read the weights.
+  - `slv`: Effective solver. This rule needs none, because the inversion is scalar.
+  - `ctx`: The [`CalibrationContext`](@ref) of the site. `ctx.alpha` is the sibling significance level, and it must hold a number.
 
 # Validation
 
   - `ctx.alpha` must not be `nothing`.
-  - `alg.target` must lie strictly between ``\\ln(u)`` and ``\\sinh(\\ln(u))``, which is the band the coefficient reaches over ``\\kappa \\in (0,\\, 1)``.
+  - `alg.target` must be strictly between ``\\ln(u)`` and ``\\sinh(\\ln(u))``, which is the band of the coefficient over ``\\kappa \\in (0,\\, 1)``.
 
 # Returns
 
@@ -1005,12 +1139,16 @@ Where:
   - [`CalibrationContext`](@ref)
   - [`kappa_log`](@ref)
   - [`resolve_calibration_slot`](@ref)
+
+# References
+
+  - $(ref_dict[:kaniadakis2001]) Equation 63.
 """
 function (alg::EntropyBudget)(::Symbol, pr::AbstractPriorResult, ::Any, ::Any,
                               ctx::CalibrationContext)
     @argcheck(!isnothing(ctx.alpha),
               IsNothingError("`CalibrationContext.alpha` is `nothing`, so `EntropyBudget` cannot form `inv(alpha * T)`. The sibling `alpha` reaches the rule in the context the slot owner builds, after it resolves `alpha`. State `alpha` in the context to run the rule outside a measure."))
-    T = effective_sample_size(pr, nothing)
+    T = size(pr.X, 1)
     u = inv(ctx.alpha * T)
     l = log(u)
     lo_b, hi_b = minmax(l, (u - inv(u)) / 2)
@@ -1036,27 +1174,27 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Estimate the tail index of the pool of standardised values of `X`, over the worst `k` order statistics of the pool.
+Estimates the tail index of the pool of standardised values of `X`, over the `k` most extreme order statistics of the pool.
 
-`series` names the series each column carries, and [`calibration_series_vec`](@ref) builds it. Every such series is centred and divided by its own sample dispersion, and `s` names the end. Hill's estimator reads the `k` of the `T N` standardised values that lie furthest into that end. [`HillTailDecay`](@ref) states the reading and the assumptions the pool carries. This verb is the estimate alone.
+`series` names the series of each column, and [`calibration_series_vec`](@ref) makes it. The function centres each series and divides it by its sample standard deviation, and `s` names the end. The estimator of [hill1975](@cite) reads the `k` of the `T N` standardised values that are furthest into that end. [`HillTailDecay`](@ref) states the assumptions of the pool. This function makes the estimate alone.
 
-The pool holds `T` values per column under every marker, because a drawdown series holds one entry per observation. So the count `k` the caller formed is the count this verb reads, whatever the series is.
+The pool holds `T` values for each column under every marker, because a drawdown series has one entry for each observation. So the function reads the count `k` that the caller made, for every series.
 
-The element type is bound by the signature, so the pool and the sum it feeds are concrete. A rule reads `pr.X` off an [`AbstractPriorResult`](@ref), whose field types no signature states, and this is the boundary that type crosses at.
+The signature binds the element type, so the pool and its sum have concrete types. A rule reads `pr.X` from an [`AbstractPriorResult`](@ref), whose field types no signature states, and this function is the boundary where the type becomes concrete.
 
 # Algorithm
 
  1. Read the shape of `X` into `T` and `N`, and allocate the pool `pool` of `T * N` values.
- 2. Walk the columns of `X`. Build each column's series with [`calibration_series_vec`](@ref), take its sample mean `mu` and its sample dispersion `sd`, and write `-s * (col[t] - mu) / sd` into `pool`.
- 3. Partially sort `pool` so that its `k + 1` smallest values sit in order at the front, and read the last of them into `vkp1`. `partialsort!` places one index alone, and it makes no promise about the rest of the vector, so the range is what puts the `k` entries the estimate reads before `vkp1`. The sign of step 2 puts the end the caller prices in the **lower** tail of the pool.
- 4. Return `k` over the sum of `log(pool[i] / vkp1)` across those `k` entries. Both terms of each ratio are negative, so the ratio is one of magnitudes and the sum is Hill's with no further sign.
+ 2. Walk the columns of `X`. Make the series of each column with [`calibration_series_vec`](@ref), take its sample mean `mu` and its sample standard deviation `sd`, and write `-s * (col[t] - mu) / sd` into `pool`.
+ 3. Partially sort `pool`, so that its `k + 1` smallest values are in order at the start, and read the last of them into `vkp1`. `partialsort!` with one index puts only that index in place, so the range is necessary to put the `k` entries of the estimate before `vkp1`. The sign of step 2 puts the end that the caller prices in the **lower** tail of the pool.
+ 4. Return `k` divided by the sum of `log(pool[i] / vkp1)` over those `k` entries. Both terms of each ratio are negative, so the ratio is a ratio of magnitudes, and the sum needs no change of sign.
 
 # Arguments
 
-  - `series`: The series each column carries.
+  - `series`: The series of each column.
   - `X`: Returns matrix, `T × N`.
-  - `s`: Sign of the end the estimate reads: `1` reads the gain tail and `-1` reads the loss tail.
-  - `k`: Number of order statistics the estimate reads. The caller states it, and the caller keeps the floor under it.
+  - `s`: Sign of the end that the estimate reads. `1` reads the gain tail, and `-1` reads the loss tail.
+  - `k`: Number of order statistics that the estimate reads. The caller states it and checks its floor.
 
 # Validation
 
@@ -1071,6 +1209,10 @@ The element type is bound by the signature, so the pool and the sum it feeds are
   - [`HillTailDecay`](@ref)
   - [`AbstractCalibrationSeries`](@ref)
   - [`calibration_series_vec`](@ref)
+
+# References
+
+  - $(ref_dict[:hill1975]) Pages 1163–1174. $(ref_dict[:no_original_source])
 """
 function hill_tail_index(series::AbstractCalibrationSeries, X::AbstractMatrix{E},
                          s::Integer, k::Integer) where {E <: Number}
@@ -1100,14 +1242,14 @@ end
 """
     series_end_sign(series::AbstractCalibrationSeries, key::Symbol)
 
-Return the sign of the end that `key` prices on `series`, and refuse an end the series does not have.
+Returns the sign of the end that `key` prices on `series`, and refuses an end that the series does not have.
 
-`:kappa_b` is the only head key, so on a returns series every other key prices the loss end. A drawdown series is non-positive and carries one end alone, so the head key names nothing on it and is refused. No drawdown Range measure ships, so the refusal is reached by a caller who runs a rule by hand.
+`:kappa_b` is the only head key, so on a returns series every other key prices the loss end. A drawdown series is not positive and has only one end. So the head key names no end on it, and the function refuses it. The library has no drawdown Range measure, so only a caller who runs a rule directly gets this refusal.
 
 # Arguments
 
-  - `series`: The series the estimate is taken over.
-  - `key`: Name of the slot that is being resolved.
+  - `series`: The series of the estimate.
+  - `key`: Name of the slot that the call resolves.
 
 # Validation
 
@@ -1137,29 +1279,34 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Computes the Kaniadakis deformation parameter whose tail decays at the rate the sample's own tail decays at.
+Computes the Kaniadakis deformation parameter whose tail decays at the rate of the tail of the sample.
 
-The inverse of [`kappa_log`](@ref) is the ``\\kappa``-exponential ``\\exp_{\\kappa}(x) = \\left(\\kappa x + \\sqrt{1 + \\kappa^{2} x^{2}}\\right)^{1/\\kappa}``, which goes to ``(2 \\kappa x)^{1/\\kappa}`` for large ``x``. A ``\\kappa``-deformed exponential tail is therefore a power law of index ``1/\\kappa``, and ``\\kappa`` is a reciprocal tail index. So the rule estimates the sample's tail index ``\\hat{a}`` and returns ``1/\\hat{a}``, which makes the deformation decay at the rate the sample decays at. The band the slot admits, ``(0,\\, 1)``, reads as ``\\hat{a} > 1``, and that is the condition for a finite mean. The refusal is built into the reading, on the same terms as the band of [`EntropyBudget`](@ref).
+The inverse of [`kappa_log`](@ref) is the ``\\kappa``-exponential ``\\exp_{\\kappa}(x) = \\left(\\kappa x + \\sqrt{1 + \\kappa^{2} x^{2}}\\right)^{1/\\kappa}`` of Equation 53 of [kaniadakis2001](@cite). It approaches ``(2 \\kappa x)^{1/\\kappa}`` for large ``x``, as page 20 of [kaniadakis2001](@cite) states. So a ``\\kappa``-deformed exponential tail is a power law of index ``1/\\kappa``, and ``\\kappa`` is the reciprocal of a tail index. The rule estimates the tail index ``\\hat{a}`` of the sample and returns ``1/\\hat{a}``, so the deformation decays at the rate of the sample. The band of the slot, ``(0,\\, 1)``, is ``\\hat{a} > 1``, which is the condition for a finite mean. So the rule refuses an estimate outside the band, as [`EntropyBudget`](@ref) refuses a target outside its band.
 
-The estimator is Hill's, over the worst `k` order statistics of a **pool**. Every column of `pr.X` is centred and divided by its own sample dispersion, the standardised values are signed to the end the slot prices, and the `T * N` of them are pooled. **The rule reads `pr.X` alone, and never `pr.sigma`.** A column's dispersion comes from that column, which is the line that separates this rule from [`RadialTailDecay`](@ref). The two answer two questions: this rule asks how far one end of one column moves, and its sibling asks how far the whole cross-section moves. So this rule keeps the sign of the end and answers per end, and its sibling reads a distance and answers one number for both.
+The estimator is that of [hill1975](@cite), over the `k` most extreme order statistics of a **pool**. The rule centres each column of `pr.X` and divides it by its sample standard deviation. It gives the standardised values the sign of the end that the slot prices, and it pools all `T * N` of them. **The rule reads only `pr.X`, and never `pr.sigma`.** The dispersion of a column comes from that column. This is the difference from [`RadialTailDecay`](@ref). This rule measures how far one end of one column moves, and its sibling measures how far the whole cross-section moves. So this rule keeps the sign of the end and gives one answer for each end. Its sibling reads a distance and gives one answer for both ends.
 
-The pool carries two assumptions, and both are stated rather than hidden. The columns share one tail index after standardisation, which is what lets one estimate stand for the whole sample. The columns are also cross-correlated, so the pool holds far fewer than `T * N` independent points and the estimator's spread is wider than the nominal one of `k` points. The median of `N` per-asset estimates drops both assumptions, and pays for it in noise: at `alpha = 0.05` and `T = 250` a column leaves 12 tail points, and a Hill estimate on 12 points moves from fold to fold for no reason in the data.
+The pool has two assumptions:
 
-`alpha` fixes the depth of the reading as well as the count. A Hill estimate reads the tail at the depth `alpha` names, and a sample whose tail approaches its power law slowly is read with a bias that falls as the depth rises: a Student-t sample read at a five per cent depth returns a ``\\kappa`` above the reciprocal of its degrees of freedom, and the same sample read at one per cent returns most of that distance. The spread of the estimate rises as the count falls, and `kmin` is the floor under that trade.
+  - The columns have one tail index after standardisation, so one estimate serves the whole sample.
+  - The columns are cross-correlated. So the pool holds far fewer than `T * N` independent points, and the spread of the estimator is wider than the spread for `k` independent points.
 
-`key` says which end the slot prices, and **the answer is not the same for every key**. `:kappa` and `:kappa_a` read the loss tail, and `:kappa_b` reads the gain tail. This is the opposite of [`EntropyBudget`](@ref), whose budget is a price the model pays and is therefore one number for both ends. A tail index is a statement about a tail, and a skewed sample has two different ones, which is the whole point of the rule on a Range measure.
+The median of `N` estimates, one for each asset, needs neither assumption, but it is less accurate. At `alpha = 0.05` and `T = 250`, a column has 13 tail points, and a Hill estimate on 13 points changes from fold to fold with no cause in the data.
 
-**`ctx.series` says which quantity the pool holds, and the slot owner states it.** A measure of the return distribution pools the columns of `pr.X`. A drawdown measure pools the per-column drawdown series of `pr.X` instead, because that is the quantity it prices, and the resolution site names the marker in `ctx.series`. Nothing else in the reading moves: the same standardisation, the same count and the same estimator run over the drawdown sample. The estimate the pool then carries is the index of the drawdown series rather than of the returns, and the two are different numbers. [`AbstractDrawdownSeries`](@ref) states which way they part, and it is the record that decides.
+`alpha` fixes the depth of the estimate as well as the count. A Hill estimate reads the tail at the depth that `alpha` names. If the tail of a sample approaches its power law slowly, the estimate has a bias that decreases as the depth increases. For example, a Student-t sample at a depth of five per cent gives a ``\\kappa`` above the reciprocal of its degrees of freedom. The same sample at a depth of one per cent gives a ``\\kappa`` that is nearer to it. The spread of the estimate increases as the count decreases, and `kmin` is the floor of that count.
 
-**The per-column reading stands for the portfolio's own drawdown**, under the assumption the pool already states. The rule forms no portfolio, so it reads the drawdown series of each column and pools them, exactly as it pools the columns themselves on a returns series. The columns share one tail index after standardisation, and one map carries a column to its drawdown series, so the reading the pool gives is the reading the portfolio's own drawdown series would give. A portfolio drawdown is shallower than the average asset drawdown, and that is a statement about the **scale**, which a tail index does not read.
+`key` names the end that the slot prices, so **the answer can be different for each key**. `:kappa` and `:kappa_a` read the loss tail, and `:kappa_b` reads the gain tail. [`EntropyBudget`](@ref) is different, because its budget is a price that the model pays, so it gives one number for both ends. A tail index is a property of one tail, and a skewed sample has two different tail indices. On a Range measure, the rule gives the two ends two different numbers.
 
-The count is the same count. A drawdown series holds one entry per observation, so the pool holds `T N` entries under every marker and `k = ceil(alpha * T * N)` is unchanged. No observation is dropped by the change of series.
+**`ctx.series` names the quantity in the pool, and the slot owner states it.** A measure of the return distribution pools the columns of `pr.X`. A drawdown measure pools the drawdown series of each column of `pr.X`, because it prices that quantity. The resolution site names the marker in `ctx.series`. The standardisation, the count and the estimator do not change. The pool then gives the tail index of the drawdown series and not of the returns, and the two numbers are different. [`AbstractDrawdownSeries`](@ref) states how the length of the record decides the difference.
 
-`alpha` reaches the right series as well. A drawdown measure resolves the significance level of its own drawdown series, and the depth the rule reads is that same level under a drawdown marker.
+**The drawdown series of the columns stand for the drawdown of the portfolio**, under the assumption of the pool. The rule makes no portfolio, so it pools the drawdown series of the columns, as it pools the columns on a returns series. The columns have one tail index after standardisation, and one map takes a column to its drawdown series. So the pool gives the same estimate as the drawdown series of the portfolio. A portfolio drawdown is smaller than the average asset drawdown, but that is a difference of **scale**, and a tail index does not read the scale.
 
-The pool of a drawdown series carries **more dependence** than the pool of a returns series. A drawdown series is a running functional, so consecutive entries move together and one deep episode fills many of the `k` order statistics the estimate reads. The `T N` entries therefore hold far fewer independent tail points than the same count of returns, and the spread of the estimate is wider than the count states. `kmin` is stated in entries and not in independent points, so the same floor buys less here. Raise it for a drawdown owner.
+A drawdown series has one entry for each observation. So the pool holds `T N` entries under every marker, and the count `k = ceil(alpha * T * N)` does not change. The change of series drops no observation.
 
-The rule carries no range check on the parameter it returns. The slot owner's constructor keeps that job, as it does for every calibration rule. Its checks are statements that the estimate exists at all.
+A drawdown measure resolves the significance level of its own drawdown series. So under a drawdown marker, the rule reads its tail at the level of that series.
+
+The pool of a drawdown series has **more dependence** than the pool of a returns series. A drawdown series is a running function of the path, so consecutive entries move together, and one deep drawdown fills many of the `k` order statistics of the estimate. So the `T N` entries hold far fewer independent tail points than the same count of returns, and the spread of the estimate is wider than the count suggests. `kmin` counts entries and not independent points, so the same floor gives less accuracy here. Use a larger `kmin` for a drawdown owner.
+
+The rule does not check the range of the parameter that it returns. The constructor of the slot owner does that, as for every calibration rule. The checks of the rule state that the estimate exists.
 
 # Fields
 
@@ -1171,7 +1318,7 @@ $(DocStringExtensions.FIELDS)
         kmin::Integer = 30
     ) -> HillTailDecay
 
-Keywords correspond to the struct's fields. `kmin` defaults to `30`, which is the floor under the count of order statistics the estimate reads. The significance level and the series the estimate is taken over are not fields of the rule: both reach it in the [`CalibrationContext`](@ref) the site hands over.
+Keywords correspond to the fields of the struct. The default `kmin = 30` is the floor of the count of order statistics that the estimate reads. The significance level and the series of the estimate are not fields of the rule. Both reach the rule in the [`CalibrationContext`](@ref) of the site.
 
 ## Validation
 
@@ -1188,6 +1335,11 @@ Keywords correspond to the struct's fields. `kmin` defaults to `30`, which is th
   - [`kappa_log`](@ref)
   - [`RadialTailDecay`](@ref)
   - [`series_end_sign`](@ref)
+
+# References
+
+  - $(ref_dict[:kaniadakis2001]) Equation 53 and page 20.
+  - $(ref_dict[:hill1975]) Pages 1163–1174. $(ref_dict[:no_original_source])
 """
 @concrete struct HillTailDecay <: AbstractDeformationCalibrationAlgorithm
     """
@@ -1205,7 +1357,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Compute the deformation parameter whose reciprocal is the Hill tail index of the series that `ctx.series` names, over the sample that `pr` carries.
+Computes the deformation parameter whose reciprocal is the Hill tail index of the series that `ctx.series` names, over the sample of `pr`.
 
 # Mathematical definition
 
@@ -1226,46 +1378,46 @@ k &= \\left\\lceil \\alpha T N \\right\\rceil\\,,\\\\
 Where:
 
   - $(math_dict[:kappa_rm])
-  - $(math_dict[:alpha_rm]) It is the probability of the end this slot prices, so a head slot reads its own ``\\beta``.
+  - $(math_dict[:alpha_rm]) It is the probability of the end that this slot prices, so a head slot reads its own ``\\beta``.
   - $(math_dict[:T])
   - $(math_dict[:N])
   - $(math_dict[:r_tj])
   - ``\\boldsymbol{r}_{j}``: Column ``j`` of the sample.
-  - ``\\mathcal{S}``: The series `ctx.series` names, built from one column. It is the identity on a [`ReturnsSeries`](@ref), and a drawdown series on the two markers of [`AbstractDrawdownSeries`](@ref).
+  - ``\\mathcal{S}``: The series that `ctx.series` names, made from one column. It is the identity for a [`ReturnsSeries`](@ref), and a drawdown series for the two markers of [`AbstractDrawdownSeries`](@ref).
   - ``y_{tj}``: Entry ``t`` of the series of column ``j``.
-  - ``\\hat{\\mu}_{j}``: Sample mean of the series of column ``j``, and not of the column under a drawdown marker.
-  - ``\\hat{\\sigma}_{j}``: Sample dispersion of the series of column ``j``, read off that series alone and never off ``\\hat{\\mathbf{\\Sigma}}``.
-  - ``s``: Sign of the end the slot prices.
-  - ``u_{tj}``: Standardised value of asset ``j`` at time ``t``, signed so that the end the slot prices is the upper tail of the pool.
+  - ``\\hat{\\mu}_{j}``: Sample mean of the series of column ``j``. Under a drawdown marker, it is not the mean of the column.
+  - ``\\hat{\\sigma}_{j}``: Sample standard deviation of the series of column ``j``. The rule reads it from that series, and never from ``\\hat{\\mathbf{\\Sigma}}``.
+  - ``s``: Sign of the end that the slot prices.
+  - ``u_{tj}``: Standardised value of asset ``j`` at time ``t``. Its sign makes the end that the slot prices the upper tail of the pool.
   - ``u_{(i)}``: ``i``-th largest of the ``T N`` pooled values, so that ``u_{(1)} \\geq \\ldots \\geq u_{(k+1)}``.
-  - ``k``: Number of order statistics the estimate reads.
+  - ``k``: Number of order statistics that the estimate reads.
   - ``\\hat{a}``: Hill estimate of the tail index of the pool.
 
 # Algorithm
 
- 1. Read the returns matrix off `pr` into `X`, and its element count into `np`.
- 2. Take the sign `s` from `key` and `ctx.series` with [`series_end_sign`](@ref). A drawdown series carries one end, so it refuses the head key rather than signing it.
- 3. Form the count `k = ceil(Int, ctx.alpha * np)`, the number of order statistics the estimate reads.
- 4. Estimate the tail index of the pool with [`hill_tail_index`](@ref), giving `a`. The pool holds the series `ctx.series` names, one entry per observation per column under every marker.
- 5. Return `inv(a)`, which is the deformation parameter.
+ 1. Read the returns matrix of `pr` into `X`, and its element count into `np`.
+ 2. Take the sign `s` from `key` and `ctx.series` with [`series_end_sign`](@ref). A drawdown series has one end, so it refuses the head key.
+ 3. Make the count `k = ceil(Int, ctx.alpha * np)`, the number of order statistics that the estimate reads.
+ 4. Estimate the tail index `a` of the pool with [`hill_tail_index`](@ref). Under every marker, the pool holds the series that `ctx.series` names, with one entry for each observation of each column.
+ 5. Return `inv(a)`, the deformation parameter.
 
 # Arguments
 
   - `alg`: The rule.
-  - `key`: Name of the slot that is being resolved. It names the end, so `:kappa` and `:kappa_a` read the loss tail and `:kappa_b` reads the gain tail. A skewed sample therefore resolves the two ends of a Range measure to two different numbers.
-  - `pr`: Prior result the returns matrix is read off.
-  - `w`: Effective observation weights. A tail index is a statement about the shape of a series rather than about the count of observations behind it, so this rule ignores them.
+  - `key`: Name of the slot that the call resolves. It names the end. `:kappa` and `:kappa_a` read the loss tail, and `:kappa_b` reads the gain tail. So a skewed sample gives the two ends of a Range measure two different numbers.
+  - `pr`: Prior result from which the rule reads the returns matrix.
+  - `w`: Effective observation weights. A tail index is a property of the shape of a series and not of the count of observations behind it, so this rule does not read them.
   - `slv`: Effective solver. This rule needs none, because the estimate is a closed form.
-  - `ctx`: The site's [`CalibrationContext`](@ref). `ctx.alpha` is the significance level of the end, and it must hold a number. `ctx.series` names the quantity the pool holds.
+  - `ctx`: The [`CalibrationContext`](@ref) of the site. `ctx.alpha` is the significance level of the end, and it must hold a number. `ctx.series` names the quantity in the pool.
 
 # Validation
 
   - `ctx.alpha` must not be `nothing`.
-  - `key` must name an end the series has, which [`series_end_sign`](@ref) checks.
+  - `key` must name an end of the series. [`series_end_sign`](@ref) checks it.
   - `k` must be at least `alg.kmin`.
   - The pool must hold at least `k + 1` values.
-  - ``u_{(k+1)}`` must be positive, which [`hill_tail_index`](@ref) checks.
-  - ``\\hat{a}`` must be greater than one, which is the band ``\\kappa \\in (0,\\, 1)`` read as a tail index.
+  - ``u_{(k+1)}`` must be positive. [`hill_tail_index`](@ref) checks it.
+  - ``\\hat{a}`` must be greater than one. That is the band ``\\kappa \\in (0,\\, 1)`` as a tail index.
 
 # Returns
 
@@ -1281,6 +1433,10 @@ Where:
   - [`RadialTailDecay`](@ref)
   - [`resolve_calibration_slot`](@ref)
   - [`series_end_sign`](@ref)
+
+# References
+
+  - $(ref_dict[:hill1975]) Pages 1163–1174. $(ref_dict[:no_original_source])
 """
 function (alg::HillTailDecay)(key::Symbol, pr::AbstractPriorResult, ::Any, ::Any,
                               ctx::CalibrationContext)
@@ -1307,34 +1463,38 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return the square factor of the covariance matrix that `pr` states, so that the factor's transpose whitens a centred observation.
+Returns an upper triangular square factor of the covariance matrix of `pr`, so that the transpose of the factor whitens a centred observation.
 
-The factor ``\\mathbf{U}`` satisfies ``\\mathbf{U}^{\\top} \\mathbf{U} = \\hat{\\mathbf{\\Sigma}}``, which is the convention a prior result's `chol` carries and the one the variance constraint layer reads. **`chol` takes precedence over `sigma`**, which is the rule the `chol` field states, so a prior that carries a factor is whitened by that factor and never by a factorisation of `sigma`. `chol` is optional, so the common case is a `sigma` this verb factorises itself.
+The factor ``\\mathbf{U}`` satisfies ``\\mathbf{U}^{\\top} \\mathbf{U} = \\hat{\\mathbf{\\Sigma}}``. That is the convention of the `chol` field of a prior result, and the variance constraint layer uses it too. **`chol` has precedence over `sigma`**, as the `chol` field states. So the function whitens a prior that has a factor with that factor, and never with a factorisation of `sigma`. `chol` is optional, so usually the function factorises `sigma`.
 
-`chol` is checked against the length of `mu` alone, so it can be ``K \\times N`` rather than square. A rectangular factor has no inverse. A tall factor states a covariance matrix all the same, because ``\\mathbf{U}^{\\top} \\mathbf{U}`` is ``N \\times N`` at any ``K``, and the ``\\mathbf{R}`` factor of its QR factorisation is the square factor of that same matrix. A wide factor states a singular covariance matrix, and no whitening exists for it.
+The library checks `chol` only against the length of `mu`, so it can be ``K \\times N`` and not square, and a square `chol` need not be triangular. The function needs a triangular factor, because only the diagonal of a triangular factor gives its rank:
 
-[`RadialTailDecay`](@ref) is the caller. The verb is separate because the precedence rule and its two refusals are a statement about a prior result rather than about a tail index.
+  - A `chol` of type `LinearAlgebra.UpperTriangular` is the factor.
+  - Every other `chol` with ``K \\geq N`` gives the ``\\mathbf{R}`` factor of its QR factorisation. ``\\mathbf{R}^{\\top} \\mathbf{R} = \\mathbf{F}^{\\top} \\mathbf{F}``, so ``\\mathbf{R}`` is a triangular factor of the same covariance matrix. This includes a tall factor, and a square factor that is not triangular, such as a symmetric square root.
+  - A wide `chol`, with ``K < N``, gives a singular covariance matrix, and no whitening exists for it.
+
+[`RadialTailDecay`](@ref) calls this function. The function is separate because the precedence rule and its refusals are facts about a prior result and not about a tail index.
 
 # Algorithm
 
  1. Read `pr.chol` into `F`.
- 2. When `F` is `nothing`, factorise `pr.sigma` with a Cholesky factorisation that reports rather than raises, and return its upper factor.
- 3. Otherwise refuse a wide `F`, and take `F` itself when it is square and the `R` factor of its QR factorisation when it is tall.
- 4. Refuse a zero on the diagonal of that factor, which is the rank of a triangular factor, and return the factor.
+ 2. When `F` is `nothing`, factorise `pr.sigma` with a Cholesky factorisation that reports a failure and does not raise it, and return its upper factor.
+ 3. Otherwise, refuse a wide `F`. Take `F` when it is an `UpperTriangular`, and the `R` factor of its QR factorisation otherwise.
+ 4. Refuse a zero on the diagonal of that triangular factor, because it gives a singular covariance matrix, and return the factor.
 
 # Arguments
 
-  - `pr`: Prior result the covariance matrix is read off.
+  - `pr`: Prior result from which the function reads the covariance matrix.
 
 # Validation
 
   - `pr.sigma` must be positive definite, when `pr.chol` is `nothing`.
   - `pr.chol` must have at least as many rows as columns.
-  - The diagonal of the square factor must carry no zero.
+  - The diagonal of the triangular factor must have no zero.
 
 # Returns
 
-  - `U::AbstractMatrix`: Square factor of the covariance matrix, upper triangular whenever the prior's own factor is.
+  - `U::AbstractMatrix`: Upper triangular square factor of the covariance matrix.
 
 # Related
 
@@ -1352,35 +1512,36 @@ function whitening_factor(pr::AbstractPriorResult)
     end
     @argcheck(size(F, 1) >= size(F, 2),
               DimensionMismatch("`pr.chol` is $(size(F, 1)) × $(size(F, 2)), so the covariance matrix `pr.chol' * pr.chol` it states has rank at most $(size(F, 1)) over $(size(F, 2)) assets and is singular. No whitening of the sample exists. `pr.chol` takes precedence over `pr.sigma` at every consumer, so dropping to `pr.sigma` here would state something the prior does not."))
-    U = size(F, 1) == size(F, 2) ? F : LinearAlgebra.UpperTriangular(LinearAlgebra.qr(F).R)
+    UT = LinearAlgebra.UpperTriangular
+    U = F isa UT ? F : UT(LinearAlgebra.qr(F).R)
     j = findfirst(iszero, LinearAlgebra.diag(U))
     @argcheck(isnothing(j),
               DomainError(j,
-                          "Entry $j of the diagonal of the square factor of `pr.chol` is zero, so the covariance matrix it states is singular and no whitening of the sample exists. The diagonal is the rank of a triangular factor, which is what `pr.chol` carries."))
+                          "Entry $j of the diagonal of the triangular factor of `pr.chol` is zero, so the covariance matrix it states is singular and no whitening of the sample exists. The diagonal of a triangular factor gives its rank, so the check reads `pr.chol` itself when it is an `UpperTriangular`, and the R factor of its QR factorisation otherwise."))
     return U
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Estimate the tail index of the radial series of `X`, over the largest `k` order statistics of that series.
+Estimates the tail index of the radial series of `X`, over the `k` largest order statistics of that series.
 
-Every row is centred on `mu` and whitened by `U`, and the norm of the whitened row is one entry of the radial series. Hill's estimator then reads the `k` entries that lie furthest out. [`RadialTailDecay`](@ref) states the reading the series carries. This verb is the estimate alone.
+The function centres each row on `mu` and whitens it with `U`. The norm of the whitened row is one entry of the radial series. The estimator of [hill1975](@cite) then reads the `k` entries that are furthest out. [`RadialTailDecay`](@ref) states what the series measures. This function makes the estimate alone.
 
-The element type is bound by the signature, so the series and the sum it feeds are concrete. A rule reads `pr.X` off an [`AbstractPriorResult`](@ref), whose field types no signature states, and this is the boundary that type crosses at.
+The signature binds the element type, so the series and its sum have concrete types. A rule reads `pr.X` from an [`AbstractPriorResult`](@ref), whose field types no signature states, and this function is the boundary where the type becomes concrete.
 
 # Algorithm
 
- 1. Solve `transpose(U) \\ transpose(X .- transpose(mu))`, giving the whitened observations as the columns of `Z`.
- 2. Walk the columns of `Z`, and write the negated Euclidean norm of each into the series `d`.
- 3. Partially sort `d` so that its `k + 1` smallest values sit in order at the front, and read the last of them into `vkp1`. `partialsort!` places one index alone, and it makes no promise about the rest of the vector, so the range is what puts the `k` entries the estimate reads before `vkp1`. The negation of step 2 puts the largest distances at the front.
- 4. Return `k` over the sum of `log(d[i] / vkp1)` across those `k` entries. Both terms of each ratio are negative, so the ratio is one of magnitudes and the sum is Hill's with no further sign.
+ 1. Solve `transpose(U) \\ transpose(X .- transpose(mu))`. The columns of the result `Z` are the whitened observations.
+ 2. Walk the columns of `Z`, and write the negative Euclidean norm of each column into the series `d`.
+ 3. Partially sort `d`, so that its `k + 1` smallest values are in order at the start, and read the last of them into `vkp1`. `partialsort!` with one index puts only that index in place, so the range is necessary to put the `k` entries of the estimate before `vkp1`. The negative sign of step 2 puts the largest distances at the start.
+ 4. Return `k` divided by the sum of `log(d[i] / vkp1)` over those `k` entries. Both terms of each ratio are negative, so the ratio is a ratio of magnitudes, and the sum needs no change of sign.
 
 # Arguments
 
   - `X`: Returns matrix, `T × N`.
-  - `mu`: Expected returns vector, `N × 1`. The rows are centred on it.
-  - `U`: Square factor of the covariance matrix, which [`whitening_factor`](@ref) returns.
-  - `k`: Number of order statistics the estimate reads. The caller states it, and the caller keeps the floor under it.
+  - `mu`: Expected returns vector, `N × 1`. The function centres the rows on it.
+  - `U`: Upper triangular square factor of the covariance matrix, which [`whitening_factor`](@ref) returns.
+  - `k`: Number of order statistics that the estimate reads. The caller states it and checks its floor.
 
 # Validation
 
@@ -1394,6 +1555,10 @@ The element type is bound by the signature, so the series and the sum it feeds a
 
   - [`RadialTailDecay`](@ref)
   - [`whitening_factor`](@ref)
+
+# References
+
+  - $(ref_dict[:hill1975]) Pages 1163–1174. $(ref_dict[:no_original_source])
 """
 function radial_tail_index(X::AbstractMatrix{E}, mu::AbstractVector, U::AbstractMatrix,
                            k::Integer) where {E <: Number}
@@ -1416,23 +1581,23 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Computes the Kaniadakis deformation parameter whose tail decays at the rate the sample's radial series decays at.
+Computes the Kaniadakis deformation parameter whose tail decays at the rate of the radial series of the sample.
 
-The inverse of [`kappa_log`](@ref) is the ``\\kappa``-exponential ``\\exp_{\\kappa}(x) = \\left(\\kappa x + \\sqrt{1 + \\kappa^{2} x^{2}}\\right)^{1/\\kappa}``, which goes to ``(2 \\kappa x)^{1/\\kappa}`` for large ``x``. A ``\\kappa``-deformed exponential tail is therefore a power law of index ``1/\\kappa``, and ``\\kappa`` is a reciprocal tail index. So the rule estimates a tail index ``\\hat{a}`` and returns ``1/\\hat{a}``, which makes the deformation decay at the rate the sample decays at. The band the slot admits, ``(0,\\, 1)``, reads as ``\\hat{a} > 1``, and that is the condition for a finite mean. The refusal is built into the reading, on the same terms as the band of [`EntropyBudget`](@ref).
+The inverse of [`kappa_log`](@ref) is the ``\\kappa``-exponential ``\\exp_{\\kappa}(x) = \\left(\\kappa x + \\sqrt{1 + \\kappa^{2} x^{2}}\\right)^{1/\\kappa}`` of Equation 53 of [kaniadakis2001](@cite). It approaches ``(2 \\kappa x)^{1/\\kappa}`` for large ``x``, as page 20 of [kaniadakis2001](@cite) states. So a ``\\kappa``-deformed exponential tail is a power law of index ``1/\\kappa``, and ``\\kappa`` is the reciprocal of a tail index. The rule estimates a tail index ``\\hat{a}`` and returns ``1/\\hat{a}``, so the deformation decays at the rate of the sample. The band of the slot, ``(0,\\, 1)``, is ``\\hat{a} > 1``, which is the condition for a finite mean. So the rule refuses an estimate outside the band, as [`EntropyBudget`](@ref) refuses a target outside its band.
 
-**The series the rule reads is radial.** A covariance matrix is a scale and ``\\kappa`` is a shape, so a rule that turns the one into the other needs a second quantity to fix the units, and the sample is the only one a prior result carries. The covariance matrix is what turns the ``T \\times N`` sample into **one** univariate series: [`whitening_factor`](@ref) gives the factor of ``\\hat{\\mathbf{\\Sigma}}``, each row is centred and whitened, and the Euclidean norm of the whitened row is that observation's Mahalanobis distance. Under an elliptical scale mixture that series carries the mixture's tail index, and the whole cross-section stands behind every entry of it. A per-column standardisation drops every off-diagonal term, so [`HillTailDecay`](@ref) cannot buy that reading and this rule cannot buy the per-column one.
+**The rule reads a radial series.** A covariance matrix is a scale and ``\\kappa`` is a shape. So a rule that gets a shape from a scale needs a second quantity to fix the units, and the sample is the only such quantity in a prior result. The covariance matrix turns the ``T \\times N`` sample into **one** univariate series. [`whitening_factor`](@ref) gives the factor of ``\\hat{\\mathbf{\\Sigma}}``, the rule centres and whitens each row, and the Euclidean norm of the whitened row is the Mahalanobis distance of that observation. Under an elliptical scale mixture, that series has the tail index of the mixture, and each entry reads the whole cross-section. A standardisation per column removes every off-diagonal term. So [`HillTailDecay`](@ref) cannot give this estimate, and this rule cannot give the estimate per column.
 
-**The rule is direction-blind, and that is a statement.** A distance has no sign, so one ``\\kappa`` answers both ends of a Range measure and `key` is ignored. [`HillTailDecay`](@ref) answers per end, and the difference is the whole of what the two rules say: a radial reading asks how far the cross-section moves, and a per-column reading asks how far one end of one column moves. A head slot that defaults to its tail slot therefore holds the same rule and reads the same number, which is what makes one rule correct for both ends here.
+**The rule reads no direction.** A distance has no sign, so one ``\\kappa`` serves both ends of a Range measure, and the rule does not read `key`. [`HillTailDecay`](@ref) gives one answer for each end. A radial series measures how far the cross-section moves, and a series per column measures how far one end of one column moves. A head slot that defaults to its tail slot holds the same rule and gets the same number, and that is correct for a distance.
 
-The series holds `T` entries where the pool of [`HillTailDecay`](@ref) holds `T N`, so this rule reads **fewer** tail points from the same sample: `alpha = 0.05` at `T = 250` leaves 12 of them. `kmin` is the floor under that count, and it is stated in the same units as its sibling's, so the floor binds harder here. A count below it is refused rather than estimated. The points the series does hold are one per observation rather than `N` per observation, so they carry none of the cross-correlation the pool carries.
+The series holds `T` entries, and the pool of [`HillTailDecay`](@ref) holds `T N`. So this rule reads **fewer** tail points from the same sample. At `alpha = 0.05` and `T = 250`, the series has 13 of them. `kmin` is the floor of that count, in the same units as the floor of the sibling, so this floor refuses more samples. The rule refuses a count below the floor. The series has one point for each observation and not `N`, so its points have none of the cross-correlation of the pool.
 
-**`series` says which sample the rows are read off, and the slot owner states it.** A measure of the return distribution whitens the rows of `pr.X`. A drawdown measure whitens the rows of the **drawdown sample**: [`calibration_series_matrix`](@ref) turns each column into the drawdown series it carries, and the rows of that sample are whitened and normed on the same terms. So the radial reading itself is unchanged, and only the sample it reads moves. The distance is then the depth of the whole cross-section in drawdown at one date, where on a returns series it is the distance the whole cross-section moved.
+**`series` names the sample of the rows, and the slot owner states it.** A measure of the return distribution whitens the rows of `pr.X`. A drawdown measure whitens the rows of the **drawdown sample**. [`calibration_series_matrix`](@ref) turns each column into its drawdown series, and the rule whitens the rows of that sample and takes their norms in the same way. So the radial series is the same function, and only its sample changes. On a drawdown sample, the distance is the depth of the whole cross-section in drawdown at one date. On a returns series, it is the distance that the whole cross-section moved.
 
-**A drawdown sample carries its own moments, and the prior states none of them.** `pr.mu` and `pr.sigma` are the moments of the returns, and no scaling of them states the moments of a drawdown. So under a drawdown marker the centre is the column means of the drawdown sample and the factor is the Cholesky factor of its covariance matrix, both taken off that sample. [`radial_series_inputs`](@ref) is where the two readings part, and the precedence of `pr.chol` over `pr.sigma` therefore governs the returns reading alone.
+**A drawdown sample has its own moments, and the prior states none of them.** `pr.mu` and `pr.sigma` are the moments of the returns, and no scaling of them gives the moments of a drawdown. So under a drawdown marker, the centre is the vector of column means of the drawdown sample. The factor is the Cholesky factor of the covariance matrix of that sample. [`radial_series_inputs`](@ref) makes this choice, so the precedence of `pr.chol` over `pr.sigma` applies to the returns series alone.
 
-A third reading of ``\\kappa`` exists and this rule does not take it. The excess kurtosis ``g`` of a Student-t gives ``\\nu = 4 + 6/g``, and ``\\kappa = 1/\\nu`` follows. It reads the whole sample rather than the tail, so it is steady where a Hill estimate is noisy, and it pays for that with an assumption about the shape of the whole distribution rather than of its tail.
+The rule does not use a third estimate of ``\\kappa``. The excess kurtosis ``g`` of a Student-t distribution gives ``\\nu = 4 + 6/g``, and then ``\\kappa = 1/\\nu``. That estimate reads the whole sample and not the tail. So it changes less than a Hill estimate, but it assumes the shape of the whole distribution and not only of its tail.
 
-The rule carries no range check on the parameter it returns. The slot owner's constructor keeps that job, as it does for every calibration rule. Its checks are statements that the estimate exists at all. A near-singular covariance matrix is not among them: the whitening then reads the sample's smallest eigen-direction, the radial series follows it, and that is the covariance matrix speaking rather than a defect.
+The rule does not check the range of the parameter that it returns. The constructor of the slot owner does that, as for every calibration rule. The checks of the rule state that the estimate exists. They do not refuse a covariance matrix that is almost singular. The whitening then reads the direction of the smallest eigenvalue of the sample, the radial series follows it, and that is a property of the covariance matrix.
 
 # Fields
 
@@ -1444,7 +1609,7 @@ $(DocStringExtensions.FIELDS)
         kmin::Integer = 30
     ) -> RadialTailDecay
 
-Keywords correspond to the struct's fields. `kmin` defaults to `30`, which is the floor under the count of order statistics the estimate reads. The significance level and the series the estimate is taken over are not fields of the rule: both reach it in the [`CalibrationContext`](@ref) the site hands over.
+Keywords correspond to the fields of the struct. The default `kmin = 30` is the floor of the count of order statistics that the estimate reads. The significance level and the series of the estimate are not fields of the rule. Both reach the rule in the [`CalibrationContext`](@ref) of the site.
 
 ## Validation
 
@@ -1462,6 +1627,11 @@ Keywords correspond to the struct's fields. `kmin` defaults to `30`, which is th
   - [`radial_series_inputs`](@ref)
   - [`radial_tail_index`](@ref)
   - [`whitening_factor`](@ref)
+
+# References
+
+  - $(ref_dict[:kaniadakis2001]) Equation 53 and page 20.
+  - $(ref_dict[:hill1975]) Pages 1163–1174. $(ref_dict[:no_original_source])
 """
 @concrete struct RadialTailDecay <: AbstractDeformationCalibrationAlgorithm
     """
@@ -1479,26 +1649,26 @@ end
 """
     radial_series_inputs(series::AbstractCalibrationSeries, pr::AbstractPriorResult)
 
-Return the sample, the centre and the whitening factor that the radial series of `series` is built from.
+Returns the sample, the centre and the whitening factor from which [`RadialTailDecay`](@ref) makes the radial series of `series`.
 
-A [`ReturnsSeries`](@ref) reads the three off the prior result: `pr.X`, `pr.mu` and the factor [`whitening_factor`](@ref) takes off `pr.chol` or `pr.sigma`. That is the reading [`RadialTailDecay`](@ref) has always carried, and this verb leaves it untouched.
+A [`ReturnsSeries`](@ref) reads the three from the prior result: `pr.X`, `pr.mu` and the factor that [`whitening_factor`](@ref) takes from `pr.chol` or `pr.sigma`.
 
-A drawdown series reads the three off the **drawdown sample** instead, because a prior result states no drawdown moment. [`calibration_series_matrix`](@ref) builds the sample, the centre is the column means of that sample, and the factor is the Cholesky factor of its covariance matrix. So the whole reading moves to the quantity the measure prices, and `pr.mu` and `pr.sigma` reach nothing: they are the moments of the returns, and no scaling of them states the moments of a drawdown.
+A drawdown series reads the three from the **drawdown sample**, because a prior result states no moment of a drawdown. [`calibration_series_matrix`](@ref) makes the sample. The centre is the vector of column means of that sample, and the factor is the Cholesky factor of its covariance matrix. So all three come from the quantity that the measure prices. `pr.mu` and `pr.sigma` are not read, because they are the moments of the returns, and no scaling of them gives the moments of a drawdown.
 
 # Arguments
 
-  - `series`: The series the slot owner prices.
-  - `pr`: Prior result the sample and, on a returns series, the moments are read off.
+  - `series`: The series that the slot owner prices.
+  - `pr`: Prior result. A returns series reads its sample and its moments, and a drawdown series reads its sample.
 
 # Validation
 
-  - The covariance matrix of the drawdown sample must be positive definite. A column with no movement, and two columns with one path between them, are what reach this.
+  - The covariance matrix of the drawdown sample must be positive definite. A column that does not move fails this check. Two columns with the same path also fail it.
 
 # Returns
 
-  - `Y::AbstractMatrix`: The sample the marker names, `T × N`.
+  - `Y::AbstractMatrix`: The sample that the marker names, `T × N`.
   - `mu::AbstractVector`: The centre of that sample, `N × 1`.
-  - `U::AbstractMatrix`: Square factor of its covariance matrix.
+  - `U::AbstractMatrix`: Upper triangular square factor of its covariance matrix.
 
 # Related
 
@@ -1526,7 +1696,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Compute the deformation parameter whose reciprocal is the Hill tail index of the radial series of the sample that `ctx.series` names.
+Computes the deformation parameter whose reciprocal is the Hill tail index of the radial series of the sample that `ctx.series` names.
 
 # Mathematical definition
 
@@ -1545,45 +1715,45 @@ k &= \\left\\lceil \\alpha T \\right\\rceil\\,,\\\\
 Where:
 
   - $(math_dict[:kappa_rm])
-  - $(math_dict[:alpha_rm]) It is the probability of the end the slot prices, and the count it fixes is the same for both ends because the series has no sign.
+  - $(math_dict[:alpha_rm]) It is the probability of the end that the slot prices. The series has no sign, so the count that it fixes is the same for both ends.
   - $(math_dict[:T])
   - $(math_dict[:x_t_obs])
-  - ``\\mathcal{S}``: The sample `ctx.series` names, built one column at a time. It is the identity on a [`ReturnsSeries`](@ref), and a drawdown series on the two markers of [`AbstractDrawdownSeries`](@ref).
+  - ``\\mathcal{S}``: The sample that `ctx.series` names, made one column at a time. It is the identity for a [`ReturnsSeries`](@ref), and a drawdown series for the two markers of [`AbstractDrawdownSeries`](@ref).
   - ``\\boldsymbol{y}_{t}``: Row ``t`` of that sample.
-  - ``\\hat{\\boldsymbol{\\mu}}_{y}``: Centre of that sample. It is `pr.mu` on a returns series, and the column means of the drawdown sample on a drawdown series.
-  - ``\\hat{\\mathbf{\\Sigma}}_{y}``: Covariance matrix of that sample. It is `pr.sigma` on a returns series, and the covariance matrix of the drawdown sample on a drawdown series.
-  - ``\\mathbf{U}``: Square factor of ``\\hat{\\mathbf{\\Sigma}}_{y}``, which is `pr.chol` when the prior carries one and the slot prices the returns.
+  - ``\\hat{\\boldsymbol{\\mu}}_{y}``: Centre of that sample. It is `pr.mu` for a returns series, and the vector of column means of the drawdown sample for a drawdown series.
+  - ``\\hat{\\mathbf{\\Sigma}}_{y}``: Covariance matrix of that sample. It is `pr.sigma` for a returns series, and the covariance matrix of the drawdown sample for a drawdown series.
+  - ``\\mathbf{U}``: Upper triangular square factor of ``\\hat{\\mathbf{\\Sigma}}_{y}``. It comes from `pr.chol` when the prior has one and the slot prices the returns.
   - ``\\boldsymbol{z}_{t}``: Whitened observation ``t``.
   - ``d_{t}``: Mahalanobis distance of observation ``t``, the ``t``-th entry of the radial series.
   - ``d_{(i)}``: ``i``-th largest entry of the radial series, so that ``d_{(1)} \\geq \\ldots \\geq d_{(k+1)}``.
-  - ``k``: Number of order statistics the estimate reads.
+  - ``k``: Number of order statistics that the estimate reads.
   - ``\\hat{a}``: Hill estimate of the tail index of the radial series.
 
 # Algorithm
 
- 1. Read the returns matrix off `pr` into `X`, and its row count into `T`.
- 2. Form the count `k = ceil(Int, ctx.alpha * T)`, the number of order statistics the estimate reads. A drawdown series holds one entry per observation, so the count is the same count under every marker.
+ 1. Read the returns matrix of `pr` into `X`, and its row count into `T`.
+ 2. Make the count `k = ceil(Int, ctx.alpha * T)`, the number of order statistics that the estimate reads. A drawdown series has one entry for each observation, so the count is the same under every marker.
  3. Take the sample, its centre and its whitening factor with [`radial_series_inputs`](@ref).
- 4. Estimate the tail index of the radial series with [`radial_tail_index`](@ref), giving `a`.
- 5. Return `inv(a)`, which is the deformation parameter.
+ 4. Estimate the tail index `a` of the radial series with [`radial_tail_index`](@ref).
+ 5. Return `inv(a)`, the deformation parameter.
 
 # Arguments
 
   - `alg`: The rule.
-  - `key`: Name of the slot that is being resolved. The radial series has no sign, so this rule reads no end from it and returns one number for every key.
-  - `pr`: Prior result the returns matrix, the expected returns vector and the covariance matrix are read off.
-  - `w`: Effective observation weights. A tail index is a statement about the shape of a series rather than about the count of observations behind it, so this rule ignores them.
+  - `key`: Name of the slot that the call resolves. The radial series has no sign, so this rule reads no end from the key and returns one number for every key.
+  - `pr`: Prior result from which the rule reads the returns matrix, the expected returns vector and the covariance matrix.
+  - `w`: Effective observation weights. A tail index is a property of the shape of a series and not of the count of observations behind it, so this rule does not read them.
   - `slv`: Effective solver. This rule needs none, because the estimate is a closed form.
-  - `ctx`: The site's [`CalibrationContext`](@ref). `ctx.alpha` is the significance level of the end, and it must hold a number. `ctx.series` names the sample the radial series is built from.
+  - `ctx`: The [`CalibrationContext`](@ref) of the site. `ctx.alpha` is the significance level of the end, and it must hold a number. `ctx.series` names the sample of the radial series.
 
 # Validation
 
   - `ctx.alpha` must not be `nothing`.
   - `k` must be at least `alg.kmin`.
   - The series must hold at least `k + 1` entries.
-  - The sample must state a whitening, which [`radial_series_inputs`](@ref) checks on both readings.
-  - ``d_{(k+1)}`` must be positive, which [`radial_tail_index`](@ref) checks.
-  - ``\\hat{a}`` must be greater than one, which is the band ``\\kappa \\in (0,\\, 1)`` read as a tail index.
+  - The sample must have a whitening. [`radial_series_inputs`](@ref) checks it for both series.
+  - ``d_{(k+1)}`` must be positive. [`radial_tail_index`](@ref) checks it.
+  - ``\\hat{a}`` must be greater than one. That is the band ``\\kappa \\in (0,\\, 1)`` as a tail index.
 
 # Returns
 
@@ -1600,6 +1770,10 @@ Where:
   - [`radial_tail_index`](@ref)
   - [`resolve_calibration_slot`](@ref)
   - [`whitening_factor`](@ref)
+
+# References
+
+  - $(ref_dict[:hill1975]) Pages 1163–1174. $(ref_dict[:no_original_source])
 """
 function (alg::RadialTailDecay)(::Symbol, pr::AbstractPriorResult, ::Any, ::Any,
                                 ctx::CalibrationContext)
@@ -1626,13 +1800,13 @@ $(DocStringExtensions.TYPEDEF)
 
 Computes an ambiguity radius from the data a prior result carries, so that the radius refits whenever the sample moves.
 
-An **Ambiguity Radius** is the radius of the ball of probability measures the model prices, and it is the coefficient of an un-squared norm penalty on the weight vector. It is neither a tail probability nor a deformation parameter, so it takes its own family beside the two of [`AbstractSignificanceCalibrationAlgorithm`](@ref) and [`AbstractDeformationCalibrationAlgorithm`](@ref), under the same root.
+An **Ambiguity Radius** is the radius of the ball of probability measures that the model prices. It is the coefficient of a norm penalty on the weight vector, with no square. It is not a tail probability and not a deformation parameter. So it has its own family next to [`AbstractSignificanceCalibrationAlgorithm`](@ref) and [`AbstractDeformationCalibrationAlgorithm`](@ref), under the same root.
 
-All concrete subtypes should subtype `AbstractAmbiguityRadiusCalibrationAlgorithm`, and should be **callable**, on the same terms as the two other families. [`Num_AmbRadCal`](@ref) is the bound of every radius slot, and it names this family.
+A rule of this family is a callable subtype of `AbstractAmbiguityRadiusCalibrationAlgorithm`, as a rule of the two other families is. [`Num_AmbRadCal`](@ref) is the bound of every radius slot, and it names this family.
 
 # Interfaces
 
-In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractAmbiguityRadiusCalibrationAlgorithm` and implement the following method:
+To add a radius rule, subtype `AbstractAmbiguityRadiusCalibrationAlgorithm`, keep the parameters of the rule in the fields of the struct, and add the method below.
 
 ## The functor
 
@@ -1640,11 +1814,11 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ### Arguments
 
-  - `key`: Name of the slot that is being resolved.
-  - `pr`: Prior result the rule reads its sample size and moments off.
-  - `w`: Effective observation weights, or `nothing` when neither the owner nor the prior names any.
-  - `slv`: Effective solver, or `nothing` when the owner carries none.
-  - `ctx`: What the site knows and `key` does not, as a [`CalibrationContext`](@ref). A rule reads the fields it needs off it, and one that reads none writes `::CalibrationContext`.
+  - `key`: Name of the slot that the call resolves.
+  - `pr`: Prior result from which the rule reads its sample size and its moments.
+  - `w`: Effective observation weights, or `nothing` when neither the owner nor the prior gives any.
+  - `slv`: Effective solver, or `nothing` when the owner has none.
+  - `ctx`: The facts that the site knows and `key` does not give, as a [`CalibrationContext`](@ref). A rule reads the fields that it needs. A rule that reads no field writes `::CalibrationContext`.
 
 ### Returns
 
@@ -1654,24 +1828,24 @@ In order to implement a new concrete type that works seamlessly with the library
 
   - [`AbstractCalibrationAlgorithm`](@ref)
   - [`Num_AmbRadCal`](@ref)
-  - [`ConcentrationRadius`](@ref): the family's rule that shrinks the ball as the sample grows.
-  - [`RateRadius`](@ref): the family's rule that shrinks the radius at a square-root rate.
-  - [`DimensionalRateRadius`](@ref): the family's rule that shrinks it at the dimensional rate a Wasserstein ball earns.
-  - [`DualNormRadius`](@ref): the family's rule that reads the ground metric the slot names.
+  - [`ConcentrationRadius`](@ref): the rule of the family that makes the ball smaller as the sample becomes longer.
+  - [`RateRadius`](@ref): the rule of the family that decreases the radius at a square-root rate.
+  - [`DimensionalRateRadius`](@ref): the rule of the family that decreases the radius at the dimensional rate of a Wasserstein ball.
+  - [`DualNormRadius`](@ref): the rule of the family that reads the ground metric that the slot names.
 """
 abstract type AbstractAmbiguityRadiusCalibrationAlgorithm <: AbstractCalibrationAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Computes an Esfahani-Kuhn tail weight, the weight that the `l` slot of a distributionally robust measure holds.
+Computes an Esfahani-Kuhn tail weight, the weight in the `l` slot of a distributionally robust measure.
 
-The tail weight scales the tail term of the Esfahani-Kuhn loss, and the mean term is not scaled by it. It is a different quantity from the radius, so it takes a family of its own: a radius rule placed in a tail-weight slot is refused at construction, by [`Num_AmbTwtCal`](@ref).
+The tail weight multiplies the tail term of the Esfahani-Kuhn loss, and it does not multiply the mean term. It is a different quantity from the radius, so it has its own family. [`Num_AmbTwtCal`](@ref) makes a constructor refuse a radius rule in a tail-weight slot.
 
-[`TailTermParity`](@ref) is the rule the family ships. A stated tail weight is dimensionless and is not scale-free in the sample, so one number is a different trade-off at every sampling frequency; the rule reads the sample's own units and leaves the preference in the caller's `ratio`. [`Num_AmbTwtCal`](@ref) admits a plain function beside it, so a caller's own rule needs no type.
+[`TailTermParity`](@ref) is the rule of the family in the library. A stated tail weight has no units, but it is not independent of the scale of the sample. So one number is a different trade-off at each sampling frequency. The rule reads the units of the sample and leaves the preference in the `ratio` of the caller. [`Num_AmbTwtCal`](@ref) also admits a plain function, so a rule of a caller needs no type.
 
 # Interfaces
 
-In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractAmbiguityTailWeightCalibrationAlgorithm` and implement the following method:
+To add a tail-weight rule, subtype `AbstractAmbiguityTailWeightCalibrationAlgorithm`, keep the parameters of the rule in the fields of the struct, and add the method below.
 
 ## The functor
 
@@ -1679,11 +1853,11 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ### Arguments
 
-  - `key`: Name of the slot that is being resolved.
-  - `pr`: Prior result the rule reads its sample size and moments off.
-  - `w`: Effective observation weights, or `nothing` when neither the owner nor the prior names any.
-  - `slv`: Effective solver, or `nothing` when the owner carries none.
-  - `ctx`: What the site knows and `key` does not, as a [`CalibrationContext`](@ref). A rule reads the fields it needs off it, and one that reads none writes `::CalibrationContext`.
+  - `key`: Name of the slot that the call resolves.
+  - `pr`: Prior result from which the rule reads its sample size and its moments.
+  - `w`: Effective observation weights, or `nothing` when neither the owner nor the prior gives any.
+  - `slv`: Effective solver, or `nothing` when the owner has none.
+  - `ctx`: The facts that the site knows and `key` does not give, as a [`CalibrationContext`](@ref). A rule reads the fields that it needs. A rule that reads no field writes `::CalibrationContext`.
 
 ### Returns
 
@@ -1694,7 +1868,7 @@ In order to implement a new concrete type that works seamlessly with the library
   - [`AbstractCalibrationAlgorithm`](@ref)
   - [`Num_AmbTwtCal`](@ref)
   - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
-  - [`TailTermParity`](@ref): the family's rule that prices the tail term at a stated multiple of the mean term.
+  - [`TailTermParity`](@ref): the rule of the family that prices the tail term at a stated multiple of the mean term.
 """
 abstract type AbstractAmbiguityTailWeightCalibrationAlgorithm <:
               AbstractCalibrationAlgorithm end
@@ -1703,13 +1877,13 @@ $(DocStringExtensions.TYPEDEF)
 
 Computes a norm ceiling from the data a prior result carries, so that the ceiling refits whenever the universe moves.
 
-A **Norm Ceiling** is an upper bound on a norm of the weight vector, the quantity the `l2c`, `lpc` and `linfc` slots of [`JuMPOptimiser`](@ref) hold. It is not an **Ambiguity Radius**. A radius is the coefficient of a norm penalty in the objective, and a ceiling bounds that norm in a constraint. The reciprocal of a ceiling is a floor on the effective number of assets, which is a diversification statement rather than a statement about the set of measures the model prices. So the quantity takes its own family beside the others, under the same root.
+A **Norm Ceiling** is an upper bound on a norm of the weight vector. The `l2c`, `lpc` and `linfc` slots of [`JuMPOptimiser`](@ref) hold it. It is not an **Ambiguity Radius**. A radius is the coefficient of a norm penalty in the objective, and a ceiling bounds that norm in a constraint. A ceiling on the norm is a floor on the effective number of assets. That is a statement about diversification, and not about the set of probability measures that the model prices. So the quantity has its own family next to the others, under the same root.
 
-All concrete subtypes should subtype `AbstractNormCeilingCalibrationAlgorithm`, and should be **callable**, on the same terms as the other families. [`Num_NormCeilCal`](@ref) is the bound of every ceiling slot, and it names this family.
+A rule of this family is a callable subtype of `AbstractNormCeilingCalibrationAlgorithm`, as a rule of the other families is. [`Num_NormCeilCal`](@ref) is the bound of every ceiling slot, and it names this family.
 
 # Interfaces
 
-In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractNormCeilingCalibrationAlgorithm` and implement the following method:
+To add a ceiling rule, subtype `AbstractNormCeilingCalibrationAlgorithm`, keep the parameters of the rule in the fields of the struct, and add the method below.
 
 ## The functor
 
@@ -1717,11 +1891,11 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ### Arguments
 
-  - `key`: Name of the slot that is being resolved: `:l2c`, `:lpc` or `:linfc`.
-  - `pr`: Prior result the rule reads its asset count and sample size off.
-  - `w`: Effective observation weights, or `nothing` when neither the owner nor the prior names any.
-  - `slv`: Effective solver, or `nothing` when the owner carries none.
-  - `ctx`: What the site knows and `key` does not, as a [`CalibrationContext`](@ref). A rule reads the fields it needs off it, and one that reads none writes `::CalibrationContext`.
+  - `key`: Name of the slot that the call resolves: `:l2c`, `:lpc` or `:linfc`.
+  - `pr`: Prior result from which the rule reads its asset count and its sample size.
+  - `w`: Effective observation weights, or `nothing` when neither the owner nor the prior gives any.
+  - `slv`: Effective solver, or `nothing` when the owner has none.
+  - `ctx`: The facts that the site knows and `key` does not give, as a [`CalibrationContext`](@ref). A rule reads the fields that it needs. A rule that reads no field writes `::CalibrationContext`.
 
 ### Returns
 
@@ -1729,23 +1903,23 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ## The norm order
 
-A ceiling is read against one norm order, and that order belongs to the constraint rather than to the rule. A rule that needs the order reads `ctx.p`, which each constraint site states in the [`CalibrationContext`](@ref) it hands over. A rule that needs no order reads no field of the context.
+A ceiling applies to one norm order, and that order belongs to the constraint and not to the rule. A rule that needs the order reads `ctx.p`. Each constraint site sets it in the [`CalibrationContext`](@ref) that it builds. A rule that needs no order reads no field of the context.
 
 # Related
 
   - [`AbstractCalibrationAlgorithm`](@ref)
   - [`Num_NormCeilCal`](@ref)
   - [`CalibrationContext`](@ref)
-  - [`EffectiveAssetFloor`](@ref): the family's rule that holds a stated fraction of the universe effective.
+  - [`EffectiveAssetFloor`](@ref): the rule of the family that keeps a stated fraction of the universe effective.
 """
 abstract type AbstractNormCeilingCalibrationAlgorithm <: AbstractCalibrationAlgorithm end
 """
-    const Num_AmbRadCal = Union{<:AbstractAmbiguityRadiusCalibrationAlgorithm, <:Function,
-                                <:Number}
+    const Num_AmbRadCal = Union{AbstractAmbiguityRadiusCalibrationAlgorithm, Function,
+                                Number}
 
-Field bound for an ambiguity-radius slot: the radius itself, a rule of the family, or a plain function of the same five arguments.
+Field bound for an ambiguity-radius slot: the radius, a rule of the family, or a plain function of the same five arguments.
 
-The union names one rule family and no other, so a tail-weight rule placed in a radius slot fails the constructor's signature and is refused at construction. That is the whole of the family validation, and no guard method is written for it. A function stands in the union on the terms [`Num_SigCal`](@ref) sets out: it carries no family, so the name of the slot is what states the quantity.
+The union names one rule family. So a tail-weight rule in a radius slot does not match the signature of the constructor, and the constructor refuses it. This is all the validation of the family, and no separate check exists for it. A function is a member of the union for the reason that [`Num_SigCal`](@ref) states. It has no family, so only the name of the slot states the quantity.
 
 # Related
 
@@ -1754,13 +1928,12 @@ The union names one rule family and no other, so a tail-weight rule placed in a 
   - [`Num_AmbRadNormCeilCal`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-const Num_AmbRadCal = Union{<:AbstractAmbiguityRadiusCalibrationAlgorithm, <:Function,
-                            <:Number}
+const Num_AmbRadCal = Union{AbstractAmbiguityRadiusCalibrationAlgorithm, Function, Number}
 """
-    const Num_AmbTwtCal = Union{<:AbstractAmbiguityTailWeightCalibrationAlgorithm,
-                                <:Function, <:Number}
+    const Num_AmbTwtCal = Union{AbstractAmbiguityTailWeightCalibrationAlgorithm,
+                                Function, Number}
 
-Field bound for an ambiguity-tail-weight slot: the tail weight itself, a rule of the family, or a plain function of the same five arguments. It is the counterpart of [`Num_AmbRadCal`](@ref), and carries its reading unchanged.
+Field bound for an ambiguity-tail-weight slot: the tail weight, a rule of the family, or a plain function of the same five arguments. It is the counterpart of [`Num_AmbRadCal`](@ref) for the tail-weight family, and the description of that bound applies to it.
 
 # Related
 
@@ -1768,15 +1941,15 @@ Field bound for an ambiguity-tail-weight slot: the tail weight itself, a rule of
   - [`Num_AmbRadCal`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-const Num_AmbTwtCal = Union{<:AbstractAmbiguityTailWeightCalibrationAlgorithm, <:Function,
-                            <:Number}
+const Num_AmbTwtCal = Union{AbstractAmbiguityTailWeightCalibrationAlgorithm, Function,
+                            Number}
 """
-    const Num_NormCeilCal = Union{<:AbstractNormCeilingCalibrationAlgorithm, <:Function,
-                                  <:Number}
+    const Num_NormCeilCal = Union{AbstractNormCeilingCalibrationAlgorithm, Function,
+                                  Number}
 
-Field bound for a norm-ceiling slot: the ceiling itself, a rule of the family, or a plain function of the same five arguments.
+Field bound for a norm-ceiling slot: the ceiling, a rule of the family, or a plain function of the same five arguments.
 
-The union names one rule family and no other, so a radius rule placed in a ceiling slot is refused at construction, and a ceiling rule placed in a radius slot is refused the same way. [`AbstractNormCeilingCalibrationAlgorithm`](@ref) states the difference between the two quantities.
+The union names one rule family. So a constructor refuses a radius rule in a ceiling slot, and it refuses a ceiling rule in a radius slot in the same way. [`AbstractNormCeilingCalibrationAlgorithm`](@ref) states the difference between the two quantities.
 
 # Related
 
@@ -1785,17 +1958,16 @@ The union names one rule family and no other, so a radius rule placed in a ceili
   - [`Num_AmbRadNormCeilCal`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-const Num_NormCeilCal = Union{<:AbstractNormCeilingCalibrationAlgorithm, <:Function,
-                              <:Number}
+const Num_NormCeilCal = Union{AbstractNormCeilingCalibrationAlgorithm, Function, Number}
 """
-    const Num_AmbRadNormCeilCal = Union{<:AbstractAmbiguityRadiusCalibrationAlgorithm,
-                                        <:AbstractNormCeilingCalibrationAlgorithm, <:Number}
+    const Num_AmbRadNormCeilCal = Union{AbstractAmbiguityRadiusCalibrationAlgorithm,
+                                        AbstractNormCeilingCalibrationAlgorithm, Number}
 
-Field bound for the one slot the library reads as two quantities, the `val` field of [`LpRegularisation`](@ref).
+Field bound for the one slot that the library reads as two quantities, the `val` field of [`LpRegularisation`](@ref).
 
-That estimator is a penalty in the `lp` field of [`JuMPOptimiser`](@ref) and a norm constraint in its `lpc` field, so `val` is an ambiguity radius on one route and a norm ceiling on the other. One field cannot carry two bounds, so this bound admits both rule families and each route refuses the family that has no reading on it. It is the only slot in the library whose quantity is settled after construction rather than by its bound.
+That estimator is a penalty in the `lp` field of [`JuMPOptimiser`](@ref) and a norm constraint in its `lpc` field. So `val` is an ambiguity radius on one route and a norm ceiling on the other. One field cannot have two bounds, so this bound admits both rule families, and each route refuses the family that has no meaning on it. In this slot alone, the route and not the bound settles the quantity, after the construction.
 
-A plain function is **not** admitted here, and this is the one slot that refuses one. Every other slot names one quantity, so a function placed in it needs no family of its own. This slot names two, and the two guards read the family to tell them apart, so a function would reach a route that has no reading for it and no guard could say so.
+This bound does **not** admit a plain function, and it is the only slot that refuses one. Every other slot names one quantity, so a function in it needs no family. This slot names two quantities, and the two checks read the family to tell them apart. A function has no family. So a function in this slot can reach a route that has no meaning for it, and no check can find the error.
 
 # Related
 
@@ -1805,8 +1977,8 @@ A plain function is **not** admitted here, and this is the one slot that refuses
   - [`assert_penalty_coefficient_role`](@ref)
   - [`assert_norm_ceiling_role`](@ref)
 """
-const Num_AmbRadNormCeilCal = Union{<:AbstractAmbiguityRadiusCalibrationAlgorithm,
-                                    <:AbstractNormCeilingCalibrationAlgorithm, <:Number}
+const Num_AmbRadNormCeilCal = Union{AbstractAmbiguityRadiusCalibrationAlgorithm,
+                                    AbstractNormCeilingCalibrationAlgorithm, Number}
 # The two families below name a quantity that reaches a JuMP model from a bare field of
 # `JuMPOptimiser`: the ceiling from `l2c` and `linfc`, the radius from `l1` and `linf`.
 # There is no term to rebuild on that route, and the constructor's guard read a rule rather
@@ -1815,14 +1987,8 @@ const Num_AmbRadNormCeilCal = Union{<:AbstractAmbiguityRadiusCalibrationAlgorith
 # only on the calibrated path. The three other families stand only in slots their owner
 # rebuilds, and that rebuild states their range. A rule written as a plain function names no
 # family, so it reaches neither method here and `assemble_jump_model!` states its range.
-function resolve_calibration_slot(alg::AbstractNormCeilingCalibrationAlgorithm, key::Symbol,
-                                  pr::AbstractPriorResult, w, slv = nothing,
-                                  ctx::CalibrationContext = CalibrationContext())
-    val = alg(key, pr, w, slv, ctx)
-    assert_nonempty_gt0_finite_val(val, key)
-    return val
-end
-function resolve_calibration_slot(alg::AbstractAmbiguityRadiusCalibrationAlgorithm,
+function resolve_calibration_slot(alg::Union{AbstractNormCeilingCalibrationAlgorithm,
+                                             AbstractAmbiguityRadiusCalibrationAlgorithm},
                                   key::Symbol, pr::AbstractPriorResult, w, slv = nothing,
                                   ctx::CalibrationContext = CalibrationContext())
     val = alg(key, pr, w, slv, ctx)
@@ -1832,17 +1998,19 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Computes an ambiguity radius from the concentration of measure, so that the ball shrinks as the sample grows.
+Computes an ambiguity radius from a chi-squared quantile, so that the ball becomes smaller as the sample becomes longer.
 
-The radius is the Blanchet-Kang-Murthy form, a scale in the units of the series the slot owner prices times the square root of a chi-squared quantile over the sample size. The chi-squared factor is dimensionless and grows with the number of assets, so a wider universe buys a wider ball at a fixed confidence level, and a longer sample shrinks it.
+The radius is a scale, in the units of the series that the slot owner prices, times the square root of a chi-squared quantile divided by the sample size. It simplifies Theorem 3 and Equation 22 of [blanchet2019](@cite). For the estimating equation of the mean, ``h(\\boldsymbol{x}, \\boldsymbol{\\theta}) = \\boldsymbol{x} - \\boldsymbol{\\theta}``, under the squared Euclidean cost, ``T`` times the robust Wasserstein profile function converges to ``\\boldsymbol{H}^{\\intercal} \\boldsymbol{H}``, with ``\\boldsymbol{H} \\sim \\mathcal{N}(\\boldsymbol{0}, \\mathbf{\\Sigma})``. The rule replaces ``\\mathbf{\\Sigma}`` with ``s^{2} \\mathbf{I}``, so the law is ``s^{2} \\chi^{2}_{N}``. The radius of that work is the quantile of this law divided by ``T``, for the squared cost. The rule takes its square root, because its slot multiplies a norm with no square. The isotropic covariance is an assumption of the rule and not of [blanchet2019](@cite).
 
-`scale` states the units. A radius multiplies a norm of the weight vector, so it is in the units of the loss the ball is drawn around, and no caller can intuit that number from the confidence level alone. `scale = nothing` reads the average per-asset dispersion of the series the slot owner prices instead, which is the first pass the form's source recommends, and it moves with the sample the way the rest of the rule does.
+The chi-squared factor has no units and increases with the number of assets. So at a fixed confidence level, a wider universe gives a wider ball, and a longer sample gives a smaller ball.
 
-**A drawdown owner is read on a drawdown scale.** [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) measures the transport cost of its own programme against the per-asset drawdown sample, so the ball it prices is a ball over drawdown scenarios and the radius carries drawdown units. `series` names that quantity, [`calibration_series_dispersion`](@ref) takes the dispersion off the drawdown sample, and `pr.sigma` reaches nothing there: it is a moment of the returns.
+`scale` gives the units. A radius multiplies a norm of the weight vector, so it is in the units of the loss around which the ball is drawn. A caller cannot get that number from the confidence level alone. `scale = nothing` reads the average per-asset dispersion of the series that the slot owner prices. That scale changes with the sample, as the rest of the rule does.
 
-`T` is the effective sample size when observation weights are stated, and the raw row count when they are not, on the same terms as [`ScenarioCount`](@ref). The radius prices estimation error, and the error of a weighted estimate falls with Kish's effective sample size rather than with the number of rows. [`RateRadius`](@ref) reads the raw row count instead, because a rate speaks of the length of the record.
+**A drawdown owner gets a drawdown scale.** [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) measures the transport cost of its programme against the per-asset drawdown sample. So its ball is a ball over drawdown scenarios, and the radius has the units of a drawdown. `series` names that quantity, and [`calibration_series_dispersion`](@ref) takes the dispersion from the drawdown sample. `pr.sigma` is not read there, because it is a moment of the returns.
 
-The rule carries no range check of its own. It returns the quantity of the slot it stands in, so the range is checked where the number lands. [`resolve_calibration_slot`](@ref) refuses a radius that is not `> 0` and finite, and the owner of a slot that rebuilds a term refuses one outside that owner's range at fold time.
+**`T` is the count that the site prices.** It is the `n` that the site states in its [`CalibrationContext`](@ref), and [`effective_sample_size`](@ref) when the site states none. A distributionally robust measure states the count of the rows on which its ball is centred, because the bound is a statement about the empirical measure of those rows. A regularisation slot states no count, because its radius prices the error of `pr.mu`, and that error decreases with the observations behind the moments. With observation weights, both counts are the effective sample size of the weights, because the error of a weighted estimate decreases with that count and not with the number of rows. The two counts differ only under a Scenario Cap. [`RateRadius`](@ref) and [`DimensionalRateRadius`](@ref) read the same count.
+
+The rule does not check the range of its value. It returns the quantity of its slot, so the site that receives the number checks the range. [`resolve_calibration_slot`](@ref) refuses a radius that is not `> 0` and finite. The owner of a slot that rebuilds a term refuses a radius outside its range when the fold runs.
 
 # Fields
 
@@ -1855,7 +2023,7 @@ $(DocStringExtensions.FIELDS)
         scale::Option{<:Number} = nothing
     ) -> ConcentrationRadius
 
-Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, and `scale` defaults to `nothing`, which reads the average per-asset dispersion off the sample. The series that dispersion is read over is not a field of the rule: it reaches the rule in the [`CalibrationContext`](@ref) the site hands over.
+Keywords correspond to the fields of the struct. The default `confidence` is `0.95`. The default `scale` is `nothing`, which reads the average per-asset dispersion from the sample. The series of that dispersion is not a field of the rule. It reaches the rule in the [`CalibrationContext`](@ref) of the site.
 
 ## Validation
 
@@ -1869,9 +2037,13 @@ Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, and
   - [`DimensionalRateRadius`](@ref)
   - [`CalibrationContext`](@ref)
   - [`calibration_series_dispersion`](@ref)
-  - [`DualNormRadius`](@ref): answers what the sampling error is in the ground metric the slot names, so its number changes with the key while this one's does not.
+  - [`DualNormRadius`](@ref): gives the sampling error in the ground metric that the slot names, so its number changes with the key, and the number of this rule does not.
   - [`Num_AmbRadCal`](@ref)
   - [`resolve_calibration_slot`](@ref)
+
+# References
+
+  - $(ref_dict[:blanchet2019]) Section 3.3, Theorem 3 and Equation 22.
 """
 @concrete struct ConcentrationRadius <: AbstractAmbiguityRadiusCalibrationAlgorithm
     """
@@ -1894,13 +2066,13 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Compute the ambiguity radius that the concentration of measure gives on the sample that `pr` carries.
+Computes the chi-squared ambiguity radius on the sample of `pr`.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-r &= s \\sqrt{\\dfrac{\\chi^{2}_{N,\\, q}}{T_{e}}}\\,,\\\\
+r &= s \\sqrt{\\dfrac{\\chi^{2}_{N,\\, q}}{T_{c}}}\\,,\\\\
 s &= \\begin{cases}
 \\dfrac{1}{N} \\sum\\limits_{i=1}^{N} \\hat{s}_{i} & \\textrm{if } \\texttt{scale} \\textrm{ is } \\texttt{nothing}\\\\
 \\texttt{scale} & \\textrm{otherwise}
@@ -1917,16 +2089,17 @@ Where:
   - $(math_dict[:cal_s_i_series])
   - $(math_dict[:T])
   - $(math_dict[:cal_T_e])
+  - $(math_dict[:cal_T_c])
   - $(math_dict[:w_t_obs])
 
 # Arguments
 
   - `alg`: The rule.
-  - `key`: Name of the slot that is being resolved. The radius is the same for every key, so the two tails of a Range measure that carry one rule resolve to one number.
-  - `pr`: Prior result the sample size, the asset count and, on a returns series, the covariance matrix are read off. A drawdown series reads the sample instead.
+  - `key`: Name of the slot that the call resolves. The radius is the same for every key, so the two tails of a Range measure that hold one rule resolve to one number.
+  - `pr`: Prior result from which the rule reads the sample size, the asset count and, for a returns series, the covariance matrix. A drawdown series reads the sample.
   - `w`: Effective observation weights, or `nothing`.
   - `slv`: Effective solver. This rule needs none.
-  - `ctx`: The site's [`CalibrationContext`](@ref). `ctx.series` names the quantity the ball is drawn around, and the per-asset dispersion is read off it when `scale` is `nothing`.
+  - `ctx`: The [`CalibrationContext`](@ref) of the site. `ctx.series` names the quantity around which the ball is drawn. The rule reads the per-asset dispersion of that quantity when `scale` is `nothing`. `ctx.n` is the count that the site prices, and the rule reads [`effective_sample_size`](@ref) when it is `nothing`.
 
 # Returns
 
@@ -1941,11 +2114,15 @@ Where:
   - [`calibration_series_dispersion`](@ref)
   - [`effective_sample_size`](@ref)
   - [`resolve_calibration_slot`](@ref)
+
+# References
+
+  - $(ref_dict[:blanchet2019]) Section 3.3, Theorem 3 and Equation 22.
 """
 function (alg::ConcentrationRadius)(::Symbol, pr::AbstractPriorResult, w, ::Any,
                                     ctx::CalibrationContext)
     N = size(pr.X, 2)
-    T = effective_sample_size(pr, w)
+    T = isnothing(ctx.n) ? effective_sample_size(pr, w) : ctx.n
     scale = if isnothing(alg.scale)
         Statistics.mean(calibration_series_dispersion(ctx.series, pr))
     else
@@ -1958,15 +2135,15 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Computes an ambiguity radius that shrinks with the square root of the sample length.
+Computes an ambiguity radius that decreases with the square root of the sample length.
 
-The radius is `c / sqrt(T)`. The rate is the part of the form to trust, and the coefficient is the part to calibrate: a cross-validation over `c` is the honest route to a radius, and this is the shape a grid moves over.
+The radius is `c / sqrt(T)`. The rate has a theoretical basis, and the coefficient does not. So calibrate `c` with a cross-validation, and use this rule as the form of the radius over a grid of `c`.
 
-The rule reads the raw row count, and not the effective sample size that [`ConcentrationRadius`](@ref) reads. The rate is a statement about the length of the record, on the same terms as [`RateSignificance`](@ref), and the length of the record is read the same way: the count a Scenario Cap states in `ens`, else the row count, which is [`effective_sample_size`](@ref) with no weights.
+**`T` is the count that the site prices, as for [`ConcentrationRadius`](@ref).** The rate ``1/\\sqrt{T}`` is the rate at which the empirical measure of `T` draws concentrates around the true law, and it is the basis of the rate of the three other radius rules. So `T` is the `n` that the site states in its [`CalibrationContext`](@ref), and [`effective_sample_size`](@ref) when the site states none. A distributionally robust measure states the count of the rows on which its ball is centred. Under a Scenario Cap, a read of the count in `eoc` there made the ball `sqrt(5)` times too small for `max_scenarios = 250` over 1250 observations. With observation weights, both counts are the effective sample size of the weights, because a weighted empirical measure concentrates at the rate of that count.
 
-`c` carries the units of the returns, because the rate itself is dimensionless.
+`c` has the units of the returns, because the rate has no units.
 
-The rule carries no range check of its own, on the same terms as [`ConcentrationRadius`](@ref).
+The rule does not check the range of its value, for the reason that [`ConcentrationRadius`](@ref) states.
 
 # Fields
 
@@ -1978,7 +2155,7 @@ $(DocStringExtensions.FIELDS)
         c::Number = 1
     ) -> RateRadius
 
-Keywords correspond to the struct's fields. `c` defaults to `1`, which is the plain ``1/\\sqrt{T}`` rate.
+Keywords correspond to the fields of the struct. The default `c = 1` gives the rate ``1/\\sqrt{T}``.
 
 ## Validation
 
@@ -1989,7 +2166,7 @@ Keywords correspond to the struct's fields. `c` defaults to `1`, which is the pl
   - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
   - [`ConcentrationRadius`](@ref)
   - [`DimensionalRateRadius`](@ref)
-  - [`DualNormRadius`](@ref): answers what the sampling error is in the ground metric the slot names, so its number changes with the key while this one's does not.
+  - [`DualNormRadius`](@ref): gives the sampling error in the ground metric that the slot names, so its number changes with the key, and the number of this rule does not.
   - [`Num_AmbRadCal`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
@@ -2009,13 +2186,13 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Compute the ambiguity radius at the square-root rate of the sample that `pr` carries.
+Computes the ambiguity radius at the square-root rate of the sample of `pr`.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-r &= \\frac{c}{\\sqrt{T}}\\,.
+r &= \\frac{c}{\\sqrt{T_{c}}}\\,.
 \\end{align}
 ```
 
@@ -2024,15 +2201,18 @@ Where:
   - $(math_dict[:cal_r_radius])
   - ``c``: Rate coefficient, in the units of the returns.
   - $(math_dict[:T])
+  - $(math_dict[:cal_T_e])
+  - $(math_dict[:cal_T_c])
+  - $(math_dict[:w_t_obs])
 
 # Arguments
 
   - `alg`: The rule.
-  - `key`: Name of the slot that is being resolved. The rate is the same for every key.
-  - `pr`: Prior result the sample length is read off.
-  - `w`: Effective observation weights. This rule reads the raw row count, so it ignores them; under a Scenario Cap the count is the one the result states in `ens`.
+  - `key`: Name of the slot that the call resolves. The rate is the same for every key.
+  - `pr`: Prior result from which the rule reads the sample size.
+  - `w`: Effective observation weights, or `nothing`.
   - `slv`: Effective solver. This rule needs none.
-  - `ctx`: The site's [`CalibrationContext`](@ref). This rule reads no field of it.
+  - `ctx`: The [`CalibrationContext`](@ref) of the site. `ctx.n` is the count that the site prices, and the rule reads [`effective_sample_size`](@ref) when it is `nothing`.
 
 # Returns
 
@@ -2043,36 +2223,40 @@ Where:
   - [`RateRadius`](@ref)
   - [`ConcentrationRadius`](@ref)
   - [`DimensionalRateRadius`](@ref)
+  - [`CalibrationContext`](@ref)
+  - [`effective_sample_size`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
-function (alg::RateRadius)(::Symbol, pr::AbstractPriorResult, ::Any, ::Any,
-                           ::CalibrationContext)
-    return alg.c / sqrt(effective_sample_size(pr, nothing))
+function (alg::RateRadius)(::Symbol, pr::AbstractPriorResult, w, ::Any,
+                           ctx::CalibrationContext)
+    return alg.c / sqrt(isnothing(ctx.n) ? effective_sample_size(pr, w) : ctx.n)
 end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Computes an ambiguity radius that shrinks at the dimensional rate a Wasserstein ball earns, not at the square-root rate.
+Computes an ambiguity radius that decreases at the dimensional rate of a Wasserstein ball, and not at the square-root rate.
 
-The radius is the form of [drcvar](@cite): a scale in the units of the series the slot owner prices times the sample factor `log(1 / (1 - confidence)) / T` raised to the power `1 / max(N, 2)`. A ball of probability measures must hold the true **measure**, and not merely the true mean, and the measure-concentration result the form is read off charges that exponent for it. At `N = 2` the rule returns the square-root rate that [`ConcentrationRadius`](@ref) and [`RateRadius`](@ref) both carry, so the family's existing behaviour is the two-dimensional corner of this one.
+The radius is the radius of Equation 8 of [drcvar](@cite) with the constants ``c_{1} = c_{2} = 1``, times a scale in the units of the series that the slot owner prices. It is the sample factor `log(1 / (1 - confidence)) / T` to the power `1 / max(N, 2)`. Equation 8 inverts the concentration bound of Theorem 3.4 of [drcvar](@cite), which is Theorem 2 of [fournier2015](@cite) for the Wasserstein distance of order one. A ball of probability measures must contain the true **measure**, and not only the true mean, and the concentration bound needs that exponent for a measure.
 
-**The ball hardly shrinks over a wide universe, and that is the model speaking rather than a defect.** At `N = 20` and `T = 250` the factor `T^(-1/20)` is `0.76`, so a record ten times longer buys almost nothing. This is the curse of dimensionality of the Wasserstein ball. A caller who reads a square-root rate and expects an estimation error reads a statement about a *mean*, and this rule makes one about a *measure*.
+The constants ``c_{1}`` and ``c_{2}`` depend on the dimension and on the light-tail condition of the bound. Section 3 of [drcvar](@cite) states that the proof of Theorem 2 of [fournier2015](@cite) gives them, and that the ball that they give is larger than necessary. Neither work states them as numbers. The rule sets both to one. So the radius has the rate of the bound, but it is not a calibrated confidence bound. Theorem 3.4 of [drcvar](@cite) excludes ``N = 2``. At that dimension, Theorem 2 of [fournier2015](@cite) has an additional logarithmic factor, and the rule does not apply it. At `N = 1` and `N = 2`, the rule gives the square-root rate of [`ConcentrationRadius`](@ref) and [`RateRadius`](@ref).
 
-**The radius is conservative in practice, and [drcvar](@cite) recommends a cross-validation over the radius in its place.** A portfolio priced against a ball this wide can hold nothing but cash. [`RateRadius`](@ref) is the shape such a grid moves over, so calibrate there and read this rule as the statement of what the rate is.
+**The ball becomes only a little smaller over a wide universe.** At `N = 20` and `T = 250`, the factor `T^(-1/20)` is `0.76`, and a record ten times longer gives `0.68`. This is the curse of dimensionality of the Wasserstein ball. A square-root rate is a rate for the error of a *mean*, and this rule states a rate for a *measure*.
 
-The result of [drcvar](@cite) carries a second branch for a short record, whose exponent is `1 / a` for a tail-decay exponent `a` rather than `1 / max(N, 2)`. That branch binds only below a threshold that depends on constants that [drcvar](@cite) leaves to the caller, so this rule drops it and ships the one branch. A reader who compares this form with [drcvar](@cite) finds the difference stated here, and does not have to derive it.
+**In practice the radius is conservative.** Section 3 of [drcvar](@cite) recommends that the radius come from a bootstrap or a cross-validation, and not from this bound, and Section 7.2 compares a holdout method with a k-fold cross-validation. A portfolio that a ball this wide prices can hold only cash. [`RateRadius`](@ref) is the form for such a grid. So calibrate the radius with that rule, and use this rule to know the rate.
 
-**The branch stays dropped, and [`HillTailDecay`](@ref) does not supply it.** That rule estimates the tail index of a **power law**, which is the heavy-tailed regime. The `a` of the second branch is the exponent of the **light-tail** moment condition the concentration result assumes, and the same condition carries the two constants that place the threshold. So the two exponents share a letter and nothing else, and a rule that read one for the other would state a rate the result does not give. The threshold is also unreachable in practice: it puts the short branch below a record of a few dozen rows, which no fold of a portfolio problem uses.
+Equation 8 of [drcvar](@cite) has a second branch for a short record. Its exponent is `1 / a` and not `1 / max(N, 2)`. The branch applies when ``T < \\ln(c_{1} / \\beta) / c_{2}``, with ``\\beta = 1 - q``. With the constants of the rule, that is fewer than 3 rows at `confidence = 0.95`. The rule does not use this branch.
 
-`N` is the asset count, `size(pr.X, 2)`, because the ball is over the assets. A factor prior carries a smaller effective dimension, and the ball is still over the assets, so a factor prior does not move `N`.
+[`HillTailDecay`](@ref) does not give the `a` of that branch. The `a` of Equation 8 is the exponent of the light-tail condition ``\\mathbb{E}\\left[\\exp\\left(\\lVert \\boldsymbol{\\xi} \\rVert^{a}\\right)\\right] < \\infty`` of Assumption 3.3 of [drcvar](@cite). [`HillTailDecay`](@ref) estimates the index of a **power-law** tail, which does not meet that condition. So the two quantities have the same letter and different meanings.
 
-`scale` states the units. A radius multiplies a norm of the weight vector, so it is in the units of the loss the ball is drawn around, and no caller can intuit that number from the confidence level alone. `scale = nothing` reads the average per-asset dispersion of the series the slot owner prices instead, on the same terms as [`ConcentrationRadius`](@ref), and a drawdown owner is read on a drawdown scale there for the reason that rule states.
+`N` is the asset count, `size(pr.X, 2)`, because the ball is over the assets. A factor prior has a smaller effective dimension, but the ball is still over the assets, so a factor prior does not change `N`.
 
-[`DistributionallyRobustConditionalDrawdownatRisk`](@ref) prices a ball around the drawdown scenarios. The scenario dimension there is still `N`, so the rate carries, and the scale moves with the series: the site states the owner's marker in `ctx.series`, and [`calibration_series_dispersion`](@ref) then reads the per-asset dispersion off the drawdown sample rather than off `pr.sigma`. A drawdown column is a running functional of its returns, so its dispersion is the wider of the two, and a `scale` of `nothing` therefore gives a wider ball on that owner than on a returns owner of the same sample. A stated `scale` still wins, and it is the way to price a ball whose units are neither.
+`scale` gives the units, as for [`ConcentrationRadius`](@ref). `scale = nothing` reads the average per-asset dispersion of the series that the slot owner prices.
 
-`T` is the effective sample size when observation weights are stated, and the raw row count when they are not, on the same terms as [`ConcentrationRadius`](@ref) and [`ScenarioCount`](@ref). The rate is a concentration statement, so the record it prices is the one Kish's count measures. [`RateRadius`](@ref) reads the raw row count instead, because its rate speaks of the length of the record.
+[`DistributionallyRobustConditionalDrawdownatRisk`](@ref) prices a ball around the drawdown scenarios. The dimension of a scenario is still `N`, so the rate does not change. The site states the marker of the owner in `ctx.series`, and [`calibration_series_dispersion`](@ref) then reads the per-asset dispersion from the drawdown sample and not from `pr.sigma`. A drawdown column is a running function of its returns, so its dispersion is the larger of the two. So with `scale = nothing`, that owner gets a wider ball than a returns owner of the same sample. A stated `scale` has precedence, and it is the way to price a ball whose units are neither of the two.
 
-The rule carries no range check of its own, on the same terms as [`ConcentrationRadius`](@ref). It returns the quantity of the slot it stands in, so the range is checked where the number lands, by [`resolve_calibration_slot`](@ref) and by the owner of a slot that rebuilds a term.
+`T` is the count that the site prices, as for [`ConcentrationRadius`](@ref): the `n` of its [`CalibrationContext`](@ref), and [`effective_sample_size`](@ref) when the site states none. Theorem 2 of [fournier2015](@cite) bounds the distance between the true law and the empirical measure of `T` draws. A distributionally robust measure centres its ball on the empirical measure of its rows, so it states the count of those rows. The rate is a statement of concentration, so it prices the effective sample size of the weights when weights are stated. [`RateRadius`](@ref) reads the same count, at the square-root rate.
+
+The rule does not check the range of its value, for the reason that [`ConcentrationRadius`](@ref) states.
 
 # Fields
 
@@ -2085,7 +2269,7 @@ $(DocStringExtensions.FIELDS)
         scale::Option{<:Number} = nothing
     ) -> DimensionalRateRadius
 
-Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, and `scale` defaults to `nothing`, which reads the average per-asset dispersion off the sample. The series that dispersion is read over is not a field of the rule: it reaches the rule in the [`CalibrationContext`](@ref) the site hands over.
+Keywords correspond to the fields of the struct. The default `confidence` is `0.95`. The default `scale` is `nothing`, which reads the average per-asset dispersion from the sample. The series of that dispersion is not a field of the rule. It reaches the rule in the [`CalibrationContext`](@ref) of the site.
 
 ## Validation
 
@@ -2104,7 +2288,8 @@ Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, and
 
 # References
 
-  - $(ref_dict[:drcvar])
+  - $(ref_dict[:drcvar]) Section 3, Assumption 3.3, Theorem 3.4 and Equation 8, and Section 7.2.
+  - $(ref_dict[:fournier2015]) Theorem 2.
 """
 @concrete struct DimensionalRateRadius <: AbstractAmbiguityRadiusCalibrationAlgorithm
     """
@@ -2128,13 +2313,13 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Compute the ambiguity radius that the measure-concentration bound gives on the sample that `pr` carries.
+Computes the ambiguity radius of the measure-concentration bound on the sample of `pr`.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-r &= s \\left(\\dfrac{\\ln\\left(\\dfrac{1}{1 - q}\\right)}{T_{e}}\\right)^{\\frac{1}{\\max(N,\\, 2)}}\\,,\\\\
+r &= s \\left(\\dfrac{\\ln\\left(\\dfrac{1}{1 - q}\\right)}{T_{c}}\\right)^{\\frac{1}{\\max(N,\\, 2)}}\\,,\\\\
 s &= \\begin{cases}
 \\dfrac{1}{N} \\sum\\limits_{i=1}^{N} \\hat{s}_{i} & \\textrm{if } \\texttt{scale} \\textrm{ is } \\texttt{nothing}\\\\
 \\texttt{scale} & \\textrm{otherwise}
@@ -2146,23 +2331,24 @@ Where:
 
   - $(math_dict[:cal_r_radius])
   - $(math_dict[:cal_s_radius])
-  - ``q``: Confidence level the bound is read at.
+  - ``q``: Confidence level of the bound.
   - $(math_dict[:N])
   - $(math_dict[:cal_s_i_series])
   - $(math_dict[:T])
   - $(math_dict[:cal_T_e])
+  - $(math_dict[:cal_T_c])
   - $(math_dict[:w_t_obs])
 
-The exponent is floored at one half, so a universe of one or two assets returns the square-root rate rather than a faster one. The bound states no rate above that floor.
+The first equation is Equation 8 of [drcvar](@cite) with ``c_{1} = c_{2} = 1`` and ``\\beta = 1 - q``, times the scale. The exponent is at most one half, so a universe of one or two assets gives the square-root rate and not a faster rate.
 
 # Arguments
 
   - `alg`: The rule.
-  - `key`: Name of the slot that is being resolved. The radius is the same for every key, so the two tails of a Range measure that carry one rule resolve to one number.
-  - `pr`: Prior result the sample size, the asset count and, on a returns series, the covariance matrix are read off. A drawdown series reads the sample instead.
+  - `key`: Name of the slot that the call resolves. The radius is the same for every key, so the two tails of a Range measure that hold one rule resolve to one number.
+  - `pr`: Prior result from which the rule reads the sample size, the asset count and, for a returns series, the covariance matrix. A drawdown series reads the sample.
   - `w`: Effective observation weights, or `nothing`.
   - `slv`: Effective solver. This rule needs none.
-  - `ctx`: The site's [`CalibrationContext`](@ref). `ctx.series` names the quantity the ball is drawn around, and the per-asset dispersion is read off it when `scale` is `nothing`.
+  - `ctx`: The [`CalibrationContext`](@ref) of the site. `ctx.series` names the quantity around which the ball is drawn. The rule reads the per-asset dispersion of that quantity when `scale` is `nothing`. `ctx.n` is the count that the site prices, and the rule reads [`effective_sample_size`](@ref) when it is `nothing`.
 
 # Returns
 
@@ -2177,11 +2363,16 @@ The exponent is floored at one half, so a universe of one or two assets returns 
   - [`calibration_series_dispersion`](@ref)
   - [`effective_sample_size`](@ref)
   - [`resolve_calibration_slot`](@ref)
+
+# References
+
+  - $(ref_dict[:drcvar]) Section 3, Equation 8.
+  - $(ref_dict[:fournier2015]) Theorem 2.
 """
 function (alg::DimensionalRateRadius)(::Symbol, pr::AbstractPriorResult, w, ::Any,
                                       ctx::CalibrationContext)
     N = size(pr.X, 2)
-    T = effective_sample_size(pr, w)
+    T = isnothing(ctx.n) ? effective_sample_size(pr, w) : ctx.n
     scale = if isnothing(alg.scale)
         Statistics.mean(calibration_series_dispersion(ctx.series, pr))
     else
@@ -2192,33 +2383,33 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Computes an ambiguity radius in the ground metric that the slot it stands in names, so that two slots of two different norms get two different numbers.
+Computes an ambiguity radius in the ground metric that its slot names, so that two slots of two different norms get two different numbers.
 
-The eight radius slots of the library do not measure distance in one norm. A radius multiplies a norm of the weight vector, and the ground metric of the ball is the dual of that norm, so the `l1` coefficient of [`JuMPOptimiser`](@ref) is a distance in the ∞-norm while its `linf` coefficient is a distance in the 1-norm. This rule reads `key`, picks the ground metric of that slot, and returns the sampling error of the empirical measure in it. [`ConcentrationRadius`](@ref) and [`RateRadius`](@ref) return one number for every key, which is right inside one measure and wrong across the eight slots.
+The eight radius slots of the library do not measure distance in one norm. A radius multiplies a norm of the weight vector, and the ground metric of the ball is the dual of that norm. For a loss that is linear in the sample point, Theorem 6.3 and Proposition 6.5 of [drcvar](@cite) give the worst case over the ball as the sample mean of the loss plus the radius times the dual norm of the weights. So the `l1` coefficient of [`JuMPOptimiser`](@ref) is a distance in the ∞-norm, and its `linf` coefficient is a distance in the 1-norm. This rule reads `key`, selects the ground metric of that slot, and returns the sampling error of the empirical measure in that metric. [`ConcentrationRadius`](@ref) and [`RateRadius`](@ref) return one number for every key. That is correct inside one measure, and not correct across the eight slots.
 
-The sampling error of the mean vector is the part a linear loss sees, and its per-asset scale is the dispersion of the series the slot owner prices over the square root of the effective sample size. The radius is a norm of that error vector, at the confidence level `confidence` states.
+A linear loss reads the sampling error of the mean vector. The per-asset scale of that error is the dispersion of the series that the slot owner prices, divided by the square root of the count that the site prices. The radius is a norm of that error vector, at the confidence level that `confidence` states.
 
-**No term of the covariance error belongs in that vector.** A radius multiplies a norm of the weight vector, so it prices the part of the loss that is **linear** in the weights, and the loss of a distributionally robust measure is linear in the sample point. The error of the second moment reaches the objective through the tail term rather than through the ball, and the tail term carries its own coefficient, which [`TailTermParity`](@ref) sets. A radius that carried both would price one error twice.
+**The vector has no term for the error of the covariance matrix.** A radius multiplies a norm of the weight vector, so it prices the part of the loss that is **linear** in the weights. The loss of a distributionally robust measure is linear in the sample point. The error of the second moment reaches the objective through the tail term and not through the ball. The tail term has its own coefficient, which [`TailTermParity`](@ref) sets. A radius with both errors prices one error two times.
 
-`confidence` is a **per-coordinate** level, and it is not corrected for the number of assets. The ∞-norm case is a maximum over `N` coordinates, so a per-coordinate level understates it, and a caller who wants a level over the whole vector states the corrected number themselves, as `1 - (1 - c) / N`.
+`confidence` is a level **per coordinate**, and the rule does not correct it for the number of assets. The ∞-norm case is a maximum over `N` coordinates, so a level per coordinate is too low for it. A caller who wants a level over the whole vector states the corrected level, for example `1 - (1 - c) / N`.
 
-**The correction stays with the caller, and it is not a rounding.** A Bonferroni step from `0.95` to `1 - 0.05 / N` moves the quantile by about a third at four assets and by more at twenty. It is also one choice of several: a level over the vector read off `N` correlated coordinates and one read off `N` independent ones disagree by an amount only the correlation states. The normal quantile that the radius reads is stated at a per-coordinate level with no correction. The rule ships that level and names the corrected number in prose. A rule that corrected silently would give a caller a level they did not ask for and cannot see.
+**The rule leaves the correction to the caller, because the correction is large and it is a choice.** A Bonferroni correction from `0.95` to `1 - 0.05 / N` increases the quantile by about a third at four assets, and by more at twenty. Other corrections exist. A level over the vector for `N` correlated coordinates and one for `N` independent coordinates differ by an amount that only the correlation gives. So the rule uses the level per coordinate, and this docstring names the corrected level. A rule that corrects the level with no notice gives a caller a level that the caller did not ask for and cannot see.
 
-The 1-norm case sums the per-asset errors, which prices them as if they moved together. That is the worst case over the correlations, and it is therefore the conservative reading for a radius. A correlation-aware form would give a smaller ball, and this rule does not compute one.
+The 1-norm case adds the per-asset errors, so it prices them as if they moved together. That is the worst case over the correlations, so it is the conservative choice for a radius. A form that reads the correlations gives a smaller ball, and this rule does not compute it.
 
-**The worst case is the reading a radius wants, so the correlation-aware form stays out.** A radius that understates the ball gives a model that is robust to less than the caller asked for, and the failure is silent: the optimisation solves and the weights are not robust. A radius that overstates it is visible, because the portfolio moves towards cash. The two errors are not symmetric, so the rule takes the one a caller can see.
+**A radius must not be too small, so the rule keeps the worst case.** A radius that is too small gives a model that is robust to less than the caller asked for. That failure is silent: the optimisation solves, and the weights are not robust. A radius that is too large is visible, because the portfolio moves towards cash. The two errors are not symmetric, so the rule takes the error that a caller can see.
 
-`ctx.p` serves the `:lpreg_val` slot alone. The ground metric of [`LpRegularisation`](@ref) is the type-``q`` metric with ``1/p + 1/q = 1``, and `key` names the slot rather than the norm order. The order belongs to the penalty, so that site states it in the [`CalibrationContext`](@ref) before it resolves the slot. The rule holds no order of its own, so a caller who runs it outside that site states the order in the context. Every other key ignores it.
+`ctx.p` serves the `:lpreg_val` slot alone. The ground metric of [`LpRegularisation`](@ref) is the metric of order ``q``, with ``1/p + 1/q = 1``, and `key` names the slot and not the norm order. The order belongs to the penalty, so that site states it in the [`CalibrationContext`](@ref) before it resolves the slot. The rule holds no order, so a caller who runs it outside that site states the order in the context. No other key reads it.
 
-**The drawdown owner is served on a drawdown scale, and `series` is what says so.** [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) measures the transport cost of its own programme against the per-asset drawdown sample, so the ball it prices is a ball over drawdown scenarios and the ground metric is a distance between two such vectors. [`calibration_series_dispersion`](@ref) reads the error scale off that sample under a drawdown marker, and `pr.sigma` reaches nothing there: it is a moment of the returns, and no scaling of it states a moment of a drawdown. The ground metric does not move with the series, only the vector it is taken of.
+**`series` gives the drawdown owner a drawdown scale.** [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) measures the transport cost of its programme against the per-asset drawdown sample. So its ball is a ball over drawdown scenarios, and the ground metric is a distance between two such vectors. Under a drawdown marker, [`calibration_series_dispersion`](@ref) reads the error scale from that sample. `pr.sigma` is not read, because it is a moment of the returns, and no scaling of it gives a moment of a drawdown. The ground metric does not change with the series. Only the vector of the norm changes.
 
-**The error scale of a drawdown series is a floor, and the record is the reason.** A drawdown is a running functional, so its entries are strongly dependent down a column, and ``\\hat{s}_{i} / \\sqrt{T_{e}}`` prices a record of ``T_{e}`` independent draws that a drawdown sample does not hold. The rule states no correction for it, on the same terms it states none for the number of assets: a correction needs a model of the dependence, and the sample states none. So the reading is the honest scale of the quantity, taken as if the record were independent.
+**The error scale of a drawdown series is too small, because of the record.** A drawdown is a running function of the path, so its entries are strongly dependent down a column. ``\\hat{s}_{i} / \\sqrt{T_{c}}`` prices a record of ``T_{c}`` independent draws, and a drawdown sample does not have them. The rule does not correct for this, as it does not correct for the number of assets. A correction needs a model of the dependence, and the sample gives none. So the rule uses the scale of the quantity as if the record were independent.
 
-`T_e` is Kish's effective sample size when observation weights are stated, and the raw row count when they are not, on the same terms as [`ConcentrationRadius`](@ref).
+`T_c` is the count that the site prices, as for [`ConcentrationRadius`](@ref): the `n` of its [`CalibrationContext`](@ref), and [`effective_sample_size`](@ref) when the site states none. On a distributionally robust measure the error vector is the sampling error of the mean of the rows on which the ball is centred, so the count is the count of those rows. On a regularisation slot it is the sampling error of `pr.mu`, so the count is the count of the observations behind the moments.
 
-The rule carries no range check of its own, on the same terms as [`ConcentrationRadius`](@ref).
+The rule does not check the range of its value, for the reason that [`ConcentrationRadius`](@ref) states.
 
-**A sample of no dispersion gives a radius of zero, and the slot admits it.** Every diagonal of the dispersion is non-negative, so the radius is non-negative and finite for every admissible input. A sample whose columns never move gives an error vector of zeros, and a ball of no width is the right answer for it: the empirical measure is the only measure such a sample supports, and the robust measure reduces to the plain one it is drawn around. In floating point that sample gives a number many orders below the smallest one a caller would state rather than an exact zero, so the slot owner's `> 0` check passes and the model prices a ball of no width. Both outcomes read the same way, and neither is a defect.
+**A sample with no dispersion gives a radius of zero, and the slot accepts it.** Every entry of the dispersion vector is zero or more, so the radius is zero or more, and finite, for every admissible input. A sample whose columns never move gives an error vector of zeros, and a ball of no width is correct for it. The empirical measure is the only measure that such a sample supports, and the robust measure becomes the plain measure at the centre of the ball. In floating point, such a sample gives a very small number and not an exact zero. The `> 0` check of the slot owner then passes, and the model prices a ball of almost no width. The two results have the same meaning.
 
 # Fields
 
@@ -2230,26 +2421,30 @@ $(DocStringExtensions.FIELDS)
         confidence::Number = 0.95
     ) -> DualNormRadius
 
-Keywords correspond to the struct's fields. `confidence` defaults to `0.95`. The norm order and the series are not fields of the rule: both reach it in the [`CalibrationContext`](@ref) the site hands over.
+Keywords correspond to the fields of the struct. The default `confidence` is `0.95`. The norm order and the series are not fields of the rule. Both reach the rule in the [`CalibrationContext`](@ref) of the site.
 
 ## Validation
 
   - `0 < confidence < 1`.
-  - The norm order is not a field, so the constructor cannot check it. [`dual_norm_radius_scale`](@ref) checks `ctx.p` when the `:lpreg_val` slot is resolved: it is stated, finite and above one, on the same terms as [`LpRegularisation`](@ref).
+  - The norm order is not a field, so the constructor cannot check it. [`dual_norm_radius_scale`](@ref) checks `ctx.p` when it resolves the `:lpreg_val` slot. `ctx.p` must be stated, finite and more than one, as for [`LpRegularisation`](@ref).
 
 # Related
 
   - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
-  - [`ConcentrationRadius`](@ref): answers how wide the ball is at a confidence level, in one dimensionless factor that no norm enters.
-  - [`RateRadius`](@ref): answers how fast the ball shrinks with the record, and leaves the coefficient to a cross-validation.
+  - [`ConcentrationRadius`](@ref): gives the width of the ball at a confidence level, with one factor that has no units and reads no norm.
+  - [`RateRadius`](@ref): gives the rate at which the ball becomes smaller with the record, and leaves the coefficient to a cross-validation.
   - [`Num_AmbRadCal`](@ref)
   - [`CalibrationContext`](@ref)
   - [`calibration_series_dispersion`](@ref)
   - [`resolve_calibration_slot`](@ref)
+
+# References
+
+  - $(ref_dict[:drcvar]) Section 6, Theorem 6.3 and Proposition 6.5.
 """
 @concrete struct DualNormRadius <: AbstractAmbiguityRadiusCalibrationAlgorithm
     """
-    `confidence`: Per-coordinate confidence level of the normal quantile the error scale is multiplied by. It is not corrected for the number of assets, so the ∞-norm case reads a level over one coordinate and not over the vector.
+    `confidence`: Confidence level per coordinate of the normal quantile that multiplies the error scale. The rule does not correct it for the number of assets, so the ∞-norm case reads a level over one coordinate and not over the vector.
     """
     confidence
     function DualNormRadius(confidence::Number)
@@ -2263,14 +2458,14 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Compute the ambiguity radius of the slot `key` names, in the ground metric of that slot, on the sample that `pr` carries.
+Computes the ambiguity radius of the slot that `key` names, in the ground metric of that slot, on the sample of `pr`.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
 r &= z_{c} \\lVert \\boldsymbol{e} \\rVert_{g}\\,,\\\\
-e_{i} &= \\dfrac{\\hat{s}_{i}}{\\sqrt{T_{e}}}\\,,\\\\
+e_{i} &= \\dfrac{\\hat{s}_{i}}{\\sqrt{T_{c}}}\\,,\\\\
 q &= \\dfrac{p}{p - 1}\\,.
 \\end{align}
 ```
@@ -2279,14 +2474,15 @@ Where:
 
   - $(math_dict[:cal_r_radius])
   - ``z_{c}``: Quantile of the standard normal distribution at the per-coordinate confidence level ``c``.
-  - ``\\boldsymbol{e}``: Per-asset scale of the sampling error of the mean vector, in the units of the series the slot owner prices.
+  - ``\\boldsymbol{e}``: Per-asset scale of the sampling error of the mean vector, in the units of the series that the slot owner prices.
   - ``g``: Order of the ground metric, which `key` names.
   - $(math_dict[:cal_s_i_series])
   - $(math_dict[:T])
   - $(math_dict[:cal_T_e])
+  - $(math_dict[:cal_T_c])
   - $(math_dict[:w_t_obs])
   - ``p``: Norm order of the penalty, the `p` field.
-  - ``q``: Order of the type-``q`` ground metric of that penalty.
+  - ``q``: Order of the ground metric of that penalty.
 
 # The ground metric of each key
 
@@ -2299,21 +2495,21 @@ Where:
 | `:l2reg_val`   | `val` of [`L2Regularisation`](@ref)                                                                               | 2              | 2                   |
 | `:lpreg_val`   | `val` of [`LpRegularisation`](@ref)                                                                               | ``p``          | ``q``               |
 
-The two ends of a Range measure carry one ground metric, so a rule stated on both resolves to one number. A radius names no end of the distribution.
+The two ends of a Range measure have one ground metric, so a rule on both ends resolves to one number. A radius names no end of the distribution.
 
 # Arguments
 
   - `alg`: The rule.
-  - `key`: Name of the slot that is being resolved. It selects the ground metric, so this is the one rule of its family for which the key carries meaning.
-  - `pr`: Prior result the sample size and, on a returns series, the covariance matrix are read off. A drawdown series reads the sample instead.
+  - `key`: Name of the slot that the call resolves. It selects the ground metric, so this is the one rule of its family for which the key has a meaning.
+  - `pr`: Prior result from which the rule reads the sample size and, for a returns series, the covariance matrix. A drawdown series reads the sample.
   - `w`: Effective observation weights, or `nothing`.
   - `slv`: Effective solver. This rule needs none.
-  - `ctx`: The site's [`CalibrationContext`](@ref). `ctx.series` names the quantity the error vector is measured in, and `ctx.p` is the penalty's norm order, which the `:lpreg_val` key alone reads.
+  - `ctx`: The [`CalibrationContext`](@ref) of the site. `ctx.series` names the quantity in which the rule measures the error vector. `ctx.p` is the norm order of the penalty, and only the `:lpreg_val` key reads it. `ctx.n` is the count that the site prices, and the rule reads [`effective_sample_size`](@ref) when it is `nothing`.
 
 # Validation
 
-  - `key` is one of the seven the table names, else an `ArgumentError` naming the key it received and the keys it serves.
-  - The `:lpreg_val` key needs a stated `p`, else an `ArgumentError` naming the field.
+  - `key` must be one of the seven keys of the table, else an `ArgumentError` that names the key that the rule got and the keys that it serves.
+  - The `:lpreg_val` key needs a stated `p`, else an `ArgumentError` that names the field.
 
 # Returns
 
@@ -2328,10 +2524,14 @@ The two ends of a Range measure carry one ground metric, so a rule stated on bot
   - [`calibration_series_dispersion`](@ref)
   - [`effective_sample_size`](@ref)
   - [`resolve_calibration_slot`](@ref)
+
+# References
+
+  - $(ref_dict[:drcvar]) Section 6, Theorem 6.3 and Proposition 6.5.
 """
 function (alg::DualNormRadius)(key::Symbol, pr::AbstractPriorResult, w, ::Any,
                                ctx::CalibrationContext)
-    T = effective_sample_size(pr, w)
+    T = isnothing(ctx.n) ? effective_sample_size(pr, w) : ctx.n
     e = calibration_series_dispersion(ctx.series, pr) ./ sqrt(T)
     z = Distributions.quantile(Distributions.Normal(), alg.confidence)
     return z * dual_norm_radius_scale(key, ctx.p, e)
@@ -2339,20 +2539,20 @@ end
 """
     dual_norm_radius_scale(key::Symbol, p::Option{<:Number}, e::AbstractVector)
 
-Reduce the per-asset error vector `e` to one number, in the ground metric that `key` names.
+Reduces the per-asset error vector `e` to one number, in the ground metric that `key` names.
 
-This is the whole of the key's meaning, held apart from the functor. Six of the seven keys name a fixed norm order, so they are a literal table and not a chain of branches. The seventh, `:lpreg_val`, derives its order from the `p` the rule carries, because no key can name it. An eighth key is a refusal, because a caller who writes their own measure reaches it first and the message must name the keys the rule serves.
+This function holds all the meaning of the key, apart from the functor. Six of the seven keys name a fixed norm order, so they are a literal table and not a chain of branches. The seventh key, `:lpreg_val`, gets its order from the `p` of the context, because no key can name it. The function refuses any other key. A caller who writes a measure gets this refusal first, so the message names the keys that the rule serves.
 
 # Arguments
 
-  - `key`: Name of the slot that is being resolved.
-  - `p`: Norm order the site states in its [`CalibrationContext`](@ref), read on the `:lpreg_val` arm alone.
+  - `key`: Name of the slot that the call resolves.
+  - `p`: Norm order that the site states in its [`CalibrationContext`](@ref). Only the `:lpreg_val` branch reads it.
   - `e`: Per-asset scale of the sampling error of the mean vector.
 
 # Validation
 
-  - `key` is one of the seven [`DualNormRadius`](@ref) serves, else an `ArgumentError`.
-  - `ctx.p` is stated when `key` is `:lpreg_val`, else an `ArgumentError`. It is then finite and above one, so that the conjugate order `q = p / (p - 1)` exists.
+  - `key` must be one of the seven keys that [`DualNormRadius`](@ref) serves, else an `ArgumentError`.
+  - `p` must be stated when `key` is `:lpreg_val`, else an `ArgumentError`. It must then be finite and more than one, so that the conjugate order `q = p / (p - 1)` exists.
 
 # Returns
 
@@ -2383,25 +2583,25 @@ $(DocStringExtensions.TYPEDEF)
 
 Computes the Esfahani-Kuhn tail weight that prices the tail term of the loss at a stated multiple of its mean term.
 
-At ``r \\to 0`` the loss of [`DistributionallyRobustConditionalValueatRisk`](@ref) reduces to ``-\\mathbb{E}[\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi}] + l \\, \\mathrm{CVaR}_{\\alpha}(\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi})``, so `l` is the exchange rate between one unit of expected return and one unit of tail loss. Both terms carry the units of the returns, so `l` is dimensionless. **A dimensionless number is not a scale-free one, and that is the trap this rule exists for.** The mean of a daily return column sits two orders of magnitude below its five per cent CVaR, and on a monthly column the gap is far smaller, so a stated `l = 1.0` prices the tail term about forty times the mean term on a daily sample and under ten times on a monthly one. One stated number is a different trade-off at every sampling frequency, and at every re-fit that changes the record.
+At ``r \\to 0``, the loss of [`DistributionallyRobustConditionalValueatRisk`](@ref) becomes ``-\\mathbb{E}[\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi}] + l \\, \\mathrm{CVaR}_{\\alpha}(\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi})``, the mean-risk objective of Equation 26 of [drcvar](@cite), where the tail weight is ``\\rho``. So `l` is the exchange rate between one unit of expected return and one unit of tail loss. Both terms have the units of the returns, so `l` has no units. **But `l` is not independent of the scale of the sample.** For returns that are independent over time, the mean of a return column increases with the horizon, and its CVaR increases about as the square root of the horizon. So the ratio of the CVaR to the mean decreases about as the square root of the horizon. A stated `l = 1.0` thus prices the tail term at a much larger multiple of the mean term on a daily sample than on a monthly sample. One stated number is a different trade-off at each sampling frequency, and at each fit that changes the record.
 
-The rule carries the sample's own units and nothing else, so the preference stays the caller's. `ratio` states how many mean terms one tail term is worth, and the rule returns the `l` that prices it so on the sample the prior result carries. `ratio = 1` is parity, and `ratio = 2` prices the tail term at twice the mean term on every sample.
+The rule reads the units of the sample and nothing else, so the preference stays with the caller. `ratio` states how many mean terms one tail term is worth. The rule returns the `l` that gives this ratio on the sample of the prior result. `ratio = 1` is parity, and `ratio = 2` prices the tail term at two times the mean term on every sample.
 
-A rule reads no portfolio, so it cannot form ``\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi}``. The series it reads is the cross-section of the per-asset losses of the quantity the slot owner prices: the mean-term scale ``m`` is the mean of that pool, and the tail-term scale ``c`` is the mean of the per-column ``\\mathrm{CVaR}_{\\alpha}``. **The mean of the per-column values is not the pooled ``\\mathrm{CVaR}_{\\alpha}``, and the difference is deliberate.** A pooled tail is drawn from the worst columns, so it is dominated by the most volatile assets and gives a smaller weight. The measure prices a portfolio rather than a single asset, so the per-column mean is the reading that answers it.
+A rule reads no portfolio, so it cannot make ``\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi}``. It reads the cross-section of the per-asset losses of the quantity that the slot owner prices. The mean-term scale ``m`` is the mean of that pool, and the tail-term scale ``c`` is the mean of the ``\\mathrm{CVaR}_{\\alpha}`` of each column. **The mean of the values per column is not the pooled ``\\mathrm{CVaR}_{\\alpha}``, and the difference is intentional.** A pooled tail comes from the worst columns, so the most volatile assets control it, and it gives a smaller weight. The measure prices a portfolio and not a single asset, so the rule uses the mean over the columns.
 
-**A caller who holds a reference portfolio still cannot state one, and that is the design.** The pooled cross-section is the equal-weight reading, and a stated reference portfolio would give a sharper one. It would also make the rule a second place where a portfolio enters the problem, and the calibration channel carries no portfolio by construction: [`resolve_calibration_slot`](@ref) hands a rule the Prior and nothing else, so a reference vector would have to travel a channel of its own, be checked against the universe of the fold, and be re-stated whenever a subset view or a cluster changed that universe. The exchange rate the rule prices is a property of the **sample**, and the equal-weight cross-section is the reading of it that needs no second input. A caller who wants the rate at their own portfolio computes `l` themselves and states the number.
+**A caller cannot state a reference portfolio.** The pooled cross-section gives the rate for equal weights, and a reference portfolio gives a more exact rate. But a reference portfolio makes the rule a second place where a portfolio enters the problem. [`resolve_calibration_slot`](@ref) gives a rule the Prior and nothing else, so a reference vector needs a separate route. The rule must also check the vector against the universe of each fold, and the caller must state it again when a subset view or a cluster changes that universe. The exchange rate is a property of the **sample**, and the cross-section with equal weights needs no second input. A caller who wants the rate at a portfolio computes `l` and states the number.
 
-``m`` is negative for a sample of positive expected return, and the rule takes ``\\lvert m \\rvert``. No field states the sign: a negative weight is not admissible in the slot, and a sample of negative expected return does not turn the trade-off around.
+``m`` is negative for a sample with a positive expected return, and the rule takes ``\\lvert m \\rvert``. No field states the sign. The slot does not accept a negative weight, and a sample with a negative expected return does not reverse the trade-off.
 
-The rule reads its sibling `alpha`, because ``c`` is a ``\\mathrm{CVaR}`` at the measure's own significance level. `alpha` and `l` are a **travelling pair**, on the same terms as `alpha` and `kappa`: the rule reads `ctx.alpha`, and the owner's own resolution method resolves `alpha` first for that reason. A caller who runs the rule outside a measure states `alpha` in the context.
+The rule reads its sibling `alpha`, because ``c`` is a ``\\mathrm{CVaR}`` at the significance level of the measure. So the resolution method of the owner resolves `alpha` first and puts the number in `ctx.alpha`, as it does for `alpha` and `kappa`. A caller who runs the rule outside a measure states `alpha` in the context.
 
-**Both scales read the observation weights.** They are sample statistics rather than counts, so a weighted sample is read weighted. [`RateRadius`](@ref) and [`RateSignificance`](@ref) ignore `w` because a rate speaks of the length of the record, and that reading does not carry to a moment.
+**Both scales read the observation weights.** They are sample statistics and not counts, so the rule reads a weighted sample with its weights. A rule that prices a count, such as [`RateRadius`](@ref) or [`RateSignificance`](@ref), reads `w` only through the effective sample size of the weights.
 
-**`ctx.series` says which quantity both terms are read over, and the slot owner states it.** [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) carries the key `:l` as well, and its tail term is a ``\\mathrm{CDaR}`` of the portfolio drawdown series. A rule is given no portfolio, but it can form the drawdown series of each **column**, and the resolution site names the marker in `ctx.series`. Both terms then move together: the mean term is the mean drawdown of the pool, and the tail term is the mean of the per-column ``\\mathrm{CDaR}_{\\alpha}``. The same [`ConditionalValueatRisk`](@ref) reading forms it, because the tail mean of a non-positive drawdown column **is** the ``\\mathrm{CDaR}`` of that column, so the rule and the measure it calibrates still cannot drift apart.
+**`ctx.series` names the quantity of both terms, and the slot owner states it.** [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) also has the key `:l`, and its tail term is a ``\\mathrm{CDaR}`` of the drawdown series of the portfolio. A rule gets no portfolio, but it can make the drawdown series of each **column**, and the resolution site names the marker in `ctx.series`. Both terms then change together. The mean term is the mean drawdown of the pool, and the tail term is the mean of the ``\\mathrm{CDaR}_{\\alpha}`` of each column. The rule computes it with [`ConditionalValueatRisk`](@ref), because the tail mean of a drawdown column that is not positive **is** the ``\\mathrm{CDaR}`` of that column. So the rule and the measure that it calibrates use one definition.
 
-A second reading of `l` exists, and this rule does not take it. `l` can be read as a risk-aversion coefficient and mapped from a mean-variance one, but a variance penalty is quadratic in the weight vector and a ``\\mathrm{CVaR}`` term is positively homogeneous, so the two objectives are not comparable term by term. The map holds at one reference portfolio and nowhere else, and a rule gets no portfolio.
+The rule does not use a second meaning of `l`. `l` can be read as a coefficient of risk aversion and mapped from a mean-variance coefficient. But a variance penalty is quadratic in the weight vector, and a ``\\mathrm{CVaR}`` term is positively homogeneous, so the two objectives cannot be compared term by term. The map is correct at one reference portfolio only, and a rule gets no portfolio.
 
-The rule carries no range check on the weight it returns, on the same terms as [`RateRadius`](@ref). The slot owner's constructor keeps that job. Its two refusals state that the ratio exists at all, which is the shape of the one check [`EntropyBudget`](@ref) carries. A sample whose mean loss is near zero returns a very large weight, and that is the sample speaking rather than a defect: no threshold separates a small mean loss from a smaller one.
+The rule does not check the range of the weight that it returns, for the reason that [`RateRadius`](@ref) states. The constructor of the slot owner checks it. The two refusals of the rule state that the ratio exists, as the check of [`EntropyBudget`](@ref) states that its root exists. A sample whose mean loss is near zero gives a very large weight, and that is correct for such a sample. No threshold separates a small mean loss from a smaller one.
 
 # Fields
 
@@ -2413,7 +2613,7 @@ $(DocStringExtensions.FIELDS)
         ratio::Number = 1
     ) -> TailTermParity
 
-Keywords correspond to the struct's fields. `ratio` defaults to `1`, which is parity between the two terms. The significance level and the series both terms are read over are not fields of the rule: both reach it in the [`CalibrationContext`](@ref) the site hands over.
+Keywords correspond to the fields of the struct. The default `ratio = 1` is parity between the two terms. The significance level and the series of both terms are not fields of the rule. Both reach the rule in the [`CalibrationContext`](@ref) of the site.
 
 ## Validation
 
@@ -2432,7 +2632,7 @@ Keywords correspond to the struct's fields. `ratio` defaults to `1`, which is pa
 
 # References
 
-  - $(ref_dict[:drcvar])
+  - $(ref_dict[:drcvar]) Section 7.1, Equation 26.
 """
 @concrete struct TailTermParity <: AbstractAmbiguityTailWeightCalibrationAlgorithm
     """
@@ -2450,7 +2650,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Compute the tail weight that prices the tail term at `ratio` mean terms on the sample that `pr` carries.
+Computes the tail weight that prices the tail term at `ratio` mean terms on the sample of `pr`.
 
 # Mathematical definition
 
@@ -2468,34 +2668,34 @@ Where:
   - ``l``: Esfahani-Kuhn tail weight, the weight of the tail term of the loss.
   - ``\\rho``: Number of mean terms that one tail term is worth.
   - ``m``: Mean-term scale, the mean of the pooled cross-section of the per-asset losses.
-  - ``c``: Tail-term scale, the mean of the per-column ``\\mathrm{CVaR}_{\\alpha}`` of the loss.
+  - ``c``: Tail-term scale, the mean over the columns of the ``\\mathrm{CVaR}_{\\alpha}`` of the loss.
   - ``\\boldsymbol{r}_{j}``: Column ``j`` of the returns matrix.
-  - ``\\mathcal{S}``: The series `ctx.series` names, built from one column. It is the identity on a [`ReturnsSeries`](@ref), and a drawdown series on the two markers of [`AbstractDrawdownSeries`](@ref).
+  - ``\\mathcal{S}``: The series that `ctx.series` names, made from one column. It is the identity for a [`ReturnsSeries`](@ref), and a drawdown series for the two markers of [`AbstractDrawdownSeries`](@ref).
   - ``y_{tj}``: Entry ``t`` of the series of column ``j``.
-  - ``\\boldsymbol{y}_{j}``: The series of column ``j``. A ``\\mathrm{CVaR}_{\\alpha}`` of a non-positive drawdown series is the ``\\mathrm{CDaR}_{\\alpha}`` of that column.
+  - ``\\boldsymbol{y}_{j}``: The series of column ``j``. The ``\\mathrm{CVaR}_{\\alpha}`` of a drawdown series that is not positive is the ``\\mathrm{CDaR}_{\\alpha}`` of that column.
   - $(math_dict[:w_t_obs])
   - $(math_dict[:alpha_rm])
   - $(math_dict[:T])
   - $(math_dict[:N])
   - $(math_dict[:r_tj])
 
-Every observation weight is one when none is stated. Every column holds ``T`` entries, so the pooled mean and the mean of the per-column means are one number, and the pooled form is the one written.
+Every observation weight is one when no weight is stated. Every column holds ``T`` entries, so the pooled mean and the mean of the column means are equal, and the definition uses the pooled form.
 
 # Algorithm
 
- 1. Build the sample `ctx.series` names with [`calibration_series_matrix`](@ref) into `X`, and read the effective observation weights off `w`. A [`ReturnsSeries`](@ref) returns `pr.X` itself.
- 2. Form the mean-term scale `m`, the negated weighted mean of the pooled cross-section of `X`.
- 3. Build a [`ConditionalValueatRisk`](@ref) at `ctx.alpha` carrying the same weights, and form the tail-term scale `c`, the mean over the columns of `X` of the value that measure takes on each. The measure's own reading is the one used, so the rule and the measure it calibrates cannot drift apart.
+ 1. Make the sample that `ctx.series` names with [`calibration_series_matrix`](@ref) into `X`, and read the effective observation weights from `w`. A [`ReturnsSeries`](@ref) returns `pr.X`.
+ 2. Make the mean-term scale `m`, the negative weighted mean of the pooled cross-section of `X`.
+ 3. Make a [`ConditionalValueatRisk`](@ref) at `ctx.alpha` with the same weights. Make the tail-term scale `c`, the mean over the columns of `X` of the value of that measure on each column. The rule uses the measure itself, so the rule and the measure that it calibrates use one definition.
  4. Return `alg.ratio * abs(m) / c`.
 
 # Arguments
 
   - `alg`: The rule.
-  - `key`: Name of the slot that is being resolved. The scales are read off the asset columns, so the key never selects the value, and the two ends of a Range measure part company through their two probabilities alone.
-  - `pr`: Prior result the returns matrix is read off. The series is built from its columns.
+  - `key`: Name of the slot that the call resolves. The rule reads the scales from the asset columns, so the key does not select the value. The two ends of a Range measure differ only through their two probabilities.
+  - `pr`: Prior result from which the rule reads the returns matrix. The rule makes the series from its columns.
   - `w`: Effective observation weights, or `nothing`. Both scales are sample statistics, so this rule reads them.
   - `slv`: Effective solver. This rule needs none, because both scales are closed forms.
-  - `ctx`: The site's [`CalibrationContext`](@ref). `ctx.alpha` is the measure's own significance level, and it must hold a number. `ctx.series` names the quantity both terms are read over.
+  - `ctx`: The [`CalibrationContext`](@ref) of the site. `ctx.alpha` is the significance level of the measure, and it must hold a number. `ctx.series` names the quantity of both terms.
 
 # Validation
 
@@ -2517,6 +2717,10 @@ Every observation weight is one when none is stated. Every column holds ``T`` en
   - [`DistributionallyRobustConditionalValueatRisk`](@ref)
   - [`DistributionallyRobustConditionalDrawdownatRisk`](@ref)
   - [`resolve_calibration_slot`](@ref)
+
+# References
+
+  - $(ref_dict[:drcvar]) Section 7.1, Equation 26.
 """
 function (alg::TailTermParity)(::Symbol, pr::AbstractPriorResult, w, ::Any,
                                ctx::CalibrationContext)
@@ -2549,13 +2753,13 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Computes a norm ceiling that holds a stated fraction of the universe effective, so that the floor refits whenever the universe changes.
+Computes a norm ceiling that keeps a stated fraction of the universe effective, so that the floor changes when the universe changes.
 
-A norm ceiling and the effective number of assets are reciprocally related, so a bound on the norm is a floor on that count. This rule states the floor as a **fraction of the universe** rather than as a count. The asset count comes off the prior result, so a subset view, a cluster and a cross-validation fold each get the floor their own universe earns, and no number is pinned to the universe it was written for.
+A bound on the norm of the weights is a floor on the effective number of assets. This rule states the floor as a **fraction of the universe** and not as a count. The asset count comes from the prior result, so a subset view, a cluster and a cross-validation fold each get the floor of their own universe. No count stays fixed to the universe for which a caller wrote it.
 
-`ctx.p` is the norm order the ceiling is read against, and it belongs to the constraint. Each of the three constraint sites states it in the [`CalibrationContext`](@ref) before it resolves the slot. The rule holds no order of its own, so a caller who runs it outside those sites states the order in the context.
+`ctx.p` is the norm order of the ceiling, and it belongs to the constraint. Each of the three constraint sites states it in the [`CalibrationContext`](@ref) before it resolves the slot. The rule holds no order, so a caller who runs it outside those sites states the order in the context.
 
-The rule carries no range check on its answer, on the same terms as [`ConcentrationRadius`](@ref). It returns the quantity of the slot it stands in, so the slot owner is the whole validation.
+The rule does not check the range of its value, for the reason that [`ConcentrationRadius`](@ref) states. [`resolve_calibration_slot`](@ref) checks that the ceiling is `> 0` and finite.
 
 # Mathematical definition
 
@@ -2572,14 +2776,14 @@ m^{1/p - 1} & \\textrm{otherwise}
 Where:
 
   - ``\\mathrm{val}``: Norm ceiling.
-  - ``m``: Effective number of assets the ceiling holds as a floor.
+  - ``m``: Effective number of assets that the ceiling keeps as a floor.
   - ``f``: Fraction of the universe, the `fraction` field.
   - $(math_dict[:N])
-  - ``p``: Norm order of the constraint the ceiling stands in.
+  - ``p``: Norm order of the constraint of the ceiling.
 
-The order-``p`` effective number of assets is ``N_{\\mathrm{eff},\\, p}(\\boldsymbol{w}) = \\left(\\sum_{i} \\lvert w_{i} \\rvert^{p}\\right)^{1/(1 - p)}``, so ``N_{\\mathrm{eff},\\, p} \\geq m`` is ``\\lVert \\boldsymbol{w} \\rVert_{p} \\leq m^{1/p - 1}``. It is the reading [`number_effective_assets`](@ref) states, taken to an arbitrary order: at ``p = 2`` the two are the same number, and at every order an equal-weight portfolio over ``m`` assets reports exactly ``m``. The exponent is also ``-1/q`` for the conjugate order ``q``, because ``1/p - 1 = -1/q``.
+The effective number of assets of order ``p`` is ``N_{\\mathrm{eff},\\, p}(\\boldsymbol{w}) = \\left(\\sum_{i} \\lvert w_{i} \\rvert^{p}\\right)^{1/(1 - p)}``. So for ``p > 1``, ``N_{\\mathrm{eff},\\, p} \\geq m`` is ``\\lVert \\boldsymbol{w} \\rVert_{p} \\leq m^{1/p - 1}``. At ``p = 2``, this count is the number that [`number_effective_assets`](@ref) gives. At every order, a portfolio with equal weights over ``m`` assets gives exactly ``m``. The exponent is also ``-1/q`` for the conjugate order ``q``, because ``1/p - 1 = -1/q``. At ``p = 1`` the ceiling is one for every ``m``.
 
-The infinite arm is the limit of the finite one and not a second reading. ``m^{1/p - 1} \\to m^{-1}`` as ``p`` grows, and a cap of ``1/m`` on the largest weight of a fully invested portfolio spreads it over at least ``m`` assets. So the two arms meet, and a caller who raises ``p`` towards the infinite order sees the ceiling move towards ``1/m`` rather than away from it.
+The infinite branch is the limit of the finite branch. ``m^{1/p - 1} \\to m^{-1}`` as ``p`` increases. A cap of ``1/m`` on the largest weight of a fully invested portfolio spreads it over at least ``m`` assets. So the two branches agree, and as a caller increases ``p``, the ceiling moves towards ``1/m``.
 
 # Fields
 
@@ -2591,12 +2795,12 @@ $(DocStringExtensions.FIELDS)
         fraction::Number = 0.5
     ) -> EffectiveAssetFloor
 
-Keywords correspond to the struct's fields. `fraction` defaults to `0.5`, which holds half of the universe effective. The norm order the ceiling is read against is not a field of the rule: it reaches the rule as `ctx.p` in the [`CalibrationContext`](@ref) the constraint site hands over.
+Keywords correspond to the fields of the struct. The default `fraction = 0.5` keeps half of the universe effective. The norm order of the ceiling is not a field of the rule. It reaches the rule as `ctx.p` in the [`CalibrationContext`](@ref) of the constraint site.
 
 ## Validation
 
   - `0 < fraction <= 1`.
-  - The norm order is not a field, so the constructor cannot check it. The rule checks `ctx.p` when it runs: it is stated, and it is one or more.
+  - The norm order is not a field, so the constructor cannot check it. The rule checks `ctx.p` when it runs. It must be stated, and it must be one or more.
 
 # Related
 
@@ -2625,22 +2829,40 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Compute the norm ceiling that holds `fraction` of the universe that `pr` carries effective.
+Computes the norm ceiling that keeps the fraction `alg.fraction` of the universe of `pr` effective.
 
-The universe is the column count of the prior result's returns matrix, so the ceiling moves with the universe the model actually sees.
+The universe is the column count of the returns matrix of the prior result, so the ceiling changes with the universe of the model.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{val} &= \\begin{cases}
+(f N)^{-1} & \\textrm{if } p \\textrm{ is infinite}\\\\
+(f N)^{1/p - 1} & \\textrm{otherwise}
+\\end{cases}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{val}``: Norm ceiling.
+  - ``f``: Fraction of the universe, the `fraction` field.
+  - $(math_dict[:N])
+  - ``p``: Norm order of the constraint of the ceiling, `ctx.p`.
 
 # Arguments
 
   - `alg`: The rule.
-  - `key`: Name of the slot that is being resolved. It names the site in the refusal below, and the ceiling itself does not depend on it: the norm order carries that dependence instead.
-  - `pr`: Prior result the asset count is read off.
-  - `w`: Effective observation weights. A universe count is not a sample count, so this rule ignores them.
+  - `key`: Name of the slot that the call resolves. The refusal below names the site with it, and the ceiling does not depend on it. The ceiling depends on the norm order.
+  - `pr`: Prior result from which the rule reads the asset count.
+  - `w`: Effective observation weights. A count of the universe is not a count of the sample, so this rule does not read them.
   - `slv`: Effective solver. This rule needs none.
-  - `ctx`: The site's [`CalibrationContext`](@ref). `ctx.p` is the norm order the ceiling is read against, and it must hold a number.
+  - `ctx`: The [`CalibrationContext`](@ref) of the site. `ctx.p` is the norm order of the ceiling, and it must hold a number.
 
 # Validation
 
-  - `ctx.p` is not `nothing`, and it is one or more. Every constraint site states it, so a `nothing` here means the rule was resolved from a context that names no order.
+  - `ctx.p` must not be `nothing`, and it must be one or more. Every constraint site states it, so `nothing` means that a context with no order reached the rule.
 
 # Returns
 

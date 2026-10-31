@@ -95,3 +95,10 @@ function variance_series(ce::WindowedCovariance, X::MatNum, pnl::Option{<:AssetP
                          dims::Int = 1, kwargs...)
     return windowed_variance_series(ce.ce, ce.w, ce.window, X, pnl; dims = dims, kwargs...)
 end
+# The inner count reads the keywords of the inner fit: `mean`, `iv`, and the two masks cut to the
+# window. The fit takes `mean` by name, so the window does not read it.
+function effective_observation_count(ce::WindowedCovariance, X::MatNum; mean = nothing,
+                                     kwargs...)
+    inner, Xw, iv, kw = windowed_preamble(ce.ce, ce.w, ce.window, X; kwargs...)
+    return effective_observation_count(inner, Xw; mean = mean, iv = iv, kw...)
+end

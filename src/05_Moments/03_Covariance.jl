@@ -1,9 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Adapts any `StatsBase.CovarianceEstimator` to the library's calling convention, carrying its observation weights alongside it.
+Adapts a `StatsBase.CovarianceEstimator` to the calling convention of the library, and holds its observation weights with it.
 
-The estimator and the weights travel together in one object, so a caller passes one value where the `StatsBase` API takes a separate estimator and weight vector at every call site. `ce` accepts any subtype of `StatsBase.CovarianceEstimator`, so an estimator from a package such as [`CovarianceEstimation.jl`](https://github.com/mateuszbaran/CovarianceEstimation.jl) reaches the library unchanged.
+The estimator and the weights are in one object, so a caller passes one value. The `StatsBase` API takes an estimator and a separate weight vector at each call site. `ce` accepts all subtypes of `StatsBase.CovarianceEstimator`, so an estimator from another package, such as CovarianceEstimation.jl, gets to the library without change.
 
 # Fields
 
@@ -22,30 +22,31 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
+  - $(val_dict[:ce_cov])
   - $(val_dict[:oow])
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `ce`: Recursively updated via [`factory`](@ref).
+  - `ce`: Recursively updated through [`factory`](@ref).
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
-  - `cache`: Carried unchanged via [`factory`](@ref).
+  - `cache`: Carried unchanged through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `ce`: Recursively viewed via [`port_opt_view`](@ref).
-  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
+  - `ce`: Recursively viewed through [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).
 
 ## Observation weight parameters
 
-When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
 
-  - `ce`: Recursively indexed via [`obs_weights_view`](@ref).
-  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
-  - `cache`: Dropped via [`obs_weights_view`](@ref), because no slice of a state exists on the observation axis.
+  - `ce`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
+  - `cache`: Removed by [`obs_weights_view`](@ref), because a state has no slice on the observation axis.
 
 # Examples
 
@@ -89,6 +90,7 @@ GeneralCovariance
     @fprop @vprop cache
     function GeneralCovariance(ce::StatsBase.CovarianceEstimator, w::Option{<:ObsWeights},
                                cache::Option{<:AbstractPartialFitState})
+        assert_covariance_estimator(ce, :ce)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(ce), typeof(w), typeof(cache)}(ce, w, cache)
     end
@@ -105,11 +107,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Renders every field of a [`GeneralCovariance`](@ref) except `cache`.
 
-The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:GeneralCovariance, true)` to render it.
+A `cache` holds the state of an incremental fit. That state is not part of the configuration, and it prints under the estimator at each site that renders the estimator. Set `set_show_nothing_fields!(:GeneralCovariance, true)` to render it.
 
 # Arguments
 
-  - `::GeneralCovariance`: Covariance estimator, read for its type alone.
+  - `::GeneralCovariance`: The covariance estimator. The method reads only its type.
 
 # Returns
 
@@ -123,6 +125,284 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
 """
 show_fields(::GeneralCovariance) = (:ce, :w)
 """
+    densify(X::MatNum) -> MatNum
+
+Materialise a lazy or sparse observation matrix as a dense `Matrix`.
+
+The weighted moment methods of `StatsBase` take a `DenseMatrix`. A `Transpose`, an `Adjoint`, a `SubArray` or a sparse matrix does not match them. Without a `mean`, the call raises a `MethodError`, and the caller can recover from it. With a `mean`, the caller cannot recover. `cov(::SimpleCovariance, X, w; mean = mu)` forwards four positional arguments as `covm(X, mu, w, dims)`. When the `DenseMatrix` method does not match, that call resolves to `Statistics.covm(x, xmean, y, ymean, vardim)`, which is the cross-covariance of `X` and the weight vector. It returns an `N × 1` matrix in place of an `N × N` matrix, and raises no error. [`robust_cov`](@ref) and [`robust_cor`](@ref) densify `X` before every weighted call, so neither failure can happen.
+
+# Algorithm
+
+ 1. When `X` is a `DenseMatrix` of numbers or of `JuMP` scalars, return it unchanged.
+ 2. Otherwise return `Matrix(X)`, a dense copy.
+
+# Arguments
+
+  - $(arg_dict[:X])
+
+# Returns
+
+  - `X::MatNum`: `X` itself when it is already a dense `Matrix`, and `Matrix(X)` otherwise.
+
+# Related
+
+  - [`MatNum`](@ref)
+  - [`robust_cov`](@ref)
+  - [`robust_cor`](@ref)
+"""
+function densify(X::DenseMatrix{<:Union{Number, JuMP.AbstractJuMPScalar}})
+    return X
+end
+function densify(X::MatNum)
+    return Matrix(X)
+end
+"""
+    compat_cov(
+        ce::StatsBase.CovarianceEstimator,
+        X::MatNum,
+        [w::StatsBase.AbstractWeights];
+        dims::Int = 1,
+        mean = nothing,
+        kwargs...
+    ) -> MatNum
+
+Compute the covariance matrix with the estimator `ce`, and pass the extra keyword arguments only when the method of `ce` accepts them.
+
+# Algorithm
+
+ 1. When the caller passed extra keyword arguments, and `hasmethod` reports that `Statistics.cov` takes `dims`, `mean` and those keys for this estimator and these arguments, call `Statistics.cov` with all of them and return the result.
+ 2. When step 1 raises a `MethodError`, drop the extra keyword arguments and continue. A method whose signature ends in a `kwargs...` slurp satisfies `hasmethod` and can still reject a key further down its call chain. Any other error propagates to the caller.
+ 3. Call `Statistics.cov(ce, X, args...; dims = dims, mean = mean)`, and return the result.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:X])
+  - $(arg_dict[:oow])
+  - $(arg_dict[:dims])
+  - $(arg_dict[:omean])
+  - `kwargs...`: More keyword arguments for `cov`.
+
+# Returns
+
+  - $(ret_dict[:sigma])
+
+# Related
+
+  - [`MatNum`](@ref)
+  - [`robust_cov`](@ref)
+  - [`compat_cor`](@ref)
+  - [`Statistics.cov`](https://juliastats.org/StatsBase.jl/stable/cov/)
+"""
+function compat_cov(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix, args...;
+                    dims::Int = 1, mean = nothing, kwargs...)
+    if !isempty(kwargs) &&
+       hasmethod(Statistics.cov, Tuple{typeof(ce), typeof(X), typeof.(args)...},
+                 (:dims, :mean, keys(kwargs)...))
+        try
+            return Statistics.cov(ce, X, args...; dims = dims, mean = mean, kwargs...)
+        catch err
+            # A method with a `kwargs...` slurp satisfies `hasmethod` but can still
+            # reject the keyword arguments further down its call chain.
+            if !(err isa MethodError)
+                rethrow()
+            end
+        end
+    end
+    return Statistics.cov(ce, X, args...; dims = dims, mean = mean)
+end
+"""
+    robust_cov(
+        ce::StatsBase.CovarianceEstimator,
+        X::MatNum,
+        [w::StatsBase.AbstractWeights];
+        dims::Int = 1,
+        mean = nothing,
+        kwargs...
+    ) -> MatNum
+
+Computes the weighted or unweighted covariance with [`compat_cov`](@ref) on dense observations. The unweighted method retries once with a densified `Matrix` after a `MethodError`. The weighted method calls [`densify`](@ref) before the estimator.
+
+# Algorithm
+
+ 1. Without `w`, call [`compat_cov`](@ref) on `X` as the caller gave it. When that call raises a `MethodError`, call [`compat_cov`](@ref) once more on `Matrix(X)`. Any other error propagates to the caller.
+ 2. With `w`, densify `X` with [`densify`](@ref), then call [`compat_cov`](@ref) once. The method does no retry, because [`densify`](@ref) already removes the only failure that the retry handles.
+ 3. Return the matrix that [`compat_cov`](@ref) returned.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:X])
+  - $(arg_dict[:oow])
+  - $(arg_dict[:dims])
+  - $(arg_dict[:omean])
+  - `kwargs...`: More keyword arguments for `compat_cov`.
+
+# Validation
+
+  - $(val_dict[:dims])
+
+# Returns
+
+  - $(ret_dict[:sigma])
+
+# Related
+
+  - [`MatNum`](@ref)
+  - [`densify`](@ref)
+  - [`compat_cov`](@ref)
+  - [`Statistics.cov`](https://juliastats.org/StatsBase.jl/stable/cov/)
+"""
+function robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
+                    mean = nothing, kwargs...)
+    assert_dims(dims)
+    return try
+        compat_cov(ce, X; dims = dims, mean = mean, kwargs...)
+    catch err
+        if !(err isa MethodError)
+            rethrow()
+        end
+        compat_cov(ce, Matrix(X); dims = dims, mean = mean, kwargs...)
+    end
+end
+function robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum,
+                    w::StatsBase.AbstractWeights; dims::Int = 1, mean = nothing, kwargs...)
+    assert_dims(dims)
+    return compat_cov(ce, densify(X), w; dims = dims, mean = mean, kwargs...)
+end
+"""
+    compat_cor(
+        ce::StatsBase.CovarianceEstimator,
+        X::MatNum,
+        [w::StatsBase.AbstractWeights];
+        dims::Int = 1,
+        mean = nothing,
+        kwargs...
+    ) -> MatNum
+
+Compute the correlation matrix with the estimator `ce`, and fall back to its covariance matrix when `ce` has no `cor` method for these arguments.
+
+# Algorithm
+
+ 1. When `hasmethod` reports that `Statistics.cor` takes `dims` and `mean` for this estimator and these arguments, take steps 2 and 3. Otherwise take step 4.
+ 2. When the caller passed extra keyword arguments, and `hasmethod` reports that `Statistics.cor` takes those keys too, call `Statistics.cor` with all of them and return the result. When that call raises a `MethodError`, drop the extra keyword arguments and continue. A method whose signature ends in a `kwargs...` slurp satisfies `hasmethod` and can still reject a key further down its call chain.
+ 3. Call `Statistics.cor(ce, X, args...; dims = dims, mean = mean)`, and return the result. When that call raises a `MethodError`, continue to step 4. Any other error propagates to the caller.
+ 4. The estimator has no `cor` method for these arguments, so compute the covariance matrix `sigma` with [`robust_cov`](@ref).
+ 5. When `sigma` is mutable, convert it to a correlation matrix in place with `StatsBase.cov2cor!` and the square roots of its own diagonal. Otherwise convert a dense copy with `StatsBase.cov2cor`.
+ 6. Return `sigma`.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:X])
+  - $(arg_dict[:oow])
+  - $(arg_dict[:dims])
+  - $(arg_dict[:omean])
+  - `kwargs...`: More keyword arguments for `cor`.
+
+# Returns
+
+  - $(ret_dict[:rho])
+
+# Related
+
+  - [`MatNum`](@ref)
+  - [`robust_cov`](@ref)
+  - [`Statistics.cor`](https://juliastats.org/StatsBase.jl/stable/cov/)
+"""
+function compat_cor(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix, args...;
+                    dims::Int = 1, mean = nothing, kwargs...)
+    if hasmethod(Statistics.cor, Tuple{typeof(ce), typeof(X), typeof.(args)...},
+                 (:dims, :mean))
+        if !isempty(kwargs) &&
+           hasmethod(Statistics.cor, Tuple{typeof(ce), typeof(X), typeof.(args)...},
+                     (:dims, :mean, keys(kwargs)...))
+            try
+                return Statistics.cor(ce, X, args...; dims = dims, mean = mean, kwargs...)
+            catch err
+                # A method with a `kwargs...` slurp satisfies `hasmethod` but can still
+                # reject the keyword arguments further down its call chain.
+                if !(err isa MethodError)
+                    rethrow()
+                end
+            end
+        end
+        try
+            return Statistics.cor(ce, X, args...; dims = dims, mean = mean)
+        catch err
+            if !(err isa MethodError)
+                rethrow()
+            end
+        end
+    end
+    sigma = robust_cov(ce, X, args...; dims = dims, mean = mean, kwargs...)
+    if ismutable(sigma)
+        StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
+    else
+        sigma = StatsBase.cov2cor(Matrix(sigma))
+    end
+    return sigma
+end
+"""
+    robust_cor(
+        ce::StatsBase.CovarianceEstimator,
+        X::MatNum,
+        [w::StatsBase.AbstractWeights];
+        dims::Int = 1,
+        mean = nothing,
+        kwargs...
+    ) -> MatNum
+
+Computes the weighted or unweighted correlation with [`compat_cor`](@ref) on dense observations. The unweighted method retries once with a densified `Matrix` after a `MethodError`. The weighted method calls [`densify`](@ref) before the estimator.
+
+# Algorithm
+
+ 1. Without `w`, call [`compat_cor`](@ref) on `X` as the caller gave it. When that call raises a `MethodError`, call [`compat_cor`](@ref) once more on `Matrix(X)`. Any other error propagates to the caller.
+ 2. With `w`, densify `X` with [`densify`](@ref), then call [`compat_cor`](@ref) once. The method does no retry, because [`densify`](@ref) already removes the only failure that the retry handles.
+ 3. Return the matrix that [`compat_cor`](@ref) returned.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:X])
+  - $(arg_dict[:oow])
+  - $(arg_dict[:dims])
+  - $(arg_dict[:omean])
+  - `kwargs...`: More keyword arguments for `compat_cor`.
+
+# Validation
+
+  - $(val_dict[:dims])
+
+# Returns
+
+  - $(ret_dict[:rho])
+
+# Related
+
+  - [`MatNum`](@ref)
+  - [`densify`](@ref)
+  - [`compat_cor`](@ref)
+  - [`Statistics.cor`](https://juliastats.org/StatsBase.jl/stable/cov/)
+"""
+function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
+                    mean = nothing, kwargs...)
+    assert_dims(dims)
+    return try
+        compat_cor(ce, X; dims = dims, mean = mean, kwargs...)
+    catch err
+        if !(err isa MethodError)
+            rethrow()
+        end
+        compat_cor(ce, Matrix(X); dims = dims, mean = mean, kwargs...)
+    end
+end
+function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum,
+                    w::StatsBase.AbstractWeights; dims::Int = 1, mean = nothing, kwargs...)
+    assert_dims(dims)
+    return compat_cor(ce, densify(X), w; dims = dims, mean = mean, kwargs...)
+end
+"""
     Statistics.cov(
         ce::GeneralCovariance,
         X::MatNum;
@@ -131,15 +411,16 @@ show_fields(::GeneralCovariance) = (:ce, :w)
         kwargs...
     ) -> MatNum
 
-Compute the covariance matrix using a [`GeneralCovariance`](@ref) estimator.
+Compute the covariance matrix with a [`GeneralCovariance`](@ref) estimator.
 
-This method dispatches to the appropriate [`robust_cov`](@ref) depending on `ce.w`, which computes the covariance matrix using `ce.ce`.
+The method calls [`robust_cov`](@ref) with or without observation weights, as `ce.w` sets. [`robust_cov`](@ref) computes the covariance matrix with `ce.ce`.
 
 # Algorithm
 
- 1. Resolve the observation weights from `ce.w` against `X`, giving `w`.
- 2. When `w` is `nothing`, call [`robust_cov`](@ref) with `ce.ce` and `X` alone.
- 3. Otherwise call [`robust_cov`](@ref) with `ce.ce`, `X` and `w`.
+ 1. Refuse a gapped sample with [`assert_finite_sample`](@ref).
+ 2. Get the observation weights `w` from `ce.w` and `X`.
+ 3. When `w` is `nothing`, call [`robust_cov`](@ref) with `ce.ce` and `X` only.
+ 4. Otherwise call [`robust_cov`](@ref) with `ce.ce`, `X` and `w`.
 
 # Arguments
 
@@ -147,7 +428,7 @@ This method dispatches to the appropriate [`robust_cov`](@ref) depending on `ce.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
   - $(arg_dict[:omean])
-  - `kwargs...`: Additional keyword arguments passed to [`robust_cov`](@ref).
+  - `kwargs...`: More keyword arguments for [`robust_cov`](@ref) and for the observation weights.
 
 # Returns
 
@@ -190,15 +471,16 @@ end
         kwargs...
     ) -> MatNum
 
-Compute the correlation matrix using a [`GeneralCovariance`](@ref) estimator.
+Compute the correlation matrix with a [`GeneralCovariance`](@ref) estimator.
 
-This method dispatches to the appropriate [`robust_cor`](@ref) depending on `ce.w`, which computes the correlation matrix using `ce.ce`.
+The method calls [`robust_cor`](@ref) with or without observation weights, as `ce.w` sets. [`robust_cor`](@ref) computes the correlation matrix with `ce.ce`.
 
 # Algorithm
 
- 1. Resolve the observation weights from `ce.w` against `X`, giving `w`.
- 2. When `w` is `nothing`, call [`robust_cor`](@ref) with `ce.ce` and `X` alone.
- 3. Otherwise call [`robust_cor`](@ref) with `ce.ce`, `X` and `w`.
+ 1. Refuse a gapped sample with [`assert_finite_sample`](@ref).
+ 2. Get the observation weights `w` from `ce.w` and `X`.
+ 3. When `w` is `nothing`, call [`robust_cor`](@ref) with `ce.ce` and `X` only.
+ 4. Otherwise call [`robust_cor`](@ref) with `ce.ce`, `X` and `w`.
 
 # Arguments
 
@@ -206,7 +488,7 @@ This method dispatches to the appropriate [`robust_cor`](@ref) depending on `ce.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
   - $(arg_dict[:omean])
-  - `kwargs...`: Additional keyword arguments passed to [`robust_cor`](@ref).
+  - `kwargs...`: More keyword arguments for [`robust_cor`](@ref) and for the observation weights.
 
 # Returns
 
@@ -244,14 +526,18 @@ end
     library_covariance_estimator(ce::AbstractCovarianceEstimator) -> AbstractCovarianceEstimator
     library_covariance_estimator(ce::StatsBase.CovarianceEstimator) -> GeneralCovariance
 
-Returns a nested covariance estimator in a form that takes every call this library makes of one.
+Returns a nested covariance estimator in a form that accepts all the calls that the library makes to a nested estimator.
 
-A field bound to `StatsBase.CovarianceEstimator` admits an estimator that this library does not own, such as `StatsBase.SimpleCovariance()`. The library calls a nested estimator with its own keywords, such as `iv`, `ivpa` and `active_mask`, with an Asset Panel argument, and through `Statistics.var` and `Statistics.std`. `StatsBase` defines no method for any of the three. A verb that forwards to a nested estimator therefore calls it through this function.
+A field bound to `StatsBase.CovarianceEstimator` accepts an estimator that the library does not own, such as `StatsBase.SimpleCovariance()`. The library calls a nested estimator in these three ways, and `StatsBase` has no method for any of them:
 
-The two methods select one branch each:
+  - With its own keywords, such as `iv`, `ivpa` and `active_mask`.
+  - With an Asset Panel argument.
+  - Through `Statistics.var` and `Statistics.std`.
 
-  - An [`AbstractCovarianceEstimator`](@ref) is returned unchanged, so it still receives every keyword.
-  - Any other `StatsBase.CovarianceEstimator` is wrapped in a [`GeneralCovariance`](@ref) without weights. The wrapper is an [`AbstractCovarianceEstimator`](@ref), so the Asset Panel methods and the diagonal methods of `var` and `std` take it. Its `cov` and `cor` go through [`robust_cov`](@ref) and [`robust_cor`](@ref), which call the wrapped estimator with `dims` and `mean` alone when its method does not take the other keywords. The wrapper therefore returns what the bare estimator returns for the same `dims` and `mean`.
+Thus a verb that passes a call to a nested estimator calls it through this function. The two methods select one branch each:
+
+  - The function returns an [`AbstractCovarianceEstimator`](@ref) without change, so it still gets all the keywords.
+  - The function wraps all other `StatsBase.CovarianceEstimator` types in a [`GeneralCovariance`](@ref) without weights. The wrapper is an [`AbstractCovarianceEstimator`](@ref), so the Asset Panel methods and the diagonal methods of `var` and `std` accept it. Its `cov` and `cor` go through [`robust_cov`](@ref) and [`robust_cor`](@ref). These call the wrapped estimator with only `dims` and `mean` when its method does not take the other keywords. The wrapper returns what the bare estimator returns for the same `dims` and `mean`.
 
 # Arguments
 
@@ -259,7 +545,7 @@ The two methods select one branch each:
 
 # Returns
 
-  - `ce`: `ce` itself, or `GeneralCovariance(; ce = ce)`.
+  - `ce`: `ce` without change, or `GeneralCovariance(; ce = ce)`.
 
 # Related
 
@@ -281,11 +567,11 @@ $(DocStringExtensions.TYPEDEF)
 
 Estimates the covariance matrix of asset returns from a centring estimator, a covariance estimator, and a moment algorithm.
 
-`Covariance` encapsulates all components required for estimating the covariance matrix of asset returns, including the expected returns estimator for centering the data, the covariance estimator, and the moment algorithm.
+`me` centres the data, `ce` computes the covariance matrix, and `alg` selects the full moment or the semi-moment.
 
-`w` weights the whole estimate, so it reaches the centre as well as the deviations. The four methods send `me` and `ce` through [`factory`](@ref), which replaces the weights of each with `w`, so `w` wins over the weights that `me` and `ce` carry. Pass `mean` for a centre that `w` does not describe.
+`w` weights the whole estimate, so it weights the centre and the deviations. The four methods send `me` and `ce` through [`factory`](@ref), which replaces the weights that each of them holds with `w`. Pass `mean` for a centre that `w` does not describe.
 
-`ce` admits any `StatsBase.CovarianceEstimator`, and no verb of this library reads the weights of one that the library does not own. A `ce` from a package such as [`CovarianceEstimation.jl`](https://github.com/mateuszbaran/CovarianceEstimation.jl) therefore keeps its own configuration, and `w` is the field that weights a `Covariance`.
+`ce` accepts all `StatsBase.CovarianceEstimator` types. No verb of the library reads the weights of an estimator that the library does not own. A `ce` from another package, such as CovarianceEstimation.jl, keeps its own configuration, and `w` is the field that weights a `Covariance`.
 
 # Fields
 
@@ -306,33 +592,34 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
+  - $(val_dict[:ce_cov])
   - $(val_dict[:oow])
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `me`: Recursively updated via [`factory`](@ref).
-  - `ce`: Recursively updated via [`factory`](@ref).
+  - `me`: Recursively updated through [`factory`](@ref).
+  - `ce`: Recursively updated through [`factory`](@ref).
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
-  - `cache`: Carried unchanged via [`factory`](@ref).
+  - `cache`: Carried unchanged through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `me`: Recursively viewed via [`port_opt_view`](@ref).
-  - `ce`: Recursively viewed via [`port_opt_view`](@ref).
-  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
+  - `me`: Recursively viewed through [`port_opt_view`](@ref).
+  - `ce`: Recursively viewed through [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).
 
 ## Observation weight parameters
 
-When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
 
-  - `me`: Recursively indexed via [`obs_weights_view`](@ref).
-  - `ce`: Recursively indexed via [`obs_weights_view`](@ref).
-  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
-  - `cache`: Dropped via [`obs_weights_view`](@ref), because no slice of a state exists on the observation axis.
+  - `me`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `ce`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
+  - `cache`: Removed by [`obs_weights_view`](@ref), because a state has no slice on the observation axis.
 
 # Examples
 
@@ -403,6 +690,7 @@ Covariance
                         ce::StatsBase.CovarianceEstimator, alg::AbstractMomentAlgorithm,
                         w::Option{<:ObsWeights}, cvg::Option{<:CoveragePolicy},
                         cache::Option{<:AbstractPartialFitState})
+        assert_covariance_estimator(ce, :ce)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(me), typeof(ce), typeof(alg), typeof(w), typeof(cvg),
                    typeof(cache)}(me, ce, alg, w, cvg, cache)
@@ -419,13 +707,13 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Renders every field of a [`Covariance`](@ref) except `cache`.
+Renders every field of a [`Covariance`](@ref) except `cache`, and `cvg` only where a policy is set.
 
-The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:Covariance, true)` to render it.
+A `cache` holds the state of an incremental fit. That state is not part of the configuration, and it prints under the estimator at each site that renders the estimator. Set `set_show_nothing_fields!(:Covariance, true)` to render it. The method reads `cvg` from the instance and not from the type, as the method for [`SimpleExpectedReturns`](@ref) does. That method states the reason.
 
 # Arguments
 
-  - `::Covariance`: Covariance estimator, read for its type alone.
+  - `ce`: The covariance estimator. The method reads only its `cvg` field.
 
 # Returns
 
@@ -444,15 +732,15 @@ end
 """
     gap_fill_value(ce::Covariance{<:Any, <:Any, <:Any, <:Any, <:CoveragePolicy}) -> Float64
 
-Answer `NaN`, so a gapped sample reaches the available-case arm of a [`Covariance`](@ref) with its gaps intact.
+Return `NaN`, so that a gapped sample gets to the available-case arm of a [`Covariance`](@ref) with its gaps.
 
-A [`Covariance`](@ref) with a [`CoveragePolicy`](@ref) fits each pair on the observations at which both of its assets are finite and active, see [`coverage_covariance`](@ref). A finite fill value would make a gapped cell an observation, and the pair would read a return that the asset never had. So the consumer passes the sample as it is, together with the active mask that explains each gap. A [`Covariance`](@ref) with no policy refuses a gap on its own account, so it keeps the fallback of zero.
+A [`Covariance`](@ref) with a [`CoveragePolicy`](@ref) fits each pair on the observations at which its two assets are finite and active. [`coverage_covariance`](@ref) states this. A finite fill value makes a gapped cell into an observation, and the pair then reads a return that the asset did not have. The consumer passes the sample without change, together with the active mask that explains each gap. A [`Covariance`](@ref) with no policy refuses a gap itself, so it keeps the fallback of zero.
 
-A wrapper that forwards the sample, such as [`PortfolioOptimisersCovariance`](@ref), answers what this method answers. So the wrapper reads a gapped sample when the `Covariance` inside it carries a policy.
+A wrapper that passes the sample on, such as [`PortfolioOptimisersCovariance`](@ref), returns the same value as this method, so the wrapper reads a gapped sample when the `Covariance` in it holds a policy.
 
 # Arguments
 
-  - `ce`: Covariance estimator with a [`CoveragePolicy`](@ref) in its `cvg` field.
+  - `ce`: The covariance estimator, with a [`CoveragePolicy`](@ref) in its `cvg` field.
 
 # Returns
 
@@ -471,18 +759,18 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Resolve the centring vector and the inner covariance estimator that a [`Covariance`](@ref) method computes with.
+Get the centring vector and the inner covariance estimator for a [`Covariance`](@ref) method.
 
-The four methods of `Statistics.cov` and `Statistics.cor` that take a [`Covariance`](@ref) reach one centre and one inner estimator by this verb, so `ce.w` reaches the centre and the deviations by one rule.
+The four methods of `Statistics.cov` and `Statistics.cor` that take a [`Covariance`](@ref) get one centre and one inner estimator from this function, so one rule applies `ce.w` to the centre and to the deviations.
 
 # Algorithm
 
- 1. Resolve the centre `mu` from `ce.me` and `ce.w` with [`weighted_centre`](@ref), which reads `mean` when the caller gave one. `ce.w` reaches `ce.me` through [`factory`](@ref), so the centre carries the weights of the deviations.
- 2. `ce.w` is `nothing`: return `ce.ce` unchanged.
- 3. `ce.w` is not `nothing`: send `ce.ce` through [`factory_child`](@ref) with `ce.w`. An estimator of the library takes the weights; a `StatsBase.CovarianceEstimator` that is not one of them passes through unchanged, because no verb of this library reads its weights.
- 4. Send the estimator of step 2 or 3 through [`library_covariance_estimator`](@ref). An estimator that the library does not own is wrapped in a [`GeneralCovariance`](@ref), so the keywords of the caller, such as `iv` and `ivpa`, do not reach a `StatsBase` method that refuses them.
+ 1. Get the centre `mu` from `ce.me` and `ce.w` with [`weighted_centre`](@ref). It uses `mean` if the caller gave one. `ce.w` gets to `ce.me` through [`factory`](@ref), so the centre has the weights of the deviations.
+ 2. If `ce.w` is `nothing`, take `ce.ce` without change.
+ 3. If `ce.w` is not `nothing`, send `ce.ce` through [`factory_child`](@ref) with `ce.w`. An estimator of the library takes the weights. A `StatsBase.CovarianceEstimator` that the library does not own does not change, because no verb of the library reads its weights.
+ 4. Send the estimator of step 2 or 3 through [`library_covariance_estimator`](@ref). It wraps an estimator that the library does not own in a [`GeneralCovariance`](@ref), so that the keywords of the caller, such as `iv` and `ivpa`, do not get to a `StatsBase` method that refuses them.
 
-Step 2 is a performance guard and not a second contract. `ce.w` is a field, so its type decides the branch, and the guard keeps a windowed loop from rebuilding the estimator tree of `ce` once per window. A `ce.ce` that holds weights of its own therefore keeps them when `ce.w` is `nothing`, and loses them to `ce.w` when it is not. That is what [`factory`](@ref) does on every other path.
+Step 2 is for performance and is not a second contract. `ce.w` is a field, so its type decides the branch. The step stops a windowed loop from a rebuild of the estimator tree of `ce` in each window. A `ce.ce` with its own weights keeps them when `ce.w` is `nothing`, and `ce.w` replaces them when it is not. [`factory`](@ref) does the same on all other paths.
 
 # Arguments
 
@@ -490,12 +778,12 @@ Step 2 is a performance guard and not a second contract. `ce.w` is a field, so i
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
   - $(arg_dict[:omean])
-  - `kwargs...`: Additional keyword arguments passed to the mean estimator.
+  - `kwargs...`: More keyword arguments for the mean estimator.
 
 # Returns
 
-  - `mu::Union{<:Number, <:ArrNum}`: Centring vector.
-  - `cel::AbstractCovarianceEstimator`: Inner covariance estimator, weighted by `ce.w` when it is not `nothing`, and wrapped in a [`GeneralCovariance`](@ref) when the library does not own it.
+  - `mu::Union{Number, ArrNum}`: The centring vector.
+  - `cel::AbstractCovarianceEstimator`: The inner covariance estimator. It has the weights `ce.w` when `ce.w` is not `nothing`. It is in a [`GeneralCovariance`](@ref) wrapper when the library does not own it.
 
 # Related
 
@@ -513,6 +801,23 @@ function covariance_centre_and_estimator(ce::Covariance, X::MatNum; dims::Int = 
                                                 factory_child(ce.ce, ce.w)
                                             end)
 end
+# `ce.w` replaces the weights of `ce.ce` when it is set, as `covariance_centre_and_estimator`
+# does, so only an unweighted `Covariance` reads the count of its inner estimator. The fit takes
+# `mean` and `active_mask` by name, and the weights read the other keywords.
+function effective_observation_count(ce::Covariance, X::MatNum; mean = nothing,
+                                     active_mask = nothing, kwargs...)
+    return if isnothing(ce.w)
+        effective_observation_count(ce.ce, X; kwargs...)
+    else
+        observation_weight_count(get_observation_weights(ce.w, X; dims = 1, kwargs...),
+                                 size(X, 1))
+    end
+end
+function effective_observation_count(ce::GeneralCovariance, X::MatNum; mean = nothing,
+                                     kwargs...)
+    return observation_weight_count(get_observation_weights(ce.w, X; dims = 1, kwargs...),
+                                    size(X, 1))
+end
 """
     Statistics.cov(
         ce::Covariance,
@@ -522,7 +827,7 @@ end
         kwargs...
     ) -> MatNum
 
-Compute the covariance matrix using a [`Covariance`](@ref) estimator.
+Compute the covariance matrix with a [`Covariance`](@ref) estimator.
 
 # Mathematical definition
 
@@ -534,7 +839,7 @@ FullMoment covariance:
 \\end{align}
 ```
 
-SemiMoment (downside) covariance, from the de-meaned returns clipped at zero:
+SemiMoment covariance, the downside covariance of the de-meaned returns clipped at zero:
 
 ```math
 \\begin{align}
@@ -546,30 +851,30 @@ SemiMoment (downside) covariance, from the de-meaned returns clipped at zero:
 Where:
 
   - $(math_dict[:Sigma_hat_ij])
-  - ``\\hat{\\mathbf{\\Sigma}}^{\\text{semi}}_{ij}``: Estimated semi-covariance between assets ``i`` and ``j``.
+  - ``\\hat{\\mathbf{\\Sigma}}^{\\text{semi}}_{ij}``: The estimated semi-covariance between assets ``i`` and ``j``.
   - $(math_dict[:r_tj])
-  - ``r_{ti}``: Return of asset ``i`` at time ``t``.
+  - ``r_{ti}``: The return of asset ``i`` at time ``t``.
   - $(math_dict[:mu_hat_j])
-  - ``\\hat{\\mu}_i``: Estimated mean of asset ``i``.
-  - ``\\tilde{r}_{ti}``, ``\\tilde{r}_{tj}``: De-meaned returns of assets ``i`` and ``j``, clipped at zero.
+  - ``\\hat{\\mu}_i``: The estimated mean of asset ``i``.
+  - ``\\tilde{r}_{ti}``, ``\\tilde{r}_{tj}``: The de-meaned returns of assets ``i`` and ``j``, clipped at zero.
   - $(math_dict[:T])
 
 The semi-covariance keeps the ``T-1`` divisor of the full moment, so it is not the covariance of the clipped returns about their own mean.
 
 # Algorithm
 
- 1. Resolve the centring vector `mu` and the inner estimator `cel` with [`covariance_centre_and_estimator`](@ref). When `mean` is `nothing`, `mu` comes from `ce.me`; otherwise it comes from `mean`. When `ce.w` is not `nothing`, `ce.w` reaches `ce.me` and `ce.ce` through [`factory`](@ref) first.
- 2. Delegate to `Statistics.cov(cel, X; dims = dims, mean = mu, kwargs...)`.
+ 1. Get the centring vector `mu` and the inner estimator `cel` with [`covariance_centre_and_estimator`](@ref). When `mean` is `nothing`, `mu` comes from `ce.me`. Otherwise it comes from `mean`. When `ce.w` is not `nothing`, `ce.w` first gets to `ce.me` and `ce.ce` through [`factory`](@ref).
+ 2. Call `Statistics.cov(cel, X; dims = dims, mean = mu, kwargs...)`.
 
 # Arguments
 
   - $(arg_dict[:ce])
-      + `ce::Covariance{<:Any, <:Any, <:FullMoment}`: Covariance estimator with [`FullMoment`](@ref) moment algorithm.
-      + `ce::Covariance{<:Any, <:Any, <:SemiMoment}`: Covariance estimator with [`SemiMoment`](@ref) moment algorithm.
+      + `ce::Covariance{<:Any, <:Any, <:FullMoment}`: A covariance estimator with the [`FullMoment`](@ref) moment algorithm.
+      + `ce::Covariance{<:Any, <:Any, <:SemiMoment}`: A covariance estimator with the [`SemiMoment`](@ref) moment algorithm.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - $(arg_dict[:omean]) If not provided, computed using `ce.me`.
-  - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator.
+  - $(arg_dict[:omean]) If it is `nothing`, the method computes it with `ce.me`.
+  - `kwargs...`: More keyword arguments for the mean estimator and for the inner covariance estimator.
 
 # Returns
 
@@ -612,18 +917,18 @@ end
 
 Routes a covariance or correlation fit to the Coverage Universe arm or to the available-case arm.
 
-The `cvg` field of the estimator is passed as the third argument, so the arm is chosen by **dispatch on the policy** rather than by a branch on its value, exactly as [`coverage_mean`](@ref) does for a sample mean. `f` is `Statistics.cov` or `Statistics.cor`, and the moment algorithm of `ce` chooses between the [`FullMoment`](@ref) arms, which fold, and the [`SemiMoment`](@ref) arms, which have no recursion and run a two-pass over the block.
+The `cvg` field of the estimator is the third argument, so dispatch on the policy selects the arm, not a branch on its value. [`coverage_mean`](@ref) does the same for a sample mean. `f` is `Statistics.cov` or `Statistics.cor`. The moment algorithm of `ce` selects the family of arms. The [`FullMoment`](@ref) arms fold. The [`SemiMoment`](@ref) arms have no recursion, and they make two passes over the block.
 
 # Arguments
 
   - `f`: `Statistics.cov` or `Statistics.cor`.
   - $(arg_dict[:ce])
-  - `cvg`: The policy the estimator carries, which selects the arm.
+  - `cvg`: The policy that the estimator holds. It selects the arm.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
   - `mean`: A precomputed centre, or `nothing`.
-  - `active_mask`: The active mask of the Asset Panel, `observations × assets`, or `nothing`. The Coverage Universe arms refuse an inactive cell, as they refuse a non-finite return.
-  - `kwargs...`: Additional keyword arguments passed to the centring estimator and the inner covariance estimator.
+  - `active_mask`: The active mask of the Asset Panel, `observations × assets`, or `nothing`. The Coverage Universe arms refuse an inactive cell, as they refuse a return that is not finite.
+  - `kwargs...`: More keyword arguments for the centring estimator and for the inner covariance estimator.
 
 # Returns
 
@@ -640,7 +945,7 @@ function coverage_covariance end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of the [`FullMoment`](@ref) arm of [`coverage_covariance`](@ref). The Coverage Universe arm, which resolves the centre and the inner estimator with [`covariance_centre_and_estimator`](@ref) and delegates, and which is the body the verb has always had. It refuses an inactive cell of `active_mask` with [`assert_finite_sample`](@ref), because a plain estimator reads that cell as a non-finite return.
+The `Nothing` method of the [`FullMoment`](@ref) arm of [`coverage_covariance`](@ref) is the Coverage Universe arm. It gets the centre and the inner estimator with [`covariance_centre_and_estimator`](@ref), and then calls the inner estimator. This is the body that the verb had before the `cvg` field existed. It refuses a gap and an inactive cell of `active_mask` with [`assert_finite_sample`](@ref), because a plain estimator reads an inactive cell as a return that is not finite.
 
 # Related
 
@@ -658,15 +963,16 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`CoveragePolicy`](@ref) method of the [`FullMoment`](@ref) arm of [`coverage_covariance`](@ref). The available-case arm: each pair is fitted on the observations at which both of its assets are finite and active, and the batch answer **is** the incremental one, because the arm folds the block through [`partial_fit!`](@ref) and reads the state out.
+The [`CoveragePolicy`](@ref) method of the [`FullMoment`](@ref) arm of [`coverage_covariance`](@ref) is the available-case arm. It fits each pair on the observations at which its two assets are finite and active. The batch result is the incremental result, because the arm folds the block through [`partial_fit!`](@ref) and then reads the state.
 
-The centre of a pair is that pair's own mean, which is what a pairwise Welford recursion carries, so the diagonal is each asset's ordinary available-case variance and an off-diagonal entry is centred on the observations the pair shares. `ce.ce`, `ce.me` and `ce.w` are refused where an incremental fit does not reproduce them, by [`partial_fit_corrected`](@ref).
+The centre of a pair is the mean of that pair, which a pairwise Welford recursion holds, so the diagonal is the ordinary available-case variance of each asset. An off-diagonal entry is centred on the observations that the pair shares. The arm refuses a `mean` from the caller. [`partial_fit_corrected`](@ref) refuses a `ce.ce`, a `ce.me` or a `ce.w` that an incremental fit cannot reproduce.
 
 # Algorithm
 
- 1. Read the Bessel correction, and refuse a configuration no incremental fit reproduces, with [`partial_fit_corrected`](@ref).
- 2. Fold every row of `X` into a fresh state with [`partial_fit!`](@ref), carrying the active mask.
- 3. Read the state out with [`cov(ce::Covariance, state::CovarianceState)`](@ref), and rescale to a unit diagonal when the verb is `Statistics.cor`.
+ 1. Refuse a `mean` from the caller.
+ 2. Read the Bessel correction, and refuse a configuration that no incremental fit can reproduce, with [`partial_fit_corrected`](@ref).
+ 3. Fold each row of `X` into a new state with [`partial_fit!`](@ref), together with its row of the active mask.
+ 4. Read the state with [`cov(ce::Covariance, state::CovarianceState)`](@ref). Rescale the result to a unit diagonal when the verb is `Statistics.cor`.
 
 # Related
 
@@ -690,9 +996,9 @@ end
     coverage_correlation(f::typeof(Statistics.cov), sigma::MatNum) -> MatNum
     coverage_correlation(f::typeof(Statistics.cor), sigma::MatNum) -> MatNum
 
-Maps an available-case covariance onto the answer the caller's verb asks for.
+Changes an available-case covariance to the result that the verb of the caller asks for.
 
-An available-case fit produces a covariance whichever verb called it, because the state carries a co-moment accumulator and nothing else, so the correlation is that covariance rescaled by the square roots of its own diagonal. Dispatching on the verb rather than comparing it keeps the choice at compile time.
+An available-case fit makes a covariance for both verbs, because the state holds only a co-moment accumulator. The correlation is that covariance, rescaled by the square roots of its diagonal. The method dispatches on the verb and does not compare it, so the compiler makes the choice.
 
 # Arguments
 
@@ -701,7 +1007,7 @@ An available-case fit produces a covariance whichever verb called it, because th
 
 # Returns
 
-  - `val::MatNum`: `sigma` itself, or `sigma` rescaled to a unit diagonal.
+  - `val::MatNum`: `sigma` without change, or `sigma` rescaled to a unit diagonal.
 
 # Related
 
@@ -718,13 +1024,13 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`SemiMoment`](@ref) variant of [`cov(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref). Clips de-meaned returns to zero before computing the covariance matrix, capturing only downside co-movements.
+This is the [`SemiMoment`](@ref) method of [`cov(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref). It clips the de-meaned returns at zero before it computes the covariance matrix, so the matrix holds only the downside co-movements.
 
 # Algorithm
 
- 1. Resolve the centring vector `mu` and the inner estimator `cel` with [`covariance_centre_and_estimator`](@ref).
+ 1. Get the centring vector `mu` and the inner estimator `cel` with [`covariance_centre_and_estimator`](@ref).
  2. Replace `X` with `min.(X .- mu, 0)`, the de-meaned returns clipped at zero.
- 3. Delegate to `Statistics.cov(cel, X; dims = dims, mean = 0, kwargs...)`. The zero mean is what stops the clipped returns being centred a second time.
+ 3. Call `Statistics.cov(cel, X; dims = dims, mean = 0, kwargs...)`. The zero mean stops a second centring of the clipped returns.
 """
 function Statistics.cov(ce::Covariance{<:Any, <:Any, <:SemiMoment}, X::MatNum;
                         dims::Int = 1, mean = nothing,
@@ -735,7 +1041,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of the [`SemiMoment`](@ref) arm of [`coverage_covariance`](@ref). The Coverage Universe arm, which clips the de-meaned returns at zero and delegates with a zero centre, and which is the body the verb has always had. It refuses an inactive cell of `active_mask` with [`assert_finite_sample`](@ref), because a plain estimator reads that cell as a non-finite return.
+The `Nothing` method of the [`SemiMoment`](@ref) arm of [`coverage_covariance`](@ref) is the Coverage Universe arm. It clips the de-meaned returns at zero, and then calls the inner estimator with a zero centre. This is the body that the verb had before the `cvg` field existed. It refuses a gap and an inactive cell of `active_mask` with [`assert_finite_sample`](@ref), because a plain estimator reads an inactive cell as a return that is not finite.
 
 # Related
 
@@ -754,17 +1060,18 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`CoveragePolicy`](@ref) method of the [`SemiMoment`](@ref) arm of [`coverage_covariance`](@ref). The available-case arm, run as a two-pass over the block rather than as a fold, because a semi-covariance has no incremental recursion: the clip is taken about a centre the whole window fixes, so a new observation moves every past term.
+The [`CoveragePolicy`](@ref) method of the [`SemiMoment`](@ref) arm of [`coverage_covariance`](@ref) is the available-case arm. It makes two passes over the block and does not fold, because a semi-covariance has no incremental recursion. The clip is about a centre that the whole window sets, so a new observation changes all the past terms.
 
-The centre is each asset's available-case mean, its own finite and active observations alone, and not the pair's own mean as the [`FullMoment`](@ref) arm's is. That is the same asymmetry the plain path already has, where the clip is taken about a centre and the co-moment about zero.
+The centre is the available-case mean of each asset, over only the finite and active observations of that asset. It is not the mean of the pair, which the [`FullMoment`](@ref) arm uses. The plain path has the same asymmetry. It takes the clip about a centre, and the co-moment about zero.
 
 # Algorithm
 
- 1. Read the valid entries of the block with [`coverage_valid_block`](@ref).
- 2. Centre each asset on its own available-case mean, clip the deviations at zero and zero the invalid entries.
- 3. Take the numerator as the cross product of the clipped block, and the denominator as the cross product of the valid mask, which counts the observations of each pair.
- 4. Admit the assets with [`coverage_admission`](@ref), then peel the assets of the undetermined pairs with [`coverage_peel`](@ref), which warns, or refuses under `strict`.
- 5. Divide and frame with [`coverage_divide`](@ref), and rescale to a unit diagonal when the verb is `Statistics.cor`.
+ 1. Check `dims`. Refuse a `ce.me` or a `ce.w` that holds observation weights, with [`assert_partial_fittable`](@ref). Refuse a `mean` from the caller.
+ 2. Read the valid entries of the block with [`coverage_valid_block`](@ref).
+ 3. Centre each asset on its available-case mean. Clip the deviations at zero, and set the invalid entries to zero.
+ 4. Take the numerator as the cross product of the clipped block, and the denominator as the cross product of the valid mask, which counts the observations of each pair.
+ 5. Admit the assets with [`coverage_admission`](@ref). Then peel the assets of the undetermined pairs with [`coverage_peel`](@ref), which gives a warning, or refuses them under `strict`.
+ 6. Divide and put the result in a frame with [`coverage_divide`](@ref). Rescale the result to a unit diagonal when the verb is `Statistics.cor`.
 
 # Related
 
@@ -801,7 +1108,7 @@ end
         kwargs...
     ) -> MatNum
 
-Compute the correlation matrix using a [`Covariance`](@ref) estimator.
+Compute the correlation matrix with a [`Covariance`](@ref) estimator.
 
 # Mathematical definition
 
@@ -813,32 +1120,32 @@ Compute the correlation matrix using a [`Covariance`](@ref) estimator.
 
 Where:
 
-  - ``\\hat{\\mathbf{P}}_{ij}``: Estimated correlation between assets ``i`` and ``j``.
+  - ``\\hat{\\mathbf{P}}_{ij}``: The estimated correlation between assets ``i`` and ``j``.
   - $(math_dict[:Sigma_hat_ij])
   - $(math_dict[:sigma_hat_i])
-  - ``\\hat{\\sigma}_j``: Estimated standard deviation of asset ``j``.
+  - ``\\hat{\\sigma}_j``: The estimated standard deviation of asset ``j``.
 
-The `alg` field of `ce` reaches ``\\hat{\\mathbf{\\Sigma}}``: [`SemiMoment`](@ref) standardises the semi-covariance, so the diagonal is one and an off-diagonal entry is a downside correlation.
+The `alg` field of `ce` changes ``\\hat{\\mathbf{\\Sigma}}``. [`SemiMoment`](@ref) standardises the semi-covariance, so the diagonal is one and an off-diagonal entry is a downside correlation.
 
 # Algorithm
 
- 1. Resolve the centring vector `mu` and the inner estimator `cel` with [`covariance_centre_and_estimator`](@ref). When `mean` is `nothing`, `mu` comes from `ce.me`; otherwise it comes from `mean`. When `ce.w` is not `nothing`, `ce.w` reaches `ce.me` and `ce.ce` through [`factory`](@ref) first.
- 2. Delegate to `Statistics.cor(cel, X; dims = dims, mean = mu, kwargs...)`.
+ 1. Get the centring vector `mu` and the inner estimator `cel` with [`covariance_centre_and_estimator`](@ref). When `mean` is `nothing`, `mu` comes from `ce.me`. Otherwise it comes from `mean`. When `ce.w` is not `nothing`, `ce.w` first gets to `ce.me` and `ce.ce` through [`factory`](@ref).
+ 2. Call `Statistics.cor(cel, X; dims = dims, mean = mu, kwargs...)`.
 
 # Arguments
 
   - $(arg_dict[:ce])
 
-      + `ce::Covariance{<:Any, <:Any, <:FullMoment}`: Covariance estimator with [`FullMoment`](@ref) moment algorithm.
-      + `ce::Covariance{<:Any, <:Any, <:SemiMoment}`: Covariance estimator with [`SemiMoment`](@ref) moment algorithm.
+      + `ce::Covariance{<:Any, <:Any, <:FullMoment}`: A covariance estimator with the [`FullMoment`](@ref) moment algorithm.
+      + `ce::Covariance{<:Any, <:Any, <:SemiMoment}`: A covariance estimator with the [`SemiMoment`](@ref) moment algorithm.
 
   - $(arg_dict[:X])
 
   - $(arg_dict[:dims])
 
-  - $(arg_dict[:omean]) If not provided, computed using `ce.me`.
+  - $(arg_dict[:omean]) If it is `nothing`, the method computes it with `ce.me`.
 
-  - `kwargs...`: Additional keyword arguments passed to the underlying correlation estimator.
+  - `kwargs...`: More keyword arguments for the mean estimator and for the inner correlation estimator.
 
 # Returns
 
@@ -873,13 +1180,13 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`SemiMoment`](@ref) variant of [`cor(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref). Clips de-meaned returns to zero before computing the correlation matrix, capturing only downside co-movements.
+This is the [`SemiMoment`](@ref) method of [`cor(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref). It clips the de-meaned returns at zero before it computes the correlation matrix, so the matrix holds only the downside co-movements.
 
 # Algorithm
 
- 1. Resolve the centring vector `mu` and the inner estimator `cel` with [`covariance_centre_and_estimator`](@ref).
+ 1. Get the centring vector `mu` and the inner estimator `cel` with [`covariance_centre_and_estimator`](@ref).
  2. Replace `X` with `min.(X .- mu, 0)`, the de-meaned returns clipped at zero.
- 3. Delegate to `Statistics.cor(cel, X; dims = dims, mean = 0, kwargs...)`. The zero mean is what stops the clipped returns being centred a second time.
+ 3. Call `Statistics.cor(cel, X; dims = dims, mean = 0, kwargs...)`. The zero mean stops a second centring of the clipped returns.
 """
 function Statistics.cor(ce::Covariance{<:Any, <:Any, <:SemiMoment}, X::MatNum;
                         dims::Int = 1, mean = nothing,
@@ -890,9 +1197,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Carries the running observation count, mean and co-moment accumulator of an incremental covariance fit.
+Holds the observation count, the running mean and the co-moment accumulator of an incremental covariance fit.
 
-The state of [`GeneralCovariance`](@ref) and of `Covariance{<:Any, <:Any, <:FullMoment}` under [`partial_fit!`](@ref). One struct serves both, because the two estimators run the same recursion over the same three quantities. `M` is the accumulator ``\\sum_t (\\boldsymbol{r}_t - \\hat{\\boldsymbol{\\mu}}) (\\boldsymbol{r}_t - \\hat{\\boldsymbol{\\mu}})^{\\intercal}`` and not the covariance, so [`cov(ce::GeneralCovariance, state::CovarianceState)`](@ref) divides it by the count, or by the count less one when the inner `StatsBase.SimpleCovariance` is corrected.
+It is the state of [`GeneralCovariance`](@ref) and of `Covariance{<:Any, <:Any, <:FullMoment}` under [`partial_fit!`](@ref). One struct serves both, because the two estimators run the same recursion over the same three quantities. `M` is the accumulator ``\\sum_t (\\boldsymbol{r}_t - \\hat{\\boldsymbol{\\mu}}) (\\boldsymbol{r}_t - \\hat{\\boldsymbol{\\mu}})^{\\intercal}`` and not the covariance, so [`cov(ce::GeneralCovariance, state::CovarianceState)`](@ref) divides it by the count, or by the count less one when the inner `StatsBase.SimpleCovariance` is corrected.
 
 # Fields
 
@@ -918,10 +1225,10 @@ Keywords correspond to the struct's fields. A state seeded for `N` assets is `Co
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, its fields are subset to the selected assets:
+[`port_opt_view`](@ref) takes the view of its fields at the selected assets:
 
-  - `mu`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `M`: Sliced to the selected indices on both axes via [`port_opt_view`](@ref).
+  - `mu`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `M`: Sliced to the selected indices on both axes through [`port_opt_view`](@ref).
 
 # Examples
 
@@ -974,7 +1281,8 @@ Folds two [`CovarianceState`](@ref) fitted on disjoint blocks into the state of 
 # Algorithm
 
  1. Refuse the pair with [`assert_mergeable_states`](@ref).
- 2. Fold the counts, the means and the accumulators with [`chan_merge`](@ref), whose outer-product method reads a co-moment accumulator.
+ 2. If one of the two states holds no coverage counts, fold the counts, the means and the accumulators with [`chan_merge`](@ref). Its outer-product method reads a co-moment accumulator.
+ 3. Otherwise, fold the centre and the accumulator of each pair with the pairwise counts `nu` of the two states. A pair with no shared observation in the two blocks keeps a centre and an accumulator of zero. Read the mean of each asset from the diagonal of the centre, and merge the coverage counts too.
 
 # Arguments
 
@@ -987,7 +1295,7 @@ Folds two [`CovarianceState`](@ref) fitted on disjoint blocks into the state of 
 
 # Returns
 
-  - `state::CovarianceState`: The state the two blocks give when they are fitted as one block.
+  - `state::CovarianceState`: The state of the two blocks, as if one fit read them as one block.
 
 # Related
 
@@ -1028,7 +1336,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Copies a [`CovarianceState`](@ref), so the copy shares no array with the original.
 
-The `copy` method of the [`AbstractPartialFitState`](@ref) interface, which [`partial_fit`](@ref) calls before it folds. The count is a scalar and passes through, and the running mean and the co-moment accumulator are copied.
+This method is the `copy` method of the [`AbstractPartialFitState`](@ref) interface, which [`partial_fit`](@ref) calls before it folds. The count is a scalar, and the method uses it without change. The method copies the running mean, the co-moment accumulator and the coverage counts.
 
 # Arguments
 
@@ -1036,7 +1344,7 @@ The `copy` method of the [`AbstractPartialFitState`](@ref) interface, which [`pa
 
 # Returns
 
-  - `state::CovarianceState`: A fresh state, equal to `x`, whose `mu` and `M` are fresh arrays.
+  - `state::CovarianceState`: A new state, equal to `x`, whose `mu` and `M` are new arrays.
 
 # Related
 
@@ -1053,13 +1361,13 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Slices a [`CovarianceState`](@ref) to the selected assets.
 
-The Welford accumulator of one pair of assets reads those two assets' observations alone, and reads no third asset. So the slice of the state is the state of the sliced universe, entry for entry, and the count is shared by every asset and passes through. The slice copies by index and does not `view`: a later [`partial_fit!`](@ref) on the viewed estimator would otherwise write through into the arrays of the estimator the view was taken from.
+The Welford accumulator of one pair of assets reads only the observations of those two assets, and it reads no third asset. The slice of the state is the state of the sliced universe, entry for entry. All the assets share the count, so the method uses it without change. The slice copies by index and does not use a `view`. With a `view`, a later [`partial_fit!`](@ref) on the viewed estimator writes into the arrays of the original estimator.
 
 # Arguments
 
   - `x`: The state to slice.
-  - `i`: Index or indices of the assets to keep.
-  - `args...`: Additional positional arguments (ignored).
+  - `i`: The index or the indices of the assets to keep.
+  - `args...`: More positional arguments, which the method ignores.
 
 # Returns
 
@@ -1077,9 +1385,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Resolves the bias correction of the covariance estimator an incremental fit reproduces, and refuses every other estimator.
+Returns the bias correction of a covariance estimator that an incremental fit can reproduce, and refuses all other estimators.
 
-A [`CovarianceState`](@ref) accumulates the full-moment sum of outer products about the running mean, which is what `StatsBase.SimpleCovariance` divides by the count or by the count less one. Every other covariance estimator reads the sample in a way the accumulator cannot answer, so it is refused rather than answered wrongly. The verb walks the wrappers, so it reads the flag through a [`GeneralCovariance`](@ref) and through a `Covariance` whose algorithm is [`FullMoment`](@ref).
+A [`CovarianceState`](@ref) accumulates the full-moment sum of outer products about the running mean. `StatsBase.SimpleCovariance` divides that sum by the count, or by the count less one. All other covariance estimators read the sample in a way that the accumulator cannot reproduce, so the function refuses them and does not give a wrong result. The function goes through the wrappers, so it reads the flag through a [`GeneralCovariance`](@ref) and through a `Covariance` whose algorithm is [`FullMoment`](@ref).
 
 # Arguments
 
@@ -1087,12 +1395,12 @@ A [`CovarianceState`](@ref) accumulates the full-moment sum of outer products ab
 
 # Validation
 
-  - `ce` carries no observation weights, at every level it is walked through. An `ArgumentError` is thrown otherwise.
+  - `ce` holds no observation weights at each level that the function goes through. An `ArgumentError` is thrown otherwise.
   - The innermost estimator is a `StatsBase.SimpleCovariance`. An `ArgumentError` is thrown otherwise.
 
 # Returns
 
-  - `corrected::Bool`: Bias correction of the innermost `StatsBase.SimpleCovariance`.
+  - `corrected::Bool`: The bias correction of the innermost `StatsBase.SimpleCovariance`.
 
 # Related
 
@@ -1105,7 +1413,7 @@ partial_fit_corrected(ce::StatsBase.SimpleCovariance) = ce.corrected
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`GeneralCovariance`](@ref) method of [`partial_fit_corrected`](@ref). Refuses the observation weights of `ce` with [`assert_partial_fittable`](@ref), then reads the flag off `ce.ce`.
+The [`GeneralCovariance`](@ref) method of [`partial_fit_corrected`](@ref) refuses the observation weights of `ce` with [`assert_partial_fittable`](@ref). Then it reads the flag from `ce.ce`.
 """
 function partial_fit_corrected(ce::GeneralCovariance)
     assert_partial_fittable(nothing, ce.w, "GeneralCovariance")
@@ -1114,7 +1422,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Covariance{<:Any, <:Any, <:FullMoment}` method of [`partial_fit_corrected`](@ref). Refuses the observation weights and the centring estimator of `ce` with [`assert_partial_fittable`](@ref), then reads the flag off `ce.ce`.
+The `Covariance{<:Any, <:Any, <:FullMoment}` method of [`partial_fit_corrected`](@ref) refuses the observation weights and the centring estimator of `ce` with [`assert_partial_fittable`](@ref). Then it reads the flag from `ce.ce`.
 """
 function partial_fit_corrected(ce::Covariance{<:Any, <:Any, <:FullMoment})
     assert_partial_fittable(ce.me, ce.w, "Covariance")
@@ -1123,47 +1431,57 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Fallback method of [`partial_fit_corrected`](@ref). Refuses every covariance estimator an incremental fit does not reproduce, naming the type that was handed over.
+This is the fallback method of [`partial_fit_corrected`](@ref). It refuses each covariance estimator that an incremental fit cannot reproduce, and its error names the type of the estimator.
 """
 function partial_fit_corrected(ce::StatsBase.CovarianceEstimator)
     return throw(ArgumentError("an incremental covariance fit folds one observation into a Welford accumulator, which reproduces the full-moment sample covariance of `StatsBase.SimpleCovariance` and no other estimator. `$(typeof(ce))` is not one, so use the batch method."))
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    covariance_state_seed(cache::Nothing, x::VecNum,
+                          cvg::Option{<:CoveragePolicy} = nothing) -> CovarianceState
+    covariance_state_seed(cache::CovarianceState, x::VecNum,
+                          cvg::Option{<:CoveragePolicy} = nothing) -> CovarianceState
 
-Returns the [`CovarianceState`](@ref) an incremental covariance fit folds into, seeding one of zeros when the estimator carries none.
+Returns the [`CovarianceState`](@ref) that an incremental covariance fit folds into. If the estimator holds no state, the function seeds a state of zeros.
 
-Both covariance estimators, [`GeneralCovariance`](@ref) and [`Covariance`](@ref), seed the same state from the same observation, so the seed is written once here rather than at each [`partial_fit!`](@ref) method.
+The two covariance estimators, [`GeneralCovariance`](@ref) and [`Covariance`](@ref), seed the same state from the same observation, so the seed is in this one function and not in each [`partial_fit!`](@ref) method.
 
 # Arguments
 
-  - `cache`: The state the estimator carries, or `nothing`.
-  - `x`: One observation, `assets × 1`, read for its length and its element type.
+  - `cache`: The state that the estimator holds, or `nothing`.
+  - `x`: One observation, `assets × 1`. The function reads only its length and its element type.
+  - `cvg`: The policy that the estimator holds. It decides if the seed holds per-pair counts.
 
 # Returns
 
-  - `state::CovarianceState`: The state `cache` holds, or a state of zeros over `length(x)` assets.
+  - `state::CovarianceState`: The state that `cache` holds, or a state of zeros over `length(x)` assets.
 
 # Related
 
   - [`CovarianceState`](@ref)
   - [`partial_fit!`](@ref)
 """
-function covariance_state_seed(cache::Option{<:CovarianceState}, x::VecNum,
+function covariance_state_seed(::Nothing, x::VecNum,
                                cvg::Option{<:CoveragePolicy} = nothing)
     N = length(x)
     Tf = float_if_integer(eltype(x))
-    return if isnothing(cache)
-        CovarianceState(0, zeros(Tf, N), zeros(Tf, N, N),
-                        coverage_counts_seed(cvg, nothing, N, Tf, true))
+    return CovarianceState(0, zeros(Tf, N), zeros(Tf, N, N),
+                           coverage_counts_seed(cvg, nothing, N, Tf, true))
+end
+function covariance_state_seed(cache::CovarianceState, x::VecNum,
+                               cvg::Option{<:CoveragePolicy} = nothing)
+    counts = coverage_counts_seed(cvg, cache.cvg, length(x), float_if_integer(eltype(x)),
+                                  true)
+    return if counts === cache.cvg
+        cache
     else
-        Accessors.@reset cache.cvg = coverage_counts_seed(cvg, cache.cvg, N, Tf, true)
+        CovarianceState(cache.n, cache.mu, cache.M, counts)
     end
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`CovarianceState`](@ref) method of [`partial_fit!`](@ref). Folds one observation into the running count, mean and co-moment accumulator.
+The [`CovarianceState`](@ref) method of [`partial_fit!`](@ref) folds one observation into the count, the running mean and the co-moment accumulator.
 
 # Mathematical definition
 
@@ -1178,22 +1496,22 @@ n &\\leftarrow n + 1\\\\
 
 Where:
 
-  - ``n``: observation count.
-  - ``\\boldsymbol{x}``: the observation.
-  - ``\\boldsymbol{\\mu}``: the running mean.
-  - ``\\boldsymbol{d}``: deviation of the observation from the mean **before** the fold.
-  - ``\\boldsymbol{M}``: the running co-moment accumulator.
+  - ``n``: The observation count.
+  - ``\\boldsymbol{x}``: The observation.
+  - ``\\boldsymbol{\\mu}``: The running mean.
+  - ``\\boldsymbol{d}``: The deviation of the observation from the mean before the fold.
+  - ``\\boldsymbol{M}``: The running co-moment accumulator.
 
-The last line reads ``\\boldsymbol{\\mu}`` **after** the third line moved it, where ``\\boldsymbol{d}`` read it before. That asymmetry is Welford's, and it is what keeps the accumulator positive semi-definite.
+The last line reads ``\\boldsymbol{\\mu}`` after the third line changed it, but ``\\boldsymbol{d}`` reads it before the change. This asymmetry is the one of Welford, and it keeps the accumulator positive semi-definite.
 
 # Algorithm
 
- 1. Refuse an observation whose length is not the number of assets the state describes.
+ 1. Refuse an observation whose length is not the number of assets that the state describes.
  2. Add one to the count.
- 3. Take the deviation of the observation from the mean before the fold, giving `d`.
- 4. Move `mu` in place along `d`, by the reciprocal of the new count.
- 5. Add the outer product of `d` and the deviation from the mean **after** the fold to `M`, in place.
- 6. Rebind the count with `Accessors.@reset`, and return the state.
+ 3. Take the deviation `d` of the observation from the mean before the fold.
+ 4. Add `d`, divided by the new count, to `mu` in place.
+ 5. Add the outer product of `d` and the deviation from the mean after the fold to `M`, in place.
+ 6. Build the state with the new count through its positional constructor, and return it.
 """
 function partial_fit!(state::CovarianceState, x::VecNum)
     @argcheck(length(x) == length(state.mu),
@@ -1202,12 +1520,12 @@ function partial_fit!(state::CovarianceState, x::VecNum)
     d = x .- state.mu
     state.mu .+= d ./ n
     state.M .+= d .* transpose(x .- state.mu)
-    return Accessors.@reset state.n = n
+    return CovarianceState(n, state.mu, state.M, state.cvg)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of the coverage arm of [`partial_fit!`](@ref) for a [`CovarianceState`](@ref). An estimator that carries no [`CoveragePolicy`](@ref) folds through [`partial_fit!(state::CovarianceState, x::VecNum)`](@ref). A plain state carries one count for every asset, so it cannot skip an inactive cell. [`inactive_as_nonfinite`](@ref) writes `NaN` there, and the asset then answers `NaN`, as the Asset Panel method answers an asset outside the Coverage Universe of the same rows.
+This is the `Nothing` method of the coverage arm of [`partial_fit!`](@ref) for a [`CovarianceState`](@ref). An estimator that holds no [`CoveragePolicy`](@ref) folds through [`partial_fit!(state::CovarianceState, x::VecNum)`](@ref). A plain state holds one count for all the assets, so it cannot skip an inactive cell. [`inactive_as_nonfinite`](@ref) writes `NaN` in that cell, and the row and the column of the asset are then `NaN`. The Asset Panel method gives the same `NaN` for an asset outside the Coverage Universe of the same rows.
 
 # Related
 
@@ -1222,7 +1540,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`CoveragePolicy`](@ref) method of the coverage arm of [`partial_fit!`](@ref) for a [`CovarianceState`](@ref). Folds one observation into the running per-pair count, centre and co-moment accumulator, reading each pair's own observations alone.
+This is the [`CoveragePolicy`](@ref) method of the coverage arm of [`partial_fit!`](@ref) for a [`CovarianceState`](@ref). It folds one observation into the count, the centre and the co-moment accumulator of each pair. Each pair reads only its own observations.
 
 # Mathematical definition
 
@@ -1237,34 +1555,34 @@ M_{jk} &\\leftarrow M_{jk} + d_{jk} (r_{tk} - c_{kj})\\, ,
 \\end{align}
 ```
 
-for every pair ``(j, k)`` both of whose assets are finite and active at observation ``t``, and no line at all for a pair that is not. Where:
+for each pair ``(j, k)`` whose two assets are finite and active at observation ``t``. The method applies no line to a pair that is not. Where:
 
-  - ``\\nu_{jk}``: the number of observations at which both assets of the pair were finite and active.
+  - ``\\nu_{jk}``: The number of observations at which the two assets of the pair are finite and active.
   - $(math_dict[:r_tj])
-  - ``c_{jk}``: the running mean of asset ``j`` over the observations of the pair ``(j, k)``, so that ``c_{kj}`` is the running mean of asset ``k`` over those same observations.
-  - ``M_{jk}``: the running co-moment accumulator of the pair.
+  - ``c_{jk}``: The running mean of asset ``j`` over the observations of the pair ``(j, k)``, and ``c_{kj}`` is the running mean of asset ``k`` over the same observations.
+  - ``M_{jk}``: The running co-moment accumulator of the pair.
 
-This is Welford's recursion per pair, so a covariance folded observation by observation is the covariance of the same rows fitted as a block, and the diagonal is each asset's ordinary available-case variance. The pair is the unit of the centre as well as of the count, which is what makes the recursion exact: an entry centred on the whole window's mean would need every past term corrected as the window grows.
+This is the Welford recursion for each pair. A covariance that folds one observation at a time is the covariance of the same rows in one block fit. The diagonal is the ordinary available-case variance of each asset. The pair is the unit of the centre and of the count, and this makes the recursion exact. An entry centred on the mean of the whole window needs a correction of all past terms when the window grows.
 
 # Algorithm
 
- 1. Refuse an observation whose length is not the number of assets the state describes.
- 2. Read the valid assets and the newly inactive ones with [`coverage_valid`](@ref).
- 3. Apply the algorithm's fold-time rule with [`fold_inactive!`](@ref).
- 4. Fold the observation into every pair of valid assets, taking the upper triangle and mirroring it, so that the accumulator stays exactly symmetric.
- 5. Copy the diagonal of the centre onto `mu`, which is each asset's own available-case mean.
- 6. Move the per-asset bookkeeping on with [`coverage_step!`](@ref), add one to the observation count, and return the state.
+ 1. Refuse an observation whose length is not the number of assets that the state describes.
+ 2. Read the valid assets, and the assets that became inactive at this observation, with [`coverage_valid`](@ref).
+ 3. Apply the fold-time rule of the coverage algorithm with [`fold_inactive!`](@ref).
+ 4. Fold the observation into each pair of valid assets. Compute the upper triangle and copy it to the lower triangle, so that the accumulator stays exactly symmetric.
+ 5. Copy the diagonal of the centre to `mu`. The diagonal is the available-case mean of each asset.
+ 6. Update the per-asset records with [`coverage_step!`](@ref). Add one to the observation count, and return the state.
 
 # Arguments
 
-  - `state`: The state to fold into, mutated in place.
-  - `x`: One observation, one entry per asset.
-  - `cvg`: The policy the estimator carries.
+  - `state`: The state to fold into. The method changes it in place.
+  - `x`: One observation, with one entry for each asset.
+  - `cvg`: The policy that the estimator holds.
   - `active_mask`: The active mask of the Asset Panel at this observation, or `nothing`.
 
 # Validation
 
-  - `length(x)` is the number of assets the state describes. A `DimensionMismatch` is thrown otherwise.
+  - `length(x)` is the number of assets that the state describes. A `DimensionMismatch` is thrown otherwise.
 
 # Returns
 
@@ -1309,12 +1627,12 @@ function partial_fit!(state::CovarianceState, x::VecNum, cvg::CoveragePolicy,
         end
     end
     coverage_step!(counts, valid, active_mask)
-    return Accessors.@reset state.n = state.n + 1
+    return CovarianceState(state.n + 1, state.mu, M, counts)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`CovarianceState`](@ref) method of [`fold_inactive!`](@ref) under [`ResetCoverage`](@ref). Zeroes the count, the centre and the accumulator of every row and column that touches an asset that has just gone inactive, so that a relisting starts every pair the asset belongs to cold.
+This is the [`CovarianceState`](@ref) method of [`fold_inactive!`](@ref) under [`ResetCoverage`](@ref). It sets to zero the count, the centre and the accumulator of each row and column of an asset that became inactive at this observation. Each pair of a relisted asset then starts cold.
 
 # Related
 
@@ -1334,16 +1652,16 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Folds every observation of a block into the partial-fit state of a [`GeneralCovariance`](@ref) estimator.
 
-The block arm of the [`partial_fit!`](@ref) interface. Welford's update reads one observation at a time, so the block is folded row by row and the answer is the answer of the same rows handed over one at a time.
+This method is the block arm of the [`partial_fit!`](@ref) interface. The Welford update reads one observation at a time, so the method folds the block one row at a time. The result equals the result of the same rows given one at a time.
 
 # Algorithm
 
- 1. Orient `X` to `observations × assets`, transposing it when `dims == 2`.
- 2. Fold each row in turn with the single-observation arm of [`partial_fit!`](@ref), rebinding the estimator each time.
+ 1. Orient `X` to `observations × assets`. Transpose it when `dims == 2`.
+ 2. Fold each row in order with the single-observation arm of [`partial_fit!`](@ref). Rebind the estimator after each row.
 
 # Arguments
 
-  - `ce`: Covariance estimator.
+  - `ce`: The covariance estimator.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
 
@@ -1353,7 +1671,7 @@ The block arm of the [`partial_fit!`](@ref) interface. Welford's update reads on
 
 # Returns
 
-  - `ce::GeneralCovariance`: The estimator carrying the state after the last row.
+  - `ce::GeneralCovariance`: The estimator that holds the state after the last row.
 
 # Related
 
@@ -1371,45 +1689,49 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`GeneralCovariance`](@ref) method of [`partial_fit!`](@ref). Folds one observation into the state the `cache` field carries, seeding it on the first call.
+The [`GeneralCovariance`](@ref) method of [`partial_fit!`](@ref) folds one observation into the state of the `cache` field. On the first call, it seeds that state.
 
 # Algorithm
 
- 1. Refuse an estimator an incremental fit does not reproduce, with [`partial_fit_corrected`](@ref).
+ 1. Refuse an estimator that an incremental fit cannot reproduce, with [`partial_fit_corrected`](@ref).
  2. Seed a [`CovarianceState`](@ref) of zeros over `length(x)` assets when `ce.cache` holds `nothing`, with [`covariance_state_seed`](@ref).
  3. Fold `x` into the state.
- 4. Rebind `ce.cache` with `Accessors.@reset`, and return the estimator.
+ 4. Rebuild the estimator with the new state in `cache` through [`rebuild_estimator`](@ref), and return it.
 """
 function partial_fit!(ce::GeneralCovariance{<:Any, <:Any, <:Option{<:CovarianceState}},
                       x::VecNum)
     partial_fit_corrected(ce)
-    return Accessors.@reset ce.cache = partial_fit!(covariance_state_seed(ce.cache, x), x)
+    return rebuild_estimator(ce,
+                             (;
+                              cache = partial_fit!(covariance_state_seed(ce.cache, x), x)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Folds every observation of a block into the partial-fit state of a [`Covariance`](@ref) estimator under [`FullMoment`](@ref).
 
-The block arm of the [`partial_fit!`](@ref) interface. Welford's update reads one observation at a time, so the block is folded row by row and the answer is the answer of the same rows handed over one at a time.
+This method is the block arm of the [`partial_fit!`](@ref) interface. The Welford update reads one observation at a time, so the method folds the block one row at a time. The result equals the result of the same rows given one at a time.
 
 # Algorithm
 
- 1. Orient `X` to `observations × assets`, transposing it when `dims == 2`.
- 2. Fold each row in turn with the single-observation arm of [`partial_fit!`](@ref), rebinding the estimator each time.
+ 1. Orient `X` and `active_mask` to `observations × assets`. Transpose them when `dims == 2`.
+ 2. Fold each row in order with the single-observation arm of [`partial_fit!`](@ref), together with its row of the active mask. Rebind the estimator after each row.
 
 # Arguments
 
-  - `ce`: Covariance estimator with a [`FullMoment`](@ref) moment algorithm.
+  - `ce`: The covariance estimator with a [`FullMoment`](@ref) moment algorithm.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
+  - `active_mask`: The active mask of the Asset Panel, with the same size as `X`, or `nothing`.
 
 # Validation
 
   - $(val_dict[:dims])
+  - If `active_mask` is not `nothing`, its size is the size of `X` after the orientation. A `DimensionMismatch` is thrown otherwise.
 
 # Returns
 
-  - `ce::Covariance`: The estimator carrying the state after the last row.
+  - `ce::Covariance`: The estimator that holds the state after the last row.
 
 # Related
 
@@ -1434,28 +1756,28 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Covariance{<:Any, <:Any, <:FullMoment}` method of [`partial_fit!`](@ref). Folds one observation into the state the `cache` field carries, seeding it on the first call.
+The `Covariance{<:Any, <:Any, <:FullMoment}` method of [`partial_fit!`](@ref) folds one observation into the state of the `cache` field. On the first call, it seeds that state.
 
 # Algorithm
 
- 1. Refuse an estimator an incremental fit does not reproduce, with [`partial_fit_corrected`](@ref).
+ 1. Refuse an estimator that an incremental fit cannot reproduce, with [`partial_fit_corrected`](@ref).
  2. Seed a [`CovarianceState`](@ref) of zeros over `length(x)` assets when `ce.cache` holds `nothing`, with [`covariance_state_seed`](@ref).
- 3. Fold `x` into the state.
- 4. Rebind `ce.cache` with `Accessors.@reset`, and return the estimator.
+ 3. Fold `x` into the state, with the policy `ce.cvg` and the active mask.
+ 4. Rebuild the estimator with the new state in `cache` through [`rebuild_estimator`](@ref), and return it.
 """
 function partial_fit!(ce::Covariance{<:Any, <:Any, <:FullMoment, <:Any, <:Any,
                                      <:Option{<:CovarianceState}}, x::VecNum;
                       active_mask::Option{<:AbstractVector{<:Bool}} = nothing)
     partial_fit_corrected(ce)
     state = covariance_state_seed(ce.cache, x, ce.cvg)
-    return Accessors.@reset ce.cache = partial_fit!(state, x, ce.cvg, active_mask)
+    return rebuild_estimator(ce, (; cache = partial_fit!(state, x, ce.cvg, active_mask)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Fallback [`Covariance`](@ref) method of [`partial_fit!`](@ref). Refuses every moment algorithm but [`FullMoment`](@ref), naming the reason.
+This is the fallback [`Covariance`](@ref) method of [`partial_fit!`](@ref). It refuses all moment algorithms except [`FullMoment`](@ref), and its error states the reason.
 
-[`SemiMoment`](@ref) clamps the de-meaned returns at zero **before** the covariance, and the centre it de-means by is a statistic of the whole sample. So a centre that moves moves every past clamp, and a past observation's membership of the downside flips. An incremental fit never reads a past observation again, so it cannot re-clamp one, and the batch method is the one that answers.
+[`SemiMoment`](@ref) clips the de-meaned returns at zero before the covariance, and its centre is a statistic of the whole sample. A change of the centre changes all past clips, and a past observation can go into or out of the downside. An incremental fit does not read a past observation again, so it cannot clip it again. Only the batch method gives the correct result.
 """
 function partial_fit!(ce::Covariance{<:Any, <:Any, <:Any, <:Any, <:Any,
                                      <:Option{<:CovarianceState}}, ::VecNum_MatNum;
@@ -1464,17 +1786,17 @@ function partial_fit!(ce::Covariance{<:Any, <:Any, <:Any, <:Any, <:Any,
 end
 """
     Statistics.cov(
-        ce::Union{<:GeneralCovariance, <:Covariance{<:Any, <:Any, <:FullMoment}},
+        ce::Union{GeneralCovariance, Covariance{<:Any, <:Any, <:FullMoment}},
         state::CovarianceState;
         strict::Bool = false
     ) -> MatNum
-    Statistics.cov(ce::Union{<:GeneralCovariance, <:Covariance}; strict::Bool = false) -> MatNum
+    Statistics.cov(ce::Union{GeneralCovariance, Covariance}; strict::Bool = false) -> MatNum
 
-Read the covariance matrix of an incremental fit out of a [`CovarianceState`](@ref).
+Read the covariance matrix of an incremental fit from a [`CovarianceState`](@ref).
 
-The two-argument method reads a state the caller holds, and the one-argument method reads the state the `cache` field of `ce` carries. The bias correction comes from the innermost `StatsBase.SimpleCovariance`, which [`partial_fit_corrected`](@ref) resolves.
+The two-argument method reads a state that the caller holds. The one-argument method reads the state in the `cache` field of `ce`. The bias correction comes from the innermost `StatsBase.SimpleCovariance`, and [`partial_fit_corrected`](@ref) reads it.
 
-The one-argument method is bound to every moment algorithm, not to [`FullMoment`](@ref) alone, because an estimator wrapped in [`Online`](@ref) carries a [`SampleBufferState`](@ref) rather than a [`CovarianceState`](@ref), and reading it runs the batch verb over the buffer's rows — which every algorithm answers. It dispatches on what `cache` holds, so a [`SemiMoment`](@ref) estimator answers when it was wrapped and meets the named refusal of [`partial_fit_cache`](@ref) when it carries nothing.
+The one-argument method accepts all moment algorithms, not only [`FullMoment`](@ref). An estimator wrapped in [`Online`](@ref) holds a [`SampleBufferState`](@ref) and not a [`CovarianceState`](@ref). To read that state, the method runs the batch verb over the rows of the buffer, and all algorithms accept that. The method dispatches on what `cache` holds, so a [`SemiMoment`](@ref) estimator returns a result when a wrapper gave it a buffer. When it holds no state, [`partial_fit_cache`](@ref) refuses it with an error that names the cause.
 
 # Mathematical definition
 
@@ -1487,21 +1809,21 @@ The one-argument method is bound to every moment algorithm, not to [`FullMoment`
 Where:
 
   - $(math_dict[:Sigma_hat])
-  - ``M``: Running co-moment accumulator.
-  - ``n``: Observation count.
+  - ``M``: The running co-moment accumulator.
+  - ``n``: The observation count.
   - ``c``: One when the innermost `StatsBase.SimpleCovariance` is corrected, and zero otherwise.
 
 # Algorithm
 
- 1. Resolve the bias correction with [`partial_fit_corrected`](@ref), which refuses every estimator an incremental fit does not reproduce.
- 2. Take the divisor `n - c`, and return a matrix of `NaN` when it is below one, in the way `min_obs` reads an asset with too few observations.
+ 1. Get the bias correction with [`partial_fit_corrected`](@ref), which refuses each estimator that an incremental fit cannot reproduce.
+ 2. Take the divisor `n - c`. Return a matrix of `NaN` when the divisor is less than one. `min_obs` reads an asset with too few observations in the same way.
  3. Otherwise divide the accumulator by the divisor.
 
 # Arguments
 
   - $(arg_dict[:ce])
   - `state`: The state to read.
-  - `strict`: Whether a peel of the [`CoveragePolicy`](@ref) of `ce` refuses rather than warns. See [`coverage_peel`](@ref).
+  - `strict`: If `true`, a peel of the [`CoveragePolicy`](@ref) of `ce` throws an error. If `false`, the peel gives a warning. See [`coverage_peel`](@ref).
 
 # Validation
 
@@ -1532,8 +1854,8 @@ julia> cov(ce)
   - [`partial_fit_corrected`](@ref)
   - [`cov(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
-function Statistics.cov(ce::Union{<:GeneralCovariance,
-                                  <:Covariance{<:Any, <:Any, <:FullMoment}},
+function Statistics.cov(ce::Union{GeneralCovariance,
+                                  Covariance{<:Any, <:Any, <:FullMoment}},
                         state::CovarianceState; strict::Bool = false)
     return coverage_covariance(ce, coverage_policy(ce), state; strict = strict)
 end
@@ -1541,17 +1863,17 @@ end
     coverage_policy(ce::GeneralCovariance) -> Nothing
     coverage_policy(ce::Covariance) -> Option{<:CoveragePolicy}
 
-Reads the [`CoveragePolicy`](@ref) a covariance estimator carries, out of an estimator that may have no such field.
+Reads the [`CoveragePolicy`](@ref) of a covariance estimator. The estimator can have no `cvg` field.
 
-[`GeneralCovariance`](@ref) and [`Covariance`](@ref) share one state and one method that makes the estimate from it, `cov(ce)` with no data, and only the second has a `cvg` field. That method therefore asks for the policy through this verb rather than for the field, so that the arm is still chosen by dispatch and the estimator without the field answers `nothing`.
+[`GeneralCovariance`](@ref) and [`Covariance`](@ref) share one state, and one method that makes the estimate from it, `cov(ce)` with no data. Only [`Covariance`](@ref) has a `cvg` field, so that method gets the policy through this function and not from the field. Dispatch still selects the arm, and the estimator with no field returns `nothing`.
 
 # Arguments
 
-  - `ce`: Covariance estimator.
+  - `ce`: The covariance estimator.
 
 # Returns
 
-  - `cvg::Option{<:CoveragePolicy}`: The policy the estimator carries, or `nothing`.
+  - `cvg::Option{<:CoveragePolicy}`: The policy that the estimator holds, or `nothing`.
 
 # Related
 
@@ -1569,17 +1891,17 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of [`coverage_covariance`](@ref) for a state, which `cov(ce)` with no data calls. Every pair shares one count, so the whole answer is `NaN` until the count passes the Bessel correction.
+This is the `Nothing` method of [`coverage_covariance`](@ref) for a state. `cov(ce)` with no data calls it. All the pairs share one count, so the result is all `NaN` until the count is more than the Bessel correction.
 
-[`GeneralCovariance`](@ref) carries no `cvg` field and reads the same state, so it always reaches this arm.
+[`GeneralCovariance`](@ref) has no `cvg` field and reads the same state, so it always gets to this arm.
 
 # Related
 
   - [`coverage_covariance`](@ref)
   - [`CovarianceState`](@ref)
 """
-function coverage_covariance(ce::Union{<:GeneralCovariance,
-                                       <:Covariance{<:Any, <:Any, <:FullMoment}}, ::Nothing,
+function coverage_covariance(ce::Union{GeneralCovariance,
+                                       Covariance{<:Any, <:Any, <:FullMoment}}, ::Nothing,
                              state::CovarianceState; kwargs...)
     k = state.n - partial_fit_corrected(ce)
     return k >= one(k) ? state.M ./ k : fill(convert(eltype(state.M), NaN), size(state.M))
@@ -1587,9 +1909,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`CoveragePolicy`](@ref) method of [`coverage_covariance`](@ref) for a state, which `cov(ce)` with no data calls. Each pair's accumulator is divided by that pair's own count less the Bessel correction, and an asset the policy refuses is `NaN` across its whole row and column.
+This is the [`CoveragePolicy`](@ref) method of [`coverage_covariance`](@ref) for a state. `cov(ce)` with no data calls it. The method divides the accumulator of each pair by the count of that pair less the Bessel correction. An asset that the policy refuses is `NaN` in all of its row and column.
 
-A pair whose two assets are each admitted but which share too few observations has no covariance, because a covariance of no observations is not a number. [`coverage_peel`](@ref) removes the assets of such pairs from the admitted set with the `peel` rule of the policy, and reports the peel through `strict`. Under [`NoPeel`](@ref) the cell stays `NaN`, and the matrix repair refuses it.
+A pair of two admitted assets that share too few observations has no covariance, because a covariance of no observations is not a number. [`coverage_peel`](@ref) removes the assets of such pairs from the admitted set with the `peel` rule of the policy. It reports the peel as `strict` sets. Under `peel = nothing` the cell stays `NaN`, and the matrix repair refuses it.
 
 # Related
 
@@ -1607,23 +1929,24 @@ function coverage_covariance(ce::Covariance{<:Any, <:Any, <:FullMoment},
                          corrected, strict)
     return coverage_divide(state.M, counts.nu, corrected, cmsk)
 end
-function Statistics.cov(ce::Union{<:GeneralCovariance, <:Covariance}; strict::Bool = false)
+function Statistics.cov(ce::Union{GeneralCovariance, Covariance}; strict::Bool = false)
     return Statistics.cov(ce, partial_fit_cache(ce); strict = strict)
 end
 """
-    Statistics.cor(ce::Union{<:GeneralCovariance,
-                             <:Covariance{<:Any, <:Any, <:FullMoment}},
+    Statistics.cor(ce::Union{GeneralCovariance,
+                             Covariance{<:Any, <:Any, <:FullMoment}},
                    state::CovarianceState)
-    Statistics.cor(ce::Union{<:GeneralCovariance, <:Covariance})
+    Statistics.cor(ce::Union{GeneralCovariance, Covariance})
 
-Reads a correlation matrix out of a folded covariance estimator.
+Reads a correlation matrix from a folded covariance estimator.
 
-The correlation twin of `cov(ce)` with no data, and the same two steps the batch method takes: the folded covariance first, then [`coverage_correlation`](@ref), which is the one place the conversion lives. So a folded estimator answers `cor` for the same configurations it answers `cov`, and the composite [`PortfolioOptimisersCovariance`](@ref) can offer both.
+This method is the correlation form of `cov(ce)` with no data. It takes the same two steps as the batch method. First it computes the folded covariance. Then it applies [`coverage_correlation`](@ref), which is the one place that holds the conversion. A folded estimator returns `cor` for the same configurations as `cov`, and the composite [`PortfolioOptimisersCovariance`](@ref) can give both.
 
 # Arguments
 
   - $(arg_dict[:ce])
-  - `state`: The state the estimator carries.
+  - `state`: The state that the estimator holds.
+  - `strict`: If `true`, a peel of the [`CoveragePolicy`](@ref) of `ce` throws an error. If `false`, the peel gives a warning. See [`coverage_peel`](@ref).
 
 # Validation
 
@@ -1631,7 +1954,7 @@ The correlation twin of `cov(ce)` with no data, and the same two steps the batch
 
 # Returns
 
-  - `rho::MatNum`: Correlation matrix of the observations the state was fitted on.
+  - `rho::MatNum`: The correlation matrix of the observations that the state holds.
 
 # Related
 
@@ -1639,14 +1962,14 @@ The correlation twin of `cov(ce)` with no data, and the same two steps the batch
   - [`coverage_correlation`](@ref)
   - [`partial_fit!`](@ref)
 """
-function Statistics.cor(ce::Union{<:GeneralCovariance,
-                                  <:Covariance{<:Any, <:Any, <:FullMoment}},
+function Statistics.cor(ce::Union{GeneralCovariance,
+                                  Covariance{<:Any, <:Any, <:FullMoment}},
                         state::CovarianceState; strict::Bool = false)
     return coverage_correlation(Statistics.cor,
                                 coverage_covariance(ce, coverage_policy(ce), state;
                                                     strict = strict))
 end
-function Statistics.cor(ce::Union{<:GeneralCovariance, <:Covariance}; strict::Bool = false)
+function Statistics.cor(ce::Union{GeneralCovariance, Covariance}; strict::Bool = false)
     return Statistics.cor(ce, partial_fit_cache(ce); strict = strict)
 end
 

@@ -270,6 +270,47 @@ end
         @test PO.buffer_gap_marks(copy(s)) == PO.buffer_gap_marks(s)
         @test PO.buffer_gap_marks(PO.port_opt_view(s, [2])) == PO.buffer_gap_marks(s)
         @test_throws DimensionMismatch partial_fit!(s, [1.0 1]; gaps = [true, false])
+        # A block whose marks are all false records none in a buffer that holds none.
+        e = partial_fit!(PO.SampleBufferState(; max_history = 4), [1.0 2; 3 4])
+        e = partial_fit!(e, [5.0 6; 7 8]; gaps = [false, false])
+        @test isnothing(e.G) && e.n == 4
+        # A block longer than the cap keeps the marks of the rows it keeps.
+        cap = partial_fit!(PO.SampleBufferState(; max_history = 2), [1.0 2; 3 4; 5 6; 7 8];
+                           gaps = [true, false, true, false])
+        @test PO.buffer_gap_marks(cap) == [true, false]
+        @test PO.sample_buffer(cap) == [5.0 6; 7 8]
+        # A block with no marks, appended to a buffer that holds them, marks its rows as no gap.
+        s = partial_fit!(s, [11.0 12])
+        @test PO.buffer_gap_marks(s) == [false, true, false, false]
+        @test PO.sample_buffer(s) == [5.0 6; 7 8; 9 10; 11 12]
+    end
+
+    @testset "The member rows of a gapped block carry the active mask" begin
+        # The members of a carry fold the unmarked rows of the block and the same rows of the
+        # active mask, so a block with a gap equals the block without it.
+        n = 20
+        Xg = X0[1:n, :]
+        gp = falses(n)
+        gp[7] = true
+        rk = findall(!, gp)
+        Mg = trues(n, N)
+        Mg[3, 2] = false
+        Mg[7, 1] = false
+        Mg[12, 3] = false
+        a = prior(partial_fit!(EmpiricalPrior(), Xg; gaps = gp, active_mask = Mg))
+        b = prior(partial_fit!(EmpiricalPrior(), Xg[rk, :]; active_mask = Mg[rk, :]))
+        # The asset whose only hole sits on the dropped row stays in the Coverage Universe,
+        # and the two with a hole on a kept row leave it.
+        @test isequal(isnan.(a.mu), [false, true, true])
+        @test isapprox(a.mu, b.mu; nans = true)
+        @test isapprox(a.sigma, b.sigma; nans = true)
+        # With no mask the keyword is absent from what the members get, and the rows still go.
+        c = prior(partial_fit!(EmpiricalPrior(), Xg; gaps = gp))
+        d = prior(partial_fit!(EmpiricalPrior(), Xg[rk, :]))
+        @test c.mu ≈ d.mu
+        @test c.sigma ≈ d.sigma
+        # The mask is read: the same rows without it keep every asset.
+        @test all(isfinite, c.mu)
     end
 
     @testset "A fold of an empty block leaves a co-moment unchanged" begin
@@ -385,8 +426,21 @@ end
     @test all(isnan, p3.sigma[2, :])
     # A fit that does not read the surface keeps the asset.
     @test all(isfinite, Statistics.cov(Covariance(), X0, nothing; iv = ivg))
-    @test PO.reads_implied_volatility(pe)
-    @test !PO.reads_implied_volatility(EmpiricalPrior())
+    # The same holds for a prior over the plain default: its surface has a gap, and the
+    # asset stays, with the moments of the fit on the data without the surface.
+    rdg = ReturnsResult(; nx = nx, X = X0, iv = ivg, ivpa = [1.1, 1.2, 1.3])
+    p4 = prior(EmpiricalPrior(), rdg)
+    @test all(isfinite, p4.sigma)
+    @test p4.sigma ≈ prior(EmpiricalPrior(), ReturnsResult(; nx = nx, X = X0)).sigma
+    # The wrapped surface reads the gap in the surface through every wrapper above it.
+    ce2 = PortfolioOptimisersCovariance(; ce = ce)
+    p5 = prior(EmpiricalPrior(; ce = ce2), rdg)
+    @test all(isnan, p5.sigma[2, :])
+    @test p5.sigma[[1, 3], [1, 3]] ≈ p3.sigma[[1, 3], [1, 3]]
+    # No estimator of the library holds a pair, so no verb reaches the method for a pair
+    # (#1919). It reads the value the pair holds.
+    @test PO.reads_implied_volatility("iv" => ImpliedVolatility(; ppy = 252))
+    @test !PO.reads_implied_volatility("iv" => Covariance())
 end
 
 @testset "A collapse of the implied volatilities reads the finite active cells" begin
@@ -535,7 +589,7 @@ end
 
     @testset "A graph reader pairs iv by the marks" begin
         # The window is short enough that the regression of the 59 kept rows has more than
-        # two windows.
+        # four windows.
         ive = ImpliedVolatility(; ppy = 252, alg = ImpliedVolatilityRegression(; ws = 10))
         clp = ClustersEstimator(; ce = ive, x_src = PriorSource())
         ref = clusterise(clp, pr; iv = ivg[keep, :], ivpa = 1.1)

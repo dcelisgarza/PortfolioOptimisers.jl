@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the deviations that a JuMP weight finaliser can minimise.
 
-A subtype is the field `alg` of a [`JuMPWeightFinaliser`](@ref). It selects the norm of the deviation, and whether the deviation is absolute or relative to the weights that the optimisation produced.
+A subtype is the field `alg` of a [`JuMPWeightFinaliser`](@ref), and the field `wf` of a [`DiscreteAllocation`](@ref). It selects the deviation from the target weights that the programme minimises. [`ErrorWeightFinaliser`](@ref) is the library's subtype.
 
 # Interfaces
 
@@ -25,72 +25,194 @@ To add a deviation, subtype `JuMPWeightFinaliserFormulation` and implement the m
 
 # Related
 
-  - [`RelativeErrorWeightFinaliser`](@ref)
-  - [`SquaredRelativeErrorWeightFinaliser`](@ref)
-  - [`AbsoluteErrorWeightFinaliser`](@ref)
-  - [`SquaredAbsoluteErrorWeightFinaliser`](@ref)
+  - [`ErrorWeightFinaliser`](@ref)
   - [`JuMPWeightFinaliser`](@ref)
+  - [`DiscreteAllocation`](@ref)
 """
 abstract type JuMPWeightFinaliserFormulation <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Selects the L1 norm of the relative weight deviation as the objective of a JuMP weight finaliser.
+Abstract supertype for the forms of the deviation of a vector from its target weights.
 
-A relative deviation weighs a change to a small weight more than the same change to a large weight. So the finaliser moves mass to the largest free weights first.
+A subtype is the field `dev` of an [`ErrorWeightFinaliser`](@ref). It states the residual whose norm the programme minimises.
 
-# Mathematical definition
+# Interfaces
 
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w}}{\\min} &\\quad \\left\\lVert \\boldsymbol{w} \\oslash \\boldsymbol{w}_{0} - \\boldsymbol{1} \\right\\rVert_{1}\\,, \\\\
-\\textrm{s.t.} &\\quad \\boldsymbol{1}^\\intercal \\boldsymbol{w} = \\boldsymbol{1}^\\intercal \\boldsymbol{w}_{0}\\,, \\\\
-&\\quad \\boldsymbol{l} \\leq \\boldsymbol{w} \\leq \\boldsymbol{u}\\,.
-\\end{align}
-```
+To add a deviation, subtype `WeightDeviation` and implement the two methods below.
+
+## `weight_deviation`
+
+  - `weight_deviation(dev::MyDeviation, x, w0::VecNum, c::Number) -> AbstractVector`: Returns the residual of `x` against the target `c * w0`.
+
+### Arguments
+
+  - `dev`: The concrete subtype instance.
+  - `x`: The model's vector that tracks the target. It is the weights in [`JuMPWeightFinaliser`](@ref), and the money in each position in [`DiscreteAllocation`](@ref).
+  - `w0`: The target weights. The method must not change them.
+  - `c`: The scale that turns `w0` into the units of `x`. It is `1` in [`JuMPWeightFinaliser`](@ref), and the cash of the side in [`DiscreteAllocation`](@ref).
+
+### Returns
+
+  - The residual, a vector of the length of `x`.
+
+## `deviation_error_term`
+
+  - `deviation_error_term(dev::MyDeviation, u, c::Number)`: Returns the error term of the objective of [`DiscreteAllocation`](@ref), in money.
+
+### Arguments
+
+  - `dev`: The concrete subtype instance.
+  - `u`: The model's bound on the norm of the residual.
+  - `c`: The cash of the side.
+
+### Returns
+
+  - The term that the objective adds to the cash left over.
+
+# Related
+
+  - [`RelativeWeightDeviation`](@ref)
+  - [`AbsoluteWeightDeviation`](@ref)
+  - [`ErrorWeightFinaliser`](@ref)
+"""
+abstract type WeightDeviation <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Selects the deviation relative to the target weights, ``\\boldsymbol{x} \\oslash (c\\, \\tilde{\\boldsymbol{w}}_{0}) - \\boldsymbol{1}``.
+
+A relative deviation weighs a change to a small weight more than the same change to a large weight. The deviation is defined only where every entry of ``\\boldsymbol{w}_{0}`` is not zero, so [`weight_deviation`](@ref) replaces each zero entry of a copy of the target with `eps`. The deviation has no unit, so [`DiscreteAllocation`](@ref) prices it in money as ``c\\, u``.
 
 Where:
 
-  - $(math_dict[:w_port])
-  - $(math_dict[:w_0_finaliser])
-  - $(math_dict[:lb_ub_finaliser])
+  - ``\\boldsymbol{x}``: The model's vector that tracks the target.
+  - ``c``: The scale of the target.
+  - ``\\tilde{\\boldsymbol{w}}_{0}``: The target weights with each zero entry replaced by `eps`.
   - $(math_dict[:oslash])
   - ``\\boldsymbol{1}``: Vector of ones.
 
-The relative deviation is defined only where every entry of ``\\boldsymbol{w}_{0}`` is not zero.
-
-# Constructors
-
-    RelativeErrorWeightFinaliser() -> RelativeErrorWeightFinaliser
-
 # Examples
 
 ```jldoctest
-julia> RelativeErrorWeightFinaliser()
-RelativeErrorWeightFinaliser()
+julia> RelativeWeightDeviation()
+RelativeWeightDeviation()
 ```
 
 # Related
 
-  - [`JuMPWeightFinaliserFormulation`](@ref)
-  - [`SquaredRelativeErrorWeightFinaliser`](@ref)
-  - [`AbsoluteErrorWeightFinaliser`](@ref)
-  - [`SquaredAbsoluteErrorWeightFinaliser`](@ref)
-  - [`JuMPWeightFinaliser`](@ref)
+  - [`WeightDeviation`](@ref)
+  - [`AbsoluteWeightDeviation`](@ref)
+  - [`ErrorWeightFinaliser`](@ref)
 """
-struct RelativeErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
+struct RelativeWeightDeviation <: WeightDeviation end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Selects the L2 norm of the relative weight deviation as the objective of a JuMP weight finaliser.
+Selects the deviation from the target weights, ``\\boldsymbol{x} - c\\, \\boldsymbol{w}_{0}``.
 
-The name comes from the squared error. The programme minimises the norm and not its square, and the two have the same minimiser because the square increases on non-negative values. So the value of the objective is the L2 norm.
+The deviation has the units of ``\\boldsymbol{x}``. So [`DiscreteAllocation`](@ref) uses its norm ``u`` as the money term of the objective.
+
+Where:
+
+  - ``\\boldsymbol{x}``: The model's vector that tracks the target.
+  - ``c``: The scale of the target.
+  - $(math_dict[:w_0_finaliser])
+
+# Examples
+
+```jldoctest
+julia> AbsoluteWeightDeviation()
+AbsoluteWeightDeviation()
+```
+
+# Related
+
+  - [`WeightDeviation`](@ref)
+  - [`RelativeWeightDeviation`](@ref)
+  - [`ErrorWeightFinaliser`](@ref)
+"""
+struct AbsoluteWeightDeviation <: WeightDeviation end
+"""
+    weight_deviation(dev::RelativeWeightDeviation, x, w0::VecNum, c::Number)
+    weight_deviation(dev::AbsoluteWeightDeviation, x, w0::VecNum, c::Number)
+
+Returns the residual of `x` against the target `c * w0` that `dev` selects.
+
+The relative method replaces each zero entry of a copy of `w0` with `eps(eltype(w0))` before it multiplies by `c`. It does not change `w0`.
+
+# Arguments
+
+  - `dev`: The deviation.
+  - `x`: The model's vector that tracks the target.
+  - `w0`: The target weights.
+  - `c`: The scale that turns `w0` into the units of `x`.
+
+# Returns
+
+  - [`RelativeWeightDeviation`](@ref): ``\\boldsymbol{x} \\oslash (c\\, \\tilde{\\boldsymbol{w}}_{0}) - \\boldsymbol{1}``.
+  - [`AbsoluteWeightDeviation`](@ref): ``\\boldsymbol{x} - c\\, \\boldsymbol{w}_{0}``.
+
+# Related
+
+  - [`WeightDeviation`](@ref)
+  - [`deviation_error_term`](@ref)
+  - [`ErrorWeightFinaliser`](@ref)
+"""
+function weight_deviation(::RelativeWeightDeviation, x, w0::VecNum, c::Number)
+    mask = iszero.(w0)
+    if any(mask)
+        w0 = copy(w0)
+        w0[mask] .= eps(eltype(w0))
+    end
+    wc = w0 * c
+    return x ⊘ wc .- one(eltype(wc))
+end
+function weight_deviation(::AbsoluteWeightDeviation, x, w0::VecNum, c::Number)
+    return x - w0 * c
+end
+"""
+    deviation_error_term(dev::RelativeWeightDeviation, u, c::Number)
+    deviation_error_term(dev::AbsoluteWeightDeviation, u, ::Number)
+
+Returns the error term of the objective of [`DiscreteAllocation`](@ref), in money.
+
+The cash left over is money. An absolute deviation is money too, so the term is ``u``. A relative deviation has no unit, so the term is ``c\\, u``, and a relative deviation of one over the whole side is worth the cash of the side.
+
+# Arguments
+
+  - `dev`: The deviation.
+  - `u`: The model's bound on the norm of the residual.
+  - `c`: The cash of the side.
+
+# Returns
+
+  - The error term of the objective.
+
+# Related
+
+  - [`WeightDeviation`](@ref)
+  - [`weight_deviation`](@ref)
+  - [`set_discrete_error!`](@ref)
+"""
+function deviation_error_term(::RelativeWeightDeviation, u, c::Number)
+    return c * u
+end
+function deviation_error_term(::AbsoluteWeightDeviation, u, ::Number)
+    return u
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Selects the norm of a weight deviation as the objective of a JuMP weight finaliser.
+
+The field `alg` is the norm, and the field `dev` states whether the deviation is relative to the target weights or absolute.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{w}}{\\min} &\\quad \\left\\lVert \\boldsymbol{w} \\oslash \\boldsymbol{w}_{0} - \\boldsymbol{1} \\right\\rVert_{2}\\,, \\\\
+\\underset{\\boldsymbol{w}}{\\min} &\\quad \\left\\lVert \\boldsymbol{d}(\\boldsymbol{w},\\, \\boldsymbol{w}_{0}) \\right\\rVert\\,, \\\\
 \\textrm{s.t.} &\\quad \\boldsymbol{1}^\\intercal \\boldsymbol{w} = \\boldsymbol{1}^\\intercal \\boldsymbol{w}_{0}\\,, \\\\
 &\\quad \\boldsymbol{l} \\leq \\boldsymbol{w} \\leq \\boldsymbol{u}\\,.
 \\end{align}
@@ -101,121 +223,137 @@ Where:
   - $(math_dict[:w_port])
   - $(math_dict[:w_0_finaliser])
   - $(math_dict[:lb_ub_finaliser])
+  - ``\\boldsymbol{d}``: The deviation of `dev`, ``\\boldsymbol{w} \\oslash \\boldsymbol{w}_{0} - \\boldsymbol{1}`` for a [`RelativeWeightDeviation`](@ref), and ``\\boldsymbol{w} - \\boldsymbol{w}_{0}`` for an [`AbsoluteWeightDeviation`](@ref).
+  - ``\\lVert \\cdot \\rVert``: The norm of `alg`.
   - $(math_dict[:oslash])
   - ``\\boldsymbol{1}``: Vector of ones.
 
-The relative deviation is defined only where every entry of ``\\boldsymbol{w}_{0}`` is not zero. Where the bounds bind none of the free weights, the minimiser is ``w_{i} = w_{0,i} + c\\, w_{0,i}^{2}``, with one ``c`` that restores the budget.
+The programme bounds the norm itself. It does not divide the norm by [`norm_factor`](@ref), so the `ddof` of `alg` has no effect. A [`SquaredL2Norm`](@ref) and an [`L2Norm`](@ref) give the same programme, because the square increases on non-negative values and so does not move the minimiser.
+
+Each pair of a norm and a deviation has its own minimiser:
+
+  - The L1 norm of the relative deviation weighs a change to a small weight more than the same change to a large weight. So the finaliser moves mass to the largest free weights first.
+  - The L2 norm of the relative deviation has the minimiser ``w_{i} = w_{0,i} + c\\, w_{0,i}^{2}`` where the bounds bind none of the free weights, with one ``c`` that restores the budget.
+  - The L1 norm of the absolute deviation costs the same for every transfer of mass between two weights, so its minimiser is often not unique. The value of the objective is twice the mass that the finaliser moves.
+  - The L2 norm of the absolute deviation has the Euclidean projection of ``\\boldsymbol{w}_{0}`` onto the feasible set as its minimiser, which [`EuclideanWeightFinaliser`](@ref) finds with no solver. Where the bounds bind none of the free weights, the minimiser is ``w_{i} = w_{0,i} + c``, with one ``c`` that restores the budget.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    SquaredRelativeErrorWeightFinaliser() -> SquaredRelativeErrorWeightFinaliser
+    ErrorWeightFinaliser(;
+        alg::NormError = L1Norm(),
+        dev::WeightDeviation = RelativeWeightDeviation()
+    ) -> ErrorWeightFinaliser
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `alg` is an [`LpNorm`](@ref): `alg.p > 1`.
 
 # Examples
 
 ```jldoctest
-julia> SquaredRelativeErrorWeightFinaliser()
-SquaredRelativeErrorWeightFinaliser()
+julia> ErrorWeightFinaliser()
+ErrorWeightFinaliser
+  alg ┼ L1Norm
+      │   ddof ┴ Int64: 0
+  dev ┴ RelativeWeightDeviation()
 ```
 
 # Related
 
   - [`JuMPWeightFinaliserFormulation`](@ref)
-  - [`RelativeErrorWeightFinaliser`](@ref)
-  - [`AbsoluteErrorWeightFinaliser`](@ref)
-  - [`SquaredAbsoluteErrorWeightFinaliser`](@ref)
+  - [`WeightDeviation`](@ref)
+  - [`NormError`](@ref)
   - [`JuMPWeightFinaliser`](@ref)
+  - [`DiscreteAllocation`](@ref)
 """
-struct SquaredRelativeErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
+@concrete struct ErrorWeightFinaliser <: JuMPWeightFinaliserFormulation
+    """
+    $(field_dict[:wfnorm])
+    """
+    alg
+    """
+    $(field_dict[:wfdev])
+    """
+    dev
+    function ErrorWeightFinaliser(alg::NormError, dev::WeightDeviation)
+        if isa(alg, LpNorm)
+            @argcheck(alg.p > 1,
+                      DomainError(alg.p,
+                                  "`LpNorm.p` is $(alg.p), and the model states the `p`-norm of the deviation with a power cone of exponent `1 / p`, so `1 < p` must hold. State a value greater than `1`."))
+        end
+        return new{typeof(alg), typeof(dev)}(alg, dev)
+    end
+end
+function ErrorWeightFinaliser(; alg::NormError = L1Norm(),
+                              dev::WeightDeviation = RelativeWeightDeviation())::ErrorWeightFinaliser
+    return ErrorWeightFinaliser(alg, dev)
+end
 """
-$(DocStringExtensions.TYPEDEF)
+    set_norm_error_epigraph!(model::JuMP.Model, t, r::AbstractVector, alg::NormError)
 
-Selects the L1 norm of the absolute weight deviation as the objective of a JuMP weight finaliser.
+Adds the rows that bound the norm of `r` by `t`, ``t \\geq \\lVert \\boldsymbol{r} \\rVert``, and returns them.
 
-Every transfer of mass between two weights costs the same, so the minimiser is often not unique. The value of the objective is twice the mass that the finaliser moves.
+Every row is scaled by the constraint scale ``s_c`` of `model`. The norm gives the order, and [`norm_epigraph!`](@ref) writes the rows.
 
-# Mathematical definition
+# JuMP formulation
 
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w}}{\\min} &\\quad \\left\\lVert \\boldsymbol{w} - \\boldsymbol{w}_{0} \\right\\rVert_{1}\\,, \\\\
-\\textrm{s.t.} &\\quad \\boldsymbol{1}^\\intercal \\boldsymbol{w} = \\boldsymbol{1}^\\intercal \\boldsymbol{w}_{0}\\,, \\\\
-&\\quad \\boldsymbol{l} \\leq \\boldsymbol{w} \\leq \\boldsymbol{u}\\,.
-\\end{align}
-```
+## Variables
+
+  - `z`: One auxiliary variable for each entry of `r`, created with no key, only for an [`LpNorm`](@ref) of an order other than `2` and `Inf`.
+
+## Constraints
+
+The rows that `alg` selects:
+
+  - [`L1Norm`](@ref): ``(s_c t,\\, s_c \\boldsymbol{r}) \\in \\mathcal{K}_{1}``.
+  - [`L2Norm`](@ref) and [`SquaredL2Norm`](@ref): ``(s_c t,\\, s_c \\boldsymbol{r}) \\in \\mathcal{K}_{2}``.
+  - [`LInfNorm`](@ref): ``(s_c t,\\, s_c \\boldsymbol{r}) \\in \\mathcal{K}_{\\infty}``.
+  - [`LpNorm`](@ref): ``(s_c z_{i},\\, s_c t,\\, s_c r_{i}) \\in \\mathcal{P}_{1/p}`` for each ``i``, and ``s_c (\\boldsymbol{1}^\\intercal \\boldsymbol{z} - t) = 0``. At ``p = 2`` and ``p = \\infty`` it is the row of [`L2Norm`](@ref) or of [`LInfNorm`](@ref).
 
 Where:
 
-  - $(math_dict[:w_port])
-  - $(math_dict[:w_0_finaliser])
-  - $(math_dict[:lb_ub_finaliser])
-  - ``\\boldsymbol{1}``: Vector of ones.
+  - ``t``: The bound on the norm.
+  - ``\\boldsymbol{r}``: The residual.
+  - $(math_dict[:sc_scale])
+  - $(math_dict[:K_q_norm])
+  - ``\\mathcal{P}_{a}``: The power cone ``\\{(x, y, z) : x^{a} y^{1 - a} \\geq \\lvert z \\rvert,\\, x, y \\geq 0\\}``.
 
-# Constructors
+# Arguments
 
-    AbsoluteErrorWeightFinaliser() -> AbsoluteErrorWeightFinaliser
+  - `model`: The JuMP model. It must already hold the constraint scale `sc`.
+  - `t`: The bound on the norm.
+  - `r`: The residual.
+  - `alg`: The norm.
 
-# Examples
+# Returns
 
-```jldoctest
-julia> AbsoluteErrorWeightFinaliser()
-AbsoluteErrorWeightFinaliser()
-```
-
-# Related
-
-  - [`JuMPWeightFinaliserFormulation`](@ref)
-  - [`RelativeErrorWeightFinaliser`](@ref)
-  - [`SquaredRelativeErrorWeightFinaliser`](@ref)
-  - [`SquaredAbsoluteErrorWeightFinaliser`](@ref)
-  - [`JuMPWeightFinaliser`](@ref)
-"""
-struct AbsoluteErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Selects the L2 norm of the absolute weight deviation as the objective of a JuMP weight finaliser.
-
-The name comes from the squared error. The programme minimises the norm and not its square, and the two have the same minimiser because the square increases on non-negative values. So the value of the objective is the L2 norm.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w}}{\\min} &\\quad \\left\\lVert \\boldsymbol{w} - \\boldsymbol{w}_{0} \\right\\rVert_{2}\\,, \\\\
-\\textrm{s.t.} &\\quad \\boldsymbol{1}^\\intercal \\boldsymbol{w} = \\boldsymbol{1}^\\intercal \\boldsymbol{w}_{0}\\,, \\\\
-&\\quad \\boldsymbol{l} \\leq \\boldsymbol{w} \\leq \\boldsymbol{u}\\,.
-\\end{align}
-```
-
-Where:
-
-  - $(math_dict[:w_port])
-  - $(math_dict[:w_0_finaliser])
-  - $(math_dict[:lb_ub_finaliser])
-  - ``\\boldsymbol{1}``: Vector of ones.
-
-The minimiser is the Euclidean projection of ``\\boldsymbol{w}_{0}`` onto the feasible set, which [`EuclideanWeightFinaliser`](@ref) finds with no solver. Where the bounds bind none of the free weights, the minimiser is ``w_{i} = w_{0,i} + c``, with one ``c`` that restores the budget.
-
-# Constructors
-
-    SquaredAbsoluteErrorWeightFinaliser() -> SquaredAbsoluteErrorWeightFinaliser
-
-# Examples
-
-```jldoctest
-julia> SquaredAbsoluteErrorWeightFinaliser()
-SquaredAbsoluteErrorWeightFinaliser()
-```
+  - `(cone, csum, z)`: The cone row or rows, the sum row and the auxiliary variables. `csum` and `z` are `nothing` off the power cone route.
 
 # Related
 
-  - [`JuMPWeightFinaliserFormulation`](@ref)
-  - [`RelativeErrorWeightFinaliser`](@ref)
-  - [`SquaredRelativeErrorWeightFinaliser`](@ref)
-  - [`AbsoluteErrorWeightFinaliser`](@ref)
-  - [`JuMPWeightFinaliser`](@ref)
+  - [`ErrorWeightFinaliser`](@ref)
+  - [`NormError`](@ref)
+  - [`norm_epigraph!`](@ref)
 """
-struct SquaredAbsoluteErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
+function set_norm_error_epigraph!(model::JuMP.Model, t, r::AbstractVector, ::L1Norm)
+    return norm_epigraph!(model, t, r, 1, get_constraint_scale(model))
+end
+function set_norm_error_epigraph!(model::JuMP.Model, t, r::AbstractVector,
+                                  ::Union{L2Norm, SquaredL2Norm})
+    return norm_epigraph!(model, t, r, 2, get_constraint_scale(model))
+end
+function set_norm_error_epigraph!(model::JuMP.Model, t, r::AbstractVector, ::LInfNorm)
+    return norm_epigraph!(model, t, r, Inf, get_constraint_scale(model))
+end
+function set_norm_error_epigraph!(model::JuMP.Model, t, r::AbstractVector, alg::LpNorm)
+    return norm_epigraph!(model, t, r, alg.p, get_constraint_scale(model))
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -333,7 +471,7 @@ $(DocStringExtensions.FIELDS)
         slv::Slv_VecSlv,
         sc::Number = 1.0,
         so::Number = 1.0,
-        alg::JuMPWeightFinaliserFormulation = RelativeErrorWeightFinaliser()
+        alg::JuMPWeightFinaliserFormulation = ErrorWeightFinaliser()
     ) -> JuMPWeightFinaliser
 
 Keywords correspond to the struct's fields.
@@ -356,7 +494,10 @@ JuMPWeightFinaliser
       │   add_bridges ┴ Bool: true
    sc ┼ Float64: 1.0
    so ┼ Float64: 1.0
-  alg ┴ RelativeErrorWeightFinaliser()
+  alg ┼ ErrorWeightFinaliser
+      │   alg ┼ L1Norm
+      │       │   ddof ┴ Int64: 0
+      │   dev ┴ RelativeWeightDeviation()
 ```
 
 # Related
@@ -393,33 +534,28 @@ JuMPWeightFinaliser
     end
 end
 function JuMPWeightFinaliser(; slv::Slv_VecSlv, sc::Number = 1.0, so::Number = 1.0,
-                             alg::JuMPWeightFinaliserFormulation = RelativeErrorWeightFinaliser())::JuMPWeightFinaliser
+                             alg::JuMPWeightFinaliserFormulation = ErrorWeightFinaliser())::JuMPWeightFinaliser
     return JuMPWeightFinaliser(slv, sc, so, alg)
 end
 """
     set_clustering_weight_finaliser_alg!(model::JuMP.Model,
-                                         alg::JuMPWeightFinaliserFormulation,
+                                         alg::ErrorWeightFinaliser,
                                          wi::VecNum)
 
 Adds the deviation objective of `alg` to the weight finalisation model.
 
-[`opt_weight_bounds`](@ref) adds the weights `w`, the budget row and the bound rows before it calls this function. The two relative formulations divide by `wi`, so they replace each zero entry of a copy of `wi` with `eps(eltype(wi))`. They do not change `wi`.
+[`opt_weight_bounds`](@ref) adds the weights `w`, the budget row and the bound rows before it calls this function. A [`RelativeWeightDeviation`](@ref) divides by `wi`, so [`weight_deviation`](@ref) replaces each zero entry of a copy of `wi` with `eps(eltype(wi))`. It does not change `wi`.
 
 # JuMP formulation
 
 ## Variables
 
   - `w`: The weights, read from the model.
-  - `t`: The bound on the deviation, created with no key.
+  - `t`: The bound on the deviation, created.
 
 ## Constraints
 
-One unnamed row, which `alg` selects:
-
-  - [`RelativeErrorWeightFinaliser`](@ref): ``(s_c t,\\, s_c (\\boldsymbol{w} \\oslash \\tilde{\\boldsymbol{w}}_{0} - \\boldsymbol{1})) \\in \\mathcal{K}_{1}``.
-  - [`SquaredRelativeErrorWeightFinaliser`](@ref): ``(s_c t,\\, s_c (\\boldsymbol{w} \\oslash \\tilde{\\boldsymbol{w}}_{0} - \\boldsymbol{1})) \\in \\mathcal{K}_{2}``.
-  - [`AbsoluteErrorWeightFinaliser`](@ref): ``(s_c t,\\, s_c (\\boldsymbol{w} - \\boldsymbol{w}_{0})) \\in \\mathcal{K}_{1}``.
-  - [`SquaredAbsoluteErrorWeightFinaliser`](@ref): ``(s_c t,\\, s_c (\\boldsymbol{w} - \\boldsymbol{w}_{0})) \\in \\mathcal{K}_{2}``.
+  - The rows of [`set_norm_error_epigraph!`](@ref) for the norm `alg.alg`, which bound the norm of the residual ``\\boldsymbol{d}`` by ``t``. They are unnamed.
 
 ## Objective
 
@@ -429,18 +565,17 @@ Where:
 
   - $(math_dict[:w_port])
   - $(math_dict[:w_0_finaliser])
+  - ``\\boldsymbol{d}``: The residual of [`weight_deviation`](@ref) for `alg.dev`, ``\\boldsymbol{w} \\oslash \\tilde{\\boldsymbol{w}}_{0} - \\boldsymbol{1}`` for a [`RelativeWeightDeviation`](@ref), and ``\\boldsymbol{w} - \\boldsymbol{w}_{0}`` for an [`AbsoluteWeightDeviation`](@ref).
   - ``\\tilde{\\boldsymbol{w}}_{0}``: ``\\boldsymbol{w}_{0}`` with each zero entry replaced by `eps(eltype(wi))`, so that the division is defined.
   - ``t``: Bound on the norm of the deviation.
-  - $(math_dict[:sc_scale])
   - $(math_dict[:so_scale])
-  - $(math_dict[:K_q_norm])
   - $(math_dict[:oslash])
   - ``\\boldsymbol{1}``: Vector of ones.
 
 # Arguments
 
   - `model`: The JuMP model. It must already hold `w` and the two scales `sc` and `so`.
-  - `alg`: The deviation, one of the four [`JuMPWeightFinaliserFormulation`](@ref) subtypes.
+  - `alg`: The deviation and its norm.
   - `wi`: The weights that the optimisation produced.
 
 # Returns
@@ -453,59 +588,13 @@ Where:
   - [`JuMPWeightFinaliser`](@ref)
   - [`opt_weight_bounds`](@ref)
 """
-function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
-                                              ::RelativeErrorWeightFinaliser, wi::VecNum)
-    mask = iszero.(wi)
-    if any(mask)
-        wi = copy(wi)
-        wi[mask] .= eps(eltype(wi))
-    end
-    w = get_w(model)
-    sc = get_constraint_scale(model)
-    so = get_objective_scale(model)
-    JuMP.@variable(model, t)
-    JuMP.@constraint(model,
-                     [sc * t;
-                      sc * (w ⊘ wi .- one(eltype(wi)))] in
-                     JuMP.MOI.NormOneCone(length(w) + 1))
-    JuMP.@objective(model, Min, so * t)
-    return nothing
-end
-function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
-                                              ::SquaredRelativeErrorWeightFinaliser,
-                                              wi::VecNum)
-    mask = iszero.(wi)
-    if any(mask)
-        wi = copy(wi)
-        wi[mask] .= eps(eltype(wi))
-    end
-    w = get_w(model)
-    sc = get_constraint_scale(model)
-    so = get_objective_scale(model)
-    JuMP.@variable(model, t)
-    JuMP.@constraint(model,
-                     [sc * t; sc * (w ⊘ wi .- one(eltype(wi)))] in JuMP.SecondOrderCone())
-    JuMP.@objective(model, Min, so * t)
-    return nothing
-end
-function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
-                                              ::AbsoluteErrorWeightFinaliser, wi::VecNum)
-    w = get_w(model)
-    sc = get_constraint_scale(model)
-    so = get_objective_scale(model)
-    JuMP.@variable(model, t)
-    JuMP.@constraint(model, [sc * t; sc * (w - wi)] in JuMP.MOI.NormOneCone(length(w) + 1))
-    JuMP.@objective(model, Min, so * t)
-    return nothing
-end
-function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
-                                              ::SquaredAbsoluteErrorWeightFinaliser,
+function set_clustering_weight_finaliser_alg!(model::JuMP.Model, alg::ErrorWeightFinaliser,
                                               wi::VecNum)
     w = get_w(model)
-    sc = get_constraint_scale(model)
     so = get_objective_scale(model)
     JuMP.@variable(model, t)
-    JuMP.@constraint(model, [sc * t; sc * (w - wi)] in JuMP.SecondOrderCone())
+    set_norm_error_epigraph!(model, t, weight_deviation(alg.dev, w, wi, one(eltype(wi))),
+                             alg.alg)
     JuMP.@objective(model, Min, so * t)
     return nothing
 end
@@ -603,7 +692,8 @@ function opt_weight_bounds(wf::JuMPWeightFinaliser, wb::WeightBounds, wi::VecNum
     return if optimise_JuMP_model!(model, wf.slv).success
         JuMP.value.(get_w(model))
     else
-        @warn("The weight finalisation model of $(wf.alg) could not be solved, so the weights are finalised with IterativeWeightFinaliser() instead.")
+        @warn("The weight finalisation model of $(wf.alg) could not be solved, so the weights are finalised with IterativeWeightFinaliser() instead.",
+              maxlog = log_limit(:warn), _id = @log_id(typeof(wf.alg)))
         opt_weight_bounds(IterativeWeightFinaliser(), wb, wi)
     end
 end
@@ -649,8 +739,8 @@ function finalise_weight_bounds(wf::WeightFinaliser, wb::WeightBounds, w::VecNum
     return retcode, w
 end
 
-export IterativeWeightFinaliser, RelativeErrorWeightFinaliser,
-       SquaredRelativeErrorWeightFinaliser, AbsoluteErrorWeightFinaliser,
-       SquaredAbsoluteErrorWeightFinaliser, JuMPWeightFinaliser
+export IterativeWeightFinaliser, RelativeWeightDeviation, AbsoluteWeightDeviation,
+       ErrorWeightFinaliser, JuMPWeightFinaliser
 public JuMPWeightFinaliserFormulation, set_clustering_weight_finaliser_alg!,
-       WeightFinaliser, opt_weight_bounds
+       WeightFinaliser, opt_weight_bounds, WeightDeviation, weight_deviation,
+       deviation_error_term

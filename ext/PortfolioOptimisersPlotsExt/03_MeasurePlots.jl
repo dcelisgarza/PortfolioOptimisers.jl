@@ -72,9 +72,7 @@ function PortfolioOptimisers.plot_measures(res_vec::AbstractVector{<:Optimisatio
                 kwargs...)
     end
 end
-function PortfolioOptimisers.plot_measures(ppred::Union{<:PredictionResult,
-                                                        <:MultiPeriodPredictionResult,
-                                                        <:PopulationPredictionResult};
+function PortfolioOptimisers.plot_measures(ppred::PortfolioOptimisers.AbstractPredictionResult;
                                            x::PortfolioOptimisers.BaseRM_VecBaseRM = ConditionalValueatRisk(),
                                            y::PortfolioOptimisers.BaseRM_VecBaseRM = MeanReturn(),
                                            z::Option{<:PortfolioOptimisers.BaseRM_VecBaseRM} = nothing,
@@ -186,8 +184,7 @@ end
 # Every other arity computes the summary through `performance_summary`, whose own methods
 # validate it, and renders it through the method above; the four summary keywords go to the
 # summary and the rest to the bars.
-function PortfolioOptimisers.plot_performance_summary(x::Union{<:ArrNum,
-                                                               <:OptimisationResult},
+function PortfolioOptimisers.plot_performance_summary(x::Union{ArrNum, OptimisationResult},
                                                       args...; ppy::Number = 1,
                                                       alpha::Number = 0.05,
                                                       compound::Bool = false,

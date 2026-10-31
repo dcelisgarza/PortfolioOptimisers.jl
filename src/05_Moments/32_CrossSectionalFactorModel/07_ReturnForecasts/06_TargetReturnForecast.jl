@@ -702,6 +702,31 @@ function target_forecast_samples(S::Arr3Num, y::MatNum, w::MatNum, nt::Integer)
     return Sf, yf, ok
 end
 """
+    target_forecast_target(rfe::TargetReturnForecast, Sf::MatNum) -> AbstractRegressionTarget
+
+Return the regression target that a [`TargetReturnForecast`](@ref) fits on its flattened design.
+
+Under `intercept`, [`target_forecast_design`](@ref) appends the column of ones after the scores, so it is the last column of the flattened design. The function names it with [`InterceptColumn`](@ref), so that a penalised target such as [`ElasticNet`](@ref) does not shrink the intercept. An unpenalised target ignores the call. Without `intercept`, the function returns `rfe.tgt`.
+
+# Arguments
+
+  - `rfe`: Target Return Forecast Estimator.
+  - `Sf`: The flattened design, one column per score and the column of ones last under `intercept`.
+
+# Returns
+
+  - `tgt::AbstractRegressionTarget`: The target of every fit of the member.
+
+# Related
+
+  - [`TargetReturnForecast`](@ref)
+  - [`InterceptColumn`](@ref)
+  - [`target_forecast_fit`](@ref)
+"""
+function target_forecast_target(rfe::TargetReturnForecast, Sf::MatNum)
+    return rfe.intercept ? factory(rfe.tgt, InterceptColumn(size(Sf, 2))) : rfe.tgt
+end
+"""
     target_forecast_fit(rfe::TargetReturnForecast, Sf::MatNum, yf::VecNum,
                         ok::AbstractVector{Bool}) -> Option
 
@@ -733,7 +758,7 @@ function target_forecast_fit(rfe::TargetReturnForecast, Sf::MatNum, yf::VecNum,
         return nothing
     end
     idx = findall(ok)
-    return StatsAPI.fit(rfe.tgt, Sf[idx, :], yf[idx])
+    return StatsAPI.fit(target_forecast_target(rfe, Sf), Sf[idx, :], yf[idx])
 end
 """
     target_forecast_uncalibrated(cv::Nothing, rfe::TargetReturnForecast, model,
@@ -797,10 +822,11 @@ function target_forecast_uncalibrated(cv::CrossValidationEstimator,
     yv = yf[idx]
     q = fill(Tf(NaN), m)
     fld = Base.split(cv, rdx)
+    tgt = target_forecast_target(rfe, Sf)
     for k in eachindex(fld.train_idx)
         tr = fld.train_idx[k]
         te = fld.test_idx[k]
-        q[te] = StatsAPI.predict(StatsAPI.fit(rfe.tgt, Sv[tr, :], yv[tr]), Sv[te, :])
+        q[te] = StatsAPI.predict(StatsAPI.fit(tgt, Sv[tr, :], yv[tr]), Sv[te, :])
     end
     p[idx] = q
     return p
@@ -808,7 +834,8 @@ end
 function target_forecast_uncalibrated(::PrequentialCalibration, rfe::TargetReturnForecast,
                                       ::Any, Sf::MatNum, yf::VecNum,
                                       ok::AbstractVector{Bool}, N::Integer)::VecNum
-    return target_forecast_prequential(rfe.tgt, rfe.lag + rfe.horizon - 1, Sf, yf, ok, N)
+    return target_forecast_prequential(target_forecast_target(rfe, Sf),
+                                       rfe.lag + rfe.horizon - 1, Sf, yf, ok, N)
 end
 """
     target_forecast_insample(model, Sf::MatNum, ok::AbstractVector{Bool}) -> VecNum

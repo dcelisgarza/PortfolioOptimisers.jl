@@ -32,4 +32,5 @@ port_opt_view(csr::CrossSectionalRegression, i, args...)
 cross_sectional_solve
 cross_sectional_target_solve
 assert_cross_sectional_target_solve
+cross_sectional_rank
 ```

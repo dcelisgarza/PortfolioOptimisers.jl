@@ -1,34 +1,29 @@
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Shared preamble for windowed moment estimators (matrix input).
+Cut the returns matrix, the observation weights and the per-observation arguments of a windowed moment call to its window.
 
-Whenever a window is given — an `Int`, which resolves to a range, or an explicit index
-vector — `iv`, and the `active_mask` and `estimation_mask` keywords, are subset to the same
-rows, or columns when `dims = 2`, so they stay aligned with the windowed returns. Only
-`window = nothing`, which resolves to a `Colon`, leaves them unchanged.
+A window that is an `Int` or an index vector cuts `iv`, `active_mask` and `estimation_mask` to the rows that it keeps in `X`, or to the columns when `dims = 2`. These arguments then align with the windowed returns. A `window` of `nothing` cuts nothing.
 
 # Algorithm
 
- 1. Resolve `window` with [`get_window`](@ref), giving `win`. `nothing` resolves to a `Colon`, an `Int` to the range of the last `window` observations, and an index vector passes through.
- 2. Apply `win` to `X` and rebind the observation weights to it with [`moment_window_and_weights`](@ref), giving the windowed `X` and `w_new`.
- 3. Build `inner`, a copy of `est` that carries `w_new`, with [`factory`](@ref).
- 4. Cut `iv` to `win` with [`windowed_rows`](@ref), and cut the row-aligned keywords with [`windowed_keywords`](@ref), giving `kw`.
- 5. Return `inner`, the windowed `X`, `iv` and `kw`.
+ 1. Check `dims` with [`assert_dims`](@ref).
+ 2. Resolve `window` to `win` with [`get_window`](@ref). `nothing` resolves to a `Colon`, an `Int` to the range of the last `window` observations, and an index vector to itself.
+ 3. Cut `X` to `win`, and resolve the observation weights `w_new` over the cut `X`, with [`moment_window_and_weights`](@ref).
+ 4. Make `inner`, a copy of `est` that holds `w_new`, with [`factory`](@ref).
+ 5. Cut `iv` to `win` with [`windowed_rows`](@ref).
+ 6. Cut the two universe masks in `kwargs` to `win` with [`windowed_keywords`](@ref). The result is `kw`.
+ 7. Return `inner`, the cut `X`, the cut `iv` and `kw`.
 
 # Arguments
 
-  - `est`: Wrapped moment estimator to be cloned with updated weights.
-  - `w`: Optional observation weights applied after windowing.
-  - `window`: Window specification — `nothing` (full data), an `Int` (last `window`
-    observations), or a `VecInt` of explicit row/column indices.
-  - `X`: Data matrix of asset returns.
-  - `iv`: Optional instrument variable matrix; subsetted to the window when `window` is a
-    `VecInt`.
-  - `dims`: Observation dimension — 1 for rows (default), 2 for columns. Checked by
-    [`assert_dims`](@ref), so every generated windowed method rejects an out-of-range `dims`
-    instead of silently resolving a one-observation window.
-  - `kwargs...`: Passed through to [`moment_window_and_weights`](@ref), and returned as `kw` with the masks cut.
+  - `est`: Inner moment estimator. The function copies it with the windowed observation weights.
+  - $(arg_dict[:oow]) The function cuts it to the window before it resolves it.
+  - $(arg_dict[:window]) `nothing` selects every observation.
+  - $(arg_dict[:X])
+  - $(arg_dict[:oiv]) The function cuts it to the window.
+  - $(arg_dict[:dims])
+  - `kwargs...`: Keywords for [`moment_window_and_weights`](@ref). The function also returns them as `kw`, with the two universe masks cut to the window.
 
 # Validation
 
@@ -36,8 +31,7 @@ rows, or columns when `dims = 2`, so they stay aligned with the windowed returns
 
 # Returns
 
-  - `(inner, X, iv, kw)`: Weight-updated estimator, windowed returns matrix, (possibly
-    subsetted) instrument variable matrix, and the keywords with the masks cut to the window.
+  - `(inner, X, iv, kw)`: The copy of `est` with the windowed weights, the windowed returns, the windowed `iv` or `nothing`, and the keywords with the two masks cut to the window.
 
 # Related
 
@@ -65,29 +59,27 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Shared preamble for windowed moment estimators (vector input).
+Cut the returns vector and the observation weights of a windowed moment call to its window.
 
-This method takes no `dims`, because a vector carries one axis, and no `iv`, because no
-vector generic of the family declares one.
+This method takes no `dims`, because a vector has one axis. It takes no `iv`, because no vector method of a windowed estimator takes one.
 
 # Algorithm
 
- 1. Resolve `window` with [`get_window`](@ref), giving `win`. `nothing` resolves to a `Colon`, an `Int` to the range of the last `window` observations, and an index vector passes through.
- 2. Apply `win` to `X` and rebind the observation weights to it with [`moment_window_and_weights`](@ref), giving the windowed `X` and `w_new`.
- 3. Build `inner`, a copy of `est` that carries `w_new`, with [`factory`](@ref).
- 4. Return `inner` and the windowed `X`.
+ 1. Resolve `window` to `win` with [`get_window`](@ref), as the matrix method does.
+ 2. Cut `X` to `win`, and resolve the observation weights `w_new` over the cut `X`, with [`moment_window_and_weights`](@ref).
+ 3. Make `inner`, a copy of `est` that holds `w_new`, with [`factory`](@ref).
+ 4. Return `inner` and the cut `X`.
 
 # Arguments
 
-  - `est`: Wrapped moment estimator to be cloned with updated weights.
-  - `w`: Optional observation weights applied after windowing.
-  - `window`: Window specification — `nothing` (full data), an `Int` (last `window`
-    observations), or a `VecInt` of explicit indices.
-  - `X`: Data vector of returns.
+  - `est`: Inner moment estimator. The function copies it with the windowed observation weights.
+  - $(arg_dict[:oow]) The function cuts it to the window before it resolves it.
+  - $(arg_dict[:window]) `nothing` selects every observation.
+  - $(arg_dict[:Xv])
 
 # Returns
 
-  - `(inner, X)`: Weight-updated estimator and windowed returns vector.
+  - `(inner, X)`: The copy of `est` with the windowed weights, and the windowed returns.
 
 # Related
 
@@ -109,16 +101,16 @@ end
     windowed_rows(x::AbstractMatrix, win::Colon, dims::Int) -> AbstractMatrix
     windowed_rows(x::AbstractMatrix, win::VecInt, dims::Int) -> SubArray
 
-Cut a matrix that pairs each observation of the returns with one row, or with one column when `dims = 2`, to the observations of a resolved window.
+Cut a matrix with one row for each observation, or one column when `dims = 2`, to the observations of a resolved window.
 
-The instrument variables and the two universe masks carry one entry per observation, so a window that cuts the returns must cut them too, or they no longer line up.
+The implied volatility matrix `iv` and the two universe masks have one entry for each observation. A window that cuts the returns must cut them too. If it does not, their rows do not align with the rows of the returns.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
  1. `x` is `nothing`: return `nothing`.
- 2. `win` is a `Colon`: return `x` unchanged, so the full-data case never copies it.
+ 2. `win` is a `Colon`: return `x` unchanged.
  3. `win` is an index vector: return a view of the rows of `x` in `win`, or of its columns when `dims == 2`.
 
 # Arguments
@@ -149,14 +141,14 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Cut the row-aligned keywords of a windowed moment call to the observations of a resolved window.
+Cut the two universe mask keywords of a windowed moment call to the observations of a resolved window.
 
-A mask-aware estimator, such as [`ExpWeightedCovariance`](@ref), takes an `active_mask` keyword, and a regime-adjusted one also takes an `estimation_mask` keyword. Each has the size of the returns. The wrapper cuts the returns to the window, so it cuts these two keywords with them. Every other keyword passes through unchanged, and a keyword the caller did not give is not added.
+A mask-aware estimator, such as [`ExpWeightedCovariance`](@ref), takes an `active_mask` keyword. A regime-adjusted estimator also takes an `estimation_mask` keyword. Each mask has the size of the returns. The windowed estimator cuts the returns to the window, so the function cuts the two masks with them. It passes every other keyword unchanged, and it adds no keyword that the caller did not give.
 
 # Algorithm
 
- 1. Read the keywords as a `NamedTuple`, giving `kw`.
- 2. Cut the entries named `active_mask` and `estimation_mask` with [`windowed_rows`](@ref), and keep every other entry.
+ 1. Read the keywords as the `NamedTuple` `kw`.
+ 2. Cut the entries `active_mask` and `estimation_mask` with [`windowed_rows`](@ref). Keep every other entry.
  3. Return the entries under the names of `kw`.
 
 # Arguments
@@ -187,7 +179,7 @@ end
 
 Cut an Asset Panel to the observations of a resolved window.
 
-The panel method of a windowed estimator cuts the returns to the window, and gives the inner estimator the panel over the same observations. So a mask-aware inner estimator reads the active mask of the rows it fits, and a plain inner estimator reduces to the Coverage Universe of the window, not of the whole sample. The panel always holds its observations on the rows, whatever the orientation of the returns.
+The panel method of a windowed estimator cuts the returns to the window. It gives the inner estimator the panel over the same observations. So a mask-aware inner estimator reads the active mask of the rows that it fits. A plain inner estimator reduces to the Coverage Universe of the window, not of the whole sample. The panel holds its observations on the rows for each orientation of the returns.
 
 # Algorithm
 
@@ -222,21 +214,21 @@ end
     windowed_series_rows(window::Integer, t::Integer) -> UnitRange
     windowed_series_rows(window::VecInt, t::Integer) -> VecInt
 
-The observations that a windowed estimator keeps when it is fitted on observations `1` to `t`.
+Return the observations that a windowed estimator keeps in a fit on the observations `1` to `t`.
 
-Row `t` of a variance series is a fit on the first `t` observations. A windowed estimator keeps the observations of its window among them, so row `t` of its series reads nothing after `t`.
+Row `t` of a variance series is a fit on the first `t` observations. A windowed estimator keeps the observations of its window among them, so row `t` of its series reads no observation after `t`.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
  1. `window` is `nothing`: keep `1:t`.
- 2. `window` is an `Int`: keep the last `window` observations of `1:t`, that is `max(1, t - window + 1):t`.
- 3. `window` is an index vector: keep its entries that are at most `t`, in their order. The result is empty before the first entry.
+ 2. `window` is an `Int`: keep the last `window` observations of `1:t`, which are `max(1, t - window + 1):t`.
+ 3. `window` is an index vector: keep its entries that are at most `t`, in their order. The result is empty when `t` is less than the first entry.
 
 # Arguments
 
-  - `window`: The window of the estimator.
+  - $(arg_dict[:window]) `nothing` selects every observation.
   - `t`: The last observation of the fit.
 
 # Returns
@@ -261,23 +253,23 @@ end
     windowed_series_row(est, w, rows, X, pnl::Nothing; dims::Int = 1, kwargs...)
     windowed_series_row(est, w, rows, X, pnl::AssetPanel; dims::Int = 1, kwargs...)
 
-Fit the variance of a windowed estimator on the observations `rows`, as one row of its variance series.
+Fit the variance of the inner estimator of a windowed estimator on the observations `rows`, as one row of its variance series.
 
 # Algorithm
 
- 1. Cut `X`, the observation weights and the row-aligned keywords to `rows` with [`windowed_preamble`](@ref), giving `inner`, `Xt` and `kw`.
- 2. `pnl` is `nothing`: call `Statistics.var(inner, Xt; dims, kw...)`. `pnl` is an Asset Panel: call its panel method on the panel over `rows`, from [`windowed_panel`](@ref).
+ 1. Cut `X`, the observation weights and the two universe masks to `rows` with [`windowed_preamble`](@ref). The results are `inner`, `Xt` and `kw`.
+ 2. `pnl` is `nothing`: call `Statistics.var(inner, Xt; dims, kw...)`. `pnl` is an Asset Panel: call the panel method of `Statistics.var` with the panel over `rows`, from [`windowed_panel`](@ref).
  3. Return the result as a vector.
 
 # Arguments
 
   - `est`: The inner estimator of the windowed estimator.
-  - `w`: Its observation weights, one per observation of `X`, or `nothing`.
+  - $(arg_dict[:oow])
   - `rows`: The observations of the fit, from [`windowed_series_rows`](@ref).
   - $(arg_dict[:X])
   - $(arg_dict[:pnl_moment])
   - $(arg_dict[:dims])
-  - `kwargs...`: Keywords passed to the variance estimator. The two universe masks are cut to `rows`.
+  - `kwargs...`: Keywords for the variance estimator. The function cuts the two universe masks to `rows`.
 
 # Returns
 
@@ -303,45 +295,55 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Compute the point-in-time variance series of a windowed estimator.
 
-Row `t` of a variance series is the estimate that the estimator gives when it is fitted on the observations `1` to `t`. A windowed estimator keeps the last observations of its window, so row `t` is a fit on the window that ends at `t`: the window rolls with `t`. Row `t` thus reads nothing after `t`, and the last row equals the batch fit of the estimator on the whole sample.
-
-Before the window is full, row `t` keeps every observation from `1` to `t`. An index-vector window keeps its entries up to `t`, and a row before its first entry is `NaN`.
+Row `t` of a variance series is the estimate of the estimator on the observations `1` to `t`. A windowed estimator keeps the last observations of its window, so row `t` is a fit on the window that ends at `t`. The window moves with `t`. Row `t` reads no observation after `t`, and the last row equals the batch fit of the estimator on the whole sample.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-v_{t,\\,i} &= \\left[ \\hat{\\boldsymbol{\\sigma}}^{2}\\left( \\mathbf{X}_{\\mathcal{W}_{t},\\,\\cdot} \\right) \\right]_{i}\\,, \\\\
-\\mathcal{W}_{t} &= \\left\\{ \\max(1,\\, t - n + 1),\\, \\ldots,\\, t \\right\\}\\,.
+\\mathbf{V}_{tj} &= \\hat{\\sigma}^2_j\\left(\\mathbf{X}_{\\mathcal{W}_{t}}\\right)\\,, \\\\
+\\mathcal{W}_{t} &= \\begin{cases}
+\\left\\{1,\\, \\ldots,\\, t\\right\\} & \\text{without a window}\\,, \\\\
+\\left\\{\\max(1,\\, t - n + 1),\\, \\ldots,\\, t\\right\\} & \\text{for a window of } n \\text{ observations}\\,, \\\\
+\\left\\{s \\in \\mathcal{S} : s \\leq t\\right\\} & \\text{for a window of the indices } \\mathcal{S}\\,.
+\\end{cases}
 \\end{align}
 ```
 
 Where:
 
-  - ``v_{t,\\,i}``: Entry of the series for asset ``i`` at observation ``t``.
-  - ``\\mathcal{W}_{t}``: Observations that the window keeps at ``t``, for a window of ``n`` observations.
-  - ``\\mathbf{X}_{\\mathcal{W}_{t},\\,\\cdot}``: Rows of the returns matrix in ``\\mathcal{W}_{t}``, with the active mask of the same rows.
-  - ``\\hat{\\boldsymbol{\\sigma}}^{2}(\\cdot)``: Variance vector that the inner estimator fits on a block, indexed by asset.
+  - $(math_dict[:V_tj_series])
+  - $(math_dict[:sigma2_hat_j]) Here the inner estimator estimates it.
+  - ``\\mathbf{X}_{\\mathcal{W}_{t}}``: Rows of the returns matrix in ``\\mathcal{W}_{t}``, with the active mask of the same rows.
+  - ``\\mathcal{W}_{t}``: Observations that the window keeps at ``t``.
+  - ``n``: Number of observations in the window.
+  - ``\\mathcal{S}``: Indices of the observations that an index window selects.
+
+``\\mathbf{V}_{tj}`` is `NaN` when ``\\mathcal{W}_{t}`` is empty. Before an integer window is full, ``\\mathcal{W}_{t}`` holds every observation from ``1`` to ``t``.
 
 # Algorithm
 
- 1. Fit row `T`, the last observation, with [`windowed_series_row`](@ref) on the rows from [`windowed_series_rows`](@ref), and allocate the frame from its element type.
- 2. For each earlier observation `t`, fit row `t` the same way. A row that keeps no observation is `NaN`.
- 3. Return the series, transposed when `dims == 2`.
+ 1. Check `dims` with [`assert_dims`](@ref).
+ 2. Fit row `T`, the last observation, with [`windowed_series_row`](@ref) on the rows from [`windowed_series_rows`](@ref). The result is `vT`.
+ 3. If row `1` keeps no observation, refuse an `Integer` or a `Rational` element type of `vT`. The rows that a window keeps grow with `t`, so a row holds `NaN` only in this case.
+ 4. Allocate the series `val` with the element type of `vT`, and write `vT` into row `T`.
+ 5. For each earlier observation `t`, fit row `t` the same way. A row that keeps no observation is `NaN`.
+ 6. Return `val`, transposed when `dims == 2`.
 
 # Arguments
 
   - `est`: The inner estimator of the windowed estimator.
-  - `w`: Its observation weights, one per observation of `X`, or `nothing`.
-  - `window`: The window of the estimator.
+  - $(arg_dict[:oow])
+  - $(arg_dict[:window]) `nothing` selects every observation.
   - $(arg_dict[:X])
   - $(arg_dict[:pnl_moment])
   - $(arg_dict[:dims])
-  - `kwargs...`: Keywords passed to the variance estimator. The two universe masks are cut to the rows of each fit.
+  - `kwargs...`: Keywords for the variance estimator. The function cuts the two universe masks to the rows of each fit.
 
 # Validation
 
   - $(val_dict[:dims])
+  - $(val_dict[:nan_series_window])
 
 # Returns
 
@@ -362,6 +364,11 @@ function windowed_variance_series(est, w::Option{<:ObsWeights},
     T = size(X, dims)
     vT = windowed_series_row(est, w, windowed_series_rows(window, T), X, pnl; dims = dims,
                              kwargs...)
+    # The rows that a window keeps grow with `t`, so a row with no observation exists when
+    # the first row has none.
+    @argcheck(!isempty(windowed_series_rows(window, 1)) ||
+              !(eltype(vT) <: Union{Integer, Rational}),
+              ArgumentError("the window keeps no observation of the first rows of the variance series, and those rows hold NaN. The element type $(eltype(vT)) of the variance cannot hold NaN. Convert the sample to a floating-point type, or start the index window at the first observation."))
     val = Matrix{eltype(vT)}(undef, T, length(vT))
     val[T, :] = vT
     for t in 1:(T - 1)
@@ -375,41 +382,46 @@ function windowed_variance_series(est, w::Option{<:ObsWeights},
     return isone(dims) ? val : permutedims(val)
 end
 """
-    const SeedWindowed = Union{<:WindowedExpectedReturns{<:Any, <:Any, <:Any, <:SeedWindow},
-                               <:WindowedCovariance{<:Any, <:Any, <:Any, <:SeedWindow},
-                               <:WindowedVariance{<:Any, <:Any, <:Any, <:SeedWindow},
-                               <:WindowedCoskewness{<:Any, <:Any, <:Any, <:SeedWindow},
-                               <:WindowedCokurtosis{<:Any, <:Any, <:Any, <:SeedWindow}}
+    const SeedWindowed = Union{WindowedExpectedReturns{<:Any, <:Any, <:Any, <:SeedWindow},
+                               WindowedCovariance{<:Any, <:Any, <:Any, <:SeedWindow},
+                               WindowedVariance{<:Any, <:Any, <:Any, <:SeedWindow},
+                               WindowedCoskewness{<:Any, <:Any, <:Any, <:SeedWindow},
+                               WindowedCokurtosis{<:Any, <:Any, <:Any, <:SeedWindow}}
 
-The windowed estimators under a [`SeedWindow`](@ref), the ones that fold.
+Groups the windowed estimators under a [`SeedWindow`](@ref), which are the windowed estimators that fold.
 
-The last type parameter of a windowed estimator is the type of its `rule` field, so the alias selects the rule by dispatch. A windowed estimator under a [`RollingWindow`](@ref) is not in it, and it does not fold.
+The fourth type parameter of a windowed estimator is the type of its `rule` field, so the alias selects the rule by dispatch. A windowed estimator under a [`RollingWindow`](@ref) is not in the group, and it does not fold.
 
 # Related
 
+  - [`WindowedExpectedReturns`](@ref)
+  - [`WindowedCovariance`](@ref)
+  - [`WindowedVariance`](@ref)
+  - [`WindowedCoskewness`](@ref)
+  - [`WindowedCokurtosis`](@ref)
   - [`SeedWindow`](@ref)
   - [`partial_fit!(est::SeedWindowed, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
-const SeedWindowed = Union{<:WindowedExpectedReturns{<:Any, <:Any, <:Any, <:SeedWindow},
-                           <:WindowedCovariance{<:Any, <:Any, <:Any, <:SeedWindow},
-                           <:WindowedVariance{<:Any, <:Any, <:Any, <:SeedWindow},
-                           <:WindowedCoskewness{<:Any, <:Any, <:Any, <:SeedWindow},
-                           <:WindowedCokurtosis{<:Any, <:Any, <:Any, <:SeedWindow}}
+const SeedWindowed = Union{WindowedExpectedReturns{<:Any, <:Any, <:Any, <:SeedWindow},
+                           WindowedCovariance{<:Any, <:Any, <:Any, <:SeedWindow},
+                           WindowedVariance{<:Any, <:Any, <:Any, <:SeedWindow},
+                           WindowedCoskewness{<:Any, <:Any, <:Any, <:SeedWindow},
+                           WindowedCokurtosis{<:Any, <:Any, <:Any, <:SeedWindow}}
 """
     partial_fit!(est::SeedWindowed, X::MatNum; dims::Int = 1, kwargs...)
     partial_fit!(est::SeedWindowed, x::VecNum; kwargs...)
 
 Fold a block of observations into a windowed estimator under a [`SeedWindow`](@ref).
 
-The first fold cuts the block to the window, as a batch fit does, and folds the rows that remain into the inner estimator. It returns the estimator with `window = nothing`, so the window is spent, and each later fold passes every row to the inner estimator. The estimator holds no state of its own: its inner estimator holds the state of the fold, and the spent window records that the first fold happened.
+The first fold cuts the block to the window, as a batch fit does, and folds the rows that remain into the inner estimator. It returns the estimator with `window = nothing`. Each later fold then passes every row to the inner estimator. The windowed estimator holds no state of its own. Its inner estimator holds the state of the fold, and the window of `nothing` records that the first fold happened.
 
-The vector method folds one observation as a matrix of one row. So a first fold of one observation keeps it when the window keeps the last row.
+The vector method folds one observation as a matrix of one row. It also changes each `Bool` vector keyword, such as a mask, to a matrix of one row. A first fold of one observation keeps it when the window keeps the last row.
 
 # Algorithm
 
- 1. Read the inner estimator, the first field that the declaration of the type sets, giving `inner`.
- 2. Resolve the window against the block with [`get_window`](@ref), giving `win`. After the first fold the window is `nothing`, and `win` is a `Colon`.
- 3. Cut the block with [`windowed_rows`](@ref), and cut the `active_mask` and `estimation_mask` keywords with [`windowed_keywords`](@ref).
+ 1. Read `inner`, the inner estimator. The declaration of each windowed type sets it as the first field.
+ 2. Resolve the window against the block to `win` with [`get_window`](@ref). After the first fold, the window is `nothing` and `win` is a `Colon`.
+ 3. Cut the block with [`windowed_rows`](@ref). Cut the `active_mask` and `estimation_mask` keywords with [`windowed_keywords`](@ref).
  4. Fold the cut block into `inner` with [`partial_fit!`](@ref).
  5. Return the estimator with the folded `inner` and `window = nothing`.
 
@@ -417,14 +429,14 @@ The vector method folds one observation as a matrix of one row. So a first fold 
 
   - `est`: Windowed estimator under a seed window.
   - $(arg_dict[:X])
-  - `x::VecNum`: One observation, with one entry per asset.
+  - `x::VecNum`: One observation, with one entry for each asset.
   - $(arg_dict[:dims])
-  - `kwargs...`: Keywords passed to the fold of the inner estimator. The two universe masks are cut to the window.
+  - `kwargs...`: Keywords for the fold of the inner estimator. The function cuts the two universe masks to the window.
 
 # Validation
 
-  - `est.w` is `nothing`, because a weight vector reweights every past observation when a new one arrives. An `ArgumentError` is thrown otherwise.
-  - The inner estimator folds, by [`supports_partial_fit`](@ref). An `ArgumentError` is thrown otherwise.
+  - `est.w` is `nothing`, because a vector of observation weights gives a new weight to each past observation when a new observation arrives. The function throws an `ArgumentError` otherwise.
+  - The inner estimator folds, by [`supports_partial_fit`](@ref). The function throws an `ArgumentError` otherwise.
   - $(val_dict[:dims])
 
 # Returns
@@ -458,9 +470,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Answers that a windowed estimator under a [`SeedWindow`](@ref) folds.
+Return `true`, because a windowed estimator under a [`SeedWindow`](@ref) folds.
 
-A prior that carries the observations, such as the carry of [`EmpiricalPrior`](@ref), folds each member that folds, and refits the others over its rows. A seed window must fold, because a refit keeps the rolling window. So the answer is `true` whatever the inner estimator, and the fold refuses an inner estimator that does not fold with an error that names it, not a silent refit.
+In a Carry Fold, a prior such as [`EmpiricalPrior`](@ref) folds each member that folds. It fits each other member again over the rows that it carries. A fit again over those rows cuts the window again, which is the rule of a [`RollingWindow`](@ref). So a seed window must fold, and the answer is `true` for each inner estimator. If the inner estimator does not fold, [`partial_fit!`](@ref) throws an error that names it, and the prior does not fit the estimator again.
 
 # Arguments
 
@@ -481,7 +493,41 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Names the `rule` field of a windowed estimator under a [`SeedWindow`](@ref), the end of the walk of [`seed_window_path`](@ref).
+[`SeedWindowed`](@ref) method of [`observation_count`](@ref).
+
+A windowed estimator under a [`SeedWindow`](@ref) keeps no state of its own, and its inner estimator holds the state of the fold. So the method reads the count of the inner estimator. That count is the number of rows that the inner estimator folded: the rows of the first block that the window kept, and every later row.
+
+# Arguments
+
+  - `est`: Windowed estimator under a seed window.
+
+# Validation
+
+  - The inner estimator holds a partial-fit state with a count, as [`observation_count`](@ref) states. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `n::Integer`: The number of observations that the inner estimator folded.
+
+# Related
+
+  - [`observation_count`](@ref)
+  - [`partial_fit!(est::SeedWindowed, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+"""
+function observation_count(est::SeedWindowed)
+    # The declaration of every windowed type sets the inner estimator as the first field.
+    return observation_count(getfield(est, 1))
+end
+# The inner estimator holds the state of the fold, as for `observation_count` above.
+function effective_observation_count(est::SeedWindowed; kwargs...)
+    return effective_observation_count(getfield(est, 1); kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `"rule"`, the path to the seed window inside a windowed estimator under a [`SeedWindow`](@ref).
+
+The walk of [`seed_window_path`](@ref) over an estimator tree stops at this method. The walk puts the names of the fields above the estimator before `"rule"`.
 
 # Arguments
 
@@ -502,14 +548,14 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Read the expected returns out of the fold of a windowed estimator under a [`SeedWindow`](@ref).
+Read the expected returns from the fold of a windowed estimator under a [`SeedWindow`](@ref).
 
 The inner estimator holds the state of the fold, so the method reads it there.
 
 # Arguments
 
   - `me`: Windowed expected returns estimator under a seed window.
-  - `kwargs...`: Keywords passed to the read of the inner estimator.
+  - `kwargs...`: Keywords for the read of the inner estimator.
 
 # Returns
 
@@ -527,14 +573,14 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Read the covariance out of the fold of a windowed estimator under a [`SeedWindow`](@ref).
+Read the covariance from the fold of a windowed estimator under a [`SeedWindow`](@ref).
 
 The inner estimator holds the state of the fold, so the method reads it there.
 
 # Arguments
 
   - `ce`: Windowed covariance estimator under a seed window.
-  - `kwargs...`: Keywords passed to the read of the inner estimator.
+  - `kwargs...`: Keywords for the read of the inner estimator.
 
 # Returns
 
@@ -552,14 +598,39 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Read the variance out of the fold of a windowed estimator under a [`SeedWindow`](@ref).
+Read the correlation from the fold of a windowed estimator under a [`SeedWindow`](@ref).
+
+The inner estimator holds the state of the fold, so the method reads it there. The generic `cor` with no data reads the `cache` of the windowed estimator, which stays `nothing`.
+
+# Arguments
+
+  - `ce`: Windowed covariance estimator under a seed window.
+  - `kwargs...`: Keywords for the read of the inner estimator.
+
+# Returns
+
+  - $(ret_dict[:rho])
+
+# Related
+
+  - [`WindowedCovariance`](@ref)
+  - [`partial_fit!(est::SeedWindowed, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+"""
+function Statistics.cor(ce::WindowedCovariance{<:Any, <:Any, <:Any, <:SeedWindow};
+                        kwargs...)
+    return Statistics.cor(ce.ce; kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Read the variance from the fold of a windowed estimator under a [`SeedWindow`](@ref).
 
 The inner estimator holds the state of the fold, so the method reads it there.
 
 # Arguments
 
   - `ve`: Windowed variance estimator under a seed window.
-  - `kwargs...`: Keywords passed to the read of the inner estimator.
+  - `kwargs...`: Keywords for the read of the inner estimator.
 
 # Returns
 
@@ -576,14 +647,38 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Read the coskewness out of the fold of a windowed estimator under a [`SeedWindow`](@ref).
+Read the standard deviation from the fold of a windowed estimator under a [`SeedWindow`](@ref).
+
+The inner estimator holds the state of the fold, so the method reads it there. The generic `std` with no data reads the `cache` of the windowed estimator, which stays `nothing`.
+
+# Arguments
+
+  - `ve`: Windowed variance estimator under a seed window.
+  - `kwargs...`: Keywords for the read of the inner estimator.
+
+# Returns
+
+  - $(ret_dict[:stdarr])
+
+# Related
+
+  - [`WindowedVariance`](@ref)
+  - [`partial_fit!(est::SeedWindowed, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+"""
+function Statistics.std(ve::WindowedVariance{<:Any, <:Any, <:Any, <:SeedWindow}; kwargs...)
+    return Statistics.std(ve.ve; kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Read the coskewness from the fold of a windowed estimator under a [`SeedWindow`](@ref).
 
 The inner estimator holds the state of the fold, so the method reads it there.
 
 # Arguments
 
   - `ske`: Windowed coskewness estimator under a seed window.
-  - `kwargs...`: Keywords passed to the read of the inner estimator.
+  - `kwargs...`: Keywords for the read of the inner estimator.
 
 # Returns
 
@@ -601,18 +696,18 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Read the cokurtosis out of the fold of a windowed estimator under a [`SeedWindow`](@ref).
+Read the cokurtosis from the fold of a windowed estimator under a [`SeedWindow`](@ref).
 
 The inner estimator holds the state of the fold, so the method reads it there.
 
 # Arguments
 
   - `kte`: Windowed cokurtosis estimator under a seed window.
-  - `kwargs...`: Keywords passed to the read of the inner estimator.
+  - `kwargs...`: Keywords for the read of the inner estimator.
 
 # Returns
 
-  - $(ret_dict[:kte])
+  - $(ret_dict[:ckurt])
 
 # Related
 
@@ -625,17 +720,17 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Renders every field of a windowed estimator except `cache`.
+Return the fields of a windowed estimator that the printout shows, which are every field except `cache`.
 
-The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:WindowedCovariance, true)` to render it.
+The `cache` field holds the Partial Fit State of an online fit. It is not configuration. Without this method, the state prints under the estimator each time a Prior or an optimiser that holds the estimator prints. To show the field for one type, call `set_show_nothing_fields!` with the name of the type and `true`, for example `set_show_nothing_fields!(:WindowedCovariance, true)`.
 
 # Arguments
 
-  - `est`: Windowed estimator, read for its type alone.
+  - `est`: Windowed estimator. The function reads its type alone.
 
 # Returns
 
-  - `fields::Tuple`: The field names to render, every field name but `:cache`.
+  - `fields::Tuple`: The field names to show, which are every field name except `:cache`.
 
 # Related
 
@@ -647,8 +742,7 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
   - [`show_fields`](@ref)
   - [`set_show_nothing_fields!`](@ref)
 """
-function show_fields(est::Union{<:WindowedExpectedReturns, <:WindowedCovariance,
-                                <:WindowedVariance, <:WindowedCoskewness,
-                                <:WindowedCokurtosis})
+function show_fields(est::Union{WindowedExpectedReturns, WindowedCovariance,
+                                WindowedVariance, WindowedCoskewness, WindowedCokurtosis})
     return filter(!=(:cache), fieldnames(typeof(est)))
 end

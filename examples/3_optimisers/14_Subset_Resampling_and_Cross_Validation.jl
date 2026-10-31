@@ -279,14 +279,14 @@ estimator also fits each training fold at a smaller `T / N` than the 252 rows of
 give, and `T / N` is the shape of the denoising fit. Read the deferred estimator's number as
 the one a portfolio could have earned.
 
-The fields a prior fills, `mu`, `sigma`, `kt` and `sk`, all work this way. A measure with two or
-more such fields takes a prior estimator in `pe` instead, and one fit fills every field you left
-unstated. The fit fills `mu` and `kt` of a `Kurtosis`, so its `pe` must compute a cokurtosis,
-as a `HighOrderPriorEstimator` does. It fills `mu`, `sigma` and `chol` of a
-`DistributionValueatRisk`.
+The fields a prior fills, `mu`, `sigma`, `kt` and `sk`, all work this way. A field also takes a
+prior estimator, and the fit fills the field from the prior that the estimator computes. The
+`kt` of a `Kurtosis` needs a cokurtosis, as a `HighOrderPriorEstimator` computes. A measure with
+two or more such fields takes a prior estimator in `pe` instead, and one fit fills every field
+you left unstated. The fit fills `mu`, `sigma` and `chol` of a `DistributionValueatRisk`.
 
 ```julia
-Kurtosis(; pe = HighOrderPriorEstimator())
+Kurtosis(; kt = HighOrderPriorEstimator())
 DistributionValueatRisk(; pe = EmpiricalPrior())
 ```
 

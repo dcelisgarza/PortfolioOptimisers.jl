@@ -7,6 +7,12 @@ Run the named test files the way `test/runtests.jl` runs them, without the full 
     julia -t 1 --project=test test/run_files.jl --coverage=<absolute dir> test_04_owa.jl
     julia -t 1 --project=test test/run_files.jl --testset='^OWA l-moments$' test_04_owa.jl
     julia -t 1 --project=test test/run_files.jl --time-depth=2 --timeout=900 test_04_owa.jl
+    julia -t 1 --project=test test/run_files.jl --ci test_78
+    julia -t 1 --project=test test/run_files.jl --case='^bl_' test_78
+    julia -t 1 --project=test test/run_files.jl --resume=<done path> --done=<path> test_04 test_26
+
+A file is named as `test_X.jl`, `test/test_X.jl`, a path, or a unique prefix such as `test_78`.
+A name that matches no file, or several, is an error that lists the candidates.
 
 Each file runs in a module of its own, after the `init_code` preamble that `test/runtests.jl`
 declares, so a file sees what it sees in the suite. A red file does not stop the run. The driver
@@ -64,17 +70,51 @@ own:
     RESULT test_04_owa.jl pass=50 fail=1 error=0 broken=0 seconds=315.6 known red, #1709: ...
 
 A failure that no row covers is named after the rows, as `red outside known_red.toml: <path>`. The
-verdict does not change: a known red is still red. When a row's file or test set runs and passes,
+verdict does not change: a known red is still red. (CI is different: `test/runtests.jl` passes a run
+whose every failure a row covers. `test/known_red.jl` holds the rows for both.) When a row's file
+or test set runs and passes,
 the driver prints a `STALE` line that asks for the row to be deleted. Under `--testset`, only the
 rows whose test set ran are judged.
 
 `--coverage=<absolute dir>` runs the files in a child process under `--code-coverage=@<dir>`,
 because Julia writes the counters only when a process exits. The parent then prints one
-`COVERAGE` line per source file under `<dir>`, with the lines that no test reached, and deletes the
-counter files of the child. The other options are passed to the child.
+`COVERAGE` line per source file that the child loaded under `<dir>`, with the lines that no test
+reached, and deletes the counter files of the child. It counts a miss the way CI does: a counter
+at zero, and also each body line of a method that no test compiled, which has no counter at all.
+An anonymous function is a method here, so a `const` closure that no test calls is a miss. A
+closure inside a method that ran is not, as on CI. A short-form method whose body is a literal,
+such as `f(::T) = true`, gets no counter even when a test calls it, so it reads as a miss here and
+on CI. A return type, `f(::T)::Bool = true`, gives it one. The other options are passed to the
+child. `<dir>` is the source
+directory to measure, such as `<worktree>/src/16_RiskMeasures`, because Julia counts only the files
+under it. A scratch directory holds no source file, so the run prints no `COVERAGE` line at all.
+
+The run then prints one `PATCH` line for each `.jl` file under `src/` or `ext/` that the working
+tree changes against its merge-base with `origin/dev`, with the added lines that CI reads as a miss,
+by the rule of the `COVERAGE` line (#1912). A changed file that no test loaded has no counter, so
+each body line that it adds is a miss. When every file ran whole and green, every
+changed file lies under `<dir>`, and no added line is a miss, the run records the `coverage` stamp
+that the push guard asks of a change to the code. Use the narrowest directory that holds every
+changed file, such as `<worktree>/src`.
+
+`--ci` runs the files in a child process under the flags of `Pkg.test` on CI,
+`--check-bounds=yes --code-coverage=user`. A test that pins solver output can pass locally and fail
+on CI only, because the two flags change the compiled code. The coverage goes to one scratch
+tracefile, which the parent deletes, so no `.cov` file lands next to a source file.
+
+`--case=<regex>` sets `ENV["RUN_FILES_CASE"]` for the run. A file whose test sets come from one
+`for` loop over named cases, whose one interpolated name `--testset` cannot select, filters its
+cases by it (`test/test_78_brt_pinned_outputs.jl` does).
+
+`--resume=<path>` skips each named file that already has a `RESULT` line in `<path>`, the `--done`
+file or the log of an earlier run that stopped halfway, for example when its session ended.
 
 Each file also records a gate stamp through `code_health/gate_stamp.sh`, which the push guard of
-`.pre-commit-config.yaml` reads. A file run under `--testset` records none: it ran only a part.
+`.pre-commit-config.yaml` reads. A file run under `--testset` or `--case` records none: it ran only
+a part.
+
+A run from the command line holds a slot of `code_health/julia_slot.jl` while it runs, so it waits
+for free memory rather than being killed for the lack of it. A `SLOT wait` line names the holders.
 
 From a REPL, `include` this file and call `RunFiles.main(["test_04_owa.jl"])`. It returns the
 exit code. Pass `--done` there too: a REPL that strips `println` still writes the file.
@@ -83,11 +123,15 @@ This file is not a test: `test/runtests.jl` discovers only `test_*.jl`.
 =#
 module RunFiles
 
-using Test, LinearAlgebra, TOML
+using Test, LinearAlgebra
 
 const TEST_DIR = @__DIR__
 const REPO_ROOT = dirname(TEST_DIR)
-const KNOWN_RED = joinpath(TEST_DIR, "known_red.toml")
+
+include(joinpath(REPO_ROOT, "code_health", "julia_slot.jl"))
+# `test/runtests.jl` reads the same rows, to filter the failures of CI (#1781).
+include(joinpath(TEST_DIR, "known_red.jl"))
+using .KnownRedRows: KNOWN_RED, KnownRed, known_red, covers, row_name
 
 """
 Where [`Collect`](@ref) prints a failure and a `TIME` line. A test of the driver points it at
@@ -174,8 +218,9 @@ function Test.record(ts::Collect, r::Test.Broken)
     ts.broken += 1
     return r
 end
-function Test.record(ts::Collect, r::Union{Test.Fail, Test.Error})
-    if r isa Test.Fail
+# A failed `@test_logs` records a `Test.LogTestFailure`, which is a failed test too.
+function Test.record(ts::Collect, r::Union{Test.Fail, Test.Error, Test.LogTestFailure})
+    if r isa Union{Test.Fail, Test.LogTestFailure}
         ts.fail += 1
     else
         ts.error += 1
@@ -230,15 +275,25 @@ end
 """
     resolve(name) -> String
 
-The absolute path of a test file named as `test_X.jl`, `test/test_X.jl` or a path.
+The absolute path of a test file named as `test_X.jl`, `test/test_X.jl`, a path, or a prefix of
+the name of exactly one test file, such as `test_78`. A miss lists the files that share the number
+of the name.
 """
-function resolve(name::AbstractString)
-    for p in (joinpath(TEST_DIR, basename(name)), abspath(name))
+function resolve(name::AbstractString; dir::AbstractString = TEST_DIR)
+    for p in (joinpath(dir, basename(name)), abspath(name))
         if isfile(p)
             return p
         end
     end
-    return error("No test file `$name` under `$TEST_DIR`.")
+    files = filter(f -> startswith(f, "test_") && endswith(f, ".jl"), readdir(dir))
+    hits = filter(f -> startswith(f, basename(name)), files)
+    if length(hits) == 1
+        return joinpath(dir, only(hits))
+    end
+    m = match(r"^(test_\d+)", basename(name))
+    near = isempty(hits) && m !== nothing ? filter(f -> startswith(f, m[1]), files) : hits
+    hint = isempty(near) ? "" : " Candidates: $(join(near, ", "))."
+    return error("No single test file `$name` under `$dir`.$hint")
 end
 
 # ---------------------------------------------------------------------------------------------
@@ -429,69 +484,11 @@ end
 
 Record a gate stamp for one test file. A failure to write it never fails the run.
 """
-function record_gate(path::AbstractString)
-    script = joinpath(REPO_ROOT, "code_health", "gate_stamp.sh")
-    try
-        cmd = Cmd(`bash $script record test/$(basename(path))`; dir = REPO_ROOT)
-        run(pipeline(cmd; stdout = devnull, stderr = devnull))
-    catch
-    end
-    return nothing
-end
+record_gate(path::AbstractString) = record_stamp("test/$(basename(path))")
 
 # ---------------------------------------------------------------------------------------------
 # `test/known_red.toml`: the reds that are known and open as issues.
 # ---------------------------------------------------------------------------------------------
-
-"""
-    KnownRed
-
-One row of `test/known_red.toml`: a test file, or one of its test sets, that is red for a reason
-an open issue records.
-"""
-struct KnownRed
-    file::String
-    testset::Union{Nothing, String}
-    issue::Int
-    reason::String
-    host::Union{Nothing, String}
-end
-
-const KNOWN_RED_KEYS = ("file", "testset", "issue", "reason", "host")
-
-"""
-    known_red(path = KNOWN_RED) -> Vector{KnownRed}
-
-The rows of `path`, each a `[[red]]` table. A row with a key the driver does not read, or without
-`file`, `issue` or `reason`, is an error, so a typo does not silently disable a row.
-"""
-function known_red(path::AbstractString = KNOWN_RED)
-    if !(isfile(path))
-        return KnownRed[]
-    end
-    rows = get(TOML.parsefile(path), "red", Any[])
-    return map(rows) do r
-        extra = setdiff(keys(r), KNOWN_RED_KEYS)
-        if !(isempty(extra))
-            error("`$path`: a row has the unknown key(s) $(join(sort(collect(extra)), ", ")).")
-        end
-        for k in ("file", "issue", "reason")
-            if !(haskey(r, k))
-                error("`$path`: a row has no `$k`.")
-            end
-        end
-        return KnownRed(r["file"], get(r, "testset", nothing), r["issue"], r["reason"],
-                        get(r, "host", nothing))
-    end
-end
-
-function covers(r::KnownRed, path::AbstractString)
-    return r.testset === nothing || occursin(r.testset, path)
-end
-
-function row_name(r::KnownRed)
-    return r.testset === nothing ? r.file : "$(r.file) \"$(r.testset)\""
-end
 
 """
     known_red_notes(ts, rows; filtered = false) -> (note, stale)
@@ -594,35 +591,212 @@ The `.cov` file of one source file. Each line opens with a count nine characters
 space. `-` marks a line with no counter, `0` a line no test reached.
 """
 function coverage_lines(cov_path::AbstractString)
-    counted, missed = 0, Int[]
-    for (n, line) in enumerate(eachline(cov_path))
+    tags = coverage_tags(cov_path)
+    return count(!isnothing, tags), findall(==(0), tags)
+end
+
+"""
+    coverage_tags(cov_path) -> Vector{Union{Nothing, Int}}
+
+The count of each line of a `.cov` file, or `nothing` for a line with no counter. A count wider
+than its nine characters is read as a hit.
+"""
+function coverage_tags(cov_path::AbstractString)
+    tags = Union{Nothing, Int}[]
+    for line in eachline(cov_path)
         tag = strip(first(line, 9))
-        if tag == "-" || isempty(tag)
-            continue
+        push!(tags, tag == "-" || isempty(tag) ? nothing : something(tryparse(Int, tag), 1))
+    end
+    return tags
+end
+
+"""
+    is_method_definition(e) -> Bool
+
+Whether `e` defines a method: a `function` block, an anonymous function `x -> …`, or a short form
+`f(x) = …`, also under `where` or a return type.
+"""
+function is_method_definition(e::Expr)
+    if e.head === :function || e.head === :->
+        return true
+    elseif e.head === :(=)
+        lhs = e.args[1]
+        while lhs isa Expr && lhs.head in (:where, :(::))
+            lhs = lhs.args[1]
         end
-        counted += 1
-        if tag == "0"
-            push!(missed, n)
+        return lhs isa Expr && lhs.head === :call
+    end
+    return false
+end
+
+no_counter(tags::AbstractVector, l::Integer) = l > length(tags) || isnothing(tags[l])
+
+function body_lines!(out::Set{Int}, e, inside::Bool, tags::AbstractVector)
+    if e isa LineNumberNode
+        inside && push!(out, e.line)
+    elseif e isa Expr &&
+           is_method_definition(e) &&
+           length(e.args) >= 2 &&
+           e.args[2] isa Expr
+        # The body alone: a line node of the signature is not a statement. A method whose body
+        # holds a counter ran, so CI amends none of its lines, nor those of a closure inside it.
+        lines = Set{Int}()
+        for a in e.args[2].args
+            body_lines!(lines, a, true, tags)
+        end
+        if all(l -> no_counter(tags, l), lines)
+            union!(out, lines)
+        end
+    elseif e isa Expr
+        for (i, a) in enumerate(e.args)
+            # The second argument of a macro call records its location, not a statement.
+            if e.head === :macrocall && i == 2 && a isa LineNumberNode
+                continue
+            end
+            body_lines!(out, a, inside, tags)
         end
     end
-    return counted, missed
+    return out
+end
+
+"""
+    function_body_lines(text, tags = []) -> Set{Int}
+
+The lines of `text` that CI amends to a miss. CI processes the `.cov` files with
+`CoverageTools.amend_coverage_from_src!` (v1.4.2), which reads each statement line of a method body
+as a miss when no line of that body has a counter in `tags`. A method that no test compiled has no
+counter on any line, so CI counts every line of it as a miss, while the raw `.cov` file shows none
+(#1912). An anonymous function `x -> …` is a method here too. A method that ran keeps the lines with
+no counter, also those of a closure inside it that never ran (R23 of #1817). With no `tags`, the
+result is every statement line of every method body.
+"""
+function function_body_lines(text::AbstractString,
+                             tags::AbstractVector = Union{Nothing, Int}[])
+    return body_lines!(Set{Int}(), Meta.parseall(text), false, tags)
+end
+
+"""
+    patch_misses(tags, body, added) -> Vector{Int}
+
+The lines of `added` that CI reads as a miss: a counter at zero, or a body line with no counter.
+`tags` comes from [`coverage_tags`](@ref), or is empty when no test loaded the file.
+"""
+function patch_misses(tags::AbstractVector, body::Set{Int}, added)
+    out = Int[]
+    for n in sort!(collect(added))
+        t = n <= length(tags) ? tags[n] : nothing
+        if t == 0 || (isnothing(t) && n in body)
+            push!(out, n)
+        end
+    end
+    return out
+end
+
+"""
+    added_lines(diff) -> Set{Int}
+
+The line numbers that a `git diff -U0` adds to the new side.
+"""
+function added_lines(diff::AbstractString)
+    out = Set{Int}()
+    for line in eachline(IOBuffer(diff))
+        m = match(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@", line)
+        if m === nothing
+            continue
+        end
+        start = parse(Int, m[1])
+        n = m[2] === nothing ? 1 : parse(Int, m[2])
+        union!(out, start:(start + n - 1))
+    end
+    return out
+end
+
+git_text(args...) = readchomp(Cmd(`git $args`; dir = REPO_ROOT))
+
+"""
+    patch_report(dir, tags) -> (lines, clean)
+
+One `PATCH` line for each `.jl` file under `src/` or `ext/` that the working tree changes against
+its merge-base with `origin/dev` (`GATE_STAMP_REF`), with the added lines that CI reads as a miss.
+`tags` maps a path relative to the repository to its [`coverage_tags`](@ref). `clean` is true when
+every changed file lies under `dir` and no added line is a miss.
+"""
+function patch_report(dir::AbstractString, tags::AbstractDict)
+    ref = get(ENV, "GATE_STAMP_REF", "origin/dev")
+    base = try
+        git_text("merge-base", ref, "HEAD")
+    catch
+        return ["PATCH skipped: no merge-base with $ref"], false
+    end
+    changed = vcat(split(git_text("diff", "--name-only", "--no-renames", base, "--", "src",
+                                  "ext")),
+                   split(git_text("ls-files", "--others", "--exclude-standard", "src",
+                                  "ext")))
+    untracked = Set(split(git_text("ls-files", "--others", "--exclude-standard", "src",
+                                   "ext")))
+    lines, clean = String[], true
+    for rel in sort!(unique(filter(f -> endswith(f, ".jl"), changed)))
+        full = joinpath(REPO_ROOT, rel)
+        if !(isfile(full))
+            continue
+        end
+        if !startswith(full, rstrip(dir, '/') * "/")
+            push!(lines, "PATCH $rel not measured: outside $dir")
+            clean = false
+            continue
+        end
+        text = read(full, String)
+        added = if rel in untracked
+            Set(1:countlines(IOBuffer(text)))
+        else
+            added_lines(git_text("diff", "-U0", "--no-color", "--no-ext-diff", base, "--",
+                                 rel))
+        end
+        file_tags = get(tags, rel, Union{Nothing, Int}[])
+        missed = patch_misses(file_tags, function_body_lines(text, file_tags), added)
+        push!(lines, "PATCH $rel added=$(length(added)) missed=$(length(missed))")
+        if !isempty(missed)
+            push!(lines, "  missed lines: " * join(missed, ", "))
+            clean = false
+        end
+    end
+    return lines, clean
+end
+
+"""
+    record_stamp(gate)
+
+Record a stamp of `gate` through `code_health/gate_stamp.sh`. A failure never fails the run.
+"""
+function record_stamp(gate::AbstractString)
+    script = joinpath(REPO_ROOT, "code_health", "gate_stamp.sh")
+    try
+        run(pipeline(Cmd(`bash $script record $gate`; dir = REPO_ROOT); stdout = devnull,
+                     stderr = devnull))
+    catch
+    end
+    return nothing
 end
 
 """
     run_coverage(dir, rest) -> Int
 
 Run the driver again in a child process under `--code-coverage=@<dir>`, then report the counter
-files that child wrote and delete them.
+files that child wrote and delete them. Then print the [`patch_report`](@ref) of the change, and
+record a `coverage` stamp when every file ran whole and green and the report is clean.
 """
 function run_coverage(dir::AbstractString, rest::Vector{String})
-    if !(isabspath(dir) && isdir(dir))
-        error("`--coverage` needs an absolute directory. A relative one instruments nothing.")
+    if !isabspath(dir)
+        error("`--coverage` needs an absolute directory. A relative one instruments nothing. Got $dir")
+    elseif !isdir(dir)
+        error("`--coverage` needs a source directory that exists, such as <worktree>/src. Got $dir")
     end
     cmd = `$(Base.julia_cmd()) -t 1 --project=$(Base.active_project()) --code-coverage=@$dir $(@__FILE__) $rest`
     p = run(ignorestatus(cmd); wait = false)
     # A process that has exited has no PID to read, so read it before the wait.
     pid = getpid(p)
     wait(p)
+    tags = Dict{String, Vector{Union{Nothing, Int}}}()
     for (root, _, files) in walkdir(dir)
         for f in sort(files)
             m = match(r"^(.+\.jl)\.(\d+)\.cov$", f)
@@ -630,21 +804,36 @@ function run_coverage(dir::AbstractString, rest::Vector{String})
                 continue
             end
             cov = joinpath(root, f)
-            counted, missed = coverage_lines(cov)
             rel = relpath(joinpath(root, m[1]), REPO_ROOT)
+            tags[rel] = coverage_tags(cov)
+            rm(cov)
+            # The misses as CI reads them: a method that no test compiled has no counter, and CI
+            # counts each line of its body (#1912).
+            body = function_body_lines(read(joinpath(root, m[1]), String), tags[rel])
+            missed = patch_misses(tags[rel], body, 1:length(tags[rel]))
+            counted = length(union(findall(!isnothing, tags[rel]), body))
             println("COVERAGE $rel counted=$counted missed=$(length(missed))")
             if !(isempty(missed))
                 println("  missed lines: ", join(missed, ", "))
             end
-            rm(cov)
         end
+    end
+    lines, clean = patch_report(dir, tags)
+    foreach(println, lines)
+    whole = !any(a -> startswith(a, "--testset=") || startswith(a, "--case="), rest)
+    if success(p) && whole && clean
+        record_stamp("coverage")
+        println("PATCH clean: recorded the `coverage` stamp.")
+    else
+        println("PATCH not clean, or a file was red or ran in part: no `coverage` stamp.")
     end
     # A child killed by its watchdog has no exit code, only a signal.
     return success(p) ? 0 : max(p.exitcode, 1)
 end
 
-const USAGE = "usage: run_files.jl [--done=<path>] [--coverage=<absolute dir>] " *
-              "[--testset=<regex>] [--time-depth=<N>] [--timeout=<seconds>] test_X.jl..."
+const USAGE = "usage: run_files.jl [--done=<path>] [--coverage=<absolute dir>] [--ci] " *
+              "[--testset=<regex>] [--case=<regex>] [--resume=<path>] [--time-depth=<N>] " *
+              "[--timeout=<seconds>] test_X.jl..."
 
 """
     parse_args(args) -> NamedTuple
@@ -654,6 +843,7 @@ prints [`USAGE`](@ref).
 """
 function parse_args(args::Vector{String})
     done, coverage, testset, time_depth, timeout = nothing, nothing, nothing, 0, nothing
+    ci, case, resume = false, nothing, nothing
     names = String[]
     value(a, key) = a[(length(key) + 1):end]
     for a in args
@@ -663,6 +853,14 @@ function parse_args(args::Vector{String})
             coverage = value(a, "--coverage=")
         elseif startswith(a, "--testset=")
             testset = Regex(value(a, "--testset="))
+        elseif startswith(a, "--case=")
+            case = value(a, "--case=")
+            # A malformed pattern fails here, before a file loads.
+            Regex(case)
+        elseif startswith(a, "--resume=")
+            resume = value(a, "--resume=")
+        elseif a == "--ci"
+            ci = true
         elseif startswith(a, "--time-depth=")
             time_depth = something(tryparse(Int, value(a, "--time-depth=")), -1)
             if time_depth < 0
@@ -682,15 +880,62 @@ function parse_args(args::Vector{String})
     if isempty(names)
         error(USAGE)
     end
-    return (; done, coverage, testset, time_depth, timeout, names)
+    return (; done, coverage, testset, time_depth, timeout, names, ci, case, resume)
+end
+
+"""
+    finished_files(path) -> Set{String}
+
+The files that have a `RESULT` line in the log or `--done` file `path`.
+"""
+function finished_files(path::AbstractString)
+    out = Set{String}()
+    if !(isfile(path))
+        return out
+    end
+    for line in eachline(path)
+        m = match(r"^RESULT (\S+) ", line)
+        m === nothing || push!(out, m[1])
+    end
+    return out
+end
+
+"""
+    run_ci(rest) -> Int
+
+Run the driver again in a child process under `--check-bounds=yes --code-coverage=user`, the
+flags of `Pkg.test` on CI, with the coverage sent to a scratch tracefile that is deleted after.
+"""
+function run_ci(rest::Vector{String})
+    dir = mktempdir()
+    try
+        cmd = `$(Base.julia_cmd()) -t 1 --project=$(Base.active_project()) --check-bounds=yes --code-coverage=user --code-coverage=$(joinpath(dir, "trace-%p.info")) $(@__FILE__) $rest`
+        p = run(ignorestatus(cmd))
+        return success(p) ? 0 : max(p.exitcode, 1)
+    finally
+        rm(dir; recursive = true, force = true)
+    end
 end
 
 function main(args::Vector{String})
-    (; done, coverage, testset, time_depth, timeout, names) = parse_args(args)
+    (; done, coverage, testset, time_depth, timeout, names, ci, case, resume) = parse_args(args)
     if coverage !== nothing
         rest = filter(a -> !startswith(a, "--coverage="), args)
         return run_coverage(coverage, rest)
     end
+    if ci
+        return run_ci(filter(!=("--ci"), args))
+    end
+    if !(OWNS_PROCESS[])
+        return run_files(; done, testset, time_depth, timeout, names, case, resume)
+    end
+    return JuliaSlot.with_slot("run_files.jl $(join(names, ' '))") do
+        return run_files(; done, testset, time_depth, timeout, names, case, resume)
+    end
+end
+
+function run_files(; done, testset, time_depth, timeout, names, case = nothing,
+                   resume = nothing)
     if timeout !== nothing && !(OWNS_PROCESS[])
         error("`--timeout` kills the process that runs the driver, so it runs only from the " *
               "command line, never from a REPL.")
@@ -699,8 +944,19 @@ function main(args::Vector{String})
     lines = String[]
     sets = Collect[]
     status = 1
+    old_case = get(ENV, "RUN_FILES_CASE", nothing)
+    if case !== nothing
+        ENV["RUN_FILES_CASE"] = case
+    end
     try
         paths = resolve.(names)
+        if resume !== nothing
+            skip = finished_files(resume)
+            for p in filter(p -> basename(p) in skip, paths)
+                println("SKIP $(basename(p)): it has a RESULT line in $resume")
+            end
+            filter!(p -> !(basename(p) in skip), paths)
+        end
         rows = known_red()
         code = init_code()
         for p in paths
@@ -717,7 +973,7 @@ function main(args::Vector{String})
                     stop_watchdog(dog, done)
                 end
             end
-            if select === nothing
+            if select === nothing && case === nothing
                 record_gate(p)
             end
             note, stale = known_red_notes(ts, rows; filtered = select !== nothing)
@@ -735,6 +991,11 @@ function main(args::Vector{String})
         println(last(lines))
         status = all(green, sets) ? 0 : 1
     finally
+        if case !== nothing && old_case === nothing
+            delete!(ENV, "RUN_FILES_CASE")
+        elseif case !== nothing
+            ENV["RUN_FILES_CASE"] = old_case
+        end
         if done !== nothing
             if status == 1 && !(any(startswith("DONE"), lines))
                 push!(lines, "DONE files=$(length(sets)) status=crashed")

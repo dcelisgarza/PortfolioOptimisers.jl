@@ -133,8 +133,8 @@ to `model`.
 
 The exact formulation fuses the two tails rather than duplicating them. It forms the single
 weight vector ``\\boldsymbol{\\omega}_{1} - \\boldsymbol{\\omega}_{2}`` and builds one assignment dual
-over it, so the range costs the same `T × T` block as a single tail. `r.w2` is already
-reversed by the constructor of [`OrderedWeightsArrayRange`](@ref), so the difference is the
+over it, so the range costs the same `T × T` block as a single tail. [`OrderedWeightsArrayRange`](@ref)
+holds `r.w2` reversed, so the difference is the
 range weight vector.
 
 # Mathematical definition
@@ -227,10 +227,12 @@ the length of `r.alg.p`.
 
 Every permutation of the weight vector satisfies those properties, so the feasible set is a
 superset of the exact one and the risk is an upper bound on the exact OWA risk. The gap
-closes as the weight vector approaches a line. [owa3](@citet) studies that linear case. For
-the Gini mean difference and the tail Gini over samples of 500 to 10,000 observations,
-[owa3](@cite) reports the same objective value as the exact formulation, to the printed
-precision.
+closes as the weight vector approaches a line. [owa3](@citet) studies that linear case.
+Tables 1 and 3 of [owa3](@cite) compare the objective value with the exact formulations for
+the Gini mean difference and the tail Gini over samples of 500 to 1,500 observations. The
+values agree to the printed precision in every cell but one, 12.94 % against 12.93 % in
+Table 3. At 10,000 observations the exact formulations do not solve, so those rows hold no
+comparison.
 
 The gap was measured here against the functor at `T = 100`, `N = 8` with the default `p`. The
 Gini mean difference is 0.06 % high, the tail Gini is 1.7e-5 % high, and the tail Gini range
@@ -261,7 +263,7 @@ Where:
 
   - ``\\boldsymbol{\\omega}``: Is the OWA weight vector, `r.w` if it is a vector, `r.w(T)` if it is a callable.
   - ``\\hat{\\boldsymbol{r}}``: Is the vector of net portfolio returns, negated when `loss` is `false`.
-  - ``S``: Is the set of p-norm orders, `r.alg.p`.
+  - ``S``: Is the set of p-norm orders, `r.alg.p`, or the empty set when at most one entry of ``\\boldsymbol{\\omega}`` lies strictly between its minimum and its maximum. `## Relaxation` gives the reason.
   - ``t``: Is the scalar auxiliary variable, `owa_t`.
   - ``\\boldsymbol{\\nu},\\, \\boldsymbol{\\eta}``: Are the `T × 1` non-negative auxiliary variables, `owa_nu` and `owa_eta`.
   - ``\\boldsymbol{\\varepsilon},\\, \\boldsymbol{\\psi}``: Are the `T × M` auxiliary variables, `owa_epsilon` and `owa_psi`.
@@ -269,6 +271,40 @@ Where:
   - ``\\mathcal{P}_{3}^{\\alpha,\\, 1-\\alpha}``: Is the three-dimensional power cone.
   - ``T``: Is the total number of observations.
   - ``M``: Is the number of p-norm orders, `length(r.alg.p)`.
+
+# JuMP formulation
+
+## Variables
+
+  - The net portfolio returns ``\\hat{\\boldsymbol{r}}``: Read, through [`set_net_portfolio_returns!`](@ref).
+  - `owa_t_`, `owa_nu_`, `owa_eta_`, `owa_epsilon_`, `owa_psi_`, `owa_z_`, `owa_y_`: Created under no name, and stored under these keys with the index `i`. They are ``t``, ``\\boldsymbol{\\nu} \\geq 0``, ``\\boldsymbol{\\eta} \\geq 0``, ``\\boldsymbol{\\varepsilon}``, ``\\boldsymbol{\\psi}``, ``\\boldsymbol{\\zeta}`` and ``\\boldsymbol{y} \\geq 0``.
+
+## Expressions
+
+  - `aowa_risk_`: ``c_{1} t - c_{2} \\boldsymbol{1}^{\\intercal} \\boldsymbol{\\nu} + c_{3} \\boldsymbol{1}^{\\intercal} \\boldsymbol{\\eta} + \\sum_{k \\in S} d_{k} y_{k}``, the risk.
+  - `neg_owa_z_owa_p_`: ``-k \\zeta_{k}`` for each ``k \\in S``.
+  - `owa_p_o_owa_pm1_`: ``k / (k - 1)`` for each ``k \\in S``.
+
+## Constraints
+
+Every row is registered under no name, and stored under its key with the index `i`.
+
+  - `ca1_owa_`: ``s_c \\left(\\hat{\\boldsymbol{r}} - \\boldsymbol{\\nu} + \\boldsymbol{\\eta} - \\sum_{k \\in S} \\boldsymbol{\\varepsilon}_{k} + t \\boldsymbol{1}\\right) = \\boldsymbol{0}``.
+  - `ca2_owa_`: ``s_c \\left(\\zeta_{k} + y_{k} - \\boldsymbol{1}^{\\intercal} \\boldsymbol{\\psi}_{k}\\right) = 0`` for each ``k \\in S``.
+  - `ca_owa_pcone_`: ``\\left(-s_c k \\zeta_{k},\\, s_c \\tfrac{k}{k-1} \\psi_{k,\\, t},\\, s_c \\varepsilon_{k,\\, t}\\right) \\in \\mathcal{P}_{3}^{1/k,\\, 1-1/k}`` for each ``k \\in S`` and each ``t``.
+
+Where:
+
+  - $(math_dict[:sc_scale])
+  - The other symbols are those of the `Where:` list of `# Mathematical definition`.
+
+## Relaxation
+
+$(val_dict[:relax])
+
+  - The bounded quantity is `aowa_risk_`. At its minimum over the auxiliary variables, it lies at or **above** the exact OWA risk of the same portfolio, ``\\boldsymbol{\\omega}^{\\intercal} \\mathrm{sort}(\\hat{\\boldsymbol{r}})``. The dual of the programme maximises over every vector with the minimum, the maximum, the sum and the p-norms of ``-\\boldsymbol{\\omega}``, and every reordering of ``-\\boldsymbol{\\omega}`` is such a vector.
+  - The bound is exact when at most one entry of the weight vector lies strictly between its minimum and its maximum, as the vectors of [`owa_wr`](@ref) and of [`owa_cvar`](@ref) at every ``\\alpha`` do. The box and the sum then describe the convex hull of the reorderings, and every p-norm constraint is redundant. The method then sets ``S`` to the empty set, so ``M = 0`` and the model is a linear programme. The redundant cones would put the optimum at the apex of every cone, ``\\boldsymbol{\\varepsilon} = \\boldsymbol{0}`` and ``\\boldsymbol{y} = \\boldsymbol{0}``, where an interior point solver can stall. For other vectors the gap closes as the vector approaches a line, and the gaps above give its size.
+  - The bound holds while the objective or a bound pulls `aowa_risk_` down, as a minimum-risk objective does. Under [`MaximumReturn`](@ref) with no risk bound, nothing pulls, and the value of `aowa_risk_` can lie further above. Read the exact figure back with [`expected_risk`](@ref).
 
 # Arguments
 
@@ -299,7 +335,7 @@ Where:
 
 # References
 
-  - $(ref_dict[:owa3])
+  - $(ref_dict[:owa3]) Sections 2.3 and 2.4, Equations 4 and 5; Section 3, Equation 7; Section 4, Tables 1 and 3.
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::OrderedWeightsArray{<:Any, <:Any,
@@ -313,7 +349,13 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     if !loss
         net_X = -net_X
     end
-    owa_p = r.alg.p
+    owa_w = isa(r.w, VecNum) ? -r.w : -r.w(T)
+    owa_s = sum(owa_w)
+    owa_l, owa_h = extrema(owa_w)
+    # With at most one entry strictly inside the box, the box and the sum describe the convex
+    # hull of the reorderings. The p-norm cones are then redundant, and they put the optimum
+    # at the apex of every cone, where the interior point solver can stall (#1895).
+    owa_p = count(x -> owa_l < x < owa_h, owa_w) <= 1 ? empty(r.alg.p) : r.alg.p
     M = length(owa_p)
     owa_t, owa_nu, owa_eta, owa_epsilon, owa_psi, owa_z, owa_y = JuMP.@variables(model,
                                                                                  begin
@@ -337,10 +379,6 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     state_set!(model, prefix, :owa_psi_, i, owa_psi)
     state_set!(model, prefix, :owa_z_, i, owa_z)
     state_set!(model, prefix, :owa_y_, i, owa_y)
-    owa_w = isa(r.w, VecNum) ? -r.w : -r.w(T)
-    owa_s = sum(owa_w)
-    owa_l = minimum(owa_w)
-    owa_h = maximum(owa_w)
     owa_d = [LinearAlgebra.norm(owa_w, p) for p in owa_p]
     aowa_risk, neg_owa_z_owa_p, owa_p_o_owa_pm1 = JuMP.@expressions(model,
                                                                     begin
@@ -582,7 +620,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add JuMP risk constraints for `OrderedWeightsArrayRange` using the sorting-network formulation to `model`.
 
-The formulation fuses the two tails, as [`ExactOrderedWeightsArray`](@ref) does. It forms the single weight vector ``\\boldsymbol{\\omega}_{1} - \\boldsymbol{\\omega}_{2}`` and builds one network over it. `r.w2` is already reversed by the constructor of [`OrderedWeightsArrayRange`](@ref), so the difference is the range weight vector, and it is nondecreasing when both tails are.
+The formulation fuses the two tails, as [`ExactOrderedWeightsArray`](@ref) does. It forms the single weight vector ``\\boldsymbol{\\omega}_{1} - \\boldsymbol{\\omega}_{2}`` and builds one network over it. [`OrderedWeightsArrayRange`](@ref) holds `r.w2` reversed, so the difference is the range weight vector, and it is nondecreasing when both tails are.
 
 # Mathematical definition
 

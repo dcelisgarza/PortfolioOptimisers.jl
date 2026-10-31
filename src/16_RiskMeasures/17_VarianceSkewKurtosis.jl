@@ -3,9 +3,13 @@ $(DocStringExtensions.TYPEDEF)
 
 Weights a risk measure inside an aggregate, and bounds its risk expression from **below**.
 
-This is the settings type of a quantity the optimisation wants **more** of, so its bound is a floor rather than a ceiling — the shape of the return floor ``\\bar{\\mu}`` in Equation 8.7 of [cajas2025](@cite). [`Skewness`](@ref) is its one holder, and a stated `lb` reaches the model only through [`VarianceSkewKurtosis`](@ref), where that skewness term is built: `Skewness` is a [`NonOptimisationRiskMeasure`](@ref), so no optimiser takes it on its own.
+This is the settings type of a quantity that the optimisation wants **more** of, so its bound is a floor and not a ceiling. It is the skewness floor ``\\bar{\\mu}_3`` of Problem 13 of [sdpmom](@cite). [`Skewness`](@ref) is its one holder, and a stated `lb` reaches the model only through [`VarianceSkewKurtosis`](@ref), which builds the skewness term. `Skewness` is a [`NonOptimisationRiskMeasure`](@ref), so no optimiser takes it alone.
 
-Unlike the `ub` of [`RiskMeasureSettings`](@ref), `lb` is not checked for non-negativity. A negative floor is meaningful here and works: `lb = -1e-8` returns the unconstrained `-6.1627e-9`, which satisfies it.
+Unlike the `ub` of [`RiskMeasureSettings`](@ref), `lb` is not checked for non-negativity. A third moment can be negative, so a negative floor is valid.
+
+!!! warning
+
+    The floor holds the relaxed third moment of the model, not the third moment of the returned weights. The method of [`set_risk_constraints!`](@ref) for [`VarianceSkewKurtosis`](@ref) states the gap under `## Relaxation`.
 
 # Fields
 
@@ -47,7 +51,7 @@ MaxRiskMeasureSettings
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 8.2.1, Equation 8.7.
+  - $(ref_dict[:sdpmom]) Section 3, Problem 13.
 """
 @concrete struct MaxRiskMeasureSettings <: JuMPRiskMeasureSettings
     """
@@ -76,28 +80,31 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the standardised Skewness risk measure.
+Measures the third central moment of the portfolio returns from the coskewness matrix `sk`.
 
-`Skewness` computes the third standardised central moment (skewness) of portfolio returns. Positive skewness is preferred (the distribution is skewed towards more positive values), so [`bigger_is_better`](@ref) returns `true` for this measure.
+The moment is ``\\boldsymbol{w}^\\intercal \\mathbf{M}_3 (\\boldsymbol{w} \\otimes \\boldsymbol{w})``. It is not divided by the cube of the standard deviation, so it is not the skewness coefficient. A larger moment is better, so [`bigger_is_better`](@ref) returns `true`. The measure is a [`NonOptimisationRiskMeasure`](@ref) and carries a [`MaxRiskMeasureSettings`](@ref), whose bound is the floor `lb`. So it answers [`bigger_is_better`](@ref), [`bounds_risk_measure`](@ref), [`no_bounds_risk_measure`](@ref), [`no_risk_expr_risk_measure`](@ref), [`no_bounds_no_risk_expr_risk_measure`](@ref) and [`unit_scale_risk_measure`](@ref) with methods of its own: the methods for a [`RiskMeasure`](@ref) build a [`RiskMeasureSettings`](@ref), which has a ceiling `ub` and no floor.
+
+No optimiser takes the measure alone. [`VarianceSkewKurtosis`](@ref) reads its `sk` and its `settings`, and builds the term ``m_3(\\boldsymbol{w})`` from `sk`. The functor reads the same matrix, so `settings.lb` and `settings.scale` act on the value of the functor, and [`expected_risk`](@ref) gives the value that the floor holds.
+
+!!! info
+
+    The matrix states the moment, so the centre and the observation weights belong to the estimator that makes the matrix, such as `sk = Coskewness(; w = w)`. [`ThirdCentralMoment`](@ref) computes the third moment from the returns, with observation weights and a Moment Target of its own. With a variance estimator in its `ve`, it divides the moment by the cube of the standard deviation and gives the standardised skewness. That measure reads one return series, so it is the score for an asset selection or a parameter search.
 
 # Mathematical definition
 
-Let ``\\mu`` be the specified centre, ``\\delta_t = x_t - \\mu``, and ``\\sigma`` the standard deviation of returns. The skewness is:
-
 ```math
 \\begin{align}
-\\mathrm{Skew}(\\boldsymbol{x}) &= \\frac{1}{T \\sigma^3} \\sum_{t=1}^{T} \\delta_t^3\\,.
+\\mathrm{Skew}(\\boldsymbol{w}) &= m_3(\\boldsymbol{w})\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\mathrm{Skew}(\\boldsymbol{x})``: Standardised skewness of portfolio returns. The `w` field replaces ``1/T`` with a weighted average when it holds observation weights.
-  - $(math_dict[:xret])
-  - $(math_dict[:T])
-  - ``\\mu``: Specified centre of the distribution.
-  - ``\\delta_t = x_t - \\mu``: Centred deviation at period ``t``.
-  - ``\\sigma``: Standard deviation of returns, computed by `ve`. Its `corrected` field sets the divisor.
+  - $(math_dict[:m3_port])
+  - $(math_dict[:M3_cosk])
+  - $(math_dict[:w_port])
+
+``m_3`` is the observation mean of the cube of the centred portfolio returns when ``\\mathbf{M}_3`` is the sample coskewness about the per-asset centres. That is Equation 1 of [sdpmom](@cite).
 
 # Fields
 
@@ -107,42 +114,28 @@ $(DocStringExtensions.FIELDS)
 
     Skewness(;
         settings::MaxRiskMeasureSettings = MaxRiskMeasureSettings(),
-        ve::AbstractVarianceEstimator = SimpleVariance(),
-        sk::Option{<:SkSlot} = nothing,
-        w::Option{<:ObsWeights} = nothing,
-        mu::Option{<:MuSlot} = nothing,
-        pe::Option{<:AbstractPriorEstimator} = nothing
+        sk::Option{<:SkSlot} = nothing
     ) -> Skewness
 
-Keywords correspond to the struct's fields. A `w` that is not `nothing` is passed to `ve` with [`factory`](@ref), so the variance estimator reads the same weights as the measure.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `sk` is not `nothing`: `!isempty(sk)` and `size(sk, 1)^2 == size(sk, 2)`.
-  - If `mu` is a `VecNum`: `!isempty(mu)`.
-  - $(val_dict[:oow_rm])
-
-!!! warning
-
-    `mu` and `sk` are stated independently, so nothing makes them agree with each other. A caller who wants one consistent set names `pe` alone and lets it fill both from a single fit. A caller who states them by hand must make sure that they agree.
+  - If `sk` is a matrix: `!isempty(sk)` and `size(sk, 1)^2 == size(sk, 2)`.
 
 !!! info
 
-    `sk` also admits a [`CoskewnessEstimator`](@ref) or an [`AbstractPriorEstimator`](@ref), and `mu` an [`AbstractExpectedReturnsEstimator`](@ref) or an [`AbstractPriorEstimator`](@ref). Either is resolved against the optimisation's own prior — see [`resolve_deferred_quantities`](@ref). A coskewness estimator in `sk` also supplies `mu` from its own `me`, so that the tensor and the centre it was taken about come out of **one** object. A deferred slot wins over `pe`.
+    `sk` also admits a [`CoskewnessEstimator`](@ref) or an [`AbstractPriorEstimator`](@ref), which [`resolve_deferred_quantities`](@ref) resolves against the prior of the optimisation. The measure carries one deferrable slot, so it takes no `pe`.
 
 # Functor
 
-    (r::Skewness)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
-    (r::Skewness)(x::VecNum)
+    (r::Skewness)(w::VecNum)
 
-Computes the skewness of the portfolio returns. The second arity takes a precomputed
-portfolio return series and skips the weighting step.
+Computes ``m_3(\\boldsymbol{w})`` from the matrix `r.sk`, with [`portfolio_third_moment`](@ref). The functor reads `sk` as it stands, so a measure whose `sk` is `nothing` or a **Deferred Quantity** needs [`factory`](@ref) with a [`HighOrderPrior`](@ref) result first.
 
 ## Arguments
 
   - $(arg_dict[:pw])
-  - `X::MatNum`: Asset returns matrix (``T \\times N``).
-  - $(arg_dict[:fees])
 
 # Examples
 
@@ -153,29 +146,35 @@ Skewness
            │   scale ┼ Float64: 1.0
            │      lb ┼ nothing
            │     rke ┴ Bool: true
-        ve ┼ SimpleVariance
-           │          me ┼ SimpleExpectedReturns
-           │             │   w ┴ nothing
-           │           w ┼ nothing
-           │   corrected ┴ Bool: true
-        sk ┼ nothing
-         w ┼ nothing
-        mu ┼ nothing
-        pe ┴ nothing
+        sk ┴ nothing
+
+julia> X = [0.02 -0.01; -0.01 0.03; 0.03 -0.02; -0.04 0.01; 0.01 0.02];
+
+julia> w = [0.6, 0.4];
+
+julia> Skewness(; sk = first(coskewness(Coskewness(), X)))(w)
+-2.331648000000001e-6
+
+julia> ThirdCentralMoment()(w, X)
+-2.3316480000000003e-6
 ```
+
+The sample coskewness about the mean of each asset gives the third moment of the portfolio returns about their mean, so the two values agree.
 
 # Related
 
   - [`NonOptimisationRiskMeasure`](@ref)
   - [`MaxRiskMeasureSettings`](@ref)
-  - [`ThirdCentralMoment`](@ref)
-  - [`AbstractVarianceEstimator`](@ref)
+  - [`ThirdCentralMoment`](@ref): the third moment of the returns, standardised or not.
   - [`bigger_is_better`](@ref)
   - [`resolve_deferred_quantities`](@ref)
+  - [`portfolio_third_moment`](@ref)
+  - [`VarianceSkewKurtosis`](@ref)
+  - [`NegativeSkewness`](@ref): a convex part of the third moment that an optimiser can minimise alone.
 
 # References
 
-  - $(ref_dict[:sdpmom])
+  - $(ref_dict[:sdpmom]) Section 2, Equation 1.
 """
 @concrete struct Skewness <: NonOptimisationRiskMeasure
     """
@@ -183,92 +182,57 @@ Skewness
     """
     settings
     """
-    $(field_dict[:ve])
-    """
-    ve
-    """
     $(field_dict[:sk_slot])
     """
     sk
-    """
-    $(field_dict[:oow])
-    """
-    w
-    """
-    $(field_dict[:mu_slot])
-    """
-    mu
-    """
-    $(field_dict[:pe_rm])
-    """
-    pe
-    function Skewness(settings::MaxRiskMeasureSettings, ve::AbstractVarianceEstimator,
-                      sk::Option{<:SkSlot}, w::Option{<:ObsWeights}, mu::Option{<:MuSlot},
-                      pe::Option{<:AbstractPriorEstimator})
-        assert_returns_source(returns_source(pe), (nothing,), :Skewness, "pe.x_src")
+    function Skewness(settings::MaxRiskMeasureSettings, sk::Option{<:SkSlot})
         if isa(sk, MatNum)
             @argcheck(!isempty(sk), IsEmptyError("sk cannot be empty"))
             @argcheck(size(sk, 1)^2 == size(sk, 2),
                       DimensionMismatch("size(sk, 1)^2 ($(size(sk, 1)^2)) must equal size(sk, 2) ($(size(sk, 2)))"))
         end
-        assert_observation_weights(w, :w)
-        if isa(mu, VecNum)
-            @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
-        end
-        return new{typeof(settings), typeof(ve), typeof(sk), typeof(w), typeof(mu),
-                   typeof(pe)}(settings, ve, sk, w, mu, pe)
+        return new{typeof(settings), typeof(sk)}(settings, sk)
     end
 end
 function Skewness(; settings::MaxRiskMeasureSettings = MaxRiskMeasureSettings(),
-                  ve::AbstractVarianceEstimator = SimpleVariance(),
-                  sk::Option{<:SkSlot} = nothing, w::Option{<:ObsWeights} = nothing,
-                  mu::Option{<:MuSlot} = nothing,
-                  pe::Option{<:AbstractPriorEstimator} = nothing)::Skewness
-    return Skewness(settings, factory(ve, w), sk, w, mu, pe)
+                  sk::Option{<:SkSlot} = nothing)::Skewness
+    return Skewness(settings, sk)
+end
+function (r::Skewness)(w::VecNum)
+    return portfolio_third_moment(r.sk, w)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Resolve every **Deferred Quantity** held by [`Skewness`](@ref) `r` against prior result `pr`.
+Resolve a **Deferred Quantity** in the `sk` slot of [`Skewness`](@ref) `r` against prior result `pr`.
 
-Three passes, in order.
-
- 1. A deferred `mu` resolves on its own.
- 2. A deferred `sk` resolves next, and it carries the centre with it. `sk` is a moment **about** a centre, so the two are one pair of quantities out of one object: when `mu` is still unstated, [`deferred_centre`](@ref) reads it off the coskewness estimator's own `me`, threads it into the fit as `mean =`, and it becomes the resolved `mu`. A stated `mu` wins and is threaded in its place. An [`AbstractPriorEstimator`](@ref) centres itself, so the centre is read back off the prior result it produced.
- 3. `pe` fans out into whatever both passes left `nothing`.
-
-A deferred slot therefore **wins over `pe`**, which is the map's precedence rule one level down. The measure reads no `V`, so only the `sk` half of the coskewness pair is kept — see [`NegativeSkewness`](@ref) for the half that needs both.
+`sk` is the one slot of the measure that a prior can supply, so the slot holds the estimator itself. The measure reads no `V`, so it keeps only the `sk` half of the coskewness pair. [`NegativeSkewness`](@ref) reads both halves. A coskewness estimator centres the matrix on its own `me`. A measure whose `sk` is not a **Deferred Quantity** returns unchanged.
 
 # Related
 
   - [`Skewness`](@ref)
   - [`resolve_deferred_quantities`](@ref)
-  - [`deferred_centre`](@ref)
-  - [`fan_out_slot`](@ref)
-  - [`fit_deferred_quantity`](@ref)
+  - [`resolve_slot`](@ref)
 """
 function resolve_deferred_quantities(r::Skewness, pr::AbstractPriorResult,
                                      ::Any = nothing)::Skewness
-    if isnothing(r.pe) && !isa(r.mu, DeferredQuantity) && !isa(r.sk, DeferredQuantity)
-        return r
-    end
-    mu = resolve_slot(r.mu, :mu, pr)
-    sk = r.sk
-    if isa(sk, DeferredQuantity)
-        centre = isnothing(mu) ? deferred_centre(sk, pr) : mu
-        fitted = fit_deferred_moment(sk, pr, centre)
-        sk = deferred_quantity(fitted, :sk)
-        mu = nothing_scalar_array_selector(centre, deferred_derived_quantity(fitted, :mu))
-    end
-    return fan_out_pe(r, r.pe, pr, (; sk = sk, mu = mu))
+    return r
 end
-# Deferrable slots — see `deferred_slots`. `ve` holds a variance estimator by design, not a
-# Deferred Quantity, so it is not declared here.
-deferred_slots(r::Skewness) = (; mu = r.mu, sk = r.sk, pe = r.pe)
+function resolve_deferred_quantities(r::Skewness{<:Any, <:DeferredQuantity},
+                                     pr::AbstractPriorResult, ::Any = nothing)::Skewness
+    return rebuild_with_slots(r, (; sk = resolve_slot(r.sk, :sk, pr)))
+end
+# Deferrable slots — see `deferred_slots`.
+deferred_slots(r::Skewness) = (; sk = r.sk)
+# The functor reads `sk` as it stands, so an empty `sk` is refused on a value-level route —
+# see `functor_slots`.
+functor_slots(r::Skewness) = (; sk = r.sk)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `true` because higher skewness is preferred over lower skewness.
+Return `true`, because a larger third moment is better.
+
+The generic method for an [`AbstractBaseRiskMeasure`](@ref) returns `false`. The asset selection, the parameter search and the ranking of cross-validation results read this trait to choose the direction of the score.
 
 # Related
 
@@ -281,84 +245,89 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Create an instance of [`Skewness`](@ref) by selecting observation weights and expected returns from the risk-measure instance or falling back to the prior result.
+Create an instance of [`Skewness`](@ref) that holds its coskewness matrix, from the measure or from the [`HighOrderPrior`](@ref) result `pr`.
+
+# Algorithm
+
+ 1. Resolve a **Deferred Quantity** in `sk` with [`resolve_deferred_quantities`](@ref), giving `r`.
+ 2. Select `sk` with [`nothing_scalar_array_selector`](@ref). A measure that states a matrix keeps it, and a measure whose `sk` is `nothing` takes `pr.sk`.
+ 3. Build a new `Skewness` from `sk` and the `settings` of `r`.
 
 # Related
 
   - [`Skewness`](@ref)
-  - [`AbstractPriorResult`](@ref)
+  - [`HighOrderPrior`](@ref)
   - [`factory`](@ref)
   - [`nothing_scalar_array_selector`](@ref)
 """
-function factory(r::Skewness, pr::HighOrderPrior, args...; kwargs...)
+function factory(r::Skewness, pr::HighOrderPrior, args...; kwargs...)::Skewness
     r = resolve_deferred_quantities(r, pr)
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    mu = nothing_scalar_array_selector(r.mu, pr.mu)
-    sk = nothing_scalar_array_selector(r.sk, pr.sk)
-    return Skewness(; settings = r.settings, ve = factory(r.ve, w), sk = sk, w = w, mu = mu,
-                    pe = nothing)
+    return Skewness(; settings = r.settings,
+                    sk = nothing_scalar_array_selector(r.sk, pr.sk))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Create an instance of [`Skewness`](@ref) from a [`LowOrderPrior`](@ref) result, selecting observation weights and expected returns while preserving the coskewness matrix from the risk measure.
+Resolve a **Deferred Quantity** in the `sk` slot of [`Skewness`](@ref) `r` against a [`LowOrderPrior`](@ref) result, and otherwise return `r` unchanged.
+
+A [`LowOrderPrior`](@ref) holds no coskewness matrix, so the method has no matrix to take from `pr`. A coskewness estimator in `sk` needs only the returns of the result, so it resolves here too. The functor and the model need a matrix. A value-level entry point refuses a measure whose `sk` is `nothing`, and so does [`set_risk_constraints!`](@ref).
 
 # Related
 
   - [`Skewness`](@ref)
   - [`LowOrderPrior`](@ref)
   - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
 """
 function factory(r::Skewness, pr::LowOrderPrior, args...; kwargs...)::Skewness
-    r = resolve_deferred_quantities(r, pr)
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    mu = nothing_scalar_array_selector(r.mu, pr.mu)
-    return Skewness(; settings = r.settings, ve = factory(r.ve, w), sk = r.sk, w = w,
-                    mu = mu, pe = nothing)
+    return resolve_deferred_quantities(r, pr)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return a view of [`Skewness`](@ref) `r` sliced to asset indices `i`.
+Return [`Skewness`](@ref) `r` unchanged, because its `sk` holds no matrix to slice.
 
-Slices the expected returns `mu` for cluster-based optimisation. `sk` passes through: it is `nothing`, or it holds a **Deferred Quantity**, which crosses the view unresolved and then fits on the subset.
+`sk` is `nothing`, or it holds a **Deferred Quantity**, which crosses the view unresolved and then fits on the subset.
 
 # Related
 
   - [`Skewness`](@ref)
   - [`port_opt_view`](@ref)
-  - [`nothing_scalar_array_view`](@ref)
 """
-function port_opt_view(r::Skewness, i, args...)
-    mu = nothing_scalar_array_view(r.mu, i)
-    return Skewness(; settings = r.settings, ve = r.ve, sk = r.sk, w = r.w, mu = mu,
-                    pe = r.pe)
+function port_opt_view(r::Skewness, i, args...)::Skewness
+    return r
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return a view of [`Skewness`](@ref) `r` sliced to asset indices `i`, also slicing the coskewness matrix `sk`.
+Return a view of [`Skewness`](@ref) `r` sliced to asset indices `i`, with a view of its coskewness matrix `sk`.
+
+The view agrees with the coskewness that a refit on the assets `i` gives.
+
+# Algorithm
+
+ 1. Compute `idx`, the columns of `sk` that belong to the pairs of assets in `i`, with [`fourth_moment_index_generator`](@ref).
+ 2. Take the view of `sk` at the rows `i` and the columns `idx` with [`nothing_scalar_array_view_odd_order`](@ref).
+ 3. Build a new `Skewness` from the view and the `settings` of `r`.
 
 # Related
 
   - [`Skewness`](@ref)
   - [`port_opt_view`](@ref)
-  - [`nothing_scalar_array_view`](@ref)
   - [`nothing_scalar_array_view_odd_order`](@ref)
   - [`fourth_moment_index_generator`](@ref)
 """
-function port_opt_view(r::Skewness{<:Any, <:Any, <:MatNum}, i, args...)
-    mu = nothing_scalar_array_view(r.mu, i)
+function port_opt_view(r::Skewness{<:Any, <:MatNum}, i, args...)::Skewness
     idx = fourth_moment_index_generator(size(r.sk, 1), i)
     sk = nothing_scalar_array_view_odd_order(r.sk, i, idx)
-    return Skewness(; settings = r.settings, ve = r.ve, sk = sk, w = r.w, mu = mu,
-                    pe = r.pe)
+    return Skewness(; settings = r.settings, sk = sk)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return a copy of [`Skewness`](@ref) `r` with `rke = false`, disabling its contribution to the JuMP objective expression.
+Return a copy of [`Skewness`](@ref) `r` with `rke = false`, so that the measure adds nothing to the risk of the objective.
+
+The copy keeps `lb` and `scale`. The constructor of [`VarianceSkewKurtosis`](@ref) calls this method on its `sk`, so the composite registers the skewness term once, inside its own risk expression. The method exists because the method for a [`RiskMeasure`](@ref) builds a [`RiskMeasureSettings`](@ref), which has no `lb`.
 
 # Related
 
@@ -369,13 +338,14 @@ Return a copy of [`Skewness`](@ref) `r` with `rke = false`, disabling its contri
 function no_risk_expr_risk_measure(r::Skewness)
     return Skewness(;
                     settings = MaxRiskMeasureSettings(; rke = false, lb = r.settings.lb,
-                                                      scale = r.settings.scale), ve = r.ve,
-                    sk = r.sk, w = r.w, mu = r.mu, pe = r.pe)
+                                                      scale = r.settings.scale), sk = r.sk)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return a copy of [`Skewness`](@ref) `r` with `rke = false` and `lb = nothing`, removing bounds and disabling its contribution to the JuMP objective expression.
+Return a copy of [`Skewness`](@ref) `r` with `rke = false`, `lb = nothing` and a unit `scale`.
+
+This is the copy that a measure takes when it only measures a distance, as the method for a [`RiskMeasure`](@ref) does. The method exists because that method builds a [`RiskMeasureSettings`](@ref), which has no `lb`.
 
 # Related
 
@@ -386,13 +356,15 @@ Return a copy of [`Skewness`](@ref) `r` with `rke = false` and `lb = nothing`, r
 function no_bounds_no_risk_expr_risk_measure(r::Skewness, ::Any = nothing)
     return Skewness(;
                     settings = MaxRiskMeasureSettings(; rke = false, lb = nothing,
-                                                      scale = 1), ve = r.ve, sk = r.sk,
-                    w = r.w, mu = r.mu, pe = r.pe)
+                                                      scale = one(r.settings.scale)),
+                    sk = r.sk)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return a copy of [`Skewness`](@ref) `r` with the lower bound set to `ub`.
+Return a copy of [`Skewness`](@ref) `r` with the floor `lb` set to `ub`.
+
+[`bounds_risk_measure`](@ref) passes the bound of every measure as `ub`. The bound of a [`MaxRiskMeasureSettings`](@ref) is a floor, so this method writes it to `lb`, and keeps `rke` and `scale`.
 
 # Related
 
@@ -403,46 +375,84 @@ Return a copy of [`Skewness`](@ref) `r` with the lower bound set to `ub`.
 function bounds_risk_measure(r::Skewness, ub::Number)
     return Skewness(;
                     settings = MaxRiskMeasureSettings(; rke = r.settings.rke, lb = ub,
-                                                      scale = r.settings.scale), ve = r.ve,
-                    sk = r.sk, w = r.w, mu = r.mu, pe = r.pe)
+                                                      scale = r.settings.scale), sk = r.sk)
 end
-function moment_risk(r::Skewness{<:Any, <:Any, <:Any, <:Option{<:StatsBase.AbstractWeights},
-                                 <:Any}, val::VecNum)
-    sigma = Statistics.std(r.ve, val; mean = zero(eltype(val)))
-    val .= val .^ 3
-    res = isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
-    return res / sigma^3
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a copy of [`Skewness`](@ref) `r` with `lb = nothing`, and keep `rke` and `scale`.
+
+[`no_bounds_risk_measure`](@ref) of a [`VarianceSkewKurtosis`](@ref) calls this method on its `sk`, so that the floor of the skewness term leaves the model with the other bounds. The method exists because the method for a [`RiskMeasure`](@ref) builds a [`RiskMeasureSettings`](@ref), which has no `lb`.
+
+# Related
+
+  - [`Skewness`](@ref)
+  - [`MaxRiskMeasureSettings`](@ref)
+  - [`no_bounds_risk_measure`](@ref)
+"""
+function no_bounds_risk_measure(r::Skewness, ::Any = nothing)
+    return Skewness(;
+                    settings = MaxRiskMeasureSettings(; rke = r.settings.rke, lb = nothing,
+                                                      scale = r.settings.scale), sk = r.sk)
 end
-# Evaluation entry points — see `MomentRiskMeasures` in `25_RiskMeasureTools.jl`.
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a copy of [`Skewness`](@ref) `r` with a unit `scale`, and keep `lb` and `rke`.
+
+A measure that already has a unit `scale` returns unchanged. The method exists because the method for a [`RiskMeasure`](@ref) builds a [`RiskMeasureSettings`](@ref), which has no `lb`.
+
+# Related
+
+  - [`Skewness`](@ref)
+  - [`MaxRiskMeasureSettings`](@ref)
+  - [`unit_scale_risk_measure`](@ref)
+"""
+function unit_scale_risk_measure(r::Skewness)
+    settings = r.settings
+    scale = settings.scale
+    if isone(scale)
+        return r
+    end
+    return Skewness(;
+                    settings = MaxRiskMeasureSettings(; rke = settings.rke,
+                                                      lb = settings.lb, scale = one(scale)),
+                    sk = r.sk)
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Composite risk measure combining variance, skewness, and kurtosis into a single expression.
+Measures a weighted sum of the variance, the third central moment and the fourth central moment of the portfolio returns.
 
-`VarianceSkewKurtosis` encodes the joint SDP formulation ``\\sigma^2 - \\mathrm{Skew} + \\kappa`` where each component has its own scale weight. The skewness term is subtracted because higher skewness is preferable.
+The third moment enters with a negative sign, because a larger skewness is better. Each term takes the `scale` of its child as its weight, and the bound of its child as its bound. The skewness bound is the floor `sk.settings.lb`, and the other two are ceilings. The terms are the raw moments: the third moment is not standardised, and the fourth moment is not square-rooted under any `alg` of `kt`. The model and the functor read the matrices of the children. To weight a term, name a **Deferred Quantity** that carries the weights, such as `kt = Kurtosis(; kt = Cokurtosis(; w = w))`.
+
+[`set_risk_constraints!`](@ref) states the model. It is the semidefinite relaxation of Problems 12 to 14 of [sdpmom](@cite), and that work states that the relaxation is tight over a range of skewness values only. The `## Relaxation` of the method states the gap of each term.
+
+!!! warning
+
+    A skewness scale ``s_{\\mathrm{sk}}`` that is large against ``s_{\\sigma^2}`` and ``s_{\\kappa}`` loosens the relaxation. The optimum moves to relaxation blocks far from any product of the weights, and the value of the model stops tracking the value of the functor, without bound. A first-order solver can then stop at a point that breaks the weight bounds and the budget, and the solution check accepts that point as solved when `check_sol = (; allow_almost = true)`. Raise ``s_{\\mathrm{sk}}`` in small steps, and compare the value of the model with the value of the functor at the returned weights. The default `check_sol` rejects an approximate solution, so a solver that stops short fails and returns no such point.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\mathcal{R}(\\boldsymbol{w}) &= s_{\\sigma^2}\\,\\mu_2(\\boldsymbol{w})
-    - s_{\\mathrm{sk}}\\,\\mu_3(\\boldsymbol{w})
-    + s_{\\kappa}\\,\\mu_4(\\boldsymbol{w})\\,, \\\\
-\\mu_2(\\boldsymbol{w}) &= \\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}\\,, \\\\
-\\mu_3(\\boldsymbol{w}) &= \\boldsymbol{w}^\\intercal \\mathbf{M}_3 \\left(\\boldsymbol{w} \\otimes \\boldsymbol{w}\\right)\\,, \\\\
-\\mu_4(\\boldsymbol{w}) &= \\left(\\boldsymbol{w} \\otimes \\boldsymbol{w}\\right)^\\intercal \\mathbf{M}_4 \\left(\\boldsymbol{w} \\otimes \\boldsymbol{w}\\right)\\,.
+\\mathcal{R}(\\boldsymbol{w}) &= s_{\\sigma^2}\\, \\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}
+    - s_{\\mathrm{sk}}\\, m_3(\\boldsymbol{w})
+    + s_{\\kappa}\\, m_4(\\boldsymbol{w})\\,.
 \\end{align}
 ```
 
 Where:
 
   - $(math_dict[:w_port])
-  - ``\\mu_2, \\mu_3, \\mu_4``: **Raw** central portfolio moments of order two, three and four. The skewness is not standardised and the kurtosis is not square-rooted.
-  - ``\\mathbf{\\Sigma}, \\mathbf{M}_3, \\mathbf{M}_4``: Covariance, coskewness and cokurtosis matrices, held by `vr`, `sk` and `kt`.
-  - ``s_{\\sigma^2},\\, s_{\\mathrm{sk}},\\, s_{\\kappa}``: Respective scale factors from each sub-measure's settings.
-  - ``\\otimes``: Kronecker product.
+  - $(math_dict[:Sigma_rm])
+  - $(math_dict[:m3_port])
+  - $(math_dict[:M3_cosk])
+  - $(math_dict[:m4_port])
+  - $(math_dict[:K_cokurt])
+  - ``s_{\\sigma^2}``, ``s_{\\mathrm{sk}}``, ``s_{\\kappa}``: The `settings.scale` of `vr`, `sk` and `kt`.
 
-The functor and the `JuMP` model compute this same quantity from these same matrices. They differ only by the gap of the semidefinite relaxation, which [sdpmom](@cite) states is tight over a range of skewness values and not beyond it.
+The three matrices are the moments of the returns, so ``\\mathcal{R}`` is Equation 2 of [sdpmom](@cite) for orders two and four and Equation 1 for order three. With the default prior, the covariance has the divisor ``T - 1`` and the two higher moments have the divisor ``T``.
 
 # Fields
 
@@ -470,63 +480,25 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `vr`: Recursively updated via [`factory`](@ref).
-  - `sk`: Recursively updated via [`factory`](@ref).
-  - `kt`: Recursively updated via [`factory`](@ref).
+  - `vr`: Recursively updated through [`factory`](@ref).
+  - `sk`: Recursively updated through [`factory`](@ref).
+  - `kt`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `vr`: Recursively viewed via [`port_opt_view`](@ref).
-  - `sk`: Recursively viewed via [`port_opt_view`](@ref).
-  - `kt`: Recursively viewed via [`port_opt_view`](@ref).
-
-# `JuMP` Formulation
-
-The `JuMP` model is the semidefinite relaxation of [sdpmom](@cite), equations 11 to 14. It relaxes the Kronecker products of the weights into the blocks of one positive semidefinite matrix, and reads each moment off a block with the trace operator.
-
-```math
-\\begin{align}
-\\mathbf{M}^{(4)*} &= \\begin{bmatrix}
-    k & \\boldsymbol{w}^\\intercal & \\left(\\mathbf{L}_2 \\mathrm{vec}(\\mathbf{W}_1)\\right)^\\intercal \\\\
-    \\boldsymbol{w} & \\mathbf{W}_1 & \\mathbf{W}_2^\\intercal \\\\
-    \\mathbf{L}_2 \\mathrm{vec}(\\mathbf{W}_1) & \\mathbf{W}_2 & \\mathbf{W}_3
-\\end{bmatrix} \\succeq 0\\,, \\\\
-\\mathcal{R}(\\boldsymbol{w}) &= s_{\\sigma^2} \\mathrm{Tr}\\left(\\mathbf{\\Sigma} \\mathbf{W}_1\\right)
-    - s_{\\mathrm{sk}} \\mathrm{Tr}\\left(\\mathbf{M}_3 \\mathbf{D}_2 \\mathbf{W}_2\\right)
-    + s_{\\kappa} \\mathrm{Tr}\\left(\\mathbf{S}_2 \\mathbf{M}_4 \\mathbf{S}_2^\\intercal \\mathbf{W}_3\\right)\\,.
-\\end{align}
-```
-
-Where:
-
-  - $(math_dict[:w_port])
-  - ``k``: Homogenisation variable of the model.
-  - ``\\mathbf{W}_1, \\mathbf{W}_2, \\mathbf{W}_3``: Relaxation blocks standing for ``\\boldsymbol{w}\\boldsymbol{w}^\\intercal``, ``(\\boldsymbol{w} \\otimes \\boldsymbol{w})\\boldsymbol{w}^\\intercal`` and ``(\\boldsymbol{w} \\otimes \\boldsymbol{w})(\\boldsymbol{w} \\otimes \\boldsymbol{w})^\\intercal``.
-  - ``\\mathbf{\\Sigma}, \\mathbf{M}_3, \\mathbf{M}_4``: Covariance, coskewness and cokurtosis matrices, from `vr`, `sk` and `kt`.
-  - ``\\mathbf{D}_2, \\mathbf{L}_2, \\mathbf{S}_2``: Duplication, elimination and summation matrices.
-  - ``s_{\\sigma^2},\\, s_{\\mathrm{sk}},\\, s_{\\kappa}``: Respective scale factors from each sub-measure's settings.
-
-The skewness term takes a **lower** bound, because a larger skewness is preferable. The other two take upper bounds.
-
-!!! info
-
-    A relaxation block stands in for an exact Kronecker product, so the model's value carries the relaxation gap. The functor reads the moments from the matrices directly and carries no gap. The two agree to the width of that gap.
-
-!!! warning
-
-    The `JuMP` model is an approximate formulation of ``\\mathcal{R}``. Its optimum matches the optimum of ``\\mathcal{R}`` only where the relaxation is tight, and the relaxation is tight over a range of skewness values only. A skewness scale ``s_{\\mathrm{sk}}`` that is large against ``s_{\\sigma^2}`` and ``s_{\\kappa}`` loosens it: the optimum moves to relaxation blocks far from any product of the weights, and the model's value stops tracking the functor's. A first-order solver can then stop at a point that breaks the weight bounds and the budget. The solution check accepts that point as solved when `check_sol = (; allow_almost = true)`.
-
-    Raise ``s_{\\mathrm{sk}}`` in small steps and check the returned weights against the bounds and the budget. The default `check_sol` rejects an approximate solution, so a solver that stops short fails instead of returning such a point.
+  - `vr`: Recursively viewed through [`port_opt_view`](@ref).
+  - `sk`: Recursively viewed through [`port_opt_view`](@ref).
+  - `kt`: Recursively viewed through [`port_opt_view`](@ref).
 
 # Functor
 
     (r::VarianceSkewKurtosis)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
 
-Computes the composite of equation 12 of [sdpmom](@cite) from `vr.sigma`, `sk.sk` and `kt.kt`. `X` and `fees` take part in no term. The moments are pinned by the matrices, and a central moment does not move when `fees` shifts every observation by the same constant.
+Computes ``\\mathcal{R}(\\boldsymbol{w})`` from `vr.sigma`, `sk.sk` and `kt.kt`, so a measure needs [`factory`](@ref) with a [`HighOrderPrior`](@ref) result first, unless its children state the three matrices. `X` and `fees` take part in no term. The matrices fix the moments, and a central moment does not move when `fees` shifts every observation by the same constant.
 
 ## Arguments
 
@@ -560,27 +532,15 @@ VarianceSkewKurtosis
            │            │   scale ┼ Float64: 1.0
            │            │      lb ┼ nothing
            │            │     rke ┴ Bool: false
-           │         ve ┼ SimpleVariance
-           │            │          me ┼ SimpleExpectedReturns
-           │            │             │   w ┴ nothing
-           │            │           w ┼ nothing
-           │            │   corrected ┴ Bool: true
-           │         sk ┼ nothing
-           │          w ┼ nothing
-           │         mu ┼ nothing
-           │         pe ┴ nothing
+           │         sk ┴ nothing
         kt ┼ Kurtosis
            │   settings ┼ RiskMeasureSettings
            │            │   scale ┼ Float64: 1.0
            │            │      ub ┼ nothing
            │            │     rke ┴ Bool: false
-           │          w ┼ nothing
-           │         mu ┼ nothing
            │         kt ┼ nothing
            │          N ┼ nothing
-           │       alg1 ┼ FullMoment()
-           │       alg2 ┼ SOCRiskExpr()
-           │         pe ┼ nothing
+           │        alg ┼ SOCRiskExpr()
            │   mtx_sqrt ┴ EigenFallbackSquareRoot()
         pe ┴ nothing
 ```
@@ -594,10 +554,12 @@ VarianceSkewKurtosis
   - [`Kurtosis`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
+  - [`set_risk_constraints!`](@ref): states the model and its relaxation.
+  - [`no_bounds_risk_measure`](@ref): removes the bounds of the container and of the three children.
 
 # References
 
-  - $(ref_dict[:sdpmom])
+  - $(ref_dict[:sdpmom]) Section 2, Equations 1 and 2, and Section 3, Problems 12 to 14.
 """
 @propagatable @concrete struct VarianceSkewKurtosis <: RiskMeasure
     """
@@ -642,25 +604,131 @@ end
 # raw moments read off the pinned comoment matrices, exactly as `set_risk_constraints!` reads
 # them off the relaxation blocks, so no return series enters. Fees shift every observation by
 # the same per-period constant given `w`, and a central moment is invariant to that shift, so
-# dropping them changes no value. Delegating to `r.sk` and `r.kt` instead reported the
-# STANDARDISED skewness and, under `SOCRiskExpr`, the square root of the fourth moment, so the
-# functor did not agree with the model it names.
+# dropping them changes no value. The fourth-moment term is the raw moment under every `alg` of
+# `r.kt`, while the functor of `r.kt` reports its square root under `SOCRiskExpr`, so the terms
+# read the matrices and do not delegate to the children.
 function (r::VarianceSkewKurtosis)(w::VecNum, ::MatNum, ::Option{<:Fees} = nothing)
+    v, s, k = variance_skew_kurtosis_terms(r, w)
+    return v - s + k
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the three scaled terms of [`VarianceSkewKurtosis`](@ref) `r` at the weights `w`, as the tuple `(v, s, k)`.
+
+The functor of `r` returns `v - s + k`. The terms have the degrees of homogeneity 2, 3 and 4, so the sum has no single degree. [`adjusted_risk`](@ref) divides each term by its own degree, and so [`risk_contribution`](@ref) decomposes the sum exactly.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+v &= s_{\\sigma^2}\\, \\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}\\,, \\\\
+s &= s_{\\mathrm{sk}}\\, m_3(\\boldsymbol{w})\\,, \\\\
+k &= s_{\\kappa}\\, m_4(\\boldsymbol{w})\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - $(math_dict[:Sigma_rm])
+  - $(math_dict[:m3_port])
+  - $(math_dict[:m4_port])
+  - ``s_{\\sigma^2}``, ``s_{\\mathrm{sk}}``, ``s_{\\kappa}``: The `settings.scale` of `vr`, `sk` and `kt`.
+
+# Arguments
+
+  - `r::VarianceSkewKurtosis`: Measure whose matrices are stated.
+  - `w::VecNum`: Portfolio weights vector `assets × 1`.
+
+# Returns
+
+  - `(v, s, k)::Tuple`: The scaled variance, third moment and fourth moment terms.
+
+# Related
+
+  - [`VarianceSkewKurtosis`](@ref)
+  - [`adjusted_risk`](@ref)
+  - [`homogeneity_degree`](@ref)
+"""
+function variance_skew_kurtosis_terms(r::VarianceSkewKurtosis, w::VecNum)
+    return (r.vr(w) * r.vr.settings.scale,
+            portfolio_third_moment(r.sk.sk, w) * r.sk.settings.scale,
+            portfolio_fourth_moment(r.kt.kt, w) * r.kt.settings.scale)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the third moment of the portfolio at the weights `w`, read off the coskewness matrix `sk`.
+
+This is the term that the model of [`VarianceSkewKurtosis`](@ref) relaxes, that the `lb` of a [`Skewness`](@ref) bounds, and that the functor of `Skewness` gives.
+
+Where:
+
+  - $(math_dict[:m3_port])
+  - $(math_dict[:M3_cosk])
+
+# Arguments
+
+  - `sk::MatNum`: Coskewness matrix `assets × assets^2`.
+  - $(arg_dict[:pw])
+
+# Returns
+
+  - `m3::Number`: The third moment of the portfolio.
+
+# Related
+
+  - [`portfolio_fourth_moment`](@ref)
+  - [`variance_skew_kurtosis_terms`](@ref)
+  - [`Skewness`](@ref)
+"""
+function portfolio_third_moment(sk::MatNum, w::VecNum)
+    return LinearAlgebra.dot(w, sk, LinearAlgebra.kron(w, w))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the fourth moment of the portfolio at the weights `w`, read off the cokurtosis matrix `kt`.
+
+This is the term that the models of [`Kurtosis`](@ref) and of [`VarianceSkewKurtosis`](@ref) read. The functor of `Kurtosis` gives it under the [`QuadSecondMomentFormulations`](@ref), and its square root under [`SOCRiskExpr`](@ref).
+
+Where:
+
+  - $(math_dict[:m4_port])
+  - $(math_dict[:K_cokurt])
+
+# Arguments
+
+  - `kt::MatNum`: Cokurtosis matrix `assets^2 × assets^2`.
+  - $(arg_dict[:pw])
+
+# Returns
+
+  - `m4::Number`: The fourth moment of the portfolio.
+
+# Related
+
+  - [`portfolio_third_moment`](@ref)
+  - [`variance_skew_kurtosis_terms`](@ref)
+  - [`Kurtosis`](@ref)
+"""
+function portfolio_fourth_moment(kt::MatNum, w::VecNum)
     w2 = LinearAlgebra.kron(w, w)
-    return r.vr(w) * r.vr.settings.scale -
-           LinearAlgebra.dot(w, r.sk.sk, w2) * r.sk.settings.scale +
-           LinearAlgebra.dot(w2, r.kt.kt, w2) * r.kt.settings.scale
+    return LinearAlgebra.dot(w2, kt, w2)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve every **Deferred Quantity** held by [`VarianceSkewKurtosis`](@ref) `r` against prior result `pr`.
 
-Two levels, in order. Each child resolves whatever it holds of its own, then the container's `pe` fans out into every child slot still unstated — `sigma` and its `chol` on `vr`, `sk` and `mu` on `sk`, `kt` and `mu` on `kt` — all from **one** fit.
+A child that names its own quantity keeps it, whether it states the quantity or defers it. The composite adds a variance, a skewness and a kurtosis term, so a caller who wants the three to describe one distribution names `pe` on the container and states nothing on the children.
 
-A child that names its own quantity keeps it. This is the map's precedence rule applied one level down, and it treats a deferred child slot exactly as it already treats a stated one.
+# Algorithm
 
-The composed measure adds a variance, a skewness and a kurtosis term, so a caller who wants the three to describe one distribution names `pe` on the container and states nothing on the children.
+ 1. Resolve each child with its own method of [`resolve_deferred_quantities`](@ref), giving `vr`, `sk` and `kt`.
+ 2. When `pe` is not `nothing`, fit it once against `pr` with [`fan_out_pe`](@ref), and fill each child slot that is still `nothing` from that one fit: `sigma` and its `chol` on `vr`, `sk` on `sk`, and `kt` on `kt`.
+ 3. Return the rebuilt measure with `pe = nothing`.
 
 # Related
 
@@ -687,28 +755,27 @@ function fan_out_pe(r::VarianceSkewKurtosis, pe::AbstractPriorEstimator,
     chol = isnothing(vr.sigma) ? deferred_derived_quantity(fitted, :chol) : vr.chol
     vr = rebuild_with_slots(vr,
                             (; sigma = fan_out_slot(fitted, vr.sigma, :sigma), chol = chol))
-    sk = rebuild_with_slots(sk,
-                            (; sk = fan_out_slot(fitted, sk.sk, :sk),
-                             mu = fan_out_slot(fitted, sk.mu, :mu), pe = nothing))
-    kt = rebuild_with_slots(kt,
-                            (; mu = fan_out_slot(fitted, kt.mu, :mu),
-                             kt = fan_out_slot(fitted, kt.kt, :kt), pe = nothing))
+    sk = rebuild_with_slots(sk, (; sk = fan_out_slot(fitted, sk.sk, :sk)))
+    kt = rebuild_with_slots(kt, (; kt = fan_out_slot(fitted, kt.kt, :kt)))
     return rebuild_with_slots(r, (; vr = vr, sk = sk, kt = kt, pe = nothing))
 end
 # Deferrable slots — see `deferred_slots`. The three children carry their own, so the check
 # recurses into them.
 deferred_slots(r::VarianceSkewKurtosis) = (; vr = r.vr, sk = r.sk, kt = r.kt, pe = r.pe)
-# The functor reads the co-moment tensors off the children directly, and neither child reads
-# its own on a value-level route, so the container names both grandchildren by the path the
-# caller wrote. `vr` reads its own `sigma`, so it is reached through `deferred_slots` — see
-# `functor_slots`.
-functor_slots(r::VarianceSkewKurtosis) = (; var"sk.sk" = r.sk.sk, var"kt.kt" = r.kt.kt)
+# The functor reads `sigma`, `sk` and `kt` off the children, and each child names its own in
+# `functor_slots`, so the check reaches them through `deferred_slots`.
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Create an instance of [`VarianceSkewKurtosis`](@ref) by fanning `pe` out over its three children, then threading `pr` into each of them.
 
-The container holds no quantity of its own, so [`@fprop`](@ref) alone would reach the children and leave `pe` standing — the measure would say one thing and compute another. This method resolves first, which is the same order the [`JuMP`](https://github.com/jump-dev/JuMP.jl) path already uses in [`set_risk_constraints!`](@ref).
+The container holds no quantity of its own, so [`@fprop`](@ref) alone would reach the children and leave `pe` in place, and the measure would then hold a `pe` that it never applied. This method resolves first, which is the same order that [`set_risk_constraints!`](@ref) uses.
+
+# Algorithm
+
+ 1. Resolve the container with [`resolve_deferred_quantities`](@ref), giving `r`.
+ 2. Thread `pr` into each child with its own method of [`factory`](@ref), giving `vr`, `sk` and `kt`.
+ 3. Build a new `VarianceSkewKurtosis` from the three children and the `settings` of `r`, with `pe = nothing`.
 
 # Related
 
@@ -723,36 +790,62 @@ function factory(r::VarianceSkewKurtosis, pr::AbstractPriorResult, args...; kwar
                                 sk = factory(r.sk, pr, args...; kwargs...),
                                 kt = factory(r.kt, pr, args...; kwargs...), pe = nothing)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a copy of [`VarianceSkewKurtosis`](@ref) `r` without its bounds, the bound of the container and the bounds of its three children.
+
+A child holds the bound of its own term, so the method for a [`RiskMeasure`](@ref), which rebuilds only `settings`, would leave `vr.settings.ub`, `sk.settings.lb` and `kt.settings.ub` in the model. [`NearOptimalCentering`](@ref) solves its corner portfolios with this copy, so a child bound would constrain a corner that must be free. Every child and the container keep `rke` and `scale`, because the scale of a child weights its term.
+
+# Related
+
+  - [`VarianceSkewKurtosis`](@ref)
+  - [`no_bounds_risk_measure`](@ref)
+  - [`no_bounds_no_risk_expr_risk_measure`](@ref)
+"""
+function no_bounds_risk_measure(r::VarianceSkewKurtosis, flag::Any = nothing)
+    return VarianceSkewKurtosis(;
+                                settings = RiskMeasureSettings(; rke = r.settings.rke,
+                                                               scale = r.settings.scale),
+                                vr = no_bounds_risk_measure(r.vr, flag),
+                                sk = no_bounds_risk_measure(r.sk, flag),
+                                kt = no_bounds_risk_measure(r.kt, flag), pe = r.pe)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a copy of [`VarianceSkewKurtosis`](@ref) `r` without its bounds and outside the risk of the objective.
+
+The container takes `rke = false` and a unit `scale`, as the method for a [`RiskMeasure`](@ref) does. The children lose their bounds through [`no_bounds_risk_measure`](@ref) and keep their scales, because the scale of a child weights its term in the composite.
+
+# Related
+
+  - [`VarianceSkewKurtosis`](@ref)
+  - [`no_bounds_no_risk_expr_risk_measure`](@ref)
+  - [`no_bounds_risk_measure`](@ref)
+"""
+function no_bounds_no_risk_expr_risk_measure(r::VarianceSkewKurtosis, flag::Any = nothing)
+    return VarianceSkewKurtosis(;
+                                settings = RiskMeasureSettings(; rke = false,
+                                                               scale = one(r.settings.scale)),
+                                vr = no_bounds_risk_measure(r.vr, flag),
+                                sk = no_bounds_risk_measure(r.sk, flag),
+                                kt = no_bounds_risk_measure(r.kt, flag), pe = r.pe)
+end
 
 # Expected-risk input kind — see `risk_input_kind`.
-risk_input_kind(::Skewness) = WeightsReturnsFeesInput()
+risk_input_kind(::Skewness) = WeightsInput()
 risk_input_kind(::VarianceSkewKurtosis) = WeightsReturnsFeesInput()
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return whether [`Skewness`](@ref) `r` supports precomputed-return evaluation.
-
-Delegates to [`weight_independent_target`](@ref) on `r.mu`: `true` iff the target is
-`Nothing`, a `Number`, or a [`MedianCenteringFunction`](@ref); `false` for per-asset targets.
-
-# Related
-
-  - [`supports_precomputed_returns`](@ref)
-  - [`weight_independent_target`](@ref)
-  - [`Skewness`](@ref)
-"""
-supports_precomputed_returns(r::Skewness) = weight_independent_target(r.mu)
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return `false`: [`VarianceSkewKurtosis`](@ref) carries a weights-only variance term
-`r.vr(w)` with no bare-series form.
+Return `false`: the functor of [`VarianceSkewKurtosis`](@ref) reads the weights in all three terms, through the comoment matrices, and has no form that reads a series alone.
 
 # Related
 
   - [`supports_precomputed_returns`](@ref)
   - [`VarianceSkewKurtosis`](@ref)
 """
-supports_precomputed_returns(::VarianceSkewKurtosis) = false
+supports_precomputed_returns(::VarianceSkewKurtosis)::Bool = false
 
 export MaxRiskMeasureSettings, Skewness, VarianceSkewKurtosis

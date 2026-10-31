@@ -23,4 +23,6 @@ gap_fill_value(::ExpWeightedCovariance)
 variance_series(ce::ExpWeightedCovariance, X::MatNum; dims::Int = 1, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
 variance_series(ce::ExpWeightedCovariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
 Base.copy(x::PortfolioOptimisers.ExpWeightedCovarianceState)
+PortfolioOptimisers.observation_count(state::PortfolioOptimisers.ExpWeightedCovarianceState)
+exp_weighted_covariance_count
 ```

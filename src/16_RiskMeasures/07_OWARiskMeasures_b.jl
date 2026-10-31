@@ -7,7 +7,7 @@ A sorting network is a fixed list of comparators. Each comparator reads two posi
 
 # Interfaces
 
-In order to implement a new sorting network that works seamlessly with the library, subtype `AbstractSortingNetworkMerge` and implement the following method:
+To implement a new sorting network, subtype `AbstractSortingNetworkMerge` and implement the following method:
 
 ## `sorting_network`
 
@@ -105,6 +105,13 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the comparators of Batcher's odd-even merge network for `T` values.
 
+# Algorithm
+
+ 1. Start with the empty comparator list `c` and the block half-size `p = 1`.
+ 2. While `p < T`, run the passes of the merge of the blocks of `2p` positions. For each distance `k` from `p` down to `1`, halved at each pass, append the comparators of the pass with [`odd_even_merge_pass!`](@ref).
+ 3. Double `p`, and repeat step 2.
+ 4. Return `c`.
+
 # Arguments
 
   - `alg`: The odd-even merge network.
@@ -155,6 +162,12 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Append to `c` the comparators of one pass of Batcher's odd-even merge network.
 
 The pass compares the positions that are `k` apart and that are in the same block of `2p` positions. A comparator that reads a position past `T` is omitted.
+
+# Algorithm
+
+ 1. For each start `j` from `k % p` up to `T - k - 1`, in steps of `2k`, and for each offset `i` from `0` while `i + j + k < T` and `i < k`:
+ 2. Append the comparator `(i + j + 1, i + j + k + 1)` when the two zero-based positions `i + j` and `i + j + k` are in the same block of `2p` positions.
+ 3. Return `c`.
 
 # Arguments
 
@@ -231,6 +244,14 @@ Append to `c` the comparators that sort the `m` positions from `lo` with a biton
 
 The first half is sorted in the opposite direction and the second half in the direction `up`, so the two halves make a bitonic sequence. [`bitonic_merge!`](@ref) then merges it.
 
+# Algorithm
+
+ 1. If `m <= 1`, return `c` unchanged.
+ 2. Set the half length `h = div(m, 2)`.
+ 3. Append the comparators that sort the first `h` positions in the direction `!up`, by recursion.
+ 4. Append the comparators that sort the last `m - h` positions in the direction `up`, by recursion.
+ 5. Append the comparators that merge the `m` positions in the direction `up`, with [`bitonic_merge!`](@ref).
+
 # Arguments
 
   - `c`: Comparator list, changed in place.
@@ -268,6 +289,13 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Append to `c` the comparators that merge the bitonic sequence of `m` positions from `lo`.
 
 The comparator span is the largest power of two below `m`, so the merge works for every length.
+
+# Algorithm
+
+ 1. If `m <= 1`, return `c` unchanged.
+ 2. Set the span `p = prevpow(2, m - 1)`, the largest power of two below `m`.
+ 3. For each position `i` from `lo` to `lo + m - p - 1`, append the comparator of `i` and `i + p`. It puts the smaller value at `i` when `up` is `true`, and at `i + p` otherwise.
+ 4. Merge the first `p` positions and the last `m - p` positions in the direction `up`, by recursion.
 
 # Arguments
 
@@ -310,7 +338,7 @@ The order changes the columns of the model, not the risk. A solver that permutes
 
 # Interfaces
 
-In order to implement a new order that works seamlessly with the library, subtype `AbstractSortingNetworkOrdering` and implement the following method:
+To implement a new order of the network variables, subtype `AbstractSortingNetworkOrdering` and implement the following method:
 
 ## `sorting_network_columns`
 
@@ -430,6 +458,12 @@ Return the columns of the network values in the order of the positions they hold
 
 A stable sort of the values by their position keeps the values of one position in the order that the network writes them.
 
+# Algorithm
+
+ 1. Build `wire`, the position of each network value. Comparator `k` writes value `2k - 1` to its first position and value `2k` to its second position.
+ 2. Sort the values by `wire` with a stable sort, which gives the permutation `sortperm(wire)`.
+ 3. Return its inverse, the column of each value.
+
 # Arguments
 
   - `alg`: The position order.
@@ -501,13 +535,13 @@ Two setups give a supernodal factorisation. The times below are for the minimum 
 
 Where:
 
-  - ``\\boldsymbol{\\omega}``: Is the nondecreasing OWA weight vector.
-  - ``\\hat{\\boldsymbol{r}}``: Is the `T × 1` vector of net portfolio returns.
-  - ``s``: Is the largest absolute asset return, which scales the network values towards one.
-  - ``K``: Is the number of comparators of the network.
-  - ``a(k),\\, b(k)``: Are the two values that comparator ``k`` reads.
-  - ``l(k),\\, h(k)``: Are the smaller and the larger value that comparator ``k`` writes.
-  - ``\\boldsymbol{z}_{\\mathrm{in}},\\, \\boldsymbol{z}_{\\mathrm{out}}``: Are the values that the network reads and the last value that it writes to each position, in ascending position.
+  - ``\\boldsymbol{\\omega}``: Nondecreasing OWA weight vector ``T \\times 1``.
+  - $(math_dict[:rhat_net_vec])
+  - ``s``: Largest absolute asset return, which scales the network values towards one.
+  - ``K``: Number of comparators of the network.
+  - ``a(k),\\, b(k)``: The two values that comparator ``k`` reads.
+  - ``l(k),\\, h(k)``: The smaller and the larger value that comparator ``k`` writes.
+  - ``\\boldsymbol{z}_{\\mathrm{in}},\\, \\boldsymbol{z}_{\\mathrm{out}}``: The values that the network reads, and the last value that it writes to each position, in ascending order of position.
 
 # Fields
 
@@ -600,11 +634,19 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Ordered Weights Array Range (OWA Range) risk measure.
+Measures risk as the sum of a loss tail and a gain tail of the sorted portfolio returns, each an OWA risk.
 
-Computes portfolio risk as the difference between two OWA linear combinations of sorted portfolio returns, providing a range-based risk measure.
+The risk is the sorted returns weighted by the difference of two OWA weight vectors, `w1` for the loss tail and `w2` for the gain tail.
 
-The constructor reverses `w2` unless the caller declares that it is already reversed (see `rev`). That reversal is what makes the *difference* of the two weight vectors a *range*: `w1` addresses the lower tail of the sorted returns, and the reversed `w2` addresses the upper tail, so `w1 - w2` sums the two tails rather than cancelling them. It is the weight-space form of the convention [`ValueatRiskRange`](@ref) states on the returns themselves.
+`w2` is held reversed. The reversal makes the difference of the two weight vectors a range. `w1` weighs the lower tail of the sorted returns and the reversed `w2` weighs the upper tail, so `w1 - w2` adds the two tails and does not cancel them. It is the weight-space form of the convention [`ValueatRiskRange`](@ref) states on the returns themselves.
+
+When `w2` is `nothing`, the constructor mirrors `w1`: it stores `reverse(w1)` for a vector and `reverse ∘ w1` for a callable. A `w2` that the caller gives is stored as given. The stored `w2` is never `nothing`, so a rebuild from the fields of an instance reverses nothing a second time.
+
+Under [`ApproxOrderedWeightsArray`](@ref) this type approximates each tail on its own, and the relaxation is tighter than one [`OrderedWeightsArray`](@ref) over a fused vector such as [`owa_cvarrg`](@ref). So a range of OWA tails is spelled with this type, and the aliases [`OWA_RG`](@ref), [`OWA_CVaR_RG`](@ref) and [`OWA_TG_RG`](@ref) build it.
+
+!!! warning
+
+    A `w2` that you give is stored as given, so you must give it already reversed: `reverse(v)` for a vector `v`, and `reverse ∘ f` for a callable `f`. The constructor does not check the orientation. An unreversed `w2` weighs the same lower tail as `w1`, so `w1 - w2` cancels the two tails instead of adding them, and the measure is not a range. [`ApproxOrderedWeightsArray`](@ref) builds each tail from properties of its weight vector that a reordering leaves unchanged, so its model still optimises the range. The functor and [`expected_risk`](@ref) read `w1 - w2`, so the risk that they report then differs from the model.
 
 # Mathematical definition
 
@@ -620,8 +662,8 @@ Where:
   - $(math_dict[:xret])
   - $(math_dict[:T])
   - ``\\boldsymbol{w}_{1}``: Lower-tail OWA weight vector ``T \\times 1``.
-  - ``\\boldsymbol{w}_{2}``: Upper-tail OWA weight vector ``T \\times 1``, held reversed by the constructor.
-  - ``x_{(t)}``: ``t``-th smallest entry of ``\\boldsymbol{x}``, so ``x_{(1)} \\leq \\dots \\leq x_{(T)}``.
+  - ``\\boldsymbol{w}_{2}``: Upper-tail OWA weight vector ``T \\times 1``, held reversed.
+  - $(math_dict[:x_t_asc])
 
 # Fields
 
@@ -632,19 +674,18 @@ $(DocStringExtensions.FIELDS)
     OrderedWeightsArrayRange(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         w1::OWA_Func_VecNum = owa_tg,
-        w2::OWA_Func_VecNum = owa_tg,
-        alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray(),
-        rev::Bool = false
+        w2::Option{<:OWA_Func_VecNum} = nothing,
+        alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray()
     ) -> OrderedWeightsArrayRange
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. `w2 = nothing` stores the reversal of `w1`.
 
 ## Validation
 
-  - If `w1` is a `VecNum`: `!isempty(w1)`.
-  - If `w2` is a `VecNum`: `!isempty(w2)`.
-  - If both `w1` and `w2` are `VecNum`: `length(w1) == length(w2)`.
-  - If both `w1` and `w2` are `VecNum` and `alg` is a [`SortingNetworkOrderedWeightsArray`](@ref): `issorted(w1 - w2)`, with `w2` reversed. Raises a `DomainError`. A callable is checked when the model is built.
+  - If `w1` is a `VecNum`: `!isempty(w1)`. Raises an `IsEmptyError`.
+  - If `w2` is a `VecNum`: `!isempty(w2)`. Raises an `IsEmptyError`.
+  - If both `w1` and `w2` are `VecNum`: `length(w1) == length(w2)`. Raises a `DimensionMismatch`.
+  - If both `w1` and `w2` are `VecNum` and `alg` is a [`SortingNetworkOrderedWeightsArray`](@ref): `issorted(w1 - w2)`, with `w2` as stored. Raises a `DomainError`. A callable is checked when the model is built.
 
 # Functor
 
@@ -669,11 +710,26 @@ OrderedWeightsArrayRange
         w2 ┼ ComposedFunction{typeof(reverse), typeof(owa_tg)}: reverse ∘ PortfolioOptimisers.owa_tg
        alg ┼ ApproxOrderedWeightsArray
            │   p ┴ Vector{Float64}: [2.0, 3.0, 4.0, 10.0, 50.0]
-       rev ┴ Bool: true
+```
+
+The worst realisation, mirrored into the gain tail, gives the range of the returns.
+
+```jldoctest
+julia> x = [0.02, -0.01, 0.03, -0.04];
+
+julia> OrderedWeightsArrayRange(; w1 = owa_wr)(x) ≈ maximum(x) - minimum(x)
+true
+
+julia> OrderedWeightsArrayRange(; w1 = owa_wr(4), w2 = reverse(owa_wr(4)))(x) ≈
+       maximum(x) - minimum(x)
+true
 ```
 
 # Related
 
+  - [`OWA_RG`](@ref)
+  - [`OWA_CVaR_RG`](@ref)
+  - [`OWA_TG_RG`](@ref)
   - [`OrderedWeightsArray`](@ref)
   - [`OrderedWeightsArrayFormulation`](@ref)
   - [`ExactOrderedWeightsArray`](@ref)
@@ -704,55 +760,40 @@ OrderedWeightsArrayRange
     $(field_dict[:alg])
     """
     alg
-    """
-    $(field_dict[:rev_owa])
-    """
-    rev
     function OrderedWeightsArrayRange(settings::RiskMeasureSettings, w1::OWA_Func_VecNum,
-                                      w2::OWA_Func_VecNum,
-                                      alg::OrderedWeightsArrayFormulation, rev::Bool)
+                                      w2::Option{<:OWA_Func_VecNum},
+                                      alg::OrderedWeightsArrayFormulation)
         w1_flag = isa(w1, VecNum)
-        w2_flag = isa(w2, VecNum)
         if w1_flag
             @argcheck(!isempty(w1), IsEmptyError("w1 cannot be empty"))
         end
+        if isnothing(w2)
+            # Non-mutating on purpose: `w1` belongs to the caller, and an in-place reverse
+            # would corrupt their vector or the cached return value of their closure.
+            w2 = w1_flag ? reverse(w1) : reverse ∘ w1
+        end
+        w2_flag = isa(w2, VecNum)
         if w2_flag
             @argcheck(!isempty(w2), IsEmptyError("w2 cannot be empty"))
-            # Non-mutating on purpose: `w2` belongs to the caller. An in-place reverse here
-            # corrupts their vector, and building two measures from one vector reverses it
-            # twice. It also makes the `w1 === w2` aliasing case need no special handling.
-            if !rev
-                w2 = reverse(w2)
-            end
-        else
-            # Same rule for the builder branch: the closure is the caller's, so a cached
-            # return value must not be reversed underneath them.
-            if !rev
-                w2 = reverse ∘ w2
-            end
         end
         if w1_flag && w2_flag
             @argcheck(length(w1) == length(w2),
                       DimensionMismatch("w1 ($(length(w1))) must match w2 ($(length(w2)))"))
             assert_owa_formulation_weights(alg, w1 - w2)
         end
-        return new{typeof(settings), typeof(w1), typeof(w2), typeof(alg), typeof(rev)}(settings,
-                                                                                       w1,
-                                                                                       w2,
-                                                                                       alg,
-                                                                                       true)
+        return new{typeof(settings), typeof(w1), typeof(w2), typeof(alg)}(settings, w1, w2,
+                                                                          alg)
     end
 end
 function OrderedWeightsArrayRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                   w1::OWA_Func_VecNum = owa_tg,
-                                  w2::OWA_Func_VecNum = owa_tg,
-                                  alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray(),
-                                  rev::Bool = false)
-    return OrderedWeightsArrayRange(settings, w1, w2, alg, rev)
+                                  w2::Option{<:OWA_Func_VecNum} = nothing,
+                                  alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray())
+    return OrderedWeightsArrayRange(settings, w1, w2, alg)
 end
-# Deferrable slots — see `deferred_slots`. Both builders carry them. `rev` is stored as a
-# done flag, so the positional rebuild of `rebuild_with_slots` passes `true` and reverses
-# nothing a second time.
+# Deferrable slots — see `deferred_slots`. Both builders carry them. The stored `w2` is never
+# `nothing`, so the positional rebuild of `rebuild_with_slots` stores it as given and
+# reverses nothing a second time.
 deferred_slots(r::OrderedWeightsArrayRange) = (; w1 = r.w1, w2 = r.w2)
 # Calibration slots — see `calibration_slots`. The container names its two children, on the
 # terms the single-builder container above states.
@@ -782,7 +823,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the weight builder inside the reversal that [`OrderedWeightsArrayRange`](@ref) wraps its `w2` in.
 
-The Range constructor stores `w2` as `reverse ∘ w2` whenever the caller has not already reversed it, so the object the `w2` slot holds is a composition and the builder a rule sits in is its inner half. Without this method the recursion would stop at the composition and a rule in the gain-side builder would never resolve, while the same rule in `w1` did.
+The Range constructor stores `w2` as `reverse ∘ w1` when the caller gives no `w2`, and a caller who gives a reversed builder gives `reverse ∘ f`. So the `w2` slot holds a composition, and the builder that holds a rule is the inner function of that composition. Without this method the recursion stops at the composition, and a rule in the gain-tail builder does not resolve, while the same rule in `w1` does.
 
 The composition is rebuilt around the resolved half, so the reversal survives. The bound names `reverse` and an [`AbstractOrderedWeightsArrayFunction`](@ref), so no other composition reaches it.
 
@@ -803,8 +844,8 @@ end
 calibration_slots(x::OWA_RevFunc) = (; inner = x.inner)
 # Tail decomposition — see `range_tails`. Declared for the approximate formulation only: the
 # exact one collapses both tails into a single constraint on `w1 - w2`, so it fuses rather
-# than duplicating. `w2` is already reversed by the constructor (`rev` is a done flag), so
-# each tail is an ordinary `OrderedWeightsArray` over its own weight vector.
+# than duplicating. The stored `w2` is the reversed gain tail, so each tail is an ordinary
+# `OrderedWeightsArray` over its own weight vector.
 function range_tails(r::OrderedWeightsArrayRange{<:Any, <:Any, <:Any,
                                                  <:ApproxOrderedWeightsArray})
     settings = RiskMeasureSettings(; rke = false)

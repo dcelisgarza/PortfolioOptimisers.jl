@@ -32,7 +32,7 @@
         kwargs...
     ) -> Plot
     plot_portfolio_cumulative_returns(
-        pred::Union{<:PredictionResult, <:MultiPeriodPredictionResult};
+        pred::Union{PredictionResult, MultiPeriodPredictionResult};
         compound::Bool = false,
         kwargs...
     ) -> Plot
@@ -614,7 +614,7 @@ function plot_drawdowns end
         x, y, z, c, slv, fees, factory, kwargs...
     ) -> Plot
     plot_measures(
-        pred::Union{<:PredictionResult, <:MultiPeriodPredictionResult, <:PopulationPredictionResult};
+        pred::AbstractPredictionResult;
         x::BaseRM_VecBaseRM = ConditionalValueatRisk(),
         y::BaseRM_VecBaseRM = MeanReturn(),
         z::Option{<:BaseRM_VecBaseRM} = nothing,
@@ -2270,7 +2270,7 @@ The figure draws what [`exposure_correlation`](@ref) returns and computes nothin
   - `csfm`: A cross-sectional factor model block.
   - `pr`: A prior result whose `rr` is such a block.
   - `nf`: Factor names of the raw factor axis. `nothing` reads them off the answer, and falls back to the position of the factor.
-  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), or `nothing` for equal weights. It names the weight history the block is read with.
   - `kwargs...`: Additional keyword arguments passed to the plotting backend.
 
 # Validation
@@ -2439,7 +2439,7 @@ The figure draws what [`exposure_dispersion`](@ref) returns and computes nothing
   - `csfm`: A cross-sectional factor model block.
   - `pr`: A prior result whose `rr` is such a block.
   - `nf`: Factor names of the raw factor axis. `nothing` reads them off the answer, and falls back to the position of the factor.
-  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), or `nothing` for equal weights. It names the weight history the block is read with.
   - `kwargs...`: Additional keyword arguments passed to the plotting backend.
 
 # Validation
@@ -2492,7 +2492,7 @@ The figure draws what [`exposure_stability`](@ref) returns and computes nothing 
   - `pr`: A prior result whose `rr` is such a block.
   - `nf`: Factor names of the raw factor axis. `nothing` reads them off the answer, and falls back to the position of the factor.
   - `step`: Number of observations between the two cross-sections.
-  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), or `nothing` for equal weights. It names the weight history the block is read with.
   - `title`: Title of the figure. The `csfm` and `pr` methods pass one that names the method or the step.
   - `kwargs...`: Additional keyword arguments passed to the plotting backend.
 
@@ -3404,7 +3404,7 @@ function plot_factor_cumulative_returns end
     plot_forecast_cumulative_ic(
         fe::ForecastEvaluationResult,
         csfm::CrossSectionalFactorModel;
-        weighting = IdentityMetric(),
+        weighting = nothing,
         min_count::Integer = fe.min_count,
         kwargs...
     ) -> Plot
@@ -3418,7 +3418,7 @@ function plot_factor_cumulative_returns end
     plot_forecast_cumulative_ic(
         fes::AbstractVector{<:ForecastEvaluationResult},
         csfm::CrossSectionalFactorModel;
-        weighting = IdentityMetric(),
+        weighting = nothing,
         names = nothing,
         rank::Bool = true,
         kwargs...
@@ -3451,7 +3451,7 @@ Where:
   - `fes`: The evaluations to overlay, at least one, from [`forecast_evaluation`](@ref).
   - `w`: Cross-sectional weight history `observations × assets`, on the axis of the forecast, or `nothing` for equal weights.
   - `csfm`: A cross-sectional factor model block, whose weight history `weighting` names.
-  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), or `nothing` for equal weights. It names the weight history the block is read with.
   - `min_count`: Least number of assets a cross-section needs before a coefficient of it is reported.
   - `names`: One name per evaluation, or `nothing` to number them.
   - `rank`: Overlay the Spearman coefficient when `true`, and the Pearson coefficient otherwise.
@@ -3490,7 +3490,7 @@ function plot_forecast_cumulative_ic end
     plot_forecast_rolling_ic(
         fe::ForecastEvaluationResult,
         csfm::CrossSectionalFactorModel;
-        weighting = IdentityMetric(),
+        weighting = nothing,
         rolling::Integer = 0,
         min_count::Integer = fe.min_count,
         kwargs...
@@ -3524,7 +3524,7 @@ Where:
   - `fe`: The evaluation to draw, from [`forecast_evaluation`](@ref).
   - `w`: Cross-sectional weight history `observations × assets`, on the axis of the forecast, or `nothing` for equal weights.
   - `csfm`: A cross-sectional factor model block, whose weight history `weighting` names.
-  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), or `nothing` for equal weights. It names the weight history the block is read with.
   - `rolling`: Number of evaluation dates in the window, or `0` for the square root of their number.
   - `min_count`: Least number of assets a cross-section needs before a coefficient of it is reported.
   - `kwargs...`: Additional keyword arguments passed to the plotting backend.
@@ -3654,7 +3654,7 @@ function plot_forecast_quantile_returns end
     plot_forecast_calibration(
         fe::ForecastEvaluationResult,
         csfm::CrossSectionalFactorModel;
-        weighting = IdentityMetric(),
+        weighting = nothing,
         bins::Integer = 10,
         kwargs...
     ) -> Plot
@@ -3672,7 +3672,7 @@ The figure takes the evaluation and not the block, for the reason [`plot_forecas
   - `fe`: The evaluation to draw, from [`forecast_evaluation`](@ref).
   - `w`: Cross-sectional weight history `observations × assets`, on the axis of the forecast, or `nothing` for equal weights.
   - `csfm`: A cross-sectional factor model block, whose weight history `weighting` names.
-  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), or `nothing` for equal weights. It names the weight history the block is read with.
   - `bins`: Number of quantile bins the curve is cut into.
   - `kwargs...`: Additional keyword arguments passed to the plotting backend.
 
@@ -3707,7 +3707,7 @@ function plot_forecast_calibration end
         fe::ForecastEvaluationResult,
         rd::ReturnsResult,
         csfm::CrossSectionalFactorModel;
-        weighting = IdentityMetric(),
+        weighting = nothing,
         n::Integer = 10,
         min_count::Integer = fe.min_count,
         kwargs...
@@ -3728,7 +3728,7 @@ The figure takes the evaluation and not the block, for the reason [`plot_forecas
   - `rd`: The returns data the target history is built from. It carries an Asset Panel in `rd.pnl`.
   - `w`: Cross-sectional weight history `observations × assets`, on the axis of the forecast, or `nothing` for equal weights.
   - `csfm`: A cross-sectional factor model block, whose weight history `weighting` names.
-  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), or `nothing` for equal weights. It names the weight history the block is read with.
   - `n`: Number of holding periods the table reaches.
   - `min_count`: Least number of assets a cross-section needs before a statistic of it is reported. It also chooses the dates that every row of the table is read on.
   - `kwargs...`: Additional keyword arguments passed to the plotting backend.
@@ -3763,7 +3763,7 @@ function plot_forecast_ic_by_holding_period end
         fe::ForecastEvaluationResult,
         rd::ReturnsResult,
         csfm::CrossSectionalFactorModel;
-        weighting = IdentityMetric(),
+        weighting = nothing,
         n::Integer = 10,
         min_count::Integer = fe.min_count,
         ppy::Number = fe.ppy,
@@ -3787,7 +3787,7 @@ The figure takes the evaluation and not the block, for the reason [`plot_forecas
   - `rd`: The returns data the target history is built from. It carries an Asset Panel in `rd.pnl`.
   - `w`: Cross-sectional weight history `observations × assets`, on the axis of the forecast, or `nothing` for equal weights.
   - `csfm`: A cross-sectional factor model block, whose weight history `weighting` names.
-  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), or `nothing` for equal weights. It names the weight history the block is read with.
   - `n`: Number of holding periods the table reaches.
   - `min_count`: Least number of assets a cross-section needs before a statistic of it is reported. It also chooses the dates that every row of the table is read on.
   - $(arg_dict[:fe_table_ppy])
@@ -3822,7 +3822,7 @@ function plot_forecast_portfolio_by_holding_period end
         fe::ForecastEvaluationResult,
         rd::ReturnsResult,
         csfm::CrossSectionalFactorModel;
-        weighting = IdentityMetric(),
+        weighting = nothing,
         n::Integer = 10,
         min_count::Integer = fe.min_count,
         kwargs...
@@ -3843,7 +3843,7 @@ The figure takes the evaluation and not the block, for the reason [`plot_forecas
   - `rd`: The returns data the target history is built from. It carries an Asset Panel in `rd.pnl`.
   - `w`: Cross-sectional weight history `observations × assets`, on the axis of the forecast, or `nothing` for equal weights.
   - `csfm`: A cross-sectional factor model block, whose weight history `weighting` names.
-  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), or `nothing` for equal weights. It names the weight history the block is read with.
   - `n`: Number of forward windows the table reaches.
   - `min_count`: Least number of assets a cross-section needs before a statistic of it is reported. It also chooses the dates that every row of the table is read on.
   - `kwargs...`: Additional keyword arguments passed to the plotting backend.
@@ -3878,7 +3878,7 @@ function plot_forecast_ic_decay end
         fe::ForecastEvaluationResult,
         rd::ReturnsResult,
         csfm::CrossSectionalFactorModel;
-        weighting = IdentityMetric(),
+        weighting = nothing,
         n::Integer = 10,
         min_count::Integer = fe.min_count,
         ppy::Number = fe.ppy,
@@ -3902,7 +3902,7 @@ The figure takes the evaluation and not the block, for the reason [`plot_forecas
   - `rd`: The returns data the target history is built from. It carries an Asset Panel in `rd.pnl`.
   - `w`: Cross-sectional weight history `observations × assets`, on the axis of the forecast, or `nothing` for equal weights.
   - `csfm`: A cross-sectional factor model block, whose weight history `weighting` names.
-  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), or `nothing` for equal weights. It names the weight history the block is read with.
   - `n`: Number of forward windows the table reaches.
   - `min_count`: Least number of assets a cross-section needs before a statistic of it is reported. It also chooses the dates that every row of the table is read on.
   - $(arg_dict[:fe_table_ppy])
@@ -3939,7 +3939,7 @@ function plot_forecast_portfolio_decay end
         fe::ForecastEvaluationResult,
         csfm::CrossSectionalFactorModel;
         nf::Option{<:AbstractVector} = nothing,
-        weighting = IdentityMetric(),
+        weighting = nothing,
         kwargs...
     ) -> Plot
     plot_forecast_factor_correlation(
@@ -3967,7 +3967,7 @@ The figure takes the evaluation and not the block, for the reason [`plot_forecas
   - `nf`: Factor names of the axis of the answer. `nothing` reads them off the block for the `csfm` method and off the answer for the `c` method, and numbers the factors for the `B` method.
   - `dates`: Row indices of `fe.alpha` the correlation is read and drawn on. The default is every observation; `fe.dates` reads the evaluation grid. On the `c` method, `dates` labels the rows of `c.X`, and its default numbers them.
   - `rank`: Take the rank correlation when `true`, and the weighted correlation otherwise.
-  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), or `nothing` for equal weights. It names the weight history the block is read with.
   - `min_count`: Least number of assets a cross-section needs before a correlation of it is reported.
   - `kwargs...`: Additional keyword arguments passed to the plotting backend. The `csfm` method passes `dates`, `rank` and `min_count` through them to the `B` method.
 
@@ -4000,7 +4000,7 @@ function plot_forecast_factor_correlation end
     plot_forecast_evaluation_summary(
         fes::AbstractVector{<:ForecastEvaluationResult},
         csfm::CrossSectionalFactorModel;
-        weighting = IdentityMetric(),
+        weighting = nothing,
         names = nothing,
         bins::Integer = 10,
         quantiles = nothing,
@@ -4034,7 +4034,7 @@ The columns carry several units, so the axis is labelled `Value` and read group 
   - `fe`: One evaluation. It is drawn as the length-1 case.
   - `w`: Cross-sectional weight history `observations × assets`, on the axis of the forecasts, or `nothing` for equal weights.
   - `csfm`: A cross-sectional factor model block, whose weight history `weighting` names.
-  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), or `nothing` for equal weights. It names the weight history the block is read with.
   - `names`: One name per evaluation, or `nothing` to number them.
   - `bins`: Number of quantile bins the calibration curve cuts.
   - `quantiles`: Tail fractions the quantile spreads are cut at, each in `(0, 0.5]`, or `nothing` for none.
@@ -4079,13 +4079,13 @@ function plot_forecast_evaluation_summary end
 
 Plot the rolling calibration of a covariance forecast: the Mahalanobis ratio, the diagonal ratio and the bias statistic over a window of steps, with a reference line at one.
 
-Each series is the statistic of [`covariance_forecast_summary`](@ref), taken over the last ``W`` steps of the walk-forward in place of all of them. The two ratios are means with the weights of `step_weighting`, as in the summary, and the bias statistic is the sample standard deviation of the standardised returns. So a window as wide as the run ends at the value of the summary under the same `step_weighting`. A step with no active asset adds nothing to a window. Under the defaults, the first ``W - 1`` points, and a window with no scored step, are `NaN` and drawn blank. The bias statistic needs two scored steps in its window. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads with `StatsPlots`.
+Each series is the statistic of [`covariance_forecast_summary`](@ref), taken over the last ``W`` steps of the walk-forward in place of all of them. The two ratios are means with the weights of `step_weighting`, as in the summary, and the bias statistic is the sample standard deviation of the standardised returns. So a window as wide as the run ends at the value of the summary under the same `step_weighting`. A step with no active asset adds nothing to a window. Under the defaults, the first ``W - 1`` points and a window with no scored step are `NaN`, and the figure leaves them blank. The bias statistic needs two scored steps in its window. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads with `StatsPlots`.
 
-The default window spans a fixed number of steps, which is a fixed stretch of the walk-forward, so two evaluations on one walk-forward are read over the same steps at each point. `scored_steps = true` makes the window hold the last ``W`` scored steps instead, so it stretches over a step with no active asset, and that step draws no point. `whole_windows = true` starts each series at its first whole window in place of the first step. Both moving averages are valid. With `step_weighting = EqualStepWeighting()` and both keywords `true`, each series is the plain rolling mean of the scored steps, drawn from its first whole window.
+The default window spans a fixed number of steps, which is a fixed stretch of the walk-forward, so the figure reads two evaluations on one walk-forward over the same steps at each point. `scored_steps = true` makes the window hold the last ``W`` scored steps instead, so it stretches over a step with no active asset, and that step draws no point. `whole_windows = true` starts each series at its first whole window in place of the first step. Each window rule gives a moving average, and the figure prefers neither. With `step_weighting = EqualStepWeighting()` and both keywords `true`, each series is the plain rolling mean of the scored steps, drawn from its first whole window.
 
 An evaluation with one test portfolio draws the bias statistic of that portfolio. An evaluation with several draws the median over the portfolios, with a band from the fifth to the ninety-fifth percentile, which are the percentiles the summary gives.
 
-The vector method is the comparison. It draws each diagnostic of each evaluation on the dates of that evaluation. A series is labelled by the name of its evaluation when one diagnostic is drawn, and by the name and the diagnostic otherwise.
+The vector method is the comparison. It draws each diagnostic of each evaluation on the dates of that evaluation. The label of a series is the name of its evaluation when the figure draws one diagnostic, and the name and the diagnostic otherwise.
 
 # Mathematical definition
 
@@ -4159,7 +4159,7 @@ function plot_covariance_calibration end
 
 Plot the rolling mean of the QLIKE loss of the variance of the test portfolios of a covariance forecast.
 
-Each series is the mean portfolio QLIKE of [`covariance_forecast_summary`](@ref), taken over the last ``W`` steps of the walk-forward in place of all of them. So a window as wide as the run ends at the value of the summary. A step with no active asset adds nothing to a window. Under the defaults, the first ``W - 1`` points, and a window with no scored step, are `NaN` and drawn blank. `scored_steps` and `whole_windows` set the window and the first point, as in [`plot_covariance_calibration`](@ref). Lower is better, and only the difference between two forecasts is a reading, so the figure draws no reference line. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads with `StatsPlots`.
+Each series is the mean portfolio QLIKE of [`covariance_forecast_summary`](@ref), taken over the last ``W`` steps of the walk-forward in place of all of them. So a window as wide as the run ends at the value of the summary. A step with no active asset adds nothing to a window. Under the defaults, the first ``W - 1`` points and a window with no scored step are `NaN`, and the figure leaves them blank. `scored_steps` and `whole_windows` set the window and the first point, as in [`plot_covariance_calibration`](@ref). Lower is better. The level of one loss has no fixed reference value. Only the difference between the losses of two forecasts shows which is better, so the figure draws no reference line. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads with `StatsPlots`.
 
 An evaluation with one test portfolio draws the loss of that portfolio. An evaluation with several draws the median over the portfolios, with a band from the fifth to the ninety-fifth percentile.
 
@@ -4231,9 +4231,9 @@ function plot_covariance_qlike end
 
 Plot the rolling rate at which the Mahalanobis statistic of a covariance forecast exceeds the chi-squared quantile of each level, with a dashed line at the target rate of each level.
 
-Each series is the exceedance rate of [`covariance_forecast_summary`](@ref), taken over the last ``W`` steps of the walk-forward in place of all of them. So a window as wide as the run ends at the value of the summary. [`covariance_exceedance`](@ref) states the statistic and its threshold. A step with no active asset adds nothing to a window. Under the defaults, the first ``W - 1`` points, and a window with no scored step, are `NaN` and drawn blank. `scored_steps` and `whole_windows` set the window and the first point, as in [`plot_covariance_calibration`](@ref). The rate is ``1 - q`` under a Gaussian null, and it rises with heavy tails as well as with a forecast that is wrong, so it compares two forecasts better than it tests one. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads with `StatsPlots`.
+Each series is the exceedance rate of [`covariance_forecast_summary`](@ref), taken over the last ``W`` steps of the walk-forward in place of all of them. So a window as wide as the run ends at the value of the summary. [`covariance_exceedance`](@ref) states the statistic and its threshold. A step with no active asset adds nothing to a window. Under the defaults, the first ``W - 1`` points and a window with no scored step are `NaN`, and the figure leaves them blank. `scored_steps` and `whole_windows` set the window and the first point, as in [`plot_covariance_calibration`](@ref). The rate is ``1 - q`` under a Gaussian null, and it rises with heavy tails as well as with a forecast that is wrong, so it compares two forecasts better than it tests one. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads with `StatsPlots`.
 
-The vector method is the comparison. It draws one series per evaluation and level, on the dates of that evaluation. A series is labelled by the name of its evaluation when one level is drawn, and by the name and the level otherwise. Its default draws one level, so that a figure of four forecasts carries four series and not eight.
+The vector method is the comparison. It draws one series per evaluation and level, on the dates of that evaluation. The label of a series is the name of its evaluation when the figure draws one level, and the name and the level otherwise. Its default draws one level, so that a figure of four forecasts carries four series and not eight.
 
 # Mathematical definition
 

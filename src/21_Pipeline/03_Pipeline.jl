@@ -134,10 +134,10 @@ Validate that each step of a [`Pipeline`](@ref) declares the slot and the target
 """
 function assert_step_declarations(ests)::Nothing
     n = length(ests)
-    families = Union{<:AbstractPricesPreprocessingEstimator,
-                     <:AbstractReturnsPreprocessingEstimator, <:AbstractPriorEstimator,
-                     <:AbstractPhylogenyEstimator, <:AbstractUncertaintySetEstimator,
-                     <:AbstractConstraintEstimator, <:OptimisationEstimator}
+    families = Union{AbstractPricesPreprocessingEstimator,
+                     AbstractReturnsPreprocessingEstimator, AbstractPriorEstimator,
+                     AbstractPhylogenyEstimator, AbstractUncertaintySetEstimator,
+                     AbstractConstraintEstimator, OptimisationEstimator}
     for (i, e) in enumerate(ests)
         est = isa(e, PipelineStep) ? e.est : e
         if isa(est, AbstractUncertaintySetEstimator)
@@ -346,7 +346,7 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    Pipeline(; steps::Union{<:Tuple, <:AbstractVector},
+    Pipeline(; steps::Union{Tuple, AbstractVector},
                cache::Option{<:AbstractPartialFitState} = nothing) -> Pipeline
 
 Give the steps in the order of execution. Each element is a step estimator or a `"name" => estimator` pair.
@@ -376,7 +376,7 @@ A Pipeline takes the online step. [`partial_fit!`](@ref) runs the steps in order
   - A universe-only step folds nothing. An [`AbstractAssetSelector`](@ref) and the column filter of a `MissingDataFilter` are universe-only. `fit(pipe)` with no data fits such a step again over the rows of the row owner, and applies its universe as a view.
   - A window-valued step, and every other step that writes a Data Slot, stops the warm-up with an error that names it. `Online(pipe)` is the declared refit that accepts such a step.
 
-A cap on the row owner alone, `Online(pe; max_history = w)`, is a window that counts the rows of the row owner. A row-local step before it folds a state across the front edge of that window, so the warm-up refuses that pair with an error that names it. The rolling window through a Pipeline is `Online(pipe; max_history = w)`, which fits every step again over the window. `cache` holds the Fold Context of the Pipeline when a prior step owns the rows, or the buffer of the input data that `Online(pipe)` seeds. It is `nothing` until a step writes one. See [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref) and [`fit(pipe::Pipeline)`](@ref).
+A cap on the row owner alone, `Online(pe; max_history = w)`, is a window that counts the rows of the row owner. A row-local step before it folds a state across the front edge of that window, so the warm-up refuses that pair with an error that names it. The rolling window through a Pipeline is `Online(pipe; max_history = w)`, which fits every step again over the window. `cache` holds the Fold Context of the Pipeline when a prior step owns the rows, or the buffer of the input data that `Online(pipe)` seeds. It is `nothing` until a step writes one. See [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{PipelineBufferState, ReturnsBufferState}}}, data::Prices_RR)`](@ref) and [`fit(pipe::Pipeline)`](@ref).
 
 # Examples
 
@@ -416,7 +416,7 @@ julia> pipe.names
         return new{typeof(names), typeof(steps), typeof(cache)}(names, steps, cache)
     end
 end
-function Pipeline(; steps::Union{<:Tuple, <:AbstractVector},
+function Pipeline(; steps::Union{Tuple, AbstractVector},
                   cache::Option{<:AbstractPartialFitState} = nothing)::Pipeline
     @argcheck(!isempty(steps), IsEmptyError("steps cannot be empty"))
     ests = Vector{Any}(undef, length(steps))
@@ -560,9 +560,9 @@ function assert_no_holdout(pipe::Pipeline)::Nothing
     return nothing
 end
 """
-    port_opt_view(pipe::Pipeline, i, args...; kwargs...)
+    port_opt_view(pipe::AbstractPipelineEstimator, i, args...; kwargs...)
 
-Refuse an asset view of a [`Pipeline`](@ref).
+Refuse an asset view of a [`Pipeline`](@ref), or of any other [`AbstractPipelineEstimator`](@ref).
 
 A meta-optimiser such as [`NestedClustered`](@ref), [`Stacking`](@ref) or [`SubsetResampling`](@ref) takes a `port_opt_view` of its inner estimator to build a portfolio over a subset of the assets. The asset universe of a pipeline is fitted state, because a missing-data filter selects it from the training window. So an asset view before the fit has no defined meaning. A meta-optimiser cannot wrap a `Pipeline`, but it can be the optimisation step of one.
 
@@ -573,9 +573,9 @@ A meta-optimiser such as [`NestedClustered`](@ref), [`Stacking`](@ref) or [`Subs
 # Related
 
   - [`Pipeline`](@ref)
-  - [`optimise(::Pipeline)`](@ref)
+  - [`optimise`](@ref)
 """
-function port_opt_view(::Pipeline, args...; kwargs...)
+function port_opt_view(::AbstractPipelineEstimator, args...; kwargs...)
     return throw(ArgumentError("a Pipeline cannot be sub-selected with port_opt_view: its asset universe is fitted state, so wrapping a Pipeline inside a meta-optimiser is unsupported. A meta-optimiser may be used as the optimisation step of a Pipeline instead."))
 end
 """
@@ -1014,7 +1014,7 @@ Check that a test window and the training window come from the same ingestion.
 
 The last weights use the asset axis of the training window. A test window with a different asset set, or with the same set from a different universe statement, misaligns the weights and the returns. This check reports that case with an error that names both universes. Without the check, the case shows as a dimension mismatch inside the risk calculation.
 
-The check reads two things. Equality of `nx` checks the asset axis. [`check_asset_panel`](@ref) binds the asset axis of an [`AssetPanel`](@ref) to the `nx` of the result that holds it, so equality of `nx` also compares the axes of the panels. Parity of panel presence checks where the universe was stated. A window with a panel and a fitted context without one, or the reverse, do not come from one ingestion.
+The check reads equality of `nx`, which checks the asset axis. [`check_asset_panel`](@ref) binds the asset axis of an [`AssetPanel`](@ref) to the `nx` of the result that holds it, so equality of `nx` also compares the axes of the panels. The check does not compare panel presence. The ingestion layer emits no panel for a window with no gap and no Panel Field, so a gapless training window and a gapped test window of one ingestion differ in panel presence.
 
 Two other parts of the library hold the rest of the alignment. The ingestion layer fixes the asset axis before the split, and [`port_opt_view`](@ref) slices it. So each window of each fold carries every asset, and no policy of the layer drops a row or a column. An asset that is present in both windows and not investable in one is a Held Gap, which `filter_held_gaps` reads from the weights and the returns under the strictness policy.
 
@@ -1029,7 +1029,6 @@ Two cases remain, and the error message names both. The first is returns data bu
 
   - When the fitted context has no `returns` slot, the check passes.
   - `rd.nx == train.nx`, where `train` is the `returns` slot of the fitted context. Raises an `ArgumentError`.
-  - Both `rd` and `train` carry an [`AssetPanel`](@ref), or neither does. Raises an `ArgumentError`.
 
 # Returns
 
@@ -1049,8 +1048,6 @@ function assert_universe_aligned(res::PipelineResult, rd::AbstractReturnsResult)
     end
     @argcheck(rd.nx == train.nx,
               ArgumentError("the pipeline's fitted steps produced a test-window universe $(rd.nx) that differs from the training universe $(train.nx), so the weights and the test returns would not be aligned. The ingestion layer fixes the asset axis before the split, so this reaches two situations only: returns data built outside it, and a step of your own that changes the asset set. Build the returns data with price_ingestion(PriceIngestion(), X)."))
-    @argcheck(isnothing(rd.pnl) == isnothing(train.pnl),
-              ArgumentError("the pipeline's fitted steps produced a test window that $(isnothing(rd.pnl) ? "states no universe" : "states a universe") while the training window $(isnothing(train.pnl) ? "states none" : "states one"), so the two did not come from one ingestion. A ReturnsResult the ingestion layer built always carries an Asset Panel, so pnl === nothing on one of them says that one was built outside it."))
     return nothing
 end
 """
@@ -1084,23 +1081,23 @@ function apply_fitted_step(f::PricesToReturns, pr::AbstractPricesResult)
     return apply_preprocessing(f, pr)
 end
 apply_fitted_step(::PricesToReturns, rd::AbstractReturnsResult) = rd
-function apply_fitted_step(f::Union{<:AbstractPricesPreprocessingResult,
-                                    <:AbstractPricesPreprocessingEstimator},
+function apply_fitted_step(f::Union{AbstractPricesPreprocessingResult,
+                                    AbstractPricesPreprocessingEstimator},
                            pr::AbstractPricesResult)
     return apply_preprocessing(f, pr)
 end
-function apply_fitted_step(::Union{<:AbstractPricesPreprocessingResult,
-                                   <:AbstractPricesPreprocessingEstimator},
+function apply_fitted_step(::Union{AbstractPricesPreprocessingResult,
+                                   AbstractPricesPreprocessingEstimator},
                            rd::AbstractReturnsResult)
     return rd
 end
-function apply_fitted_step(f::Union{<:AbstractReturnsPreprocessingResult,
-                                    <:AbstractReturnsPreprocessingEstimator},
+function apply_fitted_step(f::Union{AbstractReturnsPreprocessingResult,
+                                    AbstractReturnsPreprocessingEstimator},
                            rd::AbstractReturnsResult)
     return apply_preprocessing(f, rd)
 end
-function apply_fitted_step(::Union{<:AbstractReturnsPreprocessingResult,
-                                   <:AbstractReturnsPreprocessingEstimator},
+function apply_fitted_step(::Union{AbstractReturnsPreprocessingResult,
+                                   AbstractReturnsPreprocessingEstimator},
                            pr::AbstractPricesResult)
     return pr
 end
@@ -1244,8 +1241,9 @@ function StatsAPI.predict(res::PipelineResult, data::AbstractReturnsResult,
     return [StatsAPI.predict(res, data, test_idx, cols; kwargs...)
             for test_idx in test_idxs]
 end
-function fit_and_predict(res::PipelineResult, data::Prices_RR; test_idx::VecInt_VecVecInt,
-                         cols = :, wd::Option{<:AbstractWeightDrift} = nothing,
+function fit_and_predict(res::AbstractPipelineResult, data::Prices_RR;
+                         test_idx::VecInt_VecVecInt, cols = :,
+                         wd::Option{<:AbstractWeightDrift} = nothing,
                          hwd::Option{<:AbstractWeightDrift} = wd,
                          fa::Option{<:AbstractFeeAmortisation} = nothing,
                          store_weight_path::Bool = false, strict::Bool = false,
@@ -1254,7 +1252,7 @@ function fit_and_predict(res::PipelineResult, data::Prices_RR; test_idx::VecInt_
                             store_weight_path = store_weight_path, strict = strict,
                             w_prev = w_prev)
 end
-function fit_and_predict(pipe::Pipeline, data::Prices_RR;
+function fit_and_predict(pipe::AbstractPipelineEstimator, data::Prices_RR;
                          train_idx::Option{<:VecInt} = nothing, test_idx::VecInt_VecVecInt,
                          cols = :, wd::Option{<:AbstractWeightDrift} = nothing,
                          hwd::Option{<:AbstractWeightDrift} = wd,
@@ -1336,7 +1334,7 @@ function run_step(p::Pipeline, ctx::PipelineContext)
     slot = pipe_writes(p)
     return res, set_slot(ctx, slot, getproperty(getfield(res, :ctx), slot))
 end
-function optimise(::Pipeline, args...; kwargs...)
+function optimise(::AbstractPipelineEstimator, args...; kwargs...)
     return throw(ArgumentError("a Pipeline is a workflow, not an OptimisationEstimator: fit it with fit(pipeline, data). Wrapping a Pipeline inside a meta-optimiser is not supported."))
 end
 

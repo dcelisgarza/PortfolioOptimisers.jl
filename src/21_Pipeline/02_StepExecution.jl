@@ -483,7 +483,7 @@ function run_step(ce::AbstractConstraintEstimator, ctx::PipelineContext)
     return run_constraint_step(ce, nothing, ctx)
 end
 pipe_reads(::PricesToReturns) = (:prices,)
-pipe_writes(::PricesToReturns) = :returns
+pipe_writes(::PricesToReturns)::Symbol = :returns
 function run_step(ptr::PricesToReturns, ctx::PipelineContext)
     require_slot(ctx, :prices, ptr)
     return ptr, set_slot(ctx, :returns, apply_preprocessing(ptr, ctx.prices))
@@ -502,7 +502,7 @@ A [`TrainTestSplit`](@ref) narrows whichever data slot the pipeline input filled
   - [`assert_split_position`](@ref)
   - [`PIPELINE_SLOTS`](@ref)
 """
-pipe_writes(::TrainTestSplit) = :split
+pipe_writes(::TrainTestSplit)::Symbol = :split
 pipe_reads(::TrainTestSplit) = ()
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -608,7 +608,7 @@ function pipe_step_targets(step)
         (:pe,)
     elseif slot === :phylogeny
         est = isa(step, PipelineStep) ? step.est : step
-        if isa(est, Union{<:AbstractClustersEstimator, <:AbstractClusteringResult})
+        if isa(est, Union{AbstractClustersEstimator, AbstractClusteringResult})
             (:cle,)
         else
             ()
@@ -628,7 +628,7 @@ Internal machinery — not part of the user-facing API.
 
 # Algorithm
 
- 1. `:sigma_ucs` on a value with a field `r`: the path `"r.ucs"`, or `"r[i].ucs"` for each element `i` of a vector that is an `UncertaintySetVariance`.
+ 1. `:sigma_ucs`: the path `"r.ucs"`, or `"r[i].ucs"` for each element `i` of a vector that is an `UncertaintySetVariance`. Only an optimiser that [`@pipe_route_sigma_ucs`](@ref) declares accepts this target, and each one has a field `r`.
  2. A target with a field of the same name in `x`: the name of the field.
  3. Otherwise the paths in the configuration of `x`, after its field name, see [`pipe_config_paths`](@ref).
 
@@ -654,9 +654,8 @@ function pipe_target_paths(::JuMPOptimiser, ::Val{:mu_ucs})::Vector{String}
     return ["ret.ucs"]
 end
 function pipe_target_paths(x, t::Val{:sigma_ucs})::Vector{String}
-    if !hasfield(typeof(x), :r)
-        return pipe_config_paths(x, t)
-    end
+    # Only an optimiser that `@pipe_route_sigma_ucs` declares accepts the target, and each
+    # one holds the measures in its own field `r`.
     r = getfield(x, :r)
     return if isa(r, UncertaintySetVariance)
         ["r.ucs"]

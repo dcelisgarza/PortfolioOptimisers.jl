@@ -66,7 +66,7 @@ function WalkForwardResult(; train_idx::VecVecInt, test_idx::VecVecInt)::WalkFor
     return WalkForwardResult(train_idx, test_idx)
 end
 """
-    const WalkForward_Onl = Union{<:WalkForwardEstimator, <:Online{<:WalkForwardEstimator}}
+    const WalkForward_Onl = Union{WalkForwardEstimator, Online{<:WalkForwardEstimator}}
 
 Alias for a walk-forward scheme, plain or an Online Scheme.
 
@@ -79,9 +79,9 @@ An Online Scheme is an [`Online`](@ref) around a walk-forward, built by the sche
   - [`CVE_Onl`](@ref)
   - [`WFCVER`](@ref)
 """
-const WalkForward_Onl = Union{<:WalkForwardEstimator, <:Online{<:WalkForwardEstimator}}
+const WalkForward_Onl = Union{WalkForwardEstimator, Online{<:WalkForwardEstimator}}
 """
-    const WFCVER = Union{<:WalkForward_Onl, <:WalkForwardResult}
+    const WFCVER = Union{WalkForward_Onl, WalkForwardResult}
 
 Alias for a walk-forward cross-validation scheme, plain or online, or its result.
 
@@ -90,7 +90,23 @@ Alias for a walk-forward cross-validation scheme, plain or online, or its result
   - [`WalkForward_Onl`](@ref)
   - [`WalkForwardResult`](@ref)
 """
-const WFCVER = Union{<:WalkForward_Onl, <:WalkForwardResult}
+const WFCVER = Union{WalkForward_Onl, WalkForwardResult}
+"""
+    const OptCVE_Onl = Union{OptimisationCrossValidationEstimator, Online{<:WalkForwardEstimator}}
+
+Alias for the schemes that the `cv` field of a meta-optimiser takes: an optimisation cross-validation scheme, plain or an Online Scheme.
+
+[`NestedClustered`](@ref) and [`Stacking`](@ref) bind their `cv` field to it, and [`predict_outer_returns`](@ref) dispatches on it. It takes no split result, because an estimator holds no result. An Online Scheme is an [`Online`](@ref) around a walk-forward, so it is not an [`OptimisationCrossValidationEstimator`](@ref) by supertype, and the alias names it.
+
+# Related
+
+  - [`OptimisationCrossValidationEstimator`](@ref)
+  - [`WalkForward_Onl`](@ref)
+  - [`CVE_Onl`](@ref)
+  - [`predict_outer_returns`](@ref)
+"""
+const OptCVE_Onl = Union{OptimisationCrossValidationEstimator,
+                         Online{<:WalkForwardEstimator}}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -131,7 +147,7 @@ Each switch is `nothing` by default. An unset `pws` follows `wd`, so `wd` alone 
 
 `pws` is the Previous-Weights Source. A [`TargetWeights`](@ref) threads the target weights of the previous fold into the next one. A [`DriftedWeights`](@ref) threads the weights held after the last observation of the previous fold instead, so a turnover, a tracking or a fee estimator measures the trades a fund places rather than the change in the decision. A fold enumeration of this scheme is a timeline, so the source has a previous fold to read.
 
-`nothing` follows `wd`, through [`resolve_previous_weights_source`](@ref): the target weights when `wd` is `nothing`, and the drifted weights when `wd` is set. If the series drifts, the fund holds the drifted weights at the end of the fold, so the next trade starts there. An explicit `pws` overrides the rule. `wd` with `pws = TargetWeights()` drifts the series and still measures the change in the decision, which separates the turnover of the decision from the turnover the fund executes.
+`nothing` follows `wd`, through [`resolve_previous_weights_source`](@ref): the target weights when `wd` is `nothing`, and the drifted weights when `wd` is set. If the series drifts, the fund holds the drifted weights at the end of the fold, so the next trade starts there. An explicit `pws` overrides the rule. `wd` with `pws = TargetWeights()` drifts the series and still measures the change in the decision, which separates the turnover of the decision from the turnover the fund executes. The table of [`AbstractPreviousWeightsSource`](@ref) gives the four settings of `wd` and `pws`.
 
 ## Fee clock
 
@@ -414,17 +430,56 @@ Abstract supertype for date adjustment estimators in walk-forward cross-validati
 
 Subtypes implement specific strategies for adjusting dates used in walk-forward splits. A subtype
 reaches a [`DateWalkForward`](@ref) through its `adjuster` field, whose type bound is
-[`DateAdjType`](@ref).
+[`DateAdjType`](@ref). The default `adjuster` is `identity`, which keeps every date of the range.
+
+# Interfaces
+
+To implement a new date adjuster, subtype `DateAdjusterEstimator` and make an instance callable as below.
+
+## Call
+
+  - `(a::MyDateAdjuster)(dates::AbstractVector{<:Dates.TimeType}) -> AbstractVector{<:Dates.TimeType}`: The dates that the test windows of the split align to.
+
+### Arguments
+
+  - `a`: The date adjuster.
+  - `dates`: The date range `ti:period:tf`, from the first to the last timestamp of the data, with the `period` of the [`DateWalkForward`](@ref). The caller `walk_forward_date_range` widens `ti` and `tf` by the `period_offset` before the call.
+
+### Returns
+
+  - `dates::AbstractVector{<:Dates.TimeType}`: The adjusted dates. They must stay sorted in increasing order, because `date_index_positions` reads them in order and stops at the first date after the last timestamp. The caller adds the `period_offset` to each date after the call, and runs no other check.
+
+# Examples
+
+A date adjuster that moves a date on a weekend to the next Monday.
+
+```jldoctest
+julia> struct NextWeekday <: PortfolioOptimisers.DateAdjusterEstimator end
+
+julia> function (::NextWeekday)(dates)
+           return unique!([Dates.dayofweek(d) > 5 ? d + Dates.Day(8 - Dates.dayofweek(d)) : d
+                           for d in dates])
+       end
+
+julia> NextWeekday()(Dates.Date(2024, 1, 5):Dates.Day(1):Dates.Date(2024, 1, 8))
+2-element Vector{Date}:
+ 2024-01-05
+ 2024-01-08
+
+julia> DateWalkForward(252, 21; adjuster = NextWeekday()).adjuster
+NextWeekday()
+```
 
 # Related
 
   - [`DateWalkForward`](@ref)
   - [`DateAdjType`](@ref)
   - [`walk_forward_date_range`](@ref)
+  - [`date_index_positions`](@ref)
 """
 abstract type DateAdjusterEstimator <: AbstractEstimator end
 """
-    const DatesUnionPeriod = Union{<:Dates.Period, <:Dates.CompoundPeriod}
+    const DatesUnionPeriod = Union{Dates.Period, Dates.CompoundPeriod}
 
 Alias for a Dates period or compound period.
 
@@ -435,9 +490,9 @@ Used internally to accept either simple date periods (e.g., `Dates.Month(1)`) or
   - [`IntPeriodDateRange`](@ref)
   - [`DateWalkForward`](@ref)
 """
-const DatesUnionPeriod = Union{<:Dates.Period, <:Dates.CompoundPeriod}
+const DatesUnionPeriod = Union{Dates.Period, Dates.CompoundPeriod}
 """
-    const IntPeriodDateRange = Union{<:Integer, <:DatesUnionPeriod}
+    const IntPeriodDateRange = Union{Integer, DatesUnionPeriod}
 
 Alias for an integer or date period used to specify window sizes.
 
@@ -448,9 +503,9 @@ Matches either a plain integer (number of observations) or a date period ([`Date
   - [`DatesUnionPeriod`](@ref)
   - [`DateWalkForward`](@ref)
 """
-const IntPeriodDateRange = Union{<:Integer, <:DatesUnionPeriod}
+const IntPeriodDateRange = Union{Integer, DatesUnionPeriod}
 """
-    const DateAdjType = Union{<:Function, <:DateAdjusterEstimator}
+    const DateAdjType = Union{Function, DateAdjusterEstimator}
 
 Alias for a date adjustment function or estimator.
 
@@ -461,7 +516,7 @@ Matches either a plain `Function` or a [`DateAdjusterEstimator`](@ref) for adjus
   - [`DateAdjusterEstimator`](@ref)
   - [`DateWalkForward`](@ref)
 """
-const DateAdjType = Union{<:Function, <:DateAdjusterEstimator}
+const DateAdjType = Union{Function, DateAdjusterEstimator}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -506,7 +561,7 @@ Each switch is `nothing` by default. An unset `pws` follows `wd`, so `wd` alone 
 
 `pws` is the Previous-Weights Source. A [`TargetWeights`](@ref) threads the target weights of the previous fold into the next one. A [`DriftedWeights`](@ref) threads the weights held after the last observation of the previous fold instead, so a turnover, a tracking or a fee estimator measures the trades a fund places rather than the change in the decision. A fold enumeration of this scheme is a timeline, so the source has a previous fold to read.
 
-`nothing` follows `wd`, through [`resolve_previous_weights_source`](@ref): the target weights when `wd` is `nothing`, and the drifted weights when `wd` is set. If the series drifts, the fund holds the drifted weights at the end of the fold, so the next trade starts there. An explicit `pws` overrides the rule. `wd` with `pws = TargetWeights()` drifts the series and still measures the change in the decision, which separates the turnover of the decision from the turnover the fund executes.
+`nothing` follows `wd`, through [`resolve_previous_weights_source`](@ref): the target weights when `wd` is `nothing`, and the drifted weights when `wd` is set. If the series drifts, the fund holds the drifted weights at the end of the fold, so the next trade starts there. An explicit `pws` overrides the rule. `wd` with `pws = TargetWeights()` drifts the series and still measures the change in the decision, which separates the turnover of the decision from the turnover the fund executes. The table of [`AbstractPreviousWeightsSource`](@ref) gives the four settings of `wd` and `pws`.
 
 ## Fee clock
 
@@ -732,9 +787,10 @@ end
 Build the date range that a [`DateWalkForward`](@ref) estimator walks over the timestamps `ts`.
 
 The range runs from the first to the last timestamp with a step of `period`. If `period_offset` is
-not `nothing`, the start moves to `min(ts[1], ts[1] - period_offset)`, the `adjuster` is applied, and
-the offset is added to every date. This shifts each date by the offset without losing the start of
-`ts`.
+not `nothing`, the start moves to `min(ts[1], ts[1] - period_offset)` and the end moves to
+`max(ts[end], ts[end] - period_offset)`. Then the `adjuster` is applied, and the offset is added to
+every date. This shifts each date by the offset and loses neither end of `ts`. A negative offset
+moves a date after `ts[end]` back into the data, so that date stays in the range.
 
 # Arguments
 
@@ -760,10 +816,22 @@ function walk_forward_date_range(ts::AbstractVector, period::DatesUnionPeriod,
     po_flag = !isnothing(period_offset)
     if po_flag
         ti = min(ti, ti - period_offset)
+        tf = max(tf, tf - period_offset)
     end
     date_range = adjuster(ti:period:tf)
     if po_flag
-        date_range += period_offset
+        # A range plus a period keeps its step from the shifted start. That shifts every date
+        # only when the step and the offset are fixed periods. A calendar step needs each date
+        # shifted: `(2020-12-22):Month(1):(2021-02-19)` loses 2021-02-19, the shift of
+        # 2021-03-01, and a start of 2020-12-22 puts it at 2021-02-22.
+        exact = isa(date_range, StepRange) &&
+                isa(step(date_range), Dates.FixedPeriod) &&
+                isa(period_offset, Dates.FixedPeriod)
+        date_range = if exact
+            date_range + period_offset
+        else
+            [d + period_offset for d in date_range]
+        end
     end
     return date_range
 end
@@ -1255,7 +1323,7 @@ The fold loop reads `nothing` as the target weights. So the resolution maps [`Ta
 # Algorithm
 
  1. `pws` and `wd` are both unset: give `nothing`, the target weights.
- 2. `pws` is unset and `wd` is set: give [`DriftedWeights`](@ref) under `wd`.
+ 2. `pws` is unset and `wd` is set: give [`DriftedWeights`](@ref), and [`held_weights_drift`](@ref) runs `wd`.
  3. `pws` is a [`TargetWeights`](@ref): give `nothing`, the target weights, whatever `wd` is.
  4. Any other `pws`: give it unchanged.
 
@@ -1279,8 +1347,8 @@ The fold loop reads `nothing` as the target weights. So the resolution maps [`Ta
 function resolve_previous_weights_source(::Nothing, ::Nothing)
     return nothing
 end
-function resolve_previous_weights_source(::Nothing, wd::AbstractWeightDrift)
-    return DriftedWeights(wd)
+function resolve_previous_weights_source(::Nothing, ::AbstractWeightDrift)
+    return DriftedWeights()
 end
 function resolve_previous_weights_source(::TargetWeights, ::Option{<:AbstractWeightDrift})
     return nothing
@@ -1360,3 +1428,4 @@ function fold_evaluation(cv::HindsightSplit)
 end
 export WalkForwardResult, IndexWalkForward, DateWalkForward, HindsightSplit,
        OnlineIndexWalkForward, OnlineDateWalkForward, OnlineHindsightSplit, n_splits
+public DateAdjusterEstimator

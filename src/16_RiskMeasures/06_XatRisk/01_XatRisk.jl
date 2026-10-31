@@ -61,7 +61,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Compute the loss-tail z-score of the parametric Value-at-Risk at significance level `alpha`.
 
-The z-score is the ``1 - \\alpha`` quantile of the distribution, the loss that the standardised return exceeds with probability ``\\alpha``.
+The z-score is the ``1 - \\alpha`` quantile of the distribution, the standardised loss that the portfolio exceeds with probability ``\\alpha``.
 
 # Mathematical definition
 
@@ -73,7 +73,7 @@ z_{\\alpha} &= F^{-1}(1 - \\alpha)\\,.
 
 Each method reads ``F`` from its own distribution:
 
-  - `Normal`: ``F`` is the cumulative distribution function of `dist` as given, so the default `Normal()` is standardised.
+  - `Normal`: ``F`` is the cumulative distribution function of `dist` as given, so the default `Normal()` is standardised. A mean ``m`` adds ``m`` to ``z_{\\alpha}``, and a standard deviation ``s`` multiplies its quantile term by ``s``.
   - `TDist`: ``F`` is the Student-t distribution with ``\\nu`` degrees of freedom, scaled to unit variance, so ``z_{\\alpha} = t_{\\nu}^{-1}(1 - \\alpha) \\sqrt{(\\nu - 2)/\\nu}``.
   - `Laplace`: ``F`` is the Laplace distribution with zero mean and unit variance, whatever the parameters of `dist`. Its closed form is below.
 
@@ -86,7 +86,7 @@ z_{\\alpha} &= \\begin{cases} -\\dfrac{\\ln(2 \\alpha)}{\\sqrt{2}}\\,, & \\alpha
 Where:
 
   - ``z_{\\alpha}``: Loss-tail z-score.
-  - ``F``: Cumulative distribution function of the standardised return.
+  - ``F``: Cumulative distribution function of the standardised loss.
   - ``t_{\\nu}``: Cumulative distribution function of the Student-t distribution with ``\\nu`` degrees of freedom.
   - ``\\nu``: Degrees of freedom of `dist`.
   - $(math_dict[:alpha_rm])
@@ -95,7 +95,7 @@ Where:
 
 # Arguments
 
-  - `dist`: Distribution of the standardised return, a `Normal`, a `TDist` or a `Laplace`.
+  - `dist`: Distribution of the standardised loss, a `Normal`, a `TDist` or a `Laplace`.
   - `alpha::Number`: Significance level.
 
 # Validation
@@ -142,18 +142,18 @@ z^{c}_{\\alpha} &= F^{-1}(\\alpha)\\,.
 \\end{align}
 ```
 
-Each method reads ``F`` from the same distribution as [`compute_value_at_risk_z`](@ref). The three distributions are symmetric about zero when standardised, so ``z^{c}_{\\alpha} = -z_{\\alpha}``, and the `Laplace` method returns that value.
+Each method reads ``F`` from the same distribution as [`compute_value_at_risk_z`](@ref). For a distribution that is symmetric about zero, ``z^{c}_{\\alpha} = -z_{\\alpha}``. The `Laplace` method returns that value, and so do the `TDist` method and the `Normal` method for a zero mean. A `Normal` with a mean ``m`` gives ``z^{c}_{\\alpha} = -z_{\\alpha} + 2 m``.
 
 Where:
 
   - ``z^{c}_{\\alpha}``: Gain-tail z-score.
   - ``z_{\\alpha}``: Loss-tail z-score, from [`compute_value_at_risk_z`](@ref).
-  - ``F``: Cumulative distribution function of the standardised return.
+  - ``F``: Cumulative distribution function of the standardised loss.
   - $(math_dict[:alpha_rm])
 
 # Arguments
 
-  - `dist`: Distribution of the standardised return, a `Normal`, a `TDist` or a `Laplace`.
+  - `dist`: Distribution of the standardised loss, a `Normal`, a `TDist` or a `Laplace`.
   - `alpha::Number`: Significance level.
 
 # Validation
@@ -181,6 +181,40 @@ end
 function compute_value_at_risk_cz(dist::Distributions.Laplace, alpha::Number)
     return -compute_value_at_risk_z(dist, alpha)
 end
+"""
+    gain_tail_distribution(dist::Distributions.Normal) -> Distributions.Normal
+    gain_tail_distribution(dist::Distributions.Distribution) -> Distributions.Distribution
+
+Return the distribution of the standardised loss of the negated portfolio, which the gain tail of [`GenericValueatRiskRange`](@ref) reads.
+
+The parametric loss of the portfolio is ``-\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} + \\sigma_{\\boldsymbol{w}} \\varepsilon``, where `dist` is the law of ``\\varepsilon``. The loss of the negated portfolio is the negated loss, so its standardised loss is ``-\\varepsilon``. A gain tail that evaluates the loss tail on ``-\\boldsymbol{w}`` must read the law of ``-\\varepsilon``. Then its value equals the gain tail of [`ValueatRiskRange`](@ref), ``\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - z^{c}_{\\alpha} \\sigma_{\\boldsymbol{w}}``, because ``F_{-\\varepsilon}^{-1}(1 - \\alpha) = -F_{\\varepsilon}^{-1}(\\alpha)``.
+
+  - `Normal`: [`compute_value_at_risk_z`](@ref) reads `dist` as given, so the method rebuilds it with the negated mean and the same standard deviation. A `Normal` with a zero mean is returned unchanged.
+  - Any other distribution passes through unchanged. [`compute_value_at_risk_z`](@ref) reads `TDist` and `Laplace` as laws with zero mean, which are symmetric about zero, so each is its own reflection.
+
+# Arguments
+
+  - `dist`: Distribution of the standardised loss of the portfolio.
+
+# Returns
+
+  - `dist`: Distribution of the standardised loss of the negated portfolio.
+
+# Related
+
+  - [`compute_value_at_risk_z`](@ref)
+  - [`compute_value_at_risk_cz`](@ref)
+  - [`DistributionValueatRisk`](@ref)
+  - [`GenericValueatRiskRange`](@ref)
+  - [`gain_tail_measure`](@ref)
+"""
+function gain_tail_distribution(dist::Distributions.Normal)
+    mu, sigma = Distributions.params(dist)
+    # A zero mean is its own reflection. Returning `dist` itself lets `rebuild_with_slots` keep
+    # the measure, where `Normal(-0.0, sigma)` is not `===` to `dist`.
+    return iszero(mu) ? dist : Distributions.Normal(-mu, sigma)
+end
+gain_tail_distribution(dist::Distributions.Distribution) = dist
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -218,6 +252,8 @@ Where:
 The minimum is the ``k``-th largest loss, the order statistic that [`ValueatRisk`](@ref) defines. The programme exempts the largest losses first, and it can exempt them while their cumulative weight stays within ``(\\alpha + s) W_{T}``. So the exempt weight reaches ``\\alpha W_{T}`` and does not pass it. The slack only absorbs the rounding error of ``\\alpha W_{T}``.
 
 The programme is exact when ``b`` is at least the largest loss minus the minimum, which the derived default is. The slack must stay small. When ``s W_{T}`` reaches the gap from ``\\alpha W_{T}`` up to the next cumulative weight, the programme exempts one more observation.
+
+The order statistic is the upper quantile of Definition 3.3 of [artzner1999](@cite). Equation 7.51 of [cajas2025](@cite) subtracts its slack, so when ``\\alpha W_{T}`` is an integer it selects the next larger loss, and not the order statistic of its own Equation 7.50. This programme adds the slack, so that it selects the order statistic of the definition. Section 7.2.2.3 of [cajas2025](@cite) builds its programme on an older mixed-integer formulation of the Value-at-Risk. No copy of the work that first states that formulation was found.
 
 # Fields
 
@@ -257,7 +293,8 @@ MIPValueatRisk
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 7.2.2.3, Equations 7.50 and 7.51. The programme of Equation 7.51 subtracts its slack. This one adds it, so that it selects the order statistic of the definition, Equation 7.50.
+  - $(ref_dict[:artzner1999]) Section 3.3, Definition 3.3.
+  - $(ref_dict[:cajas2025]) Section 7.2.2.3, Equations 7.50 and 7.51. $(ref_dict[:no_original_source])
 """
 @concrete struct MIPValueatRisk <: ValueatRiskFormulation
     """
@@ -322,7 +359,7 @@ Computes the Value-at-Risk as a quantile of a parametric distribution, from the 
 
 This is a different estimand from the empirical quantile that [`MIPValueatRisk`](@ref) reports. The risk measure that holds it reports the parametric value in the optimisation model and in the functor alike. `mu` and `sigma` fall back to the prior's own, so [`factory`](@ref) fills them before either the model or the functor reads them.
 
-The optimisation model bounds the standard deviation from above with a second-order cone, so the model is convex only while the coefficient of the standard deviation is not negative. For the three distributions that is ``\\alpha \\leq 1/2`` for [`ValueatRisk`](@ref), and ``\\alpha + \\beta \\leq 1`` for [`ValueatRiskRange`](@ref). Past that level a minimisation of the risk has no finite solution.
+The optimisation model bounds the standard deviation from above with a second-order cone, so the model is convex only while the coefficient of the standard deviation is not negative. For a law that is symmetric about zero, that is ``\\alpha \\leq 1/2`` for [`ValueatRisk`](@ref), and ``\\alpha + \\beta \\leq 1`` for [`ValueatRiskRange`](@ref). A `Normal` with a mean ``m`` adds ``m`` to ``z_{\\alpha}``, so a negative ``m`` can make the coefficient of [`ValueatRisk`](@ref) negative at ``\\alpha \\leq 1/2``. The coefficient of [`ValueatRiskRange`](@ref), ``z_{\\alpha} - z^{c}_{\\beta}``, does not depend on ``m``. Two tails of a [`GenericValueatRiskRange`](@ref) that both hold this algorithm and read the same covariance matrix share one cone, whatever expected returns each tail reads, so the condition is that of [`ValueatRiskRange`](@ref). Any other tail of a [`GenericValueatRiskRange`](@ref) has a cone of its own, so its coefficient must not be negative. The coefficient of a gain tail is ``-z^{c}_{\\beta}``, which a positive ``m`` makes smaller. Past that level a minimisation of the risk has no finite solution.
 
 # Mathematical definition
 
@@ -345,6 +382,14 @@ Where:
 
 The range is the Value-at-Risk of the returns plus the Value-at-Risk of the negated returns, and the two mean terms cancel.
 
+!!! note
+
+    `dist` is the law of the standardised loss ``\\varepsilon`` of the portfolio, so the loss is ``-\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} + \\sqrt{\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}}\\, \\varepsilon``. A `Normal` with a mean ``m \\neq 0`` is not symmetric about zero. It moves the loss tail up by ``m \\sqrt{\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}}`` and the gain tail down by the same amount. A [`GenericValueatRiskRange`](@ref) evaluates the gain tail of a [`ValueatRisk`](@ref) on ``-\\boldsymbol{w}``, and the standardised loss of ``-\\boldsymbol{w}`` is ``-\\varepsilon``. So it reads the law that [`gain_tail_distribution`](@ref) gives, and its value equals that of a [`ValueatRiskRange`](@ref) with the same `dist`.
+
+The two estimands agree only when the returns follow `dist`. On a large sample drawn from `dist`, the parametric quantile of the sample moments is close to the empirical quantile. On a sample whose loss tail is heavier than that of `dist`, the parametric quantile at a small ``\\alpha`` is below the empirical quantile, so it understates the loss. On a sample whose loss tail is lighter, it is above the empirical quantile. At a larger ``\\alpha`` the order can reverse.
+
+Sections 1.2 and 4.5.2.2 of [morgan1996](@cite) state the Value-at-Risk of normal returns. Section 2.6 of [lobo1998](@cite) states its bound as a second-order cone for a confidence of at least one half, which is the condition ``\\alpha \\leq 1/2`` above. Equation 11.5 of [cajas2025](@cite) states the quantiles of the Student-t law, scaled to unit variance, and of the Laplace law. No copy of the work that first states those two forms was found. Equation 7.52 of [cajas2025](@cite) calls ``z_{\\alpha}`` the ``\\alpha`` quantile of the normal law, but the definition needs the ``1 - \\alpha`` quantile, which its Equation 11.5 states.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -365,6 +410,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `mu` is not `nothing`: `!isempty(mu)`.
+  - $(val_dict[:sigma_cov])
   - If `sigma` is not `nothing`: `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
   - If `chol` is not `nothing`: `!isempty(chol)`, and `sigma` is a matrix rather than `nothing` or a Deferred Quantity.
 
@@ -399,6 +445,7 @@ DistributionValueatRisk
   - [`ValueatRiskFormulation`](@ref)
   - [`MIPValueatRisk`](@ref)
   - [`ValueatRisk`](@ref)
+  - [`gain_tail_distribution`](@ref)
   - [`MuSlot`](@ref)
   - [`SigmaSlot`](@ref)
   - [`resolve_deferred_quantities`](@ref)
@@ -407,7 +454,9 @@ DistributionValueatRisk
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 7.2.2.3, Equations 7.52 and 7.53, and Section 11.2, Equation 11.5.
+  - $(ref_dict[:morgan1996]) Section 1.2, Equation 1.5, and Section 4.5.2.2, Equation 4.43.
+  - $(ref_dict[:lobo1998]) Section 2.6, Equation 13.
+  - $(ref_dict[:cajas2025]) Section 11.2, Equation 11.5. $(ref_dict[:no_original_source])
 """
 @propagatable @concrete struct DistributionValueatRisk <: ValueatRiskFormulation
     """
@@ -439,6 +488,7 @@ DistributionValueatRisk
                                      pe::Option{<:AbstractPriorEstimator},
                                      dist::Distributions.Distribution,
                                      mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm})
+        assert_covariance_estimator(sigma, :sigma)
         if isa(mu, VecNum)
             @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
         end
@@ -576,7 +626,7 @@ Where:
 
 ``-x_{(k)}`` is the minimum of the programme of [`MIPValueatRisk`](@ref) over the losses ``-x_{t}``. Without observation weights ``k = \\lfloor (\\alpha + s) T \\rfloor + 1``. This is ``\\lfloor \\alpha T \\rfloor + 1``, the index of the upper ``\\alpha``-quantile, while ``s T`` is smaller than ``\\lfloor \\alpha T \\rfloor + 1 - \\alpha T``. The slack absorbs the rounding error of ``\\alpha T``. For example, at ``\\alpha = 0.29`` and ``T = 100`` the product rounds to 28.999999999999996, and ``k`` is 30.
 
-``-x_{(k)}`` is the definition ``-\\inf\\{x : F(x) > \\alpha\\}`` of the reference, Equation 7.50, with ``F`` the weighted distribution function of the returns. It is the smallest loss that the portfolio exceeds with a probability of ``\\alpha`` or less. The programme of the same reference, Equation 7.51, subtracts its slack, and it selects ``\\lceil \\alpha T \\rceil``, which is one position higher when ``\\alpha T`` is an integer. At ``\\alpha T = 1`` that position is the largest loss.
+``-x_{(k)}`` is the definition ``-\\inf\\{x : F(x) > \\alpha\\}`` of Definition 3.3 of [artzner1999](@cite), with ``F`` the weighted distribution function of the returns. Equation 7.50 of [cajas2025](@cite) states it too. It is the smallest loss that the portfolio exceeds with a probability of ``\\alpha`` or less. Equation 7.51 of [cajas2025](@cite), the programme, subtracts its slack, and it selects ``\\lceil \\alpha T \\rceil``, which is one position higher when ``\\alpha T`` is an integer. At ``\\alpha T = 1`` that position is the largest loss.
 
 # Algorithm
 
@@ -608,15 +658,15 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `alg`: Recursively updated via [`factory`](@ref).
+  - `alg`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `alg`: Recursively viewed via [`port_opt_view`](@ref).
+  - `alg`: Recursively viewed through [`port_opt_view`](@ref).
 
 # Functor
 
@@ -659,6 +709,7 @@ ValueatRisk
 
 # References
 
+  - $(ref_dict[:artzner1999]) Section 3.3, Definition 3.3.
   - $(ref_dict[:cajas2025]) Section 7.2.2.3, Equations 7.50 and 7.51.
 """
 @propagatable @concrete struct ValueatRisk <: RiskMeasure
@@ -771,6 +822,10 @@ $(math_dict[:negated_upper_tail])
 
 The two tails select their order statistics with the same slack ``s``. The gain tail is the ``k``-th largest return, with ``k`` the index of [`ValueatRisk`](@ref) at ``\\beta``.
 
+Let ``k_{\\alpha}`` be the index of the loss tail and ``k_{\\beta}`` the index of the gain tail, so that the range is ``x_{(T + 1 - k_{\\beta})} - x_{(k_{\\alpha})}``. The range is not negative when ``k_{\\alpha} + k_{\\beta} \\leq T + 1``. Without observation weights this holds when ``\\lfloor (\\alpha + s) T \\rfloor + \\lfloor (\\beta + s) T \\rfloor \\leq T - 1``, which is about ``\\alpha + \\beta < 1``. When the two levels overlap past that point, the loss order statistic is above the gain order statistic, and the range is zero or negative. For example, at ``T = 10`` and ``\\alpha = \\beta = 0.5`` the range is ``x_{(5)} - x_{(6)}``. The constructor does not refuse such levels, and the model and the functor report the same number.
+
+Section 7.2.3 of [cajas2025](@cite) defines the ranges of the Conditional Value-at-Risk and of other tail measures, and names [owa1](@cite) as their source. No copy of that work was found. [cajas2025](@cite) defines no range of the Value-at-Risk, so this measure is the library's analogue of that family.
+
 # Algorithm
 
 The functor of the empirical estimand:
@@ -805,15 +860,15 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `alg`: Recursively updated via [`factory`](@ref).
+  - `alg`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `alg`: Recursively viewed via [`port_opt_view`](@ref).
+  - `alg`: Recursively viewed through [`port_opt_view`](@ref).
 
 # Functor
 
@@ -855,7 +910,9 @@ ValueatRiskRange
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 7.2.2.3.
+  - $(ref_dict[:artzner1999]) Section 3.3, Definition 3.3.
+  - $(ref_dict[:cajas2025]) Section 7.2.3. $(ref_dict[:no_original_source])
+  - $(ref_dict[:owa1])
 """
 @propagatable @concrete struct ValueatRiskRange <: RiskMeasure
     """
@@ -1002,6 +1059,8 @@ Where:
 
 The running peak starts at ``c_0 = 0``, so a series that falls from its first period is in drawdown from the start. ``-d_{(k)}`` is the minimum of the programme of [`MIPValueatRisk`](@ref) over the losses ``-d_{t}``, and ``k`` follows the rules that [`ValueatRisk`](@ref) states.
 
+Equation 3.2 of [cdar](@cite) defines the drawdown of the uncompounded cumulative return, with the peak taken from ``c_0``. Its Equations 3.6 and 3.8 take the quantile of the drawdowns as the threshold of its conditional measure, and do not name it as a measure. Equation 7.90 of [cajas2025](@cite) names that quantile the Drawdown-at-Risk.
+
 # Algorithm
 
  1. Read the slack `s` with [`mip_var_bounds`](@ref), which gives the default when the `s` field is `nothing`.
@@ -1069,8 +1128,8 @@ DrawdownatRisk
 
 # References
 
-  - $(ref_dict[:cdar])
-  - $(ref_dict[:cajas2025]) Section 7.2.4.3, Equations 7.90 and 7.91.
+  - $(ref_dict[:cdar]) Section 3, Equations 3.2, 3.6 and 3.8.
+  - $(ref_dict[:cajas2025]) Section 7.2.4.3, Equation 7.90.
 """
 @propagatable @concrete struct DrawdownatRisk <: RiskMeasure
     """
@@ -1287,7 +1346,9 @@ Where:
   - $(math_dict[:alpha_rm])
   - $(math_dict[:T])
 
-The running peak starts at ``C_0 = 1``, so each drawdown is relative to the initial portfolio value. The index ``k`` is the one of [`DrawdownatRisk`](@ref), so the two measures select the same position in their series.
+The running peak starts at ``C_0 = 1``, so the peak is never below the initial portfolio value. The index ``k`` is the one of [`DrawdownatRisk`](@ref), so the two measures select the same position in their series.
+
+Section 3 of [cdar](@cite) defines the drawdown of the uncompounded cumulative return only. It names the relative drawdown and states that it lacks the properties of the absolute drawdown, but it defines no measure on it. The relative drawdown series above, and its quantile, are the library's extension of that work.
 
 # Algorithm
 
@@ -1346,7 +1407,7 @@ RelativeDrawdownatRisk
 
 # References
 
-  - $(ref_dict[:cdar])
+  - $(ref_dict[:cdar]) Section 3, Equation 3.2.
 """
 @propagatable @concrete struct RelativeDrawdownatRisk <: HierarchicalRiskMeasure
     """
@@ -1438,7 +1499,7 @@ function (r::RelativeDrawdownatRisk)(x::VecNum)
 end
 
 """
-    const CholRM = Union{<:Variance, <:StandardDeviation, <:DistributionValueatRisk}
+    const CholRM = Union{Variance, StandardDeviation, DistributionValueatRisk}
 
 Groups the types that hold an optional covariance matrix `sigma` and its optional factor `chol`.
 
@@ -1451,7 +1512,7 @@ The group exists so that one method of [`chol_sigma_selector`](@ref) serves all 
   - [`DistributionValueatRisk`](@ref)
   - [`chol_sigma_selector`](@ref)
 """
-const CholRM = Union{<:Variance, <:StandardDeviation, <:DistributionValueatRisk}
+const CholRM = Union{Variance, StandardDeviation, DistributionValueatRisk}
 
 # Expected-risk input kind — see `risk_input_kind`.
 risk_input_kind(::ValueatRisk) = NetReturnsInput()

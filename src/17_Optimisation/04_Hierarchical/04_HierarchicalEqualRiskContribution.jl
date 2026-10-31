@@ -20,7 +20,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Splits weight down the dendrogram between clusters by their outer risk `ro`, then splits each cluster's share between its assets by their inner risk `ri`.
 
-This is the Hierarchical Equal Risk Contribution algorithm. It differs from [`HierarchicalRiskParity`](@ref) in two ways. It stops at the optimal number of clusters, not at the individual assets, and it splits at the branches of the dendrogram, not at the halves of a leaf order. The name is the source's. The portfolio is not a risk parity portfolio, and the clusters do not contribute equally to risk. It solves no optimisation problem, so it accepts a risk measure that is not convex. The weight finaliser of `opt` acts on the result, and [`_optimise`](@ref) states the steps.
+This is the Hierarchical Equal Risk Contribution algorithm of Section 1 of [raffinot2018](@cite). It differs from [`HierarchicalRiskParity`](@ref) in two ways. It stops at the optimal number of clusters, not at the individual assets, and it splits at the branches of the dendrogram, not at the halves of a leaf order. The dendrogram split follows the hierarchical clustering based allocation of [raffinot2017](@cite), which [raffinot2018](@cite) reviews in the same section. The name is the source's. The portfolio is not a risk parity portfolio, and the clusters do not contribute equally to risk. It solves no optimisation problem, so it accepts a risk measure that is not convex. The weight finaliser of `opt` acts on the result, and [`_optimise`](@ref) states the steps.
 
 # Mathematical definition
 
@@ -50,6 +50,8 @@ Where:
   - ``W(C_k)``: Weight of cluster ``C_k``, the product of the split factors on the path from the root to ``C_k``.
   - ``v_i``: Share of asset ``i`` in the weight of its cluster.
   - $(math_dict[:w_i_asset])
+
+The split factor ``\\alpha_n`` is Step 2.4 of Section 12.2.2 of [cajas2025](@cite), where the risk of a branch is the sum of the risks of its clusters. The branch with the lower risk receives more weight. Step 3 of [raffinot2018](@cite) prints the factor of the first branch as ``\\mathcal{RC}_1 / (\\mathcal{RC}_1 + \\mathcal{RC}_2)``, which gives the first branch more weight when its risk is higher. This type does not follow that print. The shares ``v_i`` are the naive risk parity weights of Step 4 of [raffinot2018](@cite).
 
 When `ri` is a vector, [`herc_intra_cluster_weights`](@ref) states the shares ``v_i`` that the scalariser `scai` makes. When `ro` is a vector, [`herc_cluster_risk`](@ref) states the risk ``\\tilde{\\rho}_o(C_k)`` that the scalariser `scao` makes.
 
@@ -84,12 +86,12 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref) or [`TDO_O
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `opt`: Recursively updated via [`factory`](@ref).
-  - `ri`: Recursively updated via [`factory`](@ref).
-  - `ro`: Recursively updated via [`factory`](@ref).
-  - `fb`: Recursively updated via [`factory`](@ref).
+  - `opt`: Recursively updated through [`factory`](@ref).
+  - `ri`: Recursively updated through [`factory`](@ref).
+  - `ro`: Recursively updated through [`factory`](@ref).
+  - `fb`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 
@@ -218,8 +220,8 @@ HierarchicalEqualRiskContribution
 # References
 
   - $(ref_dict[:raffinot2017])
-  - $(ref_dict[:raffinot2018])
-  - $(ref_dict[:cajas2025]) Section 12.2.
+  - $(ref_dict[:raffinot2018]) Section 1, Steps 1 to 4.
+  - $(ref_dict[:cajas2025]) Section 12.2.2, Steps 2.1 to 3.
 """
 @propagatable @concrete struct HierarchicalEqualRiskContribution <:
                                ClusteringOptimisationEstimator

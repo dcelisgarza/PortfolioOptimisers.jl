@@ -1,22 +1,228 @@
 """
+    ep_tail_views!(tail_views::Nothing, args...; kwargs...)
+
+Do nothing when a problem states no tail view.
+
+`ep_tail_views!` is the function that lowers a group of tail views into entropy pooling constraints. This method is the branch for an absent group. It adds no constraint, so a caller can call the function with `tail_views = nothing` and needs no special case.
+
+# Arguments
+
+  - `tail_views::Nothing`: Shows that the problem states no tail view.
+  - `args...`: More positional arguments, which the method does not read.
+  - `kwargs...`: More keyword arguments, which the method does not read.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ep_tail_views!`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+"""
+function ep_tail_views!(tail_views::Nothing, args...; kwargs...)
+    return nothing
+end
+"""
+    ep_tail_views!(tail_views::AbstractVector{<:AbstractEntropyPoolingTailViewEstimator},
+                   args...; kwargs...)
+
+Lower each group of tail views under its own settings.
+
+The function lowers each [`AbstractEntropyPoolingTailViewEstimator`](@ref) of the vector in turn. All the groups add their constraints to the same constraint set, so one entropy pooling solve meets all of them.
+
+# Algorithm
+
+ 1. Lower each group of `tail_views` in turn, and pass `args...` and `kwargs...` to each call.
+ 2. Return `nothing`. Each call already wrote its constraints into `epc` and `tvs`.
+
+# Arguments
+
+  - `tail_views`: The vector of tail view groups.
+  - `args...`: More positional arguments, which go to [`ep_tail_views!`](@ref).
+  - `kwargs...`: More keyword arguments, which go to [`ep_tail_views!`](@ref).
+
+# Returns
+
+  - `nothing`: The function mutates `epc` and `tvs` in-place.
+
+# Related
+
+  - [`ep_tail_views!`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+"""
+function ep_tail_views!(tail_views::AbstractVector{<:AbstractEntropyPoolingTailViewEstimator},
+                        args...; kwargs...)
+    for tail_view in tail_views
+        ep_tail_views!(tail_view, args...; kwargs...)
+    end
+    return nothing
+end
+"""
+    ep_tail_views!(tail_views::AbstractEntropyPoolingTailViewEstimator, epc::AbstractDict,
+                   tvs::AbstractVector, pr::AbstractPriorResult, sets::UniverseSets,
+                   w::VecNum; strict::Bool = false,
+                   ledger::Option{<:AbstractVector} = nothing)
+
+Parse a group of tail views and lower them into entropy pooling constraints.
+
+`ep_tail_views!` lowers every tail view family. It parses the view equations of a [`LinearConstraintEstimator`](@ref), and replaces the prior references with their values. It resolves the asset names against the universe, selects a formulation for each view, and appends the constraints that the formulation needs. This function solves nothing, as against the recursive algorithm of [`MeucciEntropyPoolingPrior`](@ref). The views become part of the one entropy pooling problem that [`entropy_pooling`](@ref) solves.
+
+The function accepts `==`, `>=` and `<=`. A group name expands to its members, and each member takes the coefficient of the group. So a view on a group constrains the sum of the risk measures of the members, not their average. A view whose coefficients have one sign is a positive combination of measures, and its lower-bound form is convex. A view whose coefficients have both signs is a relative view, and its lower-bound form is not convex in general.
+
+These two functions hold every difference between the conditional, the entropic and the relativistic value at risk. So a fourth measure needs two methods, and no fourth copy of this function:
+
+  - [`ep_tail_view_prior_args`](@ref) names the statistic to which a `prior(...)` reference resolves, and the settings of its search.
+  - [`ep_add_tail_view!`](@ref) checks the shape of the view, reads its prior value, selects its formulation, and appends its constraints.
+
+# Algorithm
+
+ 1. Parse the view equations of `tail_views.views.val`. The result is one [`ParsingResult`](@ref) for each view.
+ 2. Replace every group name with the assets of the group. The result is one term for each member.
+ 3. Replace every `prior(...)` reference with the prior value of the measure, through [`replace_prior_views`](@ref), under the tuple that [`ep_tail_view_prior_args`](@ref) gives.
+ 4. Expand the formulation setting to one formulation for each view with [`ep_view_formulations`](@ref). The result is `algs`.
+ 5. For each view in turn, resolve its terms with [`ep_view_terms`](@ref). Drop the view when the universe holds no name of the view.
+ 6. Lower the view with [`ep_add_tail_view!`](@ref).
+
+# Arguments
+
+  - `tail_views`: The tail view group.
+  - `epc`: The dictionary of entropy pooling constraints, from keys to `(lhs, rhs)` pairs.
+  - `tvs`: The vector of tail view constraints, to which the function appends.
+  - `pr`: The prior result. The function reads its returns matrix.
+  - `sets`: The universe sets that map the asset names to indices.
+  - `w`: The prior probability weights.
+  - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn.
+  - $(arg_dict[:ledger]) The group expansion and [`ep_view_terms`](@ref) fill it.
+
+# Returns
+
+  - `nothing`: The function mutates `epc` and `tvs` in-place.
+
+# Related
+
+  - [`ep_tail_view_prior_args`](@ref)
+  - [`ep_add_tail_view!`](@ref)
+  - [`ConditionalValueatRiskView`](@ref)
+  - [`EntropicValueatRiskView`](@ref)
+  - [`RelativisticValueatRiskView`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+
+# References
+
+  - $(ref_dict[:EPTail]) Section 2.2, Equations 2 to 6, and Section 2.3, Equations 7 to 11.
+  - $(ref_dict[:EPRLVaR]) Section 2, Equations 1 to 5, and Section 3.2, Equation 7.
+"""
+function ep_tail_views!(tail_views::AbstractEntropyPoolingTailViewEstimator,
+                        epc::AbstractDict, tvs::AbstractVector, pr::AbstractPriorResult,
+                        sets::UniverseSets, w::VecNum; strict::Bool = false,
+                        ledger::Option{<:AbstractVector} = nothing)
+    X = pr.X
+    views = parse_equation(tail_views.views.val; ops1 = ("==", ">=", "<="),
+                           ops2 = (:call, :(==), :(>=), :(<=)), datatype = eltype(X))
+    views = replace_group_by_assets(views, sets, false, true, false; ledger = ledger)
+    views = replace_prior_views(views, pr, sets, ep_tail_view_prior_args(tail_views, w)...;
+                                strict = strict)
+    if !isa(views, AbstractVector)
+        views = [views]
+    end
+    algs = ep_view_formulations(tail_views.alg, length(views), :alg)
+    for (res, algi) in zip(views, algs)
+        terms = ep_view_terms(res, sets, X; strict = strict, ledger = ledger)
+        if isnothing(terms)
+            continue
+        end
+        ep_add_tail_view!(epc, tvs, tail_views, algi, X, terms, res.eqn, w)
+    end
+    return nothing
+end
+
+"""
+    ep_diagnose_tail_view!(model::JuMP.Model, p,
+                           tv::Union{LinearConditionalValueatRiskViewConstraint,
+                                     ConicEntropicValueatRiskViewConstraint,
+                                     ConicRelativisticValueatRiskViewConstraint})
+
+Add an exact tail view constraint to the feasibility programme of [`ep_diagnose_views`](@ref).
+
+The three dual tail view constraints state a lower bound on a positive combination of concave measures. The bound is a convex set of the posterior probabilities, and the dual blocks of [`ep_tail_dual_block!`](@ref) state it exactly. So the method adds the rows of [`add_ep_tail_view!`](@ref), with the scale one. The solvers of the programme must then take the cones of those blocks: the exponential cone for an entropic view, and the power cone for a relativistic view.
+
+# Arguments
+
+  - `model`: The JuMP model of the feasibility programme.
+  - `p`: The posterior probability variables of the model.
+  - `tv`: Dual tail view constraint.
+
+# Returns
+
+  - `nothing`: The function mutates `model` in place.
+
+# Related
+
+  - [`ep_diagnose_views`](@ref)
+  - [`add_ep_tail_view!`](@ref)
+  - [`LinearConditionalValueatRiskViewConstraint`](@ref)
+  - [`ConicEntropicValueatRiskViewConstraint`](@ref)
+  - [`ConicRelativisticValueatRiskViewConstraint`](@ref)
+"""
+function ep_diagnose_tail_view!(model::JuMP.Model, p,
+                                tv::Union{LinearConditionalValueatRiskViewConstraint,
+                                          ConicEntropicValueatRiskViewConstraint,
+                                          ConicRelativisticValueatRiskViewConstraint})
+    return add_ep_tail_view!(model, p, tv, one(eltype(tv.coef)))
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Reweights the observations of a prior so that its moments and its tails meet a set of views.
 
-`EntropyPoolingPrior` is a low order prior estimator that computes the mean and covariance of asset returns using entropy pooling. It supports views on the mean, the variance, the covariance, the correlation, the skewness and the kurtosis, views on the value at risk, the conditional and entropic value at risk views of [EPTail](@cite), and the relativistic value at risk views of [EPRLVaR](@cite).
+`EntropyPoolingPrior` is a low order prior estimator. It calculates the mean and the covariance of the asset returns with entropy pooling. It takes views on the mean, the variance, the covariance, the correlation, the skewness and the kurtosis. It also takes views on the value at risk, the conditional and entropic value at risk views of [EPTail](@cite), and the relativistic value at risk views of [EPRLVaR](@cite).
 
-The tail views are the difference with [`MeucciEntropyPoolingPrior`](@ref). There, a CVaR view is a target the recursive algorithm of Meucci et al. hunts by re-solving the whole entropy pooling problem for each candidate value at risk level, which supports equalities alone. Here each tail view is written as constraints of the single entropy pooling problem, so one solve answers every view, and the operators `==`, `>=` and `<=` are all available, along with views on the entropic and the relativistic value at risk, and views over several assets of every measure: a positive combination is convex and exact, and a relative view with coefficients of both signs takes the integer formulation or a sequential convex one.
+The tail views are the difference from [`MeucciEntropyPoolingPrior`](@ref). That estimator finds a CVaR view with the recursive algorithm of [meucciardiakeel2011](@citet), which solves the whole entropy pooling problem again for each candidate value at risk. That route takes only equality views. This estimator writes each tail view as constraints of the one entropy pooling problem, so one solve meets every view. It takes the operators `==`, `>=` and `<=`, views on the entropic and the relativistic value at risk, and views over several assets of every measure.
+
+A positive combination of measures is convex, and its formulation is exact. A relative view, with coefficients of both signs, uses the integer formulation or a sequential convex formulation. [EPTail](@cite) states the views on one asset, and the relative CVaR view on two assets. The views on several assets of the other measures, the upper-bound and equality views of the relativistic value at risk, and the sequential convex formulation are the library's own.
+
+The posterior is the entropy pooling of [meucci2008](@cite). [`H1_EntropyPooling`](@ref) and [`H2_EntropyPooling`](@ref) are the two sequential heuristics of [vorobets2021](@cite). [`H0_EntropyPooling`](@ref), one solve, is the name that the library gives the original formulation. [vorobets2021](@citet) defines no H0.
+
+The comparison operators that a view accepts depend on the moment that it constrains. `var_views` takes `==` and `>=`. Every other view family takes `==`, `>=` and `<=`. An unsupported operator raises a `Meta.ParseError` that names the operators that the view accepts.
+
+A skewness, kurtosis or correlation view divides by the variance of an asset. A staged algorithm holds that variance at its value from the stage before. Both read the variance from the prior that `pe` fits. This variance is the diagonal of its `sigma`, minus the residual variance of a factor model. So the covariance estimator of `pe` sets the variance that the rows hold.
+
+The rows state the uncorrected moment of the scenarios, ``\\sum_{t} p_{t} (x_{t,\\,i} - \\mu_{i})^{2}``. The default covariance estimator is corrected. So under [`H1_EntropyPooling`](@ref) or [`H2_EntropyPooling`](@ref), a skewness or kurtosis view increases the variance of the scenarios by the correction factor of the stage before. The view also standardises by the corrected variance. To hold the uncorrected variance of the scenarios, and to standardise by it, give `pe` an uncorrected covariance estimator:
+
+    ce = GeneralCovariance(; ce = StatsBase.SimpleCovariance(; corrected = false))
+    pe = EmpiricalPrior(; ce = PortfolioOptimisersCovariance(; ce = Covariance(; ce = ce)))
+
+The posterior `sigma` is then uncorrected too. [`H0_EntropyPooling`](@ref) has no stage before, and it reads the variance of the prior in the same way.
+
+A `prior(...)` reference in a skewness or kurtosis view reads the sample statistic of the scenarios under the observation weights of the prior of the stage, as a value at risk reference does. The statistic standardises by its own variance estimator, not by the variance that the row reads.
+
+A tail view needs auxiliary variables, so the estimator writes it in the JuMP model, not as rows that multiply the posterior probabilities. This has three effects on the solver:
+
+  - `opt` must be a [`JuMPEntropyPooling`](@ref) when `cvar_views` is set. It must also be one when an `evar_views` or `rlvar_views` entry is not a lower bound under [`GridTailView`](@ref). The grid formulation of a lower bound is the only tail formulation that is linear in the posterior probabilities alone.
+  - A view that needs a binary variable needs a solver for mixed-integer exponential cone programmes. Every [`IntegerConditionalValueatRiskView`](@ref) view needs a binary variable, and so does an upper bound or an equality under [`GridTailView`](@ref).
+  - [`ConicRelativisticValueatRiskView`](@ref), and the dual side of a relativistic value-at-risk view under [`SequentialTailView`](@ref), write power cones. So their solver must also take the power cone, together with the exponential cone of the objective.
+
+The `alg` field of a view group selects the formulation. One formulation applies to every view of the group, and a vector gives one formulation for each view. With `nothing`, [`ep_cvar_formulation`](@ref), [`ep_evar_formulation`](@ref) and [`ep_rlvar_formulation`](@ref) select the formulation of each view, and their tables state the rules.
+
+A significance level is part of the statistic. The conditional value at risk at 1 % and at 10 % are two different numbers of the same series. So the level is a field of the view group, not of the estimator. `var_views`, `cvar_views`, `evar_views` and `rlvar_views` each take one [`ValueatRiskView`](@ref), [`ConditionalValueatRiskView`](@ref), [`EntropicValueatRiskView`](@ref) or [`RelativisticValueatRiskView`](@ref), or a vector of them. Each group holds the `alpha` of its equations, and a `prior(...)` reference in a group resolves to the prior value at the level of that group. A [`RelativisticValueatRiskView`](@ref) also holds a `kappa`, because the deformation parameter is also part of the statistic.
+
+A tail view group also holds `alg`, the formulation. For an [`EntropicValueatRiskView`](@ref) or a [`RelativisticValueatRiskView`](@ref), the grid formulation holds the grid of dual variables and the big-M multiplier. So a [`GridTailView`](@ref) in one group gives that group its own `pct`, `K` and `M`. [`ValueatRiskView`](@ref) has no such field. A value at risk view is linear in the posterior probabilities, so it has no formulation to select.
 
 !!! warning
 
-    An infeasible view set is not raised on by the [`OptimEntropyPooling`](@ref) route. The dual of an infeasible set is unbounded, so the minimiser runs away, the posterior collapses onto one observation, and `Optim` reports the solve as converged. A grossly infeasible view overflows instead, and the non-finite weights reach the moment estimators as an `ArgumentError` naming Infs or NaNs. Read the result rather than the flag: `ens` falls to a handful out of the number of observations, one weight sits near one, `kld` is large, and the posterior statistic the view named is far from its target. [`entropy_pooling`](@ref) states the mechanism. The [`JuMPEntropyPooling`](@ref) route does not share it: the solver reports an infeasible model itself.
+    The [`OptimEntropyPooling`](@ref) route does not detect an infeasible view set. The dual of an infeasible set is unbounded, so the minimiser does not stop at a finite point. The posterior puts almost all of its mass on one observation, and `Optim` reports the solve as converged. A view far outside the feasible set makes the dual overflow instead. The moment estimators then get weights that are not finite, and they raise an `ArgumentError` that names Infs or NaNs. [`entropy_pooling`](@ref) states the mechanism.
+
+    Read the result, not the flag. On such a result, `ens` is a small number against the number of observations, and one weight is near one. `kld` is large, and the posterior statistic of the view is far from its target. The [`JuMPEntropyPooling`](@ref) route does not have this problem, because the solver reports an infeasible model. But its error names no view.
+
+    To refuse such a view set before the solve, give `diagnose` a solver of linear programmes. [`ep_diagnose_views`](@ref) then decides with one linear programme for each stage whether the views can hold together, and its error names the view fields.
 
 # Algorithm
 
-The constructor derives the prior probabilities, and validates everything else.
+The constructor derives the prior probabilities and validates every other field.
 
- 1. When `w` is `nothing`, derive nothing. [`prior`](@ref) builds the uniform weights `1/T` at solve time, one per observation.
- 2. When `w` is not `nothing`, normalise it to sum to one, giving the prior probabilities the pooling starts from. The caller's `w` is left as it is: new weights of the same kind hold the normalised values, through [`scenario_probabilities`](@ref). The kind fixes the bias correction of the posterior covariance, see [`ScenarioProbabilities`](@ref).
+ 1. When `w` is `nothing`, derive nothing. At solve time, [`prior`](@ref) uses the `w` of the wrapped result, or the uniform weights `1/T`, one for each observation, when that result has none.
+ 2. When `w` is not `nothing`, normalise it to sum to one. The normalised weights are the prior probabilities that the pooling starts from. The caller's `w` does not change, because new weights of the same kind hold the normalised values, through [`scenario_probabilities`](@ref). The kind fixes the bias correction of the posterior covariance. [`ScenarioProbabilities`](@ref) states the rule.
 
 # Fields
 
@@ -38,6 +244,7 @@ $(DocStringExtensions.FIELDS)
         rho_views::Option{<:LinearConstraintEstimator} = nothing,
         sets::Option{<:UniverseSets} = nothing,
         opt::NonCVaREP = OptimEntropyPooling(),
+        diagnose::Option{<:Slv_VecSlv} = nothing,
         w::Option{<:ScenarioProbabilities} = nothing,
         alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling(),
         cache::Option{<:AbstractPartialFitState} = nothing,
@@ -48,71 +255,37 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If any view constraint is not `nothing`, `sets` must not be `nothing`.
+  - If a view field is not `nothing`, `sets` must not be `nothing`.
   - If `cvar_views` is not `nothing`, `opt` must be a [`JuMPEntropyPooling`](@ref).
   - If a view field is a vector, it must not be empty.
-  - If `w` is not `nothing`, it must be non-empty and match the number of observations.
-  - The refit under the posterior weights can state the model of `pe`, through [`assert_scenario_refit`](@ref). An [`OpinionPoolingPrior`](@ref) with `pe1` inside a factor prior or a Black-Litterman prior of `pe` is refused.
-  - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref).
-  - The `x_src` of `pe` is `nothing`, because the prior picks the returns that it reads, see [`assert_inner_reader`](@ref).
+  - If `diagnose` is a vector, it must not be empty.
+  - If `w` is not `nothing`, it must not be empty. At solve time, its length must equal the number of observations of the wrapped result.
+  - [`assert_scenario_refit`](@ref) checks that the refit under the posterior weights can state the model of `pe`. It refuses an [`OpinionPoolingPrior`](@ref) whose `pe1` is inside a factor prior or a Black-Litterman prior of `pe`.
+  - `x_src` must be `nothing`, `DataSource()` or `ExcessSource()`. [`assert_returns_source`](@ref) checks it.
+  - The `x_src` of `pe` must be `nothing`, because this prior selects the returns that it reads. [`assert_inner_reader`](@ref) checks it.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `pe`: Recursively updated via [`factory`](@ref).
+  - `pe`: Recursively updated through [`factory`](@ref).
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+  - `cache`: Carried unchanged through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `pe`: Recursively viewed via [`port_opt_view`](@ref).
-  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `pe`: Recursively viewed through [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).
 
 ## Observation weight parameters
 
-When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
 
-  - `pe`: Recursively indexed via [`obs_weights_view`](@ref).
-  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
-
-# View comparison operators
-
-The comparison operators accepted in each view's constraint strings depend on the moment being constrained. An unsupported operator raises a `ParseError` listing the operators allowed for that view.
-
-  - `mu_views`, `sigma_views`, `sk_views`, `kt_views`, `cov_views`, `rho_views` accept `==`, `>=` and `<=`.
-  - `var_views` (Value at Risk) accepts only `==` and `>=`.
-  - `cvar_views`, `evar_views` and `rlvar_views` accept `==`, `>=` and `<=`.
-
-# The variance a moment view reads
-
-A skewness, kurtosis or correlation view divides by the variance of an asset, and a staged algorithm holds that variance at its value from the stage before. Both read the variance from the prior that `pe` fits: the diagonal of its `sigma`, less the residual variance of a factor model. The covariance estimator of `pe` therefore decides which variance the rows hold.
-
-The rows state the uncorrected moment of the scenarios, ``\\sum_{t} p_{t} (x_{t,\\,i} - \\mu_{i})^{2}``. The default covariance estimator is corrected. So, under [`H1_EntropyPooling`](@ref) or [`H2_EntropyPooling`](@ref), a skewness or kurtosis view moves the variance of the scenarios up by the correction factor of the stage before. The view also standardises by the corrected variance. To hold and standardise by the uncorrected variance of the scenarios, give `pe` an uncorrected covariance estimator:
-
-    ce = GeneralCovariance(; ce = StatsBase.SimpleCovariance(; corrected = false))
-    pe = EmpiricalPrior(; ce = PortfolioOptimisersCovariance(; ce = Covariance(; ce = ce)))
-
-The posterior `sigma` is then uncorrected too. [`H0_EntropyPooling`](@ref) has no stage before, and it reads the variance of the prior the same way.
-
-A `prior(...)` reference in a skewness or kurtosis view reads the sample statistic of the scenarios under the observation weights of the prior that the stage reads, as a value at risk reference does. The statistic standardises by its own variance estimator, not by the variance that the row reads.
-
-# Tail views
-
-A tail view needs auxiliary variables, so it is expressed in the JuMP model rather than reduced to rows that multiply the posterior probabilities. Two consequences follow.
-
-  - `opt` must be a [`JuMPEntropyPooling`](@ref) whenever `cvar_views` is set, and whenever an `evar_views` or `rlvar_views` entry is anything other than a lower bound under [`GridEntropicValueatRiskView`](@ref) or [`GridRelativisticValueatRiskView`](@ref), which are the tail formulations that are linear in the posterior probabilities alone.
-  - A view that needs a binary variable — every [`IntegerConditionalValueatRiskView`](@ref), and an upper bound or equality under [`GridEntropicValueatRiskView`](@ref) or [`GridRelativisticValueatRiskView`](@ref) — needs a solver that handles mixed-integer exponential cone programs.
-  - [`ConicRelativisticValueatRiskView`](@ref) writes power cones, so its solver must handle the power cone alongside the exponential cone the objective needs.
-
-The `alg` field of a view group picks the formulation. A single formulation applies to every view in that group, a vector supplies one per view, and `nothing` lets each view take the cheapest formulation that expresses it exactly: [`LinearConditionalValueatRiskView`](@ref), [`ConicEntropicValueatRiskView`](@ref) and [`ConicRelativisticValueatRiskView`](@ref) where they apply, [`IntegerConditionalValueatRiskView`](@ref), [`GridEntropicValueatRiskView`](@ref) and [`GridRelativisticValueatRiskView`](@ref) otherwise.
-
-# Tail views at several significance levels
-
-A significance level is part of the statistic, not a detail of the solve: the conditional value at risk at 1% and at 10% are different numbers on the same series. So the level lives on the view rather than on the estimator. `var_views`, `cvar_views`, `evar_views` and `rlvar_views` each take one [`ValueatRiskView`](@ref), [`ConditionalValueatRiskView`](@ref), [`EntropicValueatRiskView`](@ref) or [`RelativisticValueatRiskView`](@ref), or a vector of them, and each group carries the `alpha` its equations are read under. A [`RelativisticValueatRiskView`](@ref) carries a `kappa` as well, on the same reasoning: the deformation parameter is part of the statistic. A `prior(...)` reference inside a group is replaced by the prior value at *that* group's level.
-
-A tail view group also carries `alg`, the formulation. For [`EntropicValueatRiskView`](@ref) that is where the grid of dual variables and the big-M multiplier live, so a [`GridEntropicValueatRiskView`](@ref) there gives one group its own `pct`, `K` and `M`. [`ValueatRiskView`](@ref) has no such field: a value at risk view is linear in the posterior probabilities, so there is no formulation to choose.
+  - `pe`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
 
 # Examples
 
@@ -175,10 +348,17 @@ EntropyPoolingPrior
               │      sc2 ┼ Float64: 1000.0
               │      alg ┼ ExpEntropyPooling()
               │      err ┴ nothing
+     diagnose ┼ nothing
             w ┼ nothing
           alg ┼ H1_EntropyPooling()
         x_src ┴ nothing
 ```
+
+## The incremental fit
+
+This prior has no exact incremental recursion, and it takes the online step by a **refit from a sample buffer**. [`Online`](@ref) seeds `cache`, and [`partial_fit!`](@ref) adds each observation to it with no change. The [`prior`](@ref) method with one argument then runs the batch verb of this estimator over the rows that the buffer kept. The result is the batch fit over those rows, and a `max_history` on the wrapper sets the window of the whole fit.
+
+`cache` goes through the three propagation channels as every partial-fit state does. [`factory`](@ref) carries it with no change, and [`port_opt_view`](@ref) cuts it to the selected assets. [`obs_weights_view`](@ref) drops it, because a state has no cut on the observation axis. The show method does not print `cache`, because a buffer that changes at each step is not part of the configuration.
 
 # Related
 
@@ -187,9 +367,9 @@ EntropyPoolingPrior
   - [`LinearConditionalValueatRiskView`](@ref)
   - [`IntegerConditionalValueatRiskView`](@ref)
   - [`ConicEntropicValueatRiskView`](@ref)
-  - [`GridEntropicValueatRiskView`](@ref)
   - [`ConicRelativisticValueatRiskView`](@ref)
-  - [`GridRelativisticValueatRiskView`](@ref)
+  - [`SequentialTailView`](@ref)
+  - [`GridTailView`](@ref)
   - [`JuMPEntropyPooling`](@ref)
   - [`OptimEntropyPooling`](@ref)
   - [`AbstractEntropyPoolingAlgorithm`](@ref)
@@ -199,10 +379,11 @@ EntropyPoolingPrior
 
 # References
 
-  - $(ref_dict[:meucci2008])
-  - $(ref_dict[:vorobets2021])
-  - $(ref_dict[:EPTail])
-  - $(ref_dict[:EPRLVaR])
+  - $(ref_dict[:meucci2008]) Section 4, Equations 25 to 28, and Appendix A.2 and A.3.
+  - $(ref_dict[:vorobets2021]) Section 3, Algorithms 1 and 2.
+  - $(ref_dict[:EPTail]) Section 2.2, Equations 3 to 6, and Section 2.3, Equations 7 to 11.
+  - $(ref_dict[:EPRLVaR]) Section 2, Equations 1 to 5, and Section 3.2, Equation 7.
+  - $(ref_dict[:meucciardiakeel2011])
 """
 @propagatable @concrete struct EntropyPoolingPrior <: AbstractLowOrderPriorEstimator_AF
     """
@@ -258,6 +439,10 @@ EntropyPoolingPrior
     """
     opt
     """
+    $(field_dict[:ep_diagnose])
+    """
+    diagnose
+    """
     $(field_dict[:ep_w])
     """
     @wprop w
@@ -285,6 +470,7 @@ EntropyPoolingPrior
                                  cov_views::Option{<:LinearConstraintEstimator},
                                  rho_views::Option{<:LinearConstraintEstimator},
                                  sets::Option{<:UniverseSets}, opt::NonCVaREP,
+                                 diagnose::Option{<:Slv_VecSlv},
                                  w::Option{<:ScenarioProbabilities},
                                  alg::AbstractEntropyPoolingAlgorithm,
                                  cache::Option{<:AbstractPartialFitState},
@@ -312,6 +498,9 @@ EntropyPoolingPrior
             @argcheck(isa(opt, JuMPEntropyPooling),
                       ArgumentError("A CVaR view needs auxiliary variables, which the dual formulation `OptimEntropyPooling` solves has no room for. Use `JuMPEntropyPooling` in `opt`."))
         end
+        if isa(diagnose, VecSlv)
+            @argcheck(!isempty(diagnose), IsEmptyError("diagnose cannot be empty"))
+        end
         if isa(var_views, AbstractVector)
             @argcheck(!isempty(var_views), IsEmptyError("var_views cannot be empty"))
         end
@@ -327,10 +516,11 @@ EntropyPoolingPrior
         return new{typeof(pe), typeof(mu_views), typeof(var_views), typeof(cvar_views),
                    typeof(evar_views), typeof(rlvar_views), typeof(sigma_views),
                    typeof(sk_views), typeof(kt_views), typeof(cov_views), typeof(rho_views),
-                   typeof(sets), typeof(opt), typeof(w), typeof(alg), typeof(cache),
-                   typeof(x_src)}(pe, mu_views, var_views, cvar_views, evar_views,
-                                  rlvar_views, sigma_views, sk_views, kt_views, cov_views,
-                                  rho_views, sets, opt, w, alg, cache, x_src)
+                   typeof(sets), typeof(opt), typeof(diagnose), typeof(w), typeof(alg),
+                   typeof(cache), typeof(x_src)}(pe, mu_views, var_views, cvar_views,
+                                                 evar_views, rlvar_views, sigma_views,
+                                                 sk_views, kt_views, cov_views, rho_views,
+                                                 sets, opt, diagnose, w, alg, cache, x_src)
     end
 end
 function EntropyPoolingPrior(; pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
@@ -346,20 +536,21 @@ function EntropyPoolingPrior(; pe::AbstractLowOrderPriorEstimator_A_F_AF = Empir
                              rho_views::Option{<:LinearConstraintEstimator} = nothing,
                              sets::Option{<:UniverseSets} = nothing,
                              opt::NonCVaREP = OptimEntropyPooling(),
+                             diagnose::Option{<:Slv_VecSlv} = nothing,
                              w::Option{<:ScenarioProbabilities} = nothing,
                              alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling(),
                              cache::Option{<:AbstractPartialFitState} = nothing,
                              x_src::Option{<:AbstractReturnsSource} = nothing)::EntropyPoolingPrior
     return EntropyPoolingPrior(pe, mu_views, var_views, cvar_views, evar_views, rlvar_views,
                                sigma_views, sk_views, kt_views, cov_views, rho_views, sets,
-                               opt, w, alg, cache, x_src)
+                               opt, diagnose, w, alg, cache, x_src)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Renders every field of a [`EntropyPoolingPrior`](@ref) except `cache`.
+Give every field of an [`EntropyPoolingPrior`](@ref) to print, except `cache`.
 
-The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:EntropyPoolingPrior, true)` to render it.
+The state in `cache` changes at each step of an incremental fit, and it is not part of the configuration. Each site that prints the estimator also prints this state, unless this method leaves it out. Set `set_show_nothing_fields!(:EntropyPoolingPrior, true)` to print it.
 
 # Arguments
 
@@ -367,7 +558,7 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
 
 # Returns
 
-  - `fields::Tuple`: The field names to render, which is `(:pe, :mu_views, :var_views, :cvar_views, :evar_views, :rlvar_views, :sigma_views, :sk_views, :kt_views, :cov_views, :rho_views, :sets, :opt, :w, :alg)`.
+  - `fields::Tuple`: The field names to render, which is `(:pe, :mu_views, :var_views, :cvar_views, :evar_views, :rlvar_views, :sigma_views, :sk_views, :kt_views, :cov_views, :rho_views, :sets, :opt, :diagnose, :w, :alg, :x_src)`.
 
 # Related
 
@@ -377,8 +568,8 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
 """
 function show_fields(::EntropyPoolingPrior)
     return (:pe, :mu_views, :var_views, :cvar_views, :evar_views, :rlvar_views,
-            :sigma_views, :sk_views, :kt_views, :cov_views, :rho_views, :sets, :opt, :w,
-            :alg, :x_src)
+            :sigma_views, :sk_views, :kt_views, :cov_views, :rho_views, :sets, :opt,
+            :diagnose, :w, :alg, :x_src)
 end
 # Expose `:me` and `:ce` from the embedded prior estimator `pe` for transparent access
 # (see [`@forward_properties`](@ref)).
@@ -386,7 +577,7 @@ end
     forward(pe, me, ce)
 end
 """
-    const VecEP = AbstractVector{<:Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior}}
+    const VecEP = AbstractVector{<:Union{EntropyPoolingPrior, MeucciEntropyPoolingPrior}}
 
 Alias for an abstract vector of entropy pooling prior estimators of either family.
 
@@ -395,30 +586,30 @@ Alias for an abstract vector of entropy pooling prior estimators of either famil
   - [`EntropyPoolingPrior`](@ref)
   - [`MeucciEntropyPoolingPrior`](@ref)
 """
-const VecEP = AbstractVector{<:Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior}}
+const VecEP = AbstractVector{<:Union{EntropyPoolingPrior, MeucciEntropyPoolingPrior}}
 """
     prior(pe::EntropyPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing,
           pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, strict::Bool = false,
           kwargs...)
 
-Compute the entropy pooling prior of asset returns with tail views.
+Compute the entropy pooling prior moments of the asset returns, with moment views and tail views.
 
-`prior` orients the data and forwards the estimator's algorithm as a value to [`ep_prior`](@ref), which enforces the views in stages or in one optimisation.
+`prior` orients the data along `dims` and calls [`ep_prior`](@ref), which dispatches on the entropy pooling algorithm `pe.alg`. [`H0_EntropyPooling`](@ref) applies every view in one optimisation. [`StagedEP`](@ref), the union of [`H1_EntropyPooling`](@ref) and [`H2_EntropyPooling`](@ref), applies the views in stages, from the lower moments to the higher moments.
 
 # Algorithm
 
- 1. Orient `X` and `F` along `dims` with [`dims_oriented`](@ref), so the observations lie in the rows.
- 2. Forward `pe.alg` as a value to [`ep_prior`](@ref), and return the [`LowOrderPrior`](@ref) it builds.
+ 1. Orient `X` and `F` to observations by assets with [`dims_oriented`](@ref), so every step below reads one observation in each row.
+ 2. Dispatch on `pe.alg` through [`ep_prior`](@ref), and return the [`LowOrderPrior`](@ref) that it makes.
 
 # Arguments
 
   - `pe`: Entropy pooling prior estimator.
-  - `X`: Asset returns matrix.
-  - `F`: Optional factor returns matrix.
+  - `X`: Asset returns matrix, with its observations along `dims`.
+  - `F`: Optional factor returns matrix, with its observations along `dims`.
   - $(arg_dict[:pnl_prior])
-  - `dims`: Dimension along which the observations lie.
-  - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
-  - `kwargs...`: Additional keyword arguments forwarded to the wrapped prior estimator.
+  - $(arg_dict[:dims])
+  - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn.
+  - `kwargs...`: More keyword arguments, which go to the wrapped prior estimator.
 
 # Validation
 
@@ -426,7 +617,7 @@ Compute the entropy pooling prior of asset returns with tail views.
 
 # Returns
 
-  - `pr::LowOrderPrior`: Prior result carrying the posterior probability weights.
+  - `pr::LowOrderPrior`: Prior result that holds the asset returns, the posterior mean and covariance, the posterior probability weights, the effective number of scenarios, the Kullback-Leibler divergence and the factor block of the last refit.
 
 # Related
 
@@ -444,28 +635,32 @@ end
     ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<:MatNum},
              pnl::Option{<:AssetPanel} = nothing; strict::Bool = false, kwargs...)
 
-Compute entropy pooling prior moments with tail views, enforcing the views in stages.
+Compute the entropy pooling prior moments of the asset returns, with the views applied in stages.
 
-`ep_prior` accumulates the views of each stage into one constraint set and solves once per stage, so a stage's views hold alongside every view of the stages before it. The mean of an asset a later stage constrains is pinned to the value the earlier stage produced, so a higher moment view does not silently move it.
+`ep_prior` calculates the mean and the covariance of the asset returns with entropy pooling, under the staged algorithms [`H1_EntropyPooling`](@ref) and [`H2_EntropyPooling`](@ref). Each stage adds the views of one group of moments to one constraint set, solves, and refits the wrapped estimator under the new weights. So the views of a stage hold together with every view of the stages before it. A later stage fixes the moments that the earlier stages set, so a view on a higher moment does not move a lower moment.
 
 # Algorithm
 
- 1. Fit the wrapped prior estimator with [`ep_wrapped_prior`](@ref), giving `pr` and the prior probabilities `w0` on its rows. The fit states the observation axis: `T` is `size(pr.X, 1)`, which a nested prior that drops rows makes smaller than `size(X, 1)`. The probabilities are `pe.w` where the caller set one, `pr.w` where the fit answered one, and the uniform `1/T` otherwise. A caller's `pe.w` reaches the wrapped estimator through [`prior_probability_factory`](@ref), which puts it on the rows that each weighted field reads, and `pr` is fitted under it. Before that fit, [`scenario_count`](@ref) reads `T` with only the steps that drop rows, so most wrapped priors need no fit to state it. Where the fit under `pe.w` answers its own `pr.w`, a nested prior that reweights its scenarios solved its views from `pe.w`, so `w0` is `pr.w`, the posterior of the nested prior.
- 2. Pin each choice of `pe.pe` under a [`PinnedChoice`](@ref) at this fit with [`pin_prior_choice`](@ref), so every refit reads the choice that the views read. Every refit goes through [`scenario_prior`](@ref), which holds the model of this fit, its regression and its residual block included, so the refit reads the scenarios that the views read.
- 3. Stage one holds the mean, value at risk, conditional, entropic and relativistic value at risk views. Accumulate them into the constraint dictionary `epc` and the tail view vector `tvs`. Where either is non-empty, solve from `w0` with [`entropy_pooling`](@ref), giving `w1`, and refit `pr` at `w1`.
- 4. Stage two holds the variance and covariance views, with the mean of every asset they name pinned by [`fix_mu!`](@ref). Where `epc` or `tvs` is non-empty, solve from `w0` under [`H1_EntropyPooling`](@ref), or from the previous `w1` under [`H2_EntropyPooling`](@ref), and refit `pr` at the new `w1`.
- 5. Stage three holds the skewness, kurtosis and correlation views, with the mean and the variance of every asset they name pinned by [`fix_mu!`](@ref) and [`fix_sigma!`](@ref). Under the same emptiness test, solve from the same start step 4 takes, and refit `pr` at the new `w1`.
- 6. Compute `ens`, the effective number of scenarios of `w1`, and `kld`, the divergence of `w1` from `w0`.
- 7. Return a [`LowOrderPrior`](@ref) carrying the refit moments, `w1`, `ens` and `kld`. The feature matrix and the factor block come from `pr` unchanged.
+ 1. Fit the wrapped prior estimator with [`ep_wrapped_prior`](@ref). The result is `pr` and the prior probabilities `w0` on its rows. The fit sets the observation axis. `T` is `size(pr.X, 1)`, which is smaller than `size(X, 1)` when a nested prior drops rows. The probabilities are `pe.w` when the caller gives one, `pr.w` when the fit returns one, and the uniform `1/T` otherwise. [`prior_probability_factory`](@ref) puts the `pe.w` of the caller on the rows that each weighted field of the wrapped estimator reads, and the fit of `pr` uses it. Before that fit, [`scenario_count`](@ref) reads `T` with only the steps that drop rows, so most wrapped priors need no fit for it. When the fit under `pe.w` returns its own `pr.w`, a nested prior solved its views from `pe.w`. Then `w0` is `pr.w`, the posterior of the nested prior.
+ 2. Pin each choice of `pe.pe` under a [`PinnedChoice`](@ref) at this fit with [`pin_prior_choice`](@ref), so every refit reads the choice that the views read. Every refit goes through [`scenario_prior`](@ref), which holds the model of this fit, with its regression and its residual block. So the refit reads the scenarios that the views read.
+ 3. Get the Investable Mask of the fit and the universe of the views with [`investable_views`](@ref). Every view row uses only the investable columns, and the mask is the same at each stage.
+ 4. Make the empty constraint dictionary `epc`, the empty tail view vector `tvs`, the matrix `fixed` of the pinned moments, and the Departure Ledger.
+ 5. Stage one, the mean, the value at risk and the three tail measures. Write the `mu_views` and `var_views` rows into `epc`. Lower the `cvar_views`, `evar_views` and `rlvar_views` into `epc` and `tvs` with [`ep_tail_views!`](@ref). When `epc` or `tvs` is not empty, solve from `w0` with [`entropy_pooling`](@ref) into `w1`, and refit `pr` under `w1`.
+ 6. Stage two, the variance and the covariance, when `sigma_views` or `cov_views` is set. Write the `sigma_views` and `cov_views` rows into `epc`. Pin the mean of every asset that those rows read with [`fix_mu!`](@ref). Under the same test, solve into `w1`, and refit `pr` under `w1`.
+ 7. Stage three, the skewness, the kurtosis and the correlation, when `sk_views`, `kt_views` or `rho_views` is set. Write the `sk_views`, `kt_views` and `rho_views` rows into `epc`. Pin the mean and the variance of every asset that those rows read with [`fix_mu!`](@ref) and [`fix_sigma!`](@ref). Under the same test, solve into `w1`, and refit `pr` under `w1`.
+ 8. Steps 6 and 7 solve from `w0` under [`H1_EntropyPooling`](@ref), and from the `w1` of the stage before under [`H2_EntropyPooling`](@ref).
+ 9. Report the departed assets and the views that they removed, with [`announce_ep_departures`](@ref).
+10. Calculate the effective number of scenarios `ens`, the exponential of the entropy of `w1`. Calculate `kld`, the Kullback-Leibler divergence of `w1` from `w0`.
+11. Return a [`LowOrderPrior`](@ref) that holds the moments of the last refit, `w1`, `ens` and `kld`. The factor block `fpr` comes from that refit with no change.
 
-Every row of every family can drop under `strict = false`, and a stage then states no view. The emptiness test is on the rows the stages hold, not on the fields the caller set, so such a fit answers the prior: `w1` is `w0`, `kld` is zero, and no refit runs.
+Under `strict = false`, every row of every family can drop, and a stage then states no view. The test reads the rows that the stages hold, not the fields that the caller set. So such a fit returns the prior. Then `w1` is `w0`, `kld` is zero, and no refit runs.
 
 # Arguments
 
-  - `alg`: Staged entropy pooling algorithm.
+  - `alg`: Staged entropy pooling algorithm, which [`prior`](@ref) reads from `pe.alg`.
 
-      + `::H1_EntropyPooling`: Each stage re-solves from the original prior weights.
-      + `::H2_EntropyPooling`: Each stage re-solves from the previous stage's weights.
+      + `::H1_EntropyPooling`: Each stage solves from the prior probabilities `w0`.
+      + `::H2_EntropyPooling`: Each stage solves from the weights of the stage before.
 
   - `pe`: Entropy pooling prior estimator.
 
@@ -475,13 +670,13 @@ Every row of every family can drop under `strict = false`, and a stage then stat
 
   - $(arg_dict[:pnl_prior])
 
-  - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
+  - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn.
 
-  - `kwargs...`: Additional keyword arguments forwarded to the wrapped prior estimator.
+  - `kwargs...`: More keyword arguments, which go to the wrapped prior estimator.
 
 # Returns
 
-  - `pr::LowOrderPrior`: Prior result carrying the posterior probability weights.
+  - `pr::LowOrderPrior`: Prior result that holds the asset returns, the posterior mean and covariance, the posterior probability weights, the effective number of scenarios, the Kullback-Leibler divergence and the factor block of the last refit.
 
 # Related
 
@@ -511,10 +706,10 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
     led = String[]
     vpr = investable_prior(imsk, pr)
     fixed = falses(size(vpr.X, 2), 2)
-    epc = Dict{Symbol, Tuple{<:MatNum, <:VecNum}}()
+    epc = Dict{Symbol, Tuple{MatNum, VecNum}}()
     tvs = Vector{AbstractEntropyPoolingTailView}(undef, 0)
     # mu, VaR, CVaR, EVaR and RLVaR
-    ep_mu_views!(pe.mu_views, epc, vpr, vsets; strict = strict, ledger = led)
+    ep_mu_views!(pe.mu_views, epc, vpr, vsets, w0; strict = strict, ledger = led)
     ep_var_views!(pe.var_views, epc, vpr, vsets, w0; strict = strict, ledger = led)
     ep_tail_views!(pe.cvar_views, epc, tvs, vpr, vsets, w0; strict = strict, ledger = led)
     ep_tail_views!(pe.evar_views, epc, tvs, vpr, vsets, w0; strict = strict, ledger = led)
@@ -523,6 +718,8 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
         # The posterior weights are probabilities, and the solver meets their sum to its
         # tolerance alone, so each solve normalises them. No constructor does it for the
         # refit: `scenario_prior` gives them to no entropy pooling prior (#1649).
+        ep_diagnose_views(pe.diagnose, w0, epc, tvs, pe,
+                          (:mu_views, :var_views, :cvar_views, :evar_views, :rlvar_views))
         w1 = LinearAlgebra.normalize!(entropy_pooling(w0, epc, tvs, pe.opt), 1)
         pr = scenario_prior(pe.pe, w1, pr0, X, F, pnl; strict = strict, kwargs...,
                             cache_reg = true)
@@ -531,13 +728,13 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
     if !isnothing(pe.sigma_views) || !isnothing(pe.cov_views)
         # sigma
         if !isnothing(pe.sigma_views)
-            to_fix = ep_sigma_views!(pe.sigma_views, epc, vpr, vsets; strict = strict,
+            to_fix = ep_sigma_views!(pe.sigma_views, epc, vpr, vsets, w0; strict = strict,
                                      ledger = led)
             fix_mu!(epc, view(fixed, :, 1), to_fix, vpr)
         end
         # cov
         if !isnothing(pe.cov_views)
-            to_fix = ep_cov_views!(pe.cov_views, epc, vpr, vsets; strict = strict,
+            to_fix = ep_cov_views!(pe.cov_views, epc, vpr, vsets, w0; strict = strict,
                                    ledger = led)
             fix_mu!(epc, view(fixed, :, 1), to_fix, vpr)
         end
@@ -546,6 +743,9 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
         # See issue #852.
         if !isempty(epc) || !isempty(tvs)
             ws = ifelse(isa(alg, H1_EntropyPooling), w0, w1)
+            ep_diagnose_views(pe.diagnose, ws, epc, tvs, pe,
+                              (:mu_views, :var_views, :cvar_views, :evar_views,
+                               :rlvar_views, :sigma_views, :cov_views))
             w1 = LinearAlgebra.normalize!(entropy_pooling(ws, epc, tvs, pe.opt), 1)
             pr = scenario_prior(pe.pe, w1, pr0, X, F, pnl; strict = strict, kwargs...,
                                 cache_reg = true)
@@ -569,7 +769,7 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
         end
         # rho
         if !isnothing(pe.rho_views)
-            to_fix = ep_rho_views!(pe.rho_views, epc, vpr, vsets; strict = strict,
+            to_fix = ep_rho_views!(pe.rho_views, epc, vpr, vsets, w0; strict = strict,
                                    ledger = led)
             fix_mu!(epc, view(fixed, :, 1), to_fix, vpr)
             fix_sigma!(epc, view(fixed, :, 2), to_fix, vpr)
@@ -577,54 +777,60 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
         # See the twin note one stage up: a stage that states no view does not solve.
         if !isempty(epc) || !isempty(tvs)
             ws = ifelse(isa(alg, H1_EntropyPooling), w0, w1)
+            ep_diagnose_views(pe.diagnose, ws, epc, tvs, pe,
+                              (:mu_views, :var_views, :cvar_views, :evar_views,
+                               :rlvar_views, :sigma_views, :cov_views, :sk_views, :kt_views,
+                               :rho_views))
             w1 = LinearAlgebra.normalize!(entropy_pooling(ws, epc, tvs, pe.opt), 1)
             pr = scenario_prior(pe.pe, w1, pr0, X, F, pnl; strict = strict, kwargs...,
                                 cache_reg = true)
         end
     end
     announce_ep_departures(ni, led, isempty(epc) && isempty(tvs) && !isempty(led))
-    # Entropy pooling reweights observations without touching either axis of `Z`, so the
-    # wrapped prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
     # The factor block is the refit prior's, forwarded whole, on the same reasoning as the
     # note at the same step in `MeucciEntropyPoolingPrior`'s `ep_prior`.
-    (; X, o_X, mu, sigma, chol, rr, fpr, ss_gaps) = pr
+    (; X, o_X, mu, sigma, chol, eoc, rr, fpr, ss_gaps) = pr
     ens = exp(StatsBase.entropy(w1))
     kld = StatsBase.kldivergence(w1, w0)
     return LowOrderPrior(; X = X, o_X = o_X, mu = mu, sigma = sigma, chol = chol, w = w1,
-                         ens = ens, kld = kld, rr = rr, fpr = fpr, ss_gaps = ss_gaps,
-                         pc = opinion_pooling_cache(pr))
+                         ens = ens, eoc = eoc, kld = kld, rr = rr, fpr = fpr,
+                         ss_gaps = ss_gaps, pc = opinion_pooling_cache(pr))
 end
 """
     ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
              F::Option{<:MatNum}, pnl::Option{<:AssetPanel} = nothing;
              strict::Bool = false, kwargs...)
 
-Compute entropy pooling prior moments with tail views, enforcing every view in one optimisation.
+Compute the entropy pooling prior moments of the asset returns, with every view applied in one solve.
 
-`ep_prior` builds every view constraint against the same prior and solves once. It is faster than the staged algorithms and pins nothing, so a higher moment view is free to move a lower moment.
+`ep_prior` calculates the mean and the covariance of the asset returns with entropy pooling, under the [`H0_EntropyPooling`](@ref) algorithm. It builds every view against the same prior, and solves the entropy pooling problem one time. No stage holds the lower moments fixed, so a view on a higher moment can move a lower moment.
 
 # Algorithm
 
- 1. Fit the wrapped prior estimator with [`ep_wrapped_prior`](@ref), giving `pr` and the prior probabilities `w0` on its rows. The fit states the observation axis: `T` is `size(pr.X, 1)`, which a nested prior that drops rows makes smaller than `size(X, 1)`. The probabilities are `pe.w` where the caller set one, `pr.w` where the fit answered one, and the uniform `1/T` otherwise. A caller's `pe.w` reaches the wrapped estimator through [`prior_probability_factory`](@ref), which puts it on the rows that each weighted field reads, and `pr` is fitted under it. Before that fit, [`scenario_count`](@ref) reads `T` with only the steps that drop rows, so most wrapped priors need no fit to state it. Where the fit under `pe.w` answers its own `pr.w`, a nested prior that reweights its scenarios solved its views from `pe.w`, so `w0` is `pr.w`, the posterior of the nested prior.
- 2. Pin each choice of `pe.pe` under a [`PinnedChoice`](@ref) at this fit with [`pin_prior_choice`](@ref), so every refit reads the choice that the views read. Every refit goes through [`scenario_prior`](@ref), which holds the model of this fit, its regression and its residual block included, so the refit reads the scenarios that the views read.
- 3. Build every view against that one `pr`: the mean, value at risk, conditional, entropic and relativistic value at risk, variance, covariance, skewness, kurtosis and correlation views. Each row that is linear in the posterior probabilities reaches the constraint dictionary `epc`, and each tail view that needs auxiliary variables reaches the tail view vector `tvs`. No asset's mean or variance is pinned.
- 4. Where `epc` or `tvs` is non-empty, solve once from `w0` with [`entropy_pooling`](@ref), giving `w1`, and refit `pr` at `w1`. Every row of every family can drop under `strict = false`, and the view set then states nothing: `w1` is `w0`, `kld` is zero, and no refit runs.
- 5. Compute `ens`, the effective number of scenarios of `w1`, and `kld`, the divergence of `w1` from `w0`.
- 6. Return a [`LowOrderPrior`](@ref) carrying the refit moments, `w1`, `ens` and `kld`. The feature matrix and the factor block come from `pr` unchanged.
+ 1. Fit the wrapped prior estimator with [`ep_wrapped_prior`](@ref). The result is `pr` and the prior probabilities `w0` on its rows. The fit sets the observation axis. `T` is `size(pr.X, 1)`, which is smaller than `size(X, 1)` when a nested prior drops rows. The probabilities are `pe.w` when the caller gives one, `pr.w` when the fit returns one, and the uniform `1/T` otherwise. [`prior_probability_factory`](@ref) puts the `pe.w` of the caller on the rows that each weighted field of the wrapped estimator reads, and the fit of `pr` uses it. Before that fit, [`scenario_count`](@ref) reads `T` with only the steps that drop rows, so most wrapped priors need no fit for it. When the fit under `pe.w` returns its own `pr.w`, a nested prior solved its views from `pe.w`. Then `w0` is `pr.w`, the posterior of the nested prior.
+ 2. Pin each choice of `pe.pe` under a [`PinnedChoice`](@ref) at this fit with [`pin_prior_choice`](@ref), so every refit reads the choice that the views read. Every refit goes through [`scenario_prior`](@ref), which holds the model of this fit, with its regression and its residual block. So the refit reads the scenarios that the views read.
+ 3. Get the Investable Mask of the fit and the universe of the views with [`investable_views`](@ref). Every view row uses only the investable columns.
+ 4. Make the empty constraint dictionary `epc`, the empty tail view vector `tvs` and the Departure Ledger.
+ 5. Write the `mu_views` and `var_views` rows into `epc`. Lower the `cvar_views`, `evar_views` and `rlvar_views` into `epc` and `tvs` with [`ep_tail_views!`](@ref).
+ 6. Write the `sigma_views`, `cov_views`, `sk_views`, `kt_views` and `rho_views` rows into `epc`. This route pins no moment, so it does not call [`fix_mu!`](@ref) or [`fix_sigma!`](@ref).
+ 7. Report the departed assets and the views that they removed, with [`announce_ep_departures`](@ref).
+ 8. When `epc` or `tvs` is not empty, solve the whole set one time from `w0` with [`entropy_pooling`](@ref) into `w1`, and refit `pr` under `w1`. Under `strict = false`, every row of every family can drop, and the view set then states no view. Then `w1` is `w0`, `kld` is zero, and no refit runs.
+ 9. Calculate the effective number of scenarios `ens`, the exponential of the entropy of `w1`. Calculate `kld`, the Kullback-Leibler divergence of `w1` from `w0`.
+10. Return a [`LowOrderPrior`](@ref) that holds the moments of the refit, `w1`, `ens` and `kld`. The factor block `fpr` comes from that refit with no change.
 
 # Arguments
 
-  - `alg`: Single-shot entropy pooling algorithm.
+  - `alg`: Single-shot entropy pooling algorithm, which [`prior`](@ref) reads from `pe.alg`.
   - `pe`: Entropy pooling prior estimator.
   - `X`: Asset returns matrix, already oriented.
   - `F`: Optional factor returns matrix, already oriented.
   - $(arg_dict[:pnl_prior])
-  - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
-  - `kwargs...`: Additional keyword arguments forwarded to the wrapped prior estimator.
+  - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn.
+  - `kwargs...`: More keyword arguments, which go to the wrapped prior estimator.
 
 # Returns
 
-  - `pr::LowOrderPrior`: Prior result carrying the posterior probability weights.
+  - `pr::LowOrderPrior`: Prior result that holds the asset returns, the posterior mean and covariance, the posterior probability weights, the effective number of scenarios, the Kullback-Leibler divergence and the factor block of the refit.
 
 # Related
 
@@ -648,21 +854,21 @@ function ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
     imsk, vsets, ni = investable_views(pr, pe.sets)
     led = String[]
     vpr = investable_prior(imsk, pr)
-    epc = Dict{Symbol, Tuple{<:MatNum, <:VecNum}}()
+    epc = Dict{Symbol, Tuple{MatNum, VecNum}}()
     tvs = Vector{AbstractEntropyPoolingTailView}(undef, 0)
     # mu, VaR, CVaR, EVaR and RLVaR
-    ep_mu_views!(pe.mu_views, epc, vpr, vsets; strict = strict, ledger = led)
+    ep_mu_views!(pe.mu_views, epc, vpr, vsets, w0; strict = strict, ledger = led)
     ep_var_views!(pe.var_views, epc, vpr, vsets, w0; strict = strict, ledger = led)
     ep_tail_views!(pe.cvar_views, epc, tvs, vpr, vsets, w0; strict = strict, ledger = led)
     ep_tail_views!(pe.evar_views, epc, tvs, vpr, vsets, w0; strict = strict, ledger = led)
     ep_tail_views!(pe.rlvar_views, epc, tvs, vpr, vsets, w0; strict = strict, ledger = led)
     # sigma
     if !isnothing(pe.sigma_views)
-        ep_sigma_views!(pe.sigma_views, epc, vpr, vsets; strict = strict, ledger = led)
+        ep_sigma_views!(pe.sigma_views, epc, vpr, vsets, w0; strict = strict, ledger = led)
     end
     # cov
     if !isnothing(pe.cov_views)
-        ep_cov_views!(pe.cov_views, epc, vpr, vsets; strict = strict, ledger = led)
+        ep_cov_views!(pe.cov_views, epc, vpr, vsets, w0; strict = strict, ledger = led)
     end
     # skew
     if !isnothing(pe.sk_views)
@@ -674,7 +880,7 @@ function ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
     end
     # rho
     if !isnothing(pe.rho_views)
-        ep_rho_views!(pe.rho_views, epc, vpr, vsets; strict = strict, ledger = led)
+        ep_rho_views!(pe.rho_views, epc, vpr, vsets, w0; strict = strict, ledger = led)
     end
     announce_ep_departures(ni, led, isempty(epc) && isempty(tvs) && !isempty(led))
     w1 = w0
@@ -682,26 +888,27 @@ function ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
     # states nothing. The prior is the answer, so neither the solve nor the refit runs. See
     # issue #852.
     if !isempty(epc) || !isempty(tvs)
+        ep_diagnose_views(pe.diagnose, w0, epc, tvs, pe,
+                          (:mu_views, :var_views, :cvar_views, :evar_views, :rlvar_views,
+                           :sigma_views, :cov_views, :sk_views, :kt_views, :rho_views))
         w1 = LinearAlgebra.normalize!(entropy_pooling(w0, epc, tvs, pe.opt), 1)
         pr = scenario_prior(pe.pe, w1, pr0, X, F, pnl; strict = strict, kwargs...,
                             cache_reg = true)
     end
-    # Entropy pooling reweights observations without touching either axis of `Z`, so the
-    # wrapped prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
     # The factor block is the refit prior's, forwarded whole, on the same reasoning as the
     # note at the same step in `MeucciEntropyPoolingPrior`'s `ep_prior`.
-    (; X, o_X, mu, sigma, chol, rr, fpr, ss_gaps) = pr
+    (; X, o_X, mu, sigma, chol, eoc, rr, fpr, ss_gaps) = pr
     ens = exp(StatsBase.entropy(w1))
     kld = StatsBase.kldivergence(w1, w0)
     return LowOrderPrior(; X = X, o_X = o_X, mu = mu, sigma = sigma, chol = chol, w = w1,
-                         ens = ens, kld = kld, rr = rr, fpr = fpr, ss_gaps = ss_gaps,
-                         pc = opinion_pooling_cache(pr))
+                         ens = ens, eoc = eoc, kld = kld, rr = rr, fpr = fpr,
+                         ss_gaps = ss_gaps, pc = opinion_pooling_cache(pr))
 end
 function factor_residual_config(pe::EntropyPoolingPrior)
     return factor_residual_config(pe.pe)
 end
 """
-    ep_wrapped_prior(pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior},
+    ep_wrapped_prior(pe::Union{EntropyPoolingPrior, MeucciEntropyPoolingPrior},
                      X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel};
                      strict::Bool = false, kwargs...)
 
@@ -711,10 +918,10 @@ A caller's `pe.w` states the probabilities of the scenarios that the wrapped pri
 
 # Algorithm
 
- 1. When `pe.w` is `nothing`, fit `pe.pe`, giving `pr`. Read the prior probabilities `w0` from `pr` with [`ep_prior_probabilities`](@ref), and return `pe`, `pr` and `w0`.
- 2. Otherwise find the count `T` of the scenarios of `pe.pe` with [`scenario_count`](@ref).
- 3. Check `pe.w` against `T` with [`ep_prior_probabilities`](@ref), giving `w0`.
- 4. Put `w0` on the rows that each weighted field of `pe.pe` reads with [`prior_probability_factory`](@ref), giving a new `pe`, and fit its `pe.pe`, giving `pr`.
+ 1. When `pe.w` is `nothing`, fit `pe.pe`. The result is `pr`. Read the prior probabilities `w0` from `pr` with [`ep_prior_probabilities`](@ref), and return `pe`, `pr` and `w0`.
+ 2. Otherwise, find the count `T` of the scenarios of `pe.pe` with [`scenario_count`](@ref).
+ 3. Check `pe.w` against `T` with [`ep_prior_probabilities`](@ref). The result is `w0`.
+ 4. Put `w0` on the rows that each weighted field of `pe.pe` reads with [`prior_probability_factory`](@ref). The result is a new `pe`. Fit its `pe.pe`, and the result is `pr`.
  5. Return the new `pe`, `pr`, and `pr.w` through [`scenario_probabilities`](@ref) when it is not `nothing`, or `w0` otherwise. A wrapped prior that reweights its scenarios solved its own views from `w0`, and its posterior is the prior of this estimator.
 
 Each fit of `pe.pe` passes `cache_reg = true`, so a prior that stores a cache gives it to the refits of [`scenario_prior`](@ref), which read it from `pr`.
@@ -725,17 +932,17 @@ Each fit of `pe.pe` passes `cache_reg = true`, so a prior that stores a cache gi
   - `X`: Asset returns matrix, already oriented.
   - `F`: Optional factor returns matrix, already oriented.
   - $(arg_dict[:pnl_prior])
-  - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
-  - `kwargs...`: Additional keyword arguments forwarded to the wrapped prior estimator.
+  - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn.
+  - `kwargs...`: More keyword arguments, which go to the wrapped prior estimator.
 
 # Validation
 
   - The rules of [`ep_prior_probabilities`](@ref).
-  - Under a caller's `pe.w`, the fit of `pe.pe` answers the `T` rows that [`scenario_count`](@ref) counted. A `DimensionMismatch` that names both counts is thrown otherwise.
+  - Under a caller's `pe.w`, the fit of `pe.pe` answers the `T` rows that [`scenario_count`](@ref) counted. Otherwise the function throws a `DimensionMismatch` that names both counts.
 
 # Returns
 
-  - `pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior}`: The estimator whose `pe.pe` answered `pr`.
+  - `pe::Union{EntropyPoolingPrior, MeucciEntropyPoolingPrior}`: The estimator whose `pe.pe` answered `pr`.
   - `pr::AbstractPriorResult`: Prior result of the wrapped prior.
   - `w0::ScenarioProbabilities`: Prior probabilities, on the rows of `pr.X`.
 
@@ -748,7 +955,7 @@ Each fit of `pe.pe` passes `cache_reg = true`, so a prior that stores a cache gi
   - [`EntropyPoolingPrior`](@ref)
   - [`MeucciEntropyPoolingPrior`](@ref)
 """
-function ep_wrapped_prior(pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior},
+function ep_wrapped_prior(pe::Union{EntropyPoolingPrior, MeucciEntropyPoolingPrior},
                           X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel};
                           strict::Bool = false, kwargs...)
     # The refits under the posterior weights read the cache of this fit (#1751).
@@ -777,7 +984,7 @@ function ep_wrapped_prior(pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolin
 end
 """
     embedded_pin_weights(pe::AbstractPriorEstimator, w)
-    embedded_pin_weights(pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior}, w)
+    embedded_pin_weights(pe::Union{EntropyPoolingPrior, MeucciEntropyPoolingPrior}, w)
 
 Return the observation weights of the fit of `pe.pe`, the prior that `pe` embeds, so that [`pin_prior_choice`](@ref) pins the choice of that fit.
 
@@ -808,8 +1015,7 @@ The method that Julia selects is the algorithm.
 function embedded_pin_weights(::AbstractPriorEstimator, w)
     return w
 end
-function embedded_pin_weights(pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior},
-                              w)
+function embedded_pin_weights(pe::Union{EntropyPoolingPrior, MeucciEntropyPoolingPrior}, w)
     return isnothing(w) ? pe.w : w
 end
 """
@@ -817,16 +1023,16 @@ end
                      X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
     scenario_factory(pe::EmpiricalPrior, w, pr::Option{<:AbstractPriorResult}, X::MatNum,
                      F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
-    scenario_factory(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior}, w,
+    scenario_factory(pe::Union{FactorPrior, FactorBlackLittermanPrior}, w,
                      pr::Option{<:AbstractPriorResult}, X::MatNum, F::MatNum,
                      pnl::Option{<:AssetPanel}; strict::Bool = false, kwargs...)
-    scenario_factory(pe::Union{<:BlackLittermanPrior, <:BayesianBlackLittermanPrior}, w,
+    scenario_factory(pe::Union{BlackLittermanPrior, BayesianBlackLittermanPrior}, w,
                      pr::Option{<:AbstractPriorResult}, X::MatNum, F::Option{<:MatNum},
                      pnl::Option{<:AssetPanel}; kwargs...)
     scenario_factory(pe::AugmentedBlackLittermanPrior, w, pr::Option{<:AbstractPriorResult},
                      X::MatNum, F::MatNum, pnl::Option{<:AssetPanel}; strict::Bool = false,
                      kwargs...)
-    scenario_factory(pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior}, w,
+    scenario_factory(pe::Union{EntropyPoolingPrior, MeucciEntropyPoolingPrior}, w,
                      pr::Option{<:AbstractPriorResult}, X::MatNum, F::Option{<:MatNum},
                      pnl::Option{<:AssetPanel}; kwargs...)
     scenario_factory(pe::OpinionPoolingPrior, w, pr::Option{<:AbstractPriorResult},
@@ -864,7 +1070,7 @@ The method that Julia selects is the algorithm.
  2. A [`FactorPrior`](@ref) or a [`FactorBlackLittermanPrior`](@ref): replace `pe.pe` with this function of `pe.pe` under `w` on the factor returns `F` alone and on the factor prior `pr.fpr` of the fit, as the fit of `pe` fits `pe.pe`, and keep every other field. The two factor priors keep `re` and `ve`.
  3. A [`BlackLittermanPrior`](@ref) or a [`BayesianBlackLittermanPrior`](@ref): replace `pe.pe` with this function of `pe.pe` under `w` on `pr`, `X`, `F` and `pnl`. Their `pe` is their only weighted field, and their result forwards every field of the result of `pe.pe`.
  4. An [`AugmentedBlackLittermanPrior`](@ref): replace the asset prior `a_pe` with this function of it on `pr`, `X` and `pnl`, and the factor prior `f_pe` with this function of it on `pr.fpr` and `F` alone, each under `w`. Keep `re`. Its result keeps the cache of the pool in `a_pe`, and its `fpr` the cache of the pool in `f_pe`.
- 5. A nested entropy pooling prior: return this function of the estimator that fits its model, `pe.pe`, on `pr`, under [`prior_probability_factory`](@ref) of `pe.w` when the caller set one, which puts `pe.w` on the rows that each weighted field reads. Its result forwards the fields of the result of `pe.pe` that a cache reads. Its posterior is already the prior probabilities of the entropy pooling prior that embeds it, so its views are already in `w`, and [`factory`](@ref) would give it `w` as its own prior probabilities and solve its views again. This holds for an entropy pooling prior of the factors in step 2 too.
+ 5. A nested entropy pooling prior: return this function of the estimator that fits its model, `pe.pe`, on `pr`, under [`prior_probability_factory`](@ref) of `pe.w` when the caller set one, which puts `pe.w` on the rows that each weighted field reads. Its result forwards the fields of the result of `pe.pe` that a cache reads. Its posterior is already the prior probabilities of the entropy pooling prior that embeds it, so its views are already in `w`. A call to [`factory`](@ref) gives it `w` as its own prior probabilities, and it then solves its views again. This holds for an entropy pooling prior of the factors in step 2 too.
  6. An [`OpinionPoolingPrior`](@ref): read the pooled weights `wp` from the cache of `pr`, or pool the opinions on `X` with [`opinion_pooling_weights`](@ref) when `pr` holds no cache. Its own fit fits `pe.pe2` under `wp`. Return this function of [`factory`](@ref) of `pe.pe2` under `wp`, under `w`, on `pr`. The posterior of the pool is already in the prior probabilities of the entropy pooling prior, so [`factory`](@ref) of the pool under `w` pooled its opinions again from `w`, and a [`FactorPrior`](@ref) around it read the factor moments of other weights.
  7. An [`EmpiricalPrior`](@ref): return [`factory`](@ref) of `pe` under [`scenario_weights`](@ref) of `w` on the rows of `X`. A Scenario Cap keeps the last rows as scenarios, and `w` weighs these alone. Its moment estimators read every row, so the rows that the cap removed take a zero weight, and the posterior moments are those of the scenarios under `w`. Without a cap, `w` weighs every row and passes unchanged.
  8. A [`CrossSectionalFactorPrior`](@ref): take the factor returns of `pe.pe` from the block of `pr` with [`cross_sectional_cached_scenarios`](@ref) when [`cross_sectional_cached_block`](@ref) finds a cache, and with [`cross_sectional_factor_scenarios`](@ref) on `X`, `F` and `pnl` otherwise. Replace `pe.pe` with this function of `pe.pe` under `w` on these factor returns alone, as the fit of `pe` fits `pe.pe`, and keep every other field. The regression, the weights of the cross-sectional fit, the residual block and the Return Forecast keep the weights of the fit that the views read, so the scenarios of the refit are the scenarios of that fit. A Scenario Cap in `pe.pe` keeps the last factor returns as scenarios, and step 7 gives a zero weight to the rows that it removed.
@@ -879,9 +1085,9 @@ Every step recurses through this function and never through [`factory`](@ref) of
   - $(arg_dict[:X])
   - `F`: Optional factor returns matrix, already oriented.
   - $(arg_dict[:pnl_prior])
-  - `strict`: If `true`, throws error for missing assets; otherwise, issues warnings. Default is `false`.
+  - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn. The default is `false`.
   - $(arg_dict[:cache_reg])
-  - `kwargs...`: Additional keyword arguments, forwarded where the fit of `pe` forwards them.
+  - `kwargs...`: More keyword arguments, which go where the fit of `pe` sends them.
 
 # Returns
 
@@ -904,16 +1110,16 @@ function scenario_factory(pe::EmpiricalPrior, w, ::Option{<:AbstractPriorResult}
                           ::Option{<:MatNum}, ::Option{<:AssetPanel}; kwargs...)
     return factory(pe, scenario_weights(w, size(X, 1)))
 end
-function scenario_factory(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior}, w,
+function scenario_factory(pe::Union{FactorPrior, FactorBlackLittermanPrior}, w,
                           pr::Option{<:AbstractPriorResult}, ::MatNum, F::MatNum,
                           ::Option{<:AssetPanel}; strict::Bool = false, kwargs...)
     inner = scenario_factory(pe.pe, w, scenario_factor_result(pr), F, nothing, nothing;
                              strict = strict)
     return rebuild_estimator(pe, (; pe = inner))
 end
-function scenario_factory(pe::Union{<:BlackLittermanPrior, <:BayesianBlackLittermanPrior},
-                          w, pr::Option{<:AbstractPriorResult}, X::MatNum,
-                          F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
+function scenario_factory(pe::Union{BlackLittermanPrior, BayesianBlackLittermanPrior}, w,
+                          pr::Option{<:AbstractPriorResult}, X::MatNum, F::Option{<:MatNum},
+                          pnl::Option{<:AssetPanel}; kwargs...)
     return rebuild_estimator(pe,
                              (; pe = scenario_factory(pe.pe, w, pr, X, F, pnl; kwargs...)))
 end
@@ -925,11 +1131,13 @@ function scenario_factory(pe::AugmentedBlackLittermanPrior, w,
                             strict = strict)
     return rebuild_estimator(pe, (; a_pe = a_pe, f_pe = f_pe))
 end
-function scenario_factory(pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior}, w,
+function scenario_factory(pe::Union{EntropyPoolingPrior, MeucciEntropyPoolingPrior}, w,
                           pr::Option{<:AbstractPriorResult}, X::MatNum, F::Option{<:MatNum},
                           pnl::Option{<:AssetPanel}; kwargs...)
-    # A caller's `pe.w` weighs the scenarios. Under a Scenario Cap the regression and the
-    # residual block read more rows, so `factory` gave them too few weights.
+    # A caller's `pe.w` weighs the fit that the views read. The refit of a prior that holds
+    # its model keeps the weighted fields of that fit, such as the `ce` of a
+    # `CrossSectionalFactorPrior` under an `AugmentedBlackLittermanPrior`, so these fields
+    # take `pe.w` on the rows that each reads (#1927).
     inner = if isnothing(pe.w)
         pe.pe
     else
@@ -967,7 +1175,7 @@ end
 """
     scenario_prior(pe::AbstractPriorEstimator, w, pr::Option{<:AbstractPriorResult},
                    X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
-    scenario_prior(pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior}, w,
+    scenario_prior(pe::Union{EntropyPoolingPrior, MeucciEntropyPoolingPrior}, w,
                    pr::Option{<:AbstractPriorResult}, X::MatNum, F::Option{<:MatNum},
                    pnl::Option{<:AssetPanel}; kwargs...)
     scenario_prior(pe::BlackLittermanPrior, w, pr::Option{<:AbstractPriorResult}, X::MatNum,
@@ -1006,9 +1214,9 @@ The method that Julia selects is the algorithm.
   - $(arg_dict[:X])
   - `F`: Optional factor returns matrix, already oriented.
   - $(arg_dict[:pnl_prior])
-  - `strict`: If `true`, throws error for missing assets; otherwise, issues warnings. Default is `false`.
+  - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn. The default is `false`.
   - $(arg_dict[:cache_reg])
-  - `kwargs...`: Additional keyword arguments forwarded to [`prior`](@ref).
+  - `kwargs...`: More keyword arguments, which go to [`prior`](@ref).
 
 # Returns
 
@@ -1026,7 +1234,7 @@ function scenario_prior(pe::AbstractPriorEstimator, w, pr::Option{<:AbstractPrio
                         kwargs...)
     return prior(scenario_factory(pe, w, pr, X, F, pnl; kwargs...), X, F, pnl; kwargs...)
 end
-function scenario_prior(pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior}, w,
+function scenario_prior(pe::Union{EntropyPoolingPrior, MeucciEntropyPoolingPrior}, w,
                         pr::Option{<:AbstractPriorResult}, X::MatNum, F::Option{<:MatNum},
                         pnl::Option{<:AssetPanel}; kwargs...)
     # See the note at the same step in `scenario_factory`.
@@ -1058,12 +1266,12 @@ end
                               F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
     prior_probability_factory(pe::EmpiricalPrior, w, X::MatNum, F::Option{<:MatNum},
                               pnl::Option{<:AssetPanel}; kwargs...)
-    prior_probability_factory(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior}, w,
+    prior_probability_factory(pe::Union{FactorPrior, FactorBlackLittermanPrior}, w,
                               X::MatNum, F::MatNum, pnl::Option{<:AssetPanel}; kwargs...)
-    prior_probability_factory(pe::Union{<:BlackLittermanPrior,
-                                        <:BayesianBlackLittermanPrior,
-                                        <:EntropyPoolingPrior,
-                                        <:MeucciEntropyPoolingPrior}, w, X::MatNum,
+    prior_probability_factory(pe::Union{BlackLittermanPrior,
+                                        BayesianBlackLittermanPrior,
+                                        EntropyPoolingPrior,
+                                        MeucciEntropyPoolingPrior}, w, X::MatNum,
                               F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
     prior_probability_factory(pe::AugmentedBlackLittermanPrior, w, X::MatNum, F::MatNum,
                               pnl::Option{<:AssetPanel}; kwargs...)
@@ -1073,10 +1281,10 @@ end
                               F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
     prior_probability_factory(pe::AbstractPriorEstimator, w, n::Integer)
     prior_probability_factory(pe::EmpiricalPrior, w, n::Integer)
-    prior_probability_factory(pe::Union{<:BlackLittermanPrior,
-                                        <:BayesianBlackLittermanPrior,
-                                        <:EntropyPoolingPrior,
-                                        <:MeucciEntropyPoolingPrior}, w, n::Integer)
+    prior_probability_factory(pe::Union{BlackLittermanPrior,
+                                        BayesianBlackLittermanPrior,
+                                        EntropyPoolingPrior,
+                                        MeucciEntropyPoolingPrior}, w, n::Integer)
     prior_probability_factory(pe::OpinionPoolingPrior, w, n::Integer)
 
 Return [`factory`](@ref) of `pe` under the prior probabilities `w` of the scenarios, with each weighted field on the rows that it reads.
@@ -1105,7 +1313,7 @@ The method that Julia selects is the algorithm.
   - `F`: Optional factor returns matrix, already oriented.
   - $(arg_dict[:pnl_prior])
   - `n`: The number of rows that the fit of `pe` reads, in place of the data.
-  - `kwargs...`: Additional keyword arguments of the fit of `pe`, forwarded where a nested prior reads `X` and `pnl`.
+  - `kwargs...`: More keyword arguments of the fit of `pe`, which go to each nested prior that reads `X` and `pnl`.
 
 # Validation
 
@@ -1132,24 +1340,24 @@ end
 function prior_probability_factory(pe::EmpiricalPrior, w, n::Integer)
     return factory(pe, scenario_weights(w, n))
 end
-function prior_probability_factory(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior}, w,
+function prior_probability_factory(pe::Union{FactorPrior, FactorBlackLittermanPrior}, w,
                                    ::MatNum, F::MatNum, ::Option{<:AssetPanel}; kwargs...)
     inner = prior_probability_factory(pe.pe, w, size(F, 1))
     return rebuild_estimator(factory(pe, scenario_weights(w, size(F, 1))), (; pe = inner))
 end
-function prior_probability_factory(pe::Union{<:BlackLittermanPrior,
-                                             <:BayesianBlackLittermanPrior,
-                                             <:EntropyPoolingPrior,
-                                             <:MeucciEntropyPoolingPrior}, w, X::MatNum,
+function prior_probability_factory(pe::Union{BlackLittermanPrior,
+                                             BayesianBlackLittermanPrior,
+                                             EntropyPoolingPrior,
+                                             MeucciEntropyPoolingPrior}, w, X::MatNum,
                                    F::Option{<:MatNum}, pnl::Option{<:AssetPanel};
                                    kwargs...)
     inner = prior_probability_factory(pe.pe, w, X, F, pnl; kwargs...)
     return rebuild_estimator(factory(pe, w), (; pe = inner))
 end
-function prior_probability_factory(pe::Union{<:BlackLittermanPrior,
-                                             <:BayesianBlackLittermanPrior,
-                                             <:EntropyPoolingPrior,
-                                             <:MeucciEntropyPoolingPrior}, w, n::Integer)
+function prior_probability_factory(pe::Union{BlackLittermanPrior,
+                                             BayesianBlackLittermanPrior,
+                                             EntropyPoolingPrior,
+                                             MeucciEntropyPoolingPrior}, w, n::Integer)
     return rebuild_estimator(factory(pe, w),
                              (; pe = prior_probability_factory(pe.pe, w, n)))
 end
@@ -1162,9 +1370,9 @@ function prior_probability_factory(pe::AugmentedBlackLittermanPrior, w, X::MatNu
 end
 """
     assert_scenario_model(pe::AbstractPriorEstimator)
-    assert_scenario_model(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
-                                    <:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
-                                    <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior})
+    assert_scenario_model(pe::Union{FactorPrior, FactorBlackLittermanPrior,
+                                    BlackLittermanPrior, BayesianBlackLittermanPrior,
+                                    EntropyPoolingPrior, MeucciEntropyPoolingPrior})
     assert_scenario_model(pe::AugmentedBlackLittermanPrior)
     assert_scenario_model(pe::OpinionPoolingPrior)
     assert_scenario_model(pe::CrossSectionalFactorPrior)
@@ -1190,8 +1398,8 @@ The method that Julia selects is the algorithm.
 
 # Validation
 
-  - Every [`OpinionPoolingPrior`](@ref) that the walk meets has no `pe1`. An `ArgumentError` is thrown otherwise.
-  - The walk meets no [`LowDimensionEnsemblePrior`](@ref). An `ArgumentError` is thrown otherwise.
+  - Every [`OpinionPoolingPrior`](@ref) that the walk meets has no `pe1`. Otherwise the function throws an `ArgumentError`.
+  - The walk meets no [`LowDimensionEnsemblePrior`](@ref). Otherwise the function throws an `ArgumentError`.
 
 # Returns
 
@@ -1206,11 +1414,9 @@ The method that Julia selects is the algorithm.
 function assert_scenario_model(::AbstractPriorEstimator)
     return nothing
 end
-function assert_scenario_model(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
-                                         <:BlackLittermanPrior,
-                                         <:BayesianBlackLittermanPrior,
-                                         <:EntropyPoolingPrior,
-                                         <:MeucciEntropyPoolingPrior})
+function assert_scenario_model(pe::Union{FactorPrior, FactorBlackLittermanPrior,
+                                         BlackLittermanPrior, BayesianBlackLittermanPrior,
+                                         EntropyPoolingPrior, MeucciEntropyPoolingPrior})
     return assert_scenario_model(pe.pe)
 end
 function assert_scenario_model(pe::AugmentedBlackLittermanPrior)
@@ -1219,7 +1425,7 @@ function assert_scenario_model(pe::AugmentedBlackLittermanPrior)
 end
 """
     assert_scenario_refit(pe::AbstractPriorEstimator)
-    assert_scenario_refit(pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior})
+    assert_scenario_refit(pe::Union{EntropyPoolingPrior, MeucciEntropyPoolingPrior})
     assert_scenario_refit(pe::OpinionPoolingPrior)
 
 Check that [`scenario_prior`](@ref) can refit `pe`, the prior that an entropy pooling prior embeds, under its posterior weights.
@@ -1256,8 +1462,7 @@ The method that Julia selects is the algorithm.
 function assert_scenario_refit(pe::AbstractPriorEstimator)
     return assert_scenario_model(pe)
 end
-function assert_scenario_refit(pe::Union{<:EntropyPoolingPrior,
-                                         <:MeucciEntropyPoolingPrior})
+function assert_scenario_refit(pe::Union{EntropyPoolingPrior, MeucciEntropyPoolingPrior})
     return assert_scenario_refit(pe.pe)
 end
 

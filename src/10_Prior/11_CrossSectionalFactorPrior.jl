@@ -87,8 +87,8 @@ In order to implement a new concrete type that works seamlessly with the library
 abstract type AbstractOrthogonalForecastScaleCalibrationAlgorithm <:
               AbstractCalibrationAlgorithm end
 """
-    const Num_SpanShrinkCal = Union{<:AbstractSpannedShrinkageCalibrationAlgorithm,
-                                    <:Function, <:Number}
+    const Num_SpanShrinkCal = Union{AbstractSpannedShrinkageCalibrationAlgorithm,
+                                    Function, Number}
 
 Field bound for the Spanned Shrinkage slot: the shrinkage itself, a rule of the family, or a plain function of the same five arguments.
 
@@ -100,11 +100,11 @@ The bound names one family, so a rule of the Orthogonal Forecast Scale family in
   - [`Num_OrthFcScaleCal`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
 """
-const Num_SpanShrinkCal = Union{<:AbstractSpannedShrinkageCalibrationAlgorithm, <:Function,
-                                <:Number}
+const Num_SpanShrinkCal = Union{AbstractSpannedShrinkageCalibrationAlgorithm, Function,
+                                Number}
 """
-    const Num_OrthFcScaleCal = Union{<:AbstractOrthogonalForecastScaleCalibrationAlgorithm,
-                                     <:Function, <:Number}
+    const Num_OrthFcScaleCal = Union{AbstractOrthogonalForecastScaleCalibrationAlgorithm,
+                                     Function, Number}
 
 Field bound for the Orthogonal Forecast Scale slot: the scale itself, a rule of the family, or a plain function of the same five arguments. It is the counterpart of [`Num_SpanShrinkCal`](@ref), and carries its reading unchanged.
 
@@ -114,8 +114,8 @@ Field bound for the Orthogonal Forecast Scale slot: the scale itself, a rule of 
   - [`Num_SpanShrinkCal`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
 """
-const Num_OrthFcScaleCal = Union{<:AbstractOrthogonalForecastScaleCalibrationAlgorithm,
-                                 <:Function, <:Number}
+const Num_OrthFcScaleCal = Union{AbstractOrthogonalForecastScaleCalibrationAlgorithm,
+                                 Function, Number}
 """
     reads_forecast_history(rule) -> Bool
 
@@ -342,7 +342,7 @@ $(DocStringExtensions.FIELDS)
                               pdm::AbstractPosdefEstimator = Posdef(; alg = ClippedNearestCorrelation()),
                               f_mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                               mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
-                              srep::AbstractSystematicRepair = NoSystematicRepair(),
+                              srep::Option{<:AbstractSystematicRepair} = nothing,
                               th::Real = 0.0, bp::Real = 1.0,
                               mcap::AbstractString = "market_cap",
                               bw::AbstractString = "benchmark_weights", lag::Integer = 1,
@@ -363,6 +363,7 @@ Keywords correspond to the struct's fields. `factors`, `neutralise` and `familie
 
 ## Validation
 
+  - $(val_dict[:ce_cov]) `ve` reads only `var`, so it accepts a variance estimator.
   - `factors` is not empty and repeats no factor name.
   - No Factor Family holds both estimated and observed factors, and `families` constrains no observed family, as [`assert_cross_sectional_observed_families`](@ref) states.
   - `lx`, when it is stated, is not empty, and `factors` holds an observed factor, because the prior reads net returns only under observed factors.
@@ -378,30 +379,32 @@ Keywords correspond to the struct's fields. `factors`, `neutralise` and `familie
   - A rule in `lambda` or in `c` that reads the Return Forecast history needs a fitted `rfe`, as [`assert_forecast_history_rule`](@ref) states. A rule of the wrong family is refused by the bound of the slot. The number a rule returns is checked when the prior resolves it.
   - [`OrthogonalPartCalibration`](@ref) in `ofit` needs a member that can fit the slope of the orthogonal part, as [`assert_orthogonal_forecast_fit`](@ref) states.
   - Under [`FoldOnly`](@ref) in `carry`, no part makes the cost of a step of the carry fold grow with the stream, as [`assert_carry_rule`](@ref) states.
-  - Under [`NoSystematicRepair`](@ref) in `srep`, `mp` is a [`MatrixProcessing`](@ref), as [`assert_systematic_repair`](@ref) states.
+  - Under `srep = nothing`, `mp` is a [`MatrixProcessing`](@ref), as [`assert_systematic_repair`](@ref) states.
   - `mp` states the estimator with which the lift repairs the asset covariance, see [`assert_matrix_processing_posdef`](@ref).
   - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref).
   - The `x_src` of `pe` is `nothing`, because the prior picks the returns that it reads, see [`assert_inner_reader`](@ref).
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `cre`: Recursively updated via [`factory`](@ref).
-  - `wa`: Recursively updated via [`factory`](@ref).
-  - `pe`: Recursively updated via [`factory`](@ref).
-  - `ve`: Recursively updated via [`factory`](@ref).
-  - `ce`: Recursively updated via [`factory`](@ref).
-  - `f_mp`: Recursively updated via [`factory`](@ref).
-  - `mp`: Recursively updated via [`factory`](@ref).
-  - `rfe`: Recursively updated via [`factory`](@ref).
+  - `cre`: Recursively updated through [`factory`](@ref).
+  - `wa`: Recursively updated through [`factory`](@ref).
+  - `pe`: Recursively updated through [`factory`](@ref).
+  - `ve`: Recursively updated through [`factory`](@ref).
+  - `ce`: Recursively updated through [`factory`](@ref).
+  - `f_mp`: Recursively updated through [`factory`](@ref).
+  - `mp`: Recursively updated through [`factory`](@ref).
+  - `rfe`: Recursively updated through [`factory`](@ref).
+  - `cache`: Carried unchanged through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `ve`: Recursively viewed via [`port_opt_view`](@ref).
-  - `ce`: Recursively viewed via [`port_opt_view`](@ref).
+  - `ve`: Recursively viewed through [`port_opt_view`](@ref).
+  - `ce`: Recursively viewed through [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).
 
 # Examples
 
@@ -484,7 +487,7 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
     """
     @fprop mp
     """
-    $(field_dict[:srep]) The default is [`NoSystematicRepair`](@ref). The batch fit and the carry fold run the same lift when they read the prior, so the carry fold equals the batch fit under each rule.
+    $(field_dict[:srep]) The default is `nothing`. The batch fit and the carry fold run the same lift when they read the prior, so the carry fold equals the batch fit under each rule.
     """
     srep
     """
@@ -571,8 +574,8 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
                                        pdm::AbstractPosdefEstimator,
                                        f_mp::AbstractMatrixProcessingEstimator,
                                        mp::AbstractMatrixProcessingEstimator,
-                                       srep::AbstractSystematicRepair, th::Real, bp::Real,
-                                       mcap::AbstractString, bw::AbstractString,
+                                       srep::Option{<:AbstractSystematicRepair}, th::Real,
+                                       bp::Real, mcap::AbstractString, bw::AbstractString,
                                        lag::Integer, minra::Option{<:Integer},
                                        rfe::Option{<:AbstractReturnForecastEstimator},
                                        lambda::Num_SpanShrinkCal, c::Num_OrthFcScaleCal,
@@ -586,6 +589,7 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
                                        x_src::Option{<:AbstractReturnsSource})
         assert_returns_source(x_src, DATA_RETURNS_SOURCES, :CrossSectionalFactorPrior)
         assert_inner_reader(pe, :pe, :CrossSectionalFactorPrior)
+        assert_covariance_estimator(ce, :ce)
         assert_closed_unit_interval(th, :th)
         assert_finite(bp, :bp)
         assert_nonneg(bp, :bp)
@@ -637,7 +641,7 @@ function CrossSectionalFactorPrior(; factors::Dict_VecPair,
                                                                          alg = ClippedNearestCorrelation()),
                                    f_mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                                    mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
-                                   srep::AbstractSystematicRepair = NoSystematicRepair(),
+                                   srep::Option{<:AbstractSystematicRepair} = nothing,
                                    th::Real = 0.0, bp::Real = 1.0,
                                    mcap::AbstractString = "market_cap",
                                    bw::AbstractString = "benchmark_weights",
@@ -668,7 +672,7 @@ function calibration_slots(pe::CrossSectionalFactorPrior)
 end
 """
     cross_sectional_prior_option(x::Nothing, sym::Sym_Str) -> nothing
-    cross_sectional_prior_option(x::Dict_VecPair, sym::Sym_Str) -> Vector{<:Pair}
+    cross_sectional_prior_option(x::Dict_VecPair, sym::Sym_Str) -> AbstractVector{<:Pair{String}}
 
 Collect an optional list-valued argument of a [`CrossSectionalFactorPrior`](@ref).
 
@@ -685,7 +689,7 @@ The Neutralisation and the constrained Factor Families are each absent or a list
 
 # Returns
 
-  - `pr::Option{<:Vector{<:Pair}}`: The collected Pairs, or `nothing`.
+  - `pr::Option{<:AbstractVector{<:Pair{String}}}`: The collected Pairs, or `nothing`.
 
 # Related
 
@@ -697,6 +701,46 @@ function cross_sectional_prior_option(::Nothing, ::Sym_Str)
 end
 function cross_sectional_prior_option(x::Dict_VecPair, sym::Sym_Str)
     return cross_sectional_prior_pairs(x, sym)
+end
+"""
+    string_key_pairs(x::AbstractVector{<:Pair{String}}) -> x
+    string_key_pairs(x::Dict_VecPair) -> Vector{<:Pair{String}}
+
+Return the Pairs of a vector or a dictionary as a vector of Pairs with `String` keys.
+
+A vector whose keys are already `String` is returned itself, not a copy. So a rebuild of a [`CrossSectionalFactorPrior`](@ref) through its keyword constructor holds the vectors it was built from, and allocates nothing for them. Any other vector, and every dictionary, is collected into a new vector in its order of iteration. The fields of the prior are read by position, so a dictionary cannot be held as it is.
+
+# Arguments
+
+  - `x`: The Pairs or the dictionary.
+
+# Returns
+
+  - `pr::AbstractVector{<:Pair{String}}`: `x` itself, or the collected Pairs.
+
+# Examples
+
+```jldoctest
+julia> x = [\"style\" => \"industry\"];
+
+julia> PortfolioOptimisers.string_key_pairs(x) === x
+true
+
+julia> PortfolioOptimisers.string_key_pairs([:style => \"industry\"])
+1-element Vector{Pair{String, String}}:
+ "style" => "industry"
+```
+
+# Related
+
+  - [`cross_sectional_prior_pairs`](@ref)
+  - [`Dict_VecPair`](@ref)
+"""
+function string_key_pairs(x::AbstractVector{<:Pair{String}})
+    return x
+end
+function string_key_pairs(x::Dict_VecPair)
+    return [String(first(p)) => last(p) for p in x]
 end
 """
     prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = nothing,
@@ -991,7 +1035,7 @@ Resolves the Spanned Shrinkage `lambda` and the Orthogonal Forecast Scale `c` of
 function cross_sectional_calibration(pe::CrossSectionalFactorPrior, f_pr::NamedTuple,
                                      csfm::CrossSectionalFactorModel, sp::NamedTuple)
     pr = LowOrderPrior(; X = f_pr.X, mu = f_pr.mu, sigma = f_pr.sigma, w = f_pr.w,
-                       ens = f_pr.ens, kld = f_pr.kld, ow = f_pr.ow)
+                       ens = f_pr.ens, eoc = f_pr.eoc, kld = f_pr.kld, ow = f_pr.ow)
     ctx = CalibrationContext(;
                              cs = (; g = sp.g, ap = sp.ap, csfm = csfm, hist = sp.hist,
                                    cre = pe.cre))
@@ -1344,7 +1388,7 @@ The method passes the fields of `rd` to the returns-matrix method above, which r
 # Arguments
 
   - `pe`: Cross-Sectional Factor Prior estimator.
-  - $(arg_dict[:rd]) It must carry asset returns in `rd.X` and a time-varying Asset Panel in `rd.pnl`.
+  - $(arg_dict[:rd]) It must carry asset returns in `rd.X`, and a time-varying Asset Panel in `rd.pnl` when an exposure reads a Panel Field. With no panel, the fit reads the mask-only panel of [`returns_with_universe`](@ref).
   - $(arg_dict[:strict_prior_rd])
   - $(arg_dict[:dims_rd])
   - $(arg_dict[:cache_reg])
@@ -1353,7 +1397,6 @@ The method passes the fields of `rd` to the returns-matrix method above, which r
 
   - `rd.X` is not `nothing`. Raises an [`IsNothingError`](@ref).
   - The rules of [`benchmark_relative_returns`](@ref).
-  - `rd.pnl` is not `nothing`. Raises an [`IsNothingError`](@ref).
   - The rules of the returns-matrix method.
 
 # Returns
@@ -1370,8 +1413,7 @@ function prior(pe::CrossSectionalFactorPrior, rd::ReturnsResult; strict::Bool = 
                dims::Int = 1, cache_reg::Bool = false)
     @argcheck(!isnothing(rd.X),
               IsNothingError("a Cross-Sectional Factor Prior regresses asset returns on their Factor Exposures, and rd.X is nothing"))
-    @argcheck(!isnothing(rd.pnl),
-              IsNothingError("a Cross-Sectional Factor Prior reads its Factor Exposures off an Asset Panel, and rd.pnl is nothing. Build the ReturnsResult with the `pnl` that asset_panel returns."))
+    rd = returns_with_universe(rd)
     T = size(rd.X, 1)
     rows = shared_series_rows(rd, pe.x_src, false)
     rd = shared_series_view(rd, pe.x_src, false)
@@ -1709,8 +1751,8 @@ function cross_sectional_live_regression(cre::AbstractCrossSectionalRegressionEs
     f = zeros(eltype(csl.f), size(csl.f, 1), size(Z, 3))
     f[:, lv] = csl.f
     return (;
-            csr = CrossSectionalRegression(; f = f, eps = csl.eps, n = csl.n, b = csl.b,
-                                           h1 = csl.h1,
+            csr = CrossSectionalRegression(; f = f, eps = csl.eps, n = csl.n,
+                                           edof = csl.edof, b = csl.b, h1 = csl.h1,
                                            dc = cross_sectional_live_dropped(csl.dc, lv),
                                            lv = lv), lv = lv)
 end

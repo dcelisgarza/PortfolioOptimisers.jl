@@ -361,19 +361,18 @@ const PO = PortfolioOptimisers
         @test isa(LowOrderMoment()(w, X), Number)
         @test isa(LowOrderMoment(; w = eweights(1:60, inv(60); scale = true))(w, X), Number)
 
-        # All five central-moment measures rebuild through one generic, so the rule is
-        # asserted on all five rather than on the two that used to be covered. Only
-        # `LowOrderMoment` and `HighOrderMoment` were tested here, which is how the other
-        # three drifted: `Skewness` dropped `settings` from its rebuild, and `Kurtosis`
-        # bound its rebuild to `SemiMoment`, so the default `FullMoment` matched no method.
+        # All three central-moment measures that read the returns rebuild through one
+        # generic, so the rule is asserted on all three, and on both forms of the third
+        # moment. `Kurtosis` and `Skewness` read a comoment matrix since #1846, so they
+        # hold no observation weights.
         rw = PO.get_observation_weights(cw, X; dims = 1)
         for (dyn, sta) in ((LowOrderMoment(; w = cw), LowOrderMoment(; w = rw)),
                            (HighOrderMoment(; w = cw), HighOrderMoment(; w = rw)),
-                           (Kurtosis(; w = cw), Kurtosis(; w = rw)),
-                           (Kurtosis(; w = cw, alg1 = PO.SemiMoment()),
-                            Kurtosis(; w = rw, alg1 = PO.SemiMoment())),
-                           (Skewness(; w = cw), Skewness(; w = rw)),
-                           (PO.ThirdCentralMoment(; w = cw), PO.ThirdCentralMoment(; w = rw)))
+                           (HighOrderMoment(; w = cw, alg = PO.FourthMoment(; alg = PO.SemiMoment())),
+                            HighOrderMoment(; w = rw, alg = PO.FourthMoment(; alg = PO.SemiMoment()))),
+                           (PO.ThirdCentralMoment(; w = cw), PO.ThirdCentralMoment(; w = rw)),
+                           (PO.ThirdCentralMoment(; w = cw, ve = SimpleVariance()),
+                            PO.ThirdCentralMoment(; w = rw, ve = SimpleVariance())))
             # Resolving the weights is all the rebuild does: the answer is the one the
             # measure gives when it is handed the same weights directly.
             @test dyn(w, X) == sta(w, X)
@@ -389,13 +388,13 @@ const PO = PortfolioOptimisers
         for r in (LowOrderMoment(; w = cw, settings = RiskMeasureSettings(; scale = 3),
                                  mu = 0.001, alg = SecondMoment()),
                   HighOrderMoment(; w = cw, settings = RiskMeasureSettings(; scale = 3),
-                                  mu = 0.001, alg = PO.StandardisedHighOrderMoment()),
-                  Kurtosis(; w = cw, settings = RiskMeasureSettings(; scale = 3), mu = 0.001,
-                           N = 7, alg1 = PO.SemiMoment()),
-                  Skewness(; w = cw, settings = MaxRiskMeasureSettings(; scale = 3), mu = 0.001),
+                                  mu = 0.001, ve = SimpleVariance(; me = nothing)),
                   PO.ThirdCentralMoment(; w = cw,
                                         settings = PO.HierarchicalRiskMeasureSettings(; scale = 3),
-                                        mu = 0.001))
+                                        mu = 0.001),
+                  PO.ThirdCentralMoment(; w = cw,
+                                        settings = PO.HierarchicalRiskMeasureSettings(; scale = 3),
+                                        mu = 0.001, ve = SimpleVariance()))
             rebuilt = PO.resolve_observation_weights(r, X)
             @test rebuilt.w == rw
             @test all(f -> f in (:w, :alg, :ve) || getfield(rebuilt, f) === getfield(r, f),
@@ -416,13 +415,13 @@ const PO = PortfolioOptimisers
         rw = PO.get_observation_weights(mw, X)
         pr = prior(HighOrderPriorEstimator(), X)
         mu = pr.mu
-        sha = PO.StandardisedHighOrderMoment
+        sv = SimpleVariance(; me = nothing)
         for f in (ow -> LowOrderMoment(; w = ow, mu = mu, alg = SecondMoment()),
                   ow -> LowOrderMoment(; w = ow, mu = mu,
                                        alg = SecondMoment(; alg1 = PO.SemiMoment())),
-                  ow -> HighOrderMoment(; w = ow, mu = mu, alg = sha()),
-                  ow -> HighOrderMoment(; w = ow, mu = mu, alg = sha(; alg = PO.FourthMoment())),
-                  ow -> Skewness(; w = ow, mu = mu))
+                  ow -> HighOrderMoment(; w = ow, mu = mu, ve = sv),
+                  ow -> HighOrderMoment(; w = ow, mu = mu, alg = PO.FourthMoment(), ve = sv),
+                  ow -> PO.ThirdCentralMoment(; w = ow, mu = mu, ve = SimpleVariance()))
             dyn, sta = f(mw), f(rw)
             val = factory(sta, pr)(w, X)
             @test isapprox(sta(w, X), val; rtol = 1e-12)
@@ -677,10 +676,12 @@ end
                                                                     ve = SimpleVariance(;
                                                                                         corrected = false))),
                 (;)), (ImpliedVolatility(; ppy = 252, ce = SpearmanCovariance()), (;)),
-               (ImpliedVolatility(; ppy = 252,
-                                  mp = MatrixProcessing(;
-                                                        dn = Denoise(;
-                                                                     alg = SpectralDenoise()))),
+               # `ImpliedVolatility` carries no `mp`, so the wrapper applies the denoise
+               # step to its last matrix (#1865).
+               (PortfolioOptimisersCovariance(; ce = ImpliedVolatility(; ppy = 252),
+                                              mp = MatrixProcessing(;
+                                                                    dn = Denoise(;
+                                                                                 alg = SpectralDenoise()))),
                 (;)),
                (ImpliedVolatility(; ppy = 252, alg = ImpliedVolatilityPremium()),
                 (; ivpa = 1.2)),
@@ -739,6 +740,24 @@ end
             sigma = cov(ImpliedVolatility(; alg = alg, ppy = ppy), X; iv = iv)
             @test isapprox(sqrt.(diag(sigma)), got)
         end
+        # #1886: the estimator names its first column, the column of ones, to the target. An
+        # elastic net at a strength that shrinks both slopes to zero then keeps the
+        # intercept at its unpenalised value, the mean of the log realised volatility of
+        # windows 2 to C; a penalised intercept would predict exp(0) = 1.
+        ws, ppy = 20, 252
+        chunk = div(T, ws)
+        offset = T - chunk * ws
+        lrv = log.(reduce(vcat,
+                          [Statistics.std(SimpleVariance(),
+                                          view(X,
+                                               (offset + (c - 1) * ws + 1):(offset + c * ws),
+                                               :); dims = 1) for c in 1:chunk]))
+        big = ElasticNet(; strength = FixedStrength(; gamma = 1e8))
+        got = PortfolioOptimisers.predict_realised_vols(ImpliedVolatilityRegression(;
+                                                                                    ws = ws,
+                                                                                    re = big),
+                                                        iv / sqrt(ppy), X, nothing)
+        @test got ≈ exp.(vec(mean(lrv[2:chunk, :]; dims = 1)))
     end
 
     @testset "ImpliedVolatility reproduces its documented covariance" begin
@@ -791,18 +810,27 @@ end
     end
 
     @testset "ImpliedVolatility rejects what it cannot compute" begin
-        # A window of 2 or fewer observations carries no usable standard deviation.
-        @test_throws DomainError ImpliedVolatilityRegression(; ws = 2)
-        # The regression needs more than two windows: two of them leave one training row.
-        @test_throws DomainError cov(ImpliedVolatility(; ppy = 252,
-                                                       alg = ImpliedVolatilityRegression(;
-                                                                                         ws = 126)),
-                                     X; iv = iv)
-        # Three windows is the smallest the fit accepts, and it stays finite there. This is
-        # the oracle's own floor of three folds.
+        # A window of one row has no dispersion: its corrected standard deviation is `NaN`
+        # and its uncorrected one is zero, whose logarithm is `-Inf`. A window of two rows
+        # has a corrected standard deviation with one degree of freedom (#1796).
+        @test_throws DomainError ImpliedVolatilityRegression(; ws = 1)
+        @test ImpliedVolatilityRegression(; ws = 2).ws == 2
+        #=
+        The fit has one row fewer than the windows, for three coefficients (#1796). Three
+        windows give two rows, so the coefficients have no unique value: the oracle accepts
+        that floor, and the second asset of the issue's reproduction got a per-period
+        volatility of 15. Four windows give three rows and no residual. So `T = 252` refuses
+        `ws = 63` (four windows) and `ws = 84` (three), and accepts `ws = 50` (five).
+        =#
+        for ws in (126, 84, 63)
+            @test_throws DomainError cov(ImpliedVolatility(; ppy = 252,
+                                                           alg = ImpliedVolatilityRegression(;
+                                                                                             ws = ws)),
+                                         X; iv = iv)
+        end
         @test all(isfinite,
                   diag(cov(ImpliedVolatility(; ppy = 252,
-                                             alg = ImpliedVolatilityRegression(; ws = 84)),
+                                             alg = ImpliedVolatilityRegression(; ws = 50)),
                            X; iv = iv)))
         # The premium algorithm has no default factor.
         @test_throws ArgumentError cov(ImpliedVolatility(; ppy = 252,
@@ -830,6 +858,62 @@ end
         end
         # The positive factor the bad ones were derived from still answers.
         @test all(isfinite, cov(cep, X; iv = iv, ivpa = ivpav))
+        #=
+        An implied volatility that is negative is not a volatility either. On the premium
+        path a negative last entry divided into a negative volatility, and `cor2cov!` hid its
+        sign exactly as it hides a negative factor, so the fit answered. A gap is refused by
+        the same check, with a `DomainError` that names `iv`.
+        =#
+        ivneg = copy(iv)
+        ivneg[end, 2] = -ivneg[end, 2]
+        ivgap = copy(iv)
+        ivgap[3, 2] = NaN
+        cer = ImpliedVolatility(; ppy = 252)
+        for bad in (ivneg, ivgap), f in (cov, cor)
+            @test_throws DomainError f(cep, X; iv = bad, ivpa = ivpav)
+            @test_throws DomainError f(cer, X; iv = bad)
+            @test_throws "iv" f(cep, X; iv = bad, ivpa = ivpav)
+        end
+        # A zero implied volatility is a volatility, and the premium path still answers.
+        ivzero = copy(iv)
+        ivzero[end, 2] = 0
+        @test all(isfinite, cov(cep, X; iv = ivzero, ivpa = ivpav))
+        #=
+        The regression takes the logarithm of the implied volatility at the end of each
+        window and of the realised volatility of each window, so a zero there has no value in
+        the fit. A zero at the end of an earlier window raised a LAPACK error that named
+        neither input, a zero on the last row made a predicted volatility of zero or infinity,
+        and a window of constant returns raised the same LAPACK error (R5 of #1817). A zero
+        on a row that ends no window is not read, and the fit still answers.
+        =#
+        sampled = (T - (div(T, 20) - 1) * 20):20:T
+        for row in (sampled[5], T)
+            ivz = copy(iv)
+            ivz[row, 2] = 0
+            for f in (cov, cor)
+                @test_throws DomainError f(cer, X; iv = ivz)
+                @test_throws "`iv`" f(cer, X; iv = ivz)
+            end
+        end
+        ivz = copy(iv)
+        ivz[sampled[5] - 1, 2] = 0
+        @test cov(cer, X; iv = ivz) == cov(cer, X; iv = iv)
+        #=
+        The round-off of the mean can leave a constant window a standard deviation of the
+        order of `eps`, and whether it does depends on the value and on the host. On the CI
+        host, the first value gave about `1e-19`, and the fit answered. The last three give a
+        positive value on the host that wrote the test, so the comparison of the returns
+        refuses them there too.
+        =#
+        for v in (X[sampled[5], 2], 0.015453143833033613, -0.009848612891382565,
+                  -0.0048880224182851865)
+            Xc = copy(X)
+            Xc[(sampled[5] - 19):sampled[5], 2] .= v
+            for f in (cov, cor)
+                @test_throws DomainError f(cer, Xc; iv = iv)
+                @test_throws "no dispersion" f(cer, Xc; iv = iv)
+            end
+        end
         # The implied volatility series itself is mandatory. Every method refuses a missing
         # `iv` and an `iv = nothing` by name, and so does a prior fitted on returns that
         # carry none, since `prior(pe, rd)` passes `iv = rd.iv`.
@@ -1624,7 +1708,7 @@ Every test below pins a CLAIM the documentation makes, computed a second way. #4
 condition 2 is "checked with real numbers. Not read -- run", and a claim no test holds is a
 claim the next reader has to re-derive.
 
-THREE FACTS SHAPE THE PROBES.
+FOUR FACTS SHAPE THE PROBES.
 
 1. `StatsBase.corspearman` and `StatsBase.corkendall` are TIE-CORRECTED. The textbook closed
    forms -- Spearman's `1 - 6 sum(d^2) / (T(T^2-1))` and Kendall's `(C-D)/binomial(T,2)` --
@@ -1639,10 +1723,16 @@ THREE FACTS SHAPE THE PROBES.
 
 3. `lower_tail_dependence`'s `k > 0` guard is NOT reached by a small positive `alpha`. `ceil`
    of any positive real is at least 1, so `alpha = nextfloat(0.0)` on a non-empty matrix
-   still selects one observation. The two cases that do reach it are `alpha == 0` on a direct
+   still selects one observation. The cases that do reach it are `alpha <= 0` on a direct
    call, and a matrix with no observation. The docstring said otherwise before #458.
+
+4. `lower_tail_dependence` is BIASED at a fixed `alpha`. It converges to `C(alpha, alpha) /
+   alpha`, not to the limit at zero, so a Gaussian copula, whose limit is 0, measures about
+   0.31 at correlation 0.6 and `alpha = 0.05`. Both docstrings carry that warning since #1093,
+   and the testset below holds the number against the closed form of the Gaussian copula.
 =#
 using Test, PortfolioOptimisers, Statistics, StatsBase, LinearAlgebra, StableRNGs, FLoops
+using Distributions: Distributions
 
 @testset "Distance covariance: the doubly-centred statistic" begin
     rng = StableRNG(987654321)
@@ -1791,15 +1881,48 @@ end
     @test all(isone, diag(tiny))
     @test !all(iszero, tiny)
 
-    # The two cases that DO reach it: alpha exactly zero, and a matrix with no observation.
+    # The cases that DO reach it: alpha <= 0, and a matrix with no observation.
     @test all(iszero, PortfolioOptimisers.lower_tail_dependence(Xt, 0.0))
+    @test all(iszero, PortfolioOptimisers.lower_tail_dependence(Xt, -0.5))
     empty_res = PortfolioOptimisers.lower_tail_dependence(zeros(0, 3), 0.05)
     @test size(empty_res) == (3, 3)
     @test all(iszero, empty_res)
 
+    # The function does not check `k <= T`: an alpha above one fails in `partialsort!`.
+    @test_throws BoundsError PortfolioOptimisers.lower_tail_dependence(Xt, 1.5)
+
     # The estimator rules the first case out at construction.
     @test_throws DomainError LowerTailDependenceCovariance(; alpha = 0.0)
     @test_throws DomainError LowerTailDependenceCovariance(; alpha = 1.0)
+end
+
+@testset "Lower tail dependence: the bias at a fixed alpha, #1093" begin
+    # C(a, a) / a for the Gaussian copula, by the trapezoid rule on the conditional form
+    # Phi_2(q, q; rho) = int_{-Inf}^{q} phi(x) Phi((q - rho x) / sqrt(1 - rho^2)) dx.
+    function gaussian_ratio(rho, alpha; n = 100_000)
+        nd = Distributions.Normal()
+        q = Distributions.quantile(nd, alpha)
+        s = sqrt(1 - rho^2)
+        f(x) = Distributions.pdf(nd, x) * Distributions.cdf(nd, (q - rho * x) / s)
+        xs = range(-12.0, q; length = n + 1)
+        return step(xs) * (sum(f, xs) - (f(first(xs)) + f(last(xs))) / 2) / alpha
+    end
+    # The table of the docstring of `lower_tail_dependence`.
+    @test round(gaussian_ratio(0.3, 0.05); digits = 3) == 0.143
+    @test round(gaussian_ratio(0.6, 0.05); digits = 3) == 0.310
+    @test round(gaussian_ratio(0.6, 0.001); digits = 3) == 0.095
+    @test round(gaussian_ratio(0.8, 0.01); digits = 3) == 0.377
+
+    # A Gaussian sample: the limit is 0, and the estimate sits on the ratio instead.
+    rho = 0.6
+    Z = randn(StableRNG(1093), 200_000, 2)
+    X = hcat(Z[:, 1], rho * Z[:, 1] + sqrt(1 - rho^2) * Z[:, 2])
+    for (alpha, atol) in ((0.05, 0.015), (0.01, 0.03))
+        est = PortfolioOptimisers.lower_tail_dependence(X, alpha)[1, 2]
+        @test isapprox(est, gaussian_ratio(rho, alpha); atol = atol)
+    end
+    ce = LowerTailDependenceCovariance(; ex = FLoops.SequentialEx())
+    @test cor(ce, X)[1, 2] > 0.29
 end
 
 @testset "Rank covariances: the tie correction" begin
@@ -1848,6 +1971,34 @@ end
     @test cor(SpearmanCovariance(), Xun)[1, 2] ≈
           1 - 6 * sum((ru .- su) .^ 2) / (T * (T^2 - 1))
     @test cor(KendallCovariance(), Xun)[1, 2] ≈ (C - D) / binomial(T, 2)
+end
+
+@testset "Rank covariances: Example 3 of kendall1945" begin
+    # The ten ranks of Examples 1 and 3. The work scores 33 over sqrt(41 * 36) and prints
+    # the truncated 0.8589, so the docstring names the unrounded quotient.
+    Xk = [1.0 1.0; 2.5 2.0; 2.5 4.5; 4.5 4.5; 4.5 4.5; 6.5 4.5; 6.5 8.0; 8.0 8.0; 9.5 8.0;
+          9.5 10.0]
+    tau = cor(KendallCovariance(), Xk)[1, 2]
+    @test tau == 33 / sqrt(41 * 36)
+    @test round(tau; digits = 5) == 0.85896
+    @test trunc(tau; digits = 4) == 0.8589
+end
+
+@testset "Dependence covariances: a constant series" begin
+    # A constant column has a distance variance of zero, so its distance correlations are
+    # 0 / 0. The rank correlations keep a unit diagonal and are NaN off it.
+    Xc = [1.0 2.0; 1.0 4.0; 1.0 6.0; 1.0 3.0]
+    ce = DistanceCovariance(; ex = FLoops.SequentialEx())
+    @test all(isnan, cor(ce, Xc)[1, :])
+    @test isone(cor(ce, Xc)[2, 2])
+    @test iszero(cov(ce, Xc)[1, 1])
+    @test iszero(PortfolioOptimisers.cov_distance(ce, Xc[:, 1], Xc[:, 1]))
+    @test isnan(PortfolioOptimisers.cor_distance(ce, Xc[:, 1], Xc[:, 2]))
+    for est in (KendallCovariance(), SpearmanCovariance())
+        R = cor(est, Xc)
+        @test all(isone, diag(R))
+        @test isnan(R[1, 2]) && isnan(R[2, 1])
+    end
 end
 
 @testset "The generic ve fallback rescales the three that carry one" begin
@@ -2281,6 +2432,11 @@ end
         # visible one level down. This is the behaviour the constructor now keeps out.
         @test PO.sb_delta(1.5, 1.5, -2) == 0.0
         @test PO.sb_delta(1.5, 0.5, -2) > 0.9
+        # At `n = Inf` an observation whose two magnitudes differ by more than one gives
+        # zero, and one whose magnitudes differ by less than one gives `kappa`, as the
+        # `## Validation` of `SmythBrobyCovariance` states.
+        @test PO.sb_delta(2.5, 1.0, Inf) == 0.0
+        @test PO.sb_delta(1.5, 1.0, Inf) == sqrt(2.5 * 2.0)
         # Every `n` the guard admits gives a unit diagonal and a finite matrix.
         for n in (0, 0.5, 2, Inf)
             r = cor(SmythBrobyCovariance(; n = n, alg = SmythBroby1(), pdm = nothing), X)
@@ -2328,6 +2484,36 @@ end
         fixed = cor(SmythBrobyCovariance(; alg = SmythBroby0()), X)
         @test minimum(eigvals(Symmetric(fixed))) >= -sqrt(eps(Float64))
         @test !isapprox(raw, fixed)
+    end
+
+    @testset "the neutral term does not keep the matrix positive semidefinite" begin
+        #=
+        Section 2 of the source states, with no proof (its footnote 2), that the neutral
+        sum keeps the covariance matrix positive semidefinite. The docstrings of
+        `SmythBroby1` and `GerberComovementOne` used to repeat the claim as a fact. On 30
+        standard normal observations of 20 assets the two contribution markers of the `1`
+        digit are indefinite, while `Gerber1` and `SmythBrobyCount1` are not.
+        =#
+        X = randn(StableRNG(21), 30, 20)
+        lmin(ce) = minimum(eigvals(Symmetric(cor(ce, X))))
+        @test lmin(SmythBrobyCovariance(; alg = SmythBroby1(), pdm = nothing)) < -0.05
+        @test lmin(SmythBrobyCovariance(; alg = SmythBrobyGerber1(), pdm = nothing)) < -0.3
+        @test lmin(SmythBrobyCovariance(; alg = SmythBrobyCount1(), pdm = nothing)) > 0
+        @test lmin(GerberCovariance(; alg = Gerber1(), pdm = nothing)) > 0
+        # `pdm` repairs both.
+        for a in (SmythBroby1(), SmythBrobyGerber1())
+            @test lmin(SmythBrobyCovariance(; alg = a)) >= -sqrt(eps(Float64))
+        end
+    end
+
+    @testset "posdef! keeps a zero diagonal entry, so the unit diagonal is written first" begin
+        # `comovement_unit_diagonal!` runs before `posdef!` because the repair keeps a zero
+        # variance and its zero row and column. It never writes the one itself.
+        A = [0.0 0.0 0.0; 0.0 1.0 0.5; 0.0 0.5 1.0]
+        PO.posdef!(Posdef(), A)
+        @test A[1, 1] == 0.0
+        @test all(iszero, A[1, :])
+        @test all(isfinite, A)
     end
 end
 
@@ -2821,4 +3007,51 @@ struct UnresolvedDecay <: PO.GerberIQDecayEstimator end
         end
         @test worst <= 1
     end
+
+    @testset "A one-sided co-movement reaches Gerber1 and Gerber2 (#456)" begin
+        # The diagram bullets of the three templates once said that only `Gerber1` reads a
+        # co-movement with one return inside the noise zone. `Gerber2` reads it too: the
+        # asset that crosses adds its diagonal projection to the denominator. `Gerber0`
+        # ignores it. The last row of `X1` moves asset 1 alone.
+        X0 = [1.0 1.0; -1.0 -1.0; 1.0 -1.0; 1.0 1.0; -1.0 -1.0]
+        X1 = vcat(X0, [3.0 0.0])
+        sd1 = ones(1, 2)
+        no_decay = ExpGerberIQDecay(; e = 100, y = 0.0)
+        function rho(a, Xs)
+            ce1 = GerberIQCovariance(; alg = a, pdm = nothing, decay = no_decay,
+                                     sc = AssetVolatilityGerberIQScaler(), c = 0.1)
+            return PortfolioOptimisers.gerber_IQ(ce1, Xs, sd1)[1, 2]
+        end
+        @test rho(Gerber0(), X1) == rho(Gerber0(), X0)
+        @test rho(Gerber1(), X1) < rho(Gerber1(), X0)
+        @test rho(Gerber2(), X1) < rho(Gerber2(), X0)
+
+        # The `ex` field docstring follows `field_dict[:ex]`, which already ends in a
+        # period, and once rendered as "strategy..".
+        iq_doc = Docs.meta(PortfolioOptimisers)[Docs.Binding(PortfolioOptimisers,
+                                                             :GerberIQCovariance)]
+        iq_ex = strip(first(values(iq_doc.docs)).data[:fields][:ex])
+        @test endswith(iq_ex, "strategy.")
+        @test !endswith(iq_ex, "..")
+    end
+end
+
+struct SymmetricPanelProbe <: StatsBase.CovarianceEstimator end
+function Statistics.cov(::SymmetricPanelProbe, X::AbstractMatrix; dims::Int = 1,
+                        mean = nothing)
+    return Symmetric(Statistics.cov(X; dims = dims))
+end
+function Statistics.cor(::SymmetricPanelProbe, X::AbstractMatrix; dims::Int = 1,
+                        mean = nothing)
+    return Symmetric(Statistics.cor(X; dims = dims))
+end
+@testset "PortfolioOptimisersCovariance copies an immutable panel-arm answer before it processes it" begin
+    X = randn(StableRNG(1912), 30, 4)
+    ce = PortfolioOptimisersCovariance(; ce = SymmetricPanelProbe())
+    sigma = Statistics.cov(ce, X, nothing)
+    @test isa(sigma, Matrix)
+    @test isapprox(sigma, Statistics.cov(X))
+    rho = Statistics.cor(ce, X, nothing)
+    @test isa(rho, Matrix)
+    @test isapprox(rho, Statistics.cor(X))
 end

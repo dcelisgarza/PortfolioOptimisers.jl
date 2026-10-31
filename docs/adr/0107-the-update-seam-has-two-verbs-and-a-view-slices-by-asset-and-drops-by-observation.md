@@ -175,3 +175,19 @@ such a type: the one call site, `realised_vol`, takes an `AbstractVarianceEstima
 to these two types alone would also be half a view. The identity does not reach their composed
 children, so it neither indexes a child's weights nor drops a child's state. If a caller of that kind appears, the fix is to open the
 observation channel on `@fprop` for every type at once, not a `cache` rule per type.
+
+## Amendment (2026-10-26)
+
+The Decision says that `partial_fit!` rebinds the scalar fields of a state with `Accessors.@reset`.
+Since `cf52bf7c92` (#1807), no fold uses `Accessors.jl`. The fold of a state builds the new state
+through the positional constructor of the state, called by name, as `merge_states` and the seed
+functions do. The estimator that holds the state is rebuilt through `rebuild_estimator`, which
+calls the keyword constructor of its type. § *Immutability and `Accessors.jl`* of
+`.github/instructions/julia-source-code.instructions.md` states the rule and the reasons for the
+positional route.
+
+The promise of the seam does not change. The fold writes into the arrays of the state where it
+can, and a new state holds the new scalar fields, so an estimator that the caller kept from before
+the call still holds moved arrays and an old count. The three pitfalls of the Decision stand, and
+`partial_fit` keeps its value semantics. The review of #1817 (R6) measured each fold of the commit
+against its parent: the same fields, the same bytes on each step.

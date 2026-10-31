@@ -976,8 +976,9 @@ end
 
 reviewed_total(row) = sum(row[r] for r in RULE_NAMES)
 
-function render(m, recorded, accept_rise::Bool)
-    rulings = CodeHealth.read_rulings()
+# `rulings` defaults to the committed Rulings, as in `measure`. A test over a fixture tree passes
+# its own, or every committed Dismissal names a path that the fixture does not hold.
+function render(m, recorded, accept_rise::Bool; rulings = CodeHealth.read_rulings())
     dismissal_repairs(rulings, m.files)
     measured = rows(m)
     rec = recorded_rows(recorded)
@@ -1021,8 +1022,7 @@ end
 
 # --- verify ----------------------------------------------------------------
 
-function verify(m, recorded)
-    rulings = CodeHealth.read_rulings()
+function verify(m, recorded; rulings = CodeHealth.read_rulings())
     failures = String[]
     bad_prov = CodeHealth.provenance_failures(get(recorded, "provenance", Dict()),
                                               Dict(m.provenance))

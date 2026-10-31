@@ -261,7 +261,8 @@ function apply_gap_return(alg::AbstractGapReturnAlgorithm, R::DataFrames.DataFra
         r[w] .= out[w]
     end
     if !wrote
-        @info("`gap_return_alg` is a $(typeof(alg)) and no cell is writable, so the returns are the ones the default rule computed. A Gap Return writes only a return that reads a gapped price, inside an asset's Listing Span, after the first observed price of its column. The table that reaches the conversion holds no such return.")
+        @info("`gap_return_alg` is a $(typeof(alg)) and no cell is writable, so the returns are the ones the default rule computed. A Gap Return writes only a return that reads a gapped price, inside an asset's Listing Span, after the first observed price of its column. The table that reaches the conversion holds no such return.",
+              maxlog = log_limit(:info), _id = @log_id(typeof(alg)))
     end
     return R
 end
@@ -368,7 +369,7 @@ The conversion applies the same rule to a benchmark ``B``, and carries the bench
  6. Name the four blocks. Step 1 refused a name that two tables share and the name `timestamp`. So the asset names `nx`, the factor names `nf`, the benchmark names `nb` and the Exogenous Series names `ne` are the column names of the four tables, and `ts` is the `timestamp` column of the converted table.
  7. Write each absent implied volatility as `NaN` with [`unify_gaps`](@ref), and index `pr.iv` by `ts`. Then check the implied volatilities and `pr.ivpa` against the asset count. The returns clock is the price clock, less the first observation when `padding` is `false`. So the implied volatilities of a `PricesResult` that the ingestion layer built cover it. The conversion carries an absent implied volatility as `NaN`, and the estimator that reads it excludes it.
  8. View the [`AssetPanel`](@ref) on the returns clock. Find the panel rows of the returns timestamps with [`feature_row_indices`](@ref), and view the panel with [`port_opt_view`](@ref). Give it the asset names, so that it also cuts a square tensor Panel Field on its label axis. The conversion removes no column, so the view keeps every asset. A time-varying panel loses only the observations that the returns clock does not hold.
- 9. State the universe. Cut `pr.span` to the asset axis with [`listing_span_view`](@ref). Give it and the asset returns to [`returns_universe_masks`](@ref), which projects the span onto the returns clock and intersects it with finiteness. [`attach_universe_masks`](@ref) puts the two masks on the Asset Panel and keeps its Panel Fields. When the `PricesResult` holds no panel, it makes a panel with no Panel Field. A `PricesResult` with no span states no universe, so the function attaches no masks, and the panel is the one of step 8, or `nothing`.
+ 9. State the universe. Cut `pr.span` to the asset axis with [`listing_span_view`](@ref). Give it and the asset returns to [`returns_universe_masks`](@ref), which projects the span onto the returns clock and intersects it with finiteness. [`attach_universe_masks`](@ref) puts the two masks on the Asset Panel and keeps its Panel Fields. When the `PricesResult` holds no Panel Field, it makes a panel with `pf = nothing`, or gives `nothing` when both masks are all true, because those masks state nothing that the finiteness of the returns does not state. A `PricesResult` with no span states no universe, so the function attaches no masks, and the panel is the one of step 8, or `nothing`.
 10. Build the factor and benchmark matrices from the columns of each block. A block with no column gives `nothing`, and a benchmark block with one column gives a vector. The asset matrix is always present, because the conversion removes no column.
 11. Build the Exogenous Series from its columns, or `nothing` when `pr.E` is `nothing`. It is converted with the assets, so it takes the same `ret_method`, the same `padding` and the same Gap Return rule, and a gap in it stays `NaN`.
 12. Return the [`ReturnsResult`](@ref).
@@ -424,10 +425,7 @@ ReturnsResult
     ts ┼ Vector{Dates.Date}: [Dates.Date("2020-01-02"), Dates.Date("2020-01-03")]
     iv ┼ nothing
   ivpa ┼ nothing
-   pnl ┼ AssetPanel
-       │     pf ┼ Vector{PortfolioOptimisers.AbstractPanelField}: PortfolioOptimisers.AbstractPanelField[]
-       │   amsk ┼ 2×2 PortfolioOptimisers.AllTrueMask
-       │   emsk ┴ 2×2 PortfolioOptimisers.AllTrueMask
+   pnl ┴ nothing
 ```
 
 # Related

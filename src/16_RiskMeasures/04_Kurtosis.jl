@@ -1,63 +1,38 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the square root kurtosis risk measure.
+Measures the fourth central moment of the portfolio returns, or its square root, from the cokurtosis matrix `kt`.
 
-Computes portfolio risk as the square root of the fourth central moment (kurtosis) of the return distribution, optionally using custom weights, expected returns, and a kurtosis (fourth moment) matrix. This risk measure can be evaluated using either the full or semi (downside) deviations, depending on the algorithm provided.
+The moment is the quadratic form of ``\\boldsymbol{w} \\otimes \\boldsymbol{w}`` in ``\\mathbf{K}``. It is not divided by the square of the variance, so it is not the kurtosis coefficient, and it is not an excess kurtosis. `alg` selects the quantity that the measure reports: [`SOCRiskExpr`](@ref) reports ``\\sqrt{m_4}``, and each of the [`QuadSecondMomentFormulations`](@ref) reports ``m_4``. The functor and the model read the same matrix, so [`expected_risk`](@ref) gives the value that a bound of the measure holds.
+
+[`set_risk_constraints!`](@ref) states the model, and neither model is exact. When `N` is `nothing`, the model is problem 13 of [pkurt](@cite), which replaces ``\\boldsymbol{w} \\boldsymbol{w}^\\intercal`` with a lifted matrix and drops the condition that the lift has rank one. When `N` is an integer, the model is the sum of squared quadratic forms of [pkurtapprox](@cite), and a larger `N` is more accurate and more expensive. The library calls the first model the exact formulation and the second the approximate formulation, because only the second truncates the cokurtosis. The `## Relaxation` of each method states the gap.
+
+!!! warning
+
+    With an integer `N`, the model bounds the approximate moment of [`cokurtosis_spectrum`](@ref), which lies at or below the moment of the matrix. The functor reads the whole matrix, so it reports the full moment, and the value at the solved weights can lie above the bound of the model.
+
+!!! info
+
+    The matrix states the moment, so the centre, the observation weights and the tail of the moment belong to the estimator that makes the matrix. A semi-moment needs a lower semi-cokurtosis, such as `kt = Cokurtosis(; alg = SemiMoment())`, and a weighted moment needs a weighted cokurtosis, such as `kt = Cokurtosis(; w = w)`. A lower semi-cokurtosis gives the heuristic of Section 3.1 of [pkurt](@cite). It clips the deviations of each asset, not the deviations of the portfolio, so its moment is not the semi-moment of the portfolio returns. The measures that compute a fourth moment from the returns are [`HighOrderMoment`](@ref) with [`FourthMoment`](@ref), which gives ``m_4``, and [`LowOrderMoment`](@ref) with [`EvenMoment`](@ref) at `p = 2`, which gives ``\\sqrt{m_4}``. Each takes observation weights, a Moment Target and a [`SemiMoment`](@ref) of its own.
 
 # Mathematical definition
-
-Let ``\\boldsymbol{x} = \\mathbf{X} \\boldsymbol{w}`` be the ``T \\times 1`` vector of portfolio returns, and let ``\\mu`` be the chosen centre (mean, weighted mean, or user-supplied value). Define the centred deviations:
-
-```math
-\\begin{align}
-\\delta_t &= x_t - \\mu\\,.
-\\end{align}
-```
-
-The fourth central moment (full moment) is:
-
-```math
-\\begin{align}
-m_4(\\boldsymbol{w}) &= \\frac{1}{T} \\sum_{t=1}^{T} \\delta_t^4\\,.
-\\end{align}
-```
-
-The same quantity in the ``N^2 \\times N^2`` cokurtosis matrix ``\\hat{\\mathbf{K}}``, with the Kronecker product ``\\otimes``, is:
-
-```math
-\\begin{align}
-m_4(\\boldsymbol{w}) &= (\\boldsymbol{w}^\\intercal \\otimes \\boldsymbol{w}^\\intercal)\\, \\hat{\\mathbf{K}}\\, (\\boldsymbol{w} \\otimes \\boldsymbol{w})\\,.
-\\end{align}
-```
-
-For the semi (downside) variant, only non-positive deviations contribute:
-
-```math
-\\begin{align}
-m_4^{-}(\\boldsymbol{w}) &= \\frac{1}{T} \\sum_{t=1}^{T} \\min(\\delta_t, 0)^4\\,.
-\\end{align}
-```
-
-The risk is the fourth moment itself under a quadratic formulation, and its square root under a second-order cone formulation. `alg2` selects between them, and `alg1` selects between the full and the semi moment:
 
 ```math
 \\begin{align}
 \\mathrm{Kurt}(\\boldsymbol{w}) &= \\begin{cases}
-  \\sqrt{m_4(\\boldsymbol{w})} & \\text{(\\texttt{SOCRiskExpr})} \\\\
-  m_4(\\boldsymbol{w}) & \\text{(quadratic formulation)}
-\\end{cases}\\,.
+  \\sqrt{m_4(\\boldsymbol{w})} & \\text{under } \\texttt{SOCRiskExpr}\\,, \\\\
+  m_4(\\boldsymbol{w}) & \\text{under } \\texttt{QuadRiskExpr}\\,,\\ \\texttt{SquaredSOCRiskExpr}\\,,\\ \\texttt{RSOCRiskExpr}\\,.
+\\end{cases}
 \\end{align}
 ```
 
 Where:
 
+  - $(math_dict[:m4_port])
+  - $(math_dict[:K_cokurt])
   - $(math_dict[:w_port])
-  - ``\\mathbf{X}``: ``T \\times N`` asset returns matrix.
-  - $(math_dict[:T])
-  - ``\\delta_t``: Centred portfolio return at period ``t``.
-  - ``\\hat{\\mathbf{K}}``: ``N^2 \\times N^2`` cokurtosis matrix.
-  - ``\\otimes``: Kronecker product.
+
+``m_4`` is the observation mean of the fourth power of the centred portfolio returns when ``\\mathbf{K}`` is the sample cokurtosis about the per-asset centres. That is Equation 4 of [pkurt](@cite).
 
 # Fields
 
@@ -67,13 +42,9 @@ $(DocStringExtensions.FIELDS)
 
     Kurtosis(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
-        w::Option{<:ObsWeights} = nothing,
-        mu::Option{<:MuSlot} = nothing,
         kt::Option{<:KtSlot} = nothing,
         N::Option{<:Integer} = nothing,
-        alg1::AbstractMomentAlgorithm = FullMoment(),
-        alg2::SecondMomentFormulation = SOCRiskExpr(),
-        pe::Option{<:AbstractPriorEstimator} = nothing,
+        alg::SecondMomentFormulation = SOCRiskExpr(),
         mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
     ) -> Kurtosis
 
@@ -81,41 +52,22 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `mu` is not `nothing`:
-
-      + `::Number`: `isfinite(mu)`.
-      + `::VecNum`: `!isempty(mu)` and `all(isfinite, mu)`.
-
-  - $(val_dict[:oow_rm])
-
-  - If `kt` is not `nothing`:
-
-      + `!isempty(kt)` and `size(kt, 1) == size(kt, 2)`.
-
-      + If `mu` is not `nothing`:
-
-          * `::VecNum`: `length(mu)^2 == size(kt, 1)`.
-          * `::VecScalar`: `length(mu.v)^2 == size(kt, 1)`.
-
+  - If `kt` is a matrix: `!isempty(kt)` and `size(kt, 1) == size(kt, 2)`.
   - If `N` is not `nothing`: must be positive.
-
-!!! warning
-
-    `mu` and `kt` are stated independently, so nothing makes them agree with each other. A caller who wants one consistent set names `pe` alone and lets it fill both from a single fit. A caller who states them by hand must make sure that they agree.
 
 !!! info
 
-    `kt` also admits a [`CokurtosisEstimator`](@ref) or an [`AbstractPriorEstimator`](@ref), and `mu` an [`AbstractExpectedReturnsEstimator`](@ref) or an [`AbstractPriorEstimator`](@ref). Either is resolved against the optimisation's own prior — see [`resolve_deferred_quantities`](@ref). A cokurtosis estimator in `kt` also supplies `mu` from its own `me`, so that the tensor and the centre it was taken about come out of **one** object. A deferred slot wins over `pe`.
+    `kt` also admits a [`CokurtosisEstimator`](@ref) or an [`AbstractPriorEstimator`](@ref), which [`resolve_deferred_quantities`](@ref) resolves against the prior of the optimisation. The measure carries one deferrable slot, so it takes no `pe`.
 
-# `JuMP` Formulations
+# Functor
 
-## Exact
+    (r::Kurtosis)(w::VecNum)
 
-This formulation is used when `N` is `nothing`. It is the parametric model of [pkurt](@cite).
+Computes ``\\sqrt{m_4(\\boldsymbol{w})}`` or ``m_4(\\boldsymbol{w})`` from the matrix `r.kt`, with [`portfolio_fourth_moment`](@ref). The functor reads `kt` as it stands, so a measure whose `kt` is `nothing` or a **Deferred Quantity** needs [`factory`](@ref) with a [`HighOrderPrior`](@ref) result first.
 
-## Approximate
+## Arguments
 
-This formulation is used when `N` is an integer, the larger the value of `N`, the more accurate and expensive it becomes. It is the sum-of-squared-quadratic-forms model of [pkurtapprox](@cite).
+  - $(arg_dict[:pw])
 
 # Examples
 
@@ -126,33 +78,43 @@ Kurtosis
            │   scale ┼ Float64: 1.0
            │      ub ┼ nothing
            │     rke ┴ Bool: true
-         w ┼ nothing
-        mu ┼ nothing
         kt ┼ nothing
          N ┼ nothing
-      alg1 ┼ FullMoment()
-      alg2 ┼ SOCRiskExpr()
-        pe ┼ nothing
+       alg ┼ SOCRiskExpr()
   mtx_sqrt ┴ EigenFallbackSquareRoot()
+
+julia> X = [0.02 -0.01; -0.01 0.03; 0.03 -0.02; -0.04 0.01; 0.01 0.02];
+
+julia> w = [0.6, 0.4];
+
+julia> Kurtosis(; kt = cokurtosis(Cokurtosis(), X))(w)
+0.00025455401627160726
+
+julia> LowOrderMoment(; alg = EvenMoment())(w, X)
+0.00025455401627159604
 ```
+
+The sample cokurtosis about the mean of each asset gives the root of the fourth moment of the portfolio returns about their mean, so the two values agree.
 
 # Related
 
   - [`RiskMeasure`](@ref)
   - [`RiskMeasureSettings`](@ref)
-  - [`FullMoment`](@ref)
-  - [`SemiMoment`](@ref)
   - [`HighOrderPrior`](@ref)
   - [`LowOrderPrior`](@ref)
   - [`SOCRiskExpr`](@ref)
   - [`QuadSecondMomentFormulations`](@ref)
   - [`NegativeSkewness`](@ref)
+  - [`HighOrderMoment`](@ref): the fourth moment of the returns, with [`FourthMoment`](@ref).
+  - [`EvenMoment`](@ref): the root of the fourth moment of the returns, at `p = 2`.
   - [`resolve_deferred_quantities`](@ref)
   - [`expected_risk`](@ref)
+  - [`portfolio_fourth_moment`](@ref)
+  - [`set_risk_constraints!`](@ref): states both models and their relaxations.
 
 # References
 
-  - $(ref_dict[:pkurt])
+  - $(ref_dict[:pkurt]) Section 2, Equation 4, and Section 3.1, Problem 13.
   - $(ref_dict[:pkurtapprox])
 """
 @concrete struct Kurtosis <: RiskMeasure
@@ -160,14 +122,6 @@ Kurtosis
     $(field_dict[:settings_rm])
     """
     settings
-    """
-    $(field_dict[:oow])
-    """
-    w
-    """
-    $(field_dict[:mu_slot])
-    """
-    mu
     """
     $(field_dict[:kt_slot])
     """
@@ -177,205 +131,78 @@ Kurtosis
     """
     N
     """
-    $(field_dict[:alg1])
+    $(field_dict[:alg])
     """
-    alg1
-    """
-    $(field_dict[:alg2])
-    """
-    alg2
-    """
-    $(field_dict[:pe_rm])
-    """
-    pe
+    alg
     """
     Square-root algorithm of the projected co-kurtosis matrix ``\\mathbf{S}_2 \\mathbf{K} \\mathbf{S}_2^\\intercal`` that the exact formulation reads, or `nothing` for the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. A sample co-kurtosis of ``T`` observations has rank at most ``T``, so the projected matrix is singular when ``N(N+1)/2 > T`` and no matrix processing repairs it. The default takes the square root of the eigendecomposition of such a matrix. [`matrix_square_root`](@ref) states each algorithm. The approximate formulation reads no square root.
     """
     mtx_sqrt
-    function Kurtosis(settings::RiskMeasureSettings, w::Option{<:ObsWeights},
-                      mu::Option{<:MuSlot}, kt::Option{<:KtSlot}, N::Option{<:Integer},
-                      alg1::AbstractMomentAlgorithm, alg2::SecondMomentFormulation,
-                      pe::Option{<:AbstractPriorEstimator},
+    function Kurtosis(settings::RiskMeasureSettings, kt::Option{<:KtSlot},
+                      N::Option{<:Integer}, alg::SecondMomentFormulation,
                       mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm})
-        assert_returns_source(returns_source(pe), (nothing,), :Kurtosis, "pe.x_src")
-        mu_flag = isa(mu, VecNum)
-        kt_flag = isa(kt, MatNum)
-        if mu_flag
-            @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
-            @argcheck(all(isfinite, mu), IsNonFiniteError("mu must be finite, got $mu"))
-        elseif isa(mu, Number)
-            @argcheck(isfinite(mu), IsNonFiniteError("mu must be finite, got $mu"))
-        end
-        assert_observation_weights(w, :w)
-        if kt_flag
+        if isa(kt, MatNum)
             @argcheck(!isempty(kt), IsEmptyError("kt cannot be empty"))
             assert_matrix_issquare(kt, :kt)
-        end
-        if mu_flag && kt_flag
-            @argcheck(length(mu)^2 == size(kt, 1),
-                      DimensionMismatch("length(mu)^2 ($(length(mu)^2)) must match size(kt, 1) ($(size(kt, 1)))"))
-        elseif isa(mu, VecScalar) && kt_flag
-            @argcheck(length(mu.v)^2 == size(kt, 1),
-                      DimensionMismatch("length(mu.v)^2 ($(length(mu.v)^2)) must match size(kt, 1) ($(size(kt, 1)))"))
         end
         if !isnothing(N)
             @argcheck(N > zero(N), DomainError(N, "N must be positive"))
         end
-        return new{typeof(settings), typeof(w), typeof(mu), typeof(kt), typeof(N),
-                   typeof(alg1), typeof(alg2), typeof(pe), typeof(mtx_sqrt)}(settings, w,
-                                                                             mu, kt, N,
-                                                                             alg1, alg2, pe,
-                                                                             mtx_sqrt)
+        return new{typeof(settings), typeof(kt), typeof(N), typeof(alg), typeof(mtx_sqrt)}(settings,
+                                                                                           kt,
+                                                                                           N,
+                                                                                           alg,
+                                                                                           mtx_sqrt)
     end
 end
 function Kurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                  w::Option{<:ObsWeights} = nothing, mu::Option{<:MuSlot} = nothing,
                   kt::Option{<:KtSlot} = nothing, N::Option{<:Integer} = nothing,
-                  alg1::AbstractMomentAlgorithm = FullMoment(),
-                  alg2::SecondMomentFormulation = SOCRiskExpr(),
-                  pe::Option{<:AbstractPriorEstimator} = nothing,
+                  alg::SecondMomentFormulation = SOCRiskExpr(),
                   mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())::Kurtosis
-    return Kurtosis(settings, w, mu, kt, N, alg1, alg2, pe, mtx_sqrt)
+    return Kurtosis(settings, kt, N, alg, mtx_sqrt)
+end
+function (r::Kurtosis{<:Any, <:Any, <:Any, <:SOCRiskExpr})(w::VecNum)
+    return sqrt(portfolio_fourth_moment(r.kt, w))
+end
+function (r::Kurtosis{<:Any, <:Any, <:Any, <:QuadSecondMomentFormulations})(w::VecNum)
+    return portfolio_fourth_moment(r.kt, w)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Resolve every **Deferred Quantity** held by [`Kurtosis`](@ref) `r` against prior result `pr`.
+Resolve a **Deferred Quantity** in the `kt` slot of [`Kurtosis`](@ref) `r` against prior result `pr`.
 
-Three passes, in order.
-
- 1. A deferred `mu` resolves on its own.
- 2. A deferred `kt` resolves next, and it carries the centre with it. `kt` is a moment **about** a centre, so the two are one pair of quantities out of one object: when `mu` is still unstated, [`deferred_centre`](@ref) reads it off the cokurtosis estimator's own `me`, threads it into the fit as `mean =`, and it becomes the resolved `mu`. A stated `mu` wins and is threaded in its place. An [`AbstractPriorEstimator`](@ref) centres itself, so the centre is read back off the prior result it produced.
- 3. `pe` fans out into whatever both passes left `nothing`.
-
-A deferred slot therefore **wins over `pe`**, which is the map's precedence rule one level down. `kt` lives on a [`HighOrderPrior`](@ref), so a prior estimator named in `kt` or `pe` must compute one.
+`kt` is the one slot of the measure that a prior can supply, so the slot holds the estimator itself, and no other slot reads its fit. A cokurtosis estimator centres the matrix on its own `me`. A prior estimator gives the cokurtosis of its [`HighOrderPrior`](@ref). A measure whose `kt` is not a **Deferred Quantity** returns unchanged.
 
 # Related
 
   - [`Kurtosis`](@ref)
   - [`resolve_deferred_quantities`](@ref)
-  - [`deferred_centre`](@ref)
-  - [`fan_out_slot`](@ref)
-  - [`fit_deferred_quantity`](@ref)
+  - [`resolve_slot`](@ref)
 """
 function resolve_deferred_quantities(r::Kurtosis, pr::AbstractPriorResult,
                                      ::Any = nothing)::Kurtosis
-    if isnothing(r.pe) && !isa(r.mu, DeferredQuantity) && !isa(r.kt, DeferredQuantity)
-        return r
-    end
-    mu = resolve_slot(r.mu, :mu, pr)
-    kt = r.kt
-    if isa(kt, DeferredQuantity)
-        centre = isnothing(mu) ? deferred_centre(kt, pr) : mu
-        fitted = fit_deferred_moment(kt, pr, centre)
-        kt = deferred_quantity(fitted, :kt)
-        mu = nothing_scalar_array_selector(centre, deferred_derived_quantity(fitted, :mu))
-    end
-    return fan_out_pe(r, r.pe, pr, (; mu = mu, kt = kt))
+    return r
+end
+function resolve_deferred_quantities(r::Kurtosis{<:Any, <:DeferredQuantity},
+                                     pr::AbstractPriorResult, ::Any = nothing)::Kurtosis
+    return rebuild_with_slots(r, (; kt = resolve_slot(r.kt, :kt, pr)))
 end
 # Deferrable slots — see `deferred_slots`.
-deferred_slots(r::Kurtosis) = (; mu = r.mu, kt = r.kt, pe = r.pe)
-"""
-    calc_moment_target(::Kurtosis{<:Any, Nothing, Nothing, ...}, ::Any, x::VecNum)
-    calc_moment_target(r::Kurtosis{<:Any, <:ObsWeights, Nothing, ...}, ::Any, x::VecNum)
-    calc_moment_target(r::Kurtosis{<:Any, <:Any, <:VecNum, ...}, w::VecNum, ::Any)
-    calc_moment_target(r::Kurtosis{<:Any, <:Any, <:VecScalar, ...}, w::VecNum, ::Any)
-    calc_moment_target(r::Kurtosis{<:Any, <:Any, <:Number, ...}, ::Any, ::Any)
-
-Compute the target value for kurtosis moment calculations.
-
-Dispatches on the type of `r.w` and `r.mu` to select the appropriate centring target. Follows the same rules as [`calc_moment_target`](@ref).
-
-# Related
-
-  - [`Kurtosis`](@ref)
-  - [`calc_moment_target`](@ref)
-  - [`calc_deviations_vec`](@ref)
-"""
-function calc_moment_target(::Kurtosis{<:Any, Nothing, Nothing, <:Any, <:Any, <:Any, <:Any},
-                            ::Any, x::VecNum)
-    return Statistics.mean(x)
-end
-function calc_moment_target(r::Kurtosis{<:Any, <:ObsWeights, Nothing, <:Any, <:Any, <:Any,
-                                        <:Any}, ::Any, x::VecNum)
-    return Statistics.mean(x, r.w)
-end
-function calc_moment_target(r::Kurtosis{<:Any, <:Any, <:VecNum, <:Any, <:Any, <:Any, <:Any},
-                            w::VecNum, ::Any)
-    return LinearAlgebra.dot(w, r.mu)
-end
-function calc_moment_target(r::Kurtosis{<:Any, <:Any, <:VecScalar, <:Any, <:Any, <:Any,
-                                        <:Any}, w::VecNum, ::Any)
-    return LinearAlgebra.dot(w, r.mu.v) + r.mu.s
-end
-function calc_moment_target(r::Kurtosis{<:Any, <:Any, <:Number, <:Any, <:Any, <:Any, <:Any},
-                            ::Any, ::Any)
-    return r.mu
-end
+deferred_slots(r::Kurtosis) = (; kt = r.kt)
+# The functor reads `kt` as it stands, so an empty `kt` is refused on a value-level route —
+# see `functor_slots`.
+functor_slots(r::Kurtosis) = (; kt = r.kt)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Compute the vector of deviations from the target value for [`Kurtosis`](@ref) risk measures.
+Create an instance of [`Kurtosis`](@ref) that holds its cokurtosis matrix, from the measure or from the [`HighOrderPrior`](@ref) result `pr`.
 
-See [`calc_deviations_vec`](@ref) for details.
+# Algorithm
 
-# Related
-
-  - [`Kurtosis`](@ref)
-  - [`calc_deviations_vec`](@ref)
-  - [`calc_moment_target`](@ref)
-"""
-function calc_deviations_vec(r::Kurtosis, w::VecNum, X::MatNum,
-                             fees::Option{<:Fees} = nothing)
-    x = calc_net_returns(w, X, fees)
-    tgt = calc_moment_target(r, w, x) - moment_target_fees(r.mu, w, fees, length(x))
-    return x .- tgt
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Compute the vector of deviations from the target value for a precomputed returns series for [`Kurtosis`](@ref).
-
-Single-argument form used by the precomputed-returns functor `r(x::VecNum)`.
-
-# Related
-
-  - [`Kurtosis`](@ref)
-  - [`calc_deviations_vec`](@ref)
-  - [`calc_moment_target`](@ref)
-"""
-function calc_deviations_vec(r::Kurtosis, x::VecNum)
-    return x .- calc_moment_target(r, nothing, x)
-end
-function moment_risk(r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any, <:Any,
-                                 <:Any, <:FullMoment, <:SOCRiskExpr}, val::VecNum)
-    val .= val .^ 4
-    return sqrt(isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w))
-end
-function moment_risk(r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any, <:Any,
-                                 <:Any, <:SemiMoment, <:SOCRiskExpr}, val::VecNum)
-    val = min.(val, zero(eltype(val)))
-    val .= val .^ 4
-    return sqrt(isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w))
-end
-function moment_risk(r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any, <:Any,
-                                 <:Any, <:FullMoment, <:QuadSecondMomentFormulations},
-                     val::VecNum)
-    val .= val .^ 4
-    return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
-end
-function moment_risk(r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any, <:Any,
-                                 <:Any, <:SemiMoment, <:QuadSecondMomentFormulations},
-                     val::VecNum)
-    val = min.(val, zero(eltype(val)))
-    val .= val .^ 4
-    return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
-end
-# Evaluation entry points — see `MomentRiskMeasures` in `25_RiskMeasureTools.jl`.
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`Kurtosis`](@ref) by selecting the cokurtosis matrix, expected returns, and weights from the risk-measure instance or falling back to a [`HighOrderPrior`](@ref) result.
+ 1. Resolve a **Deferred Quantity** in `kt` with [`resolve_deferred_quantities`](@ref), giving `r`.
+ 2. Select `kt` with [`nothing_scalar_array_selector`](@ref). A measure that states a matrix keeps it, and a measure whose `kt` is `nothing` takes `pr.kt`.
+ 3. Build a new `Kurtosis` from `kt` and from the `settings`, `N`, `alg` and `mtx_sqrt` of `r`.
 
 # Related
 
@@ -386,38 +213,39 @@ Create an instance of [`Kurtosis`](@ref) by selecting the cokurtosis matrix, exp
 """
 function factory(r::Kurtosis, pr::HighOrderPrior, args...; kwargs...)::Kurtosis
     r = resolve_deferred_quantities(r, pr)
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    mu = nothing_scalar_array_selector(r.mu, pr.mu)
     kt = nothing_scalar_array_selector(r.kt, pr.kt)
-    return Kurtosis(; settings = r.settings, w = w, mu = mu, kt = kt, N = r.N,
-                    alg1 = r.alg1, alg2 = r.alg2, pe = nothing, mtx_sqrt = r.mtx_sqrt)
+    return Kurtosis(; settings = r.settings, kt = kt, N = r.N, alg = r.alg,
+                    mtx_sqrt = r.mtx_sqrt)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Create an instance of [`Kurtosis`](@ref) from a [`LowOrderPrior`](@ref) result (cokurtosis matrix is not used).
+Resolve a **Deferred Quantity** in the `kt` slot of [`Kurtosis`](@ref) `r` against a [`LowOrderPrior`](@ref) result, and otherwise return `r` unchanged.
+
+A [`LowOrderPrior`](@ref) holds no cokurtosis matrix, so the method has no matrix to take from `pr`. A cokurtosis estimator in `kt` needs only the returns of the result, so it resolves here too. The functor and the model need a matrix. A value-level entry point refuses a measure whose `kt` is `nothing`, and so does [`set_risk_constraints!`](@ref).
 
 # Related
 
   - [`Kurtosis`](@ref)
   - [`LowOrderPrior`](@ref)
   - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
 """
 function factory(r::Kurtosis, pr::LowOrderPrior, args...; kwargs...)::Kurtosis
-    r = resolve_deferred_quantities(r, pr)
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    mu = nothing_scalar_array_selector(r.mu, pr.mu)
-    kt = nothing_scalar_array_selector(r.kt, nothing)
-    return Kurtosis(; settings = r.settings, w = w, mu = mu, kt = kt, N = r.N,
-                    alg1 = r.alg1, alg2 = r.alg2, pe = nothing, mtx_sqrt = r.mtx_sqrt)
+    return resolve_deferred_quantities(r, pr)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a view of [`Kurtosis`](@ref) `r` sliced to asset indices `i`.
 
-Slices both the cokurtosis matrix `kt` and the expected returns `mu` for cluster-based optimisation.
+The view of a stated matrix agrees with the cokurtosis that a refit on the assets `i` gives. A **Deferred Quantity** and `nothing` pass through unsliced, and a **Deferred Quantity** resolves on the subset.
+
+# Algorithm
+
+ 1. Return `r` unchanged when `kt` is not a matrix.
+ 2. Compute `idx`, the rows and columns of `kt` that belong to the pairs of assets in `i`, with [`fourth_moment_index_generator`](@ref). The number of assets is the square root of the size of `kt`.
+ 3. Build a new `Kurtosis` from the view of `kt` at `idx` and from the other fields of `r`.
 
 # Related
 
@@ -427,39 +255,16 @@ Slices both the cokurtosis matrix `kt` and the expected returns `mu` for cluster
   - [`fourth_moment_index_generator`](@ref)
 """
 function port_opt_view(r::Kurtosis, i, args...)::Kurtosis
-    mu = r.mu
     kt = r.kt
-    j = nothing
-    j = if isa(mu, VecNum)
-        length(mu)
-    elseif isa(kt, MatNum)
-        isqrt(size(kt, 1))
+    if !isa(kt, MatNum)
+        return r
     end
-    if !isnothing(j) && !isnothing(kt)
-        idx = fourth_moment_index_generator(j, i)
-        kt = nothing_scalar_array_view(kt, idx)
-    end
-    mu = nothing_scalar_array_view(mu, i)
-    return Kurtosis(; settings = r.settings, w = r.w, mu = mu, kt = kt, N = r.N,
-                    alg1 = r.alg1, alg2 = r.alg2, pe = r.pe, mtx_sqrt = r.mtx_sqrt)
+    idx = fourth_moment_index_generator(isqrt(size(kt, 1)), i)
+    return Kurtosis(; settings = r.settings, kt = nothing_scalar_array_view(kt, idx),
+                    N = r.N, alg = r.alg, mtx_sqrt = r.mtx_sqrt)
 end
 
 # Expected-risk input kind — see `risk_input_kind`.
-risk_input_kind(::Kurtosis) = WeightsReturnsFeesInput()
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return whether [`Kurtosis`](@ref) `r` supports precomputed-return evaluation.
-
-Delegates to [`weight_independent_target`](@ref) on `r.mu`: `true` iff the target is
-`Nothing`, a `Number`, or a [`MedianCenteringFunction`](@ref); `false` for per-asset targets.
-
-# Related
-
-  - [`supports_precomputed_returns`](@ref)
-  - [`weight_independent_target`](@ref)
-  - [`Kurtosis`](@ref)
-"""
-supports_precomputed_returns(r::Kurtosis) = weight_independent_target(r.mu)
+risk_input_kind(::Kurtosis) = WeightsInput()
 
 export Kurtosis

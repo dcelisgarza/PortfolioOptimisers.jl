@@ -194,19 +194,26 @@ using Test, TOML
         @test mc.counts["src/c.jl"]["raw"] == 2
         rm(joinpath(dir, "src", "c.jl"))
 
-        recorded = TOML.parse(P.render(m1, Dict{String, Any}(), false))
-        failures, provenance_ok = P.verify(m1, recorded)
+        # `render` and `verify` read the fixture Rulings. The committed ones name paths that the
+        # fixture does not hold, and `render` printed each of them as a dead path.
+        rulings = Dict{String, Any}("perf_dismissal" => [dismissal],
+                                    "thresholds" => Dict{String, Any}("perf_reviewed" => 1),
+                                    "rationale" => Dict{String, Any}("fixture" => Dict()))
+        recorded = TOML.parse(P.render(m1, Dict{String, Any}(), false; rulings))
+        failures, provenance_ok = P.verify(m1, recorded; rulings)
         @test provenance_ok
         @test isempty(failures)
 
-        # Without the Dismissal the slice counts again, and the row recorded 0.
-        failures, _ = P.verify(m0, recorded)
+        # Without the Dismissal the slice counts again, and the row recorded 0. The rise prints
+        # a GitHub annotation and a step summary under CI, so neither reaches the run's page.
+        failures, _ = withenv("GITHUB_STEP_SUMMARY" => nothing) do
+            return redirect_stdout(() -> P.verify(m0, recorded; rulings), devnull)
+        end
         @test any(f -> occursin("performance ratchet tripped on 1", f), failures)
 
         # An added file enters at zero reviewed Findings.
         write(joinpath(dir, "src", "b.jl"), "k(x) = maximum(abs.(x))\n")
-        m2 = P.measure(; root = dir, files = ["src/a.jl", "src/b.jl"],
-                       rulings = Dict{String, Any}("perf_dismissal" => [dismissal]))
-        @test_throws P.CodeHealth.RefreshRefused P.render(m2, recorded, true)
+        m2 = P.measure(; root = dir, files = ["src/a.jl", "src/b.jl"], rulings)
+        @test_throws P.CodeHealth.RefreshRefused P.render(m2, recorded, true; rulings)
     end
 end

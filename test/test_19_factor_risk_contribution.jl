@@ -288,6 +288,23 @@ end
                                                                               p = 0.05)])
     @test !haskey(m, :sdp_plg_1) && haskey(m, :sdp_plg_2) && haskey(m, :sdp_plg_p_2)
 
+    # Under `MaximumRatio` a variance states its objective term on a lift of the objective.
+    # The lift holds the factor block of the same matrix, so the rows read it and the risk
+    # holds the penalty down (#1912). The rows keep the linked pair of factors from both
+    # carrying weight.
+    m = build(Variance(), MaximumRatio())
+    @test haskey(m, :lift_frc_W) && haskey(m, :frc_sdp_plg_1)
+    @test !haskey(m, :frc_sdp_plg_p_1)
+    w1 = JuMP.value.(m[:w1]) / k_of(m)
+    @test abs(w1[1] * w1[2]) < 1e-5
+    @test abs(w1[1]) > 0.5
+    # A relatedness matrix that links no pair binds nothing, so the tangency weights are
+    # those of the head with no phylogeny.
+    ratio_w(ple) = optimise(FactorRiskContribution(; r = Variance(), obj = MaximumRatio(),
+                                                   opt = opt, frc_ple = ple), rd).w
+    @test isapprox(ratio_w(SemiDefinitePhylogeny(; A = zeros(Int, 3, 3), p = 0.05)),
+                   ratio_w(nothing); atol = 1e-6)
+
     # An estimator resolves on the factor returns, and a keyword that the head does not read
     # does not reach it.
     res = optimise(FactorRiskContribution(; opt = opt,

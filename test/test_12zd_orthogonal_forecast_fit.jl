@@ -231,6 +231,12 @@ PortfolioOptimisers.return_forecast_step(::OfitStepProbe, P, csfm, fs, cre) = :w
         long = TargetReturnForecast(; scores = scores(), half_life = 1e6)
         f = ofit_split(OrthogonalPartCalibration(), long, q).rf
         @test f.ocalib / f.calib ≈ 1 + var(q.L[:, 2]; corrected = false) rtol = 0.05
+        # A member that a cross-validation estimator calibrates is not a fold of the carry, so
+        # it reads `κ⊥` from the out-of-fold prediction of the batch fit.
+        kf = TargetReturnForecast(; scores = scores(), cv = KFold(; n = 3))
+        fk = ofit_split(OrthogonalPartCalibration(), kf, q).rf
+        @test isfinite(fk.calib) && isfinite(fk.ocalib)
+        @test fk.ocalib / fk.calib > 1
         # A ratio that is not finite is a warm-up, and gives the zero split.
         warm = TargetReturnForecastResult(; mu = [1.0, 2.0], calib = NaN, ocalib = NaN)
         z = po.orthogonal_forecast_rescale(OrthogonalPartCalibration(), warm, [1.0],

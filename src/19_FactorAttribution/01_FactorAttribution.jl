@@ -489,7 +489,7 @@ A [`Regression`](@ref) fits one loadings matrix over the whole sample, so it alw
 
 # Returns
 
-  - `Ms::Union{<:MatNum, <:Arr3Num}`: The exposure history `observations × assets × factors`, or the static loadings `assets × factors`.
+  - `Ms::Union{MatNum, Arr3Num}`: The exposure history `observations × assets × factors`, or the static loadings `assets × factors`.
 
 # Related
 
@@ -580,7 +580,7 @@ A realised [`factor_attribution`](@ref) of a cross-validation reads it to find t
 function attribution_row_key(::AbstractLoadingsRegressionResult)
     return (; idx = nothing, ts = nothing)
 end
-function attribution_row_key(rr::Union{<:CrossSectionalFactorModel, <:Regression})
+function attribution_row_key(rr::Union{CrossSectionalFactorModel, Regression})
     return (; idx = rr.idx, ts = rr.ts)
 end
 """
@@ -1103,7 +1103,7 @@ function attribution_investable_diagnostic(held::AbstractVector{<:Integer},
         return nothing
     end
     strict_diagnostic("a factor attribution cannot decompose a holding in an asset the prior could not estimate. Assets $(held) are not investable, and $(holder). $(note). Pass `strict = true` to refuse instead, reduce the weights to the investable universe, or refit the prior over a history that covers these assets.",
-                      strict)
+                      strict; id = @log_id(holder, note))
     return nothing
 end
 """

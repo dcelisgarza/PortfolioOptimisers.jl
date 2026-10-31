@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Collect one list-valued argument of a [`CrossSectionalFactorPrior`](@ref) into a vector of Pairs.
 
-The factors, the Neutralisation and the constrained Factor Families of the prior take the same form. Each takes Pairs in the order the caller writes them, or any `AbstractDict`. A dictionary states no order, so the collected order is its order of iteration. A caller who needs a stated order writes Pairs.
+The factors, the Neutralisation and the constrained Factor Families of the prior take the same form. Each takes Pairs in the order the caller writes them, or any `AbstractDict`. A dictionary states no order, so the collected order is its order of iteration. A caller who needs a stated order writes Pairs. A vector of Pairs with `String` keys is held as it is, not copied, as [`string_key_pairs`](@ref) states.
 
 # Arguments
 
@@ -17,7 +17,7 @@ The factors, the Neutralisation and the constrained Factor Families of the prior
 
 # Returns
 
-  - `pr::Vector{<:Pair}`: The collected Pairs, each with a `String` key.
+  - `pr::AbstractVector{<:Pair{String}}`: The collected Pairs, each with a `String` key.
 
 # Examples
 
@@ -30,10 +30,11 @@ julia> PortfolioOptimisers.cross_sectional_prior_pairs([\"style\" => \"industry\
 # Related
 
   - [`CrossSectionalFactorPrior`](@ref)
+  - [`string_key_pairs`](@ref)
   - [`Dict_VecPair`](@ref)
 """
 function cross_sectional_prior_pairs(x::Dict_VecPair, sym::Sym_Str)
-    pr = [String(first(p)) => last(p) for p in x]
+    pr = string_key_pairs(x)
     @argcheck(!isempty(pr), IsEmptyError("$sym cannot be empty"))
     ks = [first(p) for p in pr]
     @argcheck(allunique(ks), ArgumentError("$sym must not repeat a key, got $ks"))
@@ -73,9 +74,9 @@ function cross_sectional_benchmark_returns(rd::ReturnsResult, name::AbstractStri
     pnl = rd.pnl
     @argcheck(!isnothing(pnl),
               IsNothingError("a Cross-Sectional Factor Prior reads its Factor Exposures off an Asset Panel, and rd.pnl is nothing. Build the ReturnsResult with the `pnl` that asset_panel returns."))
-    @argcheck(all(f -> f.name != name, pnl.pf),
+    @argcheck(all(f -> f.name != name, each_panel_field(pnl)),
               ArgumentError("a Cross-Sectional Factor Prior writes its benchmark weights onto the Panel Field \"$name\", and the Asset Panel already holds a field of that name. Rename the field of the panel, or set the bw of the prior to a name the panel does not use."))
-    pf = push!(Any[pnl.pf...], NumericPanelField(; name = name, vals = W))
+    pf = push!(Any[each_panel_field(pnl)...], NumericPanelField(; name = name, vals = W))
     return ReturnsResult(; nx = rd.nx, X = rd.X, nf = rd.nf, F = rd.F, nb = rd.nb, B = rd.B,
                          ne = rd.ne, E = rd.E, ts = rd.ts, iv = rd.iv, ivpa = rd.ivpa,
                          pnl = AssetPanel(; pf = identity.(pf), amsk = pnl.amsk,
@@ -86,7 +87,7 @@ end
                                            xe::AbstractExposureEstimator,
                                            bw::AbstractString) -> nothing
     assert_cross_sectional_benchmark_field(key::AbstractString,
-                                           xe::Union{<:CompositeExposure, <:DerivedExposure},
+                                           xe::Union{CompositeExposure, DerivedExposure},
                                            bw::AbstractString) -> nothing
 
 Refuse a factor whose Exposure Estimator reads its benchmark weights from a Panel Field the prior does not write.
@@ -123,8 +124,8 @@ function assert_cross_sectional_benchmark_field(key::AbstractString, xe::Observe
     return assert_cross_sectional_benchmark_field(key, xe.xe, bw)
 end
 function assert_cross_sectional_benchmark_field(key::AbstractString,
-                                                xe::Union{<:CompositeExposure,
-                                                          <:DerivedExposure},
+                                                xe::Union{CompositeExposure,
+                                                          DerivedExposure},
                                                 bw::AbstractString)::Nothing
     @argcheck(xe.bw == bw,
               ArgumentError("factor \"$key\" reads its benchmark weights from the Panel Field \"$(xe.bw)\", and the prior writes them onto \"$bw\". Give the Exposure Estimator bw = \"$bw\", or give the prior bw = \"$(xe.bw)\"."))
@@ -636,7 +637,7 @@ The method over `pr` takes the factor prior already fitted on the factors that a
 
  1. Take the columns of `f` at `lv`, giving `fl`. When every factor is in `lv`, `fl` is `f`.
  2. Fit `pe` on `fl`, giving `pr`. The method over `pr` starts at step 3.
- 3. Process the covariance of `pr` in place with `f_mp`, over `fl`, with [`matrix_processing_block!`](@ref). A factor prior with a warm-up can state `NaN` for one factor and finite moments for the others, so the processing reads the block of the finite variances, and every entry outside it keeps its `NaN`. A covariance with no finite variance has no block, and is not processed.
+ 3. Process the covariance of `pr` in place with `f_mp`, over `fl`, with [`matrix_processing_block!`](@ref). The denoising step reads the count of the covariance of `pr` from [`moment_observation_count`](@ref), and not the number of rows of `fl`. A factor prior with a warm-up can state `NaN` for one factor and finite moments for the others, so the processing reads the block of the finite variances, and every entry outside it keeps its `NaN`. A covariance with no finite variance has no block, and is not processed.
  4. When every factor is in `lv`, return the scenarios, the mean and the covariance of `pr`. Otherwise, write them into the columns at `lv` of a zero scenario matrix `X`, the entries at `lv` of a zero mean `mu`, and the block at `lv` of a zero covariance `sigma`.
  5. Divide the scenario weights of `pr` by their sum with [`cross_sectional_scenario_weights`](@ref).
 
@@ -662,7 +663,7 @@ The method over `pr` takes the factor prior already fitted on the factors that a
   - `mu::VecNum`: The expected factor returns on the whole factor axis. A mean that `pr` does not state is `NaN`.
   - `sigma::MatNum`: The processed factor covariance on the whole factor axis. The row and the column of a factor that the factor prior states no variance for are `NaN`.
   - `w`: The scenario weights of `pr` divided by their sum, or `nothing`.
-  - `ens`, `kld`, `ow`: The effective number of scenarios, the Kullback-Leibler divergence and the original weights of `pr`.
+  - `ens`, `eoc`, `kld`, `ow`: The effective number of scenarios, the effective counts of the moments, the Kullback-Leibler divergence and the original weights of `pr`.
 
 # Related
 
@@ -691,7 +692,8 @@ function cross_sectional_factor_moments(pr::LowOrderPrior,
     # the finite variances, and the `NaN` frame around it stays as it is. With no finite
     # variance there is no block, and the assembly refuses the fit by name (#1510).
     if any(isfinite, LinearAlgebra.diag(pr.sigma))
-        matrix_processing_block!(f_mp, pr.sigma, fl; kwargs...)
+        matrix_processing_block!(f_mp, pr.sigma, fl, moment_observation_count(pr, 2);
+                                 kwargs...)
     end
     if live
         X, mu, sigma = pr.X, pr.mu, pr.sigma
@@ -705,7 +707,8 @@ function cross_sectional_factor_moments(pr::LowOrderPrior,
         sigma[lv, lv] = pr.sigma
     end
     return (; X = X, mu = mu, sigma = sigma, w = cross_sectional_scenario_weights(pr.w),
-            ens = pr.ens, kld = pr.kld, ow = pr.ow, pc = opinion_pooling_cache(pr))
+            ens = pr.ens, eoc = pr.eoc, kld = pr.kld, ow = pr.ow,
+            pc = opinion_pooling_cache(pr))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -757,9 +760,9 @@ Where:
 function cross_sectional_scenario_weights(::Nothing)
     return nothing
 end
-function cross_sectional_scenario_weights(w::Union{<:StatsBase.Weights,
-                                                   <:StatsBase.AnalyticWeights,
-                                                   <:StatsBase.ProbabilityWeights})
+function cross_sectional_scenario_weights(w::Union{StatsBase.Weights,
+                                                   StatsBase.AnalyticWeights,
+                                                   StatsBase.ProbabilityWeights})
     s = sum(w)
     @argcheck(s > zero(s),
               DomainError(s,
@@ -775,26 +778,14 @@ end
 
 Degrees of freedom and divisor of each idiosyncratic variance of a Cross-Sectional Factor Prior.
 
-A cross-sectional fit spends its parameters on the assets of each period, not on the observations of each asset. Observation ``t`` regresses ``n_{t}`` eligible assets on ``K`` factors, and on an intercept when the fit has one. So the ``\\sum_{t} n_{t}`` residuals keep the fraction ``\\phi`` of their degrees of freedom, and the variance of each asset takes that fraction of the effective count that its variance estimator reads.
+A cross-sectional fit spends its parameters on the assets of each period, not on the observations of each asset. The variance of each asset takes the fraction of its degrees of freedom that the fits leave, and [`cross_sectional_residual_dof`](@ref) states the fraction. It reads the residual count that the fit of each period records in `csr.edof`, because only the fit knows the parameters that it spent: the number of columns overstates the spend of a rank-deficient period and of a penalised fit. Under the default exponentially weighted variance, the law of the variance is an approximation, so the level of a bound that reads these counts is also approximate.
 
-# Mathematical definition
+# Algorithm
 
-```math
-\\begin{align}
-\\phi &= \\dfrac{\\sum_{t} \\left(n_{t} - p\\right)}{\\sum_{t} n_{t}}\\,, \\\\
-\\nu_{i} &= \\phi \\, n_{i}^{\\mathrm{eff}}\\,.
-\\end{align}
-```
+The method that Julia selects is the algorithm.
 
-Where:
-
-  - ``\\phi``: Fraction of the degrees of freedom that the fit leaves.
-  - ``n_{t}``: Number of eligible assets at observation ``t``, `csr.n`.
-  - ``p``: Number of parameters of each period, the columns of `csr.f` plus one when `csr.b` is set.
-  - ``\\nu_{i}``: Degrees of freedom of the idiosyncratic variance of asset ``i``.
-  - ``n_{i}^{\\mathrm{eff}}``: Effective count of the observations of asset ``i``, `cnt.n`.
-
-The fraction spreads the spend evenly over the assets. On a balanced panel of ``T`` observations and ``N`` assets with no intercept, ``\\nu_{i} = T (N - K) / N`` when ``n_{i}^{\\mathrm{eff}} = T``. Under the default exponentially weighted variance, the law of the variance is an approximation, so the level of a bound that reads these counts is also approximate.
+ 1. `cnt` is `nothing`: the variance estimator states no count, so neither count is known.
+ 2. `cnt` is a count: scale the effective count `cnt.n` of each asset with [`cross_sectional_residual_dof`](@ref), and take the divisor `cnt.m`. A fit that records no count states no degrees of freedom.
 
 # Arguments
 
@@ -803,22 +794,21 @@ The fraction spreads the spend evenly over the assets. On a balanced panel of ``
 
 # Returns
 
-  - `(; edof, ediv)::NamedTuple`: The degrees of freedom and the divisor of each variance, both `nothing` when the variance estimator states no count.
+  - `(; edof, ediv)::NamedTuple`: The degrees of freedom and the divisor of each variance. Both are `nothing` when the variance estimator states no count, and `edof` alone is `nothing` when the fit records no count.
 
 # Related
 
   - [`CrossSectionalFactorPrior`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
   - [`variance_count`](@ref)
+  - [`cross_sectional_residual_dof`](@ref)
   - [`ResidualInflation`](@ref)
 """
 function cross_sectional_variance_counts(::Nothing, ::CrossSectionalRegression)
     return (; edof = nothing, ediv = nothing)
 end
 function cross_sectional_variance_counts(cnt::NamedTuple, csr::CrossSectionalRegression)
-    p = size(csr.f, 2) + !isnothing(csr.b)
-    phi = sum(nt - p for nt in csr.n) / sum(csr.n)
-    return (; edof = phi * cnt.n, ediv = cnt.m)
+    return (; edof = cross_sectional_residual_dof(csr.edof, csr.n, cnt.n), ediv = cnt.m)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1620,7 +1610,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the Systematic Repair rule of a [`CrossSectionalFactorPrior`](@ref), the rule that says whether the lift repairs the systematic block before it adds the idiosyncratic block.
 
-[`cross_sectional_lift`](@ref) projects the factor covariance onto the investable assets. The result is the systematic block, whose rank is at most the number of factors. So the block is not positive definite when the investable assets outnumber the factors, and a repair under `mp.pdm` moves it by round-off alone. The lift then adds the idiosyncratic block and repairs the sum under the estimator that [`matrix_processing_posdef`](@ref) gives for `mp`, under every rule. The rule decides only which steps of `mp` run on the systematic block before the sum.
+[`cross_sectional_lift`](@ref) projects the factor covariance onto the investable assets. The result is the systematic block, whose rank is at most the number of factors. So the block is not positive definite when the investable assets outnumber the factors, and a repair under `mp.pdm` moves it by round-off alone. The lift then adds the idiosyncratic block and repairs the sum under the estimator that [`matrix_processing_posdef`](@ref) gives for `mp`, under every rule. The rule decides only which steps of `mp` run on the systematic block before the sum. `nothing` in the place of a rule is the default, and it does not repair the systematic block: it runs every step of `mp` except the `:pdm` step, as [`systematic_processing!`](@ref) states.
 
 # Interfaces
 
@@ -1628,7 +1618,7 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ## `systematic_processing!`
 
-  - `systematic_processing!(srep::MySystematicRepair, mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum; kwargs...) -> MatNum`: Processes the systematic block `sigma` in place under `mp`, and returns it.
+  - `systematic_processing!(srep::MySystematicRepair, mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, T::Real; kwargs...) -> MatNum`: Processes the systematic block `sigma` in place under `mp`, and returns it. A denoising step reads the ratio of `T` to the number of columns of `X`.
 
 ### Arguments
 
@@ -1636,6 +1626,7 @@ In order to implement a new concrete type that works seamlessly with the library
   - `mp`: The matrix processing estimator of the prior.
   - `sigma`: The systematic block, `investable assets × investable assets`.
   - `X`: The asset return scenarios of the investable assets, `scenarios × investable assets`.
+  - `T`: The effective number of observations of the factor covariance that the block projects.
   - `kwargs...`: Additional keyword arguments passed to the steps of `mp`.
 
 ### Returns
@@ -1645,7 +1636,6 @@ In order to implement a new concrete type that works seamlessly with the library
 # Related
 
   - [`SystematicRepair`](@ref)
-  - [`NoSystematicRepair`](@ref)
   - [`systematic_processing!`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
   - [`cross_sectional_lift`](@ref)
@@ -1730,7 +1720,7 @@ The answer states an entry exactly when the model determines it. An asset of ``\
 
  1. Take `Li`, the rows of `L` at the investable assets. Get `D` and `R` from [`cross_sectional_residual_block`](@ref).
  2. Project the factor mean through `Li`, giving `mui`, and the factor covariance, giving `si`, each with [`support_product`](@ref).
- 3. Process `si` under `srep` with [`systematic_processing!`](@ref). [`SystematicRepair`](@ref) runs every step of `mp`, as [`factor_lift`](@ref) does, and [`NoSystematicRepair`](@ref) runs every step except the `:pdm` step.
+ 3. Process `si` under `srep` with [`systematic_processing!`](@ref), at the count `T` of the factor covariance. [`SystematicRepair`](@ref) runs every step of `mp`, as [`factor_lift`](@ref) does, and `nothing` runs every step except the `:pdm` step.
  4. Add `D` to `si`, and make the sum positive definite under the estimator that [`matrix_processing_posdef`](@ref) gives for `mp`.
  5. Take the ready factors of `f_mu` and `f_sigma` with [`cross_sectional_ready_factors`](@ref), and `lf`, the ready factors whose column of `f_sigma` over the ready factors is not zero. Take the square root `Lf` of the block of `f_sigma` at `lf` under `mtx_sqrt`, and write it into the block at `lf` of a zero matrix `Cf`.
  6. Build `ci`, the low-rank square root `[Li * Cf  R]`.
@@ -1747,6 +1737,7 @@ The answer states an entry exactly when the model determines it. An asset of ``\
   - `esigma`: The idiosyncratic variances, or the idiosyncratic covariance.
   - `idx`: The investable assets.
   - `Xs`: The asset return scenarios, `scenarios × assets`, which the processing reads.
+  - `T`: The effective number of observations of `f_sigma`, which the denoising step reads. It is `size(Xs, 1)` by default.
   - $(arg_dict[:mtx_sqrt])
 
 # Validation
@@ -1772,10 +1763,11 @@ The answer states an entry exactly when the model determines it. An asset of ``\
   - [`AbstractSystematicRepair`](@ref)
   - [`systematic_processing!`](@ref)
 """
-function cross_sectional_lift(srep::AbstractSystematicRepair,
+function cross_sectional_lift(srep::Option{<:AbstractSystematicRepair},
                               mp::AbstractMatrixProcessingEstimator, L::MatNum,
                               f_mu::VecNum, f_sigma::MatNum, esigma::VecNum_MatNum,
-                              idx::AbstractVector{<:Integer}, Xs::MatNum;
+                              idx::AbstractVector{<:Integer}, Xs::MatNum,
+                              T::Real = size(Xs, 1);
                               mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
                               kwargs...)
     @argcheck(size(L, 2) == length(f_mu) == size(f_sigma, 1),
@@ -1786,7 +1778,7 @@ function cross_sectional_lift(srep::AbstractSystematicRepair,
     # so each product reads the factor moments on the support of the loadings alone (#1510).
     mui = support_product(Li, f_mu)
     si = support_product(Li, f_sigma, Li)
-    systematic_processing!(srep, mp, si, view(Xs, :, idx); kwargs...)
+    systematic_processing!(srep, mp, si, view(Xs, :, idx), T; kwargs...)
     si .+= D
     posdef!(matrix_processing_posdef(mp), si)
     rdy = cross_sectional_ready_factors(f_mu, f_sigma)

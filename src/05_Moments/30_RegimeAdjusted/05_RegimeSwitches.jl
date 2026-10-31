@@ -22,7 +22,6 @@ ExactDebias()
 
   - [`AbstractRegimeDebias`](@ref)
   - [`LawDebias`](@ref)
-  - [`RawStatistic`](@ref)
   - [`regime_bias_table`](@ref)
 """
 struct ExactDebias <: AbstractRegimeDebias end
@@ -52,40 +51,16 @@ LawDebias()
 """
 struct LawDebias <: AbstractRegimeDebias end
 """
-$(DocStringExtensions.TYPEDEF)
-
-Scores the raw regime statistic, with no correction of the bias of the estimated variance it reads.
-
-Every observation above `min_obs` is scored. The mean of the statistic is above the one the method assumes, by 7 % at a half-life of 10 and 1.7 % at a half-life of 40 for the root mean square, so the regime multiplier is too large on average.
-
-# Constructors
-
-    RawStatistic() -> RawStatistic
-
-# Examples
-
-```jldoctest
-julia> RegimeAdjustedExpWeightedVariance(; debias = RawStatistic()).debias
-RawStatistic()
-```
-
-# Related
-
-  - [`AbstractRegimeDebias`](@ref)
-  - [`ExactDebias`](@ref)
-  - [`LawDebias`](@ref)
-"""
-struct RawStatistic <: AbstractRegimeDebias end
-"""
-    debiases(::Union{ExactDebias, LawDebias}) -> Bool
-    debiases(::RawStatistic) -> Bool
+    debiases(::AbstractRegimeDebias) -> Bool
+    debiases(::Nothing) -> Bool
 
 Whether the regime statistic corrects the bias of the estimate it reads.
 
+With `debias = nothing`, the statistic is raw. Every observation above `min_obs` is scored. The mean of the statistic is above the one the method assumes, by 7 % at a half-life of 10 and 1.7 % at a half-life of 40 for the root mean square, so the regime multiplier is too large on average.
+
 # Returns
 
-  - `flag::Bool`: `true` for [`ExactDebias`](@ref) and [`LawDebias`](@ref), `false` for
-    [`RawStatistic`](@ref).
+  - `flag::Bool`: `true` for every [`AbstractRegimeDebias`](@ref), such as [`ExactDebias`](@ref) and [`LawDebias`](@ref), and `false` for `nothing`.
 
 # Related
 
@@ -93,15 +68,15 @@ Whether the regime statistic corrects the bias of the estimate it reads.
   - [`reads_dependence`](@ref)
   - [`regime_bias_open`](@ref)
 """
-function debiases(::Union{ExactDebias, LawDebias})
+function debiases(::AbstractRegimeDebias)
     return true
 end
-function debiases(::RawStatistic)
+function debiases(::Nothing)
     return false
 end
 """
     reads_dependence(::ExactDebias) -> Bool
-    reads_dependence(::Union{LawDebias, RawStatistic}) -> Bool
+    reads_dependence(::Option{<:LawDebias}) -> Bool
 
 Whether the bias of the regime statistic reads the dependence of the deviation on the estimate,
 which an estimated location puts in.
@@ -109,7 +84,7 @@ which an estimated location puts in.
 # Returns
 
   - `flag::Bool`: `true` for [`ExactDebias`](@ref), `false` for [`LawDebias`](@ref) and
-    [`RawStatistic`](@ref).
+    `nothing`.
 
 # Related
 
@@ -120,39 +95,15 @@ which an estimated location puts in.
 function reads_dependence(::ExactDebias)
     return true
 end
-function reads_dependence(::Union{LawDebias, RawStatistic})
+function reads_dependence(::Option{<:LawDebias})
     return false
 end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Lets a HAC-adjusted product enter the variance recursion as it is, negative or not. This is the default floor rule.
-
-A HAC term adds the lagged products of the deviations to the square, so it can be negative. Under returns with no autocorrelation each term has the mean of the variance, and the recursion is an unbiased quadratic form. Only the variance that the estimator returns is floored at zero.
-
-# Constructors
-
-    NoHacFloor() -> NoHacFloor
-
-# Examples
-
-```jldoctest
-julia> RegimeAdjustedExpWeightedVariance().hac_floor
-NoHacFloor()
-```
-
-# Related
-
-  - [`AbstractHacFloor`](@ref)
-  - [`PerTermHacFloor`](@ref)
-"""
-struct NoHacFloor <: AbstractHacFloor end
-"""
-$(DocStringExtensions.TYPEDEF)
-
 Floors each HAC-adjusted square at zero before it enters the variance recursion.
 
-The floor removes the negative part of each term, so the mean of a term is above the variance. Under returns with no autocorrelation the variance is 6.7 %, 16 % and 41 % too large at one, two and five lags.
+The floor removes the negative part of each term, so the mean of a term is above the variance. Under returns with no autocorrelation the variance is 6.7 %, 16 % and 41 % too large at one, two and five lags. The default `hac_floor = nothing` puts no floor on a term.
 
 # Constructors
 
@@ -168,14 +119,16 @@ PerTermHacFloor()
 # Related
 
   - [`AbstractHacFloor`](@ref)
-  - [`NoHacFloor`](@ref)
+  - [`hac_floor!`](@ref)
 """
 struct PerTermHacFloor <: AbstractHacFloor end
 """
-    hac_floor!(::NoHacFloor, X2::VecNum, valid::AbstractVector{<:Bool})
+    hac_floor!(::Nothing, X2::VecNum, valid::AbstractVector{<:Bool})
     hac_floor!(::PerTermHacFloor, X2::VecNum, valid::AbstractVector{<:Bool})
 
 Applies the floor rule to the HAC-adjusted squares of the valid assets.
+
+With no rule, each HAC-adjusted product enters the variance recursion as it is, negative or not. Under returns with no autocorrelation each term then has the mean of the variance, and the recursion is an unbiased quadratic form. Only the variance that the estimator returns is floored at zero.
 
 # Arguments
 
@@ -184,13 +137,13 @@ Applies the floor rule to the HAC-adjusted squares of the valid assets.
 
 # Returns
 
-  - `X2`: The squares, unchanged under [`NoHacFloor`](@ref), and floored at zero on the valid assets under [`PerTermHacFloor`](@ref).
+  - `X2`: The squares, unchanged under `nothing`, and floored at zero on the valid assets under [`PerTermHacFloor`](@ref).
 
 # Related
 
   - [`AbstractHacFloor`](@ref)
 """
-function hac_floor!(::NoHacFloor, X2::VecNum, ::AbstractVector{<:Bool})
+function hac_floor!(::Nothing, X2::VecNum, ::AbstractVector{<:Bool})
     return X2
 end
 function hac_floor!(::PerTermHacFloor, X2::VecNum, valid::AbstractVector{<:Bool})
@@ -270,7 +223,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Standardises each product of the separate correlation path by the bias-corrected variance. This is the default rule.
 
-The variance state is seeded at zero, so after ``K`` steps it holds ``1 - \\lambda^{K}`` times the variance. A product divided by the raw state thus carries the weight ``1 / (1 - \\lambda^{K})``, which falls with ``K``. The correlation cancels a scale that is the same for every product, but not this one, so in the warm-up the first products weigh more than the weights that the bias tables of [`PortfolioTarget`](@ref) assume. This rule divides the state by ``1 - \\lambda^{K}`` first. At 4 uncorrelated assets and 20 observations it moved the factor of `PortfolioTarget` from 3.5 % high to 0.05 %, and at 12 assets with a correlation of 0.5 from 8.0 % to 1.7 %. The steady state does not change.
+The variance state is seeded at zero, so after ``K`` steps it holds ``1 - \\lambda^{K}`` times the variance. A product divided by the raw state thus carries the weight ``1 / (1 - \\lambda^{K})``, which falls with ``K``. The correlation cancels a scale that is the same for every product, but not this one, so in the warm-up the first products weigh more than the weights that the bias tables of [`PortfolioTarget`](@ref) assume. This rule divides the state by ``1 - \\lambda^{K}`` first. At 4 uncorrelated assets and 20 observations it moved the factor of `PortfolioTarget` from 3.5 % high to 0.05 %, and at 12 assets with a correlation of 0.5 from 8.0 % to 1.7 %. The steady state does not change. `cor_vol = nothing` reads the raw state, the rule of the oracle.
 
 # Constructors
 
@@ -286,40 +239,16 @@ BiasCorrectedVolatility()
 # Related
 
   - [`AbstractCorrelationVolatility`](@ref)
-  - [`RawVolatility`](@ref)
   - [`correlation_variance`](@ref)
 """
 struct BiasCorrectedVolatility <: AbstractCorrelationVolatility end
 """
-$(DocStringExtensions.TYPEDEF)
-
-Standardises each product of the separate correlation path by the raw variance state, seeded at zero.
-
-This is the rule of the oracle. In the warm-up it weighs the first products of the correlation more than the bias tables of [`PortfolioTarget`](@ref) assume. The steady state is the same as under [`BiasCorrectedVolatility`](@ref).
-
-# Constructors
-
-    RawVolatility() -> RawVolatility
-
-# Examples
-
-```jldoctest
-julia> RegimeAdjustedExpWeightedCovariance(; cor_vol = RawVolatility()).cor_vol
-RawVolatility()
-```
-
-# Related
-
-  - [`AbstractCorrelationVolatility`](@ref)
-  - [`BiasCorrectedVolatility`](@ref)
-  - [`correlation_variance`](@ref)
-"""
-struct RawVolatility <: AbstractCorrelationVolatility end
-"""
     correlation_variance(::BiasCorrectedVolatility, v::VecNum, decay::Number, K::AbstractVector{<:Integer})
-    correlation_variance(::RawVolatility, v::VecNum, decay::Number, K::AbstractVector{<:Integer})
+    correlation_variance(::Nothing, v::VecNum, decay::Number, K::AbstractVector{<:Integer})
 
 The variance that standardises each product of the separate correlation path.
+
+With `cor_vol = nothing`, each product divides by the raw variance state, seeded at zero. This is the rule of the oracle. In the warm-up it weighs the first products of the correlation more than the bias tables of [`PortfolioTarget`](@ref) assume. The steady state is the same as under [`BiasCorrectedVolatility`](@ref).
 
 # Arguments
 
@@ -329,7 +258,7 @@ The variance that standardises each product of the separate correlation path.
 
 # Returns
 
-  - `v::VecNum`: `v` divided by its weight ``1 - \\lambda^{K}`` under [`BiasCorrectedVolatility`](@ref), and `v` unchanged under [`RawVolatility`](@ref).
+  - `v::VecNum`: `v` divided by its weight ``1 - \\lambda^{K}`` under [`BiasCorrectedVolatility`](@ref), and `v` unchanged under `nothing`.
 
 # Related
 
@@ -339,9 +268,70 @@ function correlation_variance(::BiasCorrectedVolatility, v::VecNum, decay::Numbe
                               K::AbstractVector{<:Integer})
     return v ./ max.(one(decay) .- decay .^ K, eps(decay))
 end
-function correlation_variance(::RawVolatility, v::VecNum, ::Number,
-                              ::AbstractVector{<:Integer})
+function correlation_variance(::Nothing, v::VecNum, ::Number, ::AbstractVector{<:Integer})
     return v
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+States whether the estimator runs the variance and the correlation at separate decays.
+
+A `cor_decay` of `nothing` states one decay for the whole matrix, and a `cor_decay` equal to
+`decay` states the same recursion in two places. Both take the single covariance recursion, so
+the cache allocates no correlation state.
+
+# Arguments
+
+  - `ce`: Regime-adjusted exponentially weighted covariance estimator.
+
+# Returns
+
+  - `flag::Bool`: `true` where `cor_decay` is not `nothing` and differs from `decay`.
+
+# Related
+
+  - [`RegimeAdjustedExpWeightedCovariance`](@ref)
+  - [`RegimeAdjustedCovarianceState`](@ref)
+"""
+function has_separate_cor_decay(ce::RegimeAdjustedExpWeightedCovariance)
+    return !isnothing(ce.cor_decay) && !isapprox(ce.cor_decay, ce.decay)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the effective number of observations of the correlation of a regime-adjusted covariance over `n` rows.
+
+The denoising step processes the correlation, so the count is the count of the correlation. Under a separate correlation decay, the correlation reads the pre-centred law at `cor_decay`, as the regime bias does. Otherwise it reads `decay` and the centring of the estimator. The count ignores the regime multiplier and the lags of a HAC adjustment, as [`variance_count`](@ref) does.
+
+# Arguments
+
+  - `ce`: Regime-adjusted exponentially weighted covariance estimator.
+  - `n`: Number of rows.
+
+# Returns
+
+  - `T_e::Number`: The effective number of observations, from [`exp_weighted_covariance_count`](@ref).
+
+# Related
+
+  - [`effective_observation_count`](@ref)
+  - [`has_separate_cor_decay`](@ref)
+  - [`exp_weighted_covariance_count`](@ref)
+"""
+function regime_correlation_count(ce::RegimeAdjustedExpWeightedCovariance, n::Integer)
+    return if has_separate_cor_decay(ce)
+        exp_weighted_covariance_count(ce.cor_decay, n, PreCentred())
+    else
+        exp_weighted_covariance_count(ce.decay, n, ce.centring)
+    end
+end
+function effective_observation_count(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum;
+                                     kwargs...)
+    return regime_correlation_count(ce, size(X, 1))
+end
+function effective_observation_count(ce::RegimeAdjustedExpWeightedCovariance,
+                                     state::RegimeAdjustedCovarianceState; kwargs...)
+    return regime_correlation_count(ce, observation_count(state))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -399,7 +389,7 @@ The product is the outer product of the deviations, with the HAC products where 
 
 # Returns
 
-  - `F::Union{<:Number, <:MatNum}`: The `N × N` matrix of the factors, or one.
+  - `F::Union{Number, MatNum}`: The `N × N` matrix of the factors, or one.
 
 # Related
 
@@ -536,8 +526,8 @@ end
 function indefinite_block(::ScoreIndefiniteBlock, C::MatNum, ::Bool)
     return C
 end
-export ExactDebias, LawDebias, RawStatistic, NoHacFloor, PerTermHacFloor,
-       VolatilityBeforeUpdate, VolatilityAfterUpdate, BiasCorrectedVolatility,
-       RawVolatility, RefuseIndefiniteWarmUp, ClipIndefiniteBlock, ScoreIndefiniteBlock
+export ExactDebias, LawDebias, PerTermHacFloor, VolatilityBeforeUpdate,
+       VolatilityAfterUpdate, BiasCorrectedVolatility, RefuseIndefiniteWarmUp,
+       ClipIndefiniteBlock, ScoreIndefiniteBlock
 public debiases, reads_dependence, hac_floor!, volatility_before_update,
        correlation_variance, indefinite_block

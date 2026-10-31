@@ -257,8 +257,8 @@ The method for an `AbstractPreprocessingEstimator` or an `AbstractPreprocessingR
   - [`AbstractPreprocessingEstimator`](@ref)
   - [`AbstractPreprocessingResult`](@ref)
 """
-function apply_preprocessing(fitted::Union{<:AbstractPreprocessingEstimator,
-                                           <:AbstractPreprocessingResult}, data)
+function apply_preprocessing(fitted::Union{AbstractPreprocessingEstimator,
+                                           AbstractPreprocessingResult}, data)
     return throw(ArgumentError("$(typeof(fitted)) subtypes AbstractPreprocessingEstimator or AbstractPreprocessingResult but does not implement apply_preprocessing. Extension authors: a preprocessing estimator must implement both halves of the interface, fit_preprocessing(est, data) -> fitted and apply_preprocessing(fitted, data) -> data′; a stateless estimator returns itself from fit_preprocessing and does the work here."))
 end
 """
@@ -285,8 +285,8 @@ The fallback returns `false`, which makes no promise. A fold whose steps make no
   - [`AbstractPreprocessingResult`](@ref)
   - [`AbstractAssetSelector`](@ref)
 """
-function keeps_observations(::Union{<:AbstractPreprocessingEstimator,
-                                    <:AbstractPreprocessingResult})::Bool
+function keeps_observations(::Union{AbstractPreprocessingEstimator,
+                                    AbstractPreprocessingResult})::Bool
     return false
 end
 export fit_preprocessing, apply_preprocessing

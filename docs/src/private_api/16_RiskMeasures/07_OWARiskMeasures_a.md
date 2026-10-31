@@ -17,6 +17,8 @@ OrderedWeightsArrayFormulation
 assert_owa_formulation_weights(::OrderedWeightsArrayFormulation, ::VecNum)
 OWA_RevFunc
 OWA_CalOccupant
+owa_constraint_scale
+owa_objective_scale
 owa_l_moment_crm_sumsq_obj
 ncrra_weights
 owa_model_setup

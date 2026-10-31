@@ -167,7 +167,9 @@ Return the homogenisation variable `model[:k]`.
 A ratio objective such as [`MaximumRatio`](@ref) solves for the scaled weights ``k \\boldsymbol{w}``, and [`process_model`](@ref) divides the solved weights by `k`. Two builders register `k`, and a head reaches one of them. The error message names both.
 
   - [`set_maximum_ratio_factor_variables!`](@ref) registers a variable ``k \\geq 0`` under [`MaximumRatio`](@ref), and the number `1` under any other objective. Every head that builds an objective calls it.
-  - [`_set_risk_budgeting_constraints!`](@ref) declares a free variable `k`, because its log barrier fixes the scale. The same head calls [`set_unit_budget!`](@ref), so a builder that reads [`effective_k`](@ref) gets `1` and not the free variable.
+  - [`_set_risk_budgeting_constraints!`](@ref) declares a variable ``k \\geq k_{\\min} \\geq 0``, because its log barrier fixes the scale of the unscaled weights. [`risk_budgeting_scale_floor`](@ref) sizes the floor. The same head calls [`set_unit_budget!`](@ref), so a builder that reads [`effective_k`](@ref) gets `1` and not the variable.
+
+Both builders bound `k` below by zero. A row ``\\boldsymbol{a}^\\intercal \\boldsymbol{y} \\leq c\\, k`` of the scaled weights ``\\boldsymbol{y} = k \\boldsymbol{w}`` states ``\\boldsymbol{a}^\\intercal \\boldsymbol{w} \\leq c`` only when ``k > 0``.
 
 # Validation
 
@@ -182,7 +184,7 @@ A ratio objective such as [`MaximumRatio`](@ref) solves for the scaled weights `
 """
 function get_k(model::JuMP.Model)
     @argcheck(haskey(model, :k),
-              ArgumentError("model[:k] (homogenisation variable) has not been registered. A head registers it either through set_maximum_ratio_factor_variables! (objective-shaped heads: MeanRisk, FactorRiskContribution, NearOptimalCentering, RelaxedRiskBudgeting) or through _set_risk_budgeting_constraints!, whose log barrier declares a free k (RiskBudgeting). Call the one that matches the head before any builder that reads k."))
+              ArgumentError("model[:k] (homogenisation variable) has not been registered. A head registers it either through set_maximum_ratio_factor_variables! (objective-shaped heads: MeanRisk, FactorRiskContribution, NearOptimalCentering, RelaxedRiskBudgeting) or through _set_risk_budgeting_constraints!, whose log barrier declares k >= kmin >= 0 (RiskBudgeting). Call the one that matches the head before any builder that reads k."))
     return model[:k]
 end
 """
@@ -190,7 +192,7 @@ end
 
 Record that the head fixed the budget scale of the model to one.
 
-A head calls it when its own constraints make the formulation invariant to scale, so a builder can use the number `1` in place of the homogenisation variable `k`. [`RiskBudgeting`](@ref) is the only such head. Its log barrier fixes the scale, and it normalises the weights after the solve. `k` stays a free variable under this record. The budget scale is one, and `k` is not a constant.
+A head calls it when its own constraints make the formulation invariant to scale, so a builder can use the number `1` in place of the homogenisation variable `k`. [`RiskBudgeting`](@ref) is the only such head. Its log barrier fixes the scale, and it normalises the weights after the solve. `k` stays a variable ``k \\geq k_{\\min} \\geq 0`` under this record. The budget scale is one, and `k` is not a constant.
 
 # Returns
 

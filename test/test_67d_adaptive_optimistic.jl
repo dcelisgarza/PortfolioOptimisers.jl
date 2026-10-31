@@ -1,8 +1,8 @@
 #=
 The adaptive and optimistic rows of the online portfolio selection family's fourth set, as
 ADR 0165 rules them (issue #1181 on map #1148): `AdaptiveSubgradient` under
-`DiagonalProjection`, and `OptimisticStep` over `MirrorDescent` with its three Gradient
-Predictors and the hint-residual rate.
+`DiagonalProjection`, and the optimistic step of `MirrorDescent` under its three Gradient
+Predictors and the hint-residual rate (the `predictor` field since #1864).
 
 Every literal below states its provenance: the AdaGrad steps are the composite mirror descent
 of Duchi, Hazan and Singer (2011, Algorithm 1) written out by hand on a two-asset row — the
@@ -83,24 +83,35 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
         @test_throws MethodError AdaptiveSubgradient(; proj = EuclideanProjection())
         # The objective slot is the first-order rule's: a Risk Loss reads the head's rows.
         @test po.rows_needed(AdaptiveSubgradient(; obj = RiskLoss(; window = 5))) == 5
-        @test po.rows_needed(OptimisticStep(;
-                                            alg = GradientProjection(;
-                                                                     obj = RiskLoss(;
-                                                                                    window = 6)))) ==
-              6
+        @test po.rows_needed(GradientProjection(; obj = RiskLoss(; window = 6),
+                                                predictor = LastGradient())) == 6
         # A zero entry is a seminorm, which the geometry takes at its limit (#1777).
         @test po.DiagonalProjection([1.0, 0.0]).h == [1.0, 0.0]
         @test_throws DomainError po.DiagonalProjection([1.0, -0.1])
         @test_throws MethodError po.DiagonalProjection()
         @test po.projection_geometry(ag) == EuclideanProjection()
-        os = OptimisticStep()
-        @test isa(os.alg, MirrorDescent) && isa(os.predictor, LastGradient)
+        os = MirrorDescent(; predictor = LastGradient())
+        @test isa(os.predictor, LastGradient) && isnothing(MirrorDescent().predictor)
         @test os.predictor.at_played
         @test !LastGradient(; at_played = false).at_played
-        @test_throws ArgumentError OptimisticStep(; alg = EGE())
-        @test_throws ArgumentError OptimisticStep(;
-                                                  alg = MirrorDescent(;
-                                                                      grad = RootMeanSquareGradient()))
+        # The optimistic step reads two gradients a period, so a Gradient Transform with a
+        # state is refused with a predictor, and kept without one.
+        @test_throws ArgumentError MirrorDescent(; grad = GradientMomentum(),
+                                                 predictor = LastGradient())
+        @test_throws ArgumentError ExponentiatedGradient(; grad = RootMeanSquareGradient(),
+                                                         predictor = MeanGradient())
+        @test isnothing(EGE().predictor)
+        @test isa(po.rule_state_seed(MirrorDescent(), [0.5, 0.5]), po.MirrorDescentState)
+        @test isa(po.rule_state_seed(os, [0.5, 0.5]), po.OptimisticMirrorDescentState)
+        # The view of the rule views its predictor and keeps the rest.
+        fv = po.port_opt_view(GradientProjection(; eta = 0.2,
+                                                 predictor = ForecastGradient(;
+                                                                              me = SimpleExpectedReturns())),
+                              [1, 3])
+        @test fv.eta == 0.2 &&
+              isa(fv.proj, EuclideanProjection) &&
+              isa(fv.predictor, ForecastGradient)
+        @test isnothing(po.port_opt_view(MirrorDescent(), [1, 3]).predictor)
         # The slot's bound refuses an `Online` wrapper before the name check does.
         @test_throws TypeError ForecastGradient(;
                                                 me = Online(;
@@ -108,12 +119,12 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
         @test_throws DomainError HintResidualRate(; rmax = 0)
         @test po.projection_geometry(os) == EntropicProjection()
         @test po.rows_needed(os) == 0
-        @test po.rows_needed(OptimisticStep(; predictor = MeanGradient())) == 0
-        fg = OptimisticStep(;
-                            predictor = ForecastGradient(;
-                                                         me = PriceLevelExpectedReturns(;
-                                                                                        alg = MovingAverage(;
-                                                                                                            window = 3))))
+        @test po.rows_needed(MirrorDescent(; predictor = MeanGradient())) == 0
+        fg = MirrorDescent(;
+                           predictor = ForecastGradient(;
+                                                        me = PriceLevelExpectedReturns(;
+                                                                                       alg = MovingAverage(;
+                                                                                                           window = 3))))
         @test po.rows_needed(fg) == 2
         # The hint-residual rate on a bare rule is refused at its first read, by name.
         @test_throws ArgumentError optimise(OPS(;
@@ -398,7 +409,7 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
         # last-gradient hint: from v₁ = w₁ = [0.5, 0.5] and x₁ = [1.2, 0.8], g₁ = −[1.2, 0.8],
         # v₂ = Proj([0.62, 0.58]) = [0.52, 0.48] and w₂ = Proj(v₂ + 0.1 [1.2, 0.8]) =
         # Proj([0.64, 0.56]) = [0.54, 0.46].
-        alg = OptimisticStep(; alg = GradientProjection(; eta = 0.1))
+        alg = GradientProjection(; eta = 0.1, predictor = LastGradient())
         w = [0.5, 0.5]
         x = [1.2, 0.8]
         st = po.rule_state_seed(alg, w)
@@ -412,7 +423,7 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
         # The residual of the first period is ‖g₁ − 0‖², and the pair shifts.
         @test st.res == [1.2^2 + 0.8^2, 0.0]
         # The entropic case is two normalised exponential steps.
-        alge = OptimisticStep(; alg = ExponentiatedGradient(; eta = 0.1))
+        alge = ExponentiatedGradient(; eta = 0.1, predictor = LastGradient())
         ste = po.rule_state_seed(alge, w)
         ste, w2e = po.online_update!(alge, ste, w, x, nothing, simplex2)
         v = w .* exp.(0.1 .* x)
@@ -438,8 +449,8 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
         @test isapprox(w3, po.project_simplex(v3 .- 0.1 .* g2); atol = 1e-12)
         @test isapprox(st2.res, [st.res[1] + sum(abs2, g2 .+ x), st.res[1]]; atol = 1e-12)
         # The Mirror-Prox form re-evaluates the period's loss at the new secondary iterate.
-        algp = OptimisticStep(; alg = GradientProjection(; eta = 0.1),
-                              predictor = LastGradient(; at_played = false))
+        algp = GradientProjection(; eta = 0.1,
+                                  predictor = LastGradient(; at_played = false))
         stp = po.rule_state_seed(algp, w)
         stp, w2p = po.online_update!(algp, stp, w, x, nothing, simplex2)
         @test isapprox(stp.v, [0.52, 0.48]; atol = 1e-12)
@@ -451,8 +462,7 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
         @test maxerr(stp.m, st.m) > 5e-3
         @test round.(w2p; digits = 5) == [0.53984, 0.46016]
         # The mean-gradient hint is the running mean, one after the first row.
-        algm = OptimisticStep(; alg = GradientProjection(; eta = 0.1),
-                              predictor = MeanGradient())
+        algm = GradientProjection(; eta = 0.1, predictor = MeanGradient())
         stm = po.rule_state_seed(algm, w)
         @test stm.ps == [0.0, 0.0]
         stm, w2m = po.online_update!(algm, stm, w, x, nothing, simplex2)
@@ -462,29 +472,30 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
         @test isapprox(w3m, po.project_simplex(v3 .- 0.1 .* stm.ps); atol = 1e-12)
     end
 
-    @testset "A zero hint is the wrapped rule, and the mix is the wrapped rule's" begin
+    @testset "A zero hint is the plain step, and the mix is the plain step's" begin
         # A predictor written to the interface: a zero hint, under which the second
-        # half-step is the identity and the optimistic step is the wrapped rule exactly,
+        # half-step is the identity and the optimistic step is the plain step exactly,
         # under every geometry.
-        for md in (GradientProjection(; eta = 0.1), ExponentiatedGradient(; eta = 0.1),
-                   MirrorDescent(; proj = TsallisProjection(), alpha = 0.1),
-                   MirrorDescent(; proj = LogBarrierProjection(), eta = InverseSquareRootRate()))
-            a = libpath(OptimisticStep(; alg = md, predictor = ZeroHint()))
-            b = libpath(md)
+        for kw in ((; proj = EuclideanProjection(), eta = 0.1),
+                   (; proj = EntropicProjection(), eta = 0.1),
+                   (; proj = TsallisProjection(), alpha = 0.1),
+                   (; proj = LogBarrierProjection(), eta = InverseSquareRootRate()))
+            a = libpath(MirrorDescent(; kw..., predictor = ZeroHint()))
+            b = libpath(MirrorDescent(; kw...))
             @test maxerr(a, b) < 1e-14
-            @test maxerr(libpath(OptimisticStep(; alg = md, predictor = FlatHint())), b) <
-                  1e-14
+            @test maxerr(libpath(MirrorDescent(; kw..., predictor = FlatHint())), b) < 1e-14
         end
         # A forecast hint moves the path off the plain step and keeps it on the simplex.
         me = PriceLevelExpectedReturns(; alg = MovingAverage(; window = 3))
-        a = libpath(OptimisticStep(; alg = GradientProjection(; eta = 0.1),
-                                   predictor = ForecastGradient(; me = me)))
+        a = libpath(GradientProjection(; eta = 0.1,
+                                       predictor = ForecastGradient(; me = me)))
         b = libpath(GradientProjection(; eta = 0.1))
         @test maxerr(a, b) > 1e-6
         @test all(isapprox.(sum(a; dims = 2), 1; atol = 1e-12))
         # The forecast hint is the gradient the forecast would give at the secondary point.
-        alg = OptimisticStep(; alg = GradientProjection(; eta = 0.1),
-                             predictor = ForecastGradient(; me = SimpleExpectedReturns()))
+        alg = GradientProjection(; eta = 0.1,
+                                 predictor = ForecastGradient(;
+                                                              me = SimpleExpectedReturns()))
         st = po.rule_state_seed(alg, fill(1 / N, N))
         @test isa(st.ps, po.ForecasterState)
         for t in 1:3
@@ -496,7 +507,7 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
         # The uniform mix reads mixed relatives at the unmixed played iterate — the paper's,
         # over the relatives normalised to a period maximum of one — and plays the mix from
         # the unmixed w_{t+1}.
-        algα = OptimisticStep(; alg = ExponentiatedGradient(; eta = 0.1, alpha = 0.2))
+        algα = ExponentiatedGradient(; eta = 0.1, alpha = 0.2, predictor = LastGradient())
         w = [0.5, 0.5]
         x = [1.2, 0.8]
         stα = po.rule_state_seed(algα, w)
@@ -518,9 +529,10 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
         # mixed ones compressed toward one; the Mirror-Prox hint re-evaluates the loss on the
         # mixed relative the gradient was read on.
         set = resolve(BoundedAllocationSet(), N)
-        md = ExponentiatedGradient(; eta = 0.1, alpha = 0.2)
-        alg = OptimisticStep(; alg = md,
-                             predictor = ForecastGradient(; me = SimpleExpectedReturns()))
+        md = (; eta = 0.1, alpha = 0.2)
+        alg = ExponentiatedGradient(; md...,
+                                    predictor = ForecastGradient(;
+                                                                 me = SimpleExpectedReturns()))
         st = po.rule_state_seed(alg, fill(1 / N, N))
         @test isa(st.ps, po.ForecasterState)
         for t in 1:3
@@ -534,11 +546,11 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
         xhatm = vec(sum(Xm; dims = 1)) ./ 3
         @test maxerr(st.m, -xhatm ./ dot(st.v, xhatm)) > 1e-4
         # A folding price-level statistic sees the same raw path.
-        algf = OptimisticStep(; alg = md,
-                              predictor = ForecastGradient(;
-                                                           me = PriceLevelExpectedReturns(;
-                                                                                          alg = ExponentialMovingAverage(;
-                                                                                                                         alpha = 0.5))))
+        algf = ExponentiatedGradient(; md...,
+                                     predictor = ForecastGradient(;
+                                                                  me = PriceLevelExpectedReturns(;
+                                                                                                 alg = ExponentialMovingAverage(;
+                                                                                                                                alpha = 0.5))))
         stf = po.rule_state_seed(algf, fill(1 / N, N))
         @test isa(stf.ps, po.ForecasterState)
         for t in 1:3
@@ -552,7 +564,7 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
         @test isapprox(stf.m, -xhatf ./ dot(stf.v, xhatf); atol = 1e-12)
         # The Mirror-Prox hint reads the mixed relative at the secondary iterate: the loss
         # the gradient saw, not the traded one.
-        algl = OptimisticStep(; alg = md, predictor = LastGradient(; at_played = false))
+        algl = ExponentiatedGradient(; md..., predictor = LastGradient(; at_played = false))
         w = fill(1 / N, N)
         stl = po.rule_state_seed(algl, w)
         stl, _ = po.online_update!(algl, stl, w, X[1, :], nothing, set)
@@ -561,11 +573,11 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
         @test maxerr(stl.m, -X[1, :] ./ dot(stl.v, X[1, :])) > 1e-4
     end
 
-    @testset "The hint-residual rate and the schedules of the wrapped rule" begin
+    @testset "The hint-residual rate and the schedules of the optimistic step" begin
         # Corollary 2: η_t = rmax · min(1 / (√S_{t−1} + √S_{t−2}), 1), the cap before any
         # residual accrues.
         sched = HintResidualRate(; rmax = 0.5)
-        alg = OptimisticStep(; alg = GradientProjection(; eta = sched))
+        alg = GradientProjection(; eta = sched, predictor = LastGradient())
         w = [0.5, 0.5]
         st = po.rule_state_seed(alg, w)
         @test po.learning_rate(sched, 1, st) == 0.5
@@ -585,16 +597,14 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
               0.5 * min(1 / (sqrt(st.res[1]) + sqrt(st.res[2])), 1)
         @test st.res[2] == 1.2^2 + 0.8^2
         # Over the fixture the rate falls and the path stays on the simplex.
-        W = libpath(OptimisticStep(;
-                                   alg = ExponentiatedGradient(; eta = HintResidualRate())))
+        W = libpath(ExponentiatedGradient(; eta = HintResidualRate(),
+                                          predictor = LastGradient()))
         @test all(isapprox.(sum(W; dims = 2), 1; atol = 1e-12)) && all(W .> 0)
         # Under any schedule the second half-step reads the next period's rate: with
         # c / sqrt(t) the secondary iterate steps at c / sqrt(t) and the played one at
         # c / sqrt(t + 1), by hand over the fixture.
-        Wi = libpath(OptimisticStep(;
-                                    alg = GradientProjection(;
-                                                             eta = InverseSquareRootRate(;
-                                                                                         c = 0.2))))
+        Wi = libpath(GradientProjection(; eta = InverseSquareRootRate(; c = 0.2),
+                                        predictor = LastGradient()))
         Wh = zeros(T, N)
         Wh[1, :] .= 1 / N
         v = fill(1 / N, N)
@@ -605,39 +615,36 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
         end
         @test maxerr(Wi, Wh) < 1e-14
         # The played mix is projected once more where the set excludes the uniform
-        # allocation, as the wrapped rule's is.
+        # allocation, as the plain step's is.
         lbset = BoundedAllocationSet(;
                                      wb = WeightBounds(; lb = [0.3, 0.0, 0.0, 0.0], ub = 1))
-        Wb = libpath(OptimisticStep(; alg = ExponentiatedGradient(; alpha = 0.5));
+        Wb = libpath(ExponentiatedGradient(; alpha = 0.5, predictor = LastGradient());
                      set = lbset)
         @test all(Wb[2:end, 1] .>= 0.3 - 1e-12)
         @test all(isapprox.(sum(Wb; dims = 2), 1; atol = 1e-12))
-        # The wrapped rule's other schedules count the wrapper's periods: the doubling
+        # The other schedules count the periods of the optimistic step: the doubling
         # trick restarts both iterates at the Start Allocation and clears the residuals.
         dt = DoublingTrickRate(; N = 2)
         first_stage = po.doubling_stage(dt, 1)[2]
-        algd = OptimisticStep(; alg = ExponentiatedGradient(; eta = dt))
+        algd = ExponentiatedGradient(; eta = dt, predictor = LastGradient())
         o = po.partial_fit!(OPS(; alg = algd), rows(rd, 1:first_stage))
         @test o.cache.st.n == first_stage
         @test o.cache.st.v == o.cache.st.w0 && o.cache.st.u == o.cache.st.w0
         @test o.cache.st.res == [0.0, 0.0] && all(iszero, o.cache.st.m)
         o = po.partial_fit!(OPS(; alg = algd), rows(rd, 1:(first_stage - 1)))
         @test o.cache.st.v != o.cache.st.w0
-        # The self-confident rate reads the wrapper's carrier.
-        Wsc = libpath(OptimisticStep(;
-                                     alg = ExponentiatedGradient(;
-                                                                 eta = SelfConfidentRate())))
+        # The self-confident rate reads the carrier of the optimistic step.
+        Wsc = libpath(ExponentiatedGradient(; eta = SelfConfidentRate(),
+                                            predictor = LastGradient()))
         @test all(isapprox.(sum(Wsc; dims = 2), 1; atol = 1e-12))
         osc = po.partial_fit!(OPS(;
-                                  alg = OptimisticStep(;
-                                                       alg = ExponentiatedGradient(;
-                                                                                   eta = SelfConfidentRate()))),
+                                  alg = ExponentiatedGradient(; eta = SelfConfidentRate(),
+                                                              predictor = LastGradient())),
                               rows(rd, 1:6))
         @test osc.cache.st.s[1] > 0 && osc.cache.st.s[2] == log(N)
         # Under the mean-gradient hint the residual sum is at most ‖g₁‖² plus twice the
         # spread of the gradients about their mean: 4.066 against 4.113 on the fixture.
-        algv = OptimisticStep(; alg = GradientProjection(; eta = 0.1),
-                              predictor = MeanGradient())
+        algv = GradientProjection(; eta = 0.1, predictor = MeanGradient())
         stv = po.rule_state_seed(algv, fill(1 / N, N))
         G = zeros(T - 1, N)
         for t in 1:(T - 1)
@@ -653,13 +660,14 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
     @testset "The batch-online identity at block sizes 10, 7 and 1" begin
         me = PriceLevelExpectedReturns(; alg = MovingAverage(; window = 3))
         for alg in (AdaptiveSubgradient(), AdaptiveSubgradient(; delta = 0.5, eta = 0.3),
-                    OptimisticStep(), OptimisticStep(; alg = GradientProjection(; eta = 0.2)),
-                    OptimisticStep(; predictor = MeanGradient()),
-                    OptimisticStep(; predictor = LastGradient(; at_played = false)),
-                    OptimisticStep(; alg = GradientProjection(; eta = HintResidualRate()),
-                                   predictor = ForecastGradient(; me = me)),
-                    OptimisticStep(;
-                                   alg = MirrorDescent(; proj = LogBarrierProjection(), alpha = 0.1)))
+                    MirrorDescent(; predictor = LastGradient()),
+                    GradientProjection(; eta = 0.2, predictor = LastGradient()),
+                    MirrorDescent(; predictor = MeanGradient()),
+                    MirrorDescent(; predictor = LastGradient(; at_played = false)),
+                    GradientProjection(; eta = HintResidualRate(),
+                                       predictor = ForecastGradient(; me = me)),
+                    MirrorDescent(; proj = LogBarrierProjection(), alpha = 0.1,
+                                  predictor = LastGradient()))
             opt = OPS(; alg = alg)
             o = po.partial_fit!(opt, rows(rd, 1:10))
             o = po.partial_fit!(o, rows(rd, 11:17))
@@ -671,12 +679,11 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
         end
     end
 
-    @testset "The carrier's views and copies, and the wrapper as an expert" begin
+    @testset "The carrier's views and copies, and the optimistic step as an expert" begin
         # A windowed forecaster is refit from the head's rows, so its carrier is
         # `nothing`; a folding one rides on the carrier and is viewed with it.
         me = PriceLevelExpectedReturns(; alg = MovingAverage(; window = 3))
-        alg = OptimisticStep(; alg = GradientProjection(; eta = 0.1),
-                             predictor = ForecastGradient(; me = me))
+        alg = GradientProjection(; eta = 0.1, predictor = ForecastGradient(; me = me))
         o = po.partial_fit!(OPS(; alg = alg), rows(rd, 1:8))
         st = o.cache.st
         @test isnothing(st.ps)
@@ -686,9 +693,9 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
         @test isapprox(sum(v.cache.st.u), 1; atol = 1e-12)
         @test v.cache.st.res == st.res
         of = po.partial_fit!(OPS(;
-                                 alg = OptimisticStep(;
-                                                      predictor = ForecastGradient(;
-                                                                                   me = SimpleExpectedReturns()))),
+                                 alg = MirrorDescent(;
+                                                     predictor = ForecastGradient(;
+                                                                                  me = SimpleExpectedReturns()))),
                              rows(rd, 1:8))
         @test isa(of.cache.st.ps, po.ForecasterState)
         vf = po.port_opt_view(of, [2, 4])
@@ -700,32 +707,34 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
         @test any(!iszero, st.m) && st.res[1] > 0
         @test_throws ArgumentError po.merge_states(st, st)
         # A mean-gradient carrier is sliced and copied as a vector.
-        om = po.partial_fit!(OPS(; alg = OptimisticStep(; predictor = MeanGradient())),
+        om = po.partial_fit!(OPS(; alg = MirrorDescent(; predictor = MeanGradient())),
                              rows(rd, 1:8))
         vm = po.port_opt_view(om, [1, 2])
         @test vm.cache.st.ps == om.cache.st.ps[1:2]
         cm = copy(om.cache.st)
         @test cm.ps == om.cache.st.ps && !(cm.ps === om.cache.st.ps)
         # The two rules are experts of a mixture and weightings of it.
-        mix = ExpertMixture(; experts = [AdaptiveSubgradient(), OptimisticStep()])
+        mix = ExpertMixture(;
+                            experts = [AdaptiveSubgradient(),
+                                       MirrorDescent(; predictor = LastGradient())])
         r = optimise(OPS(; alg = mix), rows(rd, 1:6))
         @test isapprox(sum(r.w), 1; atol = 1e-12)
         mixw = ExpertMixture(; experts = [ConstantRebalancedPortfolio(), BuyAndHold()],
-                             alg = OptimisticStep())
+                             alg = MirrorDescent(; predictor = LastGradient()))
         r = optimise(OPS(; alg = mixw), rows(rd, 1:6))
         @test isapprox(sum(r.w), 1; atol = 1e-12)
         # Both rules step on a Risk Loss over the head's rows, and stay on the simplex.
         for a in (AdaptiveSubgradient(; obj = RiskLoss(; window = 8)),
-                  OptimisticStep(; alg = GradientProjection(; obj = RiskLoss(; window = 8))),
-                  OptimisticStep(; alg = GradientProjection(; obj = RiskLoss(; window = 8)),
-                                 predictor = LastGradient(; at_played = false)))
+                  GradientProjection(; obj = RiskLoss(; window = 8), predictor = LastGradient()),
+                  GradientProjection(; obj = RiskLoss(; window = 8),
+                                     predictor = LastGradient(; at_played = false)))
             W = libpath(a)
             @test all(isapprox.(sum(W; dims = 2), 1; atol = 1e-12)) && all(W .>= -1e-15)
             @test maxerr(W, libpath(GradientProjection())) > 1e-6
         end
         # The rules run through the walk-forward at test_size = 1.
         cv = IndexWalkForward(4, 1)
-        for a in (AdaptiveSubgradient(), OptimisticStep())
+        for a in (AdaptiveSubgradient(), MirrorDescent(; predictor = LastGradient()))
             pr = cross_val_predict(OPS(; alg = a), rd, cv)
             @test isa(pr, MultiPeriodPredictionResult)
             @test length(pr.pred) == T - 4

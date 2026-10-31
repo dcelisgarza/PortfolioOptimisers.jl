@@ -11,7 +11,7 @@ Description = "Array views, public API of PortfolioOptimisers.jl: port_opt_view,
 ```@docs
 port_opt_view(x, i, args...)
 port_opt_view(x::VecScalar, i, args...)
-port_opt_view(x::AbstractVector{<:Union{Nothing, <:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}}, i, args...; kwargs...)
+port_opt_view(x::AbstractVector{<:Union{Nothing, AbstractEstimator, AbstractAlgorithm, AbstractResult}}, i, args...; kwargs...)
 obs_weights_view(x, ::Any)
-obs_weights_view(x::AbstractVector{<:Union{Nothing, <:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}}, i)
+obs_weights_view(x::AbstractVector{<:Union{Nothing, AbstractEstimator, AbstractAlgorithm, AbstractResult}}, i)
 ```

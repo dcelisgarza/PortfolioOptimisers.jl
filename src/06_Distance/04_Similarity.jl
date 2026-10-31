@@ -3,11 +3,11 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all similarity matrix algorithms.
 
-Every subtype defines a pure transformation of a distance matrix into a similarity matrix, applied by [`distance_to_similarity`](@ref). The family is consumed in two places: the Planar Maximally Filtered Graph (PMFG) construction, which the similarity branch of [`NetworkEstimator`](@ref) and both [`DBHT`](@ref) and [`LoGo`](@ref) all reach, and the similarity slot returned by [`cor_and_dist`](@ref).
+Every subtype defines a pure transformation of a distance matrix into a similarity matrix, and [`distance_to_similarity`](@ref) applies it. Two places read the family. The first is the construction of the Planar Maximally Filtered Graph (PMFG), which the similarity branch of [`NetworkEstimator`](@ref), [`DBHT`](@ref) and [`LoGo`](@ref) reach. The second is the similarity that [`cor_and_dist`](@ref) returns.
 
-The family is **open**: an extension defines a member and a [`distance_to_similarity`](@ref) method for it.
+The family is open. An extension defines a member and a [`distance_to_similarity`](@ref) method for it.
 
-The first consumer needs a similarity that cannot go below zero, so **all three** of the fields feeding it — [`NetworkEstimator`](@ref)'s `alg`, [`DBHT`](@ref)'s `sim` and [`LoGo`](@ref)'s `sim` — take the narrower [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref) rather than this type. The second takes any member: [`FeatureDistance`](@ref)'s `sim` keeps all five, and never reaches a PMFG, because every PMFG entry point recomputes the similarity from its own field and discards the one [`cor_and_dist`](@ref) returned.
+The PMFG path needs a similarity that is not negative, so the three fields that give it a similarity take the narrower [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref), not this type. These fields are `alg` of [`NetworkEstimator`](@ref), `sim` of [`DBHT`](@ref) and `sim` of [`LoGo`](@ref). The field `sim` of [`FeatureDistance`](@ref) takes all five members. Its similarity never reaches a PMFG, because each PMFG entry point computes the similarity again from its own field and discards the similarity that [`cor_and_dist`](@ref) returned.
 
 # Related
 
@@ -26,23 +26,25 @@ abstract type AbstractSimilarityMatrixAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the similarity matrix algorithms admitted on the PMFG path.
+Abstract supertype for the similarity matrix algorithms that the PMFG path admits.
 
-A member of this family promises that [`distance_to_similarity`](@ref) returns **no negative entry for any finite distance matrix in the member's own domain**. [`Tree_SimMat`](@ref), [`DBHT`](@ref)'s `sim` and [`LoGo`](@ref)'s `sim` are bounded by this type, so a similarity that can go negative fails at **construction** rather than inside [`PMFG_T2s`](@ref).
+A member of this family promises that [`distance_to_similarity`](@ref) returns no negative entry for a finite distance matrix in the domain of the member. This type bounds [`Tree_SimMat`](@ref), `sim` of [`DBHT`](@ref) and `sim` of [`LoGo`](@ref), so a similarity that can go negative fails at construction, not inside [`PMFG_T2s`](@ref).
 
 # Where the requirement comes from
 
-Not from [`PMFG_T2s`](@ref), which runs on signed input: its gain argmax compares sums of exactly three weights, and its seed mask is shift-invariant. The requirement comes from **downstream DBHT**. `DirectHb` compares unnormalised weight sums over different-sized bubbles and writes the winner into `Hc`, where a separating bubble is detected by an exact zero row sum — so cancelling signs manufacture one. `BubbleMember` divides by a signed total that can reach zero, `Inf` or a negative, in which case `argmax` picks the worst bubble. Both failures are **silent**: the caller gets wrong clusters and no error.
+The requirement does not come from [`PMFG_T2s`](@ref), which runs on a signed input. Its argmax of the gain compares sums of exactly three weights, and a constant shift of the weights does not change its seed mask.
 
-The type bound is deliberately **wider** than that provenance. [`calc_adjacency`](@ref) binarises the PMFG, [`clusterise`](@ref) takes matrix powers of it, and `logo!` reads structure only, so none of them reaches the bubble machinery. They are bound anyway, because relaxing the one guard that presently makes them safe is a change with its own justification to make.
+The requirement comes from DBHT, which runs after the PMFG. `DirectHb` compares the weight sums of bubbles of different sizes without a normalisation, and writes the winner into `Hc`. In `Hc`, a row sum of exactly zero marks a separating bubble, so weights of opposite sign can cancel and make a false one. `BubbleMember` divides by a signed total that can be zero, `Inf` or negative, and then `argmax` selects the worst bubble. Neither failure raises an error, so the caller gets wrong clusters without a message.
+
+The type bound covers more consumers than DBHT. [`calc_adjacency`](@ref) makes the PMFG binary, [`clusterise`](@ref) takes matrix powers of it, and `logo!` reads only its structure. None of them reaches the bubble code of DBHT. The bound holds on them too, because it is the one guard that makes them safe now, and its removal needs a reason of its own.
 
 # Non-negative, not positive
 
-`exp(-Inf)` is `0` exactly, and that route is live — [`LogDistance`](@ref) maps an exactly zero correlation to an infinite distance. A zero similarity is admissible; a negative one is not.
+`exp(-Inf)` is exactly `0`, and real data reaches it, because [`LogDistance`](@ref) maps a correlation of exactly zero to an infinite distance. The type admits a similarity of zero. It does not admit a negative similarity.
 
 # The guarantee is per member, and it carries a domain
 
-The type says *which algorithm*. It cannot say *which data*, so a member whose guarantee needs a precondition on `D` declares it through [`assert_similarity_domain`](@ref), which the PMFG entry points call before they transform.
+The type selects the algorithm. It cannot select the data. A member whose guarantee needs a precondition on `D` states the precondition in a method of [`assert_similarity_domain`](@ref). The PMFG entry points call that function before the transformation.
 
 | Member                                 | Holds when     |
 |:-------------------------------------- |:-------------- |
@@ -51,11 +53,11 @@ The type says *which algorithm*. It cannot say *which data*, so a member whose g
 | [`MaximumDistanceSimilarity`](@ref)    | `D` is finite  |
 | [`ComplementSimilarity`](@ref)         | `all(D .<= 1)` |
 
-[`AngularSimilarity`](@ref) is excluded permanently, and not for want of a precondition: it is negative wherever the correlation is negative, which is ordinary data.
+The family never admits [`AngularSimilarity`](@ref), and no precondition can change that. It is negative at each negative correlation, and a negative correlation is ordinary data.
 
 # Open by declaration, not by proof
 
-The family is open, and membership is a **claim a subtype makes** rather than one the library verifies. A probe cannot check it: the contract quantifies over every admissible distance matrix, so a probe that passes [`ComplementSimilarity`](@ref) at `D = 0.5` still misses its failure at `D = 7`. [`PMFG_T2s`](@ref)'s own non-negativity check is therefore kept as the backstop against an extension that claims membership and does not keep it.
+The family is open. A subtype claims its membership, and the library does not check the claim. A probe cannot check it, because the contract holds over every admissible distance matrix. A probe that passes [`ComplementSimilarity`](@ref) at `D = 0.5` does not find its failure at `D = 7`. [`PMFG_T2s`](@ref) keeps its own check of non-negativity, to stop an extension that claims membership and breaks the promise.
 
 # Related
 
@@ -77,9 +79,9 @@ abstract type AbstractNonNegativeSimilarityMatrixAlgorithm <:
 """
 $(DocStringExtensions.TYPEDEF)
 
-Subtracts the squared distance from a ceiling placed above the largest squared distance.
+Subtracts each squared distance from the largest squared distance, rounded up to an integer.
 
-The ceiling is what makes the result non-negative for a distance matrix of any scale. The source states the transformation as ``\\rho_{i,\\,j} = 1 - d_{i,\\,j}^{2}``, which this reproduces exactly whenever ``\\max(\\mathbf{D}) \\leq 1`` — the case for [`SimpleDistance`](@ref), [`SimpleAbsoluteDistance`](@ref) and [`CorrelationDistance`](@ref). Above that the source's form goes negative and this one does not.
+The ceiling makes the result non-negative for a distance matrix of any scale. The source states the transformation as ``\\rho_{i,\\,j} = 1 - d_{i,\\,j}^{2}``. This member gives the same result when ``\\max(\\mathbf{D}) \\leq 1``, which holds for [`SimpleDistance`](@ref), [`SimpleAbsoluteDistance`](@ref) and [`CorrelationDistance`](@ref). Above that bound the form of the source goes negative, and this member does not.
 
 # Mathematical definition
 
@@ -95,19 +97,19 @@ Where:
   - $(math_dict[:D_mat_dist])
   - $(math_dict[:D_ij_dist])
 
-Equation 4 of Section 3 of [gower1966](@cite) relates a similarity matrix with a unit diagonal to the distance of its points by ``\\Delta_{i,\\,j}^{2} = 2(1 - S_{i,\\,j})``, so ``S_{i,\\,j} = 1 - \\Delta_{i,\\,j}^{2} / 2``. That relation halves the squared distance, and this transformation does not. No work that states ``1 - d_{i,\\,j}^{2}`` was found.
+Equation 4 of Section 3 of [gower1966](@cite) relates a similarity matrix with a unit diagonal to the distance of its points by ``\\Delta_{i,\\,j}^{2} = 2(1 - S_{i,\\,j})``, so ``S_{i,\\,j} = 1 - \\Delta_{i,\\,j}^{2} / 2``. That relation halves the squared distance, and this transformation does not. The audit of the sources found no work that states ``1 - d_{i,\\,j}^{2}``.
 
 !!! warning
 
-    The transformation is defined only for a **finite** distance matrix. An infinite entry makes `ceil(Inf^2) - Inf^2`, which is `NaN`, and every other entry `Inf`. This is not a corner case: [`LogDistance`](@ref) maps an exactly zero correlation to an infinite distance, and this member is the default of both [`DBHT`](@ref) and [`LoGo`](@ref). [`assert_similarity_domain`](@ref) refuses it on the PMFG path.
+    The transformation needs a finite distance matrix. At an infinite entry it computes `ceil(Inf^2) - Inf^2`, which is `NaN`, and each finite entry becomes `Inf`. Real data reaches this case. [`LogDistance`](@ref) maps a correlation of exactly zero to an infinite distance, and this member is the default of [`DBHT`](@ref) and [`LoGo`](@ref). [`assert_similarity_domain`](@ref) refuses an infinite entry on the PMFG path.
 
 # Algorithm
 
 The branch of [`distance_to_similarity`](@ref) that this tag selects runs these steps.
 
- 1. Take the largest entry of `D`, square that one scalar, and round it up with `ceil`, giving the ceiling. The ceiling is the square of the maximum rounded up, not the maximum of the squares; the two agree because a distance is never negative.
+ 1. Take the largest entry of `D`, square that scalar, and round it up with `ceil`. The result is the ceiling. The code squares the maximum, and does not take the maximum of the squares. The two are equal, because a distance is never negative.
  2. Square every entry of `D`.
- 3. Subtract the squared entries of step 2 from the single scalar of step 1, giving the similarity matrix. The element type of `D` is carried through, so a `Float32` distance matrix gives a `Float32` similarity matrix.
+ 3. Subtract the squared entries of step 2 from the scalar of step 1. The result is the similarity matrix. It keeps the element type of `D`, so a `Float32` distance matrix gives a `Float32` similarity matrix.
 
 # Related
 
@@ -131,7 +133,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Maps a distance of any magnitude into ``(0,\\,1]`` by ``e^{-D}``.
 
-The one member of the family with no domain at all: it is non-negative for every finite distance, and it takes an infinite one too, where `exp(-Inf)` is `0` exactly. This is the member to reach for when the distance is unbounded, as under [`LogDistance`](@ref), [`DistanceDistance`](@ref) or [`VariationInfoDistance`](@ref) with `normalise = false`.
+This member has no domain. It is non-negative at every finite distance, and it also takes an infinite distance, where `exp(-Inf)` is exactly `0`. Use it when the distance has no upper bound, as under [`LogDistance`](@ref), [`DistanceDistance`](@ref) or [`VariationInfoDistance`](@ref) with `normalise = false`. [`GeneralExponentialSimilarity`](@ref) is the other member with no domain.
 
 # Mathematical definition
 
@@ -152,7 +154,7 @@ Where:
 The branch of [`distance_to_similarity`](@ref) that this tag selects runs these steps.
 
  1. Negate every entry of `D`.
- 2. Exponentiate the negated entries, giving the similarity matrix. The element type of `D` is carried through, so a `Float32` distance matrix gives a `Float32` similarity matrix.
+ 2. Take the exponential of each negated entry. The result is the similarity matrix. It keeps the element type of `D`, so a `Float32` distance matrix gives a `Float32` similarity matrix.
 
 # Related
 
@@ -168,9 +170,9 @@ struct ExponentialSimilarity <: AbstractNonNegativeSimilarityMatrixAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Applies ``e^{-c D^{p}}``, adding a scale and an exponent to the exponential transformation.
+Applies ``e^{-c D^{p}}``, the exponential transformation with a scale and an exponent.
 
-`coef` sets how fast the similarity decays with distance and `power` sets the shape of that decay, so a single distance matrix can be sharpened towards its nearest neighbours or flattened across the universe. It inherits [`ExponentialSimilarity`](@ref)'s freedom from a domain, and reduces to it at `coef = 1`, `power = 1`.
+`coef` sets the rate at which the similarity decreases with the distance, and `power` sets the shape of that decrease. A larger `coef` lowers the similarity at each positive distance. A larger `power` moves the similarity towards `1` below `D = 1`, and towards `0` above `D = 1`. Like [`ExponentialSimilarity`](@ref), this member has no domain, and at `coef = 1` and `power = 1` the two members give the same result.
 
 # Mathematical definition
 
@@ -185,17 +187,17 @@ Where:
   - $(math_dict[:S_ij_sim])
   - $(math_dict[:D_mat_dist])
   - $(math_dict[:D_ij_dist])
-  - ``c``: Scale factor.
-  - ``p``: Exponent.
+  - ``c``: The scale factor, the field `coef`.
+  - ``p``: The exponent, the field `power`.
 
 # Algorithm
 
 The branch of [`distance_to_similarity`](@ref) that this tag selects runs these steps.
 
- 1. Read `power` and `coef` off the tag.
+ 1. Read `power` and `coef` from the tag.
  2. Raise every entry of `D` to `power`.
- 3. Multiply the result of step 2 by `-coef`. `coef` is a scalar, so it scales the whole matrix at once.
- 4. Exponentiate entrywise, giving the similarity matrix. The element type of `D` is carried through whenever neither field is wider than it, which is the case for the `Integer` defaults: a `Float32` distance matrix gives a `Float32` similarity matrix.
+ 3. Multiply the result of step 2 by `-coef`. `coef` is a scalar, so one product scales the whole matrix.
+ 4. Take the exponential of each entry. The result is the similarity matrix. It keeps the element type of `D` when neither field has a wider type. The `Integer` defaults are not wider, so a `Float32` distance matrix gives a `Float32` similarity matrix.
 
 # Fields
 
@@ -257,9 +259,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Takes the linear complement ``1 - D``, the exact counterpart of a metric that is itself one minus a similarity.
+Takes the linear complement ``1 - D``, the exact inverse of a metric that is one minus a similarity.
 
-It is the only member that recovers a *named* similarity rather than a monotone stand-in for one, which is why [`default_similarity`](@ref) uses it as the fallback. It is also the only member with both a domain and a pairing to get right, and both warnings below are about that.
+For many metrics it recovers a similarity with a name, not a monotone function of one, so [`default_similarity`](@ref) uses it as the fallback. It is the one member that has a domain and also needs the correct metric. The two warnings below are about these two conditions.
 
 # Mathematical definition
 
@@ -275,28 +277,30 @@ Where:
   - $(math_dict[:D_mat_dist])
   - $(math_dict[:D_ij_dist])
 
-This recovers the named similarity counterpart of every distance that is itself one minus a similarity. `Distances.CosineDist` returns the cosine similarity, `Distances.Jaccard` the Ruzicka similarity, `Distances.BrayCurtis` the Sørensen–Dice similarity, and `Distances.CorrDist` the Pearson correlation.
+It recovers the named similarity of each distance that is one minus a similarity. Against `Distances.CosineDist` it returns the cosine similarity, against `Distances.Jaccard` the Ruzicka similarity, against `Distances.BrayCurtis` the Sørensen-Dice similarity, and against `Distances.CorrDist` the Pearson correlation.
 
 !!! warning "The domain is `D <= 1`"
 
-    The result is only correlation-like when ``\\mathbf{D} \\in [0,\\,1]``. Above `1` the similarity is negative.
+    The result is a non-negative similarity only when ``\\mathbf{D} \\in [0,\\,1]``. Above `1` the similarity is negative.
 
-    What happens next depends on the path. On the [`FeatureDistance`](@ref) path the value is **kept**, and [`plot_clusters`](@ref) colours it on the signed scale ``[-1,\\,1]``. A distance above `2` gives a similarity below `-1`, which that scale clips silently rather than flags. On the PMFG path the same input is **refused** by [`assert_similarity_domain`](@ref), because [`PMFG_T2s`](@ref)'s consumers cannot take a negative weight. Symmetry and the unit diagonal survive either way.
+    The result of a negative value depends on the path. The [`FeatureDistance`](@ref) path keeps the value, and [`plot_clusters`](@ref) colours it on the signed scale ``[-1,\\,1]``. A distance above `2` gives a similarity below `-1`, and that scale clips it without a warning. On the PMFG path, [`assert_similarity_domain`](@ref) refuses the same input, because the consumers of [`PMFG_T2s`](@ref) cannot take a negative weight. On each path the similarity stays symmetric, with a unit diagonal.
 
-    The rule is `D <= 1`, **not** "the metric is unbounded". `Distances.CosineDist` and `Distances.CorrDist` are bounded — by `2`, not by `1` — and are refused whenever they exceed `1`, which `CorrDist` does at every negative correlation. In-library sources that exceed `1`: [`LogDistance`](@ref), [`DistanceDistance`](@ref) — whose `Distances.Euclidean` **default** puts most of its entries above `1` — and [`VariationInfoDistance`](@ref) with `normalise = false`. Use [`ExponentialSimilarity`](@ref) or [`GeneralExponentialSimilarity`](@ref) for a member with no domain at all.
+    The rule is `D <= 1`. It is not a rule against a metric without an upper bound. `Distances.CosineDist` and `Distances.CorrDist` have the upper bound `2`, not `1`, and the check refuses them at each entry above `1`. `Distances.CorrDist` goes above `1` at each negative correlation.
 
-!!! warning "The pairing is not checked"
+    In the library, [`LogDistance`](@ref), [`DistanceDistance`](@ref) and [`VariationInfoDistance`](@ref) with `normalise = false` can go above `1`. Under its default `Distances.Euclidean`, [`DistanceDistance`](@ref) can go above `1` also when the base distance is in `[0, 1]`. For a member with no domain, use [`ExponentialSimilarity`](@ref) or [`GeneralExponentialSimilarity`](@ref).
 
-    This member is the honest inverse of a **specific** set of metrics, listed above. Paired with any other distance it returns a number that is in domain, non-negative, and wrong — and nothing catches it, on any path.
+!!! warning "The library does not check the pair"
 
-    [`SimpleDistance`](@ref) is ``\\sqrt{(1 - \\rho) / 2}``, so an ordinary correlation gives a `D` that is a perfectly legal bounded distance, and this member reports a plausible-looking similarity for it. No check placed anywhere can detect that. [`default_similarity`](@ref) pairs a metric with its inverse on the [`FeatureDistance`](@ref) path; [`NetworkEstimator`](@ref)'s `alg`, [`DBHT`](@ref)'s `sim` and [`LoGo`](@ref)'s `sim` take a member with no reference to the distance estimator that produced ``\\mathbf{D}``, so on those the pairing is the caller's to get right.
+    This member is the inverse of the metrics listed above, and of no other metric. With a different distance it returns a number that is in the domain, non-negative and wrong, and no path detects the error.
+
+    [`SimpleDistance`](@ref) is ``\\sqrt{(1 - \\rho) / 2}``. A correlation of `0.003` gives `D = 0.706`, which is a legal bounded distance, and this member reports a similarity of `0.29`. No check can detect that error. On the [`FeatureDistance`](@ref) path, [`default_similarity`](@ref) pairs a metric with its inverse. The fields `alg` of [`NetworkEstimator`](@ref), `sim` of [`DBHT`](@ref) and `sim` of [`LoGo`](@ref) take a member without a reference to the distance estimator of ``\\mathbf{D}``. On those paths, the caller must pair the two correctly.
 
 # Algorithm
 
 The branch of [`distance_to_similarity`](@ref) that this tag selects runs these steps.
 
- 1. Build the unit in the element type of `D` with `one(eltype(D))`. Writing the unit in that element type is what carries it through, so a `Float32` distance matrix gives a `Float32` similarity matrix.
- 2. Subtract every entry of `D` from that unit, giving the similarity matrix.
+ 1. Make the unit in the element type of `D` with `one(eltype(D))`. That unit keeps the element type of `D`, so a `Float32` distance matrix gives a `Float32` similarity matrix.
+ 2. Subtract every entry of `D` from that unit. The result is the similarity matrix.
 
 # Related
 
@@ -316,7 +320,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Recovers a correlation from a normalised angular distance by ``\\cos(\\pi D)``.
 
-It is the only member that returns the codependence itself rather than a monotone transformation of it, and the only one that can go negative. Both facts follow from the same thing: it is the exact algebraic inverse of [`AngularDist`](@ref), and a correlation is signed.
+It returns the correlation itself, not a monotone function of it. It is the one member that goes negative at a distance in `[0, 1]`, in this case above `D = 0.5`. Both facts have one cause. It is the exact algebraic inverse of [`AngularDist`](@ref), and a correlation can be negative.
 
 # Mathematical definition
 
@@ -332,26 +336,26 @@ Where:
   - $(math_dict[:D_mat_dist])
   - $(math_dict[:D_ij_dist])
 
-For an angular distance ``D_{i,\\,j} = \\arccos(\\rho_{i,\\,j}) / \\pi`` this recovers ``\\rho_{i,\\,j}`` exactly, without reference to the data the distance was computed from. The inverse is algebra, and no source states it. [`AngularDist`](@ref) names the sources of the distance. Against [`AngularDist`](@ref) the recovered cosine matches the one computed from the features to floating-point precision. It maps ``[0,\\,1] \\to [1,\\,-1]``, so the similarity is bounded and the diagonal is unity whenever the distance matrix has a zero diagonal.
+For an angular distance ``D_{i,\\,j} = \\arccos(\\rho_{i,\\,j}) / \\pi`` this member recovers ``\\rho_{i,\\,j}`` exactly, without the data of the distance. No source states the inverse, because it is algebra. The references below are the sources of the angular distance, which [`AngularDist`](@ref) also names. Against [`AngularDist`](@ref), the recovered cosine and the cosine of the features agree to floating-point precision. The member maps ``[0,\\,1] \\to [1,\\,-1]``, so the similarity is bounded, and its diagonal is `1` when the diagonal of the distance matrix is zero.
 
 # Where this member is correct, and where it is refused
 
-It is correct on the [`FeatureDistance`](@ref) path, which is the one path that pairs a metric with its inverse: [`default_similarity`](@ref) selects this member for [`AngularDist`](@ref), and the recovered ``\\rho`` is exact.
+It is correct on the [`FeatureDistance`](@ref) path, which is the one path that pairs a metric with its inverse. On that path, [`default_similarity`](@ref) selects this member for [`AngularDist`](@ref), and the recovered ``\\rho`` is exact.
 
-It is **not** a member of [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref), so it cannot be given to [`NetworkEstimator`](@ref)'s `alg`, [`DBHT`](@ref)'s `sim` or [`LoGo`](@ref)'s `sim` — those refuse it at construction. The exclusion is permanent rather than pending a domain precondition. Even paired correctly this member returns a negative wherever ``\\rho_{i,\\,j} < 0``, which is ordinary data, and [`PMFG_T2s`](@ref)'s consumers cannot take a negative weight.
+It is not a member of [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref), so `alg` of [`NetworkEstimator`](@ref), `sim` of [`DBHT`](@ref) and `sim` of [`LoGo`](@ref) refuse it at construction. No domain precondition can admit it. With the correct metric, this member is negative at each ``\\rho_{i,\\,j} < 0``, which is ordinary data, and the consumers of [`PMFG_T2s`](@ref) cannot take a negative weight.
 
-!!! warning "The pairing is not checked"
+!!! warning "The library does not check the pair"
 
-    Paired with a distance that is not an angular one, this member returns a number that is not a correlation. [`SimpleDistance`](@ref) is ``\\sqrt{(1 - \\rho) / 2}`` and shares this member's ``[0,\\,1]`` range exactly, so it type-checks: an ordinary positive correlation can map through ``\\cos(\\pi D)`` to a large negative number that is not a weak negative correlation, but nonsense.
+    With a distance that is not angular, this member returns a number that is not a correlation. [`SimpleDistance`](@ref) is ``\\sqrt{(1 - \\rho) / 2}``, and its range is ``[0,\\,1]``, the same range as the domain of this member. No check can find the error. A correlation of `0.003` gives `D = 0.706`, and this member reports `-0.603`, which is not a weak negative correlation but a wrong number.
 
 # Algorithm
 
 The branch of [`distance_to_similarity`](@ref) that this tag selects runs these steps.
 
- 1. Multiply every entry of `D` by `pi`. `pi` is an `Irrational`, which takes the element type of the number it multiplies rather than widening it, so a `Float32` distance matrix stays `Float32`.
- 2. Take the cosine of each scaled entry, giving the similarity matrix.
+ 1. Multiply every entry of `D` by `pi`. `pi` is an `Irrational`, which takes the element type of the number that it multiplies, so a `Float32` distance matrix stays `Float32`.
+ 2. Take the cosine of each scaled entry. The result is the similarity matrix.
 
-The sign follows from step 2 alone. ``\\cos(\\pi D)`` is positive below ``D = 0.5``, crosses zero at ``D = 0.5`` and is negative above it, which is why this member is not admitted to [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref).
+The sign comes from step 2 alone. ``\\cos(\\pi D)`` is positive below ``D = 0.5``, zero at ``D = 0.5`` and negative above it. Thus [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref) does not admit this member.
 
 # Related
 
@@ -374,18 +378,18 @@ struct AngularSimilarity <: AbstractSimilarityMatrixAlgorithm end
 """
     distance_to_similarity(se::AbstractSimilarityMatrixAlgorithm; D::MatNum, kwargs...)
 
-Compute a similarity matrix from a distance matrix using the specified similarity algorithm.
+Compute a similarity matrix from a distance matrix with a similarity matrix algorithm.
 
 # Algorithm
 
- 1. Select the method by the type of `se`. Every member of [`AbstractSimilarityMatrixAlgorithm`](@ref) owns one method, and the member's own docstring carries the closed form and the steps of its branch.
- 2. Apply that transformation to `D` entrywise, giving a new matrix of the same size. `D` is never written to, and no method reads a keyword.
+ 1. Select the method by the type of `se`. Each member of [`AbstractSimilarityMatrixAlgorithm`](@ref) has one method, and the docstring of the member states the closed form and the steps of its branch.
+ 2. Apply that transformation to each entry of `D`. The result is a new matrix of the same size. The function does not write to `D`, and no method reads a keyword.
 
-The function is a **pure transformation with no domain of its own**. It never calls [`assert_similarity_domain`](@ref), so a member whose non-negativity needs a precondition on `D` is checked by the caller, at the five PMFG entry points, and not here.
+The function is a pure transformation with no domain of its own. It does not call [`assert_similarity_domain`](@ref). The caller checks the precondition of a member on `D`, at the five PMFG entry points.
 
 # Arguments
 
-  - `se`: Similarity matrix algorithm.
+  - `se`: The similarity matrix algorithm.
 
       + `se::MaximumDistanceSimilarity`: Uses the maximum distance transformation.
       + `se::ExponentialSimilarity`: Uses the exponential transformation.
@@ -393,13 +397,13 @@ The function is a **pure transformation with no domain of its own**. It never ca
       + `se::ComplementSimilarity`: Uses the linear complement of the distance.
       + `se::AngularSimilarity`: Inverts a normalised angular distance.
 
-  - `D`: Distance matrix.
+  - `D`: The distance matrix.
 
-  - `kwargs...`: Additional keyword arguments (not used).
+  - `kwargs...`: More keyword arguments. No method reads them.
 
 # Returns
 
-  - `S::Matrix{<:Number}`: Similarity matrix of the same size as `D`.
+  - `S::Matrix{<:Number}`: The similarity matrix, with the size of `D`.
 
 # Examples
 
@@ -456,37 +460,37 @@ end
     assert_similarity_domain(sim::MaximumDistanceSimilarity,
                              de::AbstractDistanceEstimator, D::MatNum)
 
-Assert that `D` lies in `sim`'s domain, so that `sim`'s non-negativity guarantee holds on it.
+Assert that `D` is in the domain of `sim`, so that the non-negativity guarantee of `sim` holds on it.
 
-The other half of [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref)'s enforcement. The type bound says *which algorithm* may reach the PMFG path; it cannot say *which data*, and two of the four admitted members are non-negative only over part of the distances a caller can produce.
+It is the second half of the enforcement of [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref). The type bound selects the algorithms that can reach the PMFG path, but it cannot select the data. Two of the four admitted members are non-negative only over a part of the distances that a caller can give.
 
-| Member                              | Precondition                   |
-|:----------------------------------- |:------------------------------ |
-| [`ComplementSimilarity`](@ref)      | `all(D .<= 1)`                 |
-| [`MaximumDistanceSimilarity`](@ref) | `all(isfinite, D)`             |
-| every other member                  | none — the fallback is a no-op |
+| Member                              | Precondition                                |
+|:----------------------------------- |:------------------------------------------- |
+| [`ComplementSimilarity`](@ref)      | `all(D .<= 1)`                              |
+| [`MaximumDistanceSimilarity`](@ref) | `all(isfinite, D)`                          |
+| every other member                  | none, the fallback method does no operation |
 
-# Interface-scoped, not member-wide
+# Scoped to the interface, not to the member
 
-The five call sites are the PMFG entry points, and nothing else: [`calc_weighted_adjacency_graph`](@ref), [`calc_distance_weighted_graph`](@ref), both [`clusterise`](@ref) methods that build a PMFG, and `logo!`. It is deliberately **not** called inside [`distance_to_similarity`](@ref), which stays a pure transformation with no domain of its own.
+The five call sites are the PMFG entry points, and there is no other call site. They are [`calc_weighted_adjacency_graph`](@ref), [`calc_distance_weighted_graph`](@ref), the two [`clusterise`](@ref) methods that build a PMFG, and `logo!`. [`distance_to_similarity`](@ref) does not call this function, so it stays a pure transformation with no domain of its own.
 
-The scope follows the failure, which is path-dependent rather than member-wide. [`ComplementSimilarity`](@ref) against an unbounded distance is documented, tested behaviour on the [`FeatureDistance`](@ref) path — every `Distances.SemiMetric` yields a similarity there and nothing throws — and it is only on the PMFG path that the same value is unusable.
+The scope follows the failure, and the failure depends on the path, not on the member. On the [`FeatureDistance`](@ref) path, [`ComplementSimilarity`](@ref) against a distance without an upper bound is documented and tested behaviour. There, each `Distances.SemiMetric` gives a similarity, and no call raises an error. The same value is unusable only on the PMFG path.
 
 # What it costs a caller
 
-Nothing that works today. Every pairing this refuses already throws, at [`PMFG_T2s`](@ref)'s own check and one transformation later, with a message that names `W` rather than the configuration that produced it. The gain is the message: it names **both halves**, which is why `de` is passed in — the distance estimator that produced the offending value, and the similarity that refused it.
+It costs nothing that works today. Each pair that this function refuses already raises an error one transformation later, at the check of [`PMFG_T2s`](@ref). That message names `W`, and not the configuration that made it. This function gives a better message, because it names the two halves of the pair. These are the distance estimator `de` that made the bad value, and the similarity that refused it. This is the reason that the caller gives `de`.
 
 # Algorithm
 
- 1. Select the method by the type of `sim`. The two members of the table above own a method each; every other member reaches the method of [`AbstractSimilarityMatrixAlgorithm`](@ref), which is a no-op and returns immediately.
- 2. Test that member's precondition over the whole of `D`.
- 3. Raise a `DomainError` when the test fails. The message carries `maximum(D)`, the name of the similarity that refused it, that similarity's closed form, and the concrete type of `de`. Return `nothing` when it holds.
+ 1. Select the method by the type of `sim`. Each of the two members of the table above has a method. Each other member reaches the method of [`AbstractSimilarityMatrixAlgorithm`](@ref), which does no operation and returns at once.
+ 2. Test the precondition of that member over all of `D`.
+ 3. Raise a `DomainError` when the test fails. The message holds `maximum(D)`, the name of the similarity that refused it, the closed form of that similarity, and the concrete type of `de`. Return `nothing` when the precondition holds.
 
 # Arguments
 
-  - `sim`: Similarity matrix algorithm.
-  - `de`: Distance estimator that produced `D`. Read only to name it in the error.
-  - `D`: Distance matrix.
+  - `sim`: The similarity matrix algorithm.
+  - `de`: The distance estimator that made `D`. The function reads it only to name it in the error.
+  - `D`: The distance matrix.
 
 # Validation
 
@@ -528,28 +532,28 @@ end
     default_similarity(metric::Distances.SemiMetric)
     default_similarity(metric::AngularDist)
 
-Select the similarity matrix algorithm that is the natural counterpart of a distance metric.
+Select the similarity matrix algorithm that is the inverse of a distance metric.
 
-Used to default the similarity field of a distance algorithm from its metric, so that the resolved value is visible on the printed object rather than hidden inside the distance kernel. The fallback is [`ComplementSimilarity`](@ref), which is the named counterpart of every metric expressible as one minus a similarity; metrics whose inversion is not linear add their own method.
+A distance algorithm calls it to get the default of its similarity field from its metric. The printed object then shows the selected similarity, and the distance kernel does not select it out of view. The fallback is [`ComplementSimilarity`](@ref), the named inverse of each metric that is one minus a similarity. A metric whose inverse is not linear adds its own method.
 
 # Algorithm
 
- 1. Select the method by the type of `metric`. Dispatch does the selection, so a metric whose inversion is not linear adds a method of its own and reaches it without a branch here.
+ 1. Select the method by the type of `metric`. Dispatch does the selection, so a metric whose inverse is not linear adds a method of its own, and this function needs no branch for it.
 
- 2. Return the similarity that method names. There are two methods today:
+ 2. Return the similarity that the method names. There are two methods now.
 
-      + `metric::Distances.SemiMetric` is the fallback, and returns [`ComplementSimilarity`](@ref). Every metric that is itself one minus a similarity lands here, and the complement recovers that similarity by name.
-      + `metric::AngularDist` returns [`AngularSimilarity`](@ref), which is the exact algebraic inverse of the angular distance. That method is declared in `src/06_Distance/05_FeatureDistance.jl`, beside [`AngularDist`](@ref) itself, and this docstring speaks for it.
+      + `metric::Distances.SemiMetric` is the fallback, and returns [`ComplementSimilarity`](@ref). Each metric that is one minus a similarity reaches this method, and the complement recovers that named similarity.
+      + `metric::AngularDist` returns [`AngularSimilarity`](@ref), the exact algebraic inverse of the angular distance. `src/06_Distance/05_FeatureDistance.jl` declares that method, next to [`AngularDist`](@ref), and this docstring documents it.
 
-The pairing this function makes is correct because it selects the inverse of the metric it is given. A similarity chosen by hand carries no such guarantee; [`ComplementSimilarity`](@ref) and [`AngularSimilarity`](@ref) both state what a wrong pairing returns.
+The pair that this function makes is correct, because it selects the inverse of the metric that it gets. A similarity that the caller selects has no such guarantee. [`ComplementSimilarity`](@ref) and [`AngularSimilarity`](@ref) state what a wrong pair returns.
 
 # Arguments
 
-  - `metric`: Distance metric.
+  - `metric`: The distance metric.
 
 # Returns
 
-  - `sim::AbstractSimilarityMatrixAlgorithm`: Similarity matrix algorithm.
+  - `sim::AbstractSimilarityMatrixAlgorithm`: The similarity matrix algorithm.
 
 # Examples
 

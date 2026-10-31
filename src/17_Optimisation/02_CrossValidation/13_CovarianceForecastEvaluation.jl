@@ -236,15 +236,15 @@ end
 """
     forecast_location(ce::Covariance, X::MatNum; dims::Int = 1, active_mask = nothing, kwargs...)
     forecast_location(ce::GeneralCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    forecast_location(ce::Union{<:ExpWeightedCovariance, <:RegimeAdjustedExpWeightedCovariance}, X::MatNum; dims::Int = 1, active_mask = nothing, kwargs...)
-    forecast_location(ce::Union{<:PortfolioOptimisersCovariance, <:CorrelationCovariance}, X::MatNum; kwargs...)
+    forecast_location(ce::Union{ExpWeightedCovariance, RegimeAdjustedExpWeightedCovariance}, X::MatNum; dims::Int = 1, active_mask = nothing, kwargs...)
+    forecast_location(ce::Union{PortfolioOptimisersCovariance, CorrelationCovariance}, X::MatNum; kwargs...)
     forecast_location(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
     forecast_location(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
-    forecast_location(ce::Union{<:ExpWeightedCovariance, <:RegimeAdjustedExpWeightedCovariance}, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    forecast_location(ce::Union{ExpWeightedCovariance, RegimeAdjustedExpWeightedCovariance}, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
     forecast_location(ce::PortfolioOptimisersCovariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
     forecast_location(ce::Covariance)
     forecast_location(ce::GeneralCovariance)
-    forecast_location(ce::Union{<:ExpWeightedCovariance, <:RegimeAdjustedExpWeightedCovariance})
+    forecast_location(ce::Union{ExpWeightedCovariance, RegimeAdjustedExpWeightedCovariance})
     forecast_location(ce::PortfolioOptimisersCovariance)
     forecast_location(ce::CorrelationCovariance{<:Any, Nothing})
     forecast_location(ce::AbstractCovarianceEstimator)
@@ -323,8 +323,8 @@ function forecast_location(ce::GeneralCovariance, X::MatNum; dims::Int = 1, kwar
         vec(Statistics.mean(X, w; dims = 1))
     end
 end
-function forecast_location(ce::Union{<:ExpWeightedCovariance,
-                                     <:RegimeAdjustedExpWeightedCovariance}, X::MatNum;
+function forecast_location(ce::Union{ExpWeightedCovariance,
+                                     RegimeAdjustedExpWeightedCovariance}, X::MatNum;
                            dims::Int = 1,
                            active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                            kwargs...)
@@ -332,8 +332,8 @@ function forecast_location(ce::Union{<:ExpWeightedCovariance,
     return forecast_location(partial_fit!(ce, X; dims = dims, active_mask = active_mask,
                                           kwargs...))
 end
-function forecast_location(ce::Union{<:PortfolioOptimisersCovariance,
-                                     <:CorrelationCovariance}, X::MatNum; kwargs...)
+function forecast_location(ce::Union{PortfolioOptimisersCovariance, CorrelationCovariance},
+                           X::MatNum; kwargs...)
     return forecast_location(library_covariance_estimator(ce.ce), X; kwargs...)
 end
 function forecast_location(::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1,
@@ -346,8 +346,8 @@ function forecast_location(ce::AbstractCovarianceEstimator, X::MatNum,
                                  pnl, (m, cmsk) -> expand_moment(m, cmsk, 1); dims = dims,
                                  kwargs...)
 end
-function forecast_location(ce::Union{<:ExpWeightedCovariance,
-                                     <:RegimeAdjustedExpWeightedCovariance}, X::MatNum,
+function forecast_location(ce::Union{ExpWeightedCovariance,
+                                     RegimeAdjustedExpWeightedCovariance}, X::MatNum,
                            pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
     amsk, _ = dims_oriented(dims, panel_moment_masks(pnl)...)
     return forecast_location(ce, X; dims = dims, active_mask = amsk, kwargs...)
@@ -363,8 +363,8 @@ end
 function forecast_location(ce::GeneralCovariance)
     return forecast_state_location(ce, ce.cache)
 end
-function forecast_location(ce::Union{<:ExpWeightedCovariance,
-                                     <:RegimeAdjustedExpWeightedCovariance})
+function forecast_location(ce::Union{ExpWeightedCovariance,
+                                     RegimeAdjustedExpWeightedCovariance})
     return centring_report_location(ce.centring, forecast_state_location(ce, ce.cache))
 end
 function forecast_location(ce::PortfolioOptimisersCovariance)
@@ -390,7 +390,7 @@ end
     prior_forecast_location(pe::AbstractPriorEstimator, pr::AbstractPriorResult, X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
     prior_forecast_location(pe::EmpiricalPrior, pr::AbstractPriorResult, X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
     prior_forecast_location(pe::FactorPrior, pr::AbstractPriorResult, X::MatNum, F::MatNum, pnl::Option{<:AssetPanel}; kwargs...)
-    prior_forecast_location(pe::Union{<:HighOrderPriorEstimator, <:HighOrderFactorPriorEstimator}, pr::HighOrderPrior, X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
+    prior_forecast_location(pe::Union{HighOrderPriorEstimator, HighOrderFactorPriorEstimator}, pr::HighOrderPrior, X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
     prior_forecast_location(pe::AbstractPriorEstimator, pr::AbstractPriorResult; kwargs...)
     prior_forecast_location(pe::HighOrderPriorEstimator, pr::HighOrderPrior; kwargs...)
 
@@ -457,8 +457,8 @@ function prior_forecast_location(pe::FactorPrior, pr::AbstractPriorResult, ::Mat
     c = prior_forecast_location(pe.pe, fpr, F, nothing, nothing)
     return c === fpr.mu ? pr.mu : pr.mu + pr.rr.M * (c - fpr.mu)
 end
-function prior_forecast_location(pe::Union{<:HighOrderPriorEstimator,
-                                           <:HighOrderFactorPriorEstimator},
+function prior_forecast_location(pe::Union{HighOrderPriorEstimator,
+                                           HighOrderFactorPriorEstimator},
                                  pr::HighOrderPrior, X::MatNum, F::Option{<:MatNum},
                                  pnl::Option{<:AssetPanel}; kwargs...)
     return prior_forecast_location(pe.pe, pr.pr, X, F, pnl; kwargs...)
@@ -625,8 +625,8 @@ function forecast_state_location(::Any, state::CovarianceState)
     return state.mu
 end
 function forecast_state_location(::Any,
-                                 state::Union{<:ExpWeightedCovarianceState,
-                                              <:RegimeAdjustedCovarianceState})
+                                 state::Union{ExpWeightedCovarianceState,
+                                              RegimeAdjustedCovarianceState})
     return state.location
 end
 function forecast_state_location(ce, state::SampleBufferState)
@@ -654,7 +654,7 @@ Read the [`CoveragePolicy`](@ref) that decides the Asset Panel arm of [`forecast
   - [`forecast_location`](@ref)
   - [`coverage_policy`](@ref)
 """
-function forecast_coverage_policy(ce::Union{<:GeneralCovariance, <:Covariance})
+function forecast_coverage_policy(ce::Union{GeneralCovariance, Covariance})
     return coverage_policy(ce)
 end
 function forecast_coverage_policy(::Any)
@@ -934,8 +934,8 @@ function step_implied_volatility_kwargs(::Any, ::ReturnsResult)
     return (;)
 end
 """
-    is_time_dependent(est::Union{<:AbstractCovarianceEstimator, <:AbstractPriorEstimator, <:Online})
-    needs_previous_weights(est::Union{<:AbstractCovarianceEstimator, <:AbstractPriorEstimator, <:Online})
+    is_time_dependent(est::Union{AbstractCovarianceEstimator, AbstractPriorEstimator, Online})
+    needs_previous_weights(est::Union{AbstractCovarianceEstimator, AbstractPriorEstimator, Online})
 
 Answer the two per-type predicates that [`fold_loop`](@ref) reads, for an estimator that is not an optimiser.
 
@@ -946,12 +946,12 @@ No covariance estimator and no prior holds a [`TimeDependent`](@ref) schedule, a
   - [`fold_loop`](@ref)
   - [`covariance_forecast_evaluation`](@ref)
 """
-function is_time_dependent(::Union{<:AbstractCovarianceEstimator, <:AbstractPriorEstimator,
-                                   <:Online})
+function is_time_dependent(::Union{AbstractCovarianceEstimator, AbstractPriorEstimator,
+                                   Online})
     return false
 end
-function needs_previous_weights(::Union{<:AbstractCovarianceEstimator,
-                                        <:AbstractPriorEstimator, <:Online})
+function needs_previous_weights(::Union{AbstractCovarianceEstimator, AbstractPriorEstimator,
+                                        Online})
     return false
 end
 """
@@ -1130,7 +1130,7 @@ The arguments correspond to the fields of the struct, in the order of their decl
     location
 end
 """
-    covariance_forecast_evaluation(est::Union{<:AbstractCovarianceEstimator, <:AbstractPriorEstimator, <:Online},
+    covariance_forecast_evaluation(est::Union{AbstractCovarianceEstimator, AbstractPriorEstimator, Online},
                                    rd::ReturnsResult, cv::WFCVER; w::Option{<:VecNum_VecVecNum} = nothing,
                                    target::AbstractRealisedTarget = RealisedCovariance(),
                                    store_forecasts::Bool = false,
@@ -1200,8 +1200,8 @@ The loop receives the estimator as a configuration only. Under an Online Scheme 
   - [`OnlineDateWalkForward`](@ref)
   - [`Online`](@ref)
 """
-function covariance_forecast_evaluation(est::Union{<:AbstractCovarianceEstimator,
-                                                   <:AbstractPriorEstimator, <:Online},
+function covariance_forecast_evaluation(est::Union{AbstractCovarianceEstimator,
+                                                   AbstractPriorEstimator, Online},
                                         rd::ReturnsResult, cv::WFCVER;
                                         w::Option{<:VecNum_VecVecNum} = nothing,
                                         target::AbstractRealisedTarget = RealisedCovariance(),

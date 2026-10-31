@@ -1,0 +1,17 @@
+# The spell check of the paper, `docs/paper/*.typ`, which the `typos` hook of
+# `.pre-commit-config.yaml` runs at commit time. The paper is written in British English, so an
+# American spelling such as "maximize" is a finding too.
+[default]
+locale = "en-gb"
+
+# Words the paper must keep in their American spelling.
+[default.extend-words]
+# Typst's own names: `heading-color`, `link-color` and the alignment `center`.
+color = "color"
+center = "center"
+# "Near optimal centering" is the published name of a method.
+centering = "centering"
+
+[default.extend-identifiers]
+# The solver type of MathOptInterface, in the code listing.
+Optimizer = "Optimizer"

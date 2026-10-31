@@ -285,7 +285,7 @@ of a constraint on that norm.
 
 # References
 
-  - $(ref_dict[:demiguel2009])
+  - $(ref_dict[:demiguel2009]) Pages 798-812. $(ref_dict[:no_original_source])
 """
 abstract type AbstractRegularisationEstimator <: AbstractEstimator end
 """
@@ -406,7 +406,7 @@ Keywords correspond to the struct's fields.
 
 # References
 
-  - $(ref_dict[:demiguel2009])
+  - $(ref_dict[:demiguel2009]) Pages 798-812. $(ref_dict[:no_original_source])
 """
 @concrete struct L2Regularisation <: AbstractRegularisationEstimator
     """
@@ -493,7 +493,7 @@ Represents a collection of L2-norm regularisation terms to be added to the optim
 """
 const VecL2Reg = AbstractVector{<:L2Regularisation}
 """
-    const L2Reg_VecL2Reg = Union{<:L2Regularisation, <:VecL2Reg}
+    const L2Reg_VecL2Reg = Union{L2Regularisation, VecL2Reg}
 
 Alias for a single or vector of L2 regularisation terms.
 
@@ -505,7 +505,7 @@ Matches either a single [`L2Regularisation`](@ref) or a vector of them ([`VecL2R
   - [`VecL2Reg`](@ref)
   - [`set_l2_regularisation!`](@ref)
 """
-const L2Reg_VecL2Reg = Union{<:L2Regularisation, <:VecL2Reg}
+const L2Reg_VecL2Reg = Union{L2Regularisation, VecL2Reg}
 """
     squared_norm_over_k!(model::JuMP.Model, i::Integer, x, k::Number, sc::Number)
     squared_norm_over_k!(model::JuMP.Model, i::Integer, x, k, sc::Number)
@@ -760,7 +760,7 @@ Keywords correspond to the struct's fields.
 
 # References
 
-  - $(ref_dict[:demiguel2009])
+  - $(ref_dict[:demiguel2009]) Pages 798-812. $(ref_dict[:no_original_source])
 """
 @concrete struct LpRegularisation <: AbstractRegularisationEstimator
     """
@@ -998,7 +998,7 @@ Represents a collection of Lp-norm regularisation terms to be added to the optim
 """
 const VecLpReg = AbstractVector{<:LpRegularisation}
 """
-    const LpReg_VecLpReg = Union{<:LpRegularisation, <:VecLpReg}
+    const LpReg_VecLpReg = Union{LpRegularisation, VecLpReg}
 
 Alias for a single or vector of Lp regularisation terms.
 
@@ -1010,7 +1010,7 @@ Matches either a single [`LpRegularisation`](@ref) or a vector of them ([`VecLpR
   - [`VecLpReg`](@ref)
   - [`set_lp_regularisation!`](@ref)
 """
-const LpReg_VecLpReg = Union{<:LpRegularisation, <:VecLpReg}
+const LpReg_VecLpReg = Union{LpRegularisation, VecLpReg}
 function set_lp_regularisation!(model::JuMP.Model, lps::LpReg_VecLpReg)
     w = get_w(model)
     sc = get_constraint_scale(model)

@@ -10,6 +10,7 @@ AbstractPriorResult
 AbstractLowOrderPriorEstimator_A
 AbstractLowOrderPriorEstimator_F
 AbstractLowOrderPriorEstimator_AF
+AbstractHighOrderPriorEstimator
 AbstractHighOrderPriorEstimator_F
 LowOrderPrior
 HighOrderPrior

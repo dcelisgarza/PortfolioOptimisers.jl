@@ -18,29 +18,38 @@ test below therefore asserts on the matrix that reached the kernel, through the 
 `RecordingDistance` instrument `test_13c_feature_views.jl` uses, and not on the weights.
 
 The kernel stacks the observation rows its collapse reads (#1064), so under the default
-`LastObservation` it would be handed the seam's last row alone. Every recorder below wraps
+`LastRow` it would be handed the seam's last row alone. Every recorder below wraps
 `StackObservations`, the collapse that reads the whole window, so the matrix it records
 is the whole panel the seam collapsed. `test_13b` pins the row rule itself.
+
+The recorder keeps the returns data of the outer problem in `rds`, beside the matrix in `seen`.
+So a test can read the collapsed masks and implied volatilities, which no feature matrix
+carries (#1926). A recorder that wraps a distance other than a `FeatureDistance` records
+no feature matrix, so it serves a panel with no field and returns with no panel.
 =#
 mutable struct RecordingDistance{T} <: PO.AbstractDistanceEstimator
     de::T
     seen::Vector{Any}
+    rds::Vector{Any}
     lock::ReentrantLock
 end
-RecordingDistance(de) = RecordingDistance(de, Any[], ReentrantLock())
-function record!(de::RecordingDistance, Z)
+RecordingDistance(de) = RecordingDistance(de, Any[], Any[], ReentrantLock())
+function record!(de::RecordingDistance, Z, rd)
     lock(de.lock) do
-        return push!(de.seen, Z)
+        push!(de.seen, Z)
+        return push!(de.rds, rd)
     end
     return nothing
 end
+recorded_features(de::FeatureDistance, pr, rd, X) = feature_matrix(de, pr, rd, X)
+recorded_features(::PO.AbstractDistanceEstimator, pr, rd, X) = nothing
 function PO.distance(de::RecordingDistance, ce, X; pr = nothing, rd = nothing, kwargs...)
-    record!(de, feature_matrix(de.de, pr, rd, X))
+    record!(de, recorded_features(de.de, pr, rd, X), rd)
     return PO.distance(de.de, ce, X; pr = pr, rd = rd, kwargs...)
 end
 function PO.cor_and_dist(de::RecordingDistance, ce, X; pr = nothing, rd = nothing,
                          kwargs...)
-    record!(de, feature_matrix(de.de, pr, rd, X))
+    record!(de, recorded_features(de.de, pr, rd, X), rd)
     return PO.cor_and_dist(de.de, ce, X; pr = pr, rd = rd, kwargs...)
 end
 PO.distance(de::RecordingDistance, Z; kwargs...) = PO.distance(de.de, Z; kwargs...)
@@ -332,11 +341,11 @@ end
         Site three is `reconstruct_rd`, inside the fold. Each fold collapses with its own
         weights, so a *static* source becomes genuinely time-varying: constant within a
         fold and different in the next. The row count matches `X` exactly because both are
-        built by the same stacking, and the outer default `LastObservation` then reduces it
+        built by the same stacking, and the outer default `LastRow` then reduces it
         to the most recent fold.
         =#
         n_folds = 3
-        cvopt = OptimisationCrossValidation(; cv = KFold(; n = n_folds))
+        cvopt = KFold(; n = n_folds)
         mk_st(de) = Stacking(;
                              opti = [plain_hrp(),
                                      HierarchicalEqualRiskContribution(;
@@ -371,6 +380,63 @@ end
         end
     end
 
+    @testset "A panel with no field collapses to a panel with masks alone (#1912)" begin
+        sz = size(rd_r.X)
+        rd_nf = ReturnsResult(; nx = rd_r.nx, X = rd_r.X, ts = rd_r.ts,
+                              pnl = AssetPanel(; amsk = trues(sz), emsk = trues(sz)))
+        nco = NestedClustered(; opti = plain_hrp(), opto = plain_hrp(), cv = KFold(; n = 3),
+                              ex = seq)
+        res = optimise(nco, rd_nf)
+        # The panel holds no field, so no outer problem reads it: the answer is the one of
+        # the same data with no panel at all.
+        rd_np = ReturnsResult(; nx = rd_r.nx, X = rd_r.X, ts = rd_r.ts)
+        res_np = optimise(nco, rd_np)
+        @test isapprox(sum(res.w), 1)
+        @test res.w ≈ res_np.w
+        @test res.clr.k == res_np.clr.k
+        @test assignments(res.clr) == assignments(res_np.clr)
+        #=
+        The masks collapse too: a sub-portfolio is active where one member with weight is
+        active (#1926). Assets 1 and 5, the first cluster, list at row 61, and every prior
+        under a Coverage Policy keeps them, so the first sub-portfolio is inactive on rows 1
+        to 60 alone. The outer recorder reads the collapsed panel.
+        =#
+        m = trues(sz)
+        m[1:60, [1, 5]] .= false
+        Xm = copy(rd_r.X)
+        Xm[1:60, [1, 5]] .= NaN
+        rd_m = ReturnsResult(; nx = rd_r.nx, X = Xm, ts = rd_r.ts,
+                             pnl = AssetPanel(; amsk = m, emsk = copy(m)))
+        cvg = CoveragePolicy()
+        pec = EmpiricalPrior(; me = SimpleExpectedReturns(; cvg = cvg),
+                             ce = Covariance(; cvg = cvg))
+        cec = PortfolioOptimisersCovariance(; ce = Covariance(; cvg = cvg))
+        cli = ClustersEstimator(; ce = cec)
+        rm = RecordingDistance(Distance())
+        ncm = NestedClustered(; pe = pec, cle = cli,
+                              opti = HierarchicalRiskParity(;
+                                                            opt = HierarchicalOptimiser(;
+                                                                                        pe = pec,
+                                                                                        cle = cli,
+                                                                                        slv = slv)),
+                              opto = HierarchicalRiskParity(;
+                                                            opt = HierarchicalOptimiser(;
+                                                                                        pe = pec,
+                                                                                        cle = ClustersEstimator(;
+                                                                                                                ce = cec,
+                                                                                                                de = rm),
+                                                                                        slv = slv)),
+                              cv = KFold(; n = 3), ex = seq)
+        resm = optimise(ncm, rd_m)
+        @test assignments(resm.clr) == [1, 2, 2, 2, 1, 2, 2, 2]
+        po = only(rm.rds).pnl
+        @test isnothing(po.pf)
+        @test size(po.amsk) == (T, 2)
+        @test findall(.!po.amsk[:, 1]) == 1:60
+        @test all(po.amsk[:, 2])
+        @test po.emsk == po.amsk
+    end
+
     @testset "A square carrier through a fold collapses onto the synthetic universe" begin
         #=
         This testset used to pin the opposite: a square carrier kept the *real* assets as
@@ -385,7 +451,7 @@ end
         real universe depending on whether `cv` was set. That is the assertion below, and
         it is a deliberate behaviour change from `T x N x nassets`.
         =#
-        cvopt = OptimisationCrossValidation(; cv = KFold(; n = 3))
+        cvopt = KFold(; n = 3)
         ro = RecordingDistance(FeatureDistance(; alg = StackObservations()))
         st = Stacking(;
                       opti = [plain_hrp(),
@@ -699,6 +765,136 @@ end
         @test_throws TypeError NestedClustered(; opti = ew, opto = ew, pcol = :cash)
     end
 
+    @testset "The read-cell collapse on its small shapes (#1912)" begin
+        #=
+        The outer problem of `NestedClustered` reads the collapsed panel through its
+        `FeatureDistance`. The inner clusters come from the default covariance distance, not
+        from the features, so an asset whose cell holds a placeholder still sits in a cluster
+        with a weight. Without a panel the default clustering is `{1, 5}` and
+        `{2, 3, 4, 6, 7, 8}`. The reference of each shape is worked by hand from the inner
+        weights, normalised in each cluster: a collapsed cell is the mean of the cells that
+        hold data, weighted by those weights.
+        =#
+        function outer_features(rd)
+            ro = RecordingDistance(FeatureDistance(; alg = StackObservations()))
+            nco = NestedClustered(; opti = plain_hrp(),
+                                  opto = HierarchicalRiskParity(; opt = hopt(ro)), ex = seq)
+            res = optimise(nco, rd)
+            idx = assignments(res.clr)
+            Wn = zeros(N, res.clr.k)
+            for i in 1:(res.clr.k)
+                Wn[findall(==(i), idx), i] = res.resi[i].w
+            end
+            @test length(ro.seen) == 1
+            return only(ro.seen), Wn ./ sum(Wn; dims = 1), only(ro.rds)
+        end
+        rd_with(pnl) = ReturnsResult(; nx = nx, X = X, ts = ts, pnl = pnl)
+        mean_of_read(num, den) = ifelse.(iszero.(den), 0.0,
+                                         num ./ ifelse.(iszero.(den), 1.0, den))
+        # Assets 1 and 4 hold a placeholder: asset 1 sits in the first cluster with asset 5.
+        d = Bool[0, 1, 1, 0, 1, 1, 1, 1]
+        # A static numeric field reads the cells that hold data. The first cluster reads
+        # asset 5 alone, so its value is `5`, and not the mean of the weighted placeholder.
+        a = [0.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+        Z, Wn = outer_features(rd_with(AssetPanel(;
+                                                  pf = [NumericPanelField(; name = "z",
+                                                                          vals = a,
+                                                                          omsk = d,
+                                                                          pmsk = .!d)])))
+        @test size(Wn) == (N, 2)
+        @test Z ≈ reshape(mean_of_read(transpose(Wn) * (d .* a), transpose(Wn) * d), :, 1)
+        @test Z[1] ≈ 5.0
+        # The observed mask of a static field collapses with no active mask: a sub-portfolio
+        # is observed where one member with weight is (#1926). Assets 1 and 5, the first
+        # cluster, are not observed, but a fill wrote their cells, so they hold data.
+        ob = Bool[0, 1, 1, 1, 0, 1, 1, 1]
+        Z, Wn, rdo = outer_features(rd_with(AssetPanel(;
+                                                       pf = [NumericPanelField(; name = "z",
+                                                                               vals = a,
+                                                                               omsk = ob,
+                                                                               pmsk = falses(N))])))
+        fo = PO.panel_field(rdo.pnl, "z")
+        @test fo.omsk == Bool[0, 1]
+        @test fo.pmsk == Bool[0, 0]
+        @test Z ≈ reshape(transpose(Wn) * a, :, 1)
+        # A static categorical field collapses to the membership fractions of the cells
+        # that hold data.
+        codes = [1, 2, 1, 2, 2, 1, 2, 1]
+        onehot = Float64[codes[i] == l for i in 1:N, l in 1:2]
+        Z, Wn = outer_features(rd_with(AssetPanel(;
+                                                  pf = [CategoricalPanelField(; name = "c",
+                                                                              levels = ["x",
+                                                                                        "y"],
+                                                                              codes = codes,
+                                                                              omsk = d,
+                                                                              pmsk = .!d)])))
+        @test Z ≈ mean_of_read(transpose(Wn) * (d .* onehot), transpose(Wn) * d)
+        @test Z[1, :] ≈ [0.0, 1.0]
+        @test all(isapprox(sum(Z[i, :]), 1) for i in 1:2)
+        # A static rectangular tensor field reads each label at the cells that hold data at
+        # that label.
+        A = Float64[1 2; 3 4; 5 6; 7 8; 9 10; 11 12; 13 14; 15 16]
+        o = trues(N, 2)
+        o[1, 1] = false
+        o[3, 1] = false
+        o[4, 2] = false
+        Z, Wn = outer_features(rd_with(AssetPanel(;
+                                                  pf = [TensorPanelField(; name = "t",
+                                                                         axis = "factor",
+                                                                         labels = ["p",
+                                                                                   "q"],
+                                                                         vals = A, omsk = o,
+                                                                         pmsk = .!o)])))
+        Zref = reduce(hcat,
+                      [mean_of_read(transpose(Wn) * (o[:, l] .* A[:, l]),
+                                    transpose(Wn) * o[:, l]) for l in 1:2])
+        @test Z ≈ Zref
+        # Label `p` of the first cluster reads asset 5 alone.
+        @test Z[1, 1] ≈ 9.0
+        # A time-varying tensor field whose data mask holds everywhere collapses as the
+        # plain contraction of the active members does, one observation at a time.
+        A3 = reshape(Float64.(1:(T * N * 2)), T, N, 2) ./ 1000
+        Z, Wn = outer_features(rd_with(AssetPanel(;
+                                                  pf = [TensorPanelField(; name = "t",
+                                                                         axis = "factor",
+                                                                         labels = ["p",
+                                                                                   "q"],
+                                                                         vals = A3,
+                                                                         omsk = trues(T, N,
+                                                                                      2),
+                                                                         pmsk = falses(T, N,
+                                                                                       2))],
+                                                  amsk = trues(T, N), emsk = trues(T, N))))
+        @test size(Z) == (T, 2, 2)
+        @test all(t -> Z[t, :, :] ≈ transpose(Wn) * A3[t, :, :], 1:T)
+        # A static tensor field whose data mask holds everywhere collapses as the plain
+        # contraction.
+        Z, Wn = outer_features(rd_with(AssetPanel(;
+                                                  pf = [TensorPanelField(; name = "t",
+                                                                         axis = "factor",
+                                                                         labels = ["p",
+                                                                                   "q"],
+                                                                         vals = A,
+                                                                         omsk = trues(N, 2),
+                                                                         pmsk = falses(N,
+                                                                                       2))])))
+        @test Z ≈ transpose(Wn) * A
+        # Implied volatilities with no risk premium adjustment collapse to an outer problem
+        # with none. No reader of the default fit reads them, so the weights are those of
+        # the same returns with no implied volatilities. The outer recorder reads the
+        # collapsed rates (#1926).
+        ri = RecordingDistance(Distance())
+        nci = NestedClustered(; opti = plain_hrp(),
+                              opto = HierarchicalRiskParity(; opt = hopt(ri)), ex = seq)
+        rdiv = ReturnsResult(; nx = nx, X = X, ts = ts, iv = abs.(X) .* 10 .+ 0.1)
+        @test isnothing(rdiv.ivpa)
+        resiv = optimise(nci, rdiv)
+        rdo = only(ri.rds)
+        @test isnothing(rdo.ivpa)
+        @test size(rdo.iv) == (T, resiv.clr.k)
+        @test resiv.w ≈ optimise(nci, ReturnsResult(; nx = nx, X = X, ts = ts)).w
+    end
+
     @testset "Every member active: both rules equal the plain collapse bit for bit" begin
         #=
         #1456 promised that a fit whose members are all active does not change. Where no
@@ -735,7 +931,7 @@ end
         # Four optimisations whose outer problem reads the collapsed panel: each
         # meta-optimiser, with and without cross-validation. The cash rule divides by
         # nothing, so its fit is the reference that each mask and each rule must equal.
-        cvopt = OptimisationCrossValidation(; cv = KFold(; n = 3))
+        cvopt = KFold(; n = 3)
         outer() = HierarchicalRiskParity(;
                                          opt = hopt(FeatureDistance(;
                                                                     alg = StackObservations())))

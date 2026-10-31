@@ -234,6 +234,37 @@ end
                                            w = ep_w0)(rd.X[:, 1]), rtol = 1e-5)
 end
 
+@testset "ep_rlvar_tail is the minimum of the two power cones" begin
+    # Cone A bounds `psi` below by a multiple of `|u - omega|^((1 + k) / k)`, and cone B
+    # bounds `theta` below by a multiple of `omega^(-(1 - k) / k)`. The sum is convex in
+    # `omega > 0`. Its stationary point is the positive root `(u + sigma) / 2` of a
+    # quadratic whose discriminant is `sigma^2`, as `math_dict[:rlvar_sigma]` states.
+    for k in (0.1, 0.3, 0.6, 0.9), z in (1e-3, 0.1, 1.0), u in (-0.5, 0.0, 0.2, 1.0)
+        A = k / (1 + k) * (2 * k / ((1 + k) * z))^(1 / k)
+        B = k * (1 - k)^((1 - k) / k) * (z / (2 * k))^(1 / k)
+        h = om -> A * abs(u - om)^((1 + k) / k) + B * om^(-(1 - k) / k)
+        sigma = sqrt(u^2 + (1 - k^2) * z^2 / k^2)
+        om = (u + sigma) / 2
+        # `om - u` cancels when `u` is large against `z`, so this check reads at 1e-6.
+        @test isapprox(om * (om - u), (1 - k^2) * z^2 / (4 * k^2); rtol = 1e-6)
+        @test isapprox(h(om), PO.ep_rlvar_tail(u, z, k); rtol = 1e-9)
+        @test all(h(om) <= h(om * s) for s in (0.9, 0.99, 1.01, 1.1))
+    end
+end
+
+@testset "the EVaR and the RLVaR are concave in the probabilities" begin
+    # A lower-bound view on a positive combination of these measures is an upper level set
+    # of a concave function, so it is convex, as the conic formulations state. The two
+    # weight vectors are far apart, so the gap at the midpoint is far above the search error.
+    x = -rd.X[:, 1]
+    w1 = LinearAlgebra.normalize(collect(range(0.1, 1.9; length = T)), 1)
+    w2 = reverse(w1)
+    wm = (w1 + w2) / 2
+    for f in (w -> PO.ep_rlvar(x, w, ep_a, ep_k).rlvar, w -> PO.ep_evar(x, w, ep_a).evar)
+        @test f(wm) > (f(w1) + f(w2)) / 2
+    end
+end
+
 @testset "RLVaR views, conic formulation" begin
     # RLVaR sits close to the worst realisation of the sample, so the headroom a lower
     # bound has is small. A modest multiple keeps the view reachable.
@@ -293,18 +324,16 @@ end
     @test RelativisticValueatRiskView(; views = v).alg === nothing
     @test RelativisticValueatRiskView(; views = v, alpha = 0.01, kappa = 0.7).kappa == 0.7
     @test RelativisticValueatRiskView(; views = v,
-                                      alg = GridRelativisticValueatRiskView(; pct = 0.8,
-                                                                            K = 21)).alg.K ==
-          21
+                                      alg = GridTailView(; pct = 0.8, K = 21)).alg.K == 21
     @test_throws DomainError RelativisticValueatRiskView(; views = v, alpha = 1.5)
     @test_throws DomainError RelativisticValueatRiskView(; views = v, kappa = 0.0)
     @test_throws DomainError RelativisticValueatRiskView(; views = v, kappa = 1.0)
-    @test_throws DomainError GridRelativisticValueatRiskView(; K = 10)
-    @test_throws DomainError GridRelativisticValueatRiskView(; pct = 1.0)
+    @test_throws DomainError GridTailView(; K = 10)
+    @test_throws DomainError GridTailView(; pct = 1.0)
     # `M` multiplies the smallest constant that releases each row, so one is its floor.
     # Issue #1264.
-    @test_throws DomainError GridRelativisticValueatRiskView(; M = 0.5)
-    @test GridRelativisticValueatRiskView().M == 1
+    @test_throws DomainError GridTailView(; M = 0.5)
+    @test GridTailView().M == 1
     @test_throws PortfolioOptimisers.IsEmptyError RelativisticValueatRiskView(; views = v,
                                                                               alg = ConicRelativisticValueatRiskView[])
     @test_throws UndefKeywordError RelativisticValueatRiskView(; alpha = 0.05)
@@ -318,10 +347,8 @@ end
     # `nothing` takes the exact conic formulation where it applies, and the grid elsewhere.
     @test PO.ep_rlvar_formulation(nothing, false, true, :geq, 0.1, 0.05) ===
           ConicRelativisticValueatRiskView()
-    @test isa(PO.ep_rlvar_formulation(nothing, false, true, :leq, 0.1, 0.05),
-              GridRelativisticValueatRiskView)
-    @test isa(PO.ep_rlvar_formulation(nothing, false, true, :eq, 0.01, 0.05),
-              GridRelativisticValueatRiskView)
+    @test isa(PO.ep_rlvar_formulation(nothing, false, true, :leq, 0.1, 0.05), GridTailView)
+    @test isa(PO.ep_rlvar_formulation(nothing, false, true, :eq, 0.01, 0.05), GridTailView)
     @test PO.ep_rlvar_formulation(ConicRelativisticValueatRiskView(), false, true, :leq,
                                   0.0, 0.0) === ConicRelativisticValueatRiskView()
 
@@ -497,7 +524,7 @@ end
     @test isapprox(pr2.w, pr.w, rtol = 1e-6, atol = 1e-8)
     @test_throws ArgumentError prior(EntropyPoolingPrior(; sets = ep_gsets, opt = ep_jopt,
                                                          evar_views = EntropicValueatRiskView(;
-                                                                                              alg = GridEntropicValueatRiskView(),
+                                                                                              alg = GridTailView(),
                                                                                               views = gv)),
                                      rd)
     # The same holds for the linear CVaR formulation, and a common negative sign is
@@ -519,14 +546,12 @@ end
     # A view whose coefficients carry both signs is refused by every dual formulation,
     # and by the grid, and each refusal names a formulation that expresses it.
     rv = LinearConstraintEstimator(; val = "$(rd.nx[1]) - $(rd.nx[2]) >= 0.01")
-    for (key, alg, name) in ((:cvar_views, LinearConditionalValueatRiskView(),
-                              "SequentialConditionalValueatRiskView"),
-                             (:evar_views, ConicEntropicValueatRiskView(), "SequentialEntropicValueatRiskView"),
-                             (:evar_views, GridEntropicValueatRiskView(), "SequentialEntropicValueatRiskView"),
-                             (:rlvar_views, ConicRelativisticValueatRiskView(),
-                              "SequentialRelativisticValueatRiskView"),
-                             (:rlvar_views, GridRelativisticValueatRiskView(),
-                              "SequentialRelativisticValueatRiskView"))
+    for (key, alg, name) in
+        ((:cvar_views, LinearConditionalValueatRiskView(), "SequentialTailView"),
+         (:evar_views, ConicEntropicValueatRiskView(), "SequentialTailView"),
+         (:evar_views, GridTailView(), "SequentialTailView"),
+         (:rlvar_views, ConicRelativisticValueatRiskView(), "SequentialTailView"),
+         (:rlvar_views, GridTailView(), "SequentialTailView"))
         group = if key == :cvar_views
             ConditionalValueatRiskView(; alg = alg, views = rv)
         elseif key == :evar_views
@@ -594,9 +619,9 @@ end
                                                                          views = LinearConstraintEstimator(;
                                                                                                            val = "AAPL >= $(e1 * 1.2)")),
                                                  EntropicValueatRiskView(; alpha = 0.10,
-                                                                         alg = GridEntropicValueatRiskView(;
-                                                                                                           pct = 0.8,
-                                                                                                           K = 21),
+                                                                         alg = GridTailView(;
+                                                                                            pct = 0.8,
+                                                                                            K = 21),
                                                                          views = LinearConstraintEstimator(;
                                                                                                            val = "XOM >= $(e10 * 1.15)"))]),
                rd)
@@ -620,8 +645,7 @@ end
     @test ConditionalValueatRiskView(; views = v,
                                      alg = IntegerConditionalValueatRiskView(; sbar = 40)).alg.sbar ==
           40
-    @test EntropicValueatRiskView(; views = v,
-                                  alg = GridEntropicValueatRiskView(; pct = 0.8, K = 21)).alg.K ==
+    @test EntropicValueatRiskView(; views = v, alg = GridTailView(; pct = 0.8, K = 21)).alg.K ==
           21
 
     @test_throws DomainError ConditionalValueatRiskView(; views = v, alpha = 1.5)
@@ -662,7 +686,7 @@ end
     for opt in (OptimEntropyPooling(), ep_jopt)
         pr = prior(EntropyPoolingPrior(; sets = sets, opt = opt,
                                        evar_views = EntropicValueatRiskView(;
-                                                                            alg = GridEntropicValueatRiskView(),
+                                                                            alg = GridTailView(),
                                                                             views = v)), rd)
         # The grid enforces the bound at its points alone, so the answer is approximate.
         @test isapprox(ep_evar_of(1, pr.w), tgt, rtol = 5e-3)
@@ -671,15 +695,15 @@ end
     # A denser grid closes the gap.
     coarse = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
                                        evar_views = EntropicValueatRiskView(;
-                                                                            alg = GridEntropicValueatRiskView(;
-                                                                                                              pct = 0.9,
-                                                                                                              K = 3),
+                                                                            alg = GridTailView(;
+                                                                                               pct = 0.9,
+                                                                                               K = 3),
                                                                             views = v)), rd)
     fine = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
                                      evar_views = EntropicValueatRiskView(;
-                                                                          alg = GridEntropicValueatRiskView(;
-                                                                                                            pct = 0.9,
-                                                                                                            K = 41),
+                                                                          alg = GridTailView(;
+                                                                                             pct = 0.9,
+                                                                                             K = 41),
                                                                           views = v)), rd)
     @test abs(ep_evar_of(1, fine.w) - tgt) <= abs(ep_evar_of(1, coarse.w) - tgt)
 end
@@ -736,22 +760,20 @@ end
                                  0.0) === LinearConditionalValueatRiskView()
     @test PO.ep_evar_formulation(nothing, false, true, :geq, 0.1, 0.05) ===
           ConicEntropicValueatRiskView()
-    @test isa(PO.ep_evar_formulation(nothing, false, true, :leq, 0.1, 0.05),
-              GridEntropicValueatRiskView)
-    @test isa(PO.ep_evar_formulation(nothing, false, true, :eq, 0.01, 0.05),
-              GridEntropicValueatRiskView)
+    @test isa(PO.ep_evar_formulation(nothing, false, true, :leq, 0.1, 0.05), GridTailView)
+    @test isa(PO.ep_evar_formulation(nothing, false, true, :eq, 0.01, 0.05), GridTailView)
     # A view whose coefficients carry both signs has no grid to select from, so the
     # sequential formulation is the one that expresses it.
     @test PO.ep_evar_formulation(nothing, true, false, :geq, 0.1, 0.05) ===
-          SequentialEntropicValueatRiskView()
+          SequentialTailView()
     @test PO.ep_rlvar_formulation(nothing, true, false, :leq, 0.1, 0.05) ===
-          SequentialRelativisticValueatRiskView()
+          SequentialTailView()
     # An upper bound over several assets of one sign has no grid to select from either, and
     # neither has an equality below the prior value. A lower bound stays conic. Issue #1287.
-    for (f, conic, seq) in ((PO.ep_evar_formulation, ConicEntropicValueatRiskView(),
-                             SequentialEntropicValueatRiskView()),
-                            (PO.ep_rlvar_formulation, ConicRelativisticValueatRiskView(),
-                             SequentialRelativisticValueatRiskView()))
+    for (f, conic, seq) in
+        ((PO.ep_evar_formulation, ConicEntropicValueatRiskView(), SequentialTailView()),
+         (PO.ep_rlvar_formulation, ConicRelativisticValueatRiskView(),
+          SequentialTailView()))
         @test f(nothing, false, false, :geq, 0.1, 0.05) === conic
         @test f(nothing, false, false, :eq, 0.1, 0.05) === conic
         @test f(nothing, false, false, :leq, 0.1, 0.05) === seq
@@ -822,25 +844,29 @@ end
     @test IntegerConditionalValueatRiskView(; sbar = 25).sbar == 25
     @test_throws DomainError IntegerConditionalValueatRiskView(; sbar = 0)
     @test_throws DomainError IntegerConditionalValueatRiskView(; sbar = 1.5)
-    @test GridEntropicValueatRiskView().K == 11
-    @test_throws DomainError GridEntropicValueatRiskView(; K = 10)
-    @test_throws DomainError GridEntropicValueatRiskView(; pct = 1.5)
-    @test_throws DomainError GridEntropicValueatRiskView(; M = 0.5)
-    @test GridEntropicValueatRiskView().M == 1
+    @test GridTailView().K == 11
+    @test_throws DomainError GridTailView(; K = 10)
+    @test_throws DomainError GridTailView(; pct = 1.5)
+    @test_throws DomainError GridTailView(; M = 0.5)
+    @test GridTailView().M == 1
     # The anchor that centres the grid runs from a grid formulation alone, so its number of
     # steps and its tolerance live there rather than on the view group.
-    for T in (GridEntropicValueatRiskView, GridRelativisticValueatRiskView)
-        # `K` sizes a binary block of the mixed-integer program an upper-bound or equality
-        # view builds, so it takes a resource cap of its own (ADR 0041). The parity check
-        # alone admitted a grid of ten million binaries from one view.
-        @test_throws DomainError T(; K = 10_000_001)
-        @test T().iters == 50
-        @test T().tol == 1e-10
-        @test T().tilt_iters == 200
-        @test_throws DomainError T(; iters = 0)
-        @test_throws DomainError T(; tol = -1)
-        @test_throws DomainError T(; tilt_iters = 0)
-    end
+    # `K` sizes a binary block of the mixed-integer program an upper-bound or equality view
+    # builds, so it takes a resource cap of its own (ADR 0041). The parity check alone
+    # admitted a grid of ten million binaries from one view.
+    @test_throws DomainError GridTailView(; K = 10_000_001)
+    @test GridTailView().iters == 50
+    @test GridTailView().tol == 1e-10
+    @test GridTailView().tilt_iters == 200
+    @test_throws DomainError GridTailView(; iters = 0)
+    @test_throws DomainError GridTailView(; tol = -1)
+    @test_throws DomainError GridTailView(; tilt_iters = 0)
+    # The grid has no conditional value-at-risk form, so the CVaR view group refuses it
+    # through the bound of its field. Issue #1872.
+    @test_throws TypeError ConditionalValueatRiskView(;
+                                                      views = LinearConstraintEstimator(;
+                                                                                        val = "A <= 0.1"),
+                                                      alg = GridTailView())
     # The tilt of one row bisects to the resolution of the floating-point type, which for
     # `Float64` it reaches near step 64, so the cap binds only below that.
     let c = exp.(range(0, 1; length = 8)), w = fill(inv(8), 8)
@@ -987,8 +1013,7 @@ end
     @test all(>=(0), pr.w)
     @test ccvar(1, pr.w) <= 0.7 * pc1 * (1 + 1e-6)
     @test isapprox(pr.kld, 0.017502412119, rtol = 1e-6)
-    prs = fit(SequentialConditionalValueatRiskView(), JuMPEntropyPooling(; slv = slv),
-              "A <= $(0.7 * pc1)")
+    prs = fit(SequentialTailView(), JuMPEntropyPooling(; slv = slv), "A <= $(0.7 * pc1)")
     @test prs.kld > 1.05 * pr.kld
     pr = fit(ialg, ep_mopt, "A - C == $(pc1 - pc3 + 0.01)")
     @test isapprox(ccvar(1, pr.w) - ccvar(3, pr.w), pc1 - pc3 + 0.01, rtol = 1e-5)

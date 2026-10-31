@@ -154,7 +154,7 @@ Solve the ridge stabilised normal equations of an [`ExpWeightedReturnForecast`](
 # Algorithm
 
  1. When `ridge` is positive, add `ridge` times the mean absolute diagonal entry of `A` to that diagonal, with the floor `eps` on the mean, so an empty normal matrix still gets a positive penalty.
- 2. Solve through [`cross_sectional_solve`](@ref) under [`PseudoInverseFallback`](@ref), which takes the plain solve on a full rank matrix and the minimum-norm solution on a rank deficient one.
+ 2. Solve through [`cross_sectional_solve`](@ref) under [`PseudoInverseFallback`](@ref), which takes the plain solve on a full rank matrix and the minimum-norm solution on a rank deficient one, and keep its factor returns. The normal matrix is square, so the residual count of the solve has no meaning here.
 
 # Arguments
 
@@ -188,7 +188,7 @@ function ew_forecast_solve(A::MatNum, c::VecNum, ridge::Real, t::Integer)::VecNu
             Ar[k, k] += r
         end
     end
-    return cross_sectional_solve(PseudoInverseFallback(), Ar, c, t)
+    return cross_sectional_solve(PseudoInverseFallback(), Ar, c, t).f
 end
 """
     ew_forecast_state(fs::Nothing, Td::Type, K::Integer) -> NamedTuple
@@ -271,6 +271,8 @@ A Return Forecast that fits its Descriptor weights by exponentially weighted lea
 The member turns its Descriptors into scores with the recipe in `scores`. It regresses the forward mean idiosyncratic return of every observation on those scores across the assets. It combines the normal equations of the observations under an exponential decay and does not solve them one at a time, so the coefficients carry the whole history and move slowly. The fit has no intercept, so the forecast absorbs no cross-sectional mean and suits a long-short caller.
 
 The Forecast Unit chooses the pair of target and weights. In the return unit the target is the forward return and the weights are the inverse idiosyncratic variance, which is a generalised least squares. In the Sharpe unit the target is the forward return divided by the idiosyncratic volatility and the weights are the estimation mask. That is the same estimator written as an ordinary least squares, and the member multiplies the forecast by the idiosyncratic volatility at the end.
+
+[grinoldkahn1999](@citet) states the forecast as the volatility of the asset times a coefficient times its score, and Chapter 10 of that work refines a raw score into a forecast of the return by regression. The exponential accumulation of the normal equations, the ridge and the two Forecast Units are this library's own, and no earlier source for them was found.
 
 # Mathematical definition
 
@@ -379,7 +381,7 @@ ExpWeightedReturnForecast
 
 # References
 
-  - $(ref_dict[:grinoldkahn1999])
+  - $(ref_dict[:grinoldkahn1999]) Chapter 10. $(ref_dict[:no_original_source])
 """
 @concrete struct ExpWeightedReturnForecast <: AbstractReturnForecastEstimator
     """

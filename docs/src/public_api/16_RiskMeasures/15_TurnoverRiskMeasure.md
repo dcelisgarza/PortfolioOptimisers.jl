@@ -11,3 +11,10 @@ factory(r::TurnoverRiskMeasure, w::VecNum)
 factory(r::TurnoverRiskMeasure, ::Any, ::Any, ::Any, w::Option{<:VecNum} = nothing, args...; kwargs...)
 needs_previous_weights(r::TurnoverRiskMeasure)
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

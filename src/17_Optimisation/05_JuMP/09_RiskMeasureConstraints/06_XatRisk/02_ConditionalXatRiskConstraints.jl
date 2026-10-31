@@ -121,7 +121,7 @@ function set_worst_loss_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
                                      opt::RiskConstraintOwner, series, wi, keys::NamedTuple;
                                      prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
-    rows = isnothing(wi) ? eachindex(series) : findall(x -> zero(x) < x, wi)
+    rows = positive_weight_rows(wi, length(series))
     risk = state_set!(model, prefix, keys.var, i, JuMP.@variable(model))
     state_set!(model, prefix, keys.risk, i, risk)
     state_set!(model, prefix, keys.bound, i,

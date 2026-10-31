@@ -149,7 +149,7 @@ function exposure_benchmark_weights(rd::ReturnsResult, name::AbstractString;
         t = minimum(first, blank)
         nx = [rd.nx[last(k)] for k in blank if first(k) == t]
         strict_diagnostic("the benchmark weight \"$name\" is not finite on $(length(blank)) active cell(s) of the Asset Panel, first at observation $t for the assets $nx. An active cell is in the estimation set of its observation, so the weight is unknown there, and it reads as zero, which takes the asset out of that set. Fill the Panel Field, or set the active mask to false where the asset carries no weight. Under strict = true such a cell raises this message as an error.",
-                          strict)
+                          strict; id = @log_id(name))
     end
     return W
 end

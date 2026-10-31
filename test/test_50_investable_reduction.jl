@@ -835,7 +835,7 @@ end
                                                                                sets = sets)),
              NestedClustered(; pe = prk, sets = sets, opti = mrk, opto = mrk),
              Stacking(; pe = prk, sets = sets, opti = [mrk], opto = mrk),
-             SubsetResampling(; pe = prk, sets = sets, opt = mrk),
+             SubsetResampling(; subset_size = 0.8, pe = prk, sets = sets, opt = mrk),
              InverseVolatility(; pe = prk, sets = sets), EqualWeighted(; sets = sets),
              RandomWeighted(; sets = sets),
              RiskBudgeting(; opt = JuMPOptimiser(; pe = prk, slv = slv),
@@ -1055,8 +1055,8 @@ epview = LinearConstraintEstimator(; val = "a == 0.001")
     @test isempty(const_row.vars)
     @test isnothing(@test_logs (:warn,) PortfolioOptimisers.get_linear_constraints([const_row],
                                                                                    sall))
-    @test_throws ArgumentError PortfolioOptimisers.get_linear_constraints([const_row], sall;
-                                                                          strict = true)
+    @test_throws IsZeroError PortfolioOptimisers.get_linear_constraints([const_row], sall;
+                                                                        strict = true)
 end
 
 @testset "A row naming a departed asset is dropped whole, and a typo still names itself" begin
@@ -1188,6 +1188,75 @@ end
                                                                              val = "a == 0.002"),
                                         sets = setsdk), rddk)
     @test grouped.w == goracle.w
+end
+
+@testset "A held member expands whatever shape it comes in (#1912)" begin
+    # The record of a fold lives on the caller's universe, because the next fold reads its held
+    # weights. The oracle is the same prediction over the hand-reduced universe.
+    kw = (; hwd = SelfFinancingDrift(), store_weight_path = true)
+    # A weight vector, and the path it drifts along.
+    res = optimise(InverseVolatility(; pe = prn), rd)
+    resk = optimise(InverseVolatility(; pe = prk), rdk)
+    hw = predict(res, rd; kw...).hw
+    hwk = predict(resk, rdk; kw...).hw
+    @test hw.w0 == res.w
+    @test hw.w0[keep] == hwk.w0
+    @test hw.w[keep] == hwk.w
+    @test iszero(hw.w[k])
+    @test hw.U[:, keep] == hwk.U
+    @test all(iszero, hw.U[:, k])
+    @test size(hw.U) == (T, N)
+    # A population of weight vectors expands member by member, and so do its paths.
+    lb = Frontier(; N = 3)
+    mk(pe) = MeanRisk(;
+                      opt = JuMPOptimiser(; pe = pe, slv = slv,
+                                          ret = ArithmeticReturn(;
+                                                                 settings = JuMPReturnsSettings(;
+                                                                                                lb = lb))))
+    resp = optimise(mk(prn), rd)
+    respk = optimise(mk(prk), rdk)
+    hwp = predict(resp, rd; kw...).hw
+    hwpk = predict(respk, rdk; kw...).hw
+    @test length(hwp.w) == length(hwp.U) == length(hwp.w0) == 3
+    # The two solves read the same data through different paths, so the solver can stop at
+    # different iterates within its tolerance. One CI host misses by a relative norm of
+    # 4.03e-5 on the first member.
+    for i in 1:3
+        @test isapprox(hwp.w0[i][keep], hwpk.w0[i]; rtol = 1e-4)
+        @test isapprox(hwp.w[i][keep], hwpk.w[i]; rtol = 1e-4)
+        @test iszero(hwp.w[i][k])
+        @test isapprox(hwp.U[i][:, keep], hwpk.U[i]; rtol = 1e-4)
+        @test all(iszero, hwp.U[i][:, k])
+    end
+    # A fold that stores no path has none to expand.
+    @test isnothing(predict(res, rd; hwd = SelfFinancingDrift()).hw.U)
+end
+
+@testset "A prior reference to a departed asset drops its row whole (#1912)" begin
+    # A mean view referring to the prior of a departed asset goes, as a written-out name does.
+    mref = prior(EntropyPoolingPrior(; pe = EmpiricalPrior(),
+                                     mu_views = LinearConstraintEstimator(;
+                                                                          val = "a == 1.5*prior(c)"),
+                                     sets = setsd), rdd)
+    @test mref.kld == 0
+    @test mref.w == fill(1 / T, T)
+    # So does a correlation view whose prior reference names one, singly or as a group.
+    for v in ("(a, b) == 0.5*prior(a, c)",)
+        cref = prior(EntropyPoolingPrior(; pe = EmpiricalPrior(),
+                                         rho_views = LinearConstraintEstimator(; val = v),
+                                         sets = setsd), rdd)
+        @test cref.kld == 0
+        @test cref.w == fill(1 / T, T)
+    end
+    setsgd = UniverseSets(;
+                          dict = Dict("nx" => nx, "gA" => [nx[k]], "gB" => [nx[2]],
+                                      "gC" => [nx[1]]))
+    gref = prior(EntropyPoolingPrior(; pe = EmpiricalPrior(),
+                                     rho_views = LinearConstraintEstimator(;
+                                                                           val = "(gC, gB) == 0.5*prior(gA, gB)"),
+                                     sets = setsgd), rdd)
+    @test gref.kld == 0
+    @test gref.w == fill(1 / T, T)
 end
 
 @testset "The door reports once, naming its own process and what the departure cost" begin
@@ -1478,6 +1547,26 @@ end
     @test isapprox(bg.sigma[keep, keep], bo.sigma; rtol = 1e-12)
     # The factor block is not expanded, because the reduction never touched the factor axis.
     @test bg.fpr.mu == bo.fpr.mu
+    # The wrapper forwards the residual declaration of its wrapped estimator (#1912). The
+    # high order factor prior takes the residual block off the covariance before it forms
+    # the residual cokurtosis, so the cokurtosis does not depend on whether the wrapped
+    # factor prior added the block. Without the declaration, the block stays in the
+    # covariance and the two cokurtoses differ at order one.
+    hkt(rsd) = prior(HighOrderFactorPriorEstimator(;
+                                                   pe = BayesianBlackLittermanPrior(;
+                                                                                    pe = FactorPrior(;
+                                                                                                     rsd = rsd),
+                                                                                    views = blfview,
+                                                                                    sets = setsdf)),
+                     rd).kt
+    @test isapprox(hkt(true), hkt(false); rtol = 1e-4)
+    @test !isapprox(hkt(true),
+                    prior(HighOrderFactorPriorEstimator(;
+                                                        pe = BayesianBlackLittermanPrior(;
+                                                                                         pe = FactorPrior(),
+                                                                                         views = blfview,
+                                                                                         sets = setsdf),
+                                                        rsd = false), rd).kt; rtol = 0.1)
     @test length(bg.mu) == N
     @test isnan(bg.mu[k])
     @test PortfolioOptimisers.investable_mask(bg) == BitVector([1, 1, 0, 1, 1])
@@ -1558,6 +1647,30 @@ end
                                                                 BitVector([1, 1, 0, 1, 1])))
 end
 
+@testset "An augmented prior whose two view halves both resolve to nothing is the stacked prior (#1912)" begin
+    # Neither half keeps a row, so the joint posterior is the joint prior and not the
+    # empty-view algebra, which would widen the covariance by `tau`.
+    typo = LinearConstraintEstimator(; val = "zz == 0.002")
+    ftypo = LinearConstraintEstimator(; val = "zzf == 0.002")
+    pe = AugmentedBlackLittermanPrior(; a_views = typo, f_views = ftypo, sets = setsdf)
+    pa = prior(pe, rddf)
+    ref = prior(AugmentedBlackLittermanPrior(; a_views = blview, f_views = blfview,
+                                             sets = setsdf), rddf)
+    @test size(pa.mu) == size(ref.mu)
+    @test isnan(pa.mu[k])
+    # The oracle is the stack with no view at all: the asset prior, fitted on the hand-reduced
+    # returns, and the factor prior. The empty-view algebra would answer `(1 + tau) * sigma`.
+    ao = prior(EmpiricalPrior(), rddfk)
+    fo = prior(EmpiricalPrior(), F)
+    @test pa.mu[keep] ≈ ao.mu
+    @test pa.sigma[keep, keep] ≈ ao.sigma
+    @test pa.fpr.mu ≈ fo.mu
+    @test pa.fpr.sigma ≈ fo.sigma
+    @test !isapprox(pa.sigma[keep, keep], (1 + inv(T)) * ao.sigma)
+    # Views that resolve to rows do move the answer off this stack.
+    @test !isapprox(ref.sigma[keep, keep], ao.sigma)
+end
+
 @testset "The Black-Litterman collapse and the empty view block on their own terms" begin
     mu = [0.1, 0.2]
     sigma = [1.0 0.2; 0.2 1.0]
@@ -1615,10 +1728,57 @@ end
     ag = prior(AugmentedBlackLittermanPrior(; a_views = blview, f_views = blfview,
                                             sets = setsdf, l = 1, w = w), rddf)
     @test ag.mu[keep] == ao.mu
-    # Both `nothing` sentinels answer the argument they were handed.
-    @test PortfolioOptimisers.investable_weights_view(nothing, w) === w
-    @test isnothing(PortfolioOptimisers.investable_weights_view(BitVector([1, 1, 0, 1, 1]),
-                                                                nothing))
+    # No weights is no reduction: the equilibrium mean takes equal weights over the reduced
+    # axis, which is the hand-reduced fit's answer (#1912).
+    fo0 = prior(FactorBlackLittermanPrior(; views = blfview, sets = setsdfk, l = 1), rddfk)
+    fg0 = prior(FactorBlackLittermanPrior(; views = blfview, sets = setsdf, l = 1), rddf)
+    @test fg0.mu[keep] == fo0.mu
+    @test isnan(fg0.mu[k])
+end
+
+@testset "A value-level verb reduces a population and a weight path of weights (#1912)" begin
+    # The weights are viewed at the mask by shape: a population member by member, a path by
+    # columns. The oracle is the same verb on the hand-reduced prior and weights.
+    rm = ConditionalValueatRisk()
+    wv = [fill(0.2, 5), [0.25, 0.25, 0.0, 0.25, 0.25]]
+    wvk = [fill(0.2, 4), fill(0.25, 4)]
+    # A population holding the dead asset in one member is refused by name under `strict`,
+    # and warns otherwise; the held weight is dropped, so the figure is the oracle's.
+    err = try
+        expected_risk(rm, wv, prn; strict = true)
+        nothing
+    catch e
+        e
+    end
+    @test isa(err, ArgumentError)
+    @test occursin("Assets [3] are not investable", err.msg)
+    held = @test_logs (:warn,) expected_risk(rm, wv, prn)
+    @test held ≈ [expected_risk(rm, wvk[1], prk), expected_risk(rm, wvk[2], prk)]
+    # One weight vector reads the same rule.
+    wd = [0.25, 0.25, 0.1, 0.2, 0.2]
+    errd = try
+        expected_risk(rm, wd, prn; strict = true)
+        nothing
+    catch e
+        e
+    end
+    @test isa(errd, ArgumentError)
+    @test occursin("Assets [3] are not investable", errd.msg)
+    @test (@test_logs (:warn,) expected_risk(rm, wd, prn)) ≈
+          expected_risk(rm, wd[keep], prk)
+    # A member that holds nothing in the dead asset has nothing to refuse or to warn about.
+    clean = @test_logs expected_risk(rm, wv[2:2], prn; strict = true)
+    @test clean ≈ [expected_risk(rm, wvk[2], prk)]
+    # The same holds for a weight path, whose rows are observations: the mask selects its
+    # columns and every row keeps its observation.
+    W = repeat(transpose(wv[1]), T)
+    W[(T ÷ 2):end, :] .= transpose(wv[2])
+    Wk = W[:, keep]
+    @test_throws ArgumentError expected_risk(rm, W, prn; strict = true)
+    @test (@test_logs (:warn,) expected_risk(rm, W, prn)) ≈ expected_risk(rm, Wk, prk)
+    Wc = repeat(transpose(wv[2]), T)
+    @test (@test_logs expected_risk(rm, Wc, prn; strict = true)) ≈
+          expected_risk(rm, Wc[:, keep], prk)
 end
 
 @testset "A view row that resolves and cancels is still dropped, and is not a typo" begin
@@ -1636,9 +1796,9 @@ end
     @test blv.excl == [1]
     @test collect(PortfolioOptimisers.remove_excl_views([0.1, 0.2], blv.excl)) == [0.2]
     # And `strict` still refuses it, because nothing about it is a departure.
-    @test_throws ArgumentError PortfolioOptimisers.get_black_litterman_views(parse_equation("A - A == 0.0"),
-                                                                             bsets;
-                                                                             strict = true)
+    @test_throws IsZeroError PortfolioOptimisers.get_black_litterman_views(parse_equation("A - A == 0.0"),
+                                                                           bsets;
+                                                                           strict = true)
     # `A` is in the universe, so the refusal must not say the row matched nothing: it says
     # the row resolved and cancelled, which is the failure the user has to fix (#943).
     msg = try

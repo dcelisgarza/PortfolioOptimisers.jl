@@ -1,9 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Equal Risk Measure for hierarchical portfolio optimisation.
+Measures the same risk for every portfolio, so that a hierarchical optimiser splits every cluster evenly.
 
-`EqualRisk` reports the same risk for every portfolio: the reciprocal of the length of the weight vector it is given. A hierarchical optimiser weights a cluster by the reciprocal of its risk, so a constant risk makes every split an even one.
+The risk is the reciprocal of the length of the weights vector. A hierarchical optimiser weights a cluster by the reciprocal of its risk, so a constant risk makes every split an even one. [`HierarchicalRiskParity`](@ref) gives each half of each bisection one half of the weight of the parent, so its weights are ``1/N`` only when ``N`` is a power of two. [`HierarchicalEqualRiskContribution`](@ref) splits each cluster evenly and gives the assets of a cluster equal weights. The risk does not change when the weights change, so every contribution of [`risk_contribution`](@ref) is zero.
 
 # Mathematical definition
 
@@ -39,7 +39,7 @@ Keywords correspond to the struct's fields.
 
     (r::EqualRisk)(w::VecNum)
 
-Returns the reciprocal of the length of the weight vector `w`.
+Returns the reciprocal of the length of the weights vector `w`, in the element type of `w`. An integer element type gives a floating point number.
 
 ## Arguments
 
@@ -52,15 +52,22 @@ julia> EqualRisk()
 EqualRisk
   settings ┼ HierarchicalRiskMeasureSettings
            │   scale ┴ Float64: 1.0
+
+julia> EqualRisk()([0.5, 0.3, 0.2, 0.0])
+0.25
+
+julia> EqualRisk()(Float32[0.6, 0.4])
+0.5f0
 ```
 
 # Related
 
-  - [`number_effective_assets`](@ref)
-  - [`set_weight_norm_2_constraints!`](@ref)
   - [`HierarchicalRiskMeasure`](@ref)
   - [`HierarchicalRiskMeasureSettings`](@ref)
-  - [`RiskRatio`](@ref)
+  - [`HierarchicalRiskParity`](@ref)
+  - [`HierarchicalEqualRiskContribution`](@ref)
+  - [`number_effective_assets`](@ref): It equals ``N`` at the equal weights ``1/N``.
+  - [`ScaleFreeRiskMeasures`](@ref)
 """
 @concrete struct EqualRisk <: HierarchicalRiskMeasure
     """
@@ -76,7 +83,7 @@ function EqualRisk(;
     return EqualRisk(settings)
 end
 function (::EqualRisk)(w::VecNum)
-    return inv(length(w))
+    return one(eltype(w)) / length(w)
 end
 
 # Expected-risk input kind — see `risk_input_kind`.

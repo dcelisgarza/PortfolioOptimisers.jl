@@ -359,7 +359,7 @@ separate. The cell below crosses four decays against two separations.
 separations = ["HopCount(; n = 2)" => HopCount(; n = 2),
                "PathLength(; dmax = 1.0)" => PathLength(; dmax = 1.0)]
 decays = ["LinearDecay()" => LinearDecay(), "ExponentialDecay()" => ExponentialDecay(),
-          "ReciprocalDecay()" => ReciprocalDecay(), "NoDecay()" => NoDecay()]
+          "ReciprocalDecay()" => ReciprocalDecay(), "nothing" => nothing]
 
 function graph_panel(sep, decay)
     ape = PhylogenyPanel(; pl = NetworkEstimator(; sep = sep),
@@ -397,7 +397,7 @@ Compare the table column by column rather than row by row.
     pairing it does not.
   - **`ARI vs correlation` moves with both settings.** The decay changes the distance, and it
     changes the clusters that come out of it.
-  - **[`NoDecay`](@ref) does not mean no truncation.** The budget still cuts, so the field is `1`
+  - **`decay = nothing` does not mean no truncation.** The budget still cuts, so the field is `1`
     inside the budget and `0` outside it, which is an indicator of the neighbourhood rather than a
     matrix of ones. It is also the only decay under which the two separations score the same
     against the correlation cut. An indicator keeps only the support, and the `Related pairs`
@@ -517,8 +517,7 @@ pnl_tv = asset_panel([NumericPanelInput(; name = "volatility", vals = Zvol),
                       NumericPanelInput(; name = "momentum", vals = Zmom)])
 Ztv = feature_matrix(pnl_tv)
 
-collapses = ["LastObservation()" => LastObservation(),
-             "AggregateFeatures()" => AggregateFeatures(),
+collapses = ["LastRow()" => LastRow(), "AggregateFeatures()" => AggregateFeatures(),
              "AggregateDistances()" => AggregateDistances(),
              "StackObservations()" => StackObservations()]
 
@@ -537,7 +536,7 @@ pretty_table(collapse_rows;
 #=
 The four rules give four different answers.
 
-  - [`LastObservation`](@ref), the default, uses the most recent slice and ignores the rest.
+  - [`LastRow`](@ref), the default, uses the most recent slice and ignores the rest.
   - [`AggregateFeatures`](@ref) averages the features first, then measures the distance once.
   - [`AggregateDistances`](@ref) measures each period, then averages the distance matrices. Its
     constructor refuses [`MedianCollapse`](@ref), because a convex combination of metrics is a
@@ -839,7 +838,7 @@ Two settings close the gap, and each is one keyword.
 
   - State a numeric `dmax`, which fixes the budget and the scale across every fold.
   - Use a decay that pins `f(0) = 1`, which is [`ExponentialDecay`](@ref),
-    [`ReciprocalDecay`](@ref) or [`NoDecay`](@ref). None of the three reads the budget as a scale.
+    [`ReciprocalDecay`](@ref) or `nothing`. None of the three reads the budget as a scale.
 
 ## 9. A walk-forward backtest
 

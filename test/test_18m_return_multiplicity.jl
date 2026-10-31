@@ -565,11 +565,41 @@ end
     @test all(p -> p === (), pts)
 end
 
+# A sweep parameter takes its points in the units of the largest absolute point, so its values
+# lie in [-1, 1] and its row keeps the size of the expression that it bounds.
+@testset "Frontier sweep units: a parameter takes its points in units of its scale" begin
+    @test PO.bound_scale([1e-7, -3e-7, 2e-7]) == 3e-7
+    # Every point zero: the scale is one, so the division is defined.
+    @test PO.bound_scale([0.0, 0.0]) === 1.0
+    # The scale keeps the number type of the points.
+    @test PO.bound_scale([1 // 4, -1 // 2]) === 1 // 2
+    @test PO.bound_scale([2, 3]) === 3
+    # A scalar bound is its own only point.
+    @test PO.bound_scale(-2e-7) == 2e-7
+    @test PO.bound_scale(0.0) === 1.0
+    @test PO.bound_scale(-1 // 4) === 1 // 4
+    two = [(:ret_lb_var_1, :ret_lb_1) => (nothing, [10.0, 20.0], 1),
+           (:ret_lb_var_2, :ret_lb_2) => (nothing, [-30.0, 40.0, 50.0], 2)]
+    units = PO.unit_frontier(two)
+    @test [entry.first for entry in units] == [entry.first for entry in two]
+    @test units[1].second == (nothing, [0.5, 1.0], 1)
+    @test units[2].second == (nothing, [-0.6, 0.8, 1.0], 2)
+    # The registry itself keeps its points.
+    @test two[2].second[2] == [-30.0, 40.0, 50.0]
+    # The order of the axis does not change.
+    pts = PO.frontier_sweep_axes(PO.frontier_axis(units), nothing)
+    order = Vector{Float64}[]
+    for p in pts
+        push!(order, collect(p[1][2]))
+    end
+    @test order ==
+          [[0.5, -0.6], [1.0, -0.6], [0.5, 0.8], [1.0, 0.8], [0.5, 1.0], [1.0, 1.0]]
+end
+
 # A `:risk_frontier` entry is `(bound_var_key, bound_key) => (expr, points, flag, owner)`.
 # The registry is **not** parallel to the risk measure vector: a measure registers an entry
-# only when its `settings.ub` is a `Front_NumVec`. So an entry names its owner rather than
-# standing at the owner's position, and the rebuild reads both the owner and the expression
-# off the entry it is rebuilding.
+# only when its `settings.ub` is a `Front_NumVec`. So an entry holds the measure that owns it,
+# and the rebuild reads both the owner and the expression off the entry it is rebuilding.
 @testset "Frontier rebuild: an entry is rebuilt from itself, not from entry 1" begin
     X = [0.01 0.02 -0.01; -0.02 0.01 0.03; 0.03 -0.01 0.02; -0.01 0.02 -0.02;
          0.02 -0.03 0.01; 0.01 0.01 0.01; -0.03 0.02 -0.01; 0.02 0.01 0.02]
@@ -577,9 +607,9 @@ end
     w_min = fill(1 / 3, 3)
     w_max = [0.7, 0.2, 0.1]
     front = Frontier(; N = 3)
-    registry = [(:a_ub_var, :a_ub) => (:EXPR_ONE, front, true, 1),
-                (:b_ub_var, :b_ub) => (:EXPR_TWO, front, false, 2)]
     rs = factory([Variance(), ConditionalValueatRisk()], pr)
+    registry = [(:a_ub_var, :a_ub) => (:EXPR_ONE, front, true, rs[1]),
+                (:b_ub_var, :b_ub) => (:EXPR_TWO, front, false, rs[2])]
 
     entry = PO._rebuild_risk_frontier(pr, nothing, rs[2], registry, w_min, w_max, 2)
     # The keys, the expression, the polarity and the owner are entry 2's own. Only the bound
@@ -588,7 +618,7 @@ end
     @test entry.first == (:b_ub_var, :b_ub)
     @test entry.second[1] === :EXPR_TWO
     @test entry.second[3] === false
-    @test entry.second[4] === 2
+    @test entry.second[4] === rs[2]
     # The span is measure 2's own risk at the two corner portfolios.
     @test collect(entry.second[2]) ≈
           range(expected_risk(rs[2], w_min, X), expected_risk(rs[2], w_max, X); length = 3)
@@ -596,22 +626,35 @@ end
     entry1 = PO._rebuild_risk_frontier(pr, nothing, rs[1], registry, w_min, w_max, 1)
     @test entry1.second[1] === :EXPR_ONE
     @test entry1.second[3] === true
-    @test entry1.second[4] === 1
+    @test entry1.second[4] === rs[1]
 end
 
-@testset "Frontier rebuild: registry positions map to their owning measures" begin
+@testset "Frontier rebuild: an owner is written once, into the entries that have none" begin
+    model = JuMP.Model()
+    x = JuMP.@variable(model)
     front = Frontier(; N = 2)
-    # Measure 1 carries no bound, so the only entry belongs to measure 2. Indexing the
-    # measure vector with the registry position picks measure 1 and builds the span from the
-    # wrong measure.
-    registry = [(:b_ub_var, :b_ub) => (:EXPR_TWO, front, true, 2)]
-    @test PO.risk_frontier_owners(registry, [1]) == [2]
-
-    # Three measures, two of them bounded, and the second bounded one is the third measure.
-    registry = [(:a_ub_var, :a_ub) => (:EXPR_ONE, front, true, 1),
-                (:c_ub_var, :c_ub) => (:EXPR_THREE, front, true, 3)]
-    @test PO.risk_frontier_owners(registry, [1, 2]) == [1, 3]
-    @test PO.risk_frontier_owners(registry, [2]) == [3]
+    rv, rc, rs = Variance(), ConditionalValueatRisk(), StandardDeviation()
+    model[:risk_frontier] = Pair{Tuple{Symbol, Symbol},
+                                 Tuple{JuMP.AbstractJuMPScalar, PO.Front_NumVec, Bool,
+                                       Union{Nothing, PO.AbstractBaseRiskMeasure}}}[(:a_ub_var, :a_ub) => (1.0 * x,
+                                                                                                           front,
+                                                                                                           true,
+                                                                                                           rv),
+                                                                                    (:b_ub_var, :b_ub) => (1.0 * x,
+                                                                                                           front,
+                                                                                                           true,
+                                                                                                           nothing),
+                                                                                    (:c_ub_var, :c_ub) => (1.0 * x,
+                                                                                                           front,
+                                                                                                           true,
+                                                                                                           rc)]
+    PO.set_risk_frontier_owner!(model, 0, rs)
+    # A composite records the measure of a term before the whole measure claims the rest, so
+    # the owners of entries 1 and 3 stay. Entry 2 had none, and takes `rs`.
+    @test [e.second[4] for e in model[:risk_frontier]] == [rv, rs, rc]
+    # Entries at or before `first` belong to an earlier measure and are not read.
+    PO.set_risk_frontier_owner!(model, 3, rv)
+    @test model[:risk_frontier][2].second[4] === rs
 end
 
 # A risk measure registers a `:risk_frontier` entry only when its `settings.ub` is a
@@ -628,7 +671,7 @@ end
     @test all(x -> isa(x, PortfolioOptimisers.OptimisationSuccess), res.retcode)
 
     entry = only(res.model[:risk_frontier])
-    @test entry.second[4] == 2
+    @test entry.second[4] isa ConditionalValueatRisk
 
     r_cvar = factory(ConditionalValueatRisk(), pr)
     res_min = optimise(MeanRisk(; r = [Variance(), ConditionalValueatRisk()], opt = opt))
@@ -653,7 +696,8 @@ end
 
     registry = res.model[:risk_frontier]
     @test length(registry) == 2
-    @test [e.second[4] for e in registry] == [1, 2]
+    @test registry[1].second[4] isa Variance
+    @test registry[2].second[4] isa ConditionalValueatRisk
     # Each entry keeps its own expression. Rebuilding entry 2 from entry 1 bounds the
     # variance twice and leaves the conditional value at risk unbounded.
     @test registry[1].second[1] !== registry[2].second[1]

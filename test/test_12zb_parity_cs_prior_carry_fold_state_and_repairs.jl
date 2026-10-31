@@ -78,7 +78,7 @@ end
 # A test-local target that fits as a `LinearModel` and keeps the default answer of
 # `is_basis_invariant`, so a move of the dropped member under it fits every observation again
 # (#1614).
-struct BasisBoundTarget <: PortfolioOptimisers.AbstractRegressionTarget end
+struct BasisBoundTarget <: PortfolioOptimisers.AbstractUnpenalisedRegressionTarget end
 function PortfolioOptimisers.factory(::BasisBoundTarget, w::PortfolioOptimisers.ObsWeights)
     return factory(LinearModel(), w)
 end
@@ -191,7 +191,7 @@ end
         end
         # The batch fit and the read-out of the carry fold run the same lift, so the carry
         # fold equals the batch fit under each Systematic Repair rule (#1576).
-        for srep in (NoSystematicRepair(), SystematicRepair())
+        for srep in (nothing, SystematicRepair())
             pe = CrossSectionalFactorPrior(; lambda = 1, srep = srep, style...)
             for (k, x) in enumerate(stream(pe, rd, e))
                 @test near(x.pr, batch(pe, k, rd, e))

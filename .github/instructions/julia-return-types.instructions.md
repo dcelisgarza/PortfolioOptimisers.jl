@@ -4,11 +4,11 @@ applyTo: "src/**/*.jl"
 
 # Julia Return Type Annotation Guidelines for PortfolioOptimisers.jl
 
-Julia's type inference is excellent, so return type annotations (`::ReturnType`) are not needed everywhere. They are most valuable when they:
+Julia infers return types well, so a function does not need a return type annotation (`::ReturnType`) everywhere. An annotation is most useful when it does one of these:
 
-1. Serve as documentation — making the return type explicit when reading a function definition.
-2. Catch programming errors — Julia will throw a `TypeError` if the actual return does not match the annotation.
-3. Enforce a contract — particularly for library-facing interfaces.
+1. It documents the return type, so a reader of the function definition sees it.
+2. It catches a programming error. Julia throws a `TypeError` when the returned value does not match the annotation.
+3. It enforces a contract, most of all on an interface that the library exposes.
 
 ## When to Annotate
 
@@ -31,7 +31,7 @@ Julia's type inference is excellent, so return type annotations (`::ReturnType`)
   end
   ```
 
-- **Hand-written factory methods** when the return type is the exact same concrete type as the first argument. A `@propagatable` type gets its `factory` from the macro, so this applies only to a method written by hand:
+- **Hand-written factory methods** whose return type is the same concrete type as the first argument. A `@propagatable` type gets its `factory` from the macro, so this rule applies only to a method that someone writes by hand:
 
   ```julia
   function factory(re::LinearModel, w::ObsWeights)::LinearModel
@@ -49,15 +49,15 @@ Julia's type inference is excellent, so return type annotations (`::ReturnType`)
 
 ### Annotate when helpful for clarity
 
-- Functions in a clearly typed dispatch chain where the concrete return type is stable and non-obvious from the name.
-- Functions that return a union type and the annotation is narrower than what inference produces.
+- A function in a typed dispatch chain whose concrete return type is stable, and which its name does not make obvious.
+- A function that returns a union type, when the annotation is narrower than the type that inference gives.
 
 ## When NOT to Annotate
 
-- Functions whose return type is polymorphic or depends on input types in complex ways (let Julia infer).
-- Functions that return `JuMP` expressions or model variables (types are opaque/complex).
-- Internal helper functions where the call site is always in the same file and context is obvious.
-- Anywhere the annotation would force an allocation-inducing type conversion.
+- A function whose return type is polymorphic, or depends on the input types in a complex way. Let Julia infer it.
+- A function that returns `JuMP` expressions or model variables. Their types are opaque and complex.
+- An internal helper whose call sites are all in the same file, where the context makes the type obvious.
+- Any place where the annotation forces a type conversion that allocates.
 
 ## Syntax
 
@@ -73,7 +73,7 @@ bar(x::Option{<:Number})::Nothing = (@argcheck ...; return nothing)
 
 ## Abstract Return Types
 
-When the return type is an abstract type (e.g., `AbstractPriorResult`), the annotation still adds value as documentation even though Julia cannot use it for specialisation:
+When the return type is an abstract type, such as `AbstractPriorResult`, the annotation still documents the function. Julia cannot use it for specialisation.
 
 ```julia
 function prior(pe::EmpiricalPrior, X::MatNum; kwargs...)::AbstractPriorResult
@@ -82,11 +82,11 @@ function prior(pe::EmpiricalPrior, X::MatNum; kwargs...)::AbstractPriorResult
 end
 ```
 
-Prefer the most specific concrete type when it is always the same; use the abstract supertype when the concrete type varies by dispatch.
+Prefer the most specific concrete type when the function always returns that type. Use the abstract supertype when the concrete type varies by dispatch.
 
 ## `Nothing` Returns
 
-All functions that exist solely for side effects (validation, in-place mutation, printing) and explicitly `return nothing` should be annotated `::Nothing`:
+Annotate with `::Nothing` every function that exists only for a side effect, such as validation, in-place mutation or printing, and that ends with an explicit `return nothing`.
 
 ```julia
 function record_non_investable_drop!(ledger::AbstractVector, what::AbstractString)::Nothing

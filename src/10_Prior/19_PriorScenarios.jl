@@ -156,13 +156,13 @@ Cut a nested Prior Result to the last `n` scenarios that it carries.
 
 [`AugmentedBlackLittermanPrior`](@ref) fits two nested priors, one on the asset returns and one on the factor returns. A Scenario Cap in one of them keeps the last rows of its own returns alone. The two blocks of the result describe the same observations, so the result keeps the rows that both nested priors keep, and this function cuts the nested prior that carries more rows. The moments of `pr` are fitted over every observation, so the cut changes no moment.
 
-A Prior Result with `ens = nothing` states `size(pr.X, 1)` as the count of the observations that its moments read. The cut makes `X` shorter, so it writes that count in `ens`, as [`scenario_ens`](@ref) does for the cap itself.
+An entry of `nothing` in the `eoc` of a Prior Result states `size(pr.X, 1)` as the count of the observations that its moment reads. The cut makes `X` shorter, so it writes that count in each such entry, as [`scenario_moment_counts`](@ref) does for the cap itself.
 
 # Algorithm
 
  1. Take `t = size(pr.X, 1)`. When `n >= t`, return `pr`.
  2. Refuse a `pr` that carries weights, per `# Validation`.
- 3. Forward `pr` with [`forward_prior`](@ref), with `X` and `o_X` cut by [`scenario_window`](@ref), and with `ens` set to `t` when it is `nothing`.
+ 3. Forward `pr` with [`forward_prior`](@ref), with `X` and `o_X` cut by [`scenario_window`](@ref), and with each entry of `eoc` set to `t` when it is `nothing`.
 
 # Arguments
 
@@ -181,7 +181,7 @@ A Prior Result with `ens = nothing` states `size(pr.X, 1)` as the count of the o
 # Related
 
   - [`scenario_window`](@ref)
-  - [`scenario_ens`](@ref)
+  - [`scenario_moment_counts`](@ref)
   - [`AugmentedBlackLittermanPrior`](@ref)
 """
 function scenario_tail(pr::LowOrderPrior, n::Integer, name::Symbol)
@@ -193,16 +193,16 @@ function scenario_tail(pr::LowOrderPrior, n::Integer, name::Symbol)
               DimensionMismatch("`$name` answered $t weighted scenarios, and the other nested prior keeps the last $n. The two blocks of the result describe the same observations, so the result keeps $n rows, and the weights of `$name` have no meaning on fewer rows than they weigh. Put the same Scenario Cap inside `$name`, in the prior that it reweights, so that its weights state the same $n scenarios."))
     o_X = isnothing(pr.o_X) ? nothing : scenario_window(n, pr.o_X)
     return forward_prior(pr; X = scenario_window(n, pr.X), o_X = o_X,
-                         ens = something(pr.ens, t))
+                         eoc = map(c -> something(c, t), pr.eoc))
 end
 """
     keeps_observations(pe::AbstractPriorEstimator) -> false
     keeps_observations(pe::EmpiricalPrior) -> Bool
-    keeps_observations(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
-                                 <:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
-                                 <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior,
-                                 <:HighOrderPriorEstimator,
-                                 <:HighOrderFactorPriorEstimator}) -> Bool
+    keeps_observations(pe::Union{FactorPrior, FactorBlackLittermanPrior,
+                                 BlackLittermanPrior, BayesianBlackLittermanPrior,
+                                 EntropyPoolingPrior, MeucciEntropyPoolingPrior,
+                                 HighOrderPriorEstimator,
+                                 HighOrderFactorPriorEstimator}) -> Bool
     keeps_observations(pe::AugmentedBlackLittermanPrior) -> Bool
     keeps_observations(pe::OpinionPoolingPrior) -> Bool
     keeps_observations(pe::Online{<:AbstractPriorEstimator}) -> false
@@ -259,11 +259,11 @@ end
 function keeps_observations(pe::EmpiricalPrior)::Bool
     return isnothing(pe.max_scenarios)
 end
-function keeps_observations(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
-                                      <:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
-                                      <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior,
-                                      <:HighOrderPriorEstimator,
-                                      <:HighOrderFactorPriorEstimator})::Bool
+function keeps_observations(pe::Union{FactorPrior, FactorBlackLittermanPrior,
+                                      BlackLittermanPrior, BayesianBlackLittermanPrior,
+                                      EntropyPoolingPrior, MeucciEntropyPoolingPrior,
+                                      HighOrderPriorEstimator,
+                                      HighOrderFactorPriorEstimator})::Bool
     return keeps_observations(pe.pe)
 end
 function keeps_observations(pe::AugmentedBlackLittermanPrior)::Bool
@@ -278,10 +278,10 @@ end
 """
     kept_scenarios(pe::AbstractPriorEstimator, T::Integer)
     kept_scenarios(pe::EmpiricalPrior, T::Integer)
-    kept_scenarios(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
-                             <:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
-                             <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior,
-                             <:HighOrderPriorEstimator, <:HighOrderFactorPriorEstimator},
+    kept_scenarios(pe::Union{FactorPrior, FactorBlackLittermanPrior,
+                             BlackLittermanPrior, BayesianBlackLittermanPrior,
+                             EntropyPoolingPrior, MeucciEntropyPoolingPrior,
+                             HighOrderPriorEstimator, HighOrderFactorPriorEstimator},
                    T::Integer)
     kept_scenarios(pe::AugmentedBlackLittermanPrior, T::Integer)
     kept_scenarios(pe::OpinionPoolingPrior, T::Integer)
@@ -321,11 +321,11 @@ end
 function kept_scenarios(pe::EmpiricalPrior, T::Integer)::Option{Int}
     return isnothing(pe.max_scenarios) ? T : min(pe.max_scenarios, T)
 end
-function kept_scenarios(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
-                                  <:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
-                                  <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior,
-                                  <:HighOrderPriorEstimator,
-                                  <:HighOrderFactorPriorEstimator}, T::Integer)::Option{Int}
+function kept_scenarios(pe::Union{FactorPrior, FactorBlackLittermanPrior,
+                                  BlackLittermanPrior, BayesianBlackLittermanPrior,
+                                  EntropyPoolingPrior, MeucciEntropyPoolingPrior,
+                                  HighOrderPriorEstimator, HighOrderFactorPriorEstimator},
+                        T::Integer)::Option{Int}
     return kept_scenarios(pe.pe, T)
 end
 function kept_scenarios(pe::AugmentedBlackLittermanPrior, T::Integer)::Option{Int}
@@ -339,11 +339,11 @@ end
 """
     scenario_count(pe::AbstractPriorEstimator, X::MatNum, F::Option{<:MatNum},
                    pnl::Option{<:AssetPanel}; strict::Bool = false, kwargs...)
-    scenario_count(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior}, X::MatNum,
+    scenario_count(pe::Union{FactorPrior, FactorBlackLittermanPrior}, X::MatNum,
                    F::MatNum, pnl::Option{<:AssetPanel}; strict::Bool = false, kwargs...)
-    scenario_count(pe::Union{<:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
-                             <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior,
-                             <:HighOrderPriorEstimator, <:HighOrderFactorPriorEstimator},
+    scenario_count(pe::Union{BlackLittermanPrior, BayesianBlackLittermanPrior,
+                             EntropyPoolingPrior, MeucciEntropyPoolingPrior,
+                             HighOrderPriorEstimator, HighOrderFactorPriorEstimator},
                    X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
     scenario_count(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
                    pnl::Option{<:AssetPanel}; strict::Bool = false, kwargs...)
@@ -402,16 +402,16 @@ function scenario_count(pe::AbstractPriorEstimator, X::MatNum, F::Option{<:MatNu
     end
     return size(prior(pe, X, F, pnl; strict = strict, kwargs...).X, 1)
 end
-function scenario_count(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior}, ::MatNum,
+function scenario_count(pe::Union{FactorPrior, FactorBlackLittermanPrior}, ::MatNum,
                         F::MatNum, ::Option{<:AssetPanel}; strict::Bool = false,
                         kwargs...)::Int
     return scenario_count(pe.pe, F, nothing, nothing; strict = strict)
 end
-function scenario_count(pe::Union{<:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
-                                  <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior,
-                                  <:HighOrderPriorEstimator,
-                                  <:HighOrderFactorPriorEstimator}, X::MatNum,
-                        F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)::Int
+function scenario_count(pe::Union{BlackLittermanPrior, BayesianBlackLittermanPrior,
+                                  EntropyPoolingPrior, MeucciEntropyPoolingPrior,
+                                  HighOrderPriorEstimator, HighOrderFactorPriorEstimator},
+                        X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel};
+                        kwargs...)::Int
     return scenario_count(pe.pe, X, F, pnl; kwargs...)
 end
 function scenario_count(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
@@ -887,14 +887,18 @@ function cross_sectional_moment_prior(pe::CrossSectionalFactorPrior, f_pr::Named
     # the last rows of each history, so the factor returns keep the rows the scenarios keep
     # (#1384).
     rs = (T - size(Xs, 1) + 1):T
-    lift = cross_sectional_lift(pe.srep, pe.mp, L, f_mu, f_pr.sigma, csfm.esigma, idx, Xs;
+    # The systematic block is assembled from the factor covariance, so its denoiser reads the
+    # count of that covariance (#1893).
+    lift = cross_sectional_lift(pe.srep, pe.mp, L, f_mu, f_pr.sigma, csfm.esigma, idx, Xs,
+                                something(f_pr.eoc[2], size(f_pr.X, 1));
                                 mtx_sqrt = pe.mtx_sqrt, kwargs...)
     fX = something(csfm.fr, cross_sectional_factor_returns(csfm))
     fpr = LowOrderPrior(; X = fX[rs, :], mu = ex.mu, sigma = ex.sigma, w = f_pr.w,
-                        ens = f_pr.ens, kld = f_pr.kld, ow = f_pr.ow, pc = f_pr.pc)
+                        ens = f_pr.ens, eoc = f_pr.eoc, kld = f_pr.kld, ow = f_pr.ow,
+                        pc = f_pr.pc)
     return LowOrderPrior(; X = Xs, o_X = oX, mu = lift.mu + rr.b, sigma = lift.sigma,
-                         chol = lift.chol, w = f_pr.w, ens = f_pr.ens, kld = f_pr.kld,
-                         ow = f_pr.ow, rr = rr, fpr = fpr)
+                         chol = lift.chol, w = f_pr.w, ens = f_pr.ens, eoc = f_pr.eoc,
+                         kld = f_pr.kld, ow = f_pr.ow, rr = rr, fpr = fpr)
 end
 """
     cross_sectional_stored_cache(csfm::CrossSectionalFactorModel, cache_reg::Bool,
@@ -1042,37 +1046,95 @@ function assert_scenario_model(pe::CrossSectionalFactorPrior)
     return assert_scenario_model(pe.pe)
 end
 """
-    scenario_ens(::Nothing, X::MatNum)
-    scenario_ens(max_scenarios::Integer, X::MatNum)
+    scenario_moment_counts(pe::EmpiricalPrior, X::MatNum, t::Integer,
+                           T_mu::Option{<:Real} = nothing; kwargs...)
+        -> Tuple{Option{<:Real}, Option{<:Real}}
 
-State the number of observations the moments of a capped Prior Result were fitted over, or `nothing` when the cap cuts nothing.
+State the effective number of observations of the mean and of the covariance of an empirical Prior Result, in the form of its field `eoc`.
 
-The count a Scenario Cap owes its readers. [`scenario_window`](@ref) cuts the rows the result carries and leaves `mu` and `sigma` fitted over every observation, so a consumer that prices a sample size off `size(pr.X, 1)` — an uncertainty set's `T`, a calibration rule's count — would read `w` rows for moments fitted over `t`, and mis-price every count by `t / w`. The result therefore states `t` in `ens` exactly when the cap cuts, and every count reader takes `ens` before the shape. When the cap does not cut, or there is no cap, the rows carried *are* the observations fitted over, and `ens` stays `nothing`, so a fit without a cap is bit-identical to what it was.
+`pe.me` fits `mu` and `pe.ce` fits `sigma` over every row of `X`. Each estimator states the number of observations that its moment is worth with [`effective_observation_count`](@ref). That is `size(X, 1)` for an unweighted estimator, and the count of its weights for a weighted one, such as the Kish count of an exponentially weighted covariance. The two estimators can carry different weights, so each moment has its own count.
 
-It is the same verb in batch and in `prior(pe)` with no data after a fold, as [`scenario_window`](@ref) is, and the two agree by construction: both read the same `t` off the same matrix.
+`T_mu` is the count of the mean that the fit of `mu` stated, from [`mean_with_count`](@ref). A [`PriorExpectedReturns`](@ref) states it, because its count is known only after the fit of its prior. When `T_mu` is `nothing`, the function reads the count of `pe.me` with [`effective_observation_count`](@ref).
+
+A Scenario Cap cuts the rows that the result carries to the last `t`, and leaves the moments fitted over every row. [`scenario_window`](@ref) makes the cut. A consumer that reads `size(pr.X, 1)` then reads `t` rows for moments fitted over `size(X, 1)`. So an entry of `eoc` states the count whenever it is not `t`, and `nothing` otherwise, through [`moment_count_entry`](@ref). A fit with no cap and no weights states `(nothing, nothing)`.
+
+It is the same function in batch and in `prior(pe)` with no data after a fold, as [`scenario_window`](@ref) is. The fold keeps the rows in its buffer, so both routes read the same counts over the same rows.
 
 # Arguments
 
-  - `max_scenarios`: The number of observations carried, or `nothing`.
-  - `X`: Asset returns the moments were fitted over, `observations × assets`, **before** the cut.
+  - `pe`: Empirical prior estimator.
+  - `X`: The returns that the moments were fitted over, `observations × assets`, **before** the cut. Under a horizon they are the log-returns.
+  - `t`: The number of rows that the result carries, after the cut.
+  - `T_mu`: The count of the mean that the fit of `mu` stated, or `nothing`.
+  - `kwargs...`: The keywords that the prior gives to the fits of `mu` and `sigma`. The function gives them to [`effective_observation_count`](@ref), so a count reads the same values as its fit.
 
 # Returns
 
-  - `ens::Option{<:Integer}`: `size(X, 1)` when `max_scenarios` cuts it, `nothing` otherwise.
+  - `eoc::Tuple`: The entries `(T_mu, T_sigma)` of the field `eoc`.
 
 # Related
 
   - [`scenario_window`](@ref)
+  - [`effective_observation_count`](@ref)
+  - [`mean_with_count`](@ref)
+  - [`moment_count_entry`](@ref)
   - [`EmpiricalPrior`](@ref)
   - [`LowOrderPrior`](@ref)
-  - [`effective_sample_size`](@ref)
 """
-function scenario_ens(::Nothing, ::MatNum)
-    return nothing
+function scenario_moment_counts(pe::EmpiricalPrior, X::MatNum, t::Integer,
+                                T_mu::Option{<:Real} = nothing; kwargs...)
+    # The count of a mean that a fit states wins, so the second fit of a prior is not paid.
+    T_mu = isnothing(T_mu) ? effective_observation_count(pe.me, X; kwargs...) : T_mu
+    return (moment_count_entry(T_mu, t),
+            moment_count_entry(effective_observation_count(pe.ce, X; kwargs...), t))
 end
-function scenario_ens(max_scenarios::Integer, X::MatNum)
-    t = size(X, 1)
-    return max_scenarios >= t ? nothing : t
+"""
+    mean_with_count(me::AbstractExpectedReturnsEstimator, X::MatNum,
+                    pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    mean_with_count(me::AbstractExpectedReturnsEstimator; kwargs...)
+
+Fit the mean of `me` as a vector, and return it with the count of the mean that the fit states.
+
+An [`EmpiricalPrior`](@ref) reads its mean through this function, and gives the count to [`scenario_moment_counts`](@ref). Most mean estimators state their count before the fit, with [`effective_observation_count`](@ref), so the function returns `nothing` as their count. A [`PriorExpectedReturns`](@ref) reads the `mu` of a prior that it fits, and a pooling prior knows its count only after its fit. So its method returns entry 1 of the `eoc` of that prior result, and the prior is fitted once.
+
+The form with no data reads a folded estimator, as `Statistics.mean(me)` does.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. On a mean estimator with no method of its own, fit `mu` with `Statistics.mean`, and return `vec(mu)` with the count `nothing`.
+ 2. On [`PriorExpectedReturns`](@ref), fit the prior result `pr` with [`prior`](@ref), with no factor returns. Return `vec(pr.mu)` with the count of the mean of `pr`, from [`moment_observation_count`](@ref). The form with no data reads `prior(me.pe)`.
+
+# Arguments
+
+  - `me`: The expected returns estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:pnl_moment])
+  - $(arg_dict[:dims])
+  - `kwargs...`: Forwarded to the fit of the mean.
+
+# Validation
+
+  - Everything the fit of the mean refuses.
+
+# Returns
+
+  - `(mu, T_mu)::Tuple`: The mean vector `mu`, and its count `T_mu`, a `Real` or `nothing`.
+
+# Related
+
+  - [`scenario_moment_counts`](@ref)
+  - [`effective_observation_count`](@ref)
+  - [`PriorExpectedReturns`](@ref)
+  - [`EmpiricalPrior`](@ref)
+"""
+function mean_with_count(me::AbstractExpectedReturnsEstimator, X::MatNum,
+                         pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    return vec(Statistics.mean(me, X, pnl; dims = dims, kwargs...)), nothing
+end
+function mean_with_count(me::AbstractExpectedReturnsEstimator; kwargs...)
+    return vec(Statistics.mean(me; kwargs...)), nothing
 end
 """
     scenario_fill_report(filled, ::Nothing)
@@ -1223,7 +1285,7 @@ function scenario_fill(X::MatNum, mu::VecNum, sigma::MatNum, strict::Bool,
         frac = length(filled) / length(X)
         if strict || isnothing(fill_limit) || worst > fill_limit
             strict_diagnostic(scenario_fill_msg(report, wi, worst, frac, fill_limit),
-                              strict)
+                              strict; id = @log_id())
             scenario_fill_remember!(named, report)
         end
     end

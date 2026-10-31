@@ -121,7 +121,7 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
             @test_throws ArgumentError ReturnsResult(; nx = nx, X = X,
                                                      pnl = matrix_panel(["f", "f"],
                                                                         rand(rng, 3, 2)))
-            # A blank never reaches a carrier: `NaN` is a blank, and the default `NoPanelFill`
+            # A blank never reaches a carrier: `NaN` is a blank, and the default fill `nothing`
             # refuses it at the build rather than letting it reach a metric that would map it
             # to a plausible wrong distance.
             @test_throws ArgumentError ReturnsResult(; nx = nx, X = X,
@@ -629,6 +629,12 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test_throws DimensionMismatch PricesResult(; X = X, ivpa = [1.0, 1.0])
         @test_throws DimensionMismatch PricesResult(; X = X, B = B[:bA, :bB])
         @test_throws DimensionMismatch PricesResult(; X = X, span = trues(5, 2))
+        # A repeated timestamp is refused, because a window of `port_opt_view` finds each
+        # row by its timestamp, and it would take the first of the two rows.
+        tsd = [ts[1], ts[1], ts[2], ts[3], ts[3]]
+        Xd = TimeArray(tsd, values(X), colnames(X))
+        @test_throws "Got 2 repeated timestamp(s), and the first is $(ts[1])" PricesResult(;
+                                                                                           X = Xd)
     end
 
     @testset "the preprocessing interface refuses a half-implemented estimator" begin
@@ -1302,13 +1308,14 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test_throws MethodError prices_to_returns(Xc, Fc)
 
         # The bare call is exactly the two steps, and it is the layer's own path rather than
-        # a way around it, so it emits the `AssetPanel` the layer always emits. A carrier
-        # built by hand states no span, and therefore no universe.
+        # a way around it, so it emits the panel the layer emits: none for a gapless table
+        # with no Panel Field (#1882). A carrier built by hand states no span, and therefore
+        # no universe.
         pr = price_ingestion(PriceIngestion(), Xc)
         routed = prices_to_returns(Xc)
         @test isequal(routed.X, prices_to_returns(pr).X)
         @test routed.ts == tsc[2:end]
-        @test isa(routed.pnl, AssetPanel)
+        @test isequal(routed.pnl, prices_to_returns(pr).pnl)
         @test isnothing(prices_to_returns(PricesResult(; X = Xc)).pnl)
 
         # The three surviving keywords reach the carrier form unchanged.
@@ -1351,11 +1358,14 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test occursin("Asset Panel or Listing Span", err.msg)
 
         # A panel with its two masks and no Panel Field has an observation axis.
-        pm = AssetPanel(; pf = PortfolioOptimisers.AbstractPanelField[], amsk = trues(6, 3),
-                        emsk = trues(6, 3))
+        pm = AssetPanel(; amsk = trues(6, 3), emsk = trues(6, 3))
         @test !PortfolioOptimisers.panel_is_static(pm)
         @test PortfolioOptimisers.feature_row_indices(pm, ts[[6, 1]], ts) == [6, 1]
-        @test PortfolioOptimisers.panel_feature_names(pm) == String[]
+        @test isnothing(PortfolioOptimisers.panel_feature_names(pm))
+        @test PortfolioOptimisers.panel_feature_matrix(pm) === (nothing, nothing)
+        @test_throws IsEmptyError AssetPanel(;
+                                             pf = PortfolioOptimisers.AbstractPanelField[],
+                                             amsk = trues(6, 3), emsk = trues(6, 3))
 
         # The names follow the column order of the derived Feature Matrix, observed masks
         # after the values of their own field.
@@ -3004,8 +3014,7 @@ end
     a = AssetPanel(; amsk = [true true; false true], emsk = [true false; false true])
     b = AssetPanel(; amsk = [true false], emsk = [true false])
     c = vcat(a, b)
-    @test isempty(c.pf)
-    @test c.pf === a.pf
+    @test isnothing(c.pf)
     @test Matrix(c.amsk) == [true true; false true; true false]
     @test Matrix(c.emsk) == [true false; false true; true false]
 end
@@ -3026,6 +3035,20 @@ end
              AssetPanel(; pf = [PO.panel_field_lift(t, 1)], amsk = PO.AllTrueMask(1, 3),
                         emsk = PO.AllTrueMask(1, 3)))
     @test isa(d.pf[1].vals, PO.RepeatedLeading)
+    # Equal lifts of two element types stay lazy, and the element types promote as `vcat`
+    # promotes them.
+    lift(v, n) = AssetPanel(;
+                            pf = [PO.panel_field_lift(NumericPanelField(; name = "size",
+                                                                        vals = v), n)],
+                            amsk = PO.AllTrueMask(n, 3), emsk = PO.AllTrueMask(n, 3))
+    for (x, y) in ((Float32[1, 2, 3], [1.0, 2.0, 3.0]), ([1, 2, 3], Float32[1, 2, 3]))
+        for (p, q) in ((x, y), (y, x))
+            f = only(vcat(lift(p, 2), lift(q, 1)).pf).vals
+            @test isa(f, PO.RepeatedLeading)
+            @test eltype(f) === eltype(vcat(repeat(p', 2), q'))
+            @test f == repeat([1.0 2.0 3.0], 3)
+        end
+    end
     # A lift of another array makes the field time-varying, and a mask with a false cell
     # makes the mask dense.
     u = NumericPanelField(; name = "size", vals = [4.0, 5.0, 6.0])
@@ -3154,7 +3177,7 @@ end
 #=
 The missing-share report, the info report and the active-mask alignment of an Asset Panel (#1400).
 
-`describe` counts the cells that the builder filled, `panel_info` prints the dimensions, the mask
+`describe` counts the cells that the raw source did not observe, `panel_info` prints the dimensions, the mask
 coverage and the level coverage, and `panel_align_active` moves the start of each asset to the
 first active observation where each named Panel Field is observed. Each is checked by hand on a
 small panel, and against the oracle on the parity fixture of map #1375 with an observed mask
@@ -3265,6 +3288,12 @@ end
     @test by.missing[1:2] == [0.0, 1.0]
     empty = AssetPanel(; amsk = trues(2, 2), emsk = trues(2, 2))
     @test size(describe(empty)) == (0, 7)
+    # A share is a Float64 also when no row holds one. An empty comprehension over the
+    # abstract Panel Fields gave a column of `Any` (#1453).
+    df = describe(empty)
+    @test eltype(df.missing) == eltype(df.active_missing) == Float64
+    only_by = AssetPanel(; pf = PO.AbstractPanelField[pnl.pf[2]])
+    @test eltype(describe(only_by; by = "sector").missing) == Float64
 end
 
 @testset "panel_info prints the dimensions, the masks, the fields and the levels" begin
@@ -3296,6 +3325,22 @@ end
                                                   codes = [1:8;])])
     @test occursin("< 10    : 8 levels (L1, L2, L3, L4, … +4 more)",
                    sprint(panel_info, many))
+    # A group of one level prints the singular (#1453).
+    @test occursin("< 10    : 1 level (L1)",
+                   sprint(panel_info,
+                          AssetPanel(;
+                                     pf = [CategoricalPanelField(; name = "g",
+                                                                 levels = ["L1"],
+                                                                 codes = [1, 1])])))
+    # The name column is as wide as the widest name in columns of text, so a name in a wide
+    # script lines up with the header. Each of the two characters takes two columns (#1453).
+    wide = AssetPanel(; pf = [NumericPanelField(; name = "市值市值", vals = [1.0, 2.0])])
+    ls = split(sprint(panel_info, wide), '\n')
+    head = ls[findfirst(l -> startswith(l, "  field"), ls)]
+    row = ls[findfirst(l -> startswith(l, "  市值市值"), ls)]
+    @test textwidth(head) == textwidth(row)
+    @test textwidth(row[1:prevind(row, findfirst("numeric", row)[1])]) ==
+          findfirst("kind", head)[1] - 1
     # A panel with no row prints no spread.
     norow = AssetPanel(; amsk = falses(0, 2), emsk = falses(0, 2))
     s = sprint(panel_info, norow)

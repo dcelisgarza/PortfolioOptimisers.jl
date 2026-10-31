@@ -3,7 +3,7 @@
 # A file with no lcov record has no executable line and records zero of both.
 
 [provenance]
-julia = "1.13.2"
+julia = "1.13.3"
 commit = "8610300"
 
 [file]
@@ -58,6 +58,8 @@ commit = "8610300"
 "src/02_Tools/05_Propagatable.jl" = { lines = 198, misses = 0 }
 "src/02_Tools/06_ForwardProperties.jl" = { lines = 128, misses = 0 }
 "src/02_Tools/07_VectorToScalarMeasures.jl" = { lines = 71, misses = 0 }
+"src/02_Tools/08_MeanTest.jl" = { lines = 278, misses = 1 }
+"src/02_Tools/09_MeanTestDraws.jl" = { lines = 182, misses = 0 }
 "src/03_InputData/01_AssetPanel.jl" = { lines = 93, misses = 0 }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { lines = 195, misses = 0 }
 "src/03_InputData/03_ListingSpan.jl" = { lines = 51, misses = 0 }
@@ -125,11 +127,17 @@ commit = "8610300"
 "src/05_Moments/29_ExpWeighted/01_ExpWeightedExpectedReturns.jl" = { lines = 73, misses = 0 }
 "src/05_Moments/29_ExpWeighted/02_ExpWeightedVariance.jl" = { lines = 85, misses = 0 }
 "src/05_Moments/29_ExpWeighted/03_ExpWeightedCovariance.jl" = { lines = 96, misses = 0 }
+"src/05_Moments/29_ExpWeighted/04_ExpWeightedCentring.jl" = { lines = 98, misses = 0 }
 "src/05_Moments/30_RegimeAdjusted/01_RegimeAdjustedExpWeightedVariance.jl" = { lines = 176, misses = 0 }
 "src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_a.jl" = { lines = 269, misses = 0 }
 "src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_b.jl" = { lines = 72, misses = 0 }
 "src/05_Moments/30_RegimeAdjusted/03_MahalanobisRegimeBias.jl" = { lines = 203, misses = 0 }
 "src/05_Moments/30_RegimeAdjusted/04_HacRowKernel.jl" = { lines = 103, misses = 0 }
+"src/05_Moments/30_RegimeAdjusted/05_RegimeSwitches.jl" = { lines = 54, misses = 0 }
+"src/05_Moments/30_RegimeAdjusted/06_EstimatedRegimeBias.jl" = { lines = 161, misses = 3 }
+"src/05_Moments/30_RegimeAdjusted/07_EstimatedMahalanobisBias.jl" = { lines = 174, misses = 2 }
+"src/05_Moments/30_RegimeAdjusted/08_SeparatePortfolioBias.jl" = { lines = 84, misses = 0 }
+"src/05_Moments/30_RegimeAdjusted/09_MahalanobisLevelClosure.jl" = { lines = 243, misses = 0 }
 "src/05_Moments/31_HigherMomentPartialFit.jl" = { lines = 77, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl" = { lines = 123, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/02_CrossSectionalWeights.jl" = { lines = 86, misses = 0 }
@@ -148,6 +156,7 @@ commit = "8610300"
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/11_OneHotExposure.jl" = { lines = 52, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/12_ConstantExposure.jl" = { lines = 10, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/13_ExposureNeutralisation.jl" = { lines = 64, misses = 0 }
+"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/14_ObservedExposure.jl" = { lines = 175, misses = 2 }
 "src/05_Moments/32_CrossSectionalFactorModel/05_FactorFamilyBasis.jl" = { lines = 143, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/06_FactorFamilyBasisTransforms.jl" = { lines = 169, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/01_Base_ReturnForecast.jl" = { lines = 79, misses = 0 }
@@ -164,16 +173,18 @@ commit = "8610300"
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/12_ForecastForwardWindows.jl" = { lines = 55, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/13_ForecastCalibration.jl" = { lines = 58, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/14_ForecastSummary.jl" = { lines = 95, misses = 0 }
+"src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/15_TargetReturnForecastStep.jl" = { lines = 102, misses = 2 }
 "src/05_Moments/32_CrossSectionalFactorModel/08_CrossSectionalRegressionDiagnostics.jl" = { lines = 339, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/09_CrossSectionalExposureDiagnostics.jl" = { lines = 195, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { lines = 159, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/11_CrossSectionalIdiosyncraticDiagnostics.jl" = { lines = 182, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/12_CrossSectionalExposureIC.jl" = { lines = 130, misses = 0 }
 "src/05_Moments/33_CoverageUniverse.jl" = { lines = 143, misses = 0 }
-"src/05_Moments/34_PriceLevelExpectedReturns.jl" = { lines = 175, misses = 0 }
+"src/05_Moments/34_PriceLevelExpectedReturns.jl" = { lines = 218, misses = 1 }
 "src/05_Moments/35_CompositePriceLevelStatistics.jl" = { lines = 212, misses = 0 }
 "src/05_Moments/36_RankOneCovariance.jl" = { lines = 25, misses = 0 }
 "src/05_Moments/37_GeodesicShrinkageCovariance.jl" = { lines = 116, misses = 0 }
+"src/05_Moments/38_ElasticNet.jl" = { lines = 106, misses = 0 }
 "src/06_Distance/01_Base_Distance.jl" = { lines = 12, misses = 0 }
 "src/06_Distance/02_Distance.jl" = { lines = 72, misses = 0 }
 "src/06_Distance/03_DistanceDistance.jl" = { lines = 14, misses = 0 }
@@ -206,12 +217,12 @@ commit = "8610300"
 "src/08_Phylogeny/11_PhylogenyMatrix.jl" = { lines = 25, misses = 0 }
 "src/08_Phylogeny/12_AssetPhylogeny.jl" = { lines = 9, misses = 0 }
 "src/09_ConstraintGeneration/01_Base_ConstraintGeneration.jl" = { lines = 26, misses = 0 }
-"src/09_ConstraintGeneration/02_LinearConstraintGeneration_a.jl" = { lines = 265, misses = 1 }
+"src/09_ConstraintGeneration/02_LinearConstraintGeneration_a.jl" = { lines = 265, misses = 0 }
 "src/09_ConstraintGeneration/02_LinearConstraintGeneration_b.jl" = { lines = 235, misses = 0 }
 "src/09_ConstraintGeneration/03_RiskBudgetConstraintGeneration.jl" = { lines = 23, misses = 0 }
 "src/09_ConstraintGeneration/04_PhylogenyConstraintGeneration.jl" = { lines = 93, misses = 0 }
 "src/09_ConstraintGeneration/05_WeightBoundsConstraintGeneration.jl" = { lines = 61, misses = 0 }
-"src/09_ConstraintGeneration/06_AssetSetsMatrix.jl" = { lines = 174, misses = 1 }
+"src/09_ConstraintGeneration/06_AssetSetsMatrix.jl" = { lines = 174, misses = 0 }
 "src/09_ConstraintGeneration/07_ThresholdConstraintGeneration.jl" = { lines = 18, misses = 0 }
 "src/09_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { lines = 42, misses = 0 }
 "src/09_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { lines = 44, misses = 0 }
@@ -242,8 +253,12 @@ commit = "8610300"
 "src/10_Prior/12_PriorPartialFit.jl" = { lines = 76, misses = 0 }
 "src/10_Prior/13_PriorExpectedReturns.jl" = { lines = 17, misses = 0 }
 "src/10_Prior/14_LowDimensionEnsemblePrior.jl" = { lines = 38, misses = 0 }
+"src/10_Prior/15_CrossSectionalPriorFold.jl" = { lines = 228, misses = 2 }
 "src/10_Prior/16_CrossSectionalForecastHistoryCarry.jl" = { lines = 23, misses = 0 }
+"src/10_Prior/17_CrossSectionalCalibrationRules.jl" = { lines = 184, misses = 0 }
+"src/10_Prior/18_CrossSectionalCarryHistories.jl" = { lines = 154, misses = 3 }
 "src/10_Prior/19_PriorScenarios.jl" = { lines = 56, misses = 0 }
+"src/10_Prior/20_PriorReturnsSource.jl" = { lines = 154, misses = 0 }
 "src/11_UncertaintySets/01_Base_UncertaintySets.jl" = { lines = 128, misses = 0 }
 "src/11_UncertaintySets/02_DeltaUncertaintySets.jl" = { lines = 20, misses = 0 }
 "src/11_UncertaintySets/03_NormalUncertaintySets.jl" = { lines = 161, misses = 0 }
@@ -258,36 +273,37 @@ commit = "8610300"
 "src/13_Fees.jl" = { lines = 142, misses = 0 }
 "src/14_NetReturnsDrawdowns.jl" = { lines = 28, misses = 0 }
 "src/15_Tracking.jl" = { lines = 28, misses = 0 }
-"src/16_RiskMeasures/01_Base_RiskMeasures.jl" = { lines = 220, misses = 23 }
+"src/16_RiskMeasures/01_Base_RiskMeasures.jl" = { lines = 220, misses = 0 }
 "src/16_RiskMeasures/02_Variance.jl" = { lines = 117, misses = 0 }
-"src/16_RiskMeasures/03_MomentRiskMeasures.jl" = { lines = 139, misses = 2 }
-"src/16_RiskMeasures/04_Kurtosis.jl" = { lines = 89, misses = 10 }
+"src/16_RiskMeasures/03_MomentRiskMeasures.jl" = { lines = 139, misses = 0 }
+"src/16_RiskMeasures/04_Kurtosis.jl" = { lines = 89, misses = 0 }
 "src/16_RiskMeasures/05_NegativeSkewness.jl" = { lines = 42, misses = 0 }
 "src/16_RiskMeasures/06_XatRisk/01_XatRisk.jl" = { lines = 215, misses = 0 }
 "src/16_RiskMeasures/06_XatRisk/02_ConditionalXatRisk.jl" = { lines = 224, misses = 0 }
-"src/16_RiskMeasures/06_XatRisk/03_EntropicXatRisk.jl" = { lines = 103, misses = 1 }
+"src/16_RiskMeasures/06_XatRisk/03_EntropicXatRisk.jl" = { lines = 103, misses = 0 }
 "src/16_RiskMeasures/06_XatRisk/04_RelativisticXatRisk.jl" = { lines = 148, misses = 0 }
-"src/16_RiskMeasures/06_XatRisk/05_PowerNormXatRisk.jl" = { lines = 109, misses = 1 }
-"src/16_RiskMeasures/07_OWARiskMeasures_a.jl" = { lines = 260, misses = 7 }
+"src/16_RiskMeasures/06_XatRisk/05_PowerNormXatRisk.jl" = { lines = 109, misses = 0 }
+"src/16_RiskMeasures/07_OWARiskMeasures_a.jl" = { lines = 260, misses = 0 }
 "src/16_RiskMeasures/07_OWARiskMeasures_b.jl" = { lines = 34, misses = 0 }
 "src/16_RiskMeasures/08_AverageDrawdown.jl" = { lines = 16, misses = 0 }
 "src/16_RiskMeasures/09_UlcerIndex.jl" = { lines = 14, misses = 0 }
 "src/16_RiskMeasures/10_MaximumDrawdown.jl" = { lines = 14, misses = 0 }
 "src/16_RiskMeasures/11_BrownianDistanceVariance.jl" = { lines = 15, misses = 0 }
 "src/16_RiskMeasures/12_WorstRealisation.jl" = { lines = 6, misses = 0 }
-"src/16_RiskMeasures/13_NoRisk.jl" = { lines = 27, misses = 3 }
+"src/16_RiskMeasures/13_NoRisk.jl" = { lines = 27, misses = 0 }
 "src/16_RiskMeasures/14_Range.jl" = { lines = 6, misses = 0 }
-"src/16_RiskMeasures/15_TurnoverRiskMeasure.jl" = { lines = 13, misses = 2 }
+"src/16_RiskMeasures/15_TurnoverRiskMeasure.jl" = { lines = 13, misses = 0 }
 "src/16_RiskMeasures/16_TrackingRiskMeasure.jl" = { lines = 56, misses = 0 }
-"src/16_RiskMeasures/17_VarianceSkewKurtosis.jl" = { lines = 92, misses = 11 }
+"src/16_RiskMeasures/17_VarianceSkewKurtosis.jl" = { lines = 92, misses = 0 }
 "src/16_RiskMeasures/18_GenericValueatRiskRange.jl" = { lines = 13, misses = 0 }
 "src/16_RiskMeasures/19_RatioRiskMeasure.jl" = { lines = 13, misses = 0 }
 "src/16_RiskMeasures/20_EqualRiskMeasure.jl" = { lines = 5, misses = 0 }
-"src/16_RiskMeasures/21_MedianAbsoluteDeviationRisk.jl" = { lines = 41, misses = 3 }
-"src/16_RiskMeasures/22_NonOptimisationRiskMeasures.jl" = { lines = 47, misses = 8 }
-"src/16_RiskMeasures/23_AdjustRiskContributions.jl" = { lines = 8, misses = 6 }
+"src/16_RiskMeasures/21_MedianAbsoluteDeviationRisk.jl" = { lines = 41, misses = 0 }
+"src/16_RiskMeasures/22_NonOptimisationRiskMeasures.jl" = { lines = 47, misses = 0 }
+"src/16_RiskMeasures/23_AdjustRiskContributions.jl" = { lines = 8, misses = 0 }
 "src/16_RiskMeasures/24_ExpectedRisk.jl" = { lines = 105, misses = 0 }
-"src/16_RiskMeasures/25_RiskMeasureTools.jl" = { lines = 46, misses = 16 }
+"src/16_RiskMeasures/25_RiskMeasureTools.jl" = { lines = 46, misses = 0 }
+"src/16_RiskMeasures/26_WorstCaseDistribution.jl" = { lines = 79, misses = 0 }
 "src/17_Optimisation/01_Base_Optimisation/01_OptimisationTypes.jl" = { lines = 19, misses = 0 }
 "src/17_Optimisation/01_Base_Optimisation/02_PipeRouting.jl" = { lines = 32, misses = 0 }
 "src/17_Optimisation/01_Base_Optimisation/03_TimeDependent.jl" = { lines = 247, misses = 0 }
@@ -303,8 +319,7 @@ commit = "8610300"
 "src/17_Optimisation/02_CrossValidation/05_MultipleRandomised.jl" = { lines = 155, misses = 0 }
 "src/17_Optimisation/02_CrossValidation/06_Validation.jl" = { lines = 9, misses = 0 }
 "src/17_Optimisation/02_CrossValidation/07_Scoring.jl" = { lines = 6, misses = 0 }
-"src/17_Optimisation/02_CrossValidation/08_OptimisationCrossValidation.jl" = { lines = 3, misses = 0 }
-"src/17_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl" = { lines = 115, misses = 5 }
+"src/17_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl" = { lines = 115, misses = 0 }
 "src/17_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { lines = 73, misses = 0 }
 "src/17_Optimisation/02_CrossValidation/11_RandomisedSearchCrossValidation.jl" = { lines = 16, misses = 0 }
 "src/17_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl" = { lines = 28, misses = 0 }
@@ -322,7 +337,7 @@ commit = "8610300"
 "src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/03_JuMPModelState.jl" = { lines = 64, misses = 0 }
 "src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/04_FrontierSweep.jl" = { lines = 70, misses = 0 }
 "src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/05_JuMPModelSetup.jl" = { lines = 75, misses = 0 }
-"src/17_Optimisation/05_JuMP/02_JuMPConstraints/01_MIPIndicators.jl" = { lines = 173, misses = 10 }
+"src/17_Optimisation/05_JuMP/02_JuMPConstraints/01_MIPIndicators.jl" = { lines = 173, misses = 0 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions/01_ReturnEstimators.jl" = { lines = 73, misses = 0 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions/02_ObjectiveFunctions.jl" = { lines = 132, misses = 0 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions/03_ReturnConstraints.jl" = { lines = 210, misses = 0 }
@@ -337,18 +352,18 @@ commit = "8610300"
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/11_TrackingErrorConstraints.jl" = { lines = 114, misses = 0 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/12_RegularisationConstraints.jl" = { lines = 135, misses = 0 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/13_WeightNormConstraints.jl" = { lines = 39, misses = 0 }
-"src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl" = { lines = 128, misses = 27 }
+"src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl" = { lines = 128, misses = 0 }
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_b.jl" = { lines = 98, misses = 6 }
-"src/17_Optimisation/05_JuMP/04_MeanRisk.jl" = { lines = 147, misses = 2 }
+"src/17_Optimisation/05_JuMP/04_MeanRisk.jl" = { lines = 147, misses = 0 }
 "src/17_Optimisation/05_JuMP/05_FactorRiskContribution.jl" = { lines = 55, misses = 0 }
-"src/17_Optimisation/05_JuMP/06_NearOptimalCentering_a.jl" = { lines = 207, misses = 3 }
+"src/17_Optimisation/05_JuMP/06_NearOptimalCentering_a.jl" = { lines = 207, misses = 0 }
 "src/17_Optimisation/05_JuMP/06_NearOptimalCentering_b.jl" = { lines = 71, misses = 0 }
-"src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl" = { lines = 123, misses = 3 }
+"src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl" = { lines = 123, misses = 0 }
 "src/17_Optimisation/05_JuMP/08_RelaxedRiskBudgeting.jl" = { lines = 88, misses = 0 }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/01_BaseRiskConstraints.jl" = { lines = 135, misses = 0 }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/02_VarianceConstraints.jl" = { lines = 164, misses = 6 }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/03_MomentRiskMeasureConstraints.jl" = { lines = 142, misses = 10 }
-"src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/04_KurtosisConstraints.jl" = { lines = 85, misses = 23 }
+"src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/04_KurtosisConstraints.jl" = { lines = 85, misses = 0 }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/05_NegativeSkewnessConstraints.jl" = { lines = 38, misses = 0 }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/01_XatRiskConstraints.jl" = { lines = 70, misses = 0 }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/02_ConditionalXatRiskConstraints.jl" = { lines = 83, misses = 0 }
@@ -396,7 +411,7 @@ commit = "8610300"
 "src/19_FactorAttribution/03_FactorAttributionRealisedMethods.jl" = { lines = 63, misses = 0 }
 "src/20_AssetSelection.jl" = { lines = 168, misses = 0 }
 "src/21_Pipeline/01_Base_Pipeline.jl" = { lines = 61, misses = 14 }
-"src/21_Pipeline/02_StepExecution.jl" = { lines = 127, misses = 0 }
+"src/21_Pipeline/02_StepExecution.jl" = { lines = 259, misses = 1 }
 "src/21_Pipeline/03_Pipeline.jl" = { lines = 277, misses = 0 }
 "src/21_Pipeline/04_PredictionCV.jl" = { lines = 96, misses = 0 }
 "src/21_Pipeline/05_SearchCrossValidation.jl" = { lines = 131, misses = 0 }

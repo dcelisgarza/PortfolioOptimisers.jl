@@ -1211,3 +1211,10 @@ therefore adds `idx`, the `test_idx` of the fold, to `PredictionResult`. The ind
 records it, and the whole-sample `predict` records `nothing`. The timestamps stay the first key:
 the attribution matches by timestamp whenever both sides carry them, and by position otherwise.
 `fold_row_indices` is unchanged and still reads the timestamps.
+
+## Amendment (2026-10-28, #1867)
+
+**`NoDecay` is removed, and `decay = nothing` is the flat decay.** `Proximity(; decay = nothing)`
+is the neighbourhood indicator that `BinaryNeighbourhood` was. ADR 0222 spells a decay that does
+not fall off as `nothing`, and ADR 0048 carries the full amendment. Where the decision above
+names `Proximity(; decay = NoDecay())`, read `Proximity(; decay = nothing)`.

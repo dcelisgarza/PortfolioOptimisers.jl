@@ -759,11 +759,11 @@ function set_projection_objective!(model::JuMP.Model, proj::TsallisProjection,
                                    q::AbstractVector)::Nothing
     pos, w, sc, so = barrier_objective_entries(model, q)
     a = proj.alpha
-    JuMP.@variable(model, t_proj[1:length(pos)])
+    P = length(pos)
+    JuMP.@variable(model, t_proj[1:P])
     # `t_i ≤ w_i^α` is the power cone `w_i^α · 1^(1 − α) ≥ |t_i|`.
-    for (i, j) in enumerate(pos)
-        JuMP.@constraint(model, [sc * w[j], sc, sc * t_proj[i]] in JuMP.MOI.PowerCone(a))
-    end
+    JuMP.@constraint(model, [i = 1:P],
+                     [sc * w[pos[i]], sc, sc * t_proj[i]] in JuMP.MOI.PowerCone(a))
     # The bracket is `(1 − α)` times the divergence up to a constant. The division restores
     # the divergence, so a penalty weighs against it as under every other geometry.
     set_divergence_objective!(model,
@@ -893,7 +893,7 @@ It refuses a raw step with a negative entry or with no positive entry. It fixes 
 
 ## Constraints
 
-  - Under no name: ``s_c w_i = 0`` for each ``i`` with ``q_i = 0``.
+  - Under no name, one vector row: ``s_c w_i = 0`` for each ``i`` with ``q_i = 0``. A `q` with no zero entry writes no row.
 
 Where:
 
@@ -929,8 +929,9 @@ function barrier_objective_entries(model::JuMP.Model, q::AbstractVector)
                           "a barrier projection needs a positive entry: a raw step of zeros has no projection, because a zero stays zero under the potential"))
     w = get_w(model)
     sc = get_constraint_scale(model)
-    for i in findall(iszero, q)
-        JuMP.@constraint(model, sc * w[i] == 0)
+    zs = findall(iszero, q)
+    if !isempty(zs)
+        JuMP.@constraint(model, sc * view(w, zs) == 0)
     end
     return findall(x -> x > zero(x), q), w, sc, get_objective_scale(model)
 end
@@ -1142,7 +1143,7 @@ end
     investable_geometry_view(imsk::Nothing, proj::AbstractProjectionGeometry, q::AbstractVector)
     investable_geometry_view(imsk::BitVector, proj::AbstractProjectionGeometry, q::AbstractVector)
     investable_geometry_view(imsk::BitVector, proj::DiagonalProjection, q::AbstractVector)
-    investable_geometry_view(imsk::BitVector, proj::GramProjection, q::AbstractVector)
+    investable_geometry_view(imsk::BitVector, proj::GramProjection{<:Any, <:AbstractMatrix}, q::AbstractVector)
 
 Reduces the Projection Geometry and the raw step `q` to the Investable Mask of a projection programme.
 
@@ -1168,7 +1169,7 @@ Where:
   - ``\\tilde{\\boldsymbol{q}}_P``: Raw step of the reduced programme.
   - ``c``: Term that does not depend on ``\\boldsymbol{w}_P``.
 
-So the reduced Gram geometry holds ``\\mathbf{A}_{PP}`` and projects ``\\tilde{\\boldsymbol{q}}_P``. A Gram geometry with no matrix keeps no matrix, and [`set_projection_objective!`](@ref) refuses it.
+So the reduced Gram geometry holds ``\\mathbf{A}_{PP}`` and projects ``\\tilde{\\boldsymbol{q}}_P``. The Gram method reads a bound matrix. [`NewtonStep`](@ref), the one rule that takes a [`GramProjection`](@ref), binds the matrix before the view through [`gram_geometry`](@ref).
 
 # Returns
 
@@ -1194,11 +1195,10 @@ function investable_geometry_view(imsk::BitVector, proj::DiagonalProjection,
                                   q::AbstractVector)
     return DiagonalProjection(proj.h[imsk]), investable_weights_view(imsk, q)
 end
-function investable_geometry_view(imsk::BitVector, proj::GramProjection, q::AbstractVector)
+function investable_geometry_view(imsk::BitVector,
+                                  proj::GramProjection{<:Any, <:AbstractMatrix},
+                                  q::AbstractVector)
     A = proj.A
-    if isnothing(A)
-        return proj, investable_weights_view(imsk, q)
-    end
     zmsk = .!imsk
     App = A[imsk, imsk]
     qp = q[imsk] .+ LinearAlgebra.Symmetric(App) \ (A[imsk, zmsk] * q[zmsk])
@@ -1347,7 +1347,7 @@ function project(proj::GramProjection, set::ProgrammeAllocationSet, q::AbstractV
                  w::AbstractVector)
     return projection_programme(proj, set, q, w)
 end
-function project(proj::Union{<:TsallisProjection, <:LogBarrierProjection},
+function project(proj::Union{TsallisProjection, LogBarrierProjection},
                  set::ProgrammeAllocationSet, q::AbstractVector, w::AbstractVector)
     @argcheck(all(x -> x >= zero(x), set.wb.lb),
               DomainError(set.wb.lb,

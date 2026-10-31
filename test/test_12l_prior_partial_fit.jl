@@ -50,7 +50,9 @@ function ImmutableCovProbe(; cache = nothing)
 end
 function PortfolioOptimisers.partial_fit!(ce::ImmutableCovProbe,
                                           x::PortfolioOptimisers.VecNum; kwargs...)
-    return ImmutableCovProbe(PortfolioOptimisers.fold_buffer(ce.cache, x))
+    return ImmutableCovProbe(partial_fit!(something(ce.cache,
+                                                    PortfolioOptimisers.SampleBufferState()),
+                                          x))
 end
 function Statistics.cov(ce::ImmutableCovProbe)
     return LinearAlgebra.Symmetric(Statistics.cov(PortfolioOptimisers.sample_buffer(ce.cache)))
@@ -371,6 +373,8 @@ end
         own = PortfolioOptimisersCovariance(; mp = MatrixProcessingProbe())
         @test !pe.supports_partial_fit(own)
         @test !pe.supports_shape_processing(own.mp)
+        # The library cannot see what the estimator reads, so it states that it reads `T`.
+        @test pe.matrix_processing_reads_count(own.mp)
         msg = "`MatrixProcessingProbe` is a matrix processing estimator of your own"
         @test_throws msg partial_fit!(own, view(X, 1, :))
         @test_throws msg partial_fit!(own, X)
@@ -545,6 +549,33 @@ end
         @test !isnothing(pe.mu_ucs(NormalUncertaintySet(; pe = ep_f), rdf))
     end
 
+    @testset "A capped buffer forgets the row positions of a high order prior, and an absent member folds to nothing (#1912)" begin
+        # A fold that refits from a buffer with no cap keeps the positions of the rows of the
+        # factor model, and a capped one cannot count the rows it dropped, so it keeps none.
+        # Either way the moments are the batch fit over the rows the buffer holds.
+        w = 50
+        host(mh) = pe.Online(HighOrderFactorPriorEstimator(); max_history = mh)
+        capped = prior(fold_pair(pe.update_online_estimator(host(w)), X, F))
+        whole = prior(fold_pair(pe.update_online_estimator(host(nothing)), X, F))
+        hb = HighOrderFactorPriorEstimator()
+        b = prior(hb, X[(end - w + 1):end, :], F[(end - w + 1):end, :])
+        @test capped isa pe.HighOrderPrior
+        @test isnothing(capped.pr.rr.idx)
+        @test !isnothing(whole.pr.rr.idx)
+        @test isapprox(capped.pr.mu, b.pr.mu; rtol = 1e-10)
+        @test isapprox(capped.pr.sigma, b.pr.sigma; rtol = 1e-10)
+        @test isapprox(capped.kt, b.kt; rtol = 1e-10)
+        @test isapprox(whole.kt, prior(hb, X, F).kt; rtol = 1e-10)
+        # A co-moment the host does not hold folds to nothing, and the result has none.
+        hn = HighOrderPriorEstimator(; ske = nothing)
+        on = prior(fold(hn, X))
+        @test isnothing(on.sk)
+        @test isnothing(on.V)
+        @test isapprox(on.kt, prior(hn, X).kt; rtol = 1e-10)
+        @test isnothing(prior(HighOrderPriorEstimator(; kte = nothing), X).kt)
+        @test isnothing(prior(fold(HighOrderPriorEstimator(; kte = nothing), X)).kt)
+    end
+
     @testset "A read-out hands out no accumulator" begin
         # `mean` on a folded estimator copies the Welford accumulator. Before it did not, and
         # a prior that read its `mu` out and carried it into a Result found the Result
@@ -613,16 +644,17 @@ end
         end
         @test pe.sample_buffer(partial_fit!(pe.PriorCarryState(), permutedims(X); dims = 2)) ==
               X
-        # The identity holds for `ens` under a Scenario Cap, on both arms: it reads the
+        # The identity holds for `eoc` under a Scenario Cap, on both arms: it reads the
         # number of observations folded, not the number of rows carried.
         for est in (EmpiricalPrior(; max_scenarios = 25),
                     EmpiricalPrior(; horizon = 21, max_scenarios = 25))
             o = prior(fold(est, X))
             b = prior(est, X)
-            @test o.ens == b.ens == 80
+            @test o.eoc == b.eoc == (80, 80)
             @test o.X == b.X
         end
-        @test isnothing(prior(fold(EmpiricalPrior(; max_scenarios = 500), X)).ens)
+        @test prior(fold(EmpiricalPrior(; max_scenarios = 500), X)).eoc ==
+              (nothing, nothing)
         # The horizon arm refits a member that does not fold on the log rows it would have
         # folded, and carries the arithmetic rows.
         semi = EmpiricalPrior(; horizon = 21,
@@ -887,7 +919,7 @@ end
         @test occursin("the carry of `EmpiricalPrior`", m)
     end
     @testset "The buffer records the implied volatilities beside the returns (#1632)" begin
-        # The regression needs more than two windows of 20 rows, so the block is longer
+        # The regression needs more than four windows of 20 rows, so the block is longer
         # than the shared fixture. Its returns are complete, so the gap of `ivg` in column
         # 2 is the surface's own.
         Xc = randn(rng, 3 * T, N) ./ 100
@@ -933,7 +965,7 @@ end
         # The buffer gives the panel that it records, or nothing.
         @test isnothing(po.buffer_asset_panel(steps(EmpiricalPrior(), r0).cache.buf))
         p = po.buffer_asset_panel(steps(EmpiricalPrior(), rd(tv)).cache.buf)
-        @test p.amsk == A && p.emsk == A && isempty(p.pf)
+        @test p.amsk == A && p.emsk == A && isnothing(p.pf)
         # A gapped sample: the plain method refuses it, the batch fit and the carry answer.
         for ce in (Covariance(; alg = SemiMoment()), StatsBase.SimpleCovariance()),
             horizon in (nothing, 5)

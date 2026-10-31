@@ -488,7 +488,7 @@ The two rules also apply to different factor models. `ResidualInflation` needs t
 variances in `rr.esigma`, and it raises an error on a factor model fitted without them.
 `VarianceFraction` does not use them, but the set's default metric,
 [`InverseIdiosyncraticVarianceMetric`](@ref), inverts them and raises the same error. On such a
-model, give the set `metric = IdentityMetric()` as well. The `q` of
+model, give the set `metric = nothing` as well, which weighs every asset equally. The `q` of
 `ResidualInflation` defaults to the `q` of the `OrthogonalUncertaintySet`, so one confidence level
 sizes both the mean set and the covariance set unless you set them apart. The two `q`s are tail
 probabilities of different errors, and a smaller `q` gives a larger radius in both sets.

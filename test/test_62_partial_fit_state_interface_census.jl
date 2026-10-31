@@ -186,7 +186,9 @@ const NO_VIEW_HOSTS = (ExpWeightedExpectedReturns, ExpWeightedVariance,
                        EWDownsideBeta)
 
 # Hosts whose `port_opt_view` refuses outright, so a cache never travels a view of them. A
-# `Pipeline`'s asset universe is fitted state, which ADR 0028 says a view cannot select.
+# `Pipeline`'s asset universe is fitted state, which ADR 0028 says a view cannot select. The
+# refusal can sit on the family root: the one of `Pipeline` is declared on
+# `AbstractPipelineEstimator` (#1890), so the census reads the method dispatch reaches.
 const VIEW_REFUSING_HOSTS = (Pipeline,)
 
 #=
@@ -230,11 +232,12 @@ const UNVIEWED_STATES = (po.ExpWeightedExpectedReturnsState => ExpWeightedExpect
     # ---------------------------------------------- 2. a view of every host reaches its cache
     @testset "a view of $(nameof(T)) reaches its cache" for T in HOSTS
         m = view_method(T)
-        if isnothing(m)
+        if T in VIEW_REFUSING_HOSTS
+            r = dispatched(po.port_opt_view, T, Vector{Int}, Matrix{Float64})
+            @test !isnothing(r) && r.module === po && cache_travels(r) === :refuses
+        elseif isnothing(m)
             # No channel reaches the cache, and the host says so on the list.
             @test T in NO_VIEW_HOSTS
-        elseif T in VIEW_REFUSING_HOSTS
-            @test cache_travels(m) === :refuses
         else
             # `:carries` is the defect: a state fitted on the whole universe travels into a
             # view of a few assets. Tag the field `@fprop @vprop`, or slice it by hand.

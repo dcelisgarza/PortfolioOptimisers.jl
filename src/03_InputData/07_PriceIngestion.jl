@@ -416,7 +416,7 @@ function assert_join_padding(lines::AbstractVector, strict::Bool)::Nothing
     strict_diagnostic("the ingestion layer padded the series the join and the alignment found silent on the emitted clock, and a padded observation is an absence carried as `NaN`, which a fit drops without a message: the observation of a padded factor or one-column benchmark, and the asset of a padded implied volatility or per-asset benchmark: " *
                       join(kept, "; ") *
                       ". Under `join_method = :left` the asset table states the clock; `:outer` takes the union and `:inner` the intersection, and a caller who wants no padding aligns the series before the call.",
-                      strict)
+                      strict; id = @log_id())
     return nothing
 end
 """
@@ -538,7 +538,7 @@ The caller does not name the value type of the `PricesResult`. The layer promote
  6. Split the joined series back into the asset, factor and benchmark blocks, all on one clock.
  7. Align the implied volatilities to that clock with [`align_series`](@ref), in the type that [`absence_type`](@ref) derives from their own type, and pad the observations where they are silent. Write their report line, and carry `ivpa` through. An implied volatility is a volatility and not a price, so the layer carries it and never converts it to a return. Align the Exogenous Series `E` to the same clock in the same way, and write its report line. `E` is aligned and never joined, so it adds and drops no observation of the assets: a series one consumer reads must not change the universe of every asset. It is a level series, so [`prices_to_returns`](@ref) converts it.
  8. Name what the layer padded with [`assert_join_padding`](@ref), which warns, or refuses under `strict`.
- 9. Put a caller's [`AssetPanel`](@ref) on the emitted clock with [`project_panel_clock`](@ref). A caller states a Panel Field on the clock of the table they hold, and the join and the collapse move that clock, so the projection happens here. Each period of a collapse takes the Panel Field values of the last row of its group, as [`LastObservation`](@ref) does. The timestamp function of `collapse_args` does not change this row, so under `(Dates.week, first, last)` the prices and the Panel Field values of a week come from one day. A static panel has no observation axis, and the layer carries it through unchanged.
+ 9. Put a caller's [`AssetPanel`](@ref) on the emitted clock with [`project_panel_clock`](@ref). A caller states a Panel Field on the clock of the table they hold, and the join and the collapse move that clock, so the projection happens here. Each period of a collapse takes the Panel Field values of the last row of its group, as [`LastRow`](@ref) does. The timestamp function of `collapse_args` does not change this row, so under `(Dates.week, first, last)` the prices and the Panel Field values of a week come from one day. A static panel has no observation axis, and the layer carries it through unchanged.
 10. Read the **Listing Span** off the asset block with [`listing_span`](@ref), unless the caller declared one. A declared span replaces the answer of the Span Rule.
 11. Return the [`PricesResult`](@ref) that carries all of it.
 
@@ -689,7 +689,7 @@ Put a caller's [`AssetPanel`](@ref) on the clock the ingestion emits.
 
 A caller states a Panel Field on the clock of the table they hold. The join and the collapse of [`price_ingestion`](@ref) move that clock, so [`price_ingestion`](@ref) makes the projection. After it, the `PricesResult` states one clock and everything it holds is on that clock. A static panel has no observation axis, so [`feature_row_indices`](@ref) returns `Colon()` for it and the panel passes through unchanged.
 
-A collapse puts many rows into one period. Each period takes the Panel Field values of the last row of its group, as [`LastObservation`](@ref) does. The timestamp function of `ca` does not change this row. So under `(Dates.week, first, last)` a week pairs the prices of its last day with the Panel Field values of the same day.
+A collapse puts many rows into one period. Each period takes the Panel Field values of the last row of its group, as [`LastRow`](@ref) does. The timestamp function of `ca` does not change this row. So under `(Dates.week, first, last)` a week pairs the prices of its last day with the Panel Field values of the same day.
 
 # Algorithm
 
@@ -1014,7 +1014,7 @@ end
 
 Store a pair of universe masks that is true everywhere as the constant it is.
 
-A gapless ingestion states a universe in which every asset is listed at every observation and every return is finite, so both masks are `true` everywhere. A [`PortfolioOptimisers.AllTrueMask`](@ref) stores that in two integers. So the panel that the layer always emits costs `O(1)` memory, not one bit per observation and asset. The estimation mask is a subset of the active mask. When the estimation mask is all true, the active mask is all true too, so the function tests the estimation mask alone.
+A gapless ingestion states a universe in which every asset is listed at every observation and every return is finite, so both masks are `true` everywhere. A [`PortfolioOptimisers.AllTrueMask`](@ref) stores that in two integers. So a panel that carries such masks beside its Panel Fields costs `O(1)` memory for them, not one bit per observation and asset. With no Panel Field, [`attach_universe_masks`](@ref) reads the type and emits no panel at all. The estimation mask is a subset of the active mask. When the estimation mask is all true, the active mask is all true too, so the function tests the estimation mask alone.
 
 # Algorithm
 
@@ -1050,7 +1050,7 @@ end
 
 Derive the two universe masks that the [`AssetPanel`](@ref) of the `ReturnsResult` states.
 
-A `PricesResult` from the layer arrives with a **Listing Span**. This function projects the span onto the returns clock and intersects it with finiteness. A `PricesResult` built outside the layer arrives without a span and states **no universe**, whether or not its prices hold a gap. The function does not derive a span for it, because a derivation from one window reads a delisting that straddles the window end as an asset that was never listed. The library still handles the gaps of such a `PricesResult`, because with no panel the Coverage Universe reads finiteness alone. So `pnl === nothing` means only that the layer did not build the `PricesResult`.
+A `PricesResult` from the layer arrives with a **Listing Span**. This function projects the span onto the returns clock and intersects it with finiteness. A `PricesResult` built outside the layer arrives without a span and states **no universe**, whether or not its prices hold a gap. The function does not derive a span for it, because a derivation from one window reads a delisting that straddles the window end as an asset that was never listed. The library still handles the gaps of such a `PricesResult`, because with no panel the Coverage Universe reads finiteness alone. So `pnl === nothing` means that the returns data states no universe beyond the finiteness of its returns: the layer did not build the `PricesResult`, or the prices held no gap.
 
 # Algorithm
 
@@ -1083,7 +1083,9 @@ function returns_universe_masks(span::AbstractMatrix{Bool}, R::AbstractMatrix)
 end
 """
     attach_universe_masks(pnl, amsk::Nothing, emsk::Nothing)
+    attach_universe_masks(pnl::Nothing, amsk::AllTrueMask, emsk::AllTrueMask) -> nothing
     attach_universe_masks(pnl::Nothing, amsk::AbstractMatrix{Bool}, emsk::AbstractMatrix{Bool}) -> AssetPanel
+    attach_universe_masks(pnl::AssetPanel{Nothing}, amsk::AbstractMatrix{Bool}, emsk::AbstractMatrix{Bool}) -> Option{<:AssetPanel}
     attach_universe_masks(pnl::AssetPanel, amsk::AbstractMatrix{Bool}, emsk::AbstractMatrix{Bool}) -> AssetPanel
 
 Put the two universe masks onto the [`AssetPanel`](@ref) that the `ReturnsResult` holds.
@@ -1096,9 +1098,11 @@ The function keeps a caller's Panel Fields and replaces both masks with the laye
 
 The method that Julia selects is the algorithm.
 
- 1. No masks: return the panel unchanged. The `PricesResult` states no universe, so `pnl === nothing` means only that the layer did not build the `PricesResult`.
- 2. Masks and no panel: return an [`AssetPanel`](@ref) of the two masks and no Panel Field. This is the layer's common case: a caller holding only prices has no feature data.
- 3. Masks and a panel: keep its Panel Fields and replace both its masks. A static panel's fields carry no observation axis, so the function first lifts them onto the clock of the masks with [`panel_field_lift`](@ref).
+ 1. No masks: return the panel unchanged. The `PricesResult` states no universe.
+ 2. All-true masks and no Panel Field: return `nothing`. Every asset is listed and every return is finite, so the masks state nothing that the finiteness of the returns does not state, and the Coverage Universe of no panel is the same.
+ 3. Other masks and no panel: return an [`AssetPanel`](@ref) of the two masks and `pf = nothing`. This is the layer's common case when the prices hold a gap: a caller holding only prices has no feature data.
+ 4. Masks and a panel with no Panel Field: apply steps 2 and 3. The function replaces both masks, so the panel brings nothing else.
+ 5. Masks and a panel with Panel Fields: keep its Panel Fields and replace both its masks. A static panel's fields carry no observation axis, so the function first lifts them onto the clock of the masks with [`panel_field_lift`](@ref).
 
 # Arguments
 
@@ -1108,7 +1112,7 @@ The method that Julia selects is the algorithm.
 
 # Returns
 
-  - `pnl′::Option{<:AssetPanel}`: The panel that the `ReturnsResult` holds.
+  - `pnl′::Option{<:AssetPanel}`: The panel that the `ReturnsResult` holds, or `nothing` when there is no panel or the panel states nothing.
 
 # Related
 
@@ -1122,9 +1126,16 @@ The method that Julia selects is the algorithm.
 function attach_universe_masks(pnl, ::Nothing, ::Nothing)
     return pnl
 end
+function attach_universe_masks(::Nothing, ::AllTrueMask, ::AllTrueMask)
+    return nothing
+end
 function attach_universe_masks(::Nothing, amsk::AbstractMatrix{Bool},
                                emsk::AbstractMatrix{Bool})::AssetPanel
     return AssetPanel(; amsk = amsk, emsk = emsk)
+end
+function attach_universe_masks(::AssetPanel{Nothing}, amsk::AbstractMatrix{Bool},
+                               emsk::AbstractMatrix{Bool})
+    return attach_universe_masks(nothing, amsk, emsk)
 end
 function attach_universe_masks(pnl::AssetPanel, amsk::AbstractMatrix{Bool},
                                emsk::AbstractMatrix{Bool})::AssetPanel

@@ -80,7 +80,7 @@ function oracle_estimator(; kwargs...)
                                                regime_min_obs = 2,
                                                regime_lohi_mult = (0.7, 1.6),
                                                centring = PreCentred(), min_val = 1e-12,
-                                               debias = RawStatistic(), kwargs...)
+                                               debias = nothing, kwargs...)
 end
 
 @testset "the two masks blank what they should" begin
@@ -198,6 +198,60 @@ end
     @test PO.min_active_assets(PO.PortfolioTarget()) == 1
 end
 
+# A regime method and a regime target of the caller's own, implemented by the two `# Interfaces`
+# sections (#397).
+struct MyRegimeMethod397c <: PO.RegimeAdjustedMethod end
+PO.regime_multiplier(::MyRegimeMethod397c, s::Number) = sqrt(max(s, 0))
+function PO.get_regime_state(::MyRegimeMethod397c, ::PO.RegimeAdjustedTarget,
+                             stats::AbstractVector, n::Integer, ::Number)
+    return stats ./ n
+end
+struct MyTarget397 <: PO.RegimeAdjustedTarget end
+function PO.regime_statistic(::MyTarget397, X::AbstractVector, C::AbstractMatrix,
+                             ::AbstractVector{<:Integer}, min_val::Number)
+    return [sum(abs2, X ./ sqrt.(max.(diag(C), min_val)))]
+end
+@testset "a method and a target of the caller's own (#397)" begin
+    X = [0.01 -0.02; -0.015 0.03; 0.02 -0.01; -0.005 0.012; 0.008 -0.02; -0.02 0.03]
+    kw = (; decay = 0.9, min_obs = 2, regime_min_obs = 1, debias = nothing)
+    # The method answers what the root mean square answers, on every library target.
+    for target in (PortfolioTarget(), DiagonalTarget())
+        @test cov(RegimeAdjustedExpWeightedCovariance(;
+                                                      regime_method = MyRegimeMethod397c(),
+                                                      regime_target = target, kw...), X) ≈
+              cov(RegimeAdjustedExpWeightedCovariance(;
+                                                      regime_method = RootMeanSquaredAdjusted(),
+                                                      regime_target = target, kw...), X)
+    end
+    # The bias corrections read the moments of the library methods alone, so they refuse it.
+    for debias in (ExactDebias(), LawDebias())
+        @test_throws ArgumentError RegimeAdjustedExpWeightedCovariance(;
+                                                                       regime_method = MyRegimeMethod397c(),
+                                                                       debias = debias)
+    end
+    # The target answers what the diagonal target answers under the raw statistic.
+    @test cov(RegimeAdjustedExpWeightedCovariance(;
+                                                  regime_method = RootMeanSquaredAdjusted(),
+                                                  regime_target = MyTarget397(), kw...),
+              X) ≈ cov(RegimeAdjustedExpWeightedCovariance(;
+                                                           regime_method = RootMeanSquaredAdjusted(),
+                                                           regime_target = DiagonalTarget(), kw...),
+                       X)
+    @test PO.min_active_assets(MyTarget397()) == 1
+    # A target of a caller's keeps no bias store. Under a debias the state names an empty one,
+    # in the element type of the sample, and a fold leaves it empty. With no debias the state
+    # holds none.
+    mk_bias(db) = RegimeAdjustedExpWeightedCovariance(; merge(kw, (; debias = db))...,
+                                                      regime_method = RootMeanSquaredAdjusted(),
+                                                      regime_target = MyTarget397())
+    for (T, db) in
+        ((Float64, ExactDebias()), (Float32, ExactDebias()), (Float64, LawDebias()))
+        st = partial_fit!(mk_bias(db), T.(X)).cache
+        @test st.bias == T[]
+        @test typeof(st.bias) == Vector{T}
+    end
+    @test isnothing(partial_fit!(mk_bias(nothing), X).cache.bias)
+end
 @testset "the estimator refuses what it cannot fit" begin
     rng = StableRNG(8906)
     X = randn(rng, 20, 3) .* 0.02
@@ -224,6 +278,10 @@ end
     @test_throws DomainError RegimeAdjustedExpWeightedCovariance(; hac_lags = 0)
     @test_throws DomainError RegimeAdjustedExpWeightedCovariance(; min_obs = 0)
     @test_throws DomainError RegimeAdjustedExpWeightedCovariance(; regime_min_obs = 0)
+    # `regime_decay` weighs an exponentially weighted recursion: at one the regime state never
+    # leaves its first statistic, and outside `(0, 1)` the weights are not weights (#397).
+    @test_throws DomainError RegimeAdjustedExpWeightedCovariance(; regime_decay = 1.0)
+    @test_throws DomainError RegimeAdjustedExpWeightedCovariance(; regime_decay = 2.0)
     @test_throws DomainError RegimeAdjustedExpWeightedCovariance(;
                                                                  regime_lohi_mult = (1.6,
                                                                                      0.7))

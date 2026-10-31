@@ -383,6 +383,52 @@ end
     @test PO.vec_to_real_measure(sum, t) == 10.0
     @test PO.vec_to_real_measure(maximum, v) == 4.0
 end
+# Two `DynamicAbstractWeights` probes for the test set below. The first resolves a vector to
+# probability weights proportional to the position of each observation. The second has no
+# method, so it reaches the fallback that raises.
+using StatsBase: StatsBase
+struct RampProbeWeights <: PortfolioOptimisers.DynamicAbstractWeights end
+function PortfolioOptimisers.get_observation_weights(::RampProbeWeights, X::AbstractVector;
+                                                     kwargs...)
+    return StatsBase.pweights(collect(1.0:length(X)))
+end
+struct UnresolvedProbeWeights <: PortfolioOptimisers.DynamicAbstractWeights end
+@testset "VectorToScalarMeasure: a weighted measure resolves dynamic weights against the data" begin
+    using PortfolioOptimisers, Test, Statistics, StatsBase
+    PO = PortfolioOptimisers
+    #=
+    Issue #1824. The weighted value measures gave their `w` to `Statistics` as it was. Their
+    constructors take a `DynamicAbstractWeights`, and with one `median`, `std` and `var` raised
+    a `MethodError`, and `mean` read the vector as a function. JET found it when the alias
+    `ObsWeights` took the plain spelling, because it then split the union. Each measure now
+    resolves its weights against the data with `get_observation_weights`.
+    =#
+    v = [1.0, 2.0, 3.0, 4.0]
+    t = (1.0, 2.0, 3.0, 4.0)
+    w = pweights([1.0, 2.0, 3.0, 4.0])
+    for M in (MeanValue, MedianValue)
+        @test PO.vec_to_real_measure(M(; w = RampProbeWeights()), v) ==
+              PO.vec_to_real_measure(M(; w = w), v)
+        @test PO.vec_to_real_measure(M(; w = RampProbeWeights()), t) ==
+              PO.vec_to_real_measure(M(; w = w), v)
+    end
+    # The weighted mean of the ramp: (1 + 4 + 9 + 16) / (1 + 2 + 3 + 4).
+    @test PO.vec_to_real_measure(MeanValue(; w = RampProbeWeights()), v) == 3.0
+    for M in (StdValue, VarValue), corrected in (true, false)
+        @test PO.vec_to_real_measure(M(; w = RampProbeWeights(), corrected = corrected),
+                                     v) ==
+              PO.vec_to_real_measure(M(; w = w, corrected = corrected), v)
+        @test PO.vec_to_real_measure(M(; w = RampProbeWeights(), corrected = corrected),
+                                     t) ==
+              PO.vec_to_real_measure(M(; w = w, corrected = corrected), v)
+    end
+    # A dynamic weight with no method for a vector raises the error that names the method.
+    for M in (MeanValue, MedianValue, StdValue, VarValue)
+        @test_throws PO.ObservationWeightsError PO.vec_to_real_measure(M(;
+                                                                         w = UnresolvedProbeWeights()),
+                                                                       v)
+    end
+end
 @testset "The view and index seam selects the axis its verb names" begin
     using PortfolioOptimisers, Test, StatsBase, LinearAlgebra
     PO = PortfolioOptimisers
@@ -563,6 +609,11 @@ end
     already = [1.0, 2.0]
     @test PO.concrete_typed_array_if_abstract(already) === already
     @test eltype(PO.concrete_typed_array_if_abstract(Any[1, 2.0])) == Union{Float64, Int64}
+    # `isabstracttype` is false for a `Union` and for a `UnionAll`, so neither is narrowed (#440).
+    mixed = Union{Float64, Int64}[1, 2.0]
+    @test PO.concrete_typed_array_if_abstract(mixed) === mixed
+    nested = Vector[[1], [2.0]]
+    @test PO.concrete_typed_array_if_abstract(nested) === nested
     # --- float_if_integer: an integer type takes its float type, every other type is kept ---
     @test PO.float_if_integer(Int) === Float64
     @test PO.float_if_integer(Int32) === Float64
@@ -578,9 +629,19 @@ end
     @test length(fc) == 2
     @test fc[1].w === aw
     @test fc[2].w === aw
+    # factory_child recurses into estimators only. A `nothing` and a weights value come back
+    # with no change, because only `_wprop` replaces weights (#440).
+    @test PO.factory_child(nothing, aw) === nothing
+    @test PO.factory_child([1.0, 2.0], aw) == [1.0, 2.0]
     # --- resolve_deferred_quantities: the universal fallback returns its argument ---
     @test PO.resolve_deferred_quantities(7, nothing) === 7
     @test PO.resolve_deferred_quantities(MinValue(), nothing) == MinValue()
+    # --- the two examples that the /unslop pass of #440 wrote into the measure docstrings ---
+    # An exact zero deviation takes the guard `sqrt(eps)`.
+    @test PO.vec_to_real_measure(StandardisedValue(), [2.0, 2.0, 2.0]) ==
+          2 / sqrt(eps(Float64))
+    # A tie goes to the first value that reaches the highest count, not the first to appear.
+    @test PO.vec_to_real_measure(ModeValue(), [3.0, 1.0, 1.0, 3.0]) == 1.0
 end
 @testset "The propagation machinery reports its own broken rows" begin
     using PortfolioOptimisers, Test
@@ -597,6 +658,11 @@ end
     @test PO.extract_field_name(:a) === :a
     @test PO.extract_field_name(:(a::Int)) === :a
     @test_throws ErrorException PO.extract_field_name(1)
+    # The message names any tag, not `@fprop` alone (#440).
+    @test_throws "a propagation tag must precede" PO.extract_field_name(1)
+    # try_field_name tests the first argument of a `::` node as well as the head (#440).
+    @test PO.try_field_name(:(a::Int)) === :a
+    @test PO.try_field_name(:(a.b::Int)) === nothing
     # --- propagatable_bare_name: a name, a parametric name, a subtyped name ---
     @test PO.propagatable_bare_name(:A) === :A
     @test PO.propagatable_bare_name(:(A{T1})) === :A

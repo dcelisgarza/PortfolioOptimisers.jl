@@ -327,6 +327,50 @@ always gave.
                                                                regime_lohi_mult = (0.0,
                                                                                    1.6))
 end
+#=
+Issue #397, the docstring sweep of the family, checked each formula with numbers and found four
+defects in the code: a `regime_decay` that no constructor checked, a zero parameter of a regime
+method that made the multiplier `NaN` or `Inf`, a log multiplier that read the shape of its law as
+its exponent, and a method of the caller's own that failed with a `MethodError` from the fit.
+=#
+struct MyRegimeMethod397 <: PO.RegimeAdjustedMethod end
+PO.regime_multiplier(::MyRegimeMethod397, s::Number) = sqrt(max(s, 0))
+function PO.get_regime_state(::MyRegimeMethod397, z2::AbstractVector, ::Number)
+    return sum(z2) / length(z2)
+end
+@testset "The regime methods refuse what they cannot compute (#397)" begin
+    # `regime_decay` weighs an exponentially weighted recursion. At one the regime state never
+    # leaves its first statistic, and at 1.5 or -0.5 the variance came out as zero (#397).
+    @test_throws DomainError RegimeAdjustedExpWeightedVariance(; regime_decay = 1.0)
+    @test_throws DomainError RegimeAdjustedExpWeightedVariance(; regime_decay = 1.5)
+    @test_throws DomainError RegimeAdjustedExpWeightedVariance(; regime_decay = -0.5)
+    # A zero parameter made the multiplier `NaN` or `Inf`: `x = 0` gives the digamma pole in the
+    # constant of the log method and a division by zero in the first-moment method, and `y = 0`
+    # gives `log(0)` (#397).
+    @test_throws DomainError LogRegimeAdjusted(; x = 0.0)
+    @test_throws DomainError LogRegimeAdjusted(; y = 0.0)
+    @test_throws DomainError FirstMomentRegimeAdjusted(; x = 0.0)
+
+    # The log method's state is a log variance ratio whatever the law of the squares, so a ratio
+    # of four is a volatility multiplier of two. The multiplier read `exp(x * s)`, so a law with
+    # `x = 2` scaled the variance by the ratio to the fourth power (#397).
+    for method in (LogRegimeAdjusted(), LogRegimeAdjusted(; x = 2.0, y = 0.5))
+        @test PO.regime_multiplier(method, log(4.0)) ≈ 2.0
+    end
+
+    # A method the caller defines runs under the raw statistic, and the two bias corrections,
+    # which read the moments of the library methods alone, refuse it at construction rather
+    # than with a `MethodError` from the fit (#397).
+    rm = MyRegimeMethod397()
+    @test_throws ArgumentError RegimeAdjustedExpWeightedVariance(; regime_method = rm)
+    @test_throws ArgumentError RegimeAdjustedExpWeightedVariance(; regime_method = rm,
+                                                                 debias = LawDebias())
+    X = [0.01 -0.02; -0.015 0.03; 0.02 -0.01; -0.005 0.012; 0.008 -0.02; -0.02 0.03]
+    kw = (; decay = 0.9, min_obs = 2, regime_min_obs = 1, debias = nothing)
+    @test var(RegimeAdjustedExpWeightedVariance(; regime_method = rm, kw...), X) ≈
+          var(RegimeAdjustedExpWeightedVariance(; regime_method = RootMeanSquaredAdjusted(),
+                                                kw...), X)
+end
 
 #=
 `std` is the root of `var`, and issue #637 names its absence.

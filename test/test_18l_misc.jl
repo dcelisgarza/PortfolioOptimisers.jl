@@ -667,7 +667,7 @@ end
     # inner or outer optimiser. The outer problem reads the raw returns of the
     # sub-portfolios, in the path without folds and in the cross-validated path
     # (ADR 0215, decision 3).
-    for cv in (nothing, OptimisationCrossValidation(; cv = KFold(; n = 5))),
+    for cv in (nothing, KFold(; n = 5)),
         mk in (s -> Stacking(; pe = EmpiricalPrior(; x_src = s), cv = cv,
                              opti = [MeanRisk(; opt = jo(nothing)), InverseVolatility()],
                              opto = MeanRisk(; opt = jo(nothing))),
@@ -712,7 +712,8 @@ end
     @test PO.group_source(nco) === nothing
     st = Stacking(; pe = epx, opti = [InverseVolatility()], opto = InverseVolatility())
     @test PO.group_frames(st).excess && isempty(PO.group_frames(st).raw)
-    sr = SubsetResampling(; opt = MeanRisk(; opt = JuMPOptimiser(; pe = epx, slv = s1)))
+    sr = SubsetResampling(; subset_size = 0.8,
+                          opt = MeanRisk(; opt = JuMPOptimiser(; pe = epx, slv = s1)))
     @test PO.group_source(sr) === nothing
     @test PO.group_frames(InverseVolatility(; pe = epx)).excess
     @test PO.group_frames(JuMPOptimiser(; pe = epx, slv = s1, cte = CentralityConstraint())).raw ==
@@ -759,7 +760,7 @@ end
                opt -> SchurComplementHierarchicalRiskParity(),
                opt -> NestedClustered(; opti = InverseVolatility(), opto = InverseVolatility()),
                opt -> Stacking(; opti = [InverseVolatility()], opto = InverseVolatility()),
-               opt -> SubsetResampling(; opt = InverseVolatility()))
+               opt -> SubsetResampling(; subset_size = 0.8, opt = InverseVolatility()))
         @test_logs mk(JuMPOptimiser(; pe = epx, slv = s1))
     end
 

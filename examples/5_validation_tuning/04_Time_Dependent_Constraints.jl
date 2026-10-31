@@ -395,8 +395,7 @@ compute the out-of-sample returns that the outer optimiser combines.
 st_inner = Stacking(;
                     opti = [MeanRisk(;
                                      opt = JuMPOptimiser(; slv = slv, wb = deleverage(4))),
-                            mr_static], opto = mr_static,
-                    cv = OptimisationCrossValidation(; cv = KFold(; n = 4)))
+                            mr_static], opto = mr_static, cv = KFold(; n = 4))
 res_st_inner = optimise(st_inner, rd)
 maximum(res_st_inner.w)
 #=
@@ -406,8 +405,7 @@ try
     optimise(Stacking(;
                       opti = [MeanRisk(;
                                        opt = JuMPOptimiser(; slv = slv, wb = deleverage(7))),
-                              mr_static], opto = mr_static,
-                      cv = OptimisationCrossValidation(; cv = KFold(; n = 4))), rd)
+                              mr_static], opto = mr_static, cv = KFold(; n = 4)), rd)
 catch err
     err
 end
@@ -423,8 +421,7 @@ st_nested = Stacking(;
                      opti = [MeanRisk(;
                                       opt = JuMPOptimiser(; slv = slv,
                                                           wb = deleverage(n_wf))),
-                             mr_static], opto = mr_static,
-                     cv = OptimisationCrossValidation(; cv = KFold(; n = 4)))
+                             mr_static], opto = mr_static, cv = KFold(; n = 4))
 pred_st_nested = cross_val_predict(st_nested, rd, wf)
 pretty_table(DataFrame(:fold => 1:n_wf, :stacked => max_weights(pred_st_nested));
              formatters = [resfmt])
@@ -475,8 +472,7 @@ st_bind_near = Stacking(;
                         opti = [MeanRisk(;
                                          opt = JuMPOptimiser(; slv = slv,
                                                              wb = deleverage(4, :nearest))),
-                                mr_static], opto = mr_static,
-                        cv = OptimisationCrossValidation(; cv = KFold(; n = 4)))
+                                mr_static], opto = mr_static, cv = KFold(; n = 4))
 pred_bind_near = cross_val_predict(st_bind_near, rd, wf)
 pretty_table(DataFrame(:fold => 1:n_wf, :nearest => max_weights(pred_bind_near));
              formatters = [resfmt])

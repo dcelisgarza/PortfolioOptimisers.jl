@@ -600,7 +600,7 @@
             @test is_plot(plt(csfm_ex))
             @test is_plot(plt(pr_ex))
             @test is_plot(plt(csfm_ex; nf = ["a", "b", "c"]))
-            @test is_plot(plt(csfm_ex; weighting = IdentityMetric()))
+            @test is_plot(plt(csfm_ex; weighting = nothing))
         end
         @test is_plot(plot_exposure_stability(csfm_ex; step = 3))
         @test is_plot(plot_exposure_stability(pr_ex; step = 3))
@@ -617,7 +617,7 @@
         # A block that names no factor is labelled by position.
         bare_ex = CrossSectionalFactorModel(; M = Ms_ex[Te, :, :], b = zeros(Ne),
                                             csr = csr_ex, Ms = Ms_ex, lag = 1)
-        @test is_plot(plot_exposure_correlation(bare_ex; weighting = IdentityMetric()))
+        @test is_plot(plot_exposure_correlation(bare_ex; weighting = nothing))
         @test is_plot(plot_exposure_distribution(bare_ex))
         # A re-based block labels the cumulative information coefficient on the reduced
         # axis when it is asked for the reduced answer.
@@ -697,9 +697,8 @@
         @test is_plot(plot_factor_model_summary(csfm_fs; ppy = 252, step = 3))
         @test is_plot(plot_factor_model_summary(pr_fs; ppy = 252, step = 3))
         @test is_plot(plot_factor_model_summary(csfm_fs; ppy = 252, step = 3,
-                                                nf = ["a", "b", "c"],
-                                                weighting = IdentityMetric(),
-                                                coverage_weighting = IdentityMetric()))
+                                                nf = ["a", "b", "c"], weighting = nothing,
+                                                coverage_weighting = nothing))
         # A block with no exposure history draws its four factor return columns alone.
         bare_fs = CrossSectionalFactorModel(; M = Ms_fs[Tf, :, :], b = zeros(Nf),
                                             csr = csr_fs, lag = 1)
@@ -731,6 +730,28 @@
         @test [x[:label] for x in p_cum.series_list] == csfm_fs.nf
         p_gap = plot_factor_cumulative_returns(gap_fs)
         @test p_gap.series_list[2][:y][4] == p_gap.series_list[2][:y][3]
+        # A re-based block carries the factor return history on its own axis, and the names
+        # follow it (#1912).
+        fcb_fs = FactorFamilyBasis(; fnm = ["ind"], fi = [[1, 2, 3]], di = [3],
+                                   ratios = [0.5 0.25; 0.25 2.0], K = 3)
+        fr_fs = 0.02 * randn(rng_fs, Tf, 2)
+        # The regression holds factor returns other than `fr`, so a summary that read
+        # `csr.f` in place of the raw history draws other sums (#1926).
+        csr2_fs = CrossSectionalRegression(; f = 2 .* fr_fs .+ 0.01, eps = csr_fs.eps,
+                                           n = csr_fs.n)
+        @test csr2_fs.f != fr_fs
+        rebased_fs = CrossSectionalFactorModel(; M = Ms_fs[Tf, :, 1:2], L = Ms_fs[Tf, :, :],
+                                               b = zeros(Nf), csr = csr2_fs,
+                                               Ms = Ms_fs[:, :, 1:2],
+                                               nf = ["value", "size"], lag = 1,
+                                               fcb = fcb_fs, fr = fr_fs)
+        p_rb = plot_factor_cumulative_returns(rebased_fs)
+        @test is_plot(p_rb)
+        @test [x[:label] for x in p_rb.series_list] == rebased_fs.nf
+        # The running sums are those of the raw factor return history, not of the reduced
+        # axis.
+        @test [collect(x[:y]) for x in p_rb.series_list] ≈
+              [cumsum(fr_fs[:, j]) for j in 1:2]
         # A prior result that carries no factor block names the remedy.
         no_rr_fs = LowOrderPrior(; X = randn(rng_fs, Tf, Nf), mu = zeros(Nf),
                                  sigma = Matrix(1.0 * I, Nf, Nf))

@@ -23,6 +23,8 @@ function PortfolioOptimisers.add_custom_constraint!(model::JuMP.Model, c::FirstA
     JuMP.@constraint(model, sc * (w[1] - c.ub * k) <= 0)
     return nothing
 end
+# An allocation set of a user, which only the general method of `projection_solver` reaches.
+struct ProbeAllocationSet <: PortfolioOptimisers.AbstractAllocationSet end
 struct FirstCosts <: PortfolioOptimisers.CustomJuMPObjective
     c::Float64
 end
@@ -311,6 +313,23 @@ end
         @test_throws ArgumentError po.project(GramProjection(; slv = slv), bset, q, wh)
         @test_throws ArgumentError po.projection_solver(EuclideanProjection(), bset)
         @test po.projection_solver(EuclideanProjection(), pset) === slv
+        # A Gram geometry hands out its own solver on a bounded set and on a programme set,
+        # which `wg` and the projection above read. A set of a user takes the general method,
+        # which no library set reaches, so it stays a direct call (#1912).
+        @test po.projection_solver(g, ProbeAllocationSet()) === slv
+        # A number budget is a row of equality: the short part of the projection is 0.2.
+        sset = resolve(ProgrammeAllocationSet(; slv = slv, sbgt = 0.2,
+                                              wb = WeightBounds(; lb = -1, ub = 1)), 3)
+        qs = [0.8, -0.5, 0.7]
+        ws = po.project(EuclideanProjection(), sset, qs, wh)
+        @test isapprox(sum(ws), 1; atol = 1e-6)
+        @test isapprox(sum(-min.(ws, 0)), 0.2; atol = 1e-5)
+        # A vector is calibrated when any member is.
+        @test po.calibrated([sset, pset]) == any(po.calibrated, [sset, pset])
+        @test !po.calibrated([sset, pset])
+        # A set with no gross budget adds no budget row for it, and the number budget of the
+        # short part is the only one the projection above holds.
+        @test isnothing(sset.gbgt) && sset.sbgt == 0.2
         # The rule binds its Gram matrix at every step and runs solver-free at the default.
         rng = StableRNG(7)
         T, N = 20, 4
@@ -1547,6 +1566,14 @@ end
             @test isa(lsres.retcode, OptimisationSuccess) && isnothing(lsres.retcode.res)
             short = sum(x -> max(-x, 0), lsres.w)
             @test 0.05 * (1 - 1e-4) <= short <= 0.2 * (1 + 1e-4)
+            # A number budget of the set is an equality on the short part of the leader (#1912).
+            nsres = optimise(OPS(; alg = FollowTheLeader(; opt = lsopt),
+                                 set = ProgrammeAllocationSet(; slv = slv,
+                                                              wb = WeightBounds(; lb = -1,
+                                                                                ub = 1),
+                                                              sbgt = 0.1)), rd)
+            @test isa(nsres.retcode, OptimisationSuccess) && isnothing(nsres.retcode.res)
+            @test sum(x -> max(-x, 0), nsres.w) ≈ 0.1 atol = 1e-5
         end
     end
     @testset "The set's view, the barrier roots and the mirror step's domain (#1192)" begin
@@ -1989,4 +2016,62 @@ end
         td = TimeDependent([gset(), gset(; pe = EmpiricalPrior())])
         @test po.group_frames(OPS(; x_src = xs, set = td)).raw == ["set.val[2].pe"]
     end
+end
+
+@testset "Small seams of the online family (#1912)" begin
+    po = PortfolioOptimisers
+    OPS = po.OnlinePortfolioSelection
+    rdo = ReturnsResult(; nx = ["A", "B", "C"], X = 0.02 .* randn(StableRNG(5), 30, 3),
+                        ts = Date(2020, 1, 1) .+ Day.(0:29))
+    # The step refuses a prior result and a schedule with the reason that names them.
+    pro = prior(EmpiricalPrior(), rdo)
+    @test_throws r"holds a fitted" partial_fit!(InverseVolatility(; pe = pro), rdo)
+    # The online fold loop resolves the fallback of a head at its entry, before the warm-up.
+    # A prior result in the fallback is neither a prior estimator nor an Online wrapper, so
+    # the resolution keeps it, and the step refuses it with the same reason. A
+    # `cross_val_predict` refuses a prior result at the top of the estimator before the loop,
+    # so only a fallback reaches the resolution with one.
+    @test_throws r"holds a fitted" cross_val_predict(OPS(;
+                                                         fb = InverseVolatility(; pe = pro)),
+                                                     rdo, OnlineIndexWalkForward(10, 5))
+    @test_throws r"holds a `TimeDependent` schedule" partial_fit!(InverseVolatility(;
+                                                                                    pe = TimeDependent([EmpiricalPrior(),
+                                                                                                        EmpiricalPrior()])),
+                                                                  rdo)
+    # A head that holds no returns window reads none from its state, so the read-out of an
+    # optimiser with no hold on returns hands the batch verb an empty `ReturnsResult`, and
+    # the batch verb refuses it for the missing returns.
+    bhp = BudgetedHindsightPath(; L = 1.0, slv = Solver(; name = :none, solver = nothing))
+    @test_throws po.IsNothingError optimise(bhp)
+    # The message names the missing returns, so the batch verb received the empty
+    # `ReturnsResult` and refused it, not a refusal of the state (#1926).
+    @test_throws r"rd.X cannot be nothing" optimise(bhp)
+    # The universe of a head that reads no names is the head itself.
+    ops = OPS()
+    @test po.non_investable_universe(ops, ["A"]) === ops
+    # A vector of slots reads rows when one of its entries does.
+    @test !po.exposure_keyed([1, 2])
+    @test !po.fitted_on_rows([1, 2])
+    @test po.fitted_on_rows([1, CentralityConstraint()])
+    # The copy of a head shares no array with the original: the forecaster of its rule folds
+    # the rows of the copy alone.
+    vw(a, b) = po.port_opt_view(rdo, a:b, :)
+    fr = OPS(; alg = ForecastReversion(; me = SimpleExpectedReturns()))
+    s1 = partial_fit!(fr, vw(1, 10))
+    w1 = optimise(s1).w
+    m1 = copy(mean(s1.cache.st.me))
+    s2 = partial_fit(s1, vw(11, 20))
+    @test optimise(s1).w == w1
+    @test mean(s1.cache.st.me) == m1
+    @test vec(mean(s2.cache.st.me)) ≈ vec(mean(rdo.X[1:20, :]; dims = 1))
+    @test vec(m1) ≈ vec(mean(rdo.X[1:10, :]; dims = 1))
+    # No library prior folds inside a `PriorExpectedReturns`, so the rule fits the prior
+    # again and keeps no forecaster state.
+    fp = OPS(; alg = ForecastReversion(; me = PriorExpectedReturns()))
+    @test isnothing(partial_fit!(fp, vw(1, 10)).cache.st)
+    # Custom constraints append as one, two or many.
+    c1, c2 = FirstAtMost(0.5), FirstAtMost(0.4)
+    @test po.append_custom_constraint(nothing, c1) === c1
+    @test po.append_custom_constraint(c1, c2) == [c1, c2]
+    @test po.append_custom_constraint([c1, c2], c1) == [c1, c2, c1]
 end

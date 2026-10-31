@@ -13,7 +13,7 @@ The function concatenates the [`AssetPanel`](@ref)s with [`Base.vcat(a::AssetPan
 The method that Julia selects is the algorithm.
 
  1. [`PricesResult`](@ref): check that the implied-volatility adjustment `ivpa` of `b` equals the one of `a`. Concatenate the prices `X`, the factors `F`, the benchmark `B`, the Exogenous Series `E` and the implied volatilities `iv` with [`vcat_optional`](@ref), which also checks the column names. Concatenate the panel `pnl` and the Listing Span `span` with [`vcat_optional`](@ref).
- 2. [`ReturnsResult`](@ref): check that the names `nx`, `nf`, `nb` and `ne` and the adjustment `ivpa` of `b` equal the ones of `a`. Concatenate `X`, `F`, `B`, `E`, the timestamps `ts`, `iv` and the panel `pnl` with [`vcat_optional`](@ref).
+ 2. [`ReturnsResult`](@ref): check that the names `nx`, `nf`, `nb` and `ne` and the adjustment `ivpa` of `b` equal the ones of `a`. Concatenate `X`, `F`, `B`, `E`, the timestamps `ts` and `iv` with [`vcat_optional`](@ref), and the panel `pnl` with [`vcat_returns_panel`](@ref), which lets one block hold no panel.
 
 # Arguments
 
@@ -23,7 +23,7 @@ The method that Julia selects is the algorithm.
 # Validation
 
   - The names and the implied-volatility adjustment of `b` equal the ones of `a`. An `ArgumentError` is thrown otherwise.
-  - Each optional column is held by both `a` and `b` or by neither. An `ArgumentError` is thrown otherwise.
+  - Each optional column is held by both `a` and `b` or by neither. An `ArgumentError` is thrown otherwise. The panel of a `ReturnsResult` is the exception, see [`vcat_returns_panel`](@ref).
   - The panels of `a` and `b` concatenate. [`Base.vcat(a::AssetPanel, bs::AssetPanel...)`](@ref) throws otherwise.
 
 # Returns
@@ -57,7 +57,114 @@ function vcat_observations(a::ReturnsResult, b::ReturnsResult)
                          E = vcat_optional(a.E, b.E, :E),
                          ts = vcat_optional(a.ts, b.ts, :ts),
                          iv = vcat_optional(a.iv, b.iv, :iv), ivpa = a.ivpa,
-                         pnl = vcat_optional(a.pnl, b.pnl, :pnl))
+                         pnl = vcat_returns_panel(a, b))
+end
+"""
+    vcat_returns_panel(a::ReturnsResult, b::ReturnsResult) -> Option{<:AssetPanel}
+
+Concatenates the Asset Panels of two blocks of returns data, where one block can hold no panel.
+
+The ingestion layer emits no panel for a block with no gap and no Panel Field, and the online conversion decides it again for each block. So a gapped stream gives blocks with a mask-only panel and blocks with none. A block with no panel states the universe of the finiteness of its returns, so it stands in as the panel [`finite_universe_panel`](@ref) makes, which gives the same Coverage Universe. The concatenation is then the panel that the conversion of the whole history gives.
+
+# Algorithm
+
+ 1. Neither block holds a panel: return `nothing`.
+ 2. Otherwise: replace a missing panel with [`finite_universe_panel`](@ref) of the returns of its block, and concatenate the two panels with [`Base.vcat(a::AssetPanel, bs::AssetPanel...)`](@ref).
+
+# Arguments
+
+  - `a`: The earlier block.
+  - `b`: The later block.
+
+# Validation
+
+  - The panels concatenate. [`Base.vcat(a::AssetPanel, bs::AssetPanel...)`](@ref) throws otherwise. So a block with no panel and a block whose panel holds Panel Fields, or is static, are refused.
+
+# Returns
+
+  - `pnl::Option{<:AssetPanel}`: The panel of the observations of `a` followed by the observations of `b`, or `nothing`.
+
+# Related
+
+  - [`vcat_observations`](@ref)
+  - [`finite_universe_panel`](@ref)
+  - [`attach_universe_masks`](@ref)
+"""
+function vcat_returns_panel(a::ReturnsResult, b::ReturnsResult)
+    return vcat_returns_panel(a, b, a.pnl, b.pnl)
+end
+function vcat_returns_panel(::ReturnsResult, ::ReturnsResult, ::Nothing, ::Nothing)
+    return nothing
+end
+function vcat_returns_panel(a::ReturnsResult, b::ReturnsResult, pnl_a::Option{<:AssetPanel},
+                            pnl_b::Option{<:AssetPanel})
+    pa = isnothing(pnl_a) ? finite_universe_panel(a.X) : pnl_a
+    pb = isnothing(pnl_b) ? finite_universe_panel(b.X) : pnl_b
+    return vcat(pa, pb)
+end
+"""
+    finite_universe_panel(X::MatNum) -> AssetPanel
+
+Make the mask-only Asset Panel that states the universe of the finiteness of a block of returns.
+
+Every asset is active, and an asset is estimable where its return is finite, which is the convention `emsk = amsk .& isfinite.(X)` of the ingestion layer. The Coverage Universe of this panel equals the Coverage Universe of no panel, so the panel stands in for a block that holds none.
+
+# Algorithm
+
+ 1. Write the active mask as an all-true mask of the shape of `X`, and the estimation mask as `isfinite.(X)`.
+ 2. Compress the pair with [`compress_all_true`](@ref), and make the [`AssetPanel`](@ref) with `pf = nothing`.
+
+# Arguments
+
+  - `X`: The asset returns of the block, `observations × assets`.
+
+# Returns
+
+  - `pnl::AssetPanel`: The mask-only panel.
+
+# Related
+
+  - [`vcat_returns_panel`](@ref)
+  - [`compress_all_true`](@ref)
+  - [`AssetPanel`](@ref)
+"""
+function finite_universe_panel(X::MatNum)::AssetPanel
+    amsk, emsk = compress_all_true(AllTrueMask(size(X)...), isfinite.(X))
+    return AssetPanel(; amsk = amsk, emsk = emsk)
+end
+"""
+    returns_with_universe(rd::ReturnsResult) -> ReturnsResult
+
+Give a `ReturnsResult` that holds an Asset Panel, for a reader that needs the universe masks and no Panel Field.
+
+The ingestion layer emits no panel for a window with no gap and no Panel Field, because its all-true masks state nothing that the finiteness of the returns does not state. A reader that takes its shape or its activity from the masks, such as a rolling Descriptor, a constant Factor Exposure or the fit of a [`CrossSectionalFactorPrior`](@ref) on returns-derived exposures, then reads the mask-only panel that [`finite_universe_panel`](@ref) makes. It is the panel that the layer would have emitted, with the same Coverage Universe.
+
+# Algorithm
+
+ 1. `rd` holds a panel, or holds no asset returns: return `rd`.
+ 2. Otherwise: return `rd` with its `pnl` set to [`finite_universe_panel`](@ref) of its asset returns.
+
+# Arguments
+
+  - $(arg_dict[:rd])
+
+# Returns
+
+  - `rd′::ReturnsResult`: `rd` itself, or `rd` with a mask-only panel.
+
+# Related
+
+  - [`finite_universe_panel`](@ref)
+  - [`attach_universe_masks`](@ref)
+  - [`ReturnsResult`](@ref)
+"""
+function returns_with_universe(rd::ReturnsResult)::ReturnsResult
+    if !isnothing(rd.pnl) || isnothing(rd.X)
+        return rd
+    end
+    return ReturnsResult(; nx = rd.nx, X = rd.X, nf = rd.nf, F = rd.F, nb = rd.nb, B = rd.B,
+                         ne = rd.ne, E = rd.E, ts = rd.ts, iv = rd.iv, ivpa = rd.ivpa,
+                         pnl = finite_universe_panel(rd.X))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -186,7 +293,7 @@ For [`PricesToReturns`](@ref), [`PriceGapFill`](@ref) and [`MissingDataFilter`](
 function partial_fit_transform(est::AbstractPreprocessingEstimator, ::Prices_RR)
     return throw(ArgumentError("a `$(typeof(est).name.name)` has no online form: no `partial_fit_transform` method folds a block of observations into it. Give the step a `partial_fit_transform` and a `fit_preprocessing` method that takes no data, or declare a refit with `Online(pipe)`."))
 end
-function partial_fit!(est::Union{<:PricesToReturns, <:PriceGapFill, <:MissingDataFilter},
+function partial_fit!(est::Union{PricesToReturns, PriceGapFill, MissingDataFilter},
                       data::Prices_RR)
     return partial_fit_transform(est, data)[1]
 end
@@ -541,7 +648,7 @@ function returns_with_series(rd::ReturnsResult, R::AbstractMatrix,
     pnl = rd.pnl
     if !isnothing(pnl) && !panel_is_static(pnl)
         amsk, emsk = compress_all_true(Matrix(pnl.amsk), Matrix(pnl.amsk) .& isfinite.(X))
-        pnl = AssetPanel(; pf = pnl.pf, amsk = amsk, emsk = emsk)
+        pnl = attach_universe_masks(pnl, amsk, emsk)
     end
     return ReturnsResult(; nx = rd.nx, X = X, nf = rd.nf, F = F, nb = rd.nb, B = B,
                          ne = rd.ne, E = E, ts = rd.ts, iv = rd.iv, ivpa = rd.ivpa,
@@ -906,7 +1013,7 @@ The display shows `cache` only when the step keeps a state, so a step that has f
 
   - [`show_fields`](@ref)
 """
-function show_fields(est::Union{<:PricesToReturns, <:PriceGapFill, <:MissingDataFilter})
+function show_fields(est::Union{PricesToReturns, PriceGapFill, MissingDataFilter})
     fns = fieldnames(typeof(est))
     return isnothing(est.cache) ? filter(!=(:cache), fns) : fns
 end

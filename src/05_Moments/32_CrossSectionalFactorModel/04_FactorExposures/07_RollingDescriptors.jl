@@ -40,12 +40,11 @@ A return that is missing is a `NaN`, and a Descriptor tests for it. A return tha
 
 # Arguments
 
-  - $(arg_dict[:rd]) It must carry returns in `rd.X` and an Asset Panel in `rd.pnl`.
+  - $(arg_dict[:rd]) It must carry returns in `rd.X`. With no Asset Panel in `rd.pnl`, the function reads the mask-only panel of [`returns_with_universe`](@ref).
 
 # Validation
 
   - `!isnothing(rd.X)`. Raises an [`IsNothingError`](@ref).
-  - `!isnothing(rd.pnl)`. Raises an [`IsNothingError`](@ref).
   - Every entry of `rd.X` that is not `NaN` is finite. Raises a `DomainError`.
 
 The two shapes need no check of their own. [`ReturnsResult`](@ref) binds the observation axis and the asset axis of the feature matrix to those of the returns, so an Asset Panel that reaches a `ReturnsResult` always matches the returns beside it.
@@ -65,11 +64,9 @@ The two shapes need no check of their own. [`ReturnsResult`](@ref) binds the obs
 """
 function descriptor_returns(rd::ReturnsResult)
     X = rd.X
-    pnl = rd.pnl
     @argcheck(!isnothing(X),
               IsNothingError("a rolling Descriptor reads returns, and rd.X is nothing. Build the ReturnsResult with the returns matrix the Asset Panel was drawn on."))
-    @argcheck(!isnothing(pnl),
-              IsNothingError("a rolling Descriptor reads the active mask of an Asset Panel, and rd.pnl is nothing. Build the ReturnsResult with the `pnl` that asset_panel returns."))
+    pnl = returns_with_universe(rd).pnl
     Xf = Matrix{float_if_integer(eltype(X))}(X)
     k = findfirst(isinf, Xf)
     @argcheck(isnothing(k),

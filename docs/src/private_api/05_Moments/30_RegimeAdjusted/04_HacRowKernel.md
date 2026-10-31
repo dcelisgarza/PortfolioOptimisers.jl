@@ -14,4 +14,5 @@ hac_damped_shift!
 hac_damped_integral!
 hac_row_kernel
 correlation_hac_lags!
+hac_laplace!
 ```

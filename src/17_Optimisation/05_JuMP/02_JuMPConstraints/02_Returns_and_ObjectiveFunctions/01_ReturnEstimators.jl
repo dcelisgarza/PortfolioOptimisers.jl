@@ -130,7 +130,7 @@ alone.
 """
 const VecJRE = AbstractVector{<:JuMPReturnsEstimator}
 """
-    const JRE_VecJRE = Union{<:JuMPReturnsEstimator, <:VecJRE}
+    const JRE_VecJRE = Union{JuMPReturnsEstimator, VecJRE}
 
 Field bound for [`JuMPOptimiser`](@ref)'s `ret` slot, which takes one return term or several.
 
@@ -141,9 +141,9 @@ It is the return-side twin of [`RM_VecRM`](@ref).
   - [`JuMPReturnsEstimator`](@ref)
   - [`VecJRE`](@ref)
 """
-const JRE_VecJRE = Union{<:JuMPReturnsEstimator, <:VecJRE}
+const JRE_VecJRE = Union{JuMPReturnsEstimator, VecJRE}
 """
-    const ArithRetMu = Union{<:Num_VecNum, <:AbstractExpectedReturnsEstimator, <:AbstractPriorEstimator}
+    const ArithRetMu = Union{Num_VecNum, AbstractExpectedReturnsEstimator, AbstractPriorEstimator}
 
 Field bound for [`ArithmeticReturn`](@ref)'s `mu` slot, which holds the expected returns or the Estimator that computes them, a [`DeferredQuantity`](@ref).
 
@@ -156,8 +156,8 @@ The bound is [`MuSlot`](@ref) less a [`VecScalar`](@ref), for two reasons. A `Ve
   - [`DeferredQuantity`](@ref)
   - [`resolve_deferred_quantities`](@ref)
 """
-const ArithRetMu = Union{<:Num_VecNum, <:AbstractExpectedReturnsEstimator,
-                         <:AbstractPriorEstimator}
+const ArithRetMu = Union{Num_VecNum, AbstractExpectedReturnsEstimator,
+                         AbstractPriorEstimator}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -234,8 +234,7 @@ Keywords correspond to the struct's fields.
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 8.1.1.
-  - $(ref_dict[:markowitz1952])
+  - $(ref_dict[:markowitz1952]) Page 81.
 """
 @concrete struct ArithmeticReturn <: JuMPReturnsEstimator
     """
@@ -459,15 +458,12 @@ own expression, and the term still charges the same fees. This is the return-sid
 function unit_scale_returns_estimator(r::JuMPReturnsEstimator)
     settings = r.settings
     scale = settings.scale
-    return if isone(scale)
-        r
-    else
-        Accessors.@set r.settings = JuMPReturnsSettings(; scale = one(scale),
-                                                        lb = settings.lb,
-                                                        rte = settings.rte,
-                                                        fee = settings.fee,
-                                                        mic = settings.mic)
+    if isone(scale)
+        return r
     end
+    s = JuMPReturnsSettings(; scale = one(scale), lb = settings.lb, rte = settings.rte,
+                            fee = settings.fee, mic = settings.mic)
+    return rebuild_estimator(r, (; settings = s))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -478,7 +474,9 @@ The term takes optional observation weights. Unlike [`ArithmeticReturn`](@ref), 
 per-asset quantity, which is why this family is named for the return term and not for the
 characteristic. [`expected_return`](@ref) computes the same quantity in closed form, and the
 model's `:ret` agrees with it when the objective raises the return. The formulation is on
-[`set_return_constraints!`](@ref).
+[`set_return_constraints!`](@ref). Page 919 of [kelly1956](@cite) states the criterion for
+the bets of a gambler, and Section 7 of [thorp2008](@cite) states it for a portfolio of
+securities.
 
 # Mathematical definition
 
@@ -531,10 +529,8 @@ Keywords correspond to the struct's fields.
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 8.1.2, equations 8.2 and 8.5.
-  - $(ref_dict[:kelly1956])
-  - $(ref_dict[:thorp2008])
-  - $(ref_dict[:chares2009])
+  - $(ref_dict[:kelly1956]) Page 919.
+  - $(ref_dict[:thorp2008]) Section 7, page 406.
 """
 @concrete struct LogarithmicReturn <: JuMPReturnsEstimator
     """
@@ -651,6 +647,69 @@ function no_bounds_returns_estimator(r::VecJRE, args...)
     return [no_bounds_returns_estimator(ri, args...) for ri in r]
 end
 """
+    resolved_expected_return(rt::JRE_VecJRE, wd::VecNum, w::VecNum, X::MatNum,
+                             fees::Option{<:Fees}) -> Number
+
+Compute the expected return of the weights `wd` from a return estimator that [`factory`](@ref) resolved against a prior, net of the fee of the portfolio `w`.
+
+A resolved estimator holds every moment that it reads, so the returns matrix `X` is the only data that the function needs. [`expected_return`](@ref) on a prior calls it on `factory(rt, pr)` and `pr.X`, and [`ExpectedReturn`](@ref) and [`ExpectedReturnRiskRatio`](@ref) call it on the returns matrix of the risk path. Thus both routes read one ladder, the ladder of the model that [`set_return_constraints!`](@ref) builds.
+
+[`expected_return`](@ref) states the closed form of each estimator. The function reads the gross return of `wd` and the fee term of `w`. The two are the same vector, except in [`difference_risk`](@ref), where `wd` is the difference of `w` and a benchmark. The `mu` slot of an [`ArithmeticReturn`](@ref) and the `w` slot of a [`LogarithmicReturn`](@ref) take the place of the moments of the prior. A vector of estimators sums `settings.scale` times the return of each term whose `settings.rte` is `true`.
+
+# Arguments
+
+  - `rt`: Return estimator that [`factory`](@ref) resolved, or a vector of them.
+  - `wd`: The weights whose gross return the function computes, `assets × 1`.
+  - $(arg_dict[:pw])
+  - `X`: Asset returns matrix `observations × assets`.
+  - `fees`: Fee of the portfolio `w`, or `nothing`.
+
+# Validation
+
+  - The `mu` slot of an [`ArithmeticReturn`](@ref) holds no [`DeferredQuantity`](@ref), from [`assert_resolved_slots`](@ref), and it is not `nothing`. Otherwise the function throws an `ArgumentError` or an `IsNothingError`.
+
+# Returns
+
+  - `rt::Number`: The expected return of `wd`, net of the fee of `w`.
+
+# Related
+
+  - [`expected_return`](@ref)
+  - [`ExpectedReturn`](@ref)
+  - [`ExpectedReturnRiskRatio`](@ref)
+  - [`term_fees`](@ref)
+  - [`factory`](@ref)
+"""
+function resolved_expected_return(rt::ArithmeticReturn, wd::VecNum, w::VecNum, X::MatNum,
+                                  fees::Option{<:Fees})
+    assert_resolved_slots(rt)
+    @argcheck(!isnothing(rt.mu),
+              IsNothingError("an `ArithmeticReturn` reads the expected returns `mu` of a prior, and this one holds none. A returns matrix does not hold them. Pass the prior result, for example `expected_risk(r, w, pr)`, or resolve the measure first with `factory(r, pr)`, or state `mu` on the `ArithmeticReturn`."))
+    return LinearAlgebra.dot(wd, rt.mu) - term_fees(w, fees, size(X, 1), rt.settings.fee)
+end
+function resolved_expected_return(rt::LogarithmicReturn, wd::VecNum, w::VecNum, X::MatNum,
+                                  fees::Option{<:Fees})
+    x = X * wd
+    kret = isnothing(rt.w) ? Statistics.mean(log1p, x) : Statistics.mean(log1p.(x), rt.w)
+    return kret - term_fees(w, fees, size(X, 1), rt.settings.fee)
+end
+function resolved_expected_return(::NoReturn, wd::VecNum, ::VecNum, ::MatNum,
+                                  ::Option{<:Fees})
+    # No charge, exactly as `set_return_constraints!` applies none.
+    return zero(eltype(wd))
+end
+function resolved_expected_return(rt::VecJRE, wd::VecNum, w::VecNum, X::MatNum,
+                                  fees::Option{<:Fees})
+    ret = zero(eltype(wd))
+    for rt_i in rt
+        if !rt_i.settings.rte
+            continue
+        end
+        ret += rt_i.settings.scale * resolved_expected_return(rt_i, wd, w, X, fees)
+    end
+    return ret
+end
+"""
     bounds_returns_estimator(r, lb)
 
 Return a copy of return term `r` with its lower bound set to `lb`.
@@ -682,7 +741,12 @@ whether one number has the same meaning for all of the terms.
   - [`LogarithmicReturn`](@ref)
 """
 function bounds_returns_estimator(r::JuMPReturnsEstimator, lb::Option{<:RkRtBounds})
-    return Accessors.@set r.settings.lb = lb
+    settings = r.settings
+    return if lb === settings.lb
+        r
+    else
+        rebuild_estimator(r, (; settings = rebuild_estimator(settings, (; lb = lb))))
+    end
 end
 function bounds_returns_estimator(r::VecJRE, lb::Nothing)
     return [bounds_returns_estimator(ri, nothing) for ri in r]

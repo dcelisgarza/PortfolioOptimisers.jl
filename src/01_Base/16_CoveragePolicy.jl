@@ -149,7 +149,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype of the rules that choose which assets an available-case covariance peels away.
 
-An available-case covariance divides each pair by the observations that the pair shares. Two admitted assets can each have a variance and share too few observations for a covariance, so their cell is `NaN` inside the finite block. Such a pair is **undetermined**. The undetermined pairs make a graph, with one vertex per admitted asset that has a variance and one edge per undetermined pair. A set of assets removes every undetermined pair exactly when it is a vertex cover of this graph. A member of the family goes in the `peel` field of a [`CoveragePolicy`](@ref) and chooses the cover. The peel runs at admission, so a peeled asset is `NaN` across its row and column and leaves the Investable Mask.
+An available-case covariance divides each pair by the observations that the pair shares. Two admitted assets can each have a variance and share too few observations for a covariance, so their cell is `NaN` inside the finite block. Such a pair is **undetermined**. The undetermined pairs make a graph, with one vertex per admitted asset that has a variance and one edge per undetermined pair. A set of assets removes every undetermined pair exactly when it is a vertex cover of this graph. A member of the family goes in the `peel` field of a [`CoveragePolicy`](@ref) and chooses the cover, and `nothing` skips the peel. The peel runs at admission, so a peeled asset is `NaN` across its row and column and leaves the Investable Mask.
 
 # Interfaces
 
@@ -185,7 +185,6 @@ julia> PortfolioOptimisers.peel_assets(PeelEveryEnd(), Bool[0 1 0; 1 0 0; 0 0 0]
 
   - [`MinimalPeel`](@ref)
   - [`GreedyPeel`](@ref)
-  - [`NoPeel`](@ref)
   - [`CoveragePolicy`](@ref)
   - [`peel_assets`](@ref)
 """
@@ -224,7 +223,6 @@ The search is exact. Minimum vertex cover is NP-hard in general, but the search 
 
   - [`AbstractPeel`](@ref)
   - [`GreedyPeel`](@ref)
-  - [`NoPeel`](@ref)
   - [`CoveragePolicy`](@ref)
   - [`peel_assets`](@ref)
 """
@@ -245,25 +243,9 @@ It is the oracle's rule. It removes the asset with the most undetermined pairs t
 
   - [`AbstractPeel`](@ref)
   - [`MinimalPeel`](@ref)
-  - [`NoPeel`](@ref)
   - [`peel_assets`](@ref)
 """
 struct GreedyPeel <: AbstractPeel end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Peels no asset, so an undetermined pair stays `NaN` in the covariance.
-
-The matrix repair then refuses the `NaN` inside the finite block with an `IsNonFiniteError` that names the cell. Use it to see the undetermined pairs, or to keep a covariance whose gaps a later step fills.
-
-# Related
-
-  - [`AbstractPeel`](@ref)
-  - [`MinimalPeel`](@ref)
-  - [`GreedyPeel`](@ref)
-  - [`matrix_processing_block!`](@ref)
-"""
-struct NoPeel <: AbstractPeel end
 """
     peel_assets(peel, U)
 
@@ -273,7 +255,7 @@ It is the verb of the [`AbstractPeel`](@ref) interface. [`coverage_peel`](@ref) 
 
 # Arguments
 
-  - `peel`: The peel rule.
+  - `peel`: The peel rule, or `nothing` to skip the peel.
   - `U`: The adjacency matrix of the graph. It is symmetric, `true` at each undetermined pair, and `false` on the diagonal.
 
 # Returns
@@ -302,7 +284,7 @@ julia> PortfolioOptimisers.peel_assets(MinimalPeel(), U)
  3
  4
 
-julia> PortfolioOptimisers.peel_assets(NoPeel(), U)
+julia> PortfolioOptimisers.peel_assets(nothing, U)
 Int64[]
 ```
 
@@ -311,21 +293,22 @@ Int64[]
   - [`AbstractPeel`](@ref)
   - [`MinimalPeel`](@ref)
   - [`GreedyPeel`](@ref)
-  - [`NoPeel`](@ref)
   - [`coverage_peel`](@ref)
 """
 function peel_assets end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`NoPeel`](@ref) method of [`peel_assets`](@ref). It removes no vertex.
+`nothing` method of [`peel_assets`](@ref). It skips the peel and removes no vertex.
+
+An undetermined pair then stays `NaN` in the covariance, and the matrix repair refuses the `NaN` inside the finite block with an `IsNonFiniteError` that names the cell. Skip the peel to see the undetermined pairs, or to keep a covariance whose gaps a later step fills.
 
 # Related
 
   - [`peel_assets`](@ref)
-  - [`NoPeel`](@ref)
+  - [`matrix_processing_block!`](@ref)
 """
-function peel_assets(::NoPeel, ::AbstractMatrix{Bool})
+function peel_assets(::Nothing, ::AbstractMatrix{Bool})
     return Int[]
 end
 """
@@ -610,7 +593,7 @@ A policy replaces the all-or-nothing Coverage Universe with available-case estim
 
 The default `min_coverage = 0` admits every column, and a prior fills in silence every column that has a variance. Under the default Bessel correction that is a column with two or more observations. A column with one observation has a `NaN` variance, so the Investable Mask drops the asset and nothing is filled. To admit broadly and still get the warning, set the `fill_limit` of the prior explicitly, tighter than `1 - min_coverage`.
 
-**A covariance peels the assets of an undetermined pair at admission.** Two admitted assets can each have a variance and share too few observations for a covariance. The `peel` rule then removes a set of assets that leaves no such pair, and [`coverage_peel`](@ref) reports it through [`strict_diagnostic`](@ref): a warning names the peeled assets, and `strict = true` refuses. A peeled asset is `NaN` across its row and column, so it leaves the Investable Mask, and the matrix repair meets no `NaN` inside the finite block. The default [`MinimalPeel`](@ref) keeps the most assets. [`GreedyPeel`](@ref) is the oracle's rule, and [`NoPeel`](@ref) keeps the `NaN` for the matrix repair to refuse. A mean and a variance have no pairs, so the rule binds on a covariance and a correlation alone. On a fold, the peel runs each time the folded estimator answers a `cov` or a `cor` call, on the counts folded so far, and not in [`partial_fit!`](@ref). So a walk-forward warns at each step that holds an undetermined pair, and the peeled assets can change from one step to the next.
+**A covariance peels the assets of an undetermined pair at admission.** Two admitted assets can each have a variance and share too few observations for a covariance. The `peel` rule then removes a set of assets that leaves no such pair, and [`coverage_peel`](@ref) reports it through [`strict_diagnostic`](@ref): a warning names the peeled assets, and `strict = true` refuses. A peeled asset is `NaN` across its row and column, so it leaves the Investable Mask, and the matrix repair meets no `NaN` inside the finite block. The default [`MinimalPeel`](@ref) keeps the most assets. [`GreedyPeel`](@ref) is the oracle's rule, and `peel = nothing` skips the peel and keeps the `NaN` for the matrix repair to refuse. A mean and a variance have no pairs, so the rule binds on a covariance and a correlation alone. On a fold, the peel runs each time the folded estimator answers a `cov` or a `cor` call, on the counts folded so far, and not in [`partial_fit!`](@ref). So a walk-forward warns at each step that holds an undetermined pair, and the peeled assets can change from one step to the next.
 
 # Fields
 
@@ -621,7 +604,7 @@ $(DocStringExtensions.FIELDS)
     CoveragePolicy(;
         min_coverage::Real = 0.0,
         alg::AbstractCoverageAlgorithm = DecayCoverage(),
-        peel::AbstractPeel = MinimalPeel()
+        peel::Option{<:AbstractPeel} = MinimalPeel()
     ) -> CoveragePolicy
 
 Keywords correspond to the struct's fields.
@@ -661,11 +644,11 @@ CoveragePolicy
     """
     alg
     """
-    `peel`: Peel rule, which chooses the assets an available-case covariance removes so that no pair of admitted assets with a variance is left without a covariance.
+    `peel`: Peel rule, which chooses the assets an available-case covariance removes so that no pair of admitted assets with a variance is left without a covariance, or `nothing` to skip the peel and leave the `NaN` of each undetermined pair for the matrix repair to refuse.
     """
     peel
     function CoveragePolicy(min_coverage::Real, alg::AbstractCoverageAlgorithm,
-                            peel::AbstractPeel)
+                            peel::Option{<:AbstractPeel})
         @argcheck(zero(min_coverage) <= min_coverage <= one(min_coverage),
                   DomainError(min_coverage,
                               "`min_coverage` is a share of the observations folded, so it must lie in [0, 1]."))
@@ -674,7 +657,7 @@ CoveragePolicy
 end
 function CoveragePolicy(; min_coverage::Real = 0.0,
                         alg::AbstractCoverageAlgorithm = DecayCoverage(),
-                        peel::AbstractPeel = MinimalPeel())::CoveragePolicy
+                        peel::Option{<:AbstractPeel} = MinimalPeel())::CoveragePolicy
     return CoveragePolicy(min_coverage, alg, peel)
 end
 """
@@ -1090,7 +1073,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
   - [`DecayCoverage`](@ref)
   - [`ExpireCoverage`](@ref)
 """
-function fold_inactive!(::Union{<:DecayCoverage, <:ExpireCoverage},
+function fold_inactive!(::Union{DecayCoverage, ExpireCoverage},
                         state::AbstractPartialFitState, ::AbstractVector{<:Bool})
     return state
 end
@@ -1182,8 +1165,8 @@ Where:
   - [`DecayCoverage`](@ref)
   - [`ResetCoverage`](@ref)
 """
-function admits(::Union{<:DecayCoverage, <:ResetCoverage}, share::Real, active::Bool,
-                ::Integer, min_coverage::Real)
+function admits(::Union{DecayCoverage, ResetCoverage}, share::Real, active::Bool, ::Integer,
+                min_coverage::Real)
     return active && share >= min_coverage
 end
 """
@@ -1300,7 +1283,7 @@ Where:
 
  1. Take the vertices `V`, the admitted assets whose variance has a denominator of at least one.
  2. Take the adjacency matrix `U` of the undetermined pairs among them. Return `cmsk` when it holds no edge.
- 3. Take the assets to remove with [`peel_assets`](@ref). Return `cmsk` when the rule removes none, as [`NoPeel`](@ref) does.
+ 3. Take the assets to remove with [`peel_assets`](@ref). Return `cmsk` when the rule removes none, as `peel = nothing` does.
  4. Report the peel through [`strict_diagnostic`](@ref), which warns, or refuses under `strict`.
  5. Remove the peeled assets from the mask.
 
@@ -1343,7 +1326,8 @@ function coverage_peel(cvg::CoveragePolicy, cmsk::Option{BitVector},
     if isempty(idx)
         return cmsk
     end
-    strict_diagnostic(peel_msg(idx, count(U) ÷ 2, cvg.peel), strict)
+    strict_diagnostic(peel_msg(idx, count(U) ÷ 2, cvg.peel), strict;
+                      id = @log_id(typeof(cvg.peel)))
     out = isnothing(cmsk) ? trues(size(nu, 1)) : copy(cmsk)
     out[idx] .= false
     return out
@@ -1369,7 +1353,7 @@ Builds the text of the report of [`coverage_peel`](@ref).
   - [`strict_diagnostic`](@ref)
 """
 function peel_msg(idx::AbstractVector{<:Integer}, m::Integer, peel::AbstractPeel)
-    return "an available-case covariance peeled the assets at indices $(idx) of its universe, to remove $(m) undetermined pair(s): pairs of admitted assets that each have a variance but share too few observations for a covariance. $(peel) chose them. A peeled asset is `NaN` across its row and column, so it leaves the Investable Mask. Pass `strict = true` to refuse instead, set `peel = NoPeel()` on the `CoveragePolicy` to keep the `NaN` cells, raise `min_coverage`, or fit over a window that the pairs share."
+    return "an available-case covariance peeled the assets at indices $(idx) of its universe, to remove $(m) undetermined pair(s): pairs of admitted assets that each have a variance but share too few observations for a covariance. $(peel) chose them. A peeled asset is `NaN` across its row and column, so it leaves the Investable Mask. Pass `strict = true` to refuse instead, set `peel = nothing` on the `CoveragePolicy` to keep the `NaN` cells, raise `min_coverage`, or fit over a window that the pairs share."
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1566,6 +1550,5 @@ function coverage_refuse_comoment!(val::AbstractMatrix, cmsk::BitVector,
     val[:, pout] .= nan
     return nothing
 end
-export CoveragePolicy, DecayCoverage, ResetCoverage, ExpireCoverage, MinimalPeel,
-       GreedyPeel, NoPeel
+export CoveragePolicy, DecayCoverage, ResetCoverage, ExpireCoverage, MinimalPeel, GreedyPeel
 public AbstractCoverageAlgorithm, fold_inactive!, admits, AbstractPeel, peel_assets

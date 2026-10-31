@@ -259,7 +259,7 @@ The view is the projection of the set onto the cluster's coordinates, and not a 
 # Arguments
 
   - `risk_ucs`: Mean norm-ball uncertainty set.
-  - `i`: Cluster or asset index.
+  - `i`: Indices of the assets that the view keeps.
   - `args...`: Additional positional arguments (ignored).
 
 # Returns
@@ -334,7 +334,7 @@ The view is the projection of the set onto the cluster's coordinates, and not a 
 # Arguments
 
   - `risk_ucs`: Covariance norm-ball uncertainty set.
-  - `i`: Cluster or asset index.
+  - `i`: Indices of the assets that the view keeps.
   - `args...`: Additional positional arguments (ignored).
 
 # Returns

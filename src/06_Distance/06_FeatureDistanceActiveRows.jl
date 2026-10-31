@@ -7,8 +7,9 @@ The active mask marks, for each observation of the window and each asset, whethe
 
 # Algorithm
 
- 1. `amsk` is `nothing`: return `nothing`.
- 2. Otherwise check that `amsk` is `observations × assets` for the layout that `dims` declares, and return `nothing` when every entry is `true`, or `amsk` otherwise.
+ 1. If `amsk` is `nothing`, return `nothing`.
+ 2. Otherwise, check that `amsk` is `observations × assets` for the layout that `dims` declares.
+ 3. Return `nothing` when every entry of `amsk` is `true`, and `amsk` otherwise.
 
 # Arguments
 
@@ -43,7 +44,12 @@ end
 
 Give a copy of a window of time-varying features with a zero at each cell that the mask `A` marks unreadable.
 
-A collapse reads each asset, or each pair of assets, only at its own readable rows, so the value of an unreadable cell must reach neither the distance nor a refusal. [`distance`](@ref) checks this copy with [`assert_feature_matrix`](@ref) and collapses it. A `NaN`, or a value outside the domain of the metric, at an unreadable cell then refuses nothing, and no pass of a collapse reads it: [`StackObservations`](@ref) measures the whole stack before it measures a pair again on its shared rows, and [`AggregateDistances`](@ref) measures every asset at each row before it keeps the pairs that both are active at. The zero is the value that [`feature_window`](@ref) writes at a placeholder, and that the panel collapse of a meta-optimiser writes at an inactive cell. The copy keeps the element type of `Z`.
+A collapse reads each asset, or each pair of assets, only at its own readable rows, so the value of an unreadable cell must reach neither the distance nor a refusal. [`distance`](@ref) checks this copy with [`assert_feature_matrix`](@ref) and collapses it. A `NaN`, or a value outside the domain of the metric, at an unreadable cell then refuses nothing. No result of a collapse reads it either. [`StackObservations`](@ref) measures the whole stack, and then replaces the distance of each pair that holds an unreadable cell. [`AggregateDistances`](@ref) measures every asset at each row, and keeps only the pairs whose two assets are active at the row. The zero is the value that [`feature_window`](@ref) writes at a placeholder, and that the panel collapse of a meta-optimiser writes at an inactive cell. The copy keeps the element type of `Z`.
+
+# Algorithm
+
+ 1. Lay the mask `A` out against `Z`, giving `M`. At `dims = 1`, `M` is `A`. At `dims = 2`, `M` is `A` reshaped to `observations × 1 × assets`.
+ 2. Broadcast `ifelse` over `M` and `Z`. Keep each cell of `Z` where `M` is `true`, and write `zero(eltype(Z))` elsewhere.
 
 # Arguments
 
@@ -75,13 +81,12 @@ Mark the assets that a collapse can read in a window, from the active mask of th
 
 The method that Julia selects is the algorithm.
 
- 1. [`LastObservation`](@ref) forwards to its rule.
- 2. [`LastRow`](@ref): an asset is readable when it is active at the last row.
- 3. Every other rule and collapse: an asset is readable when it is active at one row of the window at least.
+ 1. Under [`LastRow`](@ref), an asset is readable when it is active at the last row.
+ 2. Under every other collapse, an asset is readable when it is active at one row of the window at least.
 
 # Arguments
 
-  - `alg`: The collapse algorithm, or the rule of a [`LastObservation`](@ref).
+  - `alg`: The collapse algorithm.
   - `A`: The active mask of the window, `observations × assets`.
 
 # Returns
@@ -93,21 +98,34 @@ The method that Julia selects is the algorithm.
   - [`assert_feature_readable`](@ref)
   - [`feature_readable_mask`](@ref)
 """
-function feature_readable(alg::LastObservation, A::AbstractMatrix{Bool})
-    return feature_readable(alg.alg, A)
-end
 function feature_readable(::LastRow, A::AbstractMatrix{Bool})
     return BitVector(view(A, size(A, 1), :))
 end
-function feature_readable(::Union{<:LastActiveRow, <:AbstractFeatureCollapseAlgorithm},
-                          A::AbstractMatrix{Bool})
+function feature_readable(::AbstractFeatureCollapseAlgorithm, A::AbstractMatrix{Bool})
     return BitVector(vec(any(A; dims = 1)))
 end
 """
     feature_asset_labels(nx, i::AbstractVector{<:Integer}) -> String
     feature_asset_labels(nx, E::AbstractVector{<:Tuple}) -> String
 
-Name the assets at the positions `i`, or the pairs of positions `E`, for a refusal: by their names when `nx` holds them, and by their positions otherwise.
+Name the assets at the positions `i`, or the pairs of positions `E`, for a refusal. The text quotes the names when `nx` holds them, and the positions otherwise.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. If `nx` is `nothing`, quote `i`, or the pairs of `E` joined by commas.
+ 2. Otherwise, quote `nx[i]`, or the pair of names of each pair of `E` joined by commas.
+
+# Arguments
+
+  - `nx`: The asset names, or `nothing`.
+  - `i`: The positions of the assets.
+  - `E`: The pairs of positions, `(i, j)`.
+
+# Returns
+
+  - `s::String`: The phrase that names the assets, for the message of a refusal.
 
 # Related
 
@@ -132,6 +150,12 @@ end
 Refuse a window in which the collapse has no value to read for an asset, and name each such asset.
 
 Inside a fit, [`feature_readable_mask`](@ref) drops such an asset at the entry of the optimiser, so the collapse never meets it. A direct call of [`distance`](@ref), [`cor_and_dist`](@ref) or [`clusterise`](@ref) has no entry of a fit, so it refuses here.
+
+# Algorithm
+
+ 1. If `A` is `nothing`, every cell is readable, so return `nothing`.
+ 2. Otherwise, find the assets that [`feature_readable`](@ref) does not mark, giving `i`.
+ 3. Refuse when `i` is not empty. The message names each asset of `i` with [`feature_asset_labels`](@ref), and gives the cause and the remedy from [`unreadable_message`](@ref).
 
 # Arguments
 
@@ -167,6 +191,21 @@ end
 
 State why a collapse has no value to read for an asset, and the remedy, for the refusal of [`assert_feature_readable`](@ref). [`LastRow`](@ref) reads the last row alone, so it names [`LastActiveRow`](@ref) as a remedy too.
 
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. Under [`LastRow`](@ref), the cause is the last row. The remedies are a view of the returns data and [`LastActiveRow`](@ref).
+ 2. Under every other collapse, the cause is a window with no readable row. The remedy is a view of the returns data.
+
+# Arguments
+
+  - `alg`: The collapse algorithm.
+
+# Returns
+
+  - `s::String`: The cause and the remedy.
+
 # Related
 
   - [`assert_feature_readable`](@ref)
@@ -175,13 +214,27 @@ State why a collapse has no value to read for an asset, and the remedy, for the 
 function unreadable_message(::AbstractFeatureCollapseAlgorithm)
     return "each has no readable row in the window: no row at which it is active and every value column of `sel` holds data, observed or filled. Inside a fit, the entry of the optimiser drops such an asset as a non-investable asset. A direct call has no entry of a fit. Pass a view of the returns data at the assets to cluster, `port_opt_view(rd, i)`."
 end
-function unreadable_message(::LastObservation{<:LastRow})
-    return "each is inactive at the last row of the window, or a value column of `sel` holds a placeholder there. Inside a fit, the entry of the optimiser drops such an asset as a non-investable asset. A direct call has no entry of a fit. Pass a view of the returns data at the assets to cluster, `port_opt_view(rd, i)`, or read each asset at its last readable row, `LastObservation(; alg = LastActiveRow())`."
+function unreadable_message(::LastRow)
+    return "each is inactive at the last row of the window, or a value column of `sel` holds a placeholder there. Inside a fit, the entry of the optimiser drops such an asset as a non-investable asset. A direct call has no entry of a fit. Pass a view of the returns data at the assets to cluster, `port_opt_view(rd, i)`, or read each asset at its last readable row, `LastActiveRow()`."
 end
 """
     asset_major(Z::Arr3Num, dims::Integer)
 
 Give a window of time-varying features in the layout `observations × assets × features`, whichever trailing axis `dims` says the assets occupy.
+
+# Algorithm
+
+ 1. At `dims = 1`, return `Z`.
+ 2. At `dims = 2`, return a `PermutedDimsArray` of `Z` that swaps its two last axes. It copies nothing.
+
+# Arguments
+
+  - $(arg_dict[:Z])
+  - $(arg_dict[:dims])
+
+# Returns
+
+  - `Zd::AbstractArray{<:Number, 3}`: The window, `observations × assets × features`.
 
 # Related
 
@@ -195,7 +248,9 @@ end
 
 Collapse each asset's features over its own active rows, with the weights of those rows.
 
-The weights are resolved once against the whole window. Each asset keeps the entries of its active rows, and the collapse divides by their sum, so an inactive cell has no weight.
+The caller resolves the weights once against the whole window, with [`collapse_weights`](@ref). Each asset keeps the entries of its active rows, and the collapse divides by their sum, so an inactive cell has no weight.
+
+# Mathematical definition
 
 ```math
 \\begin{align}
@@ -207,7 +262,7 @@ Where:
 
   - $(math_dict[:zbar_ik_feature])
   - $(math_dict[:z_tik_feature])
-  - ``a_{t,\\,i}``: Entry of the active mask, `1` when asset ``i`` is active at observation ``t`` and `0` otherwise.
+  - $(math_dict[:a_ti_window])
   - $(math_dict[:w_t_obs])
   - $(math_dict[:T])
 
@@ -215,9 +270,10 @@ Where:
 
 # Algorithm
 
- 1. Find the active rows of each asset.
- 2. Check that the weights of each asset's active rows sum to more than zero.
- 3. Collapse each asset over its active rows with [`collapse_features`](@ref), under the weights of those rows, and stack the results by asset.
+ 1. Find the active rows of each asset, giving `rows`.
+ 2. If `w` is not `nothing`, check that the weights of the active rows of each asset sum to more than zero.
+ 3. Collapse each asset over its active rows with [`collapse_features`](@ref), under the weights of those rows from [`active_weights`](@ref), giving `zs`.
+ 4. Stack `zs` by asset, `assets × features`.
 
 # Arguments
 
@@ -253,7 +309,23 @@ end
 """
     active_weights(w, r::AbstractVector{<:Integer})
 
-Restrict the resolved observation weights of a window to the rows `r` at which an asset is active, keeping the kind of the weights through [`nothing_scalar_array_getindex`](@ref). No weights stay `nothing`.
+Restrict the resolved observation weights of a window to the rows `r` at which an asset is active. [`nothing_scalar_array_getindex`](@ref) keeps the kind of the weights. No weights stay `nothing`.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. If `w` is `nothing`, return `nothing`.
+ 2. Otherwise, return the entries of `w` at `r` with [`nothing_scalar_array_getindex`](@ref).
+
+# Arguments
+
+  - `w`: The resolved observation weights of the window, or `nothing`.
+  - `r`: The active rows of one asset.
+
+# Returns
+
+  - `wr::Option{<:VecNum}`: The weights of the rows `r`, or `nothing`.
 
 # Related
 
@@ -270,6 +342,21 @@ end
     pair_distance(metric::Distances.SemiMetric, a::AbstractVector, b::AbstractVector)
 
 Measure one pair of feature vectors, and apply the zero-feature-vector convention of [`patch_zero_feature_vectors!`](@ref) to the result.
+
+# Algorithm
+
+ 1. Measure `a` against `b` with `metric`, giving `d`.
+ 2. If `d` is not `NaN`, or neither vector is all zero, return `d`.
+ 3. Otherwise, return zero when both vectors are all zero, and one when only one of them is.
+
+# Arguments
+
+  - `metric`: The distance metric.
+  - `a`, `b`: The feature vectors of the two assets.
+
+# Returns
+
+  - `d::Number`: The distance of the pair.
 
 # Related
 
@@ -288,7 +375,27 @@ end
 """
     stack_metric(metric::Distances.SemiMetric, idx::AbstractVector{<:Integer})
 
-Restrict a metric to the coordinates `idx` of a stack. A weighted metric keeps the weights of those coordinates, and every other metric is returned unchanged.
+Restrict a metric to the coordinates `idx` of a stack. A metric whose parameters hold one entry per coordinate keeps the entries of those coordinates. The function returns every other metric unchanged.
+
+A metric that another package defines, with parameters that hold one entry per coordinate, needs a method of this function too. Without it, the metric measures the shared coordinates with all its parameters, and it raises its own error before [`stack_rescale`](@ref) can refuse.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. For a weighted metric of Distances.jl, `Distances.WeightedHamming` included, keep `weights[idx]`.
+ 2. For `Distances.PeriodicEuclidean`, keep `periods[idx]`.
+ 3. For `Distances.Mahalanobis` and `Distances.SqMahalanobis`, keep the principal submatrix `qmat[idx, idx]`, which is the quadratic form on the shared coordinates.
+ 4. For every other metric, return `metric`.
+
+# Arguments
+
+  - `metric`: The distance metric.
+  - `idx`: The coordinates of the stack that a pair shares.
+
+# Returns
+
+  - `metric::Distances.SemiMetric`: The metric on the coordinates `idx`.
 
 # Related
 
@@ -297,6 +404,18 @@ Restrict a metric to the coordinates `idx` of a stack. A weighted metric keeps t
 """
 function stack_metric(metric::Distances.SemiMetric, ::AbstractVector)
     return metric
+end
+function stack_metric(metric::Distances.WeightedHamming, idx::AbstractVector)
+    return Distances.WeightedHamming(metric.weights[idx])
+end
+function stack_metric(metric::Distances.PeriodicEuclidean, idx::AbstractVector)
+    return Distances.PeriodicEuclidean(metric.periods[idx])
+end
+function stack_metric(metric::Distances.Mahalanobis, idx::AbstractVector)
+    return Distances.Mahalanobis(metric.qmat[idx, idx])
+end
+function stack_metric(metric::Distances.SqMahalanobis, idx::AbstractVector)
+    return Distances.SqMahalanobis(metric.qmat[idx, idx])
 end
 function stack_metric(metric::Distances.WeightedEuclidean, idx::AbstractVector)
     return Distances.WeightedEuclidean(metric.weights[idx])
@@ -315,7 +434,9 @@ end
 
 Rescale the distance `d` of a pair, measured on the coordinates `idx` of a stack, to all `len` coordinates of the stack.
 
-[`StackObservations`](@ref) measures a pair on the rows at which both assets are active. A metric that sums over the coordinates then sums over fewer of them, and gives a smaller distance than the whole window would. The rescale is the one that makes the sum an estimate of the sum over the whole window.
+[`StackObservations`](@ref) measures a pair on the rows at which both assets are active. A metric that sums over the coordinates then sums over fewer of them, and gives a smaller distance than the whole window would. The rescale makes the sum an estimate of the sum over the whole window.
+
+# Mathematical definition
 
 | Metric                                                                                                                                          | Rescale                                            |
 |:----------------------------------------------------------------------------------------------------------------------------------------------- |:-------------------------------------------------- |
@@ -325,7 +446,14 @@ Rescale the distance `d` of a pair, measured on the coordinates `idx` of a stack
 | A weighted form                                                                                                                                 | the ratio of the weight sums in place of ``L / n`` |
 | [`AngularDist`](@ref), `Distances.CosineDist`, `Distances.CorrDist`, `Distances.Jaccard`, `Distances.BrayCurtis`, and the three mean deviations | none                                               |
 
-Where ``L`` is `len` and ``n`` is the length of `idx`. Every coordinate of a row carries the features of one observation, so ``L / n`` is ``T / n`` in rows. Another metric has no method, and it refuses. The message names the method to add.
+Where ``L`` is `len` and ``n`` is the length of `idx`. The coordinates of one row carry the features of one observation, so ``L / n`` is ``T`` over the count of shared rows. A weighted form takes ``W / W_{n}``, where ``W`` is the sum of its weights and ``W_{n}`` is the sum of its weights at `idx`.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. For a metric of the table, return `d` times the factor of its row.
+ 2. For every other metric, refuse, and name the method to add.
 
 # Arguments
 
@@ -333,6 +461,10 @@ Where ``L`` is `len` and ``n`` is the length of `idx`. Every coordinate of a row
   - `d`: The distance of the pair on the coordinates `idx`.
   - `idx`: The coordinates of the stack that the pair shares.
   - `len`: The number of coordinates of the stack.
+
+# Validation
+
+  - `metric` is a metric of the table. Raises an `ArgumentError` that names the method `PortfolioOptimisers.stack_rescale` to add for the type of `metric`.
 
 # Returns
 
@@ -346,15 +478,15 @@ Where ``L`` is `len` and ``n`` is the length of `idx`. Every coordinate of a row
 function stack_rescale(metric::Distances.SemiMetric, ::Number, ::AbstractVector, ::Integer)
     return throw(ArgumentError("StackObservations measures a pair of assets on the rows at which both are active, and rescales the distance of a pair that shares fewer rows than the window to the whole window. The metric $(nameof(typeof(metric))) has no rescale. Add a method `PortfolioOptimisers.stack_rescale(metric::$(nameof(typeof(metric))), d, idx, len)` that returns `d`, measured on the coordinates `idx` of the stack, rescaled to its `len` coordinates. Or use AggregateDistances, which needs no rescale."))
 end
-function stack_rescale(::Union{<:AngularDist, <:Distances.CosineDist, <:Distances.CorrDist,
-                               <:Distances.Jaccard, <:Distances.BrayCurtis,
-                               <:Distances.MeanAbsDeviation, <:Distances.MeanSqDeviation,
-                               <:Distances.RMSDeviation}, d::Number, ::AbstractVector,
+function stack_rescale(::Union{AngularDist, Distances.CosineDist, Distances.CorrDist,
+                               Distances.Jaccard, Distances.BrayCurtis,
+                               Distances.MeanAbsDeviation, Distances.MeanSqDeviation,
+                               Distances.RMSDeviation}, d::Number, ::AbstractVector,
                        ::Integer)
     return d
 end
-function stack_rescale(::Union{<:Distances.Cityblock, <:Distances.TotalVariation,
-                               <:Distances.SqEuclidean, <:Distances.ChiSqDist}, d::Number,
+function stack_rescale(::Union{Distances.Cityblock, Distances.TotalVariation,
+                               Distances.SqEuclidean, Distances.ChiSqDist}, d::Number,
                        idx::AbstractVector, len::Integer)
     return d * len / length(idx)
 end
@@ -365,8 +497,8 @@ function stack_rescale(metric::Distances.Minkowski, d::Number, idx::AbstractVect
                        len::Integer)
     return d * (len * one(d) / length(idx))^inv(metric.p)
 end
-function stack_rescale(metric::Union{<:Distances.WeightedCityblock,
-                                     <:Distances.WeightedSqEuclidean}, d::Number,
+function stack_rescale(metric::Union{Distances.WeightedCityblock,
+                                     Distances.WeightedSqEuclidean}, d::Number,
                        idx::AbstractVector, ::Integer)
     return d * sum(metric.weights) / sum(view(metric.weights, idx))
 end
@@ -387,9 +519,10 @@ Give the distance of each pair of assets in `E`, which share no active row, by t
 
 The method that Julia selects is the algorithm.
 
- 1. [`RefusePair`](@ref): refuse, and name each pair and the two other rules.
- 2. [`DropFewerRows`](@ref): refuse, because the rule drops an asset at the entry of a fit, and a direct call has none. Name each pair and the remedy.
- 3. [`FeatureFallback`](@ref): collapse each asset over its own active rows with [`active_collapse`](@ref), under the weights of the rule. Fill the distance of each pair with [`pair_distance`](@ref) of the two collapsed vectors, laid out by [`fallback_features`](@ref) as the collapse of `de` reads a row.
+ 1. Under [`RefusePair`](@ref), refuse. Name each pair and the two other rules.
+ 2. Under [`DropFewerRows`](@ref), refuse, because the rule drops an asset at the entry of a fit, and a direct call has none. Name each pair and the remedy.
+ 3. Under [`FeatureFallback`](@ref), resolve the weights of the rule with [`collapse_weights`](@ref). Collapse each asset over its own active rows with [`active_collapse`](@ref), under the collapse and the weights of the rule, giving `Zf`.
+ 4. Then lay out the two rows of `Zf` of each pair as the collapse of `de` reads one asset, with [`fallback_features`](@ref). Write their [`pair_distance`](@ref) to `D[i, j]` and `D[j, i]`.
 
 # Arguments
 
@@ -398,6 +531,10 @@ The method that Julia selects is the algorithm.
   - `E`: The empty pairs, `(i, j)` with `i < j`.
   - `de`: The feature distance estimator.
   - `win`: The window, a `NamedTuple` of `Z`, `dims`, `A` and `nx`.
+
+# Validation
+
+  - `pair` is a [`FeatureFallback`](@ref). [`RefusePair`](@ref) and [`DropFewerRows`](@ref) raise an `ArgumentError` that names each pair of `E`.
 
 # Returns
 
@@ -432,7 +569,24 @@ end
 """
     fallback_features(alg::AbstractFeatureCollapseAlgorithm, z::AbstractVector, T::Integer)
 
-Lay out an asset's collapsed features as the collapse reads one asset. [`AggregateDistances`](@ref) reads the features of one row, `z` itself. [`StackObservations`](@ref) reads the stack of every row, so `z` fills each of the `T` rows.
+Lay out the collapsed features of an asset as the collapse reads one asset. [`AggregateDistances`](@ref) reads the features of one row, `z` itself. [`StackObservations`](@ref) reads the stack of every row, so `z` fills each of the `T` rows.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. Under [`AggregateDistances`](@ref), return `z`.
+ 2. Under [`StackObservations`](@ref), repeat each entry of `z` `T` times, `repeat(z; inner = T)`. Feature `k` then fills the coordinates `t + (k - 1) T` of the stack, as [`stack_observations`](@ref) lays them out.
+
+# Arguments
+
+  - `alg`: The collapse algorithm of the estimator.
+  - `z`: The collapsed features of one asset.
+  - `T`: The number of observations of the window.
+
+# Returns
+
+  - `zf::AbstractVector`: The features of the asset, as the collapse reads them.
 
 # Related
 
@@ -448,7 +602,24 @@ end
 """
     resolve_empty_pairs!(D::MatNum, pair::AbstractEmptyPairAlgorithm, E, de::FeatureDistance, win)
 
-Hand the empty pairs `E` to [`empty_pair_distance!`](@ref), or return `D` unchanged when no pair is empty.
+Give the empty pairs `E` to [`empty_pair_distance!`](@ref), or return `D` unchanged when no pair is empty.
+
+# Algorithm
+
+ 1. If `E` is empty, return `D`.
+ 2. Otherwise, return [`empty_pair_distance!`](@ref) of `D` under the rule `pair`.
+
+# Arguments
+
+  - `D`: The distance matrix, `assets × assets`.
+  - `pair`: The rule for an empty pair.
+  - `E`: The empty pairs, `(i, j)` with `i < j`.
+  - `de`: The feature distance estimator.
+  - `win`: The window, a `NamedTuple` of `Z`, `dims`, `A` and `nx`.
+
+# Returns
+
+  - $(ret_dict[:Ddist])
 
 # Related
 
@@ -465,19 +636,49 @@ Turn a window of time-varying features that holds an inactive cell into a distan
 
 `win` holds the window `Z`, its layout `dims`, its active mask `A` and the asset names `nx`. `Z` holds a zero at each cell that `A` marks `false`, from [`blank_unreadable`](@ref), so no step of a collapse reads the stored value of such a cell. [`distance`](@ref) calls this function only when a cell of the window is inactive, and only after [`assert_feature_readable`](@ref) checked that the collapse can read each asset. A window with no inactive cell takes the path of [`feature_distance`](@ref), so its result does not change.
 
+Under [`AggregateDistances`](@ref) and [`StackObservations`](@ref), an entry can be a weighted mean or a rescaled distance. So [`float_if_integer`](@ref) turns an integer result type of the metric, such as that of `Distances.Cityblock` on a window of integers, into a floating point type. The matrix of a `Rational` window stays exact.
+
+# Mathematical definition
+
+Under [`LastActiveRow`](@ref), the collapse reads each asset at its last active row.
+
+```math
+\\begin{align}
+\\tau_{i} &= \\max\\left\\{t : a_{t,\\,i} = 1\\right\\}\\,,\\\\
+D_{i,\\,j} &= m\\left(\\boldsymbol{z}_{\\tau_{i},\\,i},\\, \\boldsymbol{z}_{\\tau_{j},\\,j}\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:D_ij_dist])
+  - $(math_dict[:a_ti_window])
+  - ``\\tau_{i}``: Last active row of asset ``i`` in the window.
+  - ``\\boldsymbol{z}_{t,\\,i}``: Feature vector of asset ``i`` at observation ``t``.
+  - ``m``: Distance metric, `de.metric`.
+
+Under [`AggregateFeatures`](@ref), ``D_{i,\\,j}`` is the metric of the collapsed vectors that [`active_collapse`](@ref) defines. [`AggregateDistances`](@ref) and [`StackObservations`](@ref) each state their own form for a window with an inactive cell.
+
 # Algorithm
 
 The type of `de.alg` selects one of four methods.
 
- 1. [`LastObservation`](@ref): under [`LastRow`](@ref), or when every asset is active at the last row, measure the last row. Otherwise measure each asset at its last active row.
- 2. [`AggregateFeatures`](@ref): resolve the weights with [`collapse_weights`](@ref), collapse each asset over its own active rows with [`active_collapse`](@ref), and measure the collapsed matrix.
- 3. [`AggregateDistances`](@ref): measure each row, and add each entry of a pair only at a row where both assets are active, with that row's weight. Check that the weight total of each asset, on the diagonal, is more than zero. Divide each entry by its own weight total, and give each pair with a zero total to [`resolve_empty_pairs!`](@ref).
- 4. [`StackObservations`](@ref): measure the whole stack. Measure each pair that shares fewer rows than the window again, on the coordinates of its shared rows, with [`stack_metric`](@ref), and rescale it with [`stack_rescale`](@ref). Give each pair with no shared row to [`resolve_empty_pairs!`](@ref).
+ 1. Under [`LastRow`](@ref), or when every asset is active at the last row, measure the last row.
+ 2. Under [`LastActiveRow`](@ref) otherwise, read the features of each asset at its last active row, giving `zs`, and measure the stack of `zs`.
+ 3. Under [`AggregateFeatures`](@ref), resolve the weights with [`collapse_weights`](@ref). Collapse each asset over its own active rows with [`active_collapse`](@ref), giving `Zc`, and measure `Zc`.
+ 4. Under [`AggregateDistances`](@ref), resolve the weights, and measure each row into `Dt`. Add each entry of `Dt` to `D`, and the weight of the row to the weight total `S`, only for a pair whose two assets are active at the row, with [`accumulate_active_pairs!`](@ref).
+ 5. Then check that the weight total of each asset, on the diagonal of `S`, is not zero. Collect each pair with a zero total, giving `E`. Divide `D` by `S`, and give `E` to [`resolve_empty_pairs!`](@ref).
+ 6. Under [`StackObservations`](@ref), measure the whole stack, giving `D`. Measure each pair that shares fewer rows than the window again, with [`shared_stack_distance`](@ref). Collect each pair with no shared row, giving `E`, and give `E` to [`resolve_empty_pairs!`](@ref).
 
 # Arguments
 
   - `de`: Feature distance estimator.
   - `win`: The window, a `NamedTuple` of `Z`, `dims`, `A` and `nx`.
+
+# Validation
+
+  - Under [`AggregateDistances`](@ref), the weights of the active rows of each asset do not sum to zero. Raises an `ArgumentError` that names each other asset.
+  - A pair with no shared active row takes the rule `pair` of the collapse. See [`empty_pair_distance!`](@ref).
 
 # Returns
 
@@ -494,7 +695,7 @@ The type of `de.alg` selects one of four methods.
 function active_feature_distance(de::FeatureDistance{<:Any, <:LastObservation},
                                  win::NamedTuple)
     (; Z, dims, A) = win
-    if isa(de.alg.alg, LastRow) || all(view(A, size(A, 1), :))
+    if isa(de.alg, LastRow) || all(view(A, size(A, 1), :))
         return feature_distance(de.metric, view(Z, size(Z, 1), :, :), dims)
     end
     Zd = asset_major(Z, dims)
@@ -513,7 +714,9 @@ function active_feature_distance(de::FeatureDistance{<:Any, <:AggregateDistances
     (; Z, dims, A) = win
     w = collapse_weights(de.alg.w, Z)
     metric = de.metric
-    T = Distances.result_type(metric, eltype(Z), eltype(Z))
+    #! The entries are weighted means, so an integer distance or weight needs a float type.
+    Td = Distances.result_type(metric, eltype(Z), eltype(Z))
+    T = float_if_integer(isnothing(w) ? Td : promote_type(Td, eltype(w)))
     N = size(A, 2)
     D = zeros(T, N, N)
     S = zeros(T, N, N)
@@ -537,7 +740,23 @@ end
 """
     accumulate_active_pairs!(D::MatNum, S::MatNum, Dt::MatNum, wt::Number, m::AbstractVector{Bool})
 
-Add one row of [`AggregateDistances`](@ref) to its accumulators: `wt * Dt[i, j]` to `D[i, j]` and `wt` to the weight total `S[i, j]` of each pair whose two assets are both active at the row, as `m` marks them.
+Add one row of [`AggregateDistances`](@ref) to its accumulators, for each pair whose two assets are both active at the row, as `m` marks them.
+
+# Algorithm
+
+ 1. For each pair `(i, j)` with `m[i]` and `m[j]`, add `wt * Dt[i, j]` to `D[i, j]`, and add `wt` to the weight total `S[i, j]`.
+
+# Arguments
+
+  - `D`: The sum of the weighted distances, `assets × assets`, changed in place.
+  - `S`: The weight total of each pair, `assets × assets`, changed in place.
+  - `Dt`: The distance matrix of the row.
+  - `wt`: The weight of the row.
+  - `m`: The active mask of the row, one entry per asset.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -558,7 +777,9 @@ function active_feature_distance(de::FeatureDistance{<:Any, <:StackObservations}
                                  win::NamedTuple)
     (; Z, dims, A) = win
     Zs = stack_observations(Z, dims)
-    D = feature_distance(de.metric, Zs, 1)
+    #! A rescale and a fallback can give a fraction, so an integer distance needs a float type.
+    Ds = feature_distance(de.metric, Zs, 1)
+    D = convert(Matrix{float_if_integer(eltype(Ds))}, Ds)
     E = Tuple{Int, Int}[]
     for j in axes(A, 2), i in 1:(j - 1)
         rows = findall(t -> A[t, i] && A[t, j], axes(A, 1))
@@ -578,9 +799,21 @@ Measure the pair `(i, j)` of a stack `Zs`, `assets × (observations · features)
 
 # Algorithm
 
- 1. Name the coordinates of the shared rows, `t + (k - 1) T` for each shared row `t` and each feature `k`.
- 2. Measure the two assets on those coordinates with [`pair_distance`](@ref), under the metric restricted by [`stack_metric`](@ref).
- 3. Rescale the distance to every coordinate of the stack with [`stack_rescale`](@ref).
+ 1. Name the coordinates of the shared rows, `t + (k - 1) T` for each shared row `t` and each feature `k`, giving `idx`.
+ 2. Measure the two assets on `idx` with [`pair_distance`](@ref), under the metric that [`stack_metric`](@ref) restricts to `idx`, giving `d`.
+ 3. Rescale `d` to every coordinate of the stack with [`stack_rescale`](@ref).
+
+# Arguments
+
+  - `metric`: The distance metric.
+  - `Zs`: The stack, `assets × (observations · features)`.
+  - `(i, j)`: The pair of assets.
+  - `rows`: The rows at which both assets are active.
+  - `T`: The number of observations of the window.
+
+# Returns
+
+  - `d::Number`: The rescaled distance of the pair.
 
 # Related
 
@@ -588,7 +821,7 @@ Measure the pair `(i, j)` of a stack `Zs`, `assets × (observations · features)
   - [`active_feature_distance`](@ref)
 """
 function shared_stack_distance(metric::Distances.SemiMetric, Zs::MatNum,
-                               (i, j)::Tuple{<:Integer, <:Integer}, rows::AbstractVector,
+                               (i, j)::Tuple{Integer, Integer}, rows::AbstractVector,
                                T::Integer)
     idx = [t + (k - 1) * T for k in 1:div(size(Zs, 2), T) for t in rows]
     d = pair_distance(stack_metric(metric, idx), view(Zs, i, idx), view(Zs, j, idx))
@@ -599,9 +832,9 @@ end
 
 Compose the Investable Mask of a prior with the assets that each [`FeatureDistance`](@ref) inside `x` can read, at the entry of a fit.
 
-A fit reduces its prior, its optimiser and its returns data to the Investable Mask once, at its entry, with [`investable_reduction`](@ref). An asset that the prior admits can still have no value that a [`FeatureDistance`](@ref) of the fit can read in the window of its Asset Panel. A cell is readable where the asset is active and every value column of the Feature Selector holds data, observed or filled. [`LastRow`](@ref) reads nothing for an asset whose last cell is not readable, and every collapse reads nothing for an asset with no readable row. A static panel has one row, so an asset with a placeholder has none. This function drops such an asset from the mask before the reduction. The asset then departs as a non-investable asset: the reduction announces it, the fit gives it a zero weight, and it is listed on the Non-Investable Axis. Under [`DropFewerRows`](@ref) it also drops, from each pair with no shared active row, the asset with fewer active rows, until no pair is empty.
+A fit reduces its prior, its optimiser and its returns data to the Investable Mask once, at its entry, with [`investable_reduction`](@ref). An asset that the prior admits can still have no value that a [`FeatureDistance`](@ref) of the fit can read in the window of its Asset Panel. A cell is readable where the asset is active and every value column of the Feature Selector holds data, observed or filled. [`LastRow`](@ref) reads nothing for an asset whose last cell is not readable, and every collapse reads nothing for an asset with no readable row. A static panel has one row, so an asset with a placeholder has none. This function drops such an asset from the mask before the reduction. The asset then departs as a non-investable asset. The reduction announces it, the fit gives it a zero weight, and the Non-Investable Axis lists it. Under [`DropFewerRows`](@ref), the function also drops the asset with fewer active rows from each pair with no shared active row, until no pair is empty.
 
-A default prior drops every asset that is not active over its whole window, so under it this function drops only an asset with a placeholder.
+A default prior keeps only the Coverage Universe, the assets that are active at every row of its window. So under a default prior, this function drops only an asset with a placeholder.
 
 Every fit that clusters or builds a phylogeny calls it: [`HierarchicalRiskParity`](@ref), [`HierarchicalEqualRiskContribution`](@ref), [`SchurComplementHierarchicalRiskParity`](@ref), [`NestedClustered`](@ref), and a [`JuMPOptimiser`](@ref) through its phylogeny and centrality estimators. [`Stacking`](@ref) and [`SubsetResampling`](@ref) cluster only inside their inner optimisers, and each of those calls it at its own entry.
 
@@ -609,10 +842,12 @@ Every fit that clusters or builds a phylogeny calls it: [`HierarchicalRiskParity
 
 The method that Julia selects is the algorithm.
 
- 1. A `Tuple` or a vector: compose the mask of each entry in turn.
- 2. An estimator that holds a distance estimator, such as a [`ClustersEstimator`](@ref): forward to the estimator it holds.
- 3. A [`FeatureDistance`](@ref) with no producer, on returns data that holds a panel: take the mask of readable cells in the rows that the collapse reads, with [`entry_activity`](@ref). Mark the readable assets with [`feature_readable`](@ref), keep those that `imsk` keeps, and hand the result to [`drop_empty_pairs!`](@ref). Return `nothing` when `imsk` is `nothing` and every asset stays.
- 4. Every other case, a producer included, a panel whose every cell is readable, and no panel: return `imsk` unchanged.
+ 1. For a `Tuple` or a vector, compose the mask of each entry in turn.
+ 2. For an estimator that holds a distance estimator, such as a [`ClustersEstimator`](@ref), forward to the estimator it holds.
+ 3. For a [`FeatureDistance`](@ref) with no producer, on returns data that holds a panel, take the mask of readable cells in the rows that the collapse reads, with [`entry_activity`](@ref). Compose it with `imsk` through [`compose_readable_mask`](@ref).
+ 4. In every other case, a producer and returns data with no panel included, return `imsk` unchanged.
+
+A panel whose every cell is readable takes step 3, and it gives a mask equal to `imsk`.
 
 # Arguments
 
@@ -639,8 +874,8 @@ The method that Julia selects is the algorithm.
 function feature_readable_mask(::Any, imsk::Option{<:BitVector}, ::Any)
     return imsk
 end
-function feature_readable_mask(xs::Union{<:Tuple, <:AbstractVector},
-                               imsk::Option{<:BitVector}, rd)
+function feature_readable_mask(xs::Union{Tuple, AbstractVector}, imsk::Option{<:BitVector},
+                               rd)
     for x in xs
         imsk = feature_readable_mask(x, imsk, rd)
     end
@@ -653,7 +888,29 @@ end
 """
     compose_readable_mask(alg::AbstractFeatureCollapseAlgorithm, A, imsk::Option{<:BitVector})
 
-Compose the Investable Mask `imsk` with the assets that the collapse `alg` can read in a window whose active mask is `A`. This is step 3 of [`feature_readable_mask`](@ref), which states it. A window with no active mask, `A === nothing`, keeps `imsk`.
+Compose the Investable Mask `imsk` with the assets that the collapse `alg` can read in a window whose active mask is `A`. This is step 3 of [`feature_readable_mask`](@ref). A window with no active mask, `A === nothing`, keeps `imsk`.
+
+# Algorithm
+
+ 1. If `A` is `nothing`, return `imsk`.
+ 2. Mark the assets that `alg` can read with [`feature_readable`](@ref), giving `keep`. If `imsk` is not `nothing`, keep only the assets that `imsk` keeps too.
+ 3. Drop assets from `keep` with [`drop_empty_pairs!`](@ref), under the rule of [`empty_pair_rule`](@ref) for `alg`.
+ 4. Check that `keep` keeps one asset at least.
+ 5. Return `nothing` when `imsk` is `nothing` and `keep` keeps every asset, and `keep` otherwise.
+
+# Arguments
+
+  - `alg`: The collapse algorithm.
+  - `A`: The mask of readable cells of the window, `observations × assets`, or `nothing`.
+  - `imsk`: The Investable Mask of the prior, or `nothing` when every asset is investable.
+
+# Validation
+
+  - At least one asset stays. Raises an [`IsEmptyError`](@ref).
+
+# Returns
+
+  - `imsk::Option{BitVector}`: The composed mask, or `nothing` when every asset stays.
 
 # Related
 
@@ -681,6 +938,22 @@ end
 
 Give the mask of the cells that `de` can read in the window of the panel `pnl`, with [`feature_window_mask`](@ref), for the entry of a fit. Returns data with no panel gives `nothing`.
 
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. If `pnl` is `nothing`, return `nothing`.
+ 2. Otherwise, resolve `de.sel` against `pnl` with [`select_fields`](@ref). Return the mask that [`feature_window_mask`](@ref) gives for those columns.
+
+# Arguments
+
+  - `de`: Feature distance estimator.
+  - `pnl`: The Asset Panel of the returns data, or `nothing`.
+
+# Returns
+
+  - `A::Option{<:AbstractMatrix{Bool}}`: The mask of readable cells in the rows that the collapse reads, or `nothing`.
+
 # Related
 
   - [`feature_readable_mask`](@ref)
@@ -697,7 +970,13 @@ end
 
 Name the rows that a collapse reads, and cut the mask of the cells it can read to them.
 
-A cell is readable where the asset is active and every value column of `cols` holds data: [`readable_cells`](@ref) joins the active mask of the panel with [`feature_data_cells`](@ref). A cell that holds the placeholder of a blank that no fill reached holds no data. So a collapse reads it as it reads an inactive cell: each asset and each pair at its own readable rows. [`readable_window_rows`](@ref) names the rows on this mask, so [`LastActiveRow`](@ref) reads the last readable row of each asset. [`window_activity`](@ref) cuts the mask to the rows.
+A cell is readable where the asset is active and every value column of `cols` holds data. A cell that holds the placeholder of a blank that no fill reached holds no data. So a collapse reads it as it reads an inactive cell, and reads each asset and each pair at its own readable rows. The rows come from this mask, so [`LastActiveRow`](@ref) reads the last readable row of each asset.
+
+# Algorithm
+
+ 1. Join the active mask of the panel with the cells of `cols` that hold data, from [`feature_data_cells`](@ref), through [`readable_cells`](@ref). This gives `R`.
+ 2. Name the rows that the collapse reads on `R` with [`readable_window_rows`](@ref), giving `rows`.
+ 3. Cut `R` to `rows` with [`window_activity`](@ref), giving `A`.
 
 # Arguments
 
@@ -726,7 +1005,24 @@ end
 """
     readable_cells(amsk, o)
 
-Join the active mask `amsk` of a panel with the mask `o` of its cells that hold data: a cell is readable where both are `true`. Either mask can be `nothing`, which marks every cell `true`.
+Join the active mask `amsk` of a panel with the mask `o` of its cells that hold data. A cell is readable where both are `true`. Either mask can be `nothing`, which marks every cell `true`.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. If `o` is `nothing`, return `amsk`.
+ 2. If `amsk` is `nothing`, return `o`.
+ 3. Otherwise, return `amsk .& o`.
+
+# Arguments
+
+  - `amsk`: The active mask of the panel, or `nothing`.
+  - `o`: The mask of the cells that hold data, or `nothing`.
+
+# Returns
+
+  - `R`: The mask of readable cells, or `nothing` when every cell is readable.
 
 # Related
 
@@ -745,7 +1041,24 @@ end
 """
     readable_window_rows(alg, pnl::AssetPanel, R)
 
-Name the rows that a collapse reads on the mask `R` of readable cells. [`LastObservation`](@ref) forwards to its rule. [`LastActiveRow`](@ref) on a time-varying panel names them with [`last_active_rows`](@ref) on `R`, so an asset whose last active cell holds a placeholder is read at its last readable row. Every other case is [`collapse_rows`](@ref).
+Name the rows that a collapse reads on the mask `R` of readable cells. [`LastActiveRow`](@ref) reads the rows of `R`, so it reads an asset whose last active cell holds a placeholder at its last readable row.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. Under [`LastActiveRow`](@ref), with a matrix `R` of a time-varying panel, name the rows with [`last_active_rows`](@ref) on `R`.
+ 2. In every other case, a static panel and `R === nothing` included, name the rows with [`collapse_rows`](@ref).
+
+# Arguments
+
+  - `alg`: The collapse algorithm.
+  - `pnl`: The Asset Panel.
+  - `R`: The mask of readable cells, `observations × assets` on a time-varying panel, one entry per asset on a static panel, or `nothing`.
+
+# Returns
+
+  - `rows`: A range of observations, or `Colon()`. It is the value of the `rows` keyword of [`feature_matrix`](@ref).
 
 # Related
 
@@ -755,16 +1068,29 @@ Name the rows that a collapse reads on the mask `R` of readable cells. [`LastObs
 function readable_window_rows(alg, pnl::AssetPanel, ::Any)
     return collapse_rows(alg, pnl)
 end
-function readable_window_rows(alg::LastObservation, pnl::AssetPanel, R)
-    return readable_window_rows(alg.alg, pnl, R)
-end
 function readable_window_rows(::LastActiveRow, ::AssetPanel, R::AbstractMatrix{Bool})
     return last_active_rows(R)
 end
 """
     last_active_rows(A)
 
-Name the rows from the earliest last `true` row of an asset in the mask `A`, `observations × assets`, to the last row: `r0:nobs`, where `r0` is `nobs` when no asset has a `true` row. These rows hold the last `true` row of every asset that has one. `nothing` names every row, `Colon()`.
+Name the rows from the earliest last `true` row of an asset in the mask `A`, `observations × assets`, to the last row. These rows hold the last `true` row of every asset that has one.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. If `A` is `nothing`, every row is active, so return `Colon()`.
+ 2. Otherwise, find the last `true` row of each asset, or `nobs` for an asset with none. The earliest of these rows is `r0`.
+ 3. Return `r0:nobs`.
+
+# Arguments
+
+  - `A`: The mask, `observations × assets`, or `nothing`.
+
+# Returns
+
+  - `rows::Union{UnitRange{Int}, Colon}`: The rows `r0:nobs`, or `Colon()`.
 
 # Related
 
@@ -784,9 +1110,24 @@ end
 
 Check the one-row mask of a static Feature Matrix against the matrix. A static matrix has one row of cells, so its mask is `1 × assets`, and `nothing` marks every asset readable.
 
+# Algorithm
+
+ 1. If `amsk` is `nothing`, return `nothing`.
+ 2. Otherwise, check the size of `amsk`, and return `amsk`.
+
+# Arguments
+
+  - `amsk`: The mask of the static Feature Matrix, `1 × assets`, or `nothing`.
+  - $(arg_dict[:Z])
+  - $(arg_dict[:dims])
+
 # Validation
 
   - `size(amsk) == (1, assets)`, where `dims` names the asset axis of `Z`. Raises a `DimensionMismatch`.
+
+# Returns
+
+  - `A::Option{<:AbstractMatrix{Bool}}`: `amsk`.
 
 # Related
 
@@ -805,7 +1146,22 @@ end
 """
     empty_pair_rule(alg::AbstractFeatureCollapseAlgorithm)
 
-Give the rule for a pair with no shared active row that a collapse carries: the `pair` field of [`AggregateDistances`](@ref) and [`StackObservations`](@ref), and `nothing` for a collapse that reads no pair.
+Give the rule that a collapse holds for a pair with no shared active row.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. Under [`AggregateDistances`](@ref) and [`StackObservations`](@ref), return the `pair` field.
+ 2. Under every other collapse, which reads no pair, return `nothing`.
+
+# Arguments
+
+  - `alg`: The collapse algorithm.
+
+# Returns
+
+  - `pair::Option{<:AbstractEmptyPairAlgorithm}`: The rule for an empty pair, or `nothing`.
 
 # Related
 
@@ -815,7 +1171,7 @@ Give the rule for a pair with no shared active row that a collapse carries: the 
 function empty_pair_rule(::AbstractFeatureCollapseAlgorithm)
     return nothing
 end
-function empty_pair_rule(alg::Union{<:AggregateDistances, <:StackObservations})
+function empty_pair_rule(alg::Union{AggregateDistances, StackObservations})
     return alg.pair
 end
 """
@@ -823,7 +1179,17 @@ end
 
 Drop, under [`DropFewerRows`](@ref), one asset of each pair with no shared active row, until no pair of the kept assets is empty.
 
-Each pass finds the first empty pair `(i, j)` of the kept assets, with `i < j`, and drops the asset with fewer active rows in the window. On a tie it drops `j`, the asset that comes later in the universe. Every other rule keeps `keep` unchanged: [`RefusePair`](@ref) refuses in the kernel, and [`FeatureFallback`](@ref) measures the pair there.
+Each pass drops the asset with fewer active rows in the window from the first empty pair. On a tie it drops `j`, the asset that comes later in the universe. Every other rule keeps `keep` unchanged. [`RefusePair`](@ref) refuses in the kernel, and [`FeatureFallback`](@ref) measures the pair there.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. Under every rule but [`DropFewerRows`](@ref), return `keep`.
+ 2. Under [`DropFewerRows`](@ref), count the active rows of each asset in `A`, giving `n`.
+ 3. Find the first empty pair `(i, j)` of the kept assets with [`first_empty_pair`](@ref), giving `p`.
+ 4. While `p` is not `nothing`, drop `j` from `keep` when `n[j] <= n[i]`, and `i` otherwise. Then find the next empty pair.
+ 5. Return `keep`.
 
 # Arguments
 
@@ -856,7 +1222,22 @@ end
 """
     first_empty_pair(keep::BitVector, A::AbstractMatrix{Bool})
 
-Find the first pair `(i, j)` of kept assets, with `i < j`, that shares no active row of `A`, in the order of `j` and then of `i`, or `nothing` when no pair is empty.
+Find the first pair `(i, j)` of kept assets, with `i < j`, that shares no active row of `A`, or `nothing` when no pair is empty.
+
+# Algorithm
+
+ 1. Find the kept assets, giving `k`.
+ 2. For each `j` of `k`, and then each `i` of `k` with `i < j`, return `(i, j)` when no row of `A` marks both assets active.
+ 3. Return `nothing`.
+
+# Arguments
+
+  - `keep`: The kept assets.
+  - `A`: The active mask of the window, `observations × assets`.
+
+# Returns
+
+  - `p::Option{Tuple{Int, Int}}`: The first empty pair, or `nothing`.
 
 # Related
 

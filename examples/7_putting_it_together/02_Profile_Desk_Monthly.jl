@@ -102,7 +102,7 @@ pretty_table(DataFrame("Asset" => rd.nx, "Tangency weight" => desk.w);
 
 The desk has \$500,000 to invest, so rounding to whole shares moves each weight by very little.
 [`DiscreteAllocation`](@ref) solves a mixed-integer problem with
-[HiGHS](https://github.com/jump-dev/HiGHS.jl). It minimises the money by which each position
+[HiGHS](https://jump.dev/JuMP.jl/stable/packages/HiGHS/). It minimises the money by which each position
 misses its target, plus the cash left over. The table title gives the amount invested and the cash
 left.
 =#

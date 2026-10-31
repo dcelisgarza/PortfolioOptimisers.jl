@@ -3,12 +3,47 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for estimators that determine the size of each asset subset.
 
-A subtype reaches a [`MultipleRandomised`](@ref) through its `subset_size` field, and is called on the
-returns data to give the value.
+A subtype reaches a [`MultipleRandomised`](@ref) or a [`SubsetResampling`](@ref) through its `subset_size` field, and is called on the
+returns data to give the value. [`PowerSubsetSize`](@ref) is the default `subset_size` of `SubsetResampling`.
+
+# Interfaces
+
+To implement a new subset size, subtype `SubsetSizeEstimator` and make an instance callable as below.
+
+## Call
+
+  - `(s::MySubsetSize)(rd::Union{Pr_RR, AbstractPricesResult}) -> Integer`: The number of assets in each subset, from `1` to the number of assets of `rd`.
+
+### Arguments
+
+  - `s`: The subset size estimator.
+  - `rd`: The prior result or the returns result of the assets to draw from. Its `X` holds one column for each asset.
+
+### Returns
+
+  - `k::Integer`: The number of assets in each subset. The caller throws when `k < 1` or when `k` is larger than the number of assets.
+
+# Examples
+
+A subset size that takes half the assets, rounded up.
+
+```jldoctest
+julia> struct HalfSubsetSize <: PortfolioOptimisers.SubsetSizeEstimator end
+
+julia> (::HalfSubsetSize)(rd) = cld(size(rd.X, 2), 2)
+
+julia> HalfSubsetSize()(ReturnsResult(; nx = [\"A\", \"B\", \"C\", \"D\", \"E\"], X = rand(10, 5)))
+3
+
+julia> SubsetResampling(; opt = InverseVolatility(), subset_size = HalfSubsetSize()).subset_size
+HalfSubsetSize()
+```
 
 # Related
 
   - [`MultipleRandomised`](@ref)
+  - [`SubsetResampling`](@ref)
+  - [`PowerSubsetSize`](@ref)
   - [`SubsetSizeEC`](@ref)
 """
 abstract type SubsetSizeEstimator <: AbstractEstimator end
@@ -20,10 +55,44 @@ Abstract supertype for estimators that determine the number of random subsets to
 A subtype reaches a [`MultipleRandomised`](@ref) through its `n_subsets` field, and is called on the
 returns data to give the value.
 
+# Interfaces
+
+To implement a new number of subsets, subtype `NumberSubsetsEstimator` and make an instance callable as below.
+
+## Call
+
+  - `(n::MyNumberSubsets)(rd::Union{Pr_RR, AbstractPricesResult}) -> Integer`: The number of random asset subsets to draw.
+
+### Arguments
+
+  - `n`: The number of subsets estimator.
+  - `rd`: The prior result, the returns result or the prices result of the assets to draw from. Its `X` holds one row for each observation and one column for each asset.
+
+### Returns
+
+  - `n_subsets::Integer`: The number of random asset subsets. The caller throws when `n_subsets < 2`, and when `n_subsets` is larger than `RESOURCE_LIMITS[].max_n_subsets`.
+
+# Examples
+
+A number of subsets that grows with the number of assets.
+
+```jldoctest
+julia> struct TenthOfAssets <: PortfolioOptimisers.NumberSubsetsEstimator end
+
+julia> (::TenthOfAssets)(rd) = max(2, cld(size(rd.X, 2), 10))
+
+julia> TenthOfAssets()(ReturnsResult(; nx = string.(1:25), X = rand(10, 25)))
+3
+
+julia> MultipleRandomised(IndexWalkForward(4, 2); n_subsets = TenthOfAssets()).n_subsets
+TenthOfAssets()
+```
+
 # Related
 
   - [`MultipleRandomised`](@ref)
   - [`NumberSubsetsEC`](@ref)
+  - [`get_n_subsets`](@ref)
 """
 abstract type NumberSubsetsEstimator <: AbstractEstimator end
 """
@@ -34,10 +103,44 @@ Abstract supertype for estimators that determine the rolling window size.
 A subtype reaches a [`MultipleRandomised`](@ref) through its `window_size` field, and is called on the
 returns data to give the value.
 
+# Interfaces
+
+To implement a new window size, subtype `WindowSizeEstimator` and make an instance callable as below.
+
+## Call
+
+  - `(w::MyWindowSize)(rd::Union{Pr_RR, AbstractPricesResult}) -> Integer`: The number of observations in the window of each path.
+
+### Arguments
+
+  - `w`: The window size estimator.
+  - `rd`: The prior result, the returns result or the prices result of the assets to draw from. Its `X` holds one row for each observation and one column for each asset.
+
+### Returns
+
+  - `window_size::Integer`: The number of observations in each window. The caller throws when `window_size < 2`, and when `window_size` is larger than the number of observations of `rd`.
+
+# Examples
+
+A window size that takes half the observations, rounded down.
+
+```jldoctest
+julia> struct HalfWindowSize <: PortfolioOptimisers.WindowSizeEstimator end
+
+julia> (::HalfWindowSize)(rd) = max(2, fld(size(rd.X, 1), 2))
+
+julia> HalfWindowSize()(ReturnsResult(; nx = [\"A\", \"B\", \"C\"], X = rand(21, 3)))
+10
+
+julia> MultipleRandomised(IndexWalkForward(4, 2); window_size = HalfWindowSize()).window_size
+HalfWindowSize()
+```
+
 # Related
 
   - [`MultipleRandomised`](@ref)
   - [`WindowSizeEC`](@ref)
+  - [`get_window_size`](@ref)
 """
 abstract type WindowSizeEstimator <: AbstractEstimator end
 """
@@ -46,39 +149,39 @@ abstract type WindowSizeEstimator <: AbstractEstimator end
 Union of [`SubsetSizeEstimator`](@ref) subtypes and plain functions that compute a
 subset size from a returns dataset.
 """
-const SubsetSizeEC = Union{<:SubsetSizeEstimator, <:Function}
+const SubsetSizeEC = Union{SubsetSizeEstimator, Function}
 """
     const NumberSubsetsEC
 
 Union of [`NumberSubsetsEstimator`](@ref) subtypes and plain functions that compute the
 number of subsets from a returns dataset.
 """
-const NumberSubsetsEC = Union{<:NumberSubsetsEstimator, <:Function}
+const NumberSubsetsEC = Union{NumberSubsetsEstimator, Function}
 """
     const WindowSizeEC
 
 Union of [`WindowSizeEstimator`](@ref) subtypes and plain functions that compute a
 window size from a returns dataset.
 """
-const WindowSizeEC = Union{<:WindowSizeEstimator, <:Function}
+const WindowSizeEC = Union{WindowSizeEstimator, Function}
 """
     const SubsetSizeE
 
 Union of a concrete subset-size value or an estimator/function for it.
 """
-const SubsetSizeE = Union{<:Real, <:SubsetSizeEC}
+const SubsetSizeE = Union{Real, SubsetSizeEC}
 """
     const NumberSubsetsE
 
 Union of a concrete number-of-subsets value or an estimator/function for it.
 """
-const NumberSubsetsE = Union{<:Integer, <:NumberSubsetsEC}
+const NumberSubsetsE = Union{Integer, NumberSubsetsEC}
 """
     const WindowSizeE
 
 Union of a concrete window-size value or an estimator/function for it.
 """
-const WindowSizeE = Union{<:Real, <:WindowSizeEC}
+const WindowSizeE = Union{Real, WindowSizeEC}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -277,18 +380,22 @@ function n_splits(mrr::MultipleRandomisedResult)
     return length(mrr.path_ids)
 end
 """
-    const MRCVR = Union{<:MultipleRandomised, <:MultipleRandomisedResult}
+    const MRCVR = Union{NonOptimisationSequentialCrossValidationEstimator,
+                        NonOptimisationSequentialCrossValidationResult}
 
 Alias for a multiple-randomised cross-validation estimator or result.
 
-Matches either a [`MultipleRandomised`](@ref) estimator or a [`MultipleRandomisedResult`](@ref).
+Matches either a [`NonOptimisationSequentialCrossValidationEstimator`](@ref), such as [`MultipleRandomised`](@ref), or a [`NonOptimisationSequentialCrossValidationResult`](@ref), such as [`MultipleRandomisedResult`](@ref).
 
 # Related
 
   - [`MultipleRandomised`](@ref)
   - [`MultipleRandomisedResult`](@ref)
+  - [`NonOptimisationSequentialCrossValidationEstimator`](@ref)
+  - [`NonOptimisationSequentialCrossValidationResult`](@ref)
 """
-const MRCVR = Union{<:MultipleRandomised, <:MultipleRandomisedResult}
+const MRCVR = Union{NonOptimisationSequentialCrossValidationEstimator,
+                    NonOptimisationSequentialCrossValidationResult}
 """
     combination_by_index(idx::Integer, N::Integer, k::Integer) -> VecInt
 
@@ -377,7 +484,8 @@ function sample_unique_assets(N::Integer, k::Integer, n_subsets::Integer;
             subsets[:, i] .= combination_by_index(rank, N, k)
         end
     else
-        @warn("The number of combinations for `subset_size = $k` and `N = $N` is `binomial(assets, subset_size) = n_comb => binomial($N, $k) = $n_comb`, which may be computationally expensive. We will use an approximate alternate approach. If you want the exact approach consider increasing `max_comb` or moving `subset_size` closer to `div(assets, 2) = $(div(N, 2))`.")
+        @warn("The number of combinations for `subset_size = $k` and `N = $N` is `binomial(assets, subset_size) = n_comb => binomial($N, $k) = $n_comb`, which may be computationally expensive. We will use an approximate alternate approach. If you want the exact approach consider increasing `max_comb` or moving `subset_size` closer to `div(assets, 2) = $(div(N, 2))`.",
+              maxlog = log_limit(:warn), _id = @log_id())
         for i in axes(subsets, 2)
             subsets[:, i] .= sort!(StatsBase.sample(rng, 1:N, k; replace = false))
         end
@@ -406,19 +514,17 @@ Resolves the subset size from either an integer (direct count) or a fraction of 
   - [`MultipleRandomised`](@ref)
   - [`sample_unique_assets`](@ref)
 """
-function get_subset_size(subset_size::Integer, rd::Union{<:Pr_RR, <:AbstractPricesResult},
+function get_subset_size(subset_size::Integer, rd::Union{Pr_RR, AbstractPricesResult},
                          args...)
     @argcheck(subset_size <= size(rd.X, 2),
               "subset_size must not be greater than the number of assets")
     return subset_size
 end
-function get_subset_size(subset_size::Real, rd::Union{<:Pr_RR, <:AbstractPricesResult},
-                         args...)
+function get_subset_size(subset_size::Real, rd::Union{Pr_RR, AbstractPricesResult}, args...)
     subset_size = max(round(Int, subset_size * size(rd.X, 2)), 1)
     return subset_size
 end
-function get_subset_size(subset_size::SubsetSizeEC,
-                         rd::Union{<:Pr_RR, <:AbstractPricesResult})
+function get_subset_size(subset_size::SubsetSizeEC, rd::Union{Pr_RR, AbstractPricesResult})
     res = subset_size(rd)
     assert_nonempty_nonneg_finite_val(res - 1, "subset_size - 1")
     @argcheck(res <= size(rd.X, 2),
@@ -450,7 +556,7 @@ Resolves the window size from `nothing` (no windowing), an integer (direct count
 function get_window_size(::Nothing, args...)
     return nothing
 end
-function get_window_size(window_size::Integer, rd::Union{<:Pr_RR, <:AbstractPricesResult},
+function get_window_size(window_size::Integer, rd::Union{Pr_RR, AbstractPricesResult},
                          args...)
     # Every row count in this file is the whole sample a cross-validation window is cut out
     # of. It is not the model-wide `:T` of any one fit, which covers a single window.
@@ -458,15 +564,13 @@ function get_window_size(window_size::Integer, rd::Union{<:Pr_RR, <:AbstractPric
               "window_size must not be greater than the number of observations")
     return window_size
 end
-function get_window_size(window_size::Real, rd::Union{<:Pr_RR, <:AbstractPricesResult},
-                         args...)
+function get_window_size(window_size::Real, rd::Union{Pr_RR, AbstractPricesResult}, args...)
     window_size = max(round(Int, window_size * size(rd.X, 1)), 2)
     @argcheck(window_size <= size(rd.X, 1),
               "window_size must not be greater than the number of observations")
     return window_size
 end
-function get_window_size(window_size::WindowSizeEC,
-                         rd::Union{<:Pr_RR, <:AbstractPricesResult})
+function get_window_size(window_size::WindowSizeEC, rd::Union{Pr_RR, AbstractPricesResult})
     res = window_size(rd)
     assert_nonempty_nonneg_finite_val(res - 2, "window_size - 2")
     @argcheck(res <= size(rd.X, 1),
@@ -502,8 +606,7 @@ function get_n_subsets(n_subsets::Integer, args...)
                         :max_n_subsets)
     return n_subsets
 end
-function get_n_subsets(n_subsets::NumberSubsetsEC,
-                       rd::Union{<:Pr_RR, <:AbstractPricesResult})
+function get_n_subsets(n_subsets::NumberSubsetsEC, rd::Union{Pr_RR, AbstractPricesResult})
     res = n_subsets(rd)
     assert_nonempty_nonneg_finite_val(res - 2, "n_subsets - 2")
     assert_resource_cap(res, RESOURCE_LIMITS[].max_n_subsets, :n_subsets, :max_n_subsets)
@@ -740,3 +843,4 @@ function folds_are_stepped(cv::MultipleRandomised)
     return folds_are_stepped(cv.cv)
 end
 export MultipleRandomised, MultipleRandomisedResult
+public SubsetSizeEstimator, NumberSubsetsEstimator, WindowSizeEstimator

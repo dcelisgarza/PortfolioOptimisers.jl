@@ -13,7 +13,6 @@ PortfolioOptimisers.fold_held
 PortfolioOptimisers.stacked_fold_weights
 PortfolioOptimisers.comparator_path_length
 PortfolioOptimisers.series_regret
-PortfolioOptimisers.path_norm_epigraph!
 PortfolioOptimisers.row_bound_view
 PortfolioOptimisers.path_row_constraints!
 PortfolioOptimisers.path_budget_constraint!

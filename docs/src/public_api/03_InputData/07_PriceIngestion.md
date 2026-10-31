@@ -19,10 +19,11 @@ whether an asset is listed before or after it.
 
 The result holds the listing span of each asset in its `span` field. [`PricesToReturns`](@ref)
 moves the spans onto the dates of the returns and gives the [`ReturnsResult`](@ref) an
-[`AssetPanel`](@ref) that states the universe. It does so even when no price is missing, so a
-`ReturnsResult` with `pnl === nothing` did not come from `PriceIngestion`. When no price is
-missing, both universe masks are a [`PortfolioOptimisers.AllTrueMask`](@ref), which stores no
-cells.
+[`AssetPanel`](@ref) that states the universe. When no price is missing and you give no Panel
+Field, every asset is listed and every return is finite. The universe masks then state nothing
+that the returns do not state, so the conversion gives `pnl === nothing`. When you give Panel
+Fields and no price is missing, both universe masks are a
+[`PortfolioOptimisers.AllTrueMask`](@ref), which stores no cells.
 
 `PriceIngestion` writes an absent price as `NaN`, the one value the library uses for a missing
 number. The conversion to returns keeps it as a `NaN` return, and deletes neither the observation

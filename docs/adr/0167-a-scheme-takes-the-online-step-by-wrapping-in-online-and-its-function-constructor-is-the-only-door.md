@@ -199,3 +199,21 @@ that returns another type, which is the shape refused below.
   none moved a ruling.
 - No released number moves: a bare `IndexWalkForward(252, 21)` resolves `expand_train` to `false`
   as before, and the batch arms are untouched.
+
+## Amendment (2026-10-28)
+
+The build widened `NonCombOptCV` for an Online Scheme, but no meta-optimiser could take one. The
+`cv` field of `NestedClustered` and `Stacking` held an `OptimisationCrossValidation`, whose own
+`cv` field was bound to `OptCVER`, and `OptCVER` does not admit `Online`. So the widened branch
+could not be reached. The verdict of #1881 removed the wrapper. The two meta-optimisers now hold
+`cv` and `scorer` as flat fields, and `cv` is bound to the alias `OptCVE_Onl`, which admits an
+Online Scheme. The build is #1891.
+
+- An Online Scheme in the `cv` field of a meta-optimiser steps each sub-portfolio from fold to
+  fold. The outer problem reads the same returns as under the expanding batch scheme, the first
+  identity of ADR 0140. `test/test_24c_online_fold_loop.jl` pins it for both meta-optimisers.
+- `online_wrapper_path` answers `nothing` for an Online Scheme. A scheme in a `cv` field is
+  configuration that its own fold loop resolves, not the declaration of a sample buffer. Without
+  this method, `assert_batch_entry` and the entry of the online arm refused the meta-optimiser.
+- The refusal of an Online Scheme in an estimator slot at warm-up stands. The warm-up of a
+  meta-optimiser resolves its `pe` alone, so it never reaches `cv`.

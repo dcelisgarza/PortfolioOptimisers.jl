@@ -1644,10 +1644,26 @@ end
         # the score of column i is `score(X[:, i])`, computed one column at a time
         @test PO.asset_scores(SCM(), XZ) == [SCM()(view(XZ, :, i)) for i in axes(XZ, 2)]
 
-        # a NaN score is rejected: Skewness divides by a zero standard deviation
+        # a NaN score is rejected: the standardised third moment divides by a zero standard
+        # deviation
         Xc = [0.1 0.0; -0.1 0.0; 0.2 0.0]
-        @test isnan(Skewness()(view(Xc, :, 2)))
-        @test_throws DomainError PO.asset_scores(Skewness(), Xc)
+        sks = ThirdCentralMoment(; ve = SimpleVariance())
+        @test isnan(sks(view(Xc, :, 2)))
+        @test_throws DomainError PO.asset_scores(sks, Xc)
+        # A measure that reads a comoment matrix cannot score a column, and the refusal
+        # names the measure of the returns that can (#1846).
+        @test occursin("ThirdCentralMoment(; ve = SimpleVariance())",
+                       sprint(showerror, try
+                                  PO.assert_scoreable(Skewness())
+                              catch e
+                                  e
+                              end))
+        @test occursin("HighOrderMoment(; alg = FourthMoment())",
+                       sprint(showerror, try
+                                  PO.assert_scoreable(Kurtosis())
+                              catch e
+                                  e
+                              end))
         # a drawdown measure on a constant column is finite, so it is not that case
         @test isfinite(MaximumDrawdown()(view(Xc, :, 2)))
 
@@ -2001,6 +2017,10 @@ struct UnimplementedRedundancy <: PortfolioOptimisers.AbstractRedundancyAlgorith
         end
         @test occursin("does not implement redundancy_keep", e2.msg)
         @test occursin("requires_score", e2.msg)
+        # the generic `requires_score` already answers `true`, so an implementer adds it
+        # only to answer `false`, and the message says that (#550)
+        @test occursin("returning false when it can pick a survivor without a score",
+                       e2.msg)
     end
 
     @testset "correlation_components partitions the universe" begin
@@ -2481,7 +2501,8 @@ end
                         NestedClustered(; opti = EqualWeighted(), opto = EqualWeighted()),
                     "Stacking" =>
                         Stacking(; opti = [EqualWeighted()], opto = EqualWeighted()),
-                    "SubsetResampling" => SubsetResampling(; opt = EqualWeighted()),
+                    "SubsetResampling" =>
+                        SubsetResampling(; subset_size = 0.8, opt = EqualWeighted()),
                     "EqualWeighted" => EqualWeighted(),
                     "InverseVolatility" => InverseVolatility(),
                     "RandomWeighted" => RandomWeighted())
@@ -2540,7 +2561,7 @@ end
         rather than a configuration. Declaring rather than probing for `:opt` is what keeps
         that name collision from being mistaken for a configuration to route through.
         =#
-        sr = SubsetResampling(; opt = EqualWeighted())
+        sr = SubsetResampling(; subset_size = 0.8, opt = EqualWeighted())
         @test hasfield(typeof(sr), :opt)
         @test PO.pipe_config_field(sr) === nothing
     end
@@ -3263,5 +3284,206 @@ end
         @test_throws PortfolioOptimisers.IsEmptyError weight_bounds_constraints(WeightBounds(0.0,
                                                                                              1.0))
         @test_throws PortfolioOptimisers.IsEmptyError weight_bounds_constraints(nothing)
+    end
+end
+
+# A returns-level step that drops the first observation of each window. It makes no promise
+# that it keeps them, so a prediction through it records no rows (#1926).
+struct HelperDropFirstRow <: PortfolioOptimisers.AbstractReturnsPreprocessingEstimator end
+PortfolioOptimisers.fit_preprocessing(est::HelperDropFirstRow, ::Any) = est
+function PortfolioOptimisers.apply_preprocessing(::HelperDropFirstRow,
+                                                 rd::PortfolioOptimisers.AbstractReturnsResult)
+    return PortfolioOptimisers.port_opt_view(rd, 2:size(rd.X, 1), :)
+end
+@testset "Pipeline step helpers on their small shapes (#1912)" begin
+    using Dates, StableRNGs
+    PO = PortfolioOptimisers
+    rd = ReturnsResult(; nx = ["a", "b"], X = [0.1 -0.2; -0.1 0.2; 0.05 0.1; 0.01 0.02])
+    prs = PricesResult(;
+                       X = TimeArray(Date(2020, 1, 1) .+ Day.(0:4),
+                                     [1.0 2; 1.1 2.1; 1.2 2.2; 1.1 2.4; 1.3 2.3],
+                                     ["a", "b"]))
+    # A longer returns history for the walk-forward folds.
+    rdl = ReturnsResult(; nx = ["a", "b", "c"],
+                        X = randn(StableRNG(1919), 40, 3) ./ 100 .+ 0.001,
+                        ts = Date(2024, 1, 1) .+ Day.(0:39))
+    wf = IndexWalkForward(20, 5)
+    expanding = IndexWalkForward(20, 5; expand_train = true)
+    online = OnlineIndexWalkForward(20, 5)
+    nfold = n_splits(wf, rdl)
+    weights(res) = hcat([p.res.w for p in res.pred]...)
+    nets(res) = [p.rd.X for p in res.pred]
+    iv = InverseVolatility()
+    ew = EqualWeighted()
+    wrapped = PipelineStep(; est = EmpiricalPrior(), writes = :prior)
+    callable = PipelineStep(; est = c -> prior(EmpiricalPrior(), c.returns),
+                            reads = (:returns,), writes = :prior)
+    pipe = Pipeline(; steps = ("prior" => EmpiricalPrior(), "opt" => iv))
+    @testset "fitted steps keep the observations" begin
+        # A prediction records the rows of its window when every fitted step kept them. A
+        # prior and an optimiser, an asset selector, a nested Pipeline and a Pipeline fitted
+        # on prices all keep them, so each prediction on returns data records its window.
+        pipes = (pipe, Pipeline(; steps = (CompleteAssetSelector(), EmpiricalPrior(), iv)),
+                 Pipeline(; steps = ("inner" => pipe,)))
+        for p in pipes
+            @test predict(fit(p, rd), rd, 2:3).idx == 2:3
+        end
+        conv = Pipeline(; steps = (PricesToReturns(), EmpiricalPrior(), iv))
+        @test predict(fit(conv, prs), rd, 2:3).idx == 2:3
+        # A returns step that drops an observation does not keep them, so the prediction
+        # records no rows (#1926).
+        drop = Pipeline(; steps = (HelperDropFirstRow(), EmpiricalPrior(), iv))
+        @test isnothing(predict(fit(drop, rd), rd, 2:4).idx)
+    end
+    @testset "a step that no schedule changes goes through every fold untouched" begin
+        # The schedule on the optimisation step makes the Pipeline time-dependent, so each
+        # fold swaps the schedule in and the fold-less fit falls back on the default. A
+        # wrapped prior and a callable prior stay as they are, so the folds equal the folds
+        # of the bare pipelines they alternate between.
+        sched = TimeDependent([isodd(i) ? iv : ew for i in 1:nfold]; default = iv)
+        bare_iv = cross_val_predict(Pipeline(; steps = (EmpiricalPrior(), iv)), rdl, wf)
+        bare_ew = cross_val_predict(Pipeline(; steps = (EmpiricalPrior(), ew)), rdl, wf)
+        fixed = fit(Pipeline(; steps = (EmpiricalPrior(), iv)), rdl)
+        for first in (wrapped, callable)
+            td = Pipeline(; steps = (first, sched))
+            res = cross_val_predict(td, rdl, wf)
+            @test weights(res)[:, 1:2:end] == weights(bare_iv)[:, 1:2:end]
+            @test weights(res)[:, 2:2:end] == weights(bare_ew)[:, 2:2:end]
+            @test weights(bare_iv) != weights(bare_ew)
+            @test fit(td, rdl).ctx.opt.w == fixed.ctx.opt.w
+        end
+        # A step that wraps the schedule, or a nested Pipeline that holds it, resolves it for
+        # each fold, and the fold-less fit falls back on the default. A step that kept the
+        # schedule unresolved would run the default in every fold, or refuse the fit (#1926).
+        for step in (PipelineStep(; est = sched, writes = :opt),
+                     PipelineStep(; est = Pipeline(; steps = (EmpiricalPrior(), sched)), writes = :opt))
+            td = if isa(step.est, Pipeline)
+                Pipeline(; steps = (step,))
+            else
+                Pipeline(; steps = (EmpiricalPrior(), step))
+            end
+            res = cross_val_predict(td, rdl, wf)
+            @test weights(res)[:, 1:2:end] == weights(bare_iv)[:, 1:2:end]
+            @test weights(res)[:, 2:2:end] == weights(bare_ew)[:, 2:2:end]
+            @test fit(td, rdl).ctx.opt.w == fixed.ctx.opt.w
+        end
+    end
+    @testset "the previous weights reach a step that wraps a reader" begin
+        # A fee on the turnover reads the weights of the previous fold from the second fold
+        # on. A turnover that is `fixed` reads none, so the first fold agrees and the later
+        # folds do not.
+        w0 = fill(1 / 3, 3)
+        reads = InverseVolatility(; fees = Fees(; tn = Turnover(; w = w0, val = 0.01)))
+        pinned = InverseVolatility(;
+                                   fees = Fees(;
+                                               tn = Turnover(; w = w0, val = 0.01,
+                                                             fixed = true)))
+        cv = IndexWalkForward(20, 5; pws = DriftedWeights())
+        bare = cross_val_predict(Pipeline(; steps = (EmpiricalPrior(), reads)), rdl, cv)
+        fixed = cross_val_predict(Pipeline(; steps = (EmpiricalPrior(), pinned)), rdl, cv)
+        @test nets(bare)[1] == nets(fixed)[1]
+        @test nets(bare)[2] != nets(fixed)[2]
+        for first in (wrapped, callable)
+            res = cross_val_predict(Pipeline(; steps = (first, reads)), rdl, cv)
+            @test weights(res) == weights(bare)
+            @test nets(res) == nets(bare)
+        end
+        # A step that wraps the reader gives it the weights of the previous fold too. A step
+        # that kept the reader as written would read none, as the `fixed` turnover does
+        # (#1926).
+        res = cross_val_predict(Pipeline(;
+                                         steps = (EmpiricalPrior(),
+                                                  PipelineStep(; est = reads,
+                                                               writes = :opt))), rdl, cv)
+        @test nets(res) == nets(bare)
+        @test nets(res)[2] != nets(fixed)[2]
+    end
+    @testset "constraint steps and slots" begin
+        step = PipelineStep(; est = AssetSetsMatrixEstimator(; val = "nx"),
+                            writes = :constraints, target = :smtx)
+        con = fit(Pipeline(; steps = (step,)), rd).ctx.constraints
+        @test con.target == :smtx
+        @test con.res == Bool[1 0; 0 1]
+        # The default name of a step is the slot it writes.
+        split_pipe = Pipeline(;
+                              steps = (TrainTestSplit(; test_size = 0.25),
+                                       PricesToReturns(), EmpiricalPrior(), iv))
+        @test split_pipe.names == ("split", "returns", "prior", "opt")
+    end
+    @testset "a replaced slot is left out of the frames of the optimiser" begin
+        # A step that writes the `sigma` set replaces the `ucs` of each uncertainty set
+        # variance in the vector `r`. Left in, the raw readers beside an excess prior are
+        # named with their path in a warning. The step that replaces them leaves them out.
+        ex = ExcessSource()
+        pe(s) = EmpiricalPrior(; x_src = s)
+        ue(s) = DeltaUncertaintySet(; pe = pe(s))
+        ucv = UncertaintySetVariance(; ucs = ue(nothing))
+        slot = Solver(; name = :placeholder, solver = nothing)
+        raw = Logging.with_logger(Logging.NullLogger()) do
+            return MeanRisk(; opt = JuMPOptimiser(; pe = pe(ex), slv = slot),
+                            r = [ucv, Variance(), ucv])
+        end
+        prior_step = PipelineStep(; est = pe(ex), writes = :prior)
+        sigma_step = PipelineStep(; est = ue(ex), reads = (:returns,),
+                                  writes = :uncertainty, target = :sigma)
+        @test_logs (:warn, r"`steps\[2\]\.r\[1\]\.ucs\.pe`, `steps\[2\]\.r\[3\]\.ucs\.pe`") Pipeline(;
+                                                                                                     steps = (prior_step,
+                                                                                                              raw))
+        @test_logs min_level = Logging.Warn Pipeline(;
+                                                     steps = (prior_step, sigma_step, raw))
+        # The group of the Excess Frame has nothing to read when a Pipeline with no
+        # `PricesToReturns` step is fitted on prices. The view passes the empty slot on, so
+        # the step refuses it by name.
+        @test_throws PO.IsNothingError fit(Pipeline(;
+                                                    steps = (InverseVolatility(;
+                                                                               pe = pe(ex)),)),
+                                           prs)
+    end
+    @testset "the online steps of a Pipeline" begin
+        # An asset selector folds nothing and is refitted at the read-out, the prior owns
+        # the rows, and a schedule or a wrapped prior passes through the warm-up and the
+        # copy of the state. The online walk equals the expanding batch walk-forward, and
+        # the capped walk equals the rolling one.
+        sched = TimeDependent([isodd(i) ? iv : ew for i in 1:nfold]; default = iv)
+        selector = CompleteAssetSelector()
+        for p in (Pipeline(; steps = (selector, EmpiricalPrior(), sched)),
+                  Pipeline(; steps = (selector, wrapped, iv)))
+            @test isapprox(weights(cross_val_predict(p, rdl, online)),
+                           weights(cross_val_predict(p, rdl, expanding)); atol = 1e-12)
+        end
+        td = Pipeline(; steps = (selector, EmpiricalPrior(), sched))
+        @test isapprox(weights(cross_val_predict(Online(td), rdl, online)),
+                       weights(cross_val_predict(td, rdl, expanding)); atol = 1e-12)
+        @test isapprox(weights(cross_val_predict(Online(td; max_history = 20), rdl, online)),
+                       weights(cross_val_predict(td, rdl, wf)); atol = 1e-12)
+        capped = Pipeline(;
+                          steps = (selector, Online(EmpiricalPrior(); max_history = 20),
+                                   iv))
+        plain = Pipeline(; steps = (selector, EmpiricalPrior(), iv))
+        @test isapprox(weights(cross_val_predict(capped, rdl, online)),
+                       weights(cross_val_predict(plain, rdl, wf)); atol = 1e-12)
+        # A schedule that is shorter than the folds is refused through the wrapper.
+        short = Pipeline(;
+                         steps = (EmpiricalPrior(), TimeDependent([iv, ew]; default = iv)))
+        @test_throws DimensionMismatch cross_val_predict(Online(short), rdl, online)
+        # The walks above reach none of these fallbacks, so the direct calls pin them: a value
+        # that is no step owns no rows, selects no universe, caps nothing, and passes through
+        # the warm-up and the copy of the state. A wrapped prior is copied, and the view of a
+        # buffer keeps its own type.
+        @test !PO.is_universe_step(1) && PO.is_universe_step(selector)
+        @test !PO.is_row_owner(1)
+        @test PO.is_row_owner(EmpiricalPrior()) && PO.is_row_owner(iv)
+        @test isnothing(PO.step_online_cap(1))
+        @test PO.update_online_step(3) === 3
+        @test PO.copy_step_states(3) === 3
+        folded = PipelineStep(; est = partial_fit!(EmpiricalPrior(), rdl.X),
+                              writes = :prior)
+        cw = PO.copy_step_states(folded)
+        @test cw.writes == :prior && !(cw.est.cache === folded.est.cache)
+        @test prior(cw.est).mu == prior(folded.est).mu
+        @test isnothing(PO.port_opt_view(PO.PipelineBufferState(), [1]).data)
+        bv = PO.port_opt_view(PO.PipelineBufferState(; data = prs), [1]).data.X
+        @test values(bv) == values(prs.X)[:, 1:1]
+        @test TimeSeries.colnames(bv) == TimeSeries.colnames(prs.X)[1:1]
     end
 end

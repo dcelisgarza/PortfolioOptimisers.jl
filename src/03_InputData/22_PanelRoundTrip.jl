@@ -8,7 +8,7 @@ The panel holds no asset names and no observation labels, because the `PricesRes
 # Algorithm
 
  1. The asset names are `nx`, or the positions `"1"`, `"2"`, … when `nx` is `nothing`.
- 2. The observation labels are `ts`, or the positions `1`, `2`, … when `ts` is `nothing` or the panel is static.
+ 2. The observation labels are `ts`, or the positions `1`, `2`, … when `ts` is `nothing`. A static panel has no observation axis, so its labels are the positions of its assets, and no caller reads them.
  3. Check each length against the axes of the panel.
 
 # Arguments
@@ -24,7 +24,7 @@ The panel holds no asset names and no observation labels, because the `PricesRes
 
 # Returns
 
-  - `(nxa, tsa)`: The asset names and the observation labels.
+  - `(nxa, tsa)`: The asset names and the observation labels. On a static panel, `tsa` is `1:N` for `N` assets.
 
 # Related
 
@@ -335,7 +335,7 @@ end
 
 Write the cells of one Panel Field column, or of one mask, from a table into the array `A`.
 
-`A` has the shape of the column in the panel: `assets` on a static panel and `observations × assets` on a time-varying one. The caller fills it before the call, so a cell that the table does not hold keeps that value.
+`A` has the shape of the column in the panel. The shape is `assets` on a static panel and `observations × assets` on a time-varying one. The caller fills it before the call, so a cell that the table does not hold keeps that value.
 
 # Algorithm
 
@@ -346,7 +346,7 @@ The method that Julia selects is the algorithm. `lin` says the layout.
 
 # Arguments
 
-  - `A`: The array. It is changed in place.
+  - `A`: The array. This function changes it in place.
   - `lin`: The linear index of the cell of each row of a long table, or `nothing` for a wide table.
   - `tab`: The named tuple `(; df, nx)` of the table and the asset names of the manifest.
   - `name`: The column name in the long layout, and the part of the column name before `"@"` in the wide layout.
@@ -393,7 +393,7 @@ end
 
 Return the element type that holds every value of the table columns of one Panel Field.
 
-The type is derived from the columns, and never forced: it is the promoted element type of the columns with `Missing` removed, which [`panel_table_types`](@ref) reads. A reader that gives an integer column and a floating-point column for two labels of one tensor Panel Field gets the floating-point type.
+The function derives the type from the columns, and never forces it. The type is the promoted element type of the columns with `Missing` removed, which [`panel_table_types`](@ref) reads. A reader that gives an integer column and a floating-point column for two labels of one tensor Panel Field gets the floating-point type.
 
 # Arguments
 
@@ -537,7 +537,7 @@ end
 
 Read one Panel Field from a table, as its manifest entry `s` describes it.
 
-A cell that a long table does not hold is outside the universe, and no consumer reads it. It gets the value zero, the first level of a categorical Panel Field, and `false` in the observed mask and in the placeholder mask.
+A cell that a long table does not hold is outside the universe, and the table holds no value for it. It gets the value zero, the first level of a categorical Panel Field, and `false` in each mask that the manifest records. A Panel Field whose manifest records no observed mask or no placeholder mask comes back with no such mask.
 
 # Algorithm
 
@@ -741,7 +741,7 @@ end
 
 Read the entry of each Panel Field from a manifest that [`panel_manifest`](@ref) wrote.
 
-An entry is the named tuple `(; kind, name, observed, placeholder, decode, grouped, axis, labels, groups)`. `labels` holds the levels of a categorical Panel Field and the trailing-axis labels of a tensor Panel Field. `decode` belongs to a categorical Panel Field, and is `false` for the other kinds. `axis`, `grouped` and `groups` belong to a tensor Panel Field, and are `""`, `false` and empty for the other kinds.
+An entry is the named tuple `(; kind, name, observed, placeholder, decode, grouped, axis, labels, groups)`. `labels` holds the levels of a categorical Panel Field and the trailing-axis labels of a tensor Panel Field. `groups` holds one entry per label: the group of a trailing-axis label, and `""` for a level. `decode` belongs to a categorical Panel Field, and is `false` for the other kinds. `axis` and `grouped` belong to a tensor Panel Field, and are `""` and `false` for the other kinds. A numeric Panel Field has no label and no group.
 
 # Algorithm
 
@@ -915,14 +915,20 @@ A long table from [`panel_dataframe`](@ref) holds one row per asset of a static 
 """
 function panel_long_cells(df::DataFrames.DataFrame, ax::NamedTuple)
     kpos = Dict(a => k for (k, a) in pairs(ax.nx))
-    lin = [panel_long_position(kpos, x, "asset") for x in panel_table_column(df, "asset")]
+    #! A table column states no element type that inference can read, so a comprehension over
+    #! it reaches every method that a package adds to `Base.collect_to_with_first!`, and JET
+    #! reports one in JuMP. A comprehension over the row positions does not.
+    rows = 1:DataFrames.nrow(df)
+    acol = panel_table_column(df, "asset")
+    k = [panel_long_position(kpos, acol[r], "asset") for r in rows]
+    lin = k
     if !ax.static
         @argcheck(allunique(ax.ts),
                   ArgumentError("the manifest names an observation twice, so a row of a long table cannot name one observation. Read the wide layout instead."))
         tpos = Dict(t => i for (i, t) in pairs(ax.ts))
         L = LinearIndices((length(ax.ts), length(ax.nx)))
-        lin = [L[panel_long_position(tpos, x, "observation"), k]
-               for (x, k) in zip(panel_table_column(df, "observation"), lin)]
+        ocol = panel_table_column(df, "observation")
+        lin = [L[panel_long_position(tpos, ocol[r], "observation"), k[r]] for r in rows]
     end
     @argcheck(allunique(lin),
               ArgumentError("two rows of the long table hold one cell of the panel, so the table is not one that panel_dataframe wrote"))
@@ -970,8 +976,10 @@ The two tables can go through any table format and come back, for example throug
 
 The function reads the long and the wide layouts, and tells them apart by the `"asset"` column, which only the long layout holds. It does not read the single-field shape, which holds no mask.
 
-  - **Wide**: the table holds every cell and both universe masks, so the panel comes back whole.
-  - **Long**: the table holds only the rows where the active mask is `true`. The function makes the active mask from the rows that the table holds, and the manifest gives the axes. The value of a cell outside the universe does not come back: the cell gets zero, the first level of a categorical Panel Field, and an observed mask of `false`. No consumer reads a cell outside the universe, so this is lossless for every consumer.
+  - A wide table holds every cell and both universe masks, so the panel comes back whole.
+  - A long table holds only the rows where the active mask is `true`. The function makes the active mask from the rows that the table holds, and the manifest gives the axes. The value of a cell outside the universe does not come back. The cell gets zero, the first level of a categorical Panel Field, and `false` in each mask that the Panel Field carries. A Panel Field with no observed mask or no placeholder mask comes back with no such mask.
+
+A read that masks the cells outside the universe gives the same answer before and after a long round trip, for example [`panel_field_values`](@ref) with `inactive = NaN`. A read that keeps those cells gets the new values. Two such reads are [`panel_field_values`](@ref) with its default `inactive = nothing`, and the wide layout of [`panel_dataframe`](@ref).
 
 The function compares names and labels as text, so a reader that types a column still matches the manifest. A reader that changes the text of a name does not match it: CSV.jl reads the asset name `"007"` as the integer `7`. Read such a column as text. The manifest records whether each categorical column holds the levels or the codes, so the function reads the column as [`panel_dataframe`](@ref) wrote it.
 
@@ -983,7 +991,7 @@ A static Panel Field that a time-varying panel lifts, see [`RepeatedLeading`](@r
 
  1. Read the axes and the Panel Field entries of the manifest with [`panel_manifest_axes`](@ref) and [`panel_manifest_fields`](@ref). Keep the entries that `fields` names with [`panel_manifest_select`](@ref).
  2. Tell the layout with [`panel_table_cells`](@ref). In the long layout, it finds the cell of each row. In the wide layout, it checks the row count: one row on a static panel, one row per observation on a time-varying one.
- 3. Read each Panel Field with [`panel_read_field`](@ref).
+ 3. Read each Panel Field with [`panel_read_field`](@ref). When no entry is kept, the panel holds `pf = nothing`.
  4. On a time-varying panel, read the masks. [`panel_active_mask`](@ref) reads the active mask. The estimation mask is the `"emsk"` column of a long table, and the `"emsk@<asset>"` columns of a wide one.
  5. Make the panel with the [`AssetPanel`](@ref) constructor, which checks it.
 
@@ -1053,7 +1061,11 @@ function asset_panel(df::DataFrames.DataFrame, mf::DataFrames.DataFrame; fields 
     sz = ax.static ? (length(ax.nx),) : (length(ax.ts), length(ax.nx))
     tab = (; df = df, nx = ax.nx)
     lin = panel_table_cells(df, ax)
-    pf = AbstractPanelField[panel_read_field(s, lin, tab, sz) for s in specs]
+    pf = if isempty(specs)
+        nothing
+    else
+        AbstractPanelField[panel_read_field(s, lin, tab, sz) for s in specs]
+    end
     if ax.static
         return AssetPanel(; pf = pf)
     end
@@ -1065,11 +1077,11 @@ end
 
 Tell the layout of a table from [`panel_dataframe`](@ref), and find where its rows go in the panel.
 
-Only the long layout holds an `"asset"` column. A column of the wide layout is named `"<name>@<asset>"`, so no column of it is named `"asset"`.
+Only the long layout holds an `"asset"` column. The wide layout names a column `"observation"` or `"<name>@<asset>"`, so no column of it is named `"asset"`.
 
 # Algorithm
 
- 1. The table holds an `"asset"` column: it is a long table. Return the cell of each row, from [`panel_long_cells`](@ref).
+ 1. When the table holds an `"asset"` column, it is a long table. Return the cell of each row, from [`panel_long_cells`](@ref).
  2. Otherwise it is a wide table, whose rows are the observations in order. Check the row count and, on a time-varying panel, the labels of its `"observation"` column against the manifest, as text and in order. Return `nothing`.
 
 # Arguments

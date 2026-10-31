@@ -143,12 +143,11 @@ and is held to the family's promises:
                                                 pe = LowDimensionEnsemblePrior(; seed = 1)),
               "FollowTheLeadingHistory" => FollowTheLeadingHistory(),
               "AdaptiveSubgradient" => AdaptiveSubgradient(),
-              "OptimisticStep" => OptimisticStep(),
-              "OptimisticStep(MeanGradient)" =>
-                  OptimisticStep(; predictor = MeanGradient()),
-              "OptimisticStep(ForecastGradient)" =>
-                  OptimisticStep(; alg = GradientProjection(; eta = HintResidualRate()),
-                                 predictor = ForecastGradient(; me = me_ew)),
+              "MirrorDescent(LastGradient)" => MirrorDescent(; predictor = LastGradient()),
+              "MirrorDescent(MeanGradient)" => MirrorDescent(; predictor = MeanGradient()),
+              "GradientProjection(ForecastGradient)" =>
+                  GradientProjection(; eta = HintResidualRate(),
+                                     predictor = ForecastGradient(; me = me_ew)),
               "SwitchingPortfolio" => SwitchingPortfolio(; N = N),
               "Ader" => Ader(; eta_min = 0.05, K = 3, eps = 0.3),
               "Sword" => Sword(; eta_min = 0.05, K = 3, eps = 0.3)]

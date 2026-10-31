@@ -80,7 +80,7 @@ function oracle_estimator(; kwargs...)
                                                regime_min_obs = 2,
                                                regime_lohi_mult = (0.7, 1.6),
                                                centring = PreCentred(), min_val = 1e-12,
-                                               debias = RawStatistic(), kwargs...)
+                                               debias = nothing, kwargs...)
 end
 
 #=
@@ -131,8 +131,8 @@ is `x_t² ≥ 0`, and the rule after the update stays (#1440).
         @test st.variance ≈ v rtol = 1e-14
         @test st.cor_state ≈ Q rtol = 1e-14
         # The oracle's rule reads the raw variance state.
-        raw = PO.regime_adjusted_covariance_pass!(rule(b; cor_vol = RawVolatility()), X, 1,
-                                                  nothing, nothing)
+        raw = PO.regime_adjusted_covariance_pass!(rule(b; cor_vol = nothing), X, 1, nothing,
+                                                  nothing)
         @test raw.cor_state ≈ by_hand(X, 0.8, 0.9, b, false)[2] rtol = 1e-14
     end
     # The two rules differ, and the default is the rule before the update.
@@ -196,8 +196,7 @@ tables at `cor_decay` read (ADR 0190).
         @test PO.regime_bias_table(m, lamc, 300, 2) ==
               PO.regime_bias_table(m, lamc, 300, k2)
     end
-    @test PO.hac_log_det_slopes(lam, 200, 3.0, 2) ==
-          PO.hac_log_det_slopes(lam, 200, 3.0, k2)
+    @test PO.hac_log_det_slope(lam, 200, 3.0, 2) == PO.hac_log_det_slope(lam, 200, 3.0, k2)
     @test PO.exp_weight_cross_sum(lam, lamc, 40, 2) ==
           PO.exp_weight_cross_sum(lam, lamc, 40, PO.hac_lag_weights(2, lam * lamc))
 
@@ -374,6 +373,8 @@ Issues #1548 and #1549, found by #1527. Under `EstimatedCentring()` the terms of
 share their location, and the next deviation reads it too. `ExactDebias()` reads the law of the
 estimate and the dependence of the deviation on it; `LawDebias()` reads the law alone (ADR 0190).
 =#
+# A debias rule that a caller writes, with no method of `debiases` of its own (#1875).
+struct ProbeRegimeDebias <: PO.AbstractRegimeDebias end
 @testset "under the estimated location the tables read the law of the shared deviations" begin
     # The estimate as the variance pass forms it: after K + 1 returns it is (1 - λ) xᵀ M x, and
     # the location is gᵀx, both read off the pass by polarisation on unit returns.
@@ -539,7 +540,15 @@ estimate and the dependence of the deviation on it; `LawDebias()` reads the law 
     @test PO.debiases(LawDebias()) &&
           PO.reads_dependence(ExactDebias()) &&
           !PO.reads_dependence(LawDebias()) &&
-          !PO.reads_dependence(RawStatistic())
+          !PO.reads_dependence(nothing)
+    # `nothing` is the raw statistic, and the raw variance state on the separate path (#1867).
+    @test !PO.debiases(nothing)
+    # Every rule debiases, because `nothing` spells the raw statistic, so the method on the
+    # family serves a rule that a caller writes (#1875).
+    @test PO.debiases(ExactDebias()) && PO.debiases(ProbeRegimeDebias())
+    @test PO.correlation_variance(nothing, [0.5, 2.0], lam, [1, 3]) == [0.5, 2.0]
+    @test RegimeAdjustedExpWeightedCovariance(; debias = nothing, cor_vol = nothing).debias ===
+          nothing
     # The state of an estimator holds the table of its rule.
     ce = RegimeAdjustedExpWeightedVariance(; decay = lam, hac_lags = 2, min_obs = 1,
                                            debias = LawDebias())

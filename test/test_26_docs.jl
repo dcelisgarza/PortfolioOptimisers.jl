@@ -560,6 +560,24 @@ nothing raises `@error "File exists but no references were collected"` in
         unlisted = sort!([string(b) for b in keys(Base.Docs.meta(PO)) if !(b.var in listed)])
         @test unlisted == String[]
     end
+
+    #=
+    Julia attaches a docstring to the definition that follows it. The docstring of
+    `ep_refine_tail_view(::AbstractSequentialTailViewConstraint, ::VecNum)` sat above a method
+    of `ep_refine_iters`, so the binding `ep_refine_tail_view` held one docstring only. Its
+    page entry found no exact docstring and rendered the docstring of the supertype method by
+    a `<:` match, so the page showed that text twice and no gate failed (#540). A docstring
+    whose signature line names a function holds the binding of that function.
+    =#
+    @testset "every docstring names the binding that holds it" begin
+        misplaced = String[]
+        for (b, md) in Base.Docs.meta(PO), (sig, ds) in md.docs
+            m = match(r"^\s{4}([A-Za-z_][A-Za-z0-9_!]*)\(", join(string.(ds.text)))
+            (isnothing(m) || m.captures[1] == string(b.var)) && continue
+            push!(misplaced, "$(m.captures[1]) is held by $(b.var) at $sig")
+        end
+        @test sort!(misplaced) == String[]
+    end
 end
 
 #=
@@ -625,9 +643,13 @@ they are of two kinds and only one kind can red a file that no child map has swe
   A PRESENCE check says "the file must state X". It reds a file the moment its scope reaches
   it. `ext/` carries ZERO docstrings, so a presence check widened unconditionally would red
   the build on the day it landed. It reads the sweep manifest instead: a file marked
-  `swept = true` must satisfy it, and an unswept file is exempt. The `ext/` row is
-  `swept = false` today, so the testset below asserts the exemption and nothing else. Child
-  map 13 sweeps the file and flips the flag.
+  `swept = true` must satisfy it, and an unswept file is exempt. Child map 13 sweeps the
+  files of `ext/` one ticket at a time, and each ticket flips the flag of its own file.
+
+The manifest is per file and an extension is one module over many files. So the presence
+check below is per file too. A swept file answers for the names that it declares at its top
+level, and an unswept file of the same module stays exempt (#1449). A check per module armed
+on the first swept file, and it demanded the docstrings of every unswept sibling.
 
 --------------------------------------------------- what an extension file has to document
 
@@ -635,18 +657,18 @@ An extension is a module of its own, so `Base.undocumented_names` -- the instrum
 first testset in this file already uses -- answers for it directly. It also answers the
 right question rather than a widened one, and what the one file holds is why:
 
-  - `ext/PortfolioOptimisersPlotsExt/` defines 171 methods of 34 functions, and every one
-    of the 34 is declared as a bare `function ... end` stub in `src/22_Plotting.jl`, which
-    carries its docstring. Beyond those methods it declares four module-local `const`s
-    holding error-message text, and nothing else.
+  - `ext/PortfolioOptimisersPlotsExt/` defines the methods of the `plot_*` functions, and
+    every one of those functions is declared as a bare `function ... end` stub in
+    `src/22_Plotting.jl`, which carries its docstring. Beyond those methods it declares
+    module-local `const`s and the private helper functions that the methods call.
 
-A method binds in the module that declares the FUNCTION, so none of those 171 methods
-reaches `names(ext; all = true)` and the census asks for a docstring on none of them. That
-is the right demand: 171 docstrings restating 34 would be 137 copies free to drift, which is
-what `ref_dict` and `field_dict` exist to stop. What the census does ask for is the four
-`const`s and the extension module's own docstring -- the names the extension declares
-itself. The main module carries a docstring under exactly that rule, so this is one rule and
-not two.
+A method binds in the module that declares the FUNCTION, so no `plot_*` method reaches
+`names(ext; all = true)` and the census asks for a docstring on none of them. That is the
+right demand: one docstring per method would restate the stub many times, and each copy
+could drift, which is what `ref_dict` and `field_dict` exist to stop. What the census does
+ask for is each `const`, each helper function and the extension module's own docstring --
+the names the extension declares itself. Every private name of `src/` carries a docstring
+under exactly that rule, so this is one rule and not two.
 
 #409's three questions are answered by that one rule.
 
@@ -722,10 +744,23 @@ not two.
             return Base.get_extension(PortfolioOptimisers, Symbol(name))
         end
 
+        # The names that one top-level expression of a file declares. The module file of an
+        # extension wraps its body in `module`, so the walk descends into that body.
+        CH = DocsCensusHealth.CodeHealth
+        function declared_names(e)
+            d = CH.unwrap(e)
+            Meta.isexpr(d, :module) || return [CH.unit_name(d)]
+            return vcat(CH.unit_name(d),
+                        mapreduce(declared_names, vcat, d.args[3].args; init = String[]))
+        end
+
         undocumented, unloadable = String[], String[]
         for (name, triggers) in extensions
-            files = filter(f -> belongs_to(name, f), ext_rows)
-            any(f -> rows[f]["swept"], files) || continue
+            files = filter(f -> belongs_to(name, f) && rows[f]["swept"], ext_rows)
+            isempty(files) && continue
+            declared = Set{String}(n for f in files
+                                   for e in CH.parse_file(joinpath(ROOT, f)).args
+                                   for n in declared_names(e))
             trigger_list = isa(triggers, AbstractString) ? [triggers] : triggers
             mod = load_extension(name, trigger_list)
             if isnothing(mod)
@@ -736,7 +771,7 @@ not two.
                 push!(unloadable, string(name, "  triggers: ", join(trigger_list, ", ")))
             else
                 for n in Base.undocumented_names(mod; private = true)
-                    push!(undocumented, string(name, ".", n))
+                    string(n) in declared && push!(undocumented, string(name, ".", n))
                 end
             end
         end
@@ -1093,7 +1128,7 @@ in the sense of `CODING_STANDARDS.md`.
     edit and not a silent one.
     =#
     @testset "# Details is abolished" begin
-        DETAILS_TOTAL = 21
+        DETAILS_TOTAL = 4
 
         @testset "a swept file carries no # Details section" begin
             offenders = Tuple{String, Int}[]
@@ -1181,7 +1216,7 @@ in the sense of `CODING_STANDARDS.md`.
         # The count of dispatch aliases carrying no `# Related`. Each file's own #404 prose
         # ticket pays its share. Lower the number in the commit that pays it, and retire the
         # ratchet at zero.
-        NO_RELATED_TOTAL = 14
+        NO_RELATED_TOTAL = 8
 
         # A `const` bound to a bare name is an acronym; to a type expression, a dispatch
         # alias. `Expr(:curly, ...)` is a type expression and `Expr(:call, ...)` is a value,
@@ -1391,7 +1426,7 @@ in the sense of `CODING_STANDARDS.md`.
     library-wide pass.
     =#
     @testset "a math_dict value is interpolated, never copied" begin
-        MATH_COPY_TOTAL = 2
+        MATH_COPY_TOTAL = 0
 
         mvals = Dict{String, Symbol}(v => k for (k, v) in math_pairs)
         @test !isempty(mvals)
@@ -1506,7 +1541,7 @@ in the sense of `CODING_STANDARDS.md`.
                     # As `cross-sectional weight`, for ``y_{ti}`` and ``b_{k}``.
                     "forward target" => [:b_k_pair, :y_ti_fwd],
                     # Nine counts of nine different things.
-                    "number" => [:K, :N, :T, :k_tail_count, :n_network, :n_pool, :n_trials,
+                    "number" => [:K, :N, :T, :k_subset, :n_network, :n_pool, :n_trials,
                                  :sigma_st_i_paths, :sigma_st_paths],
                     # As `constraint scale`, and the same merge candidate.
                     "objective scale" => [:ep_so, :so_scale],

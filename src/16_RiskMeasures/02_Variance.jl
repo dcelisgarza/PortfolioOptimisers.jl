@@ -168,7 +168,7 @@ Where:
 """
 struct SOCRiskExpr <: SecondMomentFormulation end
 """
-    const NSkeQuadFormulations = Union{<:QuadRiskExpr, <:SquaredSOCRiskExpr}
+    const NSkeQuadFormulations = Union{QuadRiskExpr, SquaredSOCRiskExpr}
 
 Groups the two encodings under which [`NegativeSkewness`](@ref) reports the quadratic form of its skewness matrix rather than its square root.
 
@@ -180,9 +180,9 @@ The functor of [`NegativeSkewness`](@ref) dispatches on the group. It returns ``
   - [`SquaredSOCRiskExpr`](@ref)
   - [`NegativeSkewness`](@ref)
 """
-const NSkeQuadFormulations = Union{<:QuadRiskExpr, <:SquaredSOCRiskExpr}
+const NSkeQuadFormulations = Union{QuadRiskExpr, SquaredSOCRiskExpr}
 """
-    const QuadSecondMomentFormulations = Union{<:NSkeQuadFormulations, <:RSOCRiskExpr}
+    const QuadSecondMomentFormulations = Union{NSkeQuadFormulations, RSOCRiskExpr}
 
 Groups the three encodings that report the second moment itself rather than its square root.
 
@@ -195,7 +195,7 @@ The value level of [`SecondMoment`](@ref) dispatches on the group. It returns th
   - [`SOCRiskExpr`](@ref)
   - [`SecondMoment`](@ref)
 """
-const QuadSecondMomentFormulations = Union{<:NSkeQuadFormulations, <:RSOCRiskExpr}
+const QuadSecondMomentFormulations = Union{NSkeQuadFormulations, RSOCRiskExpr}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -333,7 +333,7 @@ Measures the portfolio variance, the quadratic form of the weights in a covarian
 
 `alg` selects the risk expression that the model builds, and each [`VarianceFormulation`](@ref) reports the variance itself. [`QuadRiskExpr`](@ref) states the quadratic form ``\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}``, and [`SquaredSOCRiskExpr`](@ref) states ``\\sigma^{2}``, the square of a second-order cone variable with ``\\sigma \\geq \\lVert \\mathbf{G} \\boldsymbol{w} \\rVert_{2}`` and ``\\mathbf{G}^\\intercal \\mathbf{G} = \\mathbf{\\Sigma}``. The model adds ``\\sigma`` under both encodings, because the bound in `settings.ub` and the [`MaximumRatio`](@ref) objective need an expression of degree one in the weights. The bound acts on ``\\sigma`` at the square root of `settings.ub`, so a caller states it in the units of a variance. [`set_risk_constraints!`](@ref) states the model.
 
-When `rc` holds rows, the model uses the semidefinite formulation of [sdprp](@cite) whatever `alg` says. A [`SemiDefinitePhylogeny`](@ref) in the constraints also moves the variance to this formulation. The formulation lifts the weights into a symmetric matrix ``\\mathbf{W}``, and the variance becomes the trace ``\\mathrm{Tr}(\\mathbf{\\Sigma} \\mathbf{W})``. Under [`MaximumRatio`](@ref) the corner of the lift sets the degree of the term, and so the ratio. `ratio_alg` selects it. [`SquareRootRatio`](@ref), the default, gives the Sharpe ratio, as the second-order cone does, and [`LinearRatio`](@ref) gives the excess return per unit of variance. `corner` sets the constant corner of the first. The `# Mathematical definition` of [`MaximumRatio`](@ref) states the rule, and [`rc_variance_constraints!`](@ref) states the rows.
+When `rc` holds rows, the model uses the semidefinite formulation of [sdprp](@cite) whatever `alg` says. A [`SemiDefinitePhylogeny`](@ref) in the constraints also moves the variance to this formulation. The formulation lifts the weights into a symmetric matrix ``\\mathbf{W}``, and the variance becomes the trace ``\\mathrm{Tr}(\\mathbf{\\Sigma} \\mathbf{W})``. Under [`MaximumRatio`](@ref) the corner of the lift sets the degree of the term, and so the ratio. `ratio_alg` selects it. [`SquareRootRatio`](@ref), the default, gives the Sharpe ratio, as the second-order cone does, and [`LinearRatio`](@ref) gives the excess return per unit of variance. Formulation 10 of [sdprp](@cite) is the second, although that work names it the maximisation of the Sharpe ratio. The first, with its constant corner, is the library's own. `corner` sets the constant corner of the first. The `# Mathematical definition` of [`MaximumRatio`](@ref) states the rule, and [`rc_variance_constraints!`](@ref) states the rows.
 
 !!! warning
 
@@ -382,6 +382,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
+  - $(val_dict[:sigma_cov])
   - If `sigma` is a matrix, `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
   - If `chol` is a matrix, `!isempty(chol)`.
   - `chol` is `nothing` when `sigma` is `nothing` or a **Deferred Quantity**.
@@ -459,8 +460,8 @@ julia> r(w)
 
 # References
 
-  - $(ref_dict[:markowitz1952])
-  - $(ref_dict[:sdprp]) Formulations 9 and 10.
+  - $(ref_dict[:markowitz1952]) Page 81.
+  - $(ref_dict[:sdprp]) Section 2.3, Formulations 9 and 10.
 """
 @propagatable @concrete struct Variance <: RiskMeasure
     """
@@ -500,6 +501,7 @@ julia> r(w)
                       alg::VarianceFormulation,
                       mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm},
                       ratio_alg::RatioFormulation, corner::Option{<:Number})::Variance
+        assert_covariance_estimator(sigma, :sigma)
         if isa(sigma, MatNum)
             @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
             assert_matrix_issquare(sigma, :sigma)
@@ -621,6 +623,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
+  - $(val_dict[:sigma_cov])
   - If `sigma` is a matrix, `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
   - If `chol` is a matrix, `!isempty(chol)`.
   - `chol` is `nothing` when `sigma` is `nothing` or a **Deferred Quantity**.
@@ -681,7 +684,7 @@ julia> r(w)
 
 # References
 
-  - $(ref_dict[:markowitz1952])
+  - $(ref_dict[:markowitz1952]) Pages 80 and 81.
 """
 @propagatable @concrete struct StandardDeviation <: RiskMeasure
     """
@@ -703,6 +706,7 @@ julia> r(w)
     function StandardDeviation(settings::RiskMeasureSettings, sigma::Option{<:SigmaSlot},
                                chol::Option{<:MatNum},
                                mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm})::StandardDeviation
+        assert_covariance_estimator(sigma, :sigma)
         if isa(sigma, MatNum)
             @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
             assert_matrix_issquare(sigma, :sigma)
@@ -803,7 +807,7 @@ Where:
 
   - $(math_dict[:w_port])
   - ``U_{\\mathbf{\\Sigma}}``: Uncertainty set of the covariance matrix.
-  - ``R_{\\mathrm{box}}``, ``R_{\\mathrm{ell}}``, ``R_{\\mathrm{nb}}``, ``R_{\\mathrm{cpt}}``: Value of the first line for the box, for the ellipsoid and the norm ball without the condition ``\\mathbf{\\Sigma} \\succeq 0``, and for the compact set.
+  - ``R_{\\mathrm{box}}``, ``R_{\\mathrm{ell}}``, ``R_{\\mathrm{nb}}``, ``R_{\\mathrm{cpt}}``: Value of the first line for the box, the ellipsoid and the norm ball without the condition ``\\mathbf{\\Sigma} \\succeq 0``, and for the compact set.
   - ``\\mathbf{\\Sigma}_l``, ``\\mathbf{\\Sigma}_u``: Lower and upper bounds of the box, `lb` and `ub`.
   - ``(\\cdot)_{+}``: Positive part, entry by entry.
   - ``\\hat{\\mathbf{\\Sigma}}``: Centre of the set, the `val` of the set when it states one and the `sigma` of the measure otherwise.
@@ -813,7 +817,9 @@ Where:
   - $(math_dict[:kappa_cpt])
   - ``\\langle \\mathbf{X}, \\mathbf{Y} \\rangle = \\mathrm{Tr}(\\mathbf{X}^\\intercal \\mathbf{Y})``: Inner product of two matrices.
 
-The box value and the compact value are the worst case of the first line. The ellipsoid and the norm ball also require ``\\mathbf{\\Sigma} \\succeq 0``, and their values above omit that condition, so each lies at or above the worst case of its set. The model keeps the condition through the dual matrix ``\\mathbf{E} \\succeq 0``, so its optimum lies at or below these values.
+The compact value is the worst case of the first line. The box, the ellipsoid and the norm ball also require ``\\mathbf{\\Sigma} \\succeq 0``, and their values above omit that condition, so each lies at or above the worst case of its set. The box value equals that worst case when the bound it reads on each entry gives a positive semidefinite matrix, for example when ``\\boldsymbol{w} \\geq 0`` and ``\\mathbf{\\Sigma}_u \\succeq 0``. The model keeps the condition through the dual matrix ``\\mathbf{E} \\succeq 0`` of the ellipsoid and the norm ball, and through the slack of ``\\mathbf{W} \\succeq \\boldsymbol{w} \\boldsymbol{w}^\\intercal / k`` for the box, so its optimum lies at or below these values.
+
+[sousalobo2000](@cite) states the worst case over the box as a semidefinite programme, and Proposition 3 of [tutuncu2004](@cite) gives its closed form for ``\\boldsymbol{w} \\geq 0`` and ``\\mathbf{\\Sigma}_u \\succeq 0``. [fengpalomar2016](@cite) derives the dual of the worst case over the ellipsoid. The docstrings of [`NormBallUncertaintySet`](@ref) and [`CompactCovarianceUncertaintySet`](@ref) cite the sources of the other two sets.
 
 # Fields
 
@@ -834,6 +840,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
+  - $(val_dict[:sigma_cov])
   - If `sigma` is a matrix, `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
   - If `corner` is a number, `isfinite(corner)` and `corner > 0`, [`assert_lift_corner`](@ref).
 
@@ -934,9 +941,9 @@ julia> r(w)
 
 # References
 
-  - $(ref_dict[:robustaa])
-  - $(ref_dict[:fengpalomar2016])
-  - $(ref_dict[:cajas2025]) Section 11.3.
+  - $(ref_dict[:sousalobo2000]) Section 5.2.6, Equations 6 and 7.
+  - $(ref_dict[:tutuncu2004]) Section 3.1, Proposition 3.
+  - $(ref_dict[:fengpalomar2016]) Section 6.1.3, Equations 6.8 to 6.15.
 """
 @concrete struct UncertaintySetVariance <: RiskMeasure
     """
@@ -967,6 +974,7 @@ julia> r(w)
                                     sigma::Option{<:SigmaSlot},
                                     mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm},
                                     ratio_alg::RatioFormulation, corner::Option{<:Number})
+        assert_covariance_estimator(sigma, :sigma)
         if isa(sigma, MatNum)
             @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
             assert_matrix_issquare(sigma, :sigma)
@@ -1036,7 +1044,7 @@ end
 
 Compute the worst-case portfolio variance of the weights `w` over a fitted uncertainty set.
 
-It is the value level of the risk expression that [`set_ucs_variance_risk!`](@ref) builds, at ``\\mathbf{W} = \\boldsymbol{w} \\boldsymbol{w}^\\intercal``. The functor of [`UncertaintySetVariance`](@ref) calls it when `ucs` holds a fitted set. The box and the compact values equal the optimum of the model expression. The ellipsoid and the norm-ball values take the dual matrix ``\\mathbf{E} = 0``, so each lies at or above the optimum of its model expression.
+It is the value level of the risk expression that [`set_ucs_variance_risk!`](@ref) builds, at ``\\mathbf{W} = \\boldsymbol{w} \\boldsymbol{w}^\\intercal``. The functor of [`UncertaintySetVariance`](@ref) calls it when `ucs` holds a fitted set. The compact value equals the optimum of the model expression. The box value fixes ``\\mathbf{W} = \\boldsymbol{w} \\boldsymbol{w}^\\intercal``, which the model lets rise in the order of positive semidefinite matrices, and the ellipsoid and the norm-ball values take the dual matrix ``\\mathbf{E} = 0``, so each lies at or above the optimum of its model expression.
 
 # Mathematical definition
 

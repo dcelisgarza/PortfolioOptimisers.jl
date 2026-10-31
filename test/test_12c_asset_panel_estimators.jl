@@ -202,7 +202,7 @@ end
     nx = ["A", "B", "C", "D", "E", "F"]
     rd = ReturnsResult(; nx = nx, X = X)
 
-    for alg in (Proximity(), Proximity(; decay = NoDecay())),
+    for alg in (Proximity(), Proximity(; decay = nothing)),
         pl in (NetworkEstimator(), ClustersEstimator())
 
         ape = PhylogenyPanel(; pl = pl, alg = alg)

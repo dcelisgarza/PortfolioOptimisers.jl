@@ -11,4 +11,5 @@ PortfolioOptimisers.panel_feature_names
 PortfolioOptimisers.asset_panel_view
 PortfolioOptimisers.label_positions
 PortfolioOptimisers.timestamp_positions
+PortfolioOptimisers.each_panel_field
 ```

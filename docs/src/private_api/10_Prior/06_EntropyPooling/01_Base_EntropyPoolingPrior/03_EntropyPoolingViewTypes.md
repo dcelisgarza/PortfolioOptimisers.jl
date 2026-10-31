@@ -1,5 +1,5 @@
 ```@meta
-Description = "Entropy pooling view types, private API of PortfolioOptimisers.jl: AbstractEntropyPoolingViewEstimator, VV_VecVV, AbstractEntropyPoolingViewFormulation, …"
+Description = "Entropy pooling view types, private API of PortfolioOptimisers.jl: AbstractEntropyPoolingViewEstimator, VV_VecVV, …"
 ```
 
 # Entropy pooling view types: private API
@@ -7,10 +7,12 @@ Description = "Entropy pooling view types, private API of PortfolioOptimisers.jl
 ```@docs
 AbstractEntropyPoolingViewEstimator
 VV_VecVV
-AbstractEntropyPoolingViewFormulation
 AbstractConditionalValueatRiskViewFormulation
 AbstractEntropicValueatRiskViewFormulation
 AbstractRelativisticValueatRiskViewFormulation
+CVaRVF
+EVaRVF
+RLVaRVF
 CVaRVF_VecCVaRVF
 EVaRVF_VecEVaRVF
 RLVaRVF_VecRLVaRVF

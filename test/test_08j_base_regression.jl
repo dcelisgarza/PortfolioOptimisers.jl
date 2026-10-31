@@ -524,6 +524,13 @@ using Accessors: Accessors
         @test_throws DimensionMismatch PO.Regression(; M = M, esigma = zeros(3, 2))
     end
 
+    @testset "the idiosyncratic covariance view cuts a vector once and a matrix twice" begin
+        @test isnothing(PO.idiosyncratic_covariance_view(nothing, [1, 3]))
+        @test PO.idiosyncratic_covariance_view([1.0, 2.0, 3.0], [1, 3]) == [1.0, 3.0]
+        @test PO.idiosyncratic_covariance_view([1.0 0.5; 0.5 2.0], [2]) ==
+              reshape([2.0], 1, 1)
+    end
+
     @testset "port_opt_view cuts esigma on every axis it has" begin
         M = [1.0 2.0; 3.0 4.0; 5.0 6.0]
         i = [1, 3]
@@ -565,6 +572,46 @@ using Accessors: Accessors
                                                                        nothing, nothing)
         @test_throws DimensionMismatch PO.set_idiosyncratic_covariance(re, [1.0, 2.0, 3.0],
                                                                        [1, 2], nothing)
+    end
+    @testset "Statements the /unslop pass corrected (#463)" begin
+        # `orthogonality_weights` refuses a variance that is not finite, and not only a
+        # variance that is not positive.
+        M = [1.0 2.0; 3.0 4.0]
+        metric = PO.InverseIdiosyncraticVarianceMetric()
+        @test PO.orthogonality_weights(metric,
+                                       PO.Regression(; M = M, esigma = [0.5, 0.25])) ==
+              [2.0, 4.0]
+        @test_throws DomainError PO.orthogonality_weights(metric,
+                                                          PO.Regression(; M = M,
+                                                                        esigma = [0.5, Inf]))
+        @test_throws DomainError PO.orthogonality_weights(metric,
+                                                          PO.Regression(; M = M,
+                                                                        esigma = [0.5, 0.0]))
+        # `LinearModel()` is the default of each estimator that takes a regression target,
+        # and the cross-sectional linear regression takes none.
+        @test isa(PO.StepwiseRegression().tgt, PO.LinearModel)
+        @test isa(PO.DimensionReductionRegression().retgt, PO.LinearModel)
+        @test isa(PO.CrossSectionalTargetRegression().tgt, PO.LinearModel)
+        @test isa(PO.ImpliedVolatilityRegression().re, PO.LinearModel)
+        @test !hasfield(typeof(PO.CrossSectionalLinearRegression()), :tgt)
+        # `set_row_key` has two callers beside `FactorPrior`, and both keep an unset `L` unset.
+        rr = PO.Regression(; M = [1.0 2.0; 3.0 4.0; 5.0 6.0], idx = [3, 5, 7],
+                           ts = PO.Dates.Date(2020, 1, 1) .+ PO.Dates.Day.(0:2))
+        rf = PO.forget_row_positions(rr)
+        @test isnothing(rf.idx)
+        @test rf.ts == rr.ts
+        @test isnothing(getfield(rf, :L))
+        rm = PO.map_row_positions(rr, [10, 11, 12, 13, 14, 15, 16])
+        @test rm.idx == [12, 14, 16]
+        @test isnothing(getfield(rm, :L))
+        # The three ways a position meets the kept rows (#1912).
+        @test PO.kept_row_positions(nothing, [2, 3]) == [2, 3]
+        @test isnothing(PO.kept_row_positions(nothing, nothing))
+        @test isnothing(PO.kept_row_positions([5, 6, 7], nothing))
+        @test PO.kept_row_positions([5, 6, 7], [3, 1]) == [7, 5]
+        # A factor row that is not finite is a regressor of no asset (#1912).
+        @test isnothing(PO.assert_finite_factor_rows([1.0 2.0; 3.0 4.0]))
+        @test_throws PO.IsNonFiniteError PO.assert_finite_factor_rows([1.0 2.0; NaN 4.0])
     end
 end
 
@@ -624,7 +671,7 @@ with no `kwargs` field. Every verb an estimator reads therefore reaches it throu
 the `# Interfaces` section of `AbstractRegressionTarget` names, never through a field that only
 the library's targets carry, and its results must equal the library's.
 =#
-struct CallerTestTarget{W} <: PortfolioOptimisers.AbstractRegressionTarget
+struct CallerTestTarget{W} <: PortfolioOptimisers.AbstractUnpenalisedRegressionTarget
     w::W
 end
 CallerTestTarget() = CallerTestTarget(nothing)
@@ -644,7 +691,7 @@ function PortfolioOptimisers.regression_target_weights(tgt::CallerTestTarget)
     return tgt.w
 end
 # A target that states its fit and no other method.
-struct BareTestTarget <: PortfolioOptimisers.AbstractRegressionTarget end
+struct BareTestTarget <: PortfolioOptimisers.AbstractUnpenalisedRegressionTarget end
 function PortfolioOptimisers.StatsAPI.fit(::BareTestTarget, A::AbstractMatrix,
                                           y::AbstractVector)
     return StatsAPI.fit(PO.GLM.LinearModel, A, y)
@@ -1009,6 +1056,8 @@ end
         raw = MVS.fit(MVS.PPCA, Fs; maxoutdim = 5)
         @test all(isnan, raw.W)
         @test_throws ArgumentError MVS.projection(raw)
+        # `prep_dim_red_reg` calls `predict` first, and the `PPCA` docstring names it.
+        @test_throws ArgumentError StatsAPI.predict(raw, Fs)
 
         # The library checks the width first, so the caller meets a `DomainError` that names
         # `maxoutdim` and the factor count. It is raised at the fit, before `MultivariateStats`
@@ -1073,7 +1122,7 @@ end
         w = pweights(range(0.5, 1.5; length = T))
         function roundtrip(re)
             x1, Vp, mu, sigma = PO.prep_dim_red_reg(re, F)
-            beta = PO._regression(re, y, mu, sigma, x1, Vp)
+            beta = PO._regression(re, y, mu, sigma, x1, Vp).beta
             pred = beta[1] .+ F * beta[2:end]
             pred_pc = StatsAPI.predict(StatsAPI.fit(re.retgt, x1, y))
             return maximum(abs, pred .- pred_pc)
@@ -1098,7 +1147,7 @@ end
         # Equations 4.18 to 4.20 computed by hand against `_regression`.
         re = DimensionReductionRegression()
         x1, Vp, mu, sigma = PO.prep_dim_red_reg(re, F)
-        beta = PO._regression(re, y, mu, sigma, x1, Vp)
+        beta = PO._regression(re, y, mu, sigma, x1, Vp).beta
         beta_pc = StatsAPI.coef(StatsAPI.fit(re.retgt, x1, y))[2:end]
         @test isapprox(beta[2:end], Vp * beta_pc ./ sigma)
         @test isapprox(beta[1], mean(y) - dot(beta[2:end], mu))
@@ -1324,11 +1373,11 @@ function cross_sectional_panel(; T = 6, N = 25, K = 4, seed = 987)
 end
 
 # A regression target the library does not know, for `cross_sectional_least_squares`.
-struct LeverageTestTarget <: PortfolioOptimisers.AbstractRegressionTarget end
+struct LeverageTestTarget <: PortfolioOptimisers.AbstractUnpenalisedRegressionTarget end
 
 # A caller's own weighted least-squares target, which states no basis invariance, so the fit
 # hands it the design itself (#1719). Its solve is a pseudo-inverse.
-struct PinvTestTarget{W} <: PortfolioOptimisers.AbstractRegressionTarget
+struct PinvTestTarget{W} <: PortfolioOptimisers.AbstractUnpenalisedRegressionTarget
     w::W
 end
 struct PinvTestFit{C}
@@ -1643,10 +1692,10 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
         w = Wc[1, :]
         tgt = PO.factory(LinearModel(), StatsBase.aweights(w))
         plain = PO.StatsAPI.coef(PO.StatsAPI.fit(tgt, A, y))
-        @test PO.cross_sectional_target_coef(tgt, A, y, A .* sqrt.(w)) ≈ plain
+        @test PO.cross_sectional_target_coef(tgt, A, y, A .* sqrt.(w)).f ≈ plain
         # A target that is not basis-invariant fits the design itself.
         own = PO.factory(PinvTestTarget(nothing), StatsBase.aweights(w))
-        @test PO.cross_sectional_target_coef(own, A, y, A .* sqrt.(w)) ==
+        @test PO.cross_sectional_target_coef(own, A, y, A .* sqrt.(w)).f ==
               PO.StatsAPI.coef(PO.StatsAPI.fit(own, A, y))
         # On an exactly dependent design every member of a GLM target means what it means
         # for the linear member, and so does a caller's own target.
@@ -1979,6 +2028,12 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
                                                                                b = Float64[])
         @test_throws DimensionMismatch CrossSectionalRegression(; f = f, eps = eps, n = n,
                                                                 b = [1.0, 2.0, 3.0])
+        # The residual count has one entry per observation, and a view keeps it (#1900).
+        @test isnothing(CrossSectionalRegression(; f = f, eps = eps, n = n).edof)
+        @test_throws DimensionMismatch CrossSectionalRegression(; f = f, eps = eps, n = n,
+                                                                edof = [1, 1, 1])
+        csre = CrossSectionalRegression(; f = f, eps = eps, n = n, edof = [1.5, 1.0])
+        @test PortfolioOptimisers.port_opt_view(csre, [1, 3]).edof === csre.edof
     end
 
     @testset "The cache of a refit: the live mask, the active mask and the forecast history (#1751)" begin
@@ -3081,4 +3136,60 @@ end
             @test !f.excess && isempty(f.raw)
         end
     end
+end
+
+@testset "A dimension reduction regression names its column of ones (#1886)" begin
+    using Test, PortfolioOptimisers, StableRNGs, StatsBase, Statistics, LinearAlgebra
+    PO = PortfolioOptimisers
+    S = PO.StatsAPI
+    rng = StableRNG(21)
+    T, K, N = 120, 4, 3
+    F = 0.01 .* randn(rng, T, K)
+    X = F * randn(rng, K, N) .+ 0.005 .* randn(rng, T, N) .+ 0.002
+    aw = StatsBase.aweights(rand(rng, T))
+    # The fitted values of the reduced fit, intercept included, equal the values that the
+    # recovered loadings and intercept rebuild on the original factors.
+    function gap(re, y)
+        x1, Vp, mu, sigma = PO.prep_dim_red_reg(re, F)
+        fitted = S.predict(S.fit(factory(re.retgt, InterceptColumn(1)), x1, y), x1)
+        beta = PO._regression(re, y, mu, sigma, x1, Vp).beta
+        return maximum(abs.(fitted .- (beta[1] .+ F * beta[2:end])))
+    end
+    weighted(tgt) = factory(DimensionReductionRegression(; retgt = tgt), aw)
+    en = ElasticNet(; strength = FixedStrength(; gamma = 0.02))
+    for re in
+        (DimensionReductionRegression(; retgt = en), weighted(LinearModel()), weighted(en),
+         weighted(ElasticNet()),
+         weighted(ElasticNet(; strength = FixedStrength(; gamma = 0.02),
+                             ve = SimpleVariance())))
+        @test gap(re, X[:, 1]) < 1e-14
+    end
+    @test weighted(en).retgt.w === aw && weighted(en).ve.w === aw
+    # The penalty shrinks the loadings and keeps the intercept unpenalised: at a strength
+    # that zeroes every slope, the intercept is the weighted mean of each asset.
+    big = ElasticNet(; strength = FixedStrength(; gamma = 1e10))
+    rb = regression(weighted(big), X, F)
+    @test rb.b ≈ vec(mean(X, aw; dims = 1)) && all(iszero, rb.M)
+    @test regression(DimensionReductionRegression(; retgt = big), X, F).b ≈
+          vec(mean(X; dims = 1))
+    @test norm(regression(DimensionReductionRegression(; retgt = en), X, F).M) <
+          norm(regression(DimensionReductionRegression(), X, F).M)
+    # An unpenalised target ignores the call, so the default fit does not move.
+    @test factory(LinearModel(), InterceptColumn(1)) === LinearModel()
+    # #1899: the residual count of each asset is the count of its own fit. A least-squares
+    # fit keeps the integer count of a projection for every asset, and a penalised fit
+    # spends fewer parameters than its columns.
+    rl = regression(DimensionReductionRegression(), X, F)
+    x1, Vp, mu, sigma = PO.prep_dim_red_reg(DimensionReductionRegression(), F)
+    @test eltype(rl.edof) == Int && rl.edof == fill(size(x1, 1) - size(x1, 2), N)
+    re = DimensionReductionRegression(; retgt = ElasticNet())
+    rn = regression(re, X, F)
+    x1, Vp, mu, sigma = PO.prep_dim_red_reg(re, F)
+    counts = [S.fit(factory(ElasticNet(), InterceptColumn(1)), x1, X[:, i]).rdof
+              for i in 1:N]
+    @test eltype(rn.edof) == Float64 && rn.edof ≈ counts
+    # On this fixture the penalty sets one component of one asset to zero, so that asset
+    # spends one parameter fewer than the others.
+    p = size(x1, 1) - size(x1, 2)
+    @test all(>=(p), rn.edof) && count(>(p + 0.5), rn.edof) == 1
 end

@@ -102,8 +102,8 @@
         @test !issorted(w)
         @test_throws DomainError OrderedWeightsArray(; w = w,
                                                      alg = SortingNetworkOrderedWeightsArray())
-        # The range checks `w1 - reverse(w2)`, which here is a decreasing vector.
-        @test !issorted(reverse(owa_tg(10)) - reverse(zeros(10)))
+        # The range checks `w1 - w2` with `w2` as stored, which here is a decreasing vector.
+        @test !issorted(reverse(owa_tg(10)) - zeros(10))
         @test_throws DomainError OrderedWeightsArrayRange(; w1 = reverse(owa_tg(10)),
                                                           w2 = zeros(10),
                                                           alg = SortingNetworkOrderedWeightsArray())

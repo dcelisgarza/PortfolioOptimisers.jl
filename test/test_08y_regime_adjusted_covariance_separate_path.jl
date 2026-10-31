@@ -80,7 +80,7 @@ function oracle_estimator(; kwargs...)
                                                regime_min_obs = 2,
                                                regime_lohi_mult = (0.7, 1.6),
                                                centring = PreCentred(), min_val = 1e-12,
-                                               debias = RawStatistic(), kwargs...)
+                                               debias = nothing, kwargs...)
 end
 
 #=
@@ -165,7 +165,7 @@ weights, and `mahalanobis_regime_bias!` interpolates it over the count of observ
     st = fit()
     @test st.bias.nodes isa AbstractDict && collect(keys(st.bias.nodes)) == [na]
     @test copy(st).bias !== st.bias && copy(st).bias == st.bias
-    @test isnothing(fit(; debias = RawStatistic()).bias)
+    @test isnothing(fit(; debias = nothing).bias)
 end
 
 #=
@@ -363,7 +363,7 @@ the recursion itself, and the interpolation serves the rest (ADR 0190).
     sigma, gs = peaks[1]
     c = (1 - d5) / (1 - d5^K)
     mu = eigvals(Symmetric(hac_B(d5, 5, K)))
-    @test abs(PO.hac_log_det_slopes(d5, K, sigma / c, 5)[1] / c) <
+    @test abs(PO.hac_log_det_slope(d5, K, sigma / c, 5) / c) <
           1e-9 * sum(abs.(mu) ./ abs.(1 .+ sigma .* mu))
     @test isapprox(gs, sum(log1p.(sigma .* mu)); rtol = 1e-10)
     # The continuation keeps the true lattice up to the cut for the last transform, and the lattice
@@ -379,14 +379,12 @@ the recursion itself, and the interpolation serves the rest (ADR 0190).
 
     # A Monte Carlo of four million draws of the Schur complement of the HAC estimate itself, at 12
     # assets, a half-life of 10, two lags and 520 observations, gave 2.4777, 2.3958 and 2.3165,
-    # each with a standard error of 5e-4. The recursion is 1.2e-3, 8e-4 and 3e-4 below, and the
-    # mean's fixed point 1.8 % above the first.
+    # each with a standard error of 5e-4. The recursion is 1.2e-3, 8e-4 and 3e-4 below.
     f = [PO.mahalanobis_level_bias(m, lam, [520], 12, 2)[1] for m in methods]
     for (fi, mc) in zip(f, (2.4777, 2.3958, 2.3165))
         @test isapprox(fi, mc; rtol = 2e-3)
     end
     @test f[1] > f[2] > f[3]
-    @test PO.mahalanobis_bias(lam, 520, 12, 2) > 1.015 * f[1]
     # Near the gate, at five assets, a half-life of 5, one lag and 12 observations, where 4e-4 of
     # draws are not positive definite, the Monte Carlo gave 2.9710 and 2.5881; the recursion is
     # 0.25 % and 0.03 % below. A hard cut gave infinite factors here, and at 390 observations and a
@@ -467,18 +465,18 @@ holds `1 - λ^K` times the variance. A product divided by the raw state carries 
     # Measured: 1.1e-15 under the raw rule and 1.3e-15 under the default. The two rules differ by
     # up to 5.1 relative on one cell at 30 rows, and not at all at 1200.
     @test isapprox(cov(sep(BiasCorrectedVolatility()), X), replica(X, true); rtol = 1e-12)
-    @test isapprox(cov(sep(RawVolatility()), X), replica(X, false); rtol = 1e-12)
+    @test isapprox(cov(sep(nothing), X), replica(X, false); rtol = 1e-12)
     # The two rules differ in the warm-up only.
-    @test !isapprox(cov(sep(BiasCorrectedVolatility()), X), cov(sep(RawVolatility()), X);
+    @test !isapprox(cov(sep(BiasCorrectedVolatility()), X), cov(sep(nothing), X);
                     rtol = 1e-4)
     Y = randn(StableRNG(1729), 1200, 5) .* transpose(1:5)
-    @test isapprox(cov(sep(BiasCorrectedVolatility()), Y), cov(sep(RawVolatility()), Y);
+    @test isapprox(cov(sep(BiasCorrectedVolatility()), Y), cov(sep(nothing), Y);
                    rtol = 1e-10)
     # The rule acts on the separate path alone.
     one_decay(rule) = RegimeAdjustedExpWeightedCovariance(; decay = lam, min_obs = 1,
                                                           regime_method = nothing,
                                                           cor_vol = rule)
-    @test cov(one_decay(BiasCorrectedVolatility()), X) == cov(one_decay(RawVolatility()), X)
+    @test cov(one_decay(BiasCorrectedVolatility()), X) == cov(one_decay(nothing), X)
     # Under `EstimatedCentring()`, the default, the first row of an asset gives no term, so the
     # weight of the variance state counts one step less (#1773). The replica takes each
     # deviation from the normalised location of the rows before it, divided by the root of its
@@ -509,11 +507,11 @@ holds `1 - λ^K` times the variance. A product divided by the raw state carries 
     csep(rule) = RegimeAdjustedExpWeightedCovariance(; decay = lam, cor_decay = lamc,
                                                      min_obs = 1, regime_method = nothing,
                                                      cor_vol = rule)
-    @test csep(RawVolatility()).centring === EstimatedCentring()
+    @test csep(nothing).centring === EstimatedCentring()
     Xm = X .+ transpose(0.5:0.5:2.5)
     @test isapprox(cov(csep(BiasCorrectedVolatility()), Xm), centred_replica(Xm, true);
                    rtol = 1e-12)
-    @test isapprox(cov(csep(RawVolatility()), Xm), centred_replica(Xm, false); rtol = 1e-12)
+    @test isapprox(cov(csep(nothing), Xm), centred_replica(Xm, false); rtol = 1e-12)
 end
 
 #=
@@ -543,13 +541,22 @@ below zero was floored the same way. The statistic now scores only a built asset
     eqw = PortfolioTarget(; w = fill(1 / na, na))
     state(target, X) = partial_fit!(sep(target), X).cache.regime_state
 
-    # Seed 2: no block is built after 5 rows, so the first scored row, the sixth, is skipped.
+    # Seed 2: after 5 rows only asset 8 has no diagonal of the correlation state, so it is not
+    # built and its row is zero (#631). The sixth row scores the other seven assets alone, so a
+    # mask that removes asset 8 gives the same state.
     X = panel(2)
-    @test !any(PO.regime_block_built(partial_fit!(sep(eqw), X[1:5, :]).cache, sep(eqw)))
+    cache = partial_fit!(sep(eqw), X[1:5, :]).cache
+    @test findall(.!PO.regime_block_built(cache, sep(eqw))) == [8]
+    @test iszero(cache.covariance[8, :]) && iszero(cache.covariance[:, 8])
+    mask = trues(6, na)
+    mask[:, 8] .= false
     for target in (eqw, PO.DiagonalTarget())
-        @test isnothing(state(target, X[1:6, :]))
+        masked = PO.regime_adjusted_covariance_pass!(sep(target), X[1:6, :], 1, mask,
+                                                     nothing)
+        @test isequal(state(target, X[1:6, :]), masked.regime_state)
         @test 0 < state(target, X) < 10
     end
+    @test !isnothing(state(PO.DiagonalTarget(), X[1:6, :]))
 
     # Seed 7: the block after 5 rows is built and indefinite, and the equal-weight direction has a
     # variance below zero, so the row is refused rather than scored at 1e12.
@@ -572,10 +579,38 @@ below zero was floored the same way. The statistic now scores only a built asset
 end
 
 #=
+Issue #631. Under HAC the separate path wrote its covariance block only when every active asset
+had a diagonal of the correlation state above `min_val`. Under the rule of the volatility before
+the update, an asset adds nothing to its diagonal on the row of its first deviation. So a late
+listing kept the block of every other asset at the row before, and the next row scored those
+assets against it: the block of the two old assets below was 16.9 % from the block that the same
+two assets give alone. Now the row of an asset with no diagonal is zero, so it is not built, and
+the other assets take their row.
+=#
+@testset "a late listing holds no row of the other assets" begin
+    X = randn(StableRNG(631), 60, 3) .* [0.01 0.02 0.015]
+    X[1:20, 3] .= NaN
+    ce = RegimeAdjustedExpWeightedCovariance(; decay = 0.9, cor_decay = 0.95, hac_lags = 2,
+                                             min_obs = 3, regime_min_obs = 1)
+    both, built = Matrix{Float64}[], Bool[]
+    PO.regime_adjusted_covariance_pass!(ce, X, 1, nothing, nothing) do i, c
+        push!(both, c.covariance[1:2, 1:2])
+        push!(built, PO.regime_block_built(c, ce)[3])
+        return nothing
+    end
+    alone = Matrix{Float64}[]
+    PO.regime_adjusted_covariance_pass!((i, c) -> push!(alone, copy(c.covariance)), ce,
+                                        X[:, 1:2], 1, nothing, nothing)
+    @test all(i -> isapprox(both[i], alone[i]; rtol = 1e-12), eachindex(alone))
+    # The new asset lists at row 21. Its first deviation is at row 22, where it is not built.
+    @test !built[22] && built[23]
+end
+
+#=
 Issue #1736. Under HAC a built block in the warm-up can be indefinite, and a direction with a
 small positive variance on it scores a large statistic. On seed 28 of the case below the
 inverse-volatility direction read, after 6 rows, a block with the smallest eigenvalue -0.31 and a
-direction variance of 0.0057, and the next row set the regime state to 51. `PortfolioTarget`
+direction variance of 0.0057, and the next row scored 51. `PortfolioTarget`
 holds the rule in its field `indefinite`: `RefuseIndefiniteWarmUp()`, the default, refuses such a
 block while the gate of the Mahalanobis target for the same assets is closed;
 `ClipIndefiniteBlock()` clips the eigenvalues of its correlation; `ScoreIndefiniteBlock()` scores
@@ -598,18 +633,22 @@ it as it is.
                                                    regime_method = PO.RootMeanSquaredAdjusted())
     end
     @test PortfolioTarget().indefinite === RefuseIndefiniteWarmUp()
-    # The reproduction of the issue: a fit of 6 rows, then the first 7 rows again.
+    # The reproduction of the issue: a fit of 6 rows, then the transformed statistic of row 7.
+    # Since #631 row 6 is scored too, so the state no longer equals the score of row 7.
     function state(rule)
         ce = sep(rule)
         cache = partial_fit!(ce, X[1:6, :]).cache
         C = PO.regime_covariance_block(cache, ce, collect(1:na))
-        return eigmin(Symmetric(C)), partial_fit!(ce, X[1:7, :]).cache.regime_state
+        stats = PO.regime_target_statistic(ce.regime_target, cache, ce, X[7, :],
+                                           collect(1:na))
+        return eigmin(Symmetric(C)), isnothing(stats) ? nothing : only(stats) / na
     end
     lo, score = state(ScoreIndefiniteBlock())
     @test lo < -0.3 && score > 50
     # Every block of these rows is young and indefinite, so no row is scored.
     @test isnothing(state(RefuseIndefiniteWarmUp())[2])
-    # The clip keeps the rows, and the state is a third of the score (measured 15.1).
+    @test isnothing(partial_fit!(sep(RefuseIndefiniteWarmUp()), X[1:7, :]).cache.regime_state)
+    # The clip keeps the row, and it scores a third of the score (measured 15.1).
     @test 0 < state(ClipIndefiniteBlock())[2] < score / 2
 
     # The rules on one block: the warm-up rule refuses only a young block with a negative

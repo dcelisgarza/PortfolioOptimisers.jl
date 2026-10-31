@@ -154,16 +154,15 @@ end
 # The estimators that hold a distance estimator, each forwarded to the estimator it holds, so
 # that `feature_readable_mask` finds each `FeatureDistance` of a fit. They load after the
 # distance estimators, so their methods live here, beside the reduction that reads them.
-function feature_readable_mask(x::Union{<:ClustersEstimator, <:NetworkEstimator},
+function feature_readable_mask(x::Union{ClustersEstimator, NetworkEstimator},
                                imsk::Option{<:BitVector}, rd)
     return feature_readable_mask(x.de, imsk, rd)
 end
 function feature_readable_mask(x::NetworkClustersEstimator, imsk::Option{<:BitVector}, rd)
     return feature_readable_mask(x.nte, imsk, rd)
 end
-function feature_readable_mask(x::Union{<:CentralityEstimator,
-                                        <:SemiDefinitePhylogenyEstimator,
-                                        <:IntegerPhylogenyEstimator},
+function feature_readable_mask(x::Union{CentralityEstimator, SemiDefinitePhylogenyEstimator,
+                                        IntegerPhylogenyEstimator},
                                imsk::Option{<:BitVector}, rd)
     return feature_readable_mask(x.pl, imsk, rd)
 end
@@ -457,7 +456,8 @@ function optimise(opt::OptimisationEstimator, args...; kwargs...)
           !isnothing(current_opt.fb)
         push!(fb, (current_opt, res))
         current_opt = current_opt.fb
-        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
+        @warn("Using fallback method. Please ignore previous optimisation failure warnings.",
+              maxlog = log_limit(:warn), _id = @log_id(typeof(current_opt)))
         res = shared_series_solve(current_opt, args...; kwargs...)
     end
     return isempty(fb) ? res : factory(res, fb)

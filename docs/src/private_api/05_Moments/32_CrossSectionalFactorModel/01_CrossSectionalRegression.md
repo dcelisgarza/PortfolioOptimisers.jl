@@ -1,5 +1,5 @@
 ```@meta
-Description = "Cross-Sectional Regression, private API of PortfolioOptimisers.jl: cross_sectional_design_mask, cross_sectional_block_regression, …"
+Description = "Cross-Sectional Regression, private API of PortfolioOptimisers.jl: cross_sectional_design_mask, cross_sectional_residual_dof, …"
 ```
 
 # Cross-Sectional Regression: private API
@@ -8,12 +8,12 @@ Description = "Cross-Sectional Regression, private API of PortfolioOptimisers.jl
 
 ```@docs
 cross_sectional_design_mask
+cross_sectional_residual_dof
 cross_sectional_block_regression
 cross_sectional_coefficients
 cross_sectional_leverage_one
 leverage_one_nan
 cross_sectional_least_squares
-cross_sectional_rank
 assert_cross_sectional_rank
 cross_sectional_column_drop
 cross_sectional_kept_columns

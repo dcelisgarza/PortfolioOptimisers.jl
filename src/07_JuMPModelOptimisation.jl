@@ -1,11 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all JuMP-based optimisation result types.
+Abstract supertype of the records that a solve of a JuMP model returns.
 
-All concrete and/or abstract types representing the result of a JuMP model optimisation should be subtypes of `AbstractJuMPResult`.
-
-A subtype records what happened during a solve attempt. It is not the portfolio: the weights live on the optimiser's own result type, which carries one of these alongside them.
+A subtype records what happened when [`optimise_JuMP_model!`](@ref) tried the solvers on a model. It holds no solution values. After a solve that succeeds, the caller reads them from the model.
 
 # Related
 
@@ -14,11 +12,11 @@ A subtype records what happened during a solve attempt. It is not the portfolio:
 """
 abstract type AbstractJuMPResult <: AbstractResult end
 """
-    const Dict_VecPair = Union{<:AbstractDict, <:AbstractVector{<:Pair}}
+    const Dict_VecPair = Union{AbstractDict, AbstractVector{<:Pair}}
 
-Alias for a dictionary or vector of pairs.
+Groups a dictionary and a vector of pairs, the two collections of solver attributes that [`set_solver_attributes`](@ref) applies.
 
-Represents solver settings as either a dictionary mapping constraint attributes to values, or a vector of pairs where the first element is a constraint attribute and the second is its value. Used for passing attribute settings to JuMP solvers.
+Both collections iterate as pairs of a key and a value. The key names a solver attribute, and the value is the value to set.
 
 # Related
 
@@ -26,13 +24,13 @@ Represents solver settings as either a dictionary mapping constraint attributes 
   - [`Solver`](@ref)
   - [`set_solver_attributes`](@ref)
 """
-const Dict_VecPair = Union{<:AbstractDict, <:AbstractVector{<:Pair}}
+const Dict_VecPair = Union{AbstractDict, AbstractVector{<:Pair}}
 """
-    const SlvSettings = Union{<:Pair, <:Dict_VecPair}
+    const SlvSettings = Union{Pair, Dict_VecPair}
 
-Alias for solver settings used in JuMP-based optimisation.
+Groups the two forms that the `settings` of a [`Solver`](@ref) accepts.
 
-Represents solver settings as either a single solver attribute, or a collection of solver attributes.
+The forms are one pair of a solver attribute and its value, and a [`Dict_VecPair`](@ref) of such pairs.
 
 # Related
 
@@ -40,13 +38,14 @@ Represents solver settings as either a single solver attribute, or a collection 
   - [`Solver`](@ref)
   - [`set_solver_attributes`](@ref)
 """
-const SlvSettings = Union{<:Pair, <:Dict_VecPair}
+const SlvSettings = Union{Pair, Dict_VecPair}
 """
-    const SlvKeys = Union{<:AbstractString, <:JuMP.MOI.AbstractModelAttribute}
+    const SlvKeys = Union{AbstractString, JuMP.MOI.AbstractModelAttribute,
+                          JuMP.MOI.AbstractOptimizerAttribute}
 
-Alias for JuMP solver attribute keys.
+Groups the three kinds of key that `JuMP.set_attribute` accepts for an attribute of a model.
 
-Matches either a string key or a `JuMP.MOI.AbstractModelAttribute` instance. Used internally for validating and applying solver settings to JuMP models.
+The kinds are the name of a raw solver attribute as a string, a `MOI.AbstractModelAttribute`, and a `MOI.AbstractOptimizerAttribute` such as `MOI.Silent()` or `MOI.TimeLimitSec()`. [`Solver`](@ref) refuses a key of `settings` that is not in this group.
 
 # Related
 
@@ -54,13 +53,14 @@ Matches either a string key or a `JuMP.MOI.AbstractModelAttribute` instance. Use
   - [`Solver`](@ref)
   - [`set_solver_attributes`](@ref)
 """
-const SlvKeys = Union{<:AbstractString, <:JuMP.MOI.AbstractModelAttribute}
+const SlvKeys = Union{AbstractString, JuMP.MOI.AbstractModelAttribute,
+                      JuMP.MOI.AbstractOptimizerAttribute}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Configures one solver backend, its attributes, and the statuses its solutions must reach.
+Names one JuMP solver, the attributes to set on it, and the solution statuses to accept.
 
-Every optimiser takes one `Solver` or a vector of them. [`optimise_JuMP_model!`](@ref) tries them in order and stops at the first that returns a solution `check_sol` accepts, so a vector is a fallback chain.
+An estimator that solves a JuMP model takes one `Solver` or a vector of them. [`optimise_JuMP_model!`](@ref) tries the solvers of a vector in order, and stops at the first solution that the `check_sol` of its solver accepts.
 
 # Fields
 
@@ -84,7 +84,7 @@ Keywords correspond to the struct's fields.
 
 # Examples
 
-The default `check_sol` is strict — it accepts only a solution the solver reports as `OPTIMAL` or `LOCALLY_SOLVED` at a `FEASIBLE_POINT`.
+The default `check_sol` accepts a solution only when the solver reports `OPTIMAL` or `LOCALLY_SOLVED`, and a `FEASIBLE_POINT`.
 
 ```jldoctest
 julia> Solver(; solver = nothing)
@@ -96,7 +96,7 @@ Solver
   add_bridges ┴ Bool: true
 ```
 
-To also accept an approximate solution, which is the common case and what the examples, user guide and tests use:
+This `check_sol` also accepts an approximate solution. The examples, the user guide and the tests use it.
 
 ```jldoctest
 julia> Solver(; solver = nothing, check_sol = (; allow_local = true, allow_almost = true))
@@ -144,14 +144,14 @@ Solver
             @argcheck(!isempty(settings), IsEmptyError)
             if isa(settings, AbstractVector)
                 @argcheck(all(x -> isa(x[1], SlvKeys), settings),
-                          ArgumentError("all keys in settings must be a SlvKeys (AbstractString or MOI.AbstractModelAttribute)"))
+                          ArgumentError("every key of settings must be a SlvKeys (AbstractString, MOI.AbstractModelAttribute or MOI.AbstractOptimizerAttribute)"))
             else
                 @argcheck(all(x -> isa(x, SlvKeys), keys(settings)),
-                          ArgumentError("all keys in settings must be a SlvKeys (AbstractString or MOI.AbstractModelAttribute)"))
+                          ArgumentError("every key of settings must be a SlvKeys (AbstractString, MOI.AbstractModelAttribute or MOI.AbstractOptimizerAttribute)"))
             end
         elseif isa(settings, Pair)
             @argcheck(isa(settings[1], SlvKeys),
-                      ArgumentError("settings[1] must be a SlvKeys (AbstractString or MOI.AbstractModelAttribute), got $(settings[1])"))
+                      ArgumentError("settings[1] must be a SlvKeys (AbstractString, MOI.AbstractModelAttribute or MOI.AbstractOptimizerAttribute), got $(settings[1])"))
         end
         return new{typeof(name), typeof(solver), typeof(settings), typeof(check_sol),
                    typeof(add_bridges)}(name, solver, settings, check_sol, add_bridges)
@@ -165,9 +165,9 @@ end
 """
     const VecSlv = AbstractVector{<:Solver}
 
-Alias for a vector of `Solver` objects.
+Groups the vectors of [`Solver`](@ref)s.
 
-Represents a collection of solver configurations to be used in JuMP-based optimisation routines. Enables sequential or fallback solver strategies by passing multiple solver setups.
+[`optimise_JuMP_model!`](@ref) tries the solvers of such a vector in order, until one of them gives an accepted solution.
 
 # Related
 
@@ -175,26 +175,28 @@ Represents a collection of solver configurations to be used in JuMP-based optimi
 """
 const VecSlv = AbstractVector{<:Solver}
 """
-    const Slv_VecSlv = Union{<:Solver, <:VecSlv}
+    const Slv_VecSlv = Union{Solver, VecSlv}
 
-Alias for a single `Solver` or a vector of `Solver` objects.
+Groups one [`Solver`](@ref) and a vector of them, the two forms in which an estimator takes its solvers.
 
-Represents either a single solver configuration or a collection of solver configurations for JuMP-based optimisation routines. Enables flexible dispatch for optimisation functions that accept one or multiple solvers.
+A single `Solver` iterates as a vector of one solver. So [`optimise_JuMP_model!`](@ref) takes both forms through one loop.
 
 # Related
 
   - [`Solver`](@ref)
   - [`VecSlv`](@ref)
 """
-const Slv_VecSlv = Union{<:Solver, <:VecSlv}
+const Slv_VecSlv = Union{Solver, VecSlv}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Records which solvers failed, at which stage, and whether any of them succeeded.
+Records which solvers failed, at which stage, and whether one of them succeeded.
 
-When `success` is `false` the constructor emits a warning built by [`failed_solve_msg`](@ref): one bounded line per failed solver stage (name, stage, first line of the error). The full per-solver exceptions and settings stay available on `trials` and are never dumped into the log.
+The constructor warns when `success` is `false`. [`failed_solve_msg`](@ref) writes the warning, with one line for each failed stage of each solver. A line holds the name of the solver, the stage and the first line of the error. The warning holds no settings and no full exception, and `trials` keeps them.
 
-`trials` records **failures only**. A solver that succeeds leaves no entry, so an empty `trials` with `success = true` means the first solver answered, and it is not a record of the solve. Each entry is keyed by the solver's `name` and holds a dictionary from the failed stage — `:set_optimizer`, `:optimize!` or `:assert_is_solved_and_feasible` — to the exception. Two solvers that share a name share one entry, and the default name is `\"\"` for all of them, so a vector of unnamed solvers keeps only its last failure.
+`trials` records failures only. A solver that succeeds adds no entry, so an empty `trials` with `success = true` means that the first solver succeeded. The key of an entry is the `name` of the solver. The value is a dictionary from the failed stage, `:set_optimizer`, `:optimize!` or `:assert_is_solved_and_feasible`, to its exception. An entry of the last stage also holds the termination status of the solver under `:termination_status`, so the warning can state that the problem is infeasible or unbounded, and the `settings` of the solver under `:settings`.
+
+Two solvers that share a name share one entry. Every solver has the default name `\"\"`, so a vector of unnamed solvers keeps only its last failure.
 
 # Fields
 
@@ -224,18 +226,18 @@ JuMPResult
 """
 @concrete struct JuMPResult <: AbstractJuMPResult
     """
-    Dictionary of solver trials and errors.
+    The failures of the solvers. The key of an entry is the name of a solver, and the value maps each failed stage to its exception.
     """
     trials
     """
-    Boolean indicating whether optimisation succeeded.
+    `true` when one solver gives a solution that its `check_sol` accepts.
     """
     success
     function JuMPResult(trials::AbstractDict, success::Bool)::JuMPResult
         if !success
             # Summarised via the shared builder: one bounded line per failed stage, never
             # the whole trials dict, the solver settings, or full exception payloads.
-            @warn(failed_solve_msg(trials))
+            @warn(failed_solve_msg(trials), maxlog = log_limit(:warn), _id = @log_id())
         end
         return new{typeof(trials), typeof(success)}(trials, success)
     end
@@ -246,13 +248,13 @@ end
 """
     set_solver_attributes(args...)
 
-Set solver attributes for a JuMP model.
+Set no solver attribute.
 
-This is a generic fallback that does nothing if no model or settings are provided.
+[`optimise_JuMP_model!`](@ref) calls `set_solver_attributes(model, nothing)` for a [`Solver`](@ref) whose `settings` is `nothing`, and this method takes that call.
 
 # Arguments
 
-  - `args...`: Arguments (ignored).
+  - `args...`: Ignored.
 
 # Returns
 
@@ -276,14 +278,14 @@ end
 """
     set_solver_attributes(model::JuMP.Model, settings::Dict_VecPair)
 
-Set multiple solver attributes on a JuMP model.
+Set each solver attribute of `settings` on `model`, in the iteration order of `settings`.
 
-Iterates over the provided settings and applies each as a solver attribute.
+An attribute that the solver refuses raises the error of `JuMP.set_attribute`, and the attributes before it stay set.
 
 # Arguments
 
-  - `model`: JuMP model.
-  - `settings`: Dictionary or vector of pairs of solver settings.
+  - `model`: The JuMP model, with a solver attached.
+  - `settings`: The pairs of a solver attribute and its value.
 
 # Returns
 
@@ -304,12 +306,14 @@ end
 """
     set_solver_attributes(model::JuMP.Model, settings::Pair)
 
-Set a single solver attribute on a JuMP model.
+Set one solver attribute on `model`.
+
+An attribute that the solver refuses raises the error of `JuMP.set_attribute`.
 
 # Arguments
 
-  - `model`: JuMP model.
-  - `settings`: Pair of attribute name and value.
+  - `model`: The JuMP model, with a solver attached.
+  - `settings`: The pair of a solver attribute and its value.
 
 # Returns
 
@@ -325,30 +329,31 @@ function set_solver_attributes(model::JuMP.Model, settings::Pair)::Nothing
     return nothing
 end
 """
-    optimise_JuMP_model!(model::JuMP.Model, slv::Slv_VecSlv)
+    optimise_JuMP_model!(model::JuMP.Model, slv::Slv_VecSlv) -> JuMPResult
 
-Attempt to optimise a JuMP model using one or more configured solvers.
+Solve `model` with each solver of `slv` in turn, until one gives a solution that its `check_sol` accepts.
 
-Tries each solver in order, applying settings and checking for solution feasibility. Returns a `JuMPResult` with trial errors and success status.
+The loop guards three stages: `JuMP.set_optimizer`, `JuMP.optimize!` and `JuMP.assert_is_solved_and_feasible`. It does not guard [`set_solver_attributes`](@ref). So an attribute that the solver refuses raises out of this function, the loop records no trial, and it tries no later solver. A misspelled attribute is an error of the configuration, not a failure of the solver, and the caller must see it.
+
+Give each solver of a vector its own `name`. The name is the key of `trials`, and every solver has the default name `\"\"`. Under one key, a later failure overwrites an earlier one. Two solvers that both fail at `JuMP.set_optimizer` leave one entry under the default names, and two entries under distinct names.
+
+# Algorithm
+
+ 1. For each solver of `slv`, in order:
+     1. Attach the solver to `model` with `JuMP.set_optimizer`. When that raises, record the error under `:set_optimizer` in `trials[solver.name]`, and go to the next solver.
+     2. Set the attributes of the solver from its `settings` with [`set_solver_attributes`](@ref).
+     3. Solve with `JuMP.optimize!`. When that raises, record the error under `:optimize!`, and go to the next solver.
+     4. Check the solution with `JuMP.assert_is_solved_and_feasible` under the `check_sol` keywords of the solver. When the check passes, set `success` to `true` and stop the loop. Otherwise record the error under `:assert_is_solved_and_feasible`, the termination status of the solver under `:termination_status`, and the `settings` of the solver under `:settings`.
+ 2. Build the [`JuMPResult`](@ref) from `trials` and `success`. Its constructor warns when `success` is `false`.
 
 # Arguments
 
-  - `model`: JuMP model to optimise.
-  - `slv`: Single `Solver` or vector of `Solver` objects.
+  - `model`: The JuMP model to solve. After a success, it holds the solution of the solver that succeeded.
+  - `slv`: One [`Solver`](@ref), or a vector of them in the order to try.
 
 # Returns
 
-  - `res::JuMPResult`: Result object containing trial errors and success flag.
-
-# Details
-
-  - For each solver, sets the optimizer and attributes, runs `JuMP.optimize!`, and checks solution feasibility.
-  - If a solver fails at one of the three guarded stages, records the error under the solver's `name` and tries the next.
-  - Stops at the first successful solution, and leaves no `trials` entry for it.
-
-Three stages are guarded: `JuMP.set_optimizer`, `JuMP.optimize!` and `JuMP.assert_is_solved_and_feasible`. [`set_solver_attributes`](@ref) is **not**. A solver attribute the backend refuses throws straight out of this function, so no trial is recorded and no later solver is tried. This is deliberate: a misspelled attribute is a configuration error, not a solver failure, and swallowing it would silently drop a setting the caller asked for.
-
-Give each solver of a vector its own `name`. The name is the `trials` key, the default is `\"\"` for every solver, and a later failure overwrites an earlier one under the same key. Measured on two solvers that both fail at `set_optimizer`: `trials` holds **one** entry with the default names and **two** with distinct names.
+  - `res::JuMPResult`: The failures of the solvers, and whether one solver succeeded.
 
 # Related
 
@@ -382,6 +387,8 @@ function optimise_JuMP_model!(model::JuMP.Model, slv::Slv_VecSlv)
             break
         catch err
             trials[solver.name] = Dict(:assert_is_solved_and_feasible => err,
+                                       :termination_status =>
+                                           JuMP.termination_status(model),
                                        :settings => solver.settings)
         end
     end

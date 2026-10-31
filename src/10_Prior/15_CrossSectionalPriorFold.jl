@@ -1160,7 +1160,7 @@ A batch fit drops an observation with a Shared Series gap at its entry, see [`sh
 
 # Algorithm
 
- 1. Refuse returns data that no fold takes with [`assert_prior_fold_returns`](@ref), and a panel that is absent or static. Take the Exogenous Series of the step with [`exogenous_step_kwargs`](@ref), which refuses a step with no series when the prior reads it.
+ 1. Refuse returns data that no fold takes with [`assert_prior_fold_returns`](@ref). Give a step with no panel the mask-only panel of [`returns_with_universe`](@ref), as the ingestion layer emits no panel for a block with no gap and no Panel Field. Refuse a static panel. Take the Exogenous Series of the step with [`exogenous_step_kwargs`](@ref), which refuses a step with no series when the prior reads it.
  2. Append the returns, both masks, the implied volatilities, the series and the marks `gaps` of every observation of the step to the buffer `buf`. Take the observations with no mark with [`shared_series_step`](@ref). When there is none, return the state with the new buffer.
  3. Append the rows of those observations, their series and their implied volatilities to the carried panel rows with [`cross_sectional_window_append`](@ref).
  4. Compute the neutralised exposures, the observed factors and the derived series of the new observations with [`cross_sectional_fold_rows`](@ref), and append the rows after the warm-up to the histories with [`cross_sectional_fold_histories`](@ref), and their Descriptor scores with [`cross_sectional_carry_scores`](@ref). Keep the panel rows and their derived series that [`cross_sectional_carry_rows`](@ref) names.
@@ -1179,7 +1179,7 @@ A batch fit drops an observation with a Shared Series gap at its entry, see [`sh
 
   - The rules of [`assert_prior_fold_returns`](@ref).
   - The rules of [`cross_sectional_window_append`](@ref): every step carries `iv` or none does, under the `ivpa` of the first step.
-  - `rd.pnl` is a time-varying Asset Panel. An `ArgumentError` is thrown otherwise.
+  - `rd.pnl` is `nothing` or a time-varying Asset Panel. An `ArgumentError` is thrown otherwise.
   - The rules of [`exogenous_step_kwargs`](@ref) and of the block method of [`partial_fit!`](@ref) for a [`SampleBufferState`](@ref): a prior that reads the Exogenous Series gets it at every step, under the names of the first step.
   - The rules of every verb the algorithm names.
 
@@ -1197,9 +1197,10 @@ function cross_sectional_carry_fold(pe::CrossSectionalFactorPrior,
                                     st::CrossSectionalCarryState, rd::ReturnsResult,
                                     gaps::Option{<:AbstractVector{Bool}})
     assert_prior_fold_returns(rd)
+    rd = returns_with_universe(rd)
     pnl = rd.pnl
-    @argcheck(!isnothing(pnl) && !panel_is_static(pnl),
-              ArgumentError("a Cross-Sectional Factor Prior reads its Factor Exposures off a time-varying Asset Panel, and the step carries $(isnothing(pnl) ? "no panel" : "a static panel"). Fold a ReturnsResult whose `pnl` is the one asset_panel returns."))
+    @argcheck(!panel_is_static(pnl),
+              ArgumentError("a Cross-Sectional Factor Prior reads its Factor Exposures off a time-varying Asset Panel, and the step carries a static panel. Fold a ReturnsResult whose `pnl` is the one asset_panel returns."))
     buf = partial_fit!(st.buf, rd.X; active_mask = pnl.amsk, estimation_mask = pnl.emsk,
                        iv = rd.iv, ivpa = rd.ivpa, gaps = gaps,
                        exogenous_step_kwargs(pe, rd)...)

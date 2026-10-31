@@ -141,6 +141,7 @@ const CENSUS_EXEMPT = Dict{Symbol, String}(
                                            :check_asset_panel => "a check of the axes",
                                            :panel_axes => "reads the axes",
                                            :panel_is_static => "reads whether the masks exist",
+                                           :each_panel_field => "reads whether the Panel Fields exist",
                                            :attribution_active_mask => "reads the active mask of the panel",
                                            :panel_feature_names => "reads the names",
                                            :panel_column_label => "reads the names",
@@ -156,6 +157,7 @@ const CENSUS_EXEMPT = Dict{Symbol, String}(
                                            :feature_row_indices => "reads the clock",
                                            :project_panel_clock => "moves a panel onto a new clock",
                                            :attach_universe_masks => "replaces the masks",
+                                           :vcat_returns_panel => "concatenates the panels of two blocks with vcat",
                                            # An export returns the stored cells by design, as the default read does.
                                            :panel_dataframe => "an export of the stored cells",
                                            :panel_frame_field => "a step of panel_dataframe",
@@ -193,6 +195,7 @@ const CENSUS_EXEMPT = Dict{Symbol, String}(
                                            :step_panel_fields => "passes or refuses the Panel Fields of a step",
                                            :assert_carry_step_panel => "a check of the masks and the fields that a carry honours",
                                            :ep_prior => "passes the panel to the prior it wraps",
+                                           :mean_with_count => "passes the panel to the mean of an EmpiricalPrior, or to the prior of a PriorExpectedReturns",
                                            :read_member => "passes the panel of a buffer to the batch moment, whose cases are below",
                                            :carried_location => "passes the panel of a carry to forecast_location, whose case is below",
                                            # The steps of the priors that rebuild a prior or read a co-moment: each passes the
@@ -449,7 +452,7 @@ function census_cases(rd::ReturnsResult)
     fd(alg; kwargs...) = FeatureDistance(; sel = fsel, alg = alg, kwargs...)
     # The assets readable at the last row: active, and observed in each selected field.
     function last_view(r)
-        keep = CENSUS_PO.feature_readable_mask(fd(LastObservation()), nothing, r)
+        keep = CENSUS_PO.feature_readable_mask(fd(LastRow()), nothing, r)
         return CENSUS_PO.port_opt_view(r, isnothing(keep) ? Colon() : findall(keep))
     end
     gap_view(r) = CENSUS_PO.port_opt_view(r, vcat(1:20, 61:80), :)
@@ -465,12 +468,12 @@ function census_cases(rd::ReturnsResult)
     append!(cases,
             Any[((:FeatureDistance,),
                  "FeatureDistance under LastRow, on the assets it reads",
-                 r -> fdist(fd(LastObservation()), last_view(r))),
+                 r -> fdist(fd(LastRow()), last_view(r))),
                 ((:FeatureDistance,),
                  "FeatureDistance under LastRow refuses the delisted asset",
-                 r -> fmsg(() -> fdist(fd(LastObservation()), r))),
+                 r -> fmsg(() -> fdist(fd(LastRow()), r))),
                 ((:FeatureDistance,), "FeatureDistance under LastActiveRow",
-                 r -> fdist(fd(LastObservation(; alg = LastActiveRow())), r)),
+                 r -> fdist(fd(LastActiveRow()), r)),
                 ((:FeatureDistance,), "FeatureDistance under AggregateFeatures",
                  r -> fdist(fd(AggregateFeatures()), r)),
                 ((:FeatureDistance,), "FeatureDistance under a weighted median",
@@ -521,9 +524,8 @@ function census_domain_cases(rd::ReturnsResult)
     jac = CENSUS_PO.Distances.Jaccard()
     fb = FeatureFallback()
     return Any[("LastRow refuses the delisted asset",
-                r -> fmsg(() -> fdist(fd(LastObservation(), chi), r))),
-               ("LastActiveRow",
-                r -> fdist(fd(LastObservation(; alg = LastActiveRow()), chi), r)),
+                r -> fmsg(() -> fdist(fd(LastRow(), chi), r))),
+               ("LastActiveRow", r -> fdist(fd(LastActiveRow(), chi), r)),
                ("AggregateFeatures", r -> fdist(fd(AggregateFeatures(), bray), r)),
                ("a median under AggregateFeatures",
                 r -> fdist(fd(AggregateFeatures(; alg = MedianCollapse()), jac), r)),

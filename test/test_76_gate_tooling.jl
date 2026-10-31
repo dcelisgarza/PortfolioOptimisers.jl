@@ -12,10 +12,21 @@ Each session wrote its own driver for one test file, and one of those drivers le
     answers for the branch's rows, names every foreign row, and a scoped refresh keeps the
     foreign rows as the baseline has them.
   - `code_health/gate_stamp.sh` records the merge-base a gate measured, and its `check` is the
-    pre-push guard of `.pre-commit-config.yaml`.
+    pre-push guard of `.pre-commit-config.yaml`. The guard requires the stamps of the gates of a
+    push that changes `src/`, leaves out the commits the worktree pushed itself, and stales a
+    stamp on a shared ledger file only when its gate reads the file. The test holds the list of
+    readers against the tests that name each ledger file.
+  - `code_health/gate_reach.jl` names the class of a change, so the guard demands `jet` and
+    `doctest` only of a change they can reach. The test checks each class on a fixture file, and
+    the demand of the guard for each.
+  - `code_health/julia_slot.jl` is the machine-wide slot that a run which loads the package takes,
+    and `code_health/manifest_provenance.jl` refuses a commit that moves an analyser in the
+    Manifest without the refresh of its baselines.
   - `test/run_files.jl` runs named test files after the preamble and counts each one. It prunes
     a file to the test sets `--testset` selects, times the sets, bounds a file with a watchdog,
-    and names a red that `test/known_red.toml` lists.
+    and names a red that `test/known_red.toml` lists. It takes a file by a unique prefix, a case
+    regex, a resume log, and the flags of CI. `test/known_red.jl` holds the rows for it and for
+    `test/runtests.jl`, whose filter passes a CI run when a row covers every failure (#1781).
   - `code_health/sweep_check.jl` names `code_health/census_preview.jl` when a branch adds a
     declaration that the two package-level censuses read. The test checks which diff lines name one.
   - `code_health/sweep_check.jl` and `code_health/sweep_triage.jl` refuse an open sweep issue whose
@@ -46,6 +57,14 @@ end
 
 module SweepTriageSeam
 include(joinpath(@__DIR__, "..", "code_health", "sweep_triage.jl"))
+end
+
+module ProvenanceSeam
+include(joinpath(@__DIR__, "..", "code_health", "manifest_provenance.jl"))
+end
+
+module GateReachSeam
+include(joinpath(@__DIR__, "..", "code_health", "gate_reach.jl"))
 end
 
 using Test
@@ -93,10 +112,10 @@ end
 
 """
 Run `gate_stamp.sh` in `dir` and return the exit code and the output. `force` stands in for a
-worktree under `.claude/worktrees/`.
+worktree under `.claude/worktrees/`. No gate is required unless `GATE_STAMP_REQUIRED` names one.
 """
 function stamp(dir::AbstractString, args...; force::Bool = true, env...)
-    vars = Pair{String, String}["GATE_STAMP_REF" => "trunk"]
+    vars = Pair{String, String}["GATE_STAMP_REF" => "trunk", "GATE_STAMP_REQUIRED" => ""]
     if force
         push!(vars, "GATE_STAMP_FORCE" => "1")
     end
@@ -107,6 +126,51 @@ function stamp(dir::AbstractString, args...; force::Bool = true, env...)
     cmd = addenv(Cmd(`bash $GATE_STAMP $args`; dir), vars...)
     p = run(pipeline(ignorestatus(cmd); stdout = io, stderr = io))
     return p.exitcode, String(take!(io))
+end
+
+const Q3 = "\"\"\""
+
+"""
+A source file with a docstring that holds a `jldoctest` block, a field docstring, and a function
+that returns a string. Each keyword changes one of them.
+"""
+function reach_text(; doc = "Doc of f.", out = "2", body = "x + 1", field = "field doc",
+                    msg = "message")
+    return """
+           $Q3
+               f(x)
+
+           $doc
+
+           ```jldoctest
+           julia> f(1)
+           $out
+           ```
+           $Q3
+           f(x) = $body
+
+           struct A
+               $Q3$field$Q3
+               a::Int
+           end
+
+           g() = "$msg"
+           """
+end
+
+"""
+A repository whose `trunk` holds `src/a/one.jl` as `reach_text()`, and whose `work` branch
+commits `text` there.
+"""
+function reach_repo(text::AbstractString)
+    dir = mktempdir()
+    git(dir, "init", "-q", "-b", "trunk")
+    put(dir, "src/a/one.jl", reach_text())
+    c0 = commit(dir, "c0")
+    git(dir, "checkout", "-q", "-b", "work")
+    put(dir, "src/a/one.jl", text)
+    c1 = commit(dir, "c1")
+    return dir, c0, c1
 end
 
 @testset "Gate tooling: scope, stamps and driver" begin
@@ -266,6 +330,171 @@ end
         @test first(stamp(dir, "bogus")) == 2
     end
 
+    @testset "the push guard ends a refusal with the line that drops the stale stamps" begin
+        dir, c0, c1, _ = fixture_repo()
+        @test first(stamp(dir, "record", "jet", "size")) == 0
+        git(dir, "checkout", "-q", "trunk")
+        put(dir, "src/a/three.jl", "three = 3\n")
+        c3 = commit(dir, "c3")
+        git(dir, "checkout", "-q", "work")
+        code, out = stamp(dir, "check"; PRE_COMMIT_FROM_REF = c3, PRE_COMMIT_TO_REF = c1,
+                          PRE_COMMIT_REMOTE_BRANCH = "refs/heads/dev")
+        @test code == 1
+        @test occursin("code_health/gate_stamp.sh drop jet size", out)
+    end
+
+    @testset "a push that changes src/ needs the required gates or a waiver" begin
+        dir, c0, c1, c2 = fixture_repo()
+        push = (; PRE_COMMIT_FROM_REF = c2, PRE_COMMIT_TO_REF = c1,
+                PRE_COMMIT_REMOTE_BRANCH = "refs/heads/dev",
+                GATE_STAMP_REQUIRED = "jet doctest")
+        # No stamp at all: both gates are absent.
+        code, out = stamp(dir, "check"; push...)
+        @test code == 1
+        @test occursin("no stamp records these gates: jet doctest", out)
+        @test first(stamp(dir, "record", "jet")) == 0
+        code, out = stamp(dir, "check"; push...)
+        @test code == 1
+        @test occursin("these gates: doctest", out)
+        # A waiver carries its reason, and `list` shows it.
+        @test first(stamp(dir, "waive", "doctest", "no", "docstring", "changed")) == 0
+        @test occursin("doctest\twaived: no docstring changed", last(stamp(dir, "list")))
+        @test first(stamp(dir, "check"; push...)) == 0
+        @test first(stamp(dir, "waive", "doctest")) == 2
+        # A push that changes nothing under src/ or ext/ needs no gate.
+        dir2, d0, _, d2 = fixture_repo()
+        @test first(stamp(dir2, "check"; push..., PRE_COMMIT_FROM_REF = d2,
+                          PRE_COMMIT_TO_REF = d0)) == 0
+    end
+
+    @testset "gate_reach names the class of a change" begin
+        R = GateReachSeam.GateReach
+        old = reach_text()
+        @test R.file_class("src/a.jl", old, reach_text(; doc = "Other prose.")) == "prose"
+        @test R.file_class("src/a.jl", old, reach_text(; field = "other doc")) == "prose"
+        @test R.file_class("src/a.jl", old, reach_text(; out = "3")) == "block"
+        @test R.file_class("src/a.jl", old, reach_text(; msg = "other")) == "literal"
+        @test R.file_class("src/a.jl", old, reach_text(; body = "x + 2")) == "code"
+        @test R.file_class("src/a.jl", old, nothing) == "code"
+        @test R.file_class("src/a.jl", old, "f(x) = (") == "code"
+        # A string that a function returns is not a docstring.
+        h(s) = "function h()\n    \"$s\"\nend\n"
+        @test R.file_class("src/a.jl", h("a"), h("b")) == "literal"
+        # A key or a value of a docstring dictionary feeds only docstrings.
+        d(k, v) = "unique_key_dict!(arg_dict, :arg_dict, :$k => \"$v\")\n"
+        dicts = "src/01_Base/01_DocstringDictionaries/02_X.jl"
+        @test R.file_class(dicts, d("w", "a"), d("v", "b")) == "prose"
+        @test R.file_class("src/b.jl", d("w", "a"), d("w", "b")) == "literal"
+        @test R.file_class(dicts, d("w", "a"), d("w", "a") * "x = 1\n") == "code"
+    end
+
+    @testset "the push guard demands only the gates a change reaches" begin
+        guard(dir, from, to) = stamp(dir, "check"; PRE_COMMIT_FROM_REF = from,
+                                     PRE_COMMIT_TO_REF = to,
+                                     PRE_COMMIT_REMOTE_BRANCH = "refs/heads/dev",
+                                     GATE_STAMP_REQUIRED = "jet doctest coverage")
+        demand(text) = guard(reach_repo(text)...)
+        @test demand(reach_text(; doc = "Other prose.")) == (0, "")
+        # A changed literal moves no counter, so it needs no `coverage` stamp (#1912).
+        code, out = demand(reach_text(; msg = "other"))
+        @test occursin("(literal), and no stamp records these gates: doctest\n", out)
+        code, out = demand(reach_text(; body = "x + 2"))
+        @test occursin("(code), and no stamp records these gates: jet doctest coverage\n",
+                       out)
+        # A changed block needs the scoped run, and the full run covers it.
+        dir, c0, c1 = reach_repo(reach_text(; out = "3"))
+        code, out = guard(dir, c0, c1)
+        @test code == 1
+        @test occursin("(block), and no stamp records these gates: doctest-files\n", out)
+        @test first(stamp(dir, "record", "doctest")) == 0
+        @test guard(dir, c0, c1) == (0, "")
+        # A file under src/ that is not Julia reaches no gate.
+        put(dir, "src/CLAUDE.md", "rules\n")
+        c2 = commit(dir, "c2")
+        @test guard(dir, c1, c2) == (0, "")
+        # `reach` reads the working tree against the ref, and names the gates.
+        put(dir, "src/a/one.jl", reach_text(; doc = "Other prose."))
+        code, out = stamp(dir, "reach"; GATE_STAMP_REQUIRED = "jet size doctest")
+        @test code == 0
+        @test occursin("prose src/a/one.jl\nreach prose\ngates size\n", out)
+    end
+
+    @testset "a commit this worktree pushed is not a sibling's change" begin
+        dir, c0, c1, c2 = fixture_repo()
+        @test first(stamp(dir, "record", "jet")) == 0
+        # The guard lets the push of `c1` through and remembers it. `trunk` then holds `c1`.
+        @test first(stamp(dir, "check"; PRE_COMMIT_FROM_REF = c0, PRE_COMMIT_TO_REF = c1,
+                          PRE_COMMIT_REMOTE_BRANCH = "refs/heads/dev")) == 0
+        @test occursin(c1, read(joinpath(dir, ".git", "gate_pushed"), String))
+        git(dir, "checkout", "-q", "trunk")
+        git(dir, "reset", "-q", "--hard", c1)
+        git(dir, "checkout", "-q", "work")
+        put(dir, "src/a/one.jl", "one = 111\n")
+        c6 = commit(dir, "c6 on work")
+        push = (; PRE_COMMIT_FROM_REF = c1, PRE_COMMIT_TO_REF = c6,
+                PRE_COMMIT_REMOTE_BRANCH = "refs/heads/dev")
+        # `trunk` moved from `c0` to `c1` in `src/a/one.jl`, the file `c6` changes, but the move is
+        # this worktree's own push.
+        @test first(stamp(dir, "check"; push...)) == 0
+        rm(joinpath(dir, ".git", "gate_pushed"))
+        @test first(stamp(dir, "check"; push...)) == 1
+    end
+
+    @testset "a shared ledger file stales only the gates that read it" begin
+        dir, c0, _, _ = fixture_repo()
+        put(dir, "GLOSSARY.md", "a\n")
+        put(dir, "code_health/sweep_manifest.toml", "a = 1\n")
+        head = commit(dir, "ledgers on work")
+        @test first(stamp(dir, "record", "jet", "prose", "test/test_45_sweep_census.jl")) ==
+              0
+        git(dir, "checkout", "-q", "trunk")
+        put(dir, "GLOSSARY.md", "b\n")
+        put(dir, "code_health/sweep_manifest.toml", "a = 2\n")
+        c7 = commit(dir, "ledgers on trunk")
+        git(dir, "checkout", "-q", "work")
+        code, out = stamp(dir, "check"; PRE_COMMIT_FROM_REF = c7, PRE_COMMIT_TO_REF = head,
+                          PRE_COMMIT_REMOTE_BRANCH = "refs/heads/dev")
+        @test code == 1
+        @test occursin("prose, measured on", out)
+        @test occursin("test/test_45_sweep_census.jl, measured on", out)
+        @test !occursin("jet, measured on", out)
+        @test occursin("drop prose test/test_45_sweep_census.jl", out)
+        @test strip(last(stamp(dir, "readers", "src/a/one.jl"))) == "*"
+        @test strip(last(stamp(dir, "readers", "code_health/jet_baseline.toml"))) == "jet"
+    end
+
+    @testset "the ledger readers of the push guard cover every test that names the ledger" begin
+        # A test file reads a ledger when its own text names it, or when it includes a
+        # `code_health/` script whose text names it. `CodeHealth.jl` is left out: nearly every
+        # census includes it, and it names the manifest only for `test_45`.
+        root = joinpath(@__DIR__, "..")
+        needles = ["code_health/sweep_manifest.toml" => ["sweep_manifest"],
+                   "GLOSSARY.md" => ["GLOSSARY"],
+                   "code_health/size_baseline.toml" => ["size_baseline"],
+                   "code_health/prose_baseline.toml" => ["prose_baseline"],
+                   "code_health/jet_baseline.toml" => ["jet_baseline"],
+                   "code_health/complexity_baseline.toml" => ["complexity_baseline"],
+                   "code_health/perf_baseline.toml" => ["perf_baseline"]]
+        scripts = filter(f -> endswith(f, ".jl") && f != "CodeHealth.jl",
+                         readdir(joinpath(root, "code_health")))
+        script_text = Dict(f => read(joinpath(root, "code_health", f), String)
+                           for f in scripts)
+        for (ledger, words) in needles
+            listed = split(strip(last(stamp(root, "readers", ledger; force = false))))
+            for f in
+                filter(f -> occursin(r"^test_.*\.jl$", f), readdir(joinpath(root, "test")))
+                f == "test_76_gate_tooling.jl" && continue
+                text = read(joinpath(root, "test", f), String)
+                names_it = any(w -> occursin(w, text), words)
+                via = any(s -> occursin("\"code_health\", \"$s\"", text) &&
+                               any(w -> occursin(w, script_text[s]), words), scripts)
+                if names_it || via
+                    @test "test/$f" in listed
+                end
+            end
+        end
+    end
+
     @testset "run_files counts each file after the preamble" begin
         RF = DriverSeam.RunFiles
         code = RF.init_code()
@@ -284,6 +513,8 @@ end
                       @test 1 == 1
                       @test 1 == 2
                       @test_broken 1 == 2
+                      # A failed `@test_logs` is a fail, not an error of the driver.
+                      @test_logs (:warn, "never logged") nothing
                   end
                   @test error("boom")
               end
@@ -293,11 +524,11 @@ end
             return RF.run_file(path; code)
         end
         RF.OUT[] = stdout
-        @test (ts.pass, ts.fail, ts.error, ts.broken) == (4, 1, 1, 1)
+        @test (ts.pass, ts.fail, ts.error, ts.broken) == (4, 2, 1, 1)
         @test seconds >= 0
         @test RF.result_line(ts, 1.0) ==
-              "RESULT test_fixture.jl pass=4 fail=1 error=1 broken=1 seconds=1.0"
-        @test RF.done_line([ts]) == "DONE files=1 pass=4 fail=1 error=1 broken=1 status=red"
+              "RESULT test_fixture.jl pass=4 fail=2 error=1 broken=1 seconds=1.0"
+        @test RF.done_line([ts]) == "DONE files=1 pass=4 fail=2 error=1 broken=1 status=red"
         @test RF.resolve("test_76_gate_tooling.jl") ==
               joinpath(RF.TEST_DIR, "test_76_gate_tooling.jl")
         @test_throws ErrorException RF.resolve("test_no_such_file.jl")
@@ -307,6 +538,50 @@ end
               "        - function f(x)\n        3     y = x\n        0     z = 1\n" *
               "        - end\n")
         @test RF.coverage_lines(cov) == (2, [3])
+        @test RF.coverage_tags(cov) == [nothing, 3, 0, nothing]
+
+        # A `PATCH` line reads the added lines as CI does (#1912). A method that no test compiled
+        # has no counter at all, and CI reads each line of its body as a miss.
+        text = "function f(x)\n    y = x\n    return y\nend\ng(x)::Int = 2x\nconst c = 1\n"
+        body = RF.function_body_lines(text)
+        @test issubset(Set([2, 3, 5]), body)
+        @test !(6 in body)
+        @test RF.function_body_lines("h(x) where {T} = x\nk = 1\n") == Set([1])
+        tags = [nothing, nothing, nothing, nothing, 3, nothing]
+        @test RF.patch_misses(tags, Set([2, 3, 5]), 1:6) == [2, 3]
+        @test RF.patch_misses(tags, Set([2, 3, 5]), [5, 6]) == Int[]
+        @test RF.patch_misses([nothing, 1, 0], Set([2, 3]), [3]) == [3]
+        # A file that no test loaded has no tags, so every body line it adds is a miss.
+        @test RF.patch_misses(Union{Nothing, Int}[], Set([2, 3]), [1, 2]) == [2]
+        # CoverageTools v1.4.2 amends a method only when no line of its body has a counter, and a
+        # `->` closure is a method (R23 of #1817). The tags are those of a run that called `p`
+        # and never called `h` or `q`: CI reads the lines of `h` as misses, and not those of `q`.
+        text = "const h = x -> begin\n    y = 2x\n    return y\nend\nfunction p(x)\n" *
+               "    q = y -> begin\n        z = 3y\n        return z\n    end\n" *
+               "    return x\nend\n"
+        tags = Union{Nothing, Int}[nothing, nothing, nothing, nothing, nothing, 1, nothing,
+                                   nothing, nothing, 1, nothing]
+        body = RF.function_body_lines(text, tags)
+        @test body == Set([1, 2, 3])
+        @test RF.patch_misses(tags, body, 1:11) == [1, 2, 3]
+        # The body block of a `function` opens with a line node of its first line.
+        @test RF.function_body_lines(text) == Set([1, 2, 3, 5, 6, 7, 8, 10])
+        # The location of a macro call is not a statement of its own.
+        @test RF.function_body_lines("f(x) = @inline g(x)\n") == Set([1])
+        diff = "@@ -1,0 +2,3 @@\n+a\n+b\n+c\n@@ -10 +14 @@\n-x\n+y\n@@ -20,2 +22,0 @@\n-p\n-q\n"
+        @test RF.added_lines(diff) == Set([2, 3, 4, 14])
+        # Each of the two refusals of `--coverage` names its own cause.
+        msg(f) =
+            try
+                f()
+                ""
+            catch e
+                sprint(showerror, e)
+            end
+        @test occursin("absolute directory", msg(() -> RF.run_coverage("cov", String[])))
+        missing_dir = joinpath(mktempdir(), "no_such_dir")
+        @test occursin("a source directory that exists",
+                       msg(() -> RF.run_coverage(missing_dir, String[])))
     end
 
     @testset "run_files --testset prunes to the selected sets, --time-depth times them" begin
@@ -461,6 +736,54 @@ end
                                                          ran = String[]), whole))) == 1
     end
 
+    @testset "runtests passes a run whose every failure a known_red row covers (#1781)" begin
+        KR = DriverSeam.RunFiles.KnownRedRows
+        rows = [KR.KnownRed("test_x.jl", "slow solve", 7, "a tolerance", "Linux"),
+                KR.KnownRed("test_y.jl", nothing, 8, "other file", nothing)]
+        # `Test` prints the head of a block in bold when the log has colour.
+        bold(s) = "\e[1m" * s * "\e[22m"
+        function block(name, head, site)
+            return "Error in testset $name:\n$(bold(head)) at $(bold(site))\n  Expression: a == b\n"
+        end
+        summary = "Test Summary: | Pass  Fail  Total\n  Overall     |    9     1     10\n"
+        # A block that a test file prints comes before the summary, and is not a site.
+        early = block("slow solve", "Test Failed", "/r/test/test_x.jl:1")
+        text(blocks...) = early * summary * join(blocks)
+        known = block("slow solve", "Test Failed", "/r/test/test_x.jl:12")
+        whole = block("any set", "Error During Test", "/r/test/test_y.jl:4")
+        @test KR.failure_sites(text(known, whole)) ==
+              [KR.FailureSite("slow solve", "/r/test/test_x.jl", 12),
+               KR.FailureSite("any set", "/r/test/test_y.jl", 4)]
+        @test isempty(KR.failure_sites(text())) && isempty(KR.failure_sites(early))
+        # Every failure is covered: the run passes, and each failure is named.
+        lines, green = KR.verdict(text(known, whole), rows)
+        @test green
+        @test lines[1] ==
+              "KNOWN RED /r/test/test_x.jl:12 in \"slow solve\": #7: a tolerance (Linux)"
+        @test lines[2] == "KNOWN RED /r/test/test_y.jl:4 in \"any set\": #8: other file"
+        @test startswith(lines[3], "KNOWN RED only")
+        # A new red behind a known one keeps the run red, and is named.
+        lines, green = KR.verdict(text(known,
+                                       block("fast", "Test Failed", "/r/test/test_x.jl:30")),
+                                  rows)
+        @test !(green)
+        @test lines[2] ==
+              "RED /r/test/test_x.jl:30 in \"fast\": no row of test/known_red.toml covers it"
+        # An interrupted file, the `none:1` of a crashed worker, and a run with no block to read
+        # are red.
+        @test !(last(KR.verdict(text("Error in testset test_x:\nInterrupted\n"), rows)))
+        @test !(last(KR.verdict(text(block("slow solve", "Error During Test", "none:1")),
+                                rows)))
+        lines, green = KR.verdict(text(), rows)
+        @test !(green) && startswith(only(lines), "RED the run failed")
+        # The tee writes every byte to the stream and to the buffer.
+        out, buffer = IOBuffer(), IOBuffer()
+        t = IOContext(KR.Tee(out, buffer), :color => true)
+        print(t, "ab", 'c')
+        write(t, 0x64)
+        @test String(take!(out)) == "abcd" && String(take!(buffer)) == "abcd"
+    end
+
     @testset "run_files parses its options and its watchdog kills on time" begin
         RF = DriverSeam.RunFiles
         o = RF.parse_args(["--testset=^a b\$", "--time-depth=2", "--timeout=30",
@@ -501,6 +824,154 @@ end
         @test !isfile(done) && !isfile(done * ".partial")
         kill(target)
         wait(target)
+    end
+
+    @testset "run_files takes a prefix, a case, a resume log and the CI flags" begin
+        RF = DriverSeam.RunFiles
+        o = RF.parse_args(["--ci", "--case=^bl_", "--resume=/r", "test_x.jl"])
+        @test o.ci && o.case == "^bl_" && o.resume == "/r"
+        o = RF.parse_args(["test_x.jl"])
+        @test !(o.ci) && o.case === nothing && o.resume === nothing
+        @test_throws Exception RF.parse_args(["--case=(", "test_x.jl"])
+
+        dir = mktempdir()
+        for f in ("test_01_a.jl", "test_01b_b.jl", "test_02_c.jl")
+            write(joinpath(dir, f), "")
+        end
+        @test RF.resolve("test_02"; dir) == joinpath(dir, "test_02_c.jl")
+        @test RF.resolve("test_01b"; dir) == joinpath(dir, "test_01b_b.jl")
+        # `test_01` names two files, and a miss lists the files of its number.
+        err = try
+            RF.resolve("test_01"; dir)
+        catch e
+            e
+        end
+        @test occursin("Candidates: test_01_a.jl, test_01b_b.jl", err.msg)
+        err = try
+            RF.resolve("test_02_wrong.jl"; dir)
+        catch e
+            e
+        end
+        @test occursin("Candidates: test_02_c.jl", err.msg)
+
+        log = joinpath(dir, "log.txt")
+        write(log, "noise\nRESULT test_01_a.jl pass=1 fail=0\nTIME test_02_c.jl x 1.0\n")
+        @test RF.finished_files(log) == Set(["test_01_a.jl"])
+        @test isempty(RF.finished_files(joinpath(dir, "absent.txt")))
+    end
+
+    @testset "a Manifest move without a baseline refresh is named" begin
+        MP = ProvenanceSeam.ManifestProvenance
+        dir = mktempdir()
+        write(joinpath(dir, "Manifest.toml"), """
+              julia_version = "1.13.2"
+              [[deps.JET]]
+              version = "0.12.3"
+              [[deps.JuliaSyntax]]
+              version = "1.0.2"
+              """)
+        write(joinpath(dir, "jet_baseline.toml"),
+              "[provenance]\njulia = \"1.13.2\"\njet = \"0.12.1\"\nfilter = \"x\"\n")
+        write(joinpath(dir, "size_baseline.toml"),
+              "[provenance]\njulia = \"1.13.2\"\njulia_syntax = \"1.0.2\"\n")
+        write(joinpath(dir, "expansion_bound.toml"),
+              "[provenance]\njulia = \"1.13.1\"\ncode_complexity = \"0.2.0\"\n")
+        @test MP.mismatches(dir) ==
+              ["code_health/expansion_bound.toml: julia is \"1.13.1\", the Manifest holds \"1.13.2\"",
+               "code_health/jet_baseline.toml: jet is \"0.12.1\", the Manifest holds \"0.12.3\""]
+        # The live tree is consistent.
+        @test isempty(MP.mismatches())
+    end
+
+    @testset "a Julia slot is taken once, waits for a holder, and frees a dead one" begin
+        JS = GateScopeSeam.CodeHealth.JuliaSlot
+        dir = mktempdir()
+        path = joinpath(dir, "slot-1.pid")
+        @test JS.try_take(path, "first")
+        @test JS.holder(path) == (getpid(), "first")
+        @test !(JS.try_take(path, "second"))
+        # A slot whose holder has exited is free.
+        p = run(`true`; wait = false)
+        gone = getpid(p)
+        wait(p)
+        write(path, "$gone gone\n")
+        @test JS.try_take(path, "third")
+        JS.release(path)
+        @test !isfile(path)
+        # A slot of another live process is not released by this one.
+        write(path, "1 init\n")
+        JS.release(path)
+        @test isfile(path)
+
+        withenv("PO_JULIA_SLOT_DIR" => dir, "PO_JULIA_SLOTS" => "1",
+                "PO_JULIA_MIN_FREE_GB" => "0", "PO_JULIA_RUN_GB" => "0", "CI" => nothing,
+                "PO_JULIA_SLOT_HELD" => nothing) do
+            rm(path)
+            @test JS.active()
+            @test JS.with_slot(() -> (ENV["PO_JULIA_SLOT_HELD"], isfile(path)), "probe") ==
+                  (path, true)
+            @test !isfile(path) && !haskey(ENV, "PO_JULIA_SLOT_HELD")
+            # Under a holder, and on CI, the lock is off.
+            withenv("PO_JULIA_SLOT_HELD" => path) do
+                @test !(JS.active())
+                @test JS.acquire("child") === nothing
+            end
+            withenv("CI" => "true") do
+                @test !(JS.active())
+            end
+            # A busy slot makes the run wait and say so.
+            write(path, "1 init\n")
+            io = IOBuffer()
+            t = @async JS.acquire("waiter"; poll = 0.05, io)
+            sleep(0.3)
+            @test !istaskdone(t)
+            rm(path)
+            @test fetch(t) == path
+            @test occursin("SLOT wait: waiter", String(take!(io)))
+            JS.release(path)
+        end
+        @test JS.mem_available_gb() > 0
+    end
+
+    @testset "the slots follow the machine: a cap from the threads, a reserve for each holder" begin
+        JS = GateScopeSeam.CodeHealth.JuliaSlot
+        dir = mktempdir()
+        withenv("PO_JULIA_SLOTS" => nothing) do
+            @test JS.slots() == max(1, Sys.CPU_THREADS ÷ 2)
+        end
+        withenv("PO_JULIA_SLOTS" => "3") do
+            @test JS.slots() == 3
+        end
+        # A process that is gone holds nothing.
+        p = run(`true`; wait = false)
+        gone = getpid(p)
+        wait(p)
+        @test JS.rss_gb(gone) == 0
+        # A holder is found whatever its slot index, and a dead one is not.
+        write(joinpath(dir, "slot-7.pid"), "$(getpid()) self\n")
+        write(joinpath(dir, "slot-2.pid"), "$gone gone\n")
+        write(joinpath(dir, "admit.lock"), "not a slot\n")
+        @test JS.holders(dir) == [(getpid(), "self")]
+        withenv("PO_JULIA_SLOT_DIR" => dir, "PO_JULIA_SLOTS" => "1",
+                "PO_JULIA_MIN_FREE_GB" => "0") do
+            # A holder that holds all it can grow to is owed nothing.
+            withenv("PO_JULIA_RUN_GB" => "0") do
+                @test JS.reserve_gb(dir) == 0
+                path = JS.admit(dir, "fits")
+                @test path == joinpath(dir, "slot-1.pid")
+                JS.release(path)
+            end
+            if Sys.islinux()
+                # This process holds memory, and the reserve is what it can still grow into.
+                @test 0 < JS.rss_gb(getpid()) < 1000
+                withenv("PO_JULIA_RUN_GB" => "1000") do
+                    @test JS.reserve_gb(dir) ≈ 1000 - JS.rss_gb(getpid()) atol = 0.5
+                    # No machine has 1000 GB free, so the run waits and takes no slot.
+                    @test JS.admit(dir, "too big") === nothing
+                    @test !isfile(joinpath(dir, "slot-1.pid"))
+                end
+            end
+        end
     end
 
     @testset "doctest_files selects the docstrings of the named files" begin
@@ -547,7 +1018,10 @@ end
         @test !(DF.in_scope(joinpath(dir, "subway", "c.jl"), [joinpath(dir, "sub")]))
 
         c = DF.parse_command(["--fix", a, a])
-        @test (c.paths, c.fix) == ([a], true)
+        @test (c.paths, c.fix, c.all) == ([a], true, false)
+        c = DF.parse_command(["--all"])
+        @test c.all && isempty(c.paths)
+        @test_throws ErrorException DF.parse_command(["--all", a])
         for bad in (["--against"], ["--bogus"], [joinpath(dir, "gone.jl")])
             @test_throws ErrorException DF.parse_command(bad)
         end
@@ -559,7 +1033,8 @@ end
         setup = DF.workflow_setup()
         @test occursin("DocMeta.setdocmeta!(PortfolioOptimisers, :DocTestSetup", setup)
         @test occursin("set_show_nothing_fields!(true)", setup)
-        @test !(occursin("doctest(PortfolioOptimisers)", setup))
+        @test !(occursin("doctest(PortfolioOptimisers", setup))
+        @test occursin("const DOCTEST_FILTERS", setup)
         @test_throws ErrorException DF.workflow_setup("jobs: {}\n")
         @test_throws ErrorException DF.workflow_setup("- name: Run doctest\n  run: julia --project=docs -e 'x = 1'\n")
     end

@@ -41,6 +41,7 @@ A prior calls this method in its variance slot, with the `active_mask` and `esti
 # Validation
 
   - $(val_dict[:dims])
+  - $(val_dict[:nan_series_window])
 
 # Returns
 
@@ -74,6 +75,8 @@ Row `t` is the fit of the estimator on the observations `1` to `t` of the return
 # Validation
 
   - $(val_dict[:dims])
+  - $(val_dict[:nan_series_window])
+  - $(val_dict[:nan_frame])
 
 # Returns
 

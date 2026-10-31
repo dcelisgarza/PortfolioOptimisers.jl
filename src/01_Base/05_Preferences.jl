@@ -1,9 +1,9 @@
 """
     PREFERENCE_DISTANCES
 
-Enumerated allowlist mapping the names accepted by the `"suggestion_distance"` preference to their `StringDistances.StringDistance` objects. Membership and dispatch are one `Dict` — the same single-source-of-truth discipline as the equation parser's function allowlist: an unknown name fails closed at load with a typed error carrying a [`did_you_mean`](@ref) suggestion.
+Allowlist that maps each name that the `"suggestion_distance"` preference accepts to its `StringDistances.StringDistance` object. One `Dict` holds the accepted names and the objects that they select, as the function allowlist of the equation parser does. An unknown name stops the load with an `ArgumentError`, and the message has a [`did_you_mean`](@ref) suggestion.
 
-Supported names: `"levenshtein"`, `"damerau_levenshtein"`, `"jaro"`, `"jaro_winkler"`, `"ratcliff_obershelp"`.
+The accepted names are `"levenshtein"`, `"damerau_levenshtein"`, `"jaro"`, `"jaro_winkler"` and `"ratcliff_obershelp"`.
 
 # Related
 
@@ -23,19 +23,20 @@ const PREFERENCE_DISTANCES = Dict{String, StringDistances.StringDistance}("leven
 """
     PREFERENCE_KEYS
 
-The Preferences.jl keys read at package load to seed the global config defaults (see [`apply_preferences!`](@ref)):
+The Preferences.jl keys that the package reads at load time to set the global configuration defaults, through [`apply_preferences!`](@ref).
 
-  - `"equation_max_length"` / `"equation_max_depth"`: positive integers for [`EQUATION_LIMITS`](@ref).
-  - `"max_n_sim"` / `"max_n_subsets"` / `"max_frontier"` / `"max_bins"` / `"max_hop_count"` / `"max_search_grid"` / `"max_ep_grid"`: positive integers for [`RESOURCE_LIMITS`](@ref).
-  - `"suggestion_min_score"`: real number for the [`STRING_DISTANCE`](@ref) threshold.
-  - `"suggestion_distance"`: a [`PREFERENCE_DISTANCES`](@ref) name for the [`STRING_DISTANCE`](@ref) metric.
-  - `"compact_show"`: boolean or integer for [`COMPACT_SHOW`](@ref).
-  - `"show_nothing_fields"`: boolean for the global switch of [`SHOW_NOTHING_FIELDS`](@ref).
-  - `"show_nothing_fields_by_type"`: a table of booleans, one per type name, for the per-name entries of [`SHOW_NOTHING_FIELDS`](@ref).
+  - `"equation_max_length"` and `"equation_max_depth"`: Positive integers for [`EQUATION_LIMITS`](@ref).
+  - `"max_n_sim"`, `"max_n_subsets"`, `"max_frontier"`, `"max_bins"`, `"max_hop_count"`, `"max_search_grid"` and `"max_ep_grid"`: Positive integers for [`RESOURCE_LIMITS`](@ref).
+  - `"suggestion_min_score"`: A real number for the threshold of [`STRING_DISTANCE`](@ref).
+  - `"suggestion_distance"`: A name from [`PREFERENCE_DISTANCES`](@ref) for the distance of [`STRING_DISTANCE`](@ref).
+  - `"compact_show"`: A boolean or an integer for [`COMPACT_SHOW`](@ref).
+  - `"show_nothing_fields"`: A boolean for the global switch of [`SHOW_NOTHING_FIELDS`](@ref).
+  - `"show_nothing_fields_by_type"`: A table of booleans, one for each type name, for the per-name entries of [`SHOW_NOTHING_FIELDS`](@ref).
+  - `"max_warn"`, `"max_info"` and `"max_debug"`: Positive integers for [`LOG_LIMITS`](@ref).
 
-Preferences.jl offers no way to enumerate the keys a project has set, so a misspelled *key* cannot be detected and is silently ignored (the shipped default applies) — misspelled or invalid *values* under these keys fail closed at load. A name inside the `"show_nothing_fields_by_type"` table that matches no type is a value the package cannot refuse either: a type outside the package can render through [`@define_pretty_show`](@ref), so an unknown name is accepted and does nothing.
+Preferences.jl cannot list the keys that a project set. The package thus cannot find a misspelled key, and it ignores that key with no message, so the package default applies. A misspelled or invalid value under one of these keys stops the load. The package also cannot refuse a name in the `"show_nothing_fields_by_type"` table that matches no type. A type outside the package can print through [`@define_pretty_show`](@ref), so the package accepts an unknown name, and the entry has no effect.
 
-A valid value is applied, but a value that *widens* a guard is announced with a warning (see [`relaxed_preferences_msg`](@ref)): a preference file is data, it travels with a cloned project, and it applies before any user code runs.
+The package applies each valid value, and it warns about a value that widens a guard, through [`relaxed_preferences_msg`](@ref). A preference file is data. It comes with a cloned project, and it applies before any user code runs.
 
 # Related
 
@@ -46,29 +47,29 @@ const PREFERENCE_KEYS = ("equation_max_length", "equation_max_depth", "max_n_sim
                          "max_n_subsets", "max_frontier", "max_bins", "max_hop_count",
                          "max_search_grid", "max_ep_grid", "suggestion_min_score",
                          "suggestion_distance", "compact_show", "show_nothing_fields",
-                         "show_nothing_fields_by_type")
+                         "show_nothing_fields_by_type", "max_warn", "max_info", "max_debug")
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Build the warning text for the load-time preferences that widened a guard (see [`apply_preferences!`](@ref)). One line per key: the key, the default it replaced, and the value the project asked for.
+Build the warning text for the load-time preferences that widened a guard, for [`apply_preferences!`](@ref). The text has one line for each key, with the key, the default that it replaced, and the value that the project set.
 
-A preference file is data. It ships with a cloned project or a template, it is often untracked, and [`__init__`](@ref PortfolioOptimisers.__init__) applies it at `using PortfolioOptimisers`, before any user code runs. A value that *tightens* a guard needs no announcement, so the warning names the widened guards alone: the [`RESOURCE_LIMITS`](@ref) and [`EQUATION_LIMITS`](@ref) caps a file raised, and a [`STRING_DISTANCE`](@ref) suggestion threshold it lowered (a lower threshold admits more candidates, the info-leak direction).
+A preference file is data. It comes with a cloned project or a template, git often does not track it, and [`__init__`](@ref PortfolioOptimisers.__init__) applies it at `using PortfolioOptimisers`, before any user code runs. A value that tightens a guard needs no warning, so the warning names only the widened guards. These are a cap of [`RESOURCE_LIMITS`](@ref) or [`EQUATION_LIMITS`](@ref) that the file raised, and a suggestion threshold of [`STRING_DISTANCE`](@ref) that it lowered. A lower threshold admits more candidates, so it can leak more asset names.
 
-Never interpolates the whole preference dictionary, so a key the message does not name stays out of the log — the same info-leak-safe message discipline as [`unknown_variable_msg`](@ref).
+The function never interpolates the whole preference dictionary, so a key that the message does not name stays out of the log. [`unknown_variable_msg`](@ref) follows the same rule to leak no data.
 
 # Algorithm
 
- 1. Open `msg` with the number of widened guards and the sentence that says when a preference applies.
- 2. Append one line per triple, naming the key, the default it replaced, and the value the project asked for.
- 3. Close `msg` with the two repairs: delete the key, or widen the guard for one scope with a `with_*` helper.
+ 1. Start `msg` with the number of widened guards and the sentence that says when a preference applies.
+ 2. Add one line for each triple. The line names the key, the default that it replaced, and the value that the project set.
+ 3. End `msg` with the two repairs. The user can delete the key, or widen the guard for one scope with a `with_*` function.
 
 # Arguments
 
-  - `relaxations`: One `(key, default, value)` triple per widened guard, in [`PREFERENCE_KEYS`](@ref) order.
+  - `relaxations`: One `(key, default, value)` triple for each widened guard, in the order of [`PREFERENCE_KEYS`](@ref).
 
 # Returns
 
-  - `msg::String`: Multi-line warning text, one line per triple.
+  - `msg::String`: The warning text, with one line for each triple.
 
 # Related
 
@@ -87,18 +88,18 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Apply the two load-time preferences of [`SHOW_NOTHING_FIELDS`](@ref): the global switch and the per-name table. Called by [`apply_preferences!`](@ref), which owns the contract of the preference channel; `nothing` values (unset preferences) are skipped and keep the shipped default.
+Apply the two load-time preferences of [`SHOW_NOTHING_FIELDS`](@ref), the global switch and the per-name table. [`apply_preferences!`](@ref) calls this function, and its docstring states the rules for all preferences. The function skips a `nothing` value, which is a preference that the project did not set, and the package default stays.
 
-Fails closed on an *invalid* value, as [`apply_preferences!`](@ref) does: a typed `ArgumentError` names the key and the value. A name inside the table that matches no type is not refused; see [`PREFERENCE_KEYS`](@ref).
+An invalid value raises an `ArgumentError` that names the key and the value, as in [`apply_preferences!`](@ref). The function does not refuse a name in the table that matches no type. [`PREFERENCE_KEYS`](@ref) gives the reason.
 
 # Algorithm
 
  1. Read `"show_nothing_fields"`. When it is set, check that it is a `Bool`, and apply it through the one-argument form of [`set_show_nothing_fields!`](@ref).
- 2. Read `"show_nothing_fields_by_type"`. When it is set, check that it is a table, then check that every value is a `Bool`, and apply each entry through the per-name form of [`set_show_nothing_fields!`](@ref), with the key converted to a `Symbol`.
+ 2. Read `"show_nothing_fields_by_type"`. When it is set, check that it is a table and that every value is a `Bool`. Convert each key to a `Symbol`, and apply each entry through the per-name form of [`set_show_nothing_fields!`](@ref).
 
 # Arguments
 
-  - `prefs`: The dictionary that [`apply_preferences!`](@ref) receives. Only the two keys above are read.
+  - `prefs`: The dictionary that [`apply_preferences!`](@ref) gets. The function reads only the two keys above.
 
 # Validation
 
@@ -139,13 +140,61 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Apply load-time preference values to the global config defaults ([`EQUATION_LIMITS`](@ref), [`RESOURCE_LIMITS`](@ref), [`STRING_DISTANCE`](@ref), [`COMPACT_SHOW`](@ref), [`SHOW_NOTHING_FIELDS`](@ref)). Called by the package `__init__` with the [`PREFERENCE_KEYS`](@ref) values read via `Preferences.load_preference`; `nothing` values (unset preferences) are skipped and keep the shipped default.
+Apply the three load-time preferences of [`LOG_LIMITS`](@ref), `"max_warn"`, `"max_info"` and `"max_debug"`. [`apply_preferences!`](@ref) calls this function, and its docstring states the rules for all preferences. A `nothing` value is a preference that the project did not set, and the package default stays.
 
-Fails closed on an *invalid* value: it throws a typed `ArgumentError` naming the key and value, so the package refuses to load rather than silently running with a value the project got wrong. Values are applied through the `set_*!` setters, so they receive the same validation as runtime calls.
+An invalid value raises an `ArgumentError` that names the key and the value, as in [`apply_preferences!`](@ref). A valid value gives no message. A cap limits only the repeats of a message and never hides the first one. A cap thus widens no guard, and records no triple for [`relaxed_preferences_msg`](@ref). TOML has no `nothing`, so a project gets the package default back when it deletes the key.
 
-A *valid* value is applied whatever its size — the caps exist to turn an OOM kill into a typed error, not to second-guess a sizing choice, and a project on a large machine may legitimately raise one. A value that widens a guard is announced with a `@warn` built by [`relaxed_preferences_msg`](@ref), because the channel needs no code: a `LocalPreferences.toml` is data, it travels with a cloned project, and it applies before any user code runs. Widening means a raised [`RESOURCE_LIMITS`](@ref) or [`EQUATION_LIMITS`](@ref) cap, or a lowered [`STRING_DISTANCE`](@ref) suggestion threshold. A value that tightens a guard, or that equals the default it replaces, is silent. The comparison is against the default *in effect when the preference is applied*, which at load is the shipped default.
+# Algorithm
 
-To persist a configuration, put the keys in the active project's `LocalPreferences.toml`, e.g.:
+ 1. Read the three keys. When none is set, return.
+ 2. Check that every set value is a positive integer that is not a `Bool`.
+ 3. Apply the three values through [`set_log_limits!`](@ref). A key that the project did not set keeps the value that it already has.
+
+# Arguments
+
+  - `prefs`: The dictionary that [`apply_preferences!`](@ref) gets. The function reads only the three keys above.
+
+# Validation
+
+  - Each of `"max_warn"`, `"max_info"` and `"max_debug"` is a positive integer that is not a `Bool`.
+  - A breach raises an `ArgumentError` that names the key and the value.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`apply_preferences!`](@ref)
+  - [`PREFERENCE_KEYS`](@ref)
+  - [`set_log_limits!`](@ref)
+  - [`LOG_LIMITS`](@ref)
+"""
+function apply_log_preferences!(prefs::AbstractDict{<:AbstractString, <:Any})
+    vals = map(key -> get(prefs, key, nothing), ("max_warn", "max_info", "max_debug"))
+    if all(isnothing, vals)
+        return nothing
+    end
+    for (key, val) in zip(("max_warn", "max_info", "max_debug"), vals)
+        @argcheck(isnothing(val) || val isa Integer && !(val isa Bool) && val > 0,
+                  ArgumentError("preference `$(key) = $(repr(val))` must be a positive integer."))
+    end
+    lim = @atomic LOG_LIMITS.default
+    set_log_limits!(; max_warn = something(vals[1], Some(lim.max_warn)),
+                    max_info = something(vals[2], Some(lim.max_info)),
+                    max_debug = something(vals[3], Some(lim.max_debug)))
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Apply the load-time preference values to the global configuration defaults. These are [`EQUATION_LIMITS`](@ref), [`RESOURCE_LIMITS`](@ref), [`STRING_DISTANCE`](@ref), [`COMPACT_SHOW`](@ref), [`SHOW_NOTHING_FIELDS`](@ref) and [`LOG_LIMITS`](@ref). The package `__init__` calls this function with the values of [`PREFERENCE_KEYS`](@ref) that `Preferences.load_preference` reads. The function skips a `nothing` value, which is a preference that the project did not set, and the package default stays.
+
+An invalid value raises an `ArgumentError` that names the key and the value. The package then does not load, and it does not run with a wrong value. The function applies each value through its `set_*!` function, so a preference gets the same validation as a call at run time.
+
+The function applies a valid value of any size. A cap turns a kill by the out-of-memory killer into an error with a type. It does not judge a size, and a project on a large machine can correctly raise a cap. A value that widens a guard gives a `@warn` with the text of [`relaxed_preferences_msg`](@ref), because a preference needs no code to change a guard. A `LocalPreferences.toml` is data, it comes with a cloned project, and it applies before any user code runs. A widened guard is a raised cap of [`RESOURCE_LIMITS`](@ref) or [`EQUATION_LIMITS`](@ref), or a lowered suggestion threshold of [`STRING_DISTANCE`](@ref). A value that tightens a guard, or that is equal to the default that it replaces, gives no message. The function compares each value with the default that is active when it applies the preference. At load, that is the package default.
+
+To keep a configuration, put the keys in the `LocalPreferences.toml` of the active project, as in this example:
 
 ```toml
 [PortfolioOptimisers]
@@ -162,6 +211,9 @@ suggestion_min_score = 0.8
 suggestion_distance = "damerau_levenshtein"
 compact_show = 4
 show_nothing_fields = true
+max_warn = 1
+max_info = 1
+max_debug = 10
 
 [PortfolioOptimisers.show_nothing_fields_by_type]
 SimpleVariance = false
@@ -169,18 +221,19 @@ SimpleVariance = false
 
 # Algorithm
 
- 1. Start `relaxations` empty. It collects one `(key, default, value)` triple per guard the preferences widen.
- 2. Read the two equation keys. When either is set, check that every set value is a positive integer, read the current [`EQUATION_LIMITS`](@ref) default, record a triple for each value above its default, and apply both through [`set_equation_limits!`](@ref). A key the project left unset keeps the value it already has.
- 3. Read the seven resource keys and repeat step 2 against [`RESOURCE_LIMITS`](@ref) and [`set_resource_limits!`](@ref).
- 4. Read `"suggestion_min_score"`. When it is set, check that it is a real number, record a triple when it is below the current threshold, and apply it through [`set_string_distance!`](@ref). A lower threshold widens the guard, which is the opposite direction from a cap.
- 5. Read `"suggestion_distance"`. When it is set, check that it is a string, and look it up in [`PREFERENCE_DISTANCES`](@ref). An unknown name raises, and the message carries a [`did_you_mean`](@ref) suggestion. Apply the resolved distance through [`set_string_distance!`](@ref).
- 6. Read `"compact_show"`. When it is set, check that it is a boolean or an integer, and apply it through [`set_compact_show!`](@ref). This key guards nothing, so it records no triple.
- 7. Hand `prefs` to [`apply_show_preferences!`](@ref), which reads `"show_nothing_fields"` and `"show_nothing_fields_by_type"`. Neither key guards anything, so neither records a triple.
- 8. When `relaxations` is not empty, emit the text of [`relaxed_preferences_msg`](@ref) as a warning.
+ 1. Start `relaxations` as an empty vector. It collects one `(key, default, value)` triple for each guard that the preferences widen.
+ 2. Read the two equation keys. When one of them is set, check that every set value is a positive integer, and read the current default of [`EQUATION_LIMITS`](@ref). Record a triple for each value above its default, and apply both values through [`set_equation_limits!`](@ref). A key that the project did not set keeps the value that it already has.
+ 3. Read the seven resource keys, and do step 2 again with [`RESOURCE_LIMITS`](@ref) and [`set_resource_limits!`](@ref).
+ 4. Read `"suggestion_min_score"`. When it is set, check that it is a real number. Record a triple when it is below the current threshold, and apply it through [`set_string_distance!`](@ref). A lower threshold widens the guard, which is the opposite direction to a cap.
+ 5. Read `"suggestion_distance"`. When it is set, check that it is a string, and find it in [`PREFERENCE_DISTANCES`](@ref). An unknown name raises an error, and the message has a [`did_you_mean`](@ref) suggestion. Apply the distance that the name selects through [`set_string_distance!`](@ref).
+ 6. Read `"compact_show"`. When it is set, check that it is a boolean or an integer, and apply it through [`set_compact_show!`](@ref). This key is not a guard, so it records no triple.
+ 7. Pass `prefs` to [`apply_show_preferences!`](@ref), which reads `"show_nothing_fields"` and `"show_nothing_fields_by_type"`. Neither key is a guard, so neither records a triple.
+ 8. Pass `prefs` to [`apply_log_preferences!`](@ref), which reads `"max_warn"`, `"max_info"` and `"max_debug"`. A cap never hides the first message of a site, so none of the three records a triple.
+ 9. When `relaxations` is not empty, log the text of [`relaxed_preferences_msg`](@ref) as a warning, under the cap that step 8 set.
 
 # Arguments
 
-  - `prefs`: One entry per key of [`PREFERENCE_KEYS`](@ref). A `nothing` value means the project set no preference for that key, and the shipped default stands.
+  - `prefs`: One entry for each key of [`PREFERENCE_KEYS`](@ref). A `nothing` value means that the project set no preference for that key, and the package default stays.
 
 # Validation
 
@@ -188,8 +241,9 @@ SimpleVariance = false
   - `"suggestion_min_score"` is a real number that is not a `Bool`.
   - `"suggestion_distance"` is a string, and it names an entry of [`PREFERENCE_DISTANCES`](@ref).
   - `"compact_show"` is a `Bool` or an `Integer`.
-  - `"show_nothing_fields"` is a `Bool`, and `"show_nothing_fields_by_type"` is a table of `Bool` values, both checked by [`apply_show_preferences!`](@ref).
-  - A breach of any rule above raises an `ArgumentError` that names the key and the value, so the package refuses to load.
+  - `"show_nothing_fields"` is a `Bool`, and `"show_nothing_fields_by_type"` is a table of `Bool` values. [`apply_show_preferences!`](@ref) checks both.
+  - Each of `"max_warn"`, `"max_info"` and `"max_debug"` is a positive integer that is not a `Bool`. [`apply_log_preferences!`](@ref) checks them.
+  - A breach of a rule above raises an `ArgumentError` that names the key and the value, and the package does not load.
 
 # Returns
 
@@ -204,6 +258,7 @@ SimpleVariance = false
   - [`set_string_distance!`](@ref)
   - [`set_compact_show!`](@ref)
   - [`apply_show_preferences!`](@ref)
+  - [`apply_log_preferences!`](@ref)
   - [`relaxed_preferences_msg`](@ref)
 """
 function apply_preferences!(prefs::AbstractDict{<:AbstractString, <:Any})
@@ -286,22 +341,24 @@ function apply_preferences!(prefs::AbstractDict{<:AbstractString, <:Any})
         set_compact_show!(cs)
     end
     apply_show_preferences!(prefs)
+    apply_log_preferences!(prefs)
     if !isempty(relaxations)
-        @warn relaxed_preferences_msg(relaxations)
+        @warn(relaxed_preferences_msg(relaxations), maxlog = log_limit(:warn),
+              _id = @log_id(first.(relaxations)))
     end
     return nothing
 end
 """
     __init__()
 
-Package load hook: reads the [`PREFERENCE_KEYS`](@ref) preferences of the active project via `Preferences.load_preference` and applies them to the global config defaults through [`apply_preferences!`](@ref). An invalid preference value fails closed — the package refuses to load — rather than running with a value the project got wrong.
+Load hook of the package. It reads the preferences of [`PREFERENCE_KEYS`](@ref) for the active project with `Preferences.load_preference`, and applies them to the global configuration defaults through [`apply_preferences!`](@ref). An invalid preference value stops the load, and the package does not run with a wrong value.
 
-This is the one channel that reaches the guards without running code: a `LocalPreferences.toml` is data, it travels with a cloned project or a template, and it is read here, before any user code. A valid value is therefore applied but not silent — a value that widens a guard is announced with a warning (see [`relaxed_preferences_msg`](@ref)).
+A preference is the one way to change a guard with no code. A `LocalPreferences.toml` is data, it comes with a cloned project or a template, and this hook reads it before any user code runs. The package thus applies a valid value, and it warns about a value that widens a guard, through [`relaxed_preferences_msg`](@ref).
 
 # Algorithm
 
- 1. Read every key of [`PREFERENCE_KEYS`](@ref) with `Preferences.load_preference`, giving `nothing` for a key the active project did not set.
- 2. Pass the resulting dictionary to [`apply_preferences!`](@ref), which validates each value and applies it.
+ 1. Read every key of [`PREFERENCE_KEYS`](@ref) with `Preferences.load_preference`. The value is `nothing` for a key that the active project did not set.
+ 2. Pass the dictionary to [`apply_preferences!`](@ref), which checks each value and applies it.
 
 # Returns
 

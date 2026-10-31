@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Moves weights into their bounds by the exact Euclidean projection, which needs no solver.
 
-It solves the programme of a [`JuMPWeightFinaliser`](@ref) with a [`SquaredAbsoluteErrorWeightFinaliser`](@ref) in closed form. It keeps any budget that the input weights carry, a zero or a negative budget too, and it accepts long-short bounds. When the budget lies outside the sums of the bounds, no projection exists, and [`finalise_weight_bounds`](@ref) then reports an [`OptimisationFailure`](@ref).
+It solves the programme of a [`JuMPWeightFinaliser`](@ref) with `ErrorWeightFinaliser(; alg = L2Norm(), dev = AbsoluteWeightDeviation())` in closed form. It keeps any budget that the input weights carry, a zero or a negative budget too, and it accepts long-short bounds. When the budget lies outside the sums of the bounds, no projection exists, and [`finalise_weight_bounds`](@ref) then reports an [`OptimisationFailure`](@ref).
 
 The projection moves every free weight by the same amount, so it does not keep the ratios of the free weights. [`EntropicWeightFinaliser`](@ref) and [`IterativeWeightFinaliser`](@ref) scale them instead. Under `ub = 0.5`, the weights `[0.9, 0.09, 0.01]` become `[0.5, 0.29, 0.21]` here and `[0.5, 0.45, 0.05]` there.
 

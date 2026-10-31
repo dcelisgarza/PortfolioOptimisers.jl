@@ -40,7 +40,7 @@
             success = isapprox(vec(mu), df[!, i])
             if !success
                 println("Counter: $i")
-                find_tol(mu, df[!, i])
+                find_tol(vec(mu), df[!, i])
             end
             @test success
         end
@@ -157,6 +157,14 @@
         # `nothing` weights are the equal-weight vector, not a zero vector.
         @test mean(EquilibriumExpectedReturns(; l = 3.0), X461) ≈
               mean(EquilibriumExpectedReturns(; w = fill(inv(3), 3), l = 3.0), X461)
+        # The result is linear in `l`, so a larger `l` moves a negative return down.
+        Sn461 = [4.0 -3.0 0.0; -3.0 9.0 0.0; 0.0 0.0 1.0]
+        wn461 = [0.1, 0.6, 0.3]
+        mu1461 = PortfolioOptimisers.equilibrium_mu(1.0, Sn461, wn461)
+        mu2461 = PortfolioOptimisers.equilibrium_mu(2.0, Sn461, wn461)
+        @test mu2461 == 2 * mu1461
+        @test mu1461[1] < 0
+        @test mu2461[1] < mu1461[1]
 
         # --- ExcessExpectedReturns ------------------------------------------
         exc461 = ExcessExpectedReturns(; me = SimpleExpectedReturns(), rf = 0.01)
@@ -170,6 +178,20 @@
         @test_throws DomainError mean(exc461, X461; dims = 3)
         @test_throws PortfolioOptimisers.IsNonFiniteError ExcessExpectedReturns(; rf = Inf)
         @test_throws PortfolioOptimisers.IsNonFiniteError ExcessExpectedReturns(; rf = NaN)
+        # `me` holds any expected returns estimator, and the result keeps its shape.
+        exe461 = ExcessExpectedReturns(; me = EquilibriumExpectedReturns(; w = w461),
+                                       rf = 0.01)
+        @test mean(exe461, X461) ==
+              mean(EquilibriumExpectedReturns(; w = w461), X461) .- 0.01
+        @test isa(mean(exe461, X461), Vector)
+        # Neither subtracting `rf` nor reverse optimisation is a shrinkage, so both types sit
+        # directly under the family, not under the shrunk family (#1859).
+        for T in (ExcessExpectedReturns, EquilibriumExpectedReturns)
+            @test supertype(T) === PortfolioOptimisers.AbstractExpectedReturnsEstimator
+            @test !(T <: PortfolioOptimisers.AbstractShrunkExpectedReturnsEstimator)
+        end
+        @test ShrunkExpectedReturns <:
+              PortfolioOptimisers.AbstractShrunkExpectedReturnsEstimator
 
         # --- StandardDeviationExpectedReturns and VarianceExpectedReturns ----
         # One is the elementwise square of the other, on the same data and the same `ce`.
@@ -185,6 +207,14 @@
         @test !isapprox(mean(factory(sd461, fw), X461), mean(sd461, X461))
         @test_throws DomainError mean(sd461, X461; dims = 3)
         @test_throws DomainError mean(vr461, X461; dims = 3)
+        # The result is the diagonal of the matrix that `ce` returns. Denoising changes the
+        # correlation and keeps that diagonal, so it leaves the result unchanged.
+        cedn461 = PortfolioOptimisersCovariance(; mp = MatrixProcessing(; dn = Denoise()))
+        for ce in (PortfolioOptimisersCovariance(), cedn461)
+            @test vec(mean(StandardDeviationExpectedReturns(; ce = ce), X461)) ==
+                  sqrt.(diag(cov(ce, X461)))
+            @test vec(mean(VarianceExpectedReturns(; ce = ce), X461)) == diag(cov(ce, X461))
+        end
 
         # --- MedianExpectedReturns ------------------------------------------
         #=
@@ -230,6 +260,16 @@
         @test_throws DomainError mean(MedianExpectedReturns(), Xq461; dims = 3)
         @test_throws PortfolioOptimisers.IsEmptyError MedianExpectedReturns(;
                                                                             w = StatsBase.Weights(Float64[]))
+        # Both methods refuse a gapped sample.
+        Xg461 = copy(Xq461)
+        Xg461[2, 2] = NaN
+        @test_throws PortfolioOptimisers.IsNonFiniteError mean(MedianExpectedReturns(),
+                                                               Xg461)
+        @test_throws PortfolioOptimisers.IsNonFiniteError mean(mew461, Xg461)
+        # StatsBase has a weighted median of a vector and none of a matrix, so the weighted
+        # method takes one column at a time.
+        @test !hasmethod(median, Tuple{Matrix{Float64}, typeof(wq461)})
+        @test hasmethod(median, Tuple{Vector{Float64}, typeof(wq461)})
 
         # --- CustomValueExpectedReturns -------------------------------------
         # The assertion is the whole contract, so drive every rejection and assert the
@@ -278,6 +318,10 @@
         @test_throws DomainError mean(CustomValueExpectedReturns(), X461; dims = 3)
         @test_throws PortfolioOptimisers.IsEmptyError CustomValueExpectedReturns(;
                                                                                  val = Float64[])
+        # The keyword constructor refuses a type outside the alias. The field has no bound, so
+        # the positional constructor that `@concrete` adds accepts it unchecked (#264).
+        @test_throws TypeError CustomValueExpectedReturns(; val = "a")
+        @test CustomValueExpectedReturns("a").val == "a"
 
         #=
         `assert_nonempty` labelled its bullet `!isempty(sym)` and reported the value of
@@ -913,6 +957,29 @@
         rho_pdm = cor(GerberCovariance(; alg = Gerber0(), pdm = Posdef()), Xg)
         @test minimum(eigvals(Symmetric(rho_pdm))) >= 0
         @test !isapprox(rho_raw, rho_pdm)
+
+        # ---- the keyword arguments reach both the deviation and the centring ---------------
+        # The `kwargs...` bullet of `cor` and `cov` names `demean_returns` as well as the
+        # standard deviation estimator. A `mean` keyword moves both, so the matrix is the
+        # statistic of `X .- m` thresholded by the deviation about `m`.
+        Xk = randn(StableRNG(454), 60, 4)
+        mk = fill(0.4, 1, 4)
+        for a in (Gerber0(), Gerber1(), Gerber2())
+            cek = GerberCovariance(; alg = a, pdm = nothing)
+            sdk = std(cek.ve, Xk; dims = 1, mean = mk)
+            sdk .= max.(sdk, eps(eltype(sdk)))
+            rhok = cor(cek, Xk; mean = mk)
+            @test isapprox(rhok, PortfolioOptimisers.gerber(cek, Xk .- mk, sdk))
+            @test !isapprox(rhok, cor(cek, Xk))
+            @test isapprox(cov(cek, Xk; mean = mk),
+                           rhok .* (vec(sdk) * transpose(vec(sdk))))
+        end
+
+        # The `ce` bullet of each `gerber` method follows an interpolated key that already
+        # ends in a period, and once rendered as "estimator.. Configured".
+        gerber_doc = string(@doc PortfolioOptimisers.gerber)
+        @test !occursin(r"\.\. ", gerber_doc)
+        @test count("Its `alg` field is a `Gerber", gerber_doc) == 3
     end
     @testset "Gerber IQ zero threshold (#498)" begin
         # `c = 0` puts the noise threshold at zero. The gate `abs(x) < 0` then drops
@@ -1247,6 +1314,31 @@
         @test all(giqw(a, b, full) ≈ giqw(b, a, full)
                   for a in range(-4, 4; length = 31), b in range(-4, 4; length = 31))
     end
+    # Subtypes of the three Gerber IQ rule families with no method of their own (#1878).
+    struct NoMethodGerberIQScaler <: PortfolioOptimisers.GerberIQScalerEstimator end
+    struct NoMethodGerberIQEps <: PortfolioOptimisers.GerberIQEpsEstimator end
+    struct NoMethodGerberIQGamma <: PortfolioOptimisers.GerberIQGammaEstimator end
+    @testset "Gerber IQ: `nothing` is the pair-mean scaler, and a subtype with no method raises (#1878, #1867)" begin
+        # `nothing` gives both assets of the pair the mean of their volatilities.
+        @test PortfolioOptimisers.gerber_iq_scaling(nothing, 1.0, 3.0) == (2.0, 2.0)
+        Xg = randn(StableRNG(1878), 60, 4)
+        seq = PortfolioOptimisers.FLoops.SequentialEx()
+        pair_mean = (sdi, sdj) -> ((sdi + sdj) / 2, (sdi + sdj) / 2)
+        @test cov(GerberIQCovariance(; sc = pair_mean, ex = seq), Xg) ==
+              cov(GerberIQCovariance(; ex = seq), Xg)
+        # `nothing` keeps the default delay and the default rate.
+        @test PortfolioOptimisers.gerber_iq_eps(nothing, Xg) == 45
+        @test PortfolioOptimisers.gerber_iq_gamma(nothing, Xg) == log(2) / 4
+        # A subtype with no method of its own raises. It got the default in silence before.
+        @test_throws ArgumentError PortfolioOptimisers.gerber_iq_scaling(NoMethodGerberIQScaler(),
+                                                                         1.0, 3.0)
+        @test_throws ArgumentError cov(GerberIQCovariance(; sc = NoMethodGerberIQScaler(),
+                                                          ex = seq), Xg)
+        @test_throws ArgumentError PortfolioOptimisers.gerber_iq_eps(NoMethodGerberIQEps(),
+                                                                     Xg)
+        @test_throws ArgumentError PortfolioOptimisers.gerber_iq_gamma(NoMethodGerberIQGamma(),
+                                                                       Xg)
+    end
     @testset "Regression" begin
         res = [StepwiseRegression(; alg = ForwardSelection()),
                StepwiseRegression(; alg = ForwardSelection(), crit = :aic),
@@ -1484,6 +1576,17 @@
         @test eltype(LinearAlgebra.eigen(cskew462c[:, 1:2]).values) <: Complex
         @test eltype(V462c) <: Real
         @test isapprox(V462c, [0.0 -0.5; -0.5 0.0])
+
+        # A tensor with no finite per-asset diagonal has no block, so `assert_finite_block`
+        # does not run and `eigen` raises on the first block, as step 2 states.
+        err462 = try
+            PortfolioOptimisers.negative_spectral_coskewness(fill(NaN, N462, N462^2), X462,
+                                                             nothing)
+        catch e
+            e
+        end
+        @test err462 isa ArgumentError
+        @test occursin("Infs or NaNs", sprint(showerror, err462))
 
         # Issue #543: `mp` is optional, because `matrix_processing!` already carries a
         # `Nothing` no-op. `nothing` returns the accumulated sum untouched, so it agrees
@@ -1920,6 +2023,10 @@
         # --- the constructor refuses a power below one ---
         @test_throws DomainError Distance(; power = 0)
         @test_throws DomainError Distance(; power = -2)
+        # The message states the bound alone. `power` raises the correlation under four
+        # algorithms, so a message that says it raises the distance is wrong (#448).
+        @test_throws "`Distance.power` is 0, but it must be at least `1`." Distance(;
+                                                                                    power = 0)
     end
     @testset "The distance-of-distances sweep of #449" begin
         #=
@@ -1988,11 +2095,14 @@
         # --- the constructor refuses a power below one ---
         @test_throws DomainError DistanceDistance(; power = 0)
         @test_throws DomainError DistanceDistance(; power = -2)
+        @test_throws "`DistanceDistance.power` is 0, but it must be at least `1`." DistanceDistance(;
+                                                                                                    power = 0)
         #=
         The Euclidean norm of two columns of a bounded distance matrix is not itself
         bounded by one, which is why `ComplementSimilarity` is out of domain against this
         estimator's own default.
         =#
+        @test maximum(distance(Distance(), Cd)) <= 1
         @test maximum(distance(DistanceDistance(), Cd)) > 1
     end
     """
@@ -2064,6 +2174,53 @@
         @test_throws MethodError cov(SimpleVariance(), Xsm)
         @test_throws MethodError cor(SimpleVariance(), Xsm)
         @test std(StdFromVarProbe(), Xsm) == sqrt.(var(StdFromVarProbe(), Xsm))
+        # --- #1914: a slot that calls `cov` or `cor` refuses a variance estimator by name ---
+        for ve in
+            (SimpleVariance(), ExpWeightedVariance(), RegimeAdjustedExpWeightedVariance(),
+             WindowedVariance())
+            for ctor in (() -> Covariance(; ce = ve), () -> GeneralCovariance(; ce = ve),
+                         () -> PortfolioOptimisersCovariance(; ce = ve),
+                         () -> DenoiseCovariance(; ce = ve), () -> DetoneCovariance(; ce = ve),
+                         () -> ProcessedCovariance(; ce = ve),
+                         () -> CorrelationCovariance(; ce = ve),
+                         () -> GeodesicShrinkageCovariance(; ce = ve),
+                         () -> ImpliedVolatility(; ce = ve, ppy = 252),
+                         () -> WindowedCovariance(; ce = ve),
+                         () -> ShrunkExpectedReturns(; ce = ve),
+                         () -> EquilibriumExpectedReturns(; ce = ve),
+                         () -> EmpiricalPrior(; ce = ve),
+                         () -> CrossSectionalFactorPrior(;
+                                                         factors = ["market" => ConstantExposure()],
+                                                         ce = ve),
+                         () -> ClustersEstimator(; ce = ve), () -> NetworkEstimator(; ce = ve),
+                         () -> ARCHUncertaintySet(; ce = ve), () -> PairwiseCorrelation(; ce = ve),
+                         () -> CorrelationComponents(; ce = ve))
+                err = try
+                    ctor()
+                catch e
+                    e
+                end
+                @test err isa ArgumentError
+                @test occursin("`ce` needs a covariance estimator", err.msg)
+                @test occursin("`$(nameof(typeof(ve)))` is a variance estimator", err.msg)
+            end
+            for ctor in
+                (() -> Variance(; sigma = ve), () -> StandardDeviation(; sigma = ve),
+                 () -> UncertaintySetVariance(; sigma = ve),
+                 () -> DistributionValueatRisk(; sigma = ve))
+                @test_throws "`sigma` needs a covariance estimator" ctor()
+            end
+            # A slot that calls only `var` or `std` keeps the variance estimator.
+            @test GerberCovariance(; ve = ve).ve === ve
+            @test SmythBrobyCovariance(; ve = ve).ve === ve
+            @test StandardDeviationExpectedReturns(; ce = ve).ce === ve
+            @test VarianceExpectedReturns(; ce = ve).ce === ve
+            @test CrossSectionalFactorPrior(; factors = ["market" => ConstantExposure()],
+                                            ve = ve).ve === ve
+        end
+        # A matrix and a covariance estimator still pass the `sigma` slot.
+        @test Variance(; sigma = [1.0 0.0; 0.0 1.0]).sigma == [1.0 0.0; 0.0 1.0]
+        @test Variance(; sigma = Covariance()).sigma isa Covariance
         # --- the wrappers compose `ce` and then `mp`, in the order their row declares ---
         rng453 = StableRNG(11223344)
         X453 = randn(rng453, 6, 10)
@@ -2110,6 +2267,34 @@
         @test_throws DimensionMismatch PortfolioOptimisers.find_uncorrelated_indices(W453;
                                                                                      scores = [1.0,
                                                                                                2.0])
+        #=
+        The `/unslop` pass of #453 corrected four claims, pinned here. The keywords of
+        `mean(::SimpleExpectedReturns, X)` go to the observation weights and never to
+        `Statistics.mean`, which refuses an unknown keyword. A pair at exactly the threshold
+        `t` is too correlated. The constructor of `SimpleVariance` does not check
+        `corrected` against the weight type, the fit refuses it. A `GeneralCovariance`
+        refuses a gapped sample in both verbs.
+        =#
+        @test_throws MethodError mean(Xsm; dims = 1, unknown_keyword = 1)
+        @test mean(SimpleExpectedReturns(), Xsm; dims = 1, unknown_keyword = 1) ==
+              mean(Xsm; dims = 1)
+        @test mean(SimpleExpectedReturns(; cvg = CoveragePolicy()), Xsm; dims = 1,
+                   unknown_keyword = 1) ≈ mean(Xsm; dims = 1)
+        let X3 = hcat(B453[:, 1], B453[:, 1], B453[:, 2])
+            t3 = cor(Covariance(), X3)[2, 1]
+            @test abs(cor(Covariance(), X3)[3, 1]) < t3
+            @test PortfolioOptimisers.find_uncorrelated_indices(X3; ce = Covariance(),
+                                                                t = t3) == [3]
+            @test PortfolioOptimisers.find_uncorrelated_indices(X3; ce = Covariance(),
+                                                                t = nextfloat(t3)) ==
+                  [1, 2, 3]
+        end
+        @test SimpleVariance(; w = Weights(wv)) isa SimpleVariance
+        let Xg = copy(Xsm)
+            Xg[1, 1] = NaN
+            @test_throws PortfolioOptimisers.IsNonFiniteError cov(GeneralCovariance(), Xg)
+            @test_throws PortfolioOptimisers.IsNonFiniteError cor(GeneralCovariance(), Xg)
+        end
     end
     @testset "The information-theoretic sweep of #459" begin
         #=
@@ -2142,6 +2327,8 @@
         =#
         @test !isapprox(sc, fd; rtol = 0.1)
         @test sc > fd
+        # A constant sample has no range to bin, so the bin width is zero.
+        @test iszero(PO.bin_width(Knuth(), fill(2.0, 10)))
         # --- Knuth's rule maximises its own posterior ---
         # `bin_width` returns `range / M`, so recover M and score its neighbours.
         function knuth_f(x, M)
@@ -2162,6 +2349,14 @@
         @test knuth_f(xh, Mk) >= knuth_f(xh, Mk + 1)
         # The three width rules are genuinely different selections on one sample.
         @test length(unique([sc, fd, kdx])) == 3
+        #=
+        The interquartile range reads the middle half of the sorted data, so a larger
+        maximum leaves the Freedman-Diaconis width as it is. Scott's standard deviation moves.
+        =#
+        xo = copy(xh)
+        xo[argmax(xo)] += 5
+        @test PO.bin_width(FreedmanDiaconis(), xo) == fd
+        @test PO.bin_width(Scott(), xo) > sc
         # --- Hacine-Gharbi-Ravier, both closed forms ---
         ch = cor(xh, yh)
         @test !isone(abs(ch))
@@ -2257,6 +2452,8 @@
         @test iszero(PO.intrinsic_mutual_info(PO.calc_hist_data(xh, yh, 1)[3]))
         @test iszero(PO.intrinsic_mutual_info(ones(1, 4)))
         @test iszero(PO.intrinsic_mutual_info(ones(4, 1)))
+        # The estimate is in nats, so it can be larger than one.
+        @test PO.intrinsic_mutual_info(PO.calc_hist_data(xh, xh, nb)[3]) > 1
         # --- `mutual_info` at its two extremes ---
         rngm = StableRNG(123456789)
         Xm = randn(rngm, 500, 3)
@@ -2358,6 +2555,11 @@
         @test cor(MutualInfoCovariance(; bins = 8), Xc) ≈
               cor(MutualInfoCovariance(; bins = 8), Xc'; dims = 2)
         @test_throws DomainError cor(MutualInfoCovariance(; bins = 8), Xc; dims = 3)
+        # A strong negative linear relationship gives a large positive entry.
+        xneg = -xh .+ 0.05 .* yh
+        @test cor(xh, xneg) < -0.99
+        @test cor(MutualInfoCovariance(; bins = 8), hcat(xh, xneg))[1, 2] > 0.8
+        @test MutualInfoCovariance().bins isa HacineGharbiRavier
     end
     @testset "A histogram edge is widened by the spacing at the value (#493)" begin
         #=
@@ -2447,6 +2649,16 @@ function Statistics.cov(::IVProbe, ::PortfolioOptimisers.MatNum; iv = nothing, k
 end
 function Statistics.cor(::IVProbe, ::PortfolioOptimisers.MatNum; iv = nothing, kwargs...)
     return iv_probe_shape(iv)
+end
+"""
+Returns the matrix it holds from `cov`, so a test can hand a shrinkage estimator an
+indefinite covariance that no covariance estimator of the library returns.
+"""
+struct FixedMatrixCovariance{T} <: PortfolioOptimisers.AbstractCovarianceEstimator
+    S::T
+end
+function Statistics.cov(ce::FixedMatrixCovariance, ::PortfolioOptimisers.MatNum; kwargs...)
+    return ce.S
 end
 @testset "Windowed estimator family" begin
     using Test, PortfolioOptimisers, DataFrames, TimeSeries, CSV, StatsBase, Statistics
@@ -2666,7 +2878,7 @@ end
         @test filter(x -> !isa(x, String), dv.args) == Any[:(ret_dict[:stdnum])]
         # The summary names the generic, not the type's noun: `std` on a windowed variance
         # estimator computes a standard deviation.
-        @test occursin("Compute `Statistics.std` over a rolling or indexed observation window",
+        @test occursin("Compute `Statistics.std` over a rolling or indexed window of observations",
                        join(filter(x -> isa(x, String), dv.args)))
         # Siblings cross-link, and a method never links to itself.
         @test occursin("[`sibling`](@ref)", join(filter(x -> isa(x, String), dm.args)))
@@ -2679,11 +2891,30 @@ end
                                                    :(StatsBase.CovarianceEstimator),
                                                    :(PortfolioOptimisersCovariance()),
                                                    "Covariance", "julia> 1 + 1\n2\n",
-                                                   ["[`m`](@ref)"])
+                                                   ["[`m`](@ref)"], true)
         @test Meta.isexpr(td, :string)
         # `TYPEDEF`/`FIELDS` must survive as abbreviations; a rendered string would freeze
         # the field list at macro-expansion time.
         @test filter(x -> !isa(x, String), td.args) ==
+              Any[:(DocStringExtensions.TYPEDEF), :(DocStringExtensions.FIELDS),
+                  :(val_dict[:ce_cov]), :(val_dict[:oow])]
+        # The inner constructor checks the inner estimator only under a `cov` or `cor` entry.
+        cov_specs = [PortfolioOptimisers.windowed_parse_forward(:(Statistics.cov(::MatNum;
+                                                                                 mean) =>
+                                                                      :sigma))]
+        var_specs = [PortfolioOptimisers.windowed_parse_forward(:(var(::MatNum; mean) =>
+                                                                      :vararr))]
+        @test PortfolioOptimisers.windowed_relation_check(:ce, cov_specs) ==
+              :(assert_covariance_estimator(ce, :ce))
+        @test isnothing(PortfolioOptimisers.windowed_relation_check(:ve, var_specs))
+        # A type that forwards no `cov` or `cor` states no refusal of a variance estimator.
+        tdv = PortfolioOptimisers.windowed_type_doc(:WindowedVariance,
+                                                    :AbstractVarianceEstimator, :ve,
+                                                    :AbstractVarianceEstimator,
+                                                    :(SimpleVariance()), "Variance",
+                                                    "julia> 1 + 1\n2\n", ["[`m`](@ref)"],
+                                                    false)
+        @test filter(x -> !isa(x, String), tdv.args) ==
               Any[:(DocStringExtensions.TYPEDEF), :(DocStringExtensions.FIELDS),
                   :(val_dict[:oow])]
 
@@ -2872,7 +3103,7 @@ end
         # Docstrings are generated too, with the dictionary lookups kept live rather than
         # hand-copied, so an `arg_dict`/`ret_dict` edit reaches them.
         tdoc = string(@doc WindowedEstimatorProbe.ProbeWindowedVariance)
-        @test occursin("Variance estimator that restricts computation to a rolling or indexed observation window",
+        @test occursin("Fits an inner variance estimator on a rolling or indexed window of observations",
                        tdoc)
         @test occursin(PortfolioOptimisers.val_dict[:oow], tdoc)
         @test occursin("julia> 1 + 1", tdoc)
@@ -2890,7 +3121,7 @@ end
         # keeps them in sync (ADR 0039).
         for T in (WindowedExpectedReturns, WindowedCovariance, WindowedVariance,
                   WindowedCoskewness, WindowedCokurtosis)
-            @test occursin("estimator that restricts computation to a rolling or indexed observation window",
+            @test occursin("estimator on a rolling or indexed window of observations",
                            string(Base.Docs.doc(T)))
         end
     end
@@ -3013,6 +3244,26 @@ end
             @test collect(PortfolioOptimisers.target_mean(MeanSquaredError(), mu460,
                                                           sigma460; T = T460)) ==
                   fill(tr(sigma460) / T460, N460)
+            # Only `VolatilityWeighted` inverts the covariance matrix, so a singular matrix
+            # raises there and the other two targets stay finite.
+            sing460 = [1.0 1.0 0.0; 1.0 1.0 0.0; 0.0 0.0 1.0]
+            mus460 = [0.1, 0.2, 0.3]
+            @test_throws LinearAlgebra.SingularException PortfolioOptimisers.target_mean(VolatilityWeighted(),
+                                                                                         mus460,
+                                                                                         sing460)
+            @test all(isfinite,
+                      PortfolioOptimisers.target_mean(GrandMean(), mus460, sing460))
+            @test all(isfinite,
+                      PortfolioOptimisers.target_mean(MeanSquaredError(), mus460, sing460;
+                                                      T = 10))
+            # A shift of every mean by one constant moves `GrandMean` and
+            # `VolatilityWeighted` by that constant, and leaves `MeanSquaredError` as it is.
+            for tgt in tgts460
+                b0 = PortfolioOptimisers.target_mean(tgt, mu460, sigma460; T = T460)
+                b1 = PortfolioOptimisers.target_mean(tgt, mu460 .+ 0.5, sigma460; T = T460)
+                shift = tgt isa MeanSquaredError ? 0.0 : 0.5
+                @test isapprox(collect(b1), collect(b0) .+ shift)
+            end
         end
 
         @testset "each intensity against its own closed form" begin
@@ -3084,8 +3335,8 @@ end
                 r = vec(mean(ShrunkExpectedReturns(; alg = BayesStein(; tgt = tgt)), X460))
                 @test all(min.(vm, b) .- sqrt(eps()) .<= r .<= max.(vm, b) .+ sqrt(eps()))
             end
-            # The other two are not convex on this sample, which is why the docstrings warn
-            # that nothing clamps them.
+            # The raw James-Stein intensity is convex on this sample, and the
+            # Bodnar-Okhrin-Parolya coefficient is not. Nothing clamps the second one.
             evals460 = eigvals(sigma460)
             b_gm = vec(collect(PortfolioOptimisers.target_mean(GrandMean(), mu460,
                                                                sigma460)))
@@ -3147,6 +3398,111 @@ end
                 sn = cov(me460.ce, Xn; dims = 1)
                 en = eigvals(sn)
                 @test n * mean(en) - 2 * maximum(en) <= 0
+            end
+        end
+
+        @testset "the intensity rule clamps the James-Stein intensity (#1784)" begin
+            # The raw intensity of the formula, and the blend that each rule gives.
+            function js_raw(X)
+                m_raw = vec(mean(me460.me, X; dims = 1))
+                ev_raw = eigvals(cov(me460.ce, X; dims = 1))
+                b_raw = fill(mean(m_raw), length(m_raw))
+                d_raw = m_raw - b_raw
+                a_raw = (sum(ev_raw) - 2 * maximum(ev_raw)) /
+                        (size(X, 1) * dot(d_raw, d_raw))
+                return m_raw, b_raw, a_raw
+            end
+            js_mean(X, rule) = vec(mean(ShrunkExpectedReturns(;
+                                                              alg = JamesStein(;
+                                                                               intensity = rule)),
+                                        X))
+            @test JamesStein().intensity isa UnitIntervalIntensity
+            @test BayesStein().intensity isa UnitIntervalIntensity
+            # The reproduction of #1784: one strong common factor makes the largest
+            # eigenvalue hold more than half of the trace, so the raw intensity is a large
+            # negative number. The two clamps return the sample mean, and the raw
+            # intensity moves the estimate far outside the range of the sample means.
+            rngf = StableRNG(3)
+            f = randn(rngf, 200) / 100
+            Xf = f .* ones(1, 5) .+ randn(rngf, 200, 5) / 10000
+            mu, b, a = js_raw(Xf)
+            @test a < -1000
+            @test isapprox(js_mean(Xf, UnitIntervalIntensity()), mu)
+            @test isapprox(js_mean(Xf, NonNegativeIntensity()), mu)
+            @test isapprox(js_mean(Xf, nothing), (1 - a) * mu + a * b)
+            @test maximum(js_mean(Xf, nothing)) > 100 * maximum(abs, mu)
+            # Two assets: the raw intensity is negative, as the testset above states.
+            mu, b, a = js_raw(X460[:, 1:2])
+            @test a < 0
+            @test isapprox(js_mean(X460[:, 1:2], UnitIntervalIntensity()), mu)
+            # Sample means close to the grand mean make the raw intensity exceed one. The
+            # unit interval returns the target, the non-negative clamp keeps the overshoot,
+            # and so does the raw intensity.
+            Xb = X460 .- mean(X460; dims = 1) .+ 1e-4 .* transpose(1:5)
+            mu, b, a = js_raw(Xb)
+            @test a > 1
+            @test isapprox(js_mean(Xb, UnitIntervalIntensity()), b)
+            @test isapprox(js_mean(Xb, NonNegativeIntensity()), (1 - a) * mu + a * b)
+            @test isapprox(js_mean(Xb, nothing), (1 - a) * mu + a * b)
+            # Inside the interval the three rules agree.
+            mu, b, a = js_raw(X460)
+            @test 0 < a < 1
+            @test isapprox(js_mean(X460, UnitIntervalIntensity()), js_mean(X460, nothing))
+            @test isapprox(js_mean(X460, NonNegativeIntensity()), js_mean(X460, nothing))
+            # The Bayes-Stein intensity lies in `(0, 1]` under a positive semidefinite
+            # covariance, so no rule moves it.
+            for rule in (UnitIntervalIntensity(), NonNegativeIntensity())
+                @test vec(mean(ShrunkExpectedReturns(;
+                                                     alg = BayesStein(; intensity = rule)),
+                               X460)) == vec(mean(ShrunkExpectedReturns(;
+                                                                        alg = BayesStein(; intensity = nothing)),
+                                                  X460))
+            end
+            # Each rule on a scalar, and a `NaN` that stays a `NaN`.
+            for (rule, lo, hi) in
+                ((UnitIntervalIntensity(), 0.0, 1.0), (NonNegativeIntensity(), 0.0, 2.5),
+                 (nothing, -2.5, 2.5))
+                @test PortfolioOptimisers.shrinkage_intensity(rule, -2.5) == lo
+                @test PortfolioOptimisers.shrinkage_intensity(rule, 2.5) == hi
+                @test PortfolioOptimisers.shrinkage_intensity(rule, 0.5) == 0.5
+                @test isnan(PortfolioOptimisers.shrinkage_intensity(rule, NaN))
+            end
+            # A `Rational` intensity keeps its type.
+            @test PortfolioOptimisers.shrinkage_intensity(UnitIntervalIntensity(),
+                                                          3 // 2) === 1 // 1
+        end
+
+        @testset "the intensity rule clamps the Bayes-Stein intensity of an indefinite covariance (#1784)" begin
+            # R3 of #1817: the Bayes-Stein intensity leaves `(0, 1]` only under an indefinite
+            # covariance, the one case where the default rule moves it. One negative
+            # eigenvalue sets the quadratic form `q` so that the raw intensity
+            # `(N + 2) / ((N + 2) + T q)` is 2, and then -1.
+            mu = vec(mean(X460; dims = 1))
+            b = fill(mean(mu), length(mu))
+            d = mu - b
+            Tb, Nb = size(X460)
+            E = eigen(Symmetric(cov(me460.ce, X460; dims = 1)))
+            proj = E.vectors' * d
+            function bs_mean(S, rule)
+                return vec(mean(ShrunkExpectedReturns(; ce = FixedMatrixCovariance(S),
+                                                      alg = BayesStein(; intensity = rule)),
+                                X460))
+            end
+            for a in (2.0, -1.0)
+                q = (Nb + 2) * (1 / a - 1) / Tb
+                lam1 = proj[1]^2 / (q - sum(proj[2:end] .^ 2 ./ E.values[2:end]))
+                @test lam1 < 0
+                S = Matrix(Symmetric(E.vectors *
+                                     Diagonal([lam1; E.values[2:end]]) *
+                                     E.vectors'))
+                @test isapprox((Nb + 2) / ((Nb + 2) + Tb * dot(d, S \ d)), a)
+                for (rule, ac) in ((UnitIntervalIntensity(), clamp(a, 0, 1)),
+                                   (NonNegativeIntensity(), max(a, 0)), (nothing, a))
+                    @test isapprox(bs_mean(S, rule), (1 - ac) * mu + ac * b)
+                end
+                @test bs_mean(S, UnitIntervalIntensity()) ==
+                      vec(mean(ShrunkExpectedReturns(; ce = FixedMatrixCovariance(S),
+                                                     alg = BayesStein()), X460))
             end
         end
 

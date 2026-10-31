@@ -468,18 +468,21 @@ rather than *deferrable* slots would have given `Variance` a `pe` that says what
 `sigma = <prior estimator>` already says.
 =#
 @testset "Deferred Quantity: only two independent slots earn a `pe`" begin
-    # Four take the fan-out.
-    for T in (DistributionValueatRisk, Kurtosis, Skewness, VarianceSkewKurtosis)
+    # Two take the fan-out.
+    for T in (DistributionValueatRisk, VarianceSkewKurtosis)
         @test :pe in fieldnames(T)
     end
 
-    # Three do not: their second slot is derived, so it can never hold an estimator, and it
-    # is already supplied by the fit that resolves its source.
-    for T in (Variance, StandardDeviation, NegativeSkewness)
+    # Five do not. The second slot of three is derived, so it can never hold an estimator,
+    # and it is already supplied by the fit that resolves its source. `Kurtosis` and
+    # `Skewness` carry one deferrable slot since #1846, and the slot holds the estimator.
+    for T in (Variance, StandardDeviation, NegativeSkewness, Kurtosis, Skewness)
         @test :pe ∉ fieldnames(T)
     end
     @test_throws MethodError Variance(; pe = EmpiricalPrior())
     @test_throws MethodError StandardDeviation(; pe = EmpiricalPrior())
+    @test_throws MethodError Kurtosis(; pe = HighOrderPriorEstimator())
+    @test_throws MethodError Skewness(; pe = HighOrderPriorEstimator())
 end
 
 @testset "Deferred Quantity: the fan-out fills every unstated slot from one fit" begin
@@ -494,29 +497,14 @@ end
     @test d.sigma ≈ lop.sigma
     @test isnothing(d.pe)
 
-    # `mu` and `kt` likewise, off one high-order result.
-    k = factory(Kurtosis(; pe = HighOrderPriorEstimator()), hop)
-    @test k.mu ≈ hop.mu
-    @test k.kt ≈ hop.kt
-    @test isnothing(k.pe)
-
-    # And `mu` with `sk`.
-    s = factory(Skewness(; pe = HighOrderPriorEstimator()), hop)
-    @test s.mu ≈ hop.mu
-    @test s.sk ≈ hop.sk
-    @test isnothing(s.pe)
-
-    # The container fans out into all three children, five slots in total.
+    # The container fans out into all three children, three slots in total.
     v = PO.resolve_deferred_quantities(VarianceSkewKurtosis(;
                                                             pe = HighOrderPriorEstimator()),
                                        hop)
     @test v.vr.sigma ≈ hop.sigma
     @test v.sk.sk ≈ hop.sk
-    @test v.sk.mu ≈ hop.mu
     @test v.kt.kt ≈ hop.kt
-    @test v.kt.mu ≈ hop.mu
     @test isnothing(v.pe)
-    @test isnothing(v.sk.pe) && isnothing(v.kt.pe)
 end
 
 @testset "Deferred Quantity: a stated slot wins over the fan-out" begin
@@ -531,14 +519,6 @@ end
     d = factory(DistributionValueatRisk(; mu = mu, pe = EmpiricalPrior()), lop)
     @test d.mu === mu
     @test d.sigma ≈ lop.sigma
-
-    k = factory(Kurtosis(; mu = mu, pe = HighOrderPriorEstimator()), hop)
-    @test k.mu === mu
-    @test k.kt ≈ hop.kt
-
-    s = factory(Skewness(; mu = mu, pe = HighOrderPriorEstimator()), hop)
-    @test s.mu === mu
-    @test s.sk ≈ hop.sk
 
     # A child of the container is no different: a Deferred Quantity on a child resolves
     # first and keeps its answer, and the container's `pe` fills the rest. The deferred
@@ -568,11 +548,11 @@ end
     hop = prior(HighOrderPriorEstimator(), X)
 
     c = CountingPriorEstimator(HighOrderPriorEstimator(), 0)
-    k = factory(Kurtosis(; pe = c), hop)
-    @test k.mu ≈ hop.mu && k.kt ≈ hop.kt
+    k = factory(Kurtosis(; kt = c), hop)
+    @test k.kt ≈ hop.kt
     @test c.n == 1
 
-    # Five slots across three children, still one fit. The container resolves the whole
+    # Three slots across three children, still one fit. The container resolves the whole
     # measure, not one field at a time, which is what makes this expressible.
     c = CountingPriorEstimator(HighOrderPriorEstimator(), 0)
     v = PO.resolve_deferred_quantities(VarianceSkewKurtosis(; pe = c), hop)
@@ -593,13 +573,14 @@ end
     # A low-order prior estimator computes no `kt`, and says so by name rather than
     # surfacing a bare `getproperty` failure several frames down.
     err = try
-        factory(Kurtosis(; pe = EmpiricalPrior()), hop)
+        factory(VarianceSkewKurtosis(; pe = EmpiricalPrior()), hop)
     catch e
         e
     end
     @test isa(err, ArgumentError)
-    @test occursin("kt", sprint(showerror, err))
-    @test_throws ArgumentError factory(Skewness(; pe = EmpiricalPrior()), hop)
+    @test occursin("sk", sprint(showerror, err))
+    @test_throws ArgumentError factory(Kurtosis(; kt = EmpiricalPrior()), hop)
+    @test_throws ArgumentError factory(Skewness(; sk = EmpiricalPrior()), hop)
 
     # `mu` and `sigma` live on a low-order result, so `DistributionValueatRisk` is content.
     @test factory(DistributionValueatRisk(; pe = EmpiricalPrior()), hop).mu ≈ hop.mu
@@ -680,11 +661,14 @@ end
     # `port_opt_view` runs before `factory`, so the estimator crosses unsliced and computes
     # on the subset — the whole point of the feature, now on the fan-out slot.
     for r in (DistributionValueatRisk(; pe = EmpiricalPrior()),
-              Kurtosis(; pe = HighOrderPriorEstimator()),
-              Skewness(; pe = HighOrderPriorEstimator()),
               VarianceSkewKurtosis(; pe = HighOrderPriorEstimator()))
         @test PO.port_opt_view(r, i).pe === r.pe
     end
+    # A prior estimator in the one slot of `Kurtosis` or `Skewness` crosses the same way.
+    @test PO.port_opt_view(Kurtosis(; kt = HighOrderPriorEstimator()), i).kt isa
+          HighOrderPriorEstimator
+    @test PO.port_opt_view(Skewness(; sk = HighOrderPriorEstimator()), i).sk isa
+          HighOrderPriorEstimator
 
     sub = prior(EmpiricalPrior(), X[:, i])
     d = factory(PO.port_opt_view(DistributionValueatRisk(; pe = EmpiricalPrior()), i), sub)
@@ -693,53 +677,30 @@ end
     @test d.mu ≈ sub.mu
 
     subh = prior(HighOrderPriorEstimator(), X[:, i])
-    k = factory(PO.port_opt_view(Kurtosis(; pe = HighOrderPriorEstimator()), i), subh)
+    k = factory(PO.port_opt_view(Kurtosis(; kt = HighOrderPriorEstimator()), i), subh)
     @test size(k.kt) == (9, 9)
     @test k.kt ≈ subh.kt
 end
 
-@testset "Deferred Quantity: a higher moment carries the centre it was taken about" begin
+@testset "Deferred Quantity: a higher moment is taken about the centre of its estimator" begin
     rng = StableRNG(987654321)
     X = randn(rng, 200, 5)
     lop = prior(EmpiricalPrior(), X)
     me = MedianExpectedReturns()
-    centre = vec(mean(me, X))
 
-    # A higher moment is a moment *about* a centre, so the tensor and the centre are one
-    # pair of quantities out of one object: `mu` comes from the co-moment estimator's own
-    # `me`, and the tensor is built about exactly that vector.
+    # The matrix states the moment, so its centre is the `me` of the co-moment estimator,
+    # and not the mean of the prior (#1846).
     k = factory(Kurtosis(; kt = Cokurtosis(; me = me)), lop)
     @test k.kt ≈ cokurtosis(Cokurtosis(; me = me), X)
-    @test k.mu ≈ centre
+    @test !isapprox(k.kt, cokurtosis(Cokurtosis(), X))
 
     s = factory(Skewness(; sk = Coskewness(; me = me)), lop)
     @test s.sk ≈ first(coskewness(Coskewness(; me = me), X))
-    @test s.mu ≈ centre
+    @test !isapprox(s.sk, first(coskewness(Coskewness(), X)))
 
-    # Neither silently took the prior's own field instead.
-    @test !isapprox(centre, lop.mu)
-
-    # A stated `mu` wins, and is threaded as `mean =` all the same, so the tensor is
-    # centred on it rather than on the estimator's own choice.
-    mu = fill(0.05, 5)
-    k = factory(Kurtosis(; kt = Cokurtosis(), mu = mu), lop)
-    @test k.mu === mu
-    @test k.kt ≈ cokurtosis(Cokurtosis(), X; mean = transpose(mu))
-    @test !isapprox(k.kt, cokurtosis(Cokurtosis(), X))
-
-    s = factory(Skewness(; sk = Coskewness(), mu = mu), lop)
-    @test s.mu === mu
-    @test s.sk ≈ first(coskewness(Coskewness(), X; mean = transpose(mu)))
-
-    # A scalar and a `VecScalar` centre reach the fit in the shape the estimator wants.
-    @test PO.centring_target(0.05) === 0.05
-    @test PO.centring_target(VecScalar(; v = mu, s = 0.01)) ≈ transpose(mu .+ 0.01)
-    @test isnothing(PO.centring_target(nothing))
-    @test factory(Kurtosis(; kt = Cokurtosis(), mu = 0.05), lop).kt ≈
-          cokurtosis(Cokurtosis(), X; mean = 0.05)
-
-    # An estimator that names no `me` centres itself, and the slot stays on its fallback.
-    @test isnothing(PO.deferred_centre(SimpleExpectedReturns(), lop))
+    # The functor is the moment about that centre.
+    w = fill(0.2, 5)
+    @test k(w)^2 ≈ mean((X * w .- dot(w, vec(mean(me, X)))) .^ 4)
 end
 
 @testset "Deferred Quantity: a prior estimator in `kt`/`sk` centres itself" begin
@@ -748,22 +709,12 @@ end
     lop = prior(EmpiricalPrior(), X)
     hop = prior(HighOrderPriorEstimator(), X)
 
-    # A prior estimator computes its own `mu` and its own tensor about that `mu`, so the
-    # centre is read *back* off the result rather than pushed into it.
+    # A prior estimator computes its own `mu` and its own tensor about that `mu`.
     k = factory(Kurtosis(; kt = HighOrderPriorEstimator()), lop)
     @test k.kt ≈ hop.kt
-    @test k.mu ≈ hop.mu
 
     s = factory(Skewness(; sk = HighOrderPriorEstimator()), lop)
     @test s.sk ≈ hop.sk
-    @test s.mu ≈ hop.mu
-
-    # It has no channel to take a centre, so a stated `mu` still wins as the measure's
-    # centring target and the tensor keeps the prior's own.
-    mu = fill(0.05, 5)
-    k = factory(Kurtosis(; kt = HighOrderPriorEstimator(), mu = mu), lop)
-    @test k.mu === mu
-    @test k.kt ≈ hop.kt
 
     # A low-order prior estimator computes no `kt`, and says so by name.
     err = try
@@ -775,30 +726,20 @@ end
     @test occursin("kt", sprint(showerror, err))
 end
 
-@testset "Deferred Quantity: a deferred high-order slot wins over `pe`" begin
+@testset "Deferred Quantity: a deferred high-order slot wins over the prior" begin
     rng = StableRNG(987654321)
     X = randn(rng, 200, 5)
     hop = prior(HighOrderPriorEstimator(), X)
     me = MedianExpectedReturns()
-    centre = vec(mean(me, X))
 
-    # The map's precedence rule one level down: a stated slot wins over the fan-out, and a
-    # deferred slot is stated. It brings its centre with it, so `pe` fills neither.
-    k = factory(Kurtosis(; kt = Cokurtosis(; me = me), pe = HighOrderPriorEstimator()), hop)
+    # A deferred slot is stated, so the prior of the optimisation does not fill it.
+    k = factory(Kurtosis(; kt = Cokurtosis(; me = me)), hop)
     @test k.kt ≈ cokurtosis(Cokurtosis(; me = me), X)
-    @test k.mu ≈ centre
-    @test !isapprox(k.mu, hop.mu)
-    @test isnothing(k.pe)
+    @test !isapprox(k.kt, hop.kt)
 
-    s = factory(Skewness(; sk = Coskewness(; me = me), pe = HighOrderPriorEstimator()), hop)
+    s = factory(Skewness(; sk = Coskewness(; me = me)), hop)
     @test s.sk ≈ first(coskewness(Coskewness(; me = me), X))
-    @test s.mu ≈ centre
-
-    # `pe` still fills the half the caller left unstated.
-    k = factory(Kurtosis(; mu = MedianExpectedReturns(), pe = HighOrderPriorEstimator()),
-                hop)
-    @test k.mu ≈ centre
-    @test k.kt ≈ hop.kt
+    @test !isapprox(s.sk, hop.sk)
 
     # Nothing deferred leaves the measure untouched, so every existing fallback stands.
     for r in (Kurtosis(), Skewness(), NegativeSkewness())
@@ -869,16 +810,14 @@ end
     X = randn(rng, 200, 5)
     lop = prior(EmpiricalPrior(), X)
     me = MedianExpectedReturns()
-    centre = vec(mean(me, X))
 
     # The `JuMP` builders never call `factory`, so `set_risk_constraints!` resolves. Each
     # of the three is reached directly rather than through a wrapper.
     k = PO.resolve_deferred_quantities(Kurtosis(; kt = Cokurtosis(; me = me)), lop)
     @test k.kt ≈ cokurtosis(Cokurtosis(; me = me), X)
-    @test k.mu ≈ centre
 
     s = PO.resolve_deferred_quantities(Skewness(; sk = Coskewness(; me = me)), lop)
-    @test s.mu ≈ centre
+    @test s.sk ≈ first(coskewness(Coskewness(; me = me), X))
 
     n = PO.resolve_deferred_quantities(NegativeSkewness(; sk = Coskewness(; me = me)), lop)
     @test n.V ≈ last(coskewness(Coskewness(; me = me), X))
@@ -900,7 +839,6 @@ end
     k = factory(PO.port_opt_view(Kurtosis(; kt = Cokurtosis(; me = me)), i, X), sub)
     @test size(k.kt) == (9, 9)
     @test k.kt ≈ cokurtosis(Cokurtosis(; me = me), X[:, i])
-    @test k.mu ≈ vec(mean(me, X[:, i]))
 
     sk_sub, V_sub = coskewness(Coskewness(; me = me), X[:, i])
     n = factory(PO.port_opt_view(NegativeSkewness(; sk = Coskewness(; me = me)), i, X), sub)
@@ -925,7 +863,7 @@ end
     me = MedianExpectedReturns()
 
     # A deferred child slot resolves first and wins over the container's `pe`, which then
-    # fills only what is left. One container, two fits, five slots.
+    # fills only what is left. One container, two fits, three slots.
     r = PO.resolve_deferred_quantities(VarianceSkewKurtosis(;
                                                             sk = Skewness(;
                                                                           sk = Coskewness(;
@@ -933,10 +871,7 @@ end
                                                             pe = HighOrderPriorEstimator()),
                                        hop)
     @test r.sk.sk ≈ first(coskewness(Coskewness(; me = me), X))
-    @test r.sk.mu ≈ vec(mean(me, X))
-    @test !isapprox(r.sk.mu, hop.mu)
     @test r.kt.kt ≈ hop.kt
-    @test r.kt.mu ≈ hop.mu
     @test r.vr.sigma ≈ hop.sigma
     @test isnothing(r.pe)
 
@@ -981,7 +916,7 @@ end
                                                     slv = slv)), rd)
     for (deferred, bare) in ((Kurtosis(; kt = Cokurtosis()), Kurtosis()),
                              (Kurtosis(; kt = Cokurtosis(), N = 3), Kurtosis(; N = 3)),
-                             (Kurtosis(; pe = HighOrderPriorEstimator()), Kurtosis()),
+                             (Kurtosis(; kt = HighOrderPriorEstimator()), Kurtosis()),
                              (NegativeSkewness(; sk = Coskewness()), NegativeSkewness()),
                              (NegativeSkewness(; sk = HighOrderPriorEstimator()), NegativeSkewness()),
                              (VarianceSkewKurtosis(; sk = Skewness(; sk = Coskewness()),
@@ -1212,9 +1147,10 @@ consumer resolves and the kernel refuses.
                    (UncertaintySetVariance(; sigma = ce), pr), (LowOrderMoment(; mu = me), pr),
                    (HighOrderMoment(; mu = me), pr), (ThirdCentralMoment(; mu = me), pr),
                    (MedianAbsoluteDeviation(; mu = me), pr), (Kurtosis(; kt = Cokurtosis()), pr),
-                   (Kurtosis(; mu = me), hop), (Kurtosis(; pe = HighOrderPriorEstimator()), pr),
-                   (Skewness(; sk = Coskewness()), pr), (Skewness(; mu = me), hop),
-                   (Skewness(; pe = HighOrderPriorEstimator()), pr),
+                   (Kurtosis(; kt = HighOrderPriorEstimator()), pr),
+                   (Skewness(; sk = Coskewness()), pr),
+                   (Skewness(; sk = HighOrderPriorEstimator()), pr),
+                   (ThirdCentralMoment(; mu = me, ve = SimpleVariance()), pr),
                    (NegativeSkewness(; sk = Coskewness()), pr),
                    (VarianceSkewKurtosis(; pe = HighOrderPriorEstimator()), pr),
                    (VarianceSkewKurtosis(; vr = Variance(; sigma = ce),
@@ -1276,11 +1212,9 @@ end
                              (ThirdCentralMoment(; mu = me), "ThirdCentralMoment", "mu"),
                              (MedianAbsoluteDeviation(; mu = me), "MedianAbsoluteDeviation", "mu"),
                              (Kurtosis(; kt = Cokurtosis()), "Kurtosis", "kt"),
-                             (Kurtosis(; mu = me), "Kurtosis", "mu"),
-                             (Kurtosis(; pe = HighOrderPriorEstimator()), "Kurtosis", "pe"),
+                             (Kurtosis(; kt = HighOrderPriorEstimator()), "Kurtosis", "kt"),
                              (Skewness(; sk = Coskewness()), "Skewness", "sk"),
-                             (Skewness(; mu = me), "Skewness", "mu"),
-                             (Skewness(; pe = HighOrderPriorEstimator()), "Skewness", "pe"),
+                             (Skewness(; sk = HighOrderPriorEstimator()), "Skewness", "sk"),
                              (NegativeSkewness(; sk = Coskewness()), "NegativeSkewness", "sk"),
                              (VarianceSkewKurtosis(; pe = HighOrderPriorEstimator()), "VarianceSkewKurtosis", "pe"),
                              (ValueatRisk(; alg = PortfolioOptimisers.DistributionValueatRisk(; mu = me)),
@@ -1326,12 +1260,14 @@ end
     # carries one is evaluated rather than refused.
     @test isa(expected_risk(LowOrderMoment(; alg = SecondMoment(; ve = SimpleVariance())),
                             w, X), Number)
-    @test isa(expected_risk(Skewness(; ve = SimpleVariance()), w, X), Number)
+    @test isa(expected_risk(ThirdCentralMoment(; ve = SimpleVariance()), w, X), Number)
 
     # `ve` is the falsification case: a variance estimator **is** a Deferred Quantity by
     # type, so only the per-type declaration keeps it from being refused.
     @test isa(SimpleVariance(), PortfolioOptimisers.DeferredQuantity)
-    @test !haskey(PortfolioOptimisers.deferred_slots(Skewness()), :ve)
+    @test !haskey(PortfolioOptimisers.deferred_slots(ThirdCentralMoment(;
+                                                                        ve = SimpleVariance())),
+                  :ve)
     @test isa(expected_risk(UncertaintySetVariance(; sigma = cov(X)), w, X), Number)
     @test isa(expected_risk(MedianAbsoluteDeviation(), w, X), Number)
     @test isa(expected_risk(MedianAbsoluteDeviation(; mu = MeanCentering()), w, X), Number)
@@ -1380,9 +1316,7 @@ end
     @test isnothing(f.pe)
     @test f.vr.sigma ≈ hop.sigma
     @test f.sk.sk ≈ hop.sk
-    @test f.sk.mu ≈ hop.mu
     @test f.kt.kt ≈ hop.kt
-    @test f.kt.mu ≈ hop.mu
 
     # The children keep the `rke = false` the container forced on them.
     @test f.vr.settings.rke === false
@@ -1677,4 +1611,41 @@ end
         end
     end
     @test isempty(offenders)
+end
+
+# A measure of a user holds its slots and a fan-out estimator, and reaches the general
+# `fan_out_pe`, because neither shipped measure that fans out is this type.
+struct FanOutProbe{T1, T2} <: PO.RiskMeasure
+    mu::T1
+    pe::T2
+end
+PortfolioOptimisers.risk_input_kind(::FanOutProbe) = PO.WeightsInput()
+PortfolioOptimisers.deferred_slots(r::FanOutProbe) = (; mu = r.mu, pe = r.pe)
+PortfolioOptimisers.functor_slots(r::FanOutProbe) = (; mu = r.mu)
+function PortfolioOptimisers.resolve_deferred_quantities(r::FanOutProbe,
+                                                         pr::PO.AbstractPriorResult,
+                                                         slv = nothing)
+    return PO.fan_out_pe(r, r.pe, pr, (; mu = PO.resolve_slot(r.mu, :mu, pr)))
+end
+function PortfolioOptimisers.factory(r::FanOutProbe, pr::PO.AbstractPriorResult, args...;
+                                     kwargs...)
+    return PO.resolve_deferred_quantities(r, pr)
+end
+(r::FanOutProbe)(w::AbstractVector{<:Number}) = dot(w, r.mu)
+@testset "Deferred Quantity: the general fan-out fills the slots a measure leaves open (#1912)" begin
+    X = randn(StableRNG(11), 100, 3)
+    lop = prior(EmpiricalPrior(), X)
+    w = [0.2, 0.3, 0.5]
+    pe = EmpiricalPrior(; me = ShrunkExpectedReturns())
+    fanned = prior(pe, X).mu
+    @test !isapprox(fanned, lop.mu)
+    # An unstated `mu` takes the fit of the fan-out estimator, which is not the prior's.
+    @test expected_risk(FanOutProbe(nothing, pe), w, lop) ≈ dot(w, fanned)
+    # A stated `mu` wins over the fan-out.
+    mu = [0.1, -0.2, 0.3]
+    @test expected_risk(FanOutProbe(mu, pe), w, lop) ≈ dot(w, mu)
+    # Without a fan-out estimator the measure takes its resolved slots as they are.
+    @test expected_risk(FanOutProbe(mu, nothing), w, lop) ≈ dot(w, mu)
+    # The rebuilt measure holds no estimator, because the fit is done.
+    @test isnothing(factory(FanOutProbe(nothing, pe), lop).pe)
 end

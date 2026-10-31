@@ -332,7 +332,7 @@ end
                             ppy::Number = fe.ppy) -> NamedTuple
     forecast_holding_period(fe::ForecastEvaluationResult, rd::ReturnsResult,
                             csfm::CrossSectionalFactorModel;
-                            weighting::AbstractOrthogonalityMetric = IdentityMetric(),
+                            weighting::Option{<:AbstractOrthogonalityMetric} = nothing,
                             n::Integer = 10, min_count::Integer = fe.min_count,
                             mt::AbstractMeanTestEstimator = WildBootstrapMeanTest(),
                             ppy::Number = fe.ppy) -> NamedTuple
@@ -365,7 +365,7 @@ The stride between two dates is the base evaluation's, and it does not grow with
   - `w`: Cross-sectional weight history `observations × assets`, or `nothing` for equal weights. Only the Pearson coefficient and the coverage read it.
   - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
   - `csfm`: The fitted factor-model block the evaluation was built on.
-  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), resolved by [`cs_diagnostic_weights`](@ref).
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), or `nothing` for equal weights, resolved by [`cs_diagnostic_weights`](@ref).
   - `n`: Number of forward periods, the depth of the table.
   - `mt`: The Mean Test of the t-statistics, the p-values and the intervals.
   - `min_count`: Least number of assets a cross-section needs. It defaults to the threshold the evaluation carries, and it applies to the common dates and to the statistics alike.
@@ -429,7 +429,7 @@ function forecast_holding_period(fe::ForecastEvaluationResult, X::MatNum,
 end
 function forecast_holding_period(fe::ForecastEvaluationResult, rd::ReturnsResult,
                                  csfm::CrossSectionalFactorModel;
-                                 weighting::AbstractOrthogonalityMetric = IdentityMetric(),
+                                 weighting::Option{<:AbstractOrthogonalityMetric} = nothing,
                                  n::Integer = 10, min_count::Integer = fe.min_count,
                                  ppy::Number = fe.ppy,
                                  mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())
@@ -444,7 +444,7 @@ end
                    min_count::Integer = fe.min_count, ppy::Number = fe.ppy) -> NamedTuple
     forecast_decay(fe::ForecastEvaluationResult, rd::ReturnsResult,
                    csfm::CrossSectionalFactorModel;
-                   weighting::AbstractOrthogonalityMetric = IdentityMetric(),
+                   weighting::Option{<:AbstractOrthogonalityMetric} = nothing,
                    n::Integer = 10, min_count::Integer = fe.min_count,
                    mt::AbstractMeanTestEstimator = WildBootstrapMeanTest(),
                    ppy::Number = fe.ppy) -> NamedTuple
@@ -467,7 +467,7 @@ The two tables agree at `p = 1`, which is the base evaluation's own window, and 
   - `w`: Cross-sectional weight history `observations × assets`, or `nothing` for equal weights.
   - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
   - `csfm`: The fitted factor-model block the evaluation was built on.
-  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), resolved by [`cs_diagnostic_weights`](@ref).
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), or `nothing` for equal weights, resolved by [`cs_diagnostic_weights`](@ref).
   - `n`: Number of forward periods, the depth of the table.
   - `mt`: The Mean Test of the t-statistics, the p-values and the intervals.
   - `min_count`: Least number of assets a cross-section needs. It applies to the common dates and to the statistics alike.
@@ -520,7 +520,7 @@ function forecast_decay(fe::ForecastEvaluationResult, X::MatNum,
 end
 function forecast_decay(fe::ForecastEvaluationResult, rd::ReturnsResult,
                         csfm::CrossSectionalFactorModel;
-                        weighting::AbstractOrthogonalityMetric = IdentityMetric(),
+                        weighting::Option{<:AbstractOrthogonalityMetric} = nothing,
                         n::Integer = 10, min_count::Integer = fe.min_count,
                         ppy::Number = fe.ppy,
                         mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())

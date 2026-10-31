@@ -6,5 +6,5 @@ Description = "Tracking risk measure, private API of PortfolioOptimisers.jl: bin
 
 ```@docs
 PortfolioOptimisers.bind_data_benchmark(::TrackingRiskMeasure, ::Any)
-PortfolioOptimisers.reader_frames(::Union{<:RiskTrackingError, <:RiskTrackingRiskMeasure}, ::AbstractString, ::Bool)
+PortfolioOptimisers.reader_frames(::Union{RiskTrackingError, RiskTrackingRiskMeasure}, ::AbstractString, ::Bool)
 ```

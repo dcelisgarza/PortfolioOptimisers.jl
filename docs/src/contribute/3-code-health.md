@@ -111,10 +111,16 @@ ratchet about 5 seconds, so you can run any of the three as often as you like. *
 
 The coverage check takes about 10 seconds, and it needs an `lcov.info` that it cannot make itself.
 In CI the `coverage` job of `.github/workflows/ReusableTest.yml` downloads the one the test job of
-the same run wrote, so the gate runs wherever the suite runs. The step that runs the ratchet carries
-`continue-on-error: true`, so a ratchet that trips annotates the run and leaves the test check
-green. Locally, run the suite with coverage on and process it, or download the `lcov`
-artifact from any green run of `Test.yml` and point `COVERAGE_LCOV` at it. ADR 0082.
+the same run wrote, so the gate runs wherever the suite runs, on a red suite too. A ratchet that
+trips annotates the run and turns the `Coverage ratchet` check red. The test check keeps the
+verdict of the suite alone. Locally, run the suite with coverage on and process it, or download the
+`lcov` artifact from any run of `Test.yml` and point `COVERAGE_LCOV` at it. ADR 0082.
+
+Before you push a change to a code line under `src/` or `ext/`, run its targeted test files with
+`test/run_files.jl --coverage=<absolute source dir>`. Each `PATCH` line names a line that your
+change added and that CI reads as a miss, also in a method that no test calls. Cover it, or give it
+a Coverage Exemption. A clean run records the `coverage` stamp that the push guard of
+`code_health/gate_stamp.sh` asks for.
 
 `coverage.jl` takes one more verb than the others. `terminal` answers #404's closing question
 for a child map's own files, and names the definitions that still hold an uncovered line.
@@ -148,6 +154,14 @@ For each JET report on the file, reach one of two verdicts.
 
 - **It is real.** Fix it. Reproduce the failure first, so you know what you fixed.
 - **It is a false positive.** Dismiss it. See [Dismissing a JET report](@ref code_health_dismissal) below.
+
+Do not change a form that a well-established dependency recommends only to silence JET. The
+developers of such a package analyse it with JET, and their best practice wins over a JET report.
+JET can report a call to an intrinsic, such as `getfield` or `getindex`, through the machinery of
+that package. Keep the form, and dismiss the report with the Rationale
+`a-form-its-package-recommends` in `code_health/rulings.toml`. The JuMP container
+`JuMP.@constraint(model, [i = 1:N], ...)` is the case that set the rule (#1870, #1883). A review
+rejects a change that replaces the form only to remove such a report.
 
 About 180 of the 315 reports measured at baseline belong to a single systematic noise class, so
 expect most reports on a file to end in a Dismissal rather than a fix.

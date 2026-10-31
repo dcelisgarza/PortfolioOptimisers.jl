@@ -97,7 +97,7 @@ function matched_row_indices(ts_new, ts_old)
     return Vector{Int}(rows)
 end
 """
-    panel_feature_names(pnl::Nothing) -> nothing
+    panel_feature_names(pnl::Union{Nothing, AssetPanel{Nothing}}) -> nothing
     panel_feature_names(pnl::AssetPanel) -> Vector{String}
 
 Name the columns an [`AssetPanel`](@ref) derives, without building the Feature Matrix.
@@ -108,8 +108,8 @@ A consumer that needs only the column names calls this function, which reads no 
 
 The method that Julia selects is the algorithm.
 
- 1. `pnl` is `nothing`: return `nothing`.
- 2. `pnl` is an [`AssetPanel`](@ref): read its Panel Fields in order into `nz`. For each field, append the names of its value columns, then the names of its observed-mask columns when the field has an observed mask.
+ 1. `pnl` is `nothing`, or a panel with no Panel Field: return `nothing`.
+ 2. `pnl` is an [`AssetPanel`](@ref) with Panel Fields: read them in order into `nz`. For each field, append the names of its value columns, then the names of its observed-mask columns when the field has an observed mask.
 
 # Arguments
 
@@ -117,14 +117,14 @@ The method that Julia selects is the algorithm.
 
 # Returns
 
-  - `nz::Option{Vector{String}}`: One name per derived column, in the column order of [`panel_feature_matrix`](@ref), or `nothing`. A panel with no Panel Field gives an empty vector.
+  - `nz::Option{Vector{String}}`: One name per derived column, in the column order of [`panel_feature_matrix`](@ref), or `nothing` when there is no Panel Field.
 
 # Related
 
   - [`AssetPanel`](@ref)
   - [`panel_feature_matrix`](@ref)
 """
-function panel_feature_names(::Nothing)
+function panel_feature_names(::Union{Nothing, AssetPanel{Nothing}})
     return nothing
 end
 function panel_feature_names(pnl::AssetPanel)
@@ -294,4 +294,39 @@ end
 function timestamp_positions(ts::AbstractVector, i::VecDate)
     s = sort(i)
     return findall(t -> insorted(t, s), ts)
+end
+"""
+    each_panel_field(pnl::AssetPanel{Nothing}) -> Tuple{}
+    each_panel_field(pnl::AssetPanel) -> AbstractVector{<:AbstractPanelField}
+
+Give the Panel Fields of an [`AssetPanel`](@ref) for a loop or a comprehension that reports over them.
+
+A panel that states its two masks alone holds `pf = nothing`, and `nothing` is not iterable. A report over the fields of such a panel, such as a coverage table or a count, has zero rows, so the function gives the empty tuple and the loop runs no iteration. The panel itself never stores an empty container.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. The panel holds no Panel Field: return `()`.
+ 2. Otherwise: return `pnl.pf`.
+
+# Arguments
+
+  - `pnl`: The Asset Panel.
+
+# Returns
+
+  - `pf`: The Panel Fields, or `()`.
+
+# Related
+
+  - [`AssetPanel`](@ref)
+  - [`panel_field`](@ref)
+  - [`panel_info`](@ref)
+"""
+function each_panel_field(::AssetPanel{Nothing})
+    return ()
+end
+function each_panel_field(pnl::AssetPanel)
+    return pnl.pf
 end

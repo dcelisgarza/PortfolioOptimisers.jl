@@ -42,7 +42,7 @@ end
     forecast_ic(fe::ForecastEvaluationResult, w::Option{<:MatNum} = nothing;
                 min_count::Integer = fe.min_count) -> Matrix{<:Real}
     forecast_ic(fe::ForecastEvaluationResult, csfm::CrossSectionalFactorModel;
-                weighting::AbstractOrthogonalityMetric = IdentityMetric(),
+                weighting::Option{<:AbstractOrthogonalityMetric} = nothing,
                 min_count::Integer = fe.min_count) -> Matrix{<:Real}
 
 Return the information coefficients of a Return Forecast, one row per evaluation date.
@@ -80,7 +80,7 @@ Where:
   - `fe`: The evaluation, from [`forecast_evaluation`](@ref).
   - `w`: Cross-sectional weight history `observations × assets`, on the axis of `fe.alpha`, or `nothing` for equal weights. The rank column reads no weights.
   - `csfm`: The fitted factor-model block the evaluation was built on. It supplies the weight history the metric names.
-  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history of the Pearson column, and [`cs_diagnostic_weights`](@ref) resolves it over the whole observation axis. The default reads equal weights.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), or `nothing` for equal weights. It names the weight history of the Pearson column, and [`cs_diagnostic_weights`](@ref) resolves it over the whole observation axis. The default reads equal weights.
   - `min_count`: Least number of assets a cross-section needs before the function reports a coefficient of it. It defaults to the threshold the evaluation carries. A caller overrides it to read the same pairing at a second threshold.
 
 # Validation
@@ -136,7 +136,7 @@ function forecast_ic(fe::ForecastEvaluationResult, w::Option{<:MatNum} = nothing
     return ic
 end
 function forecast_ic(fe::ForecastEvaluationResult, csfm::CrossSectionalFactorModel;
-                     weighting::AbstractOrthogonalityMetric = IdentityMetric(),
+                     weighting::Option{<:AbstractOrthogonalityMetric} = nothing,
                      min_count::Integer = fe.min_count)
     return forecast_ic(fe, cs_diagnostic_weights(weighting, csfm); min_count = min_count)
 end
@@ -349,7 +349,7 @@ end
     forecast_coverage(fe::ForecastEvaluationResult,
                       w::Option{<:MatNum} = nothing) -> Vector{<:Real}
     forecast_coverage(fe::ForecastEvaluationResult, csfm::CrossSectionalFactorModel;
-                      weighting::AbstractOrthogonalityMetric = IdentityMetric()) -> Vector{<:Real}
+                      weighting::Option{<:AbstractOrthogonalityMetric} = nothing) -> Vector{<:Real}
 
 Return the share of the universe an evaluation scored, one entry per evaluation date.
 
@@ -388,7 +388,7 @@ Where:
   - `fe`: The evaluation, from [`forecast_evaluation`](@ref). Its `umsk` is the universe of the share.
   - `w`: Cross-sectional weight history `observations × assets`, on the axis of `fe.alpha`, or `nothing` for every asset of the universe.
   - `csfm`: The fitted factor-model block the evaluation was built on. It supplies the weight history the metric names.
-  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history that narrows the universe, and [`cs_diagnostic_weights`](@ref) resolves it over the whole observation axis.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), or `nothing` for equal weights. It names the weight history that narrows the universe, and [`cs_diagnostic_weights`](@ref) resolves it over the whole observation axis.
 
 # Validation
 
@@ -460,7 +460,7 @@ function forecast_coverage(fe::ForecastEvaluationResult, w::Option{<:MatNum} = n
     return c
 end
 function forecast_coverage(fe::ForecastEvaluationResult, csfm::CrossSectionalFactorModel;
-                           weighting::AbstractOrthogonalityMetric = IdentityMetric())
+                           weighting::Option{<:AbstractOrthogonalityMetric} = nothing)
     return forecast_coverage(fe, cs_diagnostic_weights(weighting, csfm))
 end
 

@@ -1,9 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Range risk measure.
+Measures the Range, the largest return of the sample minus the smallest one.
 
-`Range` computes the difference between the maximum and minimum portfolio returns, measuring the full spread of the return distribution. It is a simple measure of the total variability across all scenarios.
+It is the [`WorstRealisation`](@ref) plus the largest return. It is the limit of [`ValueatRiskRange`](@ref) and of [`ConditionalValueatRiskRange`](@ref) as `alpha` and `beta` fall to zero, and the [`OrderedWeightsArray`](@ref) with the weights of [`owa_rg`](@ref) gives the same value. A sample of one observation, or of equal returns, has a Range of zero.
 
 # Mathematical definition
 
@@ -52,12 +52,28 @@ Range
            │     rke ┴ Bool: true
 ```
 
+On the path of [`AverageDrawdown`](@ref), the largest return is 0.375 and the smallest is ``-0.25``.
+
+```jldoctest
+julia> Range()([0.125, -0.25, 0.0625, -0.125, 0.375])
+0.625
+
+julia> Range()([-0.1])
+0.0
+```
+
 # Related
 
   - [`RiskMeasure`](@ref)
   - [`RiskMeasureSettings`](@ref)
   - [`WorstRealisation`](@ref)
   - [`ValueatRiskRange`](@ref)
+  - [`ConditionalValueatRiskRange`](@ref)
+  - [`owa_rg`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 7.2.3.1, Equation 7.73. $(ref_dict[:no_original_source])
 """
 @concrete struct Range <: RiskMeasure
     """

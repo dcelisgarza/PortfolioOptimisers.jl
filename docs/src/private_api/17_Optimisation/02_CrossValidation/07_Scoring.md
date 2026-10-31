@@ -1,5 +1,5 @@
 ```@meta
-Description = "Scoring, private API of PortfolioOptimisers.jl: AbstractCrossValidationScorer, PredictionScorer, PopulationScorer, PredictionCrossValScorer, …"
+Description = "Scoring, private API of PortfolioOptimisers.jl: AbstractCrossValidationScorer, PredictionScorer, PredictionCrossValScorer, member_solved, …"
 ```
 
 # Scoring: private API
@@ -7,9 +7,7 @@ Description = "Scoring, private API of PortfolioOptimisers.jl: AbstractCrossVali
 ```@docs
 AbstractCrossValidationScorer
 PredictionScorer
-PopulationScorer
 PredictionCrossValScorer
-PopulationCrossValScorer
 ```
 
 A scorer ranks only the members of a population whose every fold solved.

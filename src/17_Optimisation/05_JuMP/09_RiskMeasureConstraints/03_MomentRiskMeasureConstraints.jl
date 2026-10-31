@@ -86,27 +86,27 @@ Where:
   - ``z_t \\geq 0``: Auxiliary variables capturing deviations below the mean.
   - ``\\boldsymbol{\\mu}``: Expected returns vector.
   - ``\\bar{F}(\\boldsymbol{w})``: Mean fee per period, subtracted by [`calc_risk_constraint_target`](@ref) so that the target is the net mean. Zero without a fee.
-  - ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}``: Portfolio return at time ``t``.
+  - ``\\hat{r}_t``: Net portfolio return at time ``t``, ``\\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` less the fee of the period.
 
 Mean absolute deviation:
 
 ```math
 \\begin{align}
-\\mathrm{MAD}(\\boldsymbol{w}) &= \\frac{1}{T}\\sum_{t=1}^T z_t\\,, \\\\
-z_t &\\geq |\\hat{r}_t - \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} + \\bar{F}(\\boldsymbol{w})|,\\quad z_t \\geq 0\\,.
+\\mathrm{MAD}(\\boldsymbol{w}) &= \\frac{2}{T}\\sum_{t=1}^T z_t + \\frac{1}{T}\\sum_{t=1}^T \\hat{r}_t - \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} + \\bar{F}(\\boldsymbol{w})\\,, \\\\
+z_t &\\geq \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\bar{F}(\\boldsymbol{w}) - \\hat{r}_t,\\quad z_t \\geq 0\\,.
 \\end{align}
 ```
+
+The row is one-sided, and the identity ``\\lvert d \\rvert = 2 \\max(-d, 0) + d`` gives the absolute deviation from it. The mean of the second term is the gap between the mean net return and the target, so the expression is exact for every target, not only for the mean.
 
 Where:
 
   - ``\\mathrm{MAD}(\\boldsymbol{w})``: Mean absolute deviation.
   - $(math_dict[:T])
-  - ``z_t \\geq 0``: Auxiliary variables capturing absolute deviations.
+  - ``z_t \\geq 0``: Auxiliary variables capturing the deviations below the target.
   - ``\\boldsymbol{\\mu}``: Expected returns vector.
   - ``\\bar{F}(\\boldsymbol{w})``: Mean fee per period, subtracted by [`calc_risk_constraint_target`](@ref) so that the target is the net mean. Zero without a fee.
-  - ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}``: Portfolio return at time ``t``.
-
-where ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` is the net portfolio return at time ``t``.
+  - ``\\hat{r}_t``: Net portfolio return at time ``t``, ``\\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` less the fee of the period.
 
 # Arguments
 
@@ -118,7 +118,7 @@ where ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` is the net p
 
 # Returns
 
-  - `nothing`.
+  - The risk expression: `flm_risk_` under [`FirstLowerMoment`](@ref), `mad_risk_` under [`MeanAbsoluteDeviation`](@ref), and `second_moment_risk_` under [`SecondMoment`](@ref).
 
 # Related
 
@@ -171,7 +171,7 @@ expression and upper-bound constraint.
 
 # Returns
 
-  - `nothing`.
+  - `mad_risk`: The risk expression.
 
 # Related
 
@@ -193,10 +193,13 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     mad = state_set!(model, prefix, :mad_, i, JuMP.@variable(model, [1:T], lower_bound = 0))
     wi = nothing_scalar_array_selector(r.w, pr.w)
     wi = checked_observation_weights(wi, net_X)
+    # |x - tgt| = 2 max(tgt - x, 0) + (x - tgt), so the mean of the second term restores the
+    # deviation that the one-sided row leaves out when `tgt` is not the mean of `net_X`.
     mad_risk = if isnothing(wi)
-        JuMP.@expression(model, 2 * Statistics.mean(mad))
+        JuMP.@expression(model, 2 * Statistics.mean(mad) + Statistics.mean(net_X) - tgt)
     else
-        JuMP.@expression(model, 2 * Statistics.mean(mad, wi))
+        JuMP.@expression(model,
+                         2 * Statistics.mean(mad, wi) + Statistics.mean(net_X, wi) - tgt)
     end
     state_set!(model, prefix, :mad_risk_, i, mad_risk)
     state_set!(model, prefix, :cmar_mad_, i,
@@ -339,7 +342,7 @@ the risk expression and upper-bound constraint.
 
 # Returns
 
-  - `nothing`.
+  - `second_moment_risk`: The risk expression of [`set_second_moment_risk!`](@ref).
 
 # Related
 
@@ -408,19 +411,22 @@ The ``2p``-th even moment is encoded via the following power cone formulation (f
 ```math
 \\begin{align}
 \\underset{\\boldsymbol{w},\\,\\boldsymbol{u},\\,\\boldsymbol{s},\\,r}{\\mathrm{opt}} \\quad & r \\\\
-\\mathrm{s.t.} \\quad & \\sum_{t=1}^{T} u_t \\leq r \\\\
-               \\quad & \\left(u_t \\cdot T_d,\\, r,\\, s_t\\right) \\in \\mathcal{K}_{\\mathrm{pow}}\\!\\left(\\tfrac{1}{p}\\right),\\quad t = 1,\\ldots,T \\\\
-               \\quad & \\left(s_t,\\, k,\\, \\hat{r}_t - \\mu\\right) \\in \\mathcal{K}_{\\mathrm{pow}}\\!\\left(\\tfrac{1}{2}\\right),\\quad t = 1,\\ldots,T\\,.
+\\mathrm{s.t.} \\quad & \\sum_{t \\in \\mathcal{I}} u_t \\leq r \\\\
+               \\quad & \\left(u_t \\cdot T_d,\\, r,\\, s_t\\right) \\in \\mathcal{K}_{\\mathrm{pow}}\\!\\left(\\tfrac{1}{p}\\right),\\quad t \\in \\mathcal{I} \\\\
+               \\quad & \\left(s_t,\\, k,\\, \\hat{r}_t - \\mu\\right) \\in \\mathcal{K}_{\\mathrm{pow}}\\!\\left(\\tfrac{1}{2}\\right),\\quad t \\in \\mathcal{I}\\,.
 \\end{align}
 ```
 
-For the semi variant, lower-deviation variables ``d_t \\geq 0`` with ``\\hat{r}_t - \\mu + d_t \\geq 0`` replace the centred returns in the innermost power cone.
+For the semi variant, lower-deviation variables ``d_t \\geq 0`` with ``\\hat{r}_t - \\mu + d_t \\geq 0`` replace the centred returns in the innermost power cone. With observation weights ``q_t``, the budget row reads ``\\sum_{t \\in \\mathcal{I}} q_t u_t``.
+
+The variables and the rows cover the observations of positive weight only. An observation of weight zero does not change the moment, but the power cone row of a large loss can stop the solver far from the optimum.
 
 Where:
 
   - ``r``: Even-moment risk variable.
-  - ``\\boldsymbol{u}``: `T × 1` auxiliary variable vector.
-  - ``\\boldsymbol{s}``: `T × 1` auxiliary variable vector.
+  - ``\\boldsymbol{u}``: `N × 1` auxiliary variable vector, with one entry for each observation in ``\\mathcal{I}``.
+  - ``\\boldsymbol{s}``: `N × 1` auxiliary variable vector, with one entry for each observation in ``\\mathcal{I}``.
+  - $(math_dict[:I_pos_obs])
   - ``T_d = T - \\mathrm{ddof}``: Effective sample size.
   - $(math_dict[:T])
   - ``k``: Budget-scaling / homogenisation variable.
@@ -439,7 +445,7 @@ Where:
 
 # Returns
 
-  - `nothing`.
+  - `even_moment_risk`: The epigraph variable of the even moment, the risk expression.
 
 # Related
 
@@ -461,10 +467,16 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     T = length(net_X)
     p = r.alg.p
     Td = T - r.alg.ddof
+    wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = checked_observation_weights(wi, net_X)
+    # A row of weight zero does not change the moment, but the power cone row of a large loss
+    # can stop the solver far from the optimum, as in the EVaR and power-norm programmes.
+    rows = positive_weight_rows(wi, T)
+    N = length(rows)
     even_moment_u, even_moment_t, even_moment_risk = JuMP.@variables(model,
                                                                      begin
-                                                                         [1:T]
-                                                                         [1:T]
+                                                                         [1:N]
+                                                                         [1:N]
                                                                          (),
                                                                          (lower_bound = 0)
                                                                      end)
@@ -473,8 +485,6 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     state_set!(model, prefix, :even_moment_risk_, i, even_moment_risk)
     even_moment = state_set!(model, prefix, :even_moment_, i,
                              JuMP.@expression(model, net_X .- tgt))
-    wi = nothing_scalar_array_selector(r.w, pr.w)
-    wi = checked_observation_weights(wi, net_X)
     state_set!(model, prefix, :ceven_moment_s_, i,
                if isnothing(wi)
                    JuMP.@constraint(model,
@@ -482,27 +492,29 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                else
                    Td = Td / T * sum(wi)
                    JuMP.@constraint(model,
-                                    sc * (LinearAlgebra.dot(even_moment_u, wi) -
-                                          even_moment_risk) <= 0)
+                                    sc *
+                                    (LinearAlgebra.dot(even_moment_u, view(wi, rows)) -
+                                     even_moment_risk) <= 0)
                end)
     state_set!(model, prefix, :cpoweven_moment_p_, i,
-               JuMP.@constraint(model, [i = 1:T],
-                                [sc * even_moment_u[i] * Td, sc * even_moment_risk,
-                                 sc * even_moment_t[i]] in JuMP.MOI.PowerCone(inv(p))))
+               JuMP.@constraint(model, [j = 1:N],
+                                [sc * even_moment_u[j] * Td, sc * even_moment_risk,
+                                 sc * even_moment_t[j]] in JuMP.MOI.PowerCone(inv(p))))
     if isa(r.alg.alg, FullMoment)
         state_set!(model, prefix, :cpoweven_moment_, i,
-                   JuMP.@constraint(model, [i = 1:T],
-                                    [sc * even_moment_t[i], sc * k, sc * even_moment[i]] in
-                                    JuMP.MOI.PowerCone(0.5)))
+                   JuMP.@constraint(model, [j = 1:N],
+                                    [sc * even_moment_t[j], sc * k,
+                                     sc * even_moment[rows[j]]] in JuMP.MOI.PowerCone(0.5)))
     else
         even_lower_moment = state_set!(model, prefix, :even_lower_moment_, i,
-                                       JuMP.@variable(model, [1:T], (lower_bound = 0)))
+                                       JuMP.@variable(model, [1:N], (lower_bound = 0)))
         state_set!(model, prefix, :ceven_lower_moment_mar_, i,
-                   JuMP.@constraint(model, sc * (even_moment + even_lower_moment) >= 0))
+                   JuMP.@constraint(model,
+                                    sc * (view(even_moment, rows) + even_lower_moment) >= 0))
         state_set!(model, prefix, :cpoweven_moment_, i,
-                   JuMP.@constraint(model, [i = 1:T],
-                                    [sc * even_moment_t[i], sc * k,
-                                     sc * even_lower_moment[i]] in JuMP.MOI.PowerCone(0.5)))
+                   JuMP.@constraint(model, [j = 1:N],
+                                    [sc * even_moment_t[j], sc * k,
+                                     sc * even_lower_moment[j]] in JuMP.MOI.PowerCone(0.5)))
     end
     set_risk_bounds_and_expression!(model, opt, even_moment_risk, r.settings,
                                     :even_moment_risk_, i; prefix = prefix)

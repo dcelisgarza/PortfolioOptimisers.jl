@@ -123,8 +123,8 @@ Each term of the diagonal statistic ``S = \\sum_{i} a_{i} z_{i}^{2}`` is the squ
 with the correlation ``R``, times the noise ``a_{i}`` of its estimated variance. Without the noise,
 the law of the sum is ``\\sum_{k} \\mu_{k} \\chi^{2}_{k}(1)`` on the eigenvalues ``\\mu_{k}`` of
 ``R``, which the constants of [`regime_denom`](@ref) and [`regime_kappa`](@ref) do not read. At 12
-assets and a half-life of 10 the squared multiplier on iid Normal returns is 0.93 for the first
-moment and 0.94 for the log at a correlation of 0.3, and 0.72 and 0.54 at 0.9.
+assets without the noise, the squared multiplier on Normal returns is 0.97 for the first moment
+and 0.95 for the log at a correlation of 0.3, and 0.76 and 0.55 at 0.9.
 
 The noise has the mean one, but the root and the log see it through their own moment, and the
 correlation of the assets correlates the noise of their estimates, so the mean's factor of each
@@ -143,11 +143,11 @@ The true ``R`` is not known, and the eigenvalues of its estimate ``\\hat{R}`` ar
 the law of ``\\hat{R}`` over-corrects by up to 1.3 % and 2.7 %. So
 [`diagonal_law_correlation`](@ref) shrinks ``\\hat{R}`` towards the identity until its dispersion
 is the unbiased one. The factor reads the correlation alone, so a scaled return leaves it
-unchanged. Under `debias = RawStatistic()` the factor is one, which is the raw statistic.
+unchanged. Under `debias = nothing` the factor is one, which is the raw statistic.
 
 # Arguments
 
-  - `method::Union{<:FirstMomentRegimeAdjusted, <:LogRegimeAdjusted}`: Regime adjustment method.
+  - `method::Union{FirstMomentRegimeAdjusted, LogRegimeAdjusted}`: Regime adjustment method.
   - `cache::RegimeAdjustedCovarianceState`: Online covariance computation cache.
   - `ce::RegimeAdjustedExpWeightedCovariance`: Covariance estimator configuration.
   - `C::MatNum`: Bias-corrected covariance block of the contributing assets.
@@ -158,7 +158,7 @@ unchanged. Under `debias = RawStatistic()` the factor is one, which is the raw s
 # Returns
 
   - `factor::Number`: The factor of the method's law, or one where `ce.debias` is
-    [`RawStatistic`](@ref).
+    `nothing`.
 
 # Related
 
@@ -168,8 +168,7 @@ unchanged. Under `debias = RawStatistic()` the factor is one, which is the raw s
   - [`RegimeTermMoments`](@ref)
   - [`DiagonalTarget`](@ref)
 """
-function diagonal_law_factor(method::Union{<:FirstMomentRegimeAdjusted,
-                                           <:LogRegimeAdjusted},
+function diagonal_law_factor(method::Union{FirstMomentRegimeAdjusted, LogRegimeAdjusted},
                              cache::RegimeAdjustedCovarianceState,
                              ce::RegimeAdjustedExpWeightedCovariance, C::MatNum,
                              idx::AbstractVector{<:Integer}, m::AbstractVector)
@@ -307,7 +306,7 @@ Where:
 
   - `lambda::Number`: Decay of the pair's estimate.
   - `W::Number`: Weight that the pair holds.
-  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight of each lag,
+  - `hac_lags::Option{<:Union{Integer, VecNum}}`: Count of HAC lags, the weight of each lag,
     or `nothing`.
 
 # Returns
@@ -321,7 +320,7 @@ Where:
   - [`hac_lag_weights`](@ref)
 """
 function pair_weight_square_sum(lambda::Number, W::Number,
-                                hac_lags::Option{<:Union{<:Integer, <:VecNum}})
+                                hac_lags::Option{<:Union{Integer, VecNum}})
     v = (one(lambda) - lambda) / (one(lambda) + lambda)
     t = v * (2 - W) / W
     k = hac_lag_weights(hac_lags, one(lambda))
@@ -591,55 +590,62 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Returns the weights of the linear and the quadratic integrands of the first-moment correction at
-one node, the measure ``\\mathrm{d}\\tau = \\tau\\, \\mathrm{d}x`` included.
+Returns the logs of the weights of the linear and the quadratic integrands of the first-moment
+correction at one node, the measure ``\\mathrm{d}\\tau = \\tau\\, \\mathrm{d}x`` included.
 
 ``\\mathbb{E}[y_{i}^{2} S^{-1/2}]`` and ``\\mathbb{E}[y_{i}^{2} y_{j}^{2} S^{-3/2}]`` are
 ``\\Gamma(p)^{-1} \\int \\tau^{p - 1} \\mathbb{E}[\\cdot\\, e^{-\\tau S}]\\, \\mathrm{d}\\tau`` at
-``p = 1/2`` and ``p = 3/2``.
+``p = 1/2`` and ``p = 3/2``, so the weights are ``\\tau^{1/2} / \\sqrt{\\pi}`` and
+``2 \\tau^{3/2} / \\sqrt{\\pi}``. [`regime_law_correction`](@ref) reads the vector ``2 \\tau d``
+in place of ``d``, so each weight here carries the factor ``1 / (2 \\tau)`` of each ``d`` that it
+multiplies, and both weights are ``\\tau^{-1/2} / (2 \\sqrt{\\pi})``.
 
 # Arguments
 
   - `::FirstMomentRegimeAdjusted`: First-moment regime adjustment method.
-  - `tau::Number`: Node of the integration variable.
+  - `ltau::Number`: Log of the node ``\\tau`` of the integration variable.
 
 # Returns
 
-  - `(wl, wq)::Tuple`: ``(\\tau^{1/2} / \\sqrt{\\pi}, 2 \\tau^{3/2} / \\sqrt{\\pi})``.
+  - `(lwl, lwq)::Tuple`: ``-(\\ln \\tau + \\ln \\pi) / 2 - \\ln 2`` in both entries.
 
 # Related
 
   - [`regime_law_correction`](@ref)
 """
-function regime_law_weights(::FirstMomentRegimeAdjusted, tau::Number)
-    r = sqrt(tau / pi)
-    return (r, 2 * tau * r)
+function regime_law_weights(::FirstMomentRegimeAdjusted, ltau::Number)
+    lw = -(ltau + log(pi * one(ltau))) / 2 - log(2 * one(ltau))
+    return (lw, lw)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Returns the weights of the linear and the quadratic integrands of the log correction at one node,
-the measure ``\\mathrm{d}\\tau = \\tau\\, \\mathrm{d}x`` included.
+Returns the logs of the weights of the linear and the quadratic integrands of the log correction
+at one node, the measure ``\\mathrm{d}\\tau = \\tau\\, \\mathrm{d}x`` included.
 
 ``\\mathbb{E}[W_{ii} / S]`` and ``\\mathbb{E}[W_{ii} W_{jj} / S^{2}]`` are
 ``\\int \\tau^{p - 1} \\mathbb{E}[\\cdot\\, e^{-\\tau S}]\\, \\mathrm{d}\\tau`` at ``p = 1`` and
-``p = 2``, and the linear one carries the degrees of freedom ``\\nu = 2 x`` of the tilted mean.
+``p = 2``, and the linear one carries the degrees of freedom ``\\nu = 2 x`` of the tilted mean, so
+the weights are ``2 x \\tau`` and ``\\tau^{2}``. [`regime_law_correction`](@ref) reads the vector
+``2 \\tau d`` in place of ``d``, so each weight here carries the factor ``1 / (2 \\tau)`` of each
+``d`` that it multiplies, and the weights are ``x`` and ``1 / 4`` at every node.
 
 # Arguments
 
   - `method::LogRegimeAdjusted`: Log regime adjustment method.
-  - `tau::Number`: Node of the integration variable.
+  - `ltau::Number`: Log of the node ``\\tau`` of the integration variable, read for its number
+    type alone, so that the log of ``x`` is not rounded to a narrower type than that of the data.
 
 # Returns
 
-  - `(wl, wq)::Tuple`: ``(2 x \\tau, \\tau^{2})``.
+  - `(lwl, lwq)::Tuple`: ``(\\ln x, -2 \\ln 2)``.
 
 # Related
 
   - [`regime_law_correction`](@ref)
 """
-function regime_law_weights(method::LogRegimeAdjusted, tau::Number)
-    return (2 * method.x * tau, tau^2)
+function regime_law_weights(method::LogRegimeAdjusted, ltau::Number)
+    return (log(method.x * one(ltau)), -2 * log(2 * one(ltau)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -671,7 +677,10 @@ with ``d_{k} = \\mu_{k} / (1 + 2 \\tau \\mu_{k})``, and the Wishart moments
  1. On each node of [`regime_law_grid`](@ref), with ``\\tau = e^{x} / n``, accumulate the vector
     ``j = \\sum w_{l} L d`` and the matrix ``J = \\sum w_{q} L d d'``, with
     ``L = \\prod_{k} (1 + 2 \\tau \\mu_{k})^{-a}`` and the weights of
-    [`regime_law_weights`](@ref).
+    [`regime_law_weights`](@ref). Each term reads ``e = 2 \\tau d``, whose entries lie in
+    ``[0, 1)``, and ``\\exp(\\ln w + \\ln L)``, with the factor ``1 / (2 \\tau)`` of each ``d`` in
+    ``w``. Alone, ``w_{q}`` and ``d d'`` overflow and underflow the number type at the two ends of
+    the grid, and their product is bounded there.
  2. The linear sum is ``(W' \\mathrm{diag}(C_{m}))' j``, with ``W = V \\circ V``, and the part of
     the quadratic sum in ``M_{ii} M_{jj}`` is ``\\langle W' C_{m} W, J \\rangle``.
  3. The part in ``M_{ij}^{2}`` is ``\\sum_{kl} J_{kl} \\sum_{ij} C_{m, ij} V_{ik} V_{jk} V_{il} V_{jl}``.
@@ -682,7 +691,7 @@ with ``d_{k} = \\mu_{k} / (1 + 2 \\tau \\mu_{k})``, and the Wishart moments
 
 # Arguments
 
-  - `method::Union{<:FirstMomentRegimeAdjusted, <:LogRegimeAdjusted}`: Regime adjustment method.
+  - `method::Union{FirstMomentRegimeAdjusted, LogRegimeAdjusted}`: Regime adjustment method.
   - `mu::VecNum`: Eigenvalues of ``D \\tilde{R} D``.
   - `V::MatNum`: Their eigenvectors.
   - `Cm::MatNum`: Covariance of the deviations of the variable of the method.
@@ -699,23 +708,23 @@ with ``d_{k} = \\mu_{k} / (1 + 2 \\tau \\mu_{k})``, and the Wishart moments
   - [`regime_law_weights`](@ref)
   - [`diagonal_law_factor`](@ref)
 """
-function regime_law_correction(method::Union{<:FirstMomentRegimeAdjusted,
-                                             <:LogRegimeAdjusted}, mu::VecNum, V::MatNum,
-                               Cm::MatNum)
+function regime_law_correction(method::Union{FirstMomentRegimeAdjusted, LogRegimeAdjusted},
+                               mu::VecNum, V::MatNum, Cm::MatNum)
     T = eltype(mu)
     x = regime_law_grid(T)
     n = length(mu)
     a, nu = regime_law_shape(method)
     jl = zeros(T, n)
     J = zeros(T, n, n)
-    d = similar(mu)
+    e = similar(mu)
+    ln = log(n * one(T))
     for xi in x
         tau = exp(xi) / n
-        L = exp(regime_law_log_laplace(mu, a, 2 * one(T), exp(xi)))
-        d .= mu ./ (one(T) .+ 2 .* tau .* mu)
-        wl, wq = regime_law_weights(method, tau)
-        jl .+= (wl * L) .* d
-        J .+= (wq * L) .* d .* transpose(d)
+        lL = regime_law_log_laplace(mu, a, 2 * one(T), exp(xi))
+        e .= 2 .* tau .* mu ./ (one(T) .+ 2 .* tau .* mu)
+        lwl, lwq = regime_law_weights(method, xi - ln)
+        jl .+= exp(lwl + lL) .* e
+        J .+= exp(lwq + lL) .* e .* transpose(e)
     end
     J .*= step(x)
     W = V .^ 2
@@ -841,7 +850,7 @@ observations that [`regime_bias_open`](@ref) reads.
   - `a::Number`: Decay of the first set of weights.
   - `b::Number`: Decay of the second set of weights.
   - `K::Integer`: Count of observations that the weights span.
-  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight ``k_{i}`` of
+  - `hac_lags::Option{<:Union{Integer, VecNum}}`: Count of HAC lags, the weight ``k_{i}`` of
     each lag, or `nothing`.
 
 # Returns
@@ -854,7 +863,7 @@ observations that [`regime_bias_open`](@ref) reads.
   - [`hac_lag_weights`](@ref)
 """
 function exp_weight_cross_sum(a::Number, b::Number, K::Integer,
-                              hac_lags::Option{<:Union{<:Integer, <:VecNum}} = nothing)
+                              hac_lags::Option{<:Union{Integer, VecNum}} = nothing)
     ab = a * b
     t = one(ab) - ab^K
     k = hac_lag_weights(hac_lags, ab)
@@ -915,11 +924,11 @@ noise. Where it is not, the grid agrees with the finer one to ``5 \\times 10^{-7
 
 # Arguments
 
-  - `method::Union{<:RegimeAdjustedMethod, <:RegimeTermMoments}`: Regime adjustment method,
+  - `method::Union{RegimeAdjustedMethod, RegimeTermMoments}`: Regime adjustment method,
     which names the moment, or the table of the moments of one term.
   - `decay::Number`: Decay of the weights.
   - `K::Integer`: Largest count of observations in the table.
-  - `hac_lags::Union{<:Integer, <:VecNum}`: Count of HAC lags, or the weight of each lag.
+  - `hac_lags::Union{Integer, VecNum}`: Count of HAC lags, or the weight of each lag.
 
 # Returns
 
@@ -933,8 +942,8 @@ noise. Where it is not, the grid agrees with the finer one to ``5 \\times 10^{-7
   - [`regime_bias_table`](@ref)
   - [`regime_bias!`](@ref)
 """
-function regime_bias_table(method::Union{<:RegimeAdjustedMethod, <:RegimeTermMoments},
-                           decay::Number, K::Integer, hac_lags::Union{<:Integer, <:VecNum})
+function regime_bias_table(method::Union{RegimeAdjustedMethod, RegimeTermMoments},
+                           decay::Number, K::Integer, hac_lags::Union{Integer, VecNum})
     h = one(decay) / 10
     s = exp.(range(-60 * one(h), 50 * one(h); step = h))
     T = eltype(s)
@@ -1006,40 +1015,6 @@ function hac_ldl_row!(buf::NamedTuple, s::VecNum, decay::Number, lam::Number, m:
     l[:, 1, :] .= row
 
     return buf
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Forms the Laplace transform of a HAC estimate on the grid, cut at its minimum.
-
-Where the weight matrix is positive definite, ``G`` falls on the whole grid and nothing is cut.
-Where it is not, ``G`` falls to a minimum and then rises to the first zero of the determinant,
-where the negative part of the estimate rules the transform. The transform is cut at the minimum,
-and the last point takes the weight one half of a closed trapezoid, so the error of the cut is of
-the second order in the step.
-
-# Arguments
-
-  - `G::VecNum`: Transform on the grid (mutated).
-  - `lG::VecNum`: ``\\ln G`` on the grid, ``-\\infty`` past the first zero of the determinant.
-
-# Returns
-
-  - `G::VecNum`: The cut transform.
-
-# Related
-
-  - [`regime_bias_table`](@ref)
-"""
-function hac_laplace!(G::VecNum, lG::VecNum)
-    i = argmin(j -> isinf(lG[j]) ? typemax(eltype(lG)) : lG[j], eachindex(lG))
-    G .= exp.(lG)
-    if i < lastindex(G)
-        G[i] /= 2
-        G[(i + 1):end] .= zero(eltype(G))
-    end
-
-    return G
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1154,7 +1129,7 @@ target holds one factor for each count.
 
 # Returns
 
-  - `bias::Option{<:Union{<:AbstractVector, <:NamedTuple}}`: The empty store where
+  - `bias::Option{<:Union{AbstractVector, NamedTuple}}`: The empty store where
     [`debiases`](@ref) holds for `ce.debias` and a regime method is set, else `nothing`.
 
 # Related
@@ -1180,7 +1155,7 @@ throws when no ridge makes it factorise.
 A block with fewer observations than assets is singular. Where the estimator has
 `debias = ExactDebias()`, [`regime_target_statistic`](@ref) skips such a block before it reaches this
 function, so the ridge serves a block that is singular in the data, and the raw statistic of
-`debias = RawStatistic()`.
+`debias = nothing`.
 The regime statistic is one observation of a smoother rather than a result a caller reads, so a
 refusal skips that observation's regime update, and the fit continues.
 
@@ -1222,7 +1197,7 @@ estimated block that the regime method reads, where `ce.debias` is `ExactDebias(
 
 # Algorithm
 
- 1. Where `ce.debias` is `RawStatistic()`, the factor is one. Else take ``K``, the smallest count of
+ 1. Where `ce.debias` is `nothing`, the factor is one. Else take ``K``, the smallest count of
     observations among the contributing assets, and return `nothing` where
     [`regime_bias_open`](@ref) refuses it. Else read the decay of the correlation structure:
     `cor_decay` on the separate path, else `decay`. Find the factor of `ce.regime_method` with
@@ -1360,7 +1335,7 @@ history.
 
 # Returns
 
-  - `(g, dh)::Tuple{<:Number, <:Number}`: ``\\sum_{j} w_{j} / (1 + c\\, w_{j}\\, b)`` and
+  - `(g, dh)::Tuple{Number, Number}`: ``\\sum_{j} w_{j} / (1 + c\\, w_{j}\\, b)`` and
     ``\\sum_{j} w_{j} / (1 + c\\, w_{j}\\, b)^{2}``.
 
 # Related
@@ -1389,110 +1364,47 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Computes the bias factor of the squared Mahalanobis distance against a HAC-adjusted covariance
-estimate.
-
-A HAC estimate is ``\\hat{C} = Z^{\\top} A Z`` with the banded weight matrix ``A`` of
-[`regime_bias_table`](@ref), so it has the law of a plain estimate whose weights are the
-eigenvalues ``\\mu`` of ``A``, and the fixed point of [`mahalanobis_bias`](@ref) holds with ``\\mu``
-in place of the weights. Its sums are the derivatives of ``\\ell(t) = \\ln \\det(I + t A)``,
-so no eigenvalue is computed:
-
-```math
-\\begin{align}
-\\frac{1}{b} &= \\sum_{k} \\frac{\\mu_{k}}{1 + t \\mu_{k}} = \\ell'(t)\\,, \\quad t = (n + 1) b\\,.
-\\end{align}
-```
-
-Each term ``\\mu b / (1 + (n + 1) \\mu b)`` is concave in ``b`` where ``1 + t \\mu > 0``, also for a
-negative ``\\mu``, so Newton's method from ``b = 1`` rises to the root as in the plain case. A
-negative ``\\mu`` bounds ``t``: where a pivot of ``I + t A`` is not positive, or where the slope of
-the map is not positive, the map has passed its maximum below zero and no root exists. At 12
-assets, a half-life of 10 and two lags, the factor is 2.523 against a Monte Carlo of 2.479, and
-1.2654 against 1.2633 at a half-life of 40: the fixed point is a deterministic equivalent, and a
-HAC estimate has about half the degrees of freedom of a plain one.
+Multiplies two values carried with their first derivatives.
 
 # Arguments
 
-  - `decay::Number`: Decay of the weights.
-  - `K::Integer`: Count of observations in the estimate.
-  - `n::Integer`: Count of assets that contribute to the statistic.
-  - `hac_lags::Union{<:Integer, <:VecNum}`: Count of HAC lags, or the weight of each lag.
+  - `x::NTuple{2, <:Number}`: ``(x, x')``.
+  - `y::NTuple{2, <:Number}`: ``(y, y')``.
 
 # Returns
 
-  - `b::Option{<:Number}`: The bias factor, or `nothing` where `K <= n + 1` or no root exists.
-
-# Related
-
-  - [`hac_log_det_slopes`](@ref)
-  - [`mahalanobis_bias`](@ref)
-  - [`MahalanobisTarget`](@ref)
-"""
-function mahalanobis_bias(decay::Number, K::Integer, n::Integer,
-                          hac_lags::Union{<:Integer, <:VecNum})
-    b = one(decay)
-    for _ in 1:(K > n + 1 ? 100 : 0)
-        slopes = hac_log_det_slopes(decay, K, (n + 1) * b, hac_lags)
-        if isnothing(slopes) || !(slopes[2] > zero(b))
-            return nothing
-        end
-        step = (b * slopes[1] - one(b)) / slopes[2]
-        b -= step
-        if abs(step) <= 4 * eps(b)
-            return b
-        end
-    end
-
-    return nothing
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Multiplies two values carried with their first two derivatives.
-
-# Arguments
-
-  - `x::NTuple{3, <:Number}`: ``(x, x', x'')``.
-  - `y::NTuple{3, <:Number}`: ``(y, y', y'')``.
-
-# Returns
-
-  - `xy::NTuple{3, <:Number}`: ``(x y, x' y + x y', x'' y + 2 x' y' + x y'')``.
+  - `xy::NTuple{2, <:Number}`: ``(x y, x' y + x y')``.
 
 # Related
 
   - [`taylor_div`](@ref)
   - [`hac_ldl_taylor_row!`](@ref)
 """
-function taylor_mul(x::NTuple{3, <:Number}, y::NTuple{3, <:Number})
-    return (x[1] * y[1], x[2] * y[1] + x[1] * y[2],
-            x[3] * y[1] + 2 * x[2] * y[2] + x[1] * y[3])
+function taylor_mul(x::NTuple{2, <:Number}, y::NTuple{2, <:Number})
+    return (x[1] * y[1], x[2] * y[1] + x[1] * y[2])
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Divides two values carried with their first two derivatives.
+Divides two values carried with their first derivatives.
 
 # Arguments
 
-  - `x::NTuple{3, <:Number}`: ``(x, x', x'')``.
-  - `y::NTuple{3, <:Number}`: ``(y, y', y'')``, with ``y \\neq 0``.
+  - `x::NTuple{2, <:Number}`: ``(x, x')``.
+  - `y::NTuple{2, <:Number}`: ``(y, y')``, with ``y \\neq 0``.
 
 # Returns
 
-  - `q::NTuple{3, <:Number}`: ``(q, q', q'')`` of ``q = x / y``: ``q' = (x' - q y') / y`` and
-    ``q'' = (x'' - 2 q' y' - q y'') / y``.
+  - `q::NTuple{2, <:Number}`: ``(q, q')`` of ``q = x / y``, with ``q' = (x' - q y') / y``.
 
 # Related
 
   - [`taylor_mul`](@ref)
   - [`hac_ldl_taylor_row!`](@ref)
 """
-function taylor_div(x::NTuple{3, <:Number}, y::NTuple{3, <:Number})
+function taylor_div(x::NTuple{2, <:Number}, y::NTuple{2, <:Number})
     q = x[1] / y[1]
-    q1 = (x[2] - q * y[2]) / y[1]
-    return (q, q1, (x[3] - 2 * q1 * y[2] - q * y[3]) / y[1])
+    return (q, (x[2] - q * y[2]) / y[1])
 end
 """
     Statistics.cov(
@@ -1561,7 +1473,7 @@ end
 
 Answer `NaN`, so a gapped sample reaches the recursion with its gaps intact.
 
-The recursion updates only the sub-block of the assets that are valid at each observation, and the regime weight is taken from that sub-block alone, so a fill would both decay a frozen block and move the regime it is weighted by. The consumer therefore hands the sample as it stands, together with the active mask that explains the gap.
+The recursion updates only the sub-block of the assets that are valid at each observation, and the regime weight is taken from that sub-block alone, so a fill decays a frozen block and moves the regime that the block weighs. The consumer therefore hands the sample as it stands, together with the active mask that explains the gap.
 
 # Arguments
 
@@ -1715,9 +1627,7 @@ function partial_fit!(ce::RegimeAdjustedExpWeightedCovariance{<:Any, <:Any, <:An
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     cache = regime_adjusted_covariance_pass!(ce, X, dims, estimation_mask, active_mask,
                                              ce.cache)
-    Accessors.@reset ce.cache = cache
-
-    return ce
+    return cache === ce.cache ? ce : rebuild_estimator(ce, (; cache = cache))
 end
 """
     partial_fit!(
@@ -1989,7 +1899,8 @@ Refuses a pair of regime-adjusted covariance states, because this family does no
 
 A block fitted from a cold start is not what the same block contributes after another one. The
 regime statistic scores each observation against the state that stands before it, so a cold
-block loses every comparison its first `min_obs` observations would have made, and a correlation
+block does not score its first `min_obs` observations, which the same block after another one
+scores. A correlation
 state that is normalised by a running variance carries that variance with it.
 
 Fold the second block into the first with [`partial_fit!`](@ref) instead. A sequential fit is
@@ -2030,7 +1941,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Copies a [`RegimeAdjustedCovarianceState`](@ref), so the copy shares no array with the original.
 
 The `copy` method of the [`AbstractPartialFitState`](@ref) interface, which [`partial_fit`](@ref)
-calls before it folds. Every array field is copied, and the two scalar fields pass through. The
+calls before it folds. Every array field is copied, and the two scalar fields pass through. The row count goes into a
+new `Ref`, so a fold of the copy does not count in the original. The
 circular buffer of recent centred returns is rebuilt at the same capacity, and each observation
 it holds is copied into it, so a fold on the copy pushes into a buffer of its own. The two
 fields of the separate correlation recursion pass through as `nothing` where they are `nothing`.
@@ -2072,7 +1984,31 @@ function Base.copy(x::RegimeAdjustedCovarianceState)
                                          copy(x.X_old_i), copy(x.location),
                                          copy(x.obs_count), copy(x.active), x.regime_state,
                                          x.n_regime_obs, deepcopy(x.bias),
-                                         deepcopy(x.overlap), deepcopy(x.lag_records))
+                                         deepcopy(x.overlap), deepcopy(x.lag_records),
+                                         Ref(x.rows[]))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`RegimeAdjustedCovarianceState`](@ref) method of [`observation_count`](@ref).
+
+The state counts the observations of each asset in `obs_count`, and a reset sets such a count to zero. `n_regime_obs` counts only the observations that the regime statistic scored. So the method reads `rows`, the number of folded rows, which is the `size(X, 1)` of a batch fit over the same rows.
+
+# Arguments
+
+  - `state`: The state that holds the count.
+
+# Returns
+
+  - `n::Integer`: The number of observations folded so far.
+
+# Related
+
+  - [`observation_count`](@ref)
+  - [`RegimeAdjustedCovarianceState`](@ref)
+"""
+function observation_count(state::RegimeAdjustedCovarianceState)
+    return state.rows[]
 end
 """
     Statistics.cov(

@@ -14,4 +14,12 @@ factory(r::MeanReturnRiskRatio, w::VecNum)
 port_opt_view(r::ThirdCentralMoment, i, args...)
 needs_previous_weights(r::MeanReturnRiskRatio)
 supports_precomputed_returns(r::ThirdCentralMoment)
+bigger_is_better(::ThirdCentralMoment)
+```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
 ```

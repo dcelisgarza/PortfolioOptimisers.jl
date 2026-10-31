@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype of the scalings that size each direction inside the Orthogonal Subspace.
 
-A member states the ``r \\times r`` matrix ``\\mathbf{\\Lambda}`` of the mean set, and the square root of that matrix maps the coordinates of the ball onto the basis of the subspace. Every member confines the set to the same subspace, so a scaling changes the shape of the set alone, and the radius reads the same ``r`` degrees of freedom under each member.
+A member states the ``r \\times r`` matrix ``\\mathbf{\\Lambda}`` of the mean set, and the square root of that matrix maps the coordinates of the ball onto the basis of the subspace. Every member confines the set to the same subspace, so a scaling changes the shape of the set alone, and the radius reads the same ``r`` degrees of freedom under each member. `nothing` in the place of a member scales no direction, so ``\\mathbf{\\Lambda} = \\mathbf{I}_{r}``.
 
 # Interfaces
 
@@ -13,7 +13,6 @@ A member states the ``r \\times r`` matrix ``\\mathbf{\\Lambda}`` of the mean se
 
 # Related
 
-  - [`IdentityScaling`](@ref)
   - [`IdiosyncraticVarianceScaling`](@ref)
   - [`orthogonal_scaling`](@ref)
   - [`OrthogonalUncertaintySet`](@ref)
@@ -22,49 +21,9 @@ abstract type AbstractOrthogonalScaling <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Gives every direction of the Orthogonal Subspace the same uncertainty, the default.
-
-The geometry map of the mean set is then the basis of the subspace, and the set is a Euclidean ball inside the subspace.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\mathbf{\\Lambda} &= \\mathbf{I}_{r}\\,.
-\\end{align}
-```
-
-Where:
-
-  - $(math_dict[:Lambda_orth])
-  - $(math_dict[:r_orth])
-
-# Algorithm
-
-The branch of [`orthogonal_scaling`](@ref) that this tag selects runs this step.
-
- 1. Return the identity of side `size(G, 2)`, the dimension of the subspace, as a dense matrix of the element type of `G`. The caller then takes one kind of square root on both branches.
-
-# Examples
-
-```jldoctest
-julia> IdentityScaling()
-IdentityScaling()
-```
-
-# Related
-
-  - [`AbstractOrthogonalScaling`](@ref)
-  - [`IdiosyncraticVarianceScaling`](@ref)
-  - [`orthogonal_scaling`](@ref)
-"""
-struct IdentityScaling <: AbstractOrthogonalScaling end
-"""
-$(DocStringExtensions.TYPEDEF)
-
 Sizes each direction of the Orthogonal Subspace by the idiosyncratic covariance projected onto it.
 
-A direction that the factors leave noisy gets more uncertainty than a quiet one, where [`IdentityScaling`](@ref) gives both the same. The loadings block must carry an idiosyncratic covariance, and a block whose `esigma` is unset refuses.
+A direction that the factors leave noisy gets more uncertainty than a quiet one, where the default `scaling = nothing` gives both the same. The loadings block must carry an idiosyncratic covariance, and a block whose `esigma` is unset refuses.
 
 # Mathematical definition
 
@@ -98,31 +57,30 @@ IdiosyncraticVarianceScaling()
 # Related
 
   - [`AbstractOrthogonalScaling`](@ref)
-  - [`IdentityScaling`](@ref)
   - [`orthogonal_scaling`](@ref)
   - [`idiosyncratic_variances`](@ref)
 """
 struct IdiosyncraticVarianceScaling <: AbstractOrthogonalScaling end
 """
-    orthogonality_weights(::IdentityMetric, ::AbstractLoadingsRegressionResult)
+    orthogonality_weights(::Nothing, ::AbstractLoadingsRegressionResult)
     orthogonality_weights(::InverseIdiosyncraticVarianceMetric, rr::AbstractLoadingsRegressionResult)
     orthogonality_weights(::BenchmarkWeightMetric, rr::AbstractLoadingsRegressionResult)
     orthogonality_weights(::RegressionWeightMetric, rr::AbstractLoadingsRegressionResult)
     orthogonality_weights(::BenchmarkWeightMetric, rr::CrossSectionalFactorModel)
     orthogonality_weights(::RegressionWeightMetric, rr::CrossSectionalFactorModel)
 
-Cross-sectional weight vector the [`AbstractOrthogonalityMetric`](@ref) names, read off a fitted loadings block.
+Cross-sectional weight vector the [`AbstractOrthogonalityMetric`](@ref) names, read off a fitted loadings block. `nothing` in the place of a metric weighs every asset equally.
 
 # Algorithm
 
- 1. On [`IdentityMetric`](@ref), return `nothing`. The caller reads a `nothing` as a vector of ones, and skips the scaling of the loadings and the division of the projector.
+ 1. On `nothing`, return `nothing`. The caller reads a `nothing` as a vector of ones, and skips the scaling of the loadings and the division of the projector.
  2. On [`InverseIdiosyncraticVarianceMetric`](@ref), read `d`, the idiosyncratic variances, with [`idiosyncratic_variances`](@ref), refuse an entry that is not finite or not `> 0`, and return the element-wise inverse of `d`.
  3. On [`BenchmarkWeightMetric`](@ref) and [`RegressionWeightMetric`](@ref) over a [`CrossSectionalFactorModel`](@ref), return the last row of `bw` or of `rw`, the weights of the latest observation, through [`latest_orthogonality_weights`](@ref).
  4. On the same two metrics over any other loadings block, throw. A block fitted per asset over the observations carries no cross-sectional weight history, so the metric has nothing to read.
 
 # Arguments
 
-  - `metric`: Orthogonality metric.
+  - `metric`: Orthogonality metric, or `nothing` for equal weights.
   - `rr`: Fitted loadings block.
 
 # Validation
@@ -133,7 +91,7 @@ Cross-sectional weight vector the [`AbstractOrthogonalityMetric`](@ref) names, r
 
 # Returns
 
-  - `w::Option{<:VecNum}`: Weight vector of length ``N``, or `nothing` on [`IdentityMetric`](@ref).
+  - `w::Option{<:VecNum}`: Weight vector of length ``N``, or `nothing` on a `nothing` metric.
 
 # Related
 
@@ -142,7 +100,7 @@ Cross-sectional weight vector the [`AbstractOrthogonalityMetric`](@ref) names, r
   - [`idiosyncratic_variances`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
 """
-function orthogonality_weights(::IdentityMetric, ::AbstractLoadingsRegressionResult)
+function orthogonality_weights(::Nothing, ::AbstractLoadingsRegressionResult)
     return nothing
 end
 function orthogonality_weights(::InverseIdiosyncraticVarianceMetric,
@@ -155,11 +113,11 @@ function orthogonality_weights(::InverseIdiosyncraticVarianceMetric,
 end
 function orthogonality_weights(::BenchmarkWeightMetric,
                                rr::AbstractLoadingsRegressionResult)
-    return throw(IsNothingError("`BenchmarkWeightMetric` reads the benchmark weight history `bw` off the loadings block, and a `$(nameof(typeof(rr)))` carries none. A block fitted per asset over the observations states no cross-sectional weight.\nUse `InverseIdiosyncraticVarianceMetric` or `IdentityMetric`, or fit the prior with a cross-sectional factor model, which fills `bw`.\nGot\nrr => $(nameof(typeof(rr)))\nbw => absent"))
+    return throw(IsNothingError("`BenchmarkWeightMetric` reads the benchmark weight history `bw` off the loadings block, and a `$(nameof(typeof(rr)))` carries none. A block fitted per asset over the observations states no cross-sectional weight.\nUse `InverseIdiosyncraticVarianceMetric` or `metric = nothing`, or fit the prior with a cross-sectional factor model, which fills `bw`.\nGot\nrr => $(nameof(typeof(rr)))\nbw => absent"))
 end
 function orthogonality_weights(::RegressionWeightMetric,
                                rr::AbstractLoadingsRegressionResult)
-    return throw(IsNothingError("`RegressionWeightMetric` reads the regression weight history `rw` off the loadings block, and a `$(nameof(typeof(rr)))` carries none. A block fitted per asset over the observations states no cross-sectional weight.\nUse `InverseIdiosyncraticVarianceMetric` or `IdentityMetric`, or fit the prior with a cross-sectional factor model, which fills `rw`.\nGot\nrr => $(nameof(typeof(rr)))\nrw => absent"))
+    return throw(IsNothingError("`RegressionWeightMetric` reads the regression weight history `rw` off the loadings block, and a `$(nameof(typeof(rr)))` carries none. A block fitted per asset over the observations states no cross-sectional weight.\nUse `InverseIdiosyncraticVarianceMetric` or `metric = nothing`, or fit the prior with a cross-sectional factor model, which fills `rw`.\nGot\nrr => $(nameof(typeof(rr)))\nrw => absent"))
 end
 function orthogonality_weights(::BenchmarkWeightMetric, rr::CrossSectionalFactorModel)
     return latest_orthogonality_weights(rr.bw, :bw, rr)
@@ -189,7 +147,7 @@ Last row of a cross-sectional weight history, checked as a metric.
 # Validation
 
   - `!isempty(w)`, else an `IsEmptyError`.
-  - Every entry of the last row is finite and `> 0`, else a `DomainError`. A weight of zero excluded its asset from the fit, and an excluded asset gives the metric a singular direction. The Investable Mask does not remove this case. An asset can be investable, with a finite return and a stated moment, and still sit outside the estimation universe of the latest cross-section, so its weight is zero while its loadings and variance are finite. The two metrics that read no weight history, [`InverseIdiosyncraticVarianceMetric`](@ref) and [`IdentityMetric`](@ref), accept such an asset.
+  - Every entry of the last row is finite and `> 0`, else a `DomainError`. A weight of zero excluded its asset from the fit, and an excluded asset gives the metric a singular direction. The Investable Mask does not remove this case. An asset can be investable, with a finite return and a stated moment, and still sit outside the estimation universe of the latest cross-section, so its weight is zero while its loadings and variance are finite. [`InverseIdiosyncraticVarianceMetric`](@ref) and the `nothing` metric read no weight history, so they accept such an asset.
 
 # Returns
 
@@ -202,7 +160,7 @@ Last row of a cross-sectional weight history, checked as a metric.
 """
 function latest_orthogonality_weights(::Nothing, name::Symbol,
                                       rr::AbstractLoadingsRegressionResult)
-    return throw(IsNothingError("`$(name)` is unset on this loadings block, so it carries no cross-sectional weight history to read.\nBuild the block with `$(name)` set, or select `InverseIdiosyncraticVarianceMetric` or `IdentityMetric`, which read no weight history.\nGot\nrr => $(nameof(typeof(rr)))\n$(name) => nothing"))
+    return throw(IsNothingError("`$(name)` is unset on this loadings block, so it carries no cross-sectional weight history to read.\nBuild the block with `$(name)` set, or select `InverseIdiosyncraticVarianceMetric` or `metric = nothing`, which read no weight history.\nGot\nrr => $(nameof(typeof(rr)))\n$(name) => nothing"))
 end
 function latest_orthogonality_weights(w::MatNum, name::Symbol,
                                       ::AbstractLoadingsRegressionResult)
@@ -210,23 +168,36 @@ function latest_orthogonality_weights(w::MatNum, name::Symbol,
     wl = view(w, size(w, 1), :)
     @argcheck(all(x -> isfinite(x) && x > zero(x), wl),
               DomainError(wl,
-                          "every weight of the latest observation of $(name) must be finite and > 0; a weight of 0 excluded its asset from the latest cross-sectional fit and leaves the metric singular. An investable asset can sit outside the estimation universe of that fit; use `InverseIdiosyncraticVarianceMetric` or `IdentityMetric`, which read no weight history"))
+                          "every weight of the latest observation of $(name) must be finite and > 0; a weight of 0 excluded its asset from the latest cross-sectional fit and leaves the metric singular. An investable asset can sit outside the estimation universe of that fit; use `InverseIdiosyncraticVarianceMetric` or `metric = nothing`, which read no weight history"))
     return wl
 end
 """
-    orthogonal_scaling(::IdentityScaling, G::MatNum, ::AbstractLoadingsRegressionResult)
+    orthogonal_scaling(::Nothing, G::MatNum, ::AbstractLoadingsRegressionResult)
     orthogonal_scaling(::IdiosyncraticVarianceScaling, G::MatNum, rr::AbstractLoadingsRegressionResult)
 
 Scaling ``\\mathbf{\\Lambda}`` of the mean set inside the Orthogonal Subspace.
 
+`nothing` gives every direction of the subspace the same uncertainty, the default. The geometry map of the mean set is then the basis of the subspace, and the set is a Euclidean ball inside the subspace.
+
+```math
+\\begin{align}
+\\mathbf{\\Lambda} &= \\mathbf{I}_{r}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:Lambda_orth])
+  - $(math_dict[:r_orth])
+
 # Algorithm
 
- 1. On [`IdentityScaling`](@ref), run the step that its docstring lists.
+ 1. On `nothing`, return the identity of side `size(G, 2)`, the dimension of the subspace, as a dense matrix of the element type of `G`. The caller then takes one kind of square root on both branches.
  2. On [`IdiosyncraticVarianceScaling`](@ref), run the steps that its docstring lists.
 
 # Arguments
 
-  - `scaling`: Orthogonal scaling.
+  - `scaling`: Orthogonal scaling, or `nothing`.
   - `G`: Orthonormal basis of the Orthogonal Subspace, ``N \\times r``.
   - `rr`: Fitted loadings block.
 
@@ -241,13 +212,11 @@ Scaling ``\\mathbf{\\Lambda}`` of the mean set inside the Orthogonal Subspace.
 # Related
 
   - [`AbstractOrthogonalScaling`](@ref)
-  - [`IdentityScaling`](@ref)
   - [`IdiosyncraticVarianceScaling`](@ref)
   - [`OrthogonalUncertaintySet`](@ref)
   - [`idiosyncratic_variances`](@ref)
 """
-function orthogonal_scaling(::IdentityScaling, G::MatNum,
-                            ::AbstractLoadingsRegressionResult)
+function orthogonal_scaling(::Nothing, G::MatNum, ::AbstractLoadingsRegressionResult)
     return Matrix{eltype(G)}(LinearAlgebra.I, size(G, 2), size(G, 2))
 end
 function orthogonal_scaling(::IdiosyncraticVarianceScaling, G::MatNum,
@@ -302,6 +271,8 @@ One fit serves both axes. [`ucs`](@ref) takes the weighted factor span once and 
 
 The point estimates stay as the prior states them. The mean set is centred on `pr.mu` and the covariance set carries `pr.sigma`, so the prior is not shrunk. The correction is a worst case that grows with the exposure of the portfolio to the Orthogonal Subspace, and it counters an optimiser that over-allocates to the directions the factors do not span.
 
+The pair of sets is this library's construction. Section 3 of [saxena2010](@cite) shows that an optimiser over-weights the component of the characteristic that the factors do not span. Section 5 of that work adds one factor along that component to the risk model, the Alpha Alignment Factor of [saxena2013](@cite). The covariance set extends that penalty to every direction the factors do not span. The mean set is a flat ellipsoid in the sense of Equation 14 of [bentalnemirovski1998](@cite), confined to the same subspace.
+
 Inside a cluster of a hierarchical optimiser, the two routes give different sets on purpose. The estimator refits on the viewed prior, so it takes the factor span of the cluster's own loadings and sizes its radius on that span. A pair of sets fitted before is viewed instead, and each view is the projection of its set: the worst case of a cluster portfolio as a portfolio of the full universe, with the radius of the full set. The two views still spare the same portfolios.
 
 # Mathematical definition
@@ -322,7 +293,7 @@ r &= N - r_{\\mathbf{B}}\\,, \\\\
 Where:
 
   - ``\\mathbf{B}``: Effective loadings, ``N \\times K``, reduced to a full-rank basis when a Factor Family was re-based.
-  - ``\\mathbf{W}``: Diagonal cross-sectional metric that the [`AbstractOrthogonalityMetric`](@ref) names, the identity under [`IdentityMetric`](@ref).
+  - ``\\mathbf{W}``: Diagonal cross-sectional metric that the [`AbstractOrthogonalityMetric`](@ref) names, the identity under `metric = nothing`.
   - ``(\\cdot)^{+}``: Moore-Penrose pseudo-inverse.
   - $(math_dict[:Q_cpt])
   - ``r_{\\mathbf{B}}``: Numerical rank of ``\\mathbf{W}^{1/2}\\mathbf{B}``, the column count of ``\\mathbf{Q}``.
@@ -341,7 +312,7 @@ Where:
   - $(math_dict[:Sigma_hat])
   - $(math_dict[:kappa_cpt])
 
-Both penalties are zero on a portfolio in the column space of ``\\mathbf{W}\\mathbf{B}``, because ``\\mathbf{G}^{\\intercal}\\mathbf{W}\\mathbf{B} = \\mathbf{0}`` and ``\\mathbf{C}\\mathbf{W}\\mathbf{B} = \\mathbf{W}^{1/2}\\mathbf{B}``. Every other portfolio pays on both axes when both radii are positive and ``\\mathbf{\\Lambda}`` is positive definite. Under [`IdentityMetric`](@ref) that column space is the span of the loadings. Under any other metric it is a different space, and a portfolio along a column of ``\\mathbf{B}`` pays on both axes.
+Both penalties are zero on a portfolio in the column space of ``\\mathbf{W}\\mathbf{B}``, because ``\\mathbf{G}^{\\intercal}\\mathbf{W}\\mathbf{B} = \\mathbf{0}`` and ``\\mathbf{C}\\mathbf{W}\\mathbf{B} = \\mathbf{W}^{1/2}\\mathbf{B}``. Every other portfolio pays on both axes when both radii are positive and ``\\mathbf{\\Lambda}`` is positive definite. Under `metric = nothing` that column space is the span of the loadings. Under any other metric it is a different space, and a portfolio along a column of ``\\mathbf{B}`` pays on both axes.
 
 The rank of the mean set is ``r``, not ``N``, because a flat set is a confidence region of its own subspace. Loadings that span the whole cross-section leave ``r = 0``, a mean set of radius zero and a covariance basis of ``N`` columns, so neither axis carries a penalty.
 
@@ -354,9 +325,9 @@ $(DocStringExtensions.FIELDS)
     OrthogonalUncertaintySet(;
         q::Number = 0.05,
         method::Num_UcSK = ChiSqKUncertaintyAlgorithm(),
-        scaling::AbstractOrthogonalScaling = IdentityScaling(),
+        scaling::Option{<:AbstractOrthogonalScaling} = nothing,
         kappa::Num_CptRad = 1.0,
-        metric::AbstractOrthogonalityMetric = InverseIdiosyncraticVarianceMetric(),
+        metric::Option{<:AbstractOrthogonalityMetric} = InverseIdiosyncraticVarianceMetric(),
         mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot()
     ) -> OrthogonalUncertaintySet
 
@@ -375,7 +346,7 @@ OrthogonalUncertaintySet
          q ┼ Float64: 0.05
     method ┼ ChiSqKUncertaintyAlgorithm
            │   ambient ┴ Bool: false
-   scaling ┼ IdentityScaling()
+   scaling ┼ nothing
      kappa ┼ Float64: 1.0
     metric ┼ InverseIdiosyncraticVarianceMetric()
   mtx_sqrt ┴ EigenFallbackSquareRoot()
@@ -395,9 +366,10 @@ OrthogonalUncertaintySet
 
 # References
 
-  - $(ref_dict[:palomar2025]) Chapter 14.
-  - $(ref_dict[:goldfarbiyengar2003]) Section 5.
-  - $(ref_dict[:bentalnemirovski1998]) Section 3.
+  - $(ref_dict[:saxena2010]) Sections 3 and 5. $(ref_dict[:no_original_source])
+  - $(ref_dict[:saxena2013])
+  - $(ref_dict[:bentalnemirovski1998]) Section 3, Equation 14.
+  - $(ref_dict[:goldfarbiyengar2003]) Section 5, Equation 50.
 """
 @concrete struct OrthogonalUncertaintySet <: AbstractPriorUncertaintySetEstimator
     """
@@ -409,7 +381,7 @@ OrthogonalUncertaintySet
     """
     method
     """
-    Scaling of the mean set inside the Orthogonal Subspace. It changes the shape of the set and not the subspace the set lives in.
+    Scaling of the mean set inside the Orthogonal Subspace, or `nothing` for a Euclidean ball. It changes the shape of the set and not the subspace the set lives in.
     """
     scaling
     """
@@ -417,7 +389,7 @@ OrthogonalUncertaintySet
     """
     kappa
     """
-    Cross-sectional weighting under which the factor span is taken. It fixes the geometry of both sets, because both read one span.
+    Cross-sectional weighting under which the factor span is taken, or `nothing` for equal weights. It fixes the geometry of both sets, because both read one span.
     """
     metric
     """
@@ -425,8 +397,9 @@ OrthogonalUncertaintySet
     """
     mtx_sqrt
     function OrthogonalUncertaintySet(q::Number, method::Num_UcSK,
-                                      scaling::AbstractOrthogonalScaling, kappa::Num_CptRad,
-                                      metric::AbstractOrthogonalityMetric,
+                                      scaling::Option{<:AbstractOrthogonalScaling},
+                                      kappa::Num_CptRad,
+                                      metric::Option{<:AbstractOrthogonalityMetric},
                                       mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm})
         @argcheck(zero(q) < q < one(q), DomainError(q, "q must be in (0, 1)"))
         # A rule states no number yet, so its range is checked where the number lands, in
@@ -444,9 +417,9 @@ OrthogonalUncertaintySet
 end
 function OrthogonalUncertaintySet(; q::Number = 0.05,
                                   method::Num_UcSK = ChiSqKUncertaintyAlgorithm(),
-                                  scaling::AbstractOrthogonalScaling = IdentityScaling(),
+                                  scaling::Option{<:AbstractOrthogonalScaling} = nothing,
                                   kappa::Num_CptRad = 1.0,
-                                  metric::AbstractOrthogonalityMetric = InverseIdiosyncraticVarianceMetric(),
+                                  metric::Option{<:AbstractOrthogonalityMetric} = InverseIdiosyncraticVarianceMetric(),
                                   mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())::OrthogonalUncertaintySet
     return OrthogonalUncertaintySet(q, method, scaling, kappa, metric, mtx_sqrt)
 end
@@ -481,7 +454,7 @@ Step 7 counts the rank after the re-basis that step 2 reads, because the selecte
 # Returns
 
   - `rr::AbstractLoadingsRegressionResult`: The loadings block the span came from.
-  - `w_sqrt::Option{<:VecNum}`: Element-wise square root of the metric, or `nothing` on [`IdentityMetric`](@ref).
+  - `w_sqrt::Option{<:VecNum}`: Element-wise square root of the metric, or `nothing` on a `nothing` metric.
   - `Q::MatNum`: Orthonormal basis of the weighted factor span, ``N \\times r_{\\mathbf{B}}``.
 
 # Related
@@ -728,7 +701,7 @@ function sigma_ucs(ue::OrthogonalUncertaintySet, pr::AbstractPriorResult; rd = n
 end
 
 """
-    cs_diagnostic_weights(weighting::IdentityMetric, csfm::CrossSectionalFactorModel)
+    cs_diagnostic_weights(weighting::Nothing, csfm::CrossSectionalFactorModel)
     cs_diagnostic_weights(weighting::BenchmarkWeightMetric, csfm::CrossSectionalFactorModel)
     cs_diagnostic_weights(weighting::RegressionWeightMetric, csfm::CrossSectionalFactorModel)
     cs_diagnostic_weights(weighting::InverseIdiosyncraticVarianceMetric, csfm::CrossSectionalFactorModel)
@@ -739,14 +712,14 @@ Return the cross-sectional weight history an [`AbstractOrthogonalityMetric`](@re
 
 # Algorithm
 
- 1. On [`IdentityMetric`](@ref), return `nothing`.
+ 1. On `nothing`, return `nothing`.
  2. On [`BenchmarkWeightMetric`](@ref), return the history `csfm.bw` through [`cs_diagnostic_weight_history`](@ref).
  3. On [`RegressionWeightMetric`](@ref), return the history `csfm.rw` through [`cs_diagnostic_weight_history`](@ref).
  4. On [`InverseIdiosyncraticVarianceMetric`](@ref), read `vs`, the idiosyncratic variance history `csfm.vs`, through [`cs_diagnostic_weight_history`](@ref), and return its element-wise inverse.
 
 # Arguments
 
-  - `weighting`: The metric that names the history.
+  - `weighting`: The metric that names the history, or `nothing` for equal weights.
   - `csfm`: A cross-sectional factor model block.
 
 # Validation
@@ -755,7 +728,7 @@ Return the cross-sectional weight history an [`AbstractOrthogonalityMetric`](@re
 
 # Returns
 
-  - `u::Option{<:MatNum}`: `observations × assets`, and `nothing` under [`IdentityMetric`](@ref), which the diagnostics read as equal weights.
+  - `u::Option{<:MatNum}`: `observations × assets`, and `nothing` under a `nothing` metric, which the diagnostics read as equal weights.
 
 # Related
 
@@ -764,7 +737,7 @@ Return the cross-sectional weight history an [`AbstractOrthogonalityMetric`](@re
   - [`exposure_weights`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
 """
-function cs_diagnostic_weights(::IdentityMetric, ::CrossSectionalFactorModel)
+function cs_diagnostic_weights(::Nothing, ::CrossSectionalFactorModel)
     return nothing
 end
 function cs_diagnostic_weights(::BenchmarkWeightMetric, csfm::CrossSectionalFactorModel)
@@ -805,5 +778,5 @@ function cs_diagnostic_weight_history(A::MatNum, ::AbstractString, ::AbstractStr
     return A
 end
 
-export IdentityScaling, IdiosyncraticVarianceScaling, OrthogonalUncertaintySet
+export IdiosyncraticVarianceScaling, OrthogonalUncertaintySet
 public AbstractOrthogonalScaling, orthogonal_scaling

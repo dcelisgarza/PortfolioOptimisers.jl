@@ -11,20 +11,22 @@
         pdm::Option{<:AbstractPosdefEstimator},
     ) -> PortfolioOptimisersCovariance
 
-Convenience constructor. Returns a [`PortfolioOptimisersCovariance`](@ref) configured to apply
-positive definite projection then denoising, in that order, via [`MatrixProcessing`](@ref).
+Returns a [`PortfolioOptimisersCovariance`](@ref) that projects the covariance matrix to the
+positive definite cone and then denoises it. A [`MatrixProcessing`](@ref) applies the two steps in
+that order.
 
-[`denoise!`](@ref) in `src/04_MatrixProcessing/02_Denoise.jl` states the mathematics of the denoising step, and
-[`posdef!`](@ref) in `src/04_MatrixProcessing/01_PosdefMatrix.jl` that of the projection.
+[`denoise!`](@ref) in `src/04_MatrixProcessing/02_Denoise.jl` states the mathematics of the
+denoising step. [`posdef!`](@ref) in `src/04_MatrixProcessing/01_PosdefMatrix.jl` states the
+mathematics of the projection.
 
 # Algorithm
 
  1. Build a [`MatrixProcessing`](@ref) from `pdm` and `dn`, with `order = (:pdm, :dn)`.
- 2. Return a [`PortfolioOptimisersCovariance`](@ref) carrying `ce` and that estimator.
+ 2. Return a [`PortfolioOptimisersCovariance`](@ref) that holds `ce` and that estimator.
 
-`order` is what fixes the composition: `Statistics.cov` runs `ce` first, then projects the matrix
-onto the positive definite cone, and denoises last. A caller who needs the reverse order builds the
-[`MatrixProcessing`](@ref) itself.
+The `order` field sets the composition. `Statistics.cov` runs `ce` first. Then it projects the
+matrix onto the positive definite cone, and it denoises the matrix last. For the reverse order,
+build the [`MatrixProcessing`](@ref) directly.
 
 # Arguments
 
@@ -34,7 +36,7 @@ onto the positive definite cone, and denoises last. A caller who needs the rever
 
 # Returns
 
-  - `ce::PortfolioOptimisersCovariance`: Composite estimator that denoises the matrix `ce` computes.
+  - `ce::PortfolioOptimisersCovariance`: The composite estimator that denoises the matrix that `ce` computes.
 
 # Examples
 

@@ -159,7 +159,7 @@ It is the sibling of [`RiskJuMPOptimisationResult`](@ref). A relaxed risk budget
 """
 abstract type NonRiskJuMPOptimisationResult <: NonFiniteAllocationOptimisationResult end
 """
-    const RJR_NRJR = Union{<:RiskJuMPOptimisationResult, <:NonRiskJuMPOptimisationResult}
+    const RJR_NRJR = Union{RiskJuMPOptimisationResult, NonRiskJuMPOptimisationResult}
 
 Union of the two branches of JuMP optimisation results.
 
@@ -170,7 +170,7 @@ The default `getproperty` and `propertynames` dispatch on this union, not on one
   - [`RiskJuMPOptimisationResult`](@ref)
   - [`NonRiskJuMPOptimisationResult`](@ref)
 """
-const RJR_NRJR = Union{<:RiskJuMPOptimisationResult, <:NonRiskJuMPOptimisationResult}
+const RJR_NRJR = Union{RiskJuMPOptimisationResult, NonRiskJuMPOptimisationResult}
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -203,7 +203,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the objective functions of a JuMP portfolio optimisation.
 
-Four concrete subtypes are the four classic objectives of the source, one for each subsection of its Section 8.2: [`MinimumRisk`](@ref), [`MaximumReturn`](@ref), [`MaximumUtility`](@ref) and [`MaximumRatio`](@ref). The fifth, [`MaximumElementReturn`](@ref), is internal. It maximises one return term, for the corner solves of a return frontier.
+Four concrete subtypes are the four classic objectives of Section 8.2 of [cajas2025](@cite), one for each subsection: [`MinimumRisk`](@ref), [`MaximumReturn`](@ref), [`MaximumUtility`](@ref) and [`MaximumRatio`](@ref). The fifth, [`MaximumElementReturn`](@ref), is internal. It maximises one return term, for the corner solves of a return frontier.
+
+[`MinimumRisk`](@ref) and [`MaximumReturn`](@ref) are the two ends of the efficient set of [markowitz1952](@cite). Its expected return-variance rule keeps a portfolio of minimum variance for a given return or more, and of maximum return for a given variance or less, on page 82. [`MaximumRatio`](@ref) picks the portfolio at which a ray from the riskless point is tangent to the opportunity curve, which is the tangency portfolio on page 432 of [sharpe1964](@cite). [`MaximumUtility`](@ref) trades return against risk through a risk aversion parameter, as in Section 8.2.3 of [cajas2025](@cite).
 
 # Related
 
@@ -215,7 +217,9 @@ Four concrete subtypes are the four classic objectives of the source, one for ea
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 8.2.
+  - $(ref_dict[:cajas2025]) Section 8.2.3, Equation 8.12. $(ref_dict[:no_original_source])
+  - $(ref_dict[:markowitz1952]) Page 82.
+  - $(ref_dict[:sharpe1964]) Page 432.
 """
 abstract type ObjectiveFunction <: AbstractEstimator end
 """
@@ -223,7 +227,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the estimators that write the expected portfolio return into a JuMP model.
 
-Two concrete subtypes are the two return definitions of the source: [`ArithmeticReturn`](@ref), the arithmetic return of its Section 8.1.1, and [`LogarithmicReturn`](@ref), the geometric return of its Section 8.1.2. The third, [`NoReturn`](@ref), writes a return term that is identically zero.
+Two concrete subtypes are the two return definitions of Section 8.1 of [cajas2025](@cite): [`ArithmeticReturn`](@ref), the arithmetic return of its Section 8.1.1, and [`LogarithmicReturn`](@ref), the geometric return of its Section 8.1.2. The third, [`NoReturn`](@ref), writes a return term that is identically zero.
+
+The arithmetic return is the weighted sum of the expected returns of the assets, on page 81 of [markowitz1952](@cite). The logarithmic return is the expected rate of growth of capital that [kelly1956](@cite) maximises, on pages 919 and 920. The mean of the logarithm of one plus the return of a portfolio is the geometric mean of Chapter 6 of [markowitz1959](@cite), on pages 120 and 121.
 
 # Related
 
@@ -234,6 +240,9 @@ Two concrete subtypes are the two return definitions of the source: [`Arithmetic
 # References
 
   - $(ref_dict[:cajas2025]) Section 8.1.
+  - $(ref_dict[:markowitz1952]) Page 81.
+  - $(ref_dict[:kelly1956]) Pages 919 and 920.
+  - $(ref_dict[:markowitz1959]) Chapter 6, pages 120 and 121.
 """
 abstract type JuMPReturnsEstimator <: AbstractEstimator end
 """
@@ -300,7 +309,7 @@ The `ccnt` field of [`JuMPOptimiser`](@ref) accepts a vector, and [`add_custom_c
 """
 const VecJuMPConstr = AbstractVector{<:CustomJuMPConstraint}
 """
-    const JuMPConstr_VecJuMPConstr = Union{<:CustomJuMPConstraint, <:VecJuMPConstr}
+    const JuMPConstr_VecJuMPConstr = Union{CustomJuMPConstraint, VecJuMPConstr}
 
 Alias for one custom JuMP constraint or a vector of them.
 
@@ -311,7 +320,7 @@ The `ccnt` field of [`JuMPOptimiser`](@ref) accepts a value of this alias, `noth
   - [`CustomJuMPConstraint`](@ref)
   - [`VecJuMPConstr`](@ref)
 """
-const JuMPConstr_VecJuMPConstr = Union{<:CustomJuMPConstraint, <:VecJuMPConstr}
+const JuMPConstr_VecJuMPConstr = Union{CustomJuMPConstraint, VecJuMPConstr}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -360,7 +369,7 @@ The `cobj` field of [`JuMPOptimiser`](@ref) accepts a vector, and [`add_custom_o
 """
 const VecJuMPObj = AbstractVector{<:CustomJuMPObjective}
 """
-    const JuMPObj_VecJuMPObj = Union{<:CustomJuMPObjective, <:VecJuMPObj}
+    const JuMPObj_VecJuMPObj = Union{CustomJuMPObjective, VecJuMPObj}
 
 Alias for one custom JuMP objective term or a vector of them.
 
@@ -371,7 +380,7 @@ The `cobj` field of [`JuMPOptimiser`](@ref) accepts a value of this alias, `noth
   - [`CustomJuMPObjective`](@ref)
   - [`VecJuMPObj`](@ref)
 """
-const JuMPObj_VecJuMPObj = Union{<:CustomJuMPObjective, <:VecJuMPObj}
+const JuMPObj_VecJuMPObj = Union{CustomJuMPObjective, VecJuMPObj}
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -591,7 +600,7 @@ A [`Frontier`](@ref) sweep solves one model per point, and its result holds one 
 """
 const VecJuMPOptSol = AbstractVector{<:JuMPOptimisationSolution}
 """
-    const JuMPOptSol_VecJuMPOptSol = Union{<:JuMPOptimisationSolution, <:VecJuMPOptSol}
+    const JuMPOptSol_VecJuMPOptSol = Union{JuMPOptimisationSolution, VecJuMPOptSol}
 
 Alias for one JuMP optimisation solution or a vector of them.
 
@@ -602,7 +611,7 @@ It is the type of the `sol` argument of [`JuMPOptimisationResult`](@ref), which 
   - [`JuMPOptimisationSolution`](@ref)
   - [`VecJuMPOptSol`](@ref)
 """
-const JuMPOptSol_VecJuMPOptSol = Union{<:JuMPOptimisationSolution, <:VecJuMPOptSol}
+const JuMPOptSol_VecJuMPOptSol = Union{JuMPOptimisationSolution, VecJuMPOptSol}
 
 export JuMPOptimisationSolution, JuMPOptimisationResult
 public CustomJuMPObjective, CustomJuMPConstraint, VecJuMPObj, VecJuMPConstr,

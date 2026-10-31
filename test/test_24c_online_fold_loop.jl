@@ -85,6 +85,28 @@ assets is what keeps the JuMP families cheap.
         @test seen == 1:n
     end
 
+    @testset "A meta-optimiser steps its inner cross-validation under an Online Scheme" begin
+        # The `cv` field of a meta-optimiser takes an Online Scheme, and the outer problem
+        # reads the same returns as under the expanding batch scheme.
+        metas = (cv -> Stacking(; opti = [mr, InverseVolatility()],
+                                opto = InverseVolatility(), cv = cv),
+                 cv -> NestedClustered(; opti = mr, opto = InverseVolatility(), cv = cv))
+        for mk in metas
+            b = optimise(mk(batch_cv), rd)
+            o = optimise(mk(online_cv), rd)
+            @test o.cv === online_cv
+            @test isapprox(o.reso.w, b.reso.w; atol = weight_tol(mr))
+            @test isapprox(o.w, b.w; atol = weight_tol(mr))
+        end
+        # The inner Online Scheme is a scheme, not a sample buffer, so neither the batch
+        # entry nor the entry of an outer online arm refuses it.
+        st = first(metas)(online_cv)
+        @test isnothing(po.online_wrapper_path(st))
+        @test isnothing(po.online_unreached_path(st))
+        @test length(cross_val_predict(st, rd, OnlineIndexWalkForward(100, 30)).pred) ==
+              n_splits(OnlineIndexWalkForward(100, 30), rd)
+    end
+
     @testset "A benchmark-relative walk fits X - B at every fold (#1645, #1651)" begin
         # A prior that states `x_src = ExcessSource()` fits `X - B` at every fold. The step
         # folds `X - B` into the prior and keeps the raw rows, so the online walk reaches the
@@ -601,6 +623,37 @@ assets is what keeps the JuMP families cheap.
         end
         # A cold estimator with no window has nothing to read out.
         @test_throws ArgumentError po.fit_and_predict(mr, rd; test_idx = cvr.test_idx[1])
+    end
+
+    @testset "The context of a fold carries what the fold loop hands it (#1912)" begin
+        cvr = split(online_cv, rd)
+        n = length(cvr.test_idx)
+        # A schedule that is a function of the context records what the online arm hands it.
+        seen = TimeDependentContext[]
+        function record(ctx)
+            push!(seen, ctx)
+            return mr
+        end
+        sched_fn = NestedClustered(; opti = TimeDependent(record), opto = mr)
+        res = cross_val_predict(sched_fn, rd, online_cv)
+        @test length(res.pred) == n
+        @test sort!(unique(c.i for c in seen)) == 1:n
+        @test all(c -> c.n == n && c.test_idx == cvr.test_idx, seen)
+        @test all(c -> c.train_idx == cvr.train_idx, seen)
+        @test all(c -> isnothing(c.path_id) && c.rd.nx == nx, seen)
+        # The first fold has no previous weights, and each later fold carries the weights
+        # that the fold before it gave.
+        for c in seen
+            if c.i == 1
+                @test isnothing(c.w_prev)
+            else
+                @test c.w_prev == res.pred[c.i - 1].res.w
+            end
+        end
+        # The fold loop inlines the constructor, so the line of its signature has no counter
+        # in a run through the verb. A direct call pins the same record the loop builds.
+        ctx = po.fold_context(2, n, rd, cvr.train_idx, cvr.test_idx, nothing, nothing)
+        @test ctx.i == 2 && ctx.n == n && ctx.test_idx == cvr.test_idx
     end
 
     @testset "The search and the Pipeline take the loop at their doors" begin

@@ -562,7 +562,7 @@ end
 """
     ew_beta_shrink(b::AbstractVector{<:Real}, bev::AbstractVector{<:Real},
                    L::AbstractVector{<:Integer}, w::AbstractVector{<:Real},
-                   min_group_size::Integer, bounds::Tuple{<:Real, <:Real},
+                   min_group_size::Integer, bounds::Tuple{Real, Real},
                    min_val::Real) -> Vector{<:Real}
 
 Shrink one cross-section of raw betas toward the capitalisation-weighted mean of its group.
@@ -639,8 +639,7 @@ julia> PortfolioOptimisers.ew_beta_shrink([0.8, 1.4], [0.01, 0.01], [1, 1], [1.0
 """
 function ew_beta_shrink(b::AbstractVector{<:Real}, bev::AbstractVector{<:Real},
                         L::AbstractVector{<:Integer}, w::AbstractVector{<:Real},
-                        min_group_size::Integer, bounds::Tuple{<:Real, <:Real},
-                        min_val::Real)
+                        min_group_size::Integer, bounds::Tuple{Real, Real}, min_val::Real)
     s = collect(b)
     vld = [!isnan(b[i]) &&
                L[i] != CS_MISSING_GROUP &&
@@ -669,7 +668,7 @@ function ew_beta_shrink(b::AbstractVector{<:Real}, bev::AbstractVector{<:Real},
     return s
 end
 """
-    assert_ew_shrinkage_bounds(bounds::Tuple{<:Real, <:Real}) -> nothing
+    assert_ew_shrinkage_bounds(bounds::Tuple{Real, Real}) -> nothing
 
 Check the bounds an exponentially weighted shrinkage clamps its weight to.
 
@@ -690,7 +689,7 @@ Check the bounds an exponentially weighted shrinkage clamps its weight to.
   - [`EWBeta`](@ref)
   - [`ew_beta_shrink`](@ref)
 """
-function assert_ew_shrinkage_bounds(bounds::Tuple{<:Real, <:Real})::Nothing
+function assert_ew_shrinkage_bounds(bounds::Tuple{Real, Real})::Nothing
     lo, hi = bounds
     @argcheck(zero(lo) <= lo <= hi <= one(hi),
               DomainError(bounds,
@@ -731,7 +730,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Exponentially weighted beta of the returns against the market return, at every observation.
 
-This is the archetype of every market beta Descriptor. The beta is the exponentially weighted covariance of an asset with the market, divided by the exponentially weighted variance of the market. [`market_return_series`](@ref) builds the market return from the Asset Panel. Where the estimator names a categorical Panel Field in `group`, [`ew_beta_shrink`](@ref) shrinks each raw beta toward the capitalisation-weighted mean beta of its group.
+This is the archetype of every market beta Descriptor. The beta is the exponentially weighted covariance of an asset with the market, divided by the exponentially weighted variance of the market. [sharpe1964](@citet) defines the beta of an asset as the slope of the regression of its return on the return of the market, which is the covariance over the variance (pages 438 and 439). The exponential weights and the recursion below are this library's own, and no source for them was found. [`market_return_series`](@ref) builds the market return from the Asset Panel. Where the estimator names a categorical Panel Field in `group`, [`ew_beta_shrink`](@ref) shrinks each raw beta toward the capitalisation-weighted mean beta of its group.
 
 # Mathematical definition
 
@@ -767,7 +766,7 @@ $(DocStringExtensions.FIELDS)
     EWBeta(; mcap::AbstractString = "market_cap", decay::Real, min_obs::Integer,
            agg_obs::Integer = 1, group::Option{<:AbstractString} = nothing,
            min_group_size::Integer = 5,
-           bounds::Tuple{<:Real, <:Real} = (0.0, 1.0), min_val::Real = 1e-12,
+           bounds::Tuple{Real, Real} = (0.0, 1.0), min_val::Real = 1e-12,
            cache::Option{<:AbstractPartialFitState} = nothing) -> EWBeta
 
 Keywords correspond to the struct's fields. `decay` and `min_obs` take no default, because their values depend on the data frequency. [`EWMarketBeta`](@ref) takes a half-life instead, and converts it through [`half_life_decay`](@ref) and [`half_life_min_obs`](@ref).
@@ -808,7 +807,7 @@ EWBeta
 
 # References
 
-  - $(ref_dict[:sharpe1964])
+  - $(ref_dict[:sharpe1964]) Pages 438 and 439.
 """
 @concrete struct EWBeta <: AbstractDescriptorEstimator
     """
@@ -849,7 +848,7 @@ EWBeta
     cache
     function EWBeta(mcap::AbstractString, decay::Real, min_obs::Integer, agg_obs::Integer,
                     group::Option{<:AbstractString}, min_group_size::Integer,
-                    bounds::Tuple{<:Real, <:Real}, min_val::Real,
+                    bounds::Tuple{Real, Real}, min_val::Real,
                     cache::Option{<:AbstractPartialFitState})
         assert_panel_terms(mcap, :mcap)
         assert_ew_decay(decay)
@@ -866,7 +865,7 @@ EWBeta
 end
 function EWBeta(; mcap::AbstractString = "market_cap", decay::Real, min_obs::Integer,
                 agg_obs::Integer = 1, group::Option{<:AbstractString} = nothing,
-                min_group_size::Integer = 5, bounds::Tuple{<:Real, <:Real} = (0.0, 1.0),
+                min_group_size::Integer = 5, bounds::Tuple{Real, Real} = (0.0, 1.0),
                 min_val::Real = 1e-12,
                 cache::Option{<:AbstractPartialFitState} = nothing)::EWBeta
     return EWBeta(mcap, decay, min_obs, agg_obs, group, min_group_size, bounds, min_val,
@@ -1027,7 +1026,7 @@ end
                  decay::Real = half_life_decay(half_life),
                  min_obs::Integer = half_life_min_obs(half_life), agg_obs::Integer = 1,
                  group::Option{<:AbstractString} = nothing, min_group_size::Integer = 5,
-                 bounds::Tuple{<:Real, <:Real} = (0.0, 1.0),
+                 bounds::Tuple{Real, Real} = (0.0, 1.0),
                  min_val::Real = 1e-12) -> EWBeta
 
 Exponentially weighted sensitivity of an asset to the market portfolio.
@@ -1076,8 +1075,7 @@ function EWMarketBeta(; mcap::AbstractString = "market_cap", half_life::Real = 6
                       decay::Real = half_life_decay(half_life),
                       min_obs::Integer = half_life_min_obs(half_life), agg_obs::Integer = 1,
                       group::Option{<:AbstractString} = nothing,
-                      min_group_size::Integer = 5,
-                      bounds::Tuple{<:Real, <:Real} = (0.0, 1.0),
+                      min_group_size::Integer = 5, bounds::Tuple{Real, Real} = (0.0, 1.0),
                       min_val::Real = 1e-12)::EWBeta
     return EWBeta(; mcap = mcap, decay = decay, min_obs = min_obs, agg_obs = agg_obs,
                   group = group, min_group_size = min_group_size, bounds = bounds,

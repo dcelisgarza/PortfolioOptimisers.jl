@@ -10,12 +10,13 @@ whole curve of portfolios that earn the most return for each level of risk. They
 portfolios that take the least risk for each level of return. You compute the whole trade-off first,
 and then choose a point on it.
 
-This page adds three things to the [`MeanRisk` objectives](@ref example-meanrisk-objectives) page. It
+This page adds four things to the [`MeanRisk` objectives](@ref example-meanrisk-objectives) page. It
 computes the frontier from both directions, once by minimising risk above a return floor and once
 by maximising return below a risk ceiling, and plots the two on one chart. It introduces
 [`Frontier`](@ref), which finds the bounds of the frontier for you. It then compares the
 [`MeanRisk`](@ref) frontier with the centred frontier of [`NearOptimalCentering`](@ref), which gives
-up a little of the objective for a portfolio that holds more assets at each point.
+up a little of the objective for a portfolio that holds more assets at each point. Last, it sweeps a
+risk ceiling under [`MaximumRatio`](@ref), which needs a parametric solver wrapper.
 
 !!! tip "When to reach for this"
     Reach for an efficient frontier when you do not want to fix one point of risk and return
@@ -234,7 +235,59 @@ Compare the number of coloured bands at each end with the same plot for the NOC 
 plot_stacked_area_composition(resN.w, rd.nx)
 
 #=
-## 4. Visualising the frontier
+## 4. A frontier under `MaximumRatio`
+
+A risk ceiling can also bound a [`MaximumRatio`](@ref) objective. At each point the optimisation
+finds the portfolio with the highest risk-adjusted return whose CVaR is below the ceiling. Below
+the CVaR of the tangency portfolio, the one that maximises the ratio with no ceiling, the ceiling
+binds, and the point is the point of direction B. Above it, the ceiling does not bind, and every
+point is the tangency portfolio.
+
+`MaximumRatio` homogenises the problem with one more variable, the ratio factor. The
+[`Frontier`](@ref) docstring explains what this changes.
+
+  - A `Frontier` finds its span on a second model without the ratio factor, so the span is the
+    span of direction B. The second model costs one more model build.
+  - The sweep writes each ceiling into a `JuMP.Parameter`, and the ceiling row multiplies it by the
+    ratio factor. Clarabel receives a parameter as a variable, so it sees a product of two
+    variables and refuses the row. We wrap each solver in the `Optimizer` of
+    [ParametricOptInterface](https://jump.dev/ParametricOptInterface.jl/stable/). The wrapper puts
+    the value of the parameter into the row before each solve, so Clarabel receives a linear row.
+    The `settings` of each `Solver` reach Clarabel through the wrapper.
+=#
+
+import ParametricOptInterface as POI
+slv_poi = [Solver(; name = :clarabel1, solver = () -> POI.Optimizer(Clarabel.Optimizer),
+                  settings = Dict("verbose" => false),
+                  check_sol = (; allow_local = true, allow_almost = true)),
+           Solver(; name = :clarabel2, solver = () -> POI.Optimizer(Clarabel.Optimizer),
+                  settings = Dict("verbose" => false, "max_step_fraction" => 0.75),
+                  check_sol = (; allow_local = true, allow_almost = true))]
+
+resR = optimise(MeanRisk(; opt = JuMPOptimiser(; pe = pr, slv = slv_poi),
+                         obj = MaximumRatio(; rf = rf),
+                         r = ConditionalValueatRisk(;
+                                                    settings = RiskMeasureSettings(;
+                                                                                   ub = Frontier(;
+                                                                                                 N = 30)))))
+all(x -> isa(x, OptimisationSuccess), resR.retcode)
+
+#=
+We plot the `MaximumRatio` points over the points of direction B. They lie on direction B up to the
+tangency portfolio, and every point above it is the tangency portfolio.
+=#
+
+xs_R = [expected_risk(rcvar, w, pr.X) for w in resR.w]
+ys_R = [expected_return(ArithmeticReturn(), w, pr) for w in resR.w]
+
+plot(xs_B, ys_B; seriestype = :scatter, marker = (:circle, 5),
+     label = "Maximum return below a risk ceiling", xlabel = "CVaR",
+     ylabel = "Arithmetic return", title = "MaximumRatio below a risk ceiling")
+plot!(xs_R, ys_R; seriestype = :scatter, marker = (:cross, 7),
+      label = "Maximum ratio below a risk ceiling")
+
+#=
+## 5. Visualising the frontier
 
 The efficient frontier is a special case of a Pareto front, and [`plot_measures`](@ref) plots one
 on any pair of axes. Keywords set the measure on the x-axis, the y-axis, the z-axis and the colour

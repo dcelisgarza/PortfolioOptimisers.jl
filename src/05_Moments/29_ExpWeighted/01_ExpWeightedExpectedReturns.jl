@@ -463,6 +463,11 @@ function Statistics.mean(me::ExpWeightedExpectedReturns, X::MatNum; dims::Int = 
     cache = exp_weighted_pass!(me, X, dims, active_mask)
     return exp_weighted_moment(cache, me)
 end
+# The weights of the mean are proportional to `decay^k` over the rows, so the count is their
+# Kish count, the closed form of `exp_weighted_kish_count`.
+function effective_observation_count(me::ExpWeightedExpectedReturns, X::MatNum; kwargs...)
+    return exp_weighted_kish_count(me.decay, size(X, 1))
+end
 """
     Statistics.mean(
         me::ExpWeightedExpectedReturns,
@@ -542,8 +547,7 @@ function partial_fit!(me::ExpWeightedExpectedReturns{<:Any, <:Any,
                       X::MatNum; dims::Int = 1,
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     cache = exp_weighted_pass!(me, X, dims, active_mask, me.cache)
-    Accessors.@reset me.cache = cache
-    return me
+    return cache === me.cache ? me : rebuild_estimator(me, (; cache = cache))
 end
 """
     partial_fit!(

@@ -31,7 +31,7 @@ Keywords correspond to the struct's fields.
 
 # References
 
-  - $(ref_dict[:martin2021])
+  - $(ref_dict[:martin2021]) Methods, page 3. $(ref_dict[:no_original_source])
 """
 @concrete struct GreedyAllocationResult <: FiniteAllocationOptimisationResult
     """
@@ -79,7 +79,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Greedy Allocation portfolio optimiser.
 
-`GreedyAllocation` converts continuous portfolio weights to discrete share quantities with a greedy allocation in two passes. The first pass buys each asset up to its target weight, in descending order of target weight. The second pass spends the leftover cash, one `unit` at a time, on the asset whose realised weight is furthest below its target.
+`GreedyAllocation` converts continuous portfolio weights to discrete share quantities with a greedy allocation in two passes. [martin2021](@cite) states only that the package it describes converts optimal weights into a discrete allocation, in its Methods on page 3. It does not state the passes. The first pass buys each asset up to its target weight, in descending order of target weight. The second pass spends the leftover cash, one `unit` at a time, on the asset whose realised weight is furthest below its target.
 
 [`optimise`](@ref) allocates the long and the short side of a portfolio as two separate sub-problems. Each sub-problem receives its own share of the cash, and renormalises its own weights to sum to one. The definition below describes one sub-problem, so its targets ``\\boldsymbol{w}`` satisfy ``\\sum_i w_i = 1``. A side whose target weights are all zero buys nothing. `optimise` negates the short side's shares when it recombines the two sides.
 
@@ -166,7 +166,7 @@ GreedyAllocation
 
 # References
 
-  - $(ref_dict[:martin2021])
+  - $(ref_dict[:martin2021]) Methods, page 3. $(ref_dict[:no_original_source])
 """
 @concrete struct GreedyAllocation <: FiniteAllocationOptimisationEstimator
     """

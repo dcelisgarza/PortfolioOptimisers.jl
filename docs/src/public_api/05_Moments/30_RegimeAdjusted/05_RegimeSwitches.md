@@ -1,5 +1,5 @@
 ```@meta
-Description = "Regime switches, public API of PortfolioOptimisers.jl: ExactDebias, LawDebias, RawStatistic, NoHacFloor, PerTermHacFloor, VolatilityBeforeUpdate, …"
+Description = "Regime switches, public API of PortfolioOptimisers.jl: ExactDebias, LawDebias, PerTermHacFloor, VolatilityBeforeUpdate, VolatilityAfterUpdate, …"
 ```
 
 # Regime switches
@@ -9,13 +9,10 @@ Description = "Regime switches, public API of PortfolioOptimisers.jl: ExactDebia
 ```@docs
 ExactDebias
 LawDebias
-RawStatistic
-NoHacFloor
 PerTermHacFloor
 VolatilityBeforeUpdate
 VolatilityAfterUpdate
 BiasCorrectedVolatility
-RawVolatility
 RefuseIndefiniteWarmUp
 ClipIndefiniteBlock
 ScoreIndefiniteBlock

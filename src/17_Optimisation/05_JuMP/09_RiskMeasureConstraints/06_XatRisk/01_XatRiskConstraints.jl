@@ -196,7 +196,12 @@ to `model`.
 
 Uses the closed-form z-score from `compute_value_at_risk_z` and adds a second-order cone
 constraint to bound the portfolio standard deviation. The VaR expression is
-`-mu'w + z * g_var`.
+`-mu'w + z * g_var`. The gain tail is the same expression for the negated portfolio, `-w`,
+which is `mu'w + z_g * g_var`, because the cone is symmetric in `w`. Here `z_g` is the
+z-score of [`gain_tail_distribution`](@ref) of `dist`, the law of the standardised loss of
+`-w`, so `z_g = -compute_value_at_risk_cz(dist, alpha)`. For a `dist` that is symmetric
+about zero, `z_g = z`. The bound of the measure applies to the value of the tail on both
+sides.
 
 # Arguments
 
@@ -207,40 +212,129 @@ constraint to bound the portfolio standard deviation. The VaR expression is
   - $(arg_dict[:opt_rjumpe])
   - $(arg_dict[:pr])
 
+# Keyword arguments
+
+  - `loss::Bool`: If `true` (default), the measure is applied to the portfolio `w`; if
+    `false`, to the negated portfolio `-w`. [`set_range_risk_constraints!`](@ref) sets it to
+    `false` to build the gain tail of [`GenericValueatRiskRange`](@ref).
+  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
+  - `g_var::Option{<:JuMP.AbstractVariableRef}`: The standard deviation variable of a cone
+    that the two tails of a [`GenericValueatRiskRange`](@ref) share, or `nothing` (default)
+    to build a cone of its own.
+
 # Returns
 
-  - `nothing`.
+  - `var_risk`: The value of the tail, the risk expression added to the model.
 
 # Related
 
   - [`ValueatRisk`](@ref)
   - [`DistributionValueatRisk`](@ref)
   - [`compute_value_at_risk_z`](@ref)
+  - [`gain_tail_distribution`](@ref)
+  - [`set_distribution_var_cone!`](@ref)
   - [`set_risk_constraints!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::ValueatRisk{<:Any, <:Any, <:Any,
                                               <:DistributionValueatRisk},
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
-                               loss::Bool = true, prefix::Symbol = Symbol(""), kwargs...)
+                               loss::Bool = true, prefix::Symbol = Symbol(""),
+                               g_var::Option{<:JuMP.AbstractVariableRef} = nothing,
+                               kwargs...)
     alg = r.alg
     mu = nothing_scalar_array_selector(alg.mu, pr.mu)
-    G = chol_sigma_selector(model, pr, r.alg)
     w = get_w(model, prefix)
-    sc = get_constraint_scale(model)
-    z = if loss
-        compute_value_at_risk_z(r.alg.dist, r.alpha)
-    else
-        compute_value_at_risk_cz(r.alg.dist, r.alpha)
-    end
-    g_var = state_set!(model, prefix, :g_var_, i, JuMP.@variable(model))
+    g_var = set_distribution_var_cone!(model, i, g_var, alg, pr, w; prefix = prefix)
+    # The gain tail is the loss tail of the negated portfolio, `-w`. The cone is symmetric in
+    # `w`, so the sign of the mean term changes, and the standardised loss of `-w` is the
+    # negated standardised loss, whose law `gain_tail_distribution` gives (#1822). The bound
+    # and the returned expression are the value of the tail, as `range_tail_risk` reports it.
+    dist = loss ? r.alg.dist : gain_tail_distribution(r.alg.dist)
+    z = compute_value_at_risk_z(dist, r.alpha)
+    mu_w = loss ? -LinearAlgebra.dot(mu, w) : LinearAlgebra.dot(mu, w)
     var_risk = state_set!(model, prefix, :var_risk_, i,
-                          JuMP.@expression(model, -LinearAlgebra.dot(mu, w) + z * g_var))
-    state_set!(model, prefix, :cvar_soc_, i,
-               JuMP.@constraint(model, [sc * g_var; sc * G * w] in JuMP.SecondOrderCone()))
+                          JuMP.@expression(model, mu_w + z * g_var))
     set_risk_bounds_and_expression!(model, opt, var_risk, r.settings, :var_risk_, i;
                                     prefix = prefix)
-    return loss ? var_risk : -var_risk
+    return var_risk
+end
+"""
+    set_distribution_var_cone!(model::JuMP.Model, i::Any, G::MatNum, w::AbstractVector,
+                               g_key::Symbol, soc_key::Symbol; prefix::Symbol = Symbol(""))
+    set_distribution_var_cone!(model::JuMP.Model, i::Any, ::Nothing,
+                               alg::DistributionValueatRisk, pr::AbstractPriorResult,
+                               w::AbstractVector; prefix::Symbol = Symbol(""))
+    set_distribution_var_cone!(::JuMP.Model, ::Any, g_var::JuMP.AbstractVariableRef, args...;
+                               kwargs...)
+
+Add the standard deviation variable of the parametric Value-at-Risk and its second-order cone to `model`.
+
+The cone bounds the variable from below by the standard deviation of the portfolio, so an expression that reads the variable with a coefficient that is not negative takes the standard deviation at the optimum. [`ValueatRiskRange`](@ref) and the two tails of a [`GenericValueatRiskRange`](@ref) read one variable, with the sum of their coefficients.
+
+  - With a factor `G`, the method adds the variable and the cone under `g_key` and `soc_key`.
+  - With `nothing`, the method reads `G` from `alg` and `pr` with [`chol_sigma_selector`](@ref), and adds the cone of a [`ValueatRisk`](@ref) tail.
+  - With a variable `g_var`, the method adds nothing and returns `g_var`. A tail of a [`GenericValueatRiskRange`](@ref) then reads the cone that the range shares.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+g &\\geq \\lVert \\mathbf{G}\\boldsymbol{w} \\rVert_2\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``g``: Standard deviation variable.
+  - ``\\mathbf{G}``: Cholesky factor of the covariance matrix.
+  - $(math_dict[:w_port])
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `G::MatNum`: Cholesky factor of the covariance matrix, from [`chol_sigma_selector`](@ref).
+  - `w::AbstractVector`: Portfolio weights variable.
+  - `g_key::Symbol`: Bare Model State entry name of the variable.
+  - `soc_key::Symbol`: Bare Model State entry name of the cone.
+  - `alg::DistributionValueatRisk`: The formulation of the tail, read for `sigma`, `chol` and `mtx_sqrt`.
+  - $(arg_dict[:pr])
+  - `g_var::JuMP.AbstractVariableRef`: The standard deviation variable of a shared cone.
+
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
+
+# Returns
+
+  - `g_var`: The standard deviation variable.
+
+# Related
+
+  - [`ValueatRisk`](@ref)
+  - [`ValueatRiskRange`](@ref)
+  - [`GenericValueatRiskRange`](@ref)
+  - [`DistributionValueatRisk`](@ref)
+"""
+function set_distribution_var_cone!(model::JuMP.Model, i::Any, G::MatNum, w::AbstractVector,
+                                    g_key::Symbol, soc_key::Symbol;
+                                    prefix::Symbol = Symbol(""))
+    sc = get_constraint_scale(model)
+    g_var = state_set!(model, prefix, g_key, i, JuMP.@variable(model))
+    state_set!(model, prefix, soc_key, i,
+               JuMP.@constraint(model, [sc * g_var; sc * G * w] in JuMP.SecondOrderCone()))
+    return g_var
+end
+function set_distribution_var_cone!(model::JuMP.Model, i::Any, ::Nothing,
+                                    alg::DistributionValueatRisk, pr::AbstractPriorResult,
+                                    w::AbstractVector; prefix::Symbol = Symbol(""))
+    return set_distribution_var_cone!(model, i, chol_sigma_selector(model, pr, alg), w,
+                                      :g_var_, :cvar_soc_; prefix = prefix)
+end
+function set_distribution_var_cone!(::JuMP.Model, ::Any, g_var::JuMP.AbstractVariableRef,
+                                    args...; kwargs...)
+    return g_var
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -280,13 +374,12 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                prefix::Symbol = Symbol(""), kwargs...)
     alg = r.alg
     mu = nothing_scalar_array_selector(alg.mu, pr.mu)
-    G = chol_sigma_selector(model, pr, r.alg)
     w = get_w(model, prefix)
-    sc = get_constraint_scale(model)
     dist = r.alg.dist
     z_l = compute_value_at_risk_z(dist, r.alpha)
     z_h = compute_value_at_risk_cz(dist, r.beta)
-    g_var = state_set!(model, prefix, :g_var_range_, i, JuMP.@variable(model))
+    g_var = set_distribution_var_cone!(model, i, chol_sigma_selector(model, pr, alg), w,
+                                       :g_var_range_, :cvar_range_soc_; prefix = prefix)
     var_range_mu = state_set!(model, prefix, :var_range_mu_, i,
                               JuMP.@expression(model, LinearAlgebra.dot(mu, w)))
     var_risk_l, var_risk_h = JuMP.@expressions(model, begin
@@ -297,11 +390,6 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     state_set!(model, prefix, :var_risk_h_, i, var_risk_h)
     var_range_risk = state_set!(model, prefix, :var_range_risk_, i,
                                 JuMP.@expression(model, var_risk_l - var_risk_h))
-    state_set!(model, prefix, :cvar_range_soc_, i,
-               JuMP.@constraints(model,
-                                 begin
-                                     [sc * g_var; sc * G * w] in JuMP.SecondOrderCone()
-                                 end))
     set_risk_bounds_and_expression!(model, opt, var_range_risk, r.settings,
                                     :var_range_risk_, i; prefix = prefix)
     return var_range_risk
@@ -445,7 +533,7 @@ The derivation needs the weights in units of the budget, so it holds only when a
   - The fees keep the spread, as [`mip_fees_keep_spread`](@ref) states.
   - ``g\\, d`` is finite, which a `NaN` in `X` makes false.
 
-When one is false, the constant is `1000`, the value that Cajas recommends.
+When one is false, the constant is `1000`, the value that footnote 26 of [cajas2025](@cite) recommends. The bound ``b = g\\, d`` is the library's own. That work gives only the fixed value.
 
 # Arguments
 
@@ -476,7 +564,7 @@ When one is false, the constant is `1000`, the value that Cajas recommends.
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 7.2.2.3, Equation 7.51.
+  - $(ref_dict[:cajas2025]) Section 7.2.2.3, Equation 7.51 and footnote 26. $(ref_dict[:no_original_source])
 """
 function mip_big_m(::JuMP.Model, b::Number, s::Number, args...; kwargs...)
     @argcheck(b > s,

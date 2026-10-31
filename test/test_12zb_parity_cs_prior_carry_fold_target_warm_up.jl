@@ -78,7 +78,7 @@ end
 # A test-local target that fits as a `LinearModel` and keeps the default answer of
 # `is_basis_invariant`, so a move of the dropped member under it fits every observation again
 # (#1614).
-struct BasisBoundTarget <: PortfolioOptimisers.AbstractRegressionTarget end
+struct BasisBoundTarget <: PortfolioOptimisers.AbstractUnpenalisedRegressionTarget end
 function PortfolioOptimisers.factory(::BasisBoundTarget, w::PortfolioOptimisers.ObsWeights)
     return factory(LinearModel(), w)
 end
@@ -268,8 +268,14 @@ end
         m = message(() -> prior(partial_fit!(pe, rows(rd, 1:2))))
         @test occursin("holds 2 observation(s) after the Descriptor warm-up", m)
         @test occursin("lag + 2 = 3", m)
-        m = message(() -> partial_fit!(pe, ReturnsResult(; nx = rd.nx, X = rd.X[1:5, :])))
-        @test occursin("the step carries no panel", m)
+        # A step with no panel gets the mask-only panel, so a prior whose exposures read the
+        # returns alone folds it. This prior reads `market_cap`, and the refusal names both
+        # causes, in the step and in the batch fit (#1904).
+        bare = ReturnsResult(; nx = rd.nx, X = rd.X[1:5, :])
+        for m in (message(() -> partial_fit!(pe, bare)), message(() -> prior(pe, bare)))
+            @test occursin("no Panel Field named `market_cap` exists: the returns data carries no panel",
+                           m)
+        end
         e = partial_fit!(pe, rows(rd, 1:90))
         m = message(() -> po.port_opt_view(e, 1:5))
         @test occursin("not a slice of the ones it carries", m)

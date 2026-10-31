@@ -1,24 +1,26 @@
 """
     graph_weight_matrix(D::MatNum)
 
-Return `D` as a matrix whose off-diagonal entries are representable as `SimpleWeightedGraphs` edge weights.
+Return `D` as a matrix whose off-diagonal entries a `SimpleWeightedGraphs` edge weight can hold.
 
-A distance matrix and a weighted graph disagree about what `0` means. In the distance codomain `0` is the *floor* — two assets as close as they can be. In the graph representation `0` is the reserved value meaning *absent*: `SimpleWeightedGraph` sparsifies its input, and `add_edge!` with a zero weight refuses outright. Handing a zero distance straight to the constructor therefore deletes exactly the edge the minimum spanning tree most wants, and the two assets come out non-adjacent — the most related pair in the universe reported as unrelated, with no error raised.
+A distance matrix and a weighted graph give `0` different meanings. A distance of `0` is the smallest distance, so the two assets are as close as possible. In a weighted graph, a weight of `0` means that the edge is absent. `SimpleWeightedGraph` stores its input as a sparse matrix, and `add_edge!` refuses a zero weight. A zero distance in the constructor removes the edge that the minimum spanning tree wants most. The two assets are then not adjacent, and no error occurs.
 
-A zero is not a symptom of bad data. `SimpleAbsoluteDistance` and `LogDistance` are defined on `abs(rho)`, so a perfectly *anti*-correlated pair — a long/short leg, an inverse ETF, a pairs trade — is at distance zero and is genuinely maximally related. The square-root algorithms reach zero from the other side, since their `clamp!` maps any `rho >= 1` to exactly zero.
+A zero distance does not show bad data. `SimpleAbsoluteDistance` and `LogDistance` read `abs(rho)`, so a pair with a correlation of `-1` is at distance zero. An inverse ETF and its index are such a pair, and the two are as related as two assets can be. The square-root algorithms reach zero at the other end, because their `clamp!` sets the radicand to zero for every `rho >= 1`.
 
-So the zero is *repaired*, not rejected: each off-diagonal zero moves to `nextfloat(zero(eltype(D)))`, the smallest representable positive value. That is the nearest value the representation can carry, it is orders of magnitude below any distance a caller could mean, and it is absorbed exactly by any sum it enters. `D` itself is returned untouched when no entry needs moving, so the copy is only paid for when it buys something.
+The function repairs a zero distance, and does not refuse it. Each off-diagonal zero moves to `nextfloat(zero(T))`, the smallest positive value of `T = float_if_integer(eltype(D))`. It is the value nearest to zero that an edge weight can hold. It is far below any distance that a caller can mean, and a sum with a distance of normal size does not change when it enters. When no entry moves, the function returns `D` and makes no copy.
 
-Negative and `NaN` entries have no such nearest representable value and are rejected. A negative distance inverts the ordering it expresses and is *unsound* rather than merely wrong under the shortest-path routines that consume these weights — they return an answer instead of raising. A `NaN` — which a zero-variance asset produces, via a `NaN` correlation — silently fails every comparison the tree algorithms make.
+An `Integer` has no smallest positive value, so the repaired copy of an integer matrix has a floating point element type. A `Rational` also has no smallest positive value, and `nextfloat` raises a `MethodError` for it.
 
-`Inf` is left alone: it is the honest distance between uncorrelated assets under [`LogDistance`](@ref), the graph accepts it, and a spanning tree simply takes those edges last.
+The function refuses a negative entry and a `NaN`, because neither has a nearest value that an edge weight can hold. A negative distance inverts the order that it states, and the shortest path routines that read these weights return an answer for it with no error. An asset with zero variance gives a `NaN` correlation, and so a `NaN` distance. A `NaN` is false in every comparison that the tree algorithms make.
+
+The function keeps `Inf`. [`LogDistance`](@ref) gives `Inf` for two uncorrelated assets, the graph accepts it, and a spanning tree takes those edges last.
 
 # Algorithm
 
- 1. Walk every off-diagonal entry of `D`. Throw a `DomainError` on a negative entry and on a `NaN`, and record whether any entry is zero, giving `repair`.
- 2. Return `D` itself when `repair` is `false`. An input that needs no move is never copied.
- 3. Copy `D` into `W`, and take `tiny`, the smallest representable positive value of the element type.
- 4. Move every off-diagonal zero of `W` to `tiny`, giving the repaired matrix.
+ 1. Read every off-diagonal entry of `D`. Throw a `DomainError` on a negative entry and on a `NaN`. Set `repair` to `true` if an entry is zero.
+ 2. Return `D` when `repair` is `false`. The function makes no copy of an input that needs no repair.
+ 3. Copy `D` into `W`, whose element type is `T = float_if_integer(eltype(D))`. Set `tiny` to the smallest positive value of `T`.
+ 4. Set every off-diagonal zero of `W` to `tiny`, and return `W`.
 
 # Arguments
 
@@ -53,8 +55,10 @@ function graph_weight_matrix(D::MatNum)
     if !repair
         return D
     end
-    W = copy(D)
-    tiny = nextfloat(z)
+    # An `Integer` has no smallest positive value, so the repaired copy floats it.
+    T = float_if_integer(eltype(D))
+    W = copyto!(similar(D, T), D)
+    tiny = nextfloat(zero(T))
     for j in axes(W, 2), i in axes(W, 1)
         if i != j && iszero(W[i, j])
             W[i, j] = tiny
@@ -71,45 +75,45 @@ end
 
 Build the weighted graph whose edges are the network structure.
 
-This is the **one construction site** of that structure. [`calc_weighted_adjacency`](@ref) and [`calc_adjacency`](@ref) are each a single operation on the graph returned here, so how the structure is selected is decided in this function and nowhere else.
+[`calc_weighted_adjacency`](@ref) and [`calc_adjacency`](@ref) each do one operation on the graph that this function returns, so they get the structure from it. [`calc_distance_weighted_graph`](@ref) builds the same edge set, and puts distances on it.
 
 # Polarity is per branch, and the two branches are not interchangeable
 
-Each branch keeps **the quantity that selected its own edges**, and the two quantities run in opposite directions.
+Each branch keeps the quantity that selected its edges, and the two quantities go in opposite directions.
 
-  - `alg::AbstractTreeType`: [`calc_mst`](@ref) minimises the distance, so the weights are **distances**. Small means closely related.
-  - `alg::AbstractNonNegativeSimilarityMatrixAlgorithm`: [`PMFG_T2s`](@ref) maximises the gain over the similarity, so the weights are **similarities**. Large means closely related.
+  - `alg::AbstractTreeType`: [`calc_mst`](@ref) minimises the distance, so the weights are distances. A small weight means that the two assets are closely related.
+  - `alg::AbstractNonNegativeSimilarityMatrixAlgorithm`: [`PMFG_T2s`](@ref) maximises the gain over the similarity, so the weights are similarities. A large weight means that the two assets are closely related.
 
-Re-weighting either branch with the other quantity would weight a structure by the quantity that did not select it, so neither is converted. The result carries no polarity tag, because the polarity is recoverable by dispatch on the algorithm.
+With the other quantity, a branch gets its weights from a quantity that did not select its edges, so the function converts neither branch. The result carries no polarity tag, because dispatch on the algorithm gives the polarity.
 
-A consumer that walks a path must therefore branch on `nte.alg` first. A shortest path over similarities inverts the ordering it is meant to express and **returns an answer instead of raising**, so the two graphs are interchangeable in shape but not in meaning.
+A consumer that follows a path must first dispatch on `nte.alg`. A shortest path over similarities inverts the order that it must state, and it returns an answer with no error. The two graphs have the same shape and different meanings.
 
-# Two entry points, because the selecting quantity is not always cheap
+# Two entry points, because the quantity that selects the edges is not always cheap
 
-The two-argument methods take **the selecting quantity itself** — the distance on the tree branch, the similarity on the PMFG branch — and the three-argument method derives it from `X` and forwards. Which branch is which is decided by the same dispatch either way, so the polarity above is a property of the algorithm and not of the entry point.
+The methods that take `alg` take the quantity that selects the edges. It is the distance on the tree branch and the similarity on the PMFG branch. The methods that take `nte` compute that quantity from `X`, and pass it on. The same dispatch selects the branch in both cases, so the polarity above belongs to the algorithm and not to the entry point.
 
-The two-argument form exists for a caller that already holds that matrix. [`clusterise`](@ref) is one: it needs `D` and `S` for its own power sum and for the [`Clusters`](@ref) it returns, so re-deriving them here would compute the same correlation twice. That is not a rounding error — under [`VariationInfoDistance`](@ref) the derivation is `98%` of `clusterise`'s runtime, so the second one would almost double it.
+The methods that take `alg` are for a caller that already holds that matrix. [`clusterise`](@ref) is such a caller. It needs `D` and `S` for its sum of powers and for the [`Clusters`](@ref) that it returns. A second derivation here computes the same correlation two times. Under [`VariationInfoDistance`](@ref), the derivation is `98%` of the run time of `clusterise`, so a second one almost doubles it.
 
 # The weights
 
-  - Tree branch: strictly positive, and finite or `Inf`. [`graph_weight_matrix`](@ref) moves every zero distance off the value the representation reserves for *absent*, and rejects a negative or a `NaN`. `Inf` is legal — it is the honest [`LogDistance`](@ref) between two uncorrelated assets.
-  - PMFG branch: strictly positive and finite. [`PMFG_T2s`](@ref) checks its input for non-negativity, and it inserts every remaining vertex whatever the gain, so it declines no edge. A zero weight would therefore be stored as an *absent* edge and silently shrink the structure, which is why [`assert_pmfg_weights`](@ref) refuses one here.
+  - Tree branch: each weight is positive, and finite or `Inf`. [`graph_weight_matrix`](@ref) moves every zero distance away from `0`, the value that means an absent edge. It refuses a negative distance and a `NaN`. The graph accepts `Inf`, which [`LogDistance`](@ref) gives for two uncorrelated assets.
+  - PMFG branch: each weight is positive and finite. [`PMFG_T2s`](@ref) checks that its input is non-negative. It inserts every vertex whatever the gain, so it declines no edge. The graph stores a zero weight as an absent edge, so the structure then has fewer edges. For this reason, [`assert_pmfg_weights`](@ref) refuses a zero weight.
 
 # Algorithm
 
 **The tree branch**, under an [`AbstractTreeType`](@ref):
 
- 1. Derive the distance matrix `D` from `X` with `nte.de` and `nte.ce`. The two-argument entry point is handed `D` and starts at step 2.
- 2. Repair `D` with [`graph_weight_matrix`](@ref), and build the complete `SimpleWeightedGraphs.SimpleWeightedGraph` `G` over the repaired matrix.
- 3. Minimise the distance over `G` with [`calc_mst`](@ref), giving the edge vector of the tree.
- 4. Take the subgraph of `G` on those edges. It is the tree, and it carries `D`'s distances.
+ 1. Compute the distance matrix `D` from `X` with `nte.de` and `nte.ce`. The entry point that takes `alg` receives `D` and starts at step 2.
+ 2. Repair `D` with [`graph_weight_matrix`](@ref). Build the complete `SimpleWeightedGraphs.SimpleWeightedGraph` `G` over the repaired matrix.
+ 3. Find the edges of the minimum spanning tree of `G` with [`calc_mst`](@ref).
+ 4. Return the subgraph of `G` on those edges. It is the tree, and its weights are the distances of `D`.
 
 **The similarity branch**, under an [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref):
 
- 1. Derive the correlation and the distance matrix `D` from `X` with `nte.de` and `nte.ce`, check `D` against `nte.alg`'s domain with [`assert_similarity_domain`](@ref), and convert the pair to the similarity matrix `S` with [`distance_to_similarity`](@ref). The two-argument entry point is handed `S` and starts at step 2.
- 2. Maximise the planar gain over `S` with [`PMFG_T2s`](@ref), giving `A`, the weighted adjacency matrix of the triangulated maximally filtered graph.
+ 1. Compute the correlation and the distance matrix `D` from `X` with `nte.de` and `nte.ce`. Check `D` against the domain of `nte.alg` with [`assert_similarity_domain`](@ref). Convert the pair to the similarity matrix `S` with [`distance_to_similarity`](@ref). The entry point that takes `alg` receives `S` and starts at step 2.
+ 2. Build the triangulated maximally filtered graph over `S` with [`PMFG_T2s`](@ref). Its weighted adjacency matrix is `A`.
  3. Refuse a zero weight in `A` with [`assert_pmfg_weights`](@ref).
- 4. Build the `SimpleWeightedGraphs.SimpleWeightedGraph` over `A`. It carries `S`'s similarities.
+ 4. Return the `SimpleWeightedGraphs.SimpleWeightedGraph` over `A`. Its weights are the similarities of `S`.
 
 # Arguments
 
@@ -124,12 +128,12 @@ The two-argument form exists for a caller that already holds that matrix. [`clus
 # Validation
 
   - Tree branch: throws a `DomainError` if an off-diagonal entry of `D` is negative or `NaN`, through [`graph_weight_matrix`](@ref).
-  - Similarity branch: throws a `DomainError` if a zero weight cost the triangulated maximally filtered graph an edge, through [`assert_pmfg_weights`](@ref).
-  - Similarity branch, on the estimator entry point alone: throws a `DomainError` if `D` leaves the domain of `alg`, through [`assert_similarity_domain`](@ref). The two-argument entry point is handed `S` and never sees `D`.
+  - Similarity branch: throws a `DomainError` if a zero weight removes an edge of the triangulated maximally filtered graph, through [`assert_pmfg_weights`](@ref).
+  - Similarity branch, on the entry point that takes `nte` only: throws a `DomainError` if `D` leaves the domain of `alg`, through [`assert_similarity_domain`](@ref). The entry point that takes `alg` receives `S` and does not read `D`.
 
 # Returns
 
-  - `G::SimpleWeightedGraphs.SimpleWeightedGraph`: The network structure, carrying its branch's own weights.
+  - `G::SimpleWeightedGraphs.SimpleWeightedGraph`: The network structure, with the weights of its branch.
 
 # Related
 
@@ -173,22 +177,22 @@ end
 
 Compute the weighted adjacency matrix of the network structure.
 
-`Graphs.adjacency_matrix` of a *weighted* graph returns the **weights**, not `0`/`1`, so this is the matrix form of [`calc_weighted_adjacency_graph`](@ref) and inherits that function's per-branch polarity unchanged: distances on the tree branch, similarities on the PMFG branch. Read the polarity section of [`calc_weighted_adjacency_graph`](@ref) before consuming the values.
+`Graphs.adjacency_matrix` of a weighted graph returns the weights, and not `0` and `1`. This function gives the matrix form of [`calc_weighted_adjacency_graph`](@ref), with the same polarity on each branch. The entries are distances on the tree branch and similarities on the PMFG branch. Read the section on polarity of [`calc_weighted_adjacency_graph`](@ref) before you use the values.
 
-The sparsity pattern is the structure itself, so it is identical to [`calc_adjacency`](@ref)'s on the same input. Only the stored values differ.
+The pattern of nonzero entries is the structure, so it is the same as that of [`calc_adjacency`](@ref) on the same input. Only the stored values are different.
 
-The entry points are [`calc_weighted_adjacency_graph`](@ref)'s, one `Graphs.adjacency_matrix` call further on, plus one for a caller that already holds the graph itself. `W` is the selecting quantity — the distance on the tree branch, the similarity on the PMFG branch — and [`clusterise`](@ref) supplies it directly, having already paid for it; it then reads the matrix off the graph it keeps, through the one-argument form, because it needs that graph again to answer a budget **rule**.
+The entry points are those of [`calc_weighted_adjacency_graph`](@ref), with one more call to `Graphs.adjacency_matrix`. One more method takes a graph that the caller already holds. `W` is the quantity that selects the edges, the distance on the tree branch and the similarity on the PMFG branch. [`clusterise`](@ref) builds the graph from that quantity, and reads the matrix from the graph through the method that takes `G`. It keeps the graph, because it needs the graph again to resolve a budget rule.
 
 # Algorithm
 
- 1. Build the network structure with [`calc_weighted_adjacency_graph`](@ref), through the entry point the arguments name. The one-argument method is handed the graph and starts at step 2.
- 2. Read `Graphs.adjacency_matrix` off that graph. The graph is weighted, so the entries are its edge weights and not `0` and `1`.
+ 1. Build the network structure with [`calc_weighted_adjacency_graph`](@ref), through the entry point that the arguments name. The method that takes `G` receives the graph and starts at step 2.
+ 2. Return `Graphs.adjacency_matrix` of that graph. The graph is weighted, so the entries are its edge weights and not `0` and `1`.
 
 # Arguments
 
-  - `G`: Network structure a caller already holds, from [`calc_weighted_adjacency_graph`](@ref).
+  - `G`: Network structure that the caller holds, from [`calc_weighted_adjacency_graph`](@ref).
   - `alg`: Tree or similarity matrix algorithm.
-  - `W`: Selecting quantity of `alg`'s branch: a distance matrix under an [`AbstractTreeType`](@ref), a similarity matrix under an [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref).
+  - `W`: Quantity that selects the edges on the branch of `alg`. It is a distance matrix under an [`AbstractTreeType`](@ref), and a similarity matrix under an [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref).
   - $(arg_dict[:nte])
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
@@ -196,7 +200,7 @@ The entry points are [`calc_weighted_adjacency_graph`](@ref)'s, one `Graphs.adja
 
 # Returns
 
-  - `adj::SparseArrays.SparseMatrixCSC`: Weighted adjacency matrix of the network, in its branch's own polarity.
+  - `adj::SparseArrays.SparseMatrixCSC`: Weighted adjacency matrix of the network, in the polarity of its branch.
 
 # Related
 
@@ -219,17 +223,17 @@ end
 """
     calc_adjacency(nte::NetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
-Compute the binary adjacency matrix for a network estimator.
+Compute the binary adjacency matrix of the network that `nte` builds.
 
-The structure comes from [`calc_weighted_adjacency_graph`](@ref); this function is the round trip through `Graphs.SimpleGraph` that discards the weights. Both branches share the one body, because the branch is decided in the tier below.
+The structure comes from [`calc_weighted_adjacency_graph`](@ref). This function converts it to a `Graphs.SimpleGraph`, which removes the weights. Both branches use the same method, because [`calc_weighted_adjacency_graph`](@ref) selects the branch.
 
-Consumers that need the weights call [`calc_weighted_adjacency`](@ref) instead. They must then observe the per-branch polarity documented on [`calc_weighted_adjacency_graph`](@ref). The binarisation here is what exempts this function from it.
+A consumer that needs the weights calls [`calc_weighted_adjacency`](@ref). It must then obey the polarity of each branch, which [`calc_weighted_adjacency_graph`](@ref) states. This function removes the weights, so the polarity does not apply to it.
 
 # Algorithm
 
  1. Build the weighted network structure with [`calc_weighted_adjacency_graph`](@ref).
- 2. Rebuild it as a `Graphs.SimpleGraph`, which keeps the edge set and discards the weights.
- 3. Read `Graphs.adjacency_matrix` off that graph, giving the binary matrix.
+ 2. Convert it to a `Graphs.SimpleGraph`, which keeps the edge set and removes the weights.
+ 3. Return `Graphs.adjacency_matrix` of that graph, which is binary.
 
 # Arguments
 
@@ -240,7 +244,7 @@ Consumers that need the weights call [`calc_weighted_adjacency`](@ref) instead. 
 
 # Returns
 
-  - `adj::SparseArrays.SparseMatrixCSC{Int, Int}`: Binary adjacency matrix representing the network.
+  - `adj::SparseArrays.SparseMatrixCSC{Int, Int}`: Binary adjacency matrix of the network.
 
 # Related
 
@@ -259,29 +263,29 @@ end
     calc_distance_weighted_graph(nte::NetworkEstimator, X::MatNum; dims::Int = 1,
                                  kwargs...)
 
-Build the network structure carrying **distances** on its edges, on either branch.
+Build the network structure with distances on its edges, on either branch.
 
-[`calc_weighted_adjacency_graph`](@ref) gives each branch the quantity that *selected* its edges, so its two branches hold opposite polarities. This function gives both branches the same one. The structure is unchanged — it is the same edge set, vertex for vertex — and only the weights differ, on the PMFG branch alone.
+[`calc_weighted_adjacency_graph`](@ref) gives each branch the quantity that selected its edges, so its two branches have opposite polarities. This function gives both branches the distance. The edge set is the same, vertex for vertex. Only the weights are different, and only on the PMFG branch.
 
-# Why the PMFG branch may be re-weighted here, and may not be there
+# Why this function can put distances on the PMFG branch
 
-Re-weighting a structure with a quantity that did not select it is what [`calc_weighted_adjacency_graph`](@ref) refuses. This is not that. Every [`AbstractSimilarityMatrixAlgorithm`](@ref) is a strictly decreasing function of the distance, so the similarity that selected the PMFG's edges is a **monotone image of `D`**, not a foreign quantity: `D` is the selecting quantity's preimage, and the same PMFG comes out of it.
+[`calc_weighted_adjacency_graph`](@ref) does not put on a structure a quantity that did not select it. The distance is a different case. Every [`AbstractSimilarityMatrixAlgorithm`](@ref) is a strictly decreasing function of the distance. The order of the similarities that selected the edges is then the reverse of the order of the distances, pair for pair. [`PMFG_T2s`](@ref) selects the edges from `S`, and `D` gives each selected edge its length.
 
-What must not happen is a path taken over the similarities themselves. A shortest path *minimises* the sum of its edge weights, so over similarities it seeks the route through the **weakest** links — the ordering it produces is backwards. It is also quiet about it: measured over the four similarity algorithms, the backwards answer correlates `0.95` to `0.97` with the right one, which is close enough to pass a glance and not close enough to be usable.
+A shortest path over the similarities is wrong. A shortest path minimises the sum of its edge weights, so over similarities it takes the route through the weakest links. Its order is then the reverse of the correct order. Nothing shows the error. Over the four similarity algorithms, the measured correlation of the reversed answer with the correct one is `0.95` to `0.97`.
 
 # Algorithm
 
 **The tree branch**, under an [`AbstractTreeType`](@ref):
 
- 1. Return [`calc_weighted_adjacency_graph`](@ref)'s graph unchanged. That branch weights its edges with `D` already, so the two structures are one graph.
+ 1. Return the graph of [`calc_weighted_adjacency_graph`](@ref). That branch already puts the distances of `D` on its edges, so the two structures are one graph.
 
 **The similarity branch**, under an [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref):
 
- 1. Derive the correlation and the distance matrix `D` from `X`, check `D` against `nte.alg`'s domain with [`assert_similarity_domain`](@ref), and convert the pair to the similarity matrix `S` with [`distance_to_similarity`](@ref).
- 2. Repair `D` with [`graph_weight_matrix`](@ref), giving `W`. The repair is the tree branch's, needed here for the same reason: a zero distance is the value the representation reserves for *absent*.
- 3. Select the edges by maximising the planar gain over `S` with [`PMFG_T2s`](@ref), giving `A`, and refuse a zero weight in it with [`assert_pmfg_weights`](@ref).
- 4. Read the row and column index of every stored entry of `A`, and take the entry of `W` at each one, giving the length of every selected edge.
- 5. Build the `SimpleWeightedGraphs.SimpleWeightedGraph` over those indices and lengths. It is `A`'s edge set carrying `D`'s distances.
+ 1. Compute the correlation and the distance matrix `D` from `X`. Check `D` against the domain of `nte.alg` with [`assert_similarity_domain`](@ref). Convert the pair to the similarity matrix `S` with [`distance_to_similarity`](@ref).
+ 2. Repair `D` into `W` with [`graph_weight_matrix`](@ref). The tree branch does the same repair for the same reason, because a zero weight means an absent edge.
+ 3. Select the edges of the triangulated maximally filtered graph over `S` with [`PMFG_T2s`](@ref), into `A`. Refuse a zero weight in `A` with [`assert_pmfg_weights`](@ref).
+ 4. Read the row and the column of every stored entry of `A`. The entry of `W` at each of them is the length of that edge.
+ 5. Return the `SimpleWeightedGraphs.SimpleWeightedGraph` over those indices and lengths. It has the edge set of `A` and the distances of `D`.
 
 # Arguments
 
@@ -293,7 +297,8 @@ What must not happen is a path taken over the similarities themselves. A shortes
 # Validation
 
   - Throws a `DomainError` if an off-diagonal entry of `D` is negative or `NaN`, through [`graph_weight_matrix`](@ref).
-  - Similarity branch: throws a `DomainError` if `D` leaves the domain of `nte.alg`, through [`assert_similarity_domain`](@ref), and a `DomainError` if a zero weight cost the triangulated maximally filtered graph an edge, through [`assert_pmfg_weights`](@ref).
+  - Similarity branch: throws a `DomainError` if `D` leaves the domain of `nte.alg`, through [`assert_similarity_domain`](@ref).
+  - Similarity branch: throws a `DomainError` if a zero weight removes an edge of the triangulated maximally filtered graph, through [`assert_pmfg_weights`](@ref).
 
 # Returns
 

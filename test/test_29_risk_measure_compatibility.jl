@@ -50,9 +50,12 @@
         @test !supports_risk_measure(nco_none, Variance())
 
         # SubsetResampling: delegates to its single inner optimiser.
-        @test supported_risk_measures(SubsetResampling(; opt = jmp())) === RiskMeasure
-        @test supports_risk_measure(SubsetResampling(; opt = jmp()), Variance())
-        @test supported_risk_measures(SubsetResampling(; opt = none)) === Union{}
+        @test supported_risk_measures(SubsetResampling(; subset_size = 0.8, opt = jmp())) ===
+              RiskMeasure
+        @test supports_risk_measure(SubsetResampling(; subset_size = 0.8, opt = jmp()),
+                                    Variance())
+        @test supported_risk_measures(SubsetResampling(; subset_size = 0.8, opt = none)) ===
+              Union{}
 
         # Stacking: outer ∩ all inner, broadcasting over the (possibly heterogeneous) inner vector.
         stk_rm = Stacking(; opti = [jmp(), jmp()], opto = jmp())

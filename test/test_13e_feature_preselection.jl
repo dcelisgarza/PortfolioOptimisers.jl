@@ -298,7 +298,8 @@ using PortfolioOptimisers.Distances: Euclidean, Cityblock, SqEuclidean, Minkowsk
                                      CosineDist, Chebyshev, WeightedSqEuclidean,
                                      WeightedMinkowski, TotalVariation, BrayCurtis, Jaccard,
                                      CorrDist, MeanAbsDeviation, MeanSqDeviation,
-                                     RMSDeviation
+                                     RMSDeviation, WeightedHamming, PeriodicEuclidean,
+                                     Mahalanobis, SqMahalanobis
 
 const PO = PortfolioOptimisers
 
@@ -335,22 +336,23 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
 @testset "A FeatureDistance reads each asset and each pair at its own active rows (#1454)" begin
     rd = hand_rd()
     @testset "LastObservation" begin
-        @test LastObservation().alg === LastRow()
+        @test LastRow() isa PO.LastObservation
+        @test LastActiveRow() isa PO.LastObservation
         # LastRow reads the last row, where `b` is inactive: a direct call refuses it by name.
         msg = "FeatureDistance has no value to read for the assets [\"b\"]: each is inactive at the last row of the window, or a value column of `sel` holds a placeholder there."
-        @test_throws msg hand_distance(fdist(LastObservation()), rd)
+        @test_throws msg hand_distance(fdist(LastRow()), rd)
         # On a view without `b`, the last row is 4 against 7.
-        D = hand_distance(fdist(LastObservation()), PO.port_opt_view(rd, [1, 3]))
+        D = hand_distance(fdist(LastRow()), PO.port_opt_view(rd, [1, 3]))
         @test D == [0.0 3.0; 3.0 0.0]
         # LastActiveRow reads `a` at row 4 (4), `b` at row 2 (4), and `c` at row 4 (7).
-        D = hand_distance(fdist(LastObservation(; alg = LastActiveRow())), rd)
+        D = hand_distance(fdist(LastActiveRow()), rd)
         @test D == [0.0 0.0 3.0; 0.0 0.0 3.0; 3.0 3.0 0.0]
         # A direct `cor_and_dist` or `clusterise` call refuses `b` by name too (#1771).
-        @test_throws msg cor_and_dist(fdist(LastObservation()), nothing, rd.X; rd = rd)
-        @test_throws msg clusterise(ClustersEstimator(; de = fdist(LastObservation())), rd)
+        @test_throws msg cor_and_dist(fdist(LastRow()), nothing, rd.X; rd = rd)
+        @test_throws msg clusterise(ClustersEstimator(; de = fdist(LastRow())), rd)
         # The stack holds the rows from the earliest last active row, row 2, to the last.
-        @test PO.collapse_rows(LastObservation(; alg = LastActiveRow()), rd.pnl) == 2:4
-        @test PO.collapse_rows(LastObservation(), rd.pnl) == 4:4
+        @test PO.collapse_rows(LastActiveRow(), rd.pnl) == 2:4
+        @test PO.collapse_rows(LastRow(), rd.pnl) == 4:4
     end
     @testset "AggregateFeatures" begin
         # The mean of `a` is 2.5, of `b` 3, and of `c` 6.
@@ -492,8 +494,8 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
         # With every cell active the mask changes nothing, bit for bit.
         rdf = hand_rd(; A = trues(4, 3))
         Z = feature_matrix(fdist(StackObservations()), nothing, rdf, rdf.X)
-        for alg in (LastObservation(), LastObservation(; alg = LastActiveRow()),
-                    AggregateFeatures(), AggregateDistances(), StackObservations())
+        for alg in (LastRow(), LastActiveRow(), AggregateFeatures(), AggregateDistances(),
+                    StackObservations())
             de = fdist(alg)
             @test hand_distance(de, rdf) ==
                   distance(de, feature_matrix(de, nothing, rdf, rdf.X))
@@ -515,7 +517,7 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
         msg = "the assets at the positions (2, 3)"
         @test_throws msg distance(fdist(AggregateDistances()), Z; amsk = A)
         msg = "no value to read for the assets at the positions [2]: each is inactive at the last row"
-        @test_throws msg distance(fdist(LastObservation()), Z; amsk = A)
+        @test_throws msg distance(fdist(LastRow()), Z; amsk = A)
         # An asset with no active row has no value under any collapse.
         B = copy(A)
         B[:, 2] .= false
@@ -524,7 +526,7 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
         # A mask whose last row is complete reads the last row under either rule.
         C = copy(A)
         C[4, :] .= true
-        for alg in (LastObservation(), LastObservation(; alg = LastActiveRow()))
+        for alg in (LastRow(), LastActiveRow())
             @test distance(fdist(alg), Z; amsk = C) == [0 5 3; 5 0 2; 3 2 0]
         end
         # A pair whose shared rows hold a zero vector takes the zero-feature-vector convention.
@@ -542,8 +544,8 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
         A = Bool[1 1 0; 1 1 0; 1 0 1; 1 0 1]
         fb = FeatureFallback()
         metrics = (Euclidean(), AngularDist(), ChiSqDist(), BrayCurtis(), Jaccard())
-        algs = (LastObservation(; alg = LastActiveRow()), AggregateFeatures(),
-                AggregateDistances(; pair = fb), StackObservations(; pair = fb))
+        algs = (LastActiveRow(), AggregateFeatures(), AggregateDistances(; pair = fb),
+                StackObservations(; pair = fb))
         for v in (-9.0, NaN, Inf), metric in metrics, alg in algs
             Zv = copy(Z)
             Zv[1, 3, 1] = v
@@ -569,17 +571,16 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
         @test_throws DomainError distance(de, Zv; amsk = A)
         # A static matrix refuses an unreadable asset as unreadable, whatever its cells hold.
         msg = "no value to read for the assets at the positions [2]"
-        @test_throws msg distance(fdist(LastObservation()), [1.0 2; NaN 3; 4 5];
-                                  amsk = Bool[1 0 1])
+        @test_throws msg distance(fdist(LastRow()), [1.0 2; NaN 3; 4 5]; amsk = Bool[1 0 1])
     end
     @testset "The entry of a fit composes the readable assets with the Investable Mask" begin
         # LastRow cannot read `b`; the other collapses read every asset.
-        @test PO.feature_readable_mask(fdist(LastObservation()), nothing, rd) ==
+        @test PO.feature_readable_mask(fdist(LastRow()), nothing, rd) ==
               BitVector([1, 0, 1])
         @test isnothing(PO.feature_readable_mask(fdist(AggregateFeatures()), nothing, rd))
         # The Investable Mask of the prior is kept.
-        @test PO.feature_readable_mask(fdist(LastObservation()), BitVector([0, 1, 1]),
-                                       rd) == BitVector([0, 0, 1])
+        @test PO.feature_readable_mask(fdist(LastRow()), BitVector([0, 1, 1]), rd) ==
+              BitVector([0, 0, 1])
         # DropFewerRows drops the asset of (b, c) with fewer rows; on a tie, the later one.
         de = fdist(AggregateDistances(; pair = DropFewerRows()))
         @test PO.feature_readable_mask(de, nothing, rd) == BitVector([1, 1, 0])
@@ -597,11 +598,11 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
                       nx = ["a", "b", "c", "d"])
         @test PO.feature_readable_mask(de, nothing, rd4) == BitVector([1, 0, 0, 1])
         # Every holder forwards, and a producer or a precomputed estimator reads no panel.
-        cle = ClustersEstimator(; de = fdist(LastObservation()))
+        cle = ClustersEstimator(; de = fdist(LastRow()))
         @test PO.feature_readable_mask(cle, nothing, rd) == BitVector([1, 0, 1])
         @test PO.feature_readable_mask((nothing, [cle]), nothing, rd) ==
               BitVector([1, 0, 1])
-        ne = NetworkEstimator(; de = fdist(LastObservation()))
+        ne = NetworkEstimator(; de = fdist(LastRow()))
         @test PO.feature_readable_mask(CentralityEstimator(; pl = ne), nothing, rd) ==
               BitVector([1, 0, 1])
         @test PO.feature_readable_mask(SemiDefinitePhylogenyEstimator(; pl = cle), nothing,
@@ -609,14 +610,14 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
         @test isnothing(PO.feature_readable_mask(ClustersEstimator(), nothing, rd))
         # Returns data with no panel, or with a static one, has no active rows to compose.
         imsk = BitVector([1, 0, 1])
-        @test PO.feature_readable_mask(fdist(LastObservation()), imsk,
+        @test PO.feature_readable_mask(fdist(LastRow()), imsk,
                                        ReturnsResult(; nx = rd.nx, X = rd.X)) === imsk
         spnl = AssetPanel(; pf = [NumericPanelField(; name = "f", vals = [1.0, 2, 3])])
-        @test PO.feature_readable_mask(fdist(LastObservation()), imsk,
+        @test PO.feature_readable_mask(fdist(LastRow()), imsk,
                                        ReturnsResult(; nx = rd.nx, X = rd.X, pnl = spnl)) ===
               imsk
         # A static panel has no observation axis, so LastActiveRow names every row.
-        @test PO.collapse_rows(LastObservation(; alg = LastActiveRow()), spnl) === Colon()
+        @test PO.collapse_rows(LastActiveRow(), spnl) === Colon()
         # A refusal quotes the names of the returns data, or of a ReturnsResult passed as
         # `pr`, and positions otherwise.
         @test PO.feature_asset_names(nothing, rd) == rd.nx
@@ -625,7 +626,7 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
         @test isnothing(PO.feature_readable_mask(FeatureDistance(; ape = PhylogenyPanel()),
                                                  nothing, rd))
         # No asset left refuses.
-        @test_throws IsEmptyError PO.feature_readable_mask(fdist(LastObservation()),
+        @test_throws IsEmptyError PO.feature_readable_mask(fdist(LastRow()),
                                                            BitVector([0, 1, 0]), rd)
     end
     @testset "Indexed weights keep their kind, a range included" begin
@@ -639,6 +640,60 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
         ag = PO.obs_weights_view(AggregateFeatures(; w = StatsBase.pweights(1.0:10.0)),
                                  [1, 3])
         @test ag.w isa StatsBase.ProbabilityWeights && ag.w == [1.0, 3.0]
+    end
+    @testset "An integer window holds a fraction, and a metric with parameters per coordinate refuses by name (#1459)" begin
+        # Cityblock measures the pair at 4, 6 and 9 on the three rows. The mean is 19 / 3,
+        # and the mean over rows 1 and 3 is 13 / 2. An `Int` matrix raised an InexactError.
+        Z = reshape([1, 2, 4, 0, 3, 1, 5, 5, 2, 2, 0, 8], 3, 2, 2)
+        A = Bool[1 1; 1 0; 1 1]
+        de = fdist(AggregateDistances(); metric = Cityblock())
+        @test distance(de, Z) == [0 19 / 3; 19 / 3 0]
+        @test distance(de, Z; amsk = A) == [0 6.5; 6.5 0]
+        # A weight of 0.5 was cut to an integer: (0.5 * 4 + 6 + 9) / 2.5.
+        dw = fdist(AggregateDistances(; w = StatsBase.pweights([0.5, 1, 1]));
+                   metric = Cityblock())
+        @test distance(dw, Z) ≈ [0 6.8; 6.8 0] rtol = 1e-15
+        # A `Rational` window stays exact.
+        @test distance(de, Rational{Int}.(Z)) == [0 19//3; 19//3 0]
+        @test distance(de, Rational{Int}.(Z); amsk = A) == [0 13//2; 13//2 0]
+        # The fallback of an empty pair, and the rescale of a pair that shares two of three
+        # rows, each give a fraction too. `a` holds (1, 0) and (2, 1) on rows 1 and 2, `b`
+        # holds (1, 0) on row 3, and `c` holds (2, 1), (3, 2) and (4, 3).
+        Z3 = reshape(collect(1:18), 3, 3, 2) .% 5
+        Ae = Bool[1 0 1; 1 0 1; 0 1 1]
+        fb = fdist(AggregateDistances(; pair = FeatureFallback()); metric = Cityblock())
+        # The fallback: `a` collapses to (1.5, 0.5) against (1, 0).
+        @test distance(fb, Z3; amsk = Ae) == [0 1 2; 1 0 6; 2 6 0]
+        # (a, b) shares rows 1 and 2 at 6 and 5, so 11 * 6 / 4. (a, c) gives 4 * 6 / 4.
+        Ap = Bool[1 1 1; 1 1 1; 0 1 1]
+        ds = fdist(StackObservations(); metric = Cityblock())
+        @test distance(ds, Z3; amsk = Ap) == [0 16.5 6; 16.5 0 15; 6 15 0]
+        # A metric whose parameters hold one entry per coordinate keeps the entries of the
+        # shared coordinates. It then reaches the refusal that names the method to add, where
+        # it raised a DimensionMismatch.
+        I6 = Matrix(1.0I, 6, 6)
+        for m in
+            (WeightedHamming(ones(6)), PeriodicEuclidean(fill(10.0, 6)), Mahalanobis(I6),
+             SqMahalanobis(I6))
+            msg = "Add a method `PortfolioOptimisers.stack_rescale(metric::$(nameof(typeof(m))), d, idx, len)`"
+            @test_throws msg distance(fdist(StackObservations(); metric = m), float.(Z3);
+                                      amsk = Ap)
+        end
+        Q = [2.0 1 0; 1 3 0; 0 0 4]
+        @test PO.stack_metric(Mahalanobis(Q), [1, 3]).qmat == [2.0 0; 0 4]
+        @test PO.stack_metric(SqMahalanobis(Q), [1, 3]).qmat == [2.0 0; 0 4]
+        @test PO.stack_metric(WeightedHamming([1.0, 2, 3]), [1, 3]).weights == [1.0, 3]
+        @test PO.stack_metric(PeriodicEuclidean([1.0, 2, 3]), [2]).periods == [2.0]
+        # A weighted metric of the stack takes one weight per coordinate of the long vector,
+        # the three observations of the first feature first (R7 of #1817). Weights on those
+        # three measure the first feature alone, and one weight per feature does not fit.
+        Zf = float.(Z3)
+        dwe = distance(fdist(StackObservations();
+                             metric = WeightedEuclidean([1.0, 1, 1, 0, 0, 0])), Zf)
+        @test dwe ≈ [Euclidean()(Zf[:, i, 1], Zf[:, j, 1]) for i in 1:3, j in 1:3] rtol = 1e-15
+        @test_throws DimensionMismatch distance(fdist(StackObservations();
+                                                      metric = WeightedEuclidean([1.0, 1])),
+                                                Zf)
     end
 end
 
@@ -727,10 +782,7 @@ end
     res = optimise(HierarchicalRiskParity(; opt = ho), rd)
     @test PO.result_investable_mask(res) == BitVector([1, 1, 1, 0, 1])
     # LastActiveRow reads `d` at row 20, so nothing drops.
-    cla = ClustersEstimator(;
-                            de = FeatureDistance(; sel = ["f"],
-                                                 alg = LastObservation(;
-                                                                       alg = LastActiveRow())))
+    cla = ClustersEstimator(; de = FeatureDistance(; sel = ["f"], alg = LastActiveRow()))
     res = optimise(HierarchicalRiskParity(;
                                           opt = HierarchicalOptimiser(; pe = pe, cle = cla)),
                    rd)

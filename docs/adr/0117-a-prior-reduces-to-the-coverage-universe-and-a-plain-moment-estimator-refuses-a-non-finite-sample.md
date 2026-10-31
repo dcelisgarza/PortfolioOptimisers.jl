@@ -518,3 +518,13 @@ The column decision counts a gap in the implied volatility or in the own column 
 benchmark as a missing observation of that asset. The row decision counts a gap in a one-column
 benchmark or in a factor as an observation that misses every asset. The default `row_thr = 1`
 drops no observation, so the default output does not change.
+
+## Amendment (2026-10-28, #1867)
+
+**`peel = nothing` skips the peel, and `NoPeel` is removed.** `NoPeel()` named no rule. It skipped
+the peel procedure, and ADR 0222 spells a skipped procedure as `nothing`. So the `peel` field of
+`CoveragePolicy` is bound to `Option{<:AbstractPeel}`, and `peel_assets(::Nothing, U)` returns no
+vertex. The `NaN` of an undetermined pair still reaches `matrix_processing_block!`, which refuses
+it with the same `IsNonFiniteError`. The default `MinimalPeel()` and the numbers do not move.
+Where the decision above names `NoPeel()`, read `peel = nothing`. The removal is a clean break with
+no deprecation, as ADR 0044 and ADR 0213 set.

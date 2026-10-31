@@ -1,13 +1,13 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Fits an uncertainty set around a prior statistic, so that a downstream model can take the worst case over it.
+Fits an uncertainty set around a prior statistic, so that a robust model can take the worst case over the set.
 
-All concrete subtypes should subtype `AbstractUncertaintySetEstimator`.
+Every concrete estimator of an uncertainty set subtypes `AbstractUncertaintySetEstimator`.
 
 # Interfaces
 
-In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractUncertaintySetEstimator` and implement the following methods:
+To add an estimator that the library can use, subtype `AbstractUncertaintySetEstimator` and add the methods below.
 
 ## `mu_ucs`
 
@@ -15,27 +15,27 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ## `sigma_ucs`
 
-  - `sigma_ucs(ue::AbstractUncertaintySetEstimator, X::MatNum, F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...) -> AbstractUncertaintySetResult`: Fits the uncertainty set of the covariance. An estimator with no covariance analogue throws instead, as [`CharacteristicUncertaintySet`](@ref) does.
+  - `sigma_ucs(ue::AbstractUncertaintySetEstimator, X::MatNum, F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...) -> AbstractUncertaintySetResult`: Fits the uncertainty set of the covariance. An estimator with no covariance set throws an error here, as [`CharacteristicUncertaintySet`](@ref) does.
 
 ## `ucs`
 
-  - `ucs(ue::AbstractUncertaintySetEstimator, X::MatNum, F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...) -> Tuple`: Fits both sets in one pass, so that a shared prior or a shared simulation is computed once.
+  - `ucs(ue::AbstractUncertaintySetEstimator, X::MatNum, F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...) -> Tuple`: Fits the two sets in one call, so that the estimator computes a shared prior or a shared simulation once.
 
 ### Arguments
 
-  - `ue`: The concrete subtype instance.
+  - `ue`: The instance of the concrete subtype.
   - `X`: Matrix of asset returns.
   - `F`: Optional matrix of factor returns, which a factor prior needs.
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments, forwarded to the prior estimator.
+  - `kwargs...`: More keyword arguments, which the method gives to the prior estimator.
 
 ### Returns
 
-  - `ucs::AbstractUncertaintySetResult`: The fitted set, or a tuple of the mean set and the covariance set for `ucs`.
+  - `ucs::AbstractUncertaintySetResult`: The fitted set. `ucs` returns a tuple of the mean set and the covariance set.
 
 ## `reads_prior_result`
 
-  - `reads_prior_result(ue::AbstractUncertaintySetEstimator) -> Bool`: States whether the estimator is calibrated on a prior result it is handed rather than on returns data. The root answers `false`, so a subtype that fits from returns data declares nothing; one that reads a prior result subtypes [`AbstractPriorUncertaintySetEstimator`](@ref) instead, or, in the four returns-data families, holds `pe = nothing`.
+  - `reads_prior_result(ue::AbstractUncertaintySetEstimator) -> Bool`: States whether the estimator calibrates its set on a Prior Result that the caller gives it, and not on returns data. The root returns `false`, so a subtype that fits from returns data declares no method. A subtype that reads a Prior Result subtypes [`AbstractPriorUncertaintySetEstimator`](@ref) instead. Each of the four returns-data families reads a Prior Result when it holds `pe = nothing`.
 
 # Related
 
@@ -49,15 +49,15 @@ abstract type AbstractUncertaintySetEstimator <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Fits an uncertainty set from the prior result the optimisation is solving on, rather than from returns data.
+Fits an uncertainty set from the Prior Result that the optimisation solves on, and not from returns data.
 
-Every other [`AbstractUncertaintySetEstimator`](@ref) carries its own prior estimator `pe` and fits it on the returns it is handed, so the set it builds knows nothing of the prior the optimiser is using. A subtype of this root reads the fitted prior result instead: its factor model, its `mu` and its `sigma` are the inputs of the fit, and it carries no `pe` of its own. Both JuMP builders hold the prior beside the returns, so both pass it, and the three-argument form of the triple routes each estimator to the argument it reads.
+Every other [`AbstractUncertaintySetEstimator`](@ref) holds its own prior estimator `pe` and fits it on the returns that the caller gives it. So the set that it builds does not know the prior of the optimiser. A subtype of this root reads the fitted Prior Result instead. The inputs of its fit are the factor model, the `mu` and the `sigma` of that result, and it holds no `pe`. Both JuMP builders hold the prior beside the returns, so both give it to the set. The three-argument form of the ucs Triple then gives each estimator the argument that it reads.
 
-The root is unexported. It is a family root that a caller names only when it writes a subtype, and every consumer reaches it through the triple.
+The root is not exported. A caller writes its name only to declare a subtype, and every consumer gets to it through the ucs Triple.
 
 # Interfaces
 
-In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractPriorUncertaintySetEstimator` and implement the following methods:
+To add an estimator that the library can use, subtype `AbstractPriorUncertaintySetEstimator` and add the methods below.
 
 ## `mu_ucs`
 
@@ -69,21 +69,21 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ## `ucs`
 
-  - `ucs(ue::AbstractPriorUncertaintySetEstimator, pr::AbstractPriorResult; kwargs...) -> Tuple`: Fits both sets in one pass, so that a shared geometry is computed once.
+  - `ucs(ue::AbstractPriorUncertaintySetEstimator, pr::AbstractPriorResult; kwargs...) -> Tuple`: Fits the two sets in one call, so that the estimator computes a shared geometry once.
 
 ### Arguments
 
-  - `ue`: The concrete subtype instance.
-  - `pr`: The prior result the optimisation is solving on.
-  - `kwargs...`: Additional keyword arguments.
+  - `ue`: The instance of the concrete subtype.
+  - `pr`: The Prior Result that the optimisation solves on.
+  - `kwargs...`: More keyword arguments.
 
 ### Returns
 
-  - `ucs::AbstractUncertaintySetResult`: The fitted set, or a tuple of the mean set and the covariance set for `ucs`.
+  - `ucs::AbstractUncertaintySetResult`: The fitted set. `ucs` returns a tuple of the mean set and the covariance set.
 
-A subtype inherits the three-argument methods of the triple, which drop the returns data and call the two-argument methods above, because the root answers `true` to [`reads_prior_result`](@ref). It needs no method of the returns-data interface [`AbstractUncertaintySetEstimator`](@ref) declares, because no consumer reaches that interface through this root. The same contract is reached without subtyping by each of the four returns-data families when its `pe` is `nothing`: [`DeltaUncertaintySet`](@ref), [`NormalUncertaintySet`](@ref), [`ARCHUncertaintySet`](@ref) and [`CharacteristicUncertaintySet`](@ref) each carry a prior-result arm of the triple over that type, and the optimiser hands such a set the prior it is solving on.
+The root returns `true` from [`reads_prior_result`](@ref). So a subtype gets the three-argument methods of the ucs Triple, which drop the returns data and call the two-argument methods above. A subtype needs no method of the returns-data interface of [`AbstractUncertaintySetEstimator`](@ref), because no consumer calls that interface through this root. Each of the four returns-data families has the same contract with no subtype when its `pe` is `nothing`. [`DeltaUncertaintySet`](@ref), [`NormalUncertaintySet`](@ref), [`ARCHUncertaintySet`](@ref) and [`CharacteristicUncertaintySet`](@ref) each have a method of the ucs Triple over a Prior Result. The optimiser gives such a set the prior that it solves on.
 
-There is no default fit. The root carries a method of each of the three verbs, and each raises and names the type it was called on, so a subtype that declares none says which method its author owes rather than failing on the root.
+The root has no default fit. It has one method of each of the three verbs, and each method throws an error that names the type of its argument. So a subtype that declares none of the three tells its author which method is missing, and does not fail on the root.
 
 # Related
 
@@ -97,13 +97,13 @@ abstract type AbstractPriorUncertaintySetEstimator <: AbstractUncertaintySetEsti
 """
 $(DocStringExtensions.TYPEDEF)
 
-Selects which shape of uncertainty set an estimator builds, such as a box or an ellipsoid.
+Selects the shape of the uncertainty set that an estimator builds, for example a box or an ellipsoid.
 
-All concrete subtypes should subtype `AbstractUncertaintySetAlgorithm`. A subtype carries the parameters of its own shape and nothing else. The estimator does the fitting.
+Every concrete shape subtypes `AbstractUncertaintySetAlgorithm`. A subtype holds the parameters of its shape and nothing more. The estimator does the fit.
 
 # Interfaces
 
-A subtype is a tag that the estimator dispatches on, so it declares no method of its own. To add a shape, subtype `AbstractUncertaintySetAlgorithm` and add the `ucs`, `mu_ucs`, and `sigma_ucs` methods of [`AbstractUncertaintySetEstimator`](@ref) that are specialised on it, one set for each estimator that is to offer the shape.
+A subtype is a tag that the estimator dispatches on, so it declares no method. To add a shape, subtype `AbstractUncertaintySetAlgorithm`. Then add the `ucs`, `mu_ucs` and `sigma_ucs` methods of [`AbstractUncertaintySetEstimator`](@ref) for the new shape, one set of methods for each estimator that builds it.
 
 # Related
 
@@ -116,29 +116,29 @@ abstract type AbstractUncertaintySetAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Carries a fitted uncertainty set, which is the data a worst-case model reads to build its robust expression.
+Holds a fitted uncertainty set, which a robust model reads to build its worst-case expression.
 
-All concrete subtypes should subtype `AbstractUncertaintySetResult`. A subtype also carries the statistic its bounds were calibrated on, so that the consumer bounds that statistic and not an unrelated one.
+Every concrete set subtypes `AbstractUncertaintySetResult`. A subtype also holds the statistic that the estimator calibrated its bounds on, so that the consumer bounds that statistic and not a different one.
 
 # Interfaces
 
-In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractUncertaintySetResult` and implement the following method:
+To add a set that the library can use, subtype `AbstractUncertaintySetResult` and add the method below.
 
 ## `port_opt_view`
 
-  - `port_opt_view(risk_ucs::AbstractUncertaintySetResult, i, args...) -> AbstractUncertaintySetResult`: Returns the set restricted to the asset indices `i`. A hierarchical optimiser calls it once per cluster.
+  - `port_opt_view(risk_ucs::AbstractUncertaintySetResult, i, args...) -> AbstractUncertaintySetResult`: Returns the set restricted to the asset indices `i`. A hierarchical optimiser calls it once for each cluster.
 
 ### Arguments
 
-  - `risk_ucs`: The concrete subtype instance.
+  - `risk_ucs`: The instance of the concrete subtype.
   - `i`: Asset index of the cluster.
-  - `args...`: Additional arguments.
+  - `args...`: More arguments.
 
 ### Returns
 
   - `risk_ucs::AbstractUncertaintySetResult`: The restricted set.
 
-A model that is to take the worst case over the new shape also needs its own `set_ucs_return_constraints!` method, or its own `set_ucs_variance_risk!` method, or both.
+A model that takes the worst case over the new shape also needs its own `set_ucs_return_constraints!` method, its own `set_ucs_variance_risk!` method, or both.
 
 # Related
 
@@ -149,26 +149,26 @@ A model that is to take the worst case over the new shape also needs its own `se
 """
 abstract type AbstractUncertaintySetResult <: AbstractResult end
 """
-    const UcSE_UcS = Union{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetEstimator}
+    const UcSE_UcS = Union{AbstractUncertaintySetResult, AbstractUncertaintySetEstimator}
 
-Alias for a union of uncertainty set result and estimator types.
+Alias for a union of the result types and the estimator types of an uncertainty set.
 
 # Related
 
   - [`AbstractUncertaintySetResult`](@ref)
   - [`AbstractUncertaintySetEstimator`](@ref)
 """
-const UcSE_UcS = Union{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetEstimator}
+const UcSE_UcS = Union{AbstractUncertaintySetResult, AbstractUncertaintySetEstimator}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Computes the radius `k` of an ellipsoidal uncertainty set, which is how far the true statistic may lie from its estimate.
+Computes the radius `k` of an ellipsoidal uncertainty set, which bounds the distance from the estimate to the true statistic.
 
-All concrete subtypes should subtype `AbstractUncertaintyKAlgorithm`. A plain number in place of one is the radius itself.
+Every concrete radius algorithm subtypes `AbstractUncertaintyKAlgorithm`. A plain number in place of an algorithm is the radius.
 
 # Interfaces
 
-In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractUncertaintyKAlgorithm` and implement the following methods. An ellipsoid reads `k_ucs`, and a norm ball reads `k_norm_ball`.
+To add a radius algorithm that the library can use, subtype `AbstractUncertaintyKAlgorithm` and add the methods below. An ellipsoid reads `k_ucs`, and a norm ball reads `k_norm_ball`.
 
 ## `k_ucs`
 
@@ -176,11 +176,11 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ### Arguments
 
-  - `km`: The concrete subtype instance.
+  - `km`: The instance of the concrete subtype.
   - `q`: Significance level.
-  - `X`: Matrix of sampled estimation errors, one row per sample. An algorithm that runs no simulation absorbs it.
+  - `X`: Matrix of sampled estimation errors, with one row for each sample. An algorithm that runs no simulation ignores it.
   - `sigma_X`: Shape matrix of the ellipsoid.
-  - `df`: Dimension of the set, which `ucs_dimension` gives. It is less than the first dimension of `sigma_X` on a full covariance shape, because a symmetric matrix has ``N(N+1)/2`` free entries of its ``N^{2}``. An algorithm that reads no dimension absorbs it.
+  - `df`: Dimension of the set, which `ucs_dimension` gives. On a full covariance shape, it is less than the first dimension of `sigma_X`, because a symmetric matrix has ``N(N+1)/2`` free entries of its ``N^{2}``. An algorithm that reads no dimension ignores it.
 
 ### Returns
 
@@ -192,9 +192,9 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ### Arguments
 
-  - `km`, `q`, `X`: As for `k_ucs`.
+  - `km`, `q`, `X`: The same as for `k_ucs`.
   - `L`: Geometry map of the ball, in place of the shape. The shape is `L * L'`.
-  - `df`: Dimension of the ball. The caller reads `ucs_dimension` for a map factorised from a shape, and `LinearAlgebra.rank(L)` for a map of deviations. An algorithm that reads no dimension absorbs it.
+  - `df`: Dimension of the ball. For a map that is a factor of a shape, the caller reads `ucs_dimension`. For a map of deviations, the caller reads `LinearAlgebra.rank(L)`. An algorithm that reads no dimension ignores it.
 
 ### Returns
 
@@ -210,31 +210,33 @@ In order to implement a new concrete type that works seamlessly with the library
 """
 abstract type AbstractUncertaintyKAlgorithm <: AbstractAlgorithm end
 """
-    const Num_UcSK = Union{<:AbstractUncertaintyKAlgorithm, <:Number}
+    const Num_UcSK = Union{AbstractUncertaintyKAlgorithm, Number}
 
-Alias for a union of uncertainty scaling algorithm and numeric types.
+Alias for a union of the radius algorithms of an ellipsoid and the number types. A number is the radius.
 
 # Related
 
   - [`AbstractUncertaintyKAlgorithm`](@ref)
 """
-const Num_UcSK = Union{<:AbstractUncertaintyKAlgorithm, <:Number}
+const Num_UcSK = Union{AbstractUncertaintyKAlgorithm, Number}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Computes the radius ``\\kappa`` of a [`CompactCovarianceUncertaintySet`](@ref) from the prior result and the geometry the set was built on, so that the radius refits whenever the sample or the factor span moves.
+Computes the radius ``\\kappa`` of a compact covariance uncertainty set from the Prior Result and the geometry of the set.
 
-A member stands in the `kappa` slot of an [`OrthogonalUncertaintySet`](@ref), whose bound is [`Num_CptRad`](@ref). A plain number in that slot is the radius itself, exactly as it is today, and [`k_compact`](@ref) returns it unchanged.
+The radius of a [`CompactCovarianceUncertaintySet`](@ref) then changes when the sample or the factor span changes. A member goes in the `kappa` field of an [`OrthogonalUncertaintySet`](@ref), whose type bound is [`Num_CptRad`](@ref). A plain number in that field is the radius, and [`k_compact`](@ref) returns it unchanged.
 
-**This family is not the calibration-rule channel, and the two do not meet.** A **Calibration Rule** reads `(pr, w, slv, ctx)` and nothing else. The compact radius cannot be sized from those alone, because its units move with a sibling field of its own owner: the penalty is ``\\kappa \\lVert (\\mathbf{I} - \\mathbf{Q}\\mathbf{Q}^{\\intercal})\\mathbf{C}\\boldsymbol{w} \\rVert_{2}^{2}`` with ``\\mathbf{C} = \\mathbf{W}^{-1/2}``, so under [`IdentityMetric`](@ref) ``\\kappa`` carries variance units and under [`InverseIdiosyncraticVarianceMetric`](@ref) it is dimensionless. A rule that saw only the prior result would have to state one of the two readings and be wrong under the other. So the radius is sized **in family**, where the metric, the loadings block and the span are all in hand, exactly as the mean radius of the same estimator is sized by [`k_norm_ball`](@ref) through the `method` slot. A radius slot admits the rule that computes it.
+**This family is separate from the Calibration Rules, and the two do not mix.** A **Calibration Rule** reads `(pr, w, slv, ctx)` and nothing more. These four inputs cannot size the compact radius, because its units change with a different field of the same estimator. The penalty is ``\\kappa \\lVert (\\mathbf{I} - \\mathbf{Q}\\mathbf{Q}^{\\intercal})\\mathbf{C}\\boldsymbol{w} \\rVert_{2}^{2}`` with ``\\mathbf{C} = \\mathbf{W}^{-1/2}``. Under `metric = nothing`, ``\\kappa`` has the units of a variance. Under [`InverseIdiosyncraticVarianceMetric`](@ref), it has no units.
 
-A rule is named for the **method** it runs, and neither bare word is claimed elsewhere in the library. [`ResidualInflation`](@ref) inflates the residual variance to a confidence bound, and [`VarianceFraction`](@ref) matches the penalty to a fraction of the nominal variance at a reference portfolio.
+A rule that reads only the Prior Result must select one of the two units, and it is wrong under the other. So a rule of this family computes the radius **inside the family**, which has the metric, the loadings block and the span. The mean radius of the same estimator follows the same pattern through [`k_norm_ball`](@ref) and the `method` field. A field that holds a radius also accepts the rule that computes it.
+
+The name of a rule is the name of the **method** that it runs, and no other part of the library uses either word. [`ResidualInflation`](@ref) increases the residual variance to a confidence bound. [`VarianceFraction`](@ref) sets the penalty to a fraction of the nominal variance at a reference portfolio.
 
 # Interfaces
 
 ## `k_compact`
 
-  - `k_compact(alg::AbstractCompactRadiusAlgorithm, q::Number, metric::AbstractOrthogonalityMetric, pr::AbstractPriorResult, rr::AbstractLoadingsRegressionResult, C::VecNum, Q::MatNum, rd) -> Number`: Returns the radius, finite and `>= 0`. `rd` is the returns data of the fit, or `nothing`. The owner's own constructor states the range, so a rule writes no range check of its own.
+  - `k_compact(alg::AbstractCompactRadiusAlgorithm, q::Number, metric::Option{<:AbstractOrthogonalityMetric}, pr::AbstractPriorResult, rr::AbstractLoadingsRegressionResult, C::VecNum, Q::MatNum, rd) -> Number`: Returns the radius, which is finite and `>= 0`. `rd` is the returns data of the fit, or `nothing`. The constructor of the estimator that holds the rule states the range, so a rule needs no range check.
 
 # Related
 
@@ -244,15 +246,15 @@ A rule is named for the **method** it runs, and neither bare word is claimed els
   - [`k_compact`](@ref)
   - [`OrthogonalUncertaintySet`](@ref)
   - [`CompactCovarianceUncertaintySet`](@ref)
-  - [`AbstractCalibrationAlgorithm`](@ref): the parallel channel, which sizes a quantity whose units do not move with a sibling field.
+  - [`AbstractCalibrationAlgorithm`](@ref): the separate family of rules, which computes a quantity whose units do not change with a different field.
 """
 abstract type AbstractCompactRadiusAlgorithm <: AbstractAlgorithm end
 """
-    const Num_CptRad = Union{<:AbstractCompactRadiusAlgorithm, <:Number}
+    const Num_CptRad = Union{AbstractCompactRadiusAlgorithm, Number}
 
-Field bound for the compact covariance radius: the radius itself, or a rule of [`AbstractCompactRadiusAlgorithm`](@ref) that computes one.
+Type bound of the field that holds the compact covariance radius.
 
-The union names one family and no other, so a rule of any other family is refused **at construction**, where the caller wrote it. It admits no plain `Function`, because a rule of this family reads seven arguments the site settles — the metric, the loadings block, the diagonal metric and the span among them — and a closure over a caller's own data would have to restate every one of them to be called at all.
+The field holds the radius, or a rule of [`AbstractCompactRadiusAlgorithm`](@ref) that computes it. The union names one family only. So the constructor refuses a rule of a different family **at construction**, at the line where the caller writes it. The union does not accept a plain `Function`. A rule of this family reads seven arguments from the call site. Four of them are the metric, the loadings block, the diagonal metric and the span. A closure over the data of the caller must repeat all seven of them before it can run.
 
 # Related
 
@@ -260,17 +262,17 @@ The union names one family and no other, so a rule of any other family is refuse
   - [`k_compact`](@ref)
   - [`OrthogonalUncertaintySet`](@ref)
 """
-const Num_CptRad = Union{<:AbstractCompactRadiusAlgorithm, <:Number}
+const Num_CptRad = Union{AbstractCompactRadiusAlgorithm, Number}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Computes the radius `eps` of an ``\\ell_1`` uncertainty set, which controls how far the true characteristic vector may lie from its estimate, and therefore how many assets the portfolio holds.
+Computes the radius `eps` of an ``\\ell_1`` uncertainty set, which sets how many assets the portfolio holds.
 
-All concrete subtypes should subtype `AbstractUncertaintyEpsAlgorithm`. A plain number in place of one is the radius itself. It is the counterpart of [`AbstractUncertaintyKAlgorithm`](@ref) for the ``\\ell_1`` family.
+The radius bounds the distance from the estimate to the true characteristic vector. Every concrete radius algorithm of the ``\\ell_1`` family subtypes `AbstractUncertaintyEpsAlgorithm`. A plain number in place of an algorithm is the radius. The family has the same role for the ``\\ell_1`` sets as [`AbstractUncertaintyKAlgorithm`](@ref) has for the ellipsoid.
 
 # Interfaces
 
-In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractUncertaintyEpsAlgorithm` and implement the following method:
+To add a radius algorithm that the library can use, subtype `AbstractUncertaintyEpsAlgorithm` and add the method below.
 
 ## `l1_resolve_eps`
 
@@ -278,10 +280,10 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ### Arguments
 
-  - `method`: The concrete subtype instance.
+  - `method`: The instance of the concrete subtype.
   - `mus`: Characteristic vector, sorted in non-increasing order.
-  - `sds`: Per-asset scaling under the same permutation, or `nothing` when the set is unscaled.
-  - `paired`: Whether to read the paired ladder of the dollar-neutral problem rather than the long-only one.
+  - `sds`: Scale of each asset under the same permutation, or `nothing` when the set has no scale.
+  - `paired`: Whether to read the paired ladder of the dollar-neutral problem, and not the long-only ladder.
 
 ### Returns
 
@@ -295,32 +297,32 @@ In order to implement a new concrete type that works seamlessly with the library
 """
 abstract type AbstractUncertaintyEpsAlgorithm <: AbstractAlgorithm end
 """
-    const Num_UcSEps = Union{<:AbstractUncertaintyEpsAlgorithm, <:Number}
+    const Num_UcSEps = Union{AbstractUncertaintyEpsAlgorithm, Number}
 
-Alias for a union of ``\\ell_1`` uncertainty radius algorithm and numeric types. A plain number is the radius itself; an algorithm defers its computation to the data.
+Alias for a union of the radius algorithms of an ``\\ell_1`` set and the number types. A number is the radius. An algorithm computes the radius from the data.
 
 # Related
 
   - [`AbstractUncertaintyEpsAlgorithm`](@ref)
 """
-const Num_UcSEps = Union{<:AbstractUncertaintyEpsAlgorithm, <:Number}
+const Num_UcSEps = Union{AbstractUncertaintyEpsAlgorithm, Number}
 """
-    ucs(uc::Option{<:Tuple{<:Option{<:AbstractUncertaintySetResult},
-                           <:Option{<:AbstractUncertaintySetResult}}}, args...; kwargs...)
+    ucs(uc::Option{<:Tuple{Option{<:AbstractUncertaintySetResult},
+                           Option{<:AbstractUncertaintySetResult}}}, args...; kwargs...)
 
-Returns a pair of already-built uncertainty sets unchanged, so that a consumer can call [`ucs`](@ref) without first asking whether its slot holds an estimator or a result.
+Returns a pair of built uncertainty sets unchanged, so that a consumer can call [`ucs`](@ref) on an estimator or on a result.
 
-The method is a passthrough. It runs no procedure and it carries no `# Algorithm` section. Its sibling that takes an [`AbstractUncertaintySetEstimator`](@ref) is the method that fits.
+The method is a passthrough. It does no procedure, so it has no `# Algorithm` section. The method that takes an [`AbstractUncertaintySetEstimator`](@ref) does the fit.
 
 # Arguments
 
   - `uc`: Tuple of uncertainty sets, or `nothing`.
-  - `args...`: Additional positional arguments (ignored).
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `args...`: More positional arguments, which the method ignores.
+  - `kwargs...`: More keyword arguments, which the method ignores.
 
 # Returns
 
-  - `uc::Option{<:Tuple{<:Option{<:AbstractUncertaintySetResult}, <:Option{<:AbstractUncertaintySetResult}}}`: The input, unchanged.
+  - `uc::Option{<:Tuple{Option{<:AbstractUncertaintySetResult}, Option{<:AbstractUncertaintySetResult}}}`: The input, unchanged.
 
 # Related
 
@@ -329,23 +331,23 @@ The method is a passthrough. It runs no procedure and it carries no `# Algorithm
   - [`BoxUncertaintySet`](@ref)
   - [`EllipsoidalUncertaintySet`](@ref)
 """
-function ucs(uc::Option{<:Tuple{<:Option{<:AbstractUncertaintySetResult},
-                                <:Option{<:AbstractUncertaintySetResult}}}, args...;
+function ucs(uc::Option{<:Tuple{Option{<:AbstractUncertaintySetResult},
+                                Option{<:AbstractUncertaintySetResult}}}, args...;
              kwargs...)
     return uc
 end
 """
     mu_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...; kwargs...)
 
-Returns an already-built mean uncertainty set unchanged, so that a consumer can call [`mu_ucs`](@ref) without first asking whether its slot holds an estimator or a result.
+Returns a built uncertainty set of the mean unchanged, so that a consumer can call [`mu_ucs`](@ref) on an estimator or on a result.
 
-The method is a passthrough. It runs no procedure and it carries no `# Algorithm` section. Its sibling that takes an [`AbstractUncertaintySetEstimator`](@ref) is the method that fits.
+The method is a passthrough. It does no procedure, so it has no `# Algorithm` section. The method that takes an [`AbstractUncertaintySetEstimator`](@ref) does the fit.
 
 # Arguments
 
-  - `uc`: Expected returns uncertainty set or `nothing`.
-  - `args...`: Additional positional arguments (ignored).
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `uc`: Uncertainty set of the mean, or `nothing`.
+  - `args...`: More positional arguments, which the method ignores.
+  - `kwargs...`: More keyword arguments, which the method ignores.
 
 # Returns
 
@@ -365,15 +367,15 @@ end
 """
     sigma_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...; kwargs...)
 
-Returns an already-built covariance uncertainty set unchanged, so that a consumer can call [`sigma_ucs`](@ref) without first asking whether its slot holds an estimator or a result.
+Returns a built uncertainty set of the covariance unchanged, so that a consumer can call [`sigma_ucs`](@ref) on an estimator or on a result.
 
-The method is a passthrough. It runs no procedure and it carries no `# Algorithm` section. Its sibling that takes an [`AbstractUncertaintySetEstimator`](@ref) is the method that fits.
+The method is a passthrough. It does no procedure, so it has no `# Algorithm` section. The method that takes an [`AbstractUncertaintySetEstimator`](@ref) does the fit.
 
 # Arguments
 
-  - `uc`: Covariance uncertainty set or `nothing`.
-  - `args...`: Additional positional arguments (ignored).
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `uc`: Uncertainty set of the covariance, or `nothing`.
+  - `args...`: More positional arguments, which the method ignores.
+  - `kwargs...`: More keyword arguments, which the method ignores.
 
 # Returns
 
@@ -395,9 +397,9 @@ end
     ucs_selector(risk_ucs::UcSE_UcS, prior_ucs::Any)
     ucs_selector(risk_ucs::Nothing, prior_ucs::UcSE_UcS)
 
-Chooses between the uncertainty set a risk measure carries and the one a prior carries, so that the risk measure's own set outranks the prior's.
+Chooses between the uncertainty set of a risk measure and the uncertainty set of a prior, and the set of the risk measure has priority.
 
-The function is a selector. It states the table below and it carries no `# Algorithm` section, because each of its three methods returns one of its arguments and takes no step. The three methods are exhaustive over the argument pairs the callers form, and the first row is the only one that gives `nothing`.
+The function is a selector, so it states the table below and has no `# Algorithm` section. Each of its three methods returns one of its arguments and does no step. The three methods cover every pair of arguments that the callers make. Only the first row gives `nothing`.
 
 | `risk_ucs`   | `prior_ucs`  | Result      |
 |:------------ |:------------ |:----------- |
@@ -407,12 +409,12 @@ The function is a selector. It states the table below and it carries no `# Algor
 
 # Arguments
 
-  - `risk_ucs`: Risk measure uncertainty set estimator or result, or `nothing`.
-  - `prior_ucs`: Prior result uncertainty set estimator or result, or `nothing`.
+  - `risk_ucs`: Uncertainty set estimator or result of the risk measure, or `nothing`.
+  - `prior_ucs`: Uncertainty set estimator or result of the prior, or `nothing`.
 
 # Returns
 
-  - `ucs::Option{<:UcSE_UcS}`: The selected set or estimator, by the table above.
+  - `ucs::Option{<:UcSE_UcS}`: The selected set or estimator, as the table above states.
 
 # Related
 
@@ -432,15 +434,15 @@ end
 """
     port_opt_view(risk_ucs::Option{<:AbstractUncertaintySetEstimator}, i, args...)
 
-Returns an uncertainty set estimator unchanged, because an estimator carries no asset axis to restrict.
+Returns an uncertainty set estimator unchanged, because an estimator has no asset axis to restrict.
 
-The method is a passthrough. It runs no procedure and it carries no `# Algorithm` section. A hierarchical optimiser calls [`port_opt_view`](@ref) once per cluster, and an estimator that reaches this method is fitted later against the cluster's own returns, so the restriction happens in the fit rather than here. The methods that take a built result do index; each states its own steps.
+The method is a passthrough, so it has no `# Algorithm` section. A hierarchical optimiser calls [`port_opt_view`](@ref) once for each cluster. Later, the optimiser fits the estimator on the returns of the cluster. So the fit does the restriction, and this method does not. The methods that take a built result apply the index, and each one states its steps.
 
 # Arguments
 
   - `risk_ucs`: Uncertainty set estimator, or `nothing`.
-  - `i`: Cluster or asset index (ignored).
-  - `args...`: Additional positional arguments (ignored).
+  - `i`: Index of the cluster or of the assets, which the method ignores.
+  - `args...`: More positional arguments, which the method ignores.
 
 # Returns
 
@@ -461,26 +463,28 @@ end
     investable_ucs_reduction(::Nothing, pr::AbstractPriorResult, rd) -> (nothing, pr, rd)
     investable_ucs_reduction(imsk::BitVector, pr::AbstractPriorResult, rd) -> (imsk, pr_view, rd_view)
 
-Reduce a prior result, and the returns data beside it, to the Investable Mask before a set is fitted on them standalone.
+Reduces a Prior Result, and the returns data beside it, to the Investable Mask before an estimator fits a set on them outside an optimiser.
 
-A Prior Result lives on the full asset universe, and an asset outside its Investable Mask carries `NaN` in its moments and in every block a factor fit wrote, so a set fitted on the whole result meets a `NaN` where its arithmetic needs a number. Inside an optimiser the result arrives already reduced, because every optimisation family reduces once at its entry, and the mask this verb derives is then `nothing`. Standalone, the result arrives whole, and this verb takes the same view the optimiser takes, so the two routes fit the same set. [`expand_investable_ucs`](@ref) writes the fitted set back onto the full universe, and the pair is the reduce-and-expand shape every prior result takes.
+A Prior Result covers the full asset universe. An asset outside its Investable Mask has `NaN` in its moments and in every block that a factor fit wrote. So a set fitted on the whole result gets a `NaN` where its arithmetic needs a number. Every optimisation family reduces the result once at its entry, so inside an optimiser the result is already reduced and the mask is `nothing`. Outside an optimiser the result is whole. This function then takes the same view as the optimiser, and the two routes fit the same set.
 
-Three methods, and the branch is dispatch rather than a condition, as it is in `investable_reduction`. The first derives the mask; the `nothing` method is the all-investable path and returns its arguments untouched; the `BitVector` method takes the two views.
+[`expand_investable_ucs`](@ref) writes the fitted set back onto the full universe. Every Prior Result follows the same pattern of reduction and expansion.
+
+The function has three methods, and dispatch selects the branch, as in `investable_reduction`. The first method finds the mask. The `nothing` method is the path where all assets are investable, and it returns its arguments unchanged. The `BitVector` method takes the two views.
 
 # Algorithm
 
- 1. Derive the Investable Mask from the prior result with [`investable_mask`](@ref).
- 2. Return `nothing` and the two arguments unchanged when the mask is `nothing`.
- 3. Otherwise take a [`port_opt_view`](@ref) of the prior result at `findall(imsk)`, and of the returns data when it is not `nothing`, and return them beside the mask.
+ 1. Find the Investable Mask of the Prior Result with [`investable_mask`](@ref).
+ 2. If the mask is `nothing`, return `nothing` and the two arguments unchanged.
+ 3. Else, take a [`port_opt_view`](@ref) of the Prior Result at `findall(imsk)`. Take the same view of the returns data when it is not `nothing`. Return the two views and the mask.
 
 # Arguments
 
   - $(arg_dict[:pr])
-  - `rd`: Returns data the set is fitted beside, or `nothing`.
+  - `rd`: Returns data beside which the estimator fits the set, or `nothing`.
 
 # Returns
 
-  - `(imsk, pr, rd)`: The Investable Mask and the two reduced to it, or `nothing` and the two unchanged.
+  - `(imsk, pr, rd)`: The Investable Mask and the two arguments reduced to it, or `nothing` and the two arguments unchanged.
 
 # Related
 
@@ -501,11 +505,13 @@ end
 """
     expand_investable_ucs(set::AbstractUncertaintySetResult, ::Nothing, pr::AbstractPriorResult) -> set
 
-Write a set fitted on the Investable Mask back onto the full asset universe.
+Writes a set fitted on the Investable Mask back onto the full asset universe.
 
-The `nothing` method is the all-investable path of [`investable_ucs_reduction`](@ref) and returns the set untouched, so a set fitted inside an optimiser, on a result that arrived reduced, pays nothing here. Each built set that a prior-result route produces adds its own `BitVector` method beside its [`port_opt_view`](@ref), because the expansion is the inverse of that view: it writes the set's asset-axis blocks into a zero frame of the full width, and carries the full `pr.mu` or `pr.sigma` as `val`, `NaN` frame and all. The two rows of a view then commute, `port_opt_view(expand_investable_ucs(set, imsk, pr), findall(imsk))` recovers `set`, which is what lets a set fitted standalone on a point-in-time prior be handed back to an optimiser on the full universe.
+The `nothing` method is the path of [`investable_ucs_reduction`](@ref) where all assets are investable. It returns the set unchanged, so a set that an optimiser fits on a reduced result costs nothing here. Each built set that a route through a Prior Result makes adds its own `BitVector` method beside its [`port_opt_view`](@ref). The expansion is the inverse of that view. It writes the blocks of the set on the asset axis into a frame of the full width. It sets `val` to the full `pr.mu` or `pr.sigma`, with its `NaN` entries.
 
-The method is a passthrough, so it carries no `# Algorithm` section.
+So `port_opt_view(expand_investable_ucs(set, imsk, pr), findall(imsk))` gives back `set`. This lets a caller fit a set outside an optimiser on a point-in-time prior, and give it to an optimiser on the full universe. The frame is `NaN` for a box and zero for an ellipsoid, and each method states the reason.
+
+The method is a passthrough, so it has no `# Algorithm` section.
 
 # Arguments
 
@@ -529,34 +535,34 @@ end
 """
     ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; dims::Int = 1)
 
-Fits both uncertainty sets in one pass from an estimator and a [`ReturnsResult`](@ref).
+Fits the two uncertainty sets in one call from an estimator and a [`ReturnsResult`](@ref).
 
-The method unpacks the container and forwards to the matrix method, so an estimator that shares a prior or a simulation between the two axes computes it once. It takes no keyword but `dims`, which it ignores, as [`prior`](@ref) does on a `ReturnsResult`: the container carries every input of the fit, and the prior of the set states the source of the returns, so an unknown keyword is a `MethodError` and is not ignored.
+The method reads the fields of the container and calls the matrix method. The matrix method fits the two axes together, and an estimator that shares a prior or a simulation between them computes it once. The only keyword is `dims`, and the method ignores it, as [`prior`](@ref) does on a `ReturnsResult`. The container holds every input of the fit, and the prior of the set states the source of the returns. So an unknown keyword causes a `MethodError`, and the method does not ignore it.
 
 # Algorithm
 
- 1. Check that `rd.X` is not `nothing`, and raise otherwise.
- 2. When `uc.pe`'s estimator tree requires factor returns — when [`needs_factor_returns`](@ref) answers `true` — check that `rd.F` is not `nothing`, and raise otherwise. A factor leaf reads the factor returns, wherever it sits in the tree, and no other prior does.
- 3. Read the source that `uc.pe` states with [`returns_source`](@ref), giving `x_src`. The set holds no source of its own: it gives the returns to its prior, and the prior states the source. A set with `pe = nothing` reads `rd.X`.
- 4. Drop the observations of a Shared Series gap with [`shared_series_view`](@ref): a gap of a vector benchmark under `x_src = ExcessSource()`, and a gap of the factor returns when [`reads_factor_returns`](@ref) answers `true` for `uc.pe`.
- 5. Read the asset returns with [`benchmark_relative_returns`](@ref) under `x_src`, giving `X`. It is `rd.X`, or `rd.X - rd.B` under `ExcessSource()`.
- 6. Forward to `ucs(uc, X, rd.F; iv = rd.iv, ivpa = rd.ivpa, dims = 1)`, giving the pair of fitted sets. The implied volatility fields travel with the returns, because a prior that reads them takes them by keyword. `dims = 1` states that a `ReturnsResult` holds its observations along the rows.
+ 1. Check that `rd.X` is not `nothing`. If it is, throw an error.
+ 2. If [`needs_factor_returns`](@ref) returns `true` for `uc.pe`, check that `rd.F` is not `nothing`. If it is, throw an error. A factor leaf at any position in the estimator tree reads the factor returns, and no other prior reads them.
+ 3. Read the source `x_src` that `uc.pe` states, with [`returns_source`](@ref). The set holds no source of its own. It gives the returns to its prior, and the prior states the source. A set with `pe = nothing` reads `rd.X`.
+ 4. Remove the observations of a Shared Series gap with [`shared_series_view`](@ref). These are the gaps of a vector benchmark under `x_src = ExcessSource()`, and the gaps of the factor returns when [`reads_factor_returns`](@ref) returns `true` for `uc.pe`.
+ 5. Read the asset returns `X` with [`benchmark_relative_returns`](@ref) under `x_src`. `X` is `rd.X`, or `rd.X - rd.B` under `ExcessSource()`.
+ 6. Call `ucs(uc, X, rd.F; iv = rd.iv, ivpa = rd.ivpa, dims = 1)`, and return the pair of fitted sets. The method gives the implied volatility fields with the returns, because a prior that reads them takes them by keyword. `dims = 1` states that a `ReturnsResult` holds its observations in the rows.
 
 # Arguments
 
-  - `uc`: Uncertainty set estimator. Used to construct the uncertainty set.
-  - `rd`: [`ReturnsResult`](@ref). Contains the returns data and associated metadata.
+  - `uc`: Estimator of the two uncertainty sets.
+  - `rd`: [`ReturnsResult`](@ref) that holds the returns data and its metadata.
   - $(arg_dict[:dims_rd])
 
 # Validation
 
-  - `!isnothing(rd.X)`, raising an `IsNothingError`.
+  - `!isnothing(rd.X)`, else an `IsNothingError`.
   - The rules of [`benchmark_relative_returns`](@ref).
-  - If `needs_factor_returns(uc.pe) === true`: `!isnothing(rd.F)`, raising an `IsNothingError`.
+  - If `needs_factor_returns(uc.pe) === true`, then `!isnothing(rd.F)`, else an `IsNothingError`.
 
 # Returns
 
-  - `uc::Tuple{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetResult}`: Expected returns and covariance uncertainty sets.
+  - `uc::Tuple{AbstractUncertaintySetResult, AbstractUncertaintySetResult}`: The uncertainty sets of the mean and of the covariance.
 
 # Related
 
@@ -576,34 +582,34 @@ end
 """
     mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; dims::Int = 1)
 
-Fits the mean uncertainty set from an estimator and a [`ReturnsResult`](@ref).
+Fits the uncertainty set of the mean from an estimator and a [`ReturnsResult`](@ref).
 
-The method unpacks the container and forwards to the matrix method. A caller that needs both axes calls [`ucs`](@ref) instead, which fits them in one pass. It takes no keyword but `dims`, which it ignores, as [`ucs`](@ref) states.
+The method reads the fields of the container and calls the matrix method. A caller that needs the two axes calls [`ucs`](@ref), which fits them in one call. The only keyword is `dims`, and the method ignores it, as [`ucs`](@ref) states.
 
 # Algorithm
 
- 1. Check that `rd.X` is not `nothing`, and raise otherwise.
- 2. When `uc.pe`'s estimator tree requires factor returns — when [`needs_factor_returns`](@ref) answers `true` — check that `rd.F` is not `nothing`, and raise otherwise. A factor leaf reads the factor returns, wherever it sits in the tree, and no other prior does.
- 3. Read the source that `uc.pe` states with [`returns_source`](@ref), giving `x_src`. The set holds no source of its own: it gives the returns to its prior, and the prior states the source. A set with `pe = nothing` reads `rd.X`.
- 4. Drop the observations of a Shared Series gap with [`shared_series_view`](@ref): a gap of a vector benchmark under `x_src = ExcessSource()`, and a gap of the factor returns when [`reads_factor_returns`](@ref) answers `true` for `uc.pe`.
- 5. Read the asset returns with [`benchmark_relative_returns`](@ref) under `x_src`, giving `X`. It is `rd.X`, or `rd.X - rd.B` under `ExcessSource()`.
- 6. Forward to `mu_ucs(uc, X, rd.F; iv = rd.iv, ivpa = rd.ivpa, dims = 1)`, giving the fitted mean set. The implied volatility fields travel with the returns, because a prior that reads them takes them by keyword. `dims = 1` states that a `ReturnsResult` holds its observations along the rows.
+ 1. Check that `rd.X` is not `nothing`. If it is, throw an error.
+ 2. If [`needs_factor_returns`](@ref) returns `true` for `uc.pe`, check that `rd.F` is not `nothing`. If it is, throw an error. A factor leaf at any position in the estimator tree reads the factor returns, and no other prior reads them.
+ 3. Read the source `x_src` that `uc.pe` states, with [`returns_source`](@ref). The set holds no source of its own. It gives the returns to its prior, and the prior states the source. A set with `pe = nothing` reads `rd.X`.
+ 4. Remove the observations of a Shared Series gap with [`shared_series_view`](@ref). These are the gaps of a vector benchmark under `x_src = ExcessSource()`, and the gaps of the factor returns when [`reads_factor_returns`](@ref) returns `true` for `uc.pe`.
+ 5. Read the asset returns `X` with [`benchmark_relative_returns`](@ref) under `x_src`. `X` is `rd.X`, or `rd.X - rd.B` under `ExcessSource()`.
+ 6. Call `mu_ucs(uc, X, rd.F; iv = rd.iv, ivpa = rd.ivpa, dims = 1)`, and return the fitted set of the mean. The method gives the implied volatility fields with the returns, because a prior that reads them takes them by keyword. `dims = 1` states that a `ReturnsResult` holds its observations in the rows.
 
 # Arguments
 
-  - `uc`: Uncertainty set estimator. Used to construct the expected returns uncertainty set.
-  - `rd`: [`ReturnsResult`](@ref). Contains the returns data and associated metadata.
+  - `uc`: Estimator of the uncertainty set of the mean.
+  - `rd`: [`ReturnsResult`](@ref) that holds the returns data and its metadata.
   - $(arg_dict[:dims_rd])
 
 # Validation
 
-  - `!isnothing(rd.X)`, raising an `IsNothingError`.
+  - `!isnothing(rd.X)`, else an `IsNothingError`.
   - The rules of [`benchmark_relative_returns`](@ref).
-  - If `needs_factor_returns(uc.pe) === true`: `!isnothing(rd.F)`, raising an `IsNothingError`.
+  - If `needs_factor_returns(uc.pe) === true`, then `!isnothing(rd.F)`, else an `IsNothingError`.
 
 # Returns
 
-  - `uc::AbstractUncertaintySetResult`: Expected returns uncertainty set.
+  - `uc::AbstractUncertaintySetResult`: The uncertainty set of the mean.
 
 # Related
 
@@ -623,34 +629,34 @@ end
 """
     sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; dims::Int = 1)
 
-Fits the covariance uncertainty set from an estimator and a [`ReturnsResult`](@ref).
+Fits the uncertainty set of the covariance from an estimator and a [`ReturnsResult`](@ref).
 
-The method unpacks the container and forwards to the matrix method. An estimator with no covariance analogue raises there, as [`CharacteristicUncertaintySet`](@ref) does. It takes no keyword but `dims`, which it ignores, as [`ucs`](@ref) states.
+The method reads the fields of the container and calls the matrix method. An estimator with no covariance set throws an error in the matrix method, as [`CharacteristicUncertaintySet`](@ref) does. The only keyword is `dims`, and the method ignores it, as [`ucs`](@ref) states.
 
 # Algorithm
 
- 1. Check that `rd.X` is not `nothing`, and raise otherwise.
- 2. When `uc.pe`'s estimator tree requires factor returns — when [`needs_factor_returns`](@ref) answers `true` — check that `rd.F` is not `nothing`, and raise otherwise. A factor leaf reads the factor returns, wherever it sits in the tree, and no other prior does.
- 3. Read the source that `uc.pe` states with [`returns_source`](@ref), giving `x_src`. The set holds no source of its own: it gives the returns to its prior, and the prior states the source. A set with `pe = nothing` reads `rd.X`.
- 4. Drop the observations of a Shared Series gap with [`shared_series_view`](@ref): a gap of a vector benchmark under `x_src = ExcessSource()`, and a gap of the factor returns when [`reads_factor_returns`](@ref) answers `true` for `uc.pe`.
- 5. Read the asset returns with [`benchmark_relative_returns`](@ref) under `x_src`, giving `X`. It is `rd.X`, or `rd.X - rd.B` under `ExcessSource()`.
- 6. Forward to `sigma_ucs(uc, X, rd.F; iv = rd.iv, ivpa = rd.ivpa, dims = 1)`, giving the fitted covariance set. The implied volatility fields travel with the returns, because a prior that reads them takes them by keyword. `dims = 1` states that a `ReturnsResult` holds its observations along the rows.
+ 1. Check that `rd.X` is not `nothing`. If it is, throw an error.
+ 2. If [`needs_factor_returns`](@ref) returns `true` for `uc.pe`, check that `rd.F` is not `nothing`. If it is, throw an error. A factor leaf at any position in the estimator tree reads the factor returns, and no other prior reads them.
+ 3. Read the source `x_src` that `uc.pe` states, with [`returns_source`](@ref). The set holds no source of its own. It gives the returns to its prior, and the prior states the source. A set with `pe = nothing` reads `rd.X`.
+ 4. Remove the observations of a Shared Series gap with [`shared_series_view`](@ref). These are the gaps of a vector benchmark under `x_src = ExcessSource()`, and the gaps of the factor returns when [`reads_factor_returns`](@ref) returns `true` for `uc.pe`.
+ 5. Read the asset returns `X` with [`benchmark_relative_returns`](@ref) under `x_src`. `X` is `rd.X`, or `rd.X - rd.B` under `ExcessSource()`.
+ 6. Call `sigma_ucs(uc, X, rd.F; iv = rd.iv, ivpa = rd.ivpa, dims = 1)`, and return the fitted set of the covariance. The method gives the implied volatility fields with the returns, because a prior that reads them takes them by keyword. `dims = 1` states that a `ReturnsResult` holds its observations in the rows.
 
 # Arguments
 
-  - `uc`: Uncertainty set estimator. Used to construct the covariance uncertainty set.
-  - `rd`: [`ReturnsResult`](@ref). Contains the returns data and associated metadata.
+  - `uc`: Estimator of the uncertainty set of the covariance.
+  - `rd`: [`ReturnsResult`](@ref) that holds the returns data and its metadata.
   - $(arg_dict[:dims_rd])
 
 # Validation
 
-  - `!isnothing(rd.X)`, raising an `IsNothingError`.
+  - `!isnothing(rd.X)`, else an `IsNothingError`.
   - The rules of [`benchmark_relative_returns`](@ref).
-  - If `needs_factor_returns(uc.pe) === true`: `!isnothing(rd.F)`, raising an `IsNothingError`.
+  - If `needs_factor_returns(uc.pe) === true`, then `!isnothing(rd.F)`, else an `IsNothingError`.
 
 # Returns
 
-  - `uc::AbstractUncertaintySetResult`: Covariance uncertainty set.
+  - `uc::AbstractUncertaintySetResult`: The uncertainty set of the covariance.
 
 # Related
 
@@ -672,21 +678,21 @@ end
     mu_ucs(ue::AbstractPriorUncertaintySetEstimator, ::AbstractPriorResult; kwargs...)
     sigma_ucs(ue::AbstractPriorUncertaintySetEstimator, ::AbstractPriorResult; kwargs...)
 
-Refuses a prior-reading uncertainty set estimator that declares no fit of its own, and names it.
+Throws an error that names an uncertainty set estimator which reads a Prior Result and declares no fit.
 
-[`AbstractPriorUncertaintySetEstimator`](@ref) states three verbs over a Prior Result, and a member owes a method of each. These three are the root's own methods, and they raise. They exist because the three-argument form of the triple forwards here, so a member that declares none of the three would otherwise fail with a `MethodError` naming the root rather than the type the author wrote.
+[`AbstractPriorUncertaintySetEstimator`](@ref) states three verbs over a Prior Result, and each member must add a method of each verb. These three methods belong to the root, and they throw an error. The three-argument form of the ucs Triple calls them. Without them, a member that declares none of the three fails with a `MethodError` that names the root, not the type that the author wrote.
 
-There is no default fit. An estimator of this family reads a fitted prior result, and no two members read the same part of it, so a fallback would have to invent a set rather than build one. That is the polarity [`factor_residual_config`](@ref) uses for a per-type declaration whose absence is a defect rather than an answer.
+The root has no default fit. An estimator of this family reads a fitted Prior Result, and no two members read the same part of it. So a default method must invent a set, and it cannot build one. [`factor_residual_config`](@ref) uses the same rule for a declaration of each type, where a missing declaration is a defect and not an answer.
 
 # Arguments
 
-  - `ue`: Uncertainty set estimator, which the raise names.
-  - `pr`: Prior result (ignored).
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `ue`: Uncertainty set estimator, which the error names.
+  - `pr`: Prior Result, which the method ignores.
+  - `kwargs...`: More keyword arguments, which the method ignores.
 
 # Validation
 
-  - Throws an `ArgumentError` naming the type of `ue`.
+  - Throws an `ArgumentError` that names the type of `ue`.
 
 # Related
 
@@ -714,9 +720,13 @@ end
     reads_prior_result(::CharacteristicUncertaintySet{Nothing}) -> Bool
     reads_prior_result(::Option{<:AbstractUncertaintySetResult}) -> Bool
 
-States whether an uncertainty set estimator is calibrated on the prior result it is handed, rather than on a prior it fits for itself from returns data.
+States whether an uncertainty set estimator calibrates on a Prior Result from the caller, and not on a prior that it fits.
 
-It is a per-type predicate, read off the type and the `pe` field and never off a method table, so that the three consumers which must route an estimator to the argument it reads — the three-argument form of the ucs triple, [`ucs_risk_measure`](@ref) and the Pipeline's uncertainty step — ask one question and agree on the answer. Two kinds of estimator answer `true`: every [`AbstractPriorUncertaintySetEstimator`](@ref), which carries no `pe` at all, and each of the four returns-data families when its `pe` is `nothing`, each of which declares its own method beside its prior-result arm. Every other estimator answers `false`, which is the default a caller's own subtype inherits. A built set, or `nothing`, answers `false` too: it is fitted already and passes through every verb unchanged, so a slot that may hold either an estimator or a result can be asked without a test of its own.
+The predicate reads the type and the `pe` field, and never a method table. Three consumers give an estimator the argument that it reads. These are the three-argument form of the ucs Triple, [`ucs_risk_measure`](@ref) and the uncertainty step of the Pipeline. All three ask this one question, so they agree on the answer.
+
+Two kinds of estimator return `true`. The first kind is every [`AbstractPriorUncertaintySetEstimator`](@ref), which holds no `pe`. The second kind is each of the four returns-data families when its `pe` is `nothing`. Each of these families declares its own method beside its method over a Prior Result.
+
+Every other estimator returns `false`, and a subtype that a caller writes gets this default. A built set, or `nothing`, also returns `false`, because it is already fitted and every verb returns it unchanged. So a caller can ask a field that holds an estimator or a result, with no test of its own.
 
 # Arguments
 
@@ -724,7 +734,7 @@ It is a per-type predicate, read off the type and the `pe` field and never off a
 
 # Returns
 
-  - `reads::Bool`: `true` when the estimator reads a prior result, `false` when it fits its own prior or is a built set.
+  - `reads::Bool`: `true` when the estimator reads a Prior Result. `false` when it fits its own prior, or when it is a built set.
 
 # Related
 
@@ -746,9 +756,9 @@ end
     reader_frames(ue::AbstractUncertaintySetEstimator, path::AbstractString, refit::Bool)
     reader_frames(ue::AbstractPriorUncertaintySetEstimator, path::AbstractString, refit::Bool)
 
-Return the frames that the prior of an uncertainty set adds to the group of the optimiser that holds the set.
+Returns the frames that the prior of an uncertainty set adds to the group of the optimiser that holds the set.
 
-An uncertainty set holds no source of its own. It gives the returns to its `pe`, and that prior states the source, so the walk passes through to `pe` at the path `"<path>.pe"`. The warning of [`warn_raw_readers`](@ref) then names the prior of a set as, for example, `"r.ucs.pe"`. A set with `pe = nothing` reads the Prior Result of the optimiser, so it adds no frames. An [`AbstractPriorUncertaintySetEstimator`](@ref) holds no prior, and a built set reads no returns, so both add no frames.
+An uncertainty set holds no source of its own. It gives the returns to its `pe`, and that prior states the source. So the method calls [`reader_frames`](@ref) on `pe` at the path `"<path>.pe"`. The warning of [`warn_raw_readers`](@ref) then names the prior of a set as, for example, `"r.ucs.pe"`. A set with `pe = nothing` reads the Prior Result of the optimiser, so it adds no frames. An [`AbstractPriorUncertaintySetEstimator`](@ref) holds no prior, and a built set reads no returns, so they also add no frames.
 
 # Arguments
 
@@ -778,21 +788,23 @@ end
               F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     ucs_prior(::Nothing, X::MatNum, F::Option{<:MatNum} = nothing; kwargs...)
 
-Fits the prior an uncertainty set calibrates itself on, or throws an error that names `pe` when the set holds none.
+Fits the prior that an uncertainty set calibrates on, or throws an error that names `pe` when the set holds no prior estimator.
 
-The one function through which every returns-data verb of the four families — [`DeltaUncertaintySet`](@ref), [`NormalUncertaintySet`](@ref), [`ARCHUncertaintySet`](@ref) and [`CharacteristicUncertaintySet`](@ref) — fits its `pe`, so the refusal is written once rather than once per verb per family. A set whose `pe` is `nothing` is calibrated on a prior result it is handed, and `nothing` says that one thing: it does not resolve to an empirical prior over `X` at the fit, because that would calibrate the same estimator on two different priors depending on the call site. The returns-data form therefore raises and points at the prior-result form, `ucs(ue, pr)`, and at `pe`.
+Every returns-data verb of the four families fits its `pe` through this function. The four families are [`DeltaUncertaintySet`](@ref), [`NormalUncertaintySet`](@ref), [`ARCHUncertaintySet`](@ref) and [`CharacteristicUncertaintySet`](@ref). So the library writes the refusal once, and not once for each verb of each family.
+
+A set whose `pe` is `nothing` calibrates on a Prior Result that the caller gives it, and `nothing` has that meaning only. The fit does not replace `nothing` with an empirical prior over `X`. That replacement makes one estimator calibrate on two different priors, and the call site selects which one. So the returns-data form throws an error, and the error names the form `ucs(ue, pr)` and the field `pe`.
 
 # Arguments
 
-  - `pe`: The set's own prior estimator, or `nothing`.
-  - `X`: Data matrix (e.g., returns).
-  - `F`: Optional factor matrix. Used by the prior estimator.
+  - `pe`: The prior estimator of the set, or `nothing`.
+  - `X`: Data matrix, for example the returns.
+  - `F`: Optional factor matrix, which the prior estimator reads.
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+  - `kwargs...`: More keyword arguments, which the method gives to the prior estimator.
 
 # Validation
 
-  - `pe` is not `nothing`. An `ArgumentError` naming the prior-result form is thrown otherwise.
+  - `pe` is not `nothing`, else an `ArgumentError` that names the form over a Prior Result.
 
 # Returns
 
@@ -814,9 +826,9 @@ end
 """
     ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult, pr::AbstractPriorResult)
 
-Fits both uncertainty sets from an estimator that is handed the returns data **and** the prior result the optimisation is solving on.
+Fits the two uncertainty sets from an estimator, the returns data **and** the Prior Result that the optimisation solves on.
 
-This is the form both JuMP builders call, and it exists so that one call site serves every estimator. Each estimator reads the one argument its own fit is defined on, decided by [`reads_prior_result`](@ref), and the third method of the form is the passthrough that already takes `args...`, so a slot holding a built pair answers here too.
+Both JuMP builders call this form, so one call site serves every estimator. Each estimator reads the one argument that its fit uses, and [`reads_prior_result`](@ref) selects it. The passthrough method takes `args...` and is the third method of this form. So a field that holds a built pair also gets an answer here.
 
 | `uc`                                                                                               | Reads   | Forwards to            |
 |:-------------------------------------------------------------------------------------------------- |:------- |:---------------------- |
@@ -824,17 +836,17 @@ This is the form both JuMP builders call, and it exists so that one call site se
 | an [`AbstractPriorUncertaintySetEstimator`](@ref), or a returns-data estimator with `pe = nothing` | `pr`    | `ucs(uc, pr; rd = rd)` |
 | a built pair, or `nothing`                                                                         | neither | itself, unchanged      |
 
-The prior is dropped rather than checked on the first row. An estimator that carries its own `pe` fits it on the returns it is handed, so the optimisation's own prior is not an input of that fit, and passing it changes no number. An estimator on the second row is calibrated on `pr`: inside an optimiser that is the prior being solved on, so the set's centre and the objective's `mu` are the same number by construction.
+On the first row, the method drops the prior and does not check it. An estimator that holds its own `pe` fits it on the returns that it gets. The prior of the optimisation is not an input of that fit, and it changes no number. An estimator on the second row calibrates on `pr`. Inside an optimiser, `pr` is the prior of the optimisation. So the centre of the set and the `mu` of the objective are the same number.
 
 # Arguments
 
   - `uc`: Uncertainty set estimator, built pair, or `nothing`.
-  - `rd`: [`ReturnsResult`](@ref). Read by an estimator with a `pe` of its own, under the source that its `pe` states, and dropped by a prior-reading one. A prior-reading estimator reads `pr`, which is already in the frame that the prior was fitted in.
-  - `pr`: [`AbstractPriorResult`](@ref). Read by a prior-reading estimator, and dropped by one with a `pe` of its own.
+  - `rd`: [`ReturnsResult`](@ref). An estimator with its own `pe` reads it under the source that its `pe` states. An estimator that reads a Prior Result drops it, and reads `pr`, which is already in the frame of the fit of the prior.
+  - `pr`: [`AbstractPriorResult`](@ref). An estimator that reads a Prior Result reads it, and an estimator with its own `pe` drops it.
 
 # Returns
 
-  - `uc::Tuple{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetResult}`: Expected returns and covariance uncertainty sets.
+  - `uc::Tuple{AbstractUncertaintySetResult, AbstractUncertaintySetResult}`: The uncertainty sets of the mean and of the covariance.
 
 # Related
 
@@ -854,19 +866,19 @@ end
 """
     mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult, pr::AbstractPriorResult)
 
-Fits the mean uncertainty set from an estimator that is handed the returns data **and** the prior result the optimisation is solving on.
+Fits the uncertainty set of the mean from an estimator, the returns data **and** the Prior Result that the optimisation solves on.
 
-This is the form the robust-return builder calls. The routing table of [`ucs`](@ref) states which argument each estimator reads, decided by [`reads_prior_result`](@ref), and the third method of the form is the passthrough that already takes `args...`, so a slot holding a built set answers here too.
+The builder of the robust return calls this form. The table of [`ucs`](@ref) states which argument each estimator reads, and [`reads_prior_result`](@ref) selects it. The passthrough method takes `args...` and is the third method of this form. So a field that holds a built set also gets an answer here.
 
 # Arguments
 
   - `uc`: Uncertainty set estimator, built set, or `nothing`.
-  - `rd`: [`ReturnsResult`](@ref). Read by an estimator with a `pe` of its own, under the source that its `pe` states, and dropped by a prior-reading one. A prior-reading estimator reads `pr`, which is already in the frame that the prior was fitted in.
-  - `pr`: [`AbstractPriorResult`](@ref). Read by a prior-reading estimator, and dropped by one with a `pe` of its own.
+  - `rd`: [`ReturnsResult`](@ref). An estimator with its own `pe` reads it under the source that its `pe` states. An estimator that reads a Prior Result drops it, and reads `pr`, which is already in the frame of the fit of the prior.
+  - `pr`: [`AbstractPriorResult`](@ref). An estimator that reads a Prior Result reads it, and an estimator with its own `pe` drops it.
 
 # Returns
 
-  - `uc::AbstractUncertaintySetResult`: Expected returns uncertainty set.
+  - `uc::AbstractUncertaintySetResult`: The uncertainty set of the mean.
 
 # Related
 
@@ -886,19 +898,19 @@ end
 """
     sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult, pr::AbstractPriorResult)
 
-Fits the covariance uncertainty set from an estimator that is handed the returns data **and** the prior result the optimisation is solving on.
+Fits the uncertainty set of the covariance from an estimator, the returns data **and** the Prior Result that the optimisation solves on.
 
-This is the form the uncertainty set variance builder calls. The routing table of [`ucs`](@ref) states which argument each estimator reads, decided by [`reads_prior_result`](@ref), and the third method of the form is the passthrough that already takes `args...`, so a slot holding a built set answers here too.
+The builder of the uncertainty set variance calls this form. The table of [`ucs`](@ref) states which argument each estimator reads, and [`reads_prior_result`](@ref) selects it. The passthrough method takes `args...` and is the third method of this form. So a field that holds a built set also gets an answer here.
 
 # Arguments
 
   - `uc`: Uncertainty set estimator, built set, or `nothing`.
-  - `rd`: [`ReturnsResult`](@ref). Read by an estimator with a `pe` of its own, under the source that its `pe` states, and dropped by a prior-reading one. A prior-reading estimator reads `pr`, which is already in the frame that the prior was fitted in.
-  - `pr`: [`AbstractPriorResult`](@ref). Read by a prior-reading estimator, and dropped by one with a `pe` of its own.
+  - `rd`: [`ReturnsResult`](@ref). An estimator with its own `pe` reads it under the source that its `pe` states. An estimator that reads a Prior Result drops it, and reads `pr`, which is already in the frame of the fit of the prior.
+  - `pr`: [`AbstractPriorResult`](@ref). An estimator that reads a Prior Result reads it, and an estimator with its own `pe` drops it.
 
 # Returns
 
-  - `uc::AbstractUncertaintySetResult`: Covariance uncertainty set.
+  - `uc::AbstractUncertaintySetResult`: The uncertainty set of the covariance.
 
 # Related
 
@@ -920,7 +932,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Selects a box uncertainty set, a convex polytope of element-wise bounds, from an estimator that can build either shape.
 
-Its sibling [`EllipsoidalUncertaintySetAlgorithm`](@ref) selects the ellipsoid instead. The box carries no correlation between the entries it bounds, and its worst case is a linear or semidefinite programme rather than a second-order cone one.
+[`EllipsoidalUncertaintySetAlgorithm`](@ref) selects the ellipsoid. The box has no correlation between the entries that it bounds. Its worst case is a linear programme or a semidefinite programme, and not a second-order cone programme.
 
 # Related
 
@@ -930,7 +942,7 @@ Its sibling [`EllipsoidalUncertaintySetAlgorithm`](@ref) selects the ellipsoid i
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 11.3.1.
+  - $(ref_dict[:sousalobo2000]) Sections 3.1 and 4.
 """
 struct BoxUncertaintySetAlgorithm <: AbstractUncertaintySetAlgorithm end
 """
@@ -938,9 +950,11 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the element-wise lower and upper bounds of a box uncertainty set on a mean vector or on a covariance matrix.
 
-A box is a convex polytope, so it reads as a polyhedral confidence interval on the entries it bounds. Its worst case is Equation 11.19 on the mean axis and Equation 11.20 on the covariance axis of the source.
+A box is a convex polytope, so it is a polyhedral confidence interval on the entries that it bounds. Section 3.1 of [sousalobo2000](@cite) states the worst case on the mean axis, ``\\hat{\\boldsymbol{\\mu}}^{\\intercal} \\boldsymbol{w} - \\delta^{\\intercal} \\lvert \\boldsymbol{w} \\rvert`` for a box symmetric about ``\\hat{\\boldsymbol{\\mu}}``. Section 5.2.6 of the same work states the worst case on the covariance axis as Equation 7. Equation 7 is the dual of the semidefinite programme of Equation 6. Its constraint ``\\mathbf{Z} + \\mathbf{\\Lambda}_u - \\mathbf{\\Lambda}_l = -\\boldsymbol{w} \\boldsymbol{w}^\\intercal`` has the wrong sign: the dual of the worst case needs ``\\mathbf{\\Lambda}_u - \\mathbf{\\Lambda}_l \\succeq \\boldsymbol{w} \\boldsymbol{w}^\\intercal``.
 
-**The two axes read the bounds differently, so a set fitted for one axis is not a set for the other.** On the mean axis [`set_ucs_return_constraints!`](@ref) reads the bounds only through their half-width ``(\\boldsymbol{u} - \\boldsymbol{\\ell}) / 2``, the ``\\delta_{\\boldsymbol{\\mu}}`` of Equation 11.14, and centres that width on `val`. Neither `lb` nor `ub` is a bound on the mean on its own, which is why two estimators write one set two ways and agree: [`ARCHUncertaintySet`](@ref) stores the two quantiles of the bootstrap mean, while [`DeltaUncertaintySet`](@ref) and the normal box write ``\\boldsymbol{\\ell} = \\boldsymbol{0}`` and put the whole width in ``\\boldsymbol{u}``. On the covariance axis [`set_ucs_variance_risk!`](@ref) reads ``\\operatorname{tr}(\\mathbf{A}_{u} \\mathbf{\\Sigma}_{u}) - \\operatorname{tr}(\\mathbf{A}_{l} \\mathbf{\\Sigma}_{l})`` under ``\\mathbf{A}_{u} - \\mathbf{A}_{l} = \\mathbf{W}``, so both bounds bind on their own and the covariance box is absolute. That route names no centre, so it never reads `val`.
+**The two axes read the bounds differently, so a set fitted for one axis is not a set for the other.** On the mean axis, [`set_ucs_return_constraints!`](@ref) reads only the half-width ``(\\boldsymbol{u} - \\boldsymbol{\\ell}) / 2`` of the bounds, which is the ``\\delta`` of the definition below. It centres that width on `val`. So neither `lb` nor `ub` is a bound on the mean alone. This is why two estimators can write one set in two ways and agree. [`ARCHUncertaintySet`](@ref) stores the two quantiles of the bootstrap mean. [`DeltaUncertaintySet`](@ref) and the normal box write ``\\boldsymbol{\\ell} = \\boldsymbol{0}`` and put the full width in ``\\boldsymbol{u}``.
+
+On the covariance axis, [`set_ucs_variance_risk!`](@ref) reads ``\\operatorname{tr}(\\mathbf{A}_{u} \\mathbf{\\Sigma}_{u}) - \\operatorname{tr}(\\mathbf{A}_{l} \\mathbf{\\Sigma}_{l})`` under ``\\mathbf{A}_{u} - \\mathbf{A}_{l} = \\mathbf{W}``. So each bound binds alone, and the covariance box is absolute. That route has no centre, so it never reads `val`.
 
 # Mathematical definition
 
@@ -956,10 +970,10 @@ Where:
   - ``U^{\\text{box}}_{\\boldsymbol{\\mu}}``: Box uncertainty set for expected returns.
   - ``U^{\\text{box}}_{\\mathbf{\\Sigma}}``: Box uncertainty set for the covariance matrix.
   - ``\\boldsymbol{\\mu}``, ``\\mathbf{\\Sigma}``: Uncertain expected returns and covariance.
-  - ``\\boldsymbol{\\hat{\\mu}}``: Estimated (reference) mean vector.
-  - ``\\delta``: Half-width of the box (element-wise).
-  - ``\\mathbf{\\Sigma}_{l}``, ``\\mathbf{\\Sigma}_{u}``: Lower and upper bounds for the covariance matrix.
-  - ``\\mathbf{\\Sigma} \\succeq 0``: Positive semi-definiteness constraint.
+  - ``\\boldsymbol{\\hat{\\mu}}``: Estimated mean vector, the centre of the box.
+  - ``\\delta``: Element-wise half-width of the box.
+  - ``\\mathbf{\\Sigma}_{l}``, ``\\mathbf{\\Sigma}_{u}``: Lower and upper bounds of the covariance matrix.
+  - ``\\mathbf{\\Sigma} \\succeq 0``: Constraint that the matrix is positive semidefinite.
 
 # Fields
 
@@ -973,14 +987,14 @@ $(DocStringExtensions.FIELDS)
         val::Option{<:ArrNum} = nothing
     ) -> BoxUncertaintySet
 
-Keywords correspond to the struct's fields.
+The keywords are the fields of the struct.
 
 ## Validation
 
   - `!isempty(lb)`.
   - `!isempty(ub)`.
   - `size(lb) == size(ub)`.
-  - If `val` is provided: `size(val) == size(lb)`.
+  - If `val` is an array, `size(val) == size(lb)`.
 
 # Examples
 
@@ -1000,8 +1014,7 @@ BoxUncertaintySet
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equation 11.14.
-  - $(ref_dict[:sousalobo2000])
+  - $(ref_dict[:sousalobo2000]) Sections 3.1, 4 and 5.2.6, Equations 6 and 7.
 """
 @concrete struct BoxUncertaintySet <: AbstractUncertaintySetResult
     """
@@ -1038,21 +1051,21 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return a view of a vector [`BoxUncertaintySet`](@ref) restricted to the asset indices `i`.
+Returns a view of a vector [`BoxUncertaintySet`](@ref) restricted to the asset indices `i`.
 
-The method takes the mean axis, where each bound carries one entry per asset, so the asset index applies to both bounds directly.
+The method applies to the mean axis, where each bound has one entry for each asset. So the method applies the asset index to the two bounds.
 
 # Algorithm
 
  1. Take `view(risk_ucs.lb, i)` and `view(risk_ucs.ub, i)`, the two bounds restricted to the selected assets.
- 2. Take `nothing_scalar_array_view(risk_ucs.val, i)`, the centre restricted to the same assets, which passes a `nothing` through unchanged.
- 3. Build a [`BoxUncertaintySet`](@ref) from the three views. The bounds stay a pair, so the half-width the mean route reads is the half-width of the restricted box.
+ 2. Take `nothing_scalar_array_view(risk_ucs.val, i)`, the centre restricted to the same assets. It returns `nothing` unchanged.
+ 3. Build a [`BoxUncertaintySet`](@ref) from the three views. The bounds stay a pair, so the half-width that the mean route reads is the half-width of the restricted box.
 
 # Arguments
 
-  - `risk_ucs`: Vector-valued box uncertainty set.
-  - `i`: Cluster or asset index.
-  - `args...`: Additional positional arguments (ignored).
+  - `risk_ucs`: Box uncertainty set with vector bounds.
+  - `i`: Index of the cluster or of the assets.
+  - `args...`: More positional arguments, which the method ignores.
 
 # Returns
 
@@ -1071,18 +1084,18 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Write a vector [`BoxUncertaintySet`](@ref) fitted on the Investable Mask back onto the full asset universe.
+Writes a vector [`BoxUncertaintySet`](@ref) fitted on the Investable Mask back onto the full asset universe.
 
-The expansion is the inverse of [`port_opt_view`](@ref): the view slices the two bounds and the centre by the asset index and touches nothing else, so a frame written outside the mask is dropped without a trace and the view recovers the fitted set. The frame is `NaN`, the moment's own: a bound on `mu` is in the units of `mu` and lives where `mu` lives, and outside the mask the prior states `NaN` for it. The centre is the full `pr.mu`.
+The expansion is the inverse of [`port_opt_view`](@ref). The view slices the two bounds and the centre by the asset index, and reads nothing more. So the view removes all of the frame outside the mask, and it gives back the fitted set. The frame is `NaN`, as in the moment. A bound on `mu` has the units and the positions of `mu`, and outside the mask the prior states `NaN` for `mu`. The centre is the full `pr.mu`.
 
 # Algorithm
 
- 1. Write `set.lb` and `set.ub` at the rows the mask keeps into two `NaN` frames of `length(imsk)` entries, through [`expand_vector`](@ref).
- 2. Build a [`BoxUncertaintySet`](@ref) from the two, with `pr.mu` as `val`.
+ 1. Write `set.lb` and `set.ub` at the rows that the mask keeps into two `NaN` frames of `length(imsk)` entries, with [`expand_vector`](@ref).
+ 2. Build a [`BoxUncertaintySet`](@ref) from the two frames, with `pr.mu` as `val`.
 
 # Arguments
 
-  - `set`: Vector box uncertainty set fitted on the reduced prior.
+  - `set`: Box uncertainty set with vector bounds, fitted on the reduced prior.
   - `imsk`: The Investable Mask of the full prior.
   - $(arg_dict[:pr])
 
@@ -1105,21 +1118,21 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return a view of a matrix [`BoxUncertaintySet`](@ref) restricted to the asset indices `i`.
+Returns a view of a matrix [`BoxUncertaintySet`](@ref) restricted to the asset indices `i`.
 
-The method takes the covariance axis, where each bound is an `N × N` matrix, so the asset index applies to both dimensions of each bound.
+The method applies to the covariance axis, where each bound is an `N × N` matrix. So the method applies the asset index to the two dimensions of each bound.
 
 # Algorithm
 
- 1. Take `view(risk_ucs.lb, i, i)` and `view(risk_ucs.ub, i, i)`, the two bounds restricted to the selected assets on both axes. Both stay symmetric, because the source bounds are symmetric and the same index is applied twice.
- 2. Take `nothing_scalar_array_view(risk_ucs.val, i)`, the fitted covariance restricted to the same assets, which passes a `nothing` through unchanged.
- 3. Build a [`BoxUncertaintySet`](@ref) from the three views. Both bounds bind on their own on this axis, so each is restricted rather than combined.
+ 1. Take `view(risk_ucs.lb, i, i)` and `view(risk_ucs.ub, i, i)`, the two bounds restricted to the selected assets on the two axes. The two bounds stay symmetric, because the source bounds are symmetric and the method applies the same index two times.
+ 2. Take `nothing_scalar_array_view(risk_ucs.val, i)`, the fitted covariance restricted to the same assets. It returns `nothing` unchanged.
+ 3. Build a [`BoxUncertaintySet`](@ref) from the three views. On this axis each bound binds alone, so the method restricts each bound and does not combine them.
 
 # Arguments
 
-  - `risk_ucs`: Matrix-valued box uncertainty set.
-  - `i`: Cluster or asset index.
-  - `args...`: Additional positional arguments (ignored).
+  - `risk_ucs`: Box uncertainty set with matrix bounds.
+  - `i`: Index of the cluster or of the assets.
+  - `args...`: More positional arguments, which the method ignores.
 
 # Returns
 
@@ -1138,18 +1151,18 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Write a matrix [`BoxUncertaintySet`](@ref) fitted on the Investable Mask back onto the full asset universe.
+Writes a matrix [`BoxUncertaintySet`](@ref) fitted on the Investable Mask back onto the full asset universe.
 
-The expansion is the inverse of [`port_opt_view`](@ref): the view slices the two bounds on both axes and the centre by the asset index, so a frame written outside the mask is dropped without a trace and the view recovers the fitted set. The frame is `NaN`, the moment's own: a bound on `sigma` lives where `sigma` lives, and outside the mask the prior states `NaN` for its row and column. The centre is the full `pr.sigma`.
+The expansion is the inverse of [`port_opt_view`](@ref). The view slices the two bounds on the two axes, and the centre, by the asset index. So the view removes all of the frame outside the mask, and it gives back the fitted set. The frame is `NaN`, as in the moment. A bound on `sigma` has the positions of `sigma`, and outside the mask the prior states `NaN` for its row and its column. The centre is the full `pr.sigma`.
 
 # Algorithm
 
- 1. Write `set.lb` and `set.ub` at `(imsk, imsk)` into two `NaN` frames of `length(imsk)` rows and columns, through the covariance method of [`expand_moment`](@ref).
- 2. Build a [`BoxUncertaintySet`](@ref) from the two, with `pr.sigma` as `val`.
+ 1. Write `set.lb` and `set.ub` at `(imsk, imsk)` into two `NaN` frames of `length(imsk)` rows and columns, with the covariance method of [`expand_moment`](@ref).
+ 2. Build a [`BoxUncertaintySet`](@ref) from the two frames, with `pr.sigma` as `val`.
 
 # Arguments
 
-  - `set`: Matrix box uncertainty set fitted on the reduced prior.
+  - `set`: Box uncertainty set with matrix bounds, fitted on the reduced prior.
   - `imsk`: The Investable Mask of the full prior.
   - $(arg_dict[:pr])
 
@@ -1172,13 +1185,13 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Fits the ellipsoid radius `k` empirically, as the `1 - q` quantile of the Mahalanobis distances of the sampled estimation errors.
+Computes the radius `k` of the ellipsoid from a sample, as the `1 - q` quantile of the Mahalanobis distances of the sampled estimation errors.
 
-The route makes no distributional assumption: it reads the errors the estimator family sampled, whether they come from a parametric draw or from a bootstrap resample. Its two closed-form siblings are [`ChiSqKUncertaintyAlgorithm`](@ref) and [`GeneralKUncertaintyAlgorithm`](@ref).
+The algorithm makes no assumption about the distribution. It reads the errors that the estimator sampled, from a parametric draw or from a bootstrap resample. [`ChiSqKUncertaintyAlgorithm`](@ref) and [`GeneralKUncertaintyAlgorithm`](@ref) give the radius in closed form.
 
-The sample must be the estimation **error**, not the estimate. Under normality the centred Mahalanobis distance is a chi-squared variate, so this algorithm and [`ChiSqKUncertaintyAlgorithm`](@ref) compute one radius two ways and agree up to sampling noise, and that radius depends on the dimension and the significance level alone. Feeding the raw estimates instead makes the distance **non-central**, and the radius then grows with the non-centrality ``T \\hat{\\boldsymbol{\\mu}}^{\\intercal} \\hat{\\mathbf{\\Sigma}}^{-1} \\hat{\\boldsymbol{\\mu}}``, inflating a radius that is meant to measure estimation error alone.
+The sample must be the estimation **error**, not the estimate. When the errors are normal, the squared Mahalanobis distance of a centred error has a chi-squared distribution. So this algorithm and [`ChiSqKUncertaintyAlgorithm`](@ref) compute one radius in two ways, and they agree to within the noise of the sample. That radius depends only on the dimension and the significance level. A sample of the raw estimates makes the distance **non-central**. The radius then increases with the non-centrality ``T \\hat{\\boldsymbol{\\mu}}^{\\intercal} \\hat{\\mathbf{\\Sigma}}^{-1} \\hat{\\boldsymbol{\\mu}}``, although it must measure only the estimation error.
 
-The quantile is taken against the shape matrix this algorithm is handed, not against the shape the estimator started from. [`ellipsoidal_set`](@ref) replaces the asymptotic covariance with its diagonal **before** it calls [`k_ucs`](@ref), so under the `diagonal = true` default the radius is a quantile of Mahalanobis distances measured against the diagonal shape. The two radii differ, and neither shape is reliably the larger.
+The algorithm measures the distances against the shape matrix that it gets, not against the first shape of the estimator. [`ellipsoidal_set`](@ref) replaces the asymptotic covariance with its diagonal **before** it calls [`k_ucs`](@ref). So under the default `diagonal = true`, the radius is a quantile of the distances against the diagonal shape. The two radii are different, and neither shape always gives the larger radius.
 
 # Mathematical definition
 
@@ -1203,11 +1216,11 @@ $(DocStringExtensions.FIELDS)
         kwargs::NamedTuple = (;)
     )
 
-Keyword arguments correspond to the field above.
+The keyword is the field above.
 
 ## Validation
 
-  - `kwargs` must be a valid `NamedTuple`.
+  - `kwargs` is a `NamedTuple`.
 
 # Examples
 
@@ -1226,7 +1239,7 @@ NormalKUncertaintyAlgorithm
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 11.3.2.
+  - $(ref_dict[:cajas2025]) Section 11.3.2, Listings 11.10 and 11.11. $(ref_dict[:no_original_source])
 """
 @concrete struct NormalKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm
     """
@@ -1244,11 +1257,11 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Computes the ellipsoid radius `k` as `sqrt((1 - q) / q)`, the closed form that holds for any distribution of the estimation errors.
+Computes the radius `k` of the ellipsoid as `sqrt((1 - q) / q)`, a closed form that holds for every distribution of the estimation errors.
 
-It is the second branch of Equation 11.23 of the source, and it reads neither the data nor the shape matrix. The radius comes from Cantelli's one-sided Chebyshev inequality, so it holds for any law of the estimation errors that has the stated second moment. Use [`ChiSqKUncertaintyAlgorithm`](@ref) instead when the errors are normal, because the chi-squared radius is the tighter one there.
+The radius is the factor ``\\kappa(\\epsilon)`` of Theorem 1 of [elghaoui2003](@cite), Equation 8, at ``\\epsilon = q``. It reads neither the data nor the shape matrix. The theorem bounds the worst-case value at risk over every distribution with a given mean and covariance. The radius comes from the one-sided Chebyshev inequality of Cantelli. So it holds for every distribution of the estimation errors that has the stated second moment. When the errors are normal, use [`ChiSqKUncertaintyAlgorithm`](@ref), because its radius is smaller there.
 
-The guarantee is a bound in one direction and not a simultaneous region for the whole vector. It covers the scalar a robust row bounds — the worst-case value of ``\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\mu}`` along the weights the model picks — with probability at least ``1 - q``, whereas the chi-squared radius is a joint confidence region for every entry at once.
+The guarantee is a bound in one direction, not a joint region for the full vector. It covers the scalar that a robust row bounds, which is the worst-case value of ``\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\mu}`` at the weights that the model selects. It holds with a probability of at least ``1 - q``. The chi-squared radius gives a joint confidence region for all entries together.
 
 # Mathematical definition
 
@@ -1260,7 +1273,7 @@ Where:
 
   - ``q``: Significance level.
 
-Inverting the form gives ``\\left(1 + k^{2}\\right)^{-1} = q``, which is Cantelli's bound at ``k`` standard deviations. So the radius is the smallest one whose distribution-free tail bound is exactly ``q``, and no assumption on the law tightens it.
+The inverse of the form is ``\\left(1 + k^{2}\\right)^{-1} = q``, which is the bound of Cantelli at ``k`` standard deviations. So the radius is the smallest radius whose tail bound is ``q`` for every distribution with the stated moments.
 
 # Related
 
@@ -1271,20 +1284,23 @@ Inverting the form gives ``\\left(1 + k^{2}\\right)^{-1} = q``, which is Cantell
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equation 11.23.
-  - $(ref_dict[:fabozzi2007])
+  - $(ref_dict[:elghaoui2003]) Theorem 1, Equations 7 and 8.
 """
 struct GeneralKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Computes the ellipsoid radius `k` as the square root of the `1 - q` chi-squared quantile, the closed form that holds when the estimation errors are normal.
+Computes the radius `k` of the ellipsoid as the square root of a chi-squared quantile, a closed form for normal estimation errors.
 
-The degrees of freedom are the dimension of the set, the number of free coordinates the estimation error spans. That is ``N`` on the mean axis. On the covariance axis the error is a vectorised **symmetric** ``N \\times N`` matrix: the entries ``(i, j)`` and ``(j, i)`` are one number, so the error spans ``N(N+1)/2`` coordinates of the ``N^{2}``, and the shape of the normal method, ``\\left(\\mathbf{I} + \\mathbf{K}\\right) \\left(\\mathbf{\\Sigma} \\otimes \\mathbf{\\Sigma}\\right) / T``, has exactly that rank. The squared Mahalanobis distance of a normal error is chi-squared at the rank of its shape, so a full covariance shape reads ``N(N+1)/2``. A diagonal shape reads ``N^{2}``, because its statistic sums ``N^{2}`` terms of unit mean. [`ucs_dimension`](@ref) states the rule, and the set builders pass its value to [`k_ucs`](@ref) and [`k_norm_ball`](@ref).
+The degrees of freedom are the dimension of the set, which is the number of free coordinates of the estimation error. On the mean axis, the dimension is ``N``. On the covariance axis, the error is a vectorised **symmetric** ``N \\times N`` matrix. The entries ``(i, j)`` and ``(j, i)`` are one number, so the error has ``N(N+1)/2`` free coordinates of the ``N^{2}``. The shape of the normal method, ``\\left(\\mathbf{I} + \\mathbf{K}\\right) \\left(\\mathbf{\\Sigma} \\otimes \\mathbf{\\Sigma}\\right) / T``, has that rank. Theorem 3.1 (vi) of [magnus1979](@cite) gives ``\\mathbf{K}`` the eigenvalue ``+1`` with multiplicity ``N(N+1)/2``.
 
-**`ambient = true` reads the dimension of the ambient space instead**, the first dimension of the shape matrix or of the geometry map: ``N^{2}`` on every covariance shape. That radius is too large for its level. At ``N = 5`` and ``q = 0.05`` it is ``6.136`` where the set dimension gives ``5.000``, and the set covers ``0.999`` of the errors, not ``0.95``. The ratio of the two radii falls to ``1 / \\sqrt{2}`` as ``N`` increases. The field keeps that rule one keyword away, for a comparison with a caller that counts every entry of the vectorised matrix.
+The squared Mahalanobis distance of a normal error has a chi-squared distribution at the rank of its shape. So a full covariance shape reads ``N(N+1)/2``. A diagonal shape reads ``N^{2}``, because its statistic is a sum of ``N^{2}`` terms with a mean of one. [`ucs_dimension`](@ref) states the rule, and the set builders give its value to [`k_ucs`](@ref) and [`k_norm_ball`](@ref).
 
-**The source states this closed form for the mean axis only.** Equation 11.23 defines ``\\kappa^{2}_{\\boldsymbol{\\mu}}`` with ``n`` degrees of freedom, ``n`` being the number of assets, and obtains ``\\kappa^{2}_{\\mathbf{\\Sigma}}`` by simulation rather than in closed form. The form on the covariance axis is this library's extension of it. [`NormalKUncertaintyAlgorithm`](@ref) on the same errors gives the empirical counterpart, and the two agree up to the noise of the simulation.
+**`ambient = true` reads the dimension of the ambient space instead.** That is the first dimension of the shape matrix or of the geometry map, which is ``N^{2}`` on every covariance shape. At ``N = 5`` and ``q = 0.05``, that radius is ``6.136``, and the dimension of the set gives ``5.000``. So the set covers ``0.999`` of the errors, not ``0.95``, and the radius is too large for its level. As ``N`` increases, the ratio of the two radii decreases to ``1 / \\sqrt{2}``. The field keeps that rule available for a comparison with a caller that counts every entry of the vectorised matrix.
+
+**The sources state this closed form for the mean axis only.** Equation 50 of [goldfarbiyengar2003](@cite) states that the squared Mahalanobis distance of a normal estimation error has a chi-squared distribution at the dimension of the estimate. That work sizes its sets with an F quantile, because it estimates the variance. Equation 11.23 of [cajas2025](@cite) sets ``\\kappa^{2}_{\\boldsymbol{\\mu}}`` to the chi-squared quantile at ``n`` degrees of freedom, where ``n`` is the number of assets. It gets ``\\kappa^{2}_{\\mathbf{\\Sigma}}`` from a simulation, not in closed form. The form on the covariance axis is an extension that this library makes.
+
+Section 4.1 of [sousalobo2000](@cite) bounds the ``N(N+1)/2`` distinct entries of the covariance with its ellipsoid, and the dimension of the set reads that count. [`NormalKUncertaintyAlgorithm`](@ref) on the same errors gives the radius from the sample, and the two radii agree to within the noise of the simulation.
 
 # Mathematical definition
 
@@ -1310,7 +1326,7 @@ $(DocStringExtensions.FIELDS)
         ambient::Bool = false
     )
 
-Keyword arguments correspond to the field above.
+The keyword is the field above.
 
 # Examples
 
@@ -1331,12 +1347,14 @@ ChiSqKUncertaintyAlgorithm
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equation 11.23.
-  - $(ref_dict[:fabozzi2007])
+  - $(ref_dict[:goldfarbiyengar2003]) Section 5, Equations 50 and 54.
+  - $(ref_dict[:sousalobo2000]) Section 4.1.
+  - $(ref_dict[:magnus1979]) Theorem 3.1 (vi).
+  - $(ref_dict[:cajas2025]) Equation 11.23. $(ref_dict[:no_original_source])
 """
 @concrete struct ChiSqKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm
     """
-    Whether the degrees of freedom are the first dimension of the shape matrix, ``N^{2}`` on every covariance shape, rather than the dimension of the set. `false` by default.
+    Whether the degrees of freedom are the first dimension of the shape matrix, and not the dimension of the set. The first dimension is ``N^{2}`` on every covariance shape. The default is `false`.
     """
     ambient
     function ChiSqKUncertaintyAlgorithm(ambient::Bool)
@@ -1354,37 +1372,37 @@ end
           df::Integer = size(sigma_X, 1))
     k_ucs(type::Number, args...)
 
-Compute the radius `k` of an ellipsoidal uncertainty set at significance level `q`.
+Computes the radius `k` of an ellipsoidal uncertainty set at the significance level `q`.
 
-The two closed forms are the two branches of Equation 11.23 of the source, and the simulated route is its empirical counterpart. A plain `Number` in place of an algorithm is the radius itself.
+The two closed forms are the two branches of Equation 11.23 of [cajas2025](@cite). The branch for every distribution is the factor of Theorem 1 of [elghaoui2003](@cite). The chi-squared branch comes from Equation 50 of [goldfarbiyengar2003](@cite). The radius from a simulated sample is the method that Section 11.3.2 of [cajas2025](@cite) describes. A plain `Number` in place of an algorithm is the radius.
 
 # Algorithm
 
-The first three methods each run one procedure. The fourth, `k_ucs(type::Number, args...)`, returns its own argument and takes no step, so it carries none of the numbered text below.
+Each of the first three methods does one procedure. The fourth method, `k_ucs(type::Number, args...)`, returns its argument and does no step, so it has no numbered steps below.
 
 [`NormalKUncertaintyAlgorithm`](@ref):
 
- 1. Form `k_mus = LinearAlgebra.diag(X * (sigma_X \\ transpose(X)))`, the squared Mahalanobis distance of every row of `X` against the shape matrix. The solve is done once for the whole sample rather than row by row.
- 2. Take the `1 - q` quantile of `k_mus` under `km.kwargs`, and return its square root, the radius.
+ 1. Compute `k_mus = LinearAlgebra.diag(X * (sigma_X \\ transpose(X)))`, the squared Mahalanobis distance of each row of `X` against the shape matrix. The method does the solve one time for the full sample, not one row at a time.
+ 2. Take the `1 - q` quantile of `k_mus` with the keywords `km.kwargs`, and return its square root as the radius.
 
 [`GeneralKUncertaintyAlgorithm`](@ref):
 
- 1. Return `sqrt((one(q) - q) / q)`, the radius. The method reads neither `X` nor `sigma_X`, so both are absorbed by `args...`.
+ 1. Return `sqrt((one(q) - q) / q)` as the radius. The method reads neither `X` nor `sigma_X`, so `args...` takes the two of them.
 
 [`ChiSqKUncertaintyAlgorithm`](@ref):
 
- 1. Read the degrees of freedom from `df`, the dimension of the set, or from `size(sigma_X, 1)` when `km.ambient` is `true`.
- 2. Return the square root of the `1 - q` chi-squared quantile at that many degrees of freedom, the radius. The method runs no simulation, so it ignores the sample container.
+ 1. Read the degrees of freedom from `df`, the dimension of the set. If `km.ambient` is `true`, read them from `size(sigma_X, 1)`.
+ 2. Return the square root of the `1 - q` chi-squared quantile at those degrees of freedom as the radius. The method runs no simulation, so it ignores the sample argument.
 
 # Arguments
 
-  - `km`: Scaling algorithm instance.
+  - `km`: Radius algorithm.
   - `q`: Significance level.
-  - `X`: Matrix of estimation errors, one row per sample. **Every caller passes centred deviations, not levels**: each row is a deviation from the point estimate, and the method cannot check it. An uncentred sample makes the distance non-central and inflates the radius.
-  - `sigma_X`: Shape matrix of the ellipsoid, and the shape the distances are measured against. It is ``N \\times N`` on the mean axis and ``N^{2} \\times N^{2}`` on the covariance axis. [`ellipsoidal_set`](@ref) passes the diagonal of the asymptotic covariance under its `diagonal = true` default, so the quantile is taken against that diagonal and not against the full matrix.
-  - `df`: Dimension of the set, which [`ucs_dimension`](@ref) gives. The default `size(sigma_X, 1)` holds on a shape of full rank. It overstates a full covariance shape, whose rank is ``N(N+1)/2``, so [`ellipsoidal_set`](@ref) always passes it. [`NormalKUncertaintyAlgorithm`](@ref) absorbs it, because its sampled distances carry the dimension themselves.
-  - `args...`: Additional arguments, which the algorithms that need no sample absorb.
-  - `type`: Number value for direct scaling.
+  - `X`: Matrix of estimation errors, with one row for each sample. **Every caller gives centred deviations, not levels.** Each row is a deviation from the point estimate, and the method cannot check it. A sample that is not centred makes the distance non-central, and makes the radius too large.
+  - `sigma_X`: Shape matrix of the ellipsoid, against which the method measures the distances. It is ``N \\times N`` on the mean axis and ``N^{2} \\times N^{2}`` on the covariance axis. Under its default `diagonal = true`, [`ellipsoidal_set`](@ref) gives the diagonal of the asymptotic covariance. So the method takes the quantile against that diagonal, not against the full matrix.
+  - `df`: Dimension of the set, which [`ucs_dimension`](@ref) gives. The default `size(sigma_X, 1)` is correct on a shape of full rank. It is too large on a full covariance shape, whose rank is ``N(N+1)/2``, so [`ellipsoidal_set`](@ref) always gives `df`. [`NormalKUncertaintyAlgorithm`](@ref) ignores it, because its sampled distances contain the dimension.
+  - `args...`: More arguments, which the algorithms that need no sample ignore.
+  - `type`: The radius as a number.
 
 # Returns
 
@@ -1400,8 +1418,9 @@ The first three methods each run one procedure. The fourth, `k_ucs(type::Number,
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 11.3.2.
-  - $(ref_dict[:fabozzi2007])
+  - $(ref_dict[:elghaoui2003]) Theorem 1, Equations 7 and 8.
+  - $(ref_dict[:goldfarbiyengar2003]) Section 5, Equation 50.
+  - $(ref_dict[:cajas2025]) Section 11.3.2, Equation 11.23 and Listings 11.10 and 11.11. $(ref_dict[:no_original_source])
 """
 function k_ucs(km::NormalKUncertaintyAlgorithm, q::Number, X::MatNum, sigma_X::MatNum,
                ::Integer = size(sigma_X, 1))
@@ -1424,9 +1443,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Selects an ellipsoidal uncertainty set, and carries the radius algorithm and the diagonal switch it needs.
+Selects an ellipsoidal uncertainty set, and holds the radius algorithm and the diagonal switch of the set.
 
-Its sibling [`BoxUncertaintySetAlgorithm`](@ref) selects the box instead. The ellipsoid reads the correlation between the entries it bounds through its shape matrix, which `diagonal = true` discards to remove the noise in the off-diagonal estimation errors.
+[`BoxUncertaintySetAlgorithm`](@ref) selects the box. The shape matrix of the ellipsoid holds the correlation between the entries that it bounds. `diagonal = true` removes that correlation, to remove the noise in the off-diagonal estimation errors. Section 11.3.2 of [cajas2025](@cite) states that practice. Sections 3.2 and 4.1 of [sousalobo2000](@cite) state the two ellipsoids.
 
 # Fields
 
@@ -1439,8 +1458,8 @@ $(DocStringExtensions.FIELDS)
         diagonal::Bool = true
     ) -> EllipsoidalUncertaintySetAlgorithm
 
-  - `method`: Sets the scaling algorithm or value for the ellipsoidal.
-  - `diagonal`: Sets whether to use only diagonal elements.
+  - `method`: The radius algorithm, or the radius as a number.
+  - `diagonal`: Whether the shape matrix keeps only its diagonal.
 
 # Examples
 
@@ -1461,7 +1480,8 @@ EllipsoidalUncertaintySetAlgorithm
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 11.3.2.
+  - $(ref_dict[:sousalobo2000]) Sections 3.2 and 4.1.
+  - $(ref_dict[:cajas2025]) Section 11.3.2, Equation 11.24. $(ref_dict[:no_original_source])
 """
 @concrete struct EllipsoidalUncertaintySetAlgorithm <: AbstractUncertaintySetAlgorithm
     """
@@ -1484,9 +1504,11 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Selects a norm-ball uncertainty set, and carries the radius algorithm, the diagonal switch and the norm order it needs.
+Selects a norm-ball uncertainty set, and holds the radius algorithm, the diagonal switch and the norm order of the set.
 
-Its siblings [`BoxUncertaintySetAlgorithm`](@ref) and [`EllipsoidalUncertaintySetAlgorithm`](@ref) select the two older shapes. The set it selects is a [`NormBallUncertaintySet`](@ref), which holds a geometry map rather than a shape matrix, so an estimator that emits it factorises the shape once at fit time, or skips the shape entirely and stores its own deviations. `diagonal = true` discards the correlation between the estimation errors of different entries, exactly as it does on the ellipsoid.
+[`BoxUncertaintySetAlgorithm`](@ref) and [`EllipsoidalUncertaintySetAlgorithm`](@ref) select the two older shapes. This algorithm selects a [`NormBallUncertaintySet`](@ref), which holds a geometry map and not a shape matrix. So an estimator that makes it factorises the shape one time during the fit, or stores its own deviations and makes no shape. `diagonal = true` removes the correlation between the estimation errors of different entries, as it does on the ellipsoid.
+
+Theorem 2 of [bertsimas2011](@cite) states the worst case over a norm ball, which reads the dual norm. That work gives the result to [bertsimas2004](@cite). Equation 14 of [bentalnemirovski1998](@cite) defines the Euclidean case, which is an ellipsoid that can be flat.
 
 # Fields
 
@@ -1501,11 +1523,11 @@ $(DocStringExtensions.FIELDS)
         mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot()
     ) -> NormBallUncertaintySetAlgorithm
 
-Keywords correspond to the struct's fields.
+The keywords are the fields of the struct.
 
 ## Validation
 
-  - `!isnan(p)` and `p >= 1`. `Inf` is admitted.
+  - `!isnan(p)` and `p >= 1`. `Inf` is valid.
 
 # Examples
 
@@ -1531,12 +1553,13 @@ NormBallUncertaintySetAlgorithm
 
 # References
 
+  - $(ref_dict[:bertsimas2011]) Section 2.2, Theorem 2. $(ref_dict[:no_original_source])
+  - $(ref_dict[:bertsimas2004])
   - $(ref_dict[:bentalnemirovski1998]) Section 3, Equation 14.
-  - $(ref_dict[:goldfarbiyengar2003]) Section 5.
 """
 @concrete struct NormBallUncertaintySetAlgorithm <: AbstractUncertaintySetAlgorithm
     """
-    Radius algorithm of the ball, or the radius itself as a `Number`. It is read against the geometry map rather than against a shape matrix, so [`k_norm_ball`](@ref) serves it and not [`k_ucs`](@ref).
+    Radius algorithm of the ball, or the radius as a `Number`. The algorithm reads the geometry map and not a shape matrix, so [`k_norm_ball`](@ref) computes the radius, and [`k_ucs`](@ref) does not.
     """
     method
     """
@@ -1544,11 +1567,11 @@ NormBallUncertaintySetAlgorithm
     """
     diagonal
     """
-    Norm order ``p \\geq 1`` of the ball, `Inf` admitted. It reaches the set unchanged, and the consumer raises the cone of the dual order.
+    Norm order ``p \\geq 1`` of the ball. `Inf` is valid. The set gets it unchanged, and the consumer adds the cone of the dual order.
     """
     p
     """
-    Square-root algorithm of the full asymptotic covariance that gives the geometry map, or `nothing` for the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. [`matrix_square_root`](@ref) states each algorithm. The covariance of the covariance is singular by construction and positive definite only after the repair of `pdm`. The default takes the square root of its eigendecomposition when the repair is off. A [`NormalKUncertaintyAlgorithm`](@ref) radius applies the pseudo-inverse of the map, so it reads the eigen square root of a singular matrix, in the subspace that the cut of [`norm_ball_coordinates`](@ref) keeps. A ridge gives a map of full rank and a different set. A diagonal shape reads no square root.
+    Square-root algorithm of the full asymptotic covariance, which gives the geometry map. `nothing` selects the plain Cholesky factor, which throws a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. [`matrix_square_root`](@ref) states each algorithm. The covariance of the covariance is always singular, and only the repair of `pdm` makes it positive definite. When the repair is off, the default takes the square root from the eigendecomposition. A [`NormalKUncertaintyAlgorithm`](@ref) radius applies the pseudo-inverse of the map. So it reads the eigen square root of a singular matrix, in the subspace that the cut of [`norm_ball_coordinates`](@ref) keeps. A ridge gives a map of full rank and a different set, and a diagonal shape reads no square root.
     """
     mtx_sqrt
     function NormBallUncertaintySetAlgorithm(method::Num_UcSK, diagonal::Bool, p::Number,
@@ -1568,13 +1591,13 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Names the axis an uncertainty set lives on, which fixes the row count of its shape matrix or of its geometry map.
+Names the axis of an uncertainty set, which sets the row count of its shape matrix or of its geometry map.
 
-The family has exactly two inhabitants, and both ship. A consumer dispatches on the tag, because a mean set and a covariance set are the same struct with a shape matrix, or a geometry map, of a different size: [`EllipsoidalUncertaintySet`](@ref) and [`NormBallUncertaintySet`](@ref) both carry one. The tag names the axis alone and not the geometry, so a norm ball of order one, which is no ellipsoid, carries the same tag as an ellipsoid on the same axis.
+The family has two members, and the library exports both. A consumer dispatches on the tag. A mean set and a covariance set are the same struct with a different size of shape matrix or of geometry map. [`EllipsoidalUncertaintySet`](@ref) and [`NormBallUncertaintySet`](@ref) both hold a tag. The tag names only the axis, and not the geometry. So a norm ball of order one, which is not an ellipsoid, has the same tag as an ellipsoid on the same axis.
 
 # Interfaces
 
-A subtype is a tag that carries no field and declares no method of its own.
+A subtype is a tag. It has no field and declares no method.
 
 # Related
 
@@ -1587,9 +1610,9 @@ abstract type AbstractUncertaintySetClass <: AbstractUncertaintySetResult end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Tags an [`EllipsoidalUncertaintySet`](@ref) or a [`NormBallUncertaintySet`](@ref) as living on the mean axis, where the shape matrix is ``N \\times N`` and the geometry map has ``N`` rows.
+Marks an uncertainty set as a set on the mean axis, where the shape matrix is ``N \\times N`` and the geometry map has ``N`` rows.
 
-The tag is what the consumers dispatch on. `port_opt_view` slices such a set with the plain asset index, and the robust-return builder refuses a set that carries the covariance tag instead.
+The tag applies to [`EllipsoidalUncertaintySet`](@ref) and [`NormBallUncertaintySet`](@ref), and the consumers dispatch on it. [`port_opt_view`](@ref) slices such a set with the plain asset index. The builder of the robust return refuses a set that has the covariance tag.
 
 # Related
 
@@ -1600,9 +1623,9 @@ struct MuUncertaintySetClass <: AbstractUncertaintySetClass end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Tags an [`EllipsoidalUncertaintySet`](@ref) or a [`NormBallUncertaintySet`](@ref) as living on the covariance axis, where the shape matrix is ``N^{2} \\times N^{2}`` and the geometry map has ``N^{2}`` rows.
+Marks an uncertainty set as a set on the covariance axis, where the shape matrix is ``N^{2} \\times N^{2}`` and the geometry map has ``N^{2}`` rows.
 
-The tag is what the consumers dispatch on. `port_opt_view` maps the asset index through the fourth-moment index generator before it slices the shape matrix or the geometry map, because the set bounds a vectorised covariance.
+The tag applies to [`EllipsoidalUncertaintySet`](@ref) and [`NormBallUncertaintySet`](@ref), and the consumers dispatch on it. The set bounds a vectorised covariance. So [`port_opt_view`](@ref) maps the asset index through [`fourth_moment_index_generator`](@ref) before it slices the shape matrix or the geometry map.
 
 # Related
 
@@ -1615,11 +1638,11 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the shape matrix, the radius, and the axis tag of an ellipsoidal uncertainty set on a mean vector or on a covariance matrix.
 
-An ellipsoid is a Mahalanobis ball, so it reads as a confidence region that carries the correlation between the entries it bounds. Its worst case is Equation 11.25 on the mean axis and Equation 11.26 on the covariance axis of the source, and both are second-order cones.
+An ellipsoid is a Mahalanobis ball, so it is a confidence region that holds the correlation between the entries that it bounds. Section 3.2 of [sousalobo2000](@cite) states the set and its worst case on the mean axis. Section 4.1 of the same work bounds the distinct entries of the covariance with an ellipsoid. Equation 6.12 of [fengpalomar2016](@cite) states that set again on ``\\text{vec}(\\mathbf{\\Sigma})``, and Equations 6.13 to 6.15 state its worst case. The two worst cases are second-order cones.
 
-**`class` names the axis, and the axis fixes both the size of `sigma` and the index a view applies.** A [`MuUncertaintySetClass`](@ref) carries an ``N \\times N`` shape matrix and takes the plain asset index. A [`SigmaUncertaintySetClass`](@ref) carries an ``N^{2} \\times N^{2}`` one, because it bounds a vectorised covariance, so [`port_opt_view`](@ref) recovers ``N`` from the shape matrix and maps the asset index through [`fourth_moment_index_generator`](@ref) before it slices. The two consumers dispatch on the tag too, and the robust-return builder refuses a set that carries the covariance tag.
+**`class` names the axis, and the axis sets the size of `sigma` and the index that a view applies.** A set with [`MuUncertaintySetClass`](@ref) has an ``N \\times N`` shape matrix and takes the plain asset index. A set with [`SigmaUncertaintySetClass`](@ref) has an ``N^{2} \\times N^{2}`` shape matrix, because it bounds a vectorised covariance. So [`port_opt_view`](@ref) finds ``N`` from the shape matrix, and maps the asset index through [`fourth_moment_index_generator`](@ref) before it slices. The two consumers also dispatch on the tag, and the builder of the robust return refuses a set with the covariance tag.
 
-**A view carries `k` through unchanged, so it is not the set the same estimator would fit on the subset alone.** The restricted shape matrix does equal the one fitted on the subset, entry for entry, whenever the shape is diagonal. The radius does not, because two of the three algorithms calibrate it on the dimension or on the sample. Only [`GeneralKUncertaintyAlgorithm`](@ref) agrees, because its radius reads neither the data nor the shape. A view is therefore the conservative choice, and a caller who wants the subset's own radius fits the subset.
+**A view keeps `k` unchanged, so it is not the set that the same estimator fits on the subset alone.** When the shape is diagonal, the restricted shape matrix is equal to the shape matrix fitted on the subset, entry for entry. The radius is not equal, because two of the three algorithms calibrate it on the dimension or on the sample. Only [`GeneralKUncertaintyAlgorithm`](@ref) gives the same radius, because it reads neither the data nor the shape. So a view is the conservative choice. A caller who needs the radius of the subset fits the subset.
 
 # Mathematical definition
 
@@ -1633,14 +1656,14 @@ U^{\\text{ellip}}_{\\mathbf{\\Sigma}} &= \\left\\{ \\mathbf{\\Sigma}\\, \\vert\\
 Where:
 
   - ``U^{\\text{ellip}}_{\\boldsymbol{\\mu}}``: Ellipsoidal uncertainty set for expected returns.
-  - ``U^{\\text{ellip}}_{\\mathbf{\\Sigma}}``: Ellipsoidal uncertainty set for covariance matrix.
+  - ``U^{\\text{ellip}}_{\\mathbf{\\Sigma}}``: Ellipsoidal uncertainty set for the covariance matrix.
   - ``\\boldsymbol{\\mu}``, ``\\mathbf{\\Sigma}``: Uncertain expected returns and covariance.
-  - ``\\boldsymbol{\\hat{\\mu}}``, ``\\mathbf{\\hat{\\Sigma}}``: Estimated reference mean and covariance.
-  - ``\\mathbf{\\Sigma}_{\\boldsymbol{\\mu}}``: Covariance matrix of estimation error in mean.
-  - ``\\mathbf{\\Sigma}_{\\mathbf{\\Sigma}}``: Covariance matrix of estimation error in covariance (vectorised).
-  - ``k^{2}_{\\boldsymbol{\\mu}}``, ``k^{2}_{\\mathbf{\\Sigma}}``: Scaling parameters (squared ellipsoid radii).
-  - ``\\text{vec}(\\cdot)``: Vectorisation operator (column-stacking).
-  - ``\\mathbf{\\Sigma} \\succeq 0``: Positive semi-definiteness constraint.
+  - ``\\boldsymbol{\\hat{\\mu}}``, ``\\mathbf{\\hat{\\Sigma}}``: Estimated mean and covariance, the centres of the two sets.
+  - ``\\mathbf{\\Sigma}_{\\boldsymbol{\\mu}}``: Covariance matrix of the estimation error of the mean.
+  - ``\\mathbf{\\Sigma}_{\\mathbf{\\Sigma}}``: Covariance matrix of the estimation error of the vectorised covariance.
+  - ``k^{2}_{\\boldsymbol{\\mu}}``, ``k^{2}_{\\mathbf{\\Sigma}}``: Squared radii of the two ellipsoids.
+  - ``\\text{vec}(\\cdot)``: Vectorisation operator, which stacks the columns.
+  - ``\\mathbf{\\Sigma} \\succeq 0``: Constraint that the matrix is positive semidefinite.
 
 # Fields
 
@@ -1655,15 +1678,15 @@ $(DocStringExtensions.FIELDS)
         val::Option{<:ArrNum} = nothing
     ) -> EllipsoidalUncertaintySet
 
-Keywords correspond to the struct's fields.
+The keywords are the fields of the struct.
 
 ## Validation
 
   - `!isempty(sigma)`.
   - `size(sigma, 1) == size(sigma, 2)`.
-  - `!(k isa Bool)`, else an `ArgumentError`. The converter to [`NormBallUncertaintySet`](@ref) carries `k` into its radius `kappa`, which refuses a `Bool` too.
+  - `!(k isa Bool)`, else an `ArgumentError`. The converter to [`NormBallUncertaintySet`](@ref) puts `k` in its radius `kappa`, which also refuses a `Bool`.
   - `k > 0`.
-  - If `val` is provided: `length(val) == size(sigma, 1)`. The rule reads a length rather than a size, so it holds on both axes: `val` is a characteristic vector of length ``N`` beside an ``N \\times N`` shape matrix, and an ``N \\times N`` covariance matrix beside an ``N^{2} \\times N^{2}`` one.
+  - If `val` is an array, `length(val) == size(sigma, 1)`. The rule reads a length and not a size, so it holds on the two axes. On the mean axis, `val` is a vector of length ``N`` beside an ``N \\times N`` shape matrix. On the covariance axis, it is an ``N \\times N`` covariance matrix beside an ``N^{2} \\times N^{2}`` shape matrix.
 
 # Examples
 
@@ -1685,12 +1708,12 @@ EllipsoidalUncertaintySet
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equation 11.22.
-  - $(ref_dict[:fengpalomar2016])
+  - $(ref_dict[:sousalobo2000]) Sections 3.2 and 4.1.
+  - $(ref_dict[:fengpalomar2016]) Section 6.1, Equations 6.6, 6.7 and 6.12 to 6.15.
 """
 @concrete struct EllipsoidalUncertaintySet <: AbstractUncertaintySetResult
     """
-    $(field_dict[:sigma])
+    Shape matrix of the ellipsoid, which the estimator derives from the covariance of the estimation error. It is ``N \\times N`` on the mean axis and ``N^{2} \\times N^{2}`` on the covariance axis.
     """
     sigma
     """
@@ -1733,22 +1756,22 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return a view of a covariance [`EllipsoidalUncertaintySet`](@ref) restricted to assets at index `i`, mapping the sigma index through the fourth-moment index generator.
+Returns a view of a covariance [`EllipsoidalUncertaintySet`](@ref) restricted to the assets at the index `i`.
 
-The set bounds a vectorised covariance, so its shape matrix lives on the ``N^{2}`` axis while its centre lives on the ``N`` axis. The method therefore applies two different indices, one to each field.
+The set bounds a vectorised covariance. So its shape matrix is on the ``N^{2}`` axis, and its centre is on the ``N`` axis. The method applies a different index to each of the two fields.
 
 # Algorithm
 
- 1. Take `nothing_scalar_array_view(risk_ucs.val, i)`, the fitted ``N \\times N`` covariance restricted to the selected assets. It takes the plain asset index, and a `nothing` passes through unchanged. The step runs first, because step 2 overwrites `i`.
- 2. Recover `N` as `floor(Int, sqrt(size(risk_ucs.sigma, 1)))` from the shape matrix, and expand `i` with `fourth_moment_index_generator(N, i)`, giving the positions the selected assets occupy in the vectorised covariance.
- 3. Take `view(risk_ucs.sigma, i, i)` under the expanded index, giving the restricted shape matrix.
- 4. Build an [`EllipsoidalUncertaintySet`](@ref) from the two views, carrying `k` and `class` through unchanged. The radius is not recalibrated on the smaller dimension, so the view is more conservative than a fit on the subset under every radius algorithm except [`GeneralKUncertaintyAlgorithm`](@ref).
+ 1. Take `nothing_scalar_array_view(risk_ucs.val, i)`, the fitted ``N \\times N`` covariance restricted to the selected assets. It takes the plain asset index, and it returns `nothing` unchanged. This step is first, because step 2 writes a new value to `i`.
+ 2. Find `N` as `floor(Int, sqrt(size(risk_ucs.sigma, 1)))` from the shape matrix. Expand `i` with `fourth_moment_index_generator(N, i)`, which gives the positions of the selected assets in the vectorised covariance.
+ 3. Take `view(risk_ucs.sigma, i, i)` with the expanded index, which gives the restricted shape matrix.
+ 4. Build an [`EllipsoidalUncertaintySet`](@ref) from the two views, with `k` and `class` unchanged. The method does not calibrate the radius again on the smaller dimension. So under every radius algorithm except [`GeneralKUncertaintyAlgorithm`](@ref), the view is more conservative than a fit on the subset.
 
 # Arguments
 
-  - `risk_ucs`: Covariance ellipsoidal uncertainty set.
-  - `i`: Cluster or asset index.
-  - `args...`: Additional positional arguments (ignored).
+  - `risk_ucs`: Ellipsoidal uncertainty set on the covariance axis.
+  - `i`: Index of the cluster or of the assets.
+  - `args...`: More positional arguments, which the method ignores.
 
 # Returns
 
@@ -1774,19 +1797,21 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Write a covariance [`EllipsoidalUncertaintySet`](@ref) fitted on the Investable Mask back onto the full asset universe.
+Writes a covariance [`EllipsoidalUncertaintySet`](@ref) fitted on the Investable Mask back onto the full asset universe.
 
-The expansion is the inverse of [`port_opt_view`](@ref): the view slices the shape matrix at the fourth-moment index of the selected assets and the centre at the plain one, so a zero block written outside the mask is dropped without a trace and the view recovers the fitted set. The frame is zero and not `NaN`, because the shape matrix is geometry: the same set converts into a [`NormBallUncertaintySet`](@ref) whose map must be finite, and a zero row of that map moves nothing on an asset the prior could not estimate. The centre is the full `pr.sigma`.
+The expansion is the inverse of [`port_opt_view`](@ref). The view slices the shape matrix at the fourth-moment index of the selected assets, and the centre at the plain index. So the view removes all of the zero block outside the mask, and it gives back the fitted set. The centre is the full `pr.sigma`.
+
+The frame is zero and not `NaN`, because the shape matrix is geometry. The same set converts into a [`NormBallUncertaintySet`](@ref), whose map must be finite. A zero row of that map has no effect on an asset that the prior did not estimate.
 
 # Algorithm
 
- 1. Take the positions the investable pairs occupy in the vectorised covariance with [`coverage_pair_index`](@ref), which orders them as [`fourth_moment_index_generator`](@ref) does.
- 2. Allocate a zero frame of `length(imsk)^2` rows and columns, and write `set.sigma` at those positions on both axes.
- 3. Build an [`EllipsoidalUncertaintySet`](@ref) from it, carrying `k` and `class` through unchanged and `pr.sigma` as `val`.
+ 1. Find the positions of the investable pairs in the vectorised covariance with [`coverage_pair_index`](@ref), in the order of [`fourth_moment_index_generator`](@ref).
+ 2. Make a zero frame of `length(imsk)^2` rows and columns. Write `set.sigma` at those positions on the two axes.
+ 3. Build an [`EllipsoidalUncertaintySet`](@ref) from the frame, with `k` and `class` unchanged and `pr.sigma` as `val`.
 
 # Arguments
 
-  - `set`: Covariance ellipsoidal uncertainty set fitted on the reduced prior.
+  - `set`: Ellipsoidal uncertainty set on the covariance axis, fitted on the reduced prior.
   - `imsk`: The Investable Mask of the full prior.
   - $(arg_dict[:pr])
 
@@ -1816,21 +1841,21 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return a view of a mean [`EllipsoidalUncertaintySet`](@ref) restricted to assets at index `i`.
+Returns a view of a mean [`EllipsoidalUncertaintySet`](@ref) restricted to the assets at the index `i`.
 
-The set bounds a characteristic vector, so its shape matrix and its centre both live on the ``N`` axis and one index serves both.
+The set bounds a mean vector, so its shape matrix and its centre are both on the ``N`` axis. One index serves the two fields.
 
 # Algorithm
 
- 1. Take `view(risk_ucs.sigma, i, i)`, the ``N \\times N`` shape matrix restricted to the selected assets on both dimensions.
- 2. Take `nothing_scalar_array_view(risk_ucs.val, i)`, the fitted characteristic vector restricted to the same assets, which passes a `nothing` through unchanged.
- 3. Build an [`EllipsoidalUncertaintySet`](@ref) from the two views, carrying `k` and `class` through unchanged. The radius is not recalibrated on the smaller dimension, so the view is more conservative than a fit on the subset under every radius algorithm except [`GeneralKUncertaintyAlgorithm`](@ref).
+ 1. Take `view(risk_ucs.sigma, i, i)`, the ``N \\times N`` shape matrix restricted to the selected assets on the two dimensions.
+ 2. Take `nothing_scalar_array_view(risk_ucs.val, i)`, the fitted mean vector restricted to the same assets. It returns `nothing` unchanged.
+ 3. Build an [`EllipsoidalUncertaintySet`](@ref) from the two views, with `k` and `class` unchanged. The method does not calibrate the radius again on the smaller dimension. So under every radius algorithm except [`GeneralKUncertaintyAlgorithm`](@ref), the view is more conservative than a fit on the subset.
 
 # Arguments
 
-  - `risk_ucs`: Mean ellipsoidal uncertainty set.
-  - `i`: Cluster or asset index.
-  - `args...`: Additional positional arguments (ignored).
+  - `risk_ucs`: Ellipsoidal uncertainty set on the mean axis.
+  - `i`: Index of the cluster or of the assets.
+  - `args...`: More positional arguments, which the method ignores.
 
 # Returns
 
@@ -1852,18 +1877,20 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Write a mean [`EllipsoidalUncertaintySet`](@ref) fitted on the Investable Mask back onto the full asset universe.
+Writes a mean [`EllipsoidalUncertaintySet`](@ref) fitted on the Investable Mask back onto the full asset universe.
 
-The expansion is the inverse of [`port_opt_view`](@ref): the view slices the shape matrix on both axes and the centre by the asset index, so a zero row and column written outside the mask are dropped without a trace and the view recovers the fitted set. The frame is zero and not `NaN`, because the shape matrix is geometry: the same set converts into a [`NormBallUncertaintySet`](@ref) whose map must be finite, and a zero row of that map moves nothing on an asset the prior could not estimate. The centre is the full `pr.mu`.
+The expansion is the inverse of [`port_opt_view`](@ref). The view slices the shape matrix on the two axes, and the centre, by the asset index. So the view removes all of the zero rows and columns outside the mask, and it gives back the fitted set. The centre is the full `pr.mu`.
+
+The frame is zero and not `NaN`, because the shape matrix is geometry. The same set converts into a [`NormBallUncertaintySet`](@ref), whose map must be finite. A zero row of that map has no effect on an asset that the prior did not estimate.
 
 # Algorithm
 
- 1. Allocate a zero frame of `length(imsk)` rows and columns, and write `set.sigma` at `(imsk, imsk)`.
- 2. Build an [`EllipsoidalUncertaintySet`](@ref) from it, carrying `k` and `class` through unchanged and `pr.mu` as `val`.
+ 1. Make a zero frame of `length(imsk)` rows and columns. Write `set.sigma` at `(imsk, imsk)`.
+ 2. Build an [`EllipsoidalUncertaintySet`](@ref) from the frame, with `k` and `class` unchanged and `pr.mu` as `val`.
 
 # Arguments
 
-  - `set`: Mean ellipsoidal uncertainty set fitted on the reduced prior.
+  - `set`: Ellipsoidal uncertainty set on the mean axis, fitted on the reduced prior.
   - `imsk`: The Investable Mask of the full prior.
   - $(arg_dict[:pr])
 
@@ -1891,24 +1918,26 @@ end
 """
     box_quantile_bounds(::Type{TE}, get_ij, N::Integer, q::Number, kwargs) where {TE}
 
-Element-wise lower and upper quantile bounds for a symmetric ``N \\times N`` statistic.
+Computes the element-wise lower and upper quantile bounds of a symmetric ``N \\times N`` statistic.
 
-Shared by the box [`ucs`](@ref) and [`sigma_ucs`](@ref) constructions across estimator families. The `get_ij` accessor is what lets one body serve them all: it bridges the Wishart sample container, a vector of matrices, and the bootstrap one, a three-dimensional array. Positive-definite projection, if any, is applied by the caller.
+The box methods of [`ucs`](@ref) and [`sigma_ucs`](@ref) of all estimator families use this function. The accessor `get_ij` lets one body serve all of them. It reads the Wishart sample, which is a vector of matrices, and the bootstrap sample, which is a three-dimensional array. The caller does the projection to a positive definite matrix, if one is necessary.
+
+The two bounds do not always contain the sample mean of the statistic. A sample with one large outlier can put its mean outside the two quantiles.
 
 # Algorithm
 
- 1. Allocate `lb` and `ub`, both `N × N` and of element type `TE`.
- 2. For each ordered pair with `j <= i`, read `s_ij = get_ij(i, j)`, the sampled values of that entry.
- 3. Write the `q` quantile of `s_ij` into both `lb[i, j]` and `lb[j, i]`, and the `1 - q` quantile into both `ub[i, j]` and `ub[j, i]`. Writing each quantile to both positions makes the two bounds symmetric by construction, and it costs one quantile per pair rather than two.
- 4. Return `lb` and `ub`. They satisfy `lb .<= ub` entrywise, because `q` is the smaller quantile level of the same sample, and the sample mean of the statistic lies between them.
+ 1. Make `lb` and `ub`, both `N × N` with the element type `TE`.
+ 2. For each pair with `j <= i`, read `s_ij = get_ij(i, j)`, the sampled values of that entry.
+ 3. Write the `q` quantile of `s_ij` into `lb[i, j]` and `lb[j, i]`. Write the `1 - q` quantile into `ub[i, j]` and `ub[j, i]`. Each quantile goes to two positions, so the two bounds are symmetric, and each pair costs one quantile and not two.
+ 4. Return `lb` and `ub`. The caller gives `q < 1/2`, so `q` is the smaller quantile level of the same sample and `lb .<= ub` entrywise.
 
 # Arguments
 
   - `TE`: Element type of the two bounds.
-  - `get_ij`: Accessor. `get_ij(i, j)` returns the vector of sampled values for entry ``(i, j)``.
-  - `N`: Side of the statistic.
-  - `q`: Significance level, already halved by the caller.
-  - `kwargs`: Splatted into `Statistics.quantile`.
+  - `get_ij`: Accessor function. `get_ij(i, j)` returns the vector of sampled values of the entry ``(i, j)``.
+  - `N`: Number of rows and columns of the statistic.
+  - `q`: Significance level, which the caller halved.
+  - `kwargs`: Keyword arguments, which the function splats into `Statistics.quantile`.
 
 # Returns
 
@@ -1937,22 +1966,24 @@ end
 """
     vec_quantile_bounds(mus::MatNum, q::Number, kwargs)
 
-Element-wise lower and upper quantile bounds for a vector-valued statistic.
+Computes the element-wise lower and upper quantile bounds of a vector statistic.
 
-Shared by the bootstrap box [`ucs`](@ref) and [`mu_ucs`](@ref) mean constructions. **The sample axis is the second one**: the body reads `mus[j, :]`, so `mus` is ``N \\times M``, one row per component and one column per sample. A caller that passes the transpose gets bounds of length ``M``, which the [`BoxUncertaintySet`](@ref) constructor accepts, so the axis is a contract this method cannot check.
+The bootstrap box methods of [`ucs`](@ref) and [`mu_ucs`](@ref) use this function for the mean. **The samples are on the second axis.** The body reads `mus[j, :]`, so `mus` is ``N \\times M``, with one row for each component and one column for each sample. A caller that gives the transpose gets bounds of length ``M``, and the [`BoxUncertaintySet`](@ref) constructor accepts them. So the axis is a contract that this method cannot check.
+
+The two bounds do not always contain the sample mean of a component. A sample with one large outlier can put its mean outside the two quantiles.
 
 # Algorithm
 
- 1. Read `N = size(mus, 1)`, the number of components, and allocate `lb` and `ub` of that length and of `eltype(mus)`.
+ 1. Read `N = size(mus, 1)`, the number of components. Make `lb` and `ub` of that length, with the element type `eltype(mus)`.
  2. For each component `j`, read the row `mu_j = mus[j, :]`, the `M` sampled values of that component.
- 3. Write the `q` quantile of `mu_j` into `lb[j]` and the `1 - q` quantile into `ub[j]`.
- 4. Return `lb` and `ub`. They satisfy `lb .<= ub` entrywise, and they bracket the sample mean of each component.
+ 3. Write the `q` quantile of `mu_j` into `lb[j]`, and the `1 - q` quantile into `ub[j]`.
+ 4. Return `lb` and `ub`. The caller gives `q < 1/2`, so `lb .<= ub` entrywise.
 
 # Arguments
 
-  - `mus`: Sampled values, ``N \\times M``, one row per component.
-  - `q`: Significance level, already halved by the caller.
-  - `kwargs`: Splatted into `Statistics.quantile`.
+  - `mus`: Sampled values, ``N \\times M``, with one row for each component.
+  - `q`: Significance level, which the caller halved.
+  - `kwargs`: Keyword arguments, which the function splats into `Statistics.quantile`.
 
 # Returns
 
@@ -1983,11 +2014,13 @@ end
     ucs_dimension(class::AbstractUncertaintySetClass, diagonal::Bool, m::Integer,
                   M::Integer)
 
-Dimension of an uncertainty set built on a shape of side `m`, the degrees of freedom of its chi-squared radius.
+Returns the dimension of an uncertainty set on a shape of side `m`, which is the degrees of freedom of its chi-squared radius.
 
-The dimension is the number of free coordinates the estimation error spans, and the squared Mahalanobis distance of a normal error is chi-squared at that number. On the mean axis it is `m`, the number of assets. On the covariance axis the error is a vectorised symmetric matrix, so the entries ``(i, j)`` and ``(j, i)`` are one number. A full shape then has rank ``N(N+1)/2`` of its ``N^{2}``, and the positive definite repair that gives it a nominal full rank adds ``N(N-1)/2`` flat directions, the antisymmetric matrices, that no error fills. A diagonal shape keeps ``N^{2}``: its statistic sums ``N^{2}`` terms of unit mean, so its expected value is ``N^{2}``.
+The dimension is the number of free coordinates of the estimation error. The squared Mahalanobis distance of a normal error has a chi-squared distribution at that number. On the mean axis, the dimension is `m`, the number of assets. On the covariance axis, the error is a vectorised symmetric matrix, so the entries ``(i, j)`` and ``(j, i)`` are one number. A full shape then has rank ``N(N+1)/2`` of its ``N^{2}``. The positive definite repair gives it a nominal full rank, and adds ``N(N-1)/2`` flat directions that no error fills, the antisymmetric matrices.
 
-The four-argument method serves a full shape that is the sample covariance of ``M`` sampled errors. That shape has rank at most ``M - 1``, because the sample is centred, so the method caps the dimension there. The cap binds when ``M - 1`` is less than ``N`` on the mean axis, or less than ``N(N+1)/2`` on the covariance axis. A diagonal shape of sample variances has full rank and takes no cap. The cap assumes a plain sample covariance: a shrinkage estimator gives a shape of full rank, and the cap then understates its dimension.
+A diagonal shape keeps ``N^{2}``. Its statistic is a sum of ``N^{2}`` terms with a mean of one, so its expected value is ``N^{2}``.
+
+The four-argument method is for a full shape that is the sample covariance of ``M`` sampled errors. The sample is centred, so that shape has a rank of ``M - 1`` or less, and the method limits the dimension to that value. The limit applies when ``M - 1`` is less than ``N`` on the mean axis, or less than ``N(N+1)/2`` on the covariance axis. A diagonal shape of sample variances has full rank, so it has no limit. The limit assumes a plain sample covariance. A shrinkage estimator gives a shape of full rank, and the limit then makes its dimension too small.
 
 # Mathematical definition
 
@@ -2017,7 +2050,7 @@ Where:
   - `class`: Axis tag of the set.
   - `diagonal`: Whether the shape is the diagonal of the asymptotic covariance.
   - `m`: Side of the shape matrix, ``N`` on the mean axis and ``N^{2}`` on the covariance axis.
-  - `M`: Number of sampled errors the shape is the sample covariance of.
+  - `M`: Number of sampled errors, of which the shape is the sample covariance.
 
 # Returns
 
@@ -2052,27 +2085,27 @@ end
                     val::Option{<:ArrNum} = nothing;
                     df::Integer = ucs_dimension(class, alg.diagonal, size(cov, 1)))
 
-Assemble an [`EllipsoidalUncertaintySet`](@ref) from an already-computed asymptotic covariance `cov`.
+Builds an [`EllipsoidalUncertaintySet`](@ref) from an asymptotic covariance `cov` that the caller computed.
 
-Shared by every ellipsoidal [`ucs`](@ref), [`mu_ucs`](@ref) and [`sigma_ucs`](@ref) construction across estimator families. It is the ellipsoidal twin of [`norm_ball_set`](@ref), and takes the set algorithm in the same place. [`k_ucs`](@ref) absorbs the trailing arguments its own algorithm does not read, so `samples` may be the deviation matrix, a `1:n_sim` range, or `nothing`, whichever the caller has.
+Every ellipsoidal method of [`ucs`](@ref), [`mu_ucs`](@ref) and [`sigma_ucs`](@ref) in all estimator families uses this function. It is the ellipsoidal counterpart of [`norm_ball_set`](@ref), and it takes the set algorithm in the same position. [`k_ucs`](@ref) ignores the last arguments that its algorithm does not read. So `samples` can be the deviation matrix, a `1:n_sim` range or `nothing`, as the caller has it.
 
-**The order of the two steps below is load-bearing.** The diagonal is taken *before* the radius is fitted, so under the `diagonal = true` default an empirical radius is a quantile of Mahalanobis distances measured against the diagonal shape and not against the full one, and neither shape reliably gives the larger radius. Taking the diagonal afterwards would pair a radius calibrated on one shape with a different shape, and the set would not hold the coverage its significance level names.
+**The order of the first two steps below is necessary.** The function takes the diagonal *before* it computes the radius. So under the default `diagonal = true`, a radius from a sample is a quantile of Mahalanobis distances against the diagonal shape, not against the full shape. Neither shape always gives the larger radius. If the function takes the diagonal after the radius, the radius comes from one shape and the set uses a different shape. The set then does not have the coverage that its significance level states.
 
 # Algorithm
 
- 1. When `alg.diagonal` is `true`, replace `cov` with `LinearAlgebra.Diagonal(cov)`, discarding the estimation-error correlations between entries. The result is stored as a `Diagonal`, not as a dense matrix.
- 2. Compute `k = k_ucs(alg.method, q, samples, cov, df)`, the radius, measured against whichever shape step 1 left. `df` is the dimension of the set, ``N(N+1)/2`` on a full covariance shape, and not the side of the shape.
+ 1. If `alg.diagonal` is `true`, replace `cov` with `LinearAlgebra.Diagonal(cov)`. This removes the correlations of the estimation errors between entries. The result is a `Diagonal`, not a dense matrix.
+ 2. Compute the radius `k = k_ucs(alg.method, q, samples, cov, df)` against the shape that step 1 gives. `df` is the dimension of the set, which is ``N(N+1)/2`` on a full covariance shape, and not the side of the shape.
  3. Build an [`EllipsoidalUncertaintySet`](@ref) from `cov`, `k`, `class` and `val`.
 
 # Arguments
 
-  - `alg`: Ellipsoidal uncertainty set algorithm, which carries the radius algorithm `alg.method` and the diagonal switch `alg.diagonal`.
+  - `alg`: Ellipsoidal uncertainty set algorithm, which holds the radius algorithm `alg.method` and the diagonal switch `alg.diagonal`.
   - `q`: Significance level.
-  - `samples`: Sampled estimation errors, or whatever container `alg.method` reads. An algorithm that runs no simulation absorbs it.
+  - `samples`: Sampled estimation errors, or the container that `alg.method` reads. An algorithm that runs no simulation ignores it.
   - `cov`: Asymptotic covariance of the statistic, which becomes the shape matrix.
-  - `class`: Axis tag, which fixes the size of the shape matrix and the index a view applies.
-  - `val`: Quantity the set is a neighbourhood of — the fitted characteristic vector on the mean axis, the fitted covariance on the covariance axis. Every caller has it in hand, because every one of them fits a prior before it calls here.
-  - `df`: Dimension of the set, the degrees of freedom of a chi-squared radius. The default is the dimension of the shape of the statistic. A caller whose shape is the sample covariance of ``M`` errors passes the dimension capped at ``M - 1``, the rank of that shape.
+  - `class`: Axis tag, which sets the size of the shape matrix and the index that a view applies.
+  - `val`: Quantity that the set is a neighbourhood of. It is the fitted mean vector on the mean axis, and the fitted covariance on the covariance axis. Every caller has it, because every caller fits a prior before it calls this function.
+  - `df`: Dimension of the set, which is the degrees of freedom of a chi-squared radius. The default is the dimension of the shape of the statistic. A caller whose shape is the sample covariance of ``M`` errors gives the dimension limited to ``M - 1``, the rank of that shape.
 
 # Returns
 

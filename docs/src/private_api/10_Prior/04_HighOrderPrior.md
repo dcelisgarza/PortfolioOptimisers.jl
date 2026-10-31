@@ -13,6 +13,8 @@ duplication_matrix
 dup_elim_sum_view(args...)
 dup_elim_sum_view(::MatNum, n)
 PortfolioOptimisers.assemble_high_order_prior
+PortfolioOptimisers.high_order_moment_counts
+PortfolioOptimisers.high_order_observation_count
 PortfolioOptimisers.scenario_rows
 PortfolioOptimisers.read_comoment
 PortfolioOptimisers.comoment_investable

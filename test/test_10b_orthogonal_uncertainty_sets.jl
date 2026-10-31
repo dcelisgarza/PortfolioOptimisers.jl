@@ -67,7 +67,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         ue = OrthogonalUncertaintySet()
         @test ue.q == 0.05
         @test isa(ue.method, ChiSqKUncertaintyAlgorithm)
-        @test isa(ue.scaling, IdentityScaling)
+        @test isnothing(ue.scaling)
         @test ue.kappa == 1.0
         @test isa(ue.metric, InverseIdiosyncraticVarianceMetric)
         @test isa(ue, PortfolioOptimisers.AbstractPriorUncertaintySetEstimator)
@@ -81,12 +81,15 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         @test !isdefined(Main, :AbstractOrthogonalityMetric)
         @test !isdefined(Main, :AbstractOrthogonalScaling)
         for m in (BenchmarkWeightMetric(), RegressionWeightMetric(),
-                  InverseIdiosyncraticVarianceMetric(), IdentityMetric())
+                  InverseIdiosyncraticVarianceMetric())
             @test isa(m, PortfolioOptimisers.AbstractOrthogonalityMetric)
         end
-        for s in (IdentityScaling(), IdiosyncraticVarianceScaling())
-            @test isa(s, PortfolioOptimisers.AbstractOrthogonalScaling)
-        end
+        @test isa(IdiosyncraticVarianceScaling(),
+                  PortfolioOptimisers.AbstractOrthogonalScaling)
+        # `nothing` is the equal-weight metric and the identity scaling, so the two
+        # singletons that named them are gone.
+        @test !isdefined(PortfolioOptimisers, :IdentityMetric)
+        @test !isdefined(PortfolioOptimisers, :IdentityScaling)
     end
 
     @testset "The port reproduces the stored oracle" begin
@@ -131,9 +134,9 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         radius_ref = 3.0802157451680481
 
         for (metric, scaling, LLt, QQt, C) in
-            ((InverseIdiosyncraticVarianceMetric(), IdentityScaling(),
-              LLt_inv_idio_identity, QQt_inv_idio_identity, C_inv_idio_identity),
-             (RegressionWeightMetric(), IdentityScaling(), LLt_regression_identity,
+            ((InverseIdiosyncraticVarianceMetric(), nothing, LLt_inv_idio_identity,
+              QQt_inv_idio_identity, C_inv_idio_identity),
+             (RegressionWeightMetric(), nothing, LLt_regression_identity,
               QQt_regression_identity, C_regression_identity),
              (InverseIdiosyncraticVarianceMetric(), IdiosyncraticVarianceScaling(),
               LLt_inv_idio_idiovar, QQt_inv_idio_identity, C_inv_idio_identity))
@@ -164,7 +167,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         end
 
         # The identity metric leaves the compact set's metric a vector of ones.
-        ident = sigma_ucs(OrthogonalUncertaintySet(; metric = IdentityMetric()), pr777)
+        ident = sigma_ucs(OrthogonalUncertaintySet(; metric = nothing), pr777)
         @test isapprox(collect(ident.C), ones(N777))
         # The benchmark metric reads the other history, and it is a third geometry.
         bench = sigma_ucs(OrthogonalUncertaintySet(; metric = BenchmarkWeightMetric()),
@@ -184,7 +187,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         # complement read as a null space rather than as an eigendecomposition.
         for (metric, w) in ((InverseIdiosyncraticVarianceMetric(), inv.(D)),
                             (RegressionWeightMetric(), RW), (BenchmarkWeightMetric(), BW),
-                            (IdentityMetric(), ones(N777)))
+                            (nothing, ones(N777)))
             ue = OrthogonalUncertaintySet(; metric = metric)
             mu_set, sigma_set = ucs(ue, pr777)
             W = Diagonal(w)
@@ -206,7 +209,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         @test isapprox(collect(orthogonality_weights(BenchmarkWeightMetric(), rr777)), BW)
         @test isapprox(orthogonality_weights(InverseIdiosyncraticVarianceMetric(), rr777),
                        inv.(D))
-        @test isnothing(orthogonality_weights(IdentityMetric(), rr777))
+        @test isnothing(orthogonality_weights(nothing, rr777))
     end
 
     @testset "The rank of the complement is counted, not cut at a tolerance" begin
@@ -226,7 +229,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         prd = prior777(Bd, D; rw = RW, bw = BW)
         for (pr, w_span) in ((pr777, 2), (prd, 1))
             for metric in (InverseIdiosyncraticVarianceMetric(), RegressionWeightMetric(),
-                           BenchmarkWeightMetric(), IdentityMetric())
+                           BenchmarkWeightMetric(), nothing)
                 mu_set, sigma_set = ucs(OrthogonalUncertaintySet(; metric = metric), pr)
                 @test size(sigma_set.Q, 2) == w_span
                 @test size(mu_set.L, 2) == N777 - w_span
@@ -240,7 +243,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
 
     @testset "A factor-aligned portfolio pays nothing on either axis" begin
         for (metric, w) in ((InverseIdiosyncraticVarianceMetric(), inv.(D)),
-                            (RegressionWeightMetric(), RW), (IdentityMetric(), ones(N777)))
+                            (RegressionWeightMetric(), RW), (nothing, ones(N777)))
             ue = OrthogonalUncertaintySet(; metric = metric)
             mu_set, sigma_set = ucs(ue, pr777)
             # `W B e_1` is inside the span the metric spares.
@@ -277,8 +280,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         @test isapprox(transpose(idv.L) * Diagonal(inv.(D)) * B, zeros(4, 2); atol = 1e-10)
         # `Λ` on the identity scaling is the identity of the rank.
         G = Matrix(qr(base.L).Q)[:, 1:size(base.L, 2)]
-        @test isapprox(orthogonal_scaling(IdentityScaling(), G, pr777.rr),
-                       Matrix(1.0I, 4, 4))
+        @test isapprox(orthogonal_scaling(nothing, G, pr777.rr), Matrix(1.0I, 4, 4))
         # And on the idiosyncratic scaling it is the projected idiosyncratic covariance.
         @test isapprox(orthogonal_scaling(IdiosyncraticVarianceScaling(), G, pr777.rr),
                        transpose(G) * Diagonal(D) * G)
@@ -298,7 +300,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
             E = sqrt.(D) .* rho .* transpose(sqrt.(D))
             prE = prior777(B, D; rw = RW, bw = BW, esigma = E)
             ue = OrthogonalUncertaintySet(; scaling = IdiosyncraticVarianceScaling(),
-                                          metric = IdentityMetric())
+                                          metric = nothing)
             mu_set, sigma_set = ucs(ue, prE)
             # Under the identity metric `G * G'` is the projector `I - Q * Q'`, so the shape
             # matrix `L * L'` is the covariance projected onto the subspace from both sides.
@@ -315,7 +317,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
             # the set stored it as its map. A loadings block that a caller builds by hand can
             # give an indefinite scaling, and `matrix_square_root` refuses it.
             ue(alg) = OrthogonalUncertaintySet(; scaling = IdiosyncraticVarianceScaling(),
-                                               metric = IdentityMetric(), mtx_sqrt = alg)
+                                               metric = nothing, mtx_sqrt = alg)
             @test OrthogonalUncertaintySet().mtx_sqrt === EigenFallbackSquareRoot()
             E = Matrix(Diagonal(D))
             E[1, 1] = E[3, 3] = -0.05
@@ -336,7 +338,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         end
         @testset "An integer loadings block fits as its floating-point copy does" begin
             Bi = [1 0; 0 1; 1 1; 2 1; 0 3; 1 2]
-            for metric in (IdentityMetric(), InverseIdiosyncraticVarianceMetric())
+            for metric in (nothing, InverseIdiosyncraticVarianceMetric())
                 ue = OrthogonalUncertaintySet(; metric = metric)
                 mi, si = ucs(ue, prior777(Bi, D; rw = RW, bw = BW))
                 mf, sf = ucs(ue, prior777(float.(Bi), D; rw = RW, bw = BW))
@@ -351,7 +353,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
             # keeps it, and the fit drops it.
             Bt = [1.0 0.0; 0.0 8e-16; 0.0 0.0; 0.0 0.0; 0.0 0.0; 0.0 0.0]
             @test LinearAlgebra.rank(Bt) == 2
-            mu_set, sigma_set = ucs(OrthogonalUncertaintySet(; metric = IdentityMetric()),
+            mu_set, sigma_set = ucs(OrthogonalUncertaintySet(; metric = nothing),
                                     prior777(Bt, D; rw = RW, bw = BW))
             @test size(sigma_set.Q, 2) == 1
             @test size(mu_set.L, 2) == N777 - 1
@@ -645,8 +647,8 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
             # `k_compact` on a number ignores every other argument, which is what makes the
             # resolution free on the stated path.
             @test k_compact(3.25) == 3.25
-            @test k_compact(3.25, 0.05, IdentityMetric(), pr928, rr928, ones(N928),
-                            zeros(N928, 1), nothing) == 3.25
+            @test k_compact(3.25, 0.05, nothing, pr928, rr928, ones(N928), zeros(N928, 1),
+                            nothing) == 3.25
         end
 
         @testset "ResidualInflation is the relative inflation under the default metric" begin
@@ -673,12 +675,12 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
 
         @testset "ResidualInflation carries variance units where the metric needs them" begin
             #=
-            Under `IdentityMetric` the penalty matrix is dimensionless, so the radius must
+            Under `metric = nothing` the penalty matrix is dimensionless, so the radius must
             carry the variance itself. The generic formula does that without a method of its
             own: the same operator norm is `lambda_max(P D P)` there.
             =#
             ue = OrthogonalUncertaintySet(; kappa = ResidualInflation(), q = 0.05,
-                                          metric = IdentityMetric())
+                                          metric = nothing)
             _, w_sqrt, Q = orthogonal_factor_span(ue, pr928)
             @test isnothing(w_sqrt)
             P = I - Q * transpose(Q)
@@ -741,7 +743,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
                                    sigma = cov(X928), rr = bare, fpr = fpr928)
             @test_throws PortfolioOptimisers.IsNothingError sigma_ucs(OrthogonalUncertaintySet(;
                                                                                                kappa = ResidualInflation(),
-                                                                                               metric = IdentityMetric()),
+                                                                                               metric = nothing),
                                                                       prbare)
         end
 
@@ -861,15 +863,14 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
             enormous. Either way the set is useless, and the probe pins the divergence rather
             than a refusal that only the exact case reaches.
             =#
-            ue = OrthogonalUncertaintySet(; kappa = VarianceFraction(),
-                                          metric = IdentityMetric())
+            ue = OrthogonalUncertaintySet(; kappa = VarianceFraction(), metric = nothing)
             _, _, Q = orthogonal_factor_span(ue, pr928)
             generic = sigma_ucs(ue, pr928).kappa
             inside = sigma_ucs(OrthogonalUncertaintySet(;
                                                         kappa = VarianceFraction(;
                                                                                  w0 = Q[:,
                                                                                         1]),
-                                                        metric = IdentityMetric()), pr928).kappa
+                                                        metric = nothing), pr928).kappa
             @test inside > 1e10 * generic
             # An exactly vanishing penalty is the case the set's constructor refuses, and it
             # refuses on the number rather than on the rule that produced it.
@@ -949,8 +950,8 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
             rhoh946 = rrh946.ediv ./ quantile.(Chisq.(rrh946.edof), 0.05) .- 1
             for (pr946, rho946) in
                 ((pr928, fill(rho928(0.05, T928 - K928 - 1), N928)), (prh946, rhoh946)),
-                metric946 in (PortfolioOptimisers.InverseIdiosyncraticVarianceMetric(),
-                              IdentityMetric())
+                metric946 in
+                (PortfolioOptimisers.InverseIdiosyncraticVarianceMetric(), nothing)
 
                 ue946 = OrthogonalUncertaintySet(; kappa = ResidualInflation(), q = 0.05,
                                                  metric = metric946)
@@ -1171,7 +1172,11 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
             prp = prior(pe, rdp)
             csr = prp.rr.csr
             cnt = PO.variance_count(pe.ve, csr.eps)
-            p = size(csr.f, 2) + !isnothing(csr.b)
+            # The market column is the sum of the industry columns, so each period spends the
+            # rank of its design, one less than its columns. The count read the columns before
+            # #1900, and charged each period one parameter too many.
+            p = size(csr.f, 2) - 1
+            @test csr.n .- csr.edof == fill(p, length(csr.n))
             phi = sum(csr.n .- p) / sum(csr.n)
             @test prp.rr.edof ≈ phi * cnt.n
             @test prp.rr.ediv == cnt.m

@@ -24,3 +24,8 @@
         rule ┴ RollingWindow()
     """
 end
+function effective_observation_count(ske::WindowedCoskewness, X::MatNum; mean = nothing,
+                                     kwargs...)
+    inner, Xw, iv, kw = windowed_preamble(ske.ske, ske.w, ske.window, X; kwargs...)
+    return effective_observation_count(inner, Xw; mean = mean, iv = iv, kw...)
+end

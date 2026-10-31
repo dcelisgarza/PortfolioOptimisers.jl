@@ -1,5 +1,5 @@
 """
-    const Sd_Var = Union{<:StandardDeviation, <:Variance}
+    const Sd_Var = Union{StandardDeviation, Variance}
 
 Groups the two risk measures that a Schur complement bundle accepts.
 
@@ -12,7 +12,7 @@ The allocation reads the risk of each half from the augmented covariance block o
   - [`SchurComplementParams`](@ref)
   - [`naive_portfolio_risk`](@ref): Computes the risk of a block under either measure.
 """
-const Sd_Var = Union{<:StandardDeviation, <:Variance}
+const Sd_Var = Union{StandardDeviation, Variance}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -39,8 +39,8 @@ $(DocStringExtensions.FIELDS)
         wb::Option{<:WeightBounds},
         clr::Option{<:AbstractClusteringResult},
         fees::Option{<:Fees},
-        r::Union{<:Sd_Var, <:VecBaseRM},
-        gamma::Union{<:Number, <:VecNum},
+        r::Union{Sd_Var, VecBaseRM},
+        gamma::Union{Number, VecNum},
         retcode::OptimisationReturnCode,
         w::Option{<:VecNum},
         imsk::Option{<:BitVector} = nothing,
@@ -105,8 +105,8 @@ Keywords correspond to the struct's fields.
                                                          wb::Option{<:WeightBounds},
                                                          clr::Option{<:AbstractClusteringResult},
                                                          fees::Option{<:Fees},
-                                                         r::Union{<:Sd_Var, <:VecBaseRM},
-                                                         gamma::Union{<:Number, <:VecNum},
+                                                         r::Union{Sd_Var, VecBaseRM},
+                                                         gamma::Union{Number, VecNum},
                                                          retcode::OptimisationReturnCode,
                                                          w::Option{<:VecNum},
                                                          imsk::Option{<:BitVector},
@@ -128,8 +128,8 @@ function SchurComplementHierarchicalRiskParityResult(; pr::Option{<:AbstractPrio
                                                      wb::Option{<:WeightBounds},
                                                      clr::Option{<:AbstractClusteringResult},
                                                      fees::Option{<:Fees},
-                                                     r::Union{<:Sd_Var, <:VecBaseRM},
-                                                     gamma::Union{<:Number, <:VecNum},
+                                                     r::Union{Sd_Var, VecBaseRM},
+                                                     gamma::Union{Number, VecNum},
                                                      retcode::OptimisationReturnCode,
                                                      w::Option{<:VecNum},
                                                      imsk::Option{<:BitVector} = nothing,
@@ -340,6 +340,8 @@ Collects the risk measure, the interpolation parameter ``\\gamma`` and the two a
 
 [`SchurComplementHierarchicalRiskParity`](@ref) holds one bundle or a vector of bundles. A vector runs one allocation per bundle, and blends the portfolios of the bundles in proportion to the `r.settings.scale` of each bundle.
 
+The parameter ``\\gamma`` in ``[0, 1]`` sets how much of the cross-cluster covariance the augmentation uses. It is the parameter of Section 5 of [cotton2024](@cite), where ``\\gamma = 0`` is the hierarchical recursion, as in Table 2 of that work.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -371,7 +373,7 @@ Keywords correspond to the struct's fields. [`Sd_Var`](@ref) bounds `r`, because
 
 # References
 
-  - $(ref_dict[:cotton2024])
+  - $(ref_dict[:cotton2024]) Section 5, Table 2.
 """
 @concrete struct SchurComplementParams <: AbstractAlgorithm
     """
@@ -427,7 +429,7 @@ A vector of bundles runs one allocation per bundle and blends the portfolios. Th
 """
 const VecScP = AbstractVector{<:SchurComplementParams}
 """
-    const ScP_VecScP = Union{<:SchurComplementParams, <:VecScP}
+    const ScP_VecScP = Union{SchurComplementParams, VecScP}
 
 Groups one Schur complement bundle and a vector of bundles.
 
@@ -438,7 +440,7 @@ The `params` field of the estimator takes either form, so its bound is this alia
   - [`SchurComplementParams`](@ref)
   - [`VecScP`](@ref)
 """
-const ScP_VecScP = Union{<:SchurComplementParams, <:VecScP}
+const ScP_VecScP = Union{SchurComplementParams, VecScP}
 """
     port_opt_view(sp::SchurComplementParams, i, X::MatNum, args...) -> SchurComplementParams
 
@@ -527,6 +529,8 @@ Where:
   - $(math_dict[:rho_naive_sch])
   - $(math_dict[:alpha_split_hier])
 
+``\\mathbf{A}`` is the Schur complement with the parameter ``\\gamma`` of Equation 5.2 of [cotton2024](@cite), and ``\\gamma = 0`` is the hierarchical recursion, as in Table 2 of that work. Equation 4.2 of that work divides ``\\mathbf{A}`` entry by entry by ``\\boldsymbol{b} \\boldsymbol{b}^\\intercal``, where ``\\boldsymbol{b} = \\boldsymbol{1} - \\gamma \\, \\mathbf{\\Sigma}_{12} \\mathbf{\\Sigma}_{22}^{-1} \\boldsymbol{1}`` is Equation 5.3. This type does not. It builds ``\\hat{\\mathbf{\\Sigma}}_{11}`` from ``\\mathbf{R}`` and ``\\mathbf{M}``, which that work does not state. The closing remark of Appendix A of that work says that the code that accompanies it provides an alternative, and this type builds that alternative. The function `pseudo_schur_complement` of version 0.11.17 of that code, the Python package `precise`, computes ``\\mathbf{R}^{-1}\\mathbf{A}`` with the same ``\\mathbf{R}`` and ``\\mathbf{M}``. Its symmetric part equals ``\\hat{\\mathbf{\\Sigma}}_{11}`` to round-off, and that code does not augment a part with a half of one leaf either. The block of Equation 4.2 and this block differ for ``\\gamma > 0``. The risk of a half is the variance of its naive risk parity portfolio, so the allocation at ``\\gamma = 1`` is not the minimum variance portfolio of Table 2 of that work.
+
 The weights are the inverse variances of the augmented block for both measures. So at ``\\gamma = 0`` a [`Variance`](@ref) measure gives the allocation of [`HierarchicalRiskParity`](@ref) under a [`Variance`](@ref) measure. A [`StandardDeviation`](@ref) measure gives a different allocation from [`HierarchicalRiskParity`](@ref) under a [`StandardDeviation`](@ref) measure, because that optimiser takes inverse volatility weights.
 
 A part of two or three leaves has a half ``C_1`` of one leaf, and the recursion augments neither of its halves. The resolved weight bounds clamp ``\\alpha``, as in [`HierarchicalRiskParity`](@ref). ``C_1`` and ``C_2`` receive ``\\alpha`` and ``1 - \\alpha`` of the weight of the part in every case, so the weights sum to one.
@@ -568,10 +572,10 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref) or [`TDO_
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `opt`: Recursively updated via [`factory`](@ref).
-  - `fb`: Recursively updated via [`factory`](@ref).
+  - `opt`: Recursively updated through [`factory`](@ref).
+  - `fb`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 
@@ -697,7 +701,7 @@ SchurComplementHierarchicalRiskParity
 
 # References
 
-  - $(ref_dict[:cotton2024])
+  - $(ref_dict[:cotton2024]) Sections 4 and 5, Equations 4.2, 5.2 and 5.3, and Appendix A.
 """
 @propagatable @concrete struct SchurComplementHierarchicalRiskParity <:
                                ClusteringOptimisationEstimator
@@ -1153,7 +1157,7 @@ function schur_complement_binary_search(objective::Function, lgamma::Number, hga
     end
     if hgamma - lgamma > tol
         msg = "Binary search did not converge within the specified tolerance: tol => $tol"
-        strict_diagnostic(msg, strict)
+        strict_diagnostic(msg, strict; id = @log_id())
     end
     return lw, lgamma
 end

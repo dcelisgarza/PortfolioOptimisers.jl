@@ -1,5 +1,5 @@
 ```@meta
-Description = "WalkForward, private API of PortfolioOptimisers.jl: WalkForwardEstimator, WalkForward_Onl, WFCVER, DateAdjusterEstimator, DatesUnionPeriod, DateAdjType, …"
+Description = "WalkForward, private API of PortfolioOptimisers.jl: WalkForwardEstimator, WalkForward_Onl, WFCVER, OptCVE_Onl, DatesUnionPeriod, DateAdjType, …"
 ```
 
 # WalkForward: private API
@@ -8,7 +8,7 @@ Description = "WalkForward, private API of PortfolioOptimisers.jl: WalkForwardEs
 WalkForwardEstimator
 PortfolioOptimisers.WalkForward_Onl
 WFCVER
-DateAdjusterEstimator
+OptCVE_Onl
 DatesUnionPeriod
 DateAdjType
 IntPeriodDateRange

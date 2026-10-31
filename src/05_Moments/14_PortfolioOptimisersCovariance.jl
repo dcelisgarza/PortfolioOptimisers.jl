@@ -1,9 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Runs any covariance estimator, then applies a matrix post-processing step to its result.
+Runs a covariance estimator, then applies a matrix processing step to its result.
 
-`ce` computes the raw matrix and `mp` repairs or filters it — positive-definite repair, denoising, and detoning — so the composite is the estimator the rest of the library takes as its default.
+`ce` computes the raw matrix. `mp` repairs or filters it with the positive definite repair, the denoise step and the detone step. The library uses this composite as its default covariance estimator.
 
 # Fields
 
@@ -19,27 +19,31 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Validation
+
+  - $(val_dict[:ce_cov]) [`DenoiseCovariance`](@ref), [`DetoneCovariance`](@ref) and [`ProcessedCovariance`](@ref) build this type, so they refuse one too.
+
 ## The incremental fit
 
-The composite folds by **composition**, and the state it carries decides which of the two routes it takes.
+The composite folds by composition. The state in `cache` selects one of two routes.
 
-With `cache` holding `nothing`, [`partial_fit!`](@ref) forwards the observation to `ce.ce` and keeps nothing of its own, because `mp` reads no observation that a moment and a count cannot stand in for: `pdm` and `dt` read `sigma` alone, and `dn` reads the effective sample ratio `T / N`. The one-argument [`Statistics.cov`](@ref) then reads the inner estimator's folded matrix and applies `mp` from [`observation_count`](@ref), which is exactly the `size(X, 1)` the matrix arm would have read. An `mp.alg` of a caller's own is the one step with no shape substitute, and it is refused at the fold with an error that names it.
+If `cache` holds `nothing`, [`partial_fit!`](@ref) passes the observation to `ce.ce` and keeps no state of its own. This route works because `mp` needs only a moment and a count. `pdm` and `dt` read only `sigma`, and `dn` reads the effective sample ratio `T / N`. The one-argument [`Statistics.cov`](@ref) reads the folded matrix of the inner estimator. Then it applies `mp`. When `mp` denoises, it reads the count from [`effective_observation_count`](@ref), which is the same count that the batch fit reads. For an unweighted `ce` that count is `size(X, 1)`. For a weighted `ce` it is the count of its weights. An `mp.alg` of the caller is the one step that needs the sample itself. The fold refuses it with an error that names it.
 
-With `cache` holding a [`SampleBufferState`](@ref) — which [`Online`](@ref) seeds — the composite takes the buffering route instead, and `cov(ce)` with no data runs the batch verb over the observations the buffer kept. That is the route an `mp.alg` needs.
+If `cache` holds a [`SampleBufferState`](@ref), which [`Online`](@ref) seeds, the composite takes the buffer route. Then `cov(ce)` with no data runs the batch verb over the observations that the buffer kept. An `mp.alg` needs this route.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `ce`: Recursively updated via [`factory`](@ref).
-  - `cache`: Carried unchanged via [`factory`](@ref).
+  - `ce`: Recursively updated through [`factory`](@ref).
+  - `cache`: Carried unchanged through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `ce`: Recursively viewed via [`port_opt_view`](@ref).
-  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
+  - `ce`: Recursively viewed through [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).
 
 # Examples
 
@@ -90,6 +94,7 @@ PortfolioOptimisersCovariance
     function PortfolioOptimisersCovariance(ce::StatsBase.CovarianceEstimator,
                                            mp::AbstractMatrixProcessingEstimator,
                                            cache::Option{<:AbstractPartialFitState})
+        assert_covariance_estimator(ce, :ce)
         return new{typeof(ce), typeof(mp), typeof(cache)}(ce, mp, cache)
     end
 end
@@ -103,11 +108,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Renders every field of a [`PortfolioOptimisersCovariance`](@ref) except `cache`.
 
-The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:PortfolioOptimisersCovariance, true)` to render it.
+A `cache` holds the state of an incremental fit. That state is not part of the configuration, and it prints under the estimator at each site that renders the estimator. Set `set_show_nothing_fields!(:PortfolioOptimisersCovariance, true)` to render it.
 
 # Arguments
 
-  - `::PortfolioOptimisersCovariance`: Covariance estimator, read for its type alone.
+  - `::PortfolioOptimisersCovariance`: The covariance estimator. The method reads only its type.
 
 # Returns
 
@@ -124,32 +129,35 @@ show_fields(::PortfolioOptimisersCovariance) = (:ce, :mp)
     Statistics.cov(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1,
                    active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
 
-Compute the covariance matrix with post-processing using a [`PortfolioOptimisersCovariance`](@ref) estimator.
+Compute the covariance matrix with a [`PortfolioOptimisersCovariance`](@ref) estimator, and process the matrix.
 
-This method computes the covariance matrix for the input data matrix `X` using the underlying covariance estimator in `ce`, and then applies the matrix post-processing step specified by `ce.mp`.
+The method computes the covariance matrix of `X` with the inner estimator `ce.ce`. Then it applies the matrix processing step `ce.mp`.
 
-The composite is transparent to a gap: it forwards `X` and `active_mask` to `ce.ce` untouched, so [`gap_fill_value`](@ref) on it is [`gap_fill_value`](@ref) on `ce.ce`. A composite that wraps a gap-aware estimator therefore takes no finiteness refusal of its own, and repairs the finite block rather than the whole frame, which is what the [`AssetPanel`](@ref) method beside it does.
+The composite does not change a gap. It passes `X` and `active_mask` to `ce.ce` without change, so its [`gap_fill_value`](@ref) is the [`gap_fill_value`](@ref) of `ce.ce`. A composite that wraps a gap-aware estimator does not refuse a sample that is not finite. It repairs the finite block and not the whole frame. The [`AssetPanel`](@ref) method of this file does the same.
 
 # Algorithm
 
- 1. Check `dims`, and orient `X` and `active_mask` to `observations × assets`, transposing them when `dims == 2`.
- 2. Refuse a gapped sample with [`assert_finite_sample`](@ref) when [`gap_fill_value`](@ref) on `ce` is finite, because `ce.ce` is then a plain estimator that has no answer for one.
- 3. Compute `sigma` with `Statistics.cov(library_covariance_estimator(ce.ce), X; kwargs...)`, adding `active_mask` when one is given.
+ 1. Check `dims`, and orient `X` and `active_mask` to `observations × assets`. Transpose them when `dims == 2`.
+ 2. Refuse a gapped sample with [`assert_finite_sample`](@ref) when [`gap_fill_value`](@ref) on `ce` is finite, because then `ce.ce` is a plain estimator that cannot use a gapped sample.
+ 3. Compute `sigma` with `Statistics.cov(library_covariance_estimator(ce.ce), X; kwargs...)`. Pass `active_mask` too if it is given.
  4. When `sigma` is immutable, copy it into a `Matrix`, because step 5 writes in place.
- 5. Apply [`matrix_processing!`](@ref) with `ce.mp` to `sigma`, in place, or [`matrix_processing_block!`](@ref) when `ce.ce` is gap-aware, so an asset outside the Coverage Universe keeps its `NaN` row and column.
- 6. Return `sigma`.
+ 5. Take the effective number of observations `T` with [`processing_observation_count`](@ref), with the keywords of step 3. A `mean` of the caller then centres the data of the count and of the fit.
+ 6. Apply [`sample_matrix_processing!`](@ref) with `ce.mp`, `X` and `T` to `sigma` in place. If `ce.ce` is gap-aware, apply [`matrix_processing_block!`](@ref) instead, so that an asset outside the Coverage Universe keeps its `NaN` row and column.
+ 7. Return `sigma`.
 
-`ce.ce` runs before `ce.mp`, and `ce.mp.order` fixes the order of the steps inside the
-post-processing. Step 1 orients `X` once, so the estimator and the post-processing both read the
-same orientation and neither takes a `dims` of its own.
+`ce.ce` runs before `ce.mp`. `ce.mp.order` sets the order of the steps inside the processing. Step
+1 orients `X` one time, so the estimator and the processing read the same orientation. Neither of
+them takes its own `dims`.
+
+A weighted `ce.ce` is worth fewer observations than `X` has rows. So the denoising step reads the ratio `T / N` of the count of its weights, from [`effective_observation_count`](@ref), and not of `size(X, 1)`. An unweighted `ce.ce` gives `T = size(X, 1)`, so its result does not change.
 
 # Arguments
 
-  - `ce`: Composite covariance estimator with post-processing.
+  - `ce`: The composite covariance estimator with a processing step.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - `active_mask`: Optional boolean matrix with the same size as `X`, forwarded to `ce.ce` when it is given.
-  - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator and matrix processing step.
+  - `active_mask`: The optional boolean matrix with the same size as `X`. The method passes it to `ce.ce` if it is given.
+  - `kwargs...`: More keyword arguments for the inner covariance estimator and for the matrix processing step.
 
 # Validation
 
@@ -163,6 +171,7 @@ same orientation and neither takes a `dims` of its own.
 
   - [`PortfolioOptimisersCovariance`](@ref)
   - [`matrix_processing!`](@ref)
+  - [`effective_observation_count`](@ref)
   - [`Statistics.cov`](https://juliastats.org/StatsBase.jl/stable/cov/#Statistics.cov-Tuple%7BCovarianceEstimator,%20AbstractMatrix%7D)
 """
 function Statistics.cov(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1,
@@ -172,32 +181,62 @@ function Statistics.cov(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1,
     if plain
         assert_finite_sample(X)
     end
-    sigma = if isnothing(amsk)
-        Statistics.cov(library_covariance_estimator(ce.ce), X; kwargs...)
-    else
-        Statistics.cov(library_covariance_estimator(ce.ce), X; active_mask = amsk,
-                       kwargs...)
-    end
+    # The fit and the count read one set of keywords, so a count that reads the data reads the
+    # values of the fit (#1915).
+    kw = isnothing(amsk) ? (; kwargs...) : (; active_mask = amsk, kwargs...)
+    sigma = Statistics.cov(library_covariance_estimator(ce.ce), X; kw...)
     if !ismutable(sigma)
         sigma = Matrix(sigma)
     end
+    T = processing_observation_count(ce, X; kw...)
     if plain
-        matrix_processing!(ce.mp, sigma, X; kwargs...)
+        sample_matrix_processing!(ce.mp, sigma, X, T; kwargs...)
     else
-        matrix_processing_block!(ce.mp, sigma, X; kwargs...)
+        matrix_processing_block!(ce.mp, sigma, X, T; kwargs...)
     end
     return sigma
 end
 """
-    gap_fill_value(ce::PortfolioOptimisersCovariance) -> Number
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Answer what `ce.ce` answers, because the composite forwards the sample and the mask untouched.
+Return the number of observations that the matrix processing of a [`PortfolioOptimisersCovariance`](@ref) reads in a batch fit.
 
-The composite adds matrix processing to an inner estimator and reads no cell of the sample itself, so a gap is the inner estimator's to keep or to lose. A composite wrapping a gap-aware estimator is therefore gap-aware, and one wrapping a plain estimator is not.
+Only the denoising step reads the count, so the function reads [`effective_observation_count`](@ref) of `ce.ce` only when [`matrix_processing_reads_count`](@ref) answers `true`. Otherwise it returns `size(X, 1)`, which no step reads. A windowed `ce.ce` then makes no copy of its window, and the count costs nothing when no step needs it. The fold route reads its count by the same rule.
 
 # Arguments
 
-  - `ce`: Composite covariance estimator with post-processing.
+  - $(arg_dict[:ce])
+  - `X`: The data matrix, oriented to `observations × assets`.
+  - `kwargs...`: The keywords that the fit gives to `ce.ce`, `active_mask` too when the caller gives it. The function passes them to [`effective_observation_count`](@ref).
+
+# Returns
+
+  - `T::Real`: The effective number of observations of `ce.ce`, or `size(X, 1)`.
+
+# Related
+
+  - [`effective_observation_count`](@ref)
+  - [`matrix_processing_reads_count`](@ref)
+  - [`PortfolioOptimisersCovariance`](@ref)
+"""
+function processing_observation_count(ce::PortfolioOptimisersCovariance, X::MatNum;
+                                      kwargs...)
+    return if matrix_processing_reads_count(ce.mp)
+        effective_observation_count(ce.ce, X; kwargs...)
+    else
+        size(X, 1)
+    end
+end
+"""
+    gap_fill_value(ce::PortfolioOptimisersCovariance) -> Number
+
+Return the gap fill value of `ce.ce`, because the composite passes the sample and the mask to `ce.ce` without change.
+
+The composite adds matrix processing to an inner estimator and reads no cell of the sample, so the inner estimator alone decides what a gap does to the result. A composite that wraps a gap-aware estimator is gap-aware. A composite that wraps a plain estimator is not.
+
+# Arguments
+
+  - `ce`: The composite covariance estimator with a processing step.
 
 # Returns
 
@@ -217,25 +256,25 @@ end
     Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum,
                    pnl::Option{<:AssetPanel}; dims = 1, kwargs...) -> MatNum
 
-Forward the Asset Panel to the estimator that this composite wraps, then repair the finite block of the frame it gets back.
+Pass the Asset Panel to the inner estimator, then repair the finite block of the frame that it returns.
 
-This is the composite's override of the reduce-and-expand root. The inner estimator owns the reduction, because it alone knows whether it is plain or mask-aware, and this method owns the repair. The repair runs on the finite block through [`matrix_processing_block!`](@ref), so an asset outside the Coverage Universe keeps its `NaN` row and column and nothing else is touched.
+This method is the override of the composite for the reduce-and-expand root. The inner estimator does the reduction, because only the inner estimator knows if it is plain or mask-aware. This method does the repair. The repair runs on the finite block through [`matrix_processing_block!`](@ref), so an asset outside the Coverage Universe keeps its `NaN` row and column, and no entry outside the finite block changes.
 
 # Algorithm
 
  1. Check `dims` and orient `X` to `observations × assets`.
- 2. Compute the matrix with the inner estimator, forwarding `pnl` as its third positional argument.
+ 2. Compute the matrix with the inner estimator. Pass `pnl` as its third positional argument.
  3. When the matrix is immutable, copy it into a `Matrix`, because step 4 writes in place.
- 4. Repair its finite block with [`matrix_processing_block!`](@ref), under `ce.mp` and the columns of `X` the block names.
+ 4. Repair its finite block with [`matrix_processing_block!`](@ref), with `ce.mp`, the columns of `X` that the block names, and the count `T` of [`processing_observation_count`](@ref).
  5. Return the matrix.
 
 # Arguments
 
-  - `ce`: Composite covariance estimator with post-processing.
+  - `ce`: The composite covariance estimator with a processing step.
   - $(arg_dict[:X])
   - $(arg_dict[:pnl_moment])
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the underlying estimator and to the matrix processing step.
+  - `kwargs...`: More keyword arguments for the inner estimator and for the matrix processing step.
 
 # Validation
 
@@ -243,7 +282,7 @@ This is the composite's override of the reduce-and-expand root. The inner estima
 
 # Returns
 
-  - `sigma::MatNum`: The processed covariance matrix, or correlation matrix, on the full asset universe.
+  - `sigma::MatNum`: The processed covariance matrix or correlation matrix, on the full asset universe.
 
 # Related
 
@@ -258,7 +297,8 @@ function Statistics.cov(ce::PortfolioOptimisersCovariance, X::MatNum,
     if !ismutable(sigma)
         sigma = Matrix(sigma)
     end
-    matrix_processing_block!(ce.mp, sigma, X; kwargs...)
+    matrix_processing_block!(ce.mp, sigma, X,
+                             processing_observation_count(ce, X; kwargs...); kwargs...)
     return sigma
 end
 function Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum,
@@ -268,36 +308,37 @@ function Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum,
     if !ismutable(rho)
         rho = Matrix(rho)
     end
-    matrix_processing_block!(ce.mp, rho, X; kwargs...)
+    matrix_processing_block!(ce.mp, rho, X, processing_observation_count(ce, X; kwargs...);
+                             kwargs...)
     return rho
 end
 """
     Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1,
                    active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
 
-Compute the correlation matrix with post-processing using a [`PortfolioOptimisersCovariance`](@ref) estimator.
+Compute the correlation matrix with a [`PortfolioOptimisersCovariance`](@ref) estimator, and process the matrix.
 
-This method computes the correlation matrix for the input data matrix `X` using the underlying covariance estimator in `ce`, and then applies the matrix post-processing step specified by `ce.mp`.
+The method computes the correlation matrix of `X` with the inner estimator `ce.ce`. Then it applies the matrix processing step `ce.mp`.
 
 # Algorithm
 
- 1. Check `dims` and orient `X` to `observations × assets`, transposing it when `dims == 2`.
+ 1. Check `dims` and orient `X` to `observations × assets`. Transpose it when `dims == 2`.
  2. Compute `rho` with `Statistics.cor(library_covariance_estimator(ce.ce), X; kwargs...)`.
  3. When `rho` is immutable, copy it into a `Matrix`, because step 4 writes in place.
- 4. Apply [`matrix_processing!`](@ref) with `ce.mp` to `rho`, in place.
+ 4. Apply [`sample_matrix_processing!`](@ref) with `ce.mp`, `X` and the count `T` of [`processing_observation_count`](@ref) to `rho`, in place. If `ce.ce` is gap-aware, apply [`matrix_processing_block!`](@ref) instead, as the covariance method does.
  5. Return `rho`.
 
-`ce.ce` runs before `ce.mp`, and `ce.mp.order` fixes the order of the steps inside the
-post-processing. Step 1 orients `X` once, so the estimator and the post-processing both read the
-same orientation and neither takes a `dims` of its own.
+`ce.ce` runs before `ce.mp`. `ce.mp.order` sets the order of the steps inside the processing. Step
+1 orients `X` one time, so the estimator and the processing read the same orientation. Neither of
+them takes its own `dims`.
 
 # Arguments
 
-  - `ce`: Composite covariance estimator with post-processing.
+  - `ce`: The composite covariance estimator with a processing step.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - `active_mask`: Optional boolean matrix with the same size as `X`, forwarded to `ce.ce` when it is given.
-  - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator and matrix processing step.
+  - `active_mask`: The optional boolean matrix with the same size as `X`. The method passes it to `ce.ce` if it is given.
+  - `kwargs...`: More keyword arguments for the inner covariance estimator and for the matrix processing step.
 
 # Validation
 
@@ -320,19 +361,16 @@ function Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1,
     if plain
         assert_finite_sample(X)
     end
-    rho = if isnothing(amsk)
-        Statistics.cor(library_covariance_estimator(ce.ce), X; kwargs...)
-    else
-        Statistics.cor(library_covariance_estimator(ce.ce), X; active_mask = amsk,
-                       kwargs...)
-    end
+    kw = isnothing(amsk) ? (; kwargs...) : (; active_mask = amsk, kwargs...)
+    rho = Statistics.cor(library_covariance_estimator(ce.ce), X; kw...)
     if !ismutable(rho)
         rho = Matrix(rho)
     end
+    T = processing_observation_count(ce, X; kw...)
     if plain
-        matrix_processing!(ce.mp, rho, X; kwargs...)
+        sample_matrix_processing!(ce.mp, rho, X, T; kwargs...)
     else
-        matrix_processing_block!(ce.mp, rho, X; kwargs...)
+        matrix_processing_block!(ce.mp, rho, X, T; kwargs...)
     end
     return rho
 end
@@ -343,42 +381,44 @@ end
                               measure::Num_VecToScaM = MeanValue(),
                               scores::Option{<:VecNum} = nothing)
 
-Find indices of a maximally uncorrelated subset of assets from a data matrix.
+Find the indices of a subset of the assets of a data matrix in which no pair has a correlation of `t` or more.
 
-This function identifies a subset of asset columns in `X` such that no two assets in the subset have a pairwise (absolute) correlation exceeding the threshold `t`. When two assets are too correlated, the one with the higher *drop score* is removed. The function returns the indices of the remaining uncorrelated assets.
+The function compares each pair of columns of `X`. If `absolute` is `true`, it compares the absolute value of the correlation. When two assets are too correlated, the function removes the asset with the higher drop score. It returns the indices of the assets that remain.
 
-By default the drop score is each asset's summary correlation to every other asset, so the asset that is redundant with the *most* of the universe goes first. Supplying `scores` replaces that criterion — higher means "drop me" — which is how [`RedundancySelector`](@ref) makes the survivor of each correlated pair the better-scoring asset under a risk measure.
+By default, the drop score of an asset is the summary of its column of the correlation matrix, so the asset that is redundant with the largest part of the universe goes first. The `scores` keyword replaces that criterion, and a higher score removes an asset first. [`RedundancySelector`](@ref) uses `scores` to keep, from each correlated pair, the asset with the better score under a risk measure.
 
-Internal machinery — the caller-facing form is [`RedundancySelector`](@ref) with a [`PairwiseCorrelation`](@ref) algorithm.
+This function is internal. A caller uses [`RedundancySelector`](@ref) with a [`PairwiseCorrelation`](@ref) algorithm.
 
 # Algorithm
 
  1. Compute the correlation matrix `rho` with `ce`, and take its absolute value when `absolute` is `true`.
  2. When `scores` is `nothing`, collapse each column of `rho` with `measure` into `summary_rho`, the default drop score. Otherwise take `summary_rho` from `scores`.
- 3. Read the strict lower triangle of `rho` into `tril_idx`, giving each pair once.
+ 3. Read the strict lower triangle of `rho` into `tril_idx`, so that each pair occurs one time.
  4. Keep the pairs whose correlation is at least `t`, and sort them from the most to the least correlated.
- 5. Walk that list. For a pair whose two assets are both still present, remove the one with the higher drop score. **When the two scores are equal, remove both** — the library's "if we cannot tell them apart, trust neither" tie policy, which is why two identical columns leave no survivor.
+ 5. Go through that list in order. For a pair whose two assets are both still present, remove the asset with the higher drop score. When the two scores are equal, remove both assets. This is the tie policy of the library: if the function cannot tell two assets apart, it keeps neither of them. Two identical columns leave no survivor.
  6. Return the indices that step 5 did not remove, in ascending order.
 
-Step 5 skips a pair whose assets are already removed, so the result depends on the order step 4
-fixes.
+Step 5 skips a pair in which one asset or both assets are already removed. Thus the result depends
+on the order that step 4 sets. The greedy pass does not return a removed asset to the subset, so
+the result is not always the largest such subset. A tie can also remove an asset that the subset
+could keep.
 
 # Arguments
 
   - $(arg_dict[:X])
   - $(arg_dict[:ce])
-  - `t`: Correlation threshold above which two assets are considered too correlated.
-  - `absolute`: If `true`, the absolute value of the correlation is used for comparison.
-  - `measure`: Summary measure applied to each column of the correlation matrix (e.g., mean) to produce the default drop score. Ignored when `scores` is given.
-  - `scores`: Per-asset drop scores; the asset with the *higher* score is removed from a correlated pair.
+  - `t`: The correlation threshold. Two assets with a correlation of `t` or more are too correlated.
+  - `absolute`: If `true`, the function compares the absolute value of the correlation.
+  - `measure`: The summary measure that the function applies to each column of the correlation matrix, for example the mean. The result is the default drop score. The function ignores `measure` if `scores` is given.
+  - `scores`: The drop score of each asset. From a correlated pair, the function removes the asset with the higher score.
 
 # Validation
 
-  - If `scores` is not `nothing`, `length(scores) == size(X, 2)`, else a `DimensionMismatch` is raised.
+  - If `scores` is not `nothing`, `length(scores) == size(X, 2)`. A `DimensionMismatch` is thrown otherwise.
 
 # Returns
 
-  - `idx::Vector{Int}`: Indices of assets that form a maximally uncorrelated subset.
+  - `idx::Vector{Int}`: The indices of the assets that remain, in ascending order. No pair of these assets has a correlation of `t` or more.
 
 # Related
 
@@ -430,26 +470,26 @@ end
     partial_fit!(ce::PortfolioOptimisersCovariance{<:Any, <:Any, Nothing}, x::VecNum;
                  kwargs...)
 
-Folds observations into a [`PortfolioOptimisersCovariance`](@ref) by forwarding them to `ce.ce`.
+Folds observations into a [`PortfolioOptimisersCovariance`](@ref) through `ce.ce`.
 
-The composite is **exact by composition** and keeps no state of its own: `ce.ce` folds the raw matrix, and `ce.mp` is a step of `cov(ce)` with no data, which runs on whatever matrix it is given. The composite therefore owns no accumulator, and its `cache` stays `nothing` on this route — which is what selects the route, because a composite carrying a [`SampleBufferState`](@ref) is one [`Online`](@ref) seeded and takes the buffering fold instead.
+The composite is exact by composition and keeps no state of its own. `ce.ce` folds the raw matrix. `ce.mp` is a step of `cov(ce)` with no data, and it runs on the matrix that it gets. The composite has no accumulator, and its `cache` stays `nothing` on this route. The `nothing` in `cache` selects this route. A composite with a [`SampleBufferState`](@ref) got that state from [`Online`](@ref), and it takes the buffer fold.
 
-The step is `O(N²)`, the inner estimator's own, plus nothing.
+The step costs what the step of the inner estimator costs, which is `O(N²)`. The composite adds no cost.
 
-`ce.mp` reads no observation that a moment and a count cannot stand in for, with one exception: an `mp.alg` of a caller's own is handed the whole sample, and [`assert_shape_only_matrix_processing`](@ref) refuses it here, at the fold, rather than at `cov(ce)` with no data, where the rows would already be gone.
+`ce.mp` needs only a moment and a count, with one exception. An `mp.alg` of the caller gets the whole sample. [`assert_shape_only_matrix_processing`](@ref) refuses it at the fold. The refusal cannot wait until `cov(ce)` with no data, because the rows are gone at that time.
 
 # Algorithm
 
  1. Refuse an `mp` that does not run from the shape of the sample, with [`assert_shape_only_matrix_processing`](@ref).
- 2. Rebind `ce.ce` to the estimator [`partial_fit!`](@ref) gives, with `Accessors.@reset`.
+ 2. Rebuild `ce` with the estimator that [`partial_fit!`](@ref) returns in `ce.ce`, through [`rebuild_estimator`](@ref).
 
 # Arguments
 
   - $(arg_dict[:ce])
   - $(arg_dict[:X])
-  - `x`: One observation, whose entries are the assets.
+  - `x`: One observation, with one entry for each asset.
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments, forwarded to `ce.ce`.
+  - `kwargs...`: More keyword arguments for `ce.ce`.
 
 # Validation
 
@@ -457,7 +497,7 @@ The step is `O(N²)`, the inner estimator's own, plus nothing.
 
 # Returns
 
-  - `ce`: The composite, with `ce.ce` rebound to the estimator carrying the state after the last observation.
+  - `ce`: The composite. Its `ce.ce` is the estimator that holds the state after the last observation.
 
 # Related
 
@@ -470,49 +510,57 @@ The step is `O(N²)`, the inner estimator's own, plus nothing.
 function partial_fit!(ce::PortfolioOptimisersCovariance{<:Any, <:Any, Nothing}, X::MatNum;
                       dims::Int = 1, kwargs...)
     assert_shape_only_matrix_processing(ce.mp)
-    return Accessors.@reset ce.ce = partial_fit!(ce.ce, X; dims = dims, kwargs...)
+    inner = partial_fit!(ce.ce, X; dims = dims, kwargs...)
+    return inner === ce.ce ? ce : rebuild_estimator(ce, (; ce = inner))
 end
 function partial_fit!(ce::PortfolioOptimisersCovariance{<:Any, <:Any, Nothing}, x::VecNum;
                       kwargs...)
     assert_shape_only_matrix_processing(ce.mp)
-    return Accessors.@reset ce.ce = partial_fit!(ce.ce, x; kwargs...)
+    inner = partial_fit!(ce.ce, x; kwargs...)
+    return inner === ce.ce ? ce : rebuild_estimator(ce, (; ce = inner))
 end
 """
     Statistics.cov(ce::PortfolioOptimisersCovariance{<:Any, <:Any, Nothing}; kwargs...)
     Statistics.cor(ce::PortfolioOptimisersCovariance{<:Any, <:Any, Nothing}; kwargs...)
 
-Reads the covariance, or the correlation, a folded [`PortfolioOptimisersCovariance`](@ref) has accumulated.
+Reads the covariance or the correlation that a folded [`PortfolioOptimisersCovariance`](@ref) holds.
 
-The method that makes the estimate from the composition fold, `cov(ce)` or `cor(ce)` with no data. `ce.ce` answers its own folded matrix, and `ce.mp` is applied to it from the **shape** of the sample: [`observation_count`](@ref) reads the number of observations folded off the inner state, and it is exactly the `size(X, 1)` the matrix arm of [`matrix_processing!`](@ref) would have read, `NaN` rows included. The substitution is therefore an identity, not an approximation, and this method answers what a batch fit over the same observations answers.
+This method makes the estimate from the fold by composition. It is `cov(ce)` or `cor(ce)` with no data. `ce.ce` returns its own folded matrix. Then the method applies `ce.mp` to that matrix from the shape of the sample. [`effective_observation_count`](@ref) reads the effective number of folded observations from the inner state. That number is the same count that the batch fit reads from [`processing_observation_count`](@ref), so the substitution is an identity and not an approximation. This method returns the same result as a batch fit over the same observations. A windowed `ce.ce` under a [`SeedWindow`](@ref) counts the rows that its window kept on both routes.
 
-The matrix the inner estimator returns is copied when it is immutable, because the processing writes in place, exactly as the matrix methods beside this one do.
+The method reads the count only when [`matrix_processing_reads_count`](@ref) answers `true`, which is when `ce.mp` denoises. So the default `mp`, which only repairs the matrix, works over an inner state that records no count.
+
+If the matrix of the inner estimator is immutable, the method copies it, because the processing writes in place. The matrix methods of this file do the same.
 
 # Algorithm
 
- 1. Read the inner estimator's folded matrix with the one-argument `Statistics.cov` or `Statistics.cor`.
+ 1. Read the folded matrix of the inner estimator with the one-argument `Statistics.cov` or `Statistics.cor`.
  2. Copy it into a `Matrix` when it is immutable.
- 3. Apply `ce.mp` in place through the shape arm of [`matrix_processing_block!`](@ref), with `T` from [`observation_count`](@ref) and `N` from the matrix. It is the block arm rather than the plain one because a fold over a changing universe answers `NaN` for an asset outside the Coverage Universe, exactly as the [`AssetPanel`](@ref) methods beside it do; a complete matrix costs nothing extra.
- 4. Return the matrix.
+ 3. Take `T` from [`effective_observation_count`](@ref) when [`matrix_processing_reads_count`](@ref) answers `true`, and `nothing` otherwise.
+ 4. Apply `ce.mp` in place through the shape method of [`matrix_processing_block!`](@ref), with `T` and with `N` from the matrix. The method uses the block form, because a fold over a changing universe returns `NaN` for an asset outside the Coverage Universe. The [`AssetPanel`](@ref) methods of this file do the same. A complete matrix costs nothing more.
+ 5. Return the matrix.
 
 # Arguments
 
   - $(arg_dict[:ce])
-  - `kwargs...`: Additional keyword arguments, forwarded to `ce.ce`.
+  - `kwargs...`: More keyword arguments for `ce.ce`.
 
 # Validation
 
-  - `ce.ce` carries a partial-fit state. An `ArgumentError` is thrown otherwise.
+  - `ce.ce` holds a partial-fit state. An `ArgumentError` is thrown otherwise.
   - `ce.mp` runs from the shape of the sample, as [`assert_shape_only_matrix_processing`](@ref) states. An `ArgumentError` is thrown otherwise.
+  - When `ce.mp` reads the count, the state of `ce.ce` records one, as [`effective_observation_count`](@ref) states. An `ArgumentError` is thrown otherwise.
 
 # Returns
 
-  - `sigma::MatNum`: The processed covariance matrix, or `rho`, the processed correlation matrix.
+  - `sigma::MatNum`: The processed covariance matrix, or the processed correlation matrix `rho`.
 
 # Related
 
   - [`PortfolioOptimisersCovariance`](@ref)
   - [`partial_fit!`](@ref)
+  - [`effective_observation_count`](@ref)
   - [`observation_count`](@ref)
+  - [`matrix_processing_reads_count`](@ref)
   - [`matrix_processing!`](@ref)
 """
 function Statistics.cov(ce::PortfolioOptimisersCovariance{<:Any, <:Any, Nothing}; kwargs...)
@@ -520,8 +568,14 @@ function Statistics.cov(ce::PortfolioOptimisersCovariance{<:Any, <:Any, Nothing}
     if !ismutable(sigma)
         sigma = Matrix(sigma)
     end
-    matrix_processing_block!(ce.mp, sigma, observation_count(ce.ce), size(sigma, 1);
-                             kwargs...)
+    # The count is read only when a step reads it, so the default `mp` works over a state
+    # that records no count. It reads the keywords of the read of `ce.ce`.
+    T = if matrix_processing_reads_count(ce.mp)
+        effective_observation_count(ce.ce; kwargs...)
+    else
+        nothing
+    end
+    matrix_processing_block!(ce.mp, sigma, T, size(sigma, 1); kwargs...)
     return sigma
 end
 function Statistics.cor(ce::PortfolioOptimisersCovariance{<:Any, <:Any, Nothing}; kwargs...)
@@ -529,16 +583,21 @@ function Statistics.cor(ce::PortfolioOptimisersCovariance{<:Any, <:Any, Nothing}
     if !ismutable(rho)
         rho = Matrix(rho)
     end
-    matrix_processing_block!(ce.mp, rho, observation_count(ce.ce), size(rho, 1); kwargs...)
+    T = if matrix_processing_reads_count(ce.mp)
+        effective_observation_count(ce.ce; kwargs...)
+    else
+        nothing
+    end
+    matrix_processing_block!(ce.mp, rho, T, size(rho, 1); kwargs...)
     return rho
 end
 """
     Statistics.cov(ce::PortfolioOptimisersCovariance{<:Any, <:Any, <:SampleBufferState})
     Statistics.cor(ce::PortfolioOptimisersCovariance{<:Any, <:Any, <:SampleBufferState})
 
-Reads the covariance, or the correlation, of a buffered [`PortfolioOptimisersCovariance`](@ref) by refitting over its buffer.
+Reads the covariance or the correlation of a buffered [`PortfolioOptimisersCovariance`](@ref) from a new fit over its buffer.
 
-The method that makes the estimate from the buffering route, which [`Online`](@ref) seeds and which an `mp.alg` of a caller's own needs. It is the batch verb over the observations the buffer kept, so it answers exactly what a batch fit over those rows answers, `mp.alg` included.
+This method makes the estimate on the buffer route. [`Online`](@ref) seeds this route, and an `mp.alg` of the caller needs it. The method runs the batch verb over the observations that the buffer kept, so it returns the same result as a batch fit over those rows, with `mp.alg`.
 
 # Arguments
 
@@ -546,11 +605,11 @@ The method that makes the estimate from the buffering route, which [`Online`](@r
 
 # Validation
 
-  - `ce` carries a [`SampleBufferState`](@ref). An `ArgumentError` is thrown otherwise.
+  - `ce` holds a [`SampleBufferState`](@ref). An `ArgumentError` is thrown otherwise.
 
 # Returns
 
-  - `sigma::MatNum`: The processed covariance matrix, or `rho`, the processed correlation matrix.
+  - `sigma::MatNum`: The processed covariance matrix, or the processed correlation matrix `rho`.
 
 # Related
 
@@ -571,9 +630,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`PortfolioOptimisersCovariance`](@ref) method of [`supports_partial_fit`](@ref).
+Answers whether [`partial_fit!`](@ref) folds a [`PortfolioOptimisersCovariance`](@ref).
 
-The composite folds by composition, so it folds exactly when both of its halves allow it: the inner estimator must fold, and `mp` must run from the shape of the sample, as [`supports_shape_processing`](@ref) states. A [`MatrixProcessing`](@ref) passes when it carries no sample-reading `alg`, and a matrix processing estimator of a caller never passes. A composite a wrapper has given a buffer folds whatever those two say, which is the default and is what makes an `mp.alg` reachable online at all.
+The composite folds by composition, so it folds exactly when the inner estimator folds and `mp` runs from the shape of the sample, as [`supports_shape_processing`](@ref) states. A [`MatrixProcessing`](@ref) passes when it has no `alg` that reads the sample. A matrix processing estimator of the caller never passes. A composite that a wrapper gave a buffer folds in all cases. This is the default buffer route of [`supports_partial_fit`](@ref), and it is the only route that lets an `mp.alg` run online.
 
 # Arguments
 
@@ -592,6 +651,44 @@ The composite folds by composition, so it folds exactly when both of its halves 
 function supports_partial_fit(ce::PortfolioOptimisersCovariance)
     return isa(ce.cache, SampleBufferState) ||
            (supports_shape_processing(ce.mp) && supports_partial_fit(ce.ce))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`PortfolioOptimisersCovariance`](@ref) method of [`observation_count`](@ref), for a composite whose own `cache` is `nothing`.
+
+The composite then folds through `ce.ce` and keeps no state of its own, so the method reads the count of `ce.ce`. A composite whose `cache` holds a [`SampleBufferState`](@ref) reads the count of its buffer through the generic method instead.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+
+# Validation
+
+  - `ce.ce` holds a partial-fit state with a count, as [`observation_count`](@ref) states. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `n::Integer`: The number of observations that `ce.ce` folded.
+
+# Related
+
+  - [`observation_count`](@ref)
+  - [`PortfolioOptimisersCovariance`](@ref)
+"""
+function observation_count(ce::PortfolioOptimisersCovariance{<:Any, <:Any, Nothing})
+    return observation_count(ce.ce)
+end
+# The composite passes `X` to `ce.ce` without change, and with no state of its own it folds
+# through `ce.ce`, so both forms read `ce.ce`. A nested composite then reads the innermost
+# weights.
+function effective_observation_count(ce::PortfolioOptimisersCovariance, X::MatNum;
+                                     kwargs...)
+    return effective_observation_count(ce.ce, X; kwargs...)
+end
+function effective_observation_count(ce::PortfolioOptimisersCovariance{<:Any, <:Any,
+                                                                       Nothing}; kwargs...)
+    return effective_observation_count(ce.ce; kwargs...)
 end
 
 export PortfolioOptimisersCovariance

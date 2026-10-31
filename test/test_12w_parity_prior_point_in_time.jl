@@ -33,8 +33,10 @@ end
 function PortfolioOptimisers.prior(pe::ScaledWeightsPrior, X::PortfolioOptimisers.MatNum,
                                    args...; kwargs...)
     pr = prior(pe.pe, X, args...; kwargs...)
+    # A constant multiple of the weights moves no Kish count, so the counts of the moments
+    # forward with the new weights.
     return PortfolioOptimisers.forward_prior(pr; w = pweights(pe.s .* pr.w.values),
-                                             ens = nothing, kld = nothing)
+                                             ens = nothing, eoc = pr.eoc, kld = nothing)
 end
 
 @testset "The prior on a point-in-time panel, at parity (#1384)" begin
@@ -45,11 +47,10 @@ end
                "style2" => mpass("style2")]
     pe = EmpiricalPrior(; me = ExpWeightedExpectedReturns(),
                         ce = RegimeAdjustedExpWeightedCovariance(; centring = PreCentred(),
-                                                                 debias = RawStatistic(),
+                                                                 debias = nothing,
                                                                  regime_lohi_mult = (0.7,
                                                                                      1.6)))
-    ve = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(),
-                                           debias = RawStatistic(),
+    ve = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(), debias = nothing,
                                            regime_lohi_mult = (0.7, 1.6), min_val = 0.0)
     est(; kw...) = CrossSectionalFactorPrior(; lambda = 1, factors = factors, pe = pe,
                                              ve = ve, kw...)
@@ -243,7 +244,11 @@ end
         @test isequal(pc.fpr.X, prs.fpr.X[(end - 29):end, :])
         @test isequal(pc.o_X, prs.o_X[(end - 29):end, :])
         @test isequal(pc.mu, prs.mu) && isequal(pc.sigma, prs.sigma)
-        @test pc.ens == size(prs.X, 1)
+        # The cap states the counts of the moments, which read every observation of the
+        # fit. The default estimators are exponentially weighted, so each count is the Kish
+        # count of their weights, below the number of observations (#1893).
+        @test pc.eoc == prs.eoc
+        @test all(c -> c < size(prs.X, 1), pc.eoc)
     end
 
     @testset "The scenario weights are divided by their sum (#1509)" begin
@@ -369,7 +374,7 @@ end
         # leaves the whole history cold.
         rows(T) = PO.port_opt_view(fxs.rd, 1:T, :)
         ve60 = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(),
-                                                 debias = RawStatistic(),
+                                                 debias = nothing,
                                                  regime_lohi_mult = (0.7, 1.6),
                                                  min_val = 0.0, min_obs = 60)
         @test_throws PO.IsNonFiniteError prior(est(; minra = 5), rows(40))

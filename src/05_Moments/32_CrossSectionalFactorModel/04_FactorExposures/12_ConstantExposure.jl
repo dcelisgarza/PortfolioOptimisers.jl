@@ -72,11 +72,11 @@ Compute the constant Factor Exposure of a [`ReturnsResult`](@ref).
 # Arguments
 
   - `xe`: Constant Exposure Estimator.
-  - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
+  - $(arg_dict[:rd]) With no Asset Panel in `rd.pnl`, the function reads the mask-only panel of [`returns_with_universe`](@ref).
 
 # Validation
 
-  - `rd.pnl` is an [`AssetPanel`](@ref). Raises an [`IsNothingError`](@ref).
+  - `rd.pnl` is an [`AssetPanel`](@ref), or `rd.X` is not `nothing`. Raises an [`IsNothingError`](@ref).
 
 # Returns
 
@@ -103,9 +103,9 @@ julia> factor_exposure(ConstantExposure(), rd)
   - [`exposure_active_fill!`](@ref)
 """
 function factor_exposure(::ConstantExposure, rd::ReturnsResult)::Matrix{<:Real}
-    pnl = rd.pnl
+    pnl = returns_with_universe(rd).pnl
     @argcheck(!isnothing(pnl),
-              IsNothingError("a constant Factor Exposure takes its shape from the active mask of an Asset Panel, and rd.pnl is nothing. Build the ReturnsResult with the `pnl` that asset_panel returns."))
+              IsNothingError("a constant Factor Exposure takes its shape from the active mask of an Asset Panel, and rd holds neither a panel nor asset returns. Build the ReturnsResult with its returns, or with the `pnl` that asset_panel returns."))
     L = ones(float_if_integer(eltype(rd.X)), size(pnl.amsk))
     exposure_active_fill!(L, pnl)
     return L

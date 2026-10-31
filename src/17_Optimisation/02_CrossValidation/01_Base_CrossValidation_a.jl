@@ -11,17 +11,6 @@ Abstract supertype for all cross-validation result types.
 """
 abstract type CrossValidationResult <: AbstractResult end
 """
-$(DocStringExtensions.TYPEDEF)
-
-Abstract supertype for all cross-validation algorithm types.
-
-# Related
-
-  - [`CrossValidationEstimator`](@ref)
-  - [`CrossValidationResult`](@ref)
-"""
-abstract type CrossValidationAlgorithm <: AbstractAlgorithm end
-"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Give a split result back unchanged.
@@ -41,7 +30,7 @@ function Base.split(res::CrossValidationResult, args...)
     return res
 end
 """
-    CVER = Union{<:CVE_Onl, <:CrossValidationResult}
+    CVER = Union{CVE_Onl, CrossValidationResult}
 
 Union of all cross-validation schemes, plain or online, and result types.
 
@@ -50,7 +39,7 @@ Union of all cross-validation schemes, plain or online, and result types.
   - [`CVE_Onl`](@ref)
   - [`CrossValidationResult`](@ref)
 """
-const CVER = Union{<:CVE_Onl, <:CrossValidationResult}
+const CVER = Union{CVE_Onl, CrossValidationResult}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -142,21 +131,6 @@ function n_splits(res::OptimisationCrossValidationResult, ::Prices_RR)
     return n_splits(res)
 end
 """
-    OptCVER
-
-Union of all optimisation cross-validation estimators and results.
-
-# Related
-
-  - [`OptimisationCrossValidationEstimator`](@ref)
-  - [`OptimisationCrossValidationResult`](@ref)
-  - [`NonSeqCVER`](@ref)
-  - [`SeqCVER`](@ref)
-"""
-const OptCVER = Union{<:OptimisationCrossValidationEstimator,
-                      <:OptimisationCrossValidationResult}
-
-"""
     NonSeqCVER
 
 Union of all non-sequential cross-validation estimators and results.
@@ -170,8 +144,8 @@ Union of all non-sequential cross-validation estimators and results.
   - [`SeqCVER`](@ref)
   - [`folds_are_time_ordered`](@ref)
 """
-const NonSeqCVER = Union{<:NonSequentialCrossValidationEstimator,
-                         <:NonSequentialCrossValidationResult}
+const NonSeqCVER = Union{NonSequentialCrossValidationEstimator,
+                         NonSequentialCrossValidationResult}
 """
     SeqCVER
 
@@ -183,8 +157,7 @@ Union of all sequential cross-validation estimators and results.
   - [`SequentialCrossValidationResult`](@ref)
   - [`NonSeqCVER`](@ref)
 """
-const SeqCVER = Union{<:SequentialCrossValidationEstimator,
-                      <:SequentialCrossValidationResult}
+const SeqCVER = Union{SequentialCrossValidationEstimator, SequentialCrossValidationResult}
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -272,12 +245,19 @@ cv_timestamps(pr::AbstractPricesResult) = TimeSeries.timestamp(pr.X)
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for cross-validation estimators used in non-optimisation contexts
-(e.g. resampling for hierarchical clustering or phylogeny methods).
+Abstract supertype for the cross-validation schemes that the `cv` field of a meta-optimiser does
+not take.
+
+The `cv` field of [`NestedClustered`](@ref) and [`Stacking`](@ref) is bound to [`OptCVE_Onl`](@ref), so a scheme of this
+branch reaches an optimiser through [`cross_val_predict`](@ref). [`MultipleRandomised`](@ref) is the one
+member. It draws random asset subsets, applies an inner walk-forward to each, and backtests an
+optimiser on every path.
 
 # Related
 
   - [`CrossValidationEstimator`](@ref)
+  - [`NonOptimisationSequentialCrossValidationEstimator`](@ref)
+  - [`NonOptimisationCrossValidationResult`](@ref)
 """
 abstract type NonOptimisationCrossValidationEstimator <: CrossValidationEstimator end
 """
@@ -296,20 +276,6 @@ abstract type NonOptimisationSequentialCrossValidationEstimator <:
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for non-sequential non-optimisation cross-validation estimators. A
-non-sequential scheme makes folds that are not a timeline, such as randomly sampled or
-combinatorial folds.
-
-# Related
-
-  - [`NonOptimisationCrossValidationEstimator`](@ref)
-  - [`NonOptimisationNonSequentialCrossValidationResult`](@ref)
-"""
-abstract type NonOptimisationNonSequentialCrossValidationEstimator <:
-              NonOptimisationCrossValidationEstimator end
-"""
-$(DocStringExtensions.TYPEDEF)
-
 Abstract supertype for result types produced by non-optimisation cross-validation
 routines.
 
@@ -318,7 +284,6 @@ routines.
   - [`CrossValidationResult`](@ref)
   - [`NonOptimisationCrossValidationEstimator`](@ref)
   - [`NonOptimisationSequentialCrossValidationResult`](@ref)
-  - [`NonOptimisationNonSequentialCrossValidationResult`](@ref)
 """
 abstract type NonOptimisationCrossValidationResult <: CrossValidationResult end
 """
@@ -333,6 +298,24 @@ Abstract supertype for sequential non-optimisation cross-validation result types
 """
 abstract type NonOptimisationSequentialCrossValidationResult <:
               NonOptimisationCrossValidationResult end
+# The non-sequential pair below is the empty cell of the non-optimisation branch. No scheme
+# subtypes it yet. A future twin of `MultipleRandomised` over a `KFold` or a combinatorial inner
+# scheme, whose folds are not a timeline, can uncomment the pair and subtype it (#1873).
+#=
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for non-sequential non-optimisation cross-validation estimators. A
+non-sequential scheme makes folds that are not a timeline, such as randomly sampled or
+combinatorial folds.
+
+# Related
+
+  - [`NonOptimisationCrossValidationEstimator`](@ref)
+  - [`NonOptimisationNonSequentialCrossValidationResult`](@ref)
+"""
+abstract type NonOptimisationNonSequentialCrossValidationEstimator <:
+              NonOptimisationCrossValidationEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -345,6 +328,7 @@ Abstract supertype for non-sequential non-optimisation cross-validation result t
 """
 abstract type NonOptimisationNonSequentialCrossValidationResult <:
               NonOptimisationCrossValidationResult end
+=#
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -647,7 +631,8 @@ function warn_ruined_members(::Nothing, ::Nothing, ::Integer)::Nothing
 end
 function warn_ruined_members(::Nothing, ruined::VecInt, n::Integer)::Nothing
     if !isempty(ruined)
-        @warn "the drifted wealth of $(length(ruined)) of $(n) population member(s) is not positive, so their held weights are `NaN` and their members are dropped: $(ruined)"
+        @warn("the drifted wealth of $(length(ruined)) of $(n) population member(s) is not positive, so their held weights are `NaN` and their members are dropped: $(ruined)",
+              maxlog = log_limit(:warn), _id = @log_id())
     end
     return nothing
 end
@@ -1290,7 +1275,7 @@ function rolling_window_measure(r::BaseRM_VecBaseRM, mpred::MultiPeriodPredictio
     return rolling_window_measure(r, mpred.mrd.X, window; kwargs...)
 end
 """
-    PredRes_MultiPredRes = Union{<:PredictionResult, <:MultiPeriodPredictionResult}
+    PredRes_MultiPredRes = Union{PredictionResult, MultiPeriodPredictionResult}
 
 Alias for a single-fold or multi-period prediction result.
 
@@ -1302,7 +1287,7 @@ Matches either a [`PredictionResult`](@ref) or a [`MultiPeriodPredictionResult`]
   - [`MultiPeriodPredictionResult`](@ref)
   - [`VecPredRes_MultiPredRes`](@ref)
 """
-const PredRes_MultiPredRes = Union{<:PredictionResult, <:MultiPeriodPredictionResult}
+const PredRes_MultiPredRes = Union{PredictionResult, MultiPeriodPredictionResult}
 """
     VecPredRes_MultiPredRes = AbstractVector{<:PredRes_MultiPredRes}
 

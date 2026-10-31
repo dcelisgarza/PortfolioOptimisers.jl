@@ -495,6 +495,36 @@
         # step with split.
         @test PortfolioOptimisers.walk_forward_date_range(rd.ts, Month(1), Day(-10),
                                                           identity)[1] < rd.ts[1]
+        # It also moves the end of the range forward, so an anchor in the ten days after the
+        # last timestamp shifts back into the data. Here 2021-03-01 becomes 2021-02-19. A range
+        # that stops at the last timestamp loses that date and ends at 2021-01-22. So does a
+        # shift by range arithmetic, `(2020-12-22):Month(1):(2021-02-19)`, whose month step
+        # passes 2021-02-19 at 2021-02-22. The offset must move each date.
+        ts_end = Date(2021, 1, 1):Day(1):Date(2021, 2, 25)
+        @test collect(PortfolioOptimisers.walk_forward_date_range(ts_end, Month(1),
+                                                                  Day(-10), identity)) ==
+              [Date(2020, 12, 22), Date(2021, 1, 22), Date(2021, 2, 19)]
+        # Under a fixed step and a fixed offset, the shift stays a range and moves each date.
+        r_fixed = PortfolioOptimisers.walk_forward_date_range(ts_end, Week(1), Day(-3),
+                                                              identity)
+        @test r_fixed isa StepRange
+        @test collect(r_fixed) ==
+              [d - Day(3) for d in Date(2021, 1, 1):Week(1):Date(2021, 2, 28)]
+        # So the anchor of 2021-02-19, row 50, opens a fold (R7 of #1817). Under `reduce_test`
+        # it starts the last test window, which runs to the last row. Without it, the anchor
+        # closes the one test window. A range that stops at 2021-01-22 gives the one window
+        # 22:56 under `reduce_test`, and no fold without it.
+        rde = ReturnsResult(; nx = ["a", "b"], X = zeros(length(ts_end), 2),
+                            ts = collect(ts_end))
+        for previous in (false, true), train_size in (1, Day(20))
+            cv = DateWalkForward(train_size, 1; period = Month(1), period_offset = Day(-10),
+                                 previous = previous, reduce_test = true)
+            @test split(cv, rde).test_idx == [22:49, 50:56]
+            @test n_splits(cv, rde) == 2
+        end
+        cv = DateWalkForward(1, 1; period = Month(1), period_offset = Day(-10))
+        @test split(cv, rde).test_idx == [22:49]
+        @test n_splits(cv, rde) == 1
         for cv in (DateWalkForward(12, 3; period = Month(1), period_offset = Day(-10)),
                    DateWalkForward(12, 3; period = Month(1), period_offset = Day(-10),
                                    previous = true),
@@ -1033,6 +1063,14 @@
         @test PortfolioOptimisers.quantile_by_measure(ppred, MaximumDrawdown(), 0.5) isa
               MultiPeriodPredictionResult
 
+        # A single-fold member keeps itself when the population numbers it (#1912).
+        single = quiet.pred[1]
+        mixed = PopulationPredictionResult(;
+                                           pred = PortfolioOptimisers.PredRes_MultiPredRes[single,
+                                                                                           quiet])
+        @test mixed.pred[1] === single
+        @test mixed.pred[2].id == 2 && mixed.pred[2].pred === quiet.pred
+
         #=
         Issue #1250: a population built by hand from `cross_val_predict` streams numbers its
         members, so the path a scorer selects names its place instead of `nothing`.
@@ -1340,18 +1378,18 @@
         cv = IndexWalkForward(127, 171)
         eff_front = cross_val_predict(mr, rd, cv)
         @test isapprox(expected_risk(ConditionalValueatRisk(), eff_front.pred[1]),
-                       [0.024450301999433727, 0.024723562386898636, 0.025066646276899775,
-                        0.02663111818533806, 0.029764365435746204, 0.03323299305996294,
-                        0.03671242838292266, 0.04134221000889687, 0.0450895044038192,
-                        0.04832602663684721, 0.0511628965158686, 0.05340368857766957,
-                        0.05661783776523725, 0.06099862497988366, 0.06930432105395043],
+                       [0.02445046885084411, 0.02472319226792424, 0.02506586558678047,
+                        0.02663155361179255, 0.02976673052184226, 0.03323222416496702,
+                        0.036712639006072634, 0.04134317972260926, 0.045089404073354745,
+                        0.048325818464971665, 0.05116290216078244, 0.0534036724420851,
+                        0.056617886046499755, 0.06099861581582468, 0.06930432399167247],
                        rtol = 1e-6)
         @test isapprox(expected_risk(ConditionalValueatRisk(), eff_front),
-                       [0.028515793837902887, 0.02866686671424732, 0.029422544736518733,
-                        0.030690615991116957, 0.032553278762297584, 0.034629093774793916,
-                        0.03693523868040396, 0.03925372497308569, 0.04197103384502677,
-                        0.045277821913963394, 0.049019700143647246, 0.05252956796830584,
-                        0.05670666006046363, 0.06106323762304805, 0.06731010011882382],
+                       [0.028515408671007006, 0.028664636084724932, 0.029422608592514263,
+                        0.030690215512675742, 0.0325542389368768, 0.034629075757684064,
+                        0.036935240319419596, 0.0392542101735727, 0.041971441676642976,
+                        0.04527886720764179, 0.04901970961421756, 0.0525286960782263,
+                        0.0567066656523088, 0.061063231382393154, 0.0673101066787791],
                        rtol = 1e-6)
 
         # #1004: a frontier fold gives one portfolio per sweep point, and a term that reads
@@ -1535,7 +1573,9 @@
 
         gs_cv = GridSearchCrossValidation(p; r = r)
         gs_res1 = search_cross_validation(mr, gs_cv, rd)
-        rs_cv1 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r)
+        # The four sets hold 9 + 3 + 3 + 2 = 17 points. A trial count of 17 draws every
+        # point, so the randomised search scores the grid and finds the same winner.
+        rs_cv1 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r, n_iter = 17)
         rs_res1 = search_cross_validation(mr, rs_cv1, rd)
         @test gs_res1.val_grid[gs_res1.idx] == rs_res1.val_grid[rs_res1.idx]
         @test gs_res1.lens_grid[gs_res1.idx] == rs_res1.lens_grid[rs_res1.idx]
@@ -1555,7 +1595,7 @@
                                   Dict(:(opti[2]) =>
                                            [MeanRisk(; opt = opt, obj = MaximumUtility()),
                                             MeanRisk(; opt = opt, obj = MaximumRatio())])])
-        rs_cv2 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r)
+        rs_cv2 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r, n_iter = 17)
         rs_res2 = search_cross_validation(mr, rs_cv2, rd)
         rev = rs_res2.val_grid[rs_res2.idx] != rs_res1.val_grid[rs_res1.idx]
         if rev
@@ -1716,6 +1756,32 @@
         # Liveness: valid property and index paths still build working lenses.
         @test PortfolioOptimisers.parse_lens("opt.pe.ce") isa Base.Callable
         @test PortfolioOptimisers.parse_lens("a[2]") isa Base.Callable
+    end
+    @testset "Search grid keys, symbol indices and the empty grid (#1912)" begin
+        pe = PortfolioOptimisers
+        # A key reaches its field through a chain of lenses whose root is a bare symbol (`opt`),
+        # and a symbol index (`check_sol[allow_local]`) reads a field of a NamedTuple. The
+        # setting only decides whether a solution is accepted, so both candidates solve the
+        # same problem and score alike, and the winner carries the setting of its candidate.
+        sk = Solver(; name = :sk, solver = Clarabel.Optimizer,
+                    check_sol = (; allow_local = true, allow_almost = true),
+                    settings = "verbose" => false)
+        mk = MeanRisk(; opt = JuMPOptimiser(; slv = sk))
+        key = "opt.slv.check_sol[allow_local]"
+        res_k = search_cross_validation(mk,
+                                        GridSearchCrossValidation([key => [false, true]]),
+                                        rd)
+        @test res_k.val_grid == [(false,), (true,)]
+        @test size(res_k.test_scores, 2) == 2
+        @test res_k.test_scores[:, 1] == res_k.test_scores[:, 2]
+        @test res_k.opt.opt.slv.check_sol.allow_local == res_k.val_grid[res_k.idx][1]
+        @test res_k.opt.opt.slv.check_sol.allow_almost
+        # A vector of dictionaries holds only String, Symbol or Integer keys.
+        gk = GridSearchCrossValidation([Dict("opt.l1" => [0.1, 0.2])])
+        @test length(gk.p) == 1
+        @test_throws ArgumentError GridSearchCrossValidation([Dict(1.5 => [0.1, 0.2])])
+        # No grid is empty: the constructor refuses one.
+        @test_throws IsEmptyError GridSearchCrossValidation(Pair{String, Vector{Int}}[])
     end
     @testset "parse_lens recursion caps" begin
         # Same trust boundary as the equation parser (ADR 0027): an over-long / deeply
@@ -1998,7 +2064,13 @@
             @test isnothing(PO.held_weights_drift(nothing, nothing))
             @test PO.held_weights_drift(sfd, nothing) === sfd
             @test PO.held_weights_drift(sfd, dw) === sfd
-            @test PO.held_weights_drift(nothing, dw) === dw.wd
+            # The source carries no drift of its own (#1860): a scheme that drifts nothing
+            # computes the held weights under the self-financing drift, and every source
+            # without a method of its own does the same.
+            @test Base.issingletontype(DriftedWeights)
+            @test PO.held_weights_drift(nothing, dw) === SelfFinancingDrift()
+            @test PO.held_weights_drift(nothing, TargetWeights()) === SelfFinancingDrift()
+            @test PO.resolve_previous_weights_source(nothing, sfd) === DriftedWeights()
         end
         @testset "HeldWeightsResult checks the shapes of its members" begin
             X24 = [0.01 0.02; -0.01 0.03]
@@ -2305,13 +2377,13 @@
             @test PO.set_retcode(rrb, rcf).retcode === rcf
         end
         @testset "the meta results rebuild themselves" begin
-            st = StackingResult(nothing, nothing, nothing, [resj], resj, nothing,
+            st = StackingResult(nothing, nothing, nothing, [resj], resj, nothing, nothing,
                                 OptimisationSuccess(), resj.w, nothing, nothing)
             @test PO.set_retcode(st, rcf).retcode === rcf
             @test PO.set_retcode(st, rcf).w == resj.w
             nc = NestedClusteredResult(nothing, nothing, nothing, nothing, [resj], resj,
-                                       nothing, OptimisationSuccess(), resj.w, nothing,
-                                       nothing)
+                                       nothing, nothing, OptimisationSuccess(), resj.w,
+                                       nothing, nothing)
             @test PO.set_retcode(nc, rcf).retcode === rcf
             sr = SubsetResamplingResult(nothing, nothing, nothing, [resj],
                                         reshape(collect(1.0:length(resj.w)), length(resj.w),

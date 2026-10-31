@@ -1,28 +1,11 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Maximum Drawdown risk measure.
+Measures the Maximum Drawdown, the deepest fall of the uncompounded cumulative return below its running peak.
 
-`MaximumDrawdown` computes the largest peak-to-trough decline in the cumulative portfolio returns. It captures the worst-case loss from a previous high.
+The drawdown series is the one of [`absolute_drawdown_vec`](@ref): the cumulative return is a sum of the returns, and its running peak starts at ``c_0 = 0``. A first return that is negative is thus a drawdown. [`RelativeMaximumDrawdown`](@ref) takes the deepest point of the compounded drawdown series.
 
 # Mathematical definition
-
-Define the absolute drawdown series:
-
-```math
-\\begin{align}
-c_t &= \\sum_{s=1}^{t} x_s\\,, \\\\
-d_t &= c_t - \\max_{0 \\leq s \\leq t} c_s \\leq 0\\,.
-\\end{align}
-```
-
-Where:
-
-  - $(math_dict[:xret])
-  - $(math_dict[:ct])
-  - $(math_dict[:dtdd])
-
-The Maximum Drawdown is the most negative value in the drawdown series:
 
 ```math
 \\begin{align}
@@ -33,8 +16,16 @@ The Maximum Drawdown is the most negative value in the drawdown series:
 Where:
 
   - ``\\mathrm{MDD}(\\boldsymbol{x})``: Maximum drawdown.
+  - $(math_dict[:xret])
+  - $(math_dict[:dtdd]) [`absolute_drawdown_vec`](@ref) states the series.
   - $(math_dict[:T])
-  - $(math_dict[:dtdd])
+
+A path that never falls below its running peak has a Maximum Drawdown of zero. The measure is the limit of [`DrawdownatRisk`](@ref) and of [`ConditionalDrawdownatRisk`](@ref) as `alpha` falls to zero, and it is the [`WorstRealisation`](@ref) of the drawdown series. The measure takes no observation weights, because a positive weight does not change the deepest point of a series.
+
+# Algorithm
+
+ 1. Compute the drawdown series `dd` with [`absolute_drawdown_vec`](@ref).
+ 2. Return the negated minimum of `dd`.
 
 # Fields
 
@@ -69,17 +60,28 @@ MaximumDrawdown
            │     rke ┴ Bool: true
 ```
 
+On the path of [`AverageDrawdown`](@ref), the drawdown series is `[0, -0.25, -0.1875, -0.3125, 0]`.
+
+```jldoctest
+julia> x = [0.125, -0.25, 0.0625, -0.125, 0.375];
+
+julia> MaximumDrawdown()(x)
+0.3125
+```
+
 # Related
 
   - [`RiskMeasure`](@ref)
   - [`RiskMeasureSettings`](@ref)
   - [`AverageDrawdown`](@ref)
   - [`DrawdownatRisk`](@ref)
+  - [`ConditionalDrawdownatRisk`](@ref)
+  - [`WorstRealisation`](@ref)
   - [`RelativeMaximumDrawdown`](@ref)
 
 # References
 
-  - $(ref_dict[:cdar])
+  - $(ref_dict[:cdar]) Section 3.1, Definition 3.2, Equation 3.3.
 """
 @concrete struct MaximumDrawdown <: RiskMeasure
     """
@@ -101,28 +103,11 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Relative Maximum Drawdown risk measure for hierarchical optimisation.
+Measures the Relative Maximum Drawdown, the deepest fall of the compounded wealth below its running peak, as a fraction of that peak.
 
-`RelativeMaximumDrawdown` computes the maximum of the relative (compounded) drawdown series.
+The drawdown series is the one of [`relative_drawdown_vec`](@ref): the wealth compounds the returns, and its running peak starts at ``C_0 = 1``. [`MaximumDrawdown`](@ref) takes the deepest point of the uncompounded series. The compounded wealth is a product of linear functions of the weights, so the library states no JuMP formulation of the measure, and it is a [`HierarchicalRiskMeasure`](@ref).
 
 # Mathematical definition
-
-Define the relative drawdown series:
-
-```math
-\\begin{align}
-C_t &= \\prod_{s=1}^{t} (1 + x_s)\\,, \\\\
-rd_t &= \\frac{C_t}{\\max_{0 \\leq s \\leq t} C_s} - 1 \\leq 0\\,.
-\\end{align}
-```
-
-Where:
-
-  - $(math_dict[:xret])
-  - $(math_dict[:Ct])
-  - $(math_dict[:rdt])
-
-The Relative Maximum Drawdown is:
 
 ```math
 \\begin{align}
@@ -133,8 +118,18 @@ The Relative Maximum Drawdown is:
 Where:
 
   - ``\\mathrm{RMDD}(\\boldsymbol{x})``: Relative maximum drawdown.
+  - $(math_dict[:xret])
+  - $(math_dict[:rdt]) [`relative_drawdown_vec`](@ref) states the series.
   - $(math_dict[:T])
-  - $(math_dict[:rdt])
+
+The measure is the limit of [`RelativeConditionalDrawdownatRisk`](@ref) as `alpha` falls to zero. It is never above one when every return is above ``-1``, because the wealth then stays positive.
+
+Section 3 of [cdar](@cite) defines the drawdown of the uncompounded cumulative return only. It names the relative drawdown and states that it lacks the properties of the absolute drawdown, but it defines no measure on it. The deepest point of the relative drawdown series is the library's extension of that work.
+
+# Algorithm
+
+ 1. Compute the relative drawdown series `dd` with [`relative_drawdown_vec`](@ref).
+ 2. Return the negated minimum of `dd`.
 
 # Fields
 
@@ -167,16 +162,26 @@ RelativeMaximumDrawdown
            │   scale ┴ Float64: 1.0
 ```
 
+On the path of [`AverageDrawdown`](@ref), the deepest point of the compounded wealth is 30.27 % below its peak, which is less than the 0.3125 of the uncompounded series.
+
+```jldoctest
+julia> x = [0.125, -0.25, 0.0625, -0.125, 0.375];
+
+julia> RelativeMaximumDrawdown()(x)
+0.302734375
+```
+
 # Related
 
   - [`HierarchicalRiskMeasure`](@ref)
   - [`HierarchicalRiskMeasureSettings`](@ref)
   - [`MaximumDrawdown`](@ref)
   - [`RelativeAverageDrawdown`](@ref)
+  - [`RelativeConditionalDrawdownatRisk`](@ref)
 
 # References
 
-  - $(ref_dict[:cdar])
+  - $(ref_dict[:cdar]) Section 3, Equation 3.2.
 """
 @concrete struct RelativeMaximumDrawdown <: HierarchicalRiskMeasure
     """

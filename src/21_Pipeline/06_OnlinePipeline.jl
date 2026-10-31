@@ -60,7 +60,7 @@ $(DocStringExtensions.FIELDS)
   - [`AbstractPartialFitState`](@ref)
   - [`Online`](@ref)
   - [`vcat_observations`](@ref)
-  - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref)
+  - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{PipelineBufferState, ReturnsBufferState}}}, data::Prices_RR)`](@ref)
 """
 @concrete struct PipelineBufferState <: AbstractPartialFitState
     """
@@ -224,10 +224,10 @@ A universe-only step folds nothing. In `fit(pipe)` with no data its batch verb r
 # Related
 
   - [`AbstractAssetSelector`](@ref)
-  - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref)
+  - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{PipelineBufferState, ReturnsBufferState}}}, data::Prices_RR)`](@ref)
 """
-is_universe_step(::Any) = false
-is_universe_step(::AbstractAssetSelector) = true
+is_universe_step(::Any)::Bool = false
+is_universe_step(::AbstractAssetSelector)::Bool = true
 """
     is_row_owner(est) -> Bool
 
@@ -239,9 +239,9 @@ A prior estimator can, and so can an optimisation step of any form, a schedule i
 
   - [`pipeline_row_owner`](@ref)
 """
-is_row_owner(::Any) = false
-is_row_owner(::AbstractPriorEstimator) = true
-is_row_owner(::Union{<:OptE_Opt, <:TD_OptE_Opt}) = true
+is_row_owner(::Any)::Bool = false
+is_row_owner(::AbstractPriorEstimator)::Bool = true
+is_row_owner(::Union{OptE_Opt, TD_OptE_Opt})::Bool = true
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -257,7 +257,7 @@ A prior step owns the rows when one exists, because [`inject_context`](@ref) rep
 # Related
 
   - [`is_row_owner`](@ref)
-  - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref)
+  - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{PipelineBufferState, ReturnsBufferState}}}, data::Prices_RR)`](@ref)
 """
 function pipeline_row_owner(p::Pipeline)
     k = findfirst(step -> isa(step_estimator(step), AbstractPriorEstimator), p.steps)
@@ -349,7 +349,7 @@ The refusal of a capped owner on the fold route reads this cap. A cap on the own
 step_online_cap(::Any) = nothing
 step_online_cap(o::Online) = o.max_history
 step_online_cap(ps::PipelineStep) = step_online_cap(ps.est)
-function step_online_cap(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator})
+function step_online_cap(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator})
     for f in estimator_fields(est)
         cap = step_online_cap(getfield(est, f))
         if !isnothing(cap)
@@ -560,14 +560,12 @@ A wrapper step becomes the estimator that it wraps, with a seeded buffer. The me
 """
 update_online_step(step) = step
 update_online_step(o::Online) = update_online_estimator(o)
-function update_online_step(est::Union{<:AbstractEstimator,
-                                       <:StatsBase.CovarianceEstimator})
+function update_online_step(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator})
     return update_online_estimator(est)
 end
 function update_online_step(ps::PipelineStep)
     return PipelineStep(update_online_step(ps.est), ps.reads, ps.writes, ps.target)
 end
-update_online_step(ps::PipelineStep{<:Function}) = ps
 """
     update_online_estimator(p::Pipeline)
 
@@ -614,13 +612,12 @@ The method rebuilds a [`PipelineStep`](@ref) around its copied estimator, and co
   - [`update_online_step`](@ref)
 """
 copy_step_states(step) = step
-function copy_step_states(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator})
+function copy_step_states(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator})
     return copy_states(est)
 end
 function copy_step_states(ps::PipelineStep)
     return PipelineStep(copy_step_states(ps.est), ps.reads, ps.writes, ps.target)
 end
-copy_step_states(ps::PipelineStep{<:Function}) = ps
 """
     held_timestamps(p::Pipeline)
 
@@ -712,7 +709,7 @@ function assert_pipeline_entry(r::PipelineResume, cv)
     return nothing
 end
 """
-    partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)
+    partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{PipelineBufferState, ReturnsBufferState}}}, data::Prices_RR)
 
 Folds a block of observations into a [`Pipeline`](@ref), without a fit.
 
@@ -760,8 +757,8 @@ On the fold route:
   - [`update_online_estimator(p::Pipeline)`](@ref)
 """
 function partial_fit!(pipe::Pipeline{<:Any, <:Any,
-                                     <:Option{<:Union{<:PipelineBufferState,
-                                                      <:ReturnsBufferState}}},
+                                     <:Option{<:Union{PipelineBufferState,
+                                                      ReturnsBufferState}}},
                       data::Prices_RR)
     return fold_pipeline(pipe, pipe.cache, data)
 end
@@ -769,13 +766,13 @@ end
     fold_pipeline(pipe::Pipeline, cache::PipelineBufferState, data::Prices_RR)
     fold_pipeline(pipe::Pipeline, cache::Option{<:ReturnsBufferState}, data::Prices_RR)
 
-The two routes of [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref), selected by dispatch on the state that the Pipeline carries.
+The two routes of [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{PipelineBufferState, ReturnsBufferState}}}, data::Prices_RR)`](@ref), selected by dispatch on the state that the Pipeline carries.
 
 A buffer of the input data appends the block. A Fold Context, or no state, walks the steps. The steps and the refusals are those of the verb.
 
 # Related
 
-  - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref)
+  - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{PipelineBufferState, ReturnsBufferState}}}, data::Prices_RR)`](@ref)
   - [`PipelineBufferState`](@ref)
   - [`ReturnsBufferState`](@ref)
 """
@@ -848,7 +845,7 @@ For a prior owner:
 
 # Related
 
-  - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref)
+  - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{PipelineBufferState, ReturnsBufferState}}}, data::Prices_RR)`](@ref)
   - [`assert_online_owner`](@ref)
   - [`fold_prior`](@ref)
   - [`fold_context`](@ref)
@@ -903,7 +900,7 @@ Under `Online(pipe)`, `fit(pipe)` with no data is `fit(pipe, buffer)`, the batch
 
 # Related
 
-  - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref)
+  - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{PipelineBufferState, ReturnsBufferState}}}, data::Prices_RR)`](@ref)
   - [`fit_data_step_from_state`](@ref)
   - [`returns_result`](@ref)
   - [`fit`](@ref)
@@ -1100,12 +1097,12 @@ function view_owner(est, idx, n::Integer, ctx::PipelineContext)
     return port_opt_view(est, idx, ctx.returns.X)
 end
 """
-    pipeline_fold_fit(pipe::Pipeline, data::Prices_RR, train_idx::VecInt, cols = :)
-    pipeline_fold_fit(pipe::Pipeline, data::Prices_RR, ::Nothing, cols = :)
+    pipeline_fold_fit(pipe::AbstractPipelineEstimator, data::Prices_RR, train_idx::VecInt, cols = :)
+    pipeline_fold_fit(pipe::AbstractPipelineEstimator, data::Prices_RR, ::Nothing, cols = :)
 
-The fit of one fold of a [`Pipeline`](@ref), by whether the fold carries a training window.
+The fit of one fold of a pipeline, by whether the fold carries a training window.
 
-This is the pipeline form of [`fit_fold_result`](@ref). A window fits the workflow over it, `fit(pipe, data[train_idx])`, which is the refit that every fold of the batch arms runs. `nothing` means that the pipeline holds its window, because the online arm of [`fold_loop`](@ref) folded every row of it. The fold then reads the pipeline out through `fit(pipe)` with no data.
+This is the pipeline form of [`fit_fold_result`](@ref). A window fits the workflow over it, `fit(pipe, data[train_idx])`, which is the refit that every fold of the batch arms runs. `nothing` means that the pipeline holds its window, because the online arm of [`fold_loop`](@ref) folded every row of it. The fold then reads the pipeline out through `fit(pipe)` with no data. The two methods call only `fit`, so they serve every [`AbstractPipelineEstimator`](@ref). The second method needs `fit(pipe)`, which only a pipeline that holds a partial-fit state implements.
 
 # Related
 
@@ -1113,10 +1110,12 @@ This is the pipeline form of [`fit_fold_result`](@ref). A window fits the workfl
   - [`fit(pipe::Pipeline)`](@ref)
   - [`cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CVER)`](@ref)
 """
-function pipeline_fold_fit(pipe::Pipeline, data::Prices_RR, train_idx::VecInt, cols = :)
+function pipeline_fold_fit(pipe::AbstractPipelineEstimator, data::Prices_RR,
+                           train_idx::VecInt, cols = :)
     return StatsAPI.fit(pipe, pipeline_data_view(data, train_idx, cols))
 end
-function pipeline_fold_fit(pipe::Pipeline, ::Prices_RR, ::Nothing, ::Any = :)
+function pipeline_fold_fit(pipe::AbstractPipelineEstimator, ::Prices_RR, ::Nothing,
+                           ::Any = :)
     return StatsAPI.fit(pipe)
 end
 """

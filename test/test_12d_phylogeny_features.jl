@@ -19,7 +19,7 @@ function proxmat(ape, rdx, Xm)
                                            "proximity").vals
 end
 @testset "phylogeny_features: the two kernels" begin
-    Zb = phylogeny_features(Proximity(; decay = NoDecay()), NTE, rd.X)
+    Zb = phylogeny_features(Proximity(; decay = nothing), NTE, rd.X)
     Zg = phylogeny_features(Proximity(), NTE, rd.X)
     Zc = phylogeny_features(Proximity(), CLE, rd.X)
 
@@ -31,7 +31,7 @@ end
     end
 
     # The retirement gate. `BinaryNeighbourhood` *was* `phylogeny_matrix` with the diagonal
-    # restored, so checking `NoDecay` against that expression is the retired type's own
+    # restored, so checking `decay = nothing` against that expression is the retired type's own
     # implementation, not a paraphrase of it -- a flat decay under a budget that still cuts
     # is an indicator, which is exactly what the deleted member produced.
     @test Zb == Matrix{Float64}(phylogeny_matrix(NTE, rd.X).X) + I
@@ -39,7 +39,7 @@ end
     # And it is the budget doing the cutting, not the decay: no decay emits a zero, yet the
     # matrix is full of them.
     @test any(iszero, Zb)
-    @test all(==(1), separation_decay.(Ref(NoDecay()), 0:10, 2))
+    @test all(==(1), separation_decay.(Ref(nothing), 0:10, 2))
 
     # Graded keeps the step count `clamp!(P, 0, 1)` destroys: a direct neighbour scores `n`,
     # the asset itself `n + 1`, anything past `n` hops zero.
@@ -56,7 +56,7 @@ end
     @test all(isone, diag(Zc))
     # A partition has no hop structure to decay, so `alg` is inert rather than an error --
     # the same treatment a static feature matrix gets from `FeatureDistance`'s collapse alg.
-    @test phylogeny_features(Proximity(; decay = NoDecay()), CLE, rd.X) == Zc
+    @test phylogeny_features(Proximity(; decay = nothing), CLE, rd.X) == Zc
 end
 
 @testset "The diagonal picks between two different algorithms" begin
@@ -118,12 +118,12 @@ end
     @test isa(ape.pl, NetworkEstimator)
     @test ape.alg == Proximity()
     @test isa(Proximity(), PortfolioOptimisers.AbstractPhylogenyFeatureAlgorithm)
-    @test isa(Proximity(; decay = NoDecay()),
+    @test isa(Proximity(; decay = nothing),
               PortfolioOptimisers.AbstractPhylogenyFeatureAlgorithm)
 
     # Both sources refit, so the universe always matches by construction -- there is no
     # stored matrix left that could describe a different one.
-    for alg in (Proximity(; decay = NoDecay()), Proximity()), pl in (NTE, CLE)
+    for alg in (Proximity(; decay = nothing), Proximity()), pl in (NTE, CLE)
         Z = proxmat(PhylogenyPanel(; pl = pl, alg = alg), rd, rd.X)
         @test size(Z) == (NA, NA)              # the only producer whose axes coincide
         @test Z == phylogeny_features(alg, pl, rd.X)
@@ -190,7 +190,7 @@ end
                                                                  cle = ClustersEstimator(;
                                                                                          de = FeatureDistance(;
                                                                                                               ape = ape))))
-    wb = optimise(mk(PhylogenyPanel(; pl = NTE, alg = Proximity(; decay = NoDecay()))), rd).w
+    wb = optimise(mk(PhylogenyPanel(; pl = NTE, alg = Proximity(; decay = nothing))), rd).w
     wg = optimise(mk(PhylogenyPanel(; pl = NTE, alg = Proximity())), rd).w
     wc = optimise(mk(PhylogenyPanel(; pl = CLE)), rd).w
 
@@ -242,7 +242,7 @@ end
                                                                                     rd,
                                                                                     rd.X)
     res = @test_throws PortfolioOptimisers.IsNothingError phylogeny_features(Proximity(;
-                                                                                       decay = NoDecay()),
+                                                                                       decay = nothing),
                                                                              NetworkEstimator(;
                                                                                               de = FeatureDistance()),
                                                                              rd.X)
@@ -361,27 +361,27 @@ end
     @test ReciprocalDecay().power == 1.0
 end
 
-@testset "NoDecay is the flat end of the family, and does not mean no truncation" begin
-    @test isa(NoDecay(), PortfolioOptimisers.AbstractSeparationDecayAlgorithm)
-    # Constant, so it is the one member that is not strictly decreasing -- which is why it
+@testset "decay = nothing is the flat end of the family, and does not mean no truncation" begin
+    @test isnothing(Proximity(; decay = nothing).decay)
+    # Constant, so it is the one decay that is not strictly decreasing -- which is why it
     # sits outside the loop above and why the contract asks for monotone *non*-increasing.
     for dmax in (1, 2, 5, 8), d in 0:dmax
-        @test separation_decay(NoDecay(), d, dmax) == 1
+        @test separation_decay(nothing, d, dmax) == 1
     end
-    @test separation_decay(NoDecay(), 0.5, 3) == separation_decay(NoDecay(), 0, 3)
-    @test separation_decay(NoDecay(), 2, 3) == separation_decay(NoDecay(), 2, 99)
+    @test separation_decay(nothing, 0.5, 3) == separation_decay(nothing, 0, 3)
+    @test separation_decay(nothing, 2, 3) == separation_decay(nothing, 2, 99)
     # It satisfies the contract by construction, so it opts out of the probe with the other
     # shipped members -- and would pass it if it did not.
-    @test isnothing(PortfolioOptimisers.assert_separation_decay(NoDecay(), 0:3, 3))
-    @test isnothing(invoke(PortfolioOptimisers.assert_separation_decay,
-                           Tuple{PortfolioOptimisers.AbstractSeparationDecayAlgorithm, Any,
-                                 Number}, NoDecay(), 0:3, 3))
+    @test isnothing(PortfolioOptimisers.assert_separation_decay(nothing, 0:3, 3))
+    # The probe of the fallback reads `f(0) > 0`, monotone non-increasing and non-negative.
+    fs = separation_decay.(nothing, 0:3, 3)
+    @test fs[1] > 0 && issorted(fs; rev = true) && all(>=(0), fs)
 
     # The name is about the fall-off alone: the budget still cuts, so what comes out is an
     # indicator of the neighbourhood the budget selects and not a matrix of ones.
     for n in (1, 2, 3)
         pl = NetworkEstimator(; sep = HopCount(; n = n))
-        Z = phylogeny_features(Proximity(; decay = NoDecay()), pl, rd.X)
+        Z = phylogeny_features(Proximity(; decay = nothing), pl, rd.X)
         @test sort(unique(Z)) == [0.0, 1.0]
         @test Z != ones(NA, NA)
         @test Z == Matrix{Float64}(phylogeny_matrix(pl, rd.X).X) + I
@@ -495,7 +495,7 @@ end
 
     # A different decay changes the values, not which pairs are inside the budget: the
     # support is the binary variant's, whatever the fall-off.
-    Zb = phylogeny_features(Proximity(; decay = NoDecay()), NTE, rd.X)
+    Zb = phylogeny_features(Proximity(; decay = nothing), NTE, rd.X)
     for dk in
         (LinearDecay(), ExponentialDecay(; rate = 0.5), ExponentialDecay(; rate = 3.0),
          ReciprocalDecay(), ReciprocalDecay(; power = 2.0))
@@ -635,6 +635,10 @@ const WX = [0.0 1.0 5.0 0.0; 1.0 0.0 1.0 0.0; 5.0 1.0 0.0 0.1; 0.0 0.0 0.1 0.0]
     @test maximum(Wp) < minimum(Ws[Ws .!= 0])     # distances below every similarity here
     @test separation_matrix(np.sep, np, rd.X; dims = 1) !=
           G.floyd_warshall_shortest_paths(gs).dists
+    up = [i < k for i in 1:NA, k in 1:NA]
+    rs = StatsBase.cor(separation_matrix(np.sep, np, rd.X; dims = 1)[up],
+                       G.floyd_warshall_shortest_paths(gs).dists[up])
+    @test 0.95 <= round(rs; digits = 2) <= 0.97
 end
 
 @testset "The two separations order the same graph differently" begin
@@ -663,6 +667,41 @@ end
     @test all(==(2 + 1), diag(Zh))
 end
 
+@testset "On the fixture the two separations agree by the numbers PathLength states" begin
+    # The docstring of `PathLength` states a Pearson correlation of 0.99 on the tree and 0.97
+    # to 0.98 on a PMFG, 0.16% of the pairs of pairs in the opposite order on the tree, and
+    # none on a PMFG. An earlier text said 0.95 to 0.98 on a PMFG.
+    up = [i < k for i in 1:NA, k in 1:NA]
+    function agreement(alg)
+        nh = if isnothing(alg)
+            NetworkEstimator(; sep = HopCount())
+        else
+            NetworkEstimator(; alg = alg, sep = HopCount())
+        end
+        np = if isnothing(alg)
+            NetworkEstimator(; sep = PathLength())
+        else
+            NetworkEstimator(; alg = alg, sep = PathLength())
+        end
+        a = Float64.(separation_matrix(nh.sep, nh, rd.X; dims = 1)[up])
+        b = separation_matrix(np.sep, np, rd.X; dims = 1)[up]
+        m = length(a)
+        inverted = count(((a[i] < a[k]) && (b[i] > b[k])) ||
+                             ((a[i] > a[k]) && (b[i] < b[k])) for i in 1:m
+                         for k in (i + 1):m)
+        return StatsBase.cor(a, b), inverted / binomial(m, 2)
+    end
+    r, f = agreement(nothing)
+    @test round(r; digits = 2) == 0.99
+    @test round(100 * f; digits = 2) == 0.16
+    for alg in (MaximumDistanceSimilarity(), ExponentialSimilarity(),
+                GeneralExponentialSimilarity(), ComplementSimilarity())
+        r, f = agreement(alg)
+        @test 0.97 <= round(r; digits = 2) <= 0.98
+        @test iszero(f)
+    end
+end
+
 @testset "The budget is the observed diameter, and a chosen one is capped by it" begin
     nte = NetworkEstimator()
     d = separation_matrix(PathLength(), fixed_graph(PathLength(), WX))
@@ -680,8 +719,8 @@ end
     @test separation_budget(HopCount(; n = 3), nte, d) == 3
 
     # An epsilon-ball: the budget cuts, the decay does not fall off. Newly expressible, and
-    # what `NoDecay` was kept for.
-    Zb = fixed_features(Proximity(; decay = NoDecay()), PathLength(; dmax = 1.2), WX)
+    # what the flat decay `nothing` is for.
+    Zb = fixed_features(Proximity(; decay = nothing), PathLength(; dmax = 1.2), WX)
     @test sort(unique(Zb)) == [0.0, 1.0]
     @test Zb == Float64[(d[i, k] <= 1.2) for i in 1:4, k in 1:4]
     @test Zb[1, 3] == 0.0                         # 2.0 away, outside the ball
@@ -721,7 +760,7 @@ end
 end
 
 @testset "PathLength drives the whole feature-prior path" begin
-    for (alg, sep) in Iterators.product((Proximity(), Proximity(; decay = NoDecay()),
+    for (alg, sep) in Iterators.product((Proximity(), Proximity(; decay = nothing),
                                          Proximity(; decay = ExponentialDecay(; rate = 0.8)),
                                          Proximity(; decay = ReciprocalDecay())),
                                         (PathLength(), PathLength(; dmax = 0.5)))
@@ -740,9 +779,9 @@ end
     # that is connected by construction is the matrix of ones -- and a chosen budget is what
     # makes it selective again.
     pl = NetworkEstimator(; sep = PathLength())
-    @test phylogeny_features(Proximity(; decay = NoDecay()), pl, rd.X) == ones(NA, NA)
+    @test phylogeny_features(Proximity(; decay = nothing), pl, rd.X) == ones(NA, NA)
     @test any(iszero,
-              phylogeny_features(Proximity(; decay = NoDecay()),
+              phylogeny_features(Proximity(; decay = nothing),
                                  NetworkEstimator(; sep = PathLength(; dmax = 0.5)), rd.X))
 
     # `sep` is the estimator's, not the algorithm's, so a clustering source has no `sep` to
@@ -751,7 +790,7 @@ end
     @test phylogeny_features(Proximity(), CLE, rd.X) ==
           Matrix{Float64}(phylogeny_matrix(CLE, rd.X).X) + I
 
-    # `NoDecay` is the neighbourhood indicator, so it must equal the phylogeny matrix with
+    # `decay = nothing` is the neighbourhood indicator, so it must equal the phylogeny matrix with
     # the diagonal restored -- on *both* separations. #238 established the equality for a
     # hop count; the radius ball now has to satisfy it too, and it is not a coincidence:
     # both sides threshold the same separations at the same budget.
@@ -759,7 +798,7 @@ end
         sep in (HopCount(; n = 2), PathLength(), PathLength(; dmax = 0.5))
 
         pl = NetworkEstimator(; alg = alg, sep = sep)
-        @test phylogeny_features(Proximity(; decay = NoDecay()), pl, rd.X) ==
+        @test phylogeny_features(Proximity(; decay = nothing), pl, rd.X) ==
               Matrix{Float64}(phylogeny_matrix(pl, rd.X).X) + I
     end
 end
@@ -768,11 +807,11 @@ end
     PO = PortfolioOptimisers
     G = PO.Graphs
     decays = (LinearDecay(), ExponentialDecay(; rate = 0.7), ReciprocalDecay(; power = 1.5),
-              NoDecay())
+              nothing)
     fdecay(::LinearDecay, d, B) = B + 1 - d
     fdecay(::ExponentialDecay, d, B) = exp(-0.7 * d)
     fdecay(::ReciprocalDecay, d, B) = (1 + d)^(-1.5)
-    fdecay(::NoDecay, d, B) = 1.0
+    fdecay(::Nothing, d, B) = 1.0
 
     # Integer returns hold a fractional score. Every decay under both separations threw
     # `InexactError` on the element type `eltype(X)` except the two whose scores are
@@ -825,7 +864,7 @@ end
     D1 = distance(de, Z1)
     @test round(D1[1, 3]; digits = 3) == 0.436
     @test round(D1[1, 2]; digits = 3) == 0.239
-    Zn = PO._proximity_features(Proximity(; decay = NoDecay()), HopCount(), d3, 1, Float64)
+    Zn = PO._proximity_features(Proximity(; decay = nothing), HopCount(), d3, 1, Float64)
     @test Zn == Float64[0 1 0; 1 0 1; 0 1 0] + I
     Dn = distance(de, Zn)
     @test round(Dn[1, 3]; digits = 3) == 0.333

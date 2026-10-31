@@ -10,7 +10,7 @@ NestedClustered
 factory(res::NestedClusteredResult, fb::Option{<:OptE_Opt_FbChain})
 factory(nco::NestedClustered, w::AbstractVector)
 port_opt_view(nco::NestedClustered, i, X::MatNum, args...)
-optimise(nco::NestedClustered{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult; dims::Int = 1, branchorder::Symbol = :optimal, str_names::Bool = false, save::Bool = true, kwargs...)
+optimise(nco::NestedClustered{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult; dims::Int = 1, branchorder::Symbol = :optimal, str_names::Bool = false, save::Bool = true, kwargs...)
 needs_previous_weights(opt::NestedClustered)
 ```
 

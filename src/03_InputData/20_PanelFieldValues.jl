@@ -42,7 +42,7 @@ end
 
 Return the element type that holds the stored type `T` and the policy value `v` of a read.
 
-The type is derived from the two arguments, and never forced. A policy of `nothing` writes no cell, and an integer value fits every numeric type, so both keep `T`. Any other value, such as `NaN` or `0.5`, needs a type that holds a fraction, so it floats an integer `T` through [`float_if_integer`](@ref) and keeps every other `T`. A `Float32` field read with `NaN` stays `Float32`.
+[`panel_field_values`](@ref) and [`feature_matrix`](@ref) derive the element type of their answer through this function. The type is derived from the two arguments, and never forced. A policy of `nothing` writes no cell, so it keeps `T`. An integer value keeps `T` too. The value converts to `T` only when it writes a cell, so `T` must hold it. A value of `-1` in an unsigned type raises an `InexactError` there. Any other value, such as `NaN` or `0.5`, needs a type that holds a fraction. It floats an integer `T` through [`float_if_integer`](@ref) and keeps every other `T`. A `Float32` field read with `NaN` stays `Float32`.
 
 # Algorithm
 
@@ -60,6 +60,7 @@ The method that Julia selects is the algorithm.
 # Related
 
   - [`panel_field_values`](@ref)
+  - [`feature_matrix`](@ref)
   - [`float_if_integer`](@ref)
 """
 function panel_read_eltype(::Type{T}, ::Union{Nothing, Integer}) where {T}
@@ -73,11 +74,11 @@ end
 
 Write the policy value `v` into every cell of `V` where the mask `msk` is `false`, in place.
 
-`msk` covers the leading axes of `V`. An observed mask has the shape of `V`, so a cell is one entry. The active mask of a time-varying panel is `observations × assets`, so on a tensor Panel Field one `false` entry covers every label of that observation and asset.
+[`panel_field_values`](@ref) writes its two policies through this function, and [`feature_matrix`](@ref) writes its `placeholder`. `msk` covers the leading axes of `V`. A mask with the shape of `V` marks one entry for each cell. The observed mask of a Panel Field is one, and so is the data mask of one column of a Feature Matrix. The active mask of a time-varying panel is `observations × assets`, so on a tensor Panel Field one `false` entry covers every label of that observation and asset.
 
 # Algorithm
 
- 1. Return at once when `msk` or `v` is `nothing`: there is no cell to write, or the policy keeps the stored value.
+ 1. Return at once when `msk` or `v` is `nothing`. A mask of `nothing` marks no cell, and a policy of `nothing` keeps the stored value.
  2. Otherwise, for each `false` entry of `msk`, write `v` into the slab of `V` at that entry.
 
 # Arguments
@@ -93,6 +94,7 @@ Write the policy value `v` into every cell of `V` where the mask `msk` is `false
 # Related
 
   - [`panel_field_values`](@ref)
+  - [`feature_matrix`](@ref)
   - [`Option`](@ref)
 """
 function panel_read_write!(::AbstractArray, ::Any, ::Nothing)::Nothing
@@ -120,7 +122,7 @@ end
 
 Read the values of one Panel Field, with a policy for its inactive cells and a policy for its unobserved cells.
 
-An [`AssetPanel`](@ref) keeps a finite value in every cell of a numeric Panel Field. The two universe masks say which cells are in the universe, and the observed mask of the field says which cells a fill policy wrote. A consumer reads the masks, so it never needs a marker in the values. A caller who wants the marker, for example to hand the values to code that reads no mask, chooses it here at read time. Nothing is stored, and the panel does not change.
+An [`AssetPanel`](@ref) keeps a finite value in every cell of a numeric Panel Field. The two universe masks say which cells are in the universe, and the observed mask of the field says which cells a fill policy wrote. A consumer reads the masks, so it never needs a marker in the values. A caller who wants the marker, for example to give the values to code that reads no mask, chooses it here at read time. Nothing is stored, and the panel does not change.
 
 A policy is a value or `nothing`:
 
@@ -128,11 +130,38 @@ A policy is a value or `nothing`:
   - `inactive = 0` writes a zero there.
   - `inactive = nothing` keeps the stored value.
 
-`unobserved` takes the same forms for the cells whose observed mask is `false`, and its default `NaN` shows where the data held a blank. A cell that is both inactive and unobserved takes the `inactive` policy when that policy is not `nothing`, because the asset is outside the universe whatever the data held. On a static panel no cell is inactive.
+`unobserved` takes the same forms for the cells whose observed mask is `false`, and its default `NaN` shows where the data held a blank. A cell that holds the placeholder of a blank that no fill reached is unobserved too. So `unobserved` writes it, and `unobserved = nothing` reads the stored placeholder back. A cell that is both inactive and unobserved takes the `inactive` policy when that policy is not `nothing`, because the asset is outside the universe whatever the data held. On a static panel no cell is inactive.
 
 The same rule reads all three kinds of Panel Field. A [`TensorPanelField`](@ref) writes the policy into every label of an inactive observation and asset. A [`CategoricalPanelField`](@ref) reads its integer codes, so `inactive = CS_MISSING_GROUP` marks an inactive cell with the code of a missing group, and `inactive = NaN` gives floating-point codes with `NaN` there.
 
-The element type of the answer comes from the stored type and the two policies, through [`panel_read_eltype`](@ref). An integer field read with a `NaN` policy is floated, and every other type is kept: an integer field read with `inactive = 0` and `unobserved = nothing` stays an integer field.
+The element type of the answer comes from the stored type and the two policies, through [`panel_read_eltype`](@ref). An integer field read with a `NaN` policy is floated, and every other type is kept. An integer field read with `inactive = 0` and `unobserved = nothing` stays an integer field. The type depends on the policies, not on the cells that they write. So the default `unobserved = NaN` floats the codes of a categorical Panel Field that holds no blank.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+V_{t,\\,i,\\,l} &= \\begin{cases}
+\\alpha & a_{t,\\,i} = 0 \\\\
+\\beta & m_{t,\\,i,\\,l} = 0 \\\\
+x_{t,\\,i,\\,l} & \\text{otherwise}
+\\end{cases}\\,, \\\\
+& t = 1, \\ldots, T\\,, \\quad i = 1, \\ldots, N\\,, \\quad l = 1, \\ldots, L\\,.
+\\end{align}
+```
+
+The first case that holds applies. With `inactive = nothing` the first case does not apply, and with `unobserved = nothing` the second case does not apply. A static panel has no observation index and no inactive cell, so ``t`` and the first case drop out. A numeric and a categorical Panel Field have no label axis, so ``l`` drops out. A Panel Field that cannot blank has ``m = 1`` in every cell.
+
+Where:
+
+  - ``V_{t,\\,i,\\,l}``: Entry of the answer at observation ``t``, asset ``i`` and label ``l``.
+  - ``x_{t,\\,i,\\,l}``: Stored value of the Panel Field. On a categorical Panel Field it is the integer code of the level.
+  - ``a_{t,\\,i}``: Active mask of the panel, ``1`` where asset ``i`` is in the universe at observation ``t``.
+  - ``m_{t,\\,i,\\,l}``: Observed mask of the Panel Field, ``1`` where the raw input carried a value. It is ``0`` where a fill policy wrote the value, and where the cell holds a placeholder.
+  - ``\\alpha``: The value of `inactive`.
+  - ``\\beta``: The value of `unobserved`.
+  - ``L``: Number of labels of a tensor Panel Field.
+  - $(math_dict[:T])
+  - $(math_dict[:N])
 
 # Algorithm
 
@@ -148,13 +177,14 @@ The element type of the answer comes from the stored type and the two policies, 
   - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
   - `name`: The Panel Field's name.
   - `inactive`: The value for a cell outside the universe, or `nothing` to keep the stored value.
-  - `unobserved`: The value for a cell that a fill policy wrote, or `nothing` to keep the fill value.
+  - `unobserved`: The value for a cell that a fill policy wrote or that holds a placeholder, or `nothing` to keep the stored value.
 
 # Validation
 
   - The panel holds a Panel Field named `name`. Raises a `KeyError`.
   - `rd.pnl` is an [`AssetPanel`](@ref). Raises an [`IsNothingError`](@ref).
   - A policy value converts to the element type of the answer. An integer field read with `inactive = 0.5` is floated, and a `Rational` field read with `NaN` raises an `InexactError` at the first cell that the policy writes.
+  - An integer policy value keeps an integer field when the other policy keeps it too, so the integer type must hold it. The default `unobserved = NaN` floats an integer field. A `UInt` field read with `inactive = -1` and `unobserved = nothing` raises an `InexactError` at the first cell that the policy writes. A float type converts every integer, and an integer past its range reads as an infinity. A `Float16` field read with `inactive = 100000` holds `Inf16` there.
 
 # Returns
 

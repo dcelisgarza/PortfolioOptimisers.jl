@@ -152,11 +152,10 @@ end
     end
     @testset "FeatureDistance reads the last readable row" begin
         # x at row 3 (7), y at row 2 (5), z at row 3 (9).
-        D = distance(fd(LastObservation(; alg = LastActiveRow())), nothing, rd.X; rd = rd)
+        D = distance(fd(LastActiveRow()), nothing, rd.X; rd = rd)
         @test D ≈ [0 2 2; 2 0 4; 2 4 0]
-        @test_throws "the assets [\"y\"]" distance(fd(LastObservation()), nothing, rd.X;
-                                                   rd = rd)
-        @test CENSUS_PO.feature_readable_mask(fd(LastObservation()), nothing, rd) ==
+        @test_throws "the assets [\"y\"]" distance(fd(LastRow()), nothing, rd.X; rd = rd)
+        @test CENSUS_PO.feature_readable_mask(fd(LastRow()), nothing, rd) ==
               BitVector([1, 0, 1])
     end
     @testset "A static asset with a placeholder is unreadable" begin
@@ -165,12 +164,11 @@ end
                                                 omsk = BitVector([1, 0, 1]),
                                                 pmsk = BitVector([0, 1, 0]))])
         rds = ReturnsResult(; nx = nx, X = zeros(3, 3), pnl = st)
-        @test_throws "the assets [\"y\"]" distance(fd(LastObservation()), nothing, rds.X;
-                                                   rd = rds)
+        @test_throws "the assets [\"y\"]" distance(fd(LastRow()), nothing, rds.X; rd = rds)
         @test CENSUS_PO.feature_readable_mask(fd(AggregateFeatures()), nothing, rds) ==
               BitVector([1, 0, 1])
         rdv = CENSUS_PO.port_opt_view(rds, [1, 3])
-        @test distance(fd(LastObservation()), nothing, rdv.X; rd = rdv) ≈ [0 2; 2 0]
+        @test distance(fd(LastRow()), nothing, rdv.X; rd = rdv) ≈ [0 2; 2 0]
     end
     W = [0.5 0.0; 0.5 0.0; 0.0 1.0]
     @testset "The panel collapse divides by the weight of the members that hold data" begin

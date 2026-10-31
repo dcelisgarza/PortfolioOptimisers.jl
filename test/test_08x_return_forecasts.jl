@@ -99,8 +99,10 @@ end
         spnl = asset_panel([NumericPanelInput(; name = "a", vals = [1.0, 2.0])])
         srd = ReturnsResult(; nx = ["A1", "A2"], X = zeros(2, 2), pnl = spnl)
         @test_throws PO.IsNothingError PO.return_forecast_weights(srd)
-        rdn = ReturnsResult(; nx = ["A1", "A2"], X = zeros(2, 2))
-        @test_throws PO.IsNothingError PO.return_forecast_weights(rdn)
+        # #1882: returns with no panel read as the mask-only panel of their finiteness, so
+        # every asset with a finite return enters the estimate.
+        rdn = ReturnsResult(; nx = ["A1", "A2"], X = [0.0 NaN; 0.0 0.0])
+        @test PO.return_forecast_weights(rdn) == [1.0 0.0; 1.0 1.0]
     end
 end
 
@@ -1508,6 +1510,26 @@ end
         @test p[1:3] ≈ Sf[1:3, :] * (Sf[4:9, :] \ yf[4:9])
         @test isfinite(rfc.calib)
         @test rfc.mu ≈ rfc.calib .* rf.mu
+        # #1886: every fit names the last column, the column of ones, to the target. An
+        # elastic net at a strength that zeroes both slopes keeps the intercept at the mean of
+        # the target it fits: in the fit of every sample, in the out-of-fold fits, and in the
+        # prequential fits.
+        big = ElasticNet(; strength = PO.FixedStrength(; gamma = 1e8))
+        ebig = TargetReturnForecast(; scores = ds, target_outlier = nothing, tgt = big,
+                                    calibrate = false, intercept = true)
+        @test PO.target_forecast_target(ebig, Sf).ic == 3
+        @test PO.target_forecast_target(TargetReturnForecast(; scores = ds, tgt = big),
+                                        Sf) === big
+        re = return_forecast(ebig, rd, csfm)
+        @test PortfolioOptimisers.StatsAPI.coef(re.model) ≈ [0, 0, mean(yf)]
+        @test re.mu ≈ fill(mean(yf), 3)
+        pk = PO.target_forecast_uncalibrated(KFold(; n = 3), ebig, nothing, Sf, yf,
+                                             trues(9), 3)
+        @test pk[1:3] ≈ fill(mean(yf[4:9]), 3)
+        pq = PO.target_forecast_uncalibrated(PrequentialCalibration(), ebig, nothing, Sf,
+                                             yf, trues(9), 3)
+        @test all(isnan, pq[1:3])
+        @test pq[4:6] ≈ fill(mean(yf[1:3]), 3) && pq[7:9] ≈ fill(mean(yf[1:6]), 3)
     end
 
     @testset "A sample set with no valid pair fits nothing" begin
@@ -1565,7 +1587,7 @@ least squares, written on top of `StatsAPI` as the `# Interfaces` section of
 model, and `coef` and `predict` read it. The threshold `delta` is in the units of the response,
 so the fit needs no scale estimate. The library ships no such target.
 =#
-struct HuberTestTarget{T, W} <: PortfolioOptimisers.AbstractRegressionTarget
+struct HuberTestTarget{T, W} <: PortfolioOptimisers.AbstractUnpenalisedRegressionTarget
     delta::T
     w::W
 end
@@ -1598,7 +1620,7 @@ end
 PortfolioOptimisers.StatsAPI.coef(m::HuberTestFit) = m.coef
 PortfolioOptimisers.StatsAPI.predict(m::HuberTestFit, A::AbstractMatrix) = A * m.coef
 # A least-squares target that states no weight method.
-struct UnweightedTestTarget <: PortfolioOptimisers.AbstractRegressionTarget end
+struct UnweightedTestTarget <: PortfolioOptimisers.AbstractUnpenalisedRegressionTarget end
 function PortfolioOptimisers.StatsAPI.fit(::UnweightedTestTarget, A::AbstractMatrix,
                                           y::AbstractVector)
     return HuberTestFit(A \ y)

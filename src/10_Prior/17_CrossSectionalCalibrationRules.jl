@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Chooses the spanned coefficients whose distance from the factor mean measures the error of a Return Forecast.
 
-[`PrecisionBlend`](@ref) holds a member of this family in its field `err`. The blend divides the sampling error of the factor mean by the sum of that error and the error of the spanned part `g` of the forecast. It measures the second error by the distance of `g` from the factor mean, and this family chooses the rows of `g` that it reads: the latest row alone, or the rows of the Return Forecast history.
+[`PrecisionBlend`](@ref) holds a member of this family in its field `err`. The blend divides the sampling error of the factor mean by the sum of that error and the error of the spanned part `g` of the forecast. It measures the second error by the distance of `g` from the factor mean, and this family chooses the rows of `g` that it reads. One member reads the latest row alone, and the other reads the rows of the Return Forecast history.
 
 # Interfaces
 
@@ -255,7 +255,7 @@ end
 
 Return the factor mean, the spanned coefficients and the factor covariance in the form that a Spanned Shrinkage rule reads.
 
-The blend acts on the estimated factors alone, so the function keeps the leading entries of the factor moments, one per column of `cs.csfm.csr.f`. The factor covariance of those factors can be singular. A market factor beside a full one-hot industry block is the common case: the market exposure is the sum of the industry exposures, so the fitted factor returns, their mean and the spanned coefficients all lie in a subspace, and the covariance is zero across it. An Empty Factor carries a zero variance and no return, which is the same case in one direction. So the function reads the covariance through its pseudo-inverse over the eigenvalues it keeps, and `K` is the number of those eigenvalues, the dimension in which the factor mean has a sampling error. A factor whose mean or variance the factor prior does not state has no sampling error to measure, so the function keeps the estimated factors with a finite mean and a finite variance alone.
+The blend acts on the estimated factors alone, so the function keeps the leading entries of the factor moments, one per column of `cs.csfm.csr.f`. The factor covariance of those factors can be singular. A market factor beside a full one-hot industry block is the common case. The market exposure is the sum of the industry exposures, so the fitted factor returns, their mean and the spanned coefficients all lie in a subspace, and the covariance is zero across it. An Empty Factor carries a zero variance and no return, which is the same case in one direction. So the function reads the covariance through its pseudo-inverse over the eigenvalues it keeps, and `K` is the number of those eigenvalues, the dimension in which the factor mean has a sampling error. A factor whose mean or variance the factor prior does not state has no sampling error to measure, so the function keeps the estimated factors with a finite mean and a finite variance alone.
 
 # Mathematical definition
 
@@ -272,7 +272,7 @@ Where:
   - ``\\hat{\\mathbf{\\Sigma}}_{f}``: Factor covariance of the nested factor prior, over the estimated factors with a finite mean and a finite variance.
   - ``\\ell_{i}``, ``\\boldsymbol{u}_{i}``: Eigenvalue ``i`` of the factor covariance and its eigenvector.
   - ``\\mathbf{W}``: The kept eigenvectors, each divided by the square root of its eigenvalue, so ``\\mathbf{W} \\mathbf{W}^{\\intercal}`` is the pseudo-inverse of the factor covariance.
-  - ``\\tau``: Threshold below which an eigenvalue is taken as zero. The zero eigenvalue of a singular factor covariance is round-off, and its size depends on the machine, so the threshold sits far above round-off: an eigenvalue that small carries no variance a sample can measure.
+  - ``\\tau``: Threshold below which an eigenvalue is taken as zero. The zero eigenvalue of a singular factor covariance is round-off, and its size depends on the machine, so the threshold is far above round-off. An eigenvalue below it carries no variance that a sample can measure.
   - ``\\epsilon``: Machine epsilon of the element type of the eigenvalues.
 
 # Arguments
@@ -315,9 +315,9 @@ Shrinks the factor mean towards the spanned part of a Return Forecast by the pre
 
 The fitted factor mean ``\\hat{\\boldsymbol{\\mu}}_{f}`` and the spanned part ``\\boldsymbol{g}`` are two estimates of the expected factor returns. The rule gives the factor mean a weight equal to the error of ``\\boldsymbol{g}`` over the sum of the two errors, so the estimate with the smaller error gets the larger weight. The sampling error of the factor mean, in the metric of the pseudo-inverse of the factor covariance, is ``K / T_{e}``. The rule measures the error of ``\\boldsymbol{g}`` by its distance from the factor mean less that sampling error. That distance holds both errors, so the difference estimates the error of ``\\boldsymbol{g}`` alone, and the rule clips it at zero.
 
-It is the default of the `lambda` slot of [`CrossSectionalFactorPrior`](@ref). A prior that states no Return Forecast Estimator has ``\\boldsymbol{g} = \\boldsymbol{0}``, and the rule then shrinks the factor mean towards zero, with a weight that falls as the mean becomes less distinct from zero. The rule takes no warm-up: on a short history the factor mean has its largest error, so a pull towards a weight of one is the wrong direction.
+It is the default of the `lambda` slot of [`CrossSectionalFactorPrior`](@ref). A prior that states no Return Forecast Estimator has ``\\boldsymbol{g} = \\boldsymbol{0}``, and the rule then shrinks the factor mean towards zero, with a weight that falls as the mean becomes less distinct from zero. The rule takes no warm-up. On a short history the factor mean has its largest error, so a pull towards a weight of one is the wrong direction.
 
-The form is that of the shrinkage of a sample mean towards a target in [jorion1986](@cite): the weight of the target is the sampling error of the mean over the squared distance of the mean from the target. The rule estimates that ratio from the fit and takes its positive part.
+The weight of the target is ``\\min(1, K / (T_{e} B))``, the sampling error of the factor mean over the squared distance of the forecast from it. Equation 11 of [jorion1986](@cite) gives the positive-part James-Stein weight of a target in the same form, with ``N - 2`` in place of ``K``. The rule takes ``K``, because ``K / T_{e}`` is the expected part of ``B`` that the sampling error of the factor mean adds. That work names an earlier work as the source of Equation 11. No copy of that work was found.
 
 # Mathematical definition
 
@@ -368,7 +368,7 @@ true
 
 # References
 
-  - $(ref_dict[:jorion1986])
+  - $(ref_dict[:jorion1986]) Section III, Equation 11. $(ref_dict[:no_original_source])
 """
 @concrete struct PrecisionBlend <: AbstractSpannedShrinkageCalibrationAlgorithm
     """
@@ -437,9 +437,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Shrinks the factor mean towards the spanned part of a Return Forecast by the intensity of a shrunk expected-returns estimator.
 
-The rule computes the shrinkage intensity of the algorithm in `alg`, with the spanned coefficients ``\\boldsymbol{g}`` as the target, and returns the weight of the factor mean. [`ShrunkExpectedReturns`](@ref) shrinks a sample mean towards a target that its own field `tgt` computes. This rule reads the same intensity with ``\\boldsymbol{g}`` in place of that target, so it ignores the `tgt` of the algorithm. With no Return Forecast Estimator, ``\\boldsymbol{g}`` is zero.
+The rule computes the shrinkage intensity of the algorithm in `alg`, with the spanned coefficients ``\\boldsymbol{g}`` as the target, and returns the weight of the factor mean. [`ShrunkExpectedReturns`](@ref) shrinks a sample mean towards a target that its own field `tgt` computes. This rule reads the same intensity with ``\\boldsymbol{g}`` in place of that target, so it ignores the `tgt` of the algorithm. It also ignores the `intensity` of [`JamesStein`](@ref) and of [`BayesStein`](@ref). The Spanned Shrinkage is a weight in `[0, 1]`, so the rule clips the intensity into that interval under every member of [`AbstractShrunkExpectedReturnsIntensity`](@ref). With no Return Forecast Estimator, ``\\boldsymbol{g}`` is zero.
 
-Each intensity is read off the factor mean and the factor covariance of the nested factor prior, over the estimated factors, and off the effective sample size. The factor covariance enters through its pseudo-inverse and its rank, as [`spanned_shrinkage_moments`](@ref) states. [`BayesStein`](@ref) gives a weight in `[0, 1)` with no clip, as in [jorion1986](@cite). [`JamesStein`](@ref) can give an intensity outside `[0, 1]`, and the rule clips it, which is the positive-part form of [meucci2005](@cite). At two factors or fewer its intensity is not positive, so the rule keeps the factor mean. [`BodnarOkhrinParolya`](@ref) gives the weight of the sample mean and a separate scale of the target, as in [bodnar2019](@cite). The blend of the prior gives the target the weight that the sample mean leaves, so the rule returns the clipped weight of the sample mean and reads no scale of the target.
+Each intensity is read off the factor mean and the factor covariance of the nested factor prior, over the estimated factors, and off the effective sample size. The factor covariance enters through its pseudo-inverse and its rank, as [`spanned_shrinkage_moments`](@ref) states. [`BayesStein`](@ref) gives a weight in `[0, 1)` with no clip. Equation 17 of [jorion1986](@cite) is its weight of the target, with ``N`` in place of ``K``. [`JamesStein`](@ref) can give an intensity outside `[0, 1]`, and the rule clips it. Equation 4.139 of [meucci2005](@cite) is that intensity, and the text after it constrains the weight to `(0, 1)`. At two factors or fewer the trace is at most twice the largest eigenvalue, so the intensity is not positive and the rule keeps the factor mean. Theorem 1 of [bock1975](@cite) shows that, under this condition, the only minimax estimator of its class is the sample mean. [`BodnarOkhrinParolya`](@ref) gives the weight of the sample mean and a separate scale of the target, Equations 6 and 7 of [bodnar2019](@cite), with ``K`` in place of the number of assets. The blend of the prior gives the target the weight that the sample mean leaves, so the rule returns the clipped weight of the sample mean and reads no scale of the target. The methods of `mean` for [`ShrunkExpectedReturns`](@ref) state each intensity against its source.
 
 # Mathematical definition
 
@@ -493,13 +493,14 @@ true
 
 # References
 
-  - $(ref_dict[:jorion1986])
-  - $(ref_dict[:meucci2005])
-  - $(ref_dict[:bodnar2019])
+  - $(ref_dict[:jorion1986]) Section IV, Equation 17.
+  - $(ref_dict[:meucci2005]) Section 4.4, Equation 4.139.
+  - $(ref_dict[:bock1975]) Theorem 1.
+  - $(ref_dict[:bodnar2019]) Section 3, Theorem 3, Equations 6 and 7.
 """
 @concrete struct SteinShrinkage <: AbstractSpannedShrinkageCalibrationAlgorithm
     """
-    The algorithm whose shrinkage intensity the rule reads, a member of [`AbstractShrunkExpectedReturnsAlgorithm`](@ref). Its target `tgt` is not read: the target is the spanned part of the Return Forecast.
+    The algorithm whose shrinkage intensity the rule reads, a member of [`AbstractShrunkExpectedReturnsAlgorithm`](@ref). The rule reads neither its target `tgt` nor its `intensity`. The target is the spanned part of the Return Forecast, and the rule clips the intensity into `[0, 1]`.
     """
     alg
     function SteinShrinkage(alg::AbstractShrunkExpectedReturnsAlgorithm)
@@ -661,7 +662,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Takes the target below a count of history rows, and the calibration slope at or above it.
 
-The slope is clipped at zero, and a slope that is not finite gives the target.
+The rule clips the slope at zero, and a slope that is not finite gives the target.
 
 # Fields
 
@@ -869,9 +870,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Computes the Orthogonal Forecast Scale as the calibration slope of the orthogonal forecast on the forward idiosyncratic return.
 
-The rule splits each row of the Return Forecast history against the Factor Exposures of that row, and pairs the orthogonal part of each asset with the idiosyncratic return of the asset at the next row. The slope of a weighted regression of the returns on the forecasts, through the origin, is the scale that maps the forecast onto the return it predicts. A scale of the orthogonal part with the least squared error is that slope, as the forecast refinement of [grinoldkahn1999](@cite) states. The rule clips the slope at zero and puts no upper bound on it, so a forecast whose magnitude is too small is scaled up.
+The rule splits each row of the Return Forecast history against the Factor Exposures of that row, and pairs the orthogonal part of each asset with the idiosyncratic return of the asset at the next row. The slope of a weighted regression of the returns on the forecasts, through the origin, is the scale that maps the forecast onto the return it predicts. It is the ``c`` that minimises ``\\sum_{k} q_{k} (b_{k} - c a_{k})^{2}``. Chapter 10 of [grinoldkahn1999](@cite) refines a raw forecast by the coefficient of such a regression. No copy of that work was found. The rule clips the slope at zero and puts no upper bound on it, so it scales up a forecast whose magnitude is too small.
 
-The rule reads the history, so the prior makes it, and a prior whose `rfe` has no history refuses the rule at construction. The default `c` of [`CrossSectionalFactorPrior`](@ref) stays one, because a history of a fitted forecast is expensive, so a caller states this rule to take it.
+The rule reads the history, so the prior makes it, and a prior whose `rfe` has no history refuses the rule at construction. The default `c` of [`CrossSectionalFactorPrior`](@ref) is one, because the history of a fitted forecast is expensive. A caller who wants the slope states this rule.
 
 # Mathematical definition
 
@@ -924,7 +925,7 @@ julia> ForecastCalibrationSlope().target
 
 # References
 
-  - $(ref_dict[:grinoldkahn1999])
+  - $(ref_dict[:grinoldkahn1999]) Chapter 10. $(ref_dict[:no_original_source])
 """
 @concrete struct ForecastCalibrationSlope <:
                  AbstractOrthogonalForecastScaleCalibrationAlgorithm
@@ -1111,78 +1112,35 @@ SystematicRepair()
 # Related
 
   - [`AbstractSystematicRepair`](@ref)
-  - [`NoSystematicRepair`](@ref)
   - [`systematic_processing!`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
 """
 struct SystematicRepair <: AbstractSystematicRepair end
 """
-$(DocStringExtensions.TYPEDEF)
-
-Does not repair the systematic block before the lift of a [`CrossSectionalFactorPrior`](@ref) adds the idiosyncratic block. This is the default rule.
-
-The lift runs every step of `mp` on the systematic block in the order of `mp.order`, except the `:pdm` step, and takes the symmetric part of the block. Then it adds the idiosyncratic block and repairs the sum under `mp.pdm`. That repair is the one repair of the asset covariance. A sum that is positive definite passes it unchanged, so the lift does no repair of a block that is positive semidefinite to round-off.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\mathbf{\\Sigma}_{\\mathcal{I}\\mathcal{I}} &= \\operatorname{pdm}\\left(\\operatorname{mp}_{\\setminus\\mathrm{pdm}}\\left(\\mathbf{B}_{T,\\,\\mathcal{I}} \\odot \\mathbf{F} \\odot \\mathbf{B}_{T,\\,\\mathcal{I}}^{\\intercal}\\right) + \\mathbf{D}_{\\mathcal{I}\\mathcal{I}}\\right)\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\mathbf{\\Sigma}``: Asset covariance.
-  - ``\\operatorname{mp}_{\\setminus\\mathrm{pdm}}``: Every step of `mp` except the `:pdm` step, in the order of `mp.order`, then the symmetric part of the block.
-  - ``\\operatorname{pdm}``: The repair under `mp.pdm`, from [`posdef!`](@ref).
-  - ``\\odot``: The product over the support of each row of loadings, from [`support_product`](@ref).
-  - ``\\mathbf{B}_{T,\\,\\mathcal{I}}``: The rows of ``\\mathbf{B}_{T}`` at the assets of ``\\mathcal{I}``.
-  - $(math_dict[:B_T_cs])
-  - $(math_dict[:F_patt])
-  - $(math_dict[:D_orth])
-  - $(math_dict[:I_inv])
-
-# Constructors
-
-    NoSystematicRepair() -> NoSystematicRepair
-
-# Examples
-
-```jldoctest
-julia> NoSystematicRepair()
-NoSystematicRepair()
-```
-
-# Related
-
-  - [`AbstractSystematicRepair`](@ref)
-  - [`SystematicRepair`](@ref)
-  - [`systematic_processing!`](@ref)
-  - [`CrossSectionalFactorPrior`](@ref)
-"""
-struct NoSystematicRepair <: AbstractSystematicRepair end
-"""
     systematic_processing!(srep::SystematicRepair, mp::AbstractMatrixProcessingEstimator,
-                           sigma::MatNum, X::MatNum; kwargs...) -> MatNum
-    systematic_processing!(srep::NoSystematicRepair, mp::MatrixProcessing, sigma::MatNum,
-                           X::MatNum; kwargs...) -> MatNum
+                           sigma::MatNum, X::MatNum, T::Real = size(X, 1);
+                           kwargs...) -> MatNum
+    systematic_processing!(::Nothing, mp::MatrixProcessing, sigma::MatNum,
+                           X::MatNum, T::Real = size(X, 1); kwargs...) -> MatNum
 
 Processes the systematic block of the lift of a [`CrossSectionalFactorPrior`](@ref) in place, under the Systematic Repair rule `srep`.
+
+`nothing` is the default. It does not repair the systematic block before the lift adds the idiosyncratic block. The lift then repairs the sum under `mp.pdm`, and that repair is the one repair of the asset covariance. A sum that is positive definite passes it unchanged, so the lift does no repair of a block that is positive semidefinite to round-off.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. [`SystematicRepair`](@ref): run [`matrix_processing!`](@ref) of `mp` on `sigma`, every step included.
- 2. [`NoSystematicRepair`](@ref): run [`matrix_processing_step!`](@ref) for each step of `mp.order` except `:pdm`, in that order. Then replace `sigma` by its symmetric part ``(\\boldsymbol{\\Sigma} + \\boldsymbol{\\Sigma}^{\\intercal}) / 2``. The product of the loadings and the factor covariance is symmetric only to rounding, and [`posdef!`](@ref) accepts the sum without a repair only when it is exactly symmetric.
+ 1. [`SystematicRepair`](@ref): run [`sample_matrix_processing!`](@ref) of `mp` on `sigma` with `T`, every step included.
+ 2. `nothing`: run [`matrix_processing_step!`](@ref) with `T` for each step of `mp.order` except `:pdm`, in that order. Then replace `sigma` by its symmetric part ``(\\boldsymbol{\\Sigma} + \\boldsymbol{\\Sigma}^{\\intercal}) / 2``. The product of the loadings and the factor covariance is symmetric only to rounding, and [`posdef!`](@ref) accepts the sum without a repair only when it is exactly symmetric.
 
 # Arguments
 
   - $(arg_dict[:srep])
-  - `mp`: Matrix processing estimator. [`NoSystematicRepair`](@ref) reads its steps one by one, so it takes a [`MatrixProcessing`](@ref) alone.
+  - `mp`: Matrix processing estimator. `nothing` reads its steps one by one, so it takes a [`MatrixProcessing`](@ref) alone.
   - `sigma`: The systematic block, `investable assets × investable assets`.
   - `X`: The asset return scenarios of the investable assets, `scenarios × investable assets`.
+  - `T`: The effective number of observations of the factor covariance that the block projects, which the denoising step reads. [`cross_sectional_lift`](@ref) passes the count that the factor prior states. It is `size(X, 1)` by default.
   - `kwargs...`: Additional keyword arguments passed to the steps of `mp`.
 
 # Returns
@@ -1196,14 +1154,14 @@ The method that Julia selects is the algorithm.
   - [`matrix_processing!`](@ref)
 """
 function systematic_processing!(::SystematicRepair, mp::AbstractMatrixProcessingEstimator,
-                                sigma::MatNum, X::MatNum; kwargs...)
-    return matrix_processing!(mp, sigma, X; kwargs...)
+                                sigma::MatNum, X::MatNum, T::Real = size(X, 1); kwargs...)
+    return sample_matrix_processing!(mp, sigma, X, T; kwargs...)
 end
-function systematic_processing!(::NoSystematicRepair, mp::MatrixProcessing, sigma::MatNum,
-                                X::MatNum; kwargs...)
+function systematic_processing!(::Nothing, mp::MatrixProcessing, sigma::MatNum, X::MatNum,
+                                T::Real = size(X, 1); kwargs...)
     for step in mp.order
         if step !== :pdm
-            matrix_processing_step!(Val(step), mp, sigma, X; kwargs...)
+            matrix_processing_step!(Val(step), mp, sigma, X, T; kwargs...)
         end
     end
     # The product of the loadings and the factor covariance is symmetric only to rounding, and
@@ -1214,8 +1172,7 @@ end
 """
     assert_systematic_repair(srep::AbstractSystematicRepair,
                              mp::AbstractMatrixProcessingEstimator) -> nothing
-    assert_systematic_repair(srep::NoSystematicRepair,
-                             mp::AbstractMatrixProcessingEstimator) -> nothing
+    assert_systematic_repair(::Nothing, mp::AbstractMatrixProcessingEstimator) -> nothing
 
 Checks that the Systematic Repair rule of a [`CrossSectionalFactorPrior`](@ref) can process the systematic block under its matrix processing estimator.
 
@@ -1223,8 +1180,8 @@ Checks that the Systematic Repair rule of a [`CrossSectionalFactorPrior`](@ref) 
 
 The method that Julia selects is the algorithm.
 
- 1. Every rule but [`NoSystematicRepair`](@ref) accepts every `mp`. A rule of a caller states its own needs in its method of [`systematic_processing!`](@ref).
- 2. [`NoSystematicRepair`](@ref) reads the steps of `mp` one by one, so it accepts a [`MatrixProcessing`](@ref) alone. Without this check, another estimator fails at the fit with a `MethodError` of [`systematic_processing!`](@ref).
+ 1. Every rule accepts every `mp`. A rule of a caller states its own needs in its method of [`systematic_processing!`](@ref).
+ 2. `nothing` reads the steps of `mp` one by one, so it accepts a [`MatrixProcessing`](@ref) alone. Without this check, another estimator fails at the fit with a `MethodError` of [`systematic_processing!`](@ref).
 
 # Arguments
 
@@ -1233,7 +1190,7 @@ The method that Julia selects is the algorithm.
 
 # Validation
 
-  - Under [`NoSystematicRepair`](@ref), `mp` is a [`MatrixProcessing`](@ref).
+  - Under `nothing`, `mp` is a [`MatrixProcessing`](@ref).
 
 # Returns
 
@@ -1249,10 +1206,9 @@ function assert_systematic_repair(::AbstractSystematicRepair,
                                   ::AbstractMatrixProcessingEstimator)
     return nothing
 end
-function assert_systematic_repair(::NoSystematicRepair,
-                                  mp::AbstractMatrixProcessingEstimator)
+function assert_systematic_repair(::Nothing, mp::AbstractMatrixProcessingEstimator)
     @argcheck(isa(mp, MatrixProcessing),
-              ArgumentError("srep = NoSystematicRepair() runs the steps of mp one by one, so it takes a MatrixProcessing alone, and mp is a $(nameof(typeof(mp))). Use srep = SystematicRepair(), which runs matrix_processing! of mp on the systematic block, or pass a MatrixProcessing."))
+              ArgumentError("srep = nothing runs the steps of mp one by one, so it takes a MatrixProcessing alone, and mp is a $(nameof(typeof(mp))). Use srep = SystematicRepair(), which runs matrix_processing! of mp on the systematic block, or pass a MatrixProcessing."))
     return nothing
 end
 """
@@ -1260,14 +1216,14 @@ $(DocStringExtensions.TYPEDEF)
 
 Folds each part of a [`CrossSectionalFactorPrior`](@ref) that has a fold, and fits every other part again at each step of the carry fold. This is the default Carry Rule.
 
-The rule accepts every configuration. A part that does not fold, as [`carry_growing_parts`](@ref) lists it, is fitted again over every row that it reads, so the call with no data equals the batch fit over the folded observations. The cost of that refit grows with the stream:
+The rule accepts every configuration. The carry fold fits a part that does not fold again over every row that the part reads, and [`carry_growing_parts`](@ref) lists such parts. So the call with no data equals the batch fit over the folded observations. The cost of that refit grows with the stream:
 
   - A factor or a Return Forecast with no finite look-back makes the carry keep every panel row, so each step computes its Factor Exposures over every row.
   - A Return Forecast with no fold of its rows fits again over every row at each call with no data.
   - A `ve` that does not fold fits every idiosyncratic return again at each step.
   - A factor prior `pe` that does not fold fits every factor return again at each call with no data.
   - A [`BatchChoice`](@ref) with an automatic dropped member folds the factor prior again over every carried factor return at each step that moves the member.
-  - The idiosyncratic correlation under `th > 0` with a `ce` that does not fold is estimated again over every standardised idiosyncratic return at each call with no data. A `ce` that folds, as the default `ExpWeightedCovariance` does, folds the rows of each step.
+  - Under `th > 0`, a `ce` that does not fold estimates the idiosyncratic correlation again over every standardised idiosyncratic return at each call with no data. A `ce` that folds, as the default `ExpWeightedCovariance` does, folds the rows of each step.
 
 [`FoldOnly`](@ref) refuses such a prior in its constructor instead.
 
@@ -1295,7 +1251,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Accepts only a [`CrossSectionalFactorPrior`](@ref) whose every step of the carry fold has a cost that does not grow with the stream.
 
-The constructor of the prior refuses a configuration that holds a part from [`carry_growing_parts`](@ref), and names each such part and the method that it lacks. A bounded window passes: a factor whose Descriptors state a finite [`lookback`](@ref) makes the carry keep that many rows alone. On the configurations that the rule accepts, the carry fold runs the same step as under [`FoldOrRefit`](@ref), so the call with no data equals the batch fit. A step where an Empty Factor comes alive folds the factor prior again over every carried factor return, at most once for each factor, as [`cross_sectional_step_factors`](@ref) states. The data decide that step and the configuration does not, so the rule does not refuse it.
+The constructor of the prior refuses a configuration that holds a part from [`carry_growing_parts`](@ref), and names each such part and the method that it lacks. A bounded window passes. A factor whose Descriptors state a finite [`lookback`](@ref) makes the carry keep that many rows alone. On the configurations that the rule accepts, the carry fold runs the same step as under [`FoldOrRefit`](@ref), so the call with no data equals the batch fit. A step where an Empty Factor comes alive folds the factor prior again over every carried factor return, at most once for each factor, as [`cross_sectional_step_factors`](@ref) states. The data decide that step and the configuration does not, so the rule does not refuse it.
 
 # Constructors
 
@@ -1331,7 +1287,7 @@ Each entry names the part and the method that it lacks. The test reads the confi
  3. List `ve` when [`supports_partial_fit`](@ref) answers `false`.
  4. List `pe` when [`carry_folds`](@ref) answers `false`.
  5. List `th` when it is positive and [`supports_partial_fit`](@ref) answers `false` for `ce`, because the idiosyncratic correlation then has no fold.
- 6. List `choice` with [`carry_choice_parts`](@ref): a [`BatchChoice`](@ref) with an automatic dropped member, because a step that moves the member folds the factor prior again over every carried factor return.
+ 6. List `choice` with [`carry_choice_parts`](@ref) when it is a [`BatchChoice`](@ref) with an automatic dropped member, because a step that moves the member folds the factor prior again over every carried factor return.
 
 # Arguments
 
@@ -1348,7 +1304,7 @@ Each entry names the part and the method that it lacks. The test reads the confi
   - [`FoldOnly`](@ref)
   - [`cross_sectional_carry_rows`](@ref)
 """
-function carry_growing_parts(cfg::Union{<:CrossSectionalFactorPrior, <:NamedTuple})::Vector{String}
+function carry_growing_parts(cfg::Union{CrossSectionalFactorPrior, NamedTuple})::Vector{String}
     return vcat(String[],
                 (carry_growing_part(isnothing(carry_lookback(xe)),
                                     "the factor \"$name\" ($(nameof(typeof(xe)))) has no finite look-back, so the carry keeps every panel row. Each of its Descriptors needs a method of `lookback`")
@@ -1494,8 +1450,7 @@ The method that Julia selects is the algorithm.
 function assert_carry_rule(::FoldOrRefit, ::Any)
     return nothing
 end
-function assert_carry_rule(::FoldOnly,
-                           cfg::Union{<:CrossSectionalFactorPrior, <:NamedTuple})
+function assert_carry_rule(::FoldOnly, cfg::Union{CrossSectionalFactorPrior, NamedTuple})
     parts = carry_growing_parts(cfg)
     @argcheck(isempty(parts),
               ArgumentError("carry = FoldOnly() refuses this CrossSectionalFactorPrior, because the cost of a step of its carry fold grows with the stream for each part below.\n" *
@@ -1508,6 +1463,6 @@ export PrecisionBlend, CurrentForecastError, ForecastHistoryError, SteinShrinkag
        ForecastCalibrationSlope, ThresholdWarmUp, PlugInWarmUp, PositivePartWarmUp
 public AbstractForecastErrorAlgorithm, AbstractForecastScaleWarmUpAlgorithm,
        spanned_forecast_sample, forecast_scale_warm_up
-export SystematicRepair, NoSystematicRepair, FoldOrRefit, FoldOnly
+export SystematicRepair, FoldOrRefit, FoldOnly
 public AbstractSystematicRepair, systematic_processing!, AbstractCarryRule,
        assert_carry_rule

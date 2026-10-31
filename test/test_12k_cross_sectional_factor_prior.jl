@@ -222,6 +222,68 @@ end
         @test_throws PO.IsEmptyError CrossSectionalFactorPrior(; lambda = 1,
                                                                factors = Pair{String, Any}[])
     end
+    @testset "A rebuild holds the vectors it was built from (#1825)" begin
+        f = csfp_factors()
+        fam = ["industry" => nothing]
+        p = CrossSectionalFactorPrior(; lambda = 1, factors = f, families = fam)
+        @test p.factors === f
+        @test p.families === fam
+        r = PO.rebuild_estimator(p, (; cache = nothing))
+        @test r.factors === f
+        @test r.families === fam
+        # A dictionary, and a key that is not a String, are still collected.
+        d = Dict("industry" => nothing)
+        q = CrossSectionalFactorPrior(; lambda = 1, factors = f, families = d)
+        @test q.families == ["industry" => nothing]
+        @test q.families !== d
+        @test PO.rebuild_estimator(q, (; cache = nothing)).families === q.families
+        @test PO.string_key_pairs([:a => 1]) == ["a" => 1]
+    end
+    @testset "A pin has nothing to read from a buffer that fits nothing or holds no panel (#1912)" begin
+        # A pinned choice writes the dropped member of each family into `families` at the first
+        # fit of the refit route, and a step with nothing to fit leaves the family as written.
+        rdp = csfp_panel(; n_assets = 20, n_observations = 160, n_industries = 3,
+                         seed = 782_101).rd
+        rows(r, i) = PO.port_opt_view(r, i, :)
+        est(; kw...) = CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors(),
+                                                 families = ["industry" => nothing],
+                                                 choice = PinnedChoice(), minra = 5, kw...)
+        refit(e, r) = partial_fit!(PO.update_online_estimator(Online(e)), r)
+        # Too few rows follow the warm-up for a first fit, so there is nothing to pin yet.
+        @test only(refit(est(), rows(rdp, 1:2)).families) == ("industry" => nothing)
+        # The first fit pins the member, and the refit answers the batch fit.
+        o = refit(est(), rows(rdp, 1:150))
+        name = last(only(o.families))
+        @test startswith(name, "industry=")
+        b = prior(est(), rows(rdp, 1:150))
+        po = prior(o)
+        @test isequal(po.mu, b.mu)
+        @test isequal(po.sigma, b.sigma)
+        # Every observation is a gap of the Shared Series, so a fit keeps none: nothing pins.
+        rdg = ReturnsResult(; nx = rdp.nx, X = rdp.X, nb = ["BM"],
+                            B = fill(NaN, size(rdp.X, 1)), pnl = rdp.pnl, ts = rdp.ts)
+        og = refit(est(; x_src = ExcessSource()), rows(rdg, 1:50))
+        @test only(og.families) == ("industry" => nothing)
+        # The returns record no Asset Panel, which the exposures are read from.
+        rdn = ReturnsResult(; nx = rdp.nx, X = rdp.X)
+        @test only(refit(est(), rdn).families) == ("industry" => nothing)
+        # A family that names its dropped member is already pinned, and stays as written.
+        pinned = est(; families = ["industry" => name])
+        @test only(refit(pinned, rows(rdp, 1:150)).families) == ("industry" => name)
+        @test isequal(prior(refit(pinned, rows(rdp, 1:150))).mu, b.mu)
+        # A pin on a member that the fit does not choose stays as written too, and the refit
+        # answers the batch fit under that pin, not under the member the fit chooses (#1926).
+        # The basis honours a pinned member, so the exit for a set with every member pinned
+        # is a short cut: it gives the families that the steps after it give.
+        other = "industry=Banks"
+        @test other != name
+        pinned_other = est(; families = ["industry" => other])
+        o_other = refit(pinned_other, rows(rdp, 1:150))
+        @test only(o_other.families) == ("industry" => other)
+        b_other = prior(pinned_other, rows(rdp, 1:150))
+        @test isequal(prior(o_other).mu, b_other.mu)
+        @test !isequal(b_other.mu, b.mu)
+    end
     @testset "The scalar guards" begin
         f = csfp_factors()
         @test_throws DomainError CrossSectionalFactorPrior(; lambda = 1, factors = f,
@@ -279,7 +341,9 @@ end
         rd = csfp_panel(; n_assets = 10, n_observations = 20, n_industries = 2).rd
         @test_throws PO.IsNothingError prior(pe, rd.X)
         @test_throws PO.IsNothingError prior(pe, rd.X, nothing, nothing)
-        @test_throws PO.IsNothingError prior(pe, ReturnsResult(; nx = rd.nx, X = rd.X))
+        # A carrier with no panel reads the universe of its finiteness (#1882), and the
+        # exposure that reads a Panel Field names the field it does not find.
+        @test_throws KeyError prior(pe, ReturnsResult(; nx = rd.nx, X = rd.X))
         # The residual declaration has no shape that can express this estimator's block.
         @test_throws ArgumentError PO.factor_residual_config(pe)
     end
@@ -664,6 +728,50 @@ scenario mean.
                                                                   pes = ops))
         @test_throws ArgumentError EntropyPoolingPrior(; pe = pop1, sets = sets,
                                                        mu_views = views)
+    end
+    @testset "A caller's w on a nested prior reaches the residual correlation of the refit (#1927)" begin
+        # A threshold above zero makes `ce` read the standardised idiosyncratic returns, and a
+        # `Covariance` reads observation weights. A nested entropy pooling prior fits the
+        # cross-sectional prior under its own `w`, so the `ce` of the fit that the views read
+        # carries `w`. An augmented Black-Litterman prior hands its asset prior to
+        # `scenario_factory`, whose refit holds `ce`, so the refit must carry `w` too. The
+        # refit without it reads a residual correlation that no view read, and moves `sigma`
+        # by 2.1e-5 against a largest entry of 6.7e-4.
+        PO = PortfolioOptimisers
+        F = randn(StableRNG(1927), size(rd.X, 1), 2) ./ 100
+        asets = UniverseSets(; xkey = "nx",
+                             dict = Dict("nx" => rd.nx, "nf" => ["F1", "F2"]))
+        v = collect(range(1, 3; length = T))
+        wn = StatsBase.aweights(v ./ sum(v))
+        csc(pe0, ce) = CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors(),
+                                                 minra = 5, th = 0.1, pe = pe0, ce = ce)
+        abl(a, f) = AugmentedBlackLittermanPrior(; a_pe = a, f_pe = f, sets = asets,
+                                                 re = DimensionReductionRegression(),
+                                                 a_views = LinearConstraintEstimator(;
+                                                                                     val = "$(rd.nx[2]) == 0.001"),
+                                                 f_views = LinearConstraintEstimator(;
+                                                                                     val = "F1 == 0.001"))
+        nested = EntropyPoolingPrior(; pe = csc(EmpiricalPrior(), Covariance()), w = wn)
+        av = LinearConstraintEstimator(; val = "$(rd.nx[1]) == 0.003")
+        for mk in (EntropyPoolingPrior, MeucciEntropyPoolingPrior)
+            pw = prior(mk(; pe = abl(nested, EmpiricalPrior()), sets = asets,
+                          mu_views = av), rd.X, F, rd.pnl)
+            w = pw.w
+            @test length(w) == T
+            # The reference states every weight of the refit. The factor prior of the asset
+            # prior reads the posterior `w`, and `ce` reads `wn`. The factor prior of the
+            # augmented prior reads every row of `F`, and the first row, which no scenario
+            # covers, takes a zero weight.
+            ref(ce) = prior(abl(csc(PO.factory(EmpiricalPrior(), w), ce),
+                                PO.factory(EmpiricalPrior(),
+                                           StatsBase.aweights(vcat(0.0, w)))), rd.X, F,
+                            rd.pnl)
+            pr1 = ref(PO.factory(Covariance(), wn))
+            @test isapprox(pw.mu, pr1.mu; rtol = 1e-12)
+            @test isapprox(pw.sigma, pr1.sigma; rtol = 1e-12)
+            pr0 = ref(Covariance())
+            @test !isapprox(pw.sigma, pr0.sigma; rtol = 1e-6)
+        end
     end
 end
 
@@ -1736,6 +1844,29 @@ end
                                                                             intercept = true))
         @test_throws ArgumentError prior(pe, rd)
     end
+    @testset "Each period spends the parameters that its fit spent (#1900)" begin
+        rdc = csfp_panel(; n_assets = 20, n_observations = 60, n_industries = 3,
+                         seed = 1_900).rd
+        mk(cre) = prior(CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors(),
+                                                  minra = 5, cre = cre), rdc)
+        pl = mk(CrossSectionalTargetRegression(; alg = DependentColumnDrop()))
+        en = ElasticNet(; strength = FixedStrength(; gamma = 0.05))
+        pn = mk(CrossSectionalTargetRegression(; tgt = en, alg = DependentColumnDrop()))
+        cl, cn = pl.rr.csr, pn.rr.csr
+        K = size(cl.f, 2)
+        # The market column is the sum of the industry columns, so a least-squares period
+        # spends K - 1 parameters, not the K columns that the count read before #1900.
+        @test cl.n .- cl.edof == fill(K - 1, length(cl.n))
+        # The linear member and a least-squares target spend the same.
+        @test mk(CrossSectionalLinearRegression()).rr.csr.edof == cl.edof
+        # The penalised fit spends less, and the prior scales the same count of its variance
+        # estimator by the fraction of each fit, which `test_08j_cross_sectional_regression_sweep`
+        # checks period by period against a refit.
+        @test all(cn.edof .> cl.edof)
+        @test pn.rr.edof ./ pl.rr.edof ≈
+              fill((sum(cn.edof) / sum(cn.n)) / (sum(cl.edof) / sum(cl.n)),
+                   length(pl.rr.edof))
+    end
 end
 
 #=
@@ -1806,15 +1937,19 @@ allocated the exposure history in the element type of the returns, so integer re
         nT, nN, nK = 12, 7, 3
         n = rand(rng, 5:7, nT)
         cnt = (; n = 10 .* rand(rng, nN), m = rand(rng, nN))
+        # The fraction reads the residual count that the fit of each period records, a real
+        # count for a penalised fit (#1900).
+        nu = n .- nK .+ rand(rng, nT)
         csr = PO.CrossSectionalRegression(; f = randn(rng, nT, nK),
-                                          eps = randn(rng, nT, nN), n = n)
+                                          eps = randn(rng, nT, nN), n = n, edof = nu)
         c = PO.cross_sectional_variance_counts(cnt, csr)
-        @test c.edof ≈ (sum(n .- nK) / sum(n)) .* cnt.n
+        @test c.edof ≈ (sum(nu) / sum(n)) .* cnt.n
         @test c.ediv == cnt.m
-        # An intercept is one more parameter of each period.
-        csrb = PO.CrossSectionalRegression(; f = csr.f, eps = csr.eps, n = n, b = zeros(nT))
-        @test PO.cross_sectional_variance_counts(cnt, csrb).edof ≈
-              (sum(n .- nK .- 1) / sum(n)) .* cnt.n
+        # A fit that records no count, as one built by hand, states no degrees of freedom, as
+        # a time-series block with no `edof` does.
+        csr0 = PO.CrossSectionalRegression(; f = csr.f, eps = csr.eps, n = n)
+        @test PO.cross_sectional_variance_counts(cnt, csr0) ==
+              (; edof = nothing, ediv = cnt.m)
         @test PO.cross_sectional_variance_counts(nothing, csr) ==
               (; edof = nothing, ediv = nothing)
     end
@@ -1889,7 +2024,7 @@ allocated the exposure history in the element type of the returns, so integer re
         Li = L[idx, :]
         Cf = cholesky(Sf).L
         for (es, Di) in ((ev, Diagonal(ev[idx])), (D, D[idx, idx]))
-            lf = PO.cross_sectional_lift(NoSystematicRepair(), mp, L, muf, Sf, es, idx, Xs)
+            lf = PO.cross_sectional_lift(nothing, mp, L, muf, Sf, es, idx, Xs)
             @test lf.mu[idx] ≈ Li * muf
             @test lf.sigma[idx, idx] ≈ Li * Sf * Li' + Di
             @test lf.chol[:, idx]' * lf.chol[:, idx] ≈ lf.sigma[idx, idx]
@@ -1917,15 +2052,14 @@ allocated the exposure history in the element type of the returns, so integer re
         end
         # `chol` factorises the factor model before `mp` processes it, so a detoning `mp`
         # moves `sigma` and leaves `chol` where it was.
-        lf = PO.cross_sectional_lift(NoSystematicRepair(),
-                                     MatrixProcessing(; dt = Detone()), L, muf, Sf, ev, idx,
-                                     Xs)
+        lf = PO.cross_sectional_lift(nothing, MatrixProcessing(; dt = Detone()), L, muf, Sf,
+                                     ev, idx, Xs)
         @test lf.chol[:, idx]' * lf.chol[:, idx] ≈ Li * Sf * Li' + Diagonal(ev[idx])
         @test !isapprox(lf.chol[:, idx]' * lf.chol[:, idx], lf.sigma[idx, idx])
         # An asset with finite inputs that `idx` leaves out keeps a `NaN` variance, so the
         # Investable Mask of the answer is never wider than `idx`.
         idx2 = setdiff(idx, 8)
-        lf = PO.cross_sectional_lift(NoSystematicRepair(), mp, L, muf, Sf, ev, idx2, Xs)
+        lf = PO.cross_sectional_lift(nothing, mp, L, muf, Sf, ev, idx2, Xs)
         @test isfinite(lf.mu[8]) && isnan(lf.sigma[8, 8])
         @test findall(isfinite.(lf.mu) .& isfinite.(diag(lf.sigma))) == idx2
     end
@@ -1939,8 +2073,7 @@ allocated the exposure history in the element type of the returns, so integer re
         ev = rand(rng, nN) .+ 0.1
         idx = collect(1:nN)
         Xs = randn(rng, 30, nN)
-        @test CrossSectionalFactorPrior(; factors = csfp_factors()).srep ===
-              NoSystematicRepair()
+        @test CrossSectionalFactorPrior(; factors = csfp_factors()).srep === nothing
         # The systematic block has rank 3 of 8, so `LinearAlgebra.isposdef` refuses it, and
         # the `:pdm` step runs the Newton repair on it.
         si = PO.support_product(L, Sf, L)
@@ -1953,11 +2086,11 @@ allocated the exposure history in the element type of the returns, so integer re
         posdef!(mp.pdm, old)
         rep = PO.cross_sectional_lift(SystematicRepair(), mp, L, muf, Sf, ev, idx, Xs)
         @test rep.sigma == old
-        # `NoSystematicRepair` takes the symmetric part of the block under the default `mp`.
+        # `srep = nothing` takes the symmetric part of the block under the default `mp`.
         # The product is symmetric only to rounding, and `isposdef` refuses a matrix that is
         # not exactly symmetric, so the repair of the sum would run its Newton step without
         # it. The symmetric sum is positive definite, so its repair changes nothing.
-        no = PO.cross_sectional_lift(NoSystematicRepair(), mp, L, muf, Sf, ev, idx, Xs)
+        no = PO.cross_sectional_lift(nothing, mp, L, muf, Sf, ev, idx, Xs)
         sym = (si + si') / 2
         @test !issymmetric(si) && issymmetric(sym)
         @test isposdef(sym + D)
@@ -1967,17 +2100,17 @@ allocated the exposure history in the element type of the returns, so integer re
         @test no.sigma != rep.sigma
         @test maximum(abs, no.sigma - rep.sigma) / maximum(abs, rep.sigma) < 1e-11
         @test no.mu == rep.mu && no.chol == rep.chol
-        # `NoSystematicRepair` skips the `:pdm` step alone: it equals `SystematicRepair` under
+        # `srep = nothing` skips the `:pdm` step alone: it equals `SystematicRepair` under
         # an `mp` whose order leaves `:pdm` out, and it still runs every other step.
         dt = MatrixProcessing(; dt = Detone(; n = 1))
         nopdm = MatrixProcessing(; dt = Detone(; n = 1), order = (:dn, :dt, :alg))
-        a = PO.cross_sectional_lift(NoSystematicRepair(), dt, L, muf, Sf, ev, idx, Xs)
+        a = PO.cross_sectional_lift(nothing, dt, L, muf, Sf, ev, idx, Xs)
         b = PO.cross_sectional_lift(SystematicRepair(), nopdm, L, muf, Sf, ev, idx, Xs)
         @test a.sigma == b.sigma
         @test a.sigma != no.sigma
         # The verb runs the steps in place, and returns the block.
         s = copy(si)
-        @test PO.systematic_processing!(NoSystematicRepair(), mp, s, Xs) === s
+        @test PO.systematic_processing!(nothing, mp, s, Xs) === s
         @test s == sym
         s = copy(si)
         @test PO.systematic_processing!(SystematicRepair(), mp, s, Xs) === s
@@ -1985,9 +2118,9 @@ allocated the exposure history in the element type of the returns, so integer re
         # The default rule reads the steps of a `MatrixProcessing`, so the constructor refuses
         # another `mp` under it, where the fit would fail with a `MethodError`.
         cmp = CsfpCallerMatrixProcessing()
-        @test_throws "srep = NoSystematicRepair() runs the steps of mp one by one" CrossSectionalFactorPrior(;
-                                                                                                             factors = csfp_factors(),
-                                                                                                             mp = cmp)
+        @test_throws "srep = nothing runs the steps of mp one by one" CrossSectionalFactorPrior(;
+                                                                                                factors = csfp_factors(),
+                                                                                                mp = cmp)
         # Under `SystematicRepair` the lift still repairs the sum under the estimator that
         # `matrix_processing_posdef` gives, so the constructor refuses an `mp` that does not
         # state it, where the fit would fail with a `FieldError` (#1765).
@@ -2000,7 +2133,7 @@ allocated the exposure history in the element type of the returns, so integer re
                                         srep = SystematicRepair()).mp === smp
         @test PO.cross_sectional_lift(SystematicRepair(), smp, L, muf, Sf, ev, idx, Xs).sigma ==
               rep.sigma
-        @test isnothing(PO.assert_systematic_repair(NoSystematicRepair(), mp))
+        @test isnothing(PO.assert_systematic_repair(nothing, mp))
     end
     @testset "Integer returns fit, and equal the fit of their float copy" begin
         rd = csfp_panel(; n_assets = 40, n_observations = 80, n_industries = 3,

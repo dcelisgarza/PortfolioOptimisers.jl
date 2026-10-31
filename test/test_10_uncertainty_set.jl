@@ -907,6 +907,17 @@ end
             @test all(lb .<= ub)
             @test all(lb .<= sum(sims) / length(sims) .<= ub)
         end
+        @testset "A skewed sample puts its mean outside both quantile bounds" begin
+            # Ninety-nine zeros and one outlier: both quantiles are zero and the mean is ten,
+            # so the two builders bracket the mean of a near-normal sample only.
+            s = [zeros(99); 1000.0]
+            lb, ub = PortfolioOptimisers.vec_quantile_bounds(reshape(s, 1, 100), 0.025, (;))
+            @test lb == ub == [0.0]
+            @test Statistics.mean(s) == 10.0
+            blb, bub = PortfolioOptimisers.box_quantile_bounds(Float64, (i, j) -> s, 1,
+                                                               0.025, (;))
+            @test blb == bub == fill(0.0, 1, 1)
+        end
         @testset "A view carries k through, so it is not the subset's own fit" begin
             # The restricted shape matrix equals the one fitted on the subset alone, but
             # the radius does not: only the general route, which reads neither the data nor
@@ -1044,7 +1055,7 @@ end
             ue = NormalUncertaintySet(; alg = BoxUncertaintySetAlgorithm(), q = 0.05,
                                       n_sim = 4_000, seed = 1)
             pr_b = prior(ue.pe, Xd)
-            Tb, sigma_mu, q = PortfolioOptimisers.normal_box_preamble(ue, pr_b)
+            Tb, sigma_mu, q = PortfolioOptimisers.normal_box_preamble(ue, pr_b, 1)
             @test q == ue.q * 0.5
             @test Tb == size(Xd, 1)
             mset, sset = ucs(ue, Xd)
@@ -1079,28 +1090,52 @@ end
             # The per-entry box is not a joint region: over N entries it covers less.
             @test mean(vec(all(abs.(E) .<= z .* sd; dims = 1))) < 1 - ue.q
         end
-        @testset "The scaling parameter reads three sources in order" begin
+        @testset "The scaling parameter reads two sources in order, one moment at a time" begin
             rng = StableRNG(2468)
             N, T = 3, 400
             Xd = randn(rng, T, N) * 0.01
             base = NormalUncertaintySet(; alg = BoxUncertaintySetAlgorithm(), q = 0.05,
                                         n_sim = 2_000, seed = 3)
             pr_s = prior(base.pe, Xd)
-            @test isnothing(pr_s.ens)
-            @test PortfolioOptimisers.choose_scaling_parameter(base, pr_s) == size(Xd, 1)
+            @test pr_s.eoc == (nothing, nothing)
+            @test PortfolioOptimisers.choose_scaling_parameter(base, pr_s, 1) == size(Xd, 1)
+            @test PortfolioOptimisers.choose_scaling_parameter(base, pr_s, 2) == size(Xd, 1)
             # The estimator's own `ens` wins over the row count, and a prior that reports
-            # fewer effective scenarios widens the set: the width scales as T^(-1/2).
+            # fewer effective observations widens the set: the width scales as T^(-1/2).
             quarter = NormalUncertaintySet(; alg = BoxUncertaintySetAlgorithm(), q = 0.05,
                                            n_sim = 2_000, seed = 3, ens = T / 4)
-            @test PortfolioOptimisers.choose_scaling_parameter(quarter, pr_s) == T / 4
+            @test PortfolioOptimisers.choose_scaling_parameter(quarter, pr_s, 1) == T / 4
             m1, _ = ucs(base, Xd)
             m2, _ = ucs(quarter, Xd)
             @test m2.ub ≈ 2 * m1.ub
-            # The prior's own `ens` wins over the row count when the estimator states none.
-            pr_ens = PortfolioOptimisers.LowOrderPrior(; X = pr_s.X, mu = pr_s.mu,
-                                                       sigma = pr_s.sigma, ens = T / 9)
-            @test PortfolioOptimisers.choose_scaling_parameter(base, pr_ens) == T / 9
-            @test PortfolioOptimisers.choose_scaling_parameter(quarter, pr_ens) == T / 4
+            # The count of each moment that the prior states in `eoc` wins over the row
+            # count when the estimator states none (#1893). The `ens` of the prior is a
+            # diagnostic of its weights, and no set reads it.
+            pr_eoc = PortfolioOptimisers.LowOrderPrior(; X = pr_s.X, mu = pr_s.mu,
+                                                       sigma = pr_s.sigma, ens = T / 2,
+                                                       eoc = (T / 9, T / 16))
+            @test PortfolioOptimisers.choose_scaling_parameter(base, pr_eoc, 1) == T / 9
+            @test PortfolioOptimisers.choose_scaling_parameter(base, pr_eoc, 2) == T / 16
+            @test PortfolioOptimisers.choose_scaling_parameter(quarter, pr_eoc, 2) == T / 4
+            # A joint box reads each count for its own half, so it equals the two
+            # single boxes over the same prior. A set with no prior of its own reads the
+            # prior result that it is given.
+            onpr = NormalUncertaintySet(; pe = nothing, alg = BoxUncertaintySetAlgorithm(),
+                                        q = 0.05, n_sim = 2_000, seed = 3)
+            mj, sj = ucs(onpr, pr_eoc)
+            mb = mu_ucs(onpr, pr_eoc)
+            sb = sigma_ucs(onpr, pr_eoc)
+            @test mj.ub == mb.ub
+            @test sj.lb == sb.lb
+            @test sj.ub == sb.ub
+            # Each half reads its own count, so the mean box is the box at T / 9, and the
+            # covariance box differs from the box at T / 9.
+            pr_9 = PortfolioOptimisers.LowOrderPrior(; X = pr_s.X, mu = pr_s.mu,
+                                                     sigma = pr_s.sigma,
+                                                     eoc = (T / 9, T / 9))
+            m9, s9 = ucs(onpr, pr_9)
+            @test m9.ub == mj.ub
+            @test s9.ub != sj.ub
         end
         @testset "Both verbs read the asset count from the prior" begin
             # `ucs` and `sigma_ucs` both take N from `size(pr.X, 2)`, so a factor prior
@@ -1504,6 +1539,17 @@ end
             ucsv = CompactCovarianceUncertaintySet(; kappa = 2.0, C = Cc, Q = Qc,
                                                    val = sigmac)
             @test PortfolioOptimisers.port_opt_view(ucsv, iv).val == sigmac[iv, iv]
+            # Issue 663: `i` holds the indices the view keeps, as a vector, a range or a
+            # mask, and the three forms give one set.
+            imv = falses(Nc)
+            imv[iv] .= true
+            for ix in (1:5, imv)
+                vx = PortfolioOptimisers.port_opt_view(ucsc, ix)
+                @test vx.Q == vc.Q && vx.C == vc.C && vx.R == vc.R
+            end
+            # `Q' Q ⪯ I` on a view, so `I - Q Q'` is positive semidefinite and the bound of
+            # the set is a member of the set. On a view it is not a projector: measured 0.237.
+            @test minimum(eigvals(Symmetric(I - vc.Q * transpose(vc.Q)))) > 1e-3
         end
         @testset "The JuMP term reproduces the closed form and lifts no matrix" begin
             resc = optimise(MeanRisk(; r = UncertaintySetVariance(; ucs = ucsc),
@@ -2490,6 +2536,13 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
                all(isfinite, set.L) &&
                set.val === prp.sigma
     end
+    # An l1 set is the norm ball with the map diag(sd), so its scale is geometry and carries
+    # zero, and its centre `mu` is the prior's own mean. A `nothing` scale passes through.
+    function frame_is_right(set::Union{<:L1UncertaintySet, <:SignedL1UncertaintySet})
+        return (isnothing(set.sd) ||
+                (length(set.sd) == N && all(iszero, view(set.sd, .!msk)))) &&
+               set.mu === prp.mu
+    end
     # One builder per family and algorithm, taking the prior estimator, so the same
     # configuration is fitted on the prior route (`pe = nothing`) and on the returns route.
     # `seed` pins the draws, so the two fits on the same reduced inputs are identical.
@@ -2540,6 +2593,54 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
             @test size(mu_x.val, 1) == N
             @test isequal(mu_x.val, prp.mu)
         end
+    end
+    # Issue #1812. The characteristic family is mean-only, so it takes `mu_ucs` alone. Before
+    # the fix its calibration ranked the full `pr.mu`, read `NaN` rungs, and blamed a tie.
+    l1_families = ["l1" => L1UncertaintySetAlgorithm(),
+                   "l1, scaled" => L1UncertaintySetAlgorithm(; scaled = true),
+                   "l1, scaled, paired" =>
+                       L1UncertaintySetAlgorithm(; scaled = true, paired = true),
+                   "signed l1" => SignedL1UncertaintySetAlgorithm(; scaled = false),
+                   "signed l1, scaled" => SignedL1UncertaintySetAlgorithm()]
+    for (name, alg) in l1_families
+        @testset "Characteristic $(name)" begin
+            ue = CharacteristicUncertaintySet(; pe = nothing, alg = alg)
+            mu_f = mu_ucs(ue, prp)
+            @test frame_is_right(mu_f)
+            @test isnothing(mu_f.sd) == !alg.scaled
+            mu_r = mu_ucs(ue, prr)
+            @test view_recovers(mu_f, mu_r)
+            # The radii are scalar budgets, so they pass through the expansion unchanged.
+            for n in (:eps, :ep, :en)
+                hasproperty(mu_r, n) && @test getproperty(mu_f, n) == getproperty(mu_r, n)
+            end
+            mu_x = mu_ucs(CharacteristicUncertaintySet(; alg = alg), rdp)
+            @test view_recovers(mu_x, mu_r)
+            @test isequal(mu_x.mu, prp.mu)
+        end
+    end
+    @testset "Characteristic l1 checks" begin
+        # A zero scale fixes its entry at the estimate, and a `NaN` centre marks an asset
+        # outside the mask; an infinite entry of either is never a frame.
+        @test L1UncertaintySet(; eps = 0.1, sd = [0.0, 1.0], mu = [NaN, 0.1]).sd ==
+              [0.0, 1.0]
+        @test SignedL1UncertaintySet(; ep = 0.1, en = 0.2, sd = [0.0, 1.0],
+                                     mu = [NaN, 0.1]).sd == [0.0, 1.0]
+        @test_throws PO.IsNonFiniteError L1UncertaintySet(; eps = 0.1, sd = [Inf, 1.0])
+        @test_throws PO.IsNonFiniteError L1UncertaintySet(; eps = 0.1, sd = [NaN, 1.0])
+        @test_throws PO.IsNonFiniteError SignedL1UncertaintySet(; ep = 0.1, en = 0.2,
+                                                                sd = [Inf, 1.0])
+        @test_throws PO.IsNonFiniteError SignedL1UncertaintySet(; ep = 0.1, en = 0.2,
+                                                                mu = [-Inf, 1.0])
+        @test_throws DomainError SignedL1UncertaintySet(; ep = 0.1, en = 0.2,
+                                                        sd = [1.0, -1.0])
+        # The calibration names the real cause of a `NaN` rung, and refuses a scale that it
+        # divides by.
+        alg = ActiveAssetsUncertaintyAlgorithm(; active = 1)
+        @test_throws PO.IsNonFiniteError PO.l1_resolve_eps(alg, [0.2, NaN, 0.1], nothing,
+                                                           false)
+        @test_throws DomainError PO.l1_resolve_eps(alg, [0.2, 0.15, 0.1], [1.0, 0.0, 1.0],
+                                                   false)
     end
     @testset "A reduced prior is a passthrough" begin
         # On a result whose mask is `nothing`, the reduction and the expansion touch

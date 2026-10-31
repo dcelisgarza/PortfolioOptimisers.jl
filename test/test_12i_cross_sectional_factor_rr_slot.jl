@@ -112,8 +112,9 @@ end
         @test pr_csfm_reb.rr === csfm_reb
         # The positional constructor takes it too, not only the keyword one.
         @test isa(LowOrderPrior(pr_csfm_reb.X, nothing, pr_csfm_reb.mu, pr_csfm_reb.sigma,
-                                nothing, nothing, nothing, nothing, nothing, csfm_reb,
-                                pr_csfm_reb.fpr, nothing, nothing, nothing), LowOrderPrior)
+                                nothing, nothing, nothing, (nothing, nothing), nothing,
+                                nothing, csfm_reb, pr_csfm_reb.fpr, nothing, nothing,
+                                nothing), LowOrderPrior)
     end
 
     @testset "The block invariants still read rr.M" begin

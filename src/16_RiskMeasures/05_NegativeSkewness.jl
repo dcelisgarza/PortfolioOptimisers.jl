@@ -1,5 +1,5 @@
 """
-    const NSkeFormulations = Union{<:NSkeQuadFormulations, <:SOCRiskExpr}
+    const NSkeFormulations = Union{NSkeQuadFormulations, SOCRiskExpr}
 
 Union of valid optimisation formulations for the [`NegativeSkewness`](@ref) risk measure.
 
@@ -9,32 +9,36 @@ Union of valid optimisation formulations for the [`NegativeSkewness`](@ref) risk
   - [`SOCRiskExpr`](@ref)
   - [`NegativeSkewness`](@ref)
 """
-const NSkeFormulations = Union{<:NSkeQuadFormulations, <:SOCRiskExpr}
+const NSkeFormulations = Union{NSkeQuadFormulations, SOCRiskExpr}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Negative Skewness risk measure.
+Measures the negative quadratic skewness of a portfolio, a convex part of its third moment.
 
-`NegativeSkewness` quantifies the portfolio's exposure to negative asymmetry in returns by computing a quadratic or SOC (second-order cone) form of the coskewness matrix. It penalises portfolio constructions that exhibit heavy left-tail behaviour.
+The measure is the quadratic form of the weights in ``\\mathbf{V}``, or its square root. ``\\mathbf{V}`` sums the negative spectral parts of the slices of the coskewness matrix, so the measure is never negative, and it is larger for a portfolio whose returns have a heavier left tail. Smaller is better, so [`bigger_is_better`](@ref) returns `false`. To minimise the measure is the way of [nskew](@cite) to raise the skewness of a portfolio with a convex programme. [`set_risk_constraints!`](@ref) states the model, which is the second-order cone of Equation 2 of [nskew](@cite).
 
 # Mathematical definition
 
-Let ``\\boldsymbol{w}`` be the portfolio weight vector and ``\\mathbf{V}`` the positive semi-definite matrix built from the negative spectral parts of the slices of the sample coskewness tensor. The Negative Skewness risk measure is:
-
 ```math
 \\begin{align}
+\\mathbf{M}_3 &= \\begin{bmatrix} \\mathbf{S}_1 & \\mathbf{S}_2 & \\cdots & \\mathbf{S}_N \\end{bmatrix}\\,, \\\\
+\\mathbf{V} &= -\\sum_{i=1}^{N} \\mathbf{S}_i^{-}\\,, \\\\
 \\mathrm{NSke}(\\boldsymbol{w}) &= \\begin{cases}
-  \\sqrt{\\boldsymbol{w}^\\intercal \\mathbf{V} \\boldsymbol{w}} & \\text{(SOC formulation)} \\\\
-  \\boldsymbol{w}^\\intercal \\mathbf{V} \\boldsymbol{w} & \\text{(Quadratic formulation)}
-\\end{cases}\\,.
+  \\sqrt{\\boldsymbol{w}^\\intercal \\mathbf{V} \\boldsymbol{w}} & \\text{under } \\texttt{SOCRiskExpr}\\,, \\\\
+  \\boldsymbol{w}^\\intercal \\mathbf{V} \\boldsymbol{w} & \\text{under } \\texttt{QuadRiskExpr}\\,,\\ \\texttt{SquaredSOCRiskExpr}\\,.
+\\end{cases}
 \\end{align}
 ```
 
 Where:
 
-  - ``\\mathrm{NSke}(\\boldsymbol{w})``: Negative Skewness risk measure.
+  - $(math_dict[:M3_cosk])
+  - ``\\mathbf{S}_i``: Slice ``i`` of ``\\mathbf{M}_3``, a symmetric ``N \\times N`` matrix.
+  - ``\\mathbf{S}_i^{-}``: Negative spectral part of ``\\mathbf{S}_i``, the sum of the terms of its eigendecomposition with a negative eigenvalue. It is negative semidefinite, so ``\\mathbf{V}`` is positive semidefinite.
+  - ``\\mathbf{V}``: Negative spectral coskewness, ``N \\times N``. It is the measure's own `V` when the measure states one, and the prior's otherwise.
   - $(math_dict[:w_port])
-  - ``\\mathbf{V}``: Positive semi-definite matrix built from the negative spectral parts of the slices of the sample coskewness tensor, so that the square root is real.
+
+[`negative_spectral_coskewness`](@ref) builds ``\\mathbf{V}``, and it then repairs the matrix with the matrix processing `mp`.
 
 # Fields
 
@@ -62,11 +66,11 @@ Keywords correspond to the struct's fields.
 
 !!! warning
 
-    `sk` and `V` are a pair, and a stated `V` factors the `sk` beside it. A caller who wants one consistent pair names `sk` alone — a **Deferred Quantity** there supplies both from one fit, together with the `mp` that built them. A caller who states both by hand must make sure that they agree. A stated matrix is also pinned: it crosses a Cross-Validation fold or a subset view as the whole universe's answer, while a **Deferred Quantity** crosses unresolved and refits on the subset.
+    `sk` and `V` are a pair, and a stated `V` factors the `sk` beside it. A caller who wants one consistent pair names `sk` alone. A **Deferred Quantity** there supplies both from one fit, together with the `mp` that built them. A caller who states both by hand must make sure that they agree. A stated matrix is also fixed. It crosses a Cross-Validation fold as the answer for the whole universe, while a **Deferred Quantity** crosses unresolved and refits on the fold. A subset view slices `sk` and rebuilds `V` from the slice, with `mp` and `window`.
 
 !!! info
 
-    `sk` also admits a [`CoskewnessEstimator`](@ref) or an [`AbstractPriorEstimator`](@ref), resolved against the optimisation's own prior — see [`resolve_deferred_quantities`](@ref). `V` never defers: it is derived from `sk`, so it travels out of that same fit. The processor that built it travels with it and **replaces** `mp`, so a later rebuild uses the same one. The measure carries one deferrable slot, so it takes no `pe`.
+    `sk` also admits a [`CoskewnessEstimator`](@ref) or an [`AbstractPriorEstimator`](@ref), which [`resolve_deferred_quantities`](@ref) resolves against the prior of the optimisation. `V` never defers. It comes from `sk`, so it comes out of that same fit. The processor that built it travels with it and **replaces** `mp`, so a later rebuild uses the same one. The measure carries one deferrable slot, so it takes no `pe`.
 
 # Functor
 
@@ -111,10 +115,12 @@ NegativeSkewness
   - [`NSkeQuadFormulations`](@ref)
   - [`SOCRiskExpr`](@ref)
   - [`expected_risk`](@ref)
+  - [`negative_spectral_coskewness`](@ref)
+  - [`set_risk_constraints!`](@ref)
 
 # References
 
-  - $(ref_dict[:nskew])
+  - $(ref_dict[:nskew]) Section 2, and Section 3, Equations 1 and 2.
 """
 @concrete struct NegativeSkewness <: RiskMeasure
     """
@@ -192,11 +198,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve a **Deferred Quantity** in [`NegativeSkewness`](@ref)'s `sk` slot against prior result `pr`.
 
-`sk` and `V` travel together, so both come from the same fit. `V = negative_spectral_coskewness(sk, X, mp)` is never a function of `sk` alone, so **the fit's own processor** builds it and is recorded in `mp` in place of the one the measure held. A [`CoskewnessEstimator`](@ref) supplies it through [`coskewness_processor`](@ref); an [`AbstractPriorEstimator`](@ref) supplies it as the prior result's `skmp`, which is the field [`HighOrderPrior`](@ref) already carries for exactly this reason.
+`sk` and `V` come from the same fit. `V` depends on the matrix processing as well as on `sk`, so the method also takes the processor of the fit and writes it to `mp`, in place of the one that the measure held. A [`CoskewnessEstimator`](@ref) gives the processor through [`coskewness_processor`](@ref). An [`AbstractPriorEstimator`](@ref) gives it as the field `skmp` of its [`HighOrderPrior`](@ref).
 
-Recording it keeps the windowed rebuild in [`port_opt_view`](@ref) on the same processor that built the `V` it replaces. `V` is never rebuilt from a resolved `sk`: under a factor prior the negative spectral part is special, and a rebuild would throw that structure away. This is the `sigma`/`chol` rule on the `sk`/`V` pair.
+The method takes `V` from the fit, and does not compute it again from the resolved `sk`. A factor prior computes `V` with the returns that its factor model implies, so a new computation with the observed returns would give a different matrix. A later view in [`port_opt_view`](@ref) rebuilds `V` from a slice of `sk`, and it then uses the same processor, because the method wrote it to `mp`.
 
-The measure carries one deferrable slot, so there is no fan-out to make and it takes no `pe`. A coskewness estimator needs only a returns matrix, so `sk` resolves against a [`LowOrderPrior`](@ref) as readily as against a [`HighOrderPrior`](@ref).
+The measure carries one deferrable slot, so it has no `pe` to fan out. A coskewness estimator needs only a returns matrix, so `sk` resolves against a [`LowOrderPrior`](@ref) as well as against a [`HighOrderPrior`](@ref). A measure whose `sk` is not a **Deferred Quantity** returns unchanged.
 
 # Related
 
@@ -229,9 +235,15 @@ functor_slots(r::NegativeSkewness) = (; sk = r.sk)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Create an instance of [`NegativeSkewness`](@ref) by resolving a **Deferred Quantity** in `sk`, then falling back to a [`HighOrderPrior`](@ref) result for the coskewness matrix and its spectral decomposition.
+Create an instance of [`NegativeSkewness`](@ref) that holds its coskewness matrix and its negative spectral coskewness, from the measure or from the [`HighOrderPrior`](@ref) result `pr`.
 
-The two are selected field by field rather than as a pair, because the constructor already refuses every mixed state: a stated `sk` always carries its own `V`, and a deferred `sk` always resolves to both at once. So the fallback is reached only when the measure names neither.
+The method selects the two field by field and not as a pair, because the constructor refuses every mixed state. A stated `sk` always carries its own `V`, and a deferred `sk` always resolves to both. So the method takes the pair of the prior only when the measure names neither.
+
+# Algorithm
+
+ 1. Resolve a **Deferred Quantity** in `sk` with [`resolve_deferred_quantities`](@ref), giving `r`.
+ 2. Select `sk` and `V` with [`nothing_scalar_array_selector`](@ref), from `r` or else from `pr.sk` and `pr.V`.
+ 3. Build a new `NegativeSkewness` from `sk`, `V` and the `settings`, `mp`, `alg`, `window` and `mtx_sqrt` of `r`.
 
 # Related
 
@@ -254,7 +266,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve a **Deferred Quantity** in [`NegativeSkewness`](@ref)'s `sk` slot against a [`LowOrderPrior`](@ref) result, and otherwise return `r` unchanged.
 
-Coskewness is not available on a [`LowOrderPrior`](@ref), so there is no fallback to make. A coskewness estimator in `sk` needs only the returns matrix the result carries, so it resolves here all the same.
+A [`LowOrderPrior`](@ref) holds no coskewness, so the method has no pair to take from `pr`. A coskewness estimator in `sk` needs only the returns matrix of the result, so it resolves here too. The model needs `V`, and [`set_risk_constraints!`](@ref) refuses a measure that has none.
 
 # Related
 

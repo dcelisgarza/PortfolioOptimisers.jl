@@ -32,12 +32,13 @@ THE MEASURE. Every case below agreed on the `NaN` pattern.
 | the same on a late listing | Better, amendment of 2026-09-29 to ADR 0181 | the raw state is the oracle's to 1.9e-16; the separate path's report is the oracle's; the multiplier moves by up to 1.9% |
 | both regime estimators in small units | Defect found and fixed: the floor | parity at the new default floor |
 | the clamp of a warm-up multiplier | Defect found and fixed | parity |
+| the first moment of the diagonal target on the raw statistic | Defect found and fixed: the constant `√n` became the expected root of a χ²(n) variate, which is exact at independent returns | 4.2e-16 by cell on "Full" |
 | the separate path on a constant asset | Better: the variance 0, where the report floored it at `min_val` | `test_08y` |
-| the separate path in the warm-up | Better: each product divides by the bias-corrected variance, `cor_vol = RawVolatility()` is the oracle's rule (#1729) | `test_08y` |
+| the separate path in the warm-up | Better: each product divides by the bias-corrected variance, `cor_vol = nothing` is the oracle's rule (#1729) | `test_08y` |
 | the portfolio target on a young block with a negative eigenvalue | Better: `indefinite = RefuseIndefiniteWarmUp()` refuses it, `ScoreIndefiniteBlock()` is the oracle's rule (#1736) | `test_08y` |
 
 The Mahalanobis target with `min_obs = 5` on 12 assets reads a singular block, so its cases here
-use `min_obs = 13`. Every case takes the oracle's raw statistic, `debias = RawStatistic()`. The default
+use `min_obs = 13`. Every case takes the oracle's raw statistic, `debias = nothing`. The default
 statistic skips an estimate with too few observations and divides the rest by the bias of the
 estimate (#1415 for the Mahalanobis target, #1428 for the others, Better, `test_08y`).
 =#
@@ -48,7 +49,7 @@ p1383_dk(hl) = 2.0^(-1.0 / hl)
 # The oracle's clip, floor, centring and raw statistic. The first two are the defaults since
 # #1383. The default statistic divides by the bias of the estimate it reads (#1415, #1428).
 const P1383_ORC = (; regime_lohi_mult = (0.7, 1.6), min_val = 1e-12,
-                   centring = PreCentred(), debias = RawStatistic())
+                   centring = PreCentred(), debias = nothing)
 
 function p1383_rv(; hl = 10, min_obs = 5, rhl = hl / 2, rmin = floor(Int, rhl), kw...)
     return RegimeAdjustedExpWeightedVariance(; decay = p1383_dk(hl), min_obs = min_obs,
@@ -63,7 +64,7 @@ function p1383_rc(; hl = 10, min_obs = 5, rhl = hl / 2, rmin = floor(Int, rhl), 
     return RegimeAdjustedExpWeightedCovariance(; decay = p1383_dk(hl), min_obs = min_obs,
                                                regime_decay = p1383_dk(rhl),
                                                regime_min_obs = rmin, P1383_ORC...,
-                                               cor_vol = RawVolatility(),
+                                               cor_vol = nothing,
                                                regime_target = P1383.PortfolioTarget(;
                                                                                      P1383_PT...),
                                                kw...)
@@ -147,7 +148,7 @@ const P1383_RC = ["RCDefault" => (n) -> p1383_rc(; hl = 40, min_obs = 40),
 const P1383_RC_SERIES = ["RCDefault", "RCDiagonalLog", "RCMahalanobisFirstFull",
                          "RCCorrHL5", "RCClipAboveOne"]
 # The library's multipliers on "Small", in the order of `P1383_RC` (Better, see below).
-const P1383_SMALL_MULT = [0.7562660923140582, 0.8388726265938486, 0.8211425463273536,
+const P1383_SMALL_MULT = [0.7562660923140582, 0.8580233539546605, 0.8211425463273536,
                           0.8970151341030335, 0.7728297271335702, 0.7, 0.8437780453120634,
                           1.1643502876725171, 1.1697258124619465, 1.1611765971360257,
                           0.7605405673104944, 0.9212423935074233, 0.7208906150115325,
@@ -356,7 +357,7 @@ p1383_col(A, k, n = 1) = A[:, ((k - 1) * n + 1):(k * n)]
                                                                                    regime_decay = p1383_dk(5),
                                                                                    regime_min_obs = 5,
                                                                                    centring = PreCentred(),
-                                                                                   debias = RawStatistic())),
+                                                                                   debias = nothing)),
                                           ("RVLog",
                                            () -> RegimeAdjustedExpWeightedVariance(; decay = p1383_dk(10),
                                                                                    min_obs = 5,
@@ -364,7 +365,7 @@ p1383_col(A, k, n = 1) = A[:, ((k - 1) * n + 1):(k * n)]
                                                                                    regime_min_obs = 5,
                                                                                    regime_method = P1383.LogRegimeAdjusted(),
                                                                                    centring = PreCentred(),
-                                                                                   debias = RawStatistic()))))
+                                                                                   debias = nothing))))
             m1 = p1383_mult(make(), X, am, em)
             mc = p1383_mult(make(), X .* c, am, em)
             @test isapprox(mc, m1; rtol = 1e-12)

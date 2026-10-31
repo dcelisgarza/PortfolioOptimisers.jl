@@ -8,19 +8,17 @@
     expected_return(ret::JRE_VecJRE, w::VecVecNum, pr::AbstractPriorResult,
                     fees::Option{<:Fees} = nothing; strict::Bool = false, kwargs...)
 
-Compute the expected portfolio return using the specified return estimator.
+Compute the expected return of a portfolio with a return estimator.
 
-`expected_return` computes the expected return for a portfolio given its weights, a prior result, and optional transaction fees. `fees` is **positional** and follows `pr`, on every method.
+`expected_return` reads the portfolio weights, a prior result and optional transaction fees. `fees` is a **positional** argument after `pr` on every method.
 
-## The prior route reduces to the Investable Mask
+The prior route reduces to the Investable Mask. A prior result holds every asset of the universe, and an asset that it cannot estimate carries `NaN` in `mu` and down its column of `pr.X`. On the whole universe, `dot(w, mu)` and `X * w` are `NaN` at every weight, a zero weight included. So each method reduces the prior, the weights and the fees once at its entry, through [`investable_reduction`](@ref). An optimiser does the same reduction at its entry. [`NoReturn`](@ref) gives zero at every weight, so it reads nothing and reduces nothing.
 
-A prior result lives on the **full** asset universe, and an asset it could not estimate carries `NaN` in `mu` and down its column of `pr.X`. So `dot(w, mu)` and `X * w` are `NaN` at **any** weight, the optimiser's own zero included. Each method therefore reduces the prior, the weights and the fees once at its entry, through [`investable_reduction`](@ref) — the rule for an optimiser, applied at the entry of each value-level verb. A held non-investable asset warns and its weight is dropped, or raises under `strict`. [`NoReturn`](@ref) answers zero at every weight, so it reads nothing and reduces nothing.
+The reduction changes nothing on a prior that is already reduced. The moments of a reduced prior are finite everywhere, so [`investable_mask`](@ref) gives `nothing`. Thus a vector of terms, a population and a composite such as [`expected_ratio`](@ref) each give one diagnostic only.
 
-The reduction is a **no-op on a prior that is already reduced**, because a reduced prior's moments are finite everywhere and [`investable_mask`](@ref) then answers `nothing`. That is what keeps a vector of terms, a population, and a composite such as [`expected_ratio`](@ref) to exactly one diagnostic.
+Each method is the scalar twin of the `ret` expression that `set_return_constraints!` builds for the same estimator, so the two sides charge the same fee. For a [`NoReturn`](@ref), the model builds a zero expression and charges no fee on it. `settings.fee` has no effect on that term, and the scalar twin charges no fee either.
 
-Each method is the scalar twin of the `ret` expression that `set_return_constraints!` builds for the same estimator, so the two sides charge the same fee. [`NoReturn`](@ref) builds a zero expression and the model charges it nothing, so `settings.fee` is inert on that term and the scalar twin charges nothing either.
-
-The fourth method takes a vector of weight vectors, applies one of the first three to each of them, and returns one expected return per weight vector.
+The fourth method takes a vector of weight vectors. It applies one of the first three methods to each weight vector, and returns one expected return for each.
 
 # Mathematical definition
 
@@ -36,26 +34,27 @@ Where:
 
   - ``R_{\\mathrm{a}}(\\boldsymbol{w})``: Expected return of an [`ArithmeticReturn`](@ref).
   - ``R_{\\mathrm{l}}(\\boldsymbol{w})``: Expected return of a [`LogarithmicReturn`](@ref), the mean log-growth rate of the portfolio.
-  - ``R_{\\mathrm{n}}(\\boldsymbol{w})``: Expected return of a [`NoReturn`](@ref). It carries no fee term, so no `fees` argument moves it away from zero.
+  - ``R_{\\mathrm{n}}(\\boldsymbol{w})``: Expected return of a [`NoReturn`](@ref). It has no fee term, so it is zero for every value of `fees`.
   - $(math_dict[:w_port])
   - $(math_dict[:mu_er])
   - $(math_dict[:x_t_obs])
   - $(math_dict[:T])
-  - ``v_{t}``: Observation weight of observation ``t``, the ``t``-th entry of the `w` field of a [`LogarithmicReturn`](@ref). Every weight is one when that field is `nothing`, and the quotient is then the unweighted mean.
+  - ``v_{t}``: Observation weight of observation ``t``, the ``t``-th entry of the `w` field of a [`LogarithmicReturn`](@ref), or of the observation weights `pr.w` of the prior when that field is `nothing`. Every weight is one when both are `nothing`, and the quotient is then the unweighted mean.
   - ``F(\\boldsymbol{w})``: Fee term of [`term_fees`](@ref). It is [`calc_fees`](@ref) of `w` and `fees` when the term's `settings.fee` is `true`, and zero otherwise.
 
 # Arguments
 
   - `ret`: Return estimator, or a vector of them on the fourth method.
   - `w`: Portfolio weights, or a vector of portfolio weight vectors on the fourth method.
-  - `pr`: Prior result. It resolves a **Deferred Quantity** of `ret`, and it supplies `mu` to an [`ArithmeticReturn`](@ref) whose own `mu` is `nothing`.
+  - `pr`: Prior result. It resolves a Deferred Quantity of `ret`, through [`factory`](@ref). It gives `mu` to an [`ArithmeticReturn`](@ref) whose own `mu` is `nothing`, and its observation weights to a [`LogarithmicReturn`](@ref) whose own `w` is `nothing`.
   - `fees`: Optional fees.
-  - `kwargs...`: Additional keyword arguments passed to underlying routines.
+  - $(arg_dict[:strict_inv]) A [`NoReturn`](@ref) reads no weights, so `strict` has no effect on it.
+  - `kwargs...`: Keyword arguments that the methods do not read.
 
 # Returns
 
   - `rt::Number`: Expected portfolio return, net of fees, on the first three methods.
-  - `rt::VecNum`: One expected portfolio return per weight vector, on the fourth method.
+  - `rt::VecNum`: One expected portfolio return for each weight vector, on the fourth method.
 
 # Related
 
@@ -73,7 +72,7 @@ Where:
   - [`expected_risk_ret_ratio`](@ref)
   - [`expected_sric`](@ref)
   - [`expected_risk_ret_sric`](@ref)
-  - [`term_fees`](@ref): Charges ``F(\\boldsymbol{w})``, and holds the rule that decides whether it is charged.
+  - [`term_fees`](@ref): It charges ``F(\\boldsymbol{w})``, and it holds the rule that decides when to charge it.
   - [`calc_fees`](@ref)
 """
 function expected_return(r::ArithmeticReturn, w::VecNum, pr::AbstractPriorResult,
@@ -83,24 +82,17 @@ function expected_return(r::ArithmeticReturn, w::VecNum, pr::AbstractPriorResult
     # is a no-op on a prior that is already reduced, which is what keeps a composite to one
     # diagnostic.
     _, pr, w, fees = investable_reduction(pr, w, fees, strict)
-    # The scalar twin of the `ret` expression `set_return_constraints!` builds, so it uses
-    # the same ladder. The prior is in hand, so a Deferred Quantity resolves here too.
-    r = resolve_deferred_quantities(r, pr)
-    mu = nothing_scalar_array_selector(r.mu, pr.mu)
-    return LinearAlgebra.dot(w, mu) - term_fees(w, fees, size(pr.X, 1), r.settings.fee)
+    # The scalar twin of the `ret` expression `set_return_constraints!` builds, so it takes
+    # the same ladder: the `factory` that the model calls resolves a Deferred Quantity and
+    # fills the slots from the prior.
+    return resolved_expected_return(factory(r, pr), w, w, pr.X, fees)
 end
 function expected_return(ret::LogarithmicReturn, w::VecNum, pr::AbstractPriorResult,
                          fees::Option{<:Fees} = nothing; strict::Bool = false, kwargs...)
-    # Reduce to the Investable Mask — see the note on the arithmetic twin above.
+    # Reduce to the Investable Mask, and take the ladder of the model, as the arithmetic twin
+    # above does. The ladder falls back to the observation weights of the prior.
     _, pr, w, fees = investable_reduction(pr, w, fees, strict)
-    rw = ret.w
-    X = pr.X
-    kret = if isnothing(rw)
-        Statistics.mean(log1p, X * w)
-    else
-        Statistics.mean(log1p.(X * w), rw)
-    end
-    return kret - term_fees(w, fees, size(X, 1), ret.settings.fee)
+    return resolved_expected_return(factory(ret, pr), w, w, pr.X, fees)
 end
 function expected_return(::NoReturn, w::VecNum, ::AbstractPriorResult,
                          ::Option{<:Fees} = nothing; kwargs...)
@@ -111,22 +103,24 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Charge the fees to a return term only when that term's `settings.fee` says so.
+Charge the fees to a return term when the `settings.fee` of the term is `true`.
 
-The scalar twin follows the **fee** flag alone. Market impact is absent from `expected_return`
-on either side of the multiplicity, so this preserves a pre-existing divergence between the
-model expression and its scalar twin rather than widening one.
+The scalar twin reads the **fee** flag only. When `settings.mic` is `true`, the model
+expression also subtracts a market impact cost, through `add_market_impact_cost!`. No method
+of [`expected_return`](@ref) charges that cost, for one term or for a vector of terms. So the
+model expression and its scalar twin differ by the market impact cost, and this function
+does not change that difference.
 
 # Arguments
 
   - `w`: Portfolio weights.
   - `fees`: Optional fees.
-  - `T`: Observation count of the fit, over which the one-off terms are spread.
-  - `fee`: The term's `settings.fee` flag.
+  - `T`: Number of observations of the fit. The function spreads the one-off fees over them.
+  - `fee`: The `settings.fee` flag of the term.
 
 # Returns
 
-  - `f::Number`: The per period charge, [`calc_periodic_fees`](@ref) plus [`calc_one_off_fees`](@ref) divided by `T`, when `fee` is `true`, and a zero of the element type of `w` otherwise.
+  - `f::Number`: The charge for one period. It is [`calc_periodic_fees`](@ref) plus [`calc_one_off_fees`](@ref) divided by `T` when `fee` is `true`. It is a zero of the element type of `w` when `fee` is `false` or `fees` is `nothing`.
 
 # Related
 
@@ -148,16 +142,15 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Sum the value-level returns of several return terms, each at its own scale.
+Sum the value-level returns of many return terms, each at its own scale.
 
-The scalar twin of the model's `ret` expression, which is the same weighted sum over the same
-terms. A term whose `settings.rte` is `false` is skipped, exactly as it is skipped in the
-model.
+This method is the scalar twin of the `ret` expression of the model, which is the same
+weighted sum over the same terms. The method skips a term whose `settings.rte` is `false`, and
+the model skips it too.
 
-This is the one carve-out from the rule that the value-level `expected_*` family stays
-singular: [`NearOptimalCentering`](@ref)'s barrier needs the aggregate scalar, and this
-function declares itself the scalar twin of the `ret` expression. The rest of the family, and
-the whole risk side, still take one measure and one term.
+The barrier of [`NearOptimalCentering`](@ref) reads the aggregate return of all the terms as
+one number, and this method gives that number. [`expected_ratio`](@ref) and the other
+value-level functions of this file call this method when `ret` is a vector.
 
 # Mathematical definition
 
@@ -177,10 +170,9 @@ Where:
 
 # Algorithm
 
- 1. Set the accumulator `rt` to a zero of the element type of `w`.
- 2. Take the next term `ret_i` of `ret`. Skip it when its `settings.rte` is `false`.
- 3. Compute the value-level return of `ret_i` with [`expected_return`](@ref), scale it by the term's `settings.scale`, and add it to `rt`.
- 4. Repeat steps 2 and 3 over the remaining terms, then return `rt`.
+ 1. Reduce the prior, the weights and the fees to the Investable Mask once, with [`investable_reduction`](@ref). A held asset outside the mask gives one diagnostic, and not one for each term.
+ 2. Resolve each term against the prior with [`factory`](@ref), as the model does.
+ 3. Return [`resolved_expected_return`](@ref) of the resolved terms. It skips each term whose `settings.rte` is `false`, and it sums the `settings.scale` of each other term times its return. The method for one term reads the same function, so the two give the same value.
 
 # Arguments
 
@@ -188,7 +180,8 @@ Where:
   - `w`: Portfolio weights.
   - `pr`: Prior result.
   - `fees`: Optional fees.
-  - `kwargs...`: Additional keyword arguments passed to underlying routines.
+  - $(arg_dict[:strict_inv])
+  - `kwargs...`: Keyword arguments that the method does not read.
 
 # Returns
 
@@ -203,16 +196,9 @@ Where:
 function expected_return(ret::VecJRE, w::VecNum, pr::AbstractPriorResult,
                          fees::Option{<:Fees} = nothing; strict::Bool = false, kwargs...)
     # The vector reduces once, so a held non-investable asset is named once and not once per
-    # term. Every term reduces again on the reduced prior, where the mask is `nothing`.
+    # term. The sum over the terms is the one of the risk path, so the two cannot drift.
     _, pr, w, fees = investable_reduction(pr, w, fees, strict)
-    rt = zero(eltype(w))
-    for ret_i in ret
-        if !ret_i.settings.rte
-            continue
-        end
-        rt += ret_i.settings.scale * expected_return(ret_i, w, pr, fees; kwargs...)
-    end
-    return rt
+    return resolved_expected_return(factory(ret, pr), w, w, pr.X, fees)
 end
 function expected_return(ret::JRE_VecJRE, w::VecVecNum, pr::AbstractPriorResult,
                          fees::Option{<:Fees} = nothing; strict::Bool = false, kwargs...)
@@ -224,11 +210,12 @@ end
 """
     expected_ratio(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum,
                    pr::AbstractPriorResult, fees::Option{<:Fees} = nothing;
-                   rf::Number = 0, sca::Scalariser = SumScalariser(), kwargs...)
+                   rf::Number = 0, sca::Scalariser = SumScalariser(),
+                   strict::Bool = false, kwargs...)
 
-Compute the expected risk-adjusted return ratio for a portfolio.
+Compute the ratio of the expected return of a portfolio to its expected risk.
 
-`expected_ratio` computes the ratio of expected portfolio return (net of fees and risk-free rate) to expected portfolio risk, using the specified risk measure and return estimator.
+`expected_ratio` divides the expected portfolio return, net of the fees and of the risk-free rate, by the expected portfolio risk. The risk measure `r` gives the risk, and the return estimator `ret` gives the return.
 
 # Mathematical definition
 
@@ -250,13 +237,13 @@ Where:
 
 # Multiplicity
 
-Both axes take one item or several, and the ratio is **aggregate over aggregate**: the risk axis is scalarised by `sca` into one number, the return axis is summed at its terms' own `settings.scale` weights, and the two aggregates are divided.
+Each axis takes one item or a vector of items, and the ratio divides one **aggregate** by the other. `sca` scalarises the risk axis into one number. The return axis sums at the `settings.scale` weights of its terms. Then the function divides the two aggregates.
 
-Only the risk axis carries a scalariser. The return axis sums and never scalarises.
+Only the risk axis has a scalariser. The return axis sums and never scalarises.
 
 # Resolution
 
-Both axes are handed `pr` itself, so both apply the same precedence rule: a stated slot wins, then the slot's own estimator, then the prior's field. The risk axis enters [`expected_risk`](@ref)'s prior route, which resolves the measure through [`resolve_risk_inputs`](@ref) once per call — a **Deferred Quantity** is fitted against `pr`, and an unstated slot takes the prior's field.
+Both axes receive `pr` itself, so both apply the same precedence rule. A stated slot comes first, then the estimator of the slot, then the field of the prior. The risk axis goes through the prior route of [`expected_risk`](@ref). That route resolves the measure through [`resolve_risk_inputs`](@ref) once for each call. It fits a Deferred Quantity against `pr`, and an unstated slot takes the field of the prior.
 
 # Arguments
 
@@ -266,8 +253,9 @@ Both axes are handed `pr` itself, so both apply the same precedence rule: a stat
   - `pr`: Prior result.
   - `fees`: Optional transaction fees.
   - `rf`: Risk-free rate.
-  - `sca`: Scalariser combining a vector `r` into one number. Inert on a single measure.
-  - `kwargs...`: Additional keyword arguments.
+  - `sca`: Scalariser that reduces a vector `r` to one number. It has no effect on a single measure.
+  - $(arg_dict[:strict_inv])
+  - `kwargs...`: Keyword arguments that go to [`expected_risk`](@ref) and to [`expected_return`](@ref).
 
 # Returns
 
@@ -307,11 +295,12 @@ end
 """
     expected_risk_ret_ratio(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum,
                             pr::AbstractPriorResult, fees::Option{<:Fees} = nothing;
-                            rf::Number = 0, sca::Scalariser = SumScalariser(), kwargs...)
+                            rf::Number = 0, sca::Scalariser = SumScalariser(),
+                            strict::Bool = false, kwargs...)
 
-Compute expected risk, expected return, and risk-adjusted return ratio for a portfolio.
+Compute the expected risk, the expected return and the risk-adjusted return ratio of a portfolio.
 
-`expected_risk_ret_ratio` returns a tuple containing the expected portfolio risk, expected portfolio return, and the risk-adjusted return ratio, using the specified risk measure and return estimator.
+`expected_risk_ret_ratio` returns the three numbers as a tuple. The risk measure `r` gives the risk, and the return estimator `ret` gives the return.
 
 # Mathematical definition
 
@@ -335,21 +324,21 @@ Where:
 
 # Multiplicity
 
-Both axes take one item or several, and the ratio is **aggregate over aggregate**, exactly as in [`expected_ratio`](@ref): the risk axis is scalarised by `sca` into one number, the return axis is summed at its terms' own `settings.scale` weights, and the two aggregates are divided. The returned `risk` and `return` are those two aggregates, never a per-element breakdown.
+The rule is the same as for [`expected_ratio`](@ref). Each axis takes one item or a vector of items, and the ratio divides one **aggregate** by the other. `sca` scalarises the risk axis into one number, and the return axis sums at the `settings.scale` weights of its terms. The returned `risk` and `return` are those two aggregates. They are never a breakdown for each item.
 
-Only the risk axis carries a scalariser. The return axis sums and never scalarises.
+Only the risk axis has a scalariser. The return axis sums and never scalarises.
 
-# Reporting a result
+# The figures of an optimisation result
 
-This is the documented route out of an optimisation result. A result carries the measure and the scalariser it ran under, so it can name them itself:
+Use this function to get the figures of an optimisation result. A result holds the measure and the scalariser of its solve, so the call can read them from the result:
 
 ```julia
 rk, rt, rr = expected_risk_ret_ratio(res.r, res.ret, res.w, res.pr; sca = res.sca, rf = rf)
 ```
 
-`res.r` and `res.ret` are stored **resolved**, so this route reports the aggregates the optimisation actually optimised, whether either axis held one item or several. Naming the measures by hand instead is still supported, but the figure then matches the optimisation only if the caller names the same measures **and** the same scalariser; `fees` and `rf` carry the same responsibility.
+A result stores `res.r` and `res.ret` **resolved**. So this call gives the aggregates that the optimisation optimised, for one item or for many items on each axis. A caller can also name the measures by hand. Then the figure is equal to that of the optimisation only when the caller names the same measures **and** the same scalariser. The same holds for `fees` and `rf`.
 
-A result with no `r` — one on the [`NonRiskJuMPOptimisationResult`](@ref) half — resolved no measure, so there is nothing to pass back and the caller must name one.
+A [`NonRiskJuMPOptimisationResult`](@ref) has no `r`, because its solve resolved no measure. With such a result, the caller must name a measure.
 
 # Arguments
 
@@ -359,8 +348,9 @@ A result with no `r` — one on the [`NonRiskJuMPOptimisationResult`](@ref) half
   - `pr`: Prior result.
   - `fees`: Optional transaction fees.
   - `rf`: Risk-free rate.
-  - `sca`: Scalariser combining a vector `r` into one number. Inert on a single measure.
-  - `kwargs...`: Additional keyword arguments.
+  - `sca`: Scalariser that reduces a vector `r` to one number. It has no effect on a single measure.
+  - $(arg_dict[:strict_inv])
+  - `kwargs...`: Keyword arguments that go to [`expected_risk`](@ref) and to [`expected_return`](@ref).
 
 # Returns
 
@@ -394,12 +384,13 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Compute the estimation-error penalty that turns a ratio into a SRIC.
+Compute the estimation-error penalty that changes a ratio into a SRIC.
 
-The penalty is applied once to the aggregate ratio, never per element. This is the only
-difference between [`expected_sric`](@ref) and [`expected_ratio`](@ref), and between
-[`expected_risk_ret_sric`](@ref) and [`expected_risk_ret_ratio`](@ref), so both SRIC
-functions delegate here rather than restate the ratio.
+The SRIC functions subtract the penalty once from the aggregate ratio, and never from each
+item. The penalty is the only difference between [`expected_sric`](@ref) and
+[`expected_ratio`](@ref), and between [`expected_risk_ret_sric`](@ref) and
+[`expected_risk_ret_ratio`](@ref). So both SRIC functions call this function, and they do not
+state the ratio again.
 
 # Mathematical definition
 
@@ -419,7 +410,7 @@ Where:
 # Arguments
 
   - `sr`: Aggregate risk-adjusted return ratio.
-  - `pr`: Prior result. Its returns matrix supplies ``T`` and ``N``.
+  - `pr`: Prior result. Its returns matrix gives ``T`` and ``N``.
 
 # Returns
 
@@ -438,11 +429,12 @@ end
 """
     expected_sric(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum,
                   pr::AbstractPriorResult, fees::Option{<:Fees} = nothing;
-                  rf::Number = 0, sca::Scalariser = SumScalariser(), kwargs...)
+                  rf::Number = 0, sca::Scalariser = SumScalariser(),
+                  strict::Bool = false, kwargs...)
 
-Compute the risk-adjusted ratio information criterion (SRIC) for a portfolio.
+Compute the Sharpe ratio information criterion (SRIC) of a portfolio.
 
-`expected_sric` computes the SRIC, which adjusts the risk-adjusted return ratio for estimation error, penalizing overfitting in portfolio optimization. The SRIC is computed as the risk-adjusted return ratio minus a penalty term based on the number of assets and sample size.
+The SRIC corrects the risk-adjusted return ratio for the estimation error of an optimisation, which makes the in-sample ratio too large. `expected_sric` subtracts from the ratio a penalty that reads the number of assets and the number of observations.
 
 # Mathematical definition
 
@@ -461,7 +453,7 @@ Where:
 
 # Multiplicity
 
-The ratio it penalises is [`expected_ratio`](@ref)'s, so it inherits the same rule: **aggregate over aggregate**. The risk axis is scalarised by `sca`, the return axis is summed at its terms' own `settings.scale` weights, and the penalty is applied once to the resulting scalar — not per element.
+The function penalises the ratio of [`expected_ratio`](@ref), so the rule is the same as for that function. The ratio divides one **aggregate** by the other. `sca` scalarises the risk axis, and the return axis sums at the `settings.scale` weights of its terms. The function subtracts the penalty once from the scalar ratio, and not from each item.
 
 # Arguments
 
@@ -471,12 +463,13 @@ The ratio it penalises is [`expected_ratio`](@ref)'s, so it inherits the same ru
   - `pr`: Prior result.
   - `fees`: Optional transaction fees.
   - `rf`: Risk-free rate.
-  - `sca`: Scalariser combining a vector `r` into one number. Inert on a single measure.
-  - `kwargs...`: Additional keyword arguments.
+  - `sca`: Scalariser that reduces a vector `r` to one number. It has no effect on a single measure.
+  - $(arg_dict[:strict_inv]) The reduction also sets the number of assets of the penalty to the number of assets that the prior can estimate.
+  - `kwargs...`: Keyword arguments that go to [`expected_ratio`](@ref).
 
 # Returns
 
-  - `sric::Number`: Sharpe Ratio Information Criterion.
+  - `sric::Number`: Sharpe ratio information criterion.
 
 # Related
 
@@ -503,11 +496,12 @@ end
 """
     expected_risk_ret_sric(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum,
                            pr::AbstractPriorResult, fees::Option{<:Fees} = nothing;
-                           rf::Number = 0, sca::Scalariser = SumScalariser(), kwargs...)
+                           rf::Number = 0, sca::Scalariser = SumScalariser(),
+                           strict::Bool = false, kwargs...)
 
-Compute expected risk, expected return, and SRIC for a portfolio.
+Compute the expected risk, the expected return and the SRIC of a portfolio.
 
-`expected_risk_ret_sric` returns a tuple containing the expected portfolio risk, expected portfolio return, and the Sharpe Ratio Information Criterion (SRIC), which adjusts the risk-adjusted return ratio for estimation error.
+`expected_risk_ret_sric` returns the three numbers as a tuple. The Sharpe ratio information criterion (SRIC) corrects the risk-adjusted return ratio for estimation error, as [`expected_sric`](@ref) states.
 
 # Mathematical definition
 
@@ -526,24 +520,25 @@ Where:
 
 # Multiplicity
 
-The tuple is [`expected_risk_ret_ratio`](@ref)'s with the penalty applied to its third element, so it inherits the same rule: **aggregate over aggregate**. The returned `risk` and `return` are the two aggregates, never a per-element breakdown, and the penalty is applied once to the resulting scalar.
+The tuple is the tuple of [`expected_risk_ret_ratio`](@ref), with the penalty subtracted from its third entry. So the rule is the same as for that function, and the ratio divides one **aggregate** by the other. The returned `risk` and `return` are the two aggregates, and never a breakdown for each item. The function subtracts the penalty once from the scalar ratio.
 
 # Arguments
 
   - `r`: Risk measure, or a vector of them.
   - `ret`: Return estimator, or a vector of them.
   - `w`: Portfolio weights.
-  - `pr`: Prior result (must contain asset return matrix `X`).
+  - `pr`: Prior result. Its returns matrix `X` gives the two counts of the penalty.
   - `fees`: Optional transaction fees.
-  - `rf`: Risk-free rate (default: 0).
-  - `sca`: Scalariser combining a vector `r` into one number. Inert on a single measure.
-  - `kwargs...`: Additional keyword arguments.
+  - `rf`: Risk-free rate. It defaults to `0`.
+  - `sca`: Scalariser that reduces a vector `r` to one number. It has no effect on a single measure.
+  - $(arg_dict[:strict_inv])
+  - `kwargs...`: Keyword arguments that go to [`expected_risk_ret_ratio`](@ref).
 
 # Returns
 
   - `risk::Number`: Expected portfolio risk.
   - `return::Number`: Expected portfolio return.
-  - `sric::Number`: Sharpe Ratio Information Criterion.
+  - `sric::Number`: Sharpe ratio information criterion.
 
 # Related
 
@@ -569,9 +564,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Return-based risk measure.
+Risk measure whose value is the expected portfolio return of a prior result.
 
-`ExpectedReturn` is a risk measure that uses the expected portfolio return as its risk metric. This is useful for algorithms or analyses where the risk is defined as the expected return, used in portfolio performance analysis.
+`ExpectedReturn` is a [`NonOptimisationRiskMeasure`](@ref), so an optimiser cannot use it as an objective or as a constraint. Use it where a function takes a risk measure and the figure must be the expected return. For example, it is the default `y` axis of [`plot_measures`](@ref) and of [`plot_efficient_frontier`](@ref). A larger value is a better value, as [`PerfRM`](@ref) states.
 
 # Mathematical definition
 
@@ -583,7 +578,7 @@ Return-based risk measure.
 
 Where:
 
-  - ``\\mathrm{ER}(\\boldsymbol{w})``: Expected portfolio return, used here as the risk metric.
+  - ``\\mathrm{ER}(\\boldsymbol{w})``: Expected portfolio return, the value of the measure.
   - $(math_dict[:w_port])
   - ``R_j``: Expected return of the ``j``-th term in `rt`, net of `fees`.
   - ``s_j``: `settings.scale` of the ``j``-th term. A single `rt` has one term.
@@ -604,9 +599,9 @@ Keywords correspond to the struct's fields.
 
 ## Multiplicity
 
-`rt` takes one return term or a vector of them, so `ExpectedReturn(; rt = res.ret)` works after a solve against several terms. A vector is summed at its terms' `settings.scale` weights, skipping any term whose `settings.rte` is `false`.
+`rt` takes one return term or a vector of them, so `ExpectedReturn(; rt = res.ret)` works after a solve with many terms. The measure sums a vector at the `settings.scale` weights of its terms, and it skips a term whose `settings.rte` is `false`.
 
-The type gains **no** scalariser: the return axis sums and never scalarises.
+The type has **no** scalariser. The return axis sums and never scalarises.
 
 ## Validation
 
@@ -614,9 +609,9 @@ The type gains **no** scalariser: the return axis sums and never scalarises.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `rt`: Recursively updated via [`factory`](@ref).
+  - `rt`: Recursively updated through [`factory`](@ref).
 
 # Examples
 
@@ -669,25 +664,38 @@ end
 # Deferrable slots — see `deferred_slots`. The return term carries its own `mu`, so both the
 # check and the derived recursion in `resolve_deferred_quantities` reach it through `rt`.
 deferred_slots(r::ExpectedReturn) = (; rt = r.rt)
+# Expected-risk input kind — see `risk_input_kind`. The `factory` of the risk path fills the
+# moments of the return term from the prior, so the resolved measure reads the weights, the
+# returns matrix and the fees alone, and every composite of that path reaches it.
+risk_input_kind(::ExpectedReturn) = WeightsReturnsFeesInput()
+function (r::ExpectedReturn)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
+    return resolved_expected_return(r.rt, w, w, X, fees)
+end
+function difference_risk(r::ExpectedReturn, wd::VecNum, w::VecNum, X::MatNum, fees::Fees;
+                         kwargs...)
+    return resolved_expected_return(r.rt, wd, w, X, fees)
+end
 """
     expected_risk(r::ExpectedReturn, w::VecNum, pr::AbstractPriorResult,
                   fees::Option{<:Fees} = nothing; kwargs...)
 
-Compute the expected risk for a portfolio using a return-based risk measure.
+Compute the value of an [`ExpectedReturn`](@ref), the expected return of a portfolio.
 
-`expected_risk` returns the expected portfolio return as the risk metric, using the specified return estimator in the [`ExpectedReturn`](@ref). This is useful for algorithms where risk is defined as expected return. The closed form is the one [`ExpectedReturn`](@ref) states, and the method delegates to [`expected_return`](@ref) on the measure's `rt` field.
+The method calls [`expected_return`](@ref) on the `rt` field of the measure. [`ExpectedReturn`](@ref) states the closed form.
+
+The measure also has a route on a returns matrix. It declares [`WeightsReturnsFeesInput`](@ref), and its functor `r(w, X, fees)` calls [`resolved_expected_return`](@ref) on `rt`. That route needs the `mu` of an `rt` that [`factory`](@ref) resolved, and the prior route of [`risk_contribution`](@ref), [`risk_gradient`](@ref) and of each composite measure gives it. Both routes read one ladder, so they give the same value.
 
 # Arguments
 
-  - `r`: [`ExpectedReturn`](@ref) containing a return estimator.
+  - `r`: [`ExpectedReturn`](@ref) that holds a return estimator.
   - `w`: Portfolio weights.
   - `pr`: Prior result.
   - `fees`: Optional transaction fees.
-  - `kwargs...`: Additional keyword arguments.
+  - `kwargs...`: Keyword arguments that go to [`expected_return`](@ref), `strict` included.
 
 # Returns
 
-  - `risk::Number`: Expected portfolio return (net of fees if provided).
+  - `risk::Number`: Expected portfolio return, net of `fees` when they are given.
 
 # Related
 
@@ -702,9 +710,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Ratio-based risk measure.
+Risk measure whose value is the ratio of the expected return of a portfolio to its expected risk.
 
-`ExpectedReturnRiskRatio` is a risk measure that computes the risk-adjusted return ratio, such as the Sharpe ratio, for a portfolio. It combines a return estimator, a risk measure, and a risk-free rate to produce a ratio metric, used in portfolio performance analysis.
+`ExpectedReturnRiskRatio` holds a return estimator, a risk measure and a risk-free rate. Its value is the risk-adjusted return ratio of [`expected_ratio`](@ref), for example the Sharpe ratio when `rk` is a [`StandardDeviation`](@ref). It is a [`NonOptimisationRiskMeasure`](@ref), so an optimiser cannot use it as an objective or as a constraint. A larger value is a better value, as [`PerfRM`](@ref) states.
 
 # Mathematical definition
 
@@ -744,9 +752,9 @@ Keywords correspond to the struct's fields.
 
 ## Multiplicity
 
-Both axes widen, and only the **risk** axis carries a scalariser. `rt` sums its terms at their own `settings.scale` weights, skipping any term whose `settings.rte` is `false`; `rk` is scalarised into one number by `sca`. The ratio is then aggregate over aggregate. The return axis sums and never scalarises.
+Each axis takes one item or a vector of items, and only the **risk** axis has a scalariser. `rt` sums its terms at their `settings.scale` weights, and it skips a term whose `settings.rte` is `false`. `sca` scalarises `rk` into one number. Then the ratio divides one aggregate by the other. The return axis sums and never scalarises.
 
-The field beats a caller's `sca` keyword. A `sca` passed at the call site flows no further than this type, so a figure reported from an `ExpectedReturnRiskRatio` is always the one the type names.
+The field takes precedence over a `sca` keyword of the caller. A `sca` that the caller gives at the call site goes no further than this type. So the figure of an `ExpectedReturnRiskRatio` is always the figure that the type names.
 
 ## Validation
 
@@ -756,10 +764,10 @@ The field beats a caller's `sca` keyword. A `sca` passed at the call site flows 
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `rt`: Recursively updated via [`factory`](@ref).
-  - `rk`: Recursively updated via [`factory`](@ref).
+  - `rt`: Recursively updated through [`factory`](@ref).
+  - `rk`: Recursively updated through [`factory`](@ref).
 
 # Examples
 
@@ -852,12 +860,12 @@ end
 # derived recursion resolves a vector element by element.
 deferred_slots(r::ExpectedReturnRiskRatio) = (; rt = r.rt, rk = r.rk)
 """
-    reader_frames(r::Union{<:ExpectedReturn, <:ExpectedReturnRiskRatio}, path::AbstractString,
+    reader_frames(r::Union{ExpectedReturn, ExpectedReturnRiskRatio}, path::AbstractString,
                   refit::Bool) -> ReturnsFrames
 
-Return the frames of the readers inside a risk measure that holds a return term, for the frame walk of a head.
+Return the frames of the readers in a risk measure that holds a return term, for the frame walk of a head.
 
-The return term `rt` can hold an uncertainty set with a prior of its own, see [`ArithmeticReturn`](@ref), and the risk side `rk` of [`ExpectedReturnRiskRatio`](@ref) can hold a risk measure with a reader. Each of those readers belongs to the group of the head that holds the measure, so the method walks every field of `r` with [`field_frames`](@ref). A field that holds no reader adds nothing.
+The return term `rt` can hold an uncertainty set with a prior of its own, as [`ArithmeticReturn`](@ref) states. The risk side `rk` of an [`ExpectedReturnRiskRatio`](@ref) can hold a risk measure with a reader. Each of those readers belongs to the group of the head that holds the measure. So the method reads every field of `r` with [`field_frames`](@ref). A field that holds no reader adds no frame.
 
 # Arguments
 
@@ -876,7 +884,7 @@ The return term `rt` can hold an uncertainty set with a prior of its own, see [`
   - [`ExpectedReturn`](@ref)
   - [`ExpectedReturnRiskRatio`](@ref)
 """
-function reader_frames(r::Union{<:ExpectedReturn, <:ExpectedReturnRiskRatio},
+function reader_frames(r::Union{ExpectedReturn, ExpectedReturnRiskRatio},
                        path::AbstractString, refit::Bool)
     return field_frames(r, path, refit)
 end
@@ -884,19 +892,21 @@ end
     expected_risk(r::ExpectedReturnRiskRatio, w::VecNum, pr::AbstractPriorResult,
                   fees::Option{<:Fees} = nothing; kwargs...)
 
-Compute the expected risk for a portfolio using a ratio-based risk measure.
+Compute the value of an [`ExpectedReturnRiskRatio`](@ref), the risk-adjusted return ratio of a portfolio.
 
-`expected_risk` returns the risk-adjusted return ratio (e.g., Sharpe ratio) for the portfolio, using the specified return estimator, risk measure, and risk-free rate in the [`ExpectedReturnRiskRatio`](@ref). The closed form is the one [`ExpectedReturnRiskRatio`](@ref) states, and the method delegates to [`expected_ratio`](@ref) on the measure's fields.
+The method calls [`expected_ratio`](@ref) with the fields of the measure. [`ExpectedReturnRiskRatio`](@ref) states the closed form.
 
-The measure's own `sca` and `rf` are pinned after `kwargs...` is splatted, so a `sca` or an `rf` supplied at the call site loses to the field. A figure reported from an [`ExpectedReturnRiskRatio`](@ref) is therefore always the one the type names.
+The call puts `kwargs...` first and the `sca` and `rf` fields of the measure after it. So the fields take precedence over a `sca` or an `rf` that the caller gives at the call site. The figure of an [`ExpectedReturnRiskRatio`](@ref) is always the figure that the type names.
+
+The measure is also a composite on a returns matrix, as [`MeanReturnRiskRatio`](@ref) is. Its methods of [`expected_risk`](@ref), [`worst_case_distribution`](@ref) and [`linearised_risk`](@ref) on `X::MatNum` divide [`resolved_expected_return`](@ref) of `rt`, minus `rf`, by the risk of `rk`. They need an `rt` that [`factory`](@ref) resolved, and the prior route of [`risk_contribution`](@ref), [`risk_gradient`](@ref) and of each composite measure gives it. A weight path, `w::MatNum`, throws an `ArgumentError`.
 
 # Arguments
 
-  - `r`: [`ExpectedReturnRiskRatio`](@ref) containing a return estimator, risk measure, and risk-free rate.
+  - `r`: [`ExpectedReturnRiskRatio`](@ref) that holds a return estimator, a risk measure and a risk-free rate.
   - `w`: Portfolio weights.
   - `pr`: Prior result.
   - `fees`: Optional transaction fees.
-  - `kwargs...`: Additional keyword arguments.
+  - `kwargs...`: Keyword arguments that go to [`expected_ratio`](@ref), `strict` included. A `sca` or an `rf` among them has no effect.
 
 # Returns
 
@@ -919,140 +929,212 @@ function expected_risk(r::ExpectedReturnRiskRatio, w::VecNum, pr::AbstractPriorR
     # flow through `expected_ratio` into the inner vector call and silently win.
     return expected_ratio(r.rk, r.rt, w, pr, fees; kwargs..., rf = r.rf, sca = r.sca)
 end
+function expected_risk(r::ExpectedReturnRiskRatio, w::VecNum, X::MatNum,
+                       fees::Option{<:Fees} = nothing; kwargs...)
+    return (resolved_expected_return(r.rt, w, w, X, fees) - r.rf) /
+           expected_risk(r.rk, w, X, fees; kwargs..., sca = r.sca)
+end
+function expected_risk(r::ExpectedReturnRiskRatio, w::MatNum, ::MatNum,
+                       ::Option{<:Fees} = nothing; kwargs...)
+    return throw(ArgumentError("`$(nameof(typeof(r)))` reads the expected return of one cross-section of weights. A `w::MatNum` is a weight path, one row of weights per observation, which is a different quantity.\nScore this measure against the target weight vector, `w::VecNum`, which is the first row of the path.\nGot\nsize(w) => $(size(w))"))
+end
+# The composite carries the distribution of its risk measure, as `MeanReturnRiskRatio` does.
+function worst_case_distribution(r::ExpectedReturnRiskRatio, w::VecNum, X::MatNum,
+                                 fees::Option{<:Fees})
+    return (worst_case_distribution(r.rk, w, X, fees),)
+end
+function linearised_risk(q::Tuple, r::ExpectedReturnRiskRatio, w::VecNum, X::MatNum,
+                         fees::Option{<:Fees}; kwargs...)
+    return (resolved_expected_return(r.rt, w, w, X, fees) - r.rf) /
+           linearised_risk(q[1], r.rk, w, X, fees; kwargs..., sca = r.sca)
+end
+# The active weights of an independent tracking measure read the expected return of `wd` minus
+# the fee of `w`, as `difference_risk` of `ExpectedReturn` does.
+function difference_risk(r::ExpectedReturnRiskRatio, wd::VecNum, w::VecNum, X::MatNum,
+                         fees::Fees; kwargs...)
+    return (resolved_expected_return(r.rt, wd, w, X, fees) - r.rf) /
+           difference_risk(r.rk, wd, w, X, fees; kwargs..., sca = r.sca)
+end
+function difference_worst_case(r::ExpectedReturnRiskRatio, wd::VecNum, w::VecNum, X::MatNum,
+                               fees::Fees)
+    return (difference_worst_case(r.rk, wd, w, X, fees),)
+end
+function difference_linearised_risk(q::Tuple, r::ExpectedReturnRiskRatio, wd::VecNum,
+                                    w::VecNum, X::MatNum, fees::Fees; kwargs...)
+    return (resolved_expected_return(r.rt, wd, w, X, fees) - r.rf) /
+           difference_linearised_risk(q[1], r.rk, wd, w, X, fees; kwargs..., sca = r.sca)
+end
 function needs_previous_weights(r::ExpectedReturnRiskRatio)
     return needs_previous_weights(r.rk)
 end
 """
-    const PerfRM = Union{<:MeanReturn, <:MeanReturnRiskRatio, <:ExpectedReturn,
-                         <:ExpectedReturnRiskRatio}
+    homogeneity_degree(rt::JuMPReturnsEstimator, fees::Option{<:Fees} = nothing) -> Option{<:Integer}
+    homogeneity_degree(rt::VecJRE, fees::Option{<:Fees} = nothing) -> Option{<:Integer}
+    homogeneity_degree(r::ExpectedReturn, fees::Option{<:Fees} = nothing,
+                       T::Option{<:Integer} = nothing) -> Option{<:Integer}
+    homogeneity_degree(r::ExpectedReturnRiskRatio, fees::Option{<:Fees} = nothing,
+                       T::Option{<:Integer} = nothing) -> Option{<:Integer}
 
-Union of performance risk measures used to compute portfolio performance metrics (returns and return/risk ratios).
+Return the degree of homogeneity of a return estimator in the portfolio weights, under the fees `fees`, and of the two measures that read one.
 
-The group exists because every one of its members reports a **performance** figure rather than a loss, so a larger value is a better one. [`bigger_is_better`](@ref) dispatches on this alias and answers `true` for all four in one method, which is the whole reason the four are grouped.
+The arithmetic return ``\\boldsymbol{\\mu}^{\\intercal} \\boldsymbol{w}`` has degree 1. The logarithmic return ``\\mathbb{E}[\\log(1 + \\boldsymbol{x}^{\\intercal} \\boldsymbol{w})]`` is not homogeneous, so it has no degree. A vector of return estimators sums its terms whose `settings.rte` is `true`, so it has no degree when one of those terms has none.
+
+A term whose `settings.fee` is `true` subtracts the fees, through [`term_fees`](@ref). A fee that does not scale with the weights, from [`has_fixed_fee`](@ref), then takes the degree from the term. A constant shift moves the return, so no such fee cancels. [`NoReturn`](@ref) charges no fee.
+
+# Algorithm
+
+ 1. Return `nothing` for [`LogarithmicReturn`](@ref), and `1` for [`NoReturn`](@ref).
+ 2. For every other return estimator, return `nothing` when `settings.fee` is `true` and [`has_fixed_fee`](@ref) finds a fee. Otherwise return `1`.
+ 3. For a vector, return `nothing` when a term whose `settings.rte` is `true` has no degree. Otherwise return `1`.
+ 4. For [`ExpectedReturn`](@ref), return the degree of `rt`.
+ 5. For [`ExpectedReturnRiskRatio`](@ref), return `nothing` when `rf` is not zero. Otherwise subtract the degree of `rk`, from [`scalarised_degree`](@ref), from the degree of `rt` with [`degree_difference`](@ref).
+
+# Arguments
+
+  - `rt`: Return estimator, or a vector of them.
+  - $(arg_dict[:r])
+  - `fees`: The fees that the return pays, or `nothing`.
+  - `T`: The number of observations of the net returns, or `nothing` when it is not known. A return estimator does not read it, and the risk measure `rk` of a ratio does.
+
+# Returns
+
+  - `d::Option{<:Integer}`: The degree of homogeneity, or `nothing`.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.homogeneity_degree(ExpectedReturn(; rt = LogarithmicReturn()))
+
+julia> PortfolioOptimisers.homogeneity_degree(ExpectedReturn(), Fees(; fl = 0.001))
+
+julia> PortfolioOptimisers.homogeneity_degree(ExpectedReturnRiskRatio())
+-1
+
+julia> PortfolioOptimisers.homogeneity_degree(ExpectedReturnRiskRatio(; rk = StandardDeviation()))
+0
+```
 
 # Related
 
-  - [`MeanReturn`](@ref): reads a realised return series.
-  - [`MeanReturnRiskRatio`](@ref): reads a realised return series.
-  - [`ExpectedReturn`](@ref): reads a prior result, so it is also a [`PrRM`](@ref).
-  - [`ExpectedReturnRiskRatio`](@ref): reads a prior result, so it is also a [`PrRM`](@ref).
-  - [`PrRM`](@ref): the two members of this group that read a prior result.
-  - [`bigger_is_better`](@ref): the method that dispatches on this alias.
+  - [`homogeneity_degree`](@ref)
+  - [`has_fixed_fee`](@ref)
+  - [`expected_return`](@ref)
+  - [`ExpectedReturn`](@ref)
+  - [`ExpectedReturnRiskRatio`](@ref)
 """
-const PerfRM = Union{<:MeanReturn, <:MeanReturnRiskRatio, <:ExpectedReturn,
-                     <:ExpectedReturnRiskRatio}
+function homogeneity_degree(rt::JuMPReturnsEstimator, fees::Option{<:Fees} = nothing)
+    return rt.settings.fee && has_fixed_fee(fees, false) ? nothing : 1
+end
+function homogeneity_degree(::NoReturn, ::Option{<:Fees} = nothing)
+    return 1
+end
+function homogeneity_degree(::LogarithmicReturn, ::Option{<:Fees} = nothing)
+    return nothing
+end
+function homogeneity_degree(rt::VecJRE, fees::Option{<:Fees} = nothing)
+    unbounded = any(r -> r.settings.rte && isnothing(homogeneity_degree(r, fees)), rt)
+    return unbounded ? nothing : 1
+end
+function homogeneity_degree(r::ExpectedReturn, fees::Option{<:Fees} = nothing,
+                            ::Option{<:Integer} = nothing)
+    return homogeneity_degree(r.rt, fees)
+end
+function homogeneity_degree(r::ExpectedReturnRiskRatio, fees::Option{<:Fees} = nothing,
+                            T::Option{<:Integer} = nothing)
+    if !iszero(r.rf)
+        return nothing
+    end
+    return degree_difference(homogeneity_degree(r.rt, fees),
+                             scalarised_degree(r.rk, r.sca, fees, T))
+end
 """
-    const PrRM = Union{<:ExpectedReturn, <:ExpectedReturnRiskRatio}
+    const PerfRM = Union{MeanReturn, MeanReturnRiskRatio, ExpectedReturn,
+                         ExpectedReturnRiskRatio}
 
-Union of prior-based return risk measures that are incompatible with [`PredictionResult`](@ref) inputs and require the use of [`MeanReturn`](@ref) or [`MeanReturnRiskRatio`](@ref) instead.
+Union of the risk measures whose value is a performance figure, a return or a ratio of return to risk.
 
-The group exists because both members read the **prior result** itself rather than a returns matrix, so neither declares a [`risk_input_kind`](@ref). That one property drives every method that dispatches on the alias: the vector-of-weights route resolves the measure once and keeps the prior in hand, the prediction-result routes refuse the call, and [`supports_precomputed_returns`](@ref) answers `false`.
+Each member gives a **performance** figure and not a loss, so a larger value is a better value. [`bigger_is_better`](@ref) dispatches on this alias and gives `true` for the four members in one method. That method is the only reason for the group.
+
+# Related
+
+  - [`MeanReturn`](@ref): It reads a realised return series.
+  - [`MeanReturnRiskRatio`](@ref): It reads a realised return series.
+  - [`ExpectedReturn`](@ref): It reads a prior result, so it is also a [`PrRM`](@ref).
+  - [`ExpectedReturnRiskRatio`](@ref): It reads a prior result, so it is also a [`PrRM`](@ref).
+  - [`PrRM`](@ref): The two members of this group that read a prior result.
+  - [`bigger_is_better`](@ref): The method that dispatches on this alias.
+"""
+const PerfRM = Union{MeanReturn, MeanReturnRiskRatio, ExpectedReturn,
+                     ExpectedReturnRiskRatio}
+"""
+    const PrRM = Union{ExpectedReturn, ExpectedReturnRiskRatio}
+
+Union of the return risk measures that read a prior result, and that refuse a [`PredictionResult`](@ref). On a prediction result, use [`MeanReturn`](@ref) or [`MeanReturnRiskRatio`](@ref) in their place.
+
+Both members read the **prior result** through their return estimator, which a return series does not hold: an [`ArithmeticReturn`](@ref) reads the expected returns `mu`, and a [`LogarithmicReturn`](@ref) reads the observation weights. The [`factory`](@ref) of the risk path fills them into the return estimator of the measure, so the resolved measure reads the weights, the returns matrix and the fees. [`ExpectedReturn`](@ref) declares [`WeightsReturnsFeesInput`](@ref), and [`ExpectedReturnRiskRatio`](@ref) is a composite with methods of its own, as [`MeanReturnRiskRatio`](@ref) is. Thus [`risk_contribution`](@ref), [`risk_gradient`](@ref) and every composite of the risk path take both members. Each method that dispatches on the alias follows from the need for a prior:
+
+  - The methods for a prediction result refuse the call.
+  - [`supports_precomputed_returns`](@ref) gives `false`.
 
 # Related
 
   - [`ExpectedReturn`](@ref)
   - [`ExpectedReturnRiskRatio`](@ref)
-  - [`PerfRM`](@ref): the wider group both members also belong to.
-  - [`prrm_prediction_message`](@ref): builds the refusal the prediction-result methods raise.
-  - [`risk_input_kind`](@ref): the declaration neither member makes.
+  - [`PerfRM`](@ref): The larger group that both members also belong to.
+  - [`prrm_prediction_message`](@ref): It builds the message of the refusal of the prediction-result methods.
+  - [`resolved_expected_return`](@ref): The return of a resolved estimator on the returns matrix.
 """
-const PrRM = Union{<:ExpectedReturn, <:ExpectedReturnRiskRatio}
+const PrRM = Union{ExpectedReturn, ExpectedReturnRiskRatio}
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `false`: a [`PrRM`](@ref) never supports precomputed returns.
+Return `false`, because a [`PrRM`](@ref) does not support precomputed returns.
 
-Both members read the **prior result** and contract the expected returns it states with the portfolio weights. A bare net-return series carries neither the expected returns nor the weights, so `r(x::VecNum)` is undefined for the two types and neither defines one. The predicate answers here rather than reaching the erroring default of [`risk_input_kind`](@ref), which reads to a caller as an internal fault rather than as a statement about the measure they chose.
+Both members read the portfolio weights and the prior through their return estimator: an [`ArithmeticReturn`](@ref) multiplies the expected returns of the prior by the weights, and a [`LogarithmicReturn`](@ref) weights each observation by the observation weights of the prior and charges the fee of the weights once, after the mean. A bare series of net returns holds neither the prior nor the weights. So neither type defines `r(x::VecNum)`, and [`expected_risk_from_returns`](@ref) refuses both with a message that names the cause.
 
-To score a bare return series, name [`MeanReturn`](@ref) or [`MeanReturnRiskRatio`](@ref) instead, which is the substitution [`prrm_prediction_message`](@ref) names for the prediction-result routes.
+To score a bare return series, use [`MeanReturn`](@ref) or [`MeanReturnRiskRatio`](@ref). [`prrm_prediction_message`](@ref) names the same replacement for a prediction result.
 
 # Related
 
   - [`PrRM`](@ref)
   - [`supports_precomputed_returns`](@ref)
-  - [`risk_input_kind`](@ref): the declaration neither member makes.
-  - [`MeanReturn`](@ref): the [`NetReturnsInput`](@ref) measure that does score a bare series.
-  - [`expected_risk_from_returns`](@ref): the contract entry this predicate gates.
+  - [`MeanReturn`](@ref): The [`NetReturnsInput`](@ref) measure that scores a bare series.
+  - [`expected_risk_from_returns`](@ref): The entry of the contract that this predicate controls.
 """
 supports_precomputed_returns(::PrRM)::Bool = false
-"""
-    expected_risk(r::PrRM, w::VecVecNum, pr::AbstractPriorResult,
-                  fees::Option{<:Fees} = nothing; kwargs...)
-
-Evaluate a prior-reading risk measure over a vector of weight vectors, such as the points of a
-[`Frontier`](@ref).
-
-A [`PrRM`](@ref) reads the prior result itself and not a returns matrix — it declares no
-[`risk_input_kind`](@ref) for that reason. The generic `VecVecNum` method resolves the measure and
-then hands the loop `pr.X`, which is right for a measure whose kernel takes the matrix and strips
-what this family needs. So the family resolves once here and maps with the prior still in hand.
-
-# Algorithm
-
- 1. Resolve the measure against the prior once, with [`factory`](@ref), giving a measure whose slots are filled.
- 2. Evaluate the resolved measure on each weight vector `wi` of `w`, with the prior itself as the input rather than `pr.X`.
- 3. Collect one expected risk per weight vector, in the order of `w`.
-
-# Arguments
-
-  - `r`: [`ExpectedReturn`](@ref) or [`ExpectedReturnRiskRatio`](@ref).
-  - `w`: Vector of portfolio weight vectors.
-  - `pr`: Prior result.
-  - `fees`: Optional transaction fees.
-  - `kwargs...`: Additional keyword arguments.
-
-# Returns
-
-  - `risk::VecNum`: One expected risk per weight vector.
-
-# Related
-
-  - [`PrRM`](@ref)
-  - [`expected_risk`](@ref)
-  - [`resolve_risk_inputs`](@ref)
-  - [`factory`](@ref)
-"""
-function expected_risk(r::PrRM, w::VecVecNum, pr::AbstractPriorResult,
-                       fees::Option{<:Fees} = nothing; strict::Bool = false, kwargs...)
-    # The population reduces once, so the diagnostic is raised once rather than once per
-    # member. Every member reduces again on the reduced prior, where the mask is `nothing`.
-    _, pr, w, fees = investable_reduction(pr, w, fees, strict)
-    r = factory(r, pr)
-    return [expected_risk(r, wi, pr, fees; kwargs...) for wi in w]
-end
 function bigger_is_better(::PerfRM)
     return true
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Build the refusal a [`PrRM`](@ref) raises on a prediction result.
+Build the message of the error that a [`PrRM`](@ref) raises on a prediction result.
 
-The refusal itself is about **prior versus realised returns**, and multiplicity does not touch it: a [`PrRM`](@ref) reads a prior result, and a prediction result carries a realised series instead.
+The refusal is about **prior returns and realised returns**, and the number of return terms does not change it. A [`PrRM`](@ref) reads a prior result, and a prediction result holds a realised series.
 
-The suggested replacement does depend on multiplicity. [`MeanReturn`](@ref) carries **no** return estimator, so it cannot hold the several terms a widened `rt` holds. When `rt` is a vector the message says so, rather than telling the caller that a lossy substitution is equivalent.
+The replacement that the message names does change with the number of terms. [`MeanReturn`](@ref) holds **no** return estimator, so it cannot hold the many terms of a vector `rt`. When `rt` is a vector, the message says so. It does not tell the caller that the replacement gives the same figure, because the replacement loses the terms.
 
 # Algorithm
 
- 1. Choose the replacement measure `alt` from the kind of `r`: [`MeanReturn`](@ref) for an [`ExpectedReturn`](@ref), and [`MeanReturnRiskRatio`](@ref) for an [`ExpectedReturnRiskRatio`](@ref).
- 2. Write the first sentence of `msg`, naming `r`, the wrapper type of `pred` and `alt`.
- 3. When the `rt` of `r` is a vector, append the second sentence, naming the number of terms it holds and the two routes that keep them.
+ 1. Choose the replacement measure `alt` from the type of `r`. It is [`MeanReturn`](@ref) for an [`ExpectedReturn`](@ref), and [`MeanReturnRiskRatio`](@ref) for an [`ExpectedReturnRiskRatio`](@ref).
+ 2. Write the first sentence of `msg`. It names `r`, the wrapper type of `pred` and `alt`.
+ 3. When the `rt` of `r` is a vector, add the second sentence. It names the number of terms in `rt` and the two routes that keep them.
 
 # Arguments
 
   - `r`: The measure that refuses the call.
-  - `pred`: The prediction result the caller supplied.
+  - `pred`: The prediction result that the caller gave.
 
 # Returns
 
-  - `msg::String`: The message of the `ArgumentError` the refusing methods raise.
+  - `msg::String`: The message of the `ArgumentError` that the four methods for a prediction result raise.
 
 # Related
 
   - [`PrRM`](@ref)
   - [`MeanReturn`](@ref)
   - [`MeanReturnRiskRatio`](@ref)
-  - [`expected_risk`](@ref): the four methods that raise this message.
+  - [`expected_risk`](@ref): The four methods that raise this message.
 """
 function prrm_prediction_message(r::PrRM, pred)
     alt = isa(r, ExpectedReturn) ? MeanReturn : MeanReturnRiskRatio
@@ -1074,28 +1156,31 @@ end
     expected_risk(r::PrRM, pred::MultiPeriodPredictionResult; kwargs...)
     expected_risk(r::PrRM, pred::PopulationPredictionResult; kwargs...)
 
-Refuse to evaluate a prior-reading risk measure against a prediction result.
+Refuse to compute a risk measure that reads a prior on a prediction result.
 
-A [`PrRM`](@ref) reads a **prior** result: it takes the expected returns the prior states and contracts them with the weights. A prediction result carries a **realised** return series instead, and it states no expected returns, so there is nothing for these two measures to read. The four methods exist to say so, and each of them raises rather than returning a figure computed from the wrong input.
+A [`PrRM`](@ref) reads a **prior** result. It multiplies the expected returns of the prior by the weights. A prediction result holds a **realised** return series and no expected returns, so the two measures have nothing to read. Each of the four methods raises an error, and none gives a figure from the wrong input.
 
-The caller has two routes. To measure the realised series, name [`MeanReturn`](@ref) or [`MeanReturnRiskRatio`](@ref) in place of the measure and call `expected_risk(alt, pred)`. To measure the prior instead, call `expected_risk(r, w, pr)` with the prior result and the weights, which is the route the first two methods of this file document.
+The caller has two routes:
+
+  - To measure the realised series, use [`MeanReturn`](@ref) or [`MeanReturnRiskRatio`](@ref) as `alt` in place of the measure, and call `expected_risk(alt, pred)`.
+  - To measure the prior, call `expected_risk(r, w, pr)` with the weights and the prior result. The `expected_risk` methods for an [`ExpectedReturn`](@ref) and for an [`ExpectedReturnRiskRatio`](@ref) document that route.
 
 # Arguments
 
   - `r`: [`ExpectedReturn`](@ref) or [`ExpectedReturnRiskRatio`](@ref).
-  - `pred`: The prediction result the caller supplied.
-  - `kwargs...`: Additional keyword arguments. They are read by none of the four methods.
+  - `pred`: The prediction result that the caller gave.
+  - `kwargs...`: Keyword arguments that none of the four methods reads.
 
 # Validation
 
-  - Every method raises `ArgumentError`, with the message [`prrm_prediction_message`](@ref) builds. There is no input on which any of them returns.
+  - Every method raises an `ArgumentError`, with the message that [`prrm_prediction_message`](@ref) builds. No method returns for any input.
 
 # Related
 
   - [`PrRM`](@ref)
-  - [`prrm_prediction_message`](@ref): builds the message of the raise.
-  - [`MeanReturn`](@ref): the replacement for an [`ExpectedReturn`](@ref).
-  - [`MeanReturnRiskRatio`](@ref): the replacement for an [`ExpectedReturnRiskRatio`](@ref).
+  - [`prrm_prediction_message`](@ref): It builds the message of the error.
+  - [`MeanReturn`](@ref): The replacement for an [`ExpectedReturn`](@ref).
+  - [`MeanReturnRiskRatio`](@ref): The replacement for an [`ExpectedReturnRiskRatio`](@ref).
   - [`PredictionResult`](@ref)
   - [`MultiPeriodPredictionResult`](@ref)
   - [`PopulationPredictionResult`](@ref)
@@ -1122,17 +1207,19 @@ end
     brinson_attribution(X::TimeArray, w::VecNum, wb::VecNum,
                         asset_classes::DataFrame, col, date0 = nothing, date1 = nothing)
 
-Compute Brinson performance attribution aggregated per asset class [brinson_attribution](@cite).
+Compute the Brinson performance attribution of each asset class [brinson_attribution](@cite).
 
-`brinson_attribution` generates a DataFrame summarizing the Brinson performance attribution, decomposing total excess return into asset allocation, security selection, interaction, and total effect for each asset class. The calculation is performed over the specified date range, using the provided asset weights, benchmark weights, and asset class assignments.
+`brinson_attribution` returns a DataFrame with the Brinson attribution of each asset class. It splits the total excess return of the class into asset allocation, security selection and interaction. The function reads the asset weights, the benchmark weights and the class of each asset over the date range.
 
-`date0` and `date1` are **positional**, and they follow `col`. Both must be given for the filter to apply: a call that names only one of them attributes the whole of `X`.
+`date0` and `date1` are **positional** arguments after `col`. The filter applies only when the call gives both. A call that gives only one of them attributes the whole of `X`.
 
-`X` holds **prices**, not returns. The period return of an asset is the ratio of its last value in the range to its first value, less one, which is a return only when the entries are prices.
+`X` holds **prices**, not returns. The period return of an asset is the ratio of its last value in the range to its first value, minus one. This ratio is a return only when the entries are prices.
 
-The function is defined over **one** evaluation period, between the two dates, and it reads no weight path. `w` and `wb` are held fixed over that period, so a fund whose holdings drifted inside it is attributed at the weights it opened with. A drift-aware multi-period attribution needs a scheme for linking the single-period effects into a cumulative one, and this library has chosen none, so no such method exists. Attribute each period on its own, and link the results outside the library.
+The function attributes **one** evaluation period, between the two dates, and it reads no weight path. `w` and `wb` stay the same over that period. So the function attributes a fund whose holdings drifted in the period at its weights at the start. A multi-period attribution that follows the drift needs a rule that links the effects of the single periods into a cumulative effect. This library has no such rule, so it has no such method. Attribute each period alone, and link the results outside the library.
 
-Both class returns divide by the class weight, and neither division is guarded. A class holding zero portfolio weight makes its ``r_{i}`` a `NaN`, and a class holding zero benchmark weight makes its ``r_{i}^{b}`` a `NaN`. The two spread differently, because ``\\mathrm{AA}_{i}`` reads only ``r_{i}^{b}``. A zero portfolio weight leaves ``\\mathrm{AA}_{i}`` finite and makes the other three rows of that class a `NaN`; a zero benchmark weight makes all four a `NaN`. The `Total` column is a row sum, so a row is a `NaN` exactly when one of its class entries is. Drop the empty class from `asset_classes` to remove it.
+Both class returns divide by the weight of the class, and no guard stops a division by zero. A class with zero portfolio weight makes its ``r_{i}`` a `NaN`. A class with zero benchmark weight makes its ``r_{i}^{b}`` a `NaN`. The two cases spread differently, because ``\\mathrm{AA}_{i}`` reads only ``r_{i}^{b}``. A zero portfolio weight keeps ``\\mathrm{AA}_{i}`` finite, and it makes the other three rows of that class a `NaN`. A zero benchmark weight makes all four rows a `NaN`.
+
+The `Total` column is a row sum, so its entry of a row is a `NaN` when one of the class entries of the row is a `NaN`. The columns of the other classes stay finite, because each column reads only its own class and ``r^{b}``. Do not remove the rows of the empty class from `asset_classes` alone. Then `asset_classes` and `w` have different lengths, and the function raises a `DimensionMismatch`.
 
 # Mathematical definition
 
@@ -1156,48 +1243,48 @@ Where:
   - ``r_{j}``: Return of asset ``j`` over the range.
   - ``w_{j}``, ``w_{j}^{b}``: Portfolio and benchmark weight of asset ``j``.
   - ``w_{i} = \\sum_{j \\in \\mathcal{C}_{i}} w_{j}``, ``w_{i}^{b} = \\sum_{j \\in \\mathcal{C}_{i}} w_{j}^{b}``: Portfolio and benchmark weight of the class.
-  - ``r_{i}``, ``r_{i}^{b}``: Portfolio and benchmark return of the class. Each is the average of its members' returns, normalised by the weight of the class, so a class return is a weighted average and not a weighted sum.
+  - ``r_{i}``, ``r_{i}^{b}``: Portfolio and benchmark return of the class. Each is the weighted sum of the returns of its members, divided by the weight of the class. So a class return is a weighted average and not a weighted sum.
   - ``r^{b}``: Benchmark return of the whole universe.
-  - ``\\mathrm{AA}_{i}``: Asset allocation of the class, the part of the excess return that the class weight decision earned.
-  - ``\\mathrm{SS}_{i}``: Security selection of the class, the part that the choice of assets inside the class earned.
+  - ``\\mathrm{AA}_{i}``: Asset allocation of the class, the part of the excess return that comes from the weight of the class.
+  - ``\\mathrm{SS}_{i}``: Security selection of the class, the part that comes from the choice of assets in the class.
   - ``\\mathrm{I}_{i}``: Interaction of the class, the product of the two differences.
   - ``\\mathrm{TER}_{i}``: Total excess return of the class, the sum of the three.
 
 # Algorithm
 
- 1. Filter the date range. When `date0` and `date1` are both given, find the first and the last observation of `X` inside the range, giving `idx1` and `idx2`. Otherwise take the whole of `X`, so `idx1` is `1` and `idx2` is `length(X)`.
- 2. Form `ret`, the period return of each asset, from the values at `idx1` and `idx2`.
- 3. Contract `ret` with `wb`, giving `ret_b`, the benchmark return of the whole universe.
- 4. Read the class of each asset from column `col` of `asset_classes`, and build `sets_mat`, the membership matrix whose entry is `true` when the asset belongs to the class.
- 5. Take the next class. Sum the two weight vectors over its members, giving `w_i` and `wb_i`, and form its two weight-normalised returns `ret_i` and `ret_b_i`.
- 6. Compute `AA_i`, `SS_i`, `I_i` and `TER_i` of that class, and write the four numbers as its column of `df`.
- 7. Repeat steps 5 and 6 over the remaining classes.
- 8. Append the `Total` column, the row-wise sum over the class columns.
+ 1. Filter the date range. When the call gives `date0` and `date1`, find the first and the last observation of `X` in the range. These are `idx1` and `idx2`. Otherwise take the whole of `X`, so `idx1` is `1` and `idx2` is `length(X)`.
+ 2. Make `ret`, the period return of each asset, from the values at `idx1` and `idx2`.
+ 3. Take the dot product of `ret` and `wb`. This is `ret_b`, the benchmark return of the whole universe.
+ 4. Read the class of each asset from column `col` of `asset_classes`. Build `sets_mat`, the membership matrix. Its entry is `true` when the asset belongs to the class.
+ 5. Take the next class. Sum the two weight vectors over its members, to get `w_i` and `wb_i`. Divide the two weighted sums of the returns of its members by those weights, to get `ret_i` and `ret_b_i`.
+ 6. Compute `AA_i`, `SS_i`, `I_i` and `TER_i` of that class. Write the four numbers as the column of the class in `df`.
+ 7. Repeat steps 5 and 6 for the other classes.
+ 8. Add the `Total` column, the sum of the class columns for each row.
 
 # Arguments
 
   - `X`: TimeArray of asset prices.
   - `w`: Vector of portfolio weights.
   - `wb`: Vector of benchmark weights.
-  - `asset_classes`: DataFrame containing asset class assignments for each asset.
-  - `col`: Column in `asset_classes` specifying the class for each asset.
-  - `date0`: (Optional) Start date for the attribution period.
-  - `date1`: (Optional) End date for the attribution period.
+  - `asset_classes`: DataFrame that gives the class of each asset.
+  - `col`: Column of `asset_classes` that holds the class of each asset.
+  - `date0`: Optional start date of the attribution period.
+  - `date1`: Optional end date of the attribution period.
 
 # Returns
 
-  - `df::DataFrame`: DataFrame with rows for asset allocation, security selection, interaction, and total effect, and columns for each asset class and the total.
+  - `df::DataFrame`: DataFrame with one row each for asset allocation, security selection, interaction and the total effect. It has one column for each asset class, and a `Total` column.
 
 # Related
 
   - [`VecNum`](@ref)
-  - [`performance_summary`](@ref): summarises one realised return series, where this function splits one period across the classes.
-  - [`calc_net_returns`](@ref): the net return series of a portfolio, which charges fees. This function charges none.
-  - [`AssetSetsMatrixEstimator`](@ref): the library's own group-membership matrix. Step 4 builds its own from a DataFrame column instead.
+  - [`performance_summary`](@ref): It summarises one realised return series. This function splits one period across the classes.
+  - [`calc_net_returns`](@ref): It gives the net return series of a portfolio, and it charges fees. This function charges no fees.
+  - [`AssetSetsMatrixEstimator`](@ref): It builds the group membership matrix of the library. Step 4 builds its own matrix from a DataFrame column.
 
 # References
 
-  - $(ref_dict[:brinson_attribution])
+  - $(ref_dict[:brinson_attribution]) Pages 73-76. $(ref_dict[:no_original_source])
 """
 function brinson_attribution(X::TimeSeries.TimeArray, w::VecNum, wb::VecNum,
                              asset_classes::DataFrames.DataFrame, col, date0 = nothing,
@@ -1255,11 +1342,13 @@ $(DocStringExtensions.TYPEDEF)
 
 The headline performance statistics of a realised return series.
 
-`PerformanceSummaryResult` is what [`performance_summary`](@ref) returns. It carries the eleven numbers [`plot_performance_summary`](@ref) draws, the standard error of the Sharpe ratio, and the four inputs that produced them, so a summary can be tabulated, compared across runs, asserted on in a test, or fed to a search without a plotting package installed. The last four numbers read inputs a bare return series does not carry, and each is `NaN` when its input is absent: the three excess statistics need a `benchmark` series, which a prediction result reads off its own rows when the returns data carried a `B`, and the turnover needs the weight path of a multi-period prediction result.
+[`performance_summary`](@ref) returns a `PerformanceSummaryResult`. It holds the eleven numbers that [`plot_performance_summary`](@ref) draws, the standard error of the Sharpe ratio, and the four inputs of the statistics. A caller can put a summary in a table, compare it across runs, test it, or give it to a search, with no plotting package installed.
+
+The last four numbers read inputs that a bare return series does not hold. Each is `NaN` when its input is absent. The three excess statistics need a `benchmark` series. A prediction result reads that series from its own rows when the returns data held a `B`. The turnover needs the weight path of a multi-period prediction result.
 
 # Sign convention
 
-`max_drawdown` and `cvar` are reported in **return space**, so both are non-positive for a portfolio that ever loses. This is the opposite sign to the [`ConditionalValueatRisk`](@ref) risk measure, which reports a positive loss: `ConditionalValueatRisk(; alpha = alpha)(ret) == -summary.cvar`.
+`max_drawdown` and `cvar` are in **return space**, so both are not positive for a portfolio that has a loss. The [`ConditionalValueatRisk`](@ref) risk measure has the opposite sign, because it gives a loss as a positive number. Thus `ConditionalValueatRisk(; alpha = alpha)(ret) == -summary.cvar`.
 
 # Fields
 
@@ -1274,10 +1363,10 @@ $(DocStringExtensions.FIELDS)
         excess_ret, tracking_error, information_ratio, turnover
     ) -> PerformanceSummaryResult
 
-Arguments correspond to the struct's fields, in the order they are declared. The type is a
-Result, so [`performance_summary`](@ref) builds it and a caller reads it; there is no keyword
-constructor, and the type validates nothing of its own. The four inputs it carries first are
-the arguments that produced the statistics after them.
+The arguments are the fields of the struct, in the order of the declaration. The type is a
+Result, so [`performance_summary`](@ref) builds it and a caller reads it. The type has no
+keyword constructor, and it does no validation of its own. The first four fields are the
+inputs of the statistics in the fields after them.
 
 # Related
 
@@ -1335,19 +1424,19 @@ the arguments that produced the statistics after them.
     """
     cvar
     """
-    `excess_ret`: Annualised arithmetic mean of `ret - benchmark`. `NaN` without a benchmark.
+    `excess_ret`: Annualised arithmetic mean of `ret - benchmark`. It is `NaN` when no benchmark is given.
     """
     excess_ret
     """
-    `tracking_error`: Annualised sample standard deviation of `ret - benchmark`. `NaN` without a benchmark.
+    `tracking_error`: Annualised sample standard deviation of `ret - benchmark`. It is `NaN` when no benchmark is given.
     """
     tracking_error
     """
-    `information_ratio`: `excess_ret / tracking_error`. `NaN` without a benchmark, or when the tracking error is zero or `NaN`.
+    `information_ratio`: `excess_ret / tracking_error`. It is `NaN` when no benchmark is given, or when the tracking error is zero or `NaN`.
     """
     information_ratio
     """
-    `turnover`: Mean turnover per rebalance of the held path, `sum(abs, w_next - w_held)` from the weights a fold held after its last observation to the next fold's target, averaged over the rebalances of a multi-period prediction result. `NaN` for a bare series, a single fold, and a multi-period result of one fold, none of which records a rebalance.
+    `turnover`: Mean turnover for each rebalance of the held path of a multi-period prediction result. One rebalance trades `sum(abs, w_next - w_held)`, from the weights that a fold held after its last observation to the target of the next fold. It is `NaN` for a bare series, for a single fold and for a multi-period result of one fold, because none of them records a rebalance.
     """
     turnover
 end
@@ -1367,13 +1456,17 @@ end
 
 Summarise a realised return series as a [`PerformanceSummaryResult`](@ref).
 
-The weight-and-returns methods net the returns through [`calc_net_returns`](@ref) first, so a summary of a portfolio accounts for its fees.
+The methods that take weights and returns first make the net returns with [`calc_net_returns`](@ref). So the summary of a portfolio includes its fees.
 
-Every method takes a `benchmark`, a second return series over the same periods, and answers the three excess statistics against it. Without one the three are `NaN`. The prediction-result method defaults `benchmark` to the benchmark of the rows it was scored on, which [`regret_benchmark`](@ref) reads, so a prediction over returns data with a `B` answers the three without a keyword, and `benchmark = nothing` turns them off. A benchmark matrix was collapsed by each fold's weights, as [`collapse_benchmark`](@ref) states, so against it `excess_ret` is the return of ``(\\boldsymbol{X} - \\boldsymbol{B}) \\boldsymbol{w}``, the active return against the same weights held in the benchmark assets, and not the excess over one index. The other methods hold no prediction, and read no `B`. The prediction-result method also answers the **turnover** of the held path, the mean trade at a rebalance of a multi-period result; at `test_size = 1` a rebalance is a period. A bare series, a single fold and a one-fold result record no rebalance, so their turnover is `NaN`.
+Every method takes a `benchmark`, a second return series over the same periods, and gives the three excess statistics against it. When no benchmark is given, the three are `NaN`. On the prediction-result method, `benchmark` defaults to the benchmark of the rows that the prediction scored, which [`regret_benchmark`](@ref) reads. So a prediction over returns data with a `B` gives the three statistics with no keyword, and `benchmark = nothing` turns them off. The other methods hold no prediction, and they read no `B`.
 
-**The Precomputed-returns contract: the series `ret` must be finite.** No method takes a finiteness check, because every internal caller hands one a finite series: the prediction methods read the fold's own output of [`calc_net_returns`](@ref), and a scan on a long series would be paid by all of them. One non-finite entry makes the mean, the volatility and every ratio non-finite, and the tail figure answers a **finite wrong number** rather than a `NaN`, because `partialsort` orders a `NaN` after every real. A caller who holds a gapped series drops the gaps first with `x[isfinite.(x)]`, and a caller who holds a gapped panel scores it through [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref) instead, which filters the Held Gaps once.
+Each fold collapsed a benchmark matrix with its own weights, as [`collapse_benchmark`](@ref) states. Against such a benchmark, `excess_ret` is the return of ``(\\boldsymbol{X} - \\boldsymbol{B}) \\boldsymbol{w}``. That is the active return against the same weights in the benchmark assets, and not the excess over one index.
 
-The standard error of the Sharpe ratio reads every observation as independent, so it understates the true standard error on a series scored under a Weight Drift, as the `# Mathematical definition` states. The rigorous alternative is a long-run variance estimator, which needs a bandwidth the library would have to defend on every sample. The library does not build one, and it applies no guard and no threshold: the figure is reported as it stands.
+The prediction-result method also gives the **turnover** of the held path, the mean trade at a rebalance of a multi-period result. At `test_size = 1`, a rebalance is a period. A bare series, a single fold and a result of one fold record no rebalance, so their turnover is `NaN`.
+
+**The series `ret` must be finite, as the Precomputed-returns contract states.** No method checks that the series is finite, because every internal caller gives a finite series. The prediction methods read the output of [`calc_net_returns`](@ref) for the fold, and a check of a long series costs time on every call. One entry that is not finite makes the mean, the volatility and every ratio not finite. The tail figure then gives a **finite wrong number** and not a `NaN`, because `partialsort` puts a `NaN` after every real number. A caller with a gapped series must first remove the gaps with `x[isfinite.(x)]`. A caller with a gapped panel must score it through [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref), which filters the Held Gaps once.
+
+The standard error of the Sharpe ratio reads every observation as independent. So on a series scored under a Weight Drift, it is less than the true standard error, as the `# Mathematical definition` states. A long-run variance estimator corrects for serial dependence, but it needs a bandwidth, and no bandwidth is correct for every sample. The library does not build one. It applies no guard and no threshold, and it gives the figure with no change.
 
 # Mathematical definition
 
@@ -1400,7 +1493,7 @@ The three excess statistics against a benchmark, and the turnover of the held pa
 \\end{align}
 ```
 
-The standard error of the Sharpe ratio is the Bailey and Lopez de Prado [sharpe_stderr](@cite) expression, which corrects for the skewness and the excess kurtosis of the returns:
+The standard error of the Sharpe ratio corrects for the skewness and the excess kurtosis of the returns. Its variance is the asymptotic variance of Equation 2 of [mertens2002](@cite), divided by ``T - 1`` as in Section 2.5 of [sharpe_stderr](@cite), and annualised:
 
 ```math
 \\begin{align}
@@ -1418,45 +1511,45 @@ Where:
   - ``\\boldsymbol{d}``: Drawdown path of the cumulative wealth of ``\\boldsymbol{x}``, compounded or not as `compound` states, with ``d_{t} \\leq 0``.
   - ``m_e``, ``s_e``: Sample mean and corrected sample standard deviation of the excess series ``\\boldsymbol{e} = \\boldsymbol{x} - \\boldsymbol{b}``.
   - ``F``: Number of folds of the multi-period result.
-  - ``\\boldsymbol{w}_f``: Weights fold ``f`` starts from, its target on a solved fold.
-  - ``\\hat{\\boldsymbol{w}}_f``: Weights fold ``f`` holds after its last observation: the drifted holding when the fold carries a Held Weights record, and ``\\boldsymbol{w}_f`` otherwise.
+  - ``\\boldsymbol{w}_f``: Weights at the start of fold ``f``, its target on a solved fold.
+  - ``\\hat{\\boldsymbol{w}}_f``: Weights of fold ``f`` after its last observation. They are the drifted holding when the fold has a Held Weights record, and ``\\boldsymbol{w}_f`` otherwise.
   - ``g_{1}``, ``g_{2}``: Sample skewness and sample excess kurtosis of ``\\boldsymbol{x}``.
 
-Every weight vector of the turnover is embedded by asset name on the union of the folds' universes, zero at an asset its fold does not hold. Each term of the sum is the trade at one rebalance, the quantity [`calc_turnover`](@ref) reads at one step and [`Turnover`](@ref) bounds. The drift inside a fold is not a trade, so it enters the turnover only through ``\\hat{\\boldsymbol{w}}_{f-1}``.
+The turnover puts every weight vector on the union of the universes of the folds, by asset name. A weight is zero at an asset that its fold does not hold. Each term of the sum is the trade at one rebalance. [`calc_turnover`](@ref) reads that quantity at one step, and [`Turnover`](@ref) bounds it. The drift in a fold is not a trade, so it enters the turnover only through ``\\hat{\\boldsymbol{w}}_{f-1}``.
 
-The downside deviation of the Sortino ratio divides by ``T`` rather than by the count of losing periods, which is the Sortino and Price convention and the one that keeps the ratio comparable across series with different loss frequencies.
+The downside deviation of the Sortino ratio divides by ``T``, and not by the number of periods with a loss. This is the convention of Sortino and Price. With it, the ratios of two series with different frequencies of loss stay comparable.
 
-The kurtosis term is ``(g_{2} + 2)/4`` because the source states it as ``(\\gamma_{2} - 1)/4`` on the **raw** fourth standardised moment ``\\gamma_{2}``, and `StatsBase.kurtosis` returns the **excess** moment ``g_{2} = \\gamma_{2} - 3``. The two forms agree, and only this one reduces to the naive ``\\sqrt{(1 + \\mathrm{SR}^{2}/2)/T}`` on a normal series: over 200,000 samples of 250 normal returns at a per-period Sharpe ratio of 0.5, the sample standard deviation of the Sharpe ratio is **0.06728323**, against **0.06721661** from this expression evaluated at the population moments and **0.06337243** from the same expression without the ``+2``.
+The kurtosis term is ``(g_{2} + 2)/4``. Section 2.5 of [sharpe_stderr](@cite) states it as ``(\\gamma_{4} - 1)/4`` on the **raw** fourth standardised moment ``\\gamma_{4}``, and `StatsBase.kurtosis` gives the **excess** moment ``g_{2} = \\gamma_{4} - 3``. The two forms are equal. Only this form becomes the naive ``\\sqrt{(1 + \\mathrm{SR}^{2}/2)/T}`` on a normal series. Over 200,000 samples of 250 normal returns at a Sharpe ratio per period of 0.5, the sample standard deviation of the Sharpe ratio is **0.06728323**. This expression at the population moments gives **0.06721661**, and the same expression without the ``+2`` gives **0.06337243**.
 
-A non-normal return series makes a Sharpe ratio less precise than the naive expression suggests, and negative skew makes it worse. That is the case that matters for a real portfolio, which is why the standard error ships beside the ratio.
+A return series that is not normal makes a Sharpe ratio less precise than the naive expression shows, and a negative skew makes it less precise again. A real portfolio has such a series, so the summary gives the standard error with the ratio.
 
-The expression corrects for the third and fourth moments and **not** for serial dependence, so it reads every observation as independent of the others. A series scored under a Weight Drift is serially dependent through the weights it held, because a position that grew weighs the next observation more, so on such a series this figure understates the true standard error.
+The expression corrects for the third and fourth moments and **not** for serial dependence, so it reads every observation as independent of the others. A series scored under a Weight Drift is serially dependent through the weights that it held, because a position that grew has a larger weight in the next observation. So on such a series, this figure is less than the true standard error.
 
 # Algorithm
 
-Every method reduces to [`summarise_returns`](@ref), which runs the steps. A method that takes weights nets the returns through [`calc_net_returns`](@ref) first, and the method that takes a prediction result takes the first series when it carries several, defaults the benchmark to the first series of its own `B`, and reads the turnover of its held path.
+Every method calls [`summarise_returns`](@ref), which does the steps. A method that takes weights first makes the net returns with [`calc_net_returns`](@ref). The method that takes a prediction result reads the first series when it holds many series. It sets the default benchmark to the first series of its own `B`, and it reads the turnover of its held path.
 
  1. Check `alpha` and `ppy`, as `# Validation` states.
- 2. Take `T`, the number of periods, and `m` and `s`, the sample mean and the corrected sample standard deviation of `ret` about `m`. Clamp the mean to the least and the greatest entry of `ret`. The clamp moves nothing in exact arithmetic. The rounded mean of a constant `ret` can differ from its common value, and the clamp makes `m` equal that value, so `s` is exactly zero.
- 3. Annualise the two, giving `ann_ret` and `ann_vol`.
- 4. Divide, giving `sharpe`. A non-positive `ann_vol` gives a `NaN` in its place.
- 5. Clip every positive entry of `ret` to zero, square, average over all `T` periods, annualise and take the square root, giving the downside deviation `ddev`. Divide, giving `sortino`. A non-positive `ddev` gives a `NaN`.
- 6. Build the cumulative wealth series with [`cumulative_returns`](@ref), take its drawdown path with [`drawdowns`](@ref), and read `max_dd`, the minimum of that path. Divide, giving `calmar`. A non-negative `max_dd` gives a `NaN`.
- 7. Evaluate [`ConditionalValueatRisk`](@ref) at `alpha` on `ret` and negate it, giving `cvar_val` in return space.
- 8. Form the per-period Sharpe ratio `sr_p`, correct its variance `var_sr` by the sample skewness and the sample excess kurtosis of `ret`, and annualise the square root, giving `sharpe_se`. A non-positive `var_sr` gives a `NaN`.
- 9. Through [`excess_statistics`](@ref): with a `benchmark`, check its length, take `e = ret - benchmark`, annualise its mean, clamped to its least and greatest entry as in step 2, and its standard deviation about that mean, giving `excess_ret` and `tracking_error`, and divide, giving `information_ratio`; a `tracking_error` that is not positive gives a `NaN`. Without one, all three are `NaN`.
-10. Take the turnover the prediction-result method computed through [`held_path_turnover`](@ref). A `nothing` from it, and every other method, gives a `NaN`.
-11. Collect the four inputs and the twelve statistics into a [`PerformanceSummaryResult`](@ref).
+ 2. Take `T`, the number of periods. Take `m`, the sample mean of `ret`, and clamp it to the least and the greatest entry of `ret`. Take `s`, the corrected sample standard deviation of `ret` about `m`. The clamp changes nothing in exact arithmetic. The rounded mean of a constant `ret` can differ from its common value, and the clamp makes `m` equal to that value, so `s` is exactly zero.
+ 3. Annualise `m` and `s`, to get `ann_ret` and `ann_vol`.
+ 4. Divide `ann_ret` by `ann_vol`, to get `sharpe`. When `ann_vol` is not positive, `sharpe` is `NaN`.
+ 5. Set every positive entry of `ret` to zero. Square the entries, average them over all `T` periods, annualise, and take the square root, to get the downside deviation `ddev`. Divide `ann_ret` by `ddev`, to get `sortino`. When `ddev` is not positive, `sortino` is `NaN`.
+ 6. Build the cumulative wealth series with [`cumulative_returns`](@ref), and take its drawdown path with [`drawdowns`](@ref). Read `max_dd`, the minimum of that path. Divide `ann_ret` by the absolute value of `max_dd`, to get `calmar`. When `max_dd` is not negative, `calmar` is `NaN`.
+ 7. Compute [`ConditionalValueatRisk`](@ref) at `alpha` on `ret`, and change its sign, to get `cvar_val` in return space.
+ 8. Make the Sharpe ratio per period `sr_p`. Correct its variance `var_sr` for the sample skewness and the sample excess kurtosis of `ret`. Annualise the square root, to get `sharpe_se`. When `var_sr` is not positive, `sharpe_se` is `NaN`.
+ 9. Compute the three excess statistics with [`excess_statistics`](@ref). With a `benchmark`, the function checks its length and takes `e = ret - benchmark`. It annualises the mean of `e`, clamped as in step 2, and the standard deviation of `e` about that mean, to get `excess_ret` and `tracking_error`. It divides them, to get `information_ratio`, which is `NaN` when `tracking_error` is not positive. With no benchmark, all three are `NaN`.
+10. Take the turnover that the prediction-result method computed with [`held_path_turnover`](@ref). A `nothing` from that function, and every other method, gives a `NaN`.
+11. Put the four inputs and the twelve statistics into a [`PerformanceSummaryResult`](@ref).
 
 # Arguments
 
-  - `ret`: Periodic portfolio returns vector.
+  - `ret`: Vector of periodic portfolio returns.
   - `w`: Portfolio weights.
   - $(arg_dict[:X])
   - `fees`: Optional transaction fees.
-  - `rd`: [`ReturnsResult`](@ref) carrying the asset returns.
-  - `res`: An [`OptimisationResult`](@ref), whose weights and fees meet the caller's `rd` on the result's investable universe through [`result_investable_view`](@ref).
-  - $(arg_dict[:ps_ppy]) It defaults to `1`, which reports the statistics per period at any frequency of the data.
+  - `rd`: [`ReturnsResult`](@ref) that holds the asset returns.
+  - `res`: An [`OptimisationResult`](@ref). [`result_investable_view`](@ref) puts its weights and fees, and the `rd` of the caller, on the investable universe of the result.
+  - $(arg_dict[:ps_ppy]) It defaults to `1`, which gives the statistics per period at any frequency of the data.
   - $(arg_dict[:ps_alpha])
   - $(arg_dict[:ps_compound])
   - `benchmark`: Benchmark return series over the same periods as `ret`, or `nothing` for no excess statistics. It defaults to `nothing`, and on a prediction result to the benchmark of its rows.
@@ -1465,7 +1558,7 @@ Every method reduces to [`summarise_returns`](@ref), which runs the steps. A met
 
   - `0 < alpha < 1`.
   - `ppy > 0`.
-  - `length(benchmark) == length(ret)` when a benchmark is given. A `DimensionMismatch` is thrown otherwise.
+  - `length(benchmark) == length(ret)` when a benchmark is given. Otherwise the function raises a `DimensionMismatch`.
 
 # Returns
 
@@ -1484,7 +1577,8 @@ Every method reduces to [`summarise_returns`](@ref), which runs the steps. A met
 
 # References
 
-  - $(ref_dict[:sharpe_stderr])
+  - $(ref_dict[:mertens2002]) Section 1, Equation 2.
+  - $(ref_dict[:sharpe_stderr]) Section 2.5.
 """
 function performance_summary(ret::VecNum; kwargs...)::PerformanceSummaryResult
     return summarise_returns(ret, nothing; kwargs...)
@@ -1493,7 +1587,7 @@ end
     excess_statistics(ret::VecNum, benchmark::Nothing, ann::Number, m::Number)
     excess_statistics(ret::VecNum, benchmark::VecNum, ann::Number, m::Number)
 
-The three excess statistics of [`performance_summary`](@ref) against a benchmark series, or three `NaN`s without one.
+Compute the three excess statistics of [`performance_summary`](@ref) against a benchmark series, or give three `NaN` values when no benchmark is given.
 
 The closed forms are the `excess_ret`, `tracking_error` and `information_ratio` rows of the `# Mathematical definition` of [`performance_summary`](@ref).
 
@@ -1502,15 +1596,15 @@ The closed forms are the `excess_ret`, `tracking_error` and `information_ratio` 
   - `ret`: Periodic portfolio returns.
   - `benchmark`: Benchmark returns over the same periods, or `nothing`.
   - `ann`: Annualisation factor.
-  - `m`: Sample mean of `ret`. Without a benchmark, each `NaN` takes the number type its statistic takes with one, derived from `m` and `ann`.
+  - `m`: Sample mean of `ret`. With no benchmark, each `NaN` has the number type that its statistic has with a benchmark. The function derives that type from `m` and `ann`.
 
 # Validation
 
-  - `length(benchmark) == length(ret)`. A `DimensionMismatch` is thrown otherwise.
+  - `length(benchmark) == length(ret)`. Otherwise the function raises a `DimensionMismatch`.
 
 # Returns
 
-  - `(excess_ret, tracking_error, information_ratio)`: Annualised mean and standard deviation of `ret - benchmark`, and their ratio. The ratio is `NaN` when the tracking error is not positive, which a zero or a `NaN` tracking error makes.
+  - `(excess_ret, tracking_error, information_ratio)`: Annualised mean and standard deviation of `ret - benchmark`, and their ratio. The ratio is `NaN` when the tracking error is not positive, that is when the tracking error is zero or `NaN`.
 
 # Related
 
@@ -1543,16 +1637,16 @@ end
     held_path_turnover(pred::PredictionResult)
     held_path_turnover(pred::MultiPeriodPredictionResult)
 
-The mean turnover per rebalance of a prediction result's held path, as [`performance_summary`](@ref) reports it.
+Compute the mean turnover for each rebalance of the held path of a prediction result, as [`performance_summary`](@ref) gives it.
 
-A fold trades from the weights the previous fold held after its last observation, not from that fold's target. Under a Held Weights record the two differ, so the turnover of a drifted path is not the turnover of its targets. The closed form is the `turnover` row of the `# Mathematical definition` of [`performance_summary`](@ref).
+A fold trades from the weights that the previous fold held after its last observation, and not from the target of that fold. Under a Held Weights record the two are different, so the turnover of a drifted path is not the turnover of its targets. The closed form is the `turnover` row of the `# Mathematical definition` of [`performance_summary`](@ref).
 
 # Algorithm
 
- 1. Stack the weights every fold starts from, read by [`fold_target`](@ref) and embedded by asset name on the union of the folds' universes by [`stacked_fold_weights`](@ref), giving `W0`, one row per fold.
- 2. Stack the weights every fold holds after its last observation, read by [`fold_held`](@ref) on the same axis, giving `W1`.
- 3. Take `F`, the number of folds. When `F < 2` no rebalance is recorded, and the answer is `nothing`.
- 4. Average the trade from row `f - 1` of `W1` to row `f` of `W0` over the `F - 1` rebalances, giving the turnover.
+ 1. Stack the weights at the start of every fold, to get `W0` with one row for each fold. [`fold_target`](@ref) reads the weights, and [`stacked_fold_weights`](@ref) puts them on the union of the universes of the folds, by asset name.
+ 2. Stack the weights of every fold after its last observation on the same axis, to get `W1`. [`fold_held`](@ref) reads these weights.
+ 3. Take `F`, the number of folds. When `F < 2`, the result records no rebalance, and the answer is `nothing`.
+ 4. Average the trade from row `f - 1` of `W1` to row `f` of `W0` over the `F - 1` rebalances, to get the turnover.
 
 # Arguments
 
@@ -1560,7 +1654,7 @@ A fold trades from the weights the previous fold held after its last observation
 
 # Returns
 
-  - `tn::Option{<:Number}`: The mean turnover per rebalance, or `nothing` when no rebalance is recorded: a single prediction result, and a multi-period result of one fold. The summary writes `nothing` as `NaN`.
+  - `tn::Option{<:Number}`: The mean turnover for each rebalance. It is `nothing` when the result records no rebalance, that is for a single prediction result and for a multi-period result of one fold. The summary writes `nothing` as `NaN`.
 
 # Related
 
@@ -1586,20 +1680,20 @@ end
                       alpha::Number = 0.05, compound::Bool = false,
                       benchmark::Option{<:VecNum} = nothing) -> PerformanceSummaryResult
 
-The one site that computes a [`PerformanceSummaryResult`](@ref): the steps of [`performance_summary`](@ref) over a series, a turnover a caller read off a weight path, and an optional benchmark.
+Compute a [`PerformanceSummaryResult`](@ref) from a series, a turnover and an optional benchmark.
 
-Every `performance_summary` method reduces to this function. The bare-series methods hand it `nothing` for the turnover, which it writes as `NaN`; the prediction-result method hands it [`held_path_turnover`](@ref).
+This function is the one site that computes a [`PerformanceSummaryResult`](@ref). It does the steps of [`performance_summary`](@ref). The turnover is a number that the caller read from a weight path. Every `performance_summary` method calls this function. The methods for a bare series give `nothing` for the turnover, and this function writes it as `NaN`. The prediction-result method gives the value of [`held_path_turnover`](@ref).
 
 # Arguments
 
   - `ret`: Periodic portfolio returns.
-  - `turnover`: Mean turnover per rebalance, or `nothing` when the caller holds no weight path.
+  - `turnover`: Mean turnover for each rebalance, or `nothing` when the caller holds no weight path.
   - `ppy`, `alpha`, `compound`, `benchmark`: As [`performance_summary`](@ref) states them.
 
 # Validation
 
-  - `0 < alpha < 1` and `ppy > 0`. A `DomainError` is thrown otherwise.
-  - `length(benchmark) == length(ret)` when a benchmark is given, checked by [`excess_statistics`](@ref). A `DimensionMismatch` is thrown otherwise.
+  - `0 < alpha < 1` and `ppy > 0`. Otherwise the function raises a `DomainError`.
+  - `length(benchmark) == length(ret)` when a benchmark is given. [`excess_statistics`](@ref) checks it, and otherwise raises a `DimensionMismatch`.
 
 # Returns
 
@@ -1685,7 +1779,7 @@ end
 
 Return the factor by which the skewness and the kurtosis of a return series scale the asymptotic variance of its Sharpe ratio.
 
-The factor is the numerator of the variance of the sample Sharpe ratio of [sharpe_stderr](@cite), and the variance is the factor divided by ``T - 1``. [`performance_summary`](@ref) reads it for the standard error of the Sharpe ratio, and [`sharpe_ratio_moments`](@ref) reads it for the Probabilistic Sharpe Ratio.
+The factor is the asymptotic variance of the sample Sharpe ratio for independent returns of any distribution, Equation 2 of [mertens2002](@cite). Equation 8 of [sharpe_stderr](@cite) restates it, and Section 2.5 of [sharpe_stderr](@cite) divides it by ``T - 1`` for the variance of the sample Sharpe ratio. [`performance_summary`](@ref) reads it for the standard error of the Sharpe ratio, and [`sharpe_ratio_moments`](@ref) reads it for the Probabilistic Sharpe Ratio.
 
 # Mathematical definition
 
@@ -1708,7 +1802,7 @@ The factor is ``1 + \\widehat{\\mathrm{SR}}^{2} / 2`` for a normal distribution.
 
   - `sr`: Sample Sharpe ratio per period.
   - `g1`: Sample skewness.
-  - `g2`: Sample excess kurtosis ``\\hat{\\gamma}_{4} - 3``, the moment that `StatsBase.kurtosis` returns. The coefficient of the square is therefore ``(g_{2} + 2) / 4``.
+  - `g2`: Sample excess kurtosis ``\\hat{\\gamma}_{4} - 3``, the moment that `StatsBase.kurtosis` returns. So the coefficient of the square is ``(g_{2} + 2) / 4``.
 
 # Returns
 
@@ -1722,7 +1816,8 @@ The factor is ``1 + \\widehat{\\mathrm{SR}}^{2} / 2`` for a normal distribution.
 
 # References
 
-  - $(ref_dict[:sharpe_stderr]) Equation 11.
+  - $(ref_dict[:mertens2002]) Section 1, Equation 2.
+  - $(ref_dict[:sharpe_stderr]) Equation 8 and Section 2.5.
 """
 function sharpe_ratio_variance_factor(sr::Number, g1::Number, g2::Number)
     # `g2` is the EXCESS kurtosis, and the coefficient is `(gamma_4 - 1) / 4` on the raw
@@ -1742,8 +1837,8 @@ Return the number of observations, the sample Sharpe ratio and its variance fact
  1. Drop the `NaN` entries of `x`.
  2. Take `T`, the number of entries that remain. When `T < 3`, the Sharpe ratio and the factor are `NaN`. Two observations always have a skewness of zero and a kurtosis of one, so they give no data about the shape of the distribution.
  3. Take `m`, the sample mean of `x`, clamped to the least and the greatest entry, and `s`, the corrected sample standard deviation about `m`. The clamp moves nothing in exact arithmetic. On a constant series it makes `s` exactly zero. When `s` is not positive, the Sharpe ratio and the factor are `NaN`.
- 4. Divide the excess `m - rf` by `s`, giving `sr`.
- 5. Read the sample skewness and the sample excess kurtosis of `x` about `m`, and give them with `sr` to [`sharpe_ratio_variance_factor`](@ref), giving `v`. When `v` is not positive, it is `NaN`.
+ 4. Divide the excess `m - rf` by `s`, to get `sr`.
+ 5. Read the sample skewness and the sample excess kurtosis of `x` about `m`. Give them with `sr` to [`sharpe_ratio_variance_factor`](@ref), to get `v`. When `v` is not positive, it is `NaN`.
 
 # Arguments
 
@@ -1789,7 +1884,7 @@ end
 
 Compute the Probabilistic Sharpe Ratio, the probability that the true Sharpe ratio of a return series is greater than a benchmark.
 
-The Probabilistic Sharpe Ratio of [sharpe_stderr](@cite) corrects the sample Sharpe ratio for the length of the series and for the skewness and the kurtosis of its returns. Fat tails make a Sharpe ratio that is not zero less precise, and negative skewness makes a positive Sharpe ratio less precise. When the Sharpe ratio is above the benchmark, a less precise Sharpe ratio has a smaller probability. Every quantity is per period, so `x`, `bsr` and `rf` must have the same frequency, and none is annualised. The matrix method computes one probability for each column.
+The Probabilistic Sharpe Ratio of [sharpe_stderr](@cite) corrects the sample Sharpe ratio for the length of the series and for the skewness and the kurtosis of its returns. Fat tails make a Sharpe ratio that is not zero less precise, and negative skewness makes a positive Sharpe ratio less precise. When the Sharpe ratio is above the benchmark, a less precise Sharpe ratio has a smaller probability. Every quantity is per period, so `x`, `bsr` and `rf` must have the same frequency, and the function annualises none of them. The matrix method computes one probability for each column.
 
 # Mathematical definition
 
@@ -1816,7 +1911,7 @@ The denominator is the square root of the variance factor of [`sharpe_ratio_vari
 
  1. Check `bsr` and `rf`, as `# Validation` states.
  2. Take `T`, `sr` and `v`, the number of observations, the sample Sharpe ratio and its variance factor, through [`sharpe_ratio_moments`](@ref). It drops the `NaN` entries of `x`.
- 3. Scale the excess `sr - bsr` by the square root of `T - 1` and divide it by the square root of `v`, giving `z`.
+ 3. Multiply the excess `sr - bsr` by the square root of `T - 1`, and divide it by the square root of `v`, to get `z`.
  4. Evaluate the standard normal distribution function at `z`. A `NaN` from step 2 gives a `NaN`.
 
 # Arguments
@@ -1852,7 +1947,7 @@ julia> round(probabilistic_sharpe_ratio(x; bsr = 0.2); digits = 6)
   - [`deflated_sharpe_ratio`](@ref)
   - [`minimum_track_record_length`](@ref)
   - [`sharpe_ratio_moments`](@ref)
-  - [`performance_summary`](@ref): the standard error of its Sharpe ratio reads the same variance factor.
+  - [`performance_summary`](@ref): The standard error of its Sharpe ratio reads the same variance factor.
 
 # References
 
@@ -1908,7 +2003,7 @@ The length solves ``\\mathrm{PSR}(\\mathrm{SR}^{*}) = 1 - \\alpha`` for ``T``. W
  1. Check `alpha`, `bsr` and `rf`, as `# Validation` states.
  2. Take `sr` and `v`, the sample Sharpe ratio and its variance factor, through [`sharpe_ratio_moments`](@ref). It drops the `NaN` entries of `x`.
  3. Take the excess `d = sr - bsr`, and `za`, the quantile of the standard normal distribution at `1 - alpha`.
- 4. Add one to `v` times the square of `za / d`, giving `n`.
+ 4. Add one to `v` times the square of `za / d`, to get `n`.
  5. When `d` is not positive and `n` is not `NaN`, replace `n` with `Inf`.
 
 # Arguments
@@ -2081,7 +2176,7 @@ Where:
 
  1. Check `srs`, as `# Validation` states, and drop its `NaN` entries.
  2. Take `M`, the number of entries that remain, and `sigma`, their corrected sample standard deviation. When `M = 1`, `sigma` is zero.
- 3. Take the number of trials `ntrials`, or `M` when it is `nothing`, and compute the expected maximum Sharpe ratio at a zero mean through [`expected_max_sharpe_ratio`](@ref), giving `bsr`.
+ 3. Take the number of trials `ntrials`, or `M` when it is `nothing`, and compute the expected maximum Sharpe ratio at a zero mean with [`expected_max_sharpe_ratio`](@ref), to get `bsr`.
  4. Compute the [`probabilistic_sharpe_ratio`](@ref) of `x` against `bsr`.
 
 # Arguments

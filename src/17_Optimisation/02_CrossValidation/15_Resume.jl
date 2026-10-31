@@ -33,7 +33,7 @@ Two callers use it. [`Resume`](@ref) calls it once at entry, so the Result it ho
   - [`rebuild_estimator`](@ref)
   - [`AbstractPartialFitState`](@ref)
 """
-function copy_states(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator})
+function copy_states(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator})
     T = typeof(est)
     # The field tuple is read by index, which names nothing, so an estimator without a
     # `cache` field reads as one carrying nothing.

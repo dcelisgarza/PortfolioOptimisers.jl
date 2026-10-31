@@ -78,7 +78,7 @@ end
 # A test-local target that fits as a `LinearModel` and keeps the default answer of
 # `is_basis_invariant`, so a move of the dropped member under it fits every observation again
 # (#1614).
-struct BasisBoundTarget <: PortfolioOptimisers.AbstractRegressionTarget end
+struct BasisBoundTarget <: PortfolioOptimisers.AbstractUnpenalisedRegressionTarget end
 function PortfolioOptimisers.factory(::BasisBoundTarget, w::PortfolioOptimisers.ObsWeights)
     return factory(LinearModel(), w)
 end

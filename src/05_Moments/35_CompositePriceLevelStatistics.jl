@@ -656,7 +656,7 @@ CompositeTrend
 
 # References
 
-  - $(ref_dict[:lai2018aictr]) Equations (9) to (12) and (15).
+  - $(ref_dict[:lai2018aictr]) Equations (5) to (7) and (9) to (12), and (15).
 """
 @concrete struct CompositeTrend <: AbstractPriceLevelStatistic
     """
@@ -722,288 +722,13 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Reads the elastic-net regularisation path at its middle point, which gives the regression of the initial state of [`KernelTrendPattern`](@ref) on the levels of its window.
-
-The path is that of [friedman2010](@citet). The objective is Equation (15) of [lai2018ktpt](@cite), the elastic net of [zouhastie2005](@citet). [lai2018ktpt](@citet) take "the middle one in the regularization path" and state no grid. Section 2.5 of [friedman2010](@cite) runs the path over 100 strengths on a log scale, down to a floor of ``10^{-3}`` times the largest strength. Such a grid has no single middle point. The library takes the geometric middle of the path, which lies between the 50th and the 51st point of that grid. The model of [lai2018ktpt](@cite) has no intercept, so the regression fits none and does not standardise the columns. The glmnet package does both by default, and its objective is the one below divided by twice the number of observations, so it holds the same path. `theta = 0.99` is the value of [lai2018ktpt](@cite). It is almost the lasso, and it keeps the objective strictly convex.
-
-The columns are the levels of consecutive periods, so they are almost collinear, and the coordinate sweeps converge slowly. Each sweep therefore ends with an exact solve on the sign pattern that it leaves, see [`elastic_net_path`](@ref). The sweeps must still find the sign pattern of the optimum. On the 4 × 5 window of the test fixture they find it after between 2000 and 5000 sweeps, and a cap of 1000 stops more than 0.5 from the optimum in one coefficient. When the sweeps stop at `tol` or at `iters` before that, the result is the last sweep, which is not the optimum.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\hat{\\boldsymbol{z}}(\\gamma) &= \\underset{\\boldsymbol{z}}{\\arg\\min} \\lVert \\boldsymbol{y} - \\mathbf{P} \\boldsymbol{z} \\rVert^2 + \\gamma \\left( 2 \\vartheta \\lVert \\boldsymbol{z} \\rVert_1 + (1 - \\vartheta) \\lVert \\boldsymbol{z} \\rVert^2 \\right)\\,,\\\\
-\\gamma_{\\max} &= \\max_{k} \\frac{\\lvert \\mathbf{P}_k^\\intercal \\boldsymbol{y} \\rvert}{\\vartheta}\\,,\\\\
-\\hat{\\boldsymbol{z}} &= \\hat{\\boldsymbol{z}}\\left(\\gamma_{\\max} \\sqrt{\\rho}\\right)\\,.
-\\end{align}
-```
-
-Where:
-
-  - $(math_dict[:y_enet])
-  - $(math_dict[:P_enet])
-  - $(math_dict[:z_enet])
-  - $(math_dict[:gamma_enet])
-  - $(math_dict[:theta_enet])
-  - ``\\gamma_{\\max}``: Smallest strength at which every coefficient is zero.
-  - ``\\rho``: Floor of the path as a fraction of ``\\gamma_{\\max}``, the `ratio` field.
-  - ``\\hat{\\boldsymbol{z}}``: Coefficients at the middle point of the path.
-
-Every coefficient is zero at and above ``\\gamma_{\\max}``. The path runs from ``\\gamma_{\\max}`` down to ``\\rho\\, \\gamma_{\\max}`` on a log scale, so its geometric middle is ``\\gamma_{\\max} \\sqrt{\\rho}``.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    ElasticNetPath(; theta::Real = 0.99, ratio::Real = 1e-3, iters::Integer = 10_000, tol::Real = 1e-10) -> ElasticNetPath
-
-Keywords correspond to the struct's fields.
-
-## Validation
-
-  - `0 < theta <= 1`. A `DomainError` is thrown otherwise: at `theta = 0` the penalty is a ridge alone, which has no strength above which every coefficient is zero.
-  - `0 < ratio < 1`. A `DomainError` is thrown otherwise.
-  - `iters >= 1`. A `DomainError` is thrown otherwise.
-  - `tol > 0`. A `DomainError` is thrown otherwise.
-
-# Examples
-
-```jldoctest
-julia> ElasticNetPath()
-ElasticNetPath
-  theta ┼ Float64: 0.99
-  ratio ┼ Float64: 0.001
-  iters ┼ Int64: 10000
-    tol ┴ Float64: 1.0e-10
-```
-
-# Related
-
-  - [`KernelTrendPattern`](@ref)
-  - [`elastic_net_path`](@ref)
-
-# References
-
-  - $(ref_dict[:friedman2010]) Section 2.5.
-  - $(ref_dict[:zouhastie2005])
-  - $(ref_dict[:lai2018ktpt]) Equation (15).
-"""
-@concrete struct ElasticNetPath <: AbstractAlgorithm
-    """
-    The share of the ``L_1`` penalty, `1` for the lasso.
-    """
-    theta
-    """
-    The floor of the path as a fraction of the strength above which every coefficient is zero.
-    """
-    ratio
-    """
-    Maximum number of coordinate-descent sweeps. Each sweep ends with the exact solve on its sign pattern.
-    """
-    iters
-    """
-    Tolerance on the largest change of a coefficient over one sweep. The sweeps stop below it when no exact solve has given the optimum.
-    """
-    tol
-    function ElasticNetPath(theta::Real, ratio::Real, iters::Integer, tol::Real)
-        @argcheck(zero(theta) < theta <= one(theta),
-                  DomainError(theta, "theta must be in (0, 1]"))
-        @argcheck(zero(ratio) < ratio < one(ratio),
-                  DomainError(ratio, "ratio must be in (0, 1)"))
-        @argcheck(iters >= 1, DomainError(iters, "iters must be at least 1"))
-        @argcheck(tol > zero(tol), DomainError(tol, "tol must be positive"))
-        return new{typeof(theta), typeof(ratio), typeof(iters), typeof(tol)}(theta, ratio,
-                                                                             iters, tol)
-    end
-end
-function ElasticNetPath(; theta::Real = 0.99, ratio::Real = 1e-3, iters::Integer = 10_000,
-                        tol::Real = 1e-10)::ElasticNetPath
-    return ElasticNetPath(theta, ratio, iters, tol)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Returns the coefficients of the elastic net of `y` on the columns of `P` at the middle point of the path, by cyclic coordinate descent from zero.
-
-[`ElasticNetPath`](@ref) states the objective and the middle point. The function solves the middle point alone. The problem has as many columns as the window has levels, so it does not need the rest of the path as warm starts.
-
-# Mathematical definition
-
-The minimiser of the objective over one coefficient, with the others fixed, is
-
-```math
-\\begin{align}
-z_k &= \\frac{S\\left(\\mathbf{P}_k^\\intercal \\boldsymbol{r}_k,\\ \\gamma \\vartheta\\right)}{\\lVert \\mathbf{P}_k \\rVert^2 + \\gamma (1 - \\vartheta)}\\,,\\quad S(v, a) = \\operatorname{sign}(v) \\max(\\lvert v \\rvert - a, 0)\\,.
-\\end{align}
-```
-
-Where:
-
-  - $(math_dict[:z_enet])
-  - $(math_dict[:P_enet])
-  - ``\\boldsymbol{r}_k``: Residual of the response ``\\boldsymbol{y}`` without the term of column ``k``.
-  - ``S``: Soft threshold.
-  - $(math_dict[:gamma_enet]) Here it is the strength at the middle point of the path.
-  - $(math_dict[:theta_enet])
-
-# Algorithm
-
- 1. Compute `g`, the product of each column with `y`, and `lmax`, the smallest strength at which every coefficient is zero. When `lmax` is zero, return zero coefficients.
- 2. Take `lam`, the strength at the middle point, the threshold `a` of the soft threshold, and `den`, the denominator of each coordinate update.
- 3. Start from the coefficients `z` at zero and the residual `r` equal to `y`.
- 4. Sweep the columns in order. For each column `k`, compute `rho`, the product of the column with the residual without its own term, and apply the coordinate update, which gives `znew`. Update `r`, and record `delta`, the largest change of a coefficient in the sweep.
- 5. Try the exact solve of [`elastic_net_polish`](@ref) on the sign pattern of `z`. When it gives the optimum, return it.
- 6. Repeat steps 4 and 5 until `delta` is below `tol` or `iters` sweeps have run, and then return `z`.
-
-# Arguments
-
-  - `path`: The path.
-  - `P`: The regressors, `observations × columns`.
-  - `y`: The response, `observations × 1`.
-
-# Returns
-
-  - `z::Vector`: The coefficients, `columns × 1`.
-
-# Related
-
-  - [`ElasticNetPath`](@ref)
-  - [`elastic_net_polish`](@ref)
-  - [`KernelTrendPattern`](@ref)
-"""
-function elastic_net_path(path::ElasticNetPath, P::AbstractMatrix, y::AbstractVector)
-    w = size(P, 2)
-    g = map(k -> LinearAlgebra.dot(view(P, :, k), y), 1:w)
-    lmax = maximum(abs, g) / path.theta
-    lam = lmax * sqrt(path.ratio)
-    z = zeros(typeof(lam), w)
-    if iszero(lmax)
-        return z
-    end
-    a = lam * path.theta
-    nrm2 = vec(sum(abs2, P; dims = 1))
-    den = nrm2 .+ lam * (one(path.theta) - path.theta)
-    r = collect(y)
-    for _ in 1:(path.iters)
-        delta = zero(eltype(z))
-        for k in 1:w
-            Pk = view(P, :, k)
-            rho = LinearAlgebra.dot(Pk, r) + nrm2[k] * z[k]
-            znew = sign(rho) * max(abs(rho) - a, zero(a)) / den[k]
-            if znew != z[k]
-                r .-= (znew - z[k]) .* Pk
-                delta = max(delta, abs(znew - z[k]))
-                z[k] = znew
-            end
-        end
-        zp = elastic_net_polish(P, y, z, lam, path.theta)
-        if !isnothing(zp)
-            return zp
-        end
-        delta < path.tol && break
-    end
-    return z
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Returns the exact elastic-net optimum on the sign pattern of `z` when that pattern is the pattern of the optimum, and `nothing` otherwise.
-
-A point that meets the optimality conditions below minimises the objective of [`ElasticNetPath`](@ref), because the objective is convex. For `theta < 1` the objective is strictly convex, and the point is its only minimiser. At `theta = 1` the objective is the lasso, and it can have more than one minimiser. Then the equations of the active columns are singular when the pattern holds more columns than there are observations, and the function returns `nothing` for such a pattern.
-
-# Mathematical definition
-
-With ``\\mathcal{A}`` the nonzero coefficients of ``\\boldsymbol{z}``, the optimum on its sign pattern ``\\boldsymbol{s}`` solves
-
-```math
-\\begin{align}
-\\left(\\mathbf{P}_{\\mathcal{A}}^\\intercal \\mathbf{P}_{\\mathcal{A}} + \\gamma (1 - \\vartheta) \\mathbf{I}\\right) \\boldsymbol{z}_{\\mathcal{A}} &= \\mathbf{P}_{\\mathcal{A}}^\\intercal \\boldsymbol{y} - \\gamma \\vartheta\\, \\boldsymbol{s}\\,,
-\\end{align}
-```
-
-and it is the optimum of the objective when
-
-```math
-\\begin{align}
-\\operatorname{sign}(\\boldsymbol{z}_{\\mathcal{A}}) &= \\boldsymbol{s}\\,,\\\\
-\\lvert \\mathbf{P}_k^\\intercal (\\boldsymbol{y} - \\mathbf{P}_{\\mathcal{A}} \\boldsymbol{z}_{\\mathcal{A}}) \\rvert &\\leq \\gamma \\vartheta\\,,\\quad k \\notin \\mathcal{A}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\mathcal{A}``: Active set, the columns whose coefficient in ``\\boldsymbol{z}`` is nonzero.
-  - ``\\mathbf{P}_{\\mathcal{A}}``, ``\\boldsymbol{z}_{\\mathcal{A}}``: Columns of the regressors and coefficients of the active set.
-  - ``\\boldsymbol{s}``: Signs of the coefficients of the active set in ``\\boldsymbol{z}``.
-  - $(math_dict[:z_enet])
-  - $(math_dict[:P_enet])
-  - $(math_dict[:y_enet])
-  - $(math_dict[:gamma_enet])
-  - $(math_dict[:theta_enet])
-
-# Algorithm
-
- 1. Find `A`, the nonzero coefficients of `z`. When `A` is empty, return `nothing`.
- 2. Take `s`, the signs of the coefficients of `A`, and factorise the matrix of the equations of the active columns, which gives `F`. When the matrix is singular, return `nothing`.
- 3. Solve the equations with `F`, which gives `zA`. When a coefficient of `zA` does not keep its sign in `s`, return `nothing`.
- 4. Write `zA` into `zp`, zero elsewhere, and compute `corr`, the product of each column with the residual.
- 5. When an inactive column has `abs(corr[k]) > lam * theta`, return `nothing`. Otherwise return `zp`.
-
-# Arguments
-
-  - `P`: The regressors, `observations × columns`.
-  - `y`: The response.
-  - `z`: The coefficients whose sign pattern the function tries.
-  - `lam`: The regularisation strength.
-  - `theta`: The share of the ``L_1`` penalty.
-
-# Returns
-
-  - `z'::Union{Nothing, Vector}`: The optimum, or `nothing`.
-
-# Related
-
-  - [`elastic_net_path`](@ref)
-"""
-function elastic_net_polish(P::AbstractMatrix, y::AbstractVector, z::AbstractVector,
-                            lam::Real, theta::Real)
-    A = findall(!iszero, z)
-    if isempty(A)
-        return nothing
-    end
-    PA = view(P, :, A)
-    s = sign.(view(z, A))
-    # At `theta = 1` the matrix is singular when the pattern holds more columns than
-    # observations, and the pattern is then refused rather than solved.
-    F = LinearAlgebra.lu(PA' * PA + lam * (one(theta) - theta) * LinearAlgebra.I;
-                         check = false)
-    if !LinearAlgebra.issuccess(F)
-        return nothing
-    end
-    zA = F \ (PA' * y .- lam * theta .* s)
-    if any(v -> v <= zero(v), zA .* s)
-        return nothing
-    end
-    zp = zero(z)
-    zp[A] .= zA
-    corr = P' * (y .- P * zp)
-    for k in eachindex(zp)
-        if iszero(zp[k]) && abs(corr[k]) > lam * theta
-            return nothing
-        end
-    end
-    return zp
-end
-"""
-$(DocStringExtensions.TYPEDEF)
-
 Predicts the next price level in three states, which is the forecast of the kernel-based trend pattern tracking, KTPT.
 
 It is the forecast of [lai2018ktpt](@citet). It is a folding statistic with a memory. It carries its previous prediction and the last `2 window` price relatives. The initial state mixes the window peak with the previous prediction. The intermediate state is the regression of that mix on the recent levels, with negative values clipped to zero as the text of [lai2018ktpt](@cite) states. The final state moves from the intermediate state toward the peak by a reverting strength, which is long-term through the trend-reverting fraction and short-term through the reciprocal of the last price relative. The defaults `window = 5` and `nu = 0.5` are the values of [lai2018ktpt](@cite).
 
 Over the first rows the window and the memory hold the levels that exist, as Algorithm 1 of [lai2018ktpt](@cite) states. [lai2018ktpt](@citet) state no rule for fewer than three levels or for the first prediction. The library sets the trend-reverting fraction to zero below three levels, and it seeds the first prediction at the current price.
+
+`tgt` is the regression target of the intermediate state. The default [`ElasticNet`](@ref) is the elastic net of Equation (15) of [lai2018ktpt](@cite), at the middle point of its path, with no intercept and no standardisation. The last level of the window is one for every asset, so the last column of the design is a column of ones. Equation (15) penalises its coefficient, so the fold does not name it with [`InterceptColumn`](@ref). Any other [`AbstractRegressionTarget`](@ref) with `StatsAPI.fit` and `StatsAPI.predict` can replace the elastic net, for example [`LinearModel`](@ref).
 
 The regression pools the assets as its observations, so the fit changes when the levels of one asset are scaled. The library reads it on the reconstructed path, whose last level is one for every asset, so the assets enter in the same units. The data sets of [lai2018ktpt](@cite) hold price relatives, and [lai2018ktpt](@citet) do not state the anchor of the prices that they rebuild from them. Under any other anchor, an asset with higher levels than the others weighs more in the fit.
 
@@ -1031,7 +756,7 @@ Where:
   - ``\\nu``: Weight of the window peak in the initial state.
   - ``\\boldsymbol{y}_{t+1}``, ``\\hat{\\boldsymbol{y}}_{t+1}``: Initial and intermediate states.
   - ``\\mathbf{P}_{t}``: Window of levels, one row per asset and one column per level.
-  - ``\\hat{\\boldsymbol{z}}_{t}``: Coefficients of the elastic net of ``\\boldsymbol{y}_{t+1}`` on the columns of ``\\mathbf{P}_{t}``, at the middle point of the path of [`ElasticNetPath`](@ref). The assets are the observations.
+  - ``\\hat{\\boldsymbol{z}}_{t}``: Coefficients of the fit of `tgt` of ``\\boldsymbol{y}_{t+1}`` on the columns of ``\\mathbf{P}_{t}``. Under the default, the elastic net at the middle point of its path, [`MiddleOfPath`](@ref). The assets are the observations.
   - ``\\lambda_{t+1}``: Trend-reverting fraction, the share of the interior levels of the memory at which the path of an asset turns.
   - ``L``: Number of levels that the memory reaches, at most ``2w + 1``.
   - ``\\boldsymbol{c}``: Reverting strength, one entry per asset.
@@ -1052,7 +777,7 @@ For each row, the fold runs these steps.
  2. Take `Pw`, the last `window` levels of `P`, and `ptilde`, their peak per asset.
  3. Bring the carried prediction into the units of the current level, which gives `prev`. Before the first row, the carried value is the cold seed, so `prev` is one.
  4. Mix `ptilde` and `prev` with the weight `nu`, which gives the initial state `y`.
- 5. Regress `y` on the columns of the transpose of `Pw` with [`elastic_net_path`](@ref), and clip the fit at zero, which gives `yhat`.
+ 5. Fit `tgt` to `y` on the columns of the transpose of `Pw` through `StatsAPI.fit`, predict the same design through `StatsAPI.predict`, and clip the prediction at zero, which gives `yhat`.
  6. Compute the reverting strength `c` from [`trend_reverting_fraction`](@ref) over `P` and the relative `x` of the row.
  7. Return the final state, the mix of `ptilde` and `yhat` with the weights `c`.
 
@@ -1062,7 +787,7 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    KernelTrendPattern(; window::Integer = 5, nu::Real = 0.5, path::ElasticNetPath = ElasticNetPath()) -> KernelTrendPattern
+    KernelTrendPattern(; window::Integer = 5, nu::Real = 0.5, tgt::AbstractRegressionTarget = ElasticNet()) -> KernelTrendPattern
 
 Keywords correspond to the struct's fields. The statistic folds with a memory of `2 window` relatives, so the head holds no rows for it.
 
@@ -1078,17 +803,23 @@ julia> KernelTrendPattern()
 KernelTrendPattern
   window ┼ Int64: 5
       nu ┼ Float64: 0.5
-    path ┼ ElasticNetPath
-         │   theta ┼ Float64: 0.99
-         │   ratio ┼ Float64: 0.001
-         │   iters ┼ Int64: 10000
-         │     tol ┴ Float64: 1.0e-10
+     tgt ┼ ElasticNet
+         │      theta ┼ Float64: 0.99
+         │   strength ┼ MiddleOfPath
+         │            │   ratio ┴ Float64: 0.001
+         │       sdiv ┼ nothing
+         │         ve ┼ nothing
+         │      iters ┼ Int64: 10000
+         │        tol ┼ Float64: 1.0e-10
+         │          w ┼ nothing
+         │         ic ┴ nothing
 ```
 
 # Related
 
   - [`AbstractPriceLevelStatistic`](@ref)
-  - [`ElasticNetPath`](@ref)
+  - [`ElasticNet`](@ref)
+  - [`AbstractRegressionTarget`](@ref)
   - [`WindowPeak`](@ref)
   - [`KernelTrendTracking`](@ref)
   - [`KernelTrendPatternTracking`](@ref)
@@ -1109,18 +840,18 @@ KernelTrendPattern
     """
     nu
     """
-    The elastic-net path of the intermediate state.
+    The regression target of the intermediate state.
     """
-    path
-    function KernelTrendPattern(window::Integer, nu::Real, path::ElasticNetPath)
+    tgt
+    function KernelTrendPattern(window::Integer, nu::Real, tgt::AbstractRegressionTarget)
         assert_price_window(window)
         @argcheck(zero(nu) <= nu <= one(nu), DomainError(nu, "nu must be in [0, 1]"))
-        return new{typeof(window), typeof(nu), typeof(path)}(window, nu, path)
+        return new{typeof(window), typeof(nu), typeof(tgt)}(window, nu, tgt)
     end
 end
 function KernelTrendPattern(; window::Integer = 5, nu::Real = 0.5,
-                            path::ElasticNetPath = ElasticNetPath())::KernelTrendPattern
-    return KernelTrendPattern(window, nu, path)
+                            tgt::AbstractRegressionTarget = ElasticNet())::KernelTrendPattern
+    return KernelTrendPattern(window, nu, tgt)
 end
 function folds(::KernelTrendPattern)
     return true
@@ -1183,7 +914,7 @@ function fold_statistic(alg::KernelTrendPattern, stat::Option{<:AbstractVector},
     prev = (isnothing(stat) ? cold_statistic(alg, x) : stat) ./ x
     y = alg.nu .* ptilde .+ (one(alg.nu) - alg.nu) .* prev
     Pt = permutedims(Pw)
-    yhat = max.(Pt * elastic_net_path(alg.path, Pt, y), zero(eltype(y)))
+    yhat = max.(StatsAPI.predict(StatsAPI.fit(alg.tgt, Pt, y), Pt), zero(eltype(y)))
     c = min.(trend_reverting_fraction(P) ./ (2 .* x), one(eltype(x)))
     return c .* ptilde .+ (one(eltype(c)) .- c) .* yhat
 end
@@ -1191,5 +922,5 @@ function price_level_statistic(alg::KernelTrendPattern, P::AbstractMatrix)
     return fold_levels(alg, P)
 end
 export TruncatedExponentialMovingAverage, GaussianWeightedDoubleEstimate, PairwiseSlopeSum,
-       RegressionSlope, TrendSwitch, CompositeTrend, ElasticNetPath, KernelTrendPattern
+       RegressionSlope, TrendSwitch, CompositeTrend, KernelTrendPattern
 public AbstractTrendTest, trend_sign, member_statistic

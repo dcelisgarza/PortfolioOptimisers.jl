@@ -229,7 +229,8 @@ function panel_key_column!(cols::AbstractVector{Tuple{Int, Int, Symbol}}, k::Int
     keys::VecStr = panel_field_keys(f)
     l = findfirst(==(key), keys)
     if isnothing(l)
-        strict_diagnostic(panel_selector_msg(f, key, keys), strict)
+        strict_diagnostic(panel_selector_msg(f, key, keys), strict;
+                          id = @log_id(f.name, key))
     else
         push!(cols, (Int(k), Int(l), :vals))
     end
@@ -272,14 +273,15 @@ function panel_group_columns!(cols::AbstractVector{Tuple{Int, Int, Symbol}}, k::
     groups = isa(f, TensorPanelField) ? f.groups : nothing
     if isnothing(groups)
         strict_diagnostic("`sel` pairs the Panel Field \"$(f.name)\" with the group `$(lg.group)`, but the field carries no groups. Only a tensor Panel Field built with `groups` has them. Under `strict = false` the entry is dropped.",
-                          strict)
+                          strict; id = @log_id(f.name, lg.group))
         return nothing
     end
     ls = findall(==(lg.group), groups)
     if isempty(ls)
         pool = unique(groups)
         strict_diagnostic("`sel` pairs the Panel Field \"$(f.name)\" with the group `$(lg.group)`, which is not one of its $(length(pool)) group(s): $(join(pool, ", ")). Under `strict = false` the entry is dropped." *
-                          did_you_mean(lg.group, pool), strict)
+                          did_you_mean(lg.group, pool), strict;
+                          id = @log_id(f.name, lg.group))
     end
     for l in ls
         push!(cols, (Int(k), Int(l), :vals))
@@ -464,7 +466,7 @@ function select_fields_push!(cols::AbstractVector{Tuple{Int, Int, Symbol}}, pnl:
     name = isa(entry, Pair) ? first(entry) : entry
     k = findfirst(f -> f.name == name, pnl.pf)
     if isnothing(k)
-        strict_diagnostic(panel_selector_msg(name, pool), strict)
+        strict_diagnostic(panel_selector_msg(name, pool), strict; id = @log_id(name))
         return nothing
     end
     f = pnl.pf[k]
@@ -511,7 +513,7 @@ The order of `sel` is the column order, so a caller decides it. A `nothing` sele
 
 # Validation
 
-  - `!isempty(pnl.pf)`. Raises an [`IsEmptyError`](@ref) naming the panel, the Feature Matrix and [`asset_panel`](@ref).
+  - `!isnothing(pnl.pf)`. Raises an [`IsNothingError`](@ref) naming the panel, the Feature Matrix and [`asset_panel`](@ref).
   - `sel` is well formed. See [`assert_feature_selector`](@ref).
   - No two entries resolve to one column. Raises an `ArgumentError`.
   - The selection is not empty. Raises an [`IsEmptyError`](@ref).
@@ -529,8 +531,8 @@ The order of `sel` is the column order, so a caller decides it. A `nothing` sele
   - [`assert_feature_selector`](@ref)
 """
 function select_fields(pnl::AssetPanel, sel, strict::Bool)
-    @argcheck(!isempty(pnl.pf),
-              IsEmptyError("a Feature Matrix stacks the Panel Fields of an Asset Panel, and this panel carries none: it states a universe and carries no feature data, which is what a ReturnsResult built from prices alone holds. Build the panel the Feature Matrix is to stack with `asset_panel(inputs)` and pass it as `ReturnsResult(; …, pnl = pnl)`, or set a producer on the estimator, `FeatureDistance(; ape = RegressionPanel())`, which builds one from the prior it is handed."))
+    @argcheck(!isnothing(pnl.pf),
+              IsNothingError("a Feature Matrix stacks the Panel Fields of an Asset Panel, and this panel carries none: it states a universe and carries no feature data, which is what a ReturnsResult built from prices alone holds. Build the panel the Feature Matrix is to stack with `asset_panel(inputs)` and pass it as `ReturnsResult(; …, pnl = pnl)`, or set a producer on the estimator, `FeatureDistance(; ape = RegressionPanel())`, which builds one from the prior it is handed."))
     assert_feature_selector(sel)
     return select_fields(Tuple{Int, Int, Symbol}[], pnl, sel, strict)
 end
@@ -754,7 +756,7 @@ The method that Julia selects is the algorithm.
   - [`panel_data_mask`](@ref)
   - [`panel_field_value_column!`](@ref)
 """
-function panel_field_column_mask(f::Union{<:NumericPanelField, <:CategoricalPanelField},
+function panel_field_column_mask(f::Union{NumericPanelField, CategoricalPanelField},
                                  ::Integer, rows = Colon())
     d = panel_data_mask(f)
     return isnothing(d) ? nothing : selectdim(d, 1, rows)
@@ -854,7 +856,7 @@ No object keeps the result. The Asset Panel is the data and the Feature Matrix i
 
 A static panel gives an `assets × features` matrix, and a time-varying one an `observations × assets × features` array. A numeric Panel Field gives one column, a categorical Panel Field one `0`/`1` column per level, a tensor Panel Field one column per label, and an observed mask one `0`/`1` column. The order of `sel` is the column order.
 
-A time-varying panel stacks every observation unless `rows` names the rows to stack. Then it stacks those rows alone, one row of the stack for each row that `rows` names. A consumer that reads one row stacks one row this way. A [`FeatureDistance`](@ref) under [`LastObservation`](@ref) passes the last row through [`collapse_rows`](@ref), so it reads a lifted static Panel Field, whose values are a [`RepeatedLeading`](@ref), once and does not copy it once per observation. The stack keeps its observation axis whatever `rows` holds. A one-row stack is therefore a window of one observation, and every collapse algorithm agrees on it. A static panel has no observation axis, so it takes `Colon()` alone.
+A time-varying panel stacks every observation unless `rows` names the rows to stack. Then it stacks those rows alone, one row of the stack for each row that `rows` names. A consumer that reads one row stacks one row this way. A [`FeatureDistance`](@ref) under [`LastRow`](@ref) passes the last row through [`collapse_rows`](@ref), so it reads a lifted static Panel Field, whose values are a [`RepeatedLeading`](@ref), once and does not copy it once per observation. The stack keeps its observation axis whatever `rows` holds. A one-row stack is therefore a window of one observation, and every collapse algorithm agrees on it. A static panel has no observation axis, so it takes `Colon()` alone.
 
 A cell of a value column holds data where the raw input carried a value or a fill policy wrote one, and the Feature Matrix holds that value. A cell that holds the placeholder of a blank that no fill reached holds no data. The Feature Matrix holds `placeholder` in its place, `NaN` by default, so the answer does not change with the placeholder. `placeholder = nothing` keeps the stored placeholder. An observed-mask column shows where the raw input held a blank, filled or not.
 

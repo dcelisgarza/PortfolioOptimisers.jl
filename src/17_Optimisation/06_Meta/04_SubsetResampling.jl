@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the estimators that average one optimiser over random subsets of the assets.
 
-A subtype draws random subsets of the assets, solves one base optimiser on each subset, and averages the subset weights into weights over all the assets. The average has less estimation error than one solve over all the assets [shen2017](@cite).
+A subtype draws random subsets of the assets, solves one base optimiser on each subset, and averages the subset weights into weights over all the assets. Each subset portfolio rests on parameters that are estimated more accurately than those of one solve over all the assets, and the average of the subset portfolios is diversified over all the assets, as in the abstract of [shen2017](@cite).
 
 # Related
 
@@ -13,7 +13,7 @@ A subtype draws random subsets of the assets, solves one base optimiser on each 
 
 # References
 
-  - $(ref_dict[:shen2017])
+  - $(ref_dict[:shen2017]) Abstract.
 """
 abstract type BaseSubsetResamplingOptimisationEstimator <:
               NonFiniteAllocationOptimisationEstimator end
@@ -22,7 +22,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Result of a [`SubsetResampling`](@ref) optimisation.
 
-`ress[m]` is the result of the subset whose asset indices are `idx[:, m]`. `w` is the average of the subset weights over all the assets, after the weight finaliser.
+`ress[m]` is the result of the subset whose asset indices are `idx[:, m]`. `w` is the average of the subset weights over all the assets, after the weight finaliser. The average is the last step of Algorithm 1 of [shen2017](@cite).
 
 `idx`, `pr`, `wb` and `fees` are on the universe that the subsets come from. When `imsk` is not `nothing`, this universe is the investable universe. `w` is on the full asset universe.
 
@@ -55,7 +55,7 @@ Keywords correspond to the struct's fields. The keyword constructor expands `w` 
 
 # References
 
-  - $(ref_dict[:shen2017])
+  - $(ref_dict[:shen2017]) Algorithm 1.
 """
 @concrete struct SubsetResamplingResult <: NonJuMPOptimisationResult
     """
@@ -167,9 +167,83 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
+Sizes each asset subset as a power of the number of assets, the subset size of [shen2017](@cite).
+
+An instance is the default `subset_size` of [`SubsetResampling`](@ref). A call of the instance on a prior result or a returns result gives the subset size.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+k &= \\mathrm{round}\\left(N^{p}\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:k_subset])
+  - ``p``: Exponent of the number of assets, `p`.
+  - $(math_dict[:N])
+
+``\\mathrm{round}`` gives the nearest integer, and the even integer at a tie. When ``N \\geq 1`` and ``0 < p \\leq 1``, ``1 \\leq N^{p} \\leq N``, so ``1 \\leq k \\leq N``. So ``p = 0.8`` on ``N = 100`` assets gives ``k = 40``, and ``p = 0.7`` gives ``k = 25``.
+
+[shen2017](@citet) state the subset size as ``b = n^{p}`` and give no rounding rule. The simulation study uses ``p = 0.8``, and the empirical study uses ``p = 0.7``.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    PowerSubsetSize(; p::Real = 0.8) -> PowerSubsetSize
+
+Keywords correspond to the struct's fields. The default is the exponent of the simulation study of [shen2017](@cite).
+
+## Validation
+
+  - `0 < p <= 1`. A `DomainError` is thrown otherwise.
+
+# Examples
+
+```jldoctest
+julia> PowerSubsetSize()
+PowerSubsetSize
+  p ┴ Float64: 0.8
+```
+
+# Related
+
+  - [`SubsetResampling`](@ref)
+  - [`SubsetSizeEstimator`](@ref)
+  - [`get_subset_size`](@ref)
+
+# References
+
+  - $(ref_dict[:shen2017]) Page 1520, Figure 1 on page 1521, and the note of Table 2 on page 1522.
+"""
+@concrete struct PowerSubsetSize <: SubsetSizeEstimator
+    """
+    The exponent ``p`` of the number of assets.
+    """
+    p
+    function PowerSubsetSize(p::Real)
+        @argcheck(zero(p) < p <= one(p),
+                  DomainError(p, "0 < p <= 1 must hold. Got\np => $p"))
+        return new{typeof(p)}(p)
+    end
+end
+function PowerSubsetSize(; p::Real = 0.8)::PowerSubsetSize
+    return PowerSubsetSize(p)
+end
+function (s::PowerSubsetSize)(rd::Union{Pr_RR, AbstractPricesResult})::Integer
+    return round(Int, size(rd.X, 2)^s.p)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Averages the weights of one base optimiser over random subsets of the assets.
 
-The estimator draws `n_subsets` distinct subsets of `subset_size` assets, solves `opt` on each subset, and averages the subset weights. The average then goes through the weight finaliser `wf` under the bounds `wb`. [shen2017](@cite) states the method. When the number of possible subsets is larger than `max_comb`, the draw is approximate, and two subsets can be equal.
+The estimator draws `n_subsets` distinct subsets of `subset_size` assets, solves `opt` on each subset, and averages the subset weights. The average then goes through the weight finaliser `wf` under the bounds `wb`. Algorithm 1 of [shen2017](@cite) states the method. It solves the mean-variance problem on each subset, and this type takes any base optimiser. It samples the assets of each subset without replacement, and it does not require the subsets to differ. This type draws distinct subsets. When the number of possible subsets is larger than `max_comb`, the draw is approximate, and two subsets can be equal.
 
 # Mathematical definition
 
@@ -194,7 +268,7 @@ Where:
 
   - ``\\boldsymbol{w}^*``: Averaged portfolio weights, before the weight finaliser.
   - ``M``: Number of subsets, `n_subsets`. A callable `n_subsets` gives its value on ``\\mathcal{P}``.
-  - ``k``: Number of assets in each subset.
+  - $(math_dict[:k_subset])
   - ``s``: Fractional `subset_size`.
   - ``f``: Callable `subset_size`.
   - ``\\mathcal{P}``: Prior result of `pe` on the investable universe.
@@ -223,7 +297,7 @@ $(DocStringExtensions.FIELDS)
         opt::OptE_TD,
         wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-        subset_size::TD{<:SubsetSizeE} = 0.8,
+        subset_size::TD{<:SubsetSizeE} = PowerSubsetSize(),
         n_subsets::TD{<:NumberSubsetsE} = 2,
         max_comb::Integer = 1_000_000_000,
         rng::Random.AbstractRNG = Random.default_rng(),
@@ -233,7 +307,7 @@ $(DocStringExtensions.FIELDS)
         cache::Option{<:ReturnsBufferState} = nothing
     ) -> SubsetResampling
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. The default `subset_size` is the subset size of the simulation study of [shen2017](@cite), ``k = \\mathrm{round}\\left(N^{0.8}\\right)``, see [`PowerSubsetSize`](@ref).
 
 ## Time-dependent fields
 
@@ -255,12 +329,12 @@ The loop inside `SubsetResampling` is over asset subsets, not over time folds. N
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `fees`: Recursively updated via [`factory`](@ref).
-  - `opt`: Recursively updated via [`factory`](@ref).
-  - `fb`: Recursively updated via [`factory`](@ref).
-  - `cache`: Carried unchanged via [`factory`](@ref).
+  - `fees`: Recursively updated through [`factory`](@ref).
+  - `opt`: Recursively updated through [`factory`](@ref).
+  - `fb`: Recursively updated through [`factory`](@ref).
+  - `cache`: Carried unchanged through [`factory`](@ref).
 
 ## View parameters
 
@@ -279,10 +353,11 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
   - [`MeanRisk`](@ref)
   - [`port_opt_view`](@ref)
   - [`subset_resampling_finaliser`](@ref)
+  - [`PowerSubsetSize`](@ref)
 
 # References
 
-  - $(ref_dict[:shen2017])
+  - $(ref_dict[:shen2017]) Algorithm 1.
 """
 @propagatable @concrete struct SubsetResampling <: BaseSubsetResamplingOptimisationEstimator
     """
@@ -391,7 +466,7 @@ function SubsetResampling(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
                           sets::TD_Option{<:UniverseSets} = nothing, opt::OptE_TD,
                           wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
                           ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-                          subset_size::TD{<:SubsetSizeE} = 0.8,
+                          subset_size::TD{<:SubsetSizeE} = PowerSubsetSize(),
                           n_subsets::TD{<:NumberSubsetsE} = 2,
                           max_comb::Integer = 1_000_000_000,
                           rng::Random.AbstractRNG = Random.default_rng(),
@@ -416,7 +491,7 @@ The constructor passes the defaults to [`assert_time_dependent_substitution`](@r
 """
 function subset_resampling_td_defaults()::NamedTuple
     return (; pe = EmpiricalPrior(), opt = NoDefault(), wf = IterativeWeightFinaliser(),
-            subset_size = 0.8, n_subsets = 2)
+            subset_size = PowerSubsetSize(), n_subsets = 2)
 end
 function time_dependent_field_defaults(::SubsetResampling)::NamedTuple
     return subset_resampling_td_defaults()
@@ -761,7 +836,7 @@ function optimise(sr::SubsetResampling{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
 end
 """
     group_frames(opt::NestedClustered) -> ReturnsFrames
-    group_frames(opt::Union{<:Stacking, <:SubsetResampling}) -> ReturnsFrames
+    group_frames(opt::Union{BaseStackingOptimisationEstimator, BaseSubsetResamplingOptimisationEstimator}) -> ReturnsFrames
 
 Walk the readers of a meta-optimiser, for the warning of a forgotten raw reader and the gap rule of the head.
 
@@ -784,8 +859,9 @@ The group of a meta-optimiser is the head and every reader in its own slots: the
 function group_frames(opt::NestedClustered)
     return field_frames(opt, "", refits_regression(opt.pe))
 end
-function group_frames(opt::Union{<:Stacking, <:SubsetResampling})
+function group_frames(opt::Union{BaseStackingOptimisationEstimator,
+                                 BaseSubsetResamplingOptimisationEstimator})
     return field_frames(opt, "", refits_regression(opt.pe))
 end
 
-export SubsetResamplingResult, SubsetResampling
+export SubsetResamplingResult, PowerSubsetSize, SubsetResampling

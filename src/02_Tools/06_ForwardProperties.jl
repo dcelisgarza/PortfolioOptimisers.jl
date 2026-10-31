@@ -5,19 +5,19 @@
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Guard one intermediate node of a [`@forward_properties`](@ref) nested path.
+Check one intermediate node of a nested path of [`@forward_properties`](@ref).
 
-Return `v` unchanged when it is not `nothing`; otherwise throw a
-[`PropertyPathError`](@ref) naming the receiver type `T`, the full declared path
-`pathstr`, and the `nodestr` node that resolved to `nothing`. Called once per
-intermediate hop in the descent generated for a depth-≥2 locator.
+Return `v` with no change when it is not `nothing`. Otherwise, throw a
+[`PropertyPathError`](@ref) that names the receiver type `T`, the full declared path
+`pathstr`, and the node `nodestr` that resolved to `nothing`. The generated walk of a
+locator with two or more hops calls it once for each intermediate hop.
 
 # Algorithm
 
  1. `v` is `nothing`: throw a [`PropertyPathError`](@ref) whose message names `pathstr`, the type `T` and the node `nodestr`.
- 2. `v` is anything else: return `v`.
+ 2. `v` is any other value: return `v`.
 
-The guard runs on the **intermediate** hops only, so a path whose last hop gives `nothing` returns that `nothing` rather than raising. That is deliberate: an absent leaf is a value, and an absent intermediate is a path that cannot be walked.
+The check runs on the **intermediate** hops only. A path whose last hop gives `nothing` returns that `nothing`, and raises no error. This is by design. An absent leaf is a value, but an absent intermediate node is a path that the walk cannot follow.
 
 # Related
 
@@ -34,21 +34,21 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Flatten a [`@forward_properties`](@ref) locator into its path of field symbols.
+Change a locator of [`@forward_properties`](@ref) into its path of field symbols.
 
-A bare identifier `a` becomes `[:a]`; a dotted expression `a.b.c` becomes
+A bare identifier `a` becomes `[:a]`. A dotted expression `a.b.c` becomes
 `[:a, :b, :c]`. Any other expression raises an error.
 
 # Algorithm
 
- 1. `expr` is a `Symbol`: return the one-element vector holding it.
+ 1. `expr` is a `Symbol`: return the one-element vector that holds it.
  2. `expr` is an `Expr` with head `:.` and two arguments:
      1. Read `leaf`, its second argument, and unwrap a `QuoteNode` to its value.
-     2. `leaf` is not a `Symbol`: raise an error naming the leaf.
+     2. `leaf` is not a `Symbol`: raise an error that names the leaf.
      3. Call this function again on the first argument, and append `leaf` to the result.
- 3. `expr` is anything else: raise an error naming the expression.
+ 3. `expr` is any other expression: raise an error that names the expression.
 
-The recursion of step 2.3 is what makes the path any depth: `a.b.c` parses as `(a.b).c`, so the walk descends to the bare name and rebuilds the path from the left.
+The recursion of step 2.3 lets the path have any depth. `a.b.c` parses as `(a.b).c`, so the walk goes down to the bare name and builds the path again from the left.
 
 # Related
 
@@ -73,19 +73,20 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Build the expression that descends a [`@forward_properties`](@ref) `path` (a
-vector of field symbols) on the receiver `x`, returning the value at the path.
+Build the expression that walks a `path` of [`@forward_properties`](@ref) on the
+receiver `x`, and returns the value at the end of the path. `path` is a vector of field
+symbols.
 
-A depth-1 path is a single `getfield`. A depth-≥2 path descends hop by hop,
-guarding every intermediate with [`forward_nonnothing`](@ref) (keyed on the
-receiver type `struct_name`) so a `nothing` node throws a path-naming
-[`PropertyPathError`](@ref). When `broadcast` is `true`, the final hop maps over
-the penultimate value if it is an `AbstractVector` (the scalar-or-vector
-solution case), otherwise it is a plain access.
+A path with one hop is one `getfield`. A path with two or more hops goes one hop at a
+time. It checks every intermediate node with [`forward_nonnothing`](@ref), which takes
+the receiver type `struct_name`. A `nothing` node then throws a
+[`PropertyPathError`](@ref) that names the path. When `broadcast` is `true`, the last
+hop maps over the value before it if that value is an `AbstractVector`. This is the case
+of a solution that is a scalar or a vector. Otherwise, the last hop is a plain access.
 
 # Algorithm
 
- 1. The path holds one name: return `getfield(x, name)` and stop. `getfield` is used rather than `getproperty`, so the generated `Base.getproperty` never re-enters itself.
+ 1. The path holds one name: return `getfield(x, name)` and stop. The walk uses `getfield` and not `getproperty`, so the generated `Base.getproperty` never calls itself.
  2. Build `pathstr`, the whole path joined by dots, for the error message.
  3. Start `stmts` with `__v = getfield(x, first_name)`.
  4. For each further hop `k` of the path:
@@ -95,7 +96,7 @@ solution case), otherwise it is a plain access.
  5. Push `__v` as the value of the block.
  6. Return the statements wrapped in a `let` block, so `__v` never escapes into the caller.
 
-Step 4.1 runs before **every** hop after the first, so the guard covers each intermediate exactly once and never the leaf. Only the leaf of step 4.2 broadcasts, so an intermediate vector is still a path error rather than a silent map.
+Step 4.1 runs before **every** hop after the first, so the check reads each intermediate node one time and never reads the leaf. Only the leaf of step 4.2 broadcasts. So an intermediate vector raises an error at the next hop, and the walk does not map over it.
 
 # Related
 
@@ -130,18 +131,18 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Rebuild `x` with the fields named in `patch` replaced, for a type that [`@forward_properties`](@ref) decorates.
 
-This is the body of the `ConstructionBase.setproperties` method the macro generates, which `Accessors.set` and `Accessors.@set` call to rebuild every struct on a lens path. The default method refuses a type whose `propertynames` differ from its `fieldnames`, and reads every field through `getproperty`, so a `swap(L, M)` rule would write `M` into an unset `L`. This one reads the fields with `getfield` and patches only a field. A forwarded or computed property is a view of a nested value with no storage of its own, so a patch that names one is refused, and `source(sym)` gives the path to set instead.
+This function is the body of the `ConstructionBase.setproperties` method that the macro makes. `Accessors.set` and `Accessors.@set` call that method to build again every struct on a lens path. The default method refuses a type whose `propertynames` differ from its `fieldnames`. It also reads every field through `getproperty`, so with a `swap(L, M)` rule it writes `M` into an unset `L`. This function reads the fields with `getfield`, and it patches only a field. A forwarded or computed property is a view of a nested value, with no storage of its own. The function refuses a patch that names one, and `source(sym)` gives the path to set.
 
 # Algorithm
 
  1. For each key `sym` of `patch` that is not a field of `T`:
      1. `source(sym)` gives a path: refuse it, and name that path as the one to set.
      2. `sym` is another property of `x`: refuse it as a computed value, and name the fields.
-     3. Otherwise: refuse it as a name `T` does not have, and name the fields.
- 2. Read every field of `x` with `getfield` into a `NamedTuple` keyed in declaration order.
- 3. Merge `patch` over it, and call `ctor`, the keyword constructor of `T`, with the result, so every guard of the constructor runs on the new value.
+     3. Otherwise: refuse it as a name that `T` does not have, and name the fields.
+ 2. Read every field of `x` with `getfield` into a `NamedTuple`, in declaration order.
+ 3. Merge `patch` over it, and call `ctor`, the keyword constructor of `T`, with the result. Every check of the constructor runs on the new value.
 
-The macro passes `ctor` as the name of `T` without its type parameters, so step 3 calls the ordinary keyword constructor and needs no reflection to find it. A patch that changes a type parameter, such as setting an unset `L`, gives the specialisation the constructor picks. The keyword constructor must take every field of `T` by its field name.
+The macro passes `ctor` as the name of `T` without its type parameters. So step 3 calls the ordinary keyword constructor, and it needs no reflection to find it. A patch that changes a type parameter, such as a value for an unset `L`, gives the specialisation that the constructor selects. The keyword constructor must take every field of `T` by its field name.
 
 # Related
 
@@ -178,67 +179,65 @@ end
         swap(field, fn)
     end
 
-Generate the `Base.getproperty` / `Base.propertynames` pair for type `T` from a
-block of declarative forwarding rules, so the property-forwarding decision lives
-in one declared surface instead of a hand-written `getproperty` body.
-It also generates the `ConstructionBase.setproperties` method that `Accessors.set`
-needs to rebuild `T` on a lens path, which the default refuses for a type whose
-`propertynames` differ from its `fieldnames`.
-`T` may be a bare type name or a parametric/`UnionAll` signature
-(`Foo{<:Any, Nothing, <:Any}`), so a `swap` can be specialised per type parameter.
+Make the `Base.getproperty` and `Base.propertynames` methods of the type `T` from a
+block of declared forwarding rules. The forwarding of properties is then in one
+declaration, not in a hand-written `getproperty` body. The macro also makes the
+`ConstructionBase.setproperties` method that `Accessors.set` needs to build `T` again on
+a lens path. The default method refuses a type whose `propertynames` differ from its
+`fieldnames`. `T` can be a bare type name or a parametric or `UnionAll` signature, such
+as `Foo{<:Any, Nothing, <:Any}`, so a `swap` can apply to one value of a type parameter.
 
-All names are written as **bare identifiers**. Every rule names its source via a
-**locator** — a bare name `a` (the field `a` of the receiver) or a dotted path
-`a.b.c` (the receiver-rooted path `obj.a.b.c`, any depth). Nesting is simply more
-dots; a depth-≥2 path guards each intermediate and throws a
-[`PropertyPathError`](@ref) naming the path when a node is `nothing`.
+Write all names as **bare identifiers**. Every rule names its source through a
+**locator**. A locator is a bare name `a`, which is the field `a` of the receiver, or a
+dotted path `a.b.c` of any depth, which is the path `obj.a.b.c` from the receiver. A
+deeper path has more dots. A path with two or more hops checks each intermediate node,
+and it throws a [`PropertyPathError`](@ref) that names the path when a node is `nothing`.
 
-`forward`/`alias`/`compute` only *add new virtual names* and so resolve **after**
-the receiver's own fields; `swap` *replaces the value of an existing field* and so
+`forward`, `alias` and `compute` only *add new virtual names*, so they resolve **after**
+the fields of the receiver. `swap` *replaces the value of an existing field*, so it
 resolves **before** the field check.
 
 # Rules
 
-  - `forward(loc)`: forward *all* properties of the value at `loc`
-    (`sym in propertynames(value)` ? `getproperty(value, sym)`).
-  - `forward(loc, names...)`: forward only the named subset from the value at `loc`.
-  - `alias(exposed, loc)`: expose `exposed` as the value at `loc` (renaming).
-  - `compute(exposed, loc; broadcast)`: expose `exposed` via a dotted locator
-    (depth ≥ 2); `broadcast` maps the final hop over a vector penultimate value.
-  - `compute(exposed, fn)`: expose `exposed` as `fn(obj)`; `fn` must be an
-    anonymous function (a lambda), which would otherwise be ambiguous with a
-    dotted path.
-  - `swap(field, loc)` / `swap(field, fn)`: override an *existing* field's value
-    with the value at `loc` (bare name, e.g. `swap(L, M)`, or dotted path) or with
-    `fn(obj)`. Unlike the others it takes precedence over the own-field check, and
-    is the only rule that may name a real field. Typically specialised on a
-    parametric `T` (`swap(L, M)` on `Regression{<:Any, Nothing, <:Any}`).
-    The locator form reads through `getfield` and is recursion-safe; in the
-    **function form the body must read the swapped field via `getfield(obj, :field)`,
-    never `obj.field`**, since dot-access on the swapped field re-enters
-    `getproperty` and recurses (`StackOverflowError`). Other fields may use
-    dot-access freely.
+  - `forward(loc)`: forward *all* properties of the value at `loc`. A name `sym` with
+    `sym in propertynames(value)` gives `getproperty(value, sym)`.
+  - `forward(loc, names...)`: forward only the named properties of the value at `loc`.
+  - `alias(exposed, loc)`: give the value at `loc` the new name `exposed`.
+  - `compute(exposed, loc; broadcast)`: give `exposed` through a dotted locator with
+    two or more hops. `broadcast` maps the last hop over a vector value before it.
+  - `compute(exposed, fn)`: give `exposed` as `fn(obj)`. `fn` must be an anonymous
+    function, because the macro cannot tell any other function from a dotted path.
+  - `swap(field, loc)` and `swap(field, fn)`: replace the value of an *existing* field
+    with the value at `loc`, or with `fn(obj)`. `loc` is a bare name, such as in
+    `swap(L, M)`, or a dotted path. This rule runs before the own-field check, and it
+    is the only rule that can name a real field. It usually applies to one value of a
+    type parameter. For example, `swap(L, M)` applies to a `Regression` whose `L`
+    parameter is `Nothing`. The locator form reads through `getfield`, so it does not
+    recurse. In the **function form, the body must read the swapped field with
+    `getfield(obj, :field)`, never with `obj.field`**. A dot access of the swapped field
+    calls `getproperty` again, and the recursion raises a `StackOverflowError`. The body
+    can use a dot access for every other field.
 
 # Algorithm
 
  1. `block` is not a `begin … end` block: raise an error.
  2. Make four empty vectors: `swap_branches`, `getprop_branches`, `source_branches` and `propname_contribs`.
- 3. For each rule of the block, skipping a `LineNumberNode`:
-     1. The rule is not a call: raise an error naming it.
-     2. Read `marker`, the rule name, and `args`, its arguments. When the first argument is a `:parameters` node, read the `broadcast` option out of it and drop it from `args`. Any other option raises an error.
-     3. `marker` is `forward`: flatten the locator with [`forward_flatten_path`](@ref) and build `walk` with [`forward_walk_expr`](@ref). With no further argument, push a branch that returns `getproperty(walk, sym)` when `sym` is in `propertynames(walk)`, and contribute every one of those names. With further arguments, check that each is a bare identifier, push a branch that matches `sym` against that name set, and contribute the named subset. Either way, push onto `source_branches` a branch that gives the path `loc.sym` for the same names.
-     4. `marker` is `alias`: check the exposed name, build `walk` from the locator, push a branch that matches the exposed name and returns `walk`, push a source branch that gives the locator path, and contribute the name.
-     5. `marker` is `compute`: check the exposed name. An anonymous-function source pushes a branch returning `fn(x)`, and `broadcast` with that form raises an error. A dotted source builds `walk` with the `broadcast` flag, pushes the matching branch, and pushes a source branch that gives the dotted path. Any other source raises an error. Contribute the exposed name.
-     6. `marker` is `swap`: as for `compute`, but a bare name is also a legal source, and the branch is pushed onto `swap_branches` rather than `getprop_branches`.
-     7. `marker` is anything else: raise an error naming it.
- 4. Build `Base.getproperty(x::T, sym::Symbol)` in this order: the `swap` branches; the own-field check, which returns `getfield(x, sym)`; the remaining branches in declaration order; and `getfield(x, sym)` as the fallthrough, which raises the standard error for an absent field.
- 5. Build `Base.propertynames(x::T)` from `fieldnames(T)` followed by every contributed name, and return the unique names as a tuple.
- 6. Build `ConstructionBase.setproperties(x::T, patch::NamedTuple)`, which calls [`forward_setproperties`](@ref) with two more arguments: a function of `sym` that runs the `source_branches` and gives `nothing` when none matches, and the name of `T` without its type parameters, which is its keyword constructor.
+ 3. For each rule of the block, except a `LineNumberNode`:
+     1. The rule is not a call: raise an error that names it.
+     2. Read `marker`, the rule name, and `args`, its arguments. When the first argument is a `:parameters` node, read the `broadcast` option from it and drop it from `args`. Any other option raises an error.
+     3. `marker` is `forward`: flatten the locator with [`forward_flatten_path`](@ref), and build `walk` with [`forward_walk_expr`](@ref). With no more arguments, push a branch that returns `getproperty(walk, sym)` when `sym` is in `propertynames(walk)`, and add all of those names. With more arguments, check that each is a bare identifier. Then push a branch that matches `sym` against that set of names, and add those names. In both cases, push onto `source_branches` a branch that gives the path `loc.sym` for the same names.
+     4. `marker` is `alias`: check the exposed name, and build `walk` from the locator. Push a branch that matches the exposed name and returns `walk`. Push a source branch that gives the locator path, and add the name.
+     5. `marker` is `compute`: check the exposed name. An anonymous-function source pushes a branch that returns `fn(x)`, and `broadcast` with that form raises an error. A dotted source builds `walk` with the `broadcast` flag, pushes the matching branch, and pushes a source branch that gives the dotted path. Any other source raises an error. Add the exposed name.
+     6. `marker` is `swap`: do as for `compute`, but a bare name is also a valid source, and the branch goes onto `swap_branches` and not onto `getprop_branches`.
+     7. `marker` is any other name: raise an error that names it.
+ 4. Build `Base.getproperty(x::T, sym::Symbol)` in this order: the `swap` branches, then the own-field check, which returns `getfield(x, sym)`, then the other branches in declaration order. The last statement is `getfield(x, sym)`, which raises the standard error for an absent field.
+ 5. Build `Base.propertynames(x::T)` from `fieldnames(T)` and then every added name, and return the unique names as a tuple.
+ 6. Build `ConstructionBase.setproperties(x::T, patch::NamedTuple)`, which calls [`forward_setproperties`](@ref) with two more arguments. The first is a function of `sym` that runs the `source_branches` and gives `nothing` when no branch matches. The second is the name of `T` without its type parameters, which is its keyword constructor.
  7. Return the three definitions in one escaped block.
 
-Step 4 is where the two orderings in the first paragraph come from: a `swap` runs **before** the own-field check, so it replaces a real field, and every other rule runs **after** it, so it can only add a name. Within each group the first branch that matches wins, and the order of the branches is the declaration order of the rules.
+Step 4 gives the two orders of the first paragraph. A `swap` runs **before** the own-field check, so it replaces a real field. Every other rule runs **after** that check, so it can only add a name. In each group, the first branch that matches wins, and the branches are in the declaration order of the rules.
 
-Step 6 gives no source for a `swap`, which names a real field and so is patched as one, nor for the function form of `compute`, which has no path to set.
+Step 6 gives no source for a `swap`, because a `swap` names a real field, and the patch sets it as a field. Step 6 also gives no source for the function form of `compute`, because that form has no path to set.
 
 # Related
 

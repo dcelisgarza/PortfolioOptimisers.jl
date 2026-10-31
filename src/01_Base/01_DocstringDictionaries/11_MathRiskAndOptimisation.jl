@@ -6,6 +6,7 @@ unique_key_dict!(math_dict, :math_dict,
                  # Risk measure parameters.
                  :alpha_rm => "``\\alpha``: Significance level (left tail probability), ``\\alpha \\in (0, 1)``.",#
                  :w_port => "``\\boldsymbol{w}``: Portfolio weights vector ``N \\times 1``.",#
+                 :W_feas => "``\\mathcal{W}``: Feasible weight set, the portfolios that the constraints of the optimiser admit.",#
                  # The divergence Ambiguity Set reading, in the sense GLOSSARY.md
                  # gives the noun. `EntropicValueatRisk` is the Kullback-Leibler
                  # ball and `RelativisticValueatRisk` is its Kaniadakis
@@ -24,20 +25,34 @@ unique_key_dict!(math_dict, :math_dict,
                  # them state one programme, so they share these symbols.
                  :kappa_rm => "``\\kappa``: Kaniadakis deformation parameter, ``\\kappa \\in (0, 1)``.",#
                  :rlvar_loss => "``\\boldsymbol{x}``: ``T \\times 1`` loss series of one asset, the negated returns, whose ``j``-th entry is ``x_{j}``.",#
-                 :rlvar_probs => "``\\boldsymbol{w}``: ``T \\times 1`` observation probabilities, summing to one. In a view they are the posterior probabilities the model solves for.",#
+                 :rlvar_probs => "``\\boldsymbol{w}``: ``T \\times 1`` observation probabilities, which sum to one. In a view, they are the posterior probabilities that the model solves for.",#
                  :rlvar_stat => "``\\mathrm{RLVaR}_{\\alpha,\\kappa}(X)``: Relativistic value at risk of the loss series ``\\boldsymbol{x}`` at level ``\\alpha`` and deformation ``\\kappa``.",#
                  :rlvar_t => "``t``: Shift variable of the primal programme.",#
                  :rlvar_z => "``z > 0``: Dual variable of the primal programme.",#
                  :rlvar_u => "``u``: Shifted loss of one observation, ``t - x_{j}``.",#
-                 :rlvar_sigma => "``\\sigma``: Positive root of the stationarity condition of ``\\varphi_{\\kappa}``.",#
-                 :rlvar_phi => "``\\varphi_{\\kappa}(u, z)``: Smallest sum the pair of power cones of one observation allows.",#
+                 :rlvar_sigma => "``\\sigma``: Square root of the discriminant of the stationarity condition of ``\\varphi_{\\kappa}``, a quadratic whose positive root ``(u + \\sigma) / 2`` is the minimiser.",#
+                 :rlvar_phi => "``\\varphi_{\\kappa}(u, z)``: Smallest sum of the two tail variables that the pair of power cones of one observation allows.",#
                  :rlvar_target => "``\\bar{\\vartheta}``: Target relativistic value at risk of the view.",#
                  # The primal power-cone programme of `RelativisticValueatRisk`, which
                  # `RRM` builds and solves. The measure states it and `RRM` registers it.
                  :K_pow => "``\\mathcal{K}_{\\mathrm{pow}}(p) = \\{(a,b,c) : a^{p} b^{1-p} \\geq |c|,\\, a \\geq 0,\\, b \\geq 0\\}``: Power cone.",#
+                 # The power cone programme of `PowerNormValueatRisk`, which `PRM` builds
+                 # and solves. The measure states it and `PRM` registers it, and the two
+                 # drawdown measures read the order.
+                 :p_pnvar_order => "``p > 1``: Order of the power norm.",#
+                 :pnvar_eta => "``\\eta``: Threshold of the losses.",#
+                 :pnvar_t => "``t``: Power norm bound on ``\\boldsymbol{w}``.",#
+                 :pnvar_w => "``w_i``: Excess loss of observation ``i`` above the threshold ``\\eta``.",#
+                 :pnvar_v => "``v_i``: Power term bound of observation ``i``, a bound on ``w_i^{p} / t^{p-1}``.",#
+                 # The exponential cone programme of `EntropicValueatRisk`, which `ERM`
+                 # and the JuMP constraint layer build.
+                 :K_exp => "``\\mathcal{K}_{\\exp} = \\mathrm{cl}\\,\\{(a,b,c) : b\\, e^{a/b} \\leq c,\\, b > 0\\}``: Exponential cone.",#
                  :rlvar_z_ge => "``z \\geq 0``: Scale variable of the primal power-cone programme.",#
                  :rlvar_aux => "``\\psi_i``, ``\\theta_i``, ``\\epsilon_i``, ``\\omega_i``: Auxiliary variables of observation ``i`` in the primal power-cone programme.",#
                  :p_i_obs => "``p_i``: Probability of observation ``i``. It is ``1/T`` without observation weights, and the ``i``-th observation weight divided by the sum of the weights with them.",#
+                 # The observations whose rows the entropic and relativistic programmes
+                 # hold. A row of zero weight does not change the optimum.
+                 :I_pos_obs => "``\\mathcal{I}``: Set of the observations of positive weight. Without observation weights, it holds all ``T`` observations.",#
                  # Absolute drawdown series.
                  :ct => "``c_t``: Cumulative simple portfolio return at period ``t``.",#
                  :dtdd => "``d_t \\leq 0``: Absolute drawdown at period ``t``.",#
@@ -61,7 +76,7 @@ unique_key_dict!(math_dict, :math_dict,
                  :pos_part => "``(\\cdot)_{+} = \\max(\\cdot, 0)``: Positive part.",#
                  :tau_wb_tol => "``\\tau``: The tolerance that [`weights_bound_tolerance`](@ref) gives for the element type of ``\\boldsymbol{w}``, which is ``\\sqrt{\\epsilon}`` for a floating-point type and zero for an exact type such as `Rational`.",#
                  # JuMP optimisation variables.
-                 :k_budget => "``k``: Budget scaling / homogenisation variable.",#
+                 :k_budget => "``k``: Variable that scales the budget in the homogenised problem.",#
                  :sc_scale => "``s_c``: Constraint scale. It multiplies both sides of a row, so a positive value leaves the feasible set unchanged.",#
                  # The second moment in a JuMP model: the matrix, its factor, its lift and the
                  # epigraph of its square root.
@@ -69,6 +84,19 @@ unique_key_dict!(math_dict, :math_dict,
                  :G_cov_factor => "``\\mathbf{G}``: Covariance factor, with ``\\mathbf{G}^\\intercal \\mathbf{G} = \\mathbf{\\Sigma}``. It need not be square, and ``\\lVert \\mathbf{G} \\boldsymbol{w} \\rVert_{2}^{2} = \\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}``.",#
                  :W_lift => "``\\mathbf{W}``: Lifted weight matrix, symmetric ``N \\times N``. [`set_sdp_constraints!`](@ref) bounds it by ``\\mathbf{W} \\succeq \\boldsymbol{w} \\boldsymbol{w}^\\intercal / k``.",#
                  :sigma_epi => "``\\sigma``: Standard-deviation epigraph variable, ``\\sigma \\geq \\lVert \\mathbf{G} \\boldsymbol{w} \\rVert_{2}``.",#
+                 # The fourth moment in a JuMP model: the matrix, its two decompositions and
+                 # the epigraph of its square root.
+                 :K_cokurt => "``\\mathbf{K}``: Cokurtosis matrix of the risk measure, ``N^2 \\times N^2``. It is the measure's own `kt` when the measure states one, and the prior's otherwise.",#
+                 :m4_port => "``m_4(\\boldsymbol{w}) = (\\boldsymbol{w} \\otimes \\boldsymbol{w})^\\intercal \\mathbf{K} (\\boldsymbol{w} \\otimes \\boldsymbol{w})``: Fourth central moment of the portfolio returns, with ``\\otimes`` the Kronecker product.",#
+                 :S_2_sum => "``\\mathbf{S}_2``: Summation matrix, ``N(N+1)/2 \\times N^2``, which [`dup_elim_sum_matrices`](@ref) builds. For a symmetric ``\\mathbf{A}``, ``\\mathbf{S}_2 \\mathrm{vec}(\\mathbf{A})`` holds each entry on and below the diagonal of ``\\mathbf{A}``, times the number of times it occurs in ``\\mathbf{A}``.",#
+                 :L_2_elim => "``\\mathbf{L}_2``: Elimination matrix, ``N(N+1)/2 \\times N^2``, which [`dup_elim_sum_matrices`](@ref) builds. ``\\mathbf{L}_2 \\mathrm{vec}(\\mathbf{A})`` holds the entries on and below the diagonal of ``\\mathbf{A}``, column by column.",#
+                 :G_kt_factor => "``\\mathbf{G}_{kt}``: Factor of the projected cokurtosis matrix, ``N(N+1)/2 \\times N(N+1)/2``, with ``\\mathbf{G}_{kt}^\\intercal \\mathbf{G}_{kt} = \\mathbf{S}_2 \\mathbf{K} \\mathbf{S}_2^\\intercal``. It is the transpose of the square root that [`matrix_square_root`](@ref) takes under the `mtx_sqrt` of the measure.",#
+                 :B_i_kt => "``\\mathbf{B}_i``: ``N \\times N`` matrix of eigenpair ``i`` of the block vectorisation of ``\\mathbf{K}``, the reshaped ``\\sqrt{\\lambda_i}\\, \\boldsymbol{q}_i``. [`cokurtosis_spectrum`](@ref) gives the eigenvalue ``\\lambda_i``, clamped at zero, and the unit eigenvector ``\\boldsymbol{q}_i``. The index ``i`` counts down from the largest eigenvalue.",#
+                 :g_kt_epi => "``g``: Epigraph variable of the square root of the kurtosis, ``g \\geq \\lVert \\boldsymbol{x}_{kt} \\rVert_{2}``.",#
+                 :x_kt => "``\\boldsymbol{x}_{kt}``: Vector whose squared norm is the kurtosis expression. The exact formulation states ``\\mathbf{G}_{kt} \\mathbf{L}_2 \\mathrm{vec}(\\mathbf{W})``, and the approximate formulation states entry ``j`` as ``\\mathrm{Tr}(\\mathbf{B}_j \\mathbf{W})``.",#
+                 # The third moment of the portfolio, read off the coskewness matrix.
+                 :M3_cosk => "``\\mathbf{M}_3``: Coskewness matrix of the risk measure, ``N \\times N^2``. It is the measure's own `sk` when the measure states one, and the prior's otherwise.",#
+                 :m3_port => "``m_3(\\boldsymbol{w}) = \\boldsymbol{w}^\\intercal \\mathbf{M}_3 (\\boldsymbol{w} \\otimes \\boldsymbol{w})``: Third central moment of the portfolio returns, with ``\\otimes`` the Kronecker product.",#
                  # The cones of a norm, and the diversification floor a norm ceiling states.
                  :K_q_norm => "``\\mathcal{K}_{q} = \\{(t, \\boldsymbol{x}) : t \\geq \\lVert \\boldsymbol{x} \\rVert_{q}\\}``: Norm cone of order ``q``. ``\\mathcal{K}_{2}`` is the second-order cone.",#
                  :P_alpha_power => "``\\mathcal{P}_{\\alpha} = \\{(x, y, z) : x^{\\alpha} y^{1 - \\alpha} \\geq \\lvert z \\rvert,\\ x \\geq 0,\\ y \\geq 0\\}``: Power cone of exponent ``\\alpha \\in (0, 1)``, in the argument order of `MOI.PowerCone`.",#
@@ -100,6 +128,15 @@ unique_key_dict!(math_dict, :math_dict,
                  # The risk measure layer of a JuMP model.
                  :R_i_riskvec => "``\\mathcal{R}_i``: Entry ``i`` of `risk_vec`, the risk expression of the ``i``-th risk measure times the `scale` of the measure.",#
                  :rhat_t_net => "``\\hat{r}_t``: Net portfolio return at observation ``t``, ``\\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` less the fees charged at ``t``.",#
+                 :rhat_net_vec => "``\\hat{\\boldsymbol{r}}``: The net portfolio returns, ``T \\times 1``, with entries ``\\hat{r}_t``.",#
+                 # The moment risk measures: the target, the deviations, the mean over the
+                 # observations and the divisor of the variance estimator.
+                 :tau_moment => "``\\tau``: Moment Target, the value from which the measure measures the deviations. It is ``\\mathbb{E}[\\hat{\\boldsymbol{r}}]`` when `mu` is `nothing`, ``\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\bar{F}(\\boldsymbol{w})`` when `mu` is a vector ``\\boldsymbol{\\mu}``, ``\\boldsymbol{v}^\\intercal \\boldsymbol{w} + s - \\bar{F}(\\boldsymbol{w})`` when `mu` is a [`VecScalar`](@ref) with fields ``\\boldsymbol{v}`` and ``s``, and `mu` itself when it is a number.",#
+                 :Fbar_fee_mean => "``\\bar{F}(\\boldsymbol{w})``: Mean fee per period of the portfolio, zero when `fees` is `nothing`. See [`moment_target_fees`](@ref).",#
+                 :d_t_moment => "``d_t = \\hat{r}_t - \\tau``: Moment deviation of observation ``t``.",#
+                 :d_t_lower => "``d_t^{-} = \\min(d_t, 0)``: Lower part of the moment deviation of observation ``t``.",#
+                 :E_obs_mean => "``\\mathbb{E}[z] = \\sum_{t=1}^{T} w_t z_t / \\sum_{t=1}^{T} w_t``: Observation mean of a series ``z_t``, with ``w_t = 1`` for every ``t`` when the measure holds no observation weights.",#
+                 :f_ve_div => "``f``: Variance divisor of the estimator `ve`, `StatsBase.varcorrection` of ``T``, or of the observation weights when the measure holds them, at `ve.corrected`. With no observation weights it is ``1/(T-1)`` when `ve.corrected` is `true` and ``1/T`` otherwise.",#
                  # The two fee expressions of a JuMP model, and the clock of the second.
                  :f_r_fee => "``f_r``: Per period fee, the model's `:fees` expression. Each observation of the net return series pays it in full.",#
                  :f_o_fee => "``f_o``: One-off fee, the model's `:one_time_fees` expression. The holding period pays it one time.",#
@@ -114,7 +151,7 @@ unique_key_dict!(math_dict, :math_dict,
                  :mu_hat_ucs => "``\\hat{\\boldsymbol{\\mu}}``: Centre of the mean uncertainty set, ``N \\times 1``. It is the centre that the set carries, else the `mu` of the term, else the expected returns of the prior.",#
                  :r_f_ratio => "``r_f``: Risk-free rate of the ratio objective, the `rf` field of [`MaximumRatio`](@ref).",#
                  :ohf_ratio => "``\\mathrm{ohf}``: Normalisation factor of the ratio problem, the model's `:ohf`. It is positive.",#
-                 :k_min_ratio => "``k_{\\min}``: Lower bound on the homogenisation variable ``k`` of the ratio problem. It is positive.",#
+                 :k_min => "``k_{\\min}``: Lower bound on the homogenisation variable ``k``, the field `kmin` of the optimiser or a size that the model derives. It is not negative, and zero turns the floor off.",#
                  :y_homog => "``\\boldsymbol{y} = k \\boldsymbol{w}``: Homogenised weights, the weight variable of the model under the ratio objective.",#
                  :l_utility => "``l``: Risk aversion of the utility objective, the `l` field of [`MaximumUtility`](@ref). It is non-negative.",#
                  :op_penalty => "``\\mathrm{op}``: Penalty term of the objective, the model's `:op`, which holds the Objective Penalty. The regularisation, soft-constraint and custom-term builders add to it, and it is zero when none of them does.",#
@@ -154,13 +191,34 @@ unique_key_dict!(math_dict, :math_dict,
                  :C_prev_alloc => "``C^{\\text{prev}}``: Previous cash, the cash that the portfolio held before the trade, the `prev_cash` of [`FiniteAllocationInput`](@ref).",#
                  :m_prev_alloc => "``\\boldsymbol{m}^{\\text{prev}}``: Previous money vector, the money in each position of one side before the trade.",#
                  :L_liq_alloc => "``L``: Forced-exit charge, the constant fee over the whole horizon for the assets that left the universe.",#
+                 # The turnover family.
+                 :Tn_turnover => "``\\mathrm{Turnover}(\\boldsymbol{w})``: Turnover of the portfolio, the sum over the assets of the absolute change of weight from the reference weights.",#
+                 :w_0_turnover => "``\\boldsymbol{w}_{0}``: Reference portfolio weights vector ``N \\times 1``, the weights from which the turnover is measured.",#
                  # The risk tracking family.
                  :w_b_track => "``\\boldsymbol{w}_b``: Benchmark portfolio weights vector ``N \\times 1``, the `w` of the tracking specification `tr`.",#
                  :rho_track => "``\\rho``: Tracked risk measure, the `r` field. Its value at a weight vector is the risk of that vector as [`expected_risk`](@ref) reports it.",#
                  :X_returns => "``\\mathbf{X}``: Returns matrix ``T \\times N``.",#
                  :F_fee_series => "``F(\\boldsymbol{w})``: Fee series ``T \\times 1`` of the portfolio, zero when `fees` is `nothing`. See [`calc_net_returns`](@ref).",#
+                 # The Worst-Case Distribution of a risk measure whose value is a solve.
+                 :q_wcd => "``\\boldsymbol{q}``: Worst-Case Distribution ``T \\times 1``, one probability for each observation. Its entries are not negative, and they sum to one.",#
+                 :y_wcd => "``\\boldsymbol{y}(\\boldsymbol{x})``: Measured series ``T \\times 1``, the series that the risk measure reads. It is the returns, the absolute drawdowns or the relative drawdowns.",#
+                 :Rtilde_wcd => "``\\tilde{R}``: Linearised risk, the expected loss of the measured series under a fixed Worst-Case Distribution.",#
                  # The Range convention (ADR 0057).
                  :negated_upper_tail => "The upper tail is the base measure applied to the negated returns ``-\\boldsymbol{x}``, so both tails are reported on the same sign convention and the range is their sum, not their difference.",#
+                 # The ordered weights array family of `07_OWARiskMeasures_a.jl`: the
+                 # weight builders, the L-moment weights and the programme that
+                 # `OWAJuMP` solves for their risk aversion coefficients.
+                 :eta_owa => "``\\boldsymbol{\\eta}``: OWA weight vector ``T \\times 1``. Its ``t``-th entry ``\\eta_{t}`` multiplies the ``t``-th smallest return.",#
+                 :x_t_asc => "``x_{(t)}``: ``t``-th smallest entry of ``\\boldsymbol{x}``, so ``x_{(1)} \\leq \\dots \\leq x_{(T)}``.",#
+                 :eta_cvar => "``\\boldsymbol{\\eta}^{\\mathrm{CVaR}}(\\alpha)``: CVaR OWA weight vector at level ``\\alpha``, the value of [`owa_cvar`](@ref)`(T, α)`.",#
+                 :A_rev => "``\\mathbf{A}``: Reversal matrix ``T \\times T``, with ones on the anti-diagonal and zeros elsewhere, so ``(\\mathbf{A} \\boldsymbol{v})_{t} = v_{T + 1 - t}``.",#
+                 :omega_ik_lmom => "``\\omega_{i}^{k}``: L-moment weight of the ``i``-th smallest observation in the ``k``-th sample L-moment, the ``i``-th entry of [`owa_l_moment`](@ref)`(T, k)`.",#
+                 :K_lmom => "``K``: Highest L-moment order, the `k` of [`owa_l_moment_crm`](@ref).",#
+                 :phi_k_lmom => "``\\phi_{k}``: Risk aversion coefficient of the ``k``-th L-moment, for ``k = 2, \\ldots, K``.",#
+                 :W_lmom => "``\\mathbf{W}``: Signed L-moment weight matrix ``T \\times (K - 1)``. Its column ``k - 1`` is ``(-1)^{k} \\boldsymbol{\\omega}^{k}`` for ``k = 2, \\ldots, K``.",#
+                 :phi_max_owa => "``\\phi_{\\max}``: Ceiling on each risk aversion coefficient, the `max_phi` field of [`OWAJuMP`](@ref).",#
+                 :theta_owa => "``\\boldsymbol{\\theta}``: Solved OWA weight vector ``T \\times 1``, the model variable `theta`.",#
+                 :gamma_crra => "``\\gamma``: Relative risk aversion `g` of the normalised constant relative risk aversion coefficients, ``\\gamma \\in (0, 1)``.",#
                  # A meta-optimiser's sub-portfolios, the synthetic assets of its outer
                  # problem, and the combination of the two solves.
                  :K_sub => "``K``: Sub-portfolio count of a meta-optimiser, which is also the number of synthetic assets of its outer problem.",#
@@ -192,6 +250,17 @@ unique_key_dict!(math_dict, :math_dict,
                  :C_finite_cand => "``\\mathcal{C}``: Finite candidates, the candidates whose every score is finite. A failed fold scores `NaN`, so a candidate that failed one is not in ``\\mathcal{C}``.",#
                  :sigma_scorer => "``\\sigma``: Search scorer `scorer`, a map from a score matrix to the position of its best column. The default [`HighestMeanScore`](@ref) takes the column of greatest mean.",#
                  :i_star_cand => "``i^{\\star}``: Selected candidate, the position in the grid of the candidate that the search returns.",#
+                 # The trials of a randomised search, which `make_p_grid` draws from the
+                 # search space before the grid search scores them.
+                 :Lambda_l_space => "``\\Lambda^{(l)}``: Space of the ``l``-th parameter set, the product of its value vectors.",#
+                 :Lambda_space => "``\\Lambda``: Search space, the concatenation of the spaces of the parameter sets. It is the grid that [`GridSearchCrossValidation`](@ref) scores for the same `p`.",#
+                 :Theta_trials => "``\\Theta``: Trial sequence, the points of the search space that [`make_p_grid`](@ref) draws. It is the grid that the grid search of the trials scores.",#
+                 :n_iter_trials => "``n``: Trial count, the field `n_iter`.",#
+                 :U_uniform_law => "``\\mathcal{U}``: Uniform law over a finite set.",#
+                 :l_t_set => "``l_t``: Parameter set of trial ``t``.",#
+                 :lambda_tj_value => "``\\lambda_{tj}``: Trial value, the value of the ``j``-th key at trial ``t``.",#
+                 :D_j_law => "``D_j``: Law of the ``j``-th key of one parameter set. It is the distribution that the set gives the key, or the uniform law over the entries of its value vector.",#
+                 :theta_t_trial => "``\\theta_t``: Trial ``t``, one value of every key of its parameter set.",#
                  # The recursive bisection that `HierarchicalRiskParity` and
                  # `SchurComplementHierarchicalRiskParity` share.
                  :C_halves_hier => "``C_1``, ``C_2``: Halves of a part of the dendrogram's leaf order. ``C_1`` holds the first ``\\lfloor n/2 \\rfloor`` of the part's ``n`` leaves, and ``C_2`` holds the rest.",#
@@ -227,5 +296,6 @@ unique_key_dict!(math_dict, :math_dict,
                  :gamma4_hat => "``\\hat{\\gamma}_{4}``: Sample kurtosis of ``\\boldsymbol{x}``, its fourth central moment divided by the square of its biased sample variance. It is ``3`` for a normal distribution.",#
                  :Phi_normal => "``\\Phi``: Distribution function of the standard normal distribution, and ``\\Phi^{-1}`` its quantile function.",#
                  :n_trials => "``N``: Number of independent trials of the search.",#
+                 :k_subset => "``k``: Number of assets in each subset.",#
                  :sigma_sr_trials => "``\\sigma``: Dispersion of the Sharpe ratios of the trials, their standard deviation.",#
                  :gamma_em => "``\\gamma``: Euler-Mascheroni constant, about ``0.5772``.")

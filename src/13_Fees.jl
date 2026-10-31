@@ -5,9 +5,9 @@ Supertype for the algorithms that name the clock a one-off fee charge falls on.
 
 [`Fees`](@ref) and [`FeesEstimator`](@ref) each carry this family in their `fa` field, bound to `Option{<:AbstractFeeAmortisation}`. The field decides which observations of a return series carry the fixed charges `fl`, `fs` and `flq`. It affects no other term, because `l`, `s`, `tn` and `lq` are rates per period and charge on every observation. The family has two leaves. [`FirstObservationFees`](@ref) charges the two fixed amounts one time, on the first observation, and [`AmortisedFees`](@ref) spreads them evenly over a horizon instead. A `nothing` `fa` is the default, and it names the first-observation clock.
 
-Every site that reads the field dispatches on the leaf it holds rather than on this supertype, so a third clock added to the family raises a `MethodError` until someone writes its methods. The supertype groups the clocks and implements none of them.
+Every site that reads the field dispatches on the leaf it holds, not on this supertype. A third clock added to the family therefore raises a `MethodError` until someone writes its methods. The supertype groups the clocks and implements none of them.
 
-The cross-validation schemes hold the same family in a field of the same name. There it overrides the fee's own clock for a fold's realised series. [`fold_evaluation`](@ref) reads that field, and a `nothing` there inherits the fee's clock rather than naming one.
+The cross-validation schemes hold the same family in a field of the same name. There it overrides the fee's own clock for a fold's realised series. [`fold_evaluation`](@ref) reads that field, and a `nothing` there inherits the clock of the fee.
 
 # Related
 
@@ -25,7 +25,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Spreads the one-off terms of a fee, the fixed charges `fl`, `fs` and `flq`, evenly over a holding period.
 
-The algorithm holds no number. Every site that charges a fee knows the observation count it charges over and passes it in. [`charge_fees`](@ref) passes the length of the series, [`calc_total_fees`](@ref) takes the horizon as an argument, and the model passes the observation count of the fit. No field stores the count of the holding period, so it cannot go stale.
+The algorithm holds no number. Every site that charges a fee knows the observation count it charges over and passes it in. [`charge_fees`](@ref) passes the length of the series, [`calc_total_fees`](@ref) takes the horizon as an argument, and the model passes the observation count of the fit. No field stores the count of the holding period, so the count cannot disagree with the series that the site charges.
 
 [`FirstObservationFees`](@ref) names the other clock, which charges the two fixed terms one time, on the first observation. A `nothing` `fa` names that clock too.
 
@@ -56,7 +56,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Charges the one-off terms of a fee, the fixed charges `fl`, `fs` and `flq`, on the first observation of a return series.
 
-The algorithm holds no number, and it names the same clock as a `nothing` `fa`. On a [`Fees`](@ref) it is therefore a synonym for `nothing`. It exists so that a caller who must *state* this clock has a word for it. A cross-validation scheme's `fa` field is such a caller. There `nothing` means inherit the fee's own clock, so the scheme needs a separate word for the first-observation clock.
+The algorithm holds no number, and it names the same clock as a `nothing` `fa`. On a [`Fees`](@ref) it is therefore a synonym for `nothing`. A caller that must name this clock uses this type. The `fa` field of a cross-validation scheme is such a caller. There `nothing` inherits the clock of the fee, so the scheme needs a different value for the first-observation clock.
 
 The turnover charge `tn` is a rate per period, so it charges on every observation beside `l` and `s`. This algorithm never moves it.
 
@@ -87,7 +87,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Names the per-asset fee rates, for [`fees_constraints`](@ref) to align to a universe.
 
-Every fee field accepts a dictionary, a pair, or a vector of pairs keyed by asset or group name, and the matching `d*` field fills every asset the keys miss. Each default fills only its own field. `l` draws on `dl`, `s` on `ds`, `fl` on `dfl` and `fs` on `dfs`, and none draws on a neighbour's default. [`fees_constraints`](@ref) resolves the names against a [`UniverseSets`](@ref) and returns a [`Fees`](@ref), whose fee fields are plain per-asset vectors and whose `kwargs` is the `kwargs` of this estimator.
+Every fee field accepts a dictionary, a pair, or a vector of pairs keyed by asset or group name. The matching `d*` field fills every asset that the keys miss. Each default fills only its own field. `l` draws on `dl`, `s` on `ds`, `fl` on `dfl` and `fs` on `dfs`, and none draws on a neighbour's default. [`fees_constraints`](@ref) resolves the names against a [`UniverseSets`](@ref) and returns a [`Fees`](@ref), whose fee fields are plain per-asset vectors and whose `kwargs` is the `kwargs` of this estimator.
 
 !!! warning
 
@@ -101,10 +101,10 @@ $(DocStringExtensions.FIELDS)
 
     FeesEstimator(;
         tn::Option{<:TnE_Tn} = nothing,
-        l::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}} = nothing,
-        s::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}} = nothing,
-        fl::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}} = nothing,
-        fs::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}} = nothing,
+        l::Option{<:VectorEstValType} = nothing,
+        s::Option{<:VectorEstValType} = nothing,
+        fl::Option{<:VectorEstValType} = nothing,
+        fs::Option{<:VectorEstValType} = nothing,
         lq::Option{<:TnE_Tn} = nothing,
         flq::Option{<:TnE_Tn} = nothing,
         dl::Option{<:Number} = nothing,
@@ -124,17 +124,17 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `tn`: Recursively updated via [`factory`](@ref).
-  - `lq`: Recursively updated via [`factory`](@ref).
-  - `flq`: Recursively updated via [`factory`](@ref).
+  - `tn`: Recursively updated through [`factory`](@ref).
+  - `lq`: Recursively updated through [`factory`](@ref).
+  - `flq`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 
 This type spans two axes, so this file defines [`port_opt_view`](@ref) for it by hand rather than generating the method from `@vprop` tags, and no field carries such a tag. `tn`, `l`, `s`, `fl` and `fs` price the positions the portfolio holds, so the view slices them to the selected indices. `lq` and `flq` price the positions the portfolio must sell, so the view slices them to the complement of those indices. The verb derives that complement from the width of the unreduced returns matrix it receives:
 
-  - `tn`: Recursively viewed at the selected indices via [`port_opt_view`](@ref).
+  - `tn`: Recursively viewed at the selected indices through [`port_opt_view`](@ref).
   - `l`: Sliced to the selected indices.
   - `s`: Sliced to the selected indices.
   - `fl`: Sliced to the selected indices.
@@ -176,7 +176,7 @@ FeesEstimator
   - [`AbstractEstimator`](@ref)
   - [`Option`](@ref)
   - [`TnE_Tn`](@ref)
-  - [`EstValType`](@ref)
+  - [`VectorEstValType`](@ref)
   - [`AbstractFeeAmortisation`](@ref)
   - [`AmortisedFees`](@ref)
   - [`fees_constraints`](@ref)
@@ -236,14 +236,12 @@ FeesEstimator
     $(field_dict[:kwargs_fee])
     """
     kwargs
-    function FeesEstimator(tn::Option{<:TnE_Tn},
-                           l::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}},
-                           s::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}},
-                           fl::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}},
-                           fs::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}},
-                           lq::Option{<:TnE_Tn} = nothing, flq::Option{<:TnE_Tn} = nothing,
-                           dl::Option{<:Number} = nothing, ds::Option{<:Number} = nothing,
-                           dfl::Option{<:Number} = nothing, dfs::Option{<:Number} = nothing,
+    function FeesEstimator(tn::Option{<:TnE_Tn}, l::Option{<:VectorEstValType},
+                           s::Option{<:VectorEstValType}, fl::Option{<:VectorEstValType},
+                           fs::Option{<:VectorEstValType}, lq::Option{<:TnE_Tn} = nothing,
+                           flq::Option{<:TnE_Tn} = nothing, dl::Option{<:Number} = nothing,
+                           ds::Option{<:Number} = nothing, dfl::Option{<:Number} = nothing,
+                           dfs::Option{<:Number} = nothing,
                            fa::Option{<:AbstractFeeAmortisation} = nothing,
                            kwargs::NamedTuple = (; atol = 1e-8))::FeesEstimator
         assert_nonempty_nonneg_finite_val(l, :l)
@@ -263,10 +261,10 @@ FeesEstimator
     end
 end
 function FeesEstimator(; tn::Option{<:TnE_Tn} = nothing,
-                       l::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}} = nothing,
-                       s::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}} = nothing,
-                       fl::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}} = nothing,
-                       fs::Option{<:EstValType{<:VectorAbstractEstimatorValueAlgorithm}} = nothing,
+                       l::Option{<:VectorEstValType} = nothing,
+                       s::Option{<:VectorEstValType} = nothing,
+                       fl::Option{<:VectorEstValType} = nothing,
+                       fs::Option{<:VectorEstValType} = nothing,
                        lq::Option{<:TnE_Tn} = nothing, flq::Option{<:TnE_Tn} = nothing,
                        dl::Option{<:Number} = nothing, ds::Option{<:Number} = nothing,
                        dfl::Option{<:Number} = nothing, dfs::Option{<:Number} = nothing,
@@ -293,7 +291,9 @@ A fee value is either a scalar, which applies to all assets, or a vector of per-
 
 ## The axis a fee is on
 
-A caller states every field over the full universe, including the two liquidation charges `lq` and `flq`, because a caller cannot know which asset will delist. [`investable_fees_view`](@ref) then places the fee on the axes the Investable Mask defines. It puts the five holding fields on the investable assets and `lq` and `flq` on the complement. `investable_fees_view` records the mask it reduced on in `imsk`, so a reader of the returned fee can tell which axes it is on. A `nothing` `imsk` means the fee is a caller's statement on the full universe, and a `BitVector` means `investable_fees_view` has run. A caller never writes the field. When an unmarked fee meets `investable_fees_view` with no mask, no asset has left, so the verb drops `lq` and `flq` rather than charging the whole book as a forced exit. When a marked fee meets `investable_fees_view` a second time, the verb returns it untouched.
+A caller states every field over the full universe, the two liquidation charges `lq` and `flq` included, because a caller cannot know which asset will delist. [`investable_fees_view`](@ref) then places the fee on the axes the Investable Mask defines. It puts the five holding fields on the investable assets and `lq` and `flq` on the complement.
+
+`investable_fees_view` records the mask it reduced on in `imsk`, so a reader of the returned fee can tell which axes it is on. A `nothing` `imsk` means the fee is a caller's statement on the full universe, and a `BitVector` means `investable_fees_view` has run. A caller never writes the field. When an unmarked fee meets `investable_fees_view` with no mask, no asset has left. The verb then drops `lq` and `flq`, and does not charge every position as a forced exit. When a marked fee meets `investable_fees_view` a second time, the verb returns it untouched.
 
 # Mathematical definition
 
@@ -355,9 +355,11 @@ Where:
   - ``\\boldsymbol{Tn}``: `N × 1` turnover vector as defined in [`Turnover`](@ref). The `w` field of the turnover object holds the benchmark weight vector, and the new weight vector is the portfolio weight vector.
   - ``+,\\, -``: Superscripts for the long and the short fees. Brokers sometimes charge different fees for long and short positions.
   - ``\\text{Tn},\\, \\text{p},\\, \\text{f}``: Subscripts for the turnover, the proportional and the fixed fees. A [`Turnover`](@ref) holds the turnover fee, and its `val` is the per asset fee rate.
-  - ``1\\left\\{\\cdot\\right\\}``: Elementwise (Hadamard) indicator function returning `1` when the condition is true, `0` otherwise. It selects the long fee where the asset weight is non-negative and the short fee otherwise.
-  - ``\\boldsymbol{w} \\neq 0``: Evaluated as `!isapprox(w, 0; kwargs...)`, so `kwargs` decides how near zero counts as zero. Only the fixed terms use this test, ``\\boldsymbol{w}_{\\text{flq}} \\neq 0`` included, because a proportional fee on a zero weight is zero anyway.
+  - ``1\\left\\{\\cdot\\right\\}``: Elementwise (Hadamard) indicator function. It is `1` when the condition is true and `0` otherwise. It selects the long fee where the asset weight is non-negative and the short fee otherwise.
+  - ``\\boldsymbol{w} \\neq 0``: Evaluated as `!isapprox(w, 0; kwargs...)`, so `kwargs` decides how near zero counts as zero. Only the fixed terms use this test, ``\\boldsymbol{w}_{\\text{flq}} \\neq 0`` included, because a proportional fee on a zero weight is zero.
   - ``\\odot``: Elementwise (Hadamard) product.
+
+The turnover term is the linear transaction cost of Equations 1 and 2 of [pogue1969](@cite), with one rate on the two sides of the trade. The proportional and the fixed fees key on the sign of the position, not of the trade, so they price a holding.
 
 The definition subtracts the short proportional term. ``\\boldsymbol{w}`` is negative wherever its indicator is one, so the minus sign makes the fee a positive charge when ``\\boldsymbol{f}_{\\text{p}}^{-}`` is non-negative.
 
@@ -365,10 +367,10 @@ The definition subtracts the short proportional term. ``\\boldsymbol{w}`` is neg
 
 `s` can be negative down to `-l`, asset by asset. Per asset, the proportional term ``\\phi(w) = l \\max(w, 0) - s \\min(w, 0)`` has slope ``l`` for ``w > 0`` and ``-s`` for ``w < 0``, so it is convex if and only if ``s \\geq -l``. The constructor refuses a rate below that bound, because a model that charges a non-convex fee is no longer convex.
 
-The two ends of the range read a fee in two ways, and both are legitimate:
+The two ends of the range model two kinds of fee:
 
-  - `s = l` charges ``l \\lvert w \\rvert``: a carry or a borrow cost charged to the position, whatever its sign.
-  - `s = -l` charges the linear ``l w``: an expense ratio built into the instrument and absent from the returns, so it lowers the asset's return, and a short position earns it.
+  - `s = l` charges ``l \\lvert w \\rvert``. This is a carry or a borrow cost on the position, whatever its sign.
+  - `s = -l` charges the linear ``l w``. This is an expense ratio that the instrument holds and that the returns do not show. It lowers the return of the asset, and a short position earns it.
 
 The default leaves `s` at `nothing`, which charges a short position nothing.
 
@@ -380,11 +382,11 @@ The two families compute the same definition. [`calc_asset_fees`](@ref) splits o
 
 [`set_non_fixed_fees!`](@ref) writes the proportional terms against the model's `lw` and `sw` variables rather than against ``\\boldsymbol{w}``, and it writes no fixed term at all. A fixed fee needs a binary variable, and the MIP builder writes it instead.
 
-Under a [`PartsBoundWeights`](@ref) head those variables only *bound* the parts of ``\\boldsymbol{w}``, so the model's fee is an upper bound on this definition. The budget pins `sum(lw)` and `sum(sw)` whether or not the portfolio holds a short position, so the model charges both sides in full.
+Under a [`PartsBoundWeights`](@ref) head those variables only bound the parts of ``\\boldsymbol{w}``, so the model's fee is an upper bound on this definition. The budget pins `sum(lw)` and `sum(sw)` whether or not the portfolio holds a short position, so the model charges both sides in full.
 
 Setting `xbgt = true` on the [`JuMPOptimiser`](@ref) pins the decomposition, and the model's fee then agrees with this definition. The setting adds binary variables, so the same problem then needs a mixed-integer conic solver rather than a conic one.
 
-A negative `s` does not use the parts. A slack `sw` would earn a credit on an exposure the model does not hold, so the bound would fall below the definition. [`set_proportional_fees!`](@ref) charges the whole proportional fee against ``\\boldsymbol{w}`` instead, through the epigraph of ``\\max(l w, -s w)``, which equals the definition exactly.
+A negative `s` does not use the parts. With the parts, a slack `sw` earns a credit on an exposure that the model does not hold, and the bound falls below the definition. [`set_proportional_fees!`](@ref) charges the whole proportional fee against ``\\boldsymbol{w}`` instead, through the epigraph of ``\\max(l w, -s w)``, which equals the definition exactly.
 
 A long-only model needs no pinning, because it holds no short side to bound.
 
@@ -396,7 +398,7 @@ A long-only model needs no pinning, because it holds no short side to bound.
 
 A `nothing` `fa` puts the fixed charges in `one_time`, and [`charge_fees`](@ref) subtracts that from the first observation alone. An [`AmortisedFees`](@ref) divides them by the observation count and adds them to `amortised`, so every observation carries an equal share and `one_time` is zero.
 
-The field holds no count. Every site that charges a fee knows the count it charges over and passes it in, so no field stores the count and it cannot go stale. The JuMP model applies the same rule through `:one_time_fees` and [`charge_one_time_fees`](@ref).
+The field holds no count. Every site that charges a fee knows the count it charges over and passes it in, so the count cannot disagree with the series. The JuMP model applies the same rule through `:one_time_fees` and [`charge_one_time_fees`](@ref).
 
 The two clocks charge the same total over a horizon of `T` observations, which is the number [`calc_total_fees`](@ref) reports. They differ in where they place the one-off charge. One charges it whole on the first observation, and the other charges a `1 / T` share of it on each observation. So the charge of each observation differs, and so does the path of the cumulative return.
 
@@ -429,17 +431,17 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `tn`: Recursively updated via [`factory`](@ref).
-  - `lq`: Recursively updated via [`factory`](@ref).
-  - `flq`: Recursively updated via [`factory`](@ref).
+  - `tn`: Recursively updated through [`factory`](@ref).
+  - `lq`: Recursively updated through [`factory`](@ref).
+  - `flq`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 
 This type spans two axes, so this file defines [`port_opt_view`](@ref) for it by hand rather than generating the method from `@vprop` tags, and no field carries such a tag. `tn`, `l`, `s`, `fl` and `fs` price the positions the portfolio holds, so the view slices them to the selected indices. `lq` and `flq` price the positions the portfolio must sell, so the view slices them to the complement of those indices. The verb derives that complement from the width of the unreduced returns matrix it receives:
 
-  - `tn`: Recursively viewed at the selected indices via [`port_opt_view`](@ref).
+  - `tn`: Recursively viewed at the selected indices through [`port_opt_view`](@ref).
   - `l`: Sliced to the selected indices.
   - `s`: Sliced to the selected indices.
   - `fl`: Sliced to the selected indices.
@@ -448,7 +450,7 @@ This type spans two axes, so this file defines [`port_opt_view`](@ref) for it by
   - `flq`: Recursively viewed at the complement of the selected indices.
   - `imsk`: Set to `nothing`. The view only slices, and [`investable_fees_view`](@ref) writes the mark.
 
-The pretty-printer shows `imsk` only when it is set, so a fee a caller wrote prints as it did before the field existed. See [`show_fields`](@ref).
+The pretty-printer shows `imsk` only when it is set, so a fee that a caller wrote prints no `imsk` row. See [`show_fields`](@ref).
 
 # Examples
 
@@ -506,7 +508,7 @@ Fees
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 9.1, Equation 9.14. The book states the linear variable transaction cost, which is the turnover term with equal rates on the two sides of the trade. The long/short proportional and fixed fees here key on the sign of the **position** rather than of the trade, and are a generalisation of it.
+  - $(ref_dict[:pogue1969]) Pages 8 and 12, Equations 1 and 2.
 """
 @propagatable @concrete struct Fees <: AbstractResult
     """
@@ -587,7 +589,7 @@ end
 
 Check that the short proportional rate `s` of a [`Fees`](@ref) keeps the proportional fee convex.
 
-Per asset, the proportional fee is ``\\phi(w) = l \\max(w, 0) - s \\min(w, 0)``. Its slope is ``l`` for ``w > 0`` and ``-s`` for ``w < 0``, so ``\\phi`` is convex if and only if ``s \\geq -l``. Convexity keeps every JuMP model that charges the fee convex. A negative `s` is a credit on a short position. At ``s = -l`` the fee is the linear ``l w`` on either sign, which is the reading of an expense ratio built into the instrument: a short position earns it.
+Per asset, the proportional fee is ``\\phi(w) = l \\max(w, 0) - s \\min(w, 0)``. Its slope is ``l`` for ``w > 0`` and ``-s`` for ``w < 0``, so ``\\phi`` is convex if and only if ``s \\geq -l``. Convexity keeps every JuMP model that charges the fee convex. A negative `s` is a credit on a short position. At ``s = -l`` the fee is the linear ``l w`` on either sign. This models an expense ratio that the instrument holds, and a short position earns it.
 
 # Algorithm
 
@@ -630,7 +632,7 @@ end
 
 Return the fields the pretty-printer renders for a [`Fees`](@ref). These are every field but `imsk` when the mark is `nothing`, and every field when it is set.
 
-[`investable_fees_view`](@ref) writes `imsk` and a caller never does, so a fee a caller wrote holds `nothing` there and prints exactly as it did before the field existed. A fee that `investable_fees_view` reduced shows the mask it reduced the fee on, so a reader can tell the two states apart at the REPL.
+[`investable_fees_view`](@ref) writes `imsk` and a caller never does. A fee that a caller wrote therefore holds `nothing` there and prints no `imsk` row. A fee that `investable_fees_view` reduced shows the mask it reduced the fee on, so a reader can tell the two states apart at the REPL.
 
 # Algorithm
 
@@ -706,7 +708,7 @@ function override_fee_amortisation(fees::Fees, fa::AbstractFeeAmortisation)
                 imsk = fees.imsk)
 end
 """
-    const FeesE_Fees = Union{<:Fees, <:FeesEstimator}
+    const FeesE_Fees = Union{Fees, FeesEstimator}
 
 Union type for fee constraint objects and estimators.
 
@@ -717,11 +719,11 @@ There is no vector counterpart, and [`fees_constraints`](@ref) has no vector met
   - [`Fees`](@ref)
   - [`FeesEstimator`](@ref)
 """
-const FeesE_Fees = Union{<:Fees, <:FeesEstimator}
+const FeesE_Fees = Union{Fees, FeesEstimator}
 """
     needs_previous_weights(fe::FeesE_Fees) -> Bool
 
-Check if a fee constraint or estimator requires previous portfolio weights by calling [`needs_previous_weights`](@ref) on its three turnover fields, `fe.tn`, `fe.lq` and `fe.flq`.
+Check whether a fee constraint or estimator needs the previous portfolio weights, through its three turnover fields `fe.tn`, `fe.lq` and `fe.flq`.
 
 Only these three fields use a previous weight vector. `tn` charges the trade from the previous weights, and `lq` and `flq` charge the forced sale of the previous positions of the assets that left. The proportional and fixed terms key on the sign of the position that `w` already carries, so a [`Fees`](@ref) whose three turnover fields are `nothing` needs none.
 
@@ -736,7 +738,7 @@ Only these three fields use a previous weight vector. `tn` charges the trade fro
 
 # Returns
 
-  - `Bool`: `true` if previous weights are needed, `false` otherwise.
+  - `Bool`: `true` if the fee needs the previous weights, `false` otherwise.
 
 # Related
 
@@ -749,26 +751,28 @@ function needs_previous_weights(fe::FeesE_Fees)::Bool
            needs_previous_weights(fe.flq)
 end
 """
-    strip_liquidation_charges(fees, imsk)
+    strip_liquidation_charges(fees, imsk::Nothing)
 
 Drop the two liquidation charges, `lq` and `flq`, when no asset left the universe.
 
-A caller states `lq` and `flq` over the full universe, because the caller cannot know in advance which asset will delist. [`port_opt_view`](@ref) narrows them to the complement of the Investable Mask. A window in which every asset is investable derives no mask, though, and the `nothing` sentinel skips `port_opt_view` so that the all-investable path allocates nothing. `lq` and `flq` would then keep their full width, and the fee would charge them in full for assets that never left.
+A caller states `lq` and `flq` over the full universe, because the caller cannot know in advance which asset will delist. [`port_opt_view`](@ref) narrows them to the complement of the Investable Mask. But a window in which every asset is investable derives no mask. The `nothing` sentinel then skips `port_opt_view`, so that the all-investable path allocates nothing. Without this verb, `lq` and `flq` keep their full width, and the fee charges them in full for assets that never left.
 
-This verb drops `lq` and `flq` in that case, rather than taking the view on the common path, so the `nothing` mask stays allocation-free. A `BitVector` mask means `port_opt_view` has already run and `lq` and `flq` are on the right axis, so the verb returns the fee untouched. A `nothing` mask means no asset exited, so the verb drops both liquidation charges. Under either mask the verb returns a fee that holds neither liquidation charge untouched, so it allocates nothing for a caller who states no liquidation.
+This verb drops `lq` and `flq` in that case. It does not take the view on the common path, so the `nothing` mask stays allocation-free. It returns unchanged a fee that holds neither liquidation charge, so it allocates nothing for a caller who states no liquidation. A derived mask means that `port_opt_view` has already put `lq` and `flq` on the right axis, so the verb takes no mask but `nothing`.
 
-The verb does not check the mark `fees.imsk`. Under a `nothing` mask it drops `lq` and `flq` of any fee it receives. A hierarchical fit relies on this when it prices a cluster's risk from a fee that [`investable_fees_view`](@ref) has already reduced. Only the result charges the exit, so no sub-problem may charge it. `investable_fees_view` is the verb that must tell a fee that the caller states over the full universe from the reduced fee of a result. It checks `fees.imsk` and calls this verb for an unmarked fee only. This verb keeps the mark, so a reduced fee stays reduced with `lq` and `flq` gone.
+The verb does not check the mark `fees.imsk`. Under a `nothing` mask it drops `lq` and `flq` of any fee it receives. A hierarchical fit uses this when it prices the risk of a cluster from a fee that [`investable_fees_view`](@ref) has already reduced. Only the result charges the exit, so no sub-problem can charge it.
+
+`investable_fees_view` is the verb that tells a fee that the caller states over the full universe from the reduced fee of a result. It checks `fees.imsk` and calls this verb for an unmarked fee only. This verb keeps the mark, so a reduced fee stays reduced with `lq` and `flq` gone.
 
 # Algorithm
 
- 1. On a `nothing` `fees`, or a `BitVector` `imsk`, return `fees` unchanged. A stated `nothing` fee under a derived mask matches both, so a third method covers that pair and resolves the dispatch ambiguity.
- 2. On a `nothing` `imsk` with `lq` and `flq` already `nothing`, return `fees` unchanged, so the common case allocates nothing.
- 3. Otherwise rebuild the fee with `lq` and `flq` set to `nothing`, carrying every other field through.
+ 1. On a `nothing` `fees`, return `nothing`.
+ 2. On a fee with `lq` and `flq` already `nothing`, return `fees` unchanged, so the common case allocates nothing.
+ 3. Otherwise rebuild the fee with `lq` and `flq` set to `nothing`, and keep every other field.
 
 # Arguments
 
   - `fees`: The fee to strip, or `nothing`.
-  - `imsk`: The Investable Mask, or `nothing` when every asset is investable.
+  - `imsk`: `nothing`, the Investable Mask of a window in which every asset is investable.
 
 # Returns
 
@@ -781,13 +785,7 @@ The verb does not check the mark `fees.imsk`. Under a `nothing` mask it drops `l
   - [`investable_mask`](@ref)
   - [`fees_constraints`](@ref)
 """
-function strip_liquidation_charges(fees, ::BitVector)
-    return fees
-end
-function strip_liquidation_charges(::Nothing, ::Any)
-    return nothing
-end
-function strip_liquidation_charges(::Nothing, ::BitVector)
+function strip_liquidation_charges(::Nothing, ::Nothing)
     return nothing
 end
 function strip_liquidation_charges(fees::Fees, ::Nothing)
@@ -807,17 +805,21 @@ end
 
 Place a fee resolved over the caller's universe onto the axes an Investable Mask defines, and mark it with that mask.
 
-[`fees_constraints`](@ref) resolves a fee against the `sets` the caller stated before the fee reaches this verb, and this verb then reduces the resolved fee. That order lets a name-keyed fee name an asset the data later delists. After the reduction, `sets` holds only the investable names, so a departed name is missing and `strict` refuses it. A liquidation charge keyed by name could not resolve at all, because its `w` is already on the complement while `sets` is on the mask. Resolving first and viewing after avoids both problems. It needs no new arithmetic, because [`port_opt_view`](@ref) already splits a resolved [`Fees`](@ref) across its two axes.
+[`fees_constraints`](@ref) resolves a fee against the `sets` the caller stated before the fee reaches this verb, and this verb then reduces the resolved fee. That order lets a name-keyed fee name an asset the data later delists. After the reduction, `sets` holds only the investable names, so a departed name is missing and `strict` refuses it. A liquidation charge keyed by name cannot resolve at all, because its `w` is already on the complement while `sets` is on the mask. The resolution before the view avoids both problems. The order needs no new arithmetic, because [`port_opt_view`](@ref) already splits a resolved [`Fees`](@ref) across its two axes.
 
 The verb has one arm for each kind of mask. A `BitVector` means assets left, so the view runs at `findall(imsk)` and derives the complement from the width of the unreduced universe. A fit site gives that width through `X`, and a consumer that holds no full-width matrix states it as `n`. Such a consumer is a result-taking verb, which meets a caller's fee beside a result whose own prior is already reduced, and the only width it has is `length(imsk)`. A `nothing` mask means every asset is investable, so there is no complement to slice to. [`strip_liquidation_charges`](@ref) drops `lq` and `flq` instead, which keeps that path allocation-free.
 
-This is the only verb that writes `fees.imsk`. It checks the mark before it acts, so it is idempotent. A caller states the two liquidation charges over the full universe, and a result holds them on the complement of its mask. Their widths cannot tell the two apart, and this one verb serves both. `expected_risk(r, w, pr, fees)` on an all-investable prior meets the caller's fee under a `nothing` mask. It must drop `lq` and `flq`, or it charges the whole book as a forced exit on every period. `expected_risk(r, res)` on a reduced result meets the result's fee under the same `nothing` mask, because the reduced prior holds no `NaN`. It must charge the exit that `lq` and `flq` hold. The mark tells the two cases apart. An unmarked fee is a caller's statement and takes the arm the mask names. A fee marked with this mask has already been through this verb, and the verb returns it as it is. The verb refuses a fee marked with another mask, because its `lq` and `flq` hold no rate for an asset that the other reduction kept.
+This is the only verb that writes `fees.imsk`. It checks the mark before it acts, so it is idempotent. A caller states the two liquidation charges over the full universe, and a result holds them on the complement of its mask. Their widths cannot tell the two apart, and this one verb serves both.
+
+`expected_risk(r, w, pr, fees)` on an all-investable prior meets the caller's fee under a `nothing` mask. It must drop `lq` and `flq`, or it charges every position as a forced exit on every period. `expected_risk(r, res)` on a reduced result meets the result's fee under the same `nothing` mask, because the reduced prior holds no `NaN`. It must charge the exit that `lq` and `flq` hold.
+
+The mark tells the two cases apart. An unmarked fee is a caller's statement and takes the arm the mask names. This verb already reduced a fee marked with this mask, so the verb returns it as it is. The verb refuses a fee marked with another mask, because its `lq` and `flq` hold no rate for an asset that the other reduction kept.
 
 # Algorithm
 
  1. On a `nothing` fee, return `nothing`.
- 2. On a marked fee, return it untouched when the mark is `imsk`, or when the mark is a `BitVector` and `imsk` is `nothing`. Raise an `ArgumentError` naming both masks when the mark is a `BitVector` other than `imsk`.
- 3. On an unmarked fee and a `nothing` mask, pass the fee to [`strip_liquidation_charges`](@ref). That verb drops `lq` and `flq`, and it returns a fee that holds neither liquidation charge untouched.
+ 2. On a marked fee, return it untouched when the mark is `imsk`, or when the mark is a `BitVector` and `imsk` is `nothing`. Raise an `ArgumentError` that names both masks when the mark is a `BitVector` other than `imsk`.
+ 3. On an unmarked fee and a `nothing` mask, pass the fee to [`strip_liquidation_charges`](@ref). That verb drops `lq` and `flq`, and it returns unchanged a fee that holds neither liquidation charge.
  4. On an unmarked fee and a `BitVector` mask, take [`two_axis_fees_view`](@ref) at `findall(imsk)` over the width of the unreduced universe, `size(X, 2)` or `n`. That view slices the five per-asset fields to the mask and `lq` and `flq` to its complement. Rebuild the result with `imsk` as its mark.
 
 # Arguments
@@ -829,7 +831,7 @@ This is the only verb that writes `fees.imsk`. It checks the mark before it acts
 
 # Validation
 
-  - The verb refuses a fee marked with a `BitVector` other than `imsk`, with an `ArgumentError` naming the two masks. An earlier call of this verb sliced its `lq` and `flq` to the complement of its own mask, so they hold no rate for an asset that left under the caller's mask. Charging nothing for that asset would overstate the net return. Lift the fee with [`lift_fees`](@ref) and reduce the caller's statement instead.
+  - The verb refuses a fee marked with a `BitVector` other than `imsk`, with an `ArgumentError` that names the two masks. An earlier call of this verb sliced its `lq` and `flq` to the complement of its own mask, so they hold no rate for an asset that left under the caller's mask. A charge of zero for that asset overstates the net return. Lift the fee with [`lift_fees`](@ref) and reduce the caller's statement instead.
 
 # Returns
 
@@ -883,7 +885,7 @@ This is the only verb that splits a [`Fees`](@ref) across its two axes. `tn`, `l
 
 The width is a number rather than a matrix because the two callers hold different things. A fit passes the unreduced returns matrix to [`port_opt_view`](@ref), which takes `size(X, 2)` from it. [`result_investable_view`](@ref) also calls [`investable_fees_view`](@ref). It meets a caller's full-universe fee beside a result whose own prior is already reduced, so no full-width matrix exists there, and the width is the length of the mask.
 
-The view writes no `imsk`, so it returns an unmarked fee. The view is a slice, and a cluster of a nested optimiser takes it the same way [`investable_fees_view`](@ref) does. A mark written here would make an inner fit treat a cluster's complement as the assets that left. `investable_fees_view` is the only verb that marks a fee, and it does so after this view returns.
+The view writes no `imsk`, so it returns an unmarked fee. The view is a slice, and a cluster of a nested optimiser takes it the same way [`investable_fees_view`](@ref) does. A mark here makes an inner fit treat the complement of a cluster as the assets that left. `investable_fees_view` is the only verb that marks a fee, and it does so after this view returns.
 
 # Algorithm
 
@@ -891,7 +893,7 @@ The view writes no `imsk`, so it returns an unmarked fee. The view is a slice, a
  2. Slice `tn` at `i` through [`port_opt_view`](@ref), whose `@vprop` tags slice `w` and a vector `val` and leave a scalar or dictionary `val` alone.
  3. Slice `l`, `s`, `fl` and `fs` at `i` through [`nothing_scalar_array_view`](@ref).
  4. On an empty `j` no asset left the universe, so set `lq` and `flq` to `nothing`. There is nothing to liquidate, and a [`Turnover`](@ref) refuses an empty `w` in any case. Otherwise slice both at `j` with the same verb as step 2.
- 5. Rebuild through the keyword constructor, carrying `fa` and `kwargs` unchanged and `imsk` as `nothing`.
+ 5. Rebuild through the keyword constructor. Keep `fa` and `kwargs`, and set `imsk` to `nothing`.
 
 # Arguments
 
@@ -935,17 +937,19 @@ Sub-select a fee to the assets an optimisation keeps, on both of its axes.
 
 A [`Fees`](@ref) spans two axes once an optimisation has reduced to its Investable Mask. `tn`, `l`, `s`, `fl` and `fs` price the positions the portfolio holds, so they are on the investable axis and the verb slices them at `i`. `lq` and `flq` price the positions the portfolio must sell, so they are on the complement of that axis and the verb slices them at the assets `i` leaves out.
 
-For this reason neither `lq` nor `flq` has a `@vprop` tag, and this file writes the verb by hand rather than generating it. The generated method passes one index to every tagged field, and here the two groups need different indices. The verb derives the complement from `i` and the width of `X` and never stores it. `X` is the unreduced returns matrix, which [`investable_reduction`](@ref) and [`investable_view`](@ref) already pass, so `size(X, 2)` is the width of the full universe. On a resolved [`Fees`](@ref), [`two_axis_fees_view`](@ref) performs the split. It takes that width as a number, so [`investable_fees_view`](@ref) can call it without a matrix. The [`FeesEstimator`](@ref) method performs the same split in its own body.
+For this reason neither `lq` nor `flq` has a `@vprop` tag, and this file writes the verb by hand rather than generating it. The generated method passes one index to every tagged field, and here the two groups need different indices. The verb derives the complement from `i` and the width of `X` and never stores it.
+
+`X` is the unreduced returns matrix, which [`investable_reduction`](@ref) and [`investable_view`](@ref) already pass, so `size(X, 2)` is the width of the full universe. On a resolved [`Fees`](@ref), [`two_axis_fees_view`](@ref) does the split. It takes that width as a number, so [`investable_fees_view`](@ref) can call it without a matrix. The [`FeesEstimator`](@ref) method does the same split in its own body.
 
 The three-argument method serves a caller that passes no matrix. It cannot derive a complement, so it slices the five per-asset fields and returns `lq` and `flq` untouched. That is correct, because `lq` and `flq` are already on their own axis.
 
-Neither method writes `imsk`, so both return an unmarked fee. The view is a slice, and a cluster of a nested optimiser takes it the same way [`investable_fees_view`](@ref) does. A mark written here would make an inner fit treat a cluster's complement as the assets that left. `investable_fees_view` is the only verb that marks a fee, and it does so after this view returns.
+Neither method writes `imsk`, so both return an unmarked fee. [`two_axis_fees_view`](@ref) states the reason.
 
 # Algorithm
 
- 1. On a [`Fees`](@ref), pass `i` and `size(X, 2)` to [`two_axis_fees_view`](@ref), which performs the split.
- 2. On a [`FeesEstimator`](@ref), build `j`, the complement of `i` in `1:size(X, 2)`, and perform the same split directly. Slice `tn` at `i` through [`port_opt_view`](@ref), whose `@vprop` tags slice `w` and a vector `val` and leave a scalar or dictionary `val` alone. Slice `l`, `s`, `fl` and `fs` at `i` through [`nothing_scalar_array_view`](@ref). Slice `lq` and `flq` at `j`, or set them to `nothing` on an empty `j`, because then no asset left and there is nothing to liquidate.
- 3. Rebuild through the keyword constructor, carrying the defaults, `fa` and `kwargs` unchanged.
+ 1. On a [`Fees`](@ref), pass `i` and `size(X, 2)` to [`two_axis_fees_view`](@ref), which does the split.
+ 2. On a [`FeesEstimator`](@ref), build `j`, the complement of `i` in `1:size(X, 2)`, and do the same split in this method. Slice `tn` at `i` through [`port_opt_view`](@ref), whose `@vprop` tags slice `w` and a vector `val` and leave a scalar or dictionary `val` alone. Slice `l`, `s`, `fl` and `fs` at `i` through [`nothing_scalar_array_view`](@ref). Slice `lq` and `flq` at `j`, or set them to `nothing` on an empty `j`, because then no asset left and there is nothing to liquidate.
+ 3. Rebuild through the keyword constructor, and keep the defaults, `fa` and `kwargs`.
 
 # Arguments
 
@@ -1008,14 +1012,14 @@ end
 
 Reconcile a fee with the Investable Mask a caller states beside it, so that the fee alone records the axes it is on.
 
-A [`FiniteAllocationInput`](@ref) takes a fee and a mask as two keywords, and a caller may state either without the other. A result passes both. A caller who reduced a fee by hand states the mask alone, and a caller who passes a result's fee states no mask. [`lift_fees`](@ref) reads the fee's own `imsk`, so the fee and the mask must agree before the constructor builds the input. A stated mask marks an unmarked fee, a marked fee supplies a missing mask, and the verb refuses a pair that disagrees.
+A [`FiniteAllocationInput`](@ref) takes a fee and a mask as two keywords, and a caller can state either without the other. A result passes both. A caller who reduced a fee by hand states the mask alone, and a caller who passes a result's fee states no mask. [`lift_fees`](@ref) reads the fee's own `imsk`, so the fee and the mask must agree before the constructor builds the input. A stated mask marks an unmarked fee, a marked fee supplies a missing mask, and the verb refuses a pair that disagrees.
 
 # Algorithm
 
  1. On a `nothing` fee, return it with the stated mask.
- 2. On a `nothing` mask, return the fee with its own mark, which may be `nothing`.
+ 2. On a `nothing` mask, return the fee with its own mark, which can be `nothing`.
  3. On an unmarked fee and a `BitVector` mask, rebuild the fee with that mask as its mark.
- 4. On a marked fee and a `BitVector` mask, raise an `ArgumentError` naming both when they differ, and return the pair otherwise.
+ 4. On a marked fee and a `BitVector` mask, raise an `ArgumentError` that names both when they differ, and return the pair otherwise.
 
 # Arguments
 
@@ -1024,7 +1028,7 @@ A [`FiniteAllocationInput`](@ref) takes a fee and a mask as two keywords, and a 
 
 # Validation
 
-  - The verb refuses a fee marked with a `BitVector` other than `imsk`, with an `ArgumentError` naming the two masks.
+  - The verb refuses a fee marked with a `BitVector` other than `imsk`, with an `ArgumentError` that names the two masks.
 
 # Returns
 
@@ -1066,14 +1070,16 @@ Put a fee that [`investable_fees_view`](@ref) reduced back onto the full univers
 
 This verb is the inverse of [`investable_fees_view`](@ref). An optimisation reduced to its Investable Mask expands the solved weights back to the caller's universe. Its result then pairs a full-length `w` with a fee on two reduced axes, with `tn`, `l`, `s`, `fl` and `fs` on the investable assets and `lq` and `flq` on the complement. A consumer that indexes the fee by the full-length weights meets a four-element field and a five-element selector, and fails on the index.
 
-This verb moves the fee onto the axis of the weights. It lifts at the mask the fee holds in `imsk`, which `investable_fees_view` wrote when it reduced the fee, so the fee alone records the axes it is on. Every per-asset field comes back with length `length(imsk)`, with a zero wherever the field states nothing. The five holding fields hold a zero at each asset that left, and `lq` and `flq` hold a zero at each asset that stayed. A zero rate charges nothing and a zero reference weight trades nothing, so the lift changes no charge of the reduced fee. A scalar rate applies to every asset whatever the axis is, so the verb returns it untouched. The lifted fee is unmarked, because it is on the full universe again.
+This verb moves the fee onto the axis of the weights. It lifts at the mask the fee holds in `imsk`, which `investable_fees_view` wrote when it reduced the fee, so the fee alone records the axes it is on.
+
+Every per-asset field comes back with length `length(imsk)`, with a zero wherever the field states nothing. The five holding fields hold a zero at each asset that left, and `lq` and `flq` hold a zero at each asset that stayed. A zero rate charges nothing and a zero reference weight trades nothing, so the lift changes no charge of the reduced fee. A scalar rate applies to every asset whatever the axis is, so the verb returns it untouched. The lifted fee is unmarked, because it is on the full universe again.
 
 # Algorithm
 
  1. On a `nothing` `fees`, or an unmarked one, return `fees` unchanged. An unmarked fee is a caller's statement on the full universe, or the fee of an optimisation that reduced on nothing, and either is on the full universe already.
  2. Lift `tn` at `fees.imsk` with [`lift_turnover`](@ref), and `l`, `s`, `fl` and `fs` with [`lift_fee_rate`](@ref).
  3. Lift `lq` and `flq` at `.!fees.imsk`, the complement that `lq` and `flq` are on, with the same verb as step 2.
- 4. Rebuild through the keyword constructor, carrying `fa` and `kwargs` unchanged and `imsk` as `nothing`.
+ 4. Rebuild through the keyword constructor. Keep `fa` and `kwargs`, and set `imsk` to `nothing`.
 
 # Arguments
 
@@ -1177,7 +1183,7 @@ end
 
 Put a [`Turnover`](@ref) back onto the full universe, zero where the mask is `false`.
 
-This is the nested step of [`lift_fees`](@ref). A [`Turnover`](@ref) holds a reference weight per asset and a rate that is either a scalar or one entry per asset, so `w` always expands and `val` expands through [`lift_fee_rate`](@ref). A zero reference weight trades nothing, so an asset the mask leaves out is charged nothing.
+This is the nested step of [`lift_fees`](@ref). A [`Turnover`](@ref) holds a reference weight per asset and a rate that is either a scalar or one entry per asset, so `w` always expands and `val` expands through [`lift_fee_rate`](@ref). A zero reference weight trades nothing, so the fee charges nothing for an asset that the mask leaves out.
 
 # Algorithm
 
@@ -1211,26 +1217,26 @@ end
     fees_constraints(fees::FeesEstimator, sets::UniverseSets; datatype::DataType = Float64,
                      strict::Bool = false)
 
-Resolve the name-keyed fee fields of a [`FeesEstimator`](@ref) against a universe, giving a [`Fees`](@ref) of plain per-asset vectors.
+Resolve the name-keyed fee fields of a [`FeesEstimator`](@ref) against a universe into a [`Fees`](@ref) of plain per-asset vectors.
 
-Seven fields carry a specification keyed by name: the three turnover fields `tn`, `lq` and `flq`, and the four proportional and fixed fields. Each of the four fills its gaps from its own default. `l` draws on `dl`, `s` on `ds`, `fl` on `dfl` and `fs` on `dfs`. A default never fills a neighbour's field. The three turnover fields resolve through [`turnover_constraints`](@ref), so a [`FeesEstimator`](@ref) holding a [`TurnoverEstimator`](@ref) returns a [`Fees`](@ref) holding a [`Turnover`](@ref). `fees.fa` holds no universe-keyed specification, so the result holds it unchanged.
+Seven fields carry a specification keyed by name: the three turnover fields `tn`, `lq` and `flq`, and the four proportional and fixed fields. Each of the four fills its gaps from its own default. `l` draws on `dl`, `s` on `ds`, `fl` on `dfl` and `fs` on `dfs`. A default never fills a neighbour's field. The three turnover fields resolve through [`turnover_constraints`](@ref), so a [`FeesEstimator`](@ref) that holds a [`TurnoverEstimator`](@ref) returns a [`Fees`](@ref) that holds a [`Turnover`](@ref). `fees.fa` holds no universe-keyed specification, so the result holds it unchanged.
 
 # Algorithm
 
- 1. Resolve `fees.tn` against the universe of `sets` with [`turnover_constraints`](@ref), giving a [`Turnover`](@ref) whose `val` is one turnover fee rate per asset. A `nothing` `tn` stays `nothing`.
- 2. Resolve `fees.l` with [`estimator_to_val`](@ref), giving `l`, one long proportional rate per asset in the order of the universe. Every asset the keys miss takes `fees.dl`, or `zero(datatype)` when `fees.dl` is `nothing`. A `nothing` `fees.l` stays `nothing`.
- 3. Resolve `fees.s` the same way against `fees.ds`, giving `s`.
- 4. Resolve `fees.fl` the same way against `fees.dfl`, giving `fl`.
- 5. Resolve `fees.fs` the same way against `fees.dfs`, giving `fs`.
+ 1. Resolve `fees.tn` against the universe of `sets` with [`turnover_constraints`](@ref). The result is a [`Turnover`](@ref) whose `val` is one turnover fee rate per asset. A `nothing` `tn` stays `nothing`.
+ 2. Resolve `fees.l` with [`estimator_to_val`](@ref) into `l`, one long proportional rate per asset in the order of the universe. Every asset the keys miss takes `fees.dl`, or `zero(datatype)` when `fees.dl` is `nothing`. A `nothing` `fees.l` stays `nothing`.
+ 3. Resolve `fees.s` the same way against `fees.ds` into `s`.
+ 4. Resolve `fees.fl` the same way against `fees.dfl` into `fl`.
+ 5. Resolve `fees.fs` the same way against `fees.dfs` into `fs`.
  6. Resolve `fees.lq` and `fees.flq` the same way as step 1, over the full universe of `sets`. [`investable_fees_view`](@ref) moves them to the complement of the Investable Mask later.
  7. Build a [`Fees`](@ref) from the seven resolved fields, `fees.fa` unchanged, and `fees.kwargs` unchanged. `fees.kwargs` sets how near zero a weight must be for the fixed terms to treat it as zero.
 
 # Arguments
 
-  - `fees`: [`FeesEstimator`](@ref) specifying turnover, proportional, and fixed fee values.
-  - `sets`: [`UniverseSets`](@ref) containing asset names or indices.
+  - `fees`: The [`FeesEstimator`](@ref) that states the turnover, proportional and fixed fee values.
+  - `sets`: The [`UniverseSets`](@ref) that holds the asset names or indices.
   - `datatype`: Output data type for fee values.
-  - `strict`: If `true`, a mismatch between assets and fee values throws an error. If `false`, it issues a warning.
+  - `strict`: If `true`, a mismatch between assets and fee values throws an error. If `false`, it warns.
 
 # Validation
 
@@ -1238,7 +1244,7 @@ Seven fields carry a specification keyed by name: the three turnover fields `tn`
 
 # Returns
 
-  - `fe::Fees`: Object containing turnover, proportional, and fixed fee values aligned with `sets`.
+  - `fe::Fees`: The turnover, proportional and fixed fee values, aligned with `sets`.
 
 # Examples
 
@@ -1320,9 +1326,9 @@ end
 """
     fees_constraints(fees::Option{<:Fees}, args...; kwargs...)
 
-Propagate or pass through portfolio transaction fee constraints.
+Return a resolved fee, or `nothing`, unchanged.
 
-`fees_constraints` returns the input [`Fees`](@ref) object or `nothing` unchanged. This method passes through fee constraints that are already built, and missing ones, so a caller can call `fees_constraints` on either kind of fee input.
+This method lets a caller call `fees_constraints` on any fee input: a [`FeesEstimator`](@ref), a [`Fees`](@ref) or `nothing`. It returns a [`Fees`](@ref) or a `nothing` as it receives it.
 
 # Algorithm
 
@@ -1331,8 +1337,8 @@ Propagate or pass through portfolio transaction fee constraints.
 # Arguments
 
   - `fees`: An existing [`Fees`](@ref) object or `nothing`.
-  - `args...`: Additional positional arguments (ignored).
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `args...`: Positional arguments that the method does not read.
+  - `kwargs...`: Keyword arguments that the method does not read.
 
 # Returns
 
@@ -1379,7 +1385,7 @@ end
 
 Compute the proportional fees for portfolio weights.
 
-This is one term of the total fee, not the whole fee. [`calc_periodic_fees`](@ref) calls it twice, under `.>=` for the long side and under `.<` for the short side, and negates the short call. [`Fees`](@ref) states the closed form as ``F_{\\text{p}}``.
+This is one term of the total fee. [`calc_periodic_fees`](@ref) calls it twice, under `.>=` for the long side and under `.<` for the short side, and negates the short call. [`Fees`](@ref) states the closed form as ``F_{\\text{p}}``.
 
 # Algorithm
 
@@ -1394,15 +1400,15 @@ This is one term of the total fee, not the whole fee. [`calc_periodic_fees`](@re
 
   - `fees`: Fee rate.
 
-      + `nothing`: No proportional fee, returns zero.
-      + `Number`: Single fee applied to all relevant assets.
-      + `VecNum`: Vector of fee values per asset.
+      + `nothing`: No proportional fee. The method returns zero.
+      + `Number`: One rate for every asset that `op` selects.
+      + `VecNum`: One rate per asset.
 
   - `op`: Broadcast comparison that selects the assets, `.>=` for the long side and `.<` for the short side. A `nothing` `fees` does not read it.
 
 # Returns
 
-  - `val::Number`: Total proportional fee.
+  - `val::Number`: The proportional fee of the selected side.
 
 # Examples
 
@@ -1437,7 +1443,7 @@ end
 
 Compute the turnover fees for portfolio weights.
 
-This is one term of the total fee, not the whole fee. [`Fees`](@ref) states the closed form as ``F_{\\text{Tn}}``, and treats `tn.val` as a per-asset fee rate rather than as a bound. No method here uses the `fixed` flag of [`Turnover`](@ref). The flag decides, through [`factory`](@ref), which reference weights `tn.w` holds, and by the time this method runs `tn.w` is already the vector to charge the fee against.
+This is one term of the total fee. [`Fees`](@ref) states the closed form as ``F_{\\text{Tn}}``, and treats `tn.val` as a per-asset fee rate rather than as a bound. No method here uses the `fixed` flag of [`Turnover`](@ref). The flag decides, through [`factory`](@ref), which reference weights `tn.w` holds. When this method runs, `tn.w` already holds the vector to charge the fee against.
 
 # Algorithm
 
@@ -1454,9 +1460,9 @@ Steps 3 and 4 are not the same expression. They agree to rounding when `tn.val` 
 
   - `tn`: Turnover structure.
 
-      + `nothing`: No turnover fee, returns zero.
-      + `tn.val::Number`: Single turnover fee applied to all assets.
-      + `tn.val::VecNum`: Vector of turnover fees per asset.
+      + `nothing`: No turnover fee. The method returns zero.
+      + `tn.val::Number`: One turnover rate for every asset.
+      + `tn.val::VecNum`: One turnover rate per asset.
 
 # Returns
 
@@ -1501,7 +1507,7 @@ A fixed fee is a charge per position held, whatever its size. [`Fees`](@ref) sta
 
  1. On a `nothing` `fees`, return `zero(eltype(w))`. The method reads neither `kwargs` nor `op`.
  2. Otherwise build `idx1`, the mask of the assets that `op` selects against a zero of the promoted element type.
- 3. Build `idx2`, marking the selected positions that `isapprox` does not call zero. The method forwards `kwargs` to `isapprox`, so its `atol` sets the boundary. Under the default `atol = 1e-8` a weight of `1e-9` attracts no fee and a weight of `1e-7` attracts one.
+ 3. Build `idx2`, the mask of the selected positions that `isapprox` does not call zero. The method forwards `kwargs` to `isapprox`, so its `atol` sets the boundary. Under the default `atol = 1e-8` a weight of `1e-9` pays no fee and a weight of `1e-7` pays one.
  4. On a `Number` `fees`, scale the count of the positions that `idx2` marks by the one rate.
  5. On a `VecNum` `fees`, sum the rates of the positions that `idx2` marks.
 
@@ -1511,9 +1517,9 @@ A fixed fee is a charge per position held, whatever its size. [`Fees`](@ref) sta
 
   - `fees`: Fee rate.
 
-      + `nothing`: No fixed fee, returns zero.
-      + `Number`: Single fee applied to all relevant assets.
-      + `VecNum`: Vector of fee values per asset.
+      + `nothing`: No fixed fee. The method returns zero.
+      + `Number`: One rate for every asset that `op` selects.
+      + `VecNum`: One rate per asset.
 
   - `kwargs`: Named tuple of keyword arguments that decides how small an asset weight must be for `isapprox` to call it zero.
 
@@ -1565,15 +1571,15 @@ The verb returns a pair, `(amortised, one_time)`. `l`, `s`, `tn` and `lq` are ra
 
 # Algorithm
 
- 1. Charge the per period terms, the call of [`calc_periodic_fees`](@ref).
- 2. Charge the one-off terms, the call of [`calc_one_off_fees`](@ref).
+ 1. Charge the per period terms with [`calc_periodic_fees`](@ref).
+ 2. Charge the one-off terms with [`calc_one_off_fees`](@ref).
  3. On a `nothing` `fees.fa`, return the two charges unchanged.
  4. On an [`AmortisedFees`](@ref) `fees.fa`, divide the one-off charge by `T`, add it to the per period charge, and return that number beside a zero of the same type.
 
 # Arguments
 
   - `w`: Portfolio weights.
-  - `T`: Observation count the fee is charged over.
+  - `T`: The observation count that the site charges the fee over.
   - `fees`: [`Fees`](@ref) structure.
 
 # Returns
@@ -1601,8 +1607,7 @@ julia> calc_fees([0.1, -0.2], 21, fees)
 function calc_fees(w::VecNum, T::Number, fees::Fees)
     return calc_fees(w, T, fees, fees.fa)
 end
-function calc_fees(w::VecNum, ::Number, fees::Fees,
-                   ::Union{Nothing, <:FirstObservationFees})
+function calc_fees(w::VecNum, ::Number, fees::Fees, ::Union{Nothing, FirstObservationFees})
     return (calc_periodic_fees(w, fees), calc_one_off_fees(w, fees))
 end
 function calc_fees(w::VecNum, T::Number, fees::Fees, ::AmortisedFees)
@@ -1616,12 +1621,12 @@ end
 
 Compute the proportional per asset fees for portfolio weights.
 
-This is one term of the total fee, not the whole fee. It is the elementwise form of [`calc_fees(w::VecNum, fees::Number, op::Function)`](@ref), and [`Fees`](@ref) states the closed form as ``\\boldsymbol{F}_{\\text{p}}``.
+This is one term of the total fee. It is the elementwise form of [`calc_fees(w::VecNum, fees::Number, op::Function)`](@ref), and [`Fees`](@ref) states the closed form as ``\\boldsymbol{F}_{\\text{p}}``.
 
 # Algorithm
 
- 1. On a `nothing` `fees`, return a vector of zeros one entry long per asset, in the element type of `w`. The method reads `w` only for its length and its element type, and it does not read `op`.
- 2. Otherwise allocate `fees_w`, a vector of zeros one entry long per asset, in the promoted element type. An asset the mask of step 3 leaves out keeps its zero.
+ 1. On a `nothing` `fees`, return a vector with one zero per asset, in the element type of `w`. The method reads `w` only for its length and its element type, and it does not read `op`.
+ 2. Otherwise allocate `fees_w`, a vector with one zero per asset, in the promoted element type. An asset the mask of step 3 leaves out keeps its zero.
  3. Build `idx`, the mask of the assets that `op` selects against a zero of the promoted element type.
  4. On a `Number` `fees`, write the selected weights, scaled by the one rate, into the selected entries of `fees_w`.
  5. On a `VecNum` `fees`, write the selected weights, multiplied elementwise by the selected rates, into the selected entries of `fees_w`.
@@ -1632,15 +1637,15 @@ This is one term of the total fee, not the whole fee. It is the elementwise form
 
   - `fees`: Fee rate.
 
-      + `nothing`: No proportional fee, returns zero.
-      + `Number`: Single fee applied to all relevant assets.
-      + `VecNum`: Vector of fee values per asset.
+      + `nothing`: No proportional fee. The method returns zero.
+      + `Number`: One rate for every asset that `op` selects.
+      + `VecNum`: One rate per asset.
 
   - `op`: Broadcast comparison that selects the assets, `.>=` for the long side and `.<` for the short side. A `nothing` `fees` does not read it.
 
 # Returns
 
-  - `val::VecNum`: Total proportional per asset fee.
+  - `val::VecNum`: The proportional fee of each asset on the selected side, and zero elsewhere.
 
 # Examples
 
@@ -1681,11 +1686,11 @@ end
 
 Compute the per asset turnover fees for portfolio weights.
 
-This is one term of the total fee, not the whole fee. It is the elementwise form of [`calc_fees(w::VecNum, tn::Turnover)`](@ref), and [`Fees`](@ref) states the closed form as ``\\boldsymbol{F}_{\\text{Tn}}``. No method here uses the `fixed` flag of [`Turnover`](@ref), for the reason the docstring of that scalar form gives.
+This is one term of the total fee. It is the elementwise form of [`calc_fees(w::VecNum, tn::Turnover)`](@ref), and [`Fees`](@ref) states the closed form as ``\\boldsymbol{F}_{\\text{Tn}}``. No method here uses the `fixed` flag of [`Turnover`](@ref), for the reason the docstring of that scalar form gives.
 
 # Algorithm
 
- 1. On a `nothing` `tn`, return a vector of zeros one entry long per asset, in the element type of `w`.
+ 1. On a `nothing` `tn`, return a vector with one zero per asset, in the element type of `w`.
  2. Otherwise form the traded amount per asset, the absolute difference between `w` and the reference weights `tn.w`.
  3. On a `Number` `tn.val`, scale the traded amount by the one rate.
  4. On a `VecNum` `tn.val`, multiply the traded amount elementwise by the per-asset rates.
@@ -1696,9 +1701,9 @@ This is one term of the total fee, not the whole fee. It is the elementwise form
 
   - `tn`: Turnover structure.
 
-      + `nothing`: No turnover fee, returns zero.
-      + `tn.val::Number`: Single turnover fee applied to all assets.
-      + `tn.val::VecNum`: Vector of turnover fees per asset.
+      + `nothing`: No turnover fee. The method returns zero.
+      + `tn.val::Number`: One turnover rate for every asset.
+      + `tn.val::VecNum`: One turnover rate per asset.
 
 # Returns
 
@@ -1742,12 +1747,12 @@ This is the elementwise form of [`calc_fixed_fees`](@ref), and its entries sum t
 
 # Algorithm
 
- 1. On a `nothing` `fees`, return a vector of zeros one entry long per asset, in the element type of `w`. The method reads neither `kwargs` nor `op`.
- 2. Otherwise allocate `fees_w`, a vector of zeros one entry long per asset, in the promoted element type. An asset the masks of steps 3 and 4 leave out keeps its zero.
+ 1. On a `nothing` `fees`, return a vector with one zero per asset, in the element type of `w`. The method reads neither `kwargs` nor `op`.
+ 2. Otherwise allocate `fees_w`, a vector with one zero per asset, in the promoted element type. An asset the masks of steps 3 and 4 leave out keeps its zero.
  3. Build `idx1`, the mask of the assets that `op` selects against a zero of the promoted element type.
- 4. Build `idx2`, marking the selected positions that `isapprox` does not call zero. The method forwards `kwargs` to `isapprox`, so its `atol` sets the boundary.
- 5. On a `Number` `fees`, write the one rate, gated by `idx2`, into the selected entries of `fees_w`.
- 6. On a `VecNum` `fees`, write the selected per-asset rates, gated by `idx2`, into the selected entries of `fees_w`.
+ 4. Build `idx2`, the mask of the selected positions that `isapprox` does not call zero. The method forwards `kwargs` to `isapprox`, so its `atol` sets the boundary.
+ 5. On a `Number` `fees`, write the one rate times `idx2` into the selected entries of `fees_w`.
+ 6. On a `VecNum` `fees`, write the selected per-asset rates times `idx2` into the selected entries of `fees_w`.
 
 # Arguments
 
@@ -1755,9 +1760,9 @@ This is the elementwise form of [`calc_fixed_fees`](@ref), and its entries sum t
 
   - `fees`: Fee rate.
 
-      + `nothing`: No fixed fee, returns zero.
-      + `Number`: Single fee applied to all relevant assets.
-      + `VecNum`: Vector of fee values per asset.
+      + `nothing`: No fixed fee. The method returns zero.
+      + `Number`: One rate for every asset that `op` selects.
+      + `VecNum`: One rate per asset.
 
   - `kwargs`: Named tuple of keyword arguments that decides how small an asset weight must be for `isapprox` to call it zero.
 
@@ -1765,7 +1770,7 @@ This is the elementwise form of [`calc_fixed_fees`](@ref), and its entries sum t
 
 # Returns
 
-  - `val::VecNum`: Total per asset fixed fee.
+  - `val::VecNum`: The fixed fee of each asset on the selected side, and zero elsewhere.
 
 # Examples
 
@@ -1809,27 +1814,29 @@ Compute total per asset fees for portfolio weights.
 
 Sums the proportional, fixed, turnover and liquidation fees. Each half sums to the matching half of the pair [`calc_fees(w::VecNum, T::Number, fees::Fees)`](@ref) returns, up to the order of summation.
 
-The verb returns a pair, `(amortised, one_time)`, and each half is itself a pair with one entry per axis of a reduced [`Fees`](@ref). The first entry is the charge of the assets that stayed, and the second is the charge of the assets that left. `l`, `s` and `tn` are rates per period and go into `amortised`, as `lq` does on the other axis. `fl` and `fs` charge each non-zero position one time for the whole holding period, as a fraction of capital on the weights this verb takes. So `fees.fa` decides where they go, as it does for `flq`. A `nothing` `fa` puts them in `one_time`, and an [`AmortisedFees`](@ref) divides them by `T`, adds them to `amortised` and leaves `one_time` zero. The doctest below shows all four vectors.
+The verb returns a pair, `(amortised, one_time)`, and each half is itself a pair with one entry per axis of a reduced [`Fees`](@ref). The first entry is the charge of the assets that stayed, and the second is the charge of the assets that left.
+
+`l`, `s` and `tn` are rates per period and go into `amortised`, as `lq` does on the other axis. `fl` and `fs` charge each non-zero position one time for the whole holding period, as a fraction of capital on the weights this verb takes. So `fees.fa` decides where they go, as it does for `flq`. A `nothing` `fa` puts them in `one_time`, and an [`AmortisedFees`](@ref) divides them by `T`, adds them to `amortised` and leaves `one_time` zero. The doctest below shows all four vectors.
 
 `T` is the observation count the calling site charges over, and the site always knows it, so no fee stores one. [`charge_asset_fees`](@ref) passes the row count of the matrix it applies the pair to, and [`calc_total_asset_fees`](@ref) contracts the pair to the cost of a whole holding period.
 
 # Algorithm
 
- 1. Charge the per period terms, the call of [`calc_asset_periodic_fees`](@ref), which covers both axes.
- 2. Charge the one-off terms, the call of [`calc_asset_one_off_fees`](@ref), which covers both axes.
+ 1. Charge the per period terms with [`calc_asset_periodic_fees`](@ref), which covers both axes.
+ 2. Charge the one-off terms with [`calc_asset_one_off_fees`](@ref), which covers both axes.
  3. On a `nothing` `fees.fa`, return the two charges unchanged.
- 4. On an [`AmortisedFees`](@ref) `fees.fa`, divide each one-off charge by `T`, add it to the per period charge of its own axis, and return those beside zeros of the same type. The liquidation axis sums through [`add_liquidation_terms`](@ref), because a caller sets `lq` and `flq` independently and an unset one gives an empty vector.
+ 4. On an [`AmortisedFees`](@ref) `fees.fa`, divide each one-off charge by `T`, add it to the per period charge of its own axis, and return those beside zeros of the same type. The liquidation axis sums through [`add_liquidation_terms`](@ref). A caller sets `lq` and `flq` independently, and an unset one gives an empty vector.
 
 # Arguments
 
   - `w`: Portfolio weights.
-  - `T`: Observation count the fee is charged over.
+  - `T`: The observation count that the site charges the fee over.
   - `fees`: [`Fees`](@ref) structure.
 
 # Returns
 
-  - `amortised::Tuple{<:VecNum, <:VecNum}`: The charge every observation carries, per asset that stayed and per asset that left.
-  - `one_time::Tuple{<:VecNum, <:VecNum}`: The charge the first observation carries alone, on the same two axes. Zero under an [`AmortisedFees`](@ref), which spread it into `amortised`.
+  - `amortised::Tuple{VecNum, VecNum}`: The charge every observation carries, per asset that stayed and per asset that left.
+  - `one_time::Tuple{VecNum, VecNum}`: The charge the first observation carries alone, on the same two axes. It is zero under an [`AmortisedFees`](@ref), which spreads it into `amortised`.
 
 # Examples
 
@@ -1852,7 +1859,7 @@ function calc_asset_fees(w::VecNum, T::Number, fees::Fees)
     return calc_asset_fees(w, T, fees, fees.fa)
 end
 function calc_asset_fees(w::VecNum, ::Number, fees::Fees,
-                         ::Union{Nothing, <:FirstObservationFees})
+                         ::Union{Nothing, FirstObservationFees})
     return (calc_asset_periodic_fees(w, fees), calc_asset_one_off_fees(w, fees))
 end
 function calc_asset_fees(w::VecNum, T::Number, fees::Fees, ::AmortisedFees)
@@ -1865,9 +1872,9 @@ end
 """
     add_liquidation_terms(a::VecNum, b::VecNum)
 
-Add the two terms of the liquidation axis, either of which may be unset.
+Add the two terms of the liquidation axis, when either term can be unset.
 
-A caller sets `lq` and `flq` independently. The verb that prices an unset liquidation charge returns an empty vector rather than a vector of zeros, because it has no length to build one from. The axis is the complement of the Investable Mask, and that verb takes no mask. So a `Fees` that sets `flq` and no `lq` gives one term spanning the complement and one spanning nothing. Adding them elementwise would raise a `DimensionMismatch` on a fee the caller set correctly.
+A caller sets `lq` and `flq` independently. The verb that prices an unset liquidation charge returns an empty vector, not a vector of zeros, because it has no length to build one from. The axis is the complement of the Investable Mask, and that verb takes no mask. So a `Fees` that sets `flq` and no `lq` gives one term over the complement and one empty term. An elementwise sum of the two raises a `DimensionMismatch` on a correct fee.
 
 An empty term charges nothing, so the sum is the other term. Two set terms span the same complement and add elementwise. The investable axis needs no such verb, because its terms come from `w` and always span it.
 
@@ -1916,7 +1923,7 @@ The charge is a rate, so it falls on every period beside `l`, `s` and `tn`, and 
 
 # Algorithm
 
- 1. On a `nothing` `lq`, return `false`. Nothing left the universe, so nothing is owed, and a `Bool` zero adds to a charge of any element type without widening it.
+ 1. On a `nothing` `lq`, return `false`. No asset left the universe, so the charge is zero, and a `Bool` zero adds to a charge of any element type without widening it.
  2. On a scalar rate, return `lq.val * sum(abs, lq.w)`.
  3. On a per asset rate, return `dot(lq.val, abs.(lq.w))`.
 
@@ -2022,7 +2029,7 @@ This is the per asset counterpart of [`calc_liquidation_fees`](@ref). Its entrie
 # Algorithm
 
  1. On a `nothing` `lq`, return an empty vector in the element type of `w`.
- 2. Otherwise call [`calc_asset_fees`](@ref) on `lq` against a zero vector the length of `lq.w`, giving `lq.val .* abs.(lq.w)` elementwise.
+ 2. Otherwise call [`calc_asset_fees`](@ref) on `lq` against a zero vector the length of `lq.w`. The result is `lq.val .* abs.(lq.w)`.
 
 # Arguments
 
@@ -2115,10 +2122,10 @@ Charge the terms of a fee that fall on every observation.
 
 # Algorithm
 
- 1. Charge the long proportional term, the call of [`calc_fees`](@ref) on `fees.l` under `.>=`.
- 2. Charge the short proportional term, the negated call of the same name on `fees.s` under `.<`. `w` is negative on that side, so the negation makes the term a charge under a non-negative `s` and a credit under a negative one.
- 3. Charge the turnover term, the call of [`calc_fees`](@ref) on `fees.tn`.
- 4. Charge the proportional forced exit, the call of [`calc_liquidation_fees`](@ref) on `fees.lq`.
+ 1. Charge the long proportional term with [`calc_fees`](@ref) on `fees.l` under `.>=`.
+ 2. Charge the short proportional term with the same verb on `fees.s` under `.<`, and negate it. `w` is negative on that side, so the negation makes the term a charge under a non-negative `s` and a credit under a negative one.
+ 3. Charge the turnover term with [`calc_fees`](@ref) on `fees.tn`.
+ 4. Charge the proportional forced exit with [`calc_liquidation_fees`](@ref) on `fees.lq`.
  5. Return the sum of the four terms.
 
 # Arguments
@@ -2162,10 +2169,10 @@ This is the per asset counterpart of [`calc_periodic_fees`](@ref). Its entries s
 
 # Algorithm
 
- 1. Charge the long proportional term, the call of [`calc_asset_fees`](@ref) on `fees.l` under `.>=`.
- 2. Charge the short proportional term, the negated call of the same name on `fees.s` under `.<`.
- 3. Charge the turnover term, the call of [`calc_asset_fees`](@ref) on `fees.tn`.
- 4. Charge the proportional forced exit, the call of [`calc_asset_liquidation_fees`](@ref) on `fees.lq`. `lq` is a rate, so it falls on every period beside `l`, `s` and `tn`, and no clock affects it.
+ 1. Charge the long proportional term with [`calc_asset_fees`](@ref) on `fees.l` under `.>=`.
+ 2. Charge the short proportional term with the same verb on `fees.s` under `.<`, and negate it.
+ 3. Charge the turnover term with [`calc_asset_fees`](@ref) on `fees.tn`.
+ 4. Charge the proportional forced exit with [`calc_asset_liquidation_fees`](@ref) on `fees.lq`. `lq` is a rate, so it falls on every period beside `l`, `s` and `tn`, and no clock affects it.
  5. Return the pair: the elementwise sum of the three vectors of steps 1 to 3, and the vector of step 4.
 
 # Arguments
@@ -2178,7 +2185,7 @@ This is the per asset counterpart of [`calc_periodic_fees`](@ref). Its entries s
 The verb returns a pair, one entry per axis of a reduced [`Fees`](@ref).
 
   - `investable::VecNum`: The per period charge of each asset that stayed, from `l`, `s` and `tn`, which [`investable_fees_view`](@ref) sliced to the Investable Mask.
-  - `liquidation::VecNum`: The per period charge of each asset that left, from `lq`, which `investable_fees_view` sliced to the mask's complement. Empty when `lq` is unset, because the axis has no length to build a vector of zeros from.
+  - `liquidation::VecNum`: The per period charge of each asset that left, from `lq`, which `investable_fees_view` sliced to the mask's complement. It is empty when `lq` is unset, because the axis has no length to build a vector of zeros from.
 
 # Examples
 
@@ -2211,9 +2218,9 @@ Charge the terms of a fee that fall one time over a holding period.
 
 # Algorithm
 
- 1. Charge the long fixed term, the call of [`calc_fixed_fees`](@ref) on `fees.fl` under `.>=`.
- 2. Charge the short fixed term, the call of the same name on `fees.fs` under `.<`.
- 3. Charge the fixed forced exit, the call of [`calc_fixed_liquidation_fees`](@ref) on `fees.flq`.
+ 1. Charge the long fixed term with [`calc_fixed_fees`](@ref) on `fees.fl` under `.>=`.
+ 2. Charge the short fixed term with the same verb on `fees.fs` under `.<`.
+ 3. Charge the fixed forced exit with [`calc_fixed_liquidation_fees`](@ref) on `fees.flq`.
  4. Return the sum of the three terms.
 
 # Arguments
@@ -2258,9 +2265,9 @@ This is the per asset counterpart of [`calc_one_off_fees`](@ref). Its entries su
 
 # Algorithm
 
- 1. Charge the long fixed term, the call of [`calc_asset_fixed_fees`](@ref) on `fees.fl` under `.>=`.
- 2. Charge the short fixed term, the call of the same name on `fees.fs` under `.<`.
- 3. Charge the fixed forced exit, the call of [`calc_asset_fixed_liquidation_fees`](@ref) on `fees.flq`. `flq` charges one time per position, so it falls on the clock `fees.fa` names, beside `fl` and `fs`.
+ 1. Charge the long fixed term with [`calc_asset_fixed_fees`](@ref) on `fees.fl` under `.>=`.
+ 2. Charge the short fixed term with the same verb on `fees.fs` under `.<`.
+ 3. Charge the fixed forced exit with [`calc_asset_fixed_liquidation_fees`](@ref) on `fees.flq`. `flq` charges one time per position, so it falls on the clock `fees.fa` names, beside `fl` and `fs`.
  4. Return the pair: the elementwise sum of the two vectors of steps 1 and 2, and the vector of step 3.
 
 # Arguments
@@ -2273,7 +2280,7 @@ This is the per asset counterpart of [`calc_one_off_fees`](@ref). Its entries su
 The verb returns a pair, one entry per axis of a reduced [`Fees`](@ref).
 
   - `investable::VecNum`: The one-off charge of each asset that stayed, from `fl` and `fs`, which [`investable_fees_view`](@ref) sliced to the Investable Mask.
-  - `liquidation::VecNum`: The one-off charge of each asset that left, from `flq`, which `investable_fees_view` sliced to the mask's complement. Empty when `flq` is unset, because the axis has no length to build a vector of zeros from.
+  - `liquidation::VecNum`: The one-off charge of each asset that left, from `flq`, which `investable_fees_view` sliced to the mask's complement. It is empty when `flq` is unset, because the axis has no length to build a vector of zeros from.
 
 # Examples
 
@@ -2307,8 +2314,8 @@ Charge the whole cost of holding a portfolio for `T` periods.
 
 # Algorithm
 
- 1. Charge `T` times the per period terms, the call of [`calc_periodic_fees`](@ref).
- 2. Charge the one-off terms one time, the call of [`calc_one_off_fees`](@ref).
+ 1. Charge `T` times the per period terms with [`calc_periodic_fees`](@ref).
+ 2. Charge the one-off terms one time with [`calc_one_off_fees`](@ref).
  3. Return the sum of the two terms.
 
 # Arguments
@@ -2356,8 +2363,8 @@ This is the per asset counterpart of [`calc_total_fees`](@ref). Its entries sum 
 
 # Algorithm
 
- 1. Charge `T` times the per period terms, the call of [`calc_asset_periodic_fees`](@ref). Both halves of its pair are scaled, because both are rates.
- 2. Charge the one-off terms one time, the call of [`calc_asset_one_off_fees`](@ref). Neither half is scaled, because both are charged one time for the whole holding period.
+ 1. Charge `T` times the per period terms with [`calc_asset_periodic_fees`](@ref). The step scales both halves of its pair, because both are rates.
+ 2. Charge the one-off terms one time with [`calc_asset_one_off_fees`](@ref). The step scales neither half, because the holding period pays both one time.
  3. Return the pair, each axis summed with its own half. The first entry is the investable total. The second is the liquidation total through [`add_liquidation_terms`](@ref), which handles the axis whose two terms a caller sets independently.
 
 # Arguments
@@ -2371,7 +2378,7 @@ This is the per asset counterpart of [`calc_total_fees`](@ref). Its entries sum 
 The verb returns a pair, one entry per axis of a reduced [`Fees`](@ref).
 
   - `investable::VecNum`: The whole cost of the holding period for each asset that stayed, from `l`, `s`, `tn`, `fl` and `fs`, which [`investable_fees_view`](@ref) sliced to the Investable Mask.
-  - `liquidation::VecNum`: The whole cost of the forced exit of each asset that left, from `lq` and `flq`, which `investable_fees_view` sliced to the mask's complement. Empty when neither liquidation charge is set.
+  - `liquidation::VecNum`: The whole cost of the forced exit of each asset that left, from `lq` and `flq`, which `investable_fees_view` sliced to the mask's complement. It is empty when neither liquidation charge is set.
 
 # Examples
 

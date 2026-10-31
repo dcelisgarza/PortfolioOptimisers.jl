@@ -56,7 +56,10 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Add worst-realisation risk constraints to `model`.
 
 Delegates to [`set_wr_risk_expression!`](@ref) to create `wr_risk`, then calls
-[`set_risk_bounds_and_expression!`](@ref). Returns the existing expression if already present.
+[`set_unindexed_risk_bounds_and_expression!`](@ref). [`set_wr_risk_expression!`](@ref) builds
+`wr_risk` once for each `prefix`, and [`Range`](@ref) reads the same variable. The settings of
+the first [`WorstRealisation`](@ref) take effect, and a second measure logs a warning, because
+its bound and its scale have no effect.
 
 # Arguments
 
@@ -67,21 +70,18 @@ Delegates to [`set_wr_risk_expression!`](@ref) to create `wr_risk`, then calls
 
 # Returns
 
-  - `nothing`.
+  - `wr_risk`: The risk variable.
 
 # Related
 
   - [`set_wr_risk_expression!`](@ref)
-  - [`set_risk_bounds_and_expression!`](@ref)
+  - [`set_unindexed_risk_bounds_and_expression!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, ::Any, r::WorstRealisation,
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
                                loss::Bool = true, prefix::Symbol = Symbol(""), kwargs...)
     key = ifelse(loss, :wr_risk, :wr_risk_gain)
-    return state_build!(model, prefix, key) do
-        wr_risk = set_wr_risk_expression!(model, pr.X; loss = loss, prefix = prefix)
-        set_risk_bounds_and_expression!(model, opt, wr_risk, r.settings, key;
-                                        prefix = prefix)
-        return wr_risk
-    end
+    wr_risk = set_wr_risk_expression!(model, pr.X; loss = loss, prefix = prefix)
+    set_unindexed_risk_bounds_and_expression!(model, opt, wr_risk, r, key; prefix = prefix)
+    return wr_risk
 end
