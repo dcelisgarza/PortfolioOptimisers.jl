@@ -65,14 +65,15 @@ end
 
 Refuse a view row that no reweighting of the scenarios can meet.
 
-A row of a block in the entropy pooling constraint dictionary states ``\\sum_{t} p_{t} y_{t} \\lessgtr b``, where ``y`` is the row of `lhs`. The posterior probabilities sum to one, so the left-hand side is an average of ``y``, and it is between the smallest and the largest entry of ``y``. The posterior of entropy pooling puts no mass where the prior puts none, so only the entries at a positive prior probability count. For each row, the band is exact. A target on the edge of the band needs all the mass on the scenarios at that edge. The dual of the problem then has no finite solution, so the method refuses the edge too, as [`ep_assert_reachable_view`](@ref) does for a tail view.
+A row of a block in the entropy pooling constraint dictionary states ``\\sum_{t} p_{t} y_{t} \\lessgtr b``, where ``y`` is the row of `lhs`. The posterior probabilities sum to one, so the left-hand side is an average of ``y``, and it is between the smallest and the largest entry of ``y``. The posterior of entropy pooling puts no mass where the prior puts none, so only the entries at a positive prior probability count. For each row, the band is exact. A target on the edge of the band needs all the mass on the scenarios at that edge. The dual of the problem then has no finite solution, so the method refuses the edge too, as [`ep_assert_reachable_view`](@ref) does for a tail view. A row that is constant on the support has no edge: every posterior meets it when the prior does, and none meets it otherwise.
 
 Without this check, the dual solve of such a row runs to an unbounded multiplier, and the posterior weights overflow. The first consumer of the weights then fails with an error that names neither the view nor the bound.
 
 # Algorithm
 
  1. For each row `k` of `lhs`, read `lo` and `hi` with `extrema` over a view of the row. When `w` is not `nothing`, read only the entries at `w > 0`. Neither step copies the row or makes a mask.
- 2. When `key` is `:eq`, raise an error unless `lo < rhs[k] < hi`. Otherwise, the row is `<=`, and raise an error unless `lo < rhs[k]`.
+ 2. When `lo == hi`, the row is constant on the support. When `key` is `:eq`, raise an error unless `rhs[k] == lo`. Otherwise, raise an error unless `lo <= rhs[k]`.
+ 3. When `lo < hi` and `key` is `:eq`, raise an error unless `lo < rhs[k] < hi`. Otherwise, the row is `<=`, and raise an error unless `lo < rhs[k]`.
 
 # Arguments
 
@@ -85,7 +86,7 @@ Without this check, the dual solve of such a row runs to an unbounded multiplier
 
 # Validation
 
-  - If `key` is `:eq`, `lo < rhs[k] < hi` for every row `k`. Else `lo < rhs[k]`. A row that breaks this raises a `DomainError` that names the view and the band.
+  - If `key` is `:eq`, `lo < rhs[k] < hi` for every row `k`. Else `lo < rhs[k]`. A row that is constant on the support, `lo == hi`, needs `rhs[k] == lo` under `:eq` and `lo <= rhs[k]` under `:ineq`. A row that breaks this raises a `DomainError` that names the view and the band.
 
 # Returns
 
@@ -109,9 +110,12 @@ function ep_assert_attainable_rows(lhs::MatNum, rhs::VecNum, key::Symbol,
             extrema(y for (y, wt) in zip(row, w) if wt > zero(wt))
         end
         b = rhs[k]
-        @argcheck(lo < b && (key != :eq || b < hi),
+        # A row that is constant on the support holds at every posterior when the prior
+        # meets it, so its edge is no edge.
+        flat = b == lo == hi
+        @argcheck((lo < b || flat) && (key != :eq || b < hi || flat),
                   DomainError(b,
-                              "The $(name) view `$(label(k))` cannot be met: its row states a weighted average of the scenarios $(ifelse(key == :eq, "==", "<=")) $(b), and every reweighting of the scenarios at a positive prior probability keeps that average inside the open interval ($(lo), $(hi)). Move the target inside the interval, or use a prior whose scenarios spread wider."))
+                              "The $(name) view `$(label(k))` cannot be met: its row states a weighted average of the scenarios $(ifelse(key == :eq, "==", "<=")) $(b), and every reweighting of the scenarios at a positive prior probability keeps that average $(ifelse(lo == hi, "at $(lo)", "inside the open interval ($(lo), $(hi))")). Move the target into that band, or use a prior whose scenarios spread wider."))
     end
     return nothing
 end

@@ -312,22 +312,30 @@ end
     @test isapprox(flat.w, fill(inv(size(X2, 1)), size(X2, 1)); rtol = 1e-6)
     @test flat.kld < 1e-9
     @test_throws DomainError prior(mk(-0.5), rd2)
-    # A posterior on one scenario has no room to tilt: the target sits on the end of the
-    # support, no tilt exists, and the start returns the constraint it read at the prior.
-    # A prior whose worst scenario holds at least `alpha` reaches this exit through `prior`,
-    # and the fit then fails on a feasible view (#1923). The direct call stays until then.
-    x = -ep_sX[:, 1]
-    T = length(x)
-    tv = PO.SequentialConditionalValueatRiskViewConstraint([], Float64[], [x], [-1.0],
-                                                           zeros(T), 0.0, ep_a, 10.0, 20,
+    # When the constant asset is the primal side of a view, its row and its losses are both
+    # constant, so no tilt exists, and the start returns the row it read at the prior. Only
+    # the dual side can then meet the view, and the solve moves it through its exact block.
+    T2 = size(X2, 1)
+    w2 = StatsBase.pweights(fill(inv(T2), T2))
+    cA = ConditionalValueatRisk(; alpha = ep_a, w = w2)(X2[:, 2])
+    tA = cA + 0.001 + 0.3 * (maximum(-X2[:, 2]) - cA)
+    xA, xP = -X2[:, 2], -X2[:, 1]
+    tv = PO.SequentialConditionalValueatRiskViewConstraint([xA], [1.0], [xP], [-1.0],
+                                                           zeros(T2), 0.0, ep_a, tA, 20,
                                                            1e-8)
-    wp = zeros(T)
-    wp[1] = 1.0
-    out = PO.ep_sequential_start(tv, wp)
-    @test out isa PO.SequentialConditionalValueatRiskViewConstraint
-    @test out.rhs == tv.rhs
-    @test length(out.c) == T
-    @test out.c == PO.ep_refine_tail_view(tv, wp)[1].c
+    tv1 = PO.ep_refine_tail_view(tv, w2)[1]
+    # The premise: the start needs more than the row gives, and neither direction tilts.
+    @test tA - tv1.b - cA > maximum(tv1.c) == minimum(tv1.c)
+    @test isnothing(PO.ep_row_tilt(w2, xP, LinearAlgebra.dot(w2, xP)))
+    pr2 = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
+                                    cvar_views = ConditionalValueatRiskView(;
+                                                                            alg = SequentialTailView(),
+                                                                            views = LinearConstraintEstimator(;
+                                                                                                              val = "AMD - AAPL >= $tA"))),
+                rd2)
+    cv2(j) = ConditionalValueatRisk(; alpha = ep_a, w = pr2.w)(X2[:, j])
+    @test isapprox(cv2(2) - cv2(1), tA; rtol = 1e-6)
+    @test pr2.kld > 0
 end
 
 @testset "the surrogate row is tight where it is read and bounds the measure elsewhere" begin
@@ -665,6 +673,25 @@ end
     t2 = (c12 - maximum(X10[:, 1] .+ X10[:, 2])) / 2
     pr2 = prior(mk(0.05, "AAPL + AMD <= $t2"), rd10)
     @test isapprox(cv(1, pr2.w, 0.05) + cv(2, pr2.w, 0.05), t2; rtol = 1e-6)
+    # Two primal losses that sum to a constant on the support: the sum `l` is constant too,
+    # so the start tilts along the losses of one asset. The view is feasible: a posterior
+    # with 0.02 on the worst loss of AAPL and the rest spread equally meets it.
+    Xh = copy(X10)
+    Xh[:, 2] .= 0.01 .- Xh[:, 1]
+    rdh = ReturnsResult(; nx = rd.nx, X = Xh)
+    cvh(wi) = sum(ConditionalValueatRisk(; alpha = 0.05, w = wi)(Xh[:, j]) for j in 1:2)
+    pw = fill(0.98 / 9, 10)
+    pw[argmin(Xh[:, 1])] = 0.02
+    th = (cvh(w10) + cvh(StatsBase.pweights(pw))) / 2
+    @test th < cvh(w10)
+    prh = prior(mk(0.05, "AAPL + AMD <= $th"), rdh)
+    @test isapprox(cvh(prh.w), th; rtol = 1e-6)
+    pih = prior(EntropyPoolingPrior(; sets = sets, opt = ep_mopt,
+                                    cvar_views = ConditionalValueatRiskView(; alpha = 0.05,
+                                                                            views = LinearConstraintEstimator(;
+                                                                                                              val = "AAPL + AMD <= $th"))),
+                rdh)
+    @test isapprox(prh.kld, pih.kld; rtol = 1e-6)
     # A prior whose weights are zero outside 10 scenarios of the full sample: only the
     # support bounds the row, and the posterior puts no mass off it.
     wz = zeros(size(ep_sX, 1))

@@ -1783,6 +1783,21 @@ end
     # The edge of the band needs all the mass on one scenario, so it is refused too.
     @test_throws DomainError prior(EntropyPoolingPrior(; sets = sets,
                                                        mu_views = lce("AAPL == $(hi)")), rd)
+    # A row that is constant on the support has no edge. The prior meets each of these
+    # views, so every posterior does, and the fit returns the prior.
+    Xc = X[1:60, :]
+    Xc[:, 1] .= 0.001
+    rdc = ReturnsResult(; nx = rd.nx, X = Xc)
+    for v in ("AAPL == 0.001", "AAPL <= 0.001", "AAPL >= 0.001"),
+        EP in (EntropyPoolingPrior, MeucciEntropyPoolingPrior)
+
+        pc = prior(EP(; sets = sets, mu_views = lce(v)), rdc)
+        @test isapprox(pc.w, fill(inv(60), 60); rtol = 1e-10)
+    end
+    e = @test_throws DomainError prior(EntropyPoolingPrior(; sets = sets,
+                                                           mu_views = lce("AAPL == 0.0011")),
+                                       rdc)
+    @test occursin("keeps that average at 0.001.", e.value.msg)
     # An inequality needs one edge alone: `>=` above the band fails, `<=` above it holds.
     @test_throws DomainError prior(EntropyPoolingPrior(; sets = sets,
                                                        mu_views = lce("AAPL >= $(hi + 0.01)")),

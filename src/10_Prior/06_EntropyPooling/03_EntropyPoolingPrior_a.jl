@@ -1697,7 +1697,8 @@ This happens with the relativistic value at risk. At the pair of the prior, its 
  2. Calculate `need`, the value that the row must reach. It is the target, minus the constant of the row, minus the coefficient-weighted sum of the measures of the dual side under the current probabilities. [`ep_tail_surrogate_row`](@ref) gives each measure.
  3. Return `tv` when the largest coefficient of the row is at least `need`. A probability vector then meets the row, and the solve can start.
  4. Otherwise, tilt the probabilities with [`ep_row_tilt`](@ref), so that the row goes nine tenths of the way from its current value to its largest coefficient. Read the row again at the tilted probabilities, and go back to step 2.
- 5. Do at most `iters` steps. When the tilt does not exist, return `tv` with its last row.
+ 5. When the row is constant on the support of the probabilities, no tilt along the row exists. For a CVaR row this happens when the worst primal loss holds at least `alpha`. Then tilt in the same way along `l`, the coefficient-weighted sum of the primal losses, and when `l` is constant too, along the coefficient-weighted losses of each primal asset in turn. The coefficients of the primal side are negative, so each such tilt moves mass away from the worst primal losses.
+ 6. Do at most `iters` steps. When no tilt exists, return `tv` with its last row.
 
 # Arguments
 
@@ -1726,8 +1727,10 @@ function ep_sequential_start(tv::AbstractSequentialTailViewConstraint, w::VecNum
     end
     # The coefficients of the primal side are negative, so `l` is large where the primal
     # losses are small. It is the second direction of the tilt, for a row that is constant
-    # on the support (#1923).
+    # on the support (#1923). `l` is constant too when the primal losses sum to a constant
+    # on the support, so the weighted losses of each primal asset follow it.
     l = sum(ci .* x for (x, ci) in zip(xp, cp))
+    dirs = Iterators.flatten(((l,), (ci .* x for (x, ci) in zip(xp, cp))))
     for _ in 1:iters
         (; c, b, rhs) = tv
         need = rhs - b
@@ -1743,14 +1746,17 @@ function ep_sequential_start(tv::AbstractSequentialTailViewConstraint, w::VecNum
         end
         v = LinearAlgebra.dot(c, wi)
         q = ep_row_tilt(wi, c, v + 0.9 * (cmax - v))
-        if isnothing(q)
+        for d in dirs
             # The row is constant on the support. For a CVaR row this happens when the
             # worst primal loss holds at least `alpha`: the value at risk is that loss, and
             # every excess is zero. Moving mass away from the worst primal losses moves the
             # point at which the row is read.
-            vl = LinearAlgebra.dot(l, wi)
-            lmax = maximum(lj for (lj, wj) in zip(l, wi) if wj > zero(wj))
-            q = ep_row_tilt(wi, l, vl + 0.9 * (lmax - vl))
+            if !(isnothing(q))
+                break
+            end
+            vd = LinearAlgebra.dot(d, wi)
+            dmax = maximum(dj for (dj, wj) in zip(d, wi) if wj > zero(wj))
+            q = ep_row_tilt(wi, d, vd + 0.9 * (dmax - vd))
         end
         if isnothing(q)
             return tv
