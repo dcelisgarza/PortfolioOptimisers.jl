@@ -295,6 +295,8 @@ The dual problem has one variable for each row, not one for each observation. It
 
     The gradient of this dual is ``\\boldsymbol{B} - \\mathbf{A} \\boldsymbol{y}``, the primal residual of the view set, so `Optim.g_converged` and `Optim.g_residual` can tell the two outcomes apart. The method reads neither. `Optim.g_converged` also refuses a solve that is correct but has a loose tolerance. So a check on it needs a tolerance on the residual, and this library sets no such tolerance.
 
+    The `diagnose` field of [`EntropyPoolingPrior`](@ref) and [`MeucciEntropyPoolingPrior`](@ref) refuses an infeasible view set before this method runs. [`ep_diagnose_views`](@ref) decides it exactly with a linear programme, and its error names the view fields.
+
 # Mathematical definition
 
 The primal problem minimises the Kullback-Leibler divergence of the posterior from the prior, over the probabilities that meet every row. Its dual has one Lagrange multiplier for each row, and has no constraint other than the box that the sense of each row sets:

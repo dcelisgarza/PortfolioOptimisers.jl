@@ -228,6 +228,183 @@ function ep_check_tail_window(::AbstractEntropyPoolingTailView, ::VecNum)
     return nothing
 end
 """
+    ep_diagnose_tail_view!(model::JuMP.Model, p, tv::AbstractEntropyPoolingTailView)
+
+Add a tail view constraint to the feasibility programme of [`ep_diagnose_views`](@ref) when the constraint states its view exactly and convexly.
+
+The programme must refuse only a view set that no posterior meets. So it holds a tail view constraint only when the constraint is exact. [`LinearConditionalValueatRiskViewConstraint`](@ref), [`ConicEntropicValueatRiskViewConstraint`](@ref) and [`ConicRelativisticValueatRiskViewConstraint`](@ref) are exact and convex, and their method adds them with [`add_ep_tail_view!`](@ref). That method is in `src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_b.jl`.
+
+Every other tail view constraint is a restriction of its view: the surrogate row of a sequential formulation, the rows of an upper bound under [`GridTailView`](@ref), and the window of the integer formulation. A restriction can be infeasible where its view is not, so this method adds nothing for it.
+
+# Arguments
+
+  - `model`: The JuMP model of the feasibility programme.
+  - `p`: The posterior probability variables of the model.
+  - `tv`: Tail view constraint.
+
+# Returns
+
+  - `nothing`: The function mutates `model` in place, or does nothing.
+
+# Related
+
+  - [`ep_diagnose_views`](@ref)
+  - [`add_ep_tail_view!`](@ref)
+  - [`AbstractEntropyPoolingTailView`](@ref)
+"""
+function ep_diagnose_tail_view!(::JuMP.Model, p, ::AbstractEntropyPoolingTailView)
+    return nothing
+end
+"""
+    ep_diagnose_views(slv::Option{<:Slv_VecSlv}, w::VecNum, epc::AbstractDict,
+                      tvs::VecEPTV, pe::AbstractPriorEstimator, fields::Tuple)
+
+Refuse a set of entropy pooling views that no reweighting of the scenarios meets together.
+
+[`ep_assert_attainable_rows`](@ref) checks each row of a view alone. A set of rows can pass that check row by row and still have no common posterior. Then the dual of [`OptimEntropyPooling`](@ref) runs to an unbounded multiplier, and the fit fails in a consumer of the weights, or returns a degenerate posterior. [`JuMPEntropyPooling`](@ref) reports an infeasible model, but its error names no view.
+
+This function decides joint feasibility exactly with a linear programme, before the solve of each stage. It costs one solve of the programme for each stage, so it runs only when the `diagnose` field of the estimator holds solvers. With `nothing`, the method does nothing.
+
+# Mathematical definition
+
+The programme finds the largest margin ``\\tau`` by which a posterior stays above a fraction of the prior on its support ``\\mathcal{S}``:
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{p},\\, \\tau}{\\max} &\\; \\tau \\\\
+\\mathrm{s.t.} &\\; \\sum_{t=1}^{T} p_{t} = 1\\,, \\quad \\boldsymbol{p} \\geq 0\\,, \\\\
+&\\; p_{t} \\geq \\tau q_{t}\\,, \\quad \\forall\\, t \\in \\mathcal{S}\\,, \\qquad p_{t} = 0\\,, \\quad \\forall\\, t \\notin \\mathcal{S}\\,, \\\\
+&\\; \\mathbf{A}_{\\mathrm{eq}} \\boldsymbol{p} = \\boldsymbol{B}_{\\mathrm{eq}}\\,, \\quad \\mathbf{A}_{\\mathrm{ineq}} \\boldsymbol{p} \\leq \\boldsymbol{B}_{\\mathrm{ineq}}\\,.
+\\end{align}
+```
+
+The prior is a feasible point when every view is slack at it, and then ``\\tau = 1``. The views exclude each other when the programme is infeasible. When ``\\tau \\leq 0``, a posterior meets the views only with zero probability on a scenario of ``\\mathcal{S}``. The posterior of entropy pooling is positive wherever the prior is positive, so its dual then has no finite solution. This is the joint form of the edge that [`ep_assert_attainable_rows`](@ref) refuses for one row. [meucci2008](@citet) states the dual. The feasibility programme is the library's own.
+
+Where:
+
+  - $(math_dict[:ep_post_probs])
+  - $(math_dict[:ep_prior_probs])
+  - $(math_dict[:T])
+  - $(math_dict[:eq])
+  - $(math_dict[:ineq])
+  - ``\\tau``: Margin of the posterior above the prior, as a fraction of the prior.
+  - ``\\mathcal{S}``: Support of the prior, the scenarios with ``q_{t} > 0``.
+
+# JuMP formulation
+
+## Variables
+
+  - `t`: ``\\tau``, the margin.
+  - `p`: ``\\boldsymbol{p}``, the posterior probabilities, with a lower bound of zero. The variables off the support are fixed at zero.
+
+## Constraints
+
+  - `csum`: ``\\sum_{t=1}^{T} p_{t} - 1 = 0``.
+  - `cmargin`: ``\\tau \\boldsymbol{q} - \\boldsymbol{p} \\leq 0``. Off the support, ``q_{t} = 0``, and the row is the bound ``p_{t} \\geq 0``.
+  - `ceq`: ``\\mathbf{A}_{\\mathrm{eq}} \\boldsymbol{p} - \\boldsymbol{B}_{\\mathrm{eq}} = 0``, when `epc` holds an `:eq` block.
+  - `cineq`: ``\\mathbf{A}_{\\mathrm{ineq}} \\boldsymbol{p} - \\boldsymbol{B}_{\\mathrm{ineq}} \\leq 0``, when `epc` holds an `:ineq` block.
+  - The rows of each exact tail view constraint, which [`ep_diagnose_tail_view!`](@ref) adds.
+
+## Objective
+
+  - Maximise `t`.
+
+The programme leaves out three kinds of row. A `:feq` row fixes a moment of an earlier stage, and the solve relaxes it with a penalised slack, so it cannot make the solve infeasible. A `:cvar_eq` row is a trial of the root search of [`ep_cvar_views_solve!`](@ref), not a view. A tail view constraint that is a restriction of its view can be infeasible where the view is not, so [`ep_diagnose_tail_view!`](@ref) adds only the exact ones.
+
+# Algorithm
+
+ 1. Return `nothing` when `slv` is `nothing`, or when `epc` holds no `:eq` and no `:ineq` block and `tvs` is empty.
+ 2. Build the programme of the `JuMP formulation` section, and solve it with [`optimise_JuMP_model!`](@ref).
+ 3. When no solver solves it and one solver reports it infeasible, raise a `DomainError`.
+ 4. When no solver solves it for another reason, raise an `ErrorException`.
+ 5. When the margin is not positive, raise a `DomainError`.
+
+A simplex solver returns a vertex of the programme, so at the edge its margin is zero, and the check refuses the edge exactly. An interior-point solver meets the edge only to its tolerance. Its margin there can be a little above zero, and then the check passes, and the solve meets the edge to the same tolerance.
+
+# Arguments
+
+  - `slv`: Solvers of the programme, or `nothing` to skip the check. The estimator gives its `diagnose` field.
+  - `w`: Prior probabilities of the solve that follows, one for each observation.
+  - `epc`: Dictionary of entropy pooling constraints, which maps each key to an `(lhs, rhs)` pair.
+  - `tvs`: Tail view constraints of the solve that follows.
+  - `pe`: Entropy pooling prior estimator, read only for the names of its view fields in an error message.
+  - `fields`: Names of the view fields whose rows `epc` and `tvs` hold. The error message names those of them that are not `nothing`.
+
+# Validation
+
+  - The programme must be feasible, else a `DomainError` names the view fields.
+  - A solver must solve the programme, else an `ErrorException` names the view fields.
+  - The margin must be positive, else a `DomainError` names the view fields and the margin.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ep_assert_attainable_rows`](@ref)
+  - [`ep_diagnose_tail_view!`](@ref)
+  - [`entropy_pooling`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+  - [`MeucciEntropyPoolingPrior`](@ref)
+
+# References
+
+  - $(ref_dict[:meucci2008]) Appendix A.3, Equations 90 to 93.
+"""
+function ep_diagnose_views(::Nothing, ::VecNum, ::AbstractDict, ::VecEPTV,
+                           ::AbstractPriorEstimator, ::Tuple)
+    return nothing
+end
+function ep_diagnose_views(slv::Slv_VecSlv, w::VecNum, epc::AbstractDict, tvs::VecEPTV,
+                           pe::AbstractPriorEstimator, fields::Tuple)
+    if !haskey(epc, :eq) && !haskey(epc, :ineq) && isempty(tvs)
+        return nothing
+    end
+    T = length(w)
+    # `collect` reads the values of a weights vector, which StatsBase cannot index when they
+    # are a range.
+    q = collect(w)
+    Z = findall(iszero, q)
+    model = JuMP.Model()
+    JuMP.@variables(model, begin
+                        t
+                        p[1:T] >= 0
+                    end)
+    JuMP.fix.(p[Z], zero(eltype(w)); force = true)
+    JuMP.@constraint(model, csum, sum(p) - one(eltype(w)) == 0)
+    JuMP.@constraint(model, cmargin, t * q - p <= 0)
+    if haskey(epc, :eq)
+        A, B = epc[:eq]
+        JuMP.@constraint(model, ceq, A * p ⊖ B == 0)
+    end
+    if haskey(epc, :ineq)
+        A, B = epc[:ineq]
+        JuMP.@constraint(model, cineq, A * p ⊖ B <= 0)
+    end
+    for tv in tvs
+        ep_diagnose_tail_view!(model, p, tv)
+    end
+    JuMP.@objective(model, Max, t)
+    res = optimise_JuMP_model!(model, slv)
+    # The names are read only for a message, so a fit that passes builds no string.
+    names = () -> join(("`$(f)`" for f in fields if !isnothing(getfield(pe, f))), ", ",
+                       " and ")
+    infeasible = (JuMP.INFEASIBLE, JuMP.LOCALLY_INFEASIBLE, JuMP.INFEASIBLE_OR_UNBOUNDED)
+    @argcheck(res.success ||
+              !any(tr -> get(tr, :termination_status, nothing) in infeasible,
+                   values(res.trials)),
+              DomainError(names(),
+                          "No reweighting of the scenarios at a positive prior probability meets the views of $(names()) together. Each view row can be attainable alone while the rows exclude each other, so entropy pooling has no posterior. Relax or remove a view that conflicts with the others."))
+    @argcheck(res.success,
+              ErrorException("The solvers of `diagnose` did not solve the feasibility programme of the views of $(names()), and no solver reported it infeasible. Use a solver that takes the cones of the exact tail views, or other solver settings."))
+    tau = JuMP.value(t)
+    @argcheck(tau > zero(tau),
+              DomainError(tau,
+                          "The views of $(names()) hold together only when the posterior puts zero probability on a scenario of positive prior probability: the largest margin of the posterior above the prior is $(tau). The posterior of entropy pooling is positive wherever the prior is positive, so the solve has no finite dual solution. Move a target away from the edge of the views, or use a prior whose scenarios spread wider."))
+    return nothing
+end
+"""
     ep_jump_entropy_pooling(w::VecNum, epc::AbstractDict, tvs::VecEPTV,
                             opt::JuMPEntropyPooling)
 

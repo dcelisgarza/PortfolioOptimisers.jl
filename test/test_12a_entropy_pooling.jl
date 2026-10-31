@@ -1,4 +1,5 @@
 include(joinpath(@__DIR__, "test12_setup.jl"))
+using HiGHS
 
 @testset "ExpEntropyPooling" begin
     pr0 = prior(EmpiricalPrior(), rd)
@@ -1848,6 +1849,111 @@ end
         e = @test_throws DomainError prior(ep(off), X30, F30)
         @test occursin("The mean view `1.0*A1 == $(base + off)`", e.value.msg)
     end
+end
+
+@testset "A set of views that no reweighting meets together is refused by `diagnose` (#1924)" begin
+    #=
+    Each view row can be inside its band and the rows still exclude each other. The dual of
+    `OptimEntropyPooling` then ran to an unbounded multiplier, and the fit failed in a
+    consumer of the weights with `weights cannot contain Inf or NaN values`. The JuMP route
+    raised an error that named no view. With solvers in `diagnose`, a linear programme
+    decides before each solve whether the views of the stage can hold together.
+
+    `A` is large on the third scenario and `B` on the first. `A == v` and `B == v` each need
+    `p[3] = v / 2` and `p[1] = v / 2`, so together they need `v <= 1`, and `v == 1` puts no
+    mass on the second scenario.
+    =#
+    lce(v) = LinearConstraintEstimator(; val = v)
+    clr = slv[1]
+    hgs = Solver(; name = :highs, solver = HiGHS.Optimizer,
+                 settings = "output_flag" => false,
+                 check_sol = (; allow_local = true, allow_almost = true))
+    Xs = [0.0 2.0; 0.0 0.0; 2.0 0.0]
+    rds = ReturnsResult(; nx = ["A", "B"], X = Xs)
+    ss = UniverseSets(; dict = Dict("nx" => ["A", "B"]))
+    mk(EP, v; d = clr, opt = OptimEntropyPooling(), alg = H1_EntropyPooling(), kw...) = EP(;
+                                                                                           sets = ss,
+                                                                                           opt = opt,
+                                                                                           diagnose = d,
+                                                                                           alg = alg,
+                                                                                           mu_views = lce(["A == $v",
+                                                                                                           "B == $v"]),
+                                                                                           kw...)
+    # Without the check, the dual overflows and the fit fails in a consumer of the weights.
+    @test_throws ArgumentError prior(mk(EntropyPoolingPrior, 1.2; d = nothing), rds)
+    for EP in (EntropyPoolingPrior, MeucciEntropyPoolingPrior),
+        alg in (H0_EntropyPooling(), H1_EntropyPooling())
+
+        @test prior(mk(EP, 0.9; alg = alg), rds) isa LowOrderPrior
+        e = @test_throws DomainError prior(mk(EP, 1.2; alg = alg), rds)
+        @test occursin("meets the views of `mu_views` together", e.value.msg)
+    end
+    # The JuMP route raises the same named error before its own solve.
+    jo = JuMPEntropyPooling(; slv = clr)
+    @test_throws ErrorException prior(mk(EntropyPoolingPrior, 1.2; d = nothing, opt = jo),
+                                      rds)
+    @test_throws DomainError prior(mk(EntropyPoolingPrior, 1.2; opt = jo), rds)
+    # A simplex solver returns a vertex, so it refuses the edge exactly: the largest margin of
+    # the posterior above the prior is zero.
+    e = @test_throws DomainError prior(mk(EntropyPoolingPrior, 1.0; d = hgs), rds)
+    @test e.value.val <= 0
+    @test occursin("zero probability on a scenario", e.value.msg)
+    @test prior(mk(EntropyPoolingPrior, 0.9; d = hgs), rds) isa LowOrderPrior
+    # A later stage reads the rows of the stages before it. The means fix the posterior, and a
+    # variance view that its own band admits conflicts with them.
+    for EP in (EntropyPoolingPrior, MeucciEntropyPoolingPrior)
+        e = @test_throws DomainError prior(mk(EP, 0.9; sigma_views = lce("A == 1.1")), rds)
+        @test occursin("`mu_views` and `sigma_views`", e.value.msg)
+    end
+    # An exact tail view joins the programme. The means give the conditional value at risk at
+    # `alpha = 0.6` of `A` the value `-1/6`, and the prior gives it zero.
+    cvv(c) = ConditionalValueatRiskView(; alpha = 0.6,
+                                        alg = LinearConditionalValueatRiskView(),
+                                        views = lce("A >= $c"))
+    @test prior(mk(EntropyPoolingPrior, 0.9; opt = jo, cvar_views = cvv(-0.2)), rds) isa
+          LowOrderPrior
+    e = @test_throws DomainError prior(mk(EntropyPoolingPrior, 0.9; opt = jo,
+                                          cvar_views = cvv(-0.1)), rds)
+    @test occursin("`mu_views` and `cvar_views`", e.value.msg)
+    # Inequality rows join the programme too: `A >= v` and `B >= v` need `p[3] >= v / 2`
+    # and `p[1] >= v / 2`.
+    mki(v; d = clr) = EntropyPoolingPrior(; sets = ss, diagnose = d,
+                                          mu_views = lce(["A >= $v", "B >= $v"]))
+    @test prior(mki(0.9), rds) isa LowOrderPrior
+    e = @test_throws DomainError prior(mki(1.2), rds)
+    @test occursin("meets the views of `mu_views` together", e.value.msg)
+    # A sequential tail view is a restriction of its view, so the programme leaves it out,
+    # and the check does not change the solve.
+    sX = rd.X[(end - 200):end, :]
+    srd = ReturnsResult(; nx = rd.nx, X = sX)
+    tq = 0.85 * ConditionalValueatRisk(; alpha = 0.05)(sX[:, 1])
+    sv = ConditionalValueatRiskView(; alg = SequentialTailView(),
+                                    views = lce("AAPL <= $tq"))
+    @test prior(EntropyPoolingPrior(; sets = sets, opt = jo, diagnose = clr,
+                                    cvar_views = sv), srd).w ==
+          prior(EntropyPoolingPrior(; sets = sets, opt = jo, cvar_views = sv), srd).w
+    # A solver that fails for a reason other than infeasibility is not a verdict on the views.
+    bad = Solver(; name = :bad, solver = () -> error("no optimiser"))
+    e = @test_throws ErrorException prior(mk(EntropyPoolingPrior, 0.9; d = bad), rds)
+    @test occursin("no solver reported it infeasible", e.value.msg)
+    # The check does not change a solve that passes it, at every stage of both estimators. A
+    # stage whose views make no row of the programme does not run it.
+    vw = (; mu_views = lce("AAPL == 1.1prior(AAPL)"),
+          sigma_views = lce("AAPL==1.3prior(AAPL)"),
+          sk_views = lce("AAPL == prior(AAPL)*2"))
+    for EP in (EntropyPoolingPrior, MeucciEntropyPoolingPrior),
+        alg in (H0_EntropyPooling(), H1_EntropyPooling(), H2_EntropyPooling())
+
+        @test prior(EP(; sets = sets, alg = alg, diagnose = clr, vw...), rd).w ==
+              prior(EP(; sets = sets, alg = alg, vw...), rd).w
+    end
+    cv = ConditionalValueatRiskView(; views = lce("AAPL == 1.1prior(AAPL)"))
+    @test prior(MeucciEntropyPoolingPrior(; sets = sets, diagnose = clr, cvar_views = cv),
+                rd).w ==
+          prior(MeucciEntropyPoolingPrior(; sets = sets, cvar_views = cv), rd).w
+    # An empty vector of solvers names no solver.
+    @test_throws IsEmptyError EntropyPoolingPrior(; diagnose = Solver[])
+    @test_throws IsEmptyError MeucciEntropyPoolingPrior(; diagnose = Solver[])
 end
 
 @testset "An entropy pooling prior over a factor prior meets its views (#1649)" begin

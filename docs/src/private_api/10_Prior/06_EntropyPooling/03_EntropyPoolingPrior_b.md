@@ -20,6 +20,7 @@ ep_normalise_tail_view
 ep_add_tail_view!
 ep_tail_views!
 ep_check_tail_window(tv::IntegerConditionalValueatRiskViewConstraint, w::VecNum)
+ep_diagnose_tail_view!(::JuMP.Model, ::Any, ::Union{LinearConditionalValueatRiskViewConstraint, ConicEntropicValueatRiskViewConstraint, ConicRelativisticValueatRiskViewConstraint})
 ```
 
 ## References

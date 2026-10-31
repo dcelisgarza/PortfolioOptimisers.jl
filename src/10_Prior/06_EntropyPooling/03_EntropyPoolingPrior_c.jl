@@ -40,7 +40,9 @@ A tail view group also holds `alg`, the formulation. For an [`EntropicValueatRis
 
     The [`OptimEntropyPooling`](@ref) route does not detect an infeasible view set. The dual of an infeasible set is unbounded, so the minimiser does not stop at a finite point. The posterior puts almost all of its mass on one observation, and `Optim` reports the solve as converged. A view far outside the feasible set makes the dual overflow instead. The moment estimators then get weights that are not finite, and they raise an `ArgumentError` that names Infs or NaNs. [`entropy_pooling`](@ref) states the mechanism.
 
-    Read the result, not the flag. On such a result, `ens` is a small number against the number of observations, and one weight is near one. `kld` is large, and the posterior statistic of the view is far from its target. The [`JuMPEntropyPooling`](@ref) route does not have this problem, because the solver reports an infeasible model.
+    Read the result, not the flag. On such a result, `ens` is a small number against the number of observations, and one weight is near one. `kld` is large, and the posterior statistic of the view is far from its target. The [`JuMPEntropyPooling`](@ref) route does not have this problem, because the solver reports an infeasible model. But its error names no view.
+
+    To refuse such a view set before the solve, give `diagnose` a solver of linear programmes. [`ep_diagnose_views`](@ref) then decides with one linear programme for each stage whether the views can hold together, and its error names the view fields.
 
 # Algorithm
 
@@ -69,6 +71,7 @@ $(DocStringExtensions.FIELDS)
         rho_views::Option{<:LinearConstraintEstimator} = nothing,
         sets::Option{<:UniverseSets} = nothing,
         opt::NonCVaREP = OptimEntropyPooling(),
+        diagnose::Option{<:Slv_VecSlv} = nothing,
         w::Option{<:ScenarioProbabilities} = nothing,
         alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling(),
         cache::Option{<:AbstractPartialFitState} = nothing,
@@ -82,6 +85,7 @@ Keywords correspond to the struct's fields.
   - If a view field is not `nothing`, `sets` must not be `nothing`.
   - If `cvar_views` is not `nothing`, `opt` must be a [`JuMPEntropyPooling`](@ref).
   - If a view field is a vector, it must not be empty.
+  - If `diagnose` is a vector, it must not be empty.
   - If `w` is not `nothing`, it must not be empty. At solve time, its length must equal the number of observations of the wrapped result.
   - [`assert_scenario_refit`](@ref) checks that the refit under the posterior weights can state the model of `pe`. It refuses an [`OpinionPoolingPrior`](@ref) whose `pe1` is inside a factor prior or a Black-Litterman prior of `pe`.
   - `x_src` must be `nothing`, `DataSource()` or `ExcessSource()`. [`assert_returns_source`](@ref) checks it.
@@ -171,6 +175,7 @@ EntropyPoolingPrior
               │      sc2 ┼ Float64: 1000.0
               │      alg ┼ ExpEntropyPooling()
               │      err ┴ nothing
+     diagnose ┼ nothing
             w ┼ nothing
           alg ┼ H1_EntropyPooling()
         x_src ┴ nothing
@@ -261,6 +266,10 @@ This prior has no exact incremental recursion, and it takes the online step by a
     """
     opt
     """
+    $(field_dict[:ep_diagnose])
+    """
+    diagnose
+    """
     $(field_dict[:ep_w])
     """
     @wprop w
@@ -288,6 +297,7 @@ This prior has no exact incremental recursion, and it takes the online step by a
                                  cov_views::Option{<:LinearConstraintEstimator},
                                  rho_views::Option{<:LinearConstraintEstimator},
                                  sets::Option{<:UniverseSets}, opt::NonCVaREP,
+                                 diagnose::Option{<:Slv_VecSlv},
                                  w::Option{<:ScenarioProbabilities},
                                  alg::AbstractEntropyPoolingAlgorithm,
                                  cache::Option{<:AbstractPartialFitState},
@@ -315,6 +325,9 @@ This prior has no exact incremental recursion, and it takes the online step by a
             @argcheck(isa(opt, JuMPEntropyPooling),
                       ArgumentError("A CVaR view needs auxiliary variables, which the dual formulation `OptimEntropyPooling` solves has no room for. Use `JuMPEntropyPooling` in `opt`."))
         end
+        if isa(diagnose, VecSlv)
+            @argcheck(!isempty(diagnose), IsEmptyError("diagnose cannot be empty"))
+        end
         if isa(var_views, AbstractVector)
             @argcheck(!isempty(var_views), IsEmptyError("var_views cannot be empty"))
         end
@@ -330,10 +343,11 @@ This prior has no exact incremental recursion, and it takes the online step by a
         return new{typeof(pe), typeof(mu_views), typeof(var_views), typeof(cvar_views),
                    typeof(evar_views), typeof(rlvar_views), typeof(sigma_views),
                    typeof(sk_views), typeof(kt_views), typeof(cov_views), typeof(rho_views),
-                   typeof(sets), typeof(opt), typeof(w), typeof(alg), typeof(cache),
-                   typeof(x_src)}(pe, mu_views, var_views, cvar_views, evar_views,
-                                  rlvar_views, sigma_views, sk_views, kt_views, cov_views,
-                                  rho_views, sets, opt, w, alg, cache, x_src)
+                   typeof(sets), typeof(opt), typeof(diagnose), typeof(w), typeof(alg),
+                   typeof(cache), typeof(x_src)}(pe, mu_views, var_views, cvar_views,
+                                                 evar_views, rlvar_views, sigma_views,
+                                                 sk_views, kt_views, cov_views, rho_views,
+                                                 sets, opt, diagnose, w, alg, cache, x_src)
     end
 end
 function EntropyPoolingPrior(; pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
@@ -349,13 +363,14 @@ function EntropyPoolingPrior(; pe::AbstractLowOrderPriorEstimator_A_F_AF = Empir
                              rho_views::Option{<:LinearConstraintEstimator} = nothing,
                              sets::Option{<:UniverseSets} = nothing,
                              opt::NonCVaREP = OptimEntropyPooling(),
+                             diagnose::Option{<:Slv_VecSlv} = nothing,
                              w::Option{<:ScenarioProbabilities} = nothing,
                              alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling(),
                              cache::Option{<:AbstractPartialFitState} = nothing,
                              x_src::Option{<:AbstractReturnsSource} = nothing)::EntropyPoolingPrior
     return EntropyPoolingPrior(pe, mu_views, var_views, cvar_views, evar_views, rlvar_views,
                                sigma_views, sk_views, kt_views, cov_views, rho_views, sets,
-                               opt, w, alg, cache, x_src)
+                               opt, diagnose, w, alg, cache, x_src)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -370,7 +385,7 @@ The state in `cache` changes at each step of an incremental fit, and it is not p
 
 # Returns
 
-  - `fields::Tuple`: The field names to render, which is `(:pe, :mu_views, :var_views, :cvar_views, :evar_views, :rlvar_views, :sigma_views, :sk_views, :kt_views, :cov_views, :rho_views, :sets, :opt, :w, :alg, :x_src)`.
+  - `fields::Tuple`: The field names to render, which is `(:pe, :mu_views, :var_views, :cvar_views, :evar_views, :rlvar_views, :sigma_views, :sk_views, :kt_views, :cov_views, :rho_views, :sets, :opt, :diagnose, :w, :alg, :x_src)`.
 
 # Related
 
@@ -380,8 +395,8 @@ The state in `cache` changes at each step of an incremental fit, and it is not p
 """
 function show_fields(::EntropyPoolingPrior)
     return (:pe, :mu_views, :var_views, :cvar_views, :evar_views, :rlvar_views,
-            :sigma_views, :sk_views, :kt_views, :cov_views, :rho_views, :sets, :opt, :w,
-            :alg, :x_src)
+            :sigma_views, :sk_views, :kt_views, :cov_views, :rho_views, :sets, :opt,
+            :diagnose, :w, :alg, :x_src)
 end
 # Expose `:me` and `:ce` from the embedded prior estimator `pe` for transparent access
 # (see [`@forward_properties`](@ref)).
@@ -530,6 +545,8 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
         # The posterior weights are probabilities, and the solver meets their sum to its
         # tolerance alone, so each solve normalises them. No constructor does it for the
         # refit: `scenario_prior` gives them to no entropy pooling prior (#1649).
+        ep_diagnose_views(pe.diagnose, w0, epc, tvs, pe,
+                          (:mu_views, :var_views, :cvar_views, :evar_views, :rlvar_views))
         w1 = LinearAlgebra.normalize!(entropy_pooling(w0, epc, tvs, pe.opt), 1)
         pr = scenario_prior(pe.pe, w1, pr0, X, F, pnl; strict = strict, kwargs...,
                             cache_reg = true)
@@ -553,6 +570,9 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
         # See issue #852.
         if !isempty(epc) || !isempty(tvs)
             ws = ifelse(isa(alg, H1_EntropyPooling), w0, w1)
+            ep_diagnose_views(pe.diagnose, ws, epc, tvs, pe,
+                              (:mu_views, :var_views, :cvar_views, :evar_views,
+                               :rlvar_views, :sigma_views, :cov_views))
             w1 = LinearAlgebra.normalize!(entropy_pooling(ws, epc, tvs, pe.opt), 1)
             pr = scenario_prior(pe.pe, w1, pr0, X, F, pnl; strict = strict, kwargs...,
                                 cache_reg = true)
@@ -584,6 +604,10 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
         # See the twin note one stage up: a stage that states no view does not solve.
         if !isempty(epc) || !isempty(tvs)
             ws = ifelse(isa(alg, H1_EntropyPooling), w0, w1)
+            ep_diagnose_views(pe.diagnose, ws, epc, tvs, pe,
+                              (:mu_views, :var_views, :cvar_views, :evar_views,
+                               :rlvar_views, :sigma_views, :cov_views, :sk_views, :kt_views,
+                               :rho_views))
             w1 = LinearAlgebra.normalize!(entropy_pooling(ws, epc, tvs, pe.opt), 1)
             pr = scenario_prior(pe.pe, w1, pr0, X, F, pnl; strict = strict, kwargs...,
                                 cache_reg = true)
@@ -691,6 +715,9 @@ function ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
     # states nothing. The prior is the answer, so neither the solve nor the refit runs. See
     # issue #852.
     if !isempty(epc) || !isempty(tvs)
+        ep_diagnose_views(pe.diagnose, w0, epc, tvs, pe,
+                          (:mu_views, :var_views, :cvar_views, :evar_views, :rlvar_views,
+                           :sigma_views, :cov_views, :sk_views, :kt_views, :rho_views))
         w1 = LinearAlgebra.normalize!(entropy_pooling(w0, epc, tvs, pe.opt), 1)
         pr = scenario_prior(pe.pe, w1, pr0, X, F, pnl; strict = strict, kwargs...,
                             cache_reg = true)

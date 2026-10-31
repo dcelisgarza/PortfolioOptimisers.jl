@@ -1338,4 +1338,39 @@ function ep_tail_views!(tail_views::AbstractEntropyPoolingTailViewEstimator,
     return nothing
 end
 
+"""
+    ep_diagnose_tail_view!(model::JuMP.Model, p,
+                           tv::Union{LinearConditionalValueatRiskViewConstraint,
+                                     ConicEntropicValueatRiskViewConstraint,
+                                     ConicRelativisticValueatRiskViewConstraint})
+
+Add an exact tail view constraint to the feasibility programme of [`ep_diagnose_views`](@ref).
+
+The three dual tail view constraints state a lower bound on a positive combination of concave measures. The bound is a convex set of the posterior probabilities, and the dual blocks of [`ep_tail_dual_block!`](@ref) state it exactly. So the method adds the rows of [`add_ep_tail_view!`](@ref), with the scale one. The solvers of the programme must then take the cones of those blocks: the exponential cone for an entropic view, and the power cone for a relativistic view.
+
+# Arguments
+
+  - `model`: The JuMP model of the feasibility programme.
+  - `p`: The posterior probability variables of the model.
+  - `tv`: Dual tail view constraint.
+
+# Returns
+
+  - `nothing`: The function mutates `model` in place.
+
+# Related
+
+  - [`ep_diagnose_views`](@ref)
+  - [`add_ep_tail_view!`](@ref)
+  - [`LinearConditionalValueatRiskViewConstraint`](@ref)
+  - [`ConicEntropicValueatRiskViewConstraint`](@ref)
+  - [`ConicRelativisticValueatRiskViewConstraint`](@ref)
+"""
+function ep_diagnose_tail_view!(model::JuMP.Model, p,
+                                tv::Union{LinearConditionalValueatRiskViewConstraint,
+                                          ConicEntropicValueatRiskViewConstraint,
+                                          ConicRelativisticValueatRiskViewConstraint})
+    return add_ep_tail_view!(model, p, tv, one(eltype(tv.coef)))
+end
+
 public ep_add_cvar_view!, ep_add_evar_view!, ep_add_rlvar_view!
