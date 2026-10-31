@@ -1718,12 +1718,16 @@ This happens with the relativistic value at risk. At the pair of the prior, its 
   - [`AbstractSequentialTailViewConstraint`](@ref)
 """
 function ep_sequential_start(tv::AbstractSequentialTailViewConstraint, w::VecNum)
-    (; xd, cd, xp, iters) = tv
+    (; xd, cd, xp, cp, iters) = tv
     wi = w ./ sum(w)
     tv, _ = ep_refine_tail_view(tv, wi)
     if isempty(xp)
         return tv
     end
+    # The coefficients of the primal side are negative, so `l` is large where the primal
+    # losses are small. It is the second direction of the tilt, for a row that is constant
+    # on the support (#1923).
+    l = sum(ci .* x for (x, ci) in zip(xp, cp))
     for _ in 1:iters
         (; c, b, rhs) = tv
         need = rhs - b
@@ -1731,12 +1735,23 @@ function ep_sequential_start(tv::AbstractSequentialTailViewConstraint, w::VecNum
             r, r0 = ep_tail_surrogate_row(tv, x, wi)
             need -= ci * (r0 + LinearAlgebra.dot(r, wi))
         end
-        cmax = maximum(c)
+        # A posterior puts no mass where the prior puts none, so only the support bounds
+        # the value of the row (#1260).
+        cmax = maximum(cj for (cj, wj) in zip(c, wi) if wj > zero(wj))
         if need <= cmax
             return tv
         end
         v = LinearAlgebra.dot(c, wi)
         q = ep_row_tilt(wi, c, v + 0.9 * (cmax - v))
+        if isnothing(q)
+            # The row is constant on the support. For a CVaR row this happens when the
+            # worst primal loss holds at least `alpha`: the value at risk is that loss, and
+            # every excess is zero. Moving mass away from the worst primal losses moves the
+            # point at which the row is read.
+            vl = LinearAlgebra.dot(l, wi)
+            lmax = maximum(lj for (lj, wj) in zip(l, wi) if wj > zero(wj))
+            q = ep_row_tilt(wi, l, vl + 0.9 * (lmax - vl))
+        end
         if isnothing(q)
             return tv
         end

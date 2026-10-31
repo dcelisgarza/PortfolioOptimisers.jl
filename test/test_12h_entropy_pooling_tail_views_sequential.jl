@@ -613,3 +613,61 @@ end
     @test d[EQ] == 1
     @test d[(Vector{JuMP.AffExpr}, JuMP.MOI.PowerCone{Float64})] == 2 * Ts
 end
+
+@testset "a sequential CVaR view is met when the worst scenario holds at least alpha (#1923)" begin
+    #=
+    When the prior weight of the worst loss is at least `alpha`, the value at risk at the
+    prior is that loss, every excess is zero, and the surrogate row is constant on the
+    support. No tilt along the row then exists, and the start returned the row it read at the
+    prior, which no posterior meets: every solver reported the first solve infeasible. The
+    start now tilts along the coefficient-weighted losses of the primal side when the tilt
+    along the row does not exist.
+    =#
+    X10 = ep_sX[1:10, :]
+    rd10 = ReturnsResult(; nx = rd.nx, X = X10)
+    w10 = StatsBase.pweights(fill(0.1, 10))
+    cv(j, wi, a) = ConditionalValueatRisk(; alpha = a, w = wi)(X10[:, j])
+    x1 = -X10[:, 1]
+    tq = (minimum(x1) + maximum(x1)) / 2
+    mk(a, val; opt = ep_jopt) = EntropyPoolingPrior(; sets = sets, opt = opt,
+                                                    cvar_views = ConditionalValueatRiskView(;
+                                                                                            alpha = a,
+                                                                                            alg = SequentialTailView(),
+                                                                                            views = LinearConstraintEstimator(;
+                                                                                                                              val = val)))
+    # The 10 equal weights are 0.1, so `alpha = 0.05` is below the weight of the worst loss,
+    # and `alpha = 0.1` is on it. At `alpha = 0.2` the start needed no second direction.
+    for a in (0.05, 0.1, 0.2)
+        pr = prior(mk(a, "AAPL <= $tq"), rd10)
+        @test isapprox(cv(1, pr.w, a), tq; rtol = 1e-6)
+        @test pr.kld > 0
+    end
+    # The posterior is the one of smallest divergence: the integer formulation reads every
+    # scenario and finds the same posterior.
+    ps = prior(mk(0.05, "AAPL <= $tq"), rd10)
+    pi_ = prior(EntropyPoolingPrior(; sets = sets, opt = ep_mopt,
+                                    cvar_views = ConditionalValueatRiskView(; alpha = 0.05,
+                                                                            views = LinearConstraintEstimator(;
+                                                                                                              val = "AAPL <= $tq"))),
+                rd10)
+    @test isapprox(ps.kld, pi_.kld; rtol = 1e-6)
+    # Two assets on the primal side: the second direction sums their weighted losses.
+    c12 = cv(1, w10, 0.05) + cv(2, w10, 0.05)
+    t2 = (c12 - maximum(X10[:, 1] .+ X10[:, 2])) / 2
+    pr2 = prior(mk(0.05, "AAPL + AMD <= $t2"), rd10)
+    @test isapprox(cv(1, pr2.w, 0.05) + cv(2, pr2.w, 0.05), t2; rtol = 1e-6)
+    # A prior whose weights are zero outside 10 scenarios of the full sample: only the
+    # support bounds the row, and the posterior puts no mass off it.
+    wz = zeros(size(ep_sX, 1))
+    wz[1:10] .= 0.1
+    prz = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
+                                    w = StatsBase.pweights(wz),
+                                    cvar_views = ConditionalValueatRiskView(; alpha = 0.05,
+                                                                            alg = SequentialTailView(),
+                                                                            views = LinearConstraintEstimator(;
+                                                                                                              val = "AAPL <= $tq"))),
+                ep_srd)
+    @test isapprox(ConditionalValueatRisk(; alpha = 0.05, w = prz.w)(ep_sX[:, 1]), tq;
+                   rtol = 1e-6)
+    @test sum(prz.w[11:end]) < 1e-6
+end
