@@ -378,7 +378,14 @@ end
         nco = NestedClustered(; opti = plain_hrp(), opto = plain_hrp(), cv = KFold(; n = 3),
                               ex = seq)
         res = optimise(nco, rd_nf)
+        # The panel holds no field, so no outer problem reads it: the answer is the one of
+        # the same data with no panel at all.
+        rd_np = ReturnsResult(; nx = rd_r.nx, X = rd_r.X, ts = rd_r.ts)
+        res_np = optimise(nco, rd_np)
         @test isapprox(sum(res.w), 1)
+        @test res.w ≈ res_np.w
+        @test res.clr.k == res_np.clr.k
+        @test assignments(res.clr) == assignments(res_np.clr)
     end
 
     @testset "A square carrier through a fold collapses onto the synthetic universe" begin
@@ -710,31 +717,101 @@ end
     end
 
     @testset "The read-cell collapse on its small shapes (#1912)" begin
+        #=
+        The outer problem of `NestedClustered` reads the collapsed panel through its
+        `FeatureDistance`. The inner clusters come from the default covariance distance, not
+        from the features, so an asset whose cell holds a placeholder still sits in a cluster
+        with a weight. Without a panel the default clustering is `{1, 5}` and
+        `{2, 3, 4, 6, 7, 8}`. The reference of each shape is worked by hand from the inner
+        weights, normalised in each cluster: a collapsed cell is the mean of the cells that
+        hold data, weighted by those weights.
+        =#
+        function outer_features(rd)
+            ro = RecordingDistance(FeatureDistance(; alg = StackObservations()))
+            nco = NestedClustered(; opti = plain_hrp(),
+                                  opto = HierarchicalRiskParity(; opt = hopt(ro)), ex = seq)
+            res = optimise(nco, rd)
+            idx = assignments(res.clr)
+            Wn = zeros(N, res.clr.k)
+            for i in 1:(res.clr.k)
+                Wn[findall(==(i), idx), i] = res.resi[i].w
+            end
+            @test length(ro.seen) == 1
+            return only(ro.seen), Wn ./ sum(Wn; dims = 1)
+        end
+        rd_with(pnl) = ReturnsResult(; nx = nx, X = X, ts = ts, pnl = pnl)
+        mean_of_read(num, den) = ifelse.(iszero.(den), 0.0,
+                                         num ./ ifelse.(iszero.(den), 1.0, den))
+        # Assets 1 and 4 hold a placeholder: asset 1 sits in the first cluster with asset 5.
+        d = Bool[0, 1, 1, 0, 1, 1, 1, 1]
+        # A static numeric field reads the cells that hold data. The first cluster reads
+        # asset 5 alone, so its value is `5`, and not the mean of the weighted placeholder.
+        a = [0.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+        Z, Wn = outer_features(rd_with(AssetPanel(;
+                                                  pf = [NumericPanelField(; name = "z",
+                                                                          vals = a,
+                                                                          omsk = d,
+                                                                          pmsk = .!d)])))
+        @test size(Wn) == (N, 2)
+        @test Z ≈ reshape(mean_of_read(transpose(Wn) * (d .* a), transpose(Wn) * d), :, 1)
+        @test Z[1] ≈ 5.0
+        # A static categorical field collapses to the membership fractions of the cells
+        # that hold data.
+        codes = [1, 2, 1, 2, 2, 1, 2, 1]
+        onehot = Float64[codes[i] == l for i in 1:N, l in 1:2]
+        Z, Wn = outer_features(rd_with(AssetPanel(;
+                                                  pf = [CategoricalPanelField(; name = "c",
+                                                                              levels = ["x",
+                                                                                        "y"],
+                                                                              codes = codes,
+                                                                              omsk = d,
+                                                                              pmsk = .!d)])))
+        @test Z ≈ mean_of_read(transpose(Wn) * (d .* onehot), transpose(Wn) * d)
+        @test Z[1, :] ≈ [0.0, 1.0]
+        @test all(isapprox(sum(Z[i, :]), 1) for i in 1:2)
+        # A static rectangular tensor field reads each label at the cells that hold data at
+        # that label.
+        A = Float64[1 2; 3 4; 5 6; 7 8; 9 10; 11 12; 13 14; 15 16]
+        o = trues(N, 2)
+        o[1, 1] = false
+        o[3, 1] = false
+        o[4, 2] = false
+        Z, Wn = outer_features(rd_with(AssetPanel(;
+                                                  pf = [TensorPanelField(; name = "t",
+                                                                         axis = "factor",
+                                                                         labels = ["p",
+                                                                                   "q"],
+                                                                         vals = A, omsk = o,
+                                                                         pmsk = .!o)])))
+        Zref = reduce(hcat,
+                      [mean_of_read(transpose(Wn) * (o[:, l] .* A[:, l]),
+                                    transpose(Wn) * o[:, l]) for l in 1:2])
+        @test Z ≈ Zref
+        # Label `p` of the first cluster reads asset 5 alone.
+        @test Z[1, 1] ≈ 9.0
+        # A time-varying tensor field whose data mask holds everywhere collapses as the
+        # plain contraction of the active members does, one observation at a time.
+        A3 = reshape(Float64.(1:(T * N * 2)), T, N, 2) ./ 1000
+        Z, Wn = outer_features(rd_with(AssetPanel(;
+                                                  pf = [TensorPanelField(; name = "t",
+                                                                         axis = "factor",
+                                                                         labels = ["p",
+                                                                                   "q"],
+                                                                         vals = A3,
+                                                                         omsk = trues(T, N,
+                                                                                      2),
+                                                                         pmsk = falses(T, N,
+                                                                                       2))],
+                                                  amsk = trues(T, N), emsk = trues(T, N))))
+        @test size(Z) == (T, 2, 2)
+        @test all(t -> Z[t, :, :] ≈ transpose(Wn) * A3[t, :, :], 1:T)
+        # No fit above reaches two shapes, so they stay direct calls: a static tensor whose
+        # data mask holds everywhere, which collapses with no mask, and no rate.
         Wt = [0.5 0.0; 0.25 1.0; 0.25 0.0]
-        alg = RenormaliseActive()
-        # A mask with no active mask of the panel is the mask of the observed cells.
-        @test PO.collapse_panel_mask(Bool[1, 0, 0], Wt, nothing) == Bool[1, 0]
-        @test PO.collapse_panel_mask(Bool[1, 0, 0], Wt, nothing) ==
-              PO.collapse_panel_mask(Bool[1, 0, 0], Wt)
-        @test isnothing(PO.read_cells(nothing, Bool[1, 1, 1]))
-        @test PO.read_cells(nothing, Bool[1, 0, 1]) == Bool[1, 0, 1]
-        # A static vector of values reads the cells of its own mask.
-        Av = [1.0, 2.0, 3.0]
-        @test PO.collapse_read_numeric(Av, Wt, Bool[1, 1, 1], alg) ≈ [1.75, 2.0]
-        @test PO.collapse_read_numeric(Av, Wt, Bool[1, 0, 1], alg) ≈ [5 / 3, 0.0]
-        # A static one-hot block collapses as the weighted membership of its levels.
-        Hv = [1.0 0.0; 0.0 1.0; 1.0 0.0]
-        @test PO.collapse_read_onehot(Hv, Wt, Bool[1, 1, 1], alg) ≈ [0.75 0.25; 0.0 1.0]
-        # A static tensor with a data mask that holds everywhere collapses without one.
         Tv = [1.0 2.0; 3.0 4.0; 5.0 6.0]
-        @test PO.collapse_read_tensor(Tv, Wt, false, nothing, trues(3, 2), alg) ≈
-              [2.5 3.5; 3.0 4.0]
-        # A time-varying tensor whose data mask holds at every active cell does the same.
-        Tv3 = reshape(Tv, 1, 3, 2)
-        Cv3 = PO.collapse_read_tensor(Tv3, Wt, false, trues(1, 3), trues(1, 3, 2), alg)
-        @test Cv3[1, :, :] ≈ [2.5 3.5; 3.0 4.0]
-        # No rate collapses to no rate.
-        @test isnothing(PO.collapse_rate(nothing, Wt, trues(2, 3), alg))
+        @test PO.collapse_read_tensor(Tv, Wt, false, nothing, trues(3, 2),
+                                      RenormaliseActive()) ≈ [2.5 3.5; 3.0 4.0]
+        @test isnothing(PO.collapse_rate(nothing, Wt, trues(2, 3), RenormaliseActive()))
     end
 
     @testset "Every member active: both rules equal the plain collapse bit for bit" begin

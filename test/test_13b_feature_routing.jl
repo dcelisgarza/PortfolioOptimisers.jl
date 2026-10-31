@@ -100,9 +100,30 @@ const PO = PortfolioOptimisers
         for nte in (nte_t, nte_s)
             clr = clusterise(NetworkClustersEstimator(; nte = nte), rd)
             @test clr.D == distance(fde, Zd)
-            # The readable mask of the clustering is the one of the network it holds (#1912).
-            @test PO.feature_readable_mask(NetworkClustersEstimator(; nte = nte), nothing,
-                                           rd) == PO.feature_readable_mask(nte, nothing, rd)
+            # A fit finds the `FeatureDistance` of the network that the clustering holds (#1912).
+            # Asset 1 holds a placeholder at every label, so no feature of it is readable,
+            # and the fit drops it as a non-investable asset: it gets no weight, and the
+            # others get the weights of the fit on the returns data without it.
+            o = trues(na, size(Zd, 2))
+            o[1, :] .= false
+            rd_hole = ReturnsResult(; nx = rd0.nx, X = rd0.X, nf = rd0.nf, F = rd0.F,
+                                    ts = rd0.ts,
+                                    pnl = AssetPanel(;
+                                                     pf = [TensorPanelField(; name = "z",
+                                                                            axis = "factor",
+                                                                            labels = nzd,
+                                                                            vals = Zd,
+                                                                            omsk = o,
+                                                                            pmsk = .!o)]))
+            hrp = HierarchicalRiskParity(;
+                                         opt = HierarchicalOptimiser(;
+                                                                     cle = NetworkClustersEstimator(;
+                                                                                                    nte = nte)))
+            res_hole = optimise(hrp, rd_hole)
+            res_view = optimise(hrp, PO.port_opt_view(rd_hole, 2:na))
+            @test iszero(res_hole.w[1])
+            @test isapprox(sum(res_hole.w), 1)
+            @test res_hole.w[2:end] ≈ res_view.w
         end
         # `logo!`'s `distance(je.de, S, X)`: the second positional is a *similarity
         # matrix*, which is why the three-argument method must not bound it. `logo!` is

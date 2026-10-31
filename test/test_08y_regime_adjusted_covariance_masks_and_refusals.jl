@@ -238,9 +238,19 @@ end
                                                            regime_target = DiagonalTarget(), kw...),
                        X)
     @test PO.min_active_assets(MyTarget397()) == 1
-    # A target of a caller's keeps no bias store, and the fallback names an empty one.
-    @test PO.regime_bias_store(MyTarget397(), 0.9, Float64) == Float64[]
-    @test eltype(PO.regime_bias_store(MyTarget397(), 0.9, Float32)) == Float32
+    # A target of a caller's keeps no bias store. Under a debias the state names an empty one,
+    # in the element type of the sample, and a fold leaves it empty. With no debias the state
+    # holds none.
+    mk_bias(db) = RegimeAdjustedExpWeightedCovariance(; merge(kw, (; debias = db))...,
+                                                      regime_method = RootMeanSquaredAdjusted(),
+                                                      regime_target = MyTarget397())
+    for (T, db) in
+        ((Float64, ExactDebias()), (Float32, ExactDebias()), (Float64, LawDebias()))
+        st = partial_fit!(mk_bias(db), T.(X)).cache
+        @test st.bias == T[]
+        @test typeof(st.bias) == Vector{T}
+    end
+    @test isnothing(partial_fit!(mk_bias(nothing), X).cache.bias)
 end
 @testset "the estimator refuses what it cannot fit" begin
     rng = StableRNG(8906)
