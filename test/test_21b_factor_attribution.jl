@@ -1480,24 +1480,36 @@ end
     @test PO.attribution_sandwich(zeros(N, 2), q, s2, 1:2) == zeros(2, 2)
     @test PO.attribution_dropped_observation(r.dc, Z[1, :, :], nothing, 1:3, 3, 1).P ==
           LinearAlgebra.Diagonal([1.0, 1.0, 0.0])
-    # An observation that drops no pair hands back the exposures and the change it was given
+    # A mask that drops no column at any observation answers as no mask does, and an
+    # observation that drops nothing among others that drop a column keeps its own error
     # (#1912).
-    dcn = falses(2, 3)
-    Bk = Z[1, :, :]
-    kept = PO.attribution_dropped_observation(dcn, Bk, nothing, 1:3, 3, 2)
-    @test kept.B === Bk
-    @test isnothing(kept.P)
+    fn = se(Z, r.f, r.eps; dc = falses(T, 3))
+    @test fn.fbd.mu_se == f0.fbd.mu_se
+    @test fn.sys.mu_se == f0.sys.mu_se
+    dcm = copy(r.dc)
+    dcm[1, :] .= false
+    fm = se(Z, r.f, r.eps; dc = dcm)
+    @test 0 < fm.fbd.mu_se[3] < f0.fbd.mu_se[3]
+    @test fm.fbd.mu_se[1] > f0.fbd.mu_se[1]
 end
 
 @testset "A pair that is inactive turns the exposures into a history (#1912)" begin
-    PO = PortfolioOptimisers
     B = [1.0 2.0; 3.0 4.0; 5.0 6.0]
-    eps = [0.1 0.2 0.3; 0.1 NaN 0.3]
-    z = PO.attribution_zero_inactive(B, eps)
-    @test size(z.B) == (2, 3, 2)
-    @test z.B[1, :, :] == B
-    @test z.B[2, 2, :] == [0.0, 0.0]
-    @test z.B[2, 1, :] == B[1, :]
-    @test z.eps[2, 2] == 0.0
-    @test z.act == isfinite.(eps)
+    f = [0.01 -0.02; 0.03 0.01; -0.01 0.02]
+    eps = [0.1 0.2 0.3; 0.1 NaN 0.3; 0.2 0.1 -0.1] ./ 10
+    w = [0.5, 0.3, 0.2]
+    # The held pair of the second observation and the second asset has no residual, so it
+    # adds nothing to the systematic or the idiosyncratic series, and nothing to the total.
+    act = isfinite.(eps)
+    sys = [sum(w[i] * act[t, i] * dot(B[i, :], f[t, :]) for i in 1:3) for t in 1:3]
+    idio = [sum(w[i] * ifelse(act[t, i], eps[t, i], 0.0) for i in 1:3) for t in 1:3]
+    ret = sys + idio
+    fa = factor_attribution(w, B, f, eps, ret)
+    @test fa.sys.vol ≈ std(sys)
+    @test fa.idio.vol ≈ std(idio)
+    @test fa.total.vol ≈ std(ret)
+    @test abs(fa.unattr.vol) < 1e-12
+    # Zeroing only the residual would leave the pair in the systematic series.
+    full = [dot(w, B * f[t, :]) for t in 1:3]
+    @test !isapprox(fa.sys.vol, std(full); rtol = 1e-3)
 end

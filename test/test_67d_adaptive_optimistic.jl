@@ -400,7 +400,9 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
         end
         gaps = [gap(randn(StableRNG(k), 3)) for k in 1:4]
         @test maximum(gaps) - minimum(gaps) < 1e-12
-        # A Gram geometry with no matrix is the identity: the view keeps it (#1912).
+        # A Gram geometry with no matrix is the identity: the view keeps it. The rules read
+        # the matrix off the prior before the view, so no rule reaches this branch, and it
+        # stays a direct call (#1912).
         g0 = GramProjection(; slv = slv)
         gp0, qr0 = po.investable_geometry_view(imk, g0, qg)
         @test gp0 === g0 && qr0 == qg[imk]
