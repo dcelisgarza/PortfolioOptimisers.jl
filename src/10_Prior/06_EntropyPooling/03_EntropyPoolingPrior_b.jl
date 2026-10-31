@@ -362,17 +362,28 @@ end
 """
     ep_assert_reachable_view(op::Symbol, rhs::Number, x::AbstractVector{<:VecNum},
                              coef::VecNum, w::VecNum, eqn::AbstractString,
-                             name::AbstractString)
+                             name::AbstractString; worst::Bool = false)
 
-Refuse a tail view that no reweighting of the sample can reach.
+Refuse a tail view that no reweighting of the sample can reach, and tell whether the view binds the posterior.
 
 A tail risk measure of a reweighted sample is between the smallest and the largest loss of the sample at a positive prior probability. So a coefficient-weighted sum of measures is between the sums of those bounds, and no change of the probabilities meets a view outside that band. For one asset the band is exact. For several assets it is an outer bound, because a reweighting that puts every asset at its worst loss together does not always exist. The posterior of entropy pooling puts no mass where the prior puts none, so an observation of zero prior probability does not widen the band.
+
+An edge of the band needs the mass of the posterior on the scenarios at that edge. The posterior of entropy pooling is positive wherever the prior is positive, so it meets an edge only when the measure reaches the edge at such a posterior. The measures differ at the worst loss:
+
+  - The CVaR of one asset equals its worst loss when the posterior puts at least `alpha` on the scenarios of that loss. A posterior that is positive on every scenario does this, so the caller of a CVaR view passes `worst = true`, and the method accepts `rhs == hi` for a view of one asset.
+  - The EVaR and the RLVaR reach the worst loss only in the limit of a posterior on the worst scenario, so the method refuses `rhs == hi` for them.
+  - A sum of CVaRs over several assets reaches `hi` only when one posterior puts at least `alpha` on the worst scenarios of each asset together. The method does not check that joint condition, so it refuses `rhs == hi` for a view of several assets.
+  - Every measure equals the smallest loss only when all the mass is on the scenarios of that loss, so the method refuses `rhs == lo`.
+
+A left-hand side that is constant on the support has no edge. Each measure of a constant series is that constant, so every posterior meets the view when the prior meets it, and none meets it otherwise. The method refuses such a view when the prior does not meet it. Otherwise it returns `false`, so the caller drops the view, which binds no posterior. The formulations of a view below the prior value fail on a constant series, because the prior value of an EVaR or an RLVaR is a little above the constant.
 
 # Algorithm
 
  1. Calculate `hi` over the observations with `w > 0`. It is the sum over the assets of the coefficient times the largest loss when the coefficient is positive, and times the smallest loss when the coefficient is negative. Calculate `lo` with the opposite choice.
- 2. When `op` asks the statistic to be at least `rhs`, raise an error unless `rhs` is below `hi`.
- 3. When `op` asks the statistic to be at most `rhs`, raise an error unless `rhs` is above `lo`.
+ 2. When `lo == hi`, raise an error unless the prior meets the view: `rhs <= hi` when `op` asks the statistic to be at least `rhs`, and `rhs >= lo` when `op` asks it to be at most `rhs`. Return `false`.
+ 3. When `op` asks the statistic to be at least `rhs`, raise an error unless `rhs` is below `hi`. With `worst = true` and one asset, `rhs == hi` passes too.
+ 4. When `op` asks the statistic to be at most `rhs`, raise an error unless `rhs` is above `lo`.
+ 5. Return `true`.
 
 # Arguments
 
@@ -383,15 +394,17 @@ A tail risk measure of a reweighted sample is between the smallest and the large
   - `w`: The prior probability weights.
   - `eqn`: The equation of the view, for the error message.
   - `name`: The name of the view family, for the error message.
+  - `worst`: If `true`, the measure of one asset equals its worst loss at a posterior that is positive on every scenario of the support. Only a CVaR view passes `true`.
 
 # Validation
 
-  - If `op` is `:geq` or `:eq`, `rhs < hi`.
-  - If `op` is `:leq` or `:eq`, `rhs > lo`.
+  - If `lo == hi`, `rhs <= hi` when `op` is `:geq` or `:eq`, and `rhs >= lo` when `op` is `:leq` or `:eq`.
+  - Else, if `op` is `:geq` or `:eq`, `rhs < hi`. With `worst = true` and one asset, `rhs <= hi`.
+  - Else, if `op` is `:leq` or `:eq`, `rhs > lo`.
 
 # Returns
 
-  - `nothing`.
+  - `binds::Bool`: `false` when the left-hand side is constant on the support, so every posterior meets the view. `true` otherwise.
 
 # Related
 
@@ -400,7 +413,7 @@ A tail risk measure of a reweighted sample is between the smallest and the large
 """
 function ep_assert_reachable_view(op::Symbol, rhs::Number, x::AbstractVector{<:VecNum},
                                   coef::VecNum, w::VecNum, eqn::AbstractString,
-                                  name::AbstractString)
+                                  name::AbstractString; worst::Bool = false)
     # Only the support of `w` bounds the band: a posterior puts no mass where the prior puts
     # none. Issue #1260.
     sup = w .> zero(eltype(w))
@@ -408,17 +421,28 @@ function ep_assert_reachable_view(op::Symbol, rhs::Number, x::AbstractVector{<:V
              for (xi, ci) in zip(x, coef))
     lo = sum(ci * ifelse(ci > zero(ci), minimum(view(xi, sup)), maximum(view(xi, sup)))
              for (xi, ci) in zip(x, coef))
-    if op == :geq || op == :eq
-        @argcheck(rhs < hi,
+    # A constant left-hand side has no edge: every posterior meets the view when the prior
+    # does, so the view binds nothing. Issue #1925. The parser admits `:geq`, `:leq` and
+    # `:eq` alone, so `op != :leq` reads "at least" and `op != :geq` reads "at most".
+    if lo == hi
+        @argcheck(ifelse(op == :eq, rhs == hi, ifelse(op == :geq, rhs <= hi, rhs >= lo)),
+                  DomainError(rhs,
+                              "View `$(eqn)` cannot be met: its left hand side is constant at $(hi) on the scenarios at a positive prior probability, so every reweighting of this sample gives that $(name). Move the target to that value or past it on the side of the operator."))
+        return false
+    end
+    # The CVaR of one asset reaches its worst loss at a posterior with `alpha` on the
+    # scenarios of that loss, which is positive on every scenario. Issue #1925.
+    if op != :leq
+        @argcheck(ifelse(worst & isone(length(x)), rhs <= hi, rhs < hi),
                   DomainError(rhs,
                               "View `$(eqn)` is too extreme: the largest $(name) any reweighting of this sample reaches is the worst realisation of its left hand side, $(hi). Lower the view, raise alpha, or use a prior with fatter tails."))
     end
-    if op == :leq || op == :eq
+    if op != :geq
         @argcheck(rhs > lo,
                   DomainError(rhs,
                               "View `$(eqn)` is too extreme: the smallest $(name) any reweighting of this sample reaches is the best realisation of its left hand side, $(lo). Raise the view, lower alpha, or use a prior with a thinner tail."))
     end
-    return nothing
+    return true
 end
 """
     ep_cvar_formulation(alg::Option{<:CVaRVF}, mixed::Bool, op::Symbol, rhs::Number,
@@ -1048,7 +1072,7 @@ function ep_tail_view_prior_args(tail_views::RelativisticValueatRiskView, w::Vec
 end
 """
     ep_normalise_tail_view(terms::NamedTuple, X::MatNum, w::VecNum, eqn::AbstractString,
-                           name::AbstractString)
+                           name::AbstractString; worst::Bool = false)
 
 Normalise the coefficients of a tail view, read the loss series of its assets, and tell whether its coefficients have both signs.
 
@@ -1060,7 +1084,7 @@ Every tail view goes through these steps. The function divides a view of one ass
  2. When the view names one asset, divide the view by the coefficient of that asset with [`ep_normalise_view_term`](@ref), which reverses the operator when the coefficient is negative. Set the coefficient to one.
  3. When the view names several assets and `mixed` is `false`, multiply both sides by the sign of the first coefficient with the same function. Then every coefficient is positive, and the operator reverses when the sign is negative.
  4. Read the loss series `x` of each asset as the negated column of its returns.
- 5. Refuse a target that no reweighting of the sample on the support of `w` reaches, with [`ep_assert_reachable_view`](@ref).
+ 5. Refuse a target that no reweighting of the sample on the support of `w` reaches, with [`ep_assert_reachable_view`](@ref). Return `nothing` when the left-hand side is constant on the support, because every posterior then meets the view.
 
 # Arguments
 
@@ -1069,8 +1093,13 @@ Every tail view goes through these steps. The function divides a view of one ass
   - `w`: The prior probability weights.
   - `eqn`: The equation of the view, for the error messages.
   - `name`: The name of the risk measure, for the error messages.
+  - `worst`: If `true`, the measure of one asset equals its worst loss at a posterior that is positive on every scenario. It goes to [`ep_assert_reachable_view`](@ref).
 
 # Returns
+
+  - `nothing`: The view binds no posterior, so the caller drops it.
+
+Otherwise, a tuple of:
 
   - `x::AbstractVector{<:VecNum}`: The loss series of each asset that the view names.
   - `coef::VecNum`: The normalised coefficient of each asset.
@@ -1087,7 +1116,8 @@ Every tail view goes through these steps. The function divides a view of one ass
   - [`EntropyPoolingPrior`](@ref)
 """
 function ep_normalise_tail_view(terms::NamedTuple, X::MatNum, w::VecNum,
-                                eqn::AbstractString, name::AbstractString)
+                                eqn::AbstractString, name::AbstractString;
+                                worst::Bool = false)
     (; idx, coef, op, rhs) = terms
     z = zero(eltype(coef))
     mixed = any(<(z), coef) && any(>(z), coef)
@@ -1100,7 +1130,9 @@ function ep_normalise_tail_view(terms::NamedTuple, X::MatNum, w::VecNum,
         coef = coef .* sgn
     end
     x = [-X[:, j] for j in idx]
-    ep_assert_reachable_view(op, rhs, x, coef, w, eqn, name)
+    if !ep_assert_reachable_view(op, rhs, x, coef, w, eqn, name; worst = worst)
+        return nothing
+    end
     return x, coef, op, rhs, mixed
 end
 """
@@ -1118,7 +1150,7 @@ Lower one resolved tail view into the constraints that its measure and its formu
 
 `ep_add_tail_view!` is the second of the two functions that hold the differences between the measures for [`ep_tail_views!`](@ref). [`ep_tail_views!`](@ref) parses the group, expands its asset groups, and resolves its prior references and its terms. This function does every step after that point, and these are the steps that the measures do not share. A new measure needs a new method here and in [`ep_tail_view_prior_args`](@ref).
 
-Every measure accepts a view over several assets. Each method normalises the view with [`ep_normalise_tail_view`](@ref), which also tells whether the coefficients have both signs. It reads `pv`, the prior value of the left hand side, as the coefficient-weighted sum of the measures of the assets under `w`. Then it selects the formulation and lowers the view:
+Every measure accepts a view over several assets. Each method normalises the view with [`ep_normalise_tail_view`](@ref), which also tells whether the coefficients have both signs. A view whose left-hand side is constant on the support binds no posterior, so the method adds no constraint for it. Only the CVaR method passes `worst = true`, because only the CVaR of one asset equals its worst loss at a posterior that is positive on every scenario. It reads `pv`, the prior value of the left hand side, as the coefficient-weighted sum of the measures of the assets under `w`. Then it selects the formulation and lowers the view:
 
  1. A [`ConditionalValueatRiskView`](@ref) reads the prior CVaR of each asset with [`ConditionalValueatRisk`](@ref). It selects the formulation with [`ep_cvar_formulation`](@ref), and appends the constraint with [`ep_add_cvar_view!`](@ref).
  2. An [`EntropicValueatRiskView`](@ref) reads the prior EVaR of each asset, and the dual variable that attains it, with [`ep_evar`](@ref). It selects the formulation with [`ep_evar_formulation`](@ref), and appends the constraints with [`ep_add_evar_view!`](@ref).
@@ -1158,7 +1190,11 @@ function ep_add_tail_view!(epc::AbstractDict, tvs::AbstractVector,
                            tail_views::ConditionalValueatRiskView, alg, X::MatNum,
                            terms::NamedTuple, eqn::AbstractString, w::VecNum)
     alpha = tail_views.alpha
-    x, coef, op, rhs, mixed = ep_normalise_tail_view(terms, X, w, eqn, "CVaR")
+    nt = ep_normalise_tail_view(terms, X, w, eqn, "CVaR"; worst = true)
+    if isnothing(nt)
+        return nothing
+    end
+    x, coef, op, rhs, mixed = nt
     rm = ConditionalValueatRisk(; alpha = alpha, w = StatsBase.pweights(w))
     pv = sum(ci * rm(-xi) for (xi, ci) in zip(x, coef))
     alg = ep_cvar_formulation(alg, mixed, op, rhs, pv)
@@ -1169,7 +1205,11 @@ function ep_add_tail_view!(epc::AbstractDict, tvs::AbstractVector,
                            tail_views::EntropicValueatRiskView, alg, X::MatNum,
                            terms::NamedTuple, eqn::AbstractString, w::VecNum)
     (; alpha, args, kwargs, zlo_frac) = tail_views
-    x, coef, op, rhs, mixed = ep_normalise_tail_view(terms, X, w, eqn, "EVaR")
+    nt = ep_normalise_tail_view(terms, X, w, eqn, "EVaR")
+    if isnothing(nt)
+        return nothing
+    end
+    x, coef, op, rhs, mixed = nt
     pv = zero(rhs)
     zstar = Vector{typeof(rhs)}(undef, length(x))
     for (k, (xi, ci)) in enumerate(zip(x, coef))
@@ -1186,7 +1226,11 @@ function ep_add_tail_view!(epc::AbstractDict, tvs::AbstractVector,
                            tail_views::RelativisticValueatRiskView, alg, X::MatNum,
                            terms::NamedTuple, eqn::AbstractString, w::VecNum)
     (; alpha, kappa, args, kwargs, bracket) = tail_views
-    x, coef, op, rhs, mixed = ep_normalise_tail_view(terms, X, w, eqn, "RLVaR")
+    nt = ep_normalise_tail_view(terms, X, w, eqn, "RLVaR")
+    if isnothing(nt)
+        return nothing
+    end
+    x, coef, op, rhs, mixed = nt
     pv = zero(rhs)
     zstar = Vector{typeof(rhs)}(undef, length(x))
     for (k, (xi, ci)) in enumerate(zip(x, coef))
@@ -1198,179 +1242,6 @@ function ep_add_tail_view!(epc::AbstractDict, tvs::AbstractVector,
     ep_add_rlvar_view!(epc, tvs, alg, x, coef, alpha, kappa, op, rhs, w, zstar, pv, eqn;
                        args = args, kwargs = kwargs, bracket = bracket)
     return nothing
-end
-"""
-    ep_tail_views!(tail_views::Nothing, args...; kwargs...)
-
-Do nothing when a problem states no tail view.
-
-`ep_tail_views!` is the function that lowers a group of tail views into entropy pooling constraints. This method is the branch for an absent group. It adds no constraint, so a caller can call the function with `tail_views = nothing` and needs no special case.
-
-# Arguments
-
-  - `tail_views::Nothing`: Shows that the problem states no tail view.
-  - `args...`: More positional arguments, which the method does not read.
-  - `kwargs...`: More keyword arguments, which the method does not read.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`ep_tail_views!`](@ref)
-  - [`EntropyPoolingPrior`](@ref)
-"""
-function ep_tail_views!(tail_views::Nothing, args...; kwargs...)
-    return nothing
-end
-"""
-    ep_tail_views!(tail_views::AbstractVector{<:AbstractEntropyPoolingTailViewEstimator},
-                   args...; kwargs...)
-
-Lower each group of tail views under its own settings.
-
-The function lowers each [`AbstractEntropyPoolingTailViewEstimator`](@ref) of the vector in turn. All the groups add their constraints to the same constraint set, so one entropy pooling solve meets all of them.
-
-# Algorithm
-
- 1. Lower each group of `tail_views` in turn, and pass `args...` and `kwargs...` to each call.
- 2. Return `nothing`. Each call already wrote its constraints into `epc` and `tvs`.
-
-# Arguments
-
-  - `tail_views`: The vector of tail view groups.
-  - `args...`: More positional arguments, which go to [`ep_tail_views!`](@ref).
-  - `kwargs...`: More keyword arguments, which go to [`ep_tail_views!`](@ref).
-
-# Returns
-
-  - `nothing`: The function mutates `epc` and `tvs` in-place.
-
-# Related
-
-  - [`ep_tail_views!`](@ref)
-  - [`EntropyPoolingPrior`](@ref)
-"""
-function ep_tail_views!(tail_views::AbstractVector{<:AbstractEntropyPoolingTailViewEstimator},
-                        args...; kwargs...)
-    for tail_view in tail_views
-        ep_tail_views!(tail_view, args...; kwargs...)
-    end
-    return nothing
-end
-"""
-    ep_tail_views!(tail_views::AbstractEntropyPoolingTailViewEstimator, epc::AbstractDict,
-                   tvs::AbstractVector, pr::AbstractPriorResult, sets::UniverseSets,
-                   w::VecNum; strict::Bool = false,
-                   ledger::Option{<:AbstractVector} = nothing)
-
-Parse a group of tail views and lower them into entropy pooling constraints.
-
-`ep_tail_views!` lowers every tail view family. It parses the view equations of a [`LinearConstraintEstimator`](@ref), and replaces the prior references with their values. It resolves the asset names against the universe, selects a formulation for each view, and appends the constraints that the formulation needs. This function solves nothing, as against the recursive algorithm of [`MeucciEntropyPoolingPrior`](@ref). The views become part of the one entropy pooling problem that [`entropy_pooling`](@ref) solves.
-
-The function accepts `==`, `>=` and `<=`. A group name expands to its members, and each member takes the coefficient of the group. So a view on a group constrains the sum of the risk measures of the members, not their average. A view whose coefficients have one sign is a positive combination of measures, and its lower-bound form is convex. A view whose coefficients have both signs is a relative view, and its lower-bound form is not convex in general.
-
-These two functions hold every difference between the conditional, the entropic and the relativistic value at risk. So a fourth measure needs two methods, and no fourth copy of this function:
-
-  - [`ep_tail_view_prior_args`](@ref) names the statistic to which a `prior(...)` reference resolves, and the settings of its search.
-  - [`ep_add_tail_view!`](@ref) checks the shape of the view, reads its prior value, selects its formulation, and appends its constraints.
-
-# Algorithm
-
- 1. Parse the view equations of `tail_views.views.val`. The result is one [`ParsingResult`](@ref) for each view.
- 2. Replace every group name with the assets of the group. The result is one term for each member.
- 3. Replace every `prior(...)` reference with the prior value of the measure, through [`replace_prior_views`](@ref), under the tuple that [`ep_tail_view_prior_args`](@ref) gives.
- 4. Expand the formulation setting to one formulation for each view with [`ep_view_formulations`](@ref). The result is `algs`.
- 5. For each view in turn, resolve its terms with [`ep_view_terms`](@ref). Drop the view when the universe holds no name of the view.
- 6. Lower the view with [`ep_add_tail_view!`](@ref).
-
-# Arguments
-
-  - `tail_views`: The tail view group.
-  - `epc`: The dictionary of entropy pooling constraints, from keys to `(lhs, rhs)` pairs.
-  - `tvs`: The vector of tail view constraints, to which the function appends.
-  - `pr`: The prior result. The function reads its returns matrix.
-  - `sets`: The universe sets that map the asset names to indices.
-  - `w`: The prior probability weights.
-  - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn.
-  - $(arg_dict[:ledger]) The group expansion and [`ep_view_terms`](@ref) fill it.
-
-# Returns
-
-  - `nothing`: The function mutates `epc` and `tvs` in-place.
-
-# Related
-
-  - [`ep_tail_view_prior_args`](@ref)
-  - [`ep_add_tail_view!`](@ref)
-  - [`ConditionalValueatRiskView`](@ref)
-  - [`EntropicValueatRiskView`](@ref)
-  - [`RelativisticValueatRiskView`](@ref)
-  - [`EntropyPoolingPrior`](@ref)
-
-# References
-
-  - $(ref_dict[:EPTail]) Section 2.2, Equations 2 to 6, and Section 2.3, Equations 7 to 11.
-  - $(ref_dict[:EPRLVaR]) Section 2, Equations 1 to 5, and Section 3.2, Equation 7.
-"""
-function ep_tail_views!(tail_views::AbstractEntropyPoolingTailViewEstimator,
-                        epc::AbstractDict, tvs::AbstractVector, pr::AbstractPriorResult,
-                        sets::UniverseSets, w::VecNum; strict::Bool = false,
-                        ledger::Option{<:AbstractVector} = nothing)
-    X = pr.X
-    views = parse_equation(tail_views.views.val; ops1 = ("==", ">=", "<="),
-                           ops2 = (:call, :(==), :(>=), :(<=)), datatype = eltype(X))
-    views = replace_group_by_assets(views, sets, false, true, false; ledger = ledger)
-    views = replace_prior_views(views, pr, sets, ep_tail_view_prior_args(tail_views, w)...;
-                                strict = strict)
-    if !isa(views, AbstractVector)
-        views = [views]
-    end
-    algs = ep_view_formulations(tail_views.alg, length(views), :alg)
-    for (res, algi) in zip(views, algs)
-        terms = ep_view_terms(res, sets, X; strict = strict, ledger = ledger)
-        if isnothing(terms)
-            continue
-        end
-        ep_add_tail_view!(epc, tvs, tail_views, algi, X, terms, res.eqn, w)
-    end
-    return nothing
-end
-
-"""
-    ep_diagnose_tail_view!(model::JuMP.Model, p,
-                           tv::Union{LinearConditionalValueatRiskViewConstraint,
-                                     ConicEntropicValueatRiskViewConstraint,
-                                     ConicRelativisticValueatRiskViewConstraint})
-
-Add an exact tail view constraint to the feasibility programme of [`ep_diagnose_views`](@ref).
-
-The three dual tail view constraints state a lower bound on a positive combination of concave measures. The bound is a convex set of the posterior probabilities, and the dual blocks of [`ep_tail_dual_block!`](@ref) state it exactly. So the method adds the rows of [`add_ep_tail_view!`](@ref), with the scale one. The solvers of the programme must then take the cones of those blocks: the exponential cone for an entropic view, and the power cone for a relativistic view.
-
-# Arguments
-
-  - `model`: The JuMP model of the feasibility programme.
-  - `p`: The posterior probability variables of the model.
-  - `tv`: Dual tail view constraint.
-
-# Returns
-
-  - `nothing`: The function mutates `model` in place.
-
-# Related
-
-  - [`ep_diagnose_views`](@ref)
-  - [`add_ep_tail_view!`](@ref)
-  - [`LinearConditionalValueatRiskViewConstraint`](@ref)
-  - [`ConicEntropicValueatRiskViewConstraint`](@ref)
-  - [`ConicRelativisticValueatRiskViewConstraint`](@ref)
-"""
-function ep_diagnose_tail_view!(model::JuMP.Model, p,
-                                tv::Union{LinearConditionalValueatRiskViewConstraint,
-                                          ConicEntropicValueatRiskViewConstraint,
-                                          ConicRelativisticValueatRiskViewConstraint})
-    return add_ep_tail_view!(model, p, tv, one(eltype(tv.coef)))
 end
 
 public ep_add_cvar_view!, ep_add_evar_view!, ep_add_rlvar_view!

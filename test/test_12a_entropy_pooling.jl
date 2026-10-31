@@ -893,6 +893,47 @@ end
                                    rd)
 end
 
+@testset "MeucciEntropyPoolingPrior meets a CVaR view at the worst loss of the support (#1925)" begin
+    #=
+    The CVaR equals the worst loss when the posterior puts at least `alpha` on the scenarios
+    of that loss, and such a posterior is positive on every scenario. The check refused that
+    target, and it read the worst loss over every scenario, also those of zero prior weight.
+    The posterior of smallest divergence scales the prior by `alpha / q` on the worst
+    scenarios and by `(1 - alpha) / (1 - q)` on the rest, where `q` is their prior mass, so
+    its divergence is the closed form `kl(q)`.
+    =#
+    a = 0.05
+    X201 = rd.X[(end - 200):end, :]
+    rd201 = ReturnsResult(; nx = rd.nx, X = X201)
+    x = -X201[:, 1]
+    hi = maximum(x)
+    kl(q) = a * log(a / q) + (1 - a) * log((1 - a) / (1 - q))
+    cv(w) = ConditionalValueatRisk(; alpha = a, w = StatsBase.pweights(w))(X201[:, 1])
+    mk(v; w = nothing) = MeucciEntropyPoolingPrior(; sets = sets, w = w,
+                                                   cvar_views = ConditionalValueatRiskView(;
+                                                                                           alpha = a,
+                                                                                           views = LinearConstraintEstimator(;
+                                                                                                                             val = "AAPL == $v")))
+    pr = prior(mk(hi), rd201)
+    @test isapprox(cv(pr.w), hi; rtol = 1e-8)
+    @test isapprox(pr.kld, kl(count(==(hi), x) / length(x)); rtol = 1e-6)
+    @test_throws DomainError prior(mk(nextfloat(hi)), rd201)
+    # A zero prior weight on the worst scenario moves the bound to the worst loss of the
+    # support. A target above it and below the worst loss overall is refused.
+    jw = argmax(x)
+    wz = fill(1.0, length(x))
+    wz[jw] = 0.0
+    wz ./= sum(wz)
+    ws = StatsBase.pweights(wz)
+    hs = maximum(x[wz .> 0])
+    @test hs < hi
+    @test_throws DomainError prior(mk((hs + hi) / 2; w = ws), rd201)
+    prs = prior(mk(hs; w = ws), rd201)
+    @test isapprox(cv(prs.w), hs; rtol = 1e-8)
+    @test iszero(prs.w[jw])
+    @test isapprox(prs.kld, kl(count(==(hs), x) / (length(x) - 1)); rtol = 1e-6)
+end
+
 # #573: `Optim`'s default stopping rule leaves the entropy pooling dual short of its own
 # optimum, and the two testsets below read the answer through a statistic that magnifies the
 # shortfall. The staged chain misses the mean view it binds by 9e-4 of the bound, against a

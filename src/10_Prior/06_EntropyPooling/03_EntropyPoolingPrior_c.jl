@@ -1,4 +1,177 @@
 """
+    ep_tail_views!(tail_views::Nothing, args...; kwargs...)
+
+Do nothing when a problem states no tail view.
+
+`ep_tail_views!` is the function that lowers a group of tail views into entropy pooling constraints. This method is the branch for an absent group. It adds no constraint, so a caller can call the function with `tail_views = nothing` and needs no special case.
+
+# Arguments
+
+  - `tail_views::Nothing`: Shows that the problem states no tail view.
+  - `args...`: More positional arguments, which the method does not read.
+  - `kwargs...`: More keyword arguments, which the method does not read.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ep_tail_views!`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+"""
+function ep_tail_views!(tail_views::Nothing, args...; kwargs...)
+    return nothing
+end
+"""
+    ep_tail_views!(tail_views::AbstractVector{<:AbstractEntropyPoolingTailViewEstimator},
+                   args...; kwargs...)
+
+Lower each group of tail views under its own settings.
+
+The function lowers each [`AbstractEntropyPoolingTailViewEstimator`](@ref) of the vector in turn. All the groups add their constraints to the same constraint set, so one entropy pooling solve meets all of them.
+
+# Algorithm
+
+ 1. Lower each group of `tail_views` in turn, and pass `args...` and `kwargs...` to each call.
+ 2. Return `nothing`. Each call already wrote its constraints into `epc` and `tvs`.
+
+# Arguments
+
+  - `tail_views`: The vector of tail view groups.
+  - `args...`: More positional arguments, which go to [`ep_tail_views!`](@ref).
+  - `kwargs...`: More keyword arguments, which go to [`ep_tail_views!`](@ref).
+
+# Returns
+
+  - `nothing`: The function mutates `epc` and `tvs` in-place.
+
+# Related
+
+  - [`ep_tail_views!`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+"""
+function ep_tail_views!(tail_views::AbstractVector{<:AbstractEntropyPoolingTailViewEstimator},
+                        args...; kwargs...)
+    for tail_view in tail_views
+        ep_tail_views!(tail_view, args...; kwargs...)
+    end
+    return nothing
+end
+"""
+    ep_tail_views!(tail_views::AbstractEntropyPoolingTailViewEstimator, epc::AbstractDict,
+                   tvs::AbstractVector, pr::AbstractPriorResult, sets::UniverseSets,
+                   w::VecNum; strict::Bool = false,
+                   ledger::Option{<:AbstractVector} = nothing)
+
+Parse a group of tail views and lower them into entropy pooling constraints.
+
+`ep_tail_views!` lowers every tail view family. It parses the view equations of a [`LinearConstraintEstimator`](@ref), and replaces the prior references with their values. It resolves the asset names against the universe, selects a formulation for each view, and appends the constraints that the formulation needs. This function solves nothing, as against the recursive algorithm of [`MeucciEntropyPoolingPrior`](@ref). The views become part of the one entropy pooling problem that [`entropy_pooling`](@ref) solves.
+
+The function accepts `==`, `>=` and `<=`. A group name expands to its members, and each member takes the coefficient of the group. So a view on a group constrains the sum of the risk measures of the members, not their average. A view whose coefficients have one sign is a positive combination of measures, and its lower-bound form is convex. A view whose coefficients have both signs is a relative view, and its lower-bound form is not convex in general.
+
+These two functions hold every difference between the conditional, the entropic and the relativistic value at risk. So a fourth measure needs two methods, and no fourth copy of this function:
+
+  - [`ep_tail_view_prior_args`](@ref) names the statistic to which a `prior(...)` reference resolves, and the settings of its search.
+  - [`ep_add_tail_view!`](@ref) checks the shape of the view, reads its prior value, selects its formulation, and appends its constraints.
+
+# Algorithm
+
+ 1. Parse the view equations of `tail_views.views.val`. The result is one [`ParsingResult`](@ref) for each view.
+ 2. Replace every group name with the assets of the group. The result is one term for each member.
+ 3. Replace every `prior(...)` reference with the prior value of the measure, through [`replace_prior_views`](@ref), under the tuple that [`ep_tail_view_prior_args`](@ref) gives.
+ 4. Expand the formulation setting to one formulation for each view with [`ep_view_formulations`](@ref). The result is `algs`.
+ 5. For each view in turn, resolve its terms with [`ep_view_terms`](@ref). Drop the view when the universe holds no name of the view.
+ 6. Lower the view with [`ep_add_tail_view!`](@ref).
+
+# Arguments
+
+  - `tail_views`: The tail view group.
+  - `epc`: The dictionary of entropy pooling constraints, from keys to `(lhs, rhs)` pairs.
+  - `tvs`: The vector of tail view constraints, to which the function appends.
+  - `pr`: The prior result. The function reads its returns matrix.
+  - `sets`: The universe sets that map the asset names to indices.
+  - `w`: The prior probability weights.
+  - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn.
+  - $(arg_dict[:ledger]) The group expansion and [`ep_view_terms`](@ref) fill it.
+
+# Returns
+
+  - `nothing`: The function mutates `epc` and `tvs` in-place.
+
+# Related
+
+  - [`ep_tail_view_prior_args`](@ref)
+  - [`ep_add_tail_view!`](@ref)
+  - [`ConditionalValueatRiskView`](@ref)
+  - [`EntropicValueatRiskView`](@ref)
+  - [`RelativisticValueatRiskView`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+
+# References
+
+  - $(ref_dict[:EPTail]) Section 2.2, Equations 2 to 6, and Section 2.3, Equations 7 to 11.
+  - $(ref_dict[:EPRLVaR]) Section 2, Equations 1 to 5, and Section 3.2, Equation 7.
+"""
+function ep_tail_views!(tail_views::AbstractEntropyPoolingTailViewEstimator,
+                        epc::AbstractDict, tvs::AbstractVector, pr::AbstractPriorResult,
+                        sets::UniverseSets, w::VecNum; strict::Bool = false,
+                        ledger::Option{<:AbstractVector} = nothing)
+    X = pr.X
+    views = parse_equation(tail_views.views.val; ops1 = ("==", ">=", "<="),
+                           ops2 = (:call, :(==), :(>=), :(<=)), datatype = eltype(X))
+    views = replace_group_by_assets(views, sets, false, true, false; ledger = ledger)
+    views = replace_prior_views(views, pr, sets, ep_tail_view_prior_args(tail_views, w)...;
+                                strict = strict)
+    if !isa(views, AbstractVector)
+        views = [views]
+    end
+    algs = ep_view_formulations(tail_views.alg, length(views), :alg)
+    for (res, algi) in zip(views, algs)
+        terms = ep_view_terms(res, sets, X; strict = strict, ledger = ledger)
+        if isnothing(terms)
+            continue
+        end
+        ep_add_tail_view!(epc, tvs, tail_views, algi, X, terms, res.eqn, w)
+    end
+    return nothing
+end
+
+"""
+    ep_diagnose_tail_view!(model::JuMP.Model, p,
+                           tv::Union{LinearConditionalValueatRiskViewConstraint,
+                                     ConicEntropicValueatRiskViewConstraint,
+                                     ConicRelativisticValueatRiskViewConstraint})
+
+Add an exact tail view constraint to the feasibility programme of [`ep_diagnose_views`](@ref).
+
+The three dual tail view constraints state a lower bound on a positive combination of concave measures. The bound is a convex set of the posterior probabilities, and the dual blocks of [`ep_tail_dual_block!`](@ref) state it exactly. So the method adds the rows of [`add_ep_tail_view!`](@ref), with the scale one. The solvers of the programme must then take the cones of those blocks: the exponential cone for an entropic view, and the power cone for a relativistic view.
+
+# Arguments
+
+  - `model`: The JuMP model of the feasibility programme.
+  - `p`: The posterior probability variables of the model.
+  - `tv`: Dual tail view constraint.
+
+# Returns
+
+  - `nothing`: The function mutates `model` in place.
+
+# Related
+
+  - [`ep_diagnose_views`](@ref)
+  - [`add_ep_tail_view!`](@ref)
+  - [`LinearConditionalValueatRiskViewConstraint`](@ref)
+  - [`ConicEntropicValueatRiskViewConstraint`](@ref)
+  - [`ConicRelativisticValueatRiskViewConstraint`](@ref)
+"""
+function ep_diagnose_tail_view!(model::JuMP.Model, p,
+                                tv::Union{LinearConditionalValueatRiskViewConstraint,
+                                          ConicEntropicValueatRiskViewConstraint,
+                                          ConicRelativisticValueatRiskViewConstraint})
+    return add_ep_tail_view!(model, p, tv, one(eltype(tv.coef)))
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Reweights the observations of a prior so that its moments and its tails meet a set of views.

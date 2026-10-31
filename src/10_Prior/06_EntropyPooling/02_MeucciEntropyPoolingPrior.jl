@@ -456,7 +456,7 @@ The staged route of [`ep_prior`](@ref) searches up to three times, once for each
   - No view group declares a view formulation. A group whose `alg` is not `nothing` raises an `ArgumentError`, because this route writes no constraint formulation.
   - Every view names one asset. A view over more than one asset raises an `ArgumentError`.
   - Every target is not negative. A negative target raises a `DomainError`.
-  - Every target is smaller than the worst realisation of its asset. A larger target raises a `DomainError`. The message names every view that is too large, and the largest target that its asset accepts. [`ep_assert_reachable_view`](@ref) raises the same error type for one view, so one `catch` reads both.
+  - Every target is at most the worst realisation of its asset over the scenarios at a positive weight of `w`. The CVaR equals that loss when the posterior puts at least the level of the view on the scenarios of that loss, and a posterior that is positive on every scenario does this. A larger target raises a `DomainError`. The message names every view that is too large, and the largest target that its asset accepts. [`ep_assert_reachable_view`](@ref) raises the same error type for one view, so one `catch` reads both.
 
 # Returns
 
@@ -529,8 +529,11 @@ function ep_cvar_views_setup(cvar_views::CVV_VecCVV, pr::AbstractPriorResult,
         return nothing
     end
     X = view(X0, :, cols)
-    min_X = dropdims(-minimum(X; dims = 1); dims = 1)
-    invalid = B .>= min_X
+    # The worst loss on the support of `w` bounds a target: a posterior puts no mass where
+    # the prior puts none (#1260). The CVaR reaches that loss when the posterior puts `alpha`
+    # on its scenarios, which a posterior that is positive on every scenario does (#1925).
+    min_X = dropdims(-minimum(view(X, w .> zero(eltype(w)), :); dims = 1); dims = 1)
+    invalid = B .> min_X
     if any(invalid)
         msg = "The following views are too extreme, the maximum viable view for a given asset is its worst realisation:"
         for (v, m) in zip(eqns[invalid], min_X[invalid])
