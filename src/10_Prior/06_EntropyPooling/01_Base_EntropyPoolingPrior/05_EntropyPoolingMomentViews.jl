@@ -211,7 +211,8 @@ function scenario_residual_variances(rr::Regression, sigma::VecNum)
 end
 """
     ep_sigma_views!(sigma_views::LinearConstraintEstimator, epc::AbstractDict,
-                    pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false,
+                    pr::AbstractPriorResult, sets::UniverseSets,
+                    w::Option{<:ObsWeights} = nothing; strict::Bool = false,
                     ledger::Option{<:AbstractVector} = nothing)
 
 Add the variance views of a group to the entropy pooling constraint dictionary.
@@ -252,7 +253,8 @@ Where:
  3. Replace every `prior(...)` reference by the prior variance, through [`replace_prior_views`](@ref).
  4. Turn the parsed views into the linear constraint blocks `lcs`, one for `:ineq` and one for `:eq`. Under `strict = false`, every row of the group can drop, and `lcs` is then `nothing`. The group then states no view, and the call returns a `to_fix` that names no asset.
  5. Build `tmp`, the squared deviations of every observation from the prior mean, transposed so that a row of `lcs` multiplies it from the left. Read the residual variances `d` with [`scenario_residual_variances`](@ref).
- 6. For each block that `lcs` holds, add `A * tmp` against `B - A * d` under its key with [`add_ep_constraint!`](@ref), and mark in `to_fix` every asset that the block names.
+ 6. For each block that `lcs` holds, refuse a row of `A * tmp` against `B - A * d` that no reweighting of the scenarios meets, with [`ep_assert_attainable_rows`](@ref).
+ 7. Add `A * tmp` against `B - A * d` under its key with [`add_ep_constraint!`](@ref), and mark in `to_fix` every asset that the block names.
 
 # Arguments
 
@@ -260,8 +262,13 @@ Where:
   - `epc`: Dictionary of entropy pooling constraints, which maps each key to an `(lhs, rhs)` pair.
   - `pr`: Prior result that holds the asset returns.
   - `sets`: Universe sets that map the asset names to indices.
+  - $(arg_dict[:ep_view_support_w])
   - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn.
   - $(arg_dict[:ledger]) [`replace_group_by_assets`](@ref) and [`get_linear_constraints`](@ref) fill it.
+
+# Validation
+
+  - $(val_dict[:ep_attainable_row])
 
 # Returns
 
@@ -277,7 +284,8 @@ Where:
   - [`MeucciEntropyPoolingPrior`](@ref)
 """
 function ep_sigma_views!(sigma_views::LinearConstraintEstimator, epc::AbstractDict,
-                         pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false,
+                         pr::AbstractPriorResult, sets::UniverseSets,
+                         w::Option{<:ObsWeights} = nothing; strict::Bool = false,
                          ledger::Option{<:AbstractVector} = nothing)
     X = pr.X
     sigma_views = parse_equation(sigma_views.val; datatype = eltype(X))
@@ -303,8 +311,13 @@ function ep_sigma_views!(sigma_views::LinearConstraintEstimator, epc::AbstractDi
         if isnothing(getproperty(lcs, p))
             continue
         end
-        A = getproperty(lcs, p).A
-        add_ep_constraint!(epc, A * tmp, getproperty(lcs, p).B - A * d, p)
+        (; A, B) = getproperty(lcs, p)
+        # See the note at the same step in `ep_mu_views!` (#1920).
+        lhs = A * tmp
+        rhs = B - A * d
+        ep_assert_attainable_rows(lhs, rhs, p, get_observation_weights(w, X),
+                                  k -> ep_view_row_label(A, B, k, p, sets), "variance")
+        add_ep_constraint!(epc, lhs, rhs, p)
         to_fix .= to_fix .| dropdims(any(!iszero, A; dims = 1); dims = 1)
     end
     return to_fix
@@ -651,7 +664,8 @@ function get_pr_value(pr::AbstractPriorResult, i::VecInt, j::VecInt, ::Val{:cov}
 end
 """
     ep_cov_views!(cov_views::LinearConstraintEstimator, epc::AbstractDict,
-                  pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false,
+                  pr::AbstractPriorResult, sets::UniverseSets,
+                  w::Option{<:ObsWeights} = nothing; strict::Bool = false,
                   ledger::Option{<:AbstractVector} = nothing)
 
 Add the covariance views of a group to the entropy pooling constraint dictionary.
@@ -702,7 +716,8 @@ The identity holds only while the posterior means of assets ``i`` and ``j`` equa
  5. Read the sign `d` and the inequality flag from the operator with [`comparison_sign_ineq_flag`](@ref).
  6. Read the index pair `(i, j)`, and build `Ai`, the product of the two return columns scaled by `d` and the coefficient of the view.
  7. Build `Bi`, the target moved by the product of the prior means less the entry of the residual block `E` at the pair, scaled the same way. `E` is the diagonal matrix of [`scenario_residual_variances`](@ref). A single asset pair gives a scalar, which the method puts in a vector of one element. A group pair gives one entry for each spanned pair.
- 8. Add the row against `Bi` under `:ineq` or `:eq` with [`add_ep_constraint!`](@ref), and mark both assets of the pair in `to_fix`.
+ 8. Refuse a row of `Ai` against `Bi` that no reweighting of the scenarios meets, with [`ep_assert_attainable_rows`](@ref).
+ 9. Add the row against `Bi` under `:ineq` or `:eq` with [`add_ep_constraint!`](@ref), and mark both assets of the pair in `to_fix`.
 
 # Arguments
 
@@ -710,11 +725,13 @@ The identity holds only while the posterior means of assets ``i`` and ``j`` equa
   - `epc`: Dictionary of entropy pooling constraints, which maps each key to an `(lhs, rhs)` pair.
   - `pr`: Prior result that holds the asset returns.
   - `sets`: Universe sets that map the asset names to indices.
+  - $(arg_dict[:ep_view_support_w])
   - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn.
   - $(arg_dict[:ledger]) [`replace_group_by_assets`](@ref) and [`replace_coprior_views`](@ref) fill it.
 
 # Validation
 
+  - $(val_dict[:ep_attainable_row])
   - Every view names exactly one asset pair. A view that mixes pairs raises an `ArgumentError`. If every pair of a view holds an asset that the universe does not hold, the view has no pair left. Under `strict = false`, [`replace_coprior_views`](@ref) already reported the unknown names, and the method drops such a view with no second report. Under `strict = true`, that function already raised an error.
   - The coefficient of the pair is not zero. A pair whose coefficients cancel, as in `(A, B) - (A, B) == 0.1`, gives the row `0 == 0.1`, which no probabilities can meet. The method drops it, as [`get_linear_constraints`](@ref) drops a cancelled linear row: under `strict = false` it warns, and under `strict = true` it raises an [`IsZeroError`](@ref).
 
@@ -734,7 +751,8 @@ The identity holds only while the posterior means of assets ``i`` and ``j`` equa
   - [`comparison_sign_ineq_flag`](@ref)
 """
 function ep_cov_views!(cov_views::LinearConstraintEstimator, epc::AbstractDict,
-                       pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false,
+                       pr::AbstractPriorResult, sets::UniverseSets,
+                       w::Option{<:ObsWeights} = nothing; strict::Bool = false,
                        ledger::Option{<:AbstractVector} = nothing)
     X = pr.X
     cov_views = parse_equation(cov_views.val; datatype = eltype(X))
@@ -744,6 +762,7 @@ function ep_cov_views!(cov_views::LinearConstraintEstimator, epc::AbstractDict,
     to_fix = falses(size(X, 2))
     # The residual block is diagonal, so it reaches a pair of one asset alone (#1649).
     E = LinearAlgebra.Diagonal(scenario_residual_variances(pr))
+    ws = get_observation_weights(w, X)
     for cov_view in cov_views
         #! `replace_coprior_views` drops a pair naming an asset the universe does not hold,
         #! which leaves the view with no pair at all. Under `strict = false` that must drop
@@ -775,14 +794,19 @@ function ep_cov_views!(cov_views::LinearConstraintEstimator, epc::AbstractDict,
         if !isa(i, AbstractVector)
             Bi = [Bi]
         end
-        add_ep_constraint!(epc, transpose(Ai), Bi, ifelse(flag, :ineq, :eq))
+        # See the note at the same step in `ep_mu_views!` (#1920).
+        key = ifelse(flag, :ineq, :eq)
+        ep_assert_attainable_rows(transpose(Ai), Bi, key, ws, _ -> cov_view.eqn,
+                                  "covariance")
+        add_ep_constraint!(epc, transpose(Ai), Bi, key)
         to_fix[union(i, j)] .= true
     end
     return to_fix
 end
 """
     ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
-                  pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false,
+                  pr::AbstractPriorResult, sets::UniverseSets,
+                  w::Option{<:ObsWeights} = nothing; strict::Bool = false,
                   ledger::Option{<:AbstractVector} = nothing)
 
 Add the correlation views of a group to the entropy pooling constraint dictionary.
@@ -837,7 +861,8 @@ The identity holds only while the posterior means and variances of assets ``i`` 
  7. Read the index pair `(i, j)`, and build `sigma_ij`, the root of the product of the two prior variances.
  8. Build `Ai`, the product of the two return columns scaled by `d` and the coefficient of the view.
  9. Build `Bi`, the target multiplied by `sigma_ij` and moved by the product of the prior means less the entry of the residual block `E` at the pair, scaled the same way. `E` is the diagonal matrix of [`scenario_residual_variances`](@ref). A single asset pair gives a scalar, which the method puts in a vector of one element. A group pair gives one entry for each spanned pair.
-10. Add the row against `Bi` under `:ineq` or `:eq` with [`add_ep_constraint!`](@ref), and mark both assets of the pair in `to_fix`.
+10. Refuse a row of `Ai` against `Bi` that no reweighting of the scenarios meets, with [`ep_assert_attainable_rows`](@ref).
+11. Add the row against `Bi` under `:ineq` or `:eq` with [`add_ep_constraint!`](@ref), and mark both assets of the pair in `to_fix`.
 
 # Arguments
 
@@ -845,11 +870,13 @@ The identity holds only while the posterior means and variances of assets ``i`` 
   - `epc`: Dictionary of entropy pooling constraints, which maps each key to an `(lhs, rhs)` pair.
   - `pr`: Prior result that holds the asset returns.
   - `sets`: Universe sets that map the asset names to indices.
+  - $(arg_dict[:ep_view_support_w])
   - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn.
   - $(arg_dict[:ledger]) [`replace_group_by_assets`](@ref) and [`replace_coprior_views`](@ref) fill it.
 
 # Validation
 
+  - $(val_dict[:ep_attainable_row])
   - Every view names exactly one asset pair. A view that mixes pairs raises an `ArgumentError`. If every pair of a view holds an asset that the universe does not hold, the view has no pair left. Under `strict = false`, [`replace_coprior_views`](@ref) already reported the unknown names, and the method drops such a view with no second report. Under `strict = true`, that function already raised an error.
   - Every target lies in ``[-1, 1]``. A target outside that range raises an `ArgumentError`.
   - The coefficient of the pair is not zero. A pair whose coefficients cancel, as in `(A, B) - (A, B) == 0.0`, gives a row that no probabilities can move. The method drops it, as [`get_linear_constraints`](@ref) drops a cancelled linear row: under `strict = false` it warns, and under `strict = true` it raises an [`IsZeroError`](@ref).
@@ -870,7 +897,8 @@ The identity holds only while the posterior means and variances of assets ``i`` 
   - [`comparison_sign_ineq_flag`](@ref)
 """
 function ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
-                       pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false,
+                       pr::AbstractPriorResult, sets::UniverseSets,
+                       w::Option{<:ObsWeights} = nothing; strict::Bool = false,
                        ledger::Option{<:AbstractVector} = nothing)
     X = pr.X
     rho_views = parse_equation(rho_views.val; datatype = eltype(X))
@@ -881,6 +909,7 @@ function ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
     sigma = LinearAlgebra.diag(pr.sigma)
     # See the note at the same step in `ep_cov_views!` (#1649).
     E = LinearAlgebra.Diagonal(scenario_residual_variances(pr))
+    ws = get_observation_weights(w, X)
     for rho_view in rho_views
         #! See the twin note in `ep_cov_views!`: a pair naming an unknown asset leaves the
         #! view with no pair, and that drops the row, in silence.
@@ -913,7 +942,11 @@ function ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
         if !isa(i, AbstractVector)
             Bi = [Bi]
         end
-        add_ep_constraint!(epc, transpose(Ai), Bi, ifelse(flag, :ineq, :eq))
+        # See the note at the same step in `ep_mu_views!` (#1920).
+        key = ifelse(flag, :ineq, :eq)
+        ep_assert_attainable_rows(transpose(Ai), Bi, key, ws, _ -> rho_view.eqn,
+                                  "correlation")
+        add_ep_constraint!(epc, transpose(Ai), Bi, key)
         to_fix[union(i, j)] .= true
     end
     return to_fix
@@ -1004,7 +1037,8 @@ The identity holds only while the posterior mean and variance of asset ``i`` equ
  4. Turn the parsed views into the linear constraint blocks `lcs`, one for `:ineq` and one for `:eq`. Under `strict = false`, every row of the group can drop, and `lcs` is then `nothing`. The group then states no view, and the call returns a `to_fix` that names no asset.
  5. Read the prior variances of the scenarios into `sigma`. They are the diagonal of `pr.sigma`, less [`scenario_residual_variances`](@ref).
  6. Build `tmp`, the contribution of every observation to the standardised third moment, transposed so that a row of `lcs` multiplies it from the left.
- 7. For each block that `lcs` holds, add `A * tmp` against `B` under its key with [`add_ep_constraint!`](@ref), and mark in `to_fix` every asset that the block names.
+ 7. For each block that `lcs` holds, refuse a row of `A * tmp` against `B` that no reweighting of the scenarios at a positive weight of `w` meets, with [`ep_assert_attainable_rows`](@ref).
+ 8. Add `A * tmp` against `B` under its key with [`add_ep_constraint!`](@ref), and mark in `to_fix` every asset that the block names.
 
 # Arguments
 
@@ -1012,9 +1046,13 @@ The identity holds only while the posterior mean and variance of asset ``i`` equ
   - `epc`: Dictionary of entropy pooling constraints, which maps each key to an `(lhs, rhs)` pair.
   - `pr`: Prior result that holds the asset returns.
   - `sets`: Universe sets that map the asset names to indices.
-  - `w`: The weights of `pr`, or `nothing` for uniform weights. A `prior(...)` reference reads the skewness under them.
+  - `w`: The weights of `pr`, or `nothing` for uniform weights. A `prior(...)` reference reads the skewness under them, and only the scenarios at a positive weight bound a view.
   - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn.
   - $(arg_dict[:ledger]) [`replace_group_by_assets`](@ref) and [`get_linear_constraints`](@ref) fill it.
+
+# Validation
+
+  - $(val_dict[:ep_attainable_row])
 
 # Returns
 
@@ -1057,8 +1095,12 @@ function ep_sk_views!(skew_views::LinearConstraintEstimator, epc::AbstractDict,
         if isnothing(getproperty(lcs, p))
             continue
         end
-        A = getproperty(lcs, p).A
-        add_ep_constraint!(epc, A * tmp, getproperty(lcs, p).B, p)
+        (; A, B) = getproperty(lcs, p)
+        # See the note at the same step in `ep_mu_views!` (#1920).
+        lhs = A * tmp
+        ep_assert_attainable_rows(lhs, B, p, get_observation_weights(w, X),
+                                  k -> ep_view_row_label(A, B, k, p, sets), "skewness")
+        add_ep_constraint!(epc, lhs, B, p)
         to_fix .= to_fix .| dropdims(any(!iszero, A; dims = 1); dims = 1)
     end
     return to_fix
@@ -1147,7 +1189,8 @@ The identity holds only while the posterior mean and variance of asset ``i`` equ
  4. Turn the parsed views into the linear constraint blocks `lcs`, one for `:ineq` and one for `:eq`. Under `strict = false`, every row of the group can drop, and `lcs` is then `nothing`. The group then states no view, and the call returns a `to_fix` that names no asset.
  5. Build `X_sq` and `mu_sq`, the squares of the returns and of the prior means.
  6. Build `tmp`, the contribution of every observation to the fourth moment, standardised by the prior variance of the scenarios. That variance is the diagonal of `pr.sigma` less [`scenario_residual_variances`](@ref). Transpose `tmp` so that a row of `lcs` multiplies it from the left.
- 7. For each block that `lcs` holds, add `A * tmp` against `B` under its key with [`add_ep_constraint!`](@ref), and mark in `to_fix` every asset that the block names.
+ 7. For each block that `lcs` holds, refuse a row of `A * tmp` against `B` that no reweighting of the scenarios at a positive weight of `w` meets, with [`ep_assert_attainable_rows`](@ref).
+ 8. Add `A * tmp` against `B` under its key with [`add_ep_constraint!`](@ref), and mark in `to_fix` every asset that the block names.
 
 # Arguments
 
@@ -1155,9 +1198,13 @@ The identity holds only while the posterior mean and variance of asset ``i`` equ
   - `epc`: Dictionary of entropy pooling constraints, which maps each key to an `(lhs, rhs)` pair.
   - `pr`: Prior result that holds the asset returns.
   - `sets`: Universe sets that map the asset names to indices.
-  - `w`: The weights of `pr`, or `nothing` for uniform weights. A `prior(...)` reference reads the kurtosis under them.
+  - `w`: The weights of `pr`, or `nothing` for uniform weights. A `prior(...)` reference reads the kurtosis under them, and only the scenarios at a positive weight bound a view.
   - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn.
   - $(arg_dict[:ledger]) [`replace_group_by_assets`](@ref) and [`get_linear_constraints`](@ref) fill it.
+
+# Validation
+
+  - $(val_dict[:ep_attainable_row])
 
 # Returns
 
@@ -1203,8 +1250,12 @@ function ep_kt_views!(kurtosis_views::LinearConstraintEstimator, epc::AbstractDi
         if isnothing(getproperty(lcs, p))
             continue
         end
-        A = getproperty(lcs, p).A
-        add_ep_constraint!(epc, A * tmp, getproperty(lcs, p).B, p)
+        (; A, B) = getproperty(lcs, p)
+        # See the note at the same step in `ep_mu_views!` (#1920).
+        lhs = A * tmp
+        ep_assert_attainable_rows(lhs, B, p, get_observation_weights(w, X),
+                                  k -> ep_view_row_label(A, B, k, p, sets), "kurtosis")
+        add_ep_constraint!(epc, lhs, B, p)
         to_fix .= to_fix .| dropdims(any(!iszero, A; dims = 1); dims = 1)
     end
     return to_fix

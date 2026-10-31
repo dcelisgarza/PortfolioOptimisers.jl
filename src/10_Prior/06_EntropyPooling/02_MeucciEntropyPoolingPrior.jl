@@ -863,7 +863,7 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
     # different target at each stage. It is resolved once, here, and the stages read it.
     cvv = ep_cvar_views_setup(pe.cvar_views, vpr, vsets, w0, pe.ds_opt, pe.dm_opt;
                               strict = strict, ledger = led)
-    ep_mu_views!(pe.mu_views, epc, vpr, vsets; strict = strict, ledger = led)
+    ep_mu_views!(pe.mu_views, epc, vpr, vsets, w0; strict = strict, ledger = led)
     ep_var_views!(pe.var_views, epc, vpr, vsets, w0; strict = strict, ledger = led)
     # Every row of every family can drop under `strict = false`, and the stage then states
     # no view. The prior is the answer, so neither the solve nor the refit runs. See issue
@@ -878,13 +878,13 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
     if !isnothing(pe.sigma_views) || !isnothing(pe.cov_views)
         # sigma
         if !isnothing(pe.sigma_views)
-            to_fix = ep_sigma_views!(pe.sigma_views, epc, vpr, vsets; strict = strict,
+            to_fix = ep_sigma_views!(pe.sigma_views, epc, vpr, vsets, w0; strict = strict,
                                      ledger = led)
             fix_mu!(epc, view(fixed, :, 1), to_fix, vpr)
         end
         # cov
         if !isnothing(pe.cov_views)
-            to_fix = ep_cov_views!(pe.cov_views, epc, vpr, vsets; strict = strict,
+            to_fix = ep_cov_views!(pe.cov_views, epc, vpr, vsets, w0; strict = strict,
                                    ledger = led)
             fix_mu!(epc, view(fixed, :, 1), to_fix, vpr)
         end
@@ -914,7 +914,7 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
         end
         # rho
         if !isnothing(pe.rho_views)
-            to_fix = ep_rho_views!(pe.rho_views, epc, vpr, vsets; strict = strict,
+            to_fix = ep_rho_views!(pe.rho_views, epc, vpr, vsets, w0; strict = strict,
                                    ledger = led)
             fix_mu!(epc, view(fixed, :, 1), to_fix, vpr)
             fix_sigma!(epc, view(fixed, :, 2), to_fix, vpr)
@@ -1047,16 +1047,17 @@ function ep_prior(alg::H0_EntropyPooling, pe::MeucciEntropyPoolingPrior, X::MatN
     # Every `prior(...)` reference resolves against the fit above.
     cvv = ep_cvar_views_setup(pe.cvar_views, vpr, vsets, w0, pe.ds_opt, pe.dm_opt;
                               strict = strict, ledger = led)
-    ep_mu_views!(pe.mu_views, epc, vpr, vsets; strict = strict, ledger = led)
+    ep_mu_views!(pe.mu_views, epc, vpr, vsets, w0; strict = strict, ledger = led)
     ep_var_views!(pe.var_views, epc, vpr, vsets, w0; strict = strict, ledger = led)
     if !isnothing(pe.sigma_views) || !isnothing(pe.cov_views)
         # sigma
         if !isnothing(pe.sigma_views)
-            ep_sigma_views!(pe.sigma_views, epc, vpr, vsets; strict = strict, ledger = led)
+            ep_sigma_views!(pe.sigma_views, epc, vpr, vsets, w0; strict = strict,
+                            ledger = led)
         end
         # cov
         if !isnothing(pe.cov_views)
-            ep_cov_views!(pe.cov_views, epc, vpr, vsets; strict = strict, ledger = led)
+            ep_cov_views!(pe.cov_views, epc, vpr, vsets, w0; strict = strict, ledger = led)
         end
     end
     if !isnothing(pe.rho_views) || !isnothing(pe.sk_views) || !isnothing(pe.kt_views)
@@ -1070,7 +1071,7 @@ function ep_prior(alg::H0_EntropyPooling, pe::MeucciEntropyPoolingPrior, X::MatN
         end
         # rho
         if !isnothing(pe.rho_views)
-            ep_rho_views!(pe.rho_views, epc, vpr, vsets; strict = strict, ledger = led)
+            ep_rho_views!(pe.rho_views, epc, vpr, vsets, w0; strict = strict, ledger = led)
         end
     end
     announce_ep_departures(ni, led, isempty(epc) && isnothing(cvv) && !isempty(led))

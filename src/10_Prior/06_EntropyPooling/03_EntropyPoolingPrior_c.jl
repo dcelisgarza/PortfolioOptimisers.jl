@@ -521,7 +521,7 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
     epc = Dict{Symbol, Tuple{MatNum, VecNum}}()
     tvs = Vector{AbstractEntropyPoolingTailView}(undef, 0)
     # mu, VaR, CVaR, EVaR and RLVaR
-    ep_mu_views!(pe.mu_views, epc, vpr, vsets; strict = strict, ledger = led)
+    ep_mu_views!(pe.mu_views, epc, vpr, vsets, w0; strict = strict, ledger = led)
     ep_var_views!(pe.var_views, epc, vpr, vsets, w0; strict = strict, ledger = led)
     ep_tail_views!(pe.cvar_views, epc, tvs, vpr, vsets, w0; strict = strict, ledger = led)
     ep_tail_views!(pe.evar_views, epc, tvs, vpr, vsets, w0; strict = strict, ledger = led)
@@ -538,13 +538,13 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
     if !isnothing(pe.sigma_views) || !isnothing(pe.cov_views)
         # sigma
         if !isnothing(pe.sigma_views)
-            to_fix = ep_sigma_views!(pe.sigma_views, epc, vpr, vsets; strict = strict,
+            to_fix = ep_sigma_views!(pe.sigma_views, epc, vpr, vsets, w0; strict = strict,
                                      ledger = led)
             fix_mu!(epc, view(fixed, :, 1), to_fix, vpr)
         end
         # cov
         if !isnothing(pe.cov_views)
-            to_fix = ep_cov_views!(pe.cov_views, epc, vpr, vsets; strict = strict,
+            to_fix = ep_cov_views!(pe.cov_views, epc, vpr, vsets, w0; strict = strict,
                                    ledger = led)
             fix_mu!(epc, view(fixed, :, 1), to_fix, vpr)
         end
@@ -576,7 +576,7 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
         end
         # rho
         if !isnothing(pe.rho_views)
-            to_fix = ep_rho_views!(pe.rho_views, epc, vpr, vsets; strict = strict,
+            to_fix = ep_rho_views!(pe.rho_views, epc, vpr, vsets, w0; strict = strict,
                                    ledger = led)
             fix_mu!(epc, view(fixed, :, 1), to_fix, vpr)
             fix_sigma!(epc, view(fixed, :, 2), to_fix, vpr)
@@ -660,18 +660,18 @@ function ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
     epc = Dict{Symbol, Tuple{MatNum, VecNum}}()
     tvs = Vector{AbstractEntropyPoolingTailView}(undef, 0)
     # mu, VaR, CVaR, EVaR and RLVaR
-    ep_mu_views!(pe.mu_views, epc, vpr, vsets; strict = strict, ledger = led)
+    ep_mu_views!(pe.mu_views, epc, vpr, vsets, w0; strict = strict, ledger = led)
     ep_var_views!(pe.var_views, epc, vpr, vsets, w0; strict = strict, ledger = led)
     ep_tail_views!(pe.cvar_views, epc, tvs, vpr, vsets, w0; strict = strict, ledger = led)
     ep_tail_views!(pe.evar_views, epc, tvs, vpr, vsets, w0; strict = strict, ledger = led)
     ep_tail_views!(pe.rlvar_views, epc, tvs, vpr, vsets, w0; strict = strict, ledger = led)
     # sigma
     if !isnothing(pe.sigma_views)
-        ep_sigma_views!(pe.sigma_views, epc, vpr, vsets; strict = strict, ledger = led)
+        ep_sigma_views!(pe.sigma_views, epc, vpr, vsets, w0; strict = strict, ledger = led)
     end
     # cov
     if !isnothing(pe.cov_views)
-        ep_cov_views!(pe.cov_views, epc, vpr, vsets; strict = strict, ledger = led)
+        ep_cov_views!(pe.cov_views, epc, vpr, vsets, w0; strict = strict, ledger = led)
     end
     # skew
     if !isnothing(pe.sk_views)
@@ -683,7 +683,7 @@ function ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
     end
     # rho
     if !isnothing(pe.rho_views)
-        ep_rho_views!(pe.rho_views, epc, vpr, vsets; strict = strict, ledger = led)
+        ep_rho_views!(pe.rho_views, epc, vpr, vsets, w0; strict = strict, ledger = led)
     end
     announce_ep_departures(ni, led, isempty(epc) && isempty(tvs) && !isempty(led))
     w1 = w0

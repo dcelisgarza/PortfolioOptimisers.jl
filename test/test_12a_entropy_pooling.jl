@@ -1744,6 +1744,112 @@ end
     end
 end
 
+@testset "A view that no reweighting of the scenarios meets names the view and its band (#1920)" begin
+    #=
+    A view row states a weighted average of one series of the scenarios, so the scenarios at
+    a positive prior probability bound it. A target outside that band has no posterior. The
+    dual solve then ran to an unbounded multiplier, and the fit failed in a consumer of the
+    weights with `matrix contains Infs or NaNs`, or a `sqrt` of a negative number, which named
+    neither the view nor the band. Every linear family now refuses such a row with a
+    `DomainError` before the solve, as the tail views do (#1260).
+    =#
+    lce(v) = LinearConstraintEstimator(; val = v)
+    X = prior(EmpiricalPrior(), rd).X
+    lo, hi = extrema(view(X, :, 1))
+    infeasible = ((:mu_views, "AAPL == $(hi + 0.01)", "mean"),
+                  (:sigma_views, "AAPL == 1.0", "variance"),
+                  (:cov_views, "(AAPL, AMD) == 1.0", "covariance"),
+                  # `(AAPL, AAPL)` reads the second raw moment, which is never negative,
+                  # against `mu^2 - sigma^2 < 0`.
+                  (:rho_views, "(AAPL, AAPL) == -1.0", "correlation"),
+                  (:sk_views, "AAPL == 1.0e6", "skewness"),
+                  (:kt_views, "AAPL == 1.0e8", "kurtosis"))
+    for (fam, val, name) in infeasible,
+        EP in (EntropyPoolingPrior, MeucciEntropyPoolingPrior),
+        alg in (H0_EntropyPooling(), H1_EntropyPooling())
+
+        e = @test_throws DomainError prior(EP(; sets = sets, alg = alg, fam => lce(val)),
+                                           rd)
+        @test occursin("The $(name) view `", e.value.msg)
+        @test occursin("open interval", e.value.msg)
+    end
+    # The band of a mean view is the range of its asset.
+    e = @test_throws DomainError prior(EntropyPoolingPrior(; sets = sets,
+                                                           mu_views = lce("AAPL == $(hi + 0.01)")),
+                                       rd)
+    @test occursin("The mean view `1.0*AAPL == $(hi + 0.01)`", e.value.msg)
+    @test occursin("($(lo), $(hi))", e.value.msg)
+    # The edge of the band needs all the mass on one scenario, so it is refused too.
+    @test_throws DomainError prior(EntropyPoolingPrior(; sets = sets,
+                                                       mu_views = lce("AAPL == $(hi)")), rd)
+    # An inequality needs one edge alone: `>=` above the band fails, `<=` above it holds.
+    @test_throws DomainError prior(EntropyPoolingPrior(; sets = sets,
+                                                       mu_views = lce("AAPL >= $(hi + 0.01)")),
+                                   rd)
+    @test prior(EntropyPoolingPrior(; sets = sets, mu_views = lce("AAPL <= $(hi + 0.01)")),
+                rd) isa LowOrderPrior
+    # A view of several assets reads the exact band of its left-hand side.
+    y = view(X, :, 1) .- view(X, :, 2)
+    @test_throws DomainError prior(EntropyPoolingPrior(; sets = sets,
+                                                       mu_views = lce("AAPL - AMD == $(maximum(y) + 1e-4)")),
+                                   rd)
+    pr = prior(EntropyPoolingPrior(; sets = sets,
+                                   mu_views = lce("AAPL - AMD == $(maximum(y) / 2)")), rd)
+    @test isapprox(pr.mu[1] - pr.mu[2], maximum(y) / 2; rtol = 1e-6)
+    # A scenario at zero prior probability carries no posterior mass, so it does not widen
+    # the band: a target between the two largest returns is refused.
+    imx = argmax(view(X, :, 1))
+    w0 = ones(size(X, 1))
+    w0[imx] = 0
+    w0 = StatsBase.aweights(w0 / sum(w0))
+    hi2 = maximum(view(X, setdiff(axes(X, 1), imx), 1))
+    e = @test_throws DomainError prior(EntropyPoolingPrior(; sets = sets, w = w0,
+                                                           mu_views = lce("AAPL == $((hi + hi2) / 2)")),
+                                       rd)
+    @test occursin(", $(hi2))", e.value.msg)
+    # A value at risk row is the mass of the losses at or above its target. When only the
+    # scenario at zero prior probability reaches the target, the support gives that mass
+    # nothing, and the row is refused.
+    imn = argmin(view(X, :, 1))
+    w0 = ones(size(X, 1))
+    w0[imn] = 0
+    w0 = StatsBase.aweights(w0 / sum(w0))
+    lo2 = minimum(view(X, setdiff(axes(X, 1), imn), 1))
+    vv = ValueatRiskView(; alpha = 0.05, views = lce("AAPL == $(-(lo + lo2) / 2)"))
+    e = @test_throws DomainError prior(EntropyPoolingPrior(; sets = sets, w = w0,
+                                                           var_views = vv), rd)
+    @test occursin("The value at risk view `", e.value.msg)
+    # With every scenario in the support, the same view holds.
+    @test prior(EntropyPoolingPrior(; sets = sets, var_views = vv), rd) isa LowOrderPrior
+end
+
+@testset "An infeasible mean view over an augmented Black-Litterman prior names its band (#1920)" begin
+    # The reproduction of #1920. The scenarios of the augmented prior are its reconstructed
+    # returns, whose range is narrower than that of the raw returns.
+    rng = StableRNG(1751)
+    X = randn(rng, 60, 4) ./ 100
+    F = randn(rng, 60, 2) ./ 100
+    X30, F30 = X[1:30, :], F[1:30, :]
+    lce(v) = LinearConstraintEstimator(; val = v)
+    s1 = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["A1", "A2", "A3", "A4"]))
+    s2 = UniverseSets(; xkey = "nx",
+                      dict = Dict("nx" => ["A1", "A2", "A3", "A4"], "nf" => ["F1", "F2"]))
+    wnu = StatsBase.aweights(LinearAlgebra.normalize(rand(StableRNG(7), 30) .+ 0.2, 1))
+    abl = AugmentedBlackLittermanPrior(; a_views = lce("A2 == 0.001"),
+                                       f_views = lce("F2 == 0.001"), sets = s2)
+    base = LinearAlgebra.dot(wnu, prior(abl, X30, F30).X[:, 1])
+    ep(off) = EntropyPoolingPrior(; pe = abl, w = wnu, sets = s1,
+                                  mu_views = lce("A1 == $(base + off)"))
+    # Inside the band the view holds on the scenarios. The posterior `mu` of the augmented
+    # prior is its Black-Litterman mean, not the average of its scenarios.
+    pr = prior(ep(1e-3), X30, F30)
+    @test isapprox(LinearAlgebra.dot(pr.w, view(pr.X, :, 1)), base + 1e-3; rtol = 1e-6)
+    for off in (3e-3, 1e-2, 3e-2)
+        e = @test_throws DomainError prior(ep(off), X30, F30)
+        @test occursin("The mean view `1.0*A1 == $(base + off)`", e.value.msg)
+    end
+end
+
 @testset "An entropy pooling prior over a factor prior meets its views (#1649)" begin
     # The data of #1649: asset 1 loads on factor 1 in the first 60 rows, and the fit reads
     # those rows alone.

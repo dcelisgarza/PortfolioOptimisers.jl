@@ -77,7 +77,8 @@ Where:
  6. For each block that `lcs` holds, and each row `i` of it, read the asset that the row names into `j`. Read the observations of `view(X, :, j)` at or below `-abs(B[i])` into `idx`.
  7. Raise when `idx` names no observation.
  8. Read the sense of the row into `sign`. It is one for an equality row and for a positive right-hand side, and minus one otherwise. So an `:ineq` row with a target of zero takes minus one, as a row with a positive target does.
- 9. Build the row `Ai` that has `sign` at `idx` and zero at the other observations, and add it against `sign * alpha` with [`add_ep_constraint!`](@ref).
+ 9. Build the row `Ai` that has `sign` at `idx` and zero at the other observations. Refuse it against `sign * alpha` when no reweighting of the observations at a positive weight of `w` meets it, with [`ep_assert_attainable_rows`](@ref).
+10. Add the row against `sign * alpha` with [`add_ep_constraint!`](@ref).
 
 # Arguments
 
@@ -96,6 +97,7 @@ Where:
   - Every view names one asset. A view over more than one asset raises an `ArgumentError`.
   - Every target is non-negative. A negative target raises a `DomainError`.
   - The sample must hold at least one observation whose loss reaches the target. A view more extreme than the worst realisation raises a `DomainError` that names the largest target that the asset admits.
+  - $(val_dict[:ep_attainable_row]) For a value at risk row, the band is the mass that the observations whose loss reaches the target can take.
 
 # Returns
 
@@ -186,6 +188,7 @@ function ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
               DomainError(var_views,
                           "A `var_view` states a loss magnitude, so its target is non-negative, and one of these is negative:\n$var_views"))
     Ai = zeros(eltype(X), 1, size(X, 1))
+    ws = get_observation_weights(w, X)
     for p in (:ineq, :eq)
         if isnothing(getproperty(lcs, p))
             continue
@@ -205,7 +208,14 @@ function ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
                           -one(eltype(B)))
             fill!(Ai, zero(eltype(Ai)))
             Ai[1, idx] .= sign
-            add_ep_constraint!(epc, Ai, [sign * alpha], p)
+            rhs = [sign * alpha]
+            # The check above reads every observation. The mass of `idx` moves only on the
+            # support of `w`, so the row is refused when the support puts all of it, or none
+            # of it, in `idx` (#1920).
+            ep_assert_attainable_rows(Ai, rhs, p, ws,
+                                      _ -> ep_view_row_label(A, B, i, p, sets),
+                                      "value at risk")
+            add_ep_constraint!(epc, Ai, rhs, p)
         end
     end
     return nothing

@@ -60,6 +60,91 @@ function add_ep_constraint!(epc::AbstractDict, lhs::MatNum, rhs::VecNum, key::Sy
     return nothing
 end
 """
+    ep_assert_attainable_rows(lhs::MatNum, rhs::VecNum, key::Symbol,
+                              w::Option{<:VecNum}, label, name::AbstractString)
+
+Refuse a view row that no reweighting of the scenarios can meet.
+
+A row of a block in the entropy pooling constraint dictionary states ``\\sum_{t} p_{t} y_{t} \\lessgtr b``, where ``y`` is the row of `lhs`. The posterior probabilities sum to one, so the left-hand side is an average of ``y``, and it is between the smallest and the largest entry of ``y``. The posterior of entropy pooling puts no mass where the prior puts none, so only the entries at a positive prior probability count. For each row, the band is exact. A target on the edge of the band needs all the mass on the scenarios at that edge. The dual of the problem then has no finite solution, so the method refuses the edge too, as [`ep_assert_reachable_view`](@ref) does for a tail view.
+
+Without this check, the dual solve of such a row runs to an unbounded multiplier, and the posterior weights overflow. The first consumer of the weights then fails with an error that names neither the view nor the bound.
+
+# Algorithm
+
+ 1. For each row `k` of `lhs`, read `lo` and `hi` with `extrema` over a view of the row. When `w` is not `nothing`, read only the entries at `w > 0`. Neither step copies the row or makes a mask.
+ 2. When `key` is `:eq`, raise an error unless `lo < rhs[k] < hi`. Otherwise, the row is `<=`, and raise an error unless `lo < rhs[k]`.
+
+# Arguments
+
+  - `lhs`: Left-hand side block, one row for each view and one column for each scenario.
+  - `rhs`: Right-hand side vector, one target for each row of `lhs`.
+  - `key`: Sense of the block, `:eq` or `:ineq`. An `:ineq` row is `<=`.
+  - `w`: Prior probabilities of the scenarios, or `nothing` to count every scenario. A caller resolves a [`DynamicAbstractWeights`](@ref) with [`get_observation_weights`](@ref) first.
+  - `label`: Callable that takes the index `k` of a row and returns its view, for the error message. The method calls it only for a row that it refuses.
+  - `name`: The name of the view family, for the error message.
+
+# Validation
+
+  - If `key` is `:eq`, `lo < rhs[k] < hi` for every row `k`. Else `lo < rhs[k]`. A row that breaks this raises a `DomainError` that names the view and the band.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ep_assert_reachable_view`](@ref)
+  - [`add_ep_constraint!`](@ref)
+  - [`ep_mu_views!`](@ref)
+"""
+function ep_assert_attainable_rows(lhs::MatNum, rhs::VecNum, key::Symbol,
+                                   w::Option{<:VecNum}, label, name::AbstractString)
+    for k in eachindex(rhs)
+        row = view(lhs, k, :)
+        # Only the support of `w` bounds the band: a posterior puts no mass where the prior
+        # puts none (#1260).
+        lo, hi = if isnothing(w)
+            extrema(row)
+        else
+            extrema(y for (y, wt) in zip(row, w) if wt > zero(wt))
+        end
+        b = rhs[k]
+        @argcheck(lo < b && (key != :eq || b < hi),
+                  DomainError(b,
+                              "The $(name) view `$(label(k))` cannot be met: its row states a weighted average of the scenarios $(ifelse(key == :eq, "==", "<=")) $(b), and every reweighting of the scenarios at a positive prior probability keeps that average inside the open interval ($(lo), $(hi)). Move the target inside the interval, or use a prior whose scenarios spread wider."))
+    end
+    return nothing
+end
+"""
+    ep_view_row_label(A::MatNum, B::VecNum, k::Integer, key::Symbol, sets::UniverseSets)
+
+Write the view that one row of a linear constraint block states.
+
+A block of [`get_linear_constraints`](@ref) keeps no equation for its rows. This method writes row `k` again from its coefficients, the names of the universe and its target, for the error message of [`ep_assert_attainable_rows`](@ref). An `:ineq` row is `<=`, because the parser negates a `>=` row.
+
+# Arguments
+
+  - `A`: Coefficient matrix of the block, one row for each view and one column for each asset.
+  - `B`: Target of each row.
+  - `k`: Index of the row.
+  - `key`: Sense of the block, `:eq` or `:ineq`.
+  - `sets`: Universe sets that name the columns of `A`.
+
+# Returns
+
+  - `label::String`: The view of row `k`, such as `"1.0*A1 == 0.003"`.
+
+# Related
+
+  - [`ep_assert_attainable_rows`](@ref)
+"""
+function ep_view_row_label(A::MatNum, B::VecNum, k::Integer, key::Symbol,
+                           sets::UniverseSets)
+    nx = sets.dict[sets.xkey]
+    terms = join(("$(A[k, i])*$(nx[i])" for i in axes(A, 2) if !iszero(A[k, i])), " + ")
+    return "$(terms) $(ifelse(key == :eq, "==", "<=")) $(B[k])"
+end
+"""
     announce_ep_departures(ni::VecStr, ledger::VecStr, viewless::Bool) -> Nothing
 
 Report, once for each entropy pooling fit, the assets that left the investable universe and the views that their departure removed.
@@ -300,7 +385,8 @@ function ep_mu_views!(mu_views::Nothing, args...; kwargs...)
 end
 """
     ep_mu_views!(mu_views::LinearConstraintEstimator, epc::AbstractDict,
-                 pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false,
+                 pr::AbstractPriorResult, sets::UniverseSets,
+                 w::Option{<:ObsWeights} = nothing; strict::Bool = false,
                  ledger::Option{<:AbstractVector} = nothing)
 
 Add the mean views of a group to the entropy pooling constraint dictionary.
@@ -338,7 +424,8 @@ Where:
  2. Replace every group name by the assets it spans.
  3. Replace every `prior(...)` reference by the prior mean, through [`replace_prior_views`](@ref).
  4. Turn the parsed views into the linear constraint blocks `lcs`, one for `:ineq` and one for `:eq`. Under `strict = false`, every row of the group can drop, and `lcs` is then `nothing`. The group then states no view, and the call returns with no row added.
- 5. For each block that `lcs` holds, add `A * transpose(X)` against `B` under its key with [`add_ep_constraint!`](@ref).
+ 5. For each block that `lcs` holds, make `A * transpose(X)`. Refuse a row that no reweighting of the scenarios on the support of `w` meets, with [`ep_assert_attainable_rows`](@ref).
+ 6. Add `A * transpose(X)` against `B` under its key with [`add_ep_constraint!`](@ref).
 
 # Arguments
 
@@ -346,8 +433,13 @@ Where:
   - `epc`: Dictionary of entropy pooling constraints, which maps each key to an `(lhs, rhs)` pair.
   - `pr`: Prior result that holds the asset returns.
   - `sets`: Universe sets that map the asset names to indices.
+  - $(arg_dict[:ep_view_support_w])
   - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn.
   - $(arg_dict[:ledger]) [`replace_group_by_assets`](@ref) and [`get_linear_constraints`](@ref) fill it.
+
+# Validation
+
+  - $(val_dict[:ep_attainable_row])
 
 # Returns
 
@@ -362,7 +454,8 @@ Where:
   - [`MeucciEntropyPoolingPrior`](@ref)
 """
 function ep_mu_views!(mu_views::LinearConstraintEstimator, epc::AbstractDict,
-                      pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false,
+                      pr::AbstractPriorResult, sets::UniverseSets,
+                      w::Option{<:ObsWeights} = nothing; strict::Bool = false,
                       ledger::Option{<:AbstractVector} = nothing)
     X = pr.X
     mu_views = parse_equation(mu_views.val; datatype = eltype(X))
@@ -378,12 +471,18 @@ function ep_mu_views!(mu_views::LinearConstraintEstimator, epc::AbstractDict,
     if isnothing(lcs)
         return nothing
     end
+    ws = get_observation_weights(w, X)
     for p in (:ineq, :eq)
         if isnothing(getproperty(lcs, p))
             continue
         end
-        add_ep_constraint!(epc, getproperty(lcs, p).A * transpose(X), getproperty(lcs, p).B,
-                           p)
+        (; A, B) = getproperty(lcs, p)
+        # Row `k` of `A * transpose(X)` is the scenario series of the left-hand side of
+        # view `k`, so its band is exact for a view of one asset and of many (#1920).
+        lhs = A * transpose(X)
+        ep_assert_attainable_rows(lhs, B, p, ws, k -> ep_view_row_label(A, B, k, p, sets),
+                                  "mean")
+        add_ep_constraint!(epc, lhs, B, p)
     end
     return nothing
 end

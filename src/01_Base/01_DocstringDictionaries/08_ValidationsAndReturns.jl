@@ -26,6 +26,7 @@ unique_key_dict!(val_dict, :val_dict, :oow => "If `w` is not `nothing`, `!isempt
                  :beta => "`0 < beta < 1`.",#
                  :bins => "If `bins` is an integer, `0 < bins <= RESOURCE_LIMITS[].max_bins`. The joint histogram is `bins × bins`, and [`RESOURCE_LIMITS`](@ref) sets the cap.",#
                  :ep_gridK => "`isodd(K)` and `1 <= K <= RESOURCE_LIMITS[].max_ep_grid`. Each grid point is one binary variable of the mixed-integer program that an upper-bound or equality view builds, and [`RESOURCE_LIMITS`](@ref) sets the cap.",#
+                 :ep_attainable_row => "The target of each row is strictly inside the band of its left-hand side over the scenarios at a positive prior probability. A target outside the band, or on its edge, raises a `DomainError` that names the view and the band, through [`ep_assert_attainable_rows`](@ref). An inequality row needs only the lower edge of the band.",#
                  :dopower => "If `power` is not `nothing`, `power >= 1`.",#
                  :p_owa => "`!isempty(p)` and `all(x -> x > 1, p)`.",#
                  :settings => "If `settings` is a collection, `!isempty(settings)`, else an [`IsEmptyError`](@ref). If `settings` is not `nothing`, each key is a [`SlvKeys`](@ref), else an `ArgumentError`.",#
