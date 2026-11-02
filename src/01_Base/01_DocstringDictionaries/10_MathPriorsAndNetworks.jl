@@ -55,11 +55,12 @@ unique_key_dict!(math_dict, :math_dict,
                  # between two Units.
                  :c_star_clusters => "``c^{\\star}``: Selected number of clusters.",#
                  # Preselection. `20_AssetSelection.jl` states the admitted set of every
-                 # selection rule and of every redundancy algorithm, so the four
+                 # selection rule and of every redundancy algorithm, so the five
                  # symbols below are each shared by two or more Units of that file.
                  :s_i_score => "``s_{i}``: The score of asset ``i``. It is the value of the risk measure on the return series of asset ``i`` alone.",#
                  :K_keep_set => "``\\mathcal{K}``: The set of the assets that a selector keeps.",#
                  :k_tail_count => "``k``: The number of assets that a rule takes from one end of the order of the scores.",#
+                 :N_F_finite_count => "``N_{\\mathcal{F}}``: The number of assets with a finite score. A `NaN` or an infinite score does not count.",#
                  :t_corr_threshold => "``t``: The correlation at or above which two assets are redundant.",#
                  # The online step of the prior family. `12_PriorPartialFit.jl` states the
                  # result of `prior(pe)` with no data as the batch prior of the rows that

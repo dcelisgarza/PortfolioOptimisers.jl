@@ -1625,6 +1625,53 @@ end
               .!PO.rule_keep(QuantileRule(; best = 0.4, worst = 0.2), s, false)
     end
 
+    @testset "a non-finite score is outside every tail and every band (#1933)" begin
+        s = [0.3, NaN, 0.1, 0.2, 0.4]
+        # The table of #1933. Before the fix, the first four rows kept no asset: the NaN
+        # sorted to the cut end and took a slot of the count.
+        @test findall(PO.tail_mask(s, 1, true, :best)) == [5]
+        @test findall(PO.tail_mask(s, 2, true, :best)) == [1, 5]
+        @test findall(PO.tail_mask(s, 1, false, :worst)) == [5]
+        @test findall(PO.tail_mask(s, 2, false, :worst)) == [1, 5]
+        @test findall(PO.tail_mask(s, 2, false, :best)) == [3, 4]
+        # The count saturates at the four finite scores, and the NaN stays out.
+        @test findall(PO.tail_mask(s, 4, true, :best)) == [1, 3, 4, 5]
+        @test findall(PO.tail_mask(s, 9, true, :best)) == [1, 3, 4, 5]
+        # An infinite score is outside both tails too.
+        @test findall(PO.tail_mask([1.0, Inf, 2.0, -Inf], 1, true, :best)) == [3]
+        @test findall(PO.tail_mask([1.0, Inf, 2.0, -Inf], 1, true, :worst)) == [1]
+
+        # The same rows through rule_keep, both orientations.
+        @test findall(PO.rule_keep(RankRule(; best = 1), s, true)) == [5]
+        @test findall(PO.rule_keep(RankRule(; best = 2), s, true)) == [1, 5]
+        @test findall(PO.rule_keep(RankRule(; worst = 2), s, false)) == [1, 5]
+        @test findall(PO.rule_keep(RankRule(; best = 2), s, false)) == [3, 4]
+        # `:drop` takes the complement among the finite scores, so it does not keep the NaN.
+        @test findall(PO.rule_keep(RankRule(; best = 1, action = :drop), s, true)) ==
+              [1, 3, 4]
+        @test findall(PO.rule_keep(RankRule(; worst = 1, action = :drop), s, false)) ==
+              [1, 3, 4]
+        @test !PO.rule_keep(RankRule(; best = 1, action = :drop), s, false)[2]
+
+        # QuantileRule converts with the four finite scores: 0.5 of 4 is 2, not 0.5 of 5 = 3.
+        @test findall(PO.rule_keep(QuantileRule(; best = 0.5), s, false)) == [3, 4]
+        @test findall(PO.rule_keep(QuantileRule(; best = 0.5), s, true)) == [1, 5]
+        @test findall(PO.rule_keep(QuantileRule(; worst = 0.25, action = :drop), s, false)) ==
+              [1, 3, 4]
+
+        # ThresholdRule drops a NaN and an infinite score, also on the side with no bound.
+        @test findall(PO.rule_keep(ThresholdRule(; hi = 1.0), [0.3, NaN, -Inf, Inf, 0.4],
+                                   false)) == [1, 5]
+        @test findall(PO.rule_keep(ThresholdRule(; lo = 0.0), [0.3, NaN, -Inf, Inf, 0.4],
+                                   false)) == [1, 5]
+
+        # With no finite score, every rule keeps no asset, so fit_preprocessing throws.
+        @test !any(PO.rule_keep(RankRule(; best = 2), [NaN, NaN], false))
+        @test !any(PO.rule_keep(RankRule(; best = 1, action = :drop), [NaN, NaN], false))
+        @test !any(PO.rule_keep(QuantileRule(; best = 0.5), [NaN, NaN], false))
+        @test !any(PO.rule_keep(ThresholdRule(; lo = 0.0), [NaN, NaN], false))
+    end
+
     @testset "selection rule validators" begin
         @test_throws PO.IsNothingError PO.assert_tail_counts(nothing, nothing, :RankRule)
         @test_throws DomainError PO.assert_tail_counts(-1, nothing, :RankRule)
@@ -2162,6 +2209,40 @@ struct UnimplementedRedundancy <: PortfolioOptimisers.AbstractRedundancyAlgorith
         @test findall(POx.groups_argbest([Int[], [1, 2]], [1.0, 2.0], false)) == [1]
         @test findall(POx.groups_argbest([[1, 2], Int[]], [1.0, 2.0], true)) == [2]
         @test !any(POx.groups_argbest([Int[]], [1.0, 2.0], false))
+    end
+
+    @testset "a non-finite score never survives a redundancy algorithm (#1933)" begin
+        s = [0.3, NaN, 0.1, 0.2, 0.4]
+        # A NaN first in its group: before the fix, `best` stayed on it and the group kept
+        # no asset. Now the best finite member survives.
+        @test findall(POx.groups_argbest([[2, 1, 3], [4, 5]], s, false)) == [3, 4]
+        @test findall(POx.groups_argbest([[2, 1, 3], [4, 5]], s, true)) == [1, 5]
+        # A NaN later in its group is skipped, and so is an infinite score.
+        @test findall(POx.groups_argbest([[1, 2, 3]], s, false)) == [3]
+        @test findall(POx.groups_argbest([[1, 2]], [1.0, -Inf], false)) == [1]
+        # A group with no finite score keeps no asset, also a group of one member.
+        @test !any(POx.groups_argbest([[2]], s, false))
+        @test !any(POx.groups_argbest([[1, 2]], [NaN, Inf], true))
+
+        rng = StableRNG(1933)
+        a = randn(rng, 200)
+        X = hcat(a, a .+ 0.01 .* randn(rng, 200), randn(rng, 200))
+        rd = ReturnsResult(; nx = ["A", "B", "C"], X = X)
+        # A and B are a correlated pair, and C is uncorrelated with both.
+        @test POx.find_uncorrelated_indices(X; t = 0.9) == [2, 3]
+        # A NaN on one asset of the pair drops that asset alone. Before the fix the
+        # comparison fell to the tie branch and dropped both.
+        @test POx.find_uncorrelated_indices(X; t = 0.9, scores = [NaN, 1.0, 2.0]) == [2, 3]
+        @test POx.find_uncorrelated_indices(X; t = 0.9, scores = [1.0, NaN, 2.0]) == [1, 3]
+        # Two NaN drop both, and an unpaired NaN asset does not survive either.
+        @test POx.find_uncorrelated_indices(X; t = 0.9, scores = [NaN, NaN, 2.0]) == [3]
+        @test POx.find_uncorrelated_indices(X; t = 0.9, scores = [1.0, 2.0, NaN]) == [1]
+        # Through the selectors, with a reward score: B is the better finite asset of the
+        # pair under both algorithms.
+        @test findall(POx.redundancy_keep(PairwiseCorrelation(; t = 0.9), rd,
+                                          [NaN, 5.0, 2.0], true)) == [2, 3]
+        @test findall(POx.redundancy_keep(CorrelationComponents(; t = 0.9), rd,
+                                          [NaN, 5.0, 2.0], true)) == [2, 3]
     end
 
     @testset "pipeline integration" begin

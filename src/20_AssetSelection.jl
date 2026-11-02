@@ -22,7 +22,7 @@ To add a selection rule, subtype `AbstractSelectionRule`, put every parameter of
 
 ## Returns
 
-  - `keep::BitVector`: The mask `assets × 1`. It is `true` for every asset that the rule admits.
+  - `keep::BitVector`: The mask `assets × 1`. It is `true` for every asset that the rule admits. It must be `false` at every non-finite score, under every parameter of the rule. A `NaN` score marks an asset that has no score, and that asset must not survive a selection.
 
 # Related
 
@@ -43,7 +43,7 @@ Both bounds are optional, and both are literal. The rule compares `lo` and `hi` 
 
 ```math
 \\begin{align}
-\\mathcal{K} &= \\left\\{ i : l < s_{i} < u \\right\\}\\,.
+\\mathcal{K} &= \\left\\{ i : s_{i} \\in \\mathbb{R},\\; l < s_{i} < u \\right\\}\\,.
 \\end{align}
 ```
 
@@ -54,7 +54,7 @@ Where:
   - ``l``: `lo`, the lower bound. An omitted bound is ``-\\infty``.
   - ``u``: `hi`, the upper bound. An omitted bound is ``+\\infty``.
 
-Both comparisons are **strict**, so the band is open. The rule drops an asset whose score is equal to ``l`` or to ``u``.
+Both comparisons are **strict**, so the band is open. The rule drops an asset whose score is equal to ``l`` or to ``u``. A score that is not in ``\\mathbb{R}``, a `NaN` or an infinite value, is outside every band. An omitted bound does not admit it.
 
 # Fields
 
@@ -131,11 +131,12 @@ A count **saturates** at the number of assets. On a window of 30 assets, `best =
 
 ```math
 \\begin{align}
-\\mathcal{T}(k) &= \\left\\{ i : a_{i} + e_{i} \\leq k \\right\\}\\,, \\\\
+\\mathcal{F} &= \\left\\{ i : s_{i} \\in \\mathbb{R} \\right\\}\\,, \\\\
+\\mathcal{T}(k) &= \\left\\{ i \\in \\mathcal{F} : a_{i} + e_{i} \\leq k \\right\\}\\,, \\\\
 \\mathcal{S} &= \\mathcal{T}_{\\mathrm{best}}(k_{b}) \\cup \\mathcal{T}_{\\mathrm{worst}}(k_{w})\\,, \\\\
 \\mathcal{K} &= \\begin{cases}
     \\mathcal{S} & \\text{keep} \\\\
-    \\left\\{ 1,\\, \\dots,\\, N \\right\\} \\setminus \\mathcal{S} & \\text{drop}
+    \\mathcal{F} \\setminus \\mathcal{S} & \\text{drop}
 \\end{cases}\\,.
 \\end{align}
 ```
@@ -144,15 +145,16 @@ Where:
 
   - $(math_dict[:K_keep_set])
   - $(math_dict[:s_i_score])
-  - $(math_dict[:N])
   - $(math_dict[:k_tail_count])
+  - ``\\mathcal{F}``: The set of the assets with a finite score. A `NaN` or an infinite score is outside it.
+  - $(math_dict[:N_F_finite_count]) It is the size of ``\\mathcal{F}``.
   - ``\\mathcal{T}(k)``: The tail of size ``k``, at the end that the subscript names.
-  - ``a_{i}``: The number of assets whose score is strictly better than ``s_{i}``. At the `best` end, a larger score is better when [`bigger_is_better`](@ref) is `true`, and a smaller score is better when it is `false`. The `worst` end reverses this order.
-  - ``e_{i}``: The number of assets whose score is equal to ``s_{i}``. The number includes asset ``i``, so ``e_{i} \\geq 1``.
-  - ``k_{b}``, ``k_{w}``: The counts `best` and `worst`, each saturated to ``[0,\\, N]``. An omitted count is ``0``.
+  - ``a_{i}``: The number of assets in ``\\mathcal{F}`` whose score is strictly better than ``s_{i}``. At the `best` end, a larger score is better when [`bigger_is_better`](@ref) is `true`, and a smaller score is better when it is `false`. The `worst` end reverses this order.
+  - ``e_{i}``: The number of assets in ``\\mathcal{F}`` whose score is equal to ``s_{i}``. The number includes asset ``i``, so ``e_{i} \\geq 1``.
+  - ``k_{b}``, ``k_{w}``: The counts `best` and `worst`, each saturated to ``[0,\\, N_{\\mathcal{F}}]``. An omitted count is ``0``.
   - ``\\mathcal{S}``: The union of the two tails, before the rule applies `action`.
 
-Two facts follow from this definition. A tail admits asset ``i`` only when the whole tied block of ``i`` fits in ``k``. A tail excludes a block that crosses the cut, so ``\\left| \\mathcal{T}(k) \\right| \\leq k``. If all the scores are equal, ``a_{i} + e_{i} = N`` for every asset, so every tail of size ``k < N`` is empty.
+Three facts follow from this definition. A tail admits asset ``i`` only when the whole tied block of ``i`` fits in ``k``. A tail excludes a block that crosses the cut, so ``\\left| \\mathcal{T}(k) \\right| \\leq k``. If all the finite scores are equal, ``a_{i} + e_{i} = N_{\\mathcal{F}}`` for every asset of ``\\mathcal{F}``, so every tail of size ``k < N_{\\mathcal{F}}`` is empty. An asset outside ``\\mathcal{F}`` is in no tail and in neither keep-set, so an asset with no score never survives the rule.
 
 # Fields
 
@@ -218,7 +220,7 @@ $(DocStringExtensions.TYPEDEF)
 
 A [`RankRule`](@ref) whose tail sizes are *fractions* of the asset universe.
 
-`best` and `worst` are fractions in `(0, 1)`. The rule converts each fraction to a count with `round(Int, fraction * n, RoundNearestTiesUp)` on the window that it fits. An exact half rounds **up**. For example, `best = 0.625` on a window of 4 assets takes 3 assets, and not the 2 that the default `RoundNearest` of Julia gives.
+`best` and `worst` are fractions in `(0, 1)`. The rule converts each fraction to a count with `round(Int, fraction * n, RoundNearestTiesUp)` on the window that it fits. `n` is the number of assets with a finite score, so an asset with no score does not count in the size of the universe. An exact half rounds **up**. For example, `best = 0.625` on a window of 4 assets takes 3 assets, and not the 2 that the default `RoundNearest` of Julia gives.
 
 The other behaviour is the same as for [`RankRule`](@ref). [`bigger_is_better`](@ref) sets the order, `action = :drop` takes the complement, a count saturates, and the rule excludes a tied block that crosses the cut.
 
@@ -228,17 +230,17 @@ Fractions and counts have separate types on purpose. If one rule took both, `bes
 
 ```math
 \\begin{align}
-k &= \\left\\lfloor f N + \\frac{1}{2} \\right\\rfloor\\,.
+k &= \\left\\lfloor f N_{\\mathcal{F}} + \\frac{1}{2} \\right\\rfloor\\,.
 \\end{align}
 ```
 
 Where:
 
   - $(math_dict[:k_tail_count])
-  - $(math_dict[:N])
+  - $(math_dict[:N_F_finite_count])
   - ``f``: The fraction `best` or `worst`, in ``(0,\\, 1)``.
 
-The floor of ``f N + 1/2`` is the rounding mode `RoundNearestTiesUp`. An exact half rounds **up**, and not to the even neighbour that the default `RoundNearest` of Julia selects. The two counts are then the ``k_{b}`` and the ``k_{w}`` of [`RankRule`](@ref), which states the admitted set.
+The floor of ``f N_{\\mathcal{F}} + 1/2`` is the rounding mode `RoundNearestTiesUp`. An exact half rounds **up**, and not to the even neighbour that the default `RoundNearest` of Julia selects. The two counts are then the ``k_{b}`` and the ``k_{w}`` of [`RankRule`](@ref), which states the admitted set.
 
 # Fields
 
@@ -379,18 +381,20 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the mask of the `k` assets that are furthest into the `tail` end of the order of the scores.
 
-`tail` is `:best` or `:worst`. `bib`, the [`bigger_is_better`](@ref) flag of the score, sets which raw direction each end is. The count saturates at `length(scores)`.
+`tail` is `:best` or `:worst`. `bib`, the [`bigger_is_better`](@ref) flag of the score, sets which raw direction each end is. The count saturates at the number of finite scores.
+
+The function orders only the finite scores. A non-finite score is in neither tail, so the mask is `false` at every `NaN` and at every infinite score. An unscored asset is then never in a selection, and it takes no slot of the count.
 
 The mask includes the assets tied with the score at position `k` only when the whole tied block fits in `k`. Otherwise the block crosses the cut, and the mask excludes it. This is the tie policy of the library, and it is the reason that the mask can hold fewer than `k` assets. [`RankRule`](@ref) states the admitted set in closed form.
 
 # Algorithm
 
- 1. Read `n`, the number of scores. Return `n` falses when `k` is not positive, and `n` trues when `k` is at least `n`. The second case is the saturation of the count.
+ 1. Read `fin`, the mask of the finite scores, and `n`, the number of finite scores. Return a mask of falses when `k` is not positive, and `fin` when `k` is at least `n`. The second case is the saturation of the count.
  2. Select the comparison `ahead`. It is `>` when `tail` and `bib` agree that a larger score is further into the tail, and `<` otherwise.
- 3. Sort the scores under `ahead` with `sortperm` into `perm`. Read `cut`, the score at position `k` of that order.
- 4. Count the scores strictly `ahead` of `cut` into `n_ahead`, and the scores equal to `cut` into `n_eq`.
+ 3. Sort the finite scores `s` under `ahead` with `sortperm` into `perm`. Read `cut`, the score at position `k` of that order.
+ 4. Count the finite scores strictly `ahead` of `cut` into `n_ahead`, and the finite scores equal to `cut` into `n_eq`.
  5. Set `keep_ties` to `n_ahead + n_eq == k`. The tied block at the cut fits in `k` only then. `cut` is at position `k`, so `n_ahead + n_eq >= k` is always true.
- 6. Return the mask that is `true` for every score strictly `ahead` of `cut`, and for a score equal to `cut` when `keep_ties` is `true`.
+ 6. Return the mask that is `true` for every finite score strictly `ahead` of `cut`, and for a score equal to `cut` when `keep_ties` is `true`.
 
 # Arguments
 
@@ -401,7 +405,7 @@ The mask includes the assets tied with the score at position `k` only when the w
 
 # Returns
 
-  - `keep::BitVector`: The mask `assets × 1`. It is `true` for every asset in the tail. It holds `k` assets or fewer, and fewer when a tied block crosses the cut.
+  - `keep::BitVector`: The mask `assets × 1`. It is `true` for every asset in the tail, and `false` at every non-finite score. It holds `k` assets or fewer, and fewer when a tied block crosses the cut.
 
 # Related
 
@@ -410,19 +414,22 @@ The mask includes the assets tied with the score at position `k` only when the w
   - [`bigger_is_better`](@ref)
 """
 function tail_mask(scores::VecNum, k::Integer, bib::Bool, tail::Symbol)::BitVector
-    n = length(scores)
+    fin = BitVector(isfinite(s) for s in scores)
+    n = count(fin)
     if k <= zero(k)
-        return falses(n)
+        return falses(length(scores))
     elseif k >= n
-        return trues(n)
+        return fin
     end
+    s = scores[fin]
     ahead = ((tail === :best) == bib) ? (>) : (<)
-    perm = sortperm(scores; rev = (ahead === >))
-    cut = scores[perm[k]]
-    n_ahead = count(s -> ahead(s, cut), scores)
-    n_eq = count(==(cut), scores)
+    perm = sortperm(s; rev = (ahead === >))
+    cut = s[perm[k]]
+    n_ahead = count(x -> ahead(x, cut), s)
+    n_eq = count(==(cut), s)
     keep_ties = n_ahead + n_eq == k
-    return BitVector(ahead(s, cut) || (keep_ties && s == cut) for s in scores)
+    return BitVector(isfinite(x) && (ahead(x, cut) || (keep_ties && x == cut))
+                     for x in scores)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -431,7 +438,9 @@ Turn the `scores` of the assets into a keep-mask under a selection rule.
 
 `bib` is the [`bigger_is_better`](@ref) flag of the score that gave `scores`. [`ThresholdRule`](@ref) ignores it.
 
-There is one method for each rule. The [`ThresholdRule`](@ref) method compares each score with the open band, and returns the mask. The [`RankRule`](@ref) method gives its two counts to [`tail_action_mask`](@ref). The [`QuantileRule`](@ref) method first converts each fraction to a count with `round(Int, f * n, RoundNearestTiesUp)`. Then it gives the two counts to the same function.
+There is one method for each rule. The [`ThresholdRule`](@ref) method compares each score with the open band, and returns the mask. The [`RankRule`](@ref) method gives its two counts to [`tail_action_mask`](@ref). The [`QuantileRule`](@ref) method first converts each fraction to a count with `round(Int, f * n, RoundNearestTiesUp)`, where `n` is the number of finite scores. Then it gives the two counts to the same function.
+
+A non-finite score is outside every band and outside both tails, under each `action`. Each method returns `false` at a `NaN` and at an infinite score, so an asset with no score never survives the rule. A scorer can mark an asset that it cannot score with `NaN`, and the rule drops that asset with no exception. If no score is finite, the mask is empty, and [`fit_preprocessing`](@ref) throws.
 
 # Arguments
 
@@ -441,7 +450,7 @@ There is one method for each rule. The [`ThresholdRule`](@ref) method compares e
 
 # Returns
 
-  - `keep::BitVector`: The mask `assets × 1`. It is `true` for every asset that the rule admits.
+  - `keep::BitVector`: The mask `assets × 1`. It is `true` for every asset that the rule admits, and `false` at every non-finite score.
 
 # Related
 
@@ -451,13 +460,14 @@ There is one method for each rule. The [`ThresholdRule`](@ref) method compares e
 """
 function rule_keep(rule::ThresholdRule, scores::VecNum, ::Bool)::BitVector
     lo, hi = rule.lo, rule.hi
-    return BitVector((isnothing(lo) || s > lo) && (isnothing(hi) || s < hi) for s in scores)
+    return BitVector(isfinite(s) && (isnothing(lo) || s > lo) && (isnothing(hi) || s < hi)
+                     for s in scores)
 end
 function rule_keep(rule::RankRule, scores::VecNum, bib::Bool)::BitVector
     return tail_action_mask(rule.best, rule.worst, rule.action, scores, bib)
 end
 function rule_keep(rule::QuantileRule, scores::VecNum, bib::Bool)::BitVector
-    n = length(scores)
+    n = count(isfinite, scores)
     to_count(f) = isnothing(f) ? nothing : round(Int, f * n, RoundNearestTiesUp)
     return tail_action_mask(to_count(rule.best), to_count(rule.worst), rule.action, scores,
                             bib)
@@ -472,19 +482,21 @@ Make the union of the two tail masks, and apply the `action` of the rule.
  1. Start from a mask of `length(scores)` falses.
  2. When `best` is not `nothing`, take the `:best` tail of size `best` with [`tail_mask`](@ref), and add it to the mask with a union.
  3. When `worst` is not `nothing`, take the `:worst` tail of size `worst` with [`tail_mask`](@ref), and add it to the mask with a union.
- 4. Return the mask when `action` is `:keep`, and its complement when `action` is `:drop`.
+ 4. Return the mask when `action` is `:keep`. When `action` is `:drop`, return its complement among the finite scores.
+
+A non-finite score is in neither tail, so step 4 does not admit it under `:drop` either. The mask is `false` at every non-finite score under both actions.
 
 # Arguments
 
   - `best`: The number of assets to take from the best end, or `nothing`.
   - `worst`: The number of assets to take from the worst end, or `nothing`.
-  - `action`: `:keep` returns the union, and `:drop` returns its complement.
+  - `action`: `:keep` returns the union, and `:drop` returns its complement among the finite scores.
   - `scores`: The score vector `assets × 1`, with one score for each asset.
   - `bib`: The [`bigger_is_better`](@ref) flag of the score.
 
 # Returns
 
-  - `keep::BitVector`: The mask `assets × 1`. It is `true` for every asset that the rule admits.
+  - `keep::BitVector`: The mask `assets × 1`. It is `true` for every asset that the rule admits, and `false` at every non-finite score.
 
 # Related
 
@@ -500,7 +512,7 @@ function tail_action_mask(best::Option{<:Integer}, worst::Option{<:Integer}, act
     if !isnothing(worst)
         mask .|= tail_mask(scores, worst, bib, :worst)
     end
-    return action === :keep ? mask : .!mask
+    return action === :keep ? mask : (.!mask .& isfinite.(scores))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -949,16 +961,17 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Keep the member with the best score in each redundancy group.
 
-A group whose best score is *tied* keeps no asset. This is the tie policy of the library: if the library cannot tell two assets apart, it keeps neither of them. [`find_uncorrelated_indices`](@ref) does the same with a correlated pair whose drop scores are equal. A group with one member has no tie, so its member always survives.
+A group whose best score is *tied* keeps no asset. This is the tie policy of the library: if the library cannot tell two assets apart, it keeps neither of them. [`find_uncorrelated_indices`](@ref) does the same with a correlated pair whose drop scores are equal. A group with one member has no tie, so its member survives when its score is finite.
+
+A member with a non-finite score is not a candidate. The function skips it, and the best finite member of the group survives. A group with no finite score keeps no asset, so an asset with no score never survives.
 
 # Algorithm
 
  1. Start from a keep-mask of `length(scores)` falses.
- 2. Select the comparison `better`. It is `>` when `bib` is `true`, and `<` otherwise.
- 3. Take the next group `g` of `groups`. Skip it when it is empty.
- 4. Read the members of `g` in order from the first. Keep in `best` the index whose score no later member beats under `better`.
- 5. Count the members of `g` whose score is equal to `scores[best]`. Set the mask at `best` only when that count is one, so a group with a tied best keeps no asset.
- 6. Do steps 3 to 5 for each of the other groups, then return the mask.
+ 2. Take the next group `g` of `groups`. Read `fin`, the members of `g` with a finite score. Skip the group when `fin` is empty.
+ 3. Set `best` to the member of `fin` with the largest score when `bib` is `true`, and with the smallest score otherwise.
+ 4. Count the members of `fin` whose score is equal to `scores[best]`. Set the mask at `best` only when that count is one, so a group with a tied best keeps no asset.
+ 5. Do steps 2 to 4 for each of the other groups, then return the mask.
 
 # Arguments
 
@@ -968,7 +981,7 @@ A group whose best score is *tied* keeps no asset. This is the tie policy of the
 
 # Returns
 
-  - `keep::BitVector`: The keep-mask, with one survivor for each group whose best score is not tied.
+  - `keep::BitVector`: The keep-mask, with one survivor for each group whose best finite score is not tied.
 
 # Related
 
@@ -977,18 +990,14 @@ A group whose best score is *tied* keeps no asset. This is the tie policy of the
 """
 function groups_argbest(groups, scores::VecNum, bib::Bool)::BitVector
     keep = falses(length(scores))
-    better = bib ? (>) : (<)
     for g in groups
-        if isempty(g)
+        fin = filter(i -> isfinite(scores[i]), g)
+        if isempty(fin)
             continue
         end
-        best = g[1]
-        for i in view(g, 2:length(g))
-            if better(scores[i], scores[best])
-                best = i
-            end
-        end
-        if count(i -> scores[i] == scores[best], g) == 1
+        s = view(scores, fin)
+        best = fin[bib ? argmax(s) : argmin(s)]
+        if count(==(scores[best]), s) == 1
             keep[best] = true
         end
     end

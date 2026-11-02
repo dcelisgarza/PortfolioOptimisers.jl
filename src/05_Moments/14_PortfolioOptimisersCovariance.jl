@@ -395,10 +395,11 @@ This function is internal. A caller uses [`RedundancySelector`](@ref) with a [`P
  2. When `scores` is `nothing`, collapse each column of `rho` with `measure` into `summary_rho`, the default drop score. Otherwise take `summary_rho` from `scores`.
  3. Read the strict lower triangle of `rho` into `tril_idx`, so that each pair occurs one time.
  4. Keep the pairs whose correlation is at least `t`, and sort them from the most to the least correlated.
- 5. Go through that list in order. For a pair whose two assets are both still present, remove the asset with the higher drop score. When the two scores are equal, remove both assets. This is the tie policy of the library: if the function cannot tell two assets apart, it keeps neither of them. Two identical columns leave no survivor.
- 6. Return the indices that step 5 did not remove, in ascending order.
+ 5. Remove every asset whose drop score is not finite. A `NaN` drop score marks an asset that has no score, and that asset never survives. Step 6 then skips each pair of that asset, so its partner survives that pair. Two non-finite drop scores in one pair remove both assets.
+ 6. Go through that list in order. For a pair whose two assets are both still present, remove the asset with the higher drop score. When the two scores are equal, remove both assets. This is the tie policy of the library: if the function cannot tell two assets apart, it keeps neither of them. Two identical columns leave no survivor.
+ 7. Return the indices that steps 5 and 6 did not remove, in ascending order.
 
-Step 5 skips a pair in which one asset or both assets are already removed. Thus the result depends
+Step 6 skips a pair in which one asset or both assets are already removed. Thus the result depends
 on the order that step 4 sets. The greedy pass does not return a removed asset to the subset, so
 the result is not always the largest such subset. A tie can also remove an asset that the subset
 could keep.
@@ -410,7 +411,7 @@ could keep.
   - `t`: The correlation threshold. Two assets with a correlation of `t` or more are too correlated.
   - `absolute`: If `true`, the function compares the absolute value of the correlation.
   - `measure`: The summary measure that the function applies to each column of the correlation matrix, for example the mean. The result is the default drop score. The function ignores `measure` if `scores` is given.
-  - `scores`: The drop score of each asset. From a correlated pair, the function removes the asset with the higher score.
+  - `scores`: The drop score of each asset. From a correlated pair, the function removes the asset with the higher score. The function removes an asset with a non-finite score in every case.
 
 # Validation
 
@@ -448,6 +449,7 @@ function find_uncorrelated_indices(X::MatNum;
     candidate_idx = findall(x -> x >= t, rho[tril_idx])
     candidate_idx = candidate_idx[sortperm(rho[tril_idx][candidate_idx]; rev = true)]
     to_remove = sizehint!(Set{Int}(), div(length(candidate_idx), 2))
+    union!(to_remove, findall(!isfinite, summary_rho))
     for idx in candidate_idx
         i, j = tril_idx[idx][1], tril_idx[idx][2]
         if i ∉ to_remove && j ∉ to_remove
