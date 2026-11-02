@@ -592,3 +592,26 @@ end
     @test occursin("Weight Drift", doc)
     @test occursin("long-run variance estimator", doc)
 end
+
+@testset "#1938: the folds of a prediction Result stay a `Vector{PredictionResult}`" begin
+    # ADR 0067, amendment of 2026-11-02. A narrow element type puts the type of the
+    # optimiser into the type of the prediction Result, so every verb that reads the Result
+    # compiles again for each optimiser. The loop keeps the folds type-erased by decision.
+    # This testset pins that decision, and that the verbs read a narrowed copy alike.
+    rd = ReturnsResult(; nx = ["A", "B", "C", "D"], X = ER_X)
+    p = cross_val_predict(InverseVolatility(), rd, IndexWalkForward(20, 10))
+    @test length(p.pred) == 4
+    @test eltype(p.pred) === PredictionResult
+    # The fold reader infers its result abstractly, but the value is concrete at run time.
+    ps = performance_summary(p; ppy = 12)
+    @test ps.turnover isa Float64
+    @test ps.turnover > 0
+    # A user can narrow the folds. The narrowed copy infers, and gives the same figures.
+    n = MultiPeriodPredictionResult(; pred = concrete_typed_array(p.pred), id = p.id,
+                                    opt = p.opt)
+    @test isconcretetype(eltype(n.pred))
+    psn = @inferred performance_summary(n; ppy = 12)
+    for f in fieldnames(typeof(ps))
+        @test isequal(getfield(psn, f), getfield(ps, f))
+    end
+end

@@ -301,3 +301,79 @@ online arm ADR 0140 added.
 puts it inside: a search scores every candidate through `fit_and_predict(opt_i, rd, cv; ex =
 SequentialEx())`, and the `fit_and_score` families are deleted. Every cross-validation entry
 point, the searches included, now goes through the one loop.
+
+## Amendment (2026-11-02)
+
+Issue #1938. The folds of a prediction Result stay a `Vector{PredictionResult}`. The loop does
+not narrow them to the concrete type of the folds. This is a decision, not an omission.
+
+`ElT = PredictionResult` is a `UnionAll`, as the first amendment states. So a reader of the folds,
+for example `stacked_fold_weights`, `held_path_turnover` or `comparator_path_length`, infers its
+result abstractly. `log_wealth_regret(a, b)` with a multi-period comparator infers every field of
+its Result except `path_length`. `performance_summary` of a multi-period prediction infers every
+field except `turnover`. The values are correct, and each value has a concrete type at run time.
+
+### What the narrowing costs
+
+A narrowing to the concrete fold type, for example `concrete_typed_array(pred)` in the inner
+constructor of `MultiPeriodPredictionResult`, makes these readers infer. It also puts the type of
+the optimiser Result into the type of the prediction Result. Every verb that takes a
+`MultiPeriodPredictionResult` then compiles one time for each optimiser configuration, and not one
+time for all of them. The measure is `performance_summary(p)` followed by `log_wealth_regret(p, p)`
+on an `IndexWalkForward(30, 10)` over 120 rows and 4 assets, which gives 9 folds. The figures are
+for the first call on a `MeanRisk` with a risk measure that no earlier call used, over three such
+risk measures, and for a warm call. The tree is `dev` at `009482721d`, with 16 threads:
+
+| Folds | First call on a new optimiser type | Of which compile | Warm call |
+| :--- | ---: | ---: | ---: |
+| `Vector{PredictionResult}` | 24 ms | 23 ms | 58 µs |
+| narrowed to the fold type | 590 ms | 590 ms | 14 µs |
+
+The narrowing saves 44 µs on each warm call, and it costs about 0.57 s more compile time on each
+new optimiser type. The break-even is about 13 000 calls for each type. A warm `cross_val_predict`
+of the `MeanRisk` over the same folds takes about 12.6 ms. So the saved time is small next to the
+work that makes the Result. The compile time is spread over the verbs:
+
+| Function, narrowed | Compile on a new optimiser type |
+| :--- | ---: |
+| `stacked_fold_weights(p, fold_target)` | 0.29 s |
+| `held_path_turnover`, which adds `fold_held` | 0.13 s |
+| the body of `log_wealth_regret` | 0.16 s |
+| `performance_summary` and `comparator_path_length` | 0.01 s each |
+
+The cost does not stop at the fold readers. The body of `log_wealth_regret` reads no fold, and it
+compiles again because the type of its argument changes. A plot, a scorer and `expected_risk` of a
+multi-period prediction take the same kind of cost. This amendment did not measure them.
+
+### Where a narrowed element type pays
+
+The vector of folds is a type-erasure boundary. Under a batch scheme, every optimiser gives one
+`MultiPeriodPredictionResult` type for one returns data, so each verb that reads the Result
+compiles one time. An Online Scheme is different: its Result holds the threaded estimator in
+`opt`, so the type of that Result changes with the optimiser already. Each fold reader dispatches on the fold at run time, and that dispatch
+compiles one small method for each new fold type, which is the 23 ms above.
+
+`concrete_typed_array` and `concrete_typed_array_if_abstract` narrow a vector that an estimator or
+a one-shot configuration holds. The library already compiles on the type of that holder, so the
+narrowing adds no new axis of compilation. Each library site is of this kind:
+
+| Site | Vector | Why the narrowing stays |
+| :--- | :--- | :--- |
+| `factory` and `port_opt_view` of `VecTnE_Tn` | the turnover constraints of an estimator | The estimator type holds each element type already. The narrowing changes only a mixed vector. |
+| `port_opt_view` of a vector of asset sets matrices | the membership matrices of an estimator | As for the turnover constraints. |
+| `rebuild_asset_panel` | the panel fields of the folds of one meta-optimisation | A comprehension gives a concrete element type when the folds share one type. The call changes only a mixed vector. |
+| `make_p_grid` of a randomised search | the trials of one search | Dispatch needs it. A `Vector{Pair}` does not match the `AbstractVector{<:Pair{<:Any, <:AbstractVector}}` of `lens_val_grid`. The call runs one time for each search. |
+
+The rule: narrow the element type of a vector whose holder the library compiles on already. Do not
+narrow a vector of a Result that many verbs read, because each new element type then compiles
+every one of those verbs again.
+
+### Consequences
+
+- `@inferred` is not a contract for a value that a reader takes from the folds of a prediction
+  Result. A test checks the type of that value at run time.
+- A user who calls a verb many times on one Result type, for example in a loop over many
+  scenarios, can narrow the folds with
+  `MultiPeriodPredictionResult(; pred = concrete_typed_array(p.pred), id = p.id, opt = p.opt)`.
+  The verbs accept both forms.
+- `fold_loop`, `parallel_folds` and `run_folds` do not change.

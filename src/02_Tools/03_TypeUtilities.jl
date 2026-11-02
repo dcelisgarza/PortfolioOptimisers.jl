@@ -66,6 +66,8 @@ Copy of `A` whose element type is the union of the types of its elements.
 
 An array with an abstract element type, such as `Any`, costs a dynamic dispatch at each use of an element. The compiler can split a small union, so the copy can make later code faster.
 
+The narrow type also costs compile time, because each new element type compiles again every method that takes the array or its holder. So narrow a vector whose holder the library compiles on already, such as a field of an estimator or a one-shot configuration. Do not narrow a vector of a Result that many verbs read, such as the folds of a [`MultiPeriodPredictionResult`](@ref).
+
 # Algorithm
 
  1. Read the concrete type of every element of `A` with `typeof.(A)`.
@@ -100,6 +102,8 @@ julia> PortfolioOptimisers.concrete_typed_array(A)
   - [`ArrNum`](@ref)
 """
 function concrete_typed_array(A::AbstractArray)
+    # ADR 0067, amendment of 2026-11-02, measures the compile cost of a narrow type and lists
+    # the library sites that narrow.
     return reshape(Union{typeof.(A)...}[A...], size(A))
 end
 """

@@ -614,6 +614,11 @@ run. The two path-level sites, of the optimiser and of the Pipeline, pass the
 time-ordered scheme, and a `Vector{PredictionResult}` for the multi-path combinatorial scheme.
 It is positional for the reason that [`parallel_folds`](@ref) gives.
 
+`PredictionResult` is a `UnionAll`, so a reader of the folds infers its result abstractly. The
+loop does not narrow the folds to their concrete type. A narrow type puts the type of the
+optimiser into the type of the prediction Result, and every verb that reads the Result then
+compiles again for each optimiser.
+
 # Algorithm
 
  1. When `est` [`is_time_dependent`](@ref), check the number of folds against its schedules with [`assert_time_dependent_fold_count`](@ref).
@@ -648,6 +653,8 @@ function fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor,
                    ::Type{ElT} = PredictionResult; rd, train_idx, test_idx,
                    path_id = nothing, cv = nothing, fold_view = nothing,
                    pws = nothing) where {ElT}
+    # The folds stay a `Vector{ElT}` with `ElT = PredictionResult`, not their concrete type.
+    # ADR 0067, amendment of 2026-11-02, measures the compile cost of a narrow type.
     td_flag = is_time_dependent(est)
     if td_flag
         assert_time_dependent_fold_count(est, n)
