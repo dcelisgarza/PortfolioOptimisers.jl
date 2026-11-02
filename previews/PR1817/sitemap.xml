@@ -1372,7 +1372,13 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/17_Optimisation/11_ProjectionWeightFinalisers/</loc>
   </url>
   <url>
-    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/18_ExpectedReturns/</loc>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/18_ExpectedReturns/01_ExpectedReturns/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/18_ExpectedReturns/03_PerformanceSummary/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/18_ExpectedReturns/04_SharpeRatioInference/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/19_FactorAttribution/01_FactorAttribution/</loc>
@@ -1403,6 +1409,9 @@
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/21_Pipeline/06_OnlinePipeline/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/21_Pipeline/07_AssetScorers/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/22_Plotting/</loc>
@@ -2557,7 +2566,16 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/17_Optimisation/11_ProjectionWeightFinalisers/</loc>
   </url>
   <url>
-    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/18_ExpectedReturns/</loc>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/18_ExpectedReturns/01_ExpectedReturns/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/18_ExpectedReturns/02_BrinsonAttribution/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/18_ExpectedReturns/03_PerformanceSummary/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/18_ExpectedReturns/04_SharpeRatioInference/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/19_FactorAttribution/01_FactorAttribution/</loc>
@@ -2588,6 +2606,9 @@
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/21_Pipeline/06_OnlinePipeline/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/21_Pipeline/07_AssetScorers/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/22_Plotting/</loc>
