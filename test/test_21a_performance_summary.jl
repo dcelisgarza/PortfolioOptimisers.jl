@@ -639,3 +639,33 @@ end
     @test typeof(pv.pred[1]) === typeof(pc.pred[1])
     @test typeof(pv) === typeof(pc)
 end
+
+@testset "#1941: a Result does not carry the type of its scalariser or returns estimator" begin
+    # ADR 0067, amendment of 2026-11-02. Every JuMP optimisation Result held the types of
+    # `sca` and `ret` in the type parameters of `pa`, and the hierarchical Results held the
+    # types of their scalarisers and of the HERC measures. Each new part gave a new Result type
+    # and a new compilation of every verb on it. The fields keep their bounds and leave the
+    # type parameters.
+    rd = ReturnsResult(; nx = ["A", "B", "C", "D"], X = ER_X)
+    slv = Solver(; solver = Clarabel.Optimizer, settings = ["verbose" => false])
+    r0 = optimise(MeanRisk(; opt = JuMPOptimiser(; slv = slv)), rd)
+    rs = optimise(MeanRisk(; opt = JuMPOptimiser(; slv = slv, sca = MaxScalariser())), rd)
+    rr = optimise(MeanRisk(; opt = JuMPOptimiser(; slv = slv, ret = NoReturn())), rd)
+    @test typeof(r0) === typeof(rs) === typeof(rr)
+    @test rs.sca isa MaxScalariser
+    @test rr.ret isa NoReturn
+    h0 = optimise(HierarchicalRiskParity(), rd)
+    hs = optimise(HierarchicalRiskParity(; sca = MaxScalariser()), rd)
+    @test typeof(h0) === typeof(hs)
+    @test hs.sca isa MaxScalariser
+    e0 = optimise(HierarchicalEqualRiskContribution(), rd)
+    e1 = optimise(HierarchicalEqualRiskContribution(; ri = ConditionalValueatRisk(),
+                                                    ro = StandardDeviation(),
+                                                    scai = MaxScalariser(),
+                                                    scao = MaxScalariser()), rd)
+    @test typeof(e0) === typeof(e1)
+    @test e1.ri isa ConditionalValueatRisk
+    @test e1.ro isa StandardDeviation
+    @test e1.scai isa MaxScalariser
+    @test e1.scao isa MaxScalariser
+end

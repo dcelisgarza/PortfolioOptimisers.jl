@@ -23,6 +23,10 @@ Holds the prior result and every processed constraint result that a JuMP model r
 and [`assemble_jump_model!`](@ref) reads it. So each builder of the model reads a result, and no
 builder processes an estimator again.
 
+Every JuMP optimisation Result holds the bundle. So the types of `ret` and `sca` are not type
+parameters of the bundle, and the Results of two returns estimators or of two scalarisers have
+one type. A verb that reads them compiles one time.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -142,11 +146,11 @@ true
     """
     $(field_dict[:ret_jmp])
     """
-    ret
+    ret::JRE_VecJRE
     """
     $(field_dict[:sca_res])
     """
-    sca
+    sca::Scalariser
     """
     $(field_dict[:imsk])
     """
@@ -173,9 +177,13 @@ true
         return new{typeof(pr), typeof(wb), typeof(lt), typeof(st), typeof(lcsr),
                    typeof(ctr), typeof(gcardr), typeof(sgcardr), typeof(smtx),
                    typeof(sgmtx), typeof(slt), typeof(sst), typeof(sglt), typeof(sgst),
-                   typeof(tn), typeof(fees), typeof(plr), typeof(ret), typeof(sca),
-                   typeof(imsk)}(pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, sgmtx,
-                                 slt, sst, sglt, sgst, tn, fees, plr, ret, sca, imsk)
+                   typeof(tn), typeof(fees), typeof(plr), typeof(imsk)}(pr, wb, lt, st,
+                                                                        lcsr, ctr, gcardr,
+                                                                        sgcardr, smtx,
+                                                                        sgmtx, slt, sst,
+                                                                        sglt, sgst, tn,
+                                                                        fees, plr, ret, sca,
+                                                                        imsk)
     end
 end
 function ProcessedJuMPOptimiserAttributes(; pr::AbstractPriorResult,

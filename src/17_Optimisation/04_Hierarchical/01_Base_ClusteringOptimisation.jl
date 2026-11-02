@@ -313,14 +313,14 @@ Keywords correspond to the struct's fields.
     """
     $(field_dict[:sca_res])
     """
-    sca
+    sca::Scalariser
     """
     $(field_dict[:fb_res])
     """
     fb
     function HierarchicalRiskParityResult(hr::HierarchicalResult, r::BaseRM_VecBaseRM,
                                           sca::Scalariser, fb::Option{<:OptE_Opt_FbChain})
-        return new{typeof(hr), typeof(sca), typeof(fb)}(hr, r, sca, fb)
+        return new{typeof(hr), typeof(fb)}(hr, r, sca, fb)
     end
 end
 function HierarchicalRiskParityResult(; hr::HierarchicalResult, r::BaseRM_VecBaseRM,
@@ -340,7 +340,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the weights and the fitted state of a hierarchical equal risk contribution optimisation.
 
-[`HierarchicalEqualRiskContribution`](@ref) returns it. It holds the shared [`HierarchicalResult`](@ref) as `hr`, and the two risk measures and the two scalarisers of its estimator, one pair inside the clusters and one pair across them. Both measures are stored resolved.
+[`HierarchicalEqualRiskContribution`](@ref) returns it. It holds the shared [`HierarchicalResult`](@ref) as `hr`, and the two risk measures and the two scalarisers of its estimator, one pair inside the clusters and one pair across them. Both measures are stored resolved. The types of the measures and of the scalarisers are not type parameters of the Result, so the Results of two such estimators have one type, and a verb that reads them compiles one time.
 
 Every property of `hr` reads through this type, so `res.w`, `res.pr`, `res.clr`, `res.wb`, `res.fees`, `res.retcode` and `res.imsk` read as if they were fields of `res`.
 
@@ -376,19 +376,19 @@ Keywords correspond to the struct's fields.
     """
     $(field_dict[:ri_res])
     """
-    ri
+    ri::BaseRM_VecBaseRM
     """
     $(field_dict[:ro_res])
     """
-    ro
+    ro::BaseRM_VecBaseRM
     """
     $(field_dict[:scai])
     """
-    scai
+    scai::Scalariser
     """
     $(field_dict[:scao])
     """
-    scao
+    scao::Scalariser
     """
     $(field_dict[:fb_res])
     """
@@ -398,8 +398,7 @@ Keywords correspond to the struct's fields.
                                                      ro::BaseRM_VecBaseRM, scai::Scalariser,
                                                      scao::Scalariser,
                                                      fb::Option{<:OptE_Opt_FbChain})
-        return new{typeof(hr), typeof(ri), typeof(ro), typeof(scai), typeof(scao),
-                   typeof(fb)}(hr, ri, ro, scai, scao, fb)
+        return new{typeof(hr), typeof(fb)}(hr, ri, ro, scai, scao, fb)
     end
 end
 function HierarchicalEqualRiskContributionResult(; hr::HierarchicalResult,

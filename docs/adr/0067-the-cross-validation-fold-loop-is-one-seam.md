@@ -412,7 +412,7 @@ The decisions:
   parameter compiles nothing.
 - `ProcessedJuMPOptimiserAttributes`, the `pa` of a `JuMPOptimisationResult`, holds `sca` and
   `ret`, and `HierarchicalRiskParityResult` holds `sca`. A new risk measure did not change their
-  type, and this amendment did not measure them. Issue #1941 measures them.
+  type, and #1939 did not measure them. The next section measures them.
 - The vectors of constraints that `factory` and `port_opt_view` narrow keep the narrowing, because
   dispatch needs it. A `Vector{TnE_Tn}` of two `Turnover` values has no method of
   `turnover_constraints` without sets, and the narrowed `Vector{Union{Turnover{…}, Turnover{…}}}`
@@ -433,6 +433,46 @@ The rule becomes: a holder that many verbs read, or a meta-estimator over a vect
 does not carry the type of an estimator in a type parameter, unless a measured verb pays for it.
 Narrow the element type of a vector only where dispatch needs it.
 
+### The parts of an estimator in a holder (#1941)
+
+Issue #1941 measured the holders that #1939 left: `ProcessedJuMPOptimiserAttributes.sca` and
+`.ret`, which every JuMP optimisation Result holds in `jr.pa`, and
+`HierarchicalRiskParityResult.sca`. `HierarchicalEqualRiskContributionResult` held `ri`, `ro`,
+`scai` and `scao` in type parameters by the same mechanism, so #1941 measured it too. The method
+is the method of #1939, on `dev` at `5d54b94ade` with the commits of #1939, two rounds for each
+form. The measured calls are `expected_risk` two times and `predict` on the Result, and
+`performance_summary` and `log_wealth_regret` on a `cross_val_predict` Result under
+`IndexWalkForward(40, 20)`.
+
+| Holder and new parts | Form | Compile, Result | Warm call, Result | Compile, cross-validation | Warm call, cross-validation |
+| :--- | :--- | ---: | ---: | ---: | ---: |
+| `pa` of a `MeanRiskResult`: `MaxScalariser`, `LogSumExpScalariser`, `LogarithmicReturn`, `NoReturn` | type parameter | 81–85 ms | 66–93 µs | 30–31 ms | 103–187 µs |
+| | erased | 0 ms | 29–69 µs | 0 ms | 75–190 µs |
+| `HierarchicalRiskParityResult.sca`: `MaxScalariser`, `LogSumExpScalariser`, `MinScalariser` | type parameter | 79–84 ms | 48–74 µs | 31–32 ms | 113–224 µs |
+| | erased | 0 ms | 13–57 µs | 0 ms | 78–199 µs |
+| `HierarchicalEqualRiskContributionResult`: a new `ri`, `ro`, `scai` or `scao` | type parameter | 77–86 ms | 44–64 µs | 31–38 ms | 111–147 µs |
+| | erased | 0 ms | 14–45 µs | 0 ms | 79–113 µs |
+
+The erased form is emulated as in #1939: the Result is rebuilt with the parts of the warm-up. The
+erased row of `pa` leaves out `LogSumExpScalariser`. Its solve failed, so the `retcode` of its
+Result had a new type, and the Result compiled 88–115 ms for that reason alone (#1942). A new
+`mu` of an `ArithmeticReturn` gave no new type, because the processing fills `mu` from the prior.
+
+No warm call is slower in an erased form, so no call count reaches a break-even. No verb reads
+the fields of the Result. The model builders read `attrs.ret` once for each `optimise` call, and
+once for each point of a frontier, so a dispatch at run time costs nothing next to the solve.
+
+The decisions:
+
+- `ProcessedJuMPOptimiserAttributes` binds `ret` to `JRE_VecJRE` and `sca` to `Scalariser` on the
+  field, and both fields leave the type parameters. So the Results of `MeanRisk`,
+  `RiskBudgeting`, `FactorRiskContribution` and `NearOptimalCentering` have one type for every
+  scalariser and every returns estimator.
+- `HierarchicalRiskParityResult` binds `sca` to `Scalariser`, and
+  `HierarchicalEqualRiskContributionResult` binds `ri` and `ro` to `BaseRM_VecBaseRM` and `scai`
+  and `scao` to `Scalariser`. These fields leave the type parameters.
+- The processed constraint Results in `pa` are data, and they keep their type parameters.
+
 ### Consequences
 
 - `@inferred` is not a contract for a value that a reader takes from the folds of a prediction
@@ -447,3 +487,6 @@ Narrow the element type of a vector only where dispatch needs it.
   position breaks. A method that must dispatch on the type of the estimator of a Result takes
   the field as an argument, or a wrapper holds the estimator in a field of its own, as `Resume`
   does.
+- #1941 removes two type parameters from `ProcessedJuMPOptimiserAttributes`, one from
+  `HierarchicalRiskParityResult` and four from `HierarchicalEqualRiskContributionResult`. Code that
+  names the parameters of these types by position breaks.

@@ -67,7 +67,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :obj => "`obj`: Portfolio objective function.",#
                  :wi => "`wi`: Initial portfolio weights for warm-starting the solver.",#
                  :sca => "`sca`: Scalariser for combining multiple risk measures.",#
-                 :sca_res => "`sca`: The scalariser the optimisation ran under, taken from `opt.sca`. Pass it back as `expected_risk(res.r, res.w, res.pr; sca = res.sca)` so the reported figure matches the optimised one.",#
+                 :sca_res => "`sca`: The scalariser the optimisation ran under, taken from `opt.sca`. Pass it back as `expected_risk(res.r, res.w, res.pr; sca = res.sca)` so the reported figure matches the optimised one. The type of `sca` is not a type parameter, so the Results of two scalarisers have one type, and a verb that reads them compiles one time.",#
                  :wb_jmp => "`wb`: Weight bounds estimator or weight bounds.",#
                  :bgt => "`bgt`: Net budget, `1ᵀw`. A number pins it, a [`BudgetRange`](@ref) bounds it. By default a budget *bounds* the realised exposure and does not pin it, see `xbgt`. With `sbgt`, it fixes the net and gross exposures only together. To constrain the gross exposure alone, see `gbgt`.",#
                  :sbgt => "`sbgt`: Short-side budget, `sum(sw)`. A number pins it, and a [`BudgetRange`](@ref) bounds it. The realised short exposure is only bounded by default, so `sbgt = 0.3` means *at most* 30% short unless `xbgt` pins the long/short decomposition. With `bgt`, it fixes the net and gross exposures only together. To constrain the gross exposure alone, see `gbgt`.",#
