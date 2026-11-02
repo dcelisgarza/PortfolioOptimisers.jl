@@ -167,3 +167,12 @@ because observation filtering is a price-level policy, which `MissingDataFilter`
 
 `find_uncorrelated_indices` is unchanged. `RedundancySelector` still calls it, through its
 `PairwiseCorrelation` algorithm.
+
+## Amendment (2026-11-02)
+
+Decision 4 is amended by [ADR 0225](0225-an-asset-scorer-scores-the-assets-from-the-whole-returns-data-and-each-fold-scores-its-own-coverage-universe.md).
+A risk measure stays a valid `score` with no wrapper, and it is the in-sample case. Both selectors
+also take an `AbstractAssetScorer`, a new family for the scores that a risk measure on one column
+cannot state: a risk measure aggregated over the test windows of a scheme, and the weight that an
+optimiser gives each asset over the splits of a scheme. The second score reads the whole
+cross-section of each fold, so it cannot be a risk measure.

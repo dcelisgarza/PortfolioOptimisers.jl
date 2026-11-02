@@ -458,6 +458,7 @@ include("21_Pipeline/03_Pipeline.jl")
 include("21_Pipeline/04_PredictionCV.jl")
 include("21_Pipeline/05_SearchCrossValidation.jl")
 include("21_Pipeline/06_OnlinePipeline.jl")
+include("21_Pipeline/07_AssetScorers.jl")
 include("22_Plotting.jl")
 include("23_Aliases.jl")
 

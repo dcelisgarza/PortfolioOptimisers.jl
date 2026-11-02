@@ -1,5 +1,5 @@
 ```@meta
-Description = "Asset selection, public API of PortfolioOptimisers.jl: ScoreSelector, CompleteAssetSelector, AbstractSelectionRule, ThresholdRule, RankRule, QuantileRule, …"
+Description = "Asset selection, public API of PortfolioOptimisers.jl: ScoreSelector, CompleteAssetSelector, AbstractAssetScorer, AbstractSelectionRule, ThresholdRule, …"
 ```
 
 # Asset selection
@@ -19,6 +19,14 @@ A [`ScoreSelector`](@ref) computes a risk measure on the returns of each asset a
 ```@docs
 ScoreSelector
 CompleteAssetSelector
+```
+
+## Scoring assets with an asset scorer
+
+The `score` of a selector can also be an asset scorer, which reads the whole returns data and not one asset alone. [`FoldRiskScorer`](@ref) scores a risk measure over the test windows of a cross-validation scheme, and [`WeightMassScorer`](@ref) scores the weight that an optimiser gives each asset. To write a scorer of your own, subtype [`PortfolioOptimisers.AbstractAssetScorer`](@ref), and give it an [`asset_scores`](@ref PortfolioOptimisers.asset_scores) method and a [`bigger_is_better`](@ref) method.
+
+```@docs
+PortfolioOptimisers.AbstractAssetScorer
 ```
 
 ## Selection rules

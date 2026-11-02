@@ -503,15 +503,75 @@ function tail_action_mask(best::Option{<:Integer}, worst::Option{<:Integer}, act
     return action === :keep ? mask : .!mask
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the estimators that give one score to each asset from the whole returns data.
+
+An Asset Scorer is the second kind of `score` that a [`ScoreSelector`](@ref) and a [`RedundancySelector`](@ref) take. A risk measure is the first kind, and it scores each asset on the whole training window, column by column. An Asset Scorer can read more than that. [`FoldRiskScorer`](@ref) scores each asset on each test window of a cross-validation scheme and aggregates the values. [`WeightMassScorer`](@ref) runs an optimiser through a cross-validation scheme and scores each asset by the weight that the optimiser gives it. The second score reads the whole cross-section, so no risk measure on one column can state it.
+
+Every parameter of a scorer is a field. A selector is a step of a [`Pipeline`](@ref), so a field has a parameter path that [`search_cross_validation`](@ref) can tune.
+
+# Interfaces
+
+To add an Asset Scorer, subtype `AbstractAssetScorer`, put every parameter of the score in the struct, and add the two methods below. Both are mandatory. The library gives a scorer no default orientation, because an ordinal rule cuts the wrong end of the order when the orientation is a guess.
+
+## `asset_scores`
+
+  - `asset_scores(s::MyAssetScorer, rd::AbstractReturnsResult) -> VecNum`: Give one finite score to each asset column of `rd.X`, in the order of the columns.
+
+### Arguments
+
+  - `s`: The concrete Asset Scorer.
+  - $(arg_dict[:rd])
+
+### Returns
+
+  - `scores::VecNum`: The score vector `assets × 1`, with one finite entry for each asset column of `rd.X`.
+
+## `bigger_is_better`
+
+  - `bigger_is_better(s::MyAssetScorer) -> Bool`: State whether a bigger score is a better score.
+
+### Arguments
+
+  - `s`: The concrete Asset Scorer.
+
+### Returns
+
+  - `bib::Bool`: `true` when a bigger score is better, and `false` when a smaller score is better.
+
+# Related
+
+  - [`FoldRiskScorer`](@ref)
+  - [`WeightMassScorer`](@ref)
+  - [`ScoreSelector`](@ref)
+  - [`RedundancySelector`](@ref)
+  - [`rule_keep`](@ref)
+"""
+abstract type AbstractAssetScorer <: AbstractEstimator end
+"""
+    const BaseRM_AsSc = Union{AbstractBaseRiskMeasure, AbstractAssetScorer}
+
+The `score` of a [`ScoreSelector`](@ref) and of a [`RedundancySelector`](@ref). A risk measure scores each asset on the training window, and an Asset Scorer reads the whole returns data. The two families share no supertype, but [`asset_scores`](@ref) and [`bigger_is_better`](@ref) take both, so a selector reads either one in the same way.
+
+# Related
+
+  - [`AbstractBaseRiskMeasure`](@ref)
+  - [`AbstractAssetScorer`](@ref)
+"""
+const BaseRM_AsSc = Union{AbstractBaseRiskMeasure, AbstractAssetScorer}
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Check that `score` can take the return series of one asset.
 
 The score of asset `i` is `score(X[:, i])`. This is the route of a precomputed return vector, and [`supports_precomputed_returns`](@ref) controls it. A [`WeightsInput`](@ref) measure, such as [`Variance`](@ref) or [`StandardDeviation`](@ref), takes portfolio weights in place of a return vector. It cannot score an asset.
 
+The method on an [`AbstractAssetScorer`](@ref) checks nothing and returns `nothing`. A scorer that holds a risk measure checks that measure in its own constructor.
+
 # Arguments
 
-  - `score`: The risk measure that a selector uses to score its assets.
+  - `score`: The risk measure or the Asset Scorer that a selector uses to score its assets.
 
 # Validation
 
@@ -541,12 +601,17 @@ function assert_scoreable(score::AbstractBaseRiskMeasure)::Nothing
     end
     return nothing
 end
+assert_scoreable(::AbstractAssetScorer)::Nothing = nothing
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    asset_scores(score::AbstractBaseRiskMeasure, X::MatNum) -> VecNum
+    asset_scores(score::AbstractBaseRiskMeasure, rd::AbstractReturnsResult) -> VecNum
+    asset_scores(score::AbstractAssetScorer, rd::AbstractReturnsResult) -> VecNum
 
 Evaluate `score` on every asset column of `X`.
 
 The function gives each column to `score` as a view. The functor of a risk measure reads its argument, and does not write to it.
+
+The method on `rd` with a risk measure reads `rd.X` and calls the method on the matrix. This is the in-sample score of a selector. The method on an [`AbstractAssetScorer`](@ref) is the interface of that family, and each concrete scorer adds its own.
 
 # Algorithm
 
@@ -556,8 +621,9 @@ The function gives each column to `score` as a view. The functor of a risk measu
 
 # Arguments
 
-  - `score`: The risk measure to evaluate on each asset column.
+  - `score`: The risk measure to evaluate on each asset column, or the Asset Scorer.
   - $(arg_dict[:X])
+  - $(arg_dict[:rd])
 
 # Validation
 
@@ -571,6 +637,7 @@ The function gives each column to `score` as a view. The functor of a risk measu
 
   - [`ScoreSelector`](@ref)
   - [`assert_scoreable`](@ref)
+  - [`AbstractAssetScorer`](@ref)
 """
 function asset_scores(score::AbstractBaseRiskMeasure, X::MatNum)
     scores = [score(view(X, :, i)) for i in axes(X, 2)]
@@ -579,12 +646,15 @@ function asset_scores(score::AbstractBaseRiskMeasure, X::MatNum)
                           "scoring the asset columns with a $(typeof(score)) produced non-finite values at columns $(findall(!isfinite, scores))"))
     return scores
 end
+function asset_scores(score::AbstractBaseRiskMeasure, rd::AbstractReturnsResult)
+    return asset_scores(score, rd.X)
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Asset selector that scores every asset with a risk measure, and keeps the assets that a rule admits.
+Asset selector that scores every asset with a risk measure or an Asset Scorer, and keeps the assets that a rule admits.
 
-`score` is an [`AbstractBaseRiskMeasure`](@ref) that can take the return series of one asset. The score of asset `i` is `score(X[:, i])`. The selector has no score type of its own, and it uses the risk measures of the library. [`ConditionalValueatRisk`](@ref) and the drawdown measures score risk, `SCM()` scores variance, and [`MeanReturn`](@ref) scores the mean return. [`bigger_is_better`](@ref) tells the ordinal rules which end is the best.
+`score` is an [`AbstractBaseRiskMeasure`](@ref) that can take the return series of one asset, or an [`AbstractAssetScorer`](@ref). The score of asset `i` under a risk measure is `score(X[:, i])`. The risk measures of the library cover the in-sample scores. [`ConditionalValueatRisk`](@ref) and the drawdown measures score risk, `SCM()` scores variance, and [`MeanReturn`](@ref) scores the mean return. [`FoldRiskScorer`](@ref) scores a risk measure over the test windows of a cross-validation scheme, and [`WeightMassScorer`](@ref) scores the weight that an optimiser gives each asset. [`bigger_is_better`](@ref) tells the ordinal rules which end is the best.
 
 `rule` sets what the selector does with the scores. A [`ThresholdRule`](@ref) keeps an absolute band. A [`RankRule`](@ref) or a [`QuantileRule`](@ref) takes a count or a fraction from the tails.
 
@@ -597,7 +667,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     ScoreSelector(;
-        score::AbstractBaseRiskMeasure,
+        score::BaseRM_AsSc,
         rule::AbstractSelectionRule,
     ) -> ScoreSelector
 
@@ -605,7 +675,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `supports_precomputed_returns(score)`. [`Variance`](@ref) and [`StandardDeviation`](@ref) are [`WeightsInput`](@ref) measures. The constructor refuses them, and its message names `SCM()`.
+  - If `score` is a risk measure, `supports_precomputed_returns(score)`. [`Variance`](@ref) and [`StandardDeviation`](@ref) are [`WeightsInput`](@ref) measures. The constructor refuses them, and its message names `SCM()`.
 
 # Examples
 
@@ -626,23 +696,23 @@ julia> PortfolioOptimisers.fit_preprocessing(sel, rd).nx
   - [`AbstractSelectionRule`](@ref)
   - [`ZeroVarianceFilter`](@ref)
   - [`supports_precomputed_returns`](@ref)
+  - [`AbstractAssetScorer`](@ref)
 """
 @concrete struct ScoreSelector <: AbstractAssetSelector
     """
-    The [`AbstractBaseRiskMeasure`](@ref) that scores the return series of each asset.
+    The [`AbstractBaseRiskMeasure`](@ref) that scores the return series of each asset, or the [`AbstractAssetScorer`](@ref) that scores every asset from the returns data.
     """
     score
     """
     The [`AbstractSelectionRule`](@ref) that turns the scores into a keep-mask.
     """
     rule
-    function ScoreSelector(score::AbstractBaseRiskMeasure, rule::AbstractSelectionRule)
+    function ScoreSelector(score::BaseRM_AsSc, rule::AbstractSelectionRule)
         assert_scoreable(score)
         return new{typeof(score), typeof(rule)}(score, rule)
     end
 end
-function ScoreSelector(; score::AbstractBaseRiskMeasure,
-                       rule::AbstractSelectionRule)::ScoreSelector
+function ScoreSelector(; score::BaseRM_AsSc, rule::AbstractSelectionRule)::ScoreSelector
     return ScoreSelector(score, rule)
 end
 """
@@ -654,7 +724,7 @@ Select the assets that a [`ScoreSelector`](@ref) keeps. The method scores every 
 
 # Algorithm
 
- 1. Score every asset column of `rd.X` with the `score` of the selector, through [`asset_scores`](@ref).
+ 1. Score every asset column of `rd` with the `score` of the selector, through [`asset_scores`](@ref).
  2. Read the orientation of the score with [`bigger_is_better`](@ref).
  3. Return the keep-mask that [`rule_keep`](@ref) gives for those scores under the `rule` of the selector.
 
@@ -674,7 +744,7 @@ Select the assets that a [`ScoreSelector`](@ref) keeps. The method scores every 
   - [`rule_keep`](@ref)
 """
 function select_assets(sel::ScoreSelector, rd::AbstractReturnsResult)::BitVector
-    scores = asset_scores(sel.score, rd.X)
+    scores = asset_scores(sel.score, rd)
     return rule_keep(sel.rule, scores, bigger_is_better(sel.score))
 end
 """
@@ -1360,7 +1430,7 @@ Asset selector that drops the assets whose information other assets already carr
 
 `alg` sets what "redundant" means, and it returns the keep-mask. [`PairwiseCorrelation`](@ref) prunes correlated pairs greedily. [`CorrelationComponents`](@ref) keeps one representative of each correlated group. [`ClusterGroups`](@ref) keeps one representative of each cluster.
 
-`score` sets *which* asset of a redundancy group survives. It is a risk measure on the return series of each asset, and [`bigger_is_better`](@ref) sets its order, as in [`ScoreSelector`](@ref). When `score` is `nothing`, a correlation algorithm uses its own rule. The asset with the lower summary correlation with the rest of the universe survives. [`ClusterGroups`](@ref) has no such rule, and it needs a `score`.
+`score` sets *which* asset of a redundancy group survives. It is a risk measure on the return series of each asset, or an [`AbstractAssetScorer`](@ref), and [`bigger_is_better`](@ref) sets its order, as in [`ScoreSelector`](@ref). When `score` is `nothing`, a correlation algorithm uses its own rule. The asset with the lower summary correlation with the rest of the universe survives. [`ClusterGroups`](@ref) has no such rule, and it needs a `score`.
 
 # Fields
 
@@ -1370,14 +1440,14 @@ $(DocStringExtensions.FIELDS)
 
     RedundancySelector(;
         alg::AbstractRedundancyAlgorithm = PairwiseCorrelation(),
-        score::Option{<:AbstractBaseRiskMeasure} = nothing,
+        score::Option{<:BaseRM_AsSc} = nothing,
     ) -> RedundancySelector
 
 Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `score` is given, `supports_precomputed_returns(score)`.
+  - If `score` is a risk measure, `supports_precomputed_returns(score)`.
   - If `requires_score(alg)`, `score` is not `nothing`.
 
 # Examples
@@ -1408,11 +1478,11 @@ julia> PortfolioOptimisers.fit_preprocessing(sel, rd).nx
     """
     alg
     """
-    The [`AbstractBaseRiskMeasure`](@ref) that selects the survivor of each redundancy group. `nothing` uses the rule of the algorithm.
+    The [`AbstractBaseRiskMeasure`](@ref) or the [`AbstractAssetScorer`](@ref) that selects the survivor of each redundancy group. `nothing` uses the rule of the algorithm.
     """
     score
     function RedundancySelector(alg::AbstractRedundancyAlgorithm,
-                                score::Option{<:AbstractBaseRiskMeasure})
+                                score::Option{<:BaseRM_AsSc})
         if !isnothing(score)
             assert_scoreable(score)
         else
@@ -1423,7 +1493,7 @@ julia> PortfolioOptimisers.fit_preprocessing(sel, rd).nx
     end
 end
 function RedundancySelector(; alg::AbstractRedundancyAlgorithm = PairwiseCorrelation(),
-                            score::Option{<:AbstractBaseRiskMeasure} = nothing)::RedundancySelector
+                            score::Option{<:BaseRM_AsSc} = nothing)::RedundancySelector
     return RedundancySelector(alg, score)
 end
 """
@@ -1436,7 +1506,7 @@ Select the assets that a [`RedundancySelector`](@ref) keeps. The method scores e
 # Algorithm
 
  1. When the selector has no `score`, set `scores` to `nothing` and `bib` to `false`. The algorithm then uses its own survivor rule.
- 2. Otherwise score every asset column of `rd.X` with [`asset_scores`](@ref), and read `bib` from [`bigger_is_better`](@ref) of that score.
+ 2. Otherwise score every asset column of `rd` with [`asset_scores`](@ref), and read `bib` from [`bigger_is_better`](@ref) of that score.
  3. Return the keep-mask that [`redundancy_keep`](@ref) admits for the `alg` of the selector.
 
 # Arguments
@@ -1458,12 +1528,12 @@ function select_assets(sel::RedundancySelector, rd::AbstractReturnsResult)::BitV
     scores, bib = if isnothing(sel.score)
         nothing, false
     else
-        asset_scores(sel.score, rd.X), bigger_is_better(sel.score)
+        asset_scores(sel.score, rd), bigger_is_better(sel.score)
     end
     return redundancy_keep(sel.alg, rd, scores, bib)
 end
 
 export ThresholdRule, RankRule, QuantileRule, ScoreSelector, CompleteAssetSelector,
        PairwiseCorrelation, CorrelationComponents, ClusterGroups, RedundancySelector
-public AbstractSelectionRule, AbstractRedundancyAlgorithm, select_assets, asset_scores,
-       rule_keep, redundancy_keep, requires_score
+public AbstractSelectionRule, AbstractRedundancyAlgorithm, AbstractAssetScorer,
+       select_assets, asset_scores, rule_keep, redundancy_keep, requires_score

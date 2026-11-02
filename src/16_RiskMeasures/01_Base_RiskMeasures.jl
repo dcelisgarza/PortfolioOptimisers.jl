@@ -40,7 +40,7 @@ end
 
 Return whether a larger value of risk measure `r` is preferred over a smaller one.
 
-The default returns `false`, so a lower value is better, for every [`AbstractBaseRiskMeasure`](@ref) subtype. A ratio or a return-like measure that a caller maximises declares a method that returns `true`.
+The default returns `false`, so a lower value is better, for every [`AbstractBaseRiskMeasure`](@ref) subtype. A ratio or a return-like measure that a caller maximises declares a method that returns `true`. An [`AbstractAssetScorer`](@ref) has no default, and each concrete scorer declares its own method.
 
 # Returns
 
