@@ -1280,4 +1280,4 @@ function path_row_fold(res::BudgetedHindsightPathResult, rd::ReturnsResult, t::I
 end
 
 export log_wealth_regret, LogWealthRegretResult, BudgetedHindsightPath,
-       BudgetedHindsightPathResult
+       BudgetedHindsightPathResult, fold_target, fold_held

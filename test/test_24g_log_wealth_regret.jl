@@ -511,6 +511,31 @@ and be-the-leader collapses onto the static comparator.
         @test isnothing(po.member_vector(nothing, 1))
     end
 
+    @testset "The exported fold readers sit on the names of each fold (#1953)" begin
+        # An asset that lists late: the folds that train on its missing rows drop it through
+        # the Investable Mask, so `res.w` keeps the universe of the fit and `rd.nx` does not.
+        rng = StableRNG(1953)
+        X = 0.01 .* randn(rng, 300, 4)
+        X[1:100, 4] .= NaN
+        ts = collect(Date(2024, 1, 1):Day(1):Date(2024, 10, 26))
+        rd = ReturnsResult(; nx = ["A", "B", "C", "D"], X = X, ts = ts)
+        p = cross_val_predict(HierarchicalRiskParity(), rd, KFold(; n = 3))
+        @test any(f -> length(f.res.w) != length(f.rd.nx), p.pred)
+        for f in p.pred
+            @test length(fold_target(f)) == length(fold_held(f)) == length(f.rd.nx)
+            @test sum(fold_target(f)) ≈ 1
+        end
+        nms, W, labels = prediction_weights(p)
+        @test nms == ["A", "B", "C", "D"]
+        @test size(W) == (length(p.pred), 4)
+        @test length(labels) == length(p.pred)
+        for (k, f) in enumerate(p.pred)
+            @test W[k, indexin(f.rd.nx, nms)] == fold_target(f)
+        end
+        @test all(n -> Base.isexported(po, n),
+                  (:fold_target, :fold_held, :prediction_weights))
+    end
+
     @testset "A prediction with many members gives one regret for each member (#1936)" begin
         rng = StableRNG(1936)
         T, N = 60, 4

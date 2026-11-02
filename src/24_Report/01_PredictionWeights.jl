@@ -118,3 +118,5 @@ function prediction_members(ppred::PopulationPredictionResult)
               IsEmptyError("the population holds no path, so it holds no members"))
     return prediction_members(first(ppred.pred))
 end
+
+export prediction_weights
