@@ -117,22 +117,35 @@ struct NoOrientationScorer <: PortfolioOptimisers.AbstractAssetScorer end
         R3 = hand_rank(V[3], false)
         @test PO.asset_scores(sr, rd2)[1] ≈ mean([R1[1], R2[1], R3[1]])
         @test PO.asset_scores(sr, rd2)[2] ≈ mean([R2[2], R3[2]])
-        # Two covered windows are fewer than three, and the error names asset B.
+        # Two covered windows are fewer than three, so asset B has no score (#1933). The
+        # other assets keep the scores of `min_folds = 1`.
         s3 = FoldRiskScorer(; r = SCM(), cv = cv, min_folds = 3)
-        err = try
-            PO.asset_scores(s3, rd2)
-        catch e
-            e
-        end
-        @test err isa ArgumentError
-        @test occursin("[\"B\"]", err.msg)
-        @test occursin("[2]", err.msg)
-        # An asset that no window covers is refused at the default `min_folds = 1`.
+        sc3 = PO.asset_scores(s3, rd2)
+        @test isnan(sc3[2])
+        @test sc3[[1, 3, 4, 5, 6]] ≈ sc[[1, 3, 4, 5, 6]]
+        # An asset that no window covers has no score at the default `min_folds = 1`.
         X3 = copy(X)
         X3[1:5, 4] .= NaN
         X3[41:45, 4] .= NaN
         X3[81:85, 4] .= NaN
-        @test_throws ArgumentError PO.asset_scores(s, ReturnsResult(; nx = nx, X = X3))
+        rd3 = ReturnsResult(; nx = nx, X = X3)
+        @test findall(isnan, PO.asset_scores(s, rd3)) == [4]
+        # A reward puts the NaN at the best end. Before #1933 the tail took it, and the
+        # selector kept no asset. Now it keeps the best of the five finite scores.
+        f = FoldRiskScorer(; r = MeanReturn(), cv = cv)
+        fs = PO.asset_scores(f, rd3)
+        @test findall(isnan, fs) == [4]
+        @test findall(PO.select_assets(ScoreSelector(; score = f,
+                                                     rule = QuantileRule(; best = 0.2)),
+                                       rd3)) == [argmax(replace(fs, NaN => -Inf))]
+        # With no scored asset, the scores take the number type of the returns.
+        none = PO.asset_scores(FoldRiskScorer(; r = SCM(), cv = cv, min_folds = 99), rd3)
+        @test all(isnan, none)
+        @test eltype(none) == eltype(rd3.X)
+        # A selector with no finite score keeps no asset, so fit_preprocessing throws.
+        sel = ScoreSelector(; score = FoldRiskScorer(; r = SCM(), cv = cv, min_folds = 99),
+                            rule = RankRule(; best = 2))
+        @test_throws PO.IsEmptyError fit_preprocessing(sel, rd)
     end
 
     @testset "FoldRiskScorer validation" begin
@@ -213,15 +226,34 @@ struct NoOrientationScorer <: PortfolioOptimisers.AbstractAssetScorer end
         # The seed draws three subsets, and each asset is in at least one of them.
         @test held == [4, 4, 8, 12, 4, 4]
         @test PO.asset_scores(s, rd) ≈ sums ./ held
+        # An asset with fewer than `min_folds` draws has no score (#1933), and the other
+        # assets keep their mean weight.
         k = minimum(held) + 1
-        short = nx[held .< k]
-        err = try
-            PO.asset_scores(WeightMassScorer(; opt = iv, cv = mr, min_folds = k), rd)
-        catch e
-            e
-        end
-        @test err isa ArgumentError
-        @test occursin(string(short), err.msg)
+        sk = PO.asset_scores(WeightMassScorer(; opt = iv, cv = mr, min_folds = k), rd)
+        @test isnan.(sk) == (held .< k)
+        @test sk[held .>= k] ≈ (sums ./ held)[held .>= k]
+    end
+
+    @testset "a draw that misses an asset leaves it with no score (#1933)" begin
+        iv = InverseVolatility()
+        # The seed draws two subsets of five, and neither holds asset C.
+        mr = MultipleRandomised(IndexWalkForward(40, 20); subset_size = 5, n_subsets = 2,
+                                seed = 16)
+        @test [count(a -> i in a, split(mr, rd).asset_idx) for i in 1:6] ==
+              [8, 8, 0, 8, 8, 8]
+        s = WeightMassScorer(; opt = iv, cv = mr)
+        sc = PO.asset_scores(s, rd)
+        @test findall(isnan, sc) == [3]
+        # The score is a reward, so the NaN is at the best end. Before #1933 the tail took
+        # it and kept no asset. Now the rule ranks the five finite scores alone.
+        @test findall(PO.select_assets(ScoreSelector(; score = s,
+                                                     rule = QuantileRule(; best = 0.2)),
+                                       rd)) == [argmax(replace(sc, NaN => -Inf))]
+        # `:drop` drops the worst finite asset, and does not keep the unscored one.
+        keep = PO.select_assets(ScoreSelector(; score = s,
+                                              rule = RankRule(; worst = 1, action = :drop)),
+                                rd)
+        @test findall(keep) == setdiff(1:6, [3, argmin(replace(sc, NaN => Inf))])
     end
 
     @testset "WeightMassScorer offers each split its Coverage Universe" begin
@@ -235,8 +267,10 @@ struct NoOrientationScorer <: PortfolioOptimisers.AbstractAssetScorer end
         w1 = optimise(iv, ReturnsResult(; nx = nx, X = X2[cvr.train_idx[1], :])).w
         sc = PO.asset_scores(WeightMassScorer(; opt = iv, cv = cv), rd2)
         @test sc[2] ≈ w1[2]
-        @test_throws ArgumentError PO.asset_scores(WeightMassScorer(; opt = iv, cv = cv,
-                                                                    min_folds = 2), rd2)
+        # One split offered asset B, fewer than two, so B has no score (#1933).
+        sc2 = PO.asset_scores(WeightMassScorer(; opt = iv, cv = cv, min_folds = 2), rd2)
+        @test findall(isnan, sc2) == [2]
+        @test sc2[[1, 3, 4, 5, 6]] ≈ sc[[1, 3, 4, 5, 6]]
     end
 
     @testset "a failed fold leaves the sum and the count" begin
@@ -254,8 +288,10 @@ struct NoOrientationScorer <: PortfolioOptimisers.AbstractAssetScorer end
         W = reduce(hcat, [pred.pred[k].res.w for k in (1, 3)])
         s = WeightMassScorer(; opt = opt, cv = cv)
         @test PO.asset_scores(s, rd) ≈ vec(mean(W; dims = 2))
-        @test_throws ArgumentError PO.asset_scores(WeightMassScorer(; opt = opt, cv = cv,
-                                                                    min_folds = 3), rd)
+        # Two successful splits are fewer than three, so no asset has a score (#1933).
+        @test all(isnan,
+                  PO.asset_scores(WeightMassScorer(; opt = opt, cv = cv, min_folds = 3),
+                                  rd))
     end
 
     @testset "a prediction that the split does not hold is refused" begin

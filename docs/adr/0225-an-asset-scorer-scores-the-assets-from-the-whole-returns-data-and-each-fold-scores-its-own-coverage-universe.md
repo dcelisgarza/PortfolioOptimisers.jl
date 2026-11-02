@@ -111,10 +111,17 @@ ranks only the covered assets. Each split of `WeightMassScorer` offers only the 
 of its training window. So an asset with a gap in one fold keeps its score from the other folds.
 
 Both scorers take `min_folds`. When fewer than `min_folds` folds scored an asset, `asset_scores`
-throws an `ArgumentError` that names each short asset and its count. The default `1` refuses an
-asset that no fold scored, which is the `IsEmptyError` of a window with no live asset carried to
-one asset. Inside a selector the training window is already reduced to its Coverage Universe, so
-the guard matters for a direct call and under `MultipleRandomised`.
+writes `NaN` at that asset, through `min_folds_scores`. The default `1` marks an asset that no
+fold scored. Every selection rule and every redundancy algorithm drops a non-finite score
+(ADR 0029, amendment of 2026-11-02), so the asset leaves the selection and the run does not
+stop, as the rest of the library is robust to missing data. A selector with no scored asset
+keeps no asset, and `fit_preprocessing` throws `IsEmptyError`. Inside a selector the training
+window is already reduced to its Coverage Universe, so the case occurs on a direct call, under
+`MultipleRandomised`, and with a `min_folds` above one.
+
+The drop has a cost that the docstring of `WeightMassScorer` states. A draw of asset subsets can
+miss an asset completely, and a selector then drops it only because of the draw. The library
+documents a degenerate value and does not warn on it (#1282).
 
 ## Considered options
 
@@ -126,7 +133,7 @@ the guard matters for a direct call and under `MultipleRandomised`.
 | The aggregation | `MeanFoldRank` beside three value aggregations. | Every aggregation can read the rank, so the statistic is a field of each. |
 | The rank | The plain rank `1, …, n` of each window. | A window that covers fewer assets has a smaller range of ranks, so a mean over windows weighs it less. The percentile is free of `n`. |
 | Missing data | Refuse a non-finite `rd.X` with `IsNonFiniteError`. | The library reduces each fit to its Coverage Universe, and a scorer that refuses breaks that contract for a direct call. |
-| Missing data | Score an uncovered asset as `NaN`. | A `NaN` has no place in an order, and `rule_keep` sorts the scores. |
+| Missing data | Throw an `ArgumentError` that names each asset with fewer than `min_folds` folds. | It stops a run on a gap in the data, and the rest of the library drops the asset. The rules exclude a `NaN` since #1933, so a `NaN` no longer takes a place in an order. |
 | The splits | Read the paths of `cross_val_predict`. | One combinatorial split is in many paths, so a path count weighs some splits more than others. |
 | The weights | Fit each split by hand with `optimise`. | The fold loop resolves `TimeDependent` schedules and threads the previous weights. A second loop drifts from it. |
 

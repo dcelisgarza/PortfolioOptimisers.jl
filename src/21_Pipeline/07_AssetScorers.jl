@@ -417,34 +417,43 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Check that every asset has a score from at least `min_folds` folds.
+Return the score of each asset that at least `min_folds` folds scored, and `NaN` at every other asset.
 
-An Asset Scorer scores an asset only on a fold that offers it. A fold does not offer an asset outside the Coverage Universe of its window, or outside the asset subset that a [`MultipleRandomised`](@ref) split drew. So the number of folds can differ from asset to asset, and a score from two folds is not as reliable as a score from twenty.
+An Asset Scorer scores an asset only on a fold that offers it. A fold does not offer an asset outside the Coverage Universe of its window, or outside the asset subset that a [`MultipleRandomised`](@ref) split drew. So the number of folds can differ from asset to asset, and a score from two folds is not as reliable as a score from twenty. An asset with fewer than `min_folds` folds has no score, and the default `min_folds = 1` marks an asset that no fold scored.
+
+A `NaN` score is outside every selection rule and every redundancy algorithm, so the asset leaves the selection and the run does not stop. [`rule_keep`](@ref) states that rule.
+
+# Algorithm
+
+ 1. Find `ok`, the positions of the assets whose count is at least `min_folds`.
+ 2. Evaluate `score_of` at each position of `ok` into `v`. The function calls `score_of` at no other position, so an aggregation never reads an empty set of folds.
+ 3. Read the number type of `v`, or `T` when `v` is empty, and pass it to `float_if_integer`, so that the type can hold a `NaN`.
+ 4. Return the vector of that type that holds `v` at `ok`, and `NaN` at every other position.
 
 # Arguments
 
-  - `min_folds`: The smallest number of folds that must score each asset.
+  - `score_of`: The function that returns the score of the asset at a position.
   - `counts`: The number of folds that scored each asset, `assets × 1`.
-  - `nx`: The names of the assets, `assets × 1`.
-
-# Validation
-
-  - `counts[i] >= min_folds` for every asset. Otherwise the function throws an `ArgumentError` that names each short asset and its count.
+  - `min_folds`: The smallest number of folds that must score an asset.
+  - `T`: The number type of the returns data. The function reads it only when no asset has enough folds.
 
 # Returns
 
-  - `nothing`.
+  - `scores::VecNum`: The score vector `assets × 1`. It is `NaN` at each asset with fewer than `min_folds` folds.
 
 # Related
 
   - [`FoldRiskScorer`](@ref)
   - [`WeightMassScorer`](@ref)
+  - [`rule_keep`](@ref)
 """
-function assert_min_folds(min_folds::Integer, counts::VecInt, nx::AbstractVector)::Nothing
-    short = findall(<(min_folds), counts)
-    @argcheck(isempty(short),
-              ArgumentError("the assets $(nx[short]) have a score from $(counts[short]) fold(s), fewer than min_folds = $min_folds. A fold scores an asset only when the asset is in the Coverage Universe of the window, and in the asset subset of the split. Lower `min_folds`, use more folds, or fill the gaps in the returns."))
-    return nothing
+function min_folds_scores(score_of, counts::VecInt, min_folds::Integer, ::Type{T}) where {T}
+    ok = findall(>=(min_folds), counts)
+    v = [score_of(i) for i in ok]
+    S = float_if_integer(isempty(v) ? T : eltype(v))
+    scores = fill!(Vector{S}(undef, length(counts)), NaN)
+    scores[ok] = v
+    return scores
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -477,6 +486,8 @@ The scorer evaluates each distinct window once. A [`CombinatorialCrossValidation
 
 A window scores only the assets of its own Coverage Universe, the assets whose return is finite and active at every row of the window. An asset with a gap in one window keeps its score from the other windows. Under [`Rank`](@ref), a window ranks only the assets that it covers.
 
+An asset that fewer than `min_folds` windows cover has the score `NaN`. Every selection rule and every redundancy algorithm drops a `NaN` score, so a selector drops that asset and the run does not stop. Inside a selector the training window is already reduced to its Coverage Universe, so the case occurs on a direct call, or with a `min_folds` above one.
+
 # Algorithm
 
  1. Read the orientation `bib` of `r` with [`bigger_is_better`](@ref).
@@ -484,8 +495,7 @@ A window scores only the assets of its own Coverage Universe, the assets whose r
  3. For each window, find the positions `live` of the covered assets with [`cv_live_assets`](@ref).
  4. Evaluate `r` on the covered columns of the window with [`asset_scores`](@ref), and turn the values into statistics with [`fold_statistic`](@ref).
  5. Collect the statistics of each asset over the windows that cover it into `stats`.
- 6. Check the count of each asset against `min_folds` with [`assert_min_folds`](@ref).
- 7. Reduce the statistics of each asset with [`fold_aggregate`](@ref), under the orientation from [`statistic_bigger_is_better`](@ref).
+ 6. Reduce the statistics of each asset that at least `min_folds` windows cover with [`fold_aggregate`](@ref), under the orientation from [`statistic_bigger_is_better`](@ref). Write `NaN` at every other asset. [`min_folds_scores`](@ref) does this step.
 
 # Fields
 
@@ -544,7 +554,7 @@ julia> round.(PortfolioOptimisers.asset_scores(s, rd); digits = 4)
     """
     agg
     """
-    The smallest number of test windows that must cover each asset.
+    The smallest number of test windows that must cover an asset. An asset that fewer windows cover has the score `NaN`.
     """
     min_folds
     function FoldRiskScorer(r::AbstractBaseRiskMeasure, cv::CVE_Onl,
@@ -602,9 +612,9 @@ function asset_scores(s::FoldRiskScorer, rd::AbstractReturnsResult)
     wins = [window_statistic(s, rd, T, bib)
             for T in distinct_test_windows(split(s.cv, rd).test_idx)]
     stats = [[w.v[w.pos[i]] for w in wins if !iszero(w.pos[i])] for i in axes(rd.X, 2)]
-    assert_min_folds(s.min_folds, length.(stats), rd.nx)
     sbib = statistic_bigger_is_better(s.agg.alg, bib)
-    return [fold_aggregate(s.agg, v, sbib) for v in stats]
+    return min_folds_scores(i -> fold_aggregate(s.agg, stats[i], sbib), length.(stats),
+                            s.min_folds, eltype(rd.X))
 end
 function bigger_is_better(s::FoldRiskScorer)::Bool
     return statistic_bigger_is_better(s.agg.alg, bigger_is_better(s.r))
@@ -641,6 +651,10 @@ The scorer reads the result of each split once. Under [`CombinatorialCrossValida
 
     The scorer runs ``C K`` optimisations, for ``C`` configurations and ``K`` splits. Inside a [`Pipeline`](@ref) under [`search_cross_validation`](@ref), the cost multiplies again by the outer folds and the outer candidates. The scorer keeps no cache.
 
+!!! warning
+
+    An asset that fewer than `min_folds` successful splits offered has the score `NaN`, and every selection rule drops it. Under [`MultipleRandomised`](@ref), a draw of asset subsets can miss an asset completely. A selector then drops that asset only because the random draw did not offer it, and not because of its weight. More subsets in the draw make this less probable.
+
 # Algorithm
 
  1. Fix the random draw of `cv` with [`pin_draw`](@ref), so that the split and the predictions use the same splits.
@@ -648,8 +662,8 @@ The scorer reads the result of each split once. Under [`CombinatorialCrossValida
  3. Build the candidates of the grid with [`weight_mass_candidates`](@ref).
  4. Run [`cross_val_predict`](@ref) on each candidate, and find the prediction of each split with [`split_prediction`](@ref).
  5. Keep each prediction whose optimisation succeeded, and turn it into the record of the split with [`split_weight_record`](@ref).
- 6. Count the records that offered each asset, and check the counts against `min_folds` with [`assert_min_folds`](@ref).
- 7. Return the mean of the record values of each asset over the records that offered it.
+ 6. Count the records that offered each asset.
+ 7. Return the mean of the record values of each asset that at least `min_folds` records offered, over those records, and `NaN` at every other asset. [`min_folds_scores`](@ref) does this step.
 
 # Fields
 
@@ -715,7 +729,7 @@ julia> round.(PortfolioOptimisers.asset_scores(s, rd); digits = 4)
     """
     tol
     """
-    The smallest number of successful splits that must offer each asset.
+    The smallest number of successful splits that must offer an asset. An asset that fewer splits offered has the score `NaN`.
     """
     min_folds
     """
@@ -1010,8 +1024,8 @@ function asset_scores(s::WeightMassScorer, rd::AbstractReturnsResult)
     recs = [split_weight_record(p, offered[k], idx, s.tol)
             for (p, k) in splits if fold_solved(p.res.retcode)]
     counts = [count(r -> r.offered[i], recs) for i in axes(rd.X, 2)]
-    assert_min_folds(s.min_folds, counts, rd.nx)
-    return [sum(r.v[i] for r in recs if r.offered[i]) / counts[i] for i in axes(rd.X, 2)]
+    return min_folds_scores(i -> sum(r.v[i] for r in recs if r.offered[i]) / counts[i],
+                            counts, s.min_folds, eltype(rd.X))
 end
 function bigger_is_better(::WeightMassScorer)::Bool
     return true

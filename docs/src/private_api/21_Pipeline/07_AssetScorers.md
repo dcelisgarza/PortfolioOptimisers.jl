@@ -1,5 +1,5 @@
 ```@meta
-Description = "Asset scorers, private API of PortfolioOptimisers.jl: distinct_test_windows, window_statistic, assert_min_folds, weight_mass_grid, weight_mass_candidates, …"
+Description = "Asset scorers, private API of PortfolioOptimisers.jl: distinct_test_windows, window_statistic, min_folds_scores, weight_mass_grid, weight_mass_candidates, …"
 ```
 
 # Asset scorers: private API
@@ -11,7 +11,7 @@ A [`FoldRiskScorer`](@ref) reads each distinct test window once, and scores each
 ```@docs
 PortfolioOptimisers.distinct_test_windows
 PortfolioOptimisers.window_statistic
-PortfolioOptimisers.assert_min_folds
+PortfolioOptimisers.min_folds_scores
 ```
 
 ## The splits of a weight mass scorer

@@ -529,7 +529,7 @@ To add an Asset Scorer, subtype `AbstractAssetScorer`, put every parameter of th
 
 ## `asset_scores`
 
-  - `asset_scores(s::MyAssetScorer, rd::AbstractReturnsResult) -> VecNum`: Give one finite score to each asset column of `rd.X`, in the order of the columns.
+  - `asset_scores(s::MyAssetScorer, rd::AbstractReturnsResult) -> VecNum`: Give one score to each asset column of `rd.X`, in the order of the columns. Write `NaN` at an asset that the scorer cannot score, for example an asset that no fold offered. Every selection rule and every redundancy algorithm drops a `NaN` score.
 
 ### Arguments
 
@@ -538,7 +538,7 @@ To add an Asset Scorer, subtype `AbstractAssetScorer`, put every parameter of th
 
 ### Returns
 
-  - `scores::VecNum`: The score vector `assets × 1`, with one finite entry for each asset column of `rd.X`.
+  - `scores::VecNum`: The score vector `assets × 1`, with one entry for each asset column of `rd.X`. An entry is `NaN` at an asset that has no score.
 
 ## `bigger_is_better`
 
@@ -625,6 +625,8 @@ The function gives each column to `score` as a view. The functor of a risk measu
 
 The method on `rd` with a risk measure reads `rd.X` and calls the method on the matrix. This is the in-sample score of a selector. The method on an [`AbstractAssetScorer`](@ref) is the interface of that family, and each concrete scorer adds its own.
 
+The two routes treat a non-finite score differently on purpose. A risk measure scores a live column, so a non-finite value is a defect of the measure, and the method throws. An Asset Scorer writes `NaN` at an asset that it cannot score, for example an asset that fewer than `min_folds` folds offered. That entry is a gap in the data, and not a defect. Every selection rule and every redundancy algorithm drops it, as [`rule_keep`](@ref) states.
+
 # Algorithm
 
  1. Evaluate `score` on a view of each asset column of `X`, one column after the other, into `scores`.
@@ -639,11 +641,11 @@ The method on `rd` with a risk measure reads `rd.X` and calls the method on the 
 
 # Validation
 
-  - Every score is finite. Otherwise the function throws a `DomainError` that names the columns with a non-finite score. [`ThirdCentralMoment`](@ref) with a variance estimator in `ve`, on a constant series for example, divides by a zero standard deviation and gives `NaN`. A `NaN` score has no place in an order, so the function throws and does not sort the scores arbitrarily.
+  - With a risk measure, every score is finite. Otherwise the function throws a `DomainError` that names the columns with a non-finite score. [`ThirdCentralMoment`](@ref) with a variance estimator in `ve`, on a constant series for example, divides by a zero standard deviation and gives `NaN`. A rule drops a `NaN` score, so the defect of the measure becomes silent if the function does not throw.
 
 # Returns
 
-  - `scores::VecNum`: The score vector `assets × 1`, with one entry for each asset column of `X`.
+  - `scores::VecNum`: The score vector `assets × 1`, with one entry for each asset column of `X`. With an Asset Scorer, an entry is `NaN` at an asset that the scorer cannot score.
 
 # Related
 
