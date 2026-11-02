@@ -6,7 +6,7 @@ Description = "Asset scorers, private API of PortfolioOptimisers.jl: distinct_te
 
 ## The test windows of a fold risk scorer
 
-A [`FoldRiskScorer`](@ref) reads each distinct test window once, and scores each window on its own Coverage Universe.
+A [`FoldRiskScorer`](@ref) reads each distinct test window once. In each window it scores only the assets that the window covers, the assets whose return is finite and active at every row of the window. An asset that too few windows cover has no score, and its entry is `NaN`.
 
 ```@docs
 PortfolioOptimisers.distinct_test_windows
