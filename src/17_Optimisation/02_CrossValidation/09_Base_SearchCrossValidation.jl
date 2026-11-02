@@ -186,7 +186,7 @@ $(DocStringExtensions.FIELDS)
         kwargs::NamedTuple = (;),
     ) -> GridSearchCrossValidation
 
-Positional and keyword arguments correspond to fields above.
+Positional and keyword arguments correspond to fields above. The outer constructor takes a vector of parameter sets whose types differ. Such a literal infers the element type `Vector`, so the constructor narrows it through [`narrow_mixed_vector`](@ref).
 
 ## Validation
 
@@ -313,18 +313,18 @@ GridSearchCrossValidation
                                                                     kwargs)
     end
 end
-function GridSearchCrossValidation(p::Union{AbstractVector{<:Pair{<:Any, <:AbstractVector}},
-                                            AbstractVector{<:AbstractVector{<:Pair{<:Any,
-                                                                                   <:AbstractVector}}},
-                                            AbstractDict{<:Any, <:AbstractVector},
-                                            AbstractVector{<:AbstractDict{<:Any,
-                                                                          <:AbstractVector}}};
+function GridSearchCrossValidation(p::Union{AbstractVector,
+                                            AbstractDict{<:Any, <:AbstractVector}};
                                    cv::CVE_Onl = KFold(),
                                    r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
                                    scorer::CrossValSearchScorer = HighestMeanScore(),
                                    n_best::Integer = 1,
                                    ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                                    train_score::Bool = false, kwargs::NamedTuple = (;))
+    p = narrow_mixed_vector(p,
+                            Union{Pair{<:Any, <:AbstractVector},
+                                  AbstractVector{<:Pair{<:Any, <:AbstractVector}},
+                                  AbstractDict{<:Any, <:AbstractVector}}, :p)
     return GridSearchCrossValidation(p, cv, r, scorer, n_best, ex, train_score, kwargs)
 end
 """
@@ -357,7 +357,7 @@ $(DocStringExtensions.FIELDS)
         kwargs::NamedTuple = (;),
     ) -> RandomisedSearchCrossValidation
 
-Positional and keyword arguments correspond to the struct's fields.
+Positional and keyword arguments correspond to the struct's fields. The outer constructor takes a vector of parameter sets whose types differ, such as a vector of pairs and a vector of pairs with other value types. Such a literal infers the element type `Vector`, so the constructor narrows it through [`narrow_mixed_vector`](@ref).
 
 The search draws its trials from `rng`, so the trials, and the order of the `n_best` kept candidates, are the same in two runs only when `seed` is set.
 
@@ -513,10 +513,7 @@ RandomisedSearchCrossValidation
                                                         kwargs)
     end
 end
-function RandomisedSearchCrossValidation(p::Union{AbstractVector{<:Pair},
-                                                  AbstractVector{<:AbstractVector{<:Pair}},
-                                                  AbstractDict,
-                                                  AbstractVector{<:AbstractDict}};
+function RandomisedSearchCrossValidation(p::Union{AbstractVector, AbstractDict};
                                          cv::CVE_Onl = KFold(),
                                          r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
                                          scorer::CrossValSearchScorer = HighestMeanScore(),
@@ -527,6 +524,7 @@ function RandomisedSearchCrossValidation(p::Union{AbstractVector{<:Pair},
                                          seed::Option{<:Integer} = nothing,
                                          train_score::Bool = false,
                                          kwargs::NamedTuple = (;))
+    p = narrow_mixed_vector(p, Union{Pair, AbstractVector{<:Pair}, AbstractDict}, :p)
     return RandomisedSearchCrossValidation(p, cv, r, scorer, n_best, ex, n_iter, rng, seed,
                                            train_score, kwargs)
 end

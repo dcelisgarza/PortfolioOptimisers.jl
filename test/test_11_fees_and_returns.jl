@@ -250,9 +250,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
                                           datatype = Float32).val) == Float64
 
         # Both owners refuse a vector that holds an estimator when they have no universe.
-        umix = PortfolioOptimisers.concrete_typed_array([Turnover(; w = u0, val = 0.1),
-                                                         TurnoverEstimator(; w = u0,
-                                                                           val = ud)])
+        umix = [Turnover(; w = u0, val = 0.1), TurnoverEstimator(; w = u0, val = ud)]
         @test_throws PortfolioOptimisers.IsNothingError JuMPOptimiser(; slv = slv,
                                                                       tn = umix)
         @test_throws PortfolioOptimisers.IsNothingError ProgrammeAllocationSet(; slv = slv,

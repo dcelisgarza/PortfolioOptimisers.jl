@@ -603,6 +603,12 @@ v0.33 also brings the cross-sectional factor prior to parity with the oracle, an
 
 ## From v0.33 to v0.34
 
+### [Calls that now answer](@id migration-0-34-answers)
+
+| Call | v0.33 | v0.34 |
+| --- | --- | --- |
+| `JuMPOptimiser`, `ProgrammeAllocationSet` or `FactorRiskContribution` with a vector field that mixes the members of its element type, such as `tn = [Turnover(…), TurnoverEstimator(…)]`; and `GridSearchCrossValidation`, `RandomisedSearchCrossValidation` or `WeightMassScorer` with a vector of grids whose types differ | `TypeError` or `MethodError`, unless the caller narrowed the literal with `concrete_typed_array` | The keyword constructor narrows the literal. A wrong element raises an `ArgumentError` that names the field. |
+
 ### [If you extend the library](@id migration-0-34-extending)
 
 - **`GridSearchCrossValidation` and `RandomisedSearchCrossValidation`** have a field `n_best` after `scorer`, the count of the best candidates that the search keeps. Their positional constructors take one more argument. The keyword constructors keep every v0.33 keyword, and `n_best = 1` gives the v0.33 search.

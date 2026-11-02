@@ -412,11 +412,22 @@ The decisions:
   parameter compiles nothing.
 - `ProcessedJuMPOptimiserAttributes`, the `pa` of a `JuMPOptimisationResult`, holds `sca` and
   `ret`, and `HierarchicalRiskParityResult` holds `sca`. A new risk measure did not change their
-  type, and this amendment did not measure them.
+  type, and this amendment did not measure them. Issue #1941 measures them.
 - The vectors of constraints that `factory` and `port_opt_view` narrow keep the narrowing, because
   dispatch needs it. A `Vector{TnE_Tn}` of two `Turnover` values has no method of
   `turnover_constraints` without sets, and the narrowed `Vector{Union{Turnover{…}, Turnover{…}}}`
-  takes the method for a `VecTn`.
+  takes the method for a `VecTn`. A user had to narrow such a literal by hand, because a mixed
+  literal such as `[Turnover(…), TurnoverEstimator(…)]` infers `Any`, and the bound of the field
+  refused it. The keyword constructors of `JuMPOptimiser` and `ProgrammeAllocationSet` (`lcse`,
+  `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `tn` and `ple`) and of
+  `FactorRiskContribution` (`frc_ple`) now narrow it through `narrow_mixed_vector`. The positional
+  constructors keep their bounds.
+- A vector of search grids whose types differ infers the element type `Vector`, and the bounds
+  of `GridSearchCrossValidation`, `RandomisedSearchCrossValidation` and `WeightMassScorer`
+  refused it. The search runs one time, so the narrow type pays nothing at run time, but
+  `lens_val_grid` dispatches on it. The outer constructors now narrow such a literal through
+  `narrow_mixed_vector`, and `make_p_grid` keeps its own narrowing of the trials for the same
+  dispatch.
 
 The rule becomes: a holder that many verbs read, or a meta-estimator over a vector of estimators,
 does not carry the type of an estimator in a type parameter, unless a measured verb pays for it.

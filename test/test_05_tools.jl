@@ -614,6 +614,35 @@ end
     @test PO.concrete_typed_array_if_abstract(mixed) === mixed
     nested = Vector[[1], [2.0]]
     @test PO.concrete_typed_array_if_abstract(nested) === nested
+    # --- narrow_mixed_vector: a keyword constructor accepts a mixed literal (#1939) ---
+    @test PO.narrow_mixed_vector(already, Real, :x) === already
+    @test eltype(PO.narrow_mixed_vector(Any[1, 2.0], Real, :x)) == Union{Float64, Int64}
+    @test PO.narrow_mixed_vector(1.0, Real, :x) === 1.0
+    # A matrix and an estimator infer `Any`, which the bound refuses and the function narrows.
+    mats = [[1.0 0.0; 0.0 1.0], AssetSetsMatrixEstimator(; val = "a")]
+    @test !(mats isa PO.VecMatNum_ASetMatE)
+    @test PO.narrow_mixed_vector(mats, PO.MatNum_ASetMatE, :smtx) isa PO.VecMatNum_ASetMatE
+    # A threshold vector may hold `nothing`, so its element type is an `Option`.
+    w = fill(0.25, 4)
+    thr = [Threshold(; val = 0.1), nothing, ThresholdEstimator(; val = Dict("A" => 0.1))]
+    nthr = PO.narrow_mixed_vector(thr, PO.Option{<:PO.BtE_Bt}, :slt)
+    @test nthr isa PO.VecOptBtE_Bt
+    @test isequal(nthr, thr)
+    @test_throws ArgumentError PO.narrow_mixed_vector(Any[1, "a"], Real, :x)
+    msg = try
+        PO.narrow_mixed_vector(Any[1, "a"], Real, :tn)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("tn", msg) && occursin("String", msg)
+    # The keyword constructors take a mixed literal, which the positional bound refuses.
+    slv = Solver(; solver = nothing)
+    tnl = [Turnover(; w = w, val = 0.1), TurnoverEstimator(; w = w, val = Dict("A" => 0.1))]
+    sets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C", "D"]))
+    jo = JuMPOptimiser(; slv = slv, tn = tnl, sets = sets)
+    @test jo.tn isa PO.VecTnE_Tn
+    @test ProgrammeAllocationSet(; slv = slv, tn = tnl, sets = sets).tn isa PO.VecTnE_Tn
+    @test_throws ArgumentError JuMPOptimiser(; slv = slv, tn = Any[tnl[1], 1.0])
     # --- float_if_integer: an integer type takes its float type, every other type is kept ---
     @test PO.float_if_integer(Int) === Float64
     @test PO.float_if_integer(Int32) === Float64

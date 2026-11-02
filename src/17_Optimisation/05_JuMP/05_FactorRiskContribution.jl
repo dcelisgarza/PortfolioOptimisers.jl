@@ -188,14 +188,14 @@ $(DocStringExtensions.FIELDS)
         re::TD{<:RegE_Reg} = StepwiseRegression(),
         r::TD{<:RM_VecRM} = Variance(),
         obj::TD{<:ObjectiveFunction} = MinimumRisk(),
-        frc_ple::TD_Option{<:PlCE_PlC_VecPlCE_PlC} = nothing,
+        frc_ple::TD_Option{<:Union{PlCE_PlC, AbstractVector}} = nothing,
         sets::TD_Option{<:UniverseSets} = nothing,
         wi::TD_Option{<:VecNum} = nothing,
         flag::Bool = false,
         fb::TDO_Option{<:OptE_Opt} = nothing
     ) -> FactorRiskContribution
 
-Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) can hold a [`TimeDependent`](@ref) schedule in place of a static value. These fields define the problem: the factor model, the risk measure, the objective, the factor phylogeny constraints, the asset sets, the warm start and the fallback. A cross-validation fold loop resolves each schedule for its fold, and an `optimise` outside a fold uses the static default of each field. `flag` controls the execution and is always static.
+Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) can hold a [`TimeDependent`](@ref) schedule in place of a static value. These fields define the problem: the factor model, the risk measure, the objective, the factor phylogeny constraints, the asset sets, the warm start and the fallback. A cross-validation fold loop resolves each schedule for its fold, and an `optimise` outside a fold uses the static default of each field. `flag` controls the execution and is always static. `frc_ple` takes a vector that mixes estimators and Results, through [`narrow_mixed_vector`](@ref).
 
 ## Validation
 
@@ -317,11 +317,13 @@ function FactorRiskContribution(; opt::JuMPOptimiser,
                                 re::TD{<:RegE_Reg} = StepwiseRegression(),
                                 r::TD{<:RM_VecRM} = Variance(),
                                 obj::TD{<:ObjectiveFunction} = MinimumRisk(),
-                                frc_ple::TD_Option{<:PlCE_PlC_VecPlCE_PlC} = nothing,
+                                frc_ple::TD_Option{<:Union{PlCE_PlC, AbstractVector}} = nothing,
                                 sets::TD_Option{<:UniverseSets} = nothing,
                                 wi::TD_Option{<:VecNum} = nothing, flag::Bool = false,
                                 fb::TDO_Option{<:OptE_Opt} = nothing)::FactorRiskContribution
-    return FactorRiskContribution(opt, re, r, obj, frc_ple, sets, wi, flag, fb)
+    return FactorRiskContribution(opt, re, r, obj,
+                                  narrow_mixed_vector(frc_ple, PlCE_PlC, :frc_ple), sets,
+                                  wi, flag, fb)
 end
 function time_dependent_field_defaults(::FactorRiskContribution)::NamedTuple
     return factor_risk_contribution_td_defaults()

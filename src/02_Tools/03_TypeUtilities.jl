@@ -152,6 +152,62 @@ function concrete_typed_array_if_abstract(A::AbstractArray)
     return isabstracttype(eltype(A)) ? concrete_typed_array(A) : A
 end
 """
+    narrow_mixed_vector(x, ::Type{T}, name::Symbol)
+
+Narrow a vector whose elements are each a `T`, but whose element type is not a subtype of `T`, so that a keyword constructor accepts a literal that mixes the members of `T`.
+
+A literal such as `[Turnover(…), TurnoverEstimator(…)]` infers the element type `Any`, because the two types share no supertype below it. A bound such as `AbstractVector{<:TnE_Tn}` refuses that vector, but it accepts each element. The keyword constructor of an estimator calls this function on such a field, so the caller writes the literal with no [`concrete_typed_array`](@ref). The function narrows the element type and does not erase it, because the methods that read such a field dispatch on its element type. [`concrete_typed_array_if_abstract`](@ref) checks no element, so a wrong element reaches the positional constructor, which raises a `MethodError` that names no field.
+
+# Algorithm
+
+ 1. `x` is not a vector: return `x`.
+ 2. `eltype(x)` is a subtype of `T`: return `x`.
+ 3. Check that every element of `x` is a `T`.
+ 4. Return [`concrete_typed_array`](@ref) of `x`.
+
+# Arguments
+
+  - `x`: The value of the field.
+  - `T`: The element type that the bound of the field accepts.
+  - `name`: The name of the field, for the error message.
+
+# Validation
+
+  - Every element of a vector `x` that step 2 does not return is a `T`. The function throws an `ArgumentError` that names the field otherwise.
+
+# Returns
+
+  - `x`, or a copy of `x` whose element type is the union of the types of its elements.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.narrow_mixed_vector(Any[1, 2.0], Real, :x)
+2-element Vector{Union{Float64, Int64}}:
+ 1
+ 2.0
+
+julia> PortfolioOptimisers.narrow_mixed_vector(1.0, Real, :x)
+1.0
+```
+
+# Related
+
+  - [`concrete_typed_array`](@ref)
+  - [`concrete_typed_array_if_abstract`](@ref)
+"""
+function narrow_mixed_vector(x::AbstractVector, ::Type{T}, name::Symbol) where {T}
+    if eltype(x) <: T
+        return x
+    end
+    @argcheck(all(xi -> isa(xi, T), x),
+              ArgumentError("every element of $name must be a $T, and an element of type $(typeof(x[findfirst(xi -> !isa(xi, T), x)])) is not"))
+    return concrete_typed_array(x)
+end
+function narrow_mixed_vector(x, ::Type, ::Symbol)
+    return x
+end
+"""
     float_if_integer(::Type{T}) -> Type
 
 Numeric type that holds the values of a computation over data of element type `T`. It is the floating-point type that Base `float` gives for `T` when `T` is an `Integer`, and `T` for every other type.

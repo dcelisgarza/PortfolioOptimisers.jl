@@ -5,7 +5,7 @@
 julia = "1.13.3"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "e641c54bba"
+commit = "2b7a0e8c15"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { cyc = 5, cog = 7, arg = 8, cyc_sum = 53, cog_sum = 57, arg_sum = 99, macros = [] }
@@ -54,7 +54,7 @@ commit = "e641c54bba"
 "src/01_Base/17_ReturnsSource.jl" = { cyc = 3, cog = 2, arg = 3, cyc_sum = 27, cog_sum = 13, arg_sum = 29, macros = [] }
 "src/02_Tools/01_Operators.jl" = { cyc = 2, cog = 1, arg = 3, cyc_sum = 24, cog_sum = 2, arg_sum = 45, macros = [] }
 "src/02_Tools/02_ArrayViews.jl" = { cyc = 2, cog = 1, arg = 4, cyc_sum = 29, cog_sum = 5, arg_sum = 71, macros = [] }
-"src/02_Tools/03_TypeUtilities.jl" = { cyc = 4, cog = 6, arg = 2, cyc_sum = 9, cog_sum = 8, arg_sum = 6, macros = [] }
+"src/02_Tools/03_TypeUtilities.jl" = { cyc = 4, cog = 6, arg = 3, cyc_sum = 12, cog_sum = 9, arg_sum = 12, macros = [] }
 "src/02_Tools/04_Factory.jl" = { cyc = 1, cog = 1, arg = 4, cyc_sum = 8, cog_sum = 2, arg_sum = 25, macros = [] }
 "src/02_Tools/05_Propagatable.jl" = { cyc = 10, cog = 19, arg = 6, cyc_sum = 82, cog_sum = 87, arg_sum = 44, macros = [] }
 "src/02_Tools/06_ForwardProperties.jl" = { cyc = 51, cog = 103, arg = 4, cyc_sum = 71, cog_sum = 131, arg_sum = 14, macros = [] }

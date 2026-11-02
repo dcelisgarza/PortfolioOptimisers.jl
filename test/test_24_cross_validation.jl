@@ -1235,8 +1235,8 @@
         # A search scores each candidate through the fold loop, so it refuses what
         # cross_val_predict refuses, for every scheme and for the randomised form.
         pinned = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pr))
-        p = concrete_typed_array([["opt.wb" => [WeightBounds(; lb = 0.0, ub = 1.0),
-                                                WeightBounds(; lb = 0.0, ub = 0.5)]]])
+        p = [["opt.wb" =>
+                  [WeightBounds(; lb = 0.0, ub = 1.0), WeightBounds(; lb = 0.0, ub = 0.5)]]]
         for cv in (KFold(), CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2))
             @test refused(() -> search_cross_validation(pinned,
                                                         GridSearchCrossValidation(p;
@@ -1250,12 +1250,11 @@
                                                     rd), "opt.opt.pe")
         # A lens that writes a precomputed prior is refused, and one that replaces it in every
         # candidate is not.
-        writes = concrete_typed_array([["opt.pe" => [EmpiricalPrior(), pr]]])
+        writes = [["opt.pe" => [EmpiricalPrior(), pr]]]
         @test refused(() -> search_cross_validation(HierarchicalRiskParity(),
                                                     GridSearchCrossValidation(writes), rd),
                       "opt.opt.pe")
-        replaces = concrete_typed_array([["opt.pe" => [EmpiricalPrior(),
-                                                       EmpiricalPrior(; horizon = 2)]]])
+        replaces = [["opt.pe" => [EmpiricalPrior(), EmpiricalPrior(; horizon = 2)]]]
         res = search_cross_validation(pinned, GridSearchCrossValidation(replaces), rd)
         @test isa(res.opt.opt.pe, EmpiricalPrior)
         # A schedule is refused when an entry or its default is a precomputed prior, and a
@@ -1559,20 +1558,19 @@
         mr = Stacking(; opti = [MeanRisk(; opt = optl2), RiskBudgeting(; opt = opt)],
                       opto = MeanRisk(; opt = opt))
         r = MeanReturnRiskRatio(; rk = LowOrderMoment(; alg = SecondMoment()))
-        p = concrete_typed_array([["opti[2].opt.l1" =>
-                                       range(; start = 0.0005, stop = 0.0008, length = 3),
-                                   "opti[1].opt.l2.val" =>
-                                       range(; start = 0.0004, stop = 0.0007, length = 3)],
-                                  ["opti[1].opt.l2.val" =>
-                                       range(; start = 0.0004, stop = 0.0007, length = 3)],
-                                  [PropertyLens(:l1) ∘ PropertyLens(:opt) ∘ IndexLens(2) ∘
-                                   PropertyLens(:opti) =>
-                                       range(; start = 0.0009, stop = 0.0012, length = 3)],
-                                  [:(opti[2]) =>
-                                       [MeanRisk(; opt = opt, obj = MaximumUtility()),
-                                        MeanRisk(; opt = opt, obj = MaximumRatio())]]])
+        # #1939: a vector of grids of different types infers the element type `Vector`, and
+        # the constructors narrow it, so the literal needs no `concrete_typed_array`.
+        p = [["opti[2].opt.l1" => range(; start = 0.0005, stop = 0.0008, length = 3),
+              "opti[1].opt.l2.val" => range(; start = 0.0004, stop = 0.0007, length = 3)],
+             ["opti[1].opt.l2.val" => range(; start = 0.0004, stop = 0.0007, length = 3)],
+             [PropertyLens(:l1) ∘ PropertyLens(:opt) ∘ IndexLens(2) ∘ PropertyLens(:opti) =>
+                  range(; start = 0.0009, stop = 0.0012, length = 3)],
+             [:(opti[2]) => [MeanRisk(; opt = opt, obj = MaximumUtility()),
+                             MeanRisk(; opt = opt, obj = MaximumRatio())]]]
+        @test !(p isa AbstractVector{<:AbstractVector{<:Pair}})
 
         gs_cv = GridSearchCrossValidation(p; r = r)
+        @test gs_cv.p == p
         gs_res1 = search_cross_validation(mr, gs_cv, rd)
         # The four sets hold 9 + 3 + 3 + 2 = 17 points. A trial count of 17 draws every
         # point, so the randomised search scores the grid and finds the same winner.
@@ -1580,22 +1578,15 @@
         rs_res1 = search_cross_validation(mr, rs_cv1, rd)
         @test gs_res1.val_grid[gs_res1.idx] == rs_res1.val_grid[rs_res1.idx]
         @test gs_res1.lens_grid[gs_res1.idx] == rs_res1.lens_grid[rs_res1.idx]
-        p = concrete_typed_array([Dict("opti[2].opt.l1" =>
-                                           range(; start = 0.0005, stop = 0.0008,
-                                                 length = 3),
-                                       "opti[1].opt.l2.val" =>
-                                           range(; start = 0.0004, stop = 0.0007,
-                                                 length = 3)),
-                                  Dict("opti[1].opt.l2.val" =>
-                                           range(; start = 0.0004, stop = 0.0007,
-                                                 length = 3)),
-                                  Dict(PropertyLens(:l1) ∘ PropertyLens(:opt) ∘
-                                       IndexLens(2) ∘ PropertyLens(:opti) =>
-                                           range(; start = 0.0009, stop = 0.0012,
-                                                 length = 3)),
-                                  Dict(:(opti[2]) =>
-                                           [MeanRisk(; opt = opt, obj = MaximumUtility()),
-                                            MeanRisk(; opt = opt, obj = MaximumRatio())])])
+        p = [Dict("opti[2].opt.l1" => range(; start = 0.0005, stop = 0.0008, length = 3),
+                  "opti[1].opt.l2.val" =>
+                      range(; start = 0.0004, stop = 0.0007, length = 3)),
+             Dict("opti[1].opt.l2.val" =>
+                      range(; start = 0.0004, stop = 0.0007, length = 3)),
+             Dict(PropertyLens(:l1) ∘ PropertyLens(:opt) ∘ IndexLens(2) ∘
+                  PropertyLens(:opti) => range(; start = 0.0009, stop = 0.0012, length = 3)),
+             Dict(:(opti[2]) => [MeanRisk(; opt = opt, obj = MaximumUtility()),
+                                 MeanRisk(; opt = opt, obj = MaximumRatio())])]
         rs_cv2 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r, n_iter = 17)
         rs_res2 = search_cross_validation(mr, rs_cv2, rd)
         rev = rs_res2.val_grid[rs_res2.idx] != rs_res1.val_grid[rs_res1.idx]
@@ -1607,11 +1598,9 @@
             @test rs_res2.lens_grid[rs_res2.idx] == rs_res1.lens_grid[rs_res1.idx]
         end
 
-        p = concrete_typed_array(["opti[2]" =>
-                                      [MeanRisk(; opt = opt, obj = MaximumUtility()),
-                                       MeanRisk(; opt = opt, obj = MaximumRatio())],
-                                  "opti[2].opt.l1" =>
-                                      range(; start = 0.0005, stop = 0.002, length = 3)])
+        p = ["opti[2]" => [MeanRisk(; opt = opt, obj = MaximumUtility()),
+                           MeanRisk(; opt = opt, obj = MaximumRatio())],
+             "opti[2].opt.l1" => range(; start = 0.0005, stop = 0.002, length = 3)]
         gs_cv = GridSearchCrossValidation(p; r = r)
         gs_res = search_cross_validation(mr, gs_cv, rd)
 

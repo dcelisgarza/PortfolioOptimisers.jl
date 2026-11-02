@@ -472,10 +472,9 @@ The fixture is the online fold loop's, because the identities are structural.
         @test_throws DomainError po.make_p_grid(["opt.a" => 1:1000, "opt.b" => 1:1000],
                                                 100_001, StableRNG(1))
         # The search scores the trials as the grid search scores its grid.
-        cgrid = concrete_typed_array(["opt.wb" => wbgrid[1][2],
-                                      "opt.pe.ce.ce.ce.ce" =>
-                                          [SimpleCovariance(; corrected = true),
-                                           SimpleCovariance(; corrected = false)]])
+        cgrid = ["opt.wb" => wbgrid[1][2],
+                 "opt.pe.ce.ce.ce.ce" => [SimpleCovariance(; corrected = true),
+                                          SimpleCovariance(; corrected = false)]]
         kcv = KFold(; n = 4)
         gres = search_cross_validation(hrp, gs(kcv, cgrid; ex = SequentialEx()), rd)
         rs6 = RandomisedSearchCrossValidation(cgrid; cv = kcv, r = r, ex = SequentialEx(),
@@ -501,10 +500,9 @@ The fixture is the online fold loop's, because the identities are structural.
         @eval (::OnlyIndexScore)(X::AbstractMatrix) = argmax(vec(minimum(X; dims = 1)))
         hms = HighestMeanScore()
         kcv = KFold(; n = 4)
-        cgrid = concrete_typed_array(["opt.wb" => wbgrid[1][2],
-                                      "opt.pe.ce.ce.ce.ce" =>
-                                          [SimpleCovariance(; corrected = true),
-                                           SimpleCovariance(; corrected = false)]])
+        cgrid = ["opt.wb" => wbgrid[1][2],
+                 "opt.pe.ce.ce.ce.ce" => [SimpleCovariance(; corrected = true),
+                                          SimpleCovariance(; corrected = false)]]
         means(res) = vec(mean(res.test_scores; dims = 1))
 
         # n_best = 1 is the released Result: the index of the index form, and one kept

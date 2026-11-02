@@ -673,14 +673,14 @@ $(DocStringExtensions.FIELDS)
 
     WeightMassScorer(;
         opt::Union{OptE_TD, Pipeline},
-        p::Option{<:MultiGSCVValType_VecMultiGSCVValType} = nothing,
+        p::Option{<:Union{MultiGSCVValType, AbstractVector}} = nothing,
         cv::CVE_Onl = KFold(),
         tol::Option{<:Real} = nothing,
         min_folds::Integer = 1,
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
     ) -> WeightMassScorer
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. `p` takes a vector of parameter sets whose types differ, through [`narrow_mixed_vector`](@ref), as [`GridSearchCrossValidation`](@ref) does.
 
 ## Validation
 
@@ -755,11 +755,13 @@ julia> round.(PortfolioOptimisers.asset_scores(s, rd); digits = 4)
     end
 end
 function WeightMassScorer(; opt::Union{OptE_TD, Pipeline},
-                          p::Option{<:MultiGSCVValType_VecMultiGSCVValType} = nothing,
+                          p::Option{<:Union{MultiGSCVValType, AbstractVector}} = nothing,
                           cv::CVE_Onl = KFold(), tol::Option{<:Real} = nothing,
                           min_folds::Integer = 1,
                           ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())::WeightMassScorer
-    return WeightMassScorer(opt, p, cv, tol, min_folds, ex)
+    return WeightMassScorer(opt,
+                            narrow_mixed_vector(p, Union{PairGSCV, MultiGSCVValType}, :p),
+                            cv, tol, min_folds, ex)
 end
 """
     weight_mass_grid(opt, p) -> Tuple

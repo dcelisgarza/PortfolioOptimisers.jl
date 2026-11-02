@@ -99,25 +99,20 @@ randomised search, as section 2.2 explains.
 You can give a vector of grids. The search expands each grid on its own and joins the results
 into one list of candidates.
 
-A literal vector of grids whose values have different types has an abstract element type, and
-the constructor throws a `MethodError` for it. [`concrete_typed_array`](@ref) narrows the
-element type to the union of the types of the grids, which the constructor accepts. A vector
-of dictionaries needs the same call.
+A literal vector of grids whose values have different types has the element type `Vector`. The
+constructor accepts it, checks that each element is a grid, and narrows the element type to
+the union of the types of the grids. A vector of dictionaries works in the same way.
 
 We search four grids. `n_best = 3` keeps the three best candidates over all of them, in rank
 order. The default `n_best = 1` keeps the best one alone.
 =#
 
-p = concrete_typed_array([["opti[2].opt.l1" =>
-                               range(; start = 0.0005, stop = 0.0008, length = 3),
-                           "opti[1].opt.l2.val" =>
-                               range(; start = 0.0004, stop = 0.0007, length = 3)],
-                          ["opti[1].opt.l2.val" =>
-                               range(; start = 0.0004, stop = 0.0007, length = 3)],
-                          ["opti[2].opt.l1" =>
-                               range(; start = 0.0009, stop = 0.0012, length = 3)],
-                          ["opti[2]" => [MeanRisk(; opt = opt, obj = MaximumUtility()),
-                                         MeanRisk(; opt = opt, obj = MaximumRatio())]]])
+p = [["opti[2].opt.l1" => range(; start = 0.0005, stop = 0.0008, length = 3),
+      "opti[1].opt.l2.val" => range(; start = 0.0004, stop = 0.0007, length = 3)],
+     ["opti[1].opt.l2.val" => range(; start = 0.0004, stop = 0.0007, length = 3)],
+     ["opti[2].opt.l1" => range(; start = 0.0009, stop = 0.0012, length = 3)],
+     ["opti[2]" => [MeanRisk(; opt = opt, obj = MaximumUtility()),
+                    MeanRisk(; opt = opt, obj = MaximumRatio())]]]
 gs_cv = GridSearchCrossValidation(p; r = r, n_best = 3)
 #=
 We run the search. The four grids give `3 × 3 + 3 + 3 + 2 = 17` candidates. The result has
@@ -229,11 +224,8 @@ plot_composition(res_rs1, rd)
 #=
 #### 2.2.2 Sampling from a distribution
 
-We now mix vectors and distributions, with `n_iter = 10`. This grid needs no
-[`concrete_typed_array`](@ref). A distribution among the values makes the literal a vector of
-vectors of `Pair{String, Any}`, which the constructor of [`RandomisedSearchCrossValidation`](@ref)
-accepts. The constructor checks that every value is a vector or a distribution. A grid of vectors
-alone still needs `concrete_typed_array`.
+We now mix vectors and distributions, with `n_iter = 10`. The constructor of
+[`RandomisedSearchCrossValidation`](@ref) checks that every value is a vector or a distribution.
 =#
 p = [["opti[2].opt.l1" => range(; start = 0.0005, stop = 0.0008, length = 3),
       "opti[1].opt.l2.val" => LogUniform(0.0003, 0.1)],
