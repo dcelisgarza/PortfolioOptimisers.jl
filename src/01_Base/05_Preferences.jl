@@ -355,10 +355,13 @@ Load hook of the package. It reads the preferences of [`PREFERENCE_KEYS`](@ref) 
 
 A preference is the one way to change a guard with no code. A `LocalPreferences.toml` is data, it comes with a cloned project or a template, and this hook reads it before any user code runs. The package thus applies a valid value, and it warns about a value that widens a guard, through [`relaxed_preferences_msg`](@ref).
 
+The hook also registers [`plots_extension_hint`](@ref) for `MethodError`. A call to a plot function before its package extension loads then names the two packages that load the extension.
+
 # Algorithm
 
- 1. Read every key of [`PREFERENCE_KEYS`](@ref) with `Preferences.load_preference`. The value is `nothing` for a key that the active project did not set.
- 2. Pass the dictionary to [`apply_preferences!`](@ref), which checks each value and applies it.
+ 1. Register [`plots_extension_hint`](@ref) with `Base.Experimental.register_error_hint`.
+ 2. Read every key of [`PREFERENCE_KEYS`](@ref) with `Preferences.load_preference`. The value is `nothing` for a key that the active project did not set.
+ 3. Pass the dictionary to [`apply_preferences!`](@ref), which checks each value and applies it.
 
 # Returns
 
@@ -368,9 +371,11 @@ A preference is the one way to change a guard with no code. A `LocalPreferences.
 
   - [`apply_preferences!`](@ref)
   - [`PREFERENCE_KEYS`](@ref)
+  - [`plots_extension_hint`](@ref)
   - [`relaxed_preferences_msg`](@ref)
 """
 function __init__()
+    Base.Experimental.register_error_hint(plots_extension_hint, MethodError)
     return apply_preferences!(Dict{String, Any}(key =>
                                                     Preferences.load_preference(@__MODULE__,
                                                                                 key,

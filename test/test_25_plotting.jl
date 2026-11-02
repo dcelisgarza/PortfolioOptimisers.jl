@@ -57,6 +57,32 @@
         @test_throws DomainError plot_rolling_drawdowns(w, X; rolling = -1)
     end
 
+    @testset "A plot function with no extension names its trigger packages (#1952)" begin
+        PO_h = PortfolioOptimisers
+        hint(exc, args...) = sprint(io -> PO_h.plots_extension_hint(io, exc, args...))
+        msg = hint(MethodError(plot_composition, (1,)), false)
+        @test occursin("`PortfolioOptimisersPlotsExt` implements `plot_composition`", msg)
+        @test occursin("using GraphRecipes, StatsPlots", msg)
+        # With the extension loaded, a `MethodError` comes from a wrong argument. The handler
+        # that the error display calls reads the loaded extension.
+        @test isempty(hint(MethodError(plot_composition, (1,)), Any[Int], ()))
+        # A function with a method of the package itself is no plot function.
+        @test isempty(hint(MethodError(PO_h.finite_columns, (1,)), false))
+        # A function of another module gets no hint.
+        @test isempty(hint(MethodError(sum, (1, 2, 3)), false))
+        # The rule of the hint: each function of the package with no method of the package
+        # itself takes its methods from the extension.
+        ext = Base.get_extension(PO_h, :PortfolioOptimisersPlotsExt)
+        verbs = [f
+                 for f in (getfield(PO_h, n)
+                           for n in names(PO_h; all = true) if isdefined(PO_h, n))
+                 if f isa Function &&
+                        parentmodule(f) === PO_h &&
+                        !any(m -> m.module === PO_h, methods(f))]
+        @test default_report_figures in verbs
+        @test all(f -> any(m -> m.module === ext, methods(f)), verbs)
+    end
+
     @testset "plot_portfolio_cumulative_returns" begin
         @test is_plot(plot_portfolio_cumulative_returns(w, X))
         @test is_plot(plot_portfolio_cumulative_returns(w, X; ts = 1:T))
