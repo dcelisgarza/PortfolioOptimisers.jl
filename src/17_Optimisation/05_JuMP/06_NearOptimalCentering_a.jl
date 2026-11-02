@@ -97,7 +97,7 @@ A property that is a field of this type reads the field. Every other property, t
     """
     $(field_dict[:r_res])
     """
-    r
+    r::BaseRM_VecBaseRM
     """
     $(field_dict[:w_min_retcode])
     """
@@ -124,7 +124,7 @@ A property that is a field of this type reads the field. Every other property, t
                                         w_max_retcode::OptimisationReturnCode,
                                         noc_retcode::OptRetCode_VecOptRetCode,
                                         fb::Option{<:OptE_Opt_FbChain})
-        return new{typeof(jr), typeof(r), typeof(w_min_retcode), typeof(w_opt_retcode),
+        return new{typeof(jr), typeof(w_min_retcode), typeof(w_opt_retcode),
                    typeof(w_max_retcode), typeof(noc_retcode), typeof(fb)}(jr, r,
                                                                            w_min_retcode,
                                                                            w_opt_retcode,

@@ -66,7 +66,7 @@ Copy of `A` whose element type is the union of the types of its elements.
 
 An array with an abstract element type, such as `Any`, costs a dynamic dispatch at each use of an element. The compiler can split a small union, so the copy can make later code faster.
 
-The narrow type also costs compile time, because each new element type compiles again every method that takes the array or its holder. So narrow a vector whose holder the library compiles on already, such as a field of an estimator or a one-shot configuration. Do not narrow a vector of a Result that many verbs read, such as the folds of a [`MultiPeriodPredictionResult`](@ref).
+The narrow type also costs compile time, because each new element type compiles again every method that takes the array or its holder. The split saves little where the code does much work for each element, such as a solve. So narrow a vector only where dispatch needs the narrow type, such as the turnover constraints of an estimator. Do not narrow a vector of a Result that many verbs read, such as the folds of a [`MultiPeriodPredictionResult`](@ref), or a vector of estimators, such as the `opti` of a [`Stacking`](@ref), which stores a `Vector{OptE_Opt_TD}`.
 
 # Algorithm
 

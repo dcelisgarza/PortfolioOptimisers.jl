@@ -181,15 +181,16 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Narrow the element type of a vector of inner optimisers, so that the [`Stacking`](@ref) constructor accepts it.
+Erase the element type of a vector of inner optimisers to [`OptE_Opt_TD`](@ref), so that the type of a [`Stacking`](@ref) does not change with the types of its inner optimisers.
 
-A literal such as `[MeanRisk(), TimeDependent(…)]` infers the element type `AbstractEstimator`. The [`VecOptE_Opt_TD`](@ref) bound refuses that type, but it accepts each element. The keyword constructor of [`Stacking`](@ref) calls this method on `opti`.
+A literal such as `[MeanRisk(), TimeDependent(…)]` infers the element type `AbstractEstimator`. The [`VecOptE_Opt_TD`](@ref) bound refuses that type, but it accepts each element. So the keyword constructor of [`Stacking`](@ref) calls this method on `opti`. The positional constructor calls it too, so a vector that a lens writes, or that a schedule resolves to, leaves with the same element type.
+
+The element type is erased and not narrowed. A narrow element type, the union of the types of the elements, puts the type of each inner optimiser into the type of the `Stacking`, and [`optimise`](@ref) then compiles again for each combination of inner optimisers. The loop over `opti` dispatches on each element at run time, and that dispatch costs nothing next to the inner solve.
 
 # Algorithm
 
- 1. When `opti` satisfies [`VecOptE_Opt_TD`](@ref), return it unchanged.
- 2. Check that every element of `opti` is an [`OptE_Opt_TD`](@ref).
- 3. Convert `opti` to a vector whose element type is the union of the types of its elements.
+ 1. Check that every element of `opti` is an [`OptE_Opt_TD`](@ref).
+ 2. Convert `opti` to a `Vector{OptE_Opt_TD}`. A vector of that type returns unchanged.
 
 The method for a [`TimeDependent`](@ref) returns the schedule unchanged.
 
@@ -203,22 +204,20 @@ The method for a [`TimeDependent`](@ref) returns the schedule unchanged.
 
 # Returns
 
-  - The vector with the narrowed element type, or `opti` itself.
+  - The `Vector{OptE_Opt_TD}` of the same elements, or the schedule itself.
 
 # Related
 
   - [`VecOptE_Opt_TD`](@ref)
   - [`Stacking`](@ref)
 """
-function narrow_optimiser_vector(opti::AbstractVector)
+function erase_optimiser_vector(opti::AbstractVector)
+    # ADR 0067, amendment of 2026-11-02, measures the narrow and the erased element type.
     @argcheck(all(x -> isa(x, OptE_Opt_TD), opti),
               ArgumentError("every element of opti must be an optimisation estimator, a precomputed optimisation result, or a TimeDependent schedule standing in for one"))
-    return convert(Vector{Union{unique(typeof.(opti))...}}, opti)
+    return convert(Vector{OptE_Opt_TD}, opti)
 end
-function narrow_optimiser_vector(opti::VecOptE_Opt_TD)
-    return opti
-end
-function narrow_optimiser_vector(opti::TimeDependent)
+function erase_optimiser_vector(opti::TimeDependent)
     return opti
 end
 """
@@ -301,7 +300,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - When `opti` is a vector: `!isempty(opti)`. The constructor throws an `IsEmptyError` otherwise.
-  - Every element of `opti` is an [`OptE_Opt_TD`](@ref). The keyword constructor throws an `ArgumentError` otherwise, through [`narrow_optimiser_vector`](@ref).
+  - Every element of `opti` is an [`OptE_Opt_TD`](@ref). The keyword constructor throws an `ArgumentError` otherwise, through [`erase_optimiser_vector`](@ref). Both constructors store a vector `opti` as a `Vector{OptE_Opt_TD}`, so two `Stacking` estimators that differ only in their inner optimisers have one type.
   - An element schedule of `opti` that binds `:nearest` has an explicit `default`, and `cv !== nothing`. The constructor throws a [`TimeDependentDefaultError`](@ref) or an `ArgumentError` otherwise, through [`assert_nearest_optimiser_schedule`](@ref).
   - When `opti` is a [`TimeDependent`](@ref): `opti.bind !== :nearest`. The constructor throws an `ArgumentError` otherwise.
   - When `scale` is a vector: `all(isfinite, scale)`, and `length(scale) == length(opti)` when `opti` is a vector. The constructor throws an `IsNonFiniteError` or a `DimensionMismatch` otherwise.
@@ -451,6 +450,7 @@ Keywords correspond to the struct's fields.
                                            (; pe, wb, fees, sets, scale, opti, opto, cv,
                                             scorer, wf, ex, fb, strict, pcol),
                                            stacking_td_defaults())
+        opti = erase_optimiser_vector(opti)
         est = new{typeof(pe), typeof(wb), typeof(fees), typeof(sets), typeof(scale),
                   typeof(opti), typeof(opto), typeof(cv), typeof(scorer), typeof(wf),
                   typeof(ex), typeof(fb), typeof(strict), typeof(pcol), typeof(cache)}(pe,
@@ -485,7 +485,7 @@ function Stacking(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
                   fb::TDO_Option{<:OptE_Opt} = nothing, strict::Bool = false,
                   pcol::AbstractPanelCollapseAlgorithm = RenormaliseActive(),
                   cache::Option{<:ReturnsBufferState} = nothing)::Stacking
-    return Stacking(pe, wb, fees, sets, scale, narrow_optimiser_vector(opti), opto, cv,
+    return Stacking(pe, wb, fees, sets, scale, erase_optimiser_vector(opti), opto, cv,
                     scorer, wf, ex, fb, strict, pcol, cache)
 end
 """

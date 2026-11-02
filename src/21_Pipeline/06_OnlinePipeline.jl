@@ -667,19 +667,18 @@ function pipeline_held_timestamps(p::Pipeline, ::Nothing)
     return isnothing(online_entry_state(owner)) ? nothing : held_timestamps(owner)
 end
 """
-    PipelineResume = Resume{<:MultiPeriodPredictionResult{<:Any, <:Any, <:Any, <:Pipeline}}
+    PipelineResume = Resume{<:Any, <:Pipeline}
 
 Alias for a [`Resume`](@ref) whose Result carries a [`Pipeline`](@ref).
 
-The `cross_val_predict` methods of the pipeline dispatch on it, so a resumed pipeline takes the pipeline's own entry checks and fold loop, and not those of an optimiser.
+The `cross_val_predict` methods of the pipeline dispatch on it, so a resumed pipeline takes the pipeline's own entry checks and fold loop, and not those of an optimiser. The second type parameter of `Resume` is the type of the estimator that the Result carries.
 
 # Related
 
   - [`Resume`](@ref)
   - [`cross_val_predict(r::PipelineResume, data::Prices_RR, cv::CVER)`](@ref)
 """
-const PipelineResume = Resume{<:MultiPeriodPredictionResult{<:Any, <:Any, <:Any,
-                                                            <:Pipeline}}
+const PipelineResume = Resume{<:Any, <:Pipeline}
 """
     cross_val_predict(r::PipelineResume, data::Prices_RR, cv::CVER; ex = FLoops.ThreadedEx(), id = nothing)
 
@@ -704,7 +703,7 @@ function cross_val_predict(r::PipelineResume, data::Prices_RR, cv::CVER;
     return pipeline_cross_val_predict(r, data, cv; ex = ex, id = id)
 end
 function assert_pipeline_entry(r::PipelineResume, cv)
-    assert_no_holdout(r.res.opt)
+    assert_no_holdout(r.opt)
     assert_resume_scheme(cv)
     return nothing
 end

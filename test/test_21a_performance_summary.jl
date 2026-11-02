@@ -175,7 +175,7 @@ misses, and `brinson_attribution` had no test in the whole suite. Every check be
 with real numbers in the REPL first, and each quoted number is the one the REPL returned.
 =#
 
-using Dates
+using Dates, Clarabel
 
 const PO = PortfolioOptimisers
 
@@ -614,4 +614,28 @@ end
     for f in fieldnames(typeof(ps))
         @test isequal(getfield(psn, f), getfield(ps, f))
     end
+end
+
+@testset "#1939: a Result does not carry the type of its risk measure" begin
+    # ADR 0067, amendment of 2026-11-02. An optimisation Result held the type of its
+    # resolved risk measure in a type parameter, so each new risk measure gave a new
+    # Result type, a new fold type, and a new compilation of every verb on them. The field
+    # `r` keeps its bound and leaves the type parameters.
+    rd = ReturnsResult(; nx = ["A", "B", "C", "D"], X = ER_X)
+    slv = Solver(; solver = Clarabel.Optimizer, settings = ["verbose" => false])
+    opt = JuMPOptimiser(; slv = slv)
+    rv = optimise(MeanRisk(; r = Variance(), opt = opt), rd)
+    rc = optimise(MeanRisk(; r = ConditionalValueatRisk(), opt = opt), rd)
+    @test typeof(rv) === typeof(rc)
+    @test rc.r isa ConditionalValueatRisk
+    hv = optimise(HierarchicalRiskParity(; r = Variance()), rd)
+    hc = optimise(HierarchicalRiskParity(; r = ConditionalValueatRisk()), rd)
+    @test typeof(hv) === typeof(hc)
+    @test hc.r isa ConditionalValueatRisk
+    # The folds of two risk measures have one type, so a fold reader compiles one time.
+    cv = IndexWalkForward(20, 10)
+    pv = cross_val_predict(MeanRisk(; r = Variance(), opt = opt), rd, cv)
+    pc = cross_val_predict(MeanRisk(; r = ConditionalValueatRisk(), opt = opt), rd, cv)
+    @test typeof(pv.pred[1]) === typeof(pc.pred[1])
+    @test typeof(pv) === typeof(pc)
 end

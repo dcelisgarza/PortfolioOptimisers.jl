@@ -63,7 +63,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  # Optimiser fields.
                  :opt_jmp => "`opt`: `JuMP` optimiser configuration.",#
                  :r_opt => "`r`: Risk measure or vector of risk measures.",#
-                 :r_res => "`r`: The risk measure the optimisation ran under, or a vector of them, stored resolved. Every Deferred Quantity in it is fitted, and every unstated slot holds the prior's field. A resolved measure is fitted state, not configuration, so it belongs on the Result. Pass it back as `expected_risk(res.r, res.w, res.pr; sca = res.sca)`.",#
+                 :r_res => "`r`: The risk measure the optimisation ran under, or a vector of them, stored resolved. Every Deferred Quantity in it is fitted, and every unstated slot holds the prior's field. A resolved measure is fitted state, not configuration, so it belongs on the Result. Pass it back as `expected_risk(res.r, res.w, res.pr; sca = res.sca)`. The type of `r` is not a type parameter of the Result, so the Results of two risk measures have one type, and a verb that reads them compiles one time.",#
                  :obj => "`obj`: Portfolio objective function.",#
                  :wi => "`wi`: Initial portfolio weights for warm-starting the solver.",#
                  :sca => "`sca`: Scalariser for combining multiple risk measures.",#
@@ -217,7 +217,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :gamma_schur => "`gamma`: Schur complement parameter, in `[0, 1]`. At `0` the recursion augments no block, and with a [`Variance`](@ref) measure the allocation equals that of [`HierarchicalRiskParity`](@ref) under a [`Variance`](@ref) measure. A larger value subtracts more of the cross-cluster block from the covariance block of each half, which moves the allocation towards the minimum variance portfolio. Under [`MonotonicSchurComplement`](@ref) it is the upper end of the searched range, not the value that the allocation runs at.",#
                  :gamma_schur_res => "`gamma`: The Schur complement parameter that the allocation ran at. It holds one value for one bundle, and one value per bundle for a vector of bundles. Under [`MonotonicSchurComplement`](@ref) it is the value that the search chose, which is at most the `gamma` of the bundle.",#
                  :flag_schur => "`flag`: Whether to repair an augmented covariance block that is not positive definite. When `true`, `pdm` repairs the block, and a repair that throws raises an error. When `false`, the recursion abandons the allocation instead. The [`MonotonicSchurComplement`](@ref) search needs that, and a caller that keeps the weights gets an error that names the `gamma` that failed.",#
-                 :r_res_schur => "`r`: The measure that the optimisation ran under, resolved by [`factory`](@ref). It holds one measure for one bundle, and one measure per bundle for a vector of bundles.",#
+                 :r_res_schur => "`r`: The measure that the optimisation ran under, resolved by [`factory`](@ref). It holds one measure for one bundle, and one measure per bundle for a vector of bundles. The type of `r` is not a type parameter of the Result, so the Results of two measures have one type.",#
                  # Iterative solvers.
                  :tol => "`tol`: Convergence tolerance.",#
                  :lambda_sspo => "`lambda`: The weight of the ``L_1`` penalty of the short-term sparse portfolio.",#

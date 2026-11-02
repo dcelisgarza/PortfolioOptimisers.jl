@@ -1,5 +1,5 @@
 """
-    const Pipeline_OnlPipe = Union{Pipeline, Online{<:Pipeline}, Resume{<:MultiPeriodPredictionResult{<:Any, <:Any, <:Any, <:Pipeline}}}
+    const Pipeline_OnlPipe = Union{Pipeline, Online{<:Pipeline}, Resume{<:Any, <:Pipeline}}
 
 Alias for the three estimators that the `cross_val_predict` methods of a Pipeline give to the fold loop. The group exists because these methods share one body, [`pipeline_cross_val_predict`](@ref), and this alias is the type that the body dispatches on.
 
@@ -12,9 +12,7 @@ A plain pipeline takes the fold route. `Online(pipe)` declares a refit from a bu
   - [`Resume`](@ref)
   - [`PipelineBufferState`](@ref)
 """
-const Pipeline_OnlPipe = Union{Pipeline, Online{<:Pipeline},
-                               Resume{<:MultiPeriodPredictionResult{<:Any, <:Any, <:Any,
-                                                                    <:Pipeline}}}
+const Pipeline_OnlPipe = Union{Pipeline, Online{<:Pipeline}, Resume{<:Any, <:Pipeline}}
 #! Begin: TimeDependent schedules as pipeline optimisation steps.
 """
     pipeline_step_is_time_dependent(x)

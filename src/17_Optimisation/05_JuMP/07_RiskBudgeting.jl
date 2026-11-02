@@ -127,7 +127,7 @@ Keywords correspond to the struct's fields.
     """
     $(field_dict[:r_res])
     """
-    r
+    r::BaseRM_VecBaseRM
     """
     $(field_dict[:prb])
     """
@@ -139,7 +139,7 @@ Keywords correspond to the struct's fields.
     function RiskBudgetingResult(jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
                                  prb::ProcessedRiskBudgetingAttributes,
                                  fb::Option{<:OptE_Opt_FbChain})
-        return new{typeof(jr), typeof(r), typeof(prb), typeof(fb)}(jr, r, prb, fb)
+        return new{typeof(jr), typeof(prb), typeof(fb)}(jr, r, prb, fb)
     end
 end
 function RiskBudgetingResult(; jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,

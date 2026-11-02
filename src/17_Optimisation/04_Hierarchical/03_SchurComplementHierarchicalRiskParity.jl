@@ -80,7 +80,7 @@ Keywords correspond to the struct's fields.
     """
     $(field_dict[:r_res_schur])
     """
-    r
+    r::Union{Sd_Var, VecBaseRM}
     """
     $(field_dict[:gamma_schur_res])
     """
@@ -111,17 +111,10 @@ Keywords correspond to the struct's fields.
                                                          w::Option{<:VecNum},
                                                          imsk::Option{<:BitVector},
                                                          fb::Option{<:OptE_Opt_FbChain})
-        return new{typeof(pr), typeof(wb), typeof(clr), typeof(fees), typeof(r),
-                   typeof(gamma), typeof(retcode), typeof(w), typeof(imsk), typeof(fb)}(pr,
-                                                                                        wb,
-                                                                                        clr,
-                                                                                        fees,
-                                                                                        r,
-                                                                                        gamma,
-                                                                                        retcode,
-                                                                                        w,
-                                                                                        imsk,
-                                                                                        fb)
+        return new{typeof(pr), typeof(wb), typeof(clr), typeof(fees), typeof(gamma),
+                   typeof(retcode), typeof(w), typeof(imsk), typeof(fb)}(pr, wb, clr, fees,
+                                                                         r, gamma, retcode,
+                                                                         w, imsk, fb)
     end
 end
 function SchurComplementHierarchicalRiskParityResult(; pr::Option{<:AbstractPriorResult},

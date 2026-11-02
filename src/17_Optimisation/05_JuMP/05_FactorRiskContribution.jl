@@ -32,7 +32,7 @@ Keywords correspond to the struct's fields.
     """
     $(field_dict[:r_res])
     """
-    r
+    r::BaseRM_VecBaseRM
     """
     $(field_dict[:reg_rr])
     """
@@ -49,10 +49,8 @@ Keywords correspond to the struct's fields.
                                           rr::AbstractLoadingsRegressionResult,
                                           frc_plr::Option{<:PlC_VecPlC},
                                           fb::Option{<:OptE_Opt_FbChain})
-        return new{typeof(jr), typeof(r), typeof(rr), typeof(frc_plr), typeof(fb)}(jr, r,
-                                                                                   rr,
-                                                                                   frc_plr,
-                                                                                   fb)
+        return new{typeof(jr), typeof(rr), typeof(frc_plr), typeof(fb)}(jr, r, rr, frc_plr,
+                                                                        fb)
     end
 end
 function FactorRiskContributionResult(; jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,

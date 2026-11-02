@@ -336,7 +336,7 @@ end
       point. An inner frontier raises `ArgumentError`.
     - An asset outside the Investable Mask gets a zero weight, and the other weights are
       those of a run without the asset.
-    - The constructor, `narrow_optimiser_vector`, the check for `NestedClustered` and the
+    - The constructor, `erase_optimiser_vector`, the check for `NestedClustered` and the
       time-dependent methods behave as their docstrings state.
     =#
 
@@ -461,17 +461,28 @@ end
                wf = IterativeWeightFinaliser())
     end
 
-    @testset "narrow_optimiser_vector" begin
+    @testset "erase_optimiser_vector" begin
+        # #1939: every vector leaves with the element type `OptE_Opt_TD`, so the type of a
+        # Stacking does not change with the types of its inner optimisers.
+        erased = Vector{PO.OptE_Opt_TD}([ivo, ew])
+        @test PO.erase_optimiser_vector(erased) === erased
         typed = [ivo, ivo]
-        @test PO.narrow_optimiser_vector(typed) === typed
+        @test eltype(PO.erase_optimiser_vector(typed)) === PO.OptE_Opt_TD
+        @test PO.erase_optimiser_vector(typed) == typed
         td = TimeDependent([ivo, ew], :nearest; default = ew)
         mixed = Any[ivo, td]
-        narrowed = PO.narrow_optimiser_vector(mixed)
-        @test eltype(narrowed) == Union{typeof(ivo), typeof(td)}
-        @test narrowed == mixed
+        @test eltype(PO.erase_optimiser_vector(mixed)) === PO.OptE_Opt_TD
+        @test PO.erase_optimiser_vector(mixed) == mixed
         tdf = TimeDependent([opti, opti]; default = opti)
-        @test PO.narrow_optimiser_vector(tdf) === tdf
-        @test_throws ArgumentError PO.narrow_optimiser_vector(Any[ivo, "a"])
+        @test PO.erase_optimiser_vector(tdf) === tdf
+        @test_throws ArgumentError PO.erase_optimiser_vector(Any[ivo, "a"])
+        # Two Stackings over different inner optimisers have one type for `opti`, also
+        # when the positional constructor builds them, as a lens update does.
+        s1 = Stacking(; opti = [ivo, ivo], opto = ivo)
+        s2 = Stacking(; opti = [ivo, ew], opto = ivo)
+        @test typeof(s1.opti) === typeof(s2.opti) === Vector{PO.OptE_Opt_TD}
+        s3 = PO.Accessors.set(s1, PO.parse_lens("opti[2]"), ew)
+        @test typeof(s3) === typeof(s2)
     end
 
     @testset "NestedClustered refuses a precomputed result in a Stacking" begin

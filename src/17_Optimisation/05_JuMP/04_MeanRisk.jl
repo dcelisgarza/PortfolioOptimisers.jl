@@ -31,14 +31,14 @@ Keywords correspond to the struct's fields.
     """
     $(field_dict[:r_res])
     """
-    r
+    r::BaseRM_VecBaseRM
     """
     $(field_dict[:fb_res])
     """
     fb
     function MeanRiskResult(jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
                             fb::Option{<:OptE_Opt_FbChain})
-        return new{typeof(jr), typeof(r), typeof(fb)}(jr, r, fb)
+        return new{typeof(jr), typeof(fb)}(jr, r, fb)
     end
 end
 function MeanRiskResult(; jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,

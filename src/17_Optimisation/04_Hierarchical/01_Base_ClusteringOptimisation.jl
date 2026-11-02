@@ -309,7 +309,7 @@ Keywords correspond to the struct's fields.
     """
     $(field_dict[:r_res])
     """
-    r
+    r::BaseRM_VecBaseRM
     """
     $(field_dict[:sca_res])
     """
@@ -320,7 +320,7 @@ Keywords correspond to the struct's fields.
     fb
     function HierarchicalRiskParityResult(hr::HierarchicalResult, r::BaseRM_VecBaseRM,
                                           sca::Scalariser, fb::Option{<:OptE_Opt_FbChain})
-        return new{typeof(hr), typeof(r), typeof(sca), typeof(fb)}(hr, r, sca, fb)
+        return new{typeof(hr), typeof(sca), typeof(fb)}(hr, r, sca, fb)
     end
 end
 function HierarchicalRiskParityResult(; hr::HierarchicalResult, r::BaseRM_VecBaseRM,

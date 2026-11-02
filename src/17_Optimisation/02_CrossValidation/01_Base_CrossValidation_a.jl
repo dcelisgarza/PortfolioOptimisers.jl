@@ -1154,6 +1154,11 @@ arrays of the state in place, the held timestamps among them. The Result then na
 which no fold ends, and `Resume` refuses it. [`partial_fit!`](@ref) states this contract for a
 kept estimator.
 
+The type of `opt` is not a type parameter of the Result. The field is bound to
+`Union{Nothing, AbstractEstimator}`, so the Results of two online runs with different optimisers
+have one type, and a verb that reads the Result compiles one time for both. No verb reads
+`opt` except [`Resume`](@ref), and `Resume` carries the type of `opt` in its own type parameter.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -1197,7 +1202,7 @@ Keywords correspond to the struct's fields. `pred` is required. The constructor 
     """
     $(field_dict[:opt_pred])
     """
-    opt
+    opt::Union{Nothing, AbstractEstimator}
     function MultiPeriodPredictionResult(pred::VecPredRes, id::Any,
                                          opt::Option{<:AbstractEstimator})
         @argcheck(!isempty(pred), IsEmptyError("pred cannot be empty"))
@@ -1217,7 +1222,8 @@ Keywords correspond to the struct's fields. `pred` is required. The constructor 
         ivpa = rd[end].ivpa
         mrd = PredictionReturnsResult(; nx = nx, X = X, nf = nf, F = F, nb = nb, B = B,
                                       ne = ne, E = E, ts = ts, iv = iv, ivpa = ivpa)
-        return new{typeof(pred), typeof(mrd), typeof(id), typeof(opt)}(pred, mrd, id, opt)
+        # ADR 0067, amendment of 2026-11-02, measures the cost of `opt` as a type parameter.
+        return new{typeof(pred), typeof(mrd), typeof(id)}(pred, mrd, id, opt)
     end
 end
 function MultiPeriodPredictionResult(; pred::VecPredRes, id::Any = nothing,

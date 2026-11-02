@@ -349,9 +349,10 @@ multi-period prediction take the same kind of cost. This amendment did not measu
 
 The vector of folds is a type-erasure boundary. Under a batch scheme, every optimiser gives one
 `MultiPeriodPredictionResult` type for one returns data, so each verb that reads the Result
-compiles one time. An Online Scheme is different: its Result holds the threaded estimator in
-`opt`, so the type of that Result changes with the optimiser already. Each fold reader dispatches on the fold at run time, and that dispatch
-compiles one small method for each new fold type, which is the 23 ms above.
+compiles one time. Under an Online Scheme the Result holds the threaded estimator in `opt`, but
+since #1939 the type of `opt` is not a type parameter of the Result, so the same holds. Each fold
+reader dispatches on the fold at run time, and that dispatch compiles one small method for each
+new fold type, which is the 23 ms above. Since #1939 a new risk measure gives no new fold type.
 
 `concrete_typed_array` and `concrete_typed_array_if_abstract` narrow a vector that an estimator or
 a one-shot configuration holds. The library already compiles on the type of that holder, so the
@@ -368,6 +369,59 @@ The rule: narrow the element type of a vector whose holder the library compiles 
 narrow a vector of a Result that many verbs read, because each new element type then compiles
 every one of those verbs again.
 
+### The type of an estimator in a holder (#1939)
+
+Issue #1939 measured each holder whose type parameters carried the type of an estimator, or of a
+part of one. Each figure is the first call on a new type, after a warm-up that compiled every part
+that the two forms share, and then a warm call. Each form ran in a fresh process with one thread,
+on `dev` at `e641c54bba`, with 200 rows and 6 assets. Each range covers five risk measures:
+`ConditionalValueatRisk`, `StandardDeviation`, `Range`, `WorstRealisation` and `MaximumDrawdown`.
+
+| Holder and measured call | Form | Compile on a new type | Warm call |
+| :--- | :--- | ---: | ---: |
+| `MultiPeriodPredictionResult.opt` of an online run: `performance_summary` and `log_wealth_regret` | type parameter | 326–344 ms | 118–211 µs |
+| | erased | 31–33 ms | 110–189 µs |
+| `MeanRiskResult.r`: `expected_risk` two times and `predict` | type parameter | 89–97 ms | 78–93 µs |
+| | erased | 0 ms | 31–68 µs |
+| `Stacking.opti`: `optimise` | narrowed to the union of the element types | 530–620 ms | 18.6–30.1 ms |
+| | `Vector{OptE_Opt_TD}` | 107–119 ms | 18.6–25.5 ms |
+
+The erased form of `opt` and of `r` is emulated: the Result is rebuilt with `opt = nothing`, or
+with the `r` of the warm-up. No verb reads either field, so the emulation compiles what the
+erased field compiles. No warm call is slower in an erased form, so no call count reaches a
+break-even. A compile of `optimise` on a new `MeanRisk` takes 0.7 to 3 s, and the erasure of `r`
+removes about 90 ms after it.
+
+The decisions:
+
+- `MultiPeriodPredictionResult` binds `opt` to `Union{Nothing, AbstractEstimator}`, and the
+  field leaves the type parameters. Only `Resume` reads `opt`. `Resume` now holds the same object in
+  a second field, `opt`, so its second type parameter is the type of the estimator.
+  `OptimiserResume`, `PipelineResume` and `Pipeline_OnlPipe` dispatch on that parameter.
+- `MeanRiskResult`, `RiskBudgetingResult`, `FactorRiskContributionResult`,
+  `NearOptimalCenteringResult`, `HierarchicalRiskParityResult` and
+  `SchurComplementHierarchicalRiskParityResult` keep the bound of `r` on the field, and the field
+  leaves the type parameters. `r` was the field that gave each risk measure its own fold type in
+  #1938.
+- `Stacking` stores a vector `opti` as a `Vector{OptE_Opt_TD}`, through `erase_optimiser_vector`
+  in both constructors. The loop over `opti` solves one optimisation for each element, so a
+  dispatch at run time costs nothing next to it. A lens write such as `@set st.opti[2] = x`
+  already gave an abstract element type, so the narrow type did not hold after a search wrote a
+  candidate. `StackingResult.resi` was a `Vector{NonFiniteAllocationOptimisationResult}` already.
+- `SearchCrossValidationResult.opt` keeps its type parameter. No verb reads that Result, so the
+  parameter compiles nothing.
+- `ProcessedJuMPOptimiserAttributes`, the `pa` of a `JuMPOptimisationResult`, holds `sca` and
+  `ret`, and `HierarchicalRiskParityResult` holds `sca`. A new risk measure did not change their
+  type, and this amendment did not measure them.
+- The vectors of constraints that `factory` and `port_opt_view` narrow keep the narrowing, because
+  dispatch needs it. A `Vector{TnE_Tn}` of two `Turnover` values has no method of
+  `turnover_constraints` without sets, and the narrowed `Vector{Union{Turnover{…}, Turnover{…}}}`
+  takes the method for a `VecTn`.
+
+The rule becomes: a holder that many verbs read, or a meta-estimator over a vector of estimators,
+does not carry the type of an estimator in a type parameter, unless a measured verb pays for it.
+Narrow the element type of a vector only where dispatch needs it.
+
 ### Consequences
 
 - `@inferred` is not a contract for a value that a reader takes from the folds of a prediction
@@ -377,3 +431,8 @@ every one of those verbs again.
   `MultiPeriodPredictionResult(; pred = concrete_typed_array(p.pred), id = p.id, opt = p.opt)`.
   The verbs accept both forms.
 - `fold_loop`, `parallel_folds` and `run_folds` do not change.
+- #1939 removes a type parameter from `MultiPeriodPredictionResult` and from the six optimisation
+  Results above, and adds one to `Resume`. Code that names the parameters of these types by
+  position breaks. A method that must dispatch on the type of the estimator of a Result takes
+  the field as an argument, or a wrapper holds the estimator in a field of its own, as `Resume`
+  does.
