@@ -864,13 +864,15 @@ The semi-covariance keeps the ``T-1`` divisor of the full moment, so it is not t
 # Algorithm
 
  1. Get the centring vector `mu` and the inner estimator `cel` with [`covariance_centre_and_estimator`](@ref). When `mean` is `nothing`, `mu` comes from `ce.me`. Otherwise it comes from `mean`. When `ce.w` is not `nothing`, `ce.w` first gets to `ce.me` and `ce.ce` through [`factory`](@ref).
- 2. Call `Statistics.cov(cel, X; dims = dims, mean = mu, kwargs...)`.
+ 2. Call `Statistics.cov(cel, X; dims = dims, mean = mu, kwargs...)`. Under [`SemiMoment`](@ref), first replace `X` with `min.(X .- mu, 0)`, and call the inner estimator with a zero mean.
+
+[`coverage_covariance`](@ref) does these steps. It dispatches on the `alg` and `cvg` fields of `ce`, so one method serves every moment algorithm.
 
 # Arguments
 
   - $(arg_dict[:ce])
-      + `ce::Covariance{<:Any, <:Any, <:FullMoment}`: A covariance estimator with the [`FullMoment`](@ref) moment algorithm.
-      + `ce::Covariance{<:Any, <:Any, <:SemiMoment}`: A covariance estimator with the [`SemiMoment`](@ref) moment algorithm.
+      + `ce.alg::FullMoment`: The [`FullMoment`](@ref) moment algorithm gives the covariance matrix.
+      + `ce.alg::SemiMoment`: The [`SemiMoment`](@ref) moment algorithm gives the semi-covariance matrix.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
   - $(arg_dict[:omean]) If it is `nothing`, the method computes it with `ce.me`.
@@ -905,8 +907,7 @@ julia> cov(Covariance(; alg = SemiMoment()), X)
   - [`SemiMoment`](@ref)
   - [`cor(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
-function Statistics.cov(ce::Covariance{<:Any, <:Any, <:FullMoment}, X::MatNum;
-                        dims::Int = 1, mean = nothing,
+function Statistics.cov(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing,
                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     return coverage_covariance(Statistics.cov, ce, ce.cvg, X; dims = dims, mean = mean,
                                active_mask = active_mask, kwargs...)
@@ -1024,24 +1025,14 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-This is the [`SemiMoment`](@ref) method of [`cov(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref). It clips the de-meaned returns at zero before it computes the covariance matrix, so the matrix holds only the downside co-movements.
+The `Nothing` method of the [`SemiMoment`](@ref) arm of [`coverage_covariance`](@ref) is the Coverage Universe arm. It clips the de-meaned returns at zero before it computes the covariance or the correlation matrix, so the matrix holds only the downside co-movements. This is the body that the verb had before the `cvg` field existed. It refuses a gap and an inactive cell of `active_mask` with [`assert_finite_sample`](@ref), because a plain estimator reads an inactive cell as a return that is not finite.
 
 # Algorithm
 
- 1. Get the centring vector `mu` and the inner estimator `cel` with [`covariance_centre_and_estimator`](@ref).
- 2. Replace `X` with `min.(X .- mu, 0)`, the de-meaned returns clipped at zero.
- 3. Call `Statistics.cov(cel, X; dims = dims, mean = 0, kwargs...)`. The zero mean stops a second centring of the clipped returns.
-"""
-function Statistics.cov(ce::Covariance{<:Any, <:Any, <:SemiMoment}, X::MatNum;
-                        dims::Int = 1, mean = nothing,
-                        active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
-    return coverage_covariance(Statistics.cov, ce, ce.cvg, X; dims = dims, mean = mean,
-                               active_mask = active_mask, kwargs...)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-The `Nothing` method of the [`SemiMoment`](@ref) arm of [`coverage_covariance`](@ref) is the Coverage Universe arm. It clips the de-meaned returns at zero, and then calls the inner estimator with a zero centre. This is the body that the verb had before the `cvg` field existed. It refuses a gap and an inactive cell of `active_mask` with [`assert_finite_sample`](@ref), because a plain estimator reads an inactive cell as a return that is not finite.
+ 1. Refuse a gap and an inactive cell with [`assert_finite_sample`](@ref).
+ 2. Get the centring vector `mu` and the inner estimator `cel` with [`covariance_centre_and_estimator`](@ref).
+ 3. Replace `X` with `min.(X .- mu, 0)`, the de-meaned returns clipped at zero.
+ 4. Call `f(cel, X; dims = dims, mean = 0, kwargs...)`. The zero mean stops a second centring of the clipped returns.
 
 # Related
 
@@ -1130,14 +1121,16 @@ The `alg` field of `ce` changes ``\\hat{\\mathbf{\\Sigma}}``. [`SemiMoment`](@re
 # Algorithm
 
  1. Get the centring vector `mu` and the inner estimator `cel` with [`covariance_centre_and_estimator`](@ref). When `mean` is `nothing`, `mu` comes from `ce.me`. Otherwise it comes from `mean`. When `ce.w` is not `nothing`, `ce.w` first gets to `ce.me` and `ce.ce` through [`factory`](@ref).
- 2. Call `Statistics.cor(cel, X; dims = dims, mean = mu, kwargs...)`.
+ 2. Call `Statistics.cor(cel, X; dims = dims, mean = mu, kwargs...)`. Under [`SemiMoment`](@ref), first replace `X` with `min.(X .- mu, 0)`, and call the inner estimator with a zero mean.
+
+[`coverage_covariance`](@ref) does these steps. It dispatches on the `alg` and `cvg` fields of `ce`, so one method serves every moment algorithm.
 
 # Arguments
 
   - $(arg_dict[:ce])
 
-      + `ce::Covariance{<:Any, <:Any, <:FullMoment}`: A covariance estimator with the [`FullMoment`](@ref) moment algorithm.
-      + `ce::Covariance{<:Any, <:Any, <:SemiMoment}`: A covariance estimator with the [`SemiMoment`](@ref) moment algorithm.
+      + `ce.alg::FullMoment`: The [`FullMoment`](@ref) moment algorithm gives the correlation matrix.
+      + `ce.alg::SemiMoment`: The [`SemiMoment`](@ref) moment algorithm gives the downside correlation matrix.
 
   - $(arg_dict[:X])
 
@@ -1171,25 +1164,7 @@ julia> cor(Covariance(), X)
   - [`SemiMoment`](@ref)
   - [`cov(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
-function Statistics.cor(ce::Covariance{<:Any, <:Any, <:FullMoment}, X::MatNum;
-                        dims::Int = 1, mean = nothing,
-                        active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
-    return coverage_covariance(Statistics.cor, ce, ce.cvg, X; dims = dims, mean = mean,
-                               active_mask = active_mask, kwargs...)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-This is the [`SemiMoment`](@ref) method of [`cor(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref). It clips the de-meaned returns at zero before it computes the correlation matrix, so the matrix holds only the downside co-movements.
-
-# Algorithm
-
- 1. Get the centring vector `mu` and the inner estimator `cel` with [`covariance_centre_and_estimator`](@ref).
- 2. Replace `X` with `min.(X .- mu, 0)`, the de-meaned returns clipped at zero.
- 3. Call `Statistics.cor(cel, X; dims = dims, mean = 0, kwargs...)`. The zero mean stops a second centring of the clipped returns.
-"""
-function Statistics.cor(ce::Covariance{<:Any, <:Any, <:SemiMoment}, X::MatNum;
-                        dims::Int = 1, mean = nothing,
+function Statistics.cor(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing,
                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     return coverage_covariance(Statistics.cor, ce, ce.cvg, X; dims = dims, mean = mean,
                                active_mask = active_mask, kwargs...)

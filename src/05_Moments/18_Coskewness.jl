@@ -557,8 +557,8 @@ The method passes its arguments to [`coverage_coskewness`](@ref), which selects 
 
   - `ske`: The coskewness estimator.
 
-      + `ske::Coskewness{<:Any, <:Any, <:FullMoment}`: A coskewness estimator with the [`FullMoment`](@ref) moment algorithm.
-      + `ske::Coskewness{<:Any, <:Any, <:SemiMoment}`: A coskewness estimator with the [`SemiMoment`](@ref) moment algorithm.
+      + `ske.alg::FullMoment`: The [`FullMoment`](@ref) moment algorithm gives the coskewness.
+      + `ske.alg::SemiMoment`: The [`SemiMoment`](@ref) moment algorithm gives the downside coskewness.
       + `ske::Nothing`: The method returns `(nothing, nothing)`.
 
   - `X`: The data matrix (observations × assets).
@@ -611,15 +611,8 @@ julia> V
   - [`weighted_centre`](@ref)
   - [`negative_spectral_coskewness`](@ref)
 """
-function coskewness(ske::Coskewness{<:Any, <:Any, <:FullMoment}, X::MatNum; dims::Int = 1,
-                    mean = nothing, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
-                    kwargs...)
-    return coverage_coskewness(ske, ske.cvg, X; dims = dims, mean = mean,
-                               active_mask = active_mask, kwargs...)
-end
-function coskewness(ske::Coskewness{<:Any, <:Any, <:SemiMoment}, X::MatNum; dims::Int = 1,
-                    mean = nothing, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
-                    kwargs...)
+function coskewness(ske::Coskewness, X::MatNum; dims::Int = 1, mean = nothing,
+                    active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     return coverage_coskewness(ske, ske.cvg, X; dims = dims, mean = mean,
                                active_mask = active_mask, kwargs...)
 end

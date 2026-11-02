@@ -393,8 +393,8 @@ The method passes its arguments to [`coverage_cokurtosis`](@ref), which selects 
 
   - `kte`: The cokurtosis estimator.
 
-      + `kte::Cokurtosis{<:Any, <:Any, <:FullMoment}`: A cokurtosis estimator with the [`FullMoment`](@ref) moment algorithm.
-      + `kte::Cokurtosis{<:Any, <:Any, <:SemiMoment}`: A cokurtosis estimator with the [`SemiMoment`](@ref) moment algorithm.
+      + `kte.alg::FullMoment`: The [`FullMoment`](@ref) moment algorithm gives the cokurtosis.
+      + `kte.alg::SemiMoment`: The [`SemiMoment`](@ref) moment algorithm gives the downside cokurtosis.
       + `kte::Nothing`: The method returns `nothing`.
 
   - `X`: The data matrix (observations × assets).
@@ -438,15 +438,8 @@ julia> cokurtosis(Cokurtosis(), X)
   - [`_cokurtosis`](@ref)
   - [`weighted_centre`](@ref)
 """
-function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:FullMoment}, X::MatNum; dims::Int = 1,
-                    mean = nothing, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
-                    kwargs...)
-    return coverage_cokurtosis(kte, kte.cvg, X; dims = dims, mean = mean,
-                               active_mask = active_mask, kwargs...)
-end
-function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:SemiMoment}, X::MatNum; dims::Int = 1,
-                    mean = nothing, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
-                    kwargs...)
+function cokurtosis(kte::Cokurtosis, X::MatNum; dims::Int = 1, mean = nothing,
+                    active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     return coverage_cokurtosis(kte, kte.cvg, X; dims = dims, mean = mean,
                                active_mask = active_mask, kwargs...)
 end
