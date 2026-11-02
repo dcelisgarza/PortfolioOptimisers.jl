@@ -723,18 +723,22 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all moment algorithm types.
+Abstract supertype for the forms of the deviations of a moment from its target.
 
-Every concrete or abstract type that is an algorithm of a moment estimator must subtype `AbstractMomentAlgorithm`.
+The family holds two forms. [`FullMoment`](@ref) keeps every deviation, and [`SemiMoment`](@ref) keeps the deviations below the target. A moment estimator or a moment risk measure bounds its `alg` field to this type, and it implements each form. So the bound refuses in the constructor an algorithm that the verbs do not implement.
+
+An algorithm that selects something other than a form of the deviations is not a member. The Gerber, Smyth-Broby and Gerber IQ algorithms and the shrinkage targets are orthogonal to the two forms, so they subtype [`AbstractAlgorithm`](@ref) directly.
 
 # Interfaces
 
-A subtype needs no method of its own. A moment estimator holds the algorithm in a field and dispatches on its type. Define the methods on the moment estimator that uses the algorithm.
+A subtype needs no method of its own. A moment estimator holds the form in its `alg` field and dispatches on its type. A new form needs a method of each verb of every type that bounds `alg` to `AbstractMomentAlgorithm`, and a method of `coverage_comoment_deviations`.
 
 # Related
 
   - [`AbstractAlgorithm`](@ref)
   - [`AbstractCovarianceEstimator`](@ref)
+  - [`FullMoment`](@ref)
+  - [`SemiMoment`](@ref)
 """
 abstract type AbstractMomentAlgorithm <: AbstractAlgorithm end
 """

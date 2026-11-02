@@ -81,7 +81,7 @@ A marker makes two independent choices. Its prefix selects the score triple thro
 
   - $(ref_dict[:smyth2022enhanced]) Section 2, Equation 5.
 """
-abstract type SmythBrobyCovarianceAlgorithm <: AbstractMomentAlgorithm end
+abstract type SmythBrobyCovarianceAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 

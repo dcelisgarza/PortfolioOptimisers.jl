@@ -138,7 +138,7 @@ Small reusable Algorithms that collapse a vector of reals to a scalar: `MinValue
 The norm forms used as constraints, as risk-measure targets, and in entropy pooling: `L1Norm`, `L2Norm`, `SquaredL2Norm`, `LpNorm`, `LInfNorm`.
 
 **FullMoment vs SemiMoment**
-The Algorithm distinction that runs through all of moment estimation. `FullMoment` includes all deviations, and `SemiMoment` includes only those below a target. It is the basis of the split between symmetric and downside measures.
+The Algorithm distinction that runs through all of moment estimation. `FullMoment` includes all deviations, and `SemiMoment` includes only those below a target. It is the basis of the split between symmetric and downside measures. `AbstractMomentAlgorithm` holds these two forms alone. A Gerber algorithm or a shrinkage target is not a form of the deviations, so it subtypes `AbstractAlgorithm` directly (#1929).
 
 **Moment Target**
 The value from which a moment risk measure measures the deviations of the net portfolio returns. `calc_moment_target` selects it from the `mu` slot of the measure: the mean of the returns, weighted by the observation weights when the measure holds them, when `mu` is `nothing`. It is the expected portfolio return net of the mean fee per period when `mu` holds expected asset returns, and the number itself when `mu` is a number. A number is a minimum acceptable return, so it takes no fee.

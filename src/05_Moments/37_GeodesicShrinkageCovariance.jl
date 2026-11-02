@@ -53,7 +53,7 @@ julia> cov(ce, [1.0 2.0; 2.0 1.0; 0.0 0.5])
 
   - $(ref_dict[:schaferstrimmer2005]) Table 2.
 """
-abstract type AbstractCovarianceShrinkageTarget <: AbstractMomentAlgorithm end
+abstract type AbstractCovarianceShrinkageTarget <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 

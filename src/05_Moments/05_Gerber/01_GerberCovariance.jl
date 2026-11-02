@@ -57,7 +57,7 @@ The estimator that holds a new subtype must follow the interface of [`AbstractCo
   - $(ref_dict[:gerber]) Footnote 1, Section 2.1, Equation 4, Section 2.2, Equation 11, and footnote 3.
   - $(ref_dict[:gerber_analysis]) Section 2.
 """
-abstract type GerberCovarianceAlgorithm <: AbstractMomentAlgorithm end
+abstract type GerberCovarianceAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 

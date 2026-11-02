@@ -94,7 +94,7 @@ To add a squeezing template, subtype `GerberIQCovarianceAlgorithm` with its boun
 
   - $(ref_dict[:gerber2025squeezing]) Sections 3.3.3 to 3.3.5.
 """
-abstract type GerberIQCovarianceAlgorithm <: AbstractMomentAlgorithm end
+abstract type GerberIQCovarianceAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

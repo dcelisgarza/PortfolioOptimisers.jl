@@ -3573,3 +3573,36 @@ end
         end
     end
 end
+@testset "A moment form is FullMoment or SemiMoment, and every other algorithm is refused (#1929)" begin
+    using Test, PortfolioOptimisers, Statistics, StableRNGs
+    PO = PortfolioOptimisers
+    # The Gerber, Smyth-Broby and Gerber IQ algorithms and the shrinkage targets select
+    # something other than a form of the deviations, so they are not moment forms.
+    others = (Gerber1(), SmythBroby1(), BasicGerberIQ(), IdentityTarget())
+    for a in others
+        @test !(a isa PO.AbstractMomentAlgorithm)
+        @test a isa PO.AbstractAlgorithm
+        # Each type that bounds its form to the family refuses the algorithm in its
+        # constructor. Before the fix, `cov(Covariance(; alg = IdentityTarget()), X)` overflowed
+        # the stack, because no `cov` method implements a shrinkage target.
+        @test_throws TypeError Covariance(; alg = a)
+        @test_throws TypeError Coskewness(; alg = a)
+        @test_throws TypeError Cokurtosis(; alg = a)
+        @test_throws TypeError SecondMoment(; alg1 = a)
+        @test_throws TypeError EvenMoment(; alg = a)
+        @test_throws TypeError FourthMoment(; alg = a)
+        @test_throws TypeError EWVolatility(; alg = a)
+        @test_throws TypeError EWResidualVolatility(; alg = a)
+    end
+    for a in (FullMoment(), SemiMoment())
+        @test a isa PO.AbstractMomentAlgorithm
+    end
+    # The estimators that own the four families still take them.
+    X = randn(StableRNG(1929), 60, 3) ./ 100
+    for ce in
+        (GerberCovariance(; alg = Gerber1()), SmythBrobyCovariance(; alg = SmythBroby1()),
+         GerberIQCovariance(; kind = BasicGerberIQ()),
+         GeodesicShrinkageCovariance(; tgt = IdentityTarget(), alpha = 0.4))
+        @test all(isfinite, cov(ce, X))
+    end
+end
