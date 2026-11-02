@@ -11,6 +11,7 @@ PortfolioOptimisers.member_vector
 PortfolioOptimisers.fold_target
 PortfolioOptimisers.fold_held
 PortfolioOptimisers.stacked_fold_weights
+PortfolioOptimisers.weights_by_name
 PortfolioOptimisers.comparator_path_length
 PortfolioOptimisers.member_regret
 PortfolioOptimisers.series_regret

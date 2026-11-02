@@ -227,9 +227,7 @@ The folds of a multi-period result need not share a universe. A [`Pipeline`](@re
 # Algorithm
 
  1. Read each fold's weights through `read`, giving `ws`.
- 2. Take the union of the folds' `rd.nx` in order of first appearance, giving `names`, and map each name to its column, giving `pos`.
- 3. Promote the element types of `ws`, giving `Tf`, and allocate `W`, a `folds × assets` matrix of zeros of type `Tf`.
- 4. For each fold `i`, check the length of `ws[i]` against its `rd.nx`, and write each weight into row `i` of `W`, at the column that `pos` gives its name.
+ 2. Embed `ws` on the union of the folds' `rd.nx` with [`weights_by_name`](@ref), and keep the matrix `W`.
 
 # Arguments
 
@@ -246,6 +244,7 @@ The folds of a multi-period result need not share a universe. A [`Pipeline`](@re
 
 # Related
 
+  - [`weights_by_name`](@ref)
   - [`fold_target`](@ref)
   - [`comparator_path_length`](@ref)
   - [`held_path_turnover`](@ref)
@@ -253,22 +252,56 @@ The folds of a multi-period result need not share a universe. A [`Pipeline`](@re
 """
 function stacked_fold_weights(pred::MultiPeriodPredictionResult, read)
     folds = pred.pred
-    ws = [read(f) for f in folds]
-    names = unique(mapreduce(f -> collect(f.rd.nx), vcat, folds))
+    return last(weights_by_name([read(f) for f in folds], [f.rd.nx for f in folds]))
+end
+"""
+    weights_by_name(ws::AbstractVector, nxs::AbstractVector) -> (names, W)
+
+Embed weight vectors that sit on different asset names on the union of their names.
+
+Each vector `ws[i]` holds one weight for each name of `nxs[i]`. The union axis holds every name once, in the order of first appearance. A vector puts each weight in the column of its name, and every other entry of its row is zero. [`stacked_fold_weights`](@ref) embeds the folds of a path with this function, and [`prediction_weights`](@ref) embeds the paths of a population.
+
+# Algorithm
+
+ 1. Take the union of the names of `nxs` in order of first appearance, giving `names`, and map each name to its column, giving `pos`.
+ 2. Promote the element types of `ws`, giving `Tf`, and allocate `W`, a `vectors × assets` matrix of zeros of type `Tf`.
+ 3. For each vector `i`, check the length of `ws[i]` against `nxs[i]`, and write each weight into row `i` of `W`, at the column that `pos` gives its name.
+
+# Arguments
+
+  - `ws`: The weight vectors.
+  - `nxs`: The asset names of each weight vector.
+
+# Validation
+
+  - `length(ws[i]) == length(nxs[i])` for each `i`. Otherwise the function raises a `DimensionMismatch`, because the embedding would misplace the weights.
+
+# Returns
+
+  - `names::Vector`: The union of the names.
+  - `W::MatNum`: `vectors × assets` weights on the union axis, one row for each vector of `ws`.
+
+# Related
+
+  - [`stacked_fold_weights`](@ref)
+  - [`prediction_weights`](@ref)
+"""
+function weights_by_name(ws::AbstractVector, nxs::AbstractVector)
+    names = unique(mapreduce(collect, vcat, nxs))
     pos = Dict(n => i for (i, n) in enumerate(names))
     Tf = mapreduce(eltype, promote_type, ws)
-    W = zeros(Tf, length(folds), length(names))
-    for (i, f) in enumerate(folds)
-        nx = f.rd.nx
+    W = zeros(Tf, length(ws), length(names))
+    for i in eachindex(ws, nxs)
+        nx = nxs[i]
         @argcheck(length(ws[i]) == length(nx),
-                  DimensionMismatch("fold $i carries $(length(ws[i])) weights over $(length(nx)) asset names, so its weights cannot be embedded by name"))
+                  DimensionMismatch("weight vector $i carries $(length(ws[i])) weights over $(length(nx)) asset names, so its weights cannot be embedded by name"))
         # `enumerate`, not `zip(nx, ws[i])`: the zip of two untyped values gives JET a false
         # report inside `Base.Iterators` (issue #1341).
         for (j, wn) in enumerate(ws[i])
             W[i, pos[nx[j]]] = wn
         end
     end
-    return W
+    return names, W
 end
 """
     comparator_path_length(b::Nothing, j::Integer, ::Type{Tf})

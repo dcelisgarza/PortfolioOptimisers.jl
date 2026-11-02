@@ -19,6 +19,7 @@ PortfolioOptimisers.weights_n_eff
 PortfolioOptimisers.prediction_n_eff
 PortfolioOptimisers.prediction_entries
 PortfolioOptimisers.population_entries
+PortfolioOptimisers.population_path_key
 PortfolioOptimisers.input_entries
 PortfolioOptimisers.entry_list
 PortfolioOptimisers.summarise_entries

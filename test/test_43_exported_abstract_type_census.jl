@@ -220,6 +220,7 @@
         :AbstractRedundancyAlgorithm,
         :AbstractRegimeDebias,
         :AbstractRegressionTarget,
+        :AbstractReportBlock,
         :AbstractReturnForecastEstimator,
         :AbstractReturnsPreprocessingEstimator,
         :AbstractReturnsPreprocessingResult,

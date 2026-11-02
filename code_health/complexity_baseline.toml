@@ -5,7 +5,7 @@
 julia = "1.13.3"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "2b7a0e8c15"
+commit = "7dd23b4ac8"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { cyc = 5, cog = 7, arg = 8, cyc_sum = 53, cog_sum = 57, arg_sum = 99, macros = [] }
@@ -21,6 +21,7 @@ commit = "2b7a0e8c15"
 "ext/PortfolioOptimisersPlotsExt/11_FactorDiagnosticsPlots.jl" = { cyc = 6, cog = 10, arg = 8, cyc_sum = 85, cog_sum = 44, arg_sum = 202, macros = [] }
 "ext/PortfolioOptimisersPlotsExt/12_ForecastEvaluationPlots.jl" = { cyc = 5, cog = 8, arg = 8, cyc_sum = 63, cog_sum = 44, arg_sum = 183, macros = [] }
 "ext/PortfolioOptimisersPlotsExt/13_CovarianceForecastPlots.jl" = { cyc = 4, cog = 5, arg = 8, cyc_sum = 64, cog_sum = 33, arg_sum = 130, macros = [] }
+"ext/PortfolioOptimisersPlotsExt/14_ReportFigures.jl" = { cyc = 5, cog = 11, arg = 3, cyc_sum = 24, cog_sum = 14, arg_sum = 29, macros = [] }
 "ext/PortfolioOptimisersPlotsExt/PortfolioOptimisersPlotsExt.jl" = { cyc = 3, cog = 3, arg = 3, cyc_sum = 4, cog_sum = 3, arg_sum = 5, macros = [] }
 "src/01_Base/01_DocstringDictionaries/01_Tables.jl" = { cyc = 4, cog = 4, arg = 3, cyc_sum = 4, cog_sum = 4, arg_sum = 3, macros = [] }
 "src/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.jl" = { cyc = 0, cog = 0, arg = 0, cyc_sum = 0, cog_sum = 0, arg_sum = 0, macros = [] }
@@ -423,4 +424,8 @@ commit = "2b7a0e8c15"
 "src/21_Pipeline/07_AssetScorers.jl" = { cyc = 3, cog = 3, arg = 6, cyc_sum = 46, cog_sum = 17, arg_sum = 71, macros = [] }
 "src/22_Plotting.jl" = { cyc = 5, cog = 8, arg = 4, cyc_sum = 96, cog_sum = 24, arg_sum = 27, macros = [] }
 "src/23_Aliases.jl" = { cyc = 1, cog = 0, arg = 8, cyc_sum = 21, cog_sum = 0, arg_sum = 30, macros = [] }
+"src/24_Report/01_PredictionWeights.jl" = { cyc = 1, cog = 1, arg = 2, cyc_sum = 8, cog_sum = 3, arg_sum = 13, macros = [] }
+"src/24_Report/02_ReportModel.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 21, cog_sum = 8, arg_sum = 32, macros = [] }
+"src/24_Report/03_ReportWriters.jl" = { cyc = 9, cog = 11, arg = 4, cyc_sum = 89, cog_sum = 75, arg_sum = 79, macros = [] }
+"src/24_Report/04_PortfolioReport.jl" = { cyc = 4, cog = 4, arg = 5, cyc_sum = 37, cog_sum = 24, arg_sum = 46, macros = [] }
 "src/PortfolioOptimisers.jl" = { cyc = 0, cog = 0, arg = 0, cyc_sum = 0, cog_sum = 0, arg_sum = 0, macros = [] }

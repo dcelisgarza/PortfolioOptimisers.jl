@@ -8,7 +8,7 @@ jet = "0.13.1"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "StatsPlots"]
-commit = "c340bf8bf3"
+commit = "7dd23b4ac8"
 
 [run.main]
 load_set = ["GraphRecipes", "StatsPlots"]
@@ -27,6 +27,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "ext/PortfolioOptimisersPlotsExt/11_FactorDiagnosticsPlots.jl" = { raw = 0, reviewed = 0 }
 "ext/PortfolioOptimisersPlotsExt/12_ForecastEvaluationPlots.jl" = { raw = 0, reviewed = 0 }
 "ext/PortfolioOptimisersPlotsExt/13_CovarianceForecastPlots.jl" = { raw = 0, reviewed = 0 }
+"ext/PortfolioOptimisersPlotsExt/14_ReportFigures.jl" = { raw = 0, reviewed = 0 }
 "ext/PortfolioOptimisersPlotsExt/PortfolioOptimisersPlotsExt.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/01_DocstringDictionaries/01_Tables.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.jl" = { raw = 0, reviewed = 0 }
@@ -429,6 +430,10 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/21_Pipeline/07_AssetScorers.jl" = { raw = 0, reviewed = 0 }
 "src/22_Plotting.jl" = { raw = 0, reviewed = 0 }
 "src/23_Aliases.jl" = { raw = 0, reviewed = 0 }
+"src/24_Report/01_PredictionWeights.jl" = { raw = 0, reviewed = 0 }
+"src/24_Report/02_ReportModel.jl" = { raw = 0, reviewed = 0 }
+"src/24_Report/03_ReportWriters.jl" = { raw = 0, reviewed = 0 }
+"src/24_Report/04_PortfolioReport.jl" = { raw = 0, reviewed = 0 }
 "src/PortfolioOptimisers.jl" = { raw = 0, reviewed = 0 }
 
 [run.plots_ext]
@@ -448,6 +453,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "ext/PortfolioOptimisersPlotsExt/11_FactorDiagnosticsPlots.jl" = { raw = 0, reviewed = 0 }
 "ext/PortfolioOptimisersPlotsExt/12_ForecastEvaluationPlots.jl" = { raw = 0, reviewed = 0 }
 "ext/PortfolioOptimisersPlotsExt/13_CovarianceForecastPlots.jl" = { raw = 0, reviewed = 0 }
+"ext/PortfolioOptimisersPlotsExt/14_ReportFigures.jl" = { raw = 0, reviewed = 0 }
 "ext/PortfolioOptimisersPlotsExt/PortfolioOptimisersPlotsExt.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/01_DocstringDictionaries/01_Tables.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.jl" = { raw = 0, reviewed = 0 }
@@ -850,4 +856,8 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/21_Pipeline/07_AssetScorers.jl" = { raw = 0, reviewed = 0 }
 "src/22_Plotting.jl" = { raw = 0, reviewed = 0 }
 "src/23_Aliases.jl" = { raw = 0, reviewed = 0 }
+"src/24_Report/01_PredictionWeights.jl" = { raw = 0, reviewed = 0 }
+"src/24_Report/02_ReportModel.jl" = { raw = 0, reviewed = 0 }
+"src/24_Report/03_ReportWriters.jl" = { raw = 0, reviewed = 0 }
+"src/24_Report/04_PortfolioReport.jl" = { raw = 0, reviewed = 0 }
 "src/PortfolioOptimisers.jl" = { raw = 0, reviewed = 0 }

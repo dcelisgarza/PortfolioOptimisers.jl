@@ -34,28 +34,21 @@ function PortfolioOptimisers.plot_composition(pred::PredictionResult;
     nx = isnothing(pred.rd.nx) ? (1:length(w)) : pred.rd.nx
     return PortfolioOptimisers.plot_composition(w, nx; N = N, kwargs...)
 end
+# A path and a population draw the rows of `prediction_weights`: one row for each fold or
+# path, embedded by name on the union of their universes, so a fold that holds other assets
+# than the first fold draws its own assets under its own names.
 function PortfolioOptimisers.plot_composition(pred::MultiPeriodPredictionResult;
                                               N::Option{<:Number} = nothing, kwargs...)
-    folds = pred.pred
-    w_mat = hcat(getproperty.(getproperty.(folds, :res), :w)...)
-    nx = something(folds[1].rd.nx, 1:size(w_mat, 1))
-    return PortfolioOptimisers.plot_stacked_bar_composition(collect(eachcol(w_mat)), nx;
+    nx, W, _ = prediction_weights(pred)
+    return PortfolioOptimisers.plot_stacked_bar_composition(collect(eachrow(W)), nx;
                                                             xlabel = "Fold",
                                                             title = "Walk-Forward Selection Composition",
                                                             kwargs...)
 end
 function PortfolioOptimisers.plot_composition(pred::PopulationPredictionResult;
                                               N::Option{<:Number} = nothing, kwargs...)
-    members = pred.pred
-    w_mat = hcat(map(m -> if isa(m, PredictionResult)
-                         m.res.w
-                     else
-                         mean(hcat(getproperty.(getproperty.(m.pred, :res), :w)...);
-                              dims = 2)[:]
-                     end, members)...)
-    rd1 = isa(members[1], PredictionResult) ? members[1].rd : members[1].pred[1].rd
-    nx = something(rd1.nx, 1:size(w_mat, 1))
-    return PortfolioOptimisers.plot_stacked_bar_composition(collect(eachcol(w_mat)), nx;
+    nx, W, _ = prediction_weights(pred)
+    return PortfolioOptimisers.plot_stacked_bar_composition(collect(eachrow(W)), nx;
                                                             xlabel = "Population Member",
                                                             title = "Population Composition",
                                                             kwargs...)
@@ -105,10 +98,8 @@ end
 function PortfolioOptimisers.plot_stacked_area_composition(pred::MultiPeriodPredictionResult;
                                                            N::Option{<:Number} = nothing,
                                                            kwargs...)
-    folds = pred.pred
-    w_mat = hcat(getproperty.(getproperty.(folds, :res), :w)...)
-    nx = something(folds[1].rd.nx, 1:size(w_mat, 1))
-    return PortfolioOptimisers.plot_stacked_area_composition(collect(eachcol(w_mat)), nx;
+    nx, W, _ = prediction_weights(pred)
+    return PortfolioOptimisers.plot_stacked_area_composition(collect(eachrow(W)), nx;
                                                              xlabel = "Fold",
                                                              title = "Walk-Forward Selection Composition",
                                                              kwargs...)
@@ -116,16 +107,8 @@ end
 function PortfolioOptimisers.plot_stacked_area_composition(pred::PopulationPredictionResult;
                                                            N::Option{<:Number} = nothing,
                                                            kwargs...)
-    members = pred.pred
-    w_mat = hcat(map(m -> if isa(m, PredictionResult)
-                         m.res.w
-                     else
-                         mean(hcat(getproperty.(getproperty.(m.pred, :res), :w)...);
-                              dims = 2)[:]
-                     end, members)...)
-    rd1 = isa(members[1], PredictionResult) ? members[1].rd : members[1].pred[1].rd
-    nx = something(rd1.nx, 1:size(w_mat, 1))
-    return PortfolioOptimisers.plot_stacked_area_composition(collect(eachcol(w_mat)), nx;
+    nx, W, _ = prediction_weights(pred)
+    return PortfolioOptimisers.plot_stacked_area_composition(collect(eachrow(W)), nx;
                                                              xlabel = "Population Member",
                                                              title = "Population Composition",
                                                              kwargs...)

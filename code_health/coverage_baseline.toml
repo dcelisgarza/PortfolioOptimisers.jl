@@ -20,6 +20,7 @@ commit = "8610300"
 "ext/PortfolioOptimisersPlotsExt/11_FactorDiagnosticsPlots.jl" = { lines = 199, misses = 0 }
 "ext/PortfolioOptimisersPlotsExt/12_ForecastEvaluationPlots.jl" = { lines = 170, misses = 0 }
 "ext/PortfolioOptimisersPlotsExt/13_CovarianceForecastPlots.jl" = { lines = 139, misses = 0 }
+"ext/PortfolioOptimisersPlotsExt/14_ReportFigures.jl" = { lines = 44, misses = 0 }
 "ext/PortfolioOptimisersPlotsExt/PortfolioOptimisersPlotsExt.jl" = { lines = 8, misses = 0 }
 "src/01_Base/01_DocstringDictionaries/01_Tables.jl" = { lines = 8, misses = 0 }
 "src/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.jl" = { lines = 0, misses = 0 }
@@ -422,4 +423,8 @@ commit = "8610300"
 "src/21_Pipeline/07_AssetScorers.jl" = { lines = 118, misses = 0 }
 "src/22_Plotting.jl" = { lines = 11, misses = 1 }
 "src/23_Aliases.jl" = { lines = 43, misses = 0 }
+"src/24_Report/01_PredictionWeights.jl" = { lines = 26, misses = 0 }
+"src/24_Report/02_ReportModel.jl" = { lines = 36, misses = 0 }
+"src/24_Report/03_ReportWriters.jl" = { lines = 238, misses = 0 }
+"src/24_Report/04_PortfolioReport.jl" = { lines = 97, misses = 0 }
 "src/PortfolioOptimisers.jl" = { lines = 0, misses = 0 }

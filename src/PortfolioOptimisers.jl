@@ -7,6 +7,7 @@ using Accessors: Accessors
 using ArgCheck: @argcheck
 using Base.ScopedValues: ScopedValue
 using AverageShiftedHistograms: AverageShiftedHistograms
+using Base64: Base64
 using Clustering: Clustering, assignments
 using Combinatorics: Combinatorics
 using ConcreteStructs: @concrete
@@ -464,6 +465,10 @@ include("21_Pipeline/06_OnlinePipeline.jl")
 include("21_Pipeline/07_AssetScorers.jl")
 include("22_Plotting.jl")
 include("23_Aliases.jl")
+include("24_Report/01_PredictionWeights.jl")
+include("24_Report/02_ReportModel.jl")
+include("24_Report/03_ReportWriters.jl")
+include("24_Report/04_PortfolioReport.jl")
 
 # Every `@propagatable` struct is declared by now, and so is every outer keyword
 # constructor, so the contract behind the generated `factory`/`port_opt_view` methods is

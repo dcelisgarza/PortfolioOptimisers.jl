@@ -848,7 +848,7 @@ A multi-period path is keyed by its `id`. A single-fold prediction result in a p
 # Algorithm
 
  1. Check that the population holds a path.
- 2. Read the entries of each path with [`prediction_entries`](@ref), keyed by the `id` of the path or by its position.
+ 2. Read the entries of each path with [`prediction_entries`](@ref), keyed by [`population_path_key`](@ref): the `id` of the path or its position.
  3. Join the entries of the paths in the order of the population.
 
 # Arguments
@@ -867,6 +867,7 @@ A multi-period path is keyed by its `id`. A single-fold prediction result in a p
 # Related
 
   - [`prediction_entries`](@ref)
+  - [`population_path_key`](@ref)
   - [`PopulationPredictionResult`](@ref)
 """
 function population_entries(ppred::PopulationPredictionResult, bm::Option{<:Some})
@@ -877,10 +878,37 @@ function population_entries(ppred::PopulationPredictionResult, bm::Option{<:Some
     # report on an untyped element (issue #1341).
     es = map(eachindex(paths)) do k
         p = paths[k]
-        path = isa(p, MultiPeriodPredictionResult) ? p.id : k
-        return entry_list(prediction_entries(p, bm, path), nothing)
+        return entry_list(prediction_entries(p, bm, population_path_key(p, k)), nothing)
     end
     return reduce(vcat, es)
+end
+"""
+    population_path_key(p::MultiPeriodPredictionResult, k::Integer)
+    population_path_key(p::PredictionResult, k::Integer)
+
+The key of path `k` of a population, as the `paths` field of a [`PerformanceSummaryResult`](@ref) holds it.
+
+A multi-period path is keyed by its `id`. A single-fold prediction result has no `id`, so its position `k` in the population keys it, as [`population_ids`](@ref) numbers the paths that lack an `id`. [`portfolio_report`](@ref) heads the column of each path with the same key.
+
+# Arguments
+
+  - `p`: The path.
+  - `k`: The position of the path in the population.
+
+# Returns
+
+  - `key`: The `id` of a multi-period path, or `k`.
+
+# Related
+
+  - [`population_entries`](@ref)
+  - [`population_ids`](@ref)
+"""
+function population_path_key(p::MultiPeriodPredictionResult, ::Integer)
+    return p.id
+end
+function population_path_key(::PredictionResult, k::Integer)
+    return k
 end
 """
     input_entries(bm::Option{<:Some}, ret::VecNum)

@@ -164,7 +164,7 @@ function plot_asset_cumulative_returns end
 
 Plot the composition of a portfolio as a bar chart of its asset weights.
 
-[`relevant_assets`](@ref) ranks the assets by ``\\lvert w_i \\rvert`` and chooses how many bars to draw. The drawn bars keep the order of the asset axis, and the assets that the ranking left out become one more bar, `Others`, whose height is the signed sum of their weights. A walk-forward path and a population draw a stacked bar chart through [`plot_stacked_bar_composition`](@ref), one bar per fold or per member, and they accept `N` and do not read it. A member that is a walk-forward path takes the mean of its fold weights. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads with `StatsPlots`.
+[`relevant_assets`](@ref) ranks the assets by ``\\lvert w_i \\rvert`` and chooses how many bars to draw. The drawn bars keep the order of the asset axis, and the assets that the ranking left out become one more bar, `Others`, whose height is the signed sum of their weights. A walk-forward path and a population draw a stacked bar chart through [`plot_stacked_bar_composition`](@ref), one bar per fold or per path, and they accept `N` and do not read it. The bars are the rows of [`prediction_weights`](@ref), on the union of the asset names of the folds or of the paths, so a fold that holds other assets than the first fold draws its own assets. A path of a population takes the mean of its fold targets. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads with `StatsPlots`.
 
 # Arguments
 
@@ -4265,6 +4265,35 @@ Where:
   - [`CovarianceForecastEvaluationResult`](@ref)
 """
 function plot_covariance_exceedance end
+"""
+    default_report_figures() -> NamedTuple
+
+The default figures of a Portfolio Report, as the keywords `overview_figures` and `entry_figures` of [`portfolio_report`](@ref) take them.
+
+The result has two fields, each a vector of pairs `caption => f`. A caller can add a pair to either vector, or remove one:
+
+```julia
+f = default_report_figures()
+portfolio_report(preds; overview_figures = f.overview, entry_figures = f.entry)
+```
+
+  - `overview`: the cumulative returns of every series of the summary on one axis, each series on its own timestamps, with one colour and one legend label for each prediction, and the risk and the return of each prediction on one scatter plot through [`plot_measures`](@ref).
+  - `entry`: [`plot_composition`](@ref), [`plot_drawdowns`](@ref), [`plot_histogram`](@ref), and [`plot_risk_contribution`](@ref) of a [`ConditionalValueatRisk`](@ref).
+
+A figure function gives `nothing` for a prediction that it cannot draw, and the report then has no such figure. The decision is by dispatch on the type of the prediction, and never a caught error. The risk contribution needs the asset returns of a single fold, so only a [`PredictionResult`](@ref) with a Held Weights record draws it. A prediction whose optimiser gives many portfolios draws no composition, drawdown or histogram figure.
+
+A figure of the structure of the assets, such as a dendrogram, needs a clustering estimator or a prior that a prediction does not hold, so it is not a default. A caller adds it as a pair whose function closes over that estimator. The package extension `PortfolioOptimisersPlotsExt` implements the method, and it loads with `StatsPlots`.
+
+# Returns
+
+  - `figs::NamedTuple`: The fields `overview` and `entry`.
+
+# Related
+
+  - [`portfolio_report`](@ref)
+  - [`ReportFigure`](@ref)
+"""
+function default_report_figures end
 export plot_portfolio_cumulative_returns, plot_asset_cumulative_returns, plot_composition,
        plot_stacked_bar_composition, plot_stacked_area_composition, plot_dendrogram,
        plot_clusters, plot_drawdowns, plot_risk_contribution, plot_factor_risk_contribution,
@@ -4289,4 +4318,5 @@ export plot_portfolio_cumulative_returns, plot_asset_cumulative_returns, plot_co
        plot_forecast_ic_by_holding_period, plot_forecast_portfolio_by_holding_period,
        plot_forecast_ic_decay, plot_forecast_portfolio_decay,
        plot_forecast_factor_correlation, plot_forecast_evaluation_summary,
-       plot_covariance_calibration, plot_covariance_qlike, plot_covariance_exceedance
+       plot_covariance_calibration, plot_covariance_qlike, plot_covariance_exceedance,
+       default_report_figures
