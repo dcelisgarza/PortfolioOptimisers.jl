@@ -199,7 +199,8 @@ end
 function PortfolioOptimisers.plot_performance_summary(pred::PortfolioOptimisers.PredRes_MultiPredRes;
                                                       ppy::Number = 1, alpha::Number = 0.05,
                                                       compound::Bool = false,
-                                                      benchmark::Option{<:VecNum} = PortfolioOptimisers.regret_benchmark(pred),
+                                                      benchmark::Option{<:VecNum} = PortfolioOptimisers.member_vector(PortfolioOptimisers.regret_benchmark(pred),
+                                                                                                                      1),
                                                       kwargs...)
     ps = performance_summary(pred; ppy = ppy, alpha = alpha, compound = compound,
                              benchmark = benchmark)

@@ -97,11 +97,17 @@ form compares a prediction result against the benchmark of its own rows (#1664).
                               bare_prediction((1 .+ a) .* exp(0.001) .- 1, ts); mt = mt)
         @test isapprox(c.regret, 0.003; atol = 1e-12)
         @test abs(c.t_stat) > 1e10 && c.p_value == 1 / (mt.n_sim + 1)
-        # A population of paths reads its first path, as the summary does.
+        # A comparator with many members gives one regret for each member (#1936).
         b = [0.025, 0.0, 0.03]
         pop = bare_prediction([b, a], ts)
-        @test log_wealth_regret(bare_prediction(a, ts), pop).regret ≈
+        regs = log_wealth_regret(bare_prediction(a, ts), pop)
+        @test length(regs) == 2
+        @test regs[1].regret ≈
               log_wealth_regret(bare_prediction(a, ts), bare_prediction(b, ts)).regret
+        @test regs[2].regret == 0
+        # Two series of different lengths with no timestamps compare nothing.
+        @test_throws ArgumentError log_wealth_regret(bare_prediction(a, nothing),
+                                                     bare_prediction(b[1:2], nothing))
     end
 
     # The interior volatility-pumping fixture of the head's own test file.
@@ -216,9 +222,13 @@ form compares a prediction result against the benchmark of its own rows (#1664).
                           log_wealth_regret(bare_prediction(a, tsh),
                                             bare_prediction(b, tsh);
                                             mt = OverlapMeanTest()))
-        # A population reads its first path and its first benchmark series.
-        @test same_fields(log_wealth_regret(bench_prediction([a, b], [b, a], tsh); mt = mt),
-                          reg)
+        # Each member meets its own benchmark series (#1936).
+        regs = log_wealth_regret(bench_prediction([a, b], [b, a], tsh); mt = mt)
+        @test length(regs) == 2
+        @test same_fields(regs[1], reg)
+        @test same_fields(regs[2],
+                          log_wealth_regret(bare_prediction(b, tsh),
+                                            bare_prediction(a, tsh); mt = mt))
         # A multi-period result stacks the benchmark series of its folds.
         mp = MultiPeriodPredictionResult(;
                                          pred = [bench_prediction(a[1:2], b[1:2], tsh[1:2]),
@@ -295,7 +305,8 @@ fields of `LogWealthRegretResult`, and the benchmark and turnover fields of
 and be-the-leader collapses onto the static comparator.
 =#
 @testset "Hindsight split and the dynamic-regret surface" begin
-    using PortfolioOptimisers, Test, LinearAlgebra, Statistics, StatsBase, Dates, Clarabel
+    using PortfolioOptimisers, Test, LinearAlgebra, Statistics, StatsBase, Dates, Clarabel,
+          StableRNGs
     po = PortfolioOptimisers
     # A prediction result over a bare return series, on the timestamps handed in, with the
     # weights and names a fold would carry.
@@ -477,16 +488,95 @@ and be-the-leader collapses onto the static comparator.
         mp = MultiPeriodPredictionResult(; pred = [a, b, c])
         W = po.stacked_fold_weights(mp, po.fold_target)
         @test W == [1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.25 0.75]
-        @test po.comparator_path_length(mp, Float64) ≈ sqrt(2) + norm([0.0, -0.75, 0.75])
+        @test po.comparator_path_length(mp, 1, Float64) ≈ sqrt(2) + norm([0.0, -0.75, 0.75])
         # A fold whose weights and names disagree is refused.
         bad = bare_prediction([0.01], ts3[1:1]; w = [0.5, 0.5], nx = ["A"])
         @test_throws DimensionMismatch po.stacked_fold_weights(MultiPeriodPredictionResult(;
                                                                                            pred = [bad,
                                                                                                    b]),
                                                                po.fold_target)
-        # A population reads its first member.
-        @test po.first_member([[0.2, 0.8], [0.5, 0.5]]) == [0.2, 0.8]
-        @test po.first_member([0.2, 0.8]) == [0.2, 0.8]
+        # Member `j` reads entry `j`; one vector belongs to every member; no benchmark stays
+        # `nothing`.
+        @test po.member_vector([[0.2, 0.8], [0.5, 0.5]], 2) == [0.5, 0.5]
+        @test po.member_vector([0.2, 0.8], 2) == [0.2, 0.8]
+        @test isnothing(po.member_vector(nothing, 1))
+    end
+
+    @testset "A prediction with many members gives one regret for each member (#1936)" begin
+        rng = StableRNG(1936)
+        T, N = 60, 4
+        X = randn(rng, T, N) / 100 .+ 0.001
+        B = randn(StableRNG(1937), T, N) / 100
+        ts = Date(2024, 1, 1) .+ Day.(0:(T - 1))
+        nx = ["a", "b", "c", "d"]
+        rd = ReturnsResult(; nx = nx, X = X, ts = ts, nb = nx, B = B)
+        fslv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                      check_sol = (; allow_local = true, allow_almost = true),
+                      settings = Dict("verbose" => false))
+        mr = MeanRisk(;
+                      opt = JuMPOptimiser(; slv = fslv,
+                                          ret = ArithmeticReturn(;
+                                                                 settings = JuMPReturnsSettings(;
+                                                                                                lb = Frontier(;
+                                                                                                              N = 3)))))
+        cv = IndexWalkForward(30, 10)
+        fr = cross_val_predict(mr, rd, cv)
+        ew = cross_val_predict(EqualWeighted(), rd, cv)
+        @test length(fr.mrd.X) == 3
+        mt = WildBootstrapMeanTest(; seed = 1936)
+        tsf = fr.mrd.ts
+        # The series of member `j` alone, as a one-series prediction over the same rows.
+        alone(r) = bare_prediction(r, tsf)
+        rew = first(po.regret_series(ew))
+        # A many-member strategy against a one-series comparator: member `j` against it.
+        # The shape follows the types of the series: the pairing infers. The `path_length`
+        # of a multi-period comparator does not infer, so the two-side calls are not
+        # checked with `@inferred` (#1938).
+        @test isa(@inferred(po.member_regret(fr.mrd.X, rew, mt, nothing)), Vector)
+        @test isa(@inferred(po.member_regret(rew, rew, mt, nothing)), LogWealthRegretResult)
+        regs = log_wealth_regret(fr, ew; mt = mt)
+        @test length(regs) == 3
+        for j in 1:3
+            @test isequal(regs[j].regret,
+                          log_wealth_regret(alone(fr.mrd.X[j]), alone(rew); mt = mt).regret)
+            @test isequal(regs[j].p_value,
+                          log_wealth_regret(alone(fr.mrd.X[j]), alone(rew); mt = mt).p_value)
+        end
+        @test !all(r -> r.regret == regs[1].regret, regs)
+        # A one-series strategy against a many-member comparator: each member's own path.
+        back = log_wealth_regret(ew, fr; mt = mt)
+        @test [r.regret for r in back] ≈ -[r.regret for r in regs]
+        for j in 1:3
+            W = po.stacked_fold_weights(fr, f -> po.fold_target(f, j))
+            P = sum(norm(W[i, :] - W[i - 1, :]) for i in 2:size(W, 1))
+            @test back[j].path_length ≈ P
+            @test po.comparator_path_length(fr, j, Float64) ≈ P
+        end
+        @test length(unique(r.path_length for r in back)) == 3
+        # Two sides with many members pair by index.
+        self = log_wealth_regret(fr, fr; mt = mt)
+        @test all(r -> r.regret == 0, self)
+        # Each member meets its own benchmark series.
+        bench = @inferred log_wealth_regret(fr; mt = mt)
+        for j in 1:3
+            @test isequal(bench[j].regret,
+                          log_wealth_regret(alone(fr.mrd.X[j]), alone(fr.mrd.B[j]);
+                                            mt = mt).regret)
+        end
+        # Two members against three is refused, and names both counts.
+        two = bare_prediction([fr.mrd.X[1], fr.mrd.X[2]], tsf)
+        err = try
+            log_wealth_regret(two, fr)
+        catch e
+            e
+        end
+        @test isa(err, DimensionMismatch)
+        @test occursin("2 members", err.msg) && occursin("holds 3", err.msg)
+        # A one-series pair keeps the released scalar.
+        @test isa(log_wealth_regret(ew, ew; mt = mt), LogWealthRegretResult)
+        # The summary still reads the first member, series and benchmark alike (#1934).
+        @test isequal(performance_summary(fr).sharpe,
+                      performance_summary(fr.mrd.X[1]; benchmark = fr.mrd.B[1]).sharpe)
     end
 
     @testset "The benchmark fields of the performance summary" begin

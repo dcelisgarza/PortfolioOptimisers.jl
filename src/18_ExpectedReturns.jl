@@ -1451,14 +1451,14 @@ end
     performance_summary(res::OptimisationResult, rd::ReturnsResult;
                         kwargs...) -> PerformanceSummaryResult
     performance_summary(pred::PredRes_MultiPredRes;
-                        benchmark::Option{<:VecNum} = regret_benchmark(pred),
+                        benchmark::Option{<:VecNum} = member_vector(regret_benchmark(pred), 1),
                         kwargs...) -> PerformanceSummaryResult
 
 Summarise a realised return series as a [`PerformanceSummaryResult`](@ref).
 
 The methods that take weights and returns first make the net returns with [`calc_net_returns`](@ref). So the summary of a portfolio includes its fees.
 
-Every method takes a `benchmark`, a second return series over the same periods, and gives the three excess statistics against it. When no benchmark is given, the three are `NaN`. On the prediction-result method, `benchmark` defaults to the benchmark of the rows that the prediction scored, which [`regret_benchmark`](@ref) reads. So a prediction over returns data with a `B` gives the three statistics with no keyword, and `benchmark = nothing` turns them off. The other methods hold no prediction, and they read no `B`.
+Every method takes a `benchmark`, a second return series over the same periods, and gives the three excess statistics against it. When no benchmark is given, the three are `NaN`. On the prediction-result method, `benchmark` defaults to the benchmark of the rows that the prediction scored, which [`regret_benchmark`](@ref) reads. So a prediction over returns data with a `B` gives the three statistics with no keyword, and `benchmark = nothing` turns them off. The other methods hold no prediction, and they read no `B`. A prediction whose optimiser gives many portfolios holds one series for each member, and the summary reads the series, the benchmark and the turnover of its first member.
 
 Each fold collapsed a benchmark matrix with its own weights, as [`collapse_benchmark`](@ref) states. Against such a benchmark, `excess_ret` is the return of ``(\\boldsymbol{X} - \\boldsymbol{B}) \\boldsymbol{w}``. That is the active return against the same weights in the benchmark assets, and not the excess over one index.
 
@@ -1767,12 +1767,15 @@ function performance_summary(res::OptimisationResult, rd::ReturnsResult;
     _, w, X, fees = result_investable_view(res, rd.X)
     return performance_summary(w, X, fees; kwargs...)
 end
+# The summary reads member 1 of a prediction with many members; #1934 gives it one entry for
+# each member.
 function performance_summary(pred::PredRes_MultiPredRes;
-                             benchmark::Option{<:VecNum} = regret_benchmark(pred),
+                             benchmark::Option{<:VecNum} = member_vector(regret_benchmark(pred),
+                                                                         1),
                              kwargs...)::PerformanceSummaryResult
     ret, _ = regret_series(pred)
-    return summarise_returns(ret, held_path_turnover(pred); benchmark = benchmark,
-                             kwargs...)
+    return summarise_returns(member_vector(ret, 1), held_path_turnover(pred);
+                             benchmark = benchmark, kwargs...)
 end
 """
     sharpe_ratio_variance_factor(sr::Number, g1::Number, g2::Number)
