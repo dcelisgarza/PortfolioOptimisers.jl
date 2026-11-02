@@ -103,6 +103,7 @@ Where:
 
   - `risk`: created by the log-sum-exp and the maximum methods, a free scalar.
   - `u_risk`: created by the log-sum-exp method, ``n \\times 1``.
+  - `t_risk_lse`: created by the log-sum-exp method, one entry for each quadratic entry of `risk_vec`. It is empty when no entry is quadratic.
 
 ## Expressions
 
@@ -111,6 +112,7 @@ Where:
 ## Constraints
 
   - `u_risk_lse`: ``s_c \\left(\\sum_{i=1}^{n} u_i - 1\\right) \\leq 0``, registered by the log-sum-exp method.
+  - `t_risk_lse_qc`: ``s_c \\left(\\mathcal{R}_i - t_i\\right) \\leq 0``, for each quadratic entry ``\\mathcal{R}_i``, registered by the log-sum-exp method. An exponential cone takes no quadratic entry, so ``t_i`` takes the place of ``\\mathcal{R}_i`` in `risk_lse`.
   - `risk_lse`: ``\\left(s_c \\gamma (\\mathcal{R}_i - \\rho),\\, s_c,\\, s_c u_i\\right) \\in \\mathcal{K}_{\\mathrm{exp}}``, ``\\forall\\, i = 1,\\ldots,n``, registered by the log-sum-exp method.
   - `risk_ms`: ``\\rho - \\mathcal{R}_i \\geq 0``, ``\\forall\\, i = 1,\\ldots,n``, registered by the maximum method.
 
@@ -120,6 +122,7 @@ Where:
   - $(math_dict[:R_i_riskvec])
   - ``\\rho``: The variable `risk`.
   - ``u_i``: Entry ``i`` of `u_risk`.
+  - ``t_i``: The entry of `t_risk_lse` for the quadratic entry ``\\mathcal{R}_i``.
   - ``\\mathcal{K}_{\\mathrm{exp}} = \\mathrm{cl}\\,\\{(x, y, z) : y e^{x / y} \\leq z,\\, y > 0\\}``: Exponential cone.
 
 ## Relaxation
@@ -127,7 +130,7 @@ Where:
 $(val_dict[:relax])
 
   - The sum method is exact.
-  - The log-sum-exp rows give ``e^{\\gamma (\\mathcal{R}_i - \\rho)} \\leq u_i`` and ``\\sum_{i} u_i \\leq 1``, so ``\\rho \\geq \\mathcal{R}_{\\mathrm{lse}}``. The maximum rows give ``\\rho \\geq \\mathcal{R}_{\\mathrm{max}}``. In both cases `model[:risk]` lies above the scalarised risk.
+  - The log-sum-exp rows give ``e^{\\gamma (\\mathcal{R}_i - \\rho)} \\leq u_i`` and ``\\sum_{i} u_i \\leq 1``, so ``\\rho \\geq \\mathcal{R}_{\\mathrm{lse}}``. A row `t_risk_lse_qc` gives ``t_i \\geq \\mathcal{R}_i``, and the cone grows with its first entry, so the bound holds with ``t_i`` in the place of ``\\mathcal{R}_i``. The maximum rows give ``\\rho \\geq \\mathcal{R}_{\\mathrm{max}}``. In both cases `model[:risk]` lies above the scalarised risk.
   - The bound is tight when the objective pulls `risk` down, as a minimum risk objective does.
   - Under the maximum, the objective pulls on the largest entry alone. When a risk measure below the maximum is written through epigraph variables, its entry can lie above the risk that the measure gives. [`expected_risk`](@ref) gives the exact value.
 
@@ -174,11 +177,22 @@ function scalarise_risk_expression!(model::JuMP.Model, sca::LogSumExpScalariser)
                         risk
                         u_risk[1:N]
                     end)
+    # An exponential cone takes no quadratic entry. The cone is monotone in its first entry, so
+    # an epigraph variable at or above each quadratic entry gives the same scalarised risk.
+    quad = findall(x -> isa(x, JuMP.QuadExpr), risk_vec)
+    aff = setdiff(1:N, quad)
+    Q = length(quad)
+    JuMP.@variable(model, t_risk_lse[1:Q])
+    JuMP.@constraint(model, t_risk_lse_qc[j = 1:Q],
+                     sc * (risk_vec[quad[j]] - t_risk_lse[j]) <= 0)
+    lse_vec = Vector{JuMP.AffExpr}(undef, N)
+    lse_vec[aff] .= risk_vec[aff]
+    lse_vec[quad] .= t_risk_lse
     JuMP.@constraints(model,
                       begin
                           u_risk_lse, sc * (sum(u_risk) - 1) <= 0
                           risk_lse[i = 1:N],
-                          [sc * gamma * (risk_vec[i] - risk), sc, sc * u_risk[i]] in
+                          [sc * gamma * (lse_vec[i] - risk), sc, sc * u_risk[i]] in
                           JuMP.MOI.ExponentialCone()
                       end)
     return nothing

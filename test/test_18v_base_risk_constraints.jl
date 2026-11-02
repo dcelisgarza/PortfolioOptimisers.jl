@@ -22,6 +22,31 @@ include(joinpath(@__DIR__, "test18_setup.jl"))
     end
 end
 
+@testset "#1942: the log-sum-exp scalariser takes a quadratic entry of risk_vec" begin
+    # An exponential cone takes no quadratic entry, so the solve of a `Variance` under the
+    # log-sum-exp failed. An epigraph variable at or above the quadratic entry takes its place.
+    gamma = 50.0
+    opt = JuMPOptimiser(; pe = pr, slv = slv, sca = LogSumExpScalariser(; gamma = gamma))
+    res = optimise(MeanRisk(; r = [Variance(), ConditionalValueatRisk()], opt = opt))
+    @test isa(res.retcode, OptimisationSuccess)
+    risk_vec = JuMP.value.(res.model[:risk_vec])
+    @test isapprox(JuMP.value(res.model[:risk]), log(sum(exp.(gamma * risk_vec))) / gamma;
+                   rtol = 1e-6)
+    # The objective pulls the epigraph variable down onto the quadratic entry.
+    @test isapprox(JuMP.value.(res.model[:t_risk_lse]), risk_vec[1:1]; rtol = 1e-6)
+    # An affine entry needs no epigraph variable.
+    res = optimise(MeanRisk(; r = ConditionalValueatRisk(), opt = opt))
+    @test isa(res.retcode, OptimisationSuccess)
+    @test isempty(res.model[:t_risk_lse])
+    # The log-sum-exp of one entry has the minimiser of the entry. The two formulations reach
+    # the minimum within the solver tolerance: the measured gap is 1.1e-6 relative.
+    res = optimise(MeanRisk(; r = Variance(), opt = opt))
+    res0 = optimise(MeanRisk(; r = Variance(), opt = JuMPOptimiser(; pe = pr, slv = slv)))
+    @test isa(res.retcode, OptimisationSuccess)
+    @test isapprox(expected_risk(Variance(), res.w, pr),
+                   expected_risk(Variance(), res0.w, pr); rtol = 1e-5)
+end
+
 @testset "A scalariser registers nothing when no measure reaches risk_vec" begin
     rt = optimise(MeanRisk(; r = StandardDeviation(), obj = MaximumReturn(),
                            opt = JuMPOptimiser(; pe = pr, slv = slv)))
