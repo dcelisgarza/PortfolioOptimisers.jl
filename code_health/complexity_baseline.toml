@@ -388,8 +388,8 @@ commit = "7dd23b4ac8"
 "src/17_Optimisation/06_Meta/02_NestedClustered.jl" = { cyc = 8, cog = 5, arg = 15, cyc_sum = 73, cog_sum = 38, arg_sum = 69, macros = ["@propagatable"] }
 "src/17_Optimisation/06_Meta/03_Stacking.jl" = { cyc = 9, cog = 11, arg = 15, cyc_sum = 47, cog_sum = 32, arg_sum = 50, macros = ["@propagatable"] }
 "src/17_Optimisation/06_Meta/04_SubsetResampling.jl" = { cyc = 6, cog = 7, arg = 15, cyc_sum = 49, cog_sum = 33, arg_sum = 66, macros = ["@propagatable"] }
-"src/17_Optimisation/07_FiniteAllocation/01_Base_FiniteAllocation.jl" = { cyc = 5, cog = 5, arg = 8, cyc_sum = 37, cog_sum = 22, arg_sum = 64, macros = [] }
-"src/17_Optimisation/07_FiniteAllocation/02_DiscreteFiniteAllocation.jl" = { cyc = 6, cog = 9, arg = 11, cyc_sum = 29, cog_sum = 27, arg_sum = 61, macros = [] }
+"src/17_Optimisation/07_FiniteAllocation/01_Base_FiniteAllocation.jl" = { cyc = 5, cog = 5, arg = 9, cyc_sum = 58, cog_sum = 39, arg_sum = 84, macros = [] }
+"src/17_Optimisation/07_FiniteAllocation/02_DiscreteFiniteAllocation.jl" = { cyc = 6, cog = 9, arg = 11, cyc_sum = 24, cog_sum = 25, arg_sum = 46, macros = [] }
 "src/17_Optimisation/07_FiniteAllocation/03_GreedyFiniteAllocation.jl" = { cyc = 9, cog = 14, arg = 7, cyc_sum = 23, cog_sum = 20, arg_sum = 38, macros = [] }
 "src/17_Optimisation/08_RiskMeasureCompatibility.jl" = { cyc = 2, cog = 2, arg = 2, cyc_sum = 15, cog_sum = 6, arg_sum = 15, macros = [] }
 "src/17_Optimisation/09_OnlineOptimisation.jl" = { cyc = 5, cog = 4, arg = 6, cyc_sum = 87, cog_sum = 30, arg_sum = 138, macros = [] }

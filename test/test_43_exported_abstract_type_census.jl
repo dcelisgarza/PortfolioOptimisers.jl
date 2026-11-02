@@ -108,6 +108,8 @@
     subtype it directly (issue #1861, the maintainer's ruling).
     `AbstractPipelineEstimator`, `AbstractPipelineResult` and `BaseSmythBrobyCovariance` joined
     with their `# Interfaces` sections on 2026-10-28 (issue #1890, from the verdict of #1874).
+    `AbstractUnpricedWeightAlgorithm` joined with its `# Interfaces` section on 2026-11-02
+    (issue #1950): the rule of `FiniteAllocationInput` for the weight of an Unpriced Asset.
     They are held to their own list for the same reason — public is API too.
     =#
     #! format: off
@@ -249,6 +251,7 @@
         :AbstractUncertaintySetResult,
         :AbstractUnknownEntryRule,
         :AbstractUnpenalisedRegressionTarget,
+        :AbstractUnpricedWeightAlgorithm,
         :AbstractUnseenMemberRule,
         :AbstractVarianceEstimator,
         :AbstractWindowRule,

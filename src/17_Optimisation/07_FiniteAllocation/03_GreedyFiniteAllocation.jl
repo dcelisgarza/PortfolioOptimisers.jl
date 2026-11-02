@@ -433,16 +433,15 @@ function finite_sub_allocation!(w::VecNum, p::VecNum, cash::Number, bgt::Number,
     return view(shares, idx), view(cost, idx), view(aw, idx), acash, fee
 end
 function _optimise(ga::GreedyAllocation, fai::FiniteAllocationInput; kwargs...)
-    w, p, cash, pcash, T, fees, ca = fai.w, fai.prices, fai.cash, fai.prev_cash,
-                                     fai.horizon, fai.fees, fai.ca
-    lbgt, sbgt, lidx, sidx = setup_alloc_optim(w)
-    lsf, ssf = allocation_side_fees(fees, T, pcash, lidx, sidx)
+    p, cash, ca = fai.prices, fai.cash, fai.ca
+    w, lbgt, sbgt, lidx, sidx, lsf, ssf = prepare_finite_allocation(fai)
     sshares, scost, sw, _, sfee = finite_sub_allocation!(-view(w, sidx), view(p, sidx),
                                                          ca(w, p, cash), sbgt, ssf, ga)
     lcash = ca(w, p, cash, sum(scost), sfee)
     lshares, lcost, lw, lcash, lfee = finite_sub_allocation!(view(w, lidx), view(p, lidx),
                                                              lcash, lbgt, lsf, ga)
-    res = Matrix{eltype(w)}(undef, length(w), 3)
+    # An unpriced asset is on neither side, so its row keeps the zero it starts with.
+    res = zeros(eltype(w), length(w), 3)
     res[lidx, 1] = lshares
     res[sidx, 1] = -sshares
     res[lidx, 2] = lcost
@@ -464,8 +463,8 @@ This method takes a `GreedyAllocation` with no fallback. The generic `optimise` 
 
 # Algorithm
 
- 1. Split the target weights into the long and the short side with [`setup_alloc_optim`](@ref).
- 2. Split the fee into the charge of each side with [`allocation_side_fees`](@ref).
+ 1. Read the target weights, the long and the short side, and the charge of each side with [`prepare_finite_allocation`](@ref). It removes each Unpriced Asset from its side, and gives its target weight to the rule `fai.upw`.
+ 2. Start every share count, cost and weight at zero, so an Unpriced Asset holds zero in each.
  3. Allocate the short side on its negated weights with [`finite_sub_allocation!`](@ref), with the short cash that `fai.ca` gives.
  4. Compute the long side's cash with `fai.ca`, from the money of the shares that the short side sold and the fee that it paid. See [`AbstractCollateralAlgorithm`](@ref).
  5. Allocate the long side with [`finite_sub_allocation!`](@ref).

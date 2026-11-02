@@ -82,12 +82,12 @@ To implement a new collateral algorithm, subtype `AbstractCollateralAlgorithm` a
 Where:
 
   - `w`: Target portfolio weights over the full universe. A negative weight is on the short side.
-  - `prices`: Asset prices, in the order of `w`.
+  - `prices`: Asset prices, in the order of `w`. A `NaN` price marks an Unpriced Asset, and its weight in `w` is zero.
   - `cash`: Cash of the allocation, the `cash` of [`FiniteAllocationInput`](@ref).
   - `smoney`: Money of the shares that the short side sold, a non-negative number.
   - `sfee`: Fee that the short side paid over the whole horizon.
 
-Each method must return a non-negative number. The allocators do not check it.
+Each method must return a non-negative number. The allocators do not check it. A plain function with the same two methods is also a valid `ca`, as [`CollateralAlg_Func`](@ref) states.
 
 # Examples
 
@@ -106,12 +106,25 @@ julia> optimise(GreedyAllocation(), fai).shares
  70.0
  25.0
  -0.0
+
+julia> no_short(w, prices, cash) = zero(cash);
+
+julia> no_short(w, prices, cash, smoney, sfee) = cash * sum(x -> max(x, zero(x)), w);
+
+julia> optimise(GreedyAllocation(),
+                FiniteAllocationInput(; w = [0.7, 0.5, -0.2], prices = [10.0, 20.0, 5.0],
+                                      cash = 1000.0, ca = no_short)).shares
+3-element view(::Matrix{Float64}, :, 1) with eltype Float64:
+ 70.0
+ 25.0
+ -0.0
 ```
 
 # Related
 
   - [`ProceedsCollateral`](@ref)
   - [`CashCollateral`](@ref)
+  - [`CollateralAlg_Func`](@ref)
   - [`FiniteAllocationInput`](@ref)
   - [`setup_alloc_optim`](@ref)
 """
@@ -284,6 +297,471 @@ function (ca::CashCollateral)(w::VecNum, ::VecNum, cash::Number, smoney::Number,
 end
 export ProceedsCollateral, CashCollateral
 """
+    const CollateralAlg_Func = Union{AbstractCollateralAlgorithm, Function}
+
+Alias for a rule that gives each side of a finite allocation its cash: a rule of the family, or a plain function with the two methods of the family.
+
+It is the bound of the `ca` field of [`FiniteAllocationInput`](@ref). [`AbstractCollateralAlgorithm`](@ref) states the two methods.
+
+# Related
+
+  - [`AbstractCollateralAlgorithm`](@ref)
+  - [`UnpricedAlg_Func`](@ref)
+  - [`FiniteAllocationInput`](@ref)
+"""
+const CollateralAlg_Func = Union{AbstractCollateralAlgorithm, Function}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the rules that move the target weight of an Unpriced Asset to other assets of a finite allocation.
+
+An Unpriced Asset has a `NaN` price on the allocation date, because it has no bar on that date. An example is an asset that was delisted after the date of the weights. No allocator can buy such an asset. With `upw = nothing`, [`FiniteAllocationInput`](@ref) reads the weight of an Unpriced Asset as a zero weight, so the allocation does not spend it. A rule of this family moves that weight to priced assets of the same side, so the long and the short budget of the book do not change. The rule is the `upw` field of the input, not a field of the allocator, so every allocator of a fallback chain reads one rule.
+
+# Interfaces
+
+To implement a new rule, subtype `AbstractUnpricedWeightAlgorithm` and make it callable with this method:
+
+  - `(upw::MyRule)(w::VecNum, umsk::AbstractVector{Bool}) -> VecNum`: Returns the new target weights.
+
+Where:
+
+  - `w`: Target portfolio weights over the full universe. A negative weight is on the short side.
+  - `umsk`: Mask of the Unpriced Assets, in the order of `w`.
+
+The returned vector must have the length of `w`, and a zero at every Unpriced Asset. The allocators check both conditions, and throw an `ArgumentError` when one fails. A plain function with the same signature is also a valid `upw`. [`unpriced_weights`](@ref) states the zero-weight reading of `nothing`, which a rule can call to start from.
+
+# Examples
+
+```jldoctest
+julia> struct MyFirstAssetRule <: PortfolioOptimisers.AbstractUnpricedWeightAlgorithm end
+
+julia> function (::MyFirstAssetRule)(w, umsk)
+           wt = PortfolioOptimisers.unpriced_weights(nothing, w, umsk)
+           wt[1] += sum(w[umsk])
+           return wt
+       end
+
+julia> fai = FiniteAllocationInput(; w = [0.5, 0.3, 0.2], prices = [10.0, 20.0, NaN],
+                                   cash = 1000.0, upw = MyFirstAssetRule());
+
+julia> optimise(GreedyAllocation(), fai).shares
+3-element view(::Matrix{Float64}, :, 1) with eltype Float64:
+ 70.0
+ 15.0
+  0.0
+```
+
+# Related
+
+  - [`ProportionalRedistribution`](@ref)
+  - [`EvenRedistribution`](@ref)
+  - [`AssetRedistribution`](@ref)
+  - [`SideRedistribution`](@ref)
+  - [`UnpricedAlg_Func`](@ref)
+  - [`FiniteAllocationInput`](@ref)
+  - [`unpriced_weights`](@ref)
+"""
+abstract type AbstractUnpricedWeightAlgorithm <: AbstractAlgorithm end
+"""
+    const UnpricedAlg_Func = Union{AbstractUnpricedWeightAlgorithm, Function}
+
+Alias for a rule that moves the target weight of an Unpriced Asset: a rule of the family, or a plain function with the signature of the family.
+
+It is the bound of the `upw` field of [`FiniteAllocationInput`](@ref), in the form `Option{<:UnpricedAlg_Func}`.
+
+# Related
+
+  - [`AbstractUnpricedWeightAlgorithm`](@ref)
+  - [`CollateralAlg_Func`](@ref)
+  - [`FiniteAllocationInput`](@ref)
+"""
+const UnpricedAlg_Func = Union{AbstractUnpricedWeightAlgorithm, Function}
+"""
+    unpriced_side_weight(w::VecNum, umsk::AbstractVector{Bool}, long::Bool)
+
+Find the priced assets of one side of a book, and the target weight of the Unpriced Assets of that side.
+
+A zero weight is on the long side, as in [`setup_alloc_optim`](@ref). The rules of [`AbstractUnpricedWeightAlgorithm`](@ref) call this method once for each side, so the weight of a side goes to assets of that side only.
+
+# Mathematical definition
+
+```math
+d_\\sigma = \\sum_{i \\in \\mathcal{U} \\cap \\mathcal{S}_\\sigma} w_i\\,.
+```
+
+Where:
+
+  - ``d_\\sigma``: Target weight of the Unpriced Assets of the side ``\\sigma``. It is negative on the short side.
+  - ``\\mathcal{U}``: Set of the Unpriced Assets, where `umsk` is `true`.
+  - ``\\mathcal{S}_\\sigma``: Set of the assets of the side, ``w_i \\geq 0`` for the long side and ``w_i < 0`` for the short side.
+  - $(math_dict[:w_port])
+
+# Arguments
+
+  - `w::VecNum`: Target portfolio weights over the full universe.
+  - `umsk::AbstractVector{Bool}`: Mask of the Unpriced Assets.
+  - `long::Bool`: `true` for the long side.
+
+# Returns
+
+  - `r::BitVector`: Mask of the priced assets of the side, ``\\mathcal{S}_\\sigma \\setminus \\mathcal{U}``.
+  - `d::Number`: The weight ``d_\\sigma``.
+
+# Related
+
+  - [`ProportionalRedistribution`](@ref)
+  - [`EvenRedistribution`](@ref)
+  - [`AssetRedistribution`](@ref)
+"""
+function unpriced_side_weight(w::VecNum, umsk::AbstractVector{Bool}, long::Bool)
+    side = long ? w .>= zero(eltype(w)) : w .< zero(eltype(w))
+    d = sum(view(w, side .& umsk); init = zero(eltype(w)))
+    return side .& .!umsk, d
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Moves the target weight of each Unpriced Asset to the priced assets of its side, in proportion to their target weights.
+
+The rule keeps the ratios of the target weights of the priced assets of each side. A priced asset with a zero target weight gets no weight. A side that has no priced asset with a nonzero target weight keeps the weight of its Unpriced Assets as a zero weight, as `upw = nothing` does.
+
+# Mathematical definition
+
+```math
+\\tilde{w}_i = \\begin{cases} 0 & i \\in \\mathcal{U}\\,,\\\\ w_i \\left(1 + \\dfrac{d_\\sigma}{s_\\sigma}\\right) & i \\in \\mathcal{R}_\\sigma\\,,\\\\ w_i & \\text{otherwise}\\,, \\end{cases} \\qquad s_\\sigma = \\sum_{j \\in \\mathcal{R}_\\sigma} w_j\\,.
+```
+
+``\\mathcal{R}_\\sigma`` is the set of the priced assets of the side ``\\sigma`` with a nonzero target weight. ``s_\\sigma`` and ``d_\\sigma`` have the sign of the side, so the factor is larger than one on both sides, and the sum of the weights of each side does not change.
+
+Where:
+
+  - ``\\tilde{\\boldsymbol{w}}``: New target weights.
+  - $(math_dict[:w_port])
+  - ``\\mathcal{U}``: Set of the Unpriced Assets.
+  - ``d_\\sigma``: Target weight of the Unpriced Assets of the side, from [`unpriced_side_weight`](@ref).
+  - ``s_\\sigma``: Target weight of the priced assets of the side.
+
+# Functor
+
+    (upw::ProportionalRedistribution)(w::VecNum, umsk::AbstractVector{Bool})
+
+Returns ``\\tilde{\\boldsymbol{w}}``, with `umsk` as the mask of ``\\mathcal{U}``.
+
+# Examples
+
+```jldoctest
+julia> ProportionalRedistribution()([0.5, 0.3, 0.2], [false, false, true])
+3-element Vector{Float64}:
+ 0.625
+ 0.375
+ 0.0
+```
+
+# Related
+
+  - [`AbstractUnpricedWeightAlgorithm`](@ref)
+  - [`EvenRedistribution`](@ref)
+  - [`AssetRedistribution`](@ref)
+  - [`FiniteAllocationInput`](@ref)
+"""
+struct ProportionalRedistribution <: AbstractUnpricedWeightAlgorithm end
+function (::ProportionalRedistribution)(w::VecNum, umsk::AbstractVector{Bool})
+    wt = unpriced_weights(nothing, w, umsk)
+    for long in (true, false)
+        r, d = unpriced_side_weight(w, umsk, long)
+        r .&= .!iszero.(w)
+        s = sum(view(w, r); init = zero(eltype(w)))
+        if !iszero(d) && !iszero(s)
+            view(wt, r) .*= (s + d) / s
+        end
+    end
+    return wt
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Moves the target weight of each Unpriced Asset to the priced assets of its side, in equal parts.
+
+Each priced asset of the side with a nonzero target weight gets the same part. A priced asset with a zero target weight gets no part, because a zero weight marks an asset that the optimisation did not hold, such as an asset that left its universe. A side that has no priced asset with a nonzero target weight keeps the weight of its Unpriced Assets as a zero weight, as `upw = nothing` does.
+
+# Mathematical definition
+
+```math
+\\tilde{w}_i = \\begin{cases} 0 & i \\in \\mathcal{U}\\,,\\\\ w_i + \\dfrac{d_\\sigma}{\\lvert \\mathcal{R}_\\sigma \\rvert} & i \\in \\mathcal{R}_\\sigma\\,,\\\\ w_i & \\text{otherwise}\\,. \\end{cases}
+```
+
+``\\mathcal{R}_\\sigma`` is the set of the priced assets of the side ``\\sigma`` with a nonzero target weight, and ``\\lvert \\mathcal{R}_\\sigma \\rvert`` is its size.
+
+Where:
+
+  - ``\\tilde{\\boldsymbol{w}}``: New target weights.
+  - $(math_dict[:w_port])
+  - ``\\mathcal{U}``: Set of the Unpriced Assets.
+  - ``d_\\sigma``: Target weight of the Unpriced Assets of the side, from [`unpriced_side_weight`](@ref).
+
+# Functor
+
+    (upw::EvenRedistribution)(w::VecNum, umsk::AbstractVector{Bool})
+
+Returns ``\\tilde{\\boldsymbol{w}}``, with `umsk` as the mask of ``\\mathcal{U}``.
+
+# Examples
+
+```jldoctest
+julia> EvenRedistribution()([0.5, 0.3, 0.2, 0.0], [false, false, true, false])
+4-element Vector{Float64}:
+ 0.6
+ 0.4
+ 0.0
+ 0.0
+```
+
+# Related
+
+  - [`AbstractUnpricedWeightAlgorithm`](@ref)
+  - [`ProportionalRedistribution`](@ref)
+  - [`AssetRedistribution`](@ref)
+  - [`FiniteAllocationInput`](@ref)
+"""
+struct EvenRedistribution <: AbstractUnpricedWeightAlgorithm end
+function (::EvenRedistribution)(w::VecNum, umsk::AbstractVector{Bool})
+    wt = unpriced_weights(nothing, w, umsk)
+    for long in (true, false)
+        r, d = unpriced_side_weight(w, umsk, long)
+        r .&= .!iszero.(w)
+        if !iszero(d) && any(r)
+            view(wt, r) .+= d / count(r)
+        end
+    end
+    return wt
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Moves the target weight of each Unpriced Asset to the assets that `idx` names, in equal parts.
+
+The weight of a side goes to the priced assets of `idx` on that side. An asset of `idx` with a zero target weight is on the long side, as in [`setup_alloc_optim`](@ref), so it can take the weight of the long side, for example a fund that stands in for cash. A side that has no priced asset of `idx` keeps the weight of its Unpriced Assets as a zero weight, as `upw = nothing` does. So a long-short book names one asset of each side to move the weight of both sides.
+
+# Mathematical definition
+
+```math
+\\tilde{w}_i = \\begin{cases} 0 & i \\in \\mathcal{U}\\,,\\\\ w_i + \\dfrac{d_\\sigma}{\\lvert \\mathcal{R}_\\sigma \\rvert} & i \\in \\mathcal{R}_\\sigma\\,,\\\\ w_i & \\text{otherwise}\\,. \\end{cases}
+```
+
+``\\mathcal{R}_\\sigma`` is the set of the priced assets of `idx` on the side ``\\sigma``, and ``\\lvert \\mathcal{R}_\\sigma \\rvert`` is its size.
+
+Where:
+
+  - ``\\tilde{\\boldsymbol{w}}``: New target weights.
+  - $(math_dict[:w_port])
+  - ``\\mathcal{U}``: Set of the Unpriced Assets.
+  - ``d_\\sigma``: Target weight of the Unpriced Assets of the side, from [`unpriced_side_weight`](@ref).
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    AssetRedistribution(;
+        idx::Union{<:Integer, <:VecInt}
+    ) -> AssetRedistribution
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `idx` is not empty, else an [`IsEmptyError`](@ref).
+  - Every entry of `idx` is positive, else a `DomainError`.
+  - The functor throws a `BoundsError` when an entry of `idx` is larger than the length of `w`.
+
+# Functor
+
+    (upw::AssetRedistribution)(w::VecNum, umsk::AbstractVector{Bool})
+
+Returns ``\\tilde{\\boldsymbol{w}}``, with `umsk` as the mask of ``\\mathcal{U}``.
+
+# Examples
+
+```jldoctest
+julia> AssetRedistribution(; idx = 4)([0.5, 0.3, 0.2, 0.0], [false, false, true, false])
+4-element Vector{Float64}:
+ 0.5
+ 0.3
+ 0.0
+ 0.2
+```
+
+# Related
+
+  - [`AbstractUnpricedWeightAlgorithm`](@ref)
+  - [`ProportionalRedistribution`](@ref)
+  - [`EvenRedistribution`](@ref)
+  - [`FiniteAllocationInput`](@ref)
+"""
+@concrete struct AssetRedistribution <: AbstractUnpricedWeightAlgorithm
+    """
+    Index, or vector of indices, of the assets that take the weight of the Unpriced Assets, in the order of `w`.
+    """
+    idx
+    function AssetRedistribution(idx::Union{<:Integer, <:VecInt})
+        @argcheck(!isempty(idx), IsEmptyError("idx cannot be empty"))
+        @argcheck(all(>(0), idx), DomainError(idx, "every entry of idx must be > 0"))
+        return new{typeof(idx)}(idx)
+    end
+end
+function AssetRedistribution(; idx::Union{<:Integer, <:VecInt})::AssetRedistribution
+    return AssetRedistribution(idx)
+end
+function (upw::AssetRedistribution)(w::VecNum, umsk::AbstractVector{Bool})
+    wt = unpriced_weights(nothing, w, umsk)
+    tmsk = falses(length(w))
+    foreach(i -> tmsk[i] = true, upw.idx)
+    for long in (true, false)
+        r, d = unpriced_side_weight(w, umsk, long)
+        r .&= tmsk
+        if !iszero(d) && any(r)
+            view(wt, r) .+= d / count(r)
+        end
+    end
+    return wt
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Moves the target weight of the Unpriced Assets of the long side with one rule, and of the short side with another.
+
+A short position that the book cannot open often needs no replacement, while a long position does. This rule composes two rules of the family, one for each side. `nothing` on a side reads the weight of the Unpriced Assets of that side as a zero weight. A zero weight is on the long side, as in [`setup_alloc_optim`](@ref).
+
+The rule reads only the entries of its own side from each rule. The built-in rules move weight inside each side, so for them the result is exact. A plain function that moves weight from one side to the other gives a result that this rule does not define, because the rule of each side loses the entries of the other side.
+
+# Mathematical definition
+
+```math
+\\tilde{w}_i = \\begin{cases} \\tilde{w}^{L}_i & w_i \\geq 0\\,,\\\\ \\tilde{w}^{S}_i & w_i < 0\\,. \\end{cases}
+```
+
+Where:
+
+  - ``\\tilde{\\boldsymbol{w}}``: New target weights.
+  - $(math_dict[:w_port])
+  - ``\\tilde{\\boldsymbol{w}}^{L}``, ``\\tilde{\\boldsymbol{w}}^{S}``: New target weights of the rules `l` and `s`, from [`unpriced_weights`](@ref), which also checks each one.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    SideRedistribution(;
+        l::Option{<:UnpricedAlg_Func} = nothing,
+        s::Option{<:UnpricedAlg_Func} = nothing
+    ) -> SideRedistribution
+
+Keywords correspond to the struct's fields. With both rules `nothing`, the rule is equal to `upw = nothing`.
+
+## Validation
+
+  - Neither `l` nor `s` is a `SideRedistribution`, else an `ArgumentError`. The rule of a side gives only the entries of that side, so a nested rule adds nothing.
+
+# Functor
+
+    (upw::SideRedistribution)(w::VecNum, umsk::AbstractVector{Bool})
+
+Returns ``\\tilde{\\boldsymbol{w}}``, with `umsk` as the mask of the Unpriced Assets.
+
+# Examples
+
+```jldoctest
+julia> SideRedistribution(; l = ProportionalRedistribution())([0.6, 0.3, 0.3, -0.1, -0.1],
+                                                              [false, false, true, false, true])
+5-element Vector{Float64}:
+  0.8
+  0.4
+  0.0
+ -0.1
+  0.0
+```
+
+# Related
+
+  - [`AbstractUnpricedWeightAlgorithm`](@ref)
+  - [`ProportionalRedistribution`](@ref)
+  - [`EvenRedistribution`](@ref)
+  - [`AssetRedistribution`](@ref)
+  - [`FiniteAllocationInput`](@ref)
+"""
+@concrete struct SideRedistribution <: AbstractUnpricedWeightAlgorithm
+    """
+    Rule for the weight of the Unpriced Assets of the long side, or `nothing` for a zero weight.
+    """
+    l
+    """
+    Rule for the weight of the Unpriced Assets of the short side, or `nothing` for a zero weight.
+    """
+    s
+    function SideRedistribution(l::Option{<:UnpricedAlg_Func},
+                                s::Option{<:UnpricedAlg_Func})
+        @argcheck(!isa(l, SideRedistribution) && !isa(s, SideRedistribution),
+                  ArgumentError("a SideRedistribution cannot hold a SideRedistribution: each side reads only its own entries, so the nested rule adds nothing"))
+        return new{typeof(l), typeof(s)}(l, s)
+    end
+end
+function SideRedistribution(; l::Option{<:UnpricedAlg_Func} = nothing,
+                            s::Option{<:UnpricedAlg_Func} = nothing)::SideRedistribution
+    return SideRedistribution(l, s)
+end
+function (upw::SideRedistribution)(w::VecNum, umsk::AbstractVector{Bool})
+    lw = unpriced_weights(upw.l, w, umsk)
+    sw = unpriced_weights(upw.s, w, umsk)
+    return ifelse.(w .>= zero(eltype(w)), lw, sw)
+end
+"""
+    unpriced_weights(::Nothing, w::VecNum, umsk::AbstractVector{Bool})
+    unpriced_weights(upw::UnpricedAlg_Func, w::VecNum, umsk::AbstractVector{Bool})
+
+Give the target weights that a finite allocation buys when some of its assets are Unpriced Assets.
+
+The method on `nothing` sets the weight of each Unpriced Asset to zero, and changes no other weight. The allocation then reads an Unpriced Asset as an asset with a zero target weight, so it does not spend its weight. The method on a rule calls the rule, and checks the vector that it returns. [`prepare_finite_allocation`](@ref) calls this method only when the prices hold a `NaN`.
+
+The method on `nothing` returns a vector of `float_if_integer(eltype(w))`, so a rule that starts from it can add a fraction to integer weights.
+
+# Validation
+
+  - The vector of a rule has the length of `w`, and a zero at every Unpriced Asset, else an `ArgumentError`.
+
+# Arguments
+
+  - `upw`: The rule of the `upw` field of [`FiniteAllocationInput`](@ref), or `nothing`.
+  - `w::VecNum`: Target portfolio weights over the full universe.
+  - `umsk::AbstractVector{Bool}`: Mask of the Unpriced Assets, in the order of `w`.
+
+# Returns
+
+  - `wt::VecNum`: The new target weights.
+
+# Related
+
+  - [`AbstractUnpricedWeightAlgorithm`](@ref)
+  - [`UnpricedAlg_Func`](@ref)
+  - [`prepare_finite_allocation`](@ref)
+"""
+function unpriced_weights(::Nothing, w::VecNum, umsk::AbstractVector{Bool})
+    wt = zeros(float_if_integer(eltype(w)), length(w))
+    pmsk = .!umsk
+    wt[pmsk] = view(w, pmsk)
+    return wt
+end
+function unpriced_weights(upw::UnpricedAlg_Func, w::VecNum, umsk::AbstractVector{Bool})
+    wt = upw(w, umsk)
+    @argcheck(length(wt) == length(w) && all(iszero, view(wt, umsk)),
+              ArgumentError("the rule `upw` must return a weight vector of length $(length(w)) with a zero at every unpriced asset $(findall(umsk))"))
+    return wt
+end
+export ProportionalRedistribution, EvenRedistribution, AssetRedistribution,
+       SideRedistribution
+public unpriced_weights
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Holds the target weights, prices and cash that a finite allocation reads.
@@ -291,6 +769,8 @@ Holds the target weights, prices and cash that a finite allocation reads.
 [`optimise`](@ref) takes it as the second argument, with a [`DiscreteAllocation`](@ref) or a [`GreedyAllocation`](@ref). It also holds the cash before the trade, an optional horizon, fee and Investable Mask, and the collateral algorithm that gives each side of the book its cash. It subtypes [`AbstractEstimator`](@ref) and not [`OptimisationResult`](@ref), because it is the input of an allocation. The methods that dispatch on a result, such as the plots and the result [`factory`](@ref), cannot read its fields.
 
 An optimisation over a reduced universe solves on its Investable Mask, and expands the weights back to the full universe. Its result then has a full-length `w` and a fee on two reduced axes. `imsk` records the reduction. [`allocation_side_fees`](@ref) calls [`lift_fees`](@ref) to put the fee back on the axis of `w` and `prices`, so the allocation charges the forced exit of an asset that left the universe on the money that the exit sold. The fee records its mask in its own `imsk` field too, and the constructor makes the two agree through [`mark_fees`](@ref). A stated `imsk` marks a fee that has no mask. A marked fee gives its mask when `imsk` is `nothing`. The constructor refuses two masks that differ.
+
+An Unpriced Asset has a `NaN` price, the price of an asset with no bar on the allocation date. Both allocators solve each side over its priced assets only, so they buy no Unpriced Asset, and its shares, cost and realised weight are zero. Its price reaches no other number of the result. `upw` states what its target weight becomes. With `upw = nothing`, the weight is read as a zero weight. A rule of [`AbstractUnpricedWeightAlgorithm`](@ref) moves it to priced assets of the same side. A held Unpriced Asset ends the trade with no money, so its turnover fee charges the sale of the whole previous position, as [`allocation_side_fees`](@ref) states.
 
 # Fields
 
@@ -306,7 +786,8 @@ $(DocStringExtensions.FIELDS)
         horizon::Option{<:Number} = nothing,
         fees::Option{<:Fees} = nothing,
         imsk::Option{<:BitVector} = nothing,
-        ca::AbstractCollateralAlgorithm = ProceedsCollateral()
+        ca::CollateralAlg_Func = ProceedsCollateral(),
+        upw::Option{<:UnpricedAlg_Func} = nothing
     ) -> FiniteAllocationInput
 
 Keywords correspond to the struct's fields.
@@ -320,7 +801,8 @@ Keywords correspond to the struct's fields.
         horizon::Option{<:Number} = nothing,
         fees::Option{<:Fees} = nothing,
         imsk::Option{<:BitVector} = nothing,
-        ca::AbstractCollateralAlgorithm = ProceedsCollateral()
+        ca::CollateralAlg_Func = ProceedsCollateral(),
+        upw::Option{<:UnpricedAlg_Func} = nothing
     ) -> FiniteAllocationInput
 
 Reads from a fitted optimisation every value that an allocation can take from it, so the caller states only the prices and the cash. A stated keyword takes priority. A value that the result does not carry becomes `nothing`, so one call serves every optimisation family:
@@ -334,6 +816,7 @@ Reads from a fitted optimisation every value that an allocation can take from it
 
   - `!isempty(w)` and `!isempty(prices)`, else an [`IsEmptyError`](@ref).
   - `length(w) == length(prices)`, else a `DimensionMismatch`.
+  - No entry of `prices` is infinite, else a `DomainError`. An absent price is `NaN`, as the ingestion layer spells it.
   - `cash > 0`, else a `DomainError`.
   - `prev_cash >= 0`, else a `DomainError`.
   - `horizon` is not `nothing` when `fees` is not `nothing`, else an [`IsNothingError`](@ref).
@@ -352,7 +835,8 @@ FiniteAllocationInput
     horizon ┼ nothing
        fees ┼ nothing
        imsk ┼ nothing
-         ca ┴ ProceedsCollateral()
+         ca ┼ ProceedsCollateral()
+        upw ┴ nothing
 ```
 
 # Related
@@ -369,6 +853,8 @@ FiniteAllocationInput
   - [`result_investable_mask`](@ref)
   - [`setup_alloc_optim`](@ref)
   - [`AbstractCollateralAlgorithm`](@ref)
+  - [`AbstractUnpricedWeightAlgorithm`](@ref)
+  - [`prepare_finite_allocation`](@ref)
   - [`optimise`](@ref)
 """
 @concrete struct FiniteAllocationInput <: AbstractEstimator
@@ -401,17 +887,24 @@ FiniteAllocationInput
     """
     imsk
     """
-    Collateral algorithm, which gives the short side its cash, and the long side its cash after the short side trades. The default [`ProceedsCollateral`](@ref) pays for the long side with the proceeds of the short sales.
+    Collateral algorithm, which gives the short side its cash, and the long side its cash after the short side trades. A rule of [`AbstractCollateralAlgorithm`](@ref), or a plain function with its two methods. The default [`ProceedsCollateral`](@ref) pays for the long side with the proceeds of the short sales.
     """
     ca
+    """
+    Rule for the target weight of an Unpriced Asset, an asset whose price is not finite. `nothing` reads the weight as a zero weight, so the allocation does not spend it. A rule of [`AbstractUnpricedWeightAlgorithm`](@ref), or a plain function with its signature, moves the weight to priced assets of the same side.
+    """
+    upw
     function FiniteAllocationInput(w::VecNum, prices::VecNum, cash::Number,
                                    prev_cash::Number, horizon::Option{<:Number},
                                    fees::Option{<:Fees}, imsk::Option{<:BitVector},
-                                   ca::AbstractCollateralAlgorithm)
+                                   ca::CollateralAlg_Func, upw::Option{<:UnpricedAlg_Func})
         @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
         @argcheck(!isempty(prices), IsEmptyError("prices cannot be empty"))
         @argcheck(length(w) == length(prices),
                   DimensionMismatch("w ($(length(w))) must match prices ($(length(prices)))"))
+        @argcheck(!any(isinf, prices),
+                  DomainError(prices,
+                              "an infinite value is neither a price nor the marker of an absence: spell an absent price `NaN`"))
         @argcheck(cash > zero(cash), DomainError(cash, "cash must be > 0"))
         @argcheck(prev_cash >= zero(prev_cash),
                   DomainError(prev_cash, "prev_cash must be >= 0"))
@@ -427,10 +920,15 @@ FiniteAllocationInput
                       IsEmptyError("imsk must keep at least one asset, and it keeps none"))
         end
         return new{typeof(w), typeof(prices), typeof(cash), typeof(prev_cash),
-                   typeof(horizon), typeof(fees), typeof(imsk), typeof(ca)}(w, prices, cash,
-                                                                            prev_cash,
-                                                                            horizon, fees,
-                                                                            imsk, ca)
+                   typeof(horizon), typeof(fees), typeof(imsk), typeof(ca), typeof(upw)}(w,
+                                                                                         prices,
+                                                                                         cash,
+                                                                                         prev_cash,
+                                                                                         horizon,
+                                                                                         fees,
+                                                                                         imsk,
+                                                                                         ca,
+                                                                                         upw)
     end
 end
 function FiniteAllocationInput(; w::VecNum, prices::VecNum, cash::Number = 1e6,
@@ -438,8 +936,9 @@ function FiniteAllocationInput(; w::VecNum, prices::VecNum, cash::Number = 1e6,
                                horizon::Option{<:Number} = nothing,
                                fees::Option{<:Fees} = nothing,
                                imsk::Option{<:BitVector} = nothing,
-                               ca::AbstractCollateralAlgorithm = ProceedsCollateral())::FiniteAllocationInput
-    return FiniteAllocationInput(w, prices, cash, prev_cash, horizon, fees, imsk, ca)
+                               ca::CollateralAlg_Func = ProceedsCollateral(),
+                               upw::Option{<:UnpricedAlg_Func} = nothing)::FiniteAllocationInput
+    return FiniteAllocationInput(w, prices, cash, prev_cash, horizon, fees, imsk, ca, upw)
 end
 function FiniteAllocationInput(res::NonFiniteAllocationOptimisationResult; prices::VecNum,
                                cash::Number = 1e6, prev_cash::Number = cash,
@@ -447,15 +946,17 @@ function FiniteAllocationInput(res::NonFiniteAllocationOptimisationResult; price
                                horizon::Option{<:Number} = nothing,
                                fees::Option{<:Fees} = nothing,
                                imsk::Option{<:BitVector} = nothing,
-                               ca::AbstractCollateralAlgorithm = ProceedsCollateral())::FiniteAllocationInput
+                               ca::CollateralAlg_Func = ProceedsCollateral(),
+                               upw::Option{<:UnpricedAlg_Func} = nothing)::FiniteAllocationInput
     # A stated keyword wins over the result, and each reader answers `nothing` on a result
     # carrying no such object, so a family holding fewer of them takes the same call.
     return FiniteAllocationInput(isnothing(w) ? res.w : w, prices, cash, prev_cash,
                                  allocation_horizon(res, horizon), extract_fees(res, fees),
-                                 isnothing(imsk) ? result_investable_mask(res) : imsk, ca)
+                                 isnothing(imsk) ? result_investable_mask(res) : imsk, ca,
+                                 upw)
 end
 export FiniteAllocationInput
-public AbstractCollateralAlgorithm
+public AbstractCollateralAlgorithm, AbstractUnpricedWeightAlgorithm
 """
     allocation_horizon(res::NonFiniteAllocationOptimisationResult,
                        horizon::Option{<:Number} = nothing)
@@ -583,6 +1084,53 @@ function setup_alloc_optim(w::VecNum)
     return lbgt, sbgt, lidx, sidx
 end
 """
+    prepare_finite_allocation(fai::FiniteAllocationInput)
+
+Give the target weights, the two sides and the two charges that both finite allocators solve over.
+
+Both allocators call this method first, so they read one definition of an Unpriced Asset, one rule for its weight, and one fee. A `NaN` price marks an Unpriced Asset, and the method removes each one from its side. So no sub-problem reads its price.
+
+# Algorithm
+
+ 1. Compute `umsk`, the mask of the `NaN` prices.
+ 2. If `umsk` marks an asset, replace `w` with [`unpriced_weights`](@ref) of `fai.upw`.
+ 3. Split `w` into its two sides with [`setup_alloc_optim`](@ref). An Unpriced Asset now has a zero weight, so it is on the long side, and the method removes it from `lidx`.
+ 4. Split the fee into the charge of each side with [`allocation_side_fees`](@ref), which charges the Unpriced Assets as a constant of the long side.
+
+# Arguments
+
+  - `fai::FiniteAllocationInput`: The input of the allocation.
+
+# Returns
+
+  - `w::VecNum`: Target weights that the allocation buys, with a zero at every Unpriced Asset.
+  - `lbgt::Number`: Long budget of `w`.
+  - `sbgt::Number`: Short budget of `w`.
+  - `lidx`: Mask of the priced assets of the long side.
+  - `sidx`: Mask of the short side.
+  - `lsf`: The long side's charge, or `nothing`.
+  - `ssf`: The short side's charge, or `nothing`.
+
+# Related
+
+  - [`FiniteAllocationInput`](@ref)
+  - [`AbstractUnpricedWeightAlgorithm`](@ref)
+  - [`unpriced_weights`](@ref)
+  - [`setup_alloc_optim`](@ref)
+  - [`allocation_side_fees`](@ref)
+"""
+function prepare_finite_allocation(fai::FiniteAllocationInput)
+    w = fai.w
+    umsk = isnan.(fai.prices)
+    if any(umsk)
+        w = unpriced_weights(fai.upw, w, umsk)
+    end
+    lbgt, sbgt, lidx, sidx = setup_alloc_optim(w)
+    lidx = lidx .& .!umsk
+    lsf, ssf = allocation_side_fees(fai.fees, fai.horizon, fai.prev_cash, lidx, sidx, umsk)
+    return w, lbgt, sbgt, lidx, sidx, lsf, ssf
+end
+"""
     allocation_turnover_money(::Nothing, ::Number, ::Any, ::Bool)
     allocation_turnover_money(tn::Turnover, prev_cash::Number, idx, short::Bool)
 
@@ -702,8 +1250,8 @@ function allocation_liquidation_fee(fees::Fees, T::Number, prev_cash::Number)
     return fee
 end
 """
-    allocation_side_fees(::Nothing, ::Option{<:Number}, ::Number, ::Any, ::Any)
-    allocation_side_fees(fees::Fees, T::Number, prev_cash::Number, lidx, sidx)
+    allocation_side_fees(::Nothing, ::Option{<:Number}, ::Number, ::Any, ::Any, ::Any)
+    allocation_side_fees(fees::Fees, T::Number, prev_cash::Number, lidx, sidx, umsk)
 
 Split a fee into the charge of the long side and the charge of the short side.
 
@@ -713,20 +1261,24 @@ Each sub-problem charges its own side. The long side takes `l` and `fl`, the sho
 
 The forced exit of [`allocation_liquidation_fee`](@ref) is a constant of the whole allocation. It is the `liq` entry of the long side's charge, and the short side's `liq` is zero, so both charges have the same entries.
 
+An Unpriced Asset is on neither side, because no sub-problem can buy it. It ends the trade with no money, so its fee is a constant too, and the long side's `liq` adds it. The method charges it with [`allocation_fee`](@ref) on zero money, so it is the turnover term alone, ``T \\left\\lvert \\boldsymbol{m}^{\\text{prev}} \\right\\rvert \\cdot \\boldsymbol{f}_{\\text{Tn}}`` over the Unpriced Assets. The proportional and the fixed term of zero money are zero.
+
 # Algorithm
 
  1. Lift `fees` onto the full universe with [`lift_fees`](@ref).
  2. Compute `ltn_val` and `lprev` for the long side, and `stn_val` and `sprev` for the short side, with [`allocation_turnover_money`](@ref).
  3. Compute `liq`, the forced-exit charge, with [`allocation_liquidation_fee`](@ref).
- 4. Return the long side's charge, from `l`, `fl`, `ltn_val`, `lprev` and `liq`, and the short side's charge, from `s`, `fs`, `stn_val`, `sprev` and a zero `liq`.
+ 4. Add to `liq` the [`allocation_fee`](@ref) of zero money in the Unpriced Assets, with their turnover rate and previous money from [`allocation_turnover_money`](@ref).
+ 5. Return the long side's charge, from `l`, `fl`, `ltn_val`, `lprev` and `liq`, and the short side's charge, from `s`, `fs`, `stn_val`, `sprev` and a zero `liq`.
 
 # Arguments
 
   - `fees`: Fee to split, or `nothing`.
   - `T`: Horizon, in periods.
   - `prev_cash::Number`: Cash that the portfolio held before the trade.
-  - `lidx`: Mask of the long side.
-  - `sidx`: Mask of the short side.
+  - `lidx`: Mask of the long side. It holds no Unpriced Asset.
+  - `sidx`: Mask of the short side. It holds no Unpriced Asset.
+  - `umsk`: Mask of the Unpriced Assets.
 
 # Returns
 
@@ -745,15 +1297,21 @@ Each charge is a named tuple of `T`, `prop`, `fixed`, `tn_val`, `prev_money` and
   - [`setup_alloc_optim`](@ref)
   - [`Fees`](@ref)
 """
-function allocation_side_fees(::Nothing, ::Option{<:Number}, ::Number, ::Any, ::Any)
+function allocation_side_fees(::Nothing, ::Option{<:Number}, ::Number, ::Any, ::Any, ::Any)
     return nothing, nothing
 end
-function allocation_side_fees(fees::Fees, T::Number, prev_cash::Number, lidx, sidx)
+function allocation_side_fees(fees::Fees, T::Number, prev_cash::Number, lidx, sidx, umsk)
     # `lidx` and `sidx` index the full universe, so the fee comes onto that axis first.
     fees = lift_fees(fees)
     ltn_val, lprev = allocation_turnover_money(fees.tn, prev_cash, lidx, false)
     stn_val, sprev = allocation_turnover_money(fees.tn, prev_cash, sidx, true)
     liq = allocation_liquidation_fee(fees, T, prev_cash)
+    # An unpriced asset holds no money after the trade, whatever it held before. Its price
+    # never enters: the charge reads zero money, so only the sale of the old position costs.
+    utn_val, uprev = allocation_turnover_money(fees.tn, prev_cash, umsk, false)
+    z = fill(zero(liq), count(umsk))
+    liq = allocation_fee((T = T, prop = nothing, fixed = nothing, tn_val = utn_val,
+                          prev_money = uprev, liq = liq), z, z)
     return ((T = T, prop = nothing_scalar_array_view(fees.l, lidx),
              fixed = nothing_scalar_array_view(fees.fl, lidx), tn_val = ltn_val,
              prev_money = lprev, liq = liq),
@@ -769,7 +1327,7 @@ Charge the whole fee of one side on a vector of share counts.
 
 The method charges every term on the money in each position, which is exact for share counts. Both allocators report this number. A `nothing` `sf` charges zero.
 
-A side that held money before the trade owes a turnover fee when it buys nothing, because a sale to zero is a trade. A book whose universe lost an asset owes the forced exit whatever it buys. For these reasons, both allocators charge this method on the empty book too.
+A side that held money before the trade owes a turnover fee when it buys nothing, because a sale to zero is a trade. A book whose universe lost an asset owes the forced exit whatever it buys. For these reasons, both allocators charge this method on the empty book too. On the long side, ``L`` also holds the turnover fee of the Unpriced Assets, which [`allocation_side_fees`](@ref) charges on zero money.
 
 # Mathematical definition
 
