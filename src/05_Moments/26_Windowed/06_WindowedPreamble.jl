@@ -10,7 +10,7 @@ A window that is an `Int` or an index vector cuts `iv`, `active_mask` and `estim
  1. Check `dims` with [`assert_dims`](@ref).
  2. Resolve `window` to `win` with [`get_window`](@ref). `nothing` resolves to a `Colon`, an `Int` to the range of the last `window` observations, and an index vector to itself.
  3. Cut `X` to `win`, and resolve the observation weights `w_new` over the cut `X`, with [`moment_window_and_weights`](@ref).
- 4. Make `inner`, a copy of `est` that holds `w_new`, with [`factory`](@ref).
+ 4. Make `inner`, the inner estimator of the window, with [`windowed_inner`](@ref). It holds `w_new` when the wrapper holds weights. Otherwise it holds its own weights, cut to `win`.
  5. Cut `iv` to `win` with [`windowed_rows`](@ref).
  6. Cut the two universe masks in `kwargs` to `win` with [`windowed_keywords`](@ref). The result is `kw`.
  7. Return `inner`, the cut `X`, the cut `iv` and `kw`.
@@ -53,7 +53,7 @@ function windowed_preamble(est, w::Option{<:ObsWeights}, window::Option{<:Int_Ve
     assert_dims(dims)
     win = get_window(window, X, dims)
     X, w_new = moment_window_and_weights(X, w, win; dims = dims, kwargs...)
-    inner = factory(est, w_new)
+    inner = windowed_inner(est, w_new, win)
     return inner, X, windowed_rows(iv, win, dims), windowed_keywords(win, dims; kwargs...)
 end
 """
@@ -67,7 +67,7 @@ This method takes no `dims`, because a vector has one axis. It takes no `iv`, be
 
  1. Resolve `window` to `win` with [`get_window`](@ref), as the matrix method does.
  2. Cut `X` to `win`, and resolve the observation weights `w_new` over the cut `X`, with [`moment_window_and_weights`](@ref).
- 3. Make `inner`, a copy of `est` that holds `w_new`, with [`factory`](@ref).
+ 3. Make `inner`, the inner estimator of the window, with [`windowed_inner`](@ref), as the matrix method does.
  4. Return `inner` and the cut `X`.
 
 # Arguments
@@ -93,8 +93,53 @@ function windowed_preamble(est, w::Option{<:ObsWeights}, window::Option{<:Int_Ve
                            X::VecNum)
     win = get_window(window, X)
     X, w_new = moment_window_and_weights(X, w, win)
-    inner = factory(est, w_new)
+    inner = windowed_inner(est, w_new, win)
     return inner, X
+end
+"""
+    windowed_inner(est, w::ObsWeights, win) -> typeof(est)
+    windowed_inner(est, w::Nothing, win::Colon) -> typeof(est)
+    windowed_inner(est, w::Nothing, win::VecInt) -> typeof(est)
+
+Make the inner estimator of one window of a windowed moment call, with observation weights that align with the rows of the window.
+
+A window cuts the returns to the observations `win`. Each observation weight of the fit must then belong to one of those observations. The weights come from one of two places. The wrapper can hold them, and [`moment_window_and_weights`](@ref) cuts them to `win` as `w`. Otherwise the inner estimator can hold weights of its own, one for each observation of the full sample. A cut of the returns that does not cut those weights gives a fit whose weights do not align with its rows.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `w` holds weights: return `est` with `w` in each weights field, through [`factory`](@ref). The weights of the wrapper replace the weights of the inner estimator, as [`factory`](@ref) does on all other paths.
+ 2. `w` is `nothing` and `win` is a `Colon`: return `est` unchanged, because the window keeps every observation.
+ 3. `w` is `nothing` and `win` is an index vector: return `est` with each of its own weights fields indexed to `win`, through [`obs_weights_view`](@ref).
+
+Step 3 does not normalise the weights again. The fit on the window is the weighted fit on the observations `win`, with the weights that the full sample gives them. A moment estimator of the library normalises its weights over the rows that it fits, so a rescaled weight vector gives the same fit.
+
+# Arguments
+
+  - `est`: Inner moment estimator.
+  - `w`: The observation weights of the wrapper, cut to `win`, or `nothing`.
+  - `win`: The resolved window, from [`get_window`](@ref).
+
+# Returns
+
+  - `inner`: The inner estimator of the window.
+
+# Related
+
+  - [`windowed_preamble`](@ref)
+  - [`obs_weights_view`](@ref)
+  - [`factory`](@ref)
+  - [`variance_series`](@ref)
+"""
+function windowed_inner(est, w::ObsWeights, ::Any)
+    return factory(est, w)
+end
+function windowed_inner(est, ::Nothing, ::Colon)
+    return est
+end
+function windowed_inner(est, ::Nothing, win::VecInt)
+    return obs_weights_view(est, win)
 end
 """
     windowed_rows(x::Nothing, win, dims::Int) -> nothing
@@ -257,9 +302,11 @@ Fit the variance of the inner estimator of a windowed estimator on the observati
 
 # Algorithm
 
- 1. Cut `X`, the observation weights and the two universe masks to `rows` with [`windowed_preamble`](@ref). The results are `inner`, `Xt` and `kw`.
- 2. `pnl` is `nothing`: call `Statistics.var(inner, Xt; dims, kw...)`. `pnl` is an Asset Panel: call the panel method of `Statistics.var` with the panel over `rows`, from [`windowed_panel`](@ref).
+ 1. Cut `X`, the observation weights, `iv` and the two universe masks to `rows` with [`windowed_preamble`](@ref). The results are `inner`, `Xt`, `ivt` and `kw`.
+ 2. `pnl` is `nothing`: call `Statistics.var(inner, Xt; dims, iv = ivt, kw...)`. `pnl` is an Asset Panel: call the panel method of `Statistics.var` with the panel over `rows`, from [`windowed_panel`](@ref), and with the same keywords.
  3. Return the result as a vector.
+
+Step 2 passes `iv = ivt` also when `ivt` is `nothing`, as the generated `var` method of a windowed estimator does. So every row reads the implied volatility of its own observations.
 
 # Arguments
 
@@ -269,7 +316,7 @@ Fit the variance of the inner estimator of a windowed estimator on the observati
   - $(arg_dict[:X])
   - $(arg_dict[:pnl_moment])
   - $(arg_dict[:dims])
-  - `kwargs...`: Keywords for the variance estimator. The function cuts the two universe masks to `rows`.
+  - `kwargs...`: Keywords for the variance estimator. The function cuts `iv` and the two universe masks to `rows`.
 
 # Returns
 
@@ -282,13 +329,14 @@ Fit the variance of the inner estimator of a windowed estimator on the observati
 """
 function windowed_series_row(est, w::Option{<:ObsWeights}, rows::VecInt, X::MatNum,
                              ::Nothing; dims::Int = 1, kwargs...)
-    inner, Xt, _, kw = windowed_preamble(est, w, rows, X; dims = dims, kwargs...)
-    return vec(Statistics.var(inner, Xt; dims = dims, kw...))
+    inner, Xt, ivt, kw = windowed_preamble(est, w, rows, X; dims = dims, kwargs...)
+    return vec(Statistics.var(inner, Xt; dims = dims, iv = ivt, kw...))
 end
 function windowed_series_row(est, w::Option{<:ObsWeights}, rows::VecInt, X::MatNum,
                              pnl::AssetPanel; dims::Int = 1, kwargs...)
-    inner, Xt, _, kw = windowed_preamble(est, w, rows, X; dims = dims, kwargs...)
-    return vec(Statistics.var(inner, Xt, windowed_panel(pnl, rows); dims = dims, kw...))
+    inner, Xt, ivt, kw = windowed_preamble(est, w, rows, X; dims = dims, kwargs...)
+    return vec(Statistics.var(inner, Xt, windowed_panel(pnl, rows); dims = dims, iv = ivt,
+                              kw...))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

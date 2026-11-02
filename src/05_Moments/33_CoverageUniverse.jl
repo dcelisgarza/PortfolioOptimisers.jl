@@ -1586,7 +1586,7 @@ It reduces each window to its own Coverage Universe, and fits the estimator on t
  3. For each observation `t`, take `Xt`, rows `1` to `t` of `X`.
  4. Set `cmsk` to the assets whose returns are finite at every row of `Xt` and, when `amsk` is not `nothing`, whose entries of `amsk` are `true` at every one of those rows.
  5. Skip row `t` when `cmsk` holds no asset, so the whole row keeps its `NaN`.
- 6. Otherwise fit the variance of the estimator on the columns `cmsk` of `Xt`, and write it into the entries `cmsk` of row `t` of `val`.
+ 6. Otherwise fit the variance of the estimator on the columns `cmsk` of `Xt`, and write it into the entries `cmsk` of row `t` of `val`. The fit reads the observation weights of the estimator at rows `1` to `t`, cut with [`obs_weights_view`](@ref).
  7. Return `val`, transposed when `dims == 2`.
 
 # Related
@@ -1608,7 +1608,8 @@ function coverage_variance_series(ce::AbstractCovarianceEstimator, ::Nothing, X:
         if !any(cmsk)
             continue
         end
-        val[t, cmsk] = vec(Statistics.var(ce, Xt[:, cmsk]; dims = 1, kwargs...))
+        val[t, cmsk] = vec(Statistics.var(obs_weights_view(ce, 1:t), Xt[:, cmsk]; dims = 1,
+                                          kwargs...))
     end
     return isone(dims) ? val : permutedims(val)
 end
@@ -1623,7 +1624,7 @@ It fits each window over the whole universe, and does not reduce it to its own C
 
  1. Orient `X` to `observations × assets` with [`dims_oriented`](@ref).
  2. Allocate `val`, the `NaN` frame, and read `amsk`, the active mask, with [`coverage_series_frame`](@ref). The active mask of an Asset Panel is `observations × assets` already.
- 3. For each observation `t`, fit the variance of the estimator on rows `1` to `t` of `X`, with rows `1` to `t` of `amsk` as its active mask, and write it into row `t` of `val`.
+ 3. For each observation `t`, fit the variance of the estimator on rows `1` to `t` of `X`, with rows `1` to `t` of `amsk` as its active mask, and write it into row `t` of `val`. The fit reads the observation weights of the estimator at the same rows, cut with [`obs_weights_view`](@ref).
  4. Return `val`, transposed when `dims == 2`.
 
 # Related
@@ -1638,7 +1639,7 @@ function coverage_variance_series(ce::AbstractCovarianceEstimator, ::CoveragePol
     X = dims_oriented(dims, X)
     val, amsk = coverage_series_frame(X, pnl)
     for t in axes(X, 1)
-        val[t, :] = vec(Statistics.var(ce, view(X, 1:t, :); dims = 1,
+        val[t, :] = vec(Statistics.var(obs_weights_view(ce, 1:t), view(X, 1:t, :); dims = 1,
                                        active_mask = if isnothing(amsk)
                                            nothing
                                        else

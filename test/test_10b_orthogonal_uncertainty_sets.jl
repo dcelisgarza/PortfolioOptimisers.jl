@@ -1077,10 +1077,13 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
             c = PO.variance_count(WindowedVariance(; window = 20), X1334)
             @test c.n == fill(20, N1334)
             @test c.m == fill(19, N1334)
-            # The root method states no count, which is not a count of its own.
+            # The root method states no count, which is not a count of its own. It is on the
+            # covariance family, because a cross-sectional prior takes any covariance estimator
+            # as its variance estimator and asks it for its count (#1928).
             @test isnothing(invoke(PO.variance_count,
-                                   Tuple{PO.AbstractVarianceEstimator, PO.MatNum},
+                                   Tuple{PO.AbstractCovarianceEstimator, PO.MatNum},
                                    SimpleVariance(), X1334))
+            @test isnothing(PO.variance_count(Covariance(), X1334))
         end
 
         F1334 = randn(rng1334, T1334, K1334) * 0.01

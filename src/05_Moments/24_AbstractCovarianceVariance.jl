@@ -222,11 +222,15 @@ Row `t` holds the variance of each asset, as estimated from observations `1` to 
 
 This method is the fallback that gives a series to each [`AbstractCovarianceEstimator`](@ref), so a member does not need a method of its own. It fits the estimator again on an expanding window, which costs one fit for each observation. A member whose estimate is a recursion overrides this method with one forward pass.
 
+Each fit reads only the observations `1` to `t`, so every input with one entry for each observation is cut to those rows with the returns. These inputs are the observation weights that `ce` holds, the implied volatility `iv`, the active mask and the estimation mask. Row `t` under observation weights is the weighted variance of the first `t` observations. The weights of these observations keep the values that the full sample gives them. A moment estimator of the library normalises its weights over the rows that it fits, so each row is a weighted variance with weights that sum to one over its window.
+
+The expanding window is the windowed series with no window and no weights of its own. So this method calls [`windowed_variance_series`](@ref), and the two series share one definition of row `t`.
+
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\mathbf{V}_{tj} &= \\hat{\\sigma}^2_j\\left(\\mathbf{X}_{1:t}\\right)\\,.
+\\mathbf{V}_{tj} &= \\hat{\\sigma}^2_j\\left(\\mathbf{X}_{1:t};\\, \\boldsymbol{w}_{1:t}\\right)\\,.
 \\end{align}
 ```
 
@@ -235,20 +239,20 @@ Where:
   - $(math_dict[:V_tj_series])
   - $(math_dict[:sigma2_hat_j]) Here `ce` estimates it.
   - ``\\mathbf{X}_{1:t}``: The first ``t`` observations of the data matrix.
+  - ``\\boldsymbol{w}_{1:t}``: The observation weights of `ce` at the first ``t`` observations, or no weights if `ce` holds none.
   - $(math_dict[:T])
 
 # Algorithm
 
- 1. Orient `X` so that the observations lie on the rows.
- 2. For each observation `t`, call `Statistics.var(ce, X[1:t, :]; dims = 1, kwargs...)` and write the result into row `t`.
- 3. Return the series, transposed when `dims == 2`.
+ 1. Call [`windowed_variance_series`](@ref) with no window and no wrapper weights. For each observation `t`, it cuts `X`, the observation weights of `ce`, `iv` and the two universe masks to the rows `1` to `t`, and it writes the variance of that fit into row `t`.
+ 2. Return the series of [`windowed_variance_series`](@ref), which it transposes when `dims == 2`.
 
 # Arguments
 
   - $(arg_dict[:ce])
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - `kwargs...`: More keyword arguments for the variance estimator. The method does not slice a keyword that has one entry for each observation, so an estimator that takes such a keyword must override this method.
+  - `kwargs...`: More keyword arguments for the variance estimator. The method cuts `iv`, `active_mask` and `estimation_mask` to the rows of each fit. It passes every other keyword unchanged, so an estimator that takes another keyword with one entry for each observation must override this method.
 
 # Validation
 
@@ -276,20 +280,16 @@ Row `1` is a fit on one observation. An estimator that needs two observations re
 
   - [`AbstractCovarianceEstimator`](@ref)
   - [`var(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+  - [`windowed_variance_series`](@ref)
+  - [`windowed_inner`](@ref)
 """
 function variance_series(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1,
                          kwargs...)
-    X = dims_oriented(dims, X)
-    v1 = vec(Statistics.var(ce, view(X, 1:1, :); dims = 1, kwargs...))
-    val = Matrix{eltype(v1)}(undef, size(X, 1), length(v1))
-    val[1, :] = v1
-    for t in 2:size(X, 1)
-        val[t, :] = vec(Statistics.var(ce, view(X, 1:t, :); dims = 1, kwargs...))
-    end
-    return isone(dims) ? val : permutedims(val)
+    return windowed_variance_series(ce, nothing, nothing, X, nothing; dims = dims,
+                                    kwargs...)
 end
 """
-    variance_count(ve::AbstractVarianceEstimator, X::MatNum)
+    variance_count(ve::AbstractCovarianceEstimator, X::MatNum)
     variance_count(ve::SimpleVariance, X::MatNum)
     variance_count(ve::ExpWeightedVariance, X::MatNum)
     variance_count(ve::RegimeAdjustedExpWeightedVariance, X::MatNum)
@@ -299,7 +299,7 @@ Return the effective count and the divisor of the variance that `ve` measures on
 
 A consumer that prices the sampling error of a variance needs two facts that only the estimator knows. The first fact is the number of observations that the estimate is worth. The second fact is the divisor of the sum of squares. This function returns both. A prior that writes the idiosyncratic variances of a loadings block calls this function on the residuals. The prior writes the result next to the variances, so that [`ResidualInflation`](@ref) reads it from the block.
 
-The method for [`AbstractVarianceEstimator`](@ref) returns `nothing`, which means that the estimator states no count. `nothing` is not a default count. A consumer that needs a count refuses a block that has none, and its error names the fix.
+The method for [`AbstractCovarianceEstimator`](@ref) returns `nothing`, which means that the estimator states no count. `nothing` is not a default count. A consumer that needs a count refuses a block that has none, and its error names the fix. The fallback is on the covariance family and not on the variance family alone, because [`CrossSectionalFactorPrior`](@ref) takes any covariance estimator as its variance estimator, and it asks each one for its count.
 
 # Mathematical definition
 
@@ -325,7 +325,7 @@ On an unweighted sample of ``T`` observations, ``n_{i} = T``. Then ``m_{i}`` is 
 
 # Algorithm
 
- 1. On [`AbstractVarianceEstimator`](@ref), return `nothing`.
+ 1. On [`AbstractCovarianceEstimator`](@ref), return `nothing`.
  2. On [`SimpleVariance`](@ref), take the finite rows of each column, and read the count from the observation weights with [`simple_variance_count`](@ref).
  3. On [`ExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedVariance`](@ref), take the Kish count of the exponential weights over the finite rows of each column with [`exp_weighted_variance_count`](@ref). The weights sum to one after the correction of the cold start, so the divisor equals the count. The count ignores the regime multiplier and the lags of a Heteroskedasticity and Autocorrelation Consistent (HAC) adjustment.
  4. On [`WindowedVariance`](@ref), apply the window and the weights of the wrapper with [`windowed_preamble`](@ref). Then return the count of the inner estimator.
@@ -341,12 +341,13 @@ On an unweighted sample of ``T`` observations, ``n_{i} = T``. Then ``m_{i}`` is 
 
 # Related
 
+  - [`AbstractCovarianceEstimator`](@ref)
   - [`AbstractVarianceEstimator`](@ref)
   - [`factor_lift`](@ref)
   - [`ResidualInflation`](@ref)
   - [`Regression`](@ref)
 """
-function variance_count(::AbstractVarianceEstimator, ::MatNum)::Nothing
+function variance_count(::AbstractCovarianceEstimator, ::MatNum)::Nothing
     return nothing
 end
 """

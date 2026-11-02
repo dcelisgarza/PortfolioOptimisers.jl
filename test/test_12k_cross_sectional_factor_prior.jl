@@ -773,6 +773,39 @@ scenario mean.
             @test !isapprox(pw.sigma, pr0.sigma; rtol = 1e-6)
         end
     end
+    @testset "A plain variance estimator reads the masks and the weights of its rows (#1928)" begin
+        # The fit hands `ve` both universe masks, one row for each row of the residuals, and a
+        # caller's `w` on a nested entropy pooling prior reaches `ve` too. The expanding series
+        # cuts all three to the rows of each fit, so row t is the variance of the residuals of
+        # the first t rows, under the weights those rows carry.
+        PO = PortfolioOptimisers
+        csv(ve) = CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors(),
+                                            minra = 5, ve = ve)
+        function vs_reference(ve, eps, w)
+            return permutedims(reduce(hcat,
+                                      [vec(var(if isnothing(w)
+                                                   ve
+                                               else
+                                                   PO.factory(ve,
+                                                              StatsBase.aweights(w[1:t]))
+                                               end, eps[1:t, :])) for t in axes(eps, 1)]))
+        end
+        for ve in (SimpleVariance(), Covariance())
+            p1 = csv(ve)
+            pv = prior(p1, rd)
+            # Row 1 is a fit on one residual, so it is NaN in both.
+            @test isapprox(pv.rr.vs, vs_reference(ve, pv.rr.csr.eps, nothing); rtol = 1e-12,
+                           nans = true)
+            v = collect(range(1, 3; length = size(pv.rr.csr.eps, 1)))
+            wn = StatsBase.aweights(v ./ sum(v))
+            for mk in (EntropyPoolingPrior, MeucciEntropyPoolingPrior)
+                pw = prior(mk(; pe = p1, sets = sets, mu_views = views, w = wn), rd)
+                @test isapprox(pw.rr.vs, vs_reference(ve, pw.rr.csr.eps, wn); rtol = 1e-12,
+                               nans = true)
+                @test !isapprox(pw.rr.vs[2:end, :], pv.rr.vs[2:end, :]; rtol = 1e-6)
+            end
+        end
+    end
 end
 
 @testset "A constrained Factor Family re-bases the fit" begin

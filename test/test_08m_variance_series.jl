@@ -16,7 +16,7 @@ The file also holds this estimator's first tests. Two defects it found are fixed
 change, and the last two testsets are their regressions. The final testset is issue #743's
 regression: `regime_lohi_mult` clamps the multiplier now, so this file also covers that field.
 =#
-using Test, PortfolioOptimisers, Statistics, StableRNGs, LinearAlgebra
+using Test, PortfolioOptimisers, Statistics, StatsBase, StableRNGs, LinearAlgebra
 
 const PO = PortfolioOptimisers
 
@@ -27,7 +27,8 @@ function slow_series(ce, X; dims::Int = 1, kwargs...)
 end
 
 # The expanding window written out by hand, slicing every per-observation keyword with the data.
-# This is what the fallback cannot do, because it cannot know which keyword carries observations.
+# The fallback slices the two masks, `iv` and the observation weights of the estimator (#1928), and
+# this reference states that slice independently of it.
 function masked_slow_series(ce, X; estimation_mask = nothing, active_mask = nothing)
     return permutedims(reduce(hcat,
                               [var(ce, view(X, 1:t, :);
@@ -42,6 +43,14 @@ function masked_slow_series(ce, X; estimation_mask = nothing, active_mask = noth
                                    end) for t in axes(X, 1)]))
 end
 
+# A variance estimator that reads `iv` and answers the sum of each of its columns, so a test can
+# see which rows of `iv` each fit of a series reads.
+struct IvEcho <: PO.AbstractVarianceEstimator end
+function Statistics.var(::IvEcho, X::PO.MatNum; dims::Int = 1, iv = nothing, kwargs...)
+    @assert size(iv) == size(X)
+    return sum(iv; dims = 1)
+end
+
 @testset "the fallback refits on an expanding window" begin
     rng = StableRNG(4321)
     X = randn(rng, 12, 3) .* 0.03
@@ -52,8 +61,10 @@ end
         for t in axes(X, 1)
             @test isequal(val[t, :], vec(var(ce, view(X, 1:t, :))))
         end
-        # `dims = 2` names the same series with the observations on the columns.
-        @test isequal(PO.variance_series(ce, permutedims(X); dims = 2), permutedims(val))
+        # `dims = 2` names the same series with the observations on the columns. Each fit runs
+        # along `dims`, as the whole-sample `var` does, so the two agree to rounding (#1928).
+        @test isapprox(PO.variance_series(ce, permutedims(X); dims = 2), permutedims(val);
+                       rtol = 1e-12, nans = true)
     end
 
     # Row 1 is a fit on one observation, so a corrected estimator has nothing to divide by.
@@ -144,6 +155,85 @@ end
                                      active_mask = permutedims(amsk)),
                   permutedims(PO.variance_series(ce, X; estimation_mask = emsk,
                                                  active_mask = amsk)))
+    # The fallback slices the masks with the data, so the refit reaches the recursion bit for bit.
+    @test isequal(slow_series(ce, X; estimation_mask = emsk, active_mask = amsk),
+                  PO.variance_series(ce, X; estimation_mask = emsk, active_mask = amsk))
+end
+
+@testset "the fallback slices every per-observation input with the data (#1928)" begin
+    rng = StableRNG(1928)
+    X = randn(rng, 10, 3) .* 0.03
+    msk = trues(size(X))
+    wv = StatsBase.aweights(collect(range(1.0, 4.0; length = size(X, 1))))
+    # Row t under observation weights is the weighted fit on the first t observations, with the
+    # weights those observations carry in the full sample.
+    function weighted_reference(ce, X, w; rows = t -> 1:t)
+        return permutedims(reduce(hcat,
+                                  [vec(var(PO.factory(ce, StatsBase.aweights(w[rows(t)])),
+                                           X[rows(t), :])) for t in axes(X, 1)]))
+    end
+    for ce in (SimpleVariance(), Covariance())
+        # Two plain estimators that read both masks: the fallback slices them with the data.
+        @test isequal(PO.variance_series(ce, X; estimation_mask = msk, active_mask = msk),
+                      PO.variance_series(ce, X))
+        # With the observations on the columns, each fit runs along `dims = 2`, as the
+        # whole-sample `var` does, so the two orientations agree to rounding.
+        @test isapprox(PO.variance_series(ce, permutedims(X); dims = 2,
+                                          estimation_mask = permutedims(msk),
+                                          active_mask = permutedims(msk)),
+                       permutedims(PO.variance_series(ce, X)); rtol = 1e-12, nans = true)
+        cw = PO.factory(ce, wv)
+        ref = weighted_reference(ce, X, wv)
+        @test isequal(PO.variance_series(cw, X), ref)
+        @test isapprox(PO.variance_series(cw, permutedims(X); dims = 2), permutedims(ref);
+                       rtol = 1e-12, nans = true)
+        # The panel route refits on the same rows, so it cuts the weights the same way.
+        @test isequal(PO.variance_series(cw, X, nothing), ref)
+    end
+    # The weights of the series are relative: a rescaled vector states the same series.
+    sw = PO.factory(SimpleVariance(), wv)
+    @test isapprox(PO.variance_series(PO.factory(SimpleVariance(),
+                                                 StatsBase.aweights(3 .* wv.values)), X)[2:end,
+                                                                                         :],
+                   PO.variance_series(sw, X)[2:end, :]; rtol = 1e-12)
+    # A windowed wrapper with no weights of its own cuts the weights of its inner estimator to
+    # each window, and the weights of the wrapper replace them when it holds some.
+    @test isequal(PO.variance_series(WindowedVariance(; ve = sw), X),
+                  weighted_reference(SimpleVariance(), X, wv))
+    @test isequal(PO.variance_series(WindowedVariance(; ve = sw, window = 3), X),
+                  weighted_reference(SimpleVariance(), X, wv; rows = t -> max(1, t - 2):t))
+    @test isequal(var(WindowedVariance(; ve = sw, window = 4), X),
+                  var(PO.factory(SimpleVariance(), StatsBase.aweights(wv[7:10])),
+                      X[7:10, :]))
+    @test isequal(var(WindowedVariance(; ve = sw, window = 4,
+                                       w = StatsBase.aweights(ones(10))), X),
+                  var(PO.factory(SimpleVariance(), StatsBase.aweights(ones(4))),
+                      X[7:10, :]))
+    # The vector method cuts the weights of the inner estimator to its window too, and a window
+    # that keeps every observation leaves the inner estimator as it is.
+    @test isequal(var(WindowedVariance(; ve = sw, window = 4), X[:, 1]),
+                  var(PO.factory(SimpleVariance(), StatsBase.aweights(wv[7:10])),
+                      X[7:10, 1]))
+    @test isequal(var(WindowedVariance(; ve = sw), X), var(sw, X))
+    # On an Asset Panel, each row of the windowed series fits the inner estimator on the panel
+    # of its own rows, with its weights cut to the same rows.
+    pnl = PO.AssetPanel(;
+                        pf = [PO.NumericPanelField(; name = "mcap", vals = ones(size(X)...),
+                                                   omsk = trues(size(X)...))],
+                        amsk = trues(size(X)), emsk = trues(size(X)))
+    @test isequal(PO.variance_series(WindowedVariance(; ve = sw, window = 3), X, pnl),
+                  weighted_reference(SimpleVariance(), X, wv; rows = t -> max(1, t - 2):t))
+    # The available-case route refits on the same expanding window as the plain route.
+    cp = SimpleVariance(; cvg = CoveragePolicy())
+    @test isapprox(PO.variance_series(cp, X, pnl), PO.variance_series(SimpleVariance(), X);
+                   rtol = 1e-12, nans = true)
+    # An estimator that reads `iv` gets the implied volatility of its own rows. `IvEcho` answers
+    # the sum of each column of the `iv` that its fit reads, so row t is the sum of rows 1 to t.
+    ivm = reshape(collect(1.0:30.0), 10, 3)
+    @test isequal(PO.variance_series(IvEcho(), X; iv = ivm), cumsum(ivm; dims = 1))
+    @test isequal(PO.variance_series(WindowedVariance(; ve = IvEcho(), window = 2), X;
+                                     iv = ivm),
+                  vcat(ivm[1:1, :], ivm[1:(end - 1), :] .+ ivm[2:end, :]))
 end
 
 @testset "an observation the pass cannot use leaves the cache where it was" begin

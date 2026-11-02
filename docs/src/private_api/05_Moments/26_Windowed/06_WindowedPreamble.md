@@ -1,5 +1,5 @@
 ```@meta
-Description = "Windowed preamble, private API of PortfolioOptimisers.jl: windowed_preamble, windowed_rows, windowed_keywords, windowed_panel, windowed_series_rows, …"
+Description = "Windowed preamble, private API of PortfolioOptimisers.jl: windowed_preamble, windowed_inner, windowed_rows, windowed_keywords, windowed_panel, …"
 ```
 
 # [Windowed preamble: private API](@id private-api-windowed-preamble)
@@ -8,6 +8,7 @@ Description = "Windowed preamble, private API of PortfolioOptimisers.jl: windowe
 
 ```@docs
 windowed_preamble
+windowed_inner
 windowed_rows
 windowed_keywords
 windowed_panel
