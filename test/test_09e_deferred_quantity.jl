@@ -1535,10 +1535,15 @@ end
         return nothing
     end
     base(T) = Base.typename(Base.unwrap_unionall(T)).wrapper
+    # The census reads only the types of the package. A test file that ran earlier in the same
+    # worker can add a probe type and a `deferred_slots` method of its own (`OrderProbe`,
+    # `SolverProbe` and `UnpairedProbe` of `test_09f`). On CI that made the count 25 and gave
+    # a `TypeVar` field bound to `isa`, in 4 of 80 red runs (G1 of #1817, extension 5).
+    owned(T) = parentmodule(base(T)) === PO
     declaring = Any[]
     for m in methods(PO.deferred_slots)
         T = Base.unwrap_unionall(m.sig).parameters[2]
-        T === Any && continue
+        (T === Any || !owned(T)) && continue
         x = instantiate(base(T))
         isnothing(x) || push!(declaring, x)
     end
@@ -1556,8 +1561,9 @@ end
         return nothing
     end
 
-    pool = vcat(PO.traverse_concrete_subtypes(PO.AbstractBaseRiskMeasure),
-                PO.traverse_concrete_subtypes(PO.JuMPReturnsEstimator))
+    pool = filter(owned,
+                  vcat(PO.traverse_concrete_subtypes(PO.AbstractBaseRiskMeasure),
+                       PO.traverse_concrete_subtypes(PO.JuMPReturnsEstimator)))
     undeclared = String[]
     unbounded = String[]
     for T in pool

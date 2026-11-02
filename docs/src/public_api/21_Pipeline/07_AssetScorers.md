@@ -34,7 +34,7 @@ WeightMassScorer
 ## Functions
 
 ```@docs
-PortfolioOptimisers.fold_statistic
+PortfolioOptimisers.fold_statistic(::Value, ::PortfolioOptimisers.VecNum, ::Bool)
 PortfolioOptimisers.statistic_bigger_is_better
 PortfolioOptimisers.fold_aggregate
 ```
