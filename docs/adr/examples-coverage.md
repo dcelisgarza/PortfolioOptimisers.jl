@@ -100,6 +100,7 @@ Mark a topic covered (✅) only when all of the following hold:
 | ✅ | Finite allocation: rounding fractional weights to integer lots | `examples/6_post_processing/01_Finite_Allocation.jl` |
 | ✅ | Plotting and reporting | `examples/6_post_processing/02_Plotting_and_Reporting.jl` |
 | ✅ | Performance attribution: `cumulative_returns`, `drawdowns`, realised-performance scorecard, `calc_net_returns`/`calc_fees` cost drag, `risk_contribution` attribution (post-optimisation diagnostics) | `examples/6_post_processing/03_Performance_Attribution.jl` |
+| ✅ | Portfolio Report (ADR 0228): `portfolio_report` over the three prediction types (the `ranked` candidates of a search with `n_best`, a `CombinatorialCrossValidation` population, one `predict` fold with a `DiscreteAllocation`), `groups`, `measures` and `rf`, `default_report_figures` with one figure of the caller, `write_report` as HTML and Markdown with PNG figures, and the HTML file shown on the docs page in a frame and as a link (#1951) | `examples/6_post_processing/04_Portfolio_Report.jl` |
 
 ## 7. Putting it together (end-to-end profiles)
 
