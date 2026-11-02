@@ -979,7 +979,8 @@
     mapped back to the grid through the list of those columns.
     =#
     @testset "a failed candidate never wins the search" begin
-        fci = PortfolioOptimisers.finite_candidate_index
+        # The winner of the search, rank 1 of the order (#1937).
+        fci(s, S) = only(first(PortfolioOptimisers.finite_candidate_order(s, S, 1)))
         hms = PortfolioOptimisers.HighestMeanScore()
 
         # The census matrix: `argmax` over the column means `[0.80, NaN, 0.50]` returns 2

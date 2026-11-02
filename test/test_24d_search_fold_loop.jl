@@ -222,7 +222,9 @@ The fixture is the online fold loop's, because the identities are structural.
             @test all(isnan, res.test_scores[:, 3])
             @test res.idx == 1
             @test res.val_grid[res.idx] == (ok,)
-            @test po.finite_candidate_index(HighestMeanScore(), res.test_scores) == 1
+            @test po.finite_candidate_order(HighestMeanScore(), res.test_scores, 3) ==
+                  ([1], [mean(res.test_scores[:, 1])])
+            @test res.rank_idx == [1]
         end
     end
 
@@ -487,6 +489,157 @@ The fixture is the online fold loop's, because the identities are structural.
         cols = [findfirst(==(v), gres.val_grid) for v in r3.val_grid]
         @test size(r3.test_scores) == (4, 3)
         @test r3.test_scores == gres.test_scores[:, cols]
+    end
+
+    #=
+    Issue #1937: the search keeps its `n_best` best candidates in rank order, as
+    configurations built from the estimator that it was given, through the per-candidate
+    value `candidate_scores` of the scorer.
+    =#
+    @testset "12. The search keeps its n best candidates in rank order" begin
+        @eval struct OnlyIndexScore <: PortfolioOptimisers.CrossValidationSearchScorer end
+        @eval (::OnlyIndexScore)(X::AbstractMatrix) = argmax(vec(minimum(X; dims = 1)))
+        hms = HighestMeanScore()
+        kcv = KFold(; n = 4)
+        cgrid = concrete_typed_array(["opt.wb" => wbgrid[1][2],
+                                      "opt.pe.ce.ce.ce.ce" =>
+                                          [SimpleCovariance(; corrected = true),
+                                           SimpleCovariance(; corrected = false)]])
+        means(res) = vec(mean(res.test_scores; dims = 1))
+
+        # n_best = 1 is the released Result: the index of the index form, and one kept
+        # candidate, which is `opt` itself.
+        r1 = search_cross_validation(hrp, gs(kcv, cgrid; ex = SequentialEx()), rd)
+        @test r1.idx == hms(r1.test_scores)
+        @test r1.rank_idx == [r1.idx] && r1.ranked[1] === r1.opt
+        @test r1.rank_scores == [means(r1)[r1.idx]]
+        @test isnothing(r1.path_ids)
+
+        # n_best = k keeps the first k of the stable descending order of the column means.
+        r4 = search_cross_validation(hrp, gs(kcv, cgrid; n_best = 4, ex = SequentialEx()),
+                                     rd)
+        @test r4.test_scores == r1.test_scores && r4.opt === r4.ranked[1]
+        @test r4.rank_idx == sortperm(means(r4); rev = true)[1:4]
+        @test r4.rank_scores == means(r4)[r4.rank_idx]
+        @test r4.idx == r1.idx && length(r4.ranked) == 4
+        for (cand, k) in zip(r4.ranked, r4.rank_idx)
+            @test (cand.opt.wb, cand.opt.pe.ce.ce.ce.ce) == r4.val_grid[k]
+        end
+        # n_best larger than the grid keeps the whole grid, with no warning.
+        r9 = search_cross_validation(hrp, gs(kcv, cgrid; n_best = 9, ex = SequentialEx()),
+                                     rd)
+        @test r9.rank_idx == sortperm(means(r9); rev = true)
+
+        # The gap: a joined grid with different keys. Each kept candidate is built from the
+        # base estimator, so a covariance candidate keeps the base weight bounds, where a
+        # candidate built from `opt` carries the bounds of the winner.
+        sets = [Pair{String, Vector}["opt.wb" => wbgrid[1][2]],
+                Pair{String, Vector}["opt.pe.ce.ce.ce.ce" => [SimpleCovariance(;
+                                                                               corrected = false)]]]
+        rj = search_cross_validation(hrp, gs(kcv, sets; n_best = 4, ex = SequentialEx()),
+                                     rd)
+        @test length(rj.ranked) == 4
+        for (cand, k) in zip(rj.ranked, rj.rank_idx)
+            ref = po.search_candidate(hrp, rj.lens_grid[k], rj.val_grid[k])
+            @test cand.opt.wb == ref.opt.wb &&
+                  cand.opt.pe.ce.ce.ce.ce == ref.opt.pe.ce.ce.ce.ce
+        end
+        j = findfirst(==(4), rj.rank_idx)
+        @test rj.ranked[j].opt.wb == hrp.opt.wb
+        # Built from a winner of the first set, candidate 4 would carry its bounds.
+        for k in 2:3
+            win = po.search_candidate(hrp, rj.lens_grid[k], rj.val_grid[k])
+            from_opt = po.search_candidate(win, rj.lens_grid[4], rj.val_grid[4])
+            @test from_opt.opt.wb != rj.ranked[j].opt.wb
+        end
+
+        # A tie keeps grid order, in the order and in the index form.
+        S = [0.5 0.8 0.8 0.25
+             0.7 0.6 0.6 0.25]
+        o, v = po.finite_candidate_order(hms, S, 4)
+        @test o == [2, 3, 1, 4] && v == vec(mean(S; dims = 1))[o]
+        @test hms(S) == 2
+        # A failed candidate never enters the order, and the cap is the count of finite
+        # columns.
+        Sf = [NaN 0.5 0.8
+              0.2 0.5 0.8]
+        @test po.finite_candidate_order(hms, Sf, 3) == ([3, 2], [0.8, 0.5])
+        # The index form of HighestMeanScore is argmax of its values.
+        X = [0.5 0.75 0.25; 1.0 0.5 0.25]
+        @test po.candidate_scores(hms, X) == vec(mean(X; dims = 1))
+        @test argmax(po.candidate_scores(hms, X)) == hms(X)
+
+        # Refusals: a count below one, and a function scorer with more than one candidate,
+        # at construction. A function scorer keeps working at n_best = 1.
+        fsc = X -> argmax(vec(minimum(X; dims = 1)))
+        @test_throws DomainError GridSearchCrossValidation(cgrid; n_best = 0)
+        @test_throws DomainError RandomisedSearchCrossValidation(cgrid; n_best = 0)
+        for est in (GridSearchCrossValidation, RandomisedSearchCrossValidation)
+            err = try
+                est(cgrid; scorer = fsc, n_best = 2)
+                nothing
+            catch e
+                e
+            end
+            @test err isa ArgumentError && occursin("candidate_scores", err.msg)
+        end
+        rf = search_cross_validation(hrp, gs(kcv, cgrid; scorer = fsc, ex = SequentialEx()),
+                                     rd)
+        @test rf.idx == fsc(rf.test_scores) && rf.rank_idx == [rf.idx]
+        @test isnothing(rf.rank_scores)
+        # A subtype with the index form alone works at n_best = 1 and is refused at 2.
+        @test isnothing(po.candidate_scores(OnlyIndexScore(), X))
+        ro = search_cross_validation(hrp,
+                                     gs(kcv, cgrid; scorer = OnlyIndexScore(),
+                                        ex = SequentialEx()), rd)
+        @test ro.idx == rf.idx && isnothing(ro.rank_scores)
+        err = try
+            po.finite_candidate_order(OnlyIndexScore(), S, 2)
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError &&
+              occursin("OnlyIndexScore", err.msg) &&
+              occursin("candidate_scores", err.msg)
+        # A subtype's method on any matrix type is more specific than the fallback, so it is
+        # never ambiguous with it.
+        @eval struct WorstFoldScore <: PortfolioOptimisers.CrossValidationSearchScorer end
+        @eval function PortfolioOptimisers.candidate_scores(::WorstFoldScore,
+                                                            X::AbstractMatrix)
+            return vec(minimum(X; dims = 1))
+        end
+        @test po.finite_candidate_order(WorstFoldScore(), S, 2) == ([2, 3], [0.6, 0.6])
+
+        # The Result refuses kept fields that do not agree.
+        @test_throws DimensionMismatch SearchCrossValidationResult(; opt = hrp,
+                                                                   test_scores = S,
+                                                                   train_scores = nothing,
+                                                                   lens_grid = r1.lens_grid,
+                                                                   val_grid = r1.val_grid,
+                                                                   idx = 2, rank_idx = [3])
+
+        # path_ids: the path of each fold under MultipleRandomised, 1:M under a
+        # combinatorial scheme, and the combinatorial arm ranks by the same rule.
+        mcv = MultipleRandomised(IndexWalkForward(60, 30); subset_size = 5, n_subsets = 2,
+                                 seed = 7)
+        rm = search_cross_validation(hrp, gs(mcv, cgrid; n_best = 2, ex = SequentialEx()),
+                                     rd)
+        @test rm.path_ids == split(mcv, rd).path_ids
+        @test rm.rank_idx == sortperm(means(rm); rev = true)[1:2]
+        ccv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
+        rc = search_cross_validation(hrp, gs(ccv, cgrid; n_best = 3), rd)
+        @test rc.path_ids == 1:maximum(split(ccv, rd).path_ids)
+        @test rc.rank_idx == sortperm(means(rc); rev = true)[1:3]
+        @test rc.rank_scores == means(rc)[rc.rank_idx]
+
+        # The randomised search forwards n_best.
+        rr = search_cross_validation(hrp,
+                                     RandomisedSearchCrossValidation(cgrid; cv = kcv, r = r,
+                                                                     ex = SequentialEx(),
+                                                                     n_iter = 6, seed = 1,
+                                                                     n_best = 3), rd)
+        @test rr.rank_idx == r4.rank_idx[1:3] && rr.rank_scores == r4.rank_scores[1:3]
     end
 
     @testset "A result's own prior scores its weights at the result's mask" begin

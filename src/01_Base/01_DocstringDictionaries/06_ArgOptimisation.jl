@@ -160,6 +160,11 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :val_grid => "`val_grid`: Values of each candidate, one tuple per column of the score matrices, in the order of the lenses of that candidate.",#
                  :opt_cv => "`opt`: Optimal estimator found by cross-validation.",#
                  :idx_cv => "`idx`: Index of the optimal parameter configuration.",#
+                 :n_best => "`n_best`: Count of the best candidates that the search keeps in rank order. A count larger than the count of the candidates that finished every fold keeps those candidates alone. A function scorer keeps one candidate.",#
+                 :ranked_cv => "`ranked`: The kept candidates as configurations, best first. Each one is built from the estimator that the search was given, through the lenses of its own grid point. The search keeps no fitted result.",#
+                 :rank_idx_cv => "`rank_idx`: Column of the score matrices of each kept candidate, in the order of `ranked`.",#
+                 :rank_scores_cv => "`rank_scores`: Value of [`candidate_scores`](@ref) of each kept candidate, in the order of `ranked`, signed as `test_scores`, or `nothing` when the scorer gives no value per candidate.",#
+                 :path_ids_search => "`path_ids`: Path of each row of `test_scores`: the path of each fold under a [`MultipleRandomised`](@ref) scheme, `1:M` under a [`CombinatorialCrossValidation`](@ref), whose rows are paths, and `nothing` for a scheme with one path.",#
                  :asset_idx => "`asset_idx`: Asset column indices per fold.",#
                  :q_scorer => "`q`: Quantile level of the population's risks that the selected path is nearest to.",#
                  :r_kwargs => "`r_kwargs`: Keyword arguments forwarded to [`expected_risk`](@ref), such as the scalariser `sca` of a vector of risk measures.",#

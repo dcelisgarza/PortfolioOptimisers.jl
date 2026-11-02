@@ -249,6 +249,10 @@ unique_key_dict!(math_dict, :math_dict,
                  :R_search => "``\\mathcal{R}``: Expected risk under `r`, as [`expected_risk`](@ref) computes it with the keyword arguments `kwargs`.",#
                  :C_finite_cand => "``\\mathcal{C}``: Finite candidates, the candidates whose every score is finite. A failed fold scores `NaN`, so a candidate that failed one is not in ``\\mathcal{C}``.",#
                  :sigma_scorer => "``\\sigma``: Search scorer `scorer`, a map from a score matrix to the position of its best column. The default [`HighestMeanScore`](@ref) takes the column of greatest mean.",#
+                 :v_cand_scores => "``v``: Value per candidate of the scorer, [`candidate_scores`](@ref), one entry per column of the matrix that it receives, bigger is better.",#
+                 :pi_cand_order => "``\\pi``: Candidate order, the positions of the finite candidates that sort ``v`` in descending order with a stable sort.",#
+                 :r_k_rank => "``r_k``: Kept candidate of rank ``k``, the position in the grid of entry ``k`` of `rank_idx`.",#
+                 :n_b_best => "``n_{b}``: Kept-candidate count `n_best`, the most candidates that the search keeps.",#
                  :i_star_cand => "``i^{\\star}``: Selected candidate, the position in the grid of the candidate that the search returns.",#
                  # The trials of a randomised search, which `make_p_grid` draws from the
                  # search space before the grid search scores them.

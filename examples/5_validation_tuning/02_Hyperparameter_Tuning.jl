@@ -104,7 +104,8 @@ the constructor throws a `MethodError` for it. [`concrete_typed_array`](@ref) na
 element type to the union of the types of the grids, which the constructor accepts. A vector
 of dictionaries needs the same call.
 
-We search four grids, and the search keeps the best candidate over all of them.
+We search four grids. `n_best = 3` keeps the three best candidates over all of them, in rank
+order. The default `n_best = 1` keeps the best one alone.
 =#
 
 p = concrete_typed_array([["opti[2].opt.l1" =>
@@ -117,7 +118,7 @@ p = concrete_typed_array([["opti[2].opt.l1" =>
                                range(; start = 0.0009, stop = 0.0012, length = 3)],
                           ["opti[2]" => [MeanRisk(; opt = opt, obj = MaximumUtility()),
                                          MeanRisk(; opt = opt, obj = MaximumRatio())]]])
-gs_cv = GridSearchCrossValidation(p; r = r)
+gs_cv = GridSearchCrossValidation(p; r = r, n_best = 3)
 #=
 We run the search. The four grids give `3 × 3 + 3 + 3 + 2 = 17` candidates. The result has
 these fields.
@@ -127,6 +128,11 @@ these fields.
   - `train_scores` is `nothing` unless you set `train_score = true`.
   - `lens_grid` and `val_grid` give the keys and the values of every candidate.
   - `idx` is the index of the best candidate.
+  - `ranked` holds the `n_best` best estimators, best first, so `ranked[1]` is `opt`.
+  - `rank_idx` holds the column of each one in `test_scores`, and `rank_scores` holds its mean
+    test score.
+  - `path_ids` gives the path of each row of `test_scores`. It is `nothing` here, because the
+    default scheme has one path.
 
 The best candidate has the highest mean test score. The search negates a measure for which a
 lower value is better, such as a risk measure, and keeps a ratio as it is. Here the measure is
@@ -154,6 +160,20 @@ using StatsPlots, GraphRecipes
 
 res_gs1 = optimise(gs_res1.opt, rd)
 plot_composition(res_gs1, rd)
+
+#=
+The search keeps configurations, not fitted results. The table gives the column, the mean test
+score and the standard deviation of the test scores over the folds of each kept candidate. We
+optimise each kept candidate on the full data, as we did for `opt`.
+=#
+
+pretty_table(DataFrame("Rank" => eachindex(gs_res1.ranked), "Column" => gs_res1.rank_idx,
+                       "Mean score" => gs_res1.rank_scores,
+                       "Std score" =>
+                           vec(std(gs_res1.test_scores[:, gs_res1.rank_idx]; dims = 1))))
+
+res_ranked = [optimise(cand, rd) for cand in gs_res1.ranked]
+plot_composition(res_ranked[2], rd)
 
 #=
 ### 2.2 Randomised cross validation search

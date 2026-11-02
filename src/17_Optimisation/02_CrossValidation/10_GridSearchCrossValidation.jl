@@ -144,9 +144,7 @@ A candidate that failed one fold is never selected, whatever the scorer computes
 11. Build `opti` through [`search_candidate`](@ref).
 12. Fit and predict `opti` over `scheme` through [`fit_and_predict`](@ref), with the folds in sequence, giving `predictions`.
 13. Write column `i` of `test_scores` and `train_scores` through [`write_candidate_scores!`](@ref).
-14. Select `opt_idx`, the position ``i^{\\star}``, through [`finite_candidate_index`](@ref).
-15. Build the selected candidate `opt` through [`search_candidate`](@ref).
-16. Return a [`SearchCrossValidationResult`](@ref).
+14. Order the finite candidates, keep the best `gscv.n_best`, build each from `opt`, and return the [`SearchCrossValidationResult`](@ref) through [`search_result`](@ref). The path of each row is [`score_path_ids`](@ref) of `cv`.
 
 # Arguments
 
@@ -159,7 +157,7 @@ A candidate that failed one fold is never selected, whatever the scorer computes
   - `opt` carries no partial-fit state, through [`assert_search_entry`](@ref). Under an Online Scheme, `opt` also passes every check of [`assert_online_entry`](@ref).
   - Every candidate passes the entry checks of [`cross_val_predict`](@ref), through [`assert_search_candidates`](@ref).
   - The grid is not empty, and it holds at most `RESOURCE_LIMITS[].max_search_grid` candidates, through [`lens_val_grid`](@ref).
-  - At least one candidate finishes every fold. Otherwise [`finite_candidate_index`](@ref) throws an `IsNonFiniteError`.
+  - At least one candidate finishes every fold. Otherwise [`finite_candidate_order`](@ref) throws an `IsNonFiniteError`.
 
 # Returns
 
@@ -170,7 +168,7 @@ A candidate that failed one fold is never selected, whatever the scorer computes
   - [`GridSearchCrossValidation`](@ref)
   - [`RandomisedSearchCrossValidation`](@ref): its search samples a grid and runs this method on it.
   - [`fit_and_predict`](@ref)
-  - [`finite_candidate_index`](@ref)
+  - [`finite_candidate_order`](@ref)
   - [`write_candidate_scores!`](@ref)
   - [`score_rows`](@ref)
   - [`pin_draw`](@ref)
@@ -217,11 +215,8 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
                                     train_X, r, sgn, gscv.kwargs)
         end
     end
-    opt_idx = finite_candidate_index(gscv.scorer, test_scores)
-    opt = search_candidate(opt, lens_grid[opt_idx], val_grid[opt_idx])
-    return SearchCrossValidationResult(; opt = opt, test_scores = test_scores,
-                                       train_scores = train_scores, lens_grid = lens_grid,
-                                       val_grid = val_grid, idx = opt_idx)
+    return search_result(opt, gscv, test_scores, train_scores, lens_grid, val_grid,
+                         score_path_ids(cv))
 end
 """
     search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
@@ -274,9 +269,7 @@ A candidate that failed one path is never selected, whatever the scorer computes
 11. Fit and predict `opti` over `gscv.cv` through [`fit_and_predict`](@ref), with the executor `gscv.ex`, giving `predictions`, one path per member.
 12. Write ``s \\, \\mathcal{R}`` of each path of `predictions` into column `i` of `test_scores`.
 13. When `gscv.train_score` is `true`, write the train score of each fold of each path into column `i` of the matrix of that path, through [`candidate_train_score`](@ref) with the view of `path_X`.
-14. Select `opt_idx`, the position ``i^{\\star}``, through [`finite_candidate_index`](@ref).
-15. Build the selected candidate `opt` through [`search_candidate`](@ref).
-16. Return a [`SearchCrossValidationResult`](@ref).
+14. Order the finite candidates, keep the best `gscv.n_best`, build each from `opt`, and return the [`SearchCrossValidationResult`](@ref) through [`search_result`](@ref). Row `p` is path `p`, so the path of each row is `1:M`.
 
 # Arguments
 
@@ -289,7 +282,7 @@ A candidate that failed one path is never selected, whatever the scorer computes
   - `opt` carries no partial-fit state, through [`assert_search_entry`](@ref).
   - Every candidate passes the entry checks of [`cross_val_predict`](@ref), through [`assert_search_candidates`](@ref).
   - The grid is not empty, and it holds at most `RESOURCE_LIMITS[].max_search_grid` candidates, through [`lens_val_grid`](@ref).
-  - At least one candidate finishes every path. Otherwise [`finite_candidate_index`](@ref) throws an `IsNonFiniteError`.
+  - At least one candidate finishes every path. Otherwise [`finite_candidate_order`](@ref) throws an `IsNonFiniteError`.
 
 # Returns
 
@@ -303,7 +296,7 @@ A candidate that failed one path is never selected, whatever the scorer computes
   - [`fit_and_predict`](@ref)
   - [`sort_predictions`](@ref)
   - [`expected_risk`](@ref)
-  - [`finite_candidate_index`](@ref)
+  - [`finite_candidate_order`](@ref)
   - [`candidate_train_score`](@ref)
   - [`fold_train_returns`](@ref)
 """
@@ -353,10 +346,6 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
             end
         end
     end
-    opt_idx = finite_candidate_index(gscv.scorer, test_scores)
-    opt = search_candidate(opt, lens_grid[opt_idx], val_grid[opt_idx])
-    return SearchCrossValidationResult(; opt = opt, test_scores = test_scores,
-                                       train_scores = train_scores, lens_grid = lens_grid,
-                                       val_grid = val_grid, idx = opt_idx)
+    return search_result(opt, gscv, test_scores, train_scores, lens_grid, val_grid, 1:M)
 end
 export search_cross_validation, GridSearchCrossValidation

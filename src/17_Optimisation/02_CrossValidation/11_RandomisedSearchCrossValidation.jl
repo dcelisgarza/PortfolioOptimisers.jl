@@ -291,7 +291,7 @@ Where:
 
 # Returns
 
-  - `res::SearchCrossValidationResult`: The result of the grid search of the trials. Its `lens_grid` and `val_grid` hold one entry per trial, in the order of ``\\Theta``, and `idx` is ``i^{\\star}``.
+  - `res::SearchCrossValidationResult`: The result of the grid search of the trials. Its `lens_grid` and `val_grid` hold one entry per trial, in the order of ``\\Theta``, and `idx` is ``i^{\\star}``. Its `ranked` holds the `rscv.n_best` best trials, best first. The trials come from `rng`, so two runs give the same `ranked` only when `rscv.seed` is set.
 
 # Related
 
@@ -314,6 +314,7 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
                                                                          rscv.n_iter, rng);
                                                              cv = rscv.cv, r = rscv.r,
                                                              scorer = rscv.scorer,
+                                                             n_best = rscv.n_best,
                                                              ex = rscv.ex,
                                                              train_score = rscv.train_score,
                                                              kwargs = rscv.kwargs), rd)
