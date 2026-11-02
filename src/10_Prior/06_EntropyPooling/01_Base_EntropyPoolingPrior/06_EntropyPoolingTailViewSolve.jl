@@ -415,21 +415,21 @@ Build the entropy pooling model of one set of tail view constraints, and solve i
 # Algorithm
 
  1. Read `sc1`, `sc2`, `so` and `slv` from `opt`, and make an empty `JuMP.Model`.
- 2. Create the posterior variable `x` and the divergence variable `t`. Under [`ExpEntropyPooling`](@ref), `x` also has a non-negativity bound. The cone of step 4 implies this bound in both branches.
+ 2. Create the posterior variable `x` and the divergence variable `t`. Under [`ExpEntropyPooling`](@ref), `x` also has a non-negativity bound. The cone of step 4 implies this bound in both branches. Fix each entry of `x` at zero where the prior probability is zero, because the posterior of entropy pooling puts no mass where the prior puts none.
  3. Add the row that holds the sum of `x` at one.
- 4. Add the relative entropy cone that bounds `t` below by the divergence. Under [`ExpEntropyPooling`](@ref) the cone reads the prior `w` as its reference, and under [`LogEntropyPooling`](@ref) it reads a unit reference instead.
+ 4. Add the relative entropy cone that bounds `t` below by the divergence over the observations at a positive prior probability. Under [`ExpEntropyPooling`](@ref) the cone reads the prior `w` as its reference, and under [`LogEntropyPooling`](@ref) it reads a unit reference instead.
  5. Register `obj_expr` as `so * t`.
  6. Add every view with [`ep_jump_views!`](@ref), which mutates `obj_expr` when it relaxes a fixed equality row.
- 7. Set the objective to `obj_expr` under [`ExpEntropyPooling`](@ref). Under [`LogEntropyPooling`](@ref), set it to `obj_expr` less `so` times the inner product of `x` with the logarithms of the prior probabilities.
+ 7. Set the objective to `obj_expr` under [`ExpEntropyPooling`](@ref). Under [`LogEntropyPooling`](@ref), set it to `obj_expr` less `so` times the inner product of `x` with the logarithms of the prior probabilities, over the observations at a positive prior probability.
  8. Solve with `slv`, and raise when no solver configuration succeeds.
- 9. Clamp the value of `x` at zero. The solver meets the non-negativity of step 4 only to its feasibility tolerance, and a mixed-integer solve can return an entry a small amount below zero. Divide the value by its sum, and return it through [`scenario_probabilities`](@ref), in the kind of `w`.
+ 9. Clamp the value of `x` at zero, and set it to zero where the prior probability is zero. The solver meets the non-negativity of step 4 and the fixed entries of step 2 only to its feasibility tolerance, and a mixed-integer solve can return an entry a small amount below zero. Divide the value by its sum, and return it through [`scenario_probabilities`](@ref), in the kind of `w`.
 
 # JuMP formulation
 
 ## Variables
 
   - `t`: ``\\eta``, the epigraph variable of the divergence, created here.
-  - `x`: ``\\boldsymbol{p}``, the posterior probabilities, created here. Under [`ExpEntropyPooling`](@ref), it has the bound ``\\boldsymbol{p} \\geq \\boldsymbol{0}``.
+  - `x`: ``\\boldsymbol{p}``, the posterior probabilities, created here. Under [`ExpEntropyPooling`](@ref), it has the bound ``\\boldsymbol{p} \\geq \\boldsymbol{0}``. Each entry with ``q_{t} = 0`` is fixed at zero.
 
 ## Expressions
 
@@ -440,14 +440,14 @@ Build the entropy pooling model of one set of tail view constraints, and solve i
 The method registers the two rows below with no name.
 
   - ``s_{c1} \\left(\\sum_{t=1}^{T} p_{t} - 1\\right) = 0``
-  - ``\\left(s_{c1} \\eta,\\; s_{c1} \\boldsymbol{q},\\; s_{c1} \\boldsymbol{p}\\right) \\in \\mathcal{K}_{\\mathrm{relent}}``, which states ``\\eta \\geq \\sum_{t=1}^{T} p_{t} \\ln(p_{t} / q_{t})``. Under [`LogEntropyPooling`](@ref) the reference is ``s_{c1} \\boldsymbol{1}`` in place of ``s_{c1} \\boldsymbol{q}``, so the row states ``\\eta \\geq \\sum_{t=1}^{T} p_{t} \\ln(p_{t})``.
+  - ``\\left(s_{c1} \\eta,\\; s_{c1} \\boldsymbol{q}_{S},\\; s_{c1} \\boldsymbol{p}_{S}\\right) \\in \\mathcal{K}_{\\mathrm{relent}}``, which states ``\\eta \\geq \\sum_{t \\in S} p_{t} \\ln(p_{t} / q_{t})``. Under [`LogEntropyPooling`](@ref) the reference is ``s_{c1} \\boldsymbol{1}`` in place of ``s_{c1} \\boldsymbol{q}_{S}``, so the row states ``\\eta \\geq \\sum_{t \\in S} p_{t} \\ln(p_{t})``.
 
 [`ep_jump_views!`](@ref) registers every other row of the model, and its own `# JuMP formulation` names them.
 
 ## Objective
 
   - `Min` of `obj_expr` under [`ExpEntropyPooling`](@ref).
-  - `Min` of `obj_expr` less ``s_{o} \\boldsymbol{p}^{\\intercal} \\ln(\\boldsymbol{q})`` under [`LogEntropyPooling`](@ref). The subtraction changes the ``\\sum_{t} p_{t} \\ln(p_{t})`` of the cone into the divergence, so both branches minimise the same value.
+  - `Min` of `obj_expr` less ``s_{o} \\boldsymbol{p}_{S}^{\\intercal} \\ln(\\boldsymbol{q}_{S})`` under [`LogEntropyPooling`](@ref). The subtraction changes the ``\\sum_{t} p_{t} \\ln(p_{t})`` of the cone into the divergence, so both branches minimise the same value.
 
 ## Relaxation
 
@@ -466,7 +466,8 @@ Where:
   - $(math_dict[:ep_so])
   - ``\\eta``: Epigraph variable that bounds the divergence from above. Its model key is `t`.
   - ``\\eta_{c}``: Norm of the slack of the fixed equality rows, which [`ep_jump_views!`](@ref) creates under the model key `tc`.
-  - ``\\mathcal{K}_{\\mathrm{relent}}``: Relative entropy cone, `JuMP.MOI.RelativeEntropyCone(2T + 1)`.
+  - ``S``: Set of the observations at a positive prior probability, ``S = \\{t : q_{t} > 0\\}``.
+  - ``\\mathcal{K}_{\\mathrm{relent}}``: Relative entropy cone, `JuMP.MOI.RelativeEntropyCone(2|S| + 1)`.
 
 # Arguments
 
@@ -500,25 +501,36 @@ function ep_jump_entropy_pooling(w::VecNum, epc::AbstractDict, tvs::VecEPTV,
                                                          <:ExpEntropyPooling})
     (; sc1, sc2, so, slv) = opt
     T = length(w)
+    # `collect` reads the values of a weights vector, which StatsBase cannot index when they
+    # are a range. A posterior puts no mass where the prior puts none, so the entries off the
+    # support are fixed at zero, and the cone reads the support alone. The solver meets a
+    # zero reference of the cone only to its tolerance, which left a mass of about 1e-9 there
+    # and a divergence of `Inf`. Review R28 of #1817.
+    q = collect(w)
+    sup = q .> zero(eltype(q))
     model = JuMP.Model()
     JuMP.@variables(model, begin
                         t
                         x[1:T] >= 0
                     end)
+    JuMP.fix.(x[.!sup], zero(eltype(q)); force = true)
     JuMP.@constraints(model,
                       begin
                           sc1 * (sum(x) - one(eltype(w))) == 0
-                          [sc1 * t; sc1 * w; sc1 * x] in
-                          JuMP.MOI.RelativeEntropyCone(2 * T + 1)
+                          [sc1 * t; sc1 * q[sup]; sc1 * x[sup]] in
+                          JuMP.MOI.RelativeEntropyCone(2 * count(sup) + 1)
                       end)
     JuMP.@expression(model, obj_expr, so * t)
     ep_jump_views!(model, x, obj_expr, epc, tvs, sc1, sc2, so)
     JuMP.@objective(model, Min, obj_expr)
     @argcheck(optimise_JuMP_model!(model, slv).success,
               ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
-    # The solver meets `x >= 0` to its feasibility tolerance, so an entry can come back a
-    # hair below zero, and every weighted estimator of the refit refuses it. Issue #1260.
-    return scenario_probabilities(w, LinearAlgebra.normalize(max.(JuMP.value.(x), 0), 1))
+    # The solver meets `x >= 0` and a fixed entry only to its feasibility tolerance, so an
+    # entry can come back a hair below zero, and every weighted estimator of the refit refuses
+    # it. Issue #1260.
+    p = max.(JuMP.value.(x), 0)
+    p[.!sup] .= zero(eltype(p))
+    return scenario_probabilities(w, LinearAlgebra.normalize(p, 1))
 end
 function ep_jump_entropy_pooling(w::VecNum, epc::AbstractDict, tvs::VecEPTV,
                                  opt::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any,
@@ -526,25 +538,33 @@ function ep_jump_entropy_pooling(w::VecNum, epc::AbstractDict, tvs::VecEPTV,
     (; sc1, sc2, so, slv) = opt
     model = JuMP.Model()
     T = length(w)
-    log_p = log.(w)
+    # The support rule of the `ExpEntropyPooling` method. Here it also keeps the `-Inf` of
+    # `log(0)` out of the objective, which JuMP refuses. Review R28 of #1817.
+    q = collect(w)
+    sup = q .> zero(eltype(q))
+    log_p = log.(q[sup])
     JuMP.@variables(model, begin
                         x[1:T]
                         t
                     end)
+    JuMP.fix.(x[.!sup], zero(eltype(q)); force = true)
     JuMP.@expression(model, obj_expr, so * t)
     JuMP.@constraints(model,
                       begin
                           sc1 * (sum(x) - one(eltype(w))) == 0
-                          [sc1 * t; fill(sc1, T); sc1 * x] in
-                          JuMP.MOI.RelativeEntropyCone(2 * T + 1)
+                          [sc1 * t; fill(sc1, count(sup)); sc1 * x[sup]] in
+                          JuMP.MOI.RelativeEntropyCone(2 * count(sup) + 1)
                       end)
     ep_jump_views!(model, x, obj_expr, epc, tvs, sc1, sc2, so)
-    JuMP.@objective(model, Min, obj_expr - so * LinearAlgebra.dot(x, log_p))
+    JuMP.@objective(model, Min, obj_expr - so * LinearAlgebra.dot(x[sup], log_p))
     @argcheck(optimise_JuMP_model!(model, slv).success,
               ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
-    # The solver meets `x >= 0` to its feasibility tolerance, so an entry can come back a
-    # hair below zero, and every weighted estimator of the refit refuses it. Issue #1260.
-    return scenario_probabilities(w, LinearAlgebra.normalize(max.(JuMP.value.(x), 0), 1))
+    # The solver meets `x >= 0` and a fixed entry only to its feasibility tolerance, so an
+    # entry can come back a hair below zero, and every weighted estimator of the refit refuses
+    # it. Issue #1260.
+    p = max.(JuMP.value.(x), 0)
+    p[.!sup] .= zero(eltype(p))
+    return scenario_probabilities(w, LinearAlgebra.normalize(p, 1))
 end
 """
     ep_jump_views!(model::JuMP.Model, x, obj_expr, epc::AbstractDict, tvs::VecEPTV,

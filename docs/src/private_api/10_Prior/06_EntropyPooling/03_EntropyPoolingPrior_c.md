@@ -17,4 +17,13 @@ scenario_prior
 prior_probability_factory
 assert_scenario_model
 assert_scenario_refit
+ep_tail_views!
+ep_diagnose_tail_view!(::JuMP.Model, ::Any, ::Union{LinearConditionalValueatRiskViewConstraint, ConicEntropicValueatRiskViewConstraint, ConicRelativisticValueatRiskViewConstraint})
+```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
 ```

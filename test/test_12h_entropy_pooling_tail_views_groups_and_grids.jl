@@ -1030,3 +1030,48 @@ end
         end
     end
 end
+
+@testset "a JuMP posterior puts no mass where the prior puts none (R28 of #1817)" begin
+    #=
+    The relative entropy cone of the JuMP solve read every observation, and a solver meets a
+    zero reference of the cone only to its tolerance. The posterior put about 1e-9 on each
+    observation of zero prior probability, so `kld` was `Inf`. `LogEntropyPooling` refused
+    any zero prior probability, because `log(0)` put an `Inf` coefficient in the objective.
+    The reference of the tail view is the closed form of the CVaR edge of #1925 over the
+    support, which reads no solver. The `Optim` route gives exact zeros off the support, so
+    it is the reference of the mean view.
+    =#
+    x1 = -ep_sX[:, 1]
+    jw = argmax(x1)
+    q = fill(1.0, ep_sT)
+    q[jw] = 0.0
+    q[(jw == 1) + 1] = 0.0
+    q ./= sum(q)
+    ws = StatsBase.pweights(q)
+    sup = q .> 0
+    hs = maximum(x1[sup])
+    qs = sum(q[sup .& (x1 .== hs)])
+    kls = ep_a * log(ep_a / qs) + (1 - ep_a) * log((1 - ep_a) / (1 - qs))
+    mv = LinearConstraintEstimator(; val = "AAPL == $(sum(q .* ep_sX[:, 1]) + 0.001)")
+    po = prior(EntropyPoolingPrior(; sets = sets, w = ws, mu_views = mv), ep_srd)
+    @test all(iszero, po.w[.!sup])
+    for alg in (ExpEntropyPooling(), LogEntropyPooling())
+        opt = JuMPEntropyPooling(; slv = slv, alg = alg)
+        pr = prior(EntropyPoolingPrior(; sets = sets, opt = opt, w = ws,
+                                       cvar_views = ConditionalValueatRiskView(;
+                                                                               alpha = ep_a,
+                                                                               views = LinearConstraintEstimator(;
+                                                                                                                 val = "AAPL >= $hs"))),
+                   ep_srd)
+        @test all(iszero, pr.w[.!sup])
+        @test all(>(0), pr.w[sup])
+        # The solve meets the edge to its tolerance, so the divergence falls a little under
+        # the closed form: 1.1e-5 relative on a local host.
+        @test isapprox(pr.kld, kls; rtol = 1e-4)
+        pm = prior(EntropyPoolingPrior(; sets = sets, opt = opt, w = ws, mu_views = mv),
+                   ep_srd)
+        @test all(iszero, pm.w[.!sup])
+        @test isapprox(pm.w, po.w; rtol = 1e-5)
+        @test isapprox(pm.kld, po.kld; rtol = 1e-4)
+    end
+end
