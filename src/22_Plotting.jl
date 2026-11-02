@@ -1784,24 +1784,16 @@ function plot_efficient_frontier end
 ## ──────────────────────────────────────────────────────────────────────────────
 """
     plot_performance_summary(ps::PerformanceSummaryResult; kwargs...) -> Plot
-    plot_performance_summary(
-        w::ArrNum,
-        X::MatNum,
-        fees::Option{<:Fees} = nothing;
-        ppy::Number = 1,
-        alpha::Number = 0.05,
-        compound::Bool = false,
-        benchmark::Option{<:VecNum} = nothing,
-        kwargs...
-    ) -> Plot
-    plot_performance_summary(ret::VecNum; ppy, alpha, compound, benchmark, kwargs...) -> Plot
-    plot_performance_summary(w, rd::ReturnsResult, fees = nothing; ppy, alpha, compound, benchmark, kwargs...) -> Plot
-    plot_performance_summary(res::OptimisationResult, rd::ReturnsResult; ppy, alpha, compound, benchmark, kwargs...) -> Plot
-    plot_performance_summary(pred::PredRes_MultiPredRes; ppy, alpha, compound, benchmark, kwargs...) -> Plot
+    plot_performance_summary(x::Union{AbstractArray, OptimisationResult,
+                                      AbstractPredictionResult}, args...;
+                             ppy, alpha, compound, rf, measures, benchmark, names,
+                             kwargs...) -> Plot
 
-Plot the performance statistics of a portfolio as a bar chart of eleven bars, blue at a value of zero or more and red below it.
+Plot the performance statistics of one or more portfolios as bars, blue at a value of zero or more and red below it.
 
-Every method but the first computes a [`PerformanceSummaryResult`](@ref) with [`performance_summary`](@ref) and draws it, so it takes every arity that verb takes. The verb defines and validates the statistics, so a caller who wants the numbers and not the bars calls it directly and needs no plotting package. The figure draws the bars in the order below, seven of them in percent. A prediction arity defaults `benchmark` to the benchmark of its rows, as `performance_summary` does. The last four bars are `NaN`, drawn empty, when the summary has no benchmark, and the turnover bar is `NaN` on every arity that holds no path, which is every arity but a prediction. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads with `StatsPlots`.
+Every method but the first computes a [`PerformanceSummaryResult`](@ref) with [`performance_summary`](@ref) and draws it, so it takes every arity that verb takes. The keywords of the verb go to the summary, and every other keyword goes to the figure. The verb defines and validates the statistics, so a caller who wants the numbers and not the bars calls it directly and needs no plotting package. A prediction arity defaults `benchmark` to the benchmark of its rows, as `performance_summary` does. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads with `StatsPlots`.
+
+A summary of one entry draws one bar chart, with the eleven bars below in order, seven of them in percent, and one bar more for each extra measure. A summary of many entries draws one panel for each figure, with one bar for each entry. The label of a bar names the keys of its entry that are not `nothing`: the candidate, the path and the member. The excess bars are `NaN`, drawn empty, when the summary has no benchmark, and the turnover bar is `NaN` on every arity that holds no path, which is every arity but a prediction.
 
 A gapped panel reaches this figure only through the returns that the caller gives it. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref). A `w, X` or `w, rd` arity computes on the matrix that the caller holds and checks nothing, and `X * w` is `NaN` at a gap even where the weight is zero. Score a gapped panel through `predict(res, rd)` and plot the prediction.
 
@@ -1815,7 +1807,7 @@ A gapped panel reaches this figure only through the returns that the caller give
 
 Where:
 
-  - ``\\boldsymbol{v}``: The heights of the eleven bars, in order.
+  - ``\\boldsymbol{v}``: The heights of the eleven bars of one entry, in order. The value of each extra measure follows them, with no scale.
   - ``R_a``, ``\\sigma_a``: Annualised return and annualised volatility, the fields `ann_return` and `ann_volatility`.
   - ``\\mathrm{SR}``, ``\\mathrm{So}``, ``\\mathrm{Ca}``: Sharpe, Sortino and Calmar ratios, the fields `sharpe`, `sortino` and `calmar`.
   - ``\\mathrm{MDD}``: Maximum drawdown, the field `max_drawdown`, which is at most zero.
@@ -1826,25 +1818,16 @@ Where:
 # Arguments
 
   - `ps`: The summary to draw.
-  - `ret`: Net portfolio returns.
-  - `w`: Portfolio weights.
-  - `X`: Asset returns matrix (observations × assets).
-  - `fees`: Transaction fees, or `nothing`.
-  - `ppy`: Number of periods in one year, which annualises the statistics. It defaults to `1`, which draws the statistics per period.
-  - `alpha`: Tail probability of the conditional value at risk.
-  - `compound`: Compound the returns of the maximum drawdown when `true`.
-  - `benchmark`: Benchmark return series of the three excess statistics, or `nothing`.
-  - `res`: Optimisation result.
-  - `rd`: Returns result.
-  - `pred`: A prediction or a walk-forward path, whose held path gives the turnover bar.
+  - `x`, `args...`: The arguments of [`performance_summary`](@ref): a series, weights and returns, an optimisation result and its returns, a prediction, a population, or a vector of candidates.
+  - `ppy`, `alpha`, `compound`, `rf`, `measures`, `benchmark`, `names`: The keywords of [`performance_summary`](@ref).
 
 # Validation
 
-  - The rules of [`performance_summary`](@ref): `0 < alpha < 1` and `ppy > 0`, else a `DomainError` is raised, and a `benchmark` of the length of the returns, else a `DimensionMismatch` is raised.
+  - The rules of [`performance_summary`](@ref).
 
 # Returns
 
-  - `plt::Plots.Plot`: A bar chart of eleven bars.
+  - `plt::Plots.Plot`: A bar chart for one entry, or one panel for each figure for many entries.
 
 # Related
 

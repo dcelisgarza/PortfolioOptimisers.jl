@@ -8,7 +8,7 @@ jet = "0.13.1"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "StatsPlots"]
-commit = "6fee3fa849"
+commit = "c340bf8bf3"
 
 [run.main]
 load_set = ["GraphRecipes", "StatsPlots"]
@@ -412,7 +412,10 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/17_Optimisation/10_OnlinePortfolioSelection/12_AllocationSetProgramme.jl" = { raw = 2, reviewed = 0 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/13_SparsePortfolioAlgorithms.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/11_ProjectionWeightFinalisers.jl" = { raw = 0, reviewed = 0 }
-"src/18_ExpectedReturns.jl" = { raw = 1, reviewed = 1 }
+"src/18_ExpectedReturns/01_ExpectedReturns.jl" = { raw = 0, reviewed = 0 }
+"src/18_ExpectedReturns/02_BrinsonAttribution.jl" = { raw = 1, reviewed = 1 }
+"src/18_ExpectedReturns/03_PerformanceSummary.jl" = { raw = 0, reviewed = 0 }
+"src/18_ExpectedReturns/04_SharpeRatioInference.jl" = { raw = 0, reviewed = 0 }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { raw = 0, reviewed = 0 }
 "src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { raw = 0, reviewed = 0 }
 "src/19_FactorAttribution/03_FactorAttributionRealisedMethods.jl" = { raw = 0, reviewed = 0 }
@@ -830,7 +833,10 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/17_Optimisation/10_OnlinePortfolioSelection/12_AllocationSetProgramme.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/13_SparsePortfolioAlgorithms.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/11_ProjectionWeightFinalisers.jl" = { raw = 0, reviewed = 0 }
-"src/18_ExpectedReturns.jl" = { raw = 0, reviewed = 0 }
+"src/18_ExpectedReturns/01_ExpectedReturns.jl" = { raw = 0, reviewed = 0 }
+"src/18_ExpectedReturns/02_BrinsonAttribution.jl" = { raw = 0, reviewed = 0 }
+"src/18_ExpectedReturns/03_PerformanceSummary.jl" = { raw = 0, reviewed = 0 }
+"src/18_ExpectedReturns/04_SharpeRatioInference.jl" = { raw = 0, reviewed = 0 }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { raw = 0, reviewed = 0 }
 "src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { raw = 0, reviewed = 0 }
 "src/19_FactorAttribution/03_FactorAttributionRealisedMethods.jl" = { raw = 0, reviewed = 0 }

@@ -1,16 +1,18 @@
 """
-    forecast_summary_names(names::Nothing, n::Integer) -> Vector{String}
-    forecast_summary_names(names::AbstractVector{<:AbstractString},
-                           n::Integer) -> Vector{String}
+    forecast_summary_names(names::Nothing, n::Integer,
+                           label::AbstractString = "Forecast") -> Vector{String}
+    forecast_summary_names(names::AbstractVector{<:AbstractString}, n::Integer,
+                           label::AbstractString = "Forecast") -> Vector{String}
 
-Return the names axis of a forecast summary, one name per evaluation.
+Return the names axis of a summary, one name per evaluation or per candidate.
 
-A reader reads a summary as a table, and a row without a name tells the reader little. An evaluation carries the pairing and its parameters but no name, so the caller supplies the names. The method for `nothing` numbers the rows in the order of the evaluations.
+A reader reads a summary as a table, and a row without a name tells the reader little. An evaluation carries the pairing and its parameters but no name, so the caller supplies the names. The method for `nothing` numbers the rows in the order of the evaluations, as `"<label> k"`. [`performance_summary`](@ref) reads the same axis for its candidates, with the label `"Portfolio"`.
 
 # Arguments
 
   - `names`: One name per evaluation, or `nothing` to number them.
   - `n`: Number of evaluations the summary carries.
+  - `label`: The word of each default name. The method for a vector of names does not read it.
 
 # Validation
 
@@ -25,10 +27,11 @@ A reader reads a summary as a table, and a row without a name tells the reader l
   - [`forecast_evaluation_summary`](@ref)
   - [`ForecastSummaryResult`](@ref)
 """
-function forecast_summary_names(::Nothing, n::Integer)
-    return ["Forecast $(k)" for k in 1:n]
+function forecast_summary_names(::Nothing, n::Integer, label::AbstractString = "Forecast")
+    return ["$(label) $(k)" for k in 1:n]
 end
-function forecast_summary_names(names::AbstractVector{<:AbstractString}, n::Integer)
+function forecast_summary_names(names::AbstractVector{<:AbstractString}, n::Integer,
+                                ::AbstractString = "Forecast")
     @argcheck(length(names) == n,
               DimensionMismatch("names carries $(length(names)) entries and the summary carries $(n) evaluation(s)"))
     return String[String(nm) for nm in names]
@@ -550,7 +553,11 @@ The headline statistics of one or more Return Forecast evaluations, one entry pe
 
 # One class, and no comparison class beside it
 
-A single evaluation is the length-1 case of this Result, and a comparison of two is the length-2 case. A comparison only sets the columns of several evaluations side by side, and a columnar Result already does that, so the library has no second class.
+A comparison of two evaluations is the length-2 case of this Result. A comparison only sets the columns of several evaluations side by side, and a columnar Result already does that, so the library has no second class.
+
+The shape follows the type of the input, as for [`PerformanceSummaryResult`](@ref). The method for one evaluation gives scalar fields, and the vector method gives one entry for each evaluation, also for a vector of one. The scalar fields equal entry 1 of the vector method on `[fe]`. Under scalar fields, each spread is a vector over the tail fractions, and `quantiles` does not change.
+
+Breaking: a summary of one evaluation held length-1 vectors before, and it holds scalars now. A caller that read `fs.spearman_mean_ic[1]` reads `fs.spearman_mean_ic`.
 
 # One hit-rate denominator
 
@@ -806,7 +813,7 @@ end
 
 Summarise one or more Return Forecast evaluations as a [`ForecastSummaryResult`](@ref).
 
-This verb is the top of the evaluation hierarchy, and it is also the comparison. It calls one verb per block, computes no statistic of its own, and collects each block onto the forecast axis, as [`factor_model_summary`](@ref) does. A single evaluation is the length-1 case, with the same type and the same columns as a comparison of four. A caller who starts with one member and later wants a table of four changes the argument and nothing else.
+This verb is the top of the evaluation hierarchy, and it is also the comparison. It calls one verb per block, computes no statistic of its own, and collects each block onto the forecast axis, as [`factor_model_summary`](@ref) does. The method for one evaluation gives the same type and the same columns as a comparison of four, with a scalar in each column, as entry 1 of the vector method on `[fe]`. The method for a vector gives one entry for each evaluation, also for a vector of one. Breaking: the method for one evaluation gave length-1 vectors before.
 
 The vector method **refuses evaluations that are not comparable**, and names the field that differs, because a table invites a comparison that its rows must support. Two members that answer one question on two grids are the ordinary case, because a refit member warms up and a member that publishes its history does not. The verb refuses them on `dates` unless `align = true`, which first puts them on their shared grid through [`forecast_evaluation_align`](@ref).
 
@@ -828,7 +835,7 @@ A weighting reaches the summary in one of two forms, as it reaches every other b
 # Arguments
 
   - `fes`: The evaluations to summarise, at least one, from [`forecast_evaluation`](@ref).
-  - `fe`: One evaluation. The verb summarises it as the length-1 case.
+  - `fe`: One evaluation. The verb summarises it with scalar fields, through [`forecast_summary_entry`](@ref).
   - `w`: Cross-sectional weight history `observations × assets`, on the axis of the forecasts, or `nothing` for equal weights.
   - `csfm`: A cross-sectional factor model block, whose weight history `weighting` names.
   - `align`: Whether to put the evaluations on the grid they share before the summary reads them. Under `false` the verb refuses a set whose `dates` differ.
@@ -849,7 +856,7 @@ A weighting reaches the summary in one of two forms, as it reaches every other b
 
 # Returns
 
-  - `fs::ForecastSummaryResult`: The computed summary, one entry per forecast.
+  - `fs::ForecastSummaryResult`: The computed summary, with scalar fields for one evaluation, and one entry per forecast for a vector.
 
 # Related
 
@@ -928,12 +935,71 @@ end
 function forecast_evaluation_summary(fe::ForecastEvaluationResult,
                                      w::Option{<:MatNum} = nothing;
                                      kwargs...)::ForecastSummaryResult
-    return forecast_evaluation_summary([fe], w; kwargs...)
+    return forecast_summary_entry(forecast_evaluation_summary([fe], w; kwargs...))
 end
 function forecast_evaluation_summary(fe::ForecastEvaluationResult,
                                      csfm::CrossSectionalFactorModel;
                                      kwargs...)::ForecastSummaryResult
-    return forecast_evaluation_summary([fe], csfm; kwargs...)
+    return forecast_summary_entry(forecast_evaluation_summary([fe], csfm; kwargs...))
+end
+"""
+    first_summary_entry(x::AbstractVector)
+    first_summary_entry(x::AbstractMatrix)
+    first_summary_entry(x)
+
+The value of entry 1 of a column of a columnar summary: the first element of a column, the first row of a matrix whose rows are the entries, and every other value as it is.
+
+A summary of one item gives scalar fields, and a summary of many items gives one vector entry for each. The method for one item computes the summary of the vector of one item, and this function reads entry 1 of each column. So the two methods compute each figure at one site.
+
+# Arguments
+
+  - `x`: The value of a field of the summary.
+
+# Returns
+
+  - `x1`: The value of entry 1.
+
+# Related
+
+  - [`forecast_summary_entry`](@ref)
+  - [`covariance_summary_entry`](@ref)
+"""
+function first_summary_entry(x::AbstractVector)
+    return x[1]
+end
+function first_summary_entry(x::AbstractMatrix)
+    return x[1, :]
+end
+function first_summary_entry(x)
+    return x
+end
+"""
+    forecast_summary_entry(fs::ForecastSummaryResult) -> ForecastSummaryResult
+
+The summary of one forecast, with scalar fields, from a summary of one forecast with length-1 columns.
+
+Each field becomes its entry 1 through [`first_summary_entry`](@ref). `quantiles` is the axis of the tail fractions and not of the forecasts, so it stays as it is, and each spread becomes a vector over the tail fractions.
+
+# Arguments
+
+  - `fs`: The summary of the vector of one evaluation.
+
+# Returns
+
+  - `fs1::ForecastSummaryResult`: The summary with scalar fields.
+
+# Related
+
+  - [`forecast_evaluation_summary`](@ref)
+  - [`first_summary_entry`](@ref)
+"""
+function forecast_summary_entry(fs::ForecastSummaryResult)
+    return ForecastSummaryResult((if f === :quantiles
+                                      getfield(fs, f)
+                                  else
+                                      first_summary_entry(getfield(fs, f))
+                                  end
+                                  for f in fieldnames(ForecastSummaryResult))...)
 end
 
 export ForecastSummaryResult, forecast_evaluation_align, forecast_evaluation_summary

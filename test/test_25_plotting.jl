@@ -398,6 +398,33 @@
         @test isnan(ps_n.excess_ret)
         @test isequal(plot_performance_summary(pred_b; benchmark = nothing).series_list[1][:y],
                       plot_performance_summary(ps_n).series_list[1][:y])
+        # Many entries draw one panel for each figure, with one bar for each entry, and an
+        # extra measure draws a panel of its own (#1934). The label names the keys of the
+        # entry that are not `nothing`.
+        p_many = plot_performance_summary([pred_b, mpred_p]; names = ["b", "mr"],
+                                          measures = [:mdd => MaximumDrawdown()],
+                                          size = (900, 900))
+        @test length(p_many.subplots) == 12
+        @test p_many.subplots[12][:title] == "mdd"
+        @test p_many.subplots[1][:xaxis][:ticks][2] == ["b", "mr"]
+        ppop = cross_val_predict(EqualWeighted(), rd,
+                                 CombinatorialCrossValidation(; n_folds = 4,
+                                                              n_test_folds = 2))
+        p_pop = plot_performance_summary(performance_summary(ppop))
+        @test p_pop.subplots[1][:xaxis][:ticks][2][1] == "path 1"
+        pext = Base.get_extension(PortfolioOptimisers, :PortfolioOptimisersPlotsExt)
+        two = performance_summary([w, w], X)
+        @test pext.performance_summary_entry_labels(two) == ["member 1", "member 2"]
+        # A summary built by hand with no key labels each entry by its position.
+        named = performance_summary([X * w])
+        unnamed = PerformanceSummaryResult([nothing],
+                                           (getfield(named, f)
+                                            for f in
+                                                fieldnames(PerformanceSummaryResult)[2:end])...)
+        @test pext.performance_summary_entry_labels(unnamed) == ["Entry 1"]
+        # One entry with an extra measure draws one bar more.
+        p_one = plot_performance_summary(X * w; measures = [:mdd => MaximumDrawdown()])
+        @test length(p_one[1][:xaxis][:ticks][2]) == 12
     end
 
     @testset "plot_rolling_drawdowns" begin
@@ -1059,6 +1086,13 @@
         @test unique([sr[:label]
                       for sr in plot_forecast_evaluation_summary(fe_fp).series_list]) ==
               ["Forecast 1"]
+        # A summary of one evaluation holds scalar fields, and a spread over the tail
+        # fractions, and it draws as the length-1 case (#1934).
+        fs_one = forecast_evaluation_summary(fe_fp; quantiles = (0.1, 0.25))
+        @test fs_one.spearman_mean_ic isa Number
+        p_one = plot_forecast_evaluation_summary(fs_one)
+        @test unique([sr[:label] for sr in p_one.series_list]) == ["Forecast 1"]
+        @test length(p_one[1][:xaxis][:ticks][2]) == 12
         @test is_plot(plot_forecast_evaluation_summary(fe_fp, csfm_fp))
         @test is_plot(plot_forecast_evaluation_summary([fe_fp]; quantiles = (0.2,)))
         @test is_plot(plot_forecast_evaluation_summary([fe_fp], csfm_fp;

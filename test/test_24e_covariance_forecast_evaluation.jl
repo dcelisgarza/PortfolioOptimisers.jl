@@ -563,7 +563,7 @@ end
         @test r.horizon == length.(split(bm, rd).test_idx)
         @test length(unique(r.horizon)) > 1
         s = covariance_forecast_summary(r)
-        @test s.n_steps == [length(r.horizon)]
+        @test s.n_steps == length(r.horizon)
         # A carrier with no timestamps labels a step by its first test row.
         rn = cfe(Covariance(), ReturnsResult(; nx = nx, X = X), batch_cv)
         @test rn.dates == first.(split(batch_cv, rd).test_idx)
@@ -602,14 +602,30 @@ end
                               0.2726172060164678]; rtol = 1e-14,
                              name = "cfer mahalanobis ratio").ok
         s = covariance_forecast_summary(cfer)
-        @test s.names == ["forecast_1"]
+        # A summary of one evaluation holds scalars, entry 1 of the vector method on
+        # `[cfer]`, and `exceedance` is a vector over the levels (#1934).
+        @test s.names == "forecast_1"
+        s_one = covariance_forecast_summary([cfer])
+        for f in fieldnames(CovarianceForecastSummaryResult)
+            v = getfield(s_one, f)
+            want = if f === :levels
+                v
+            elseif isa(v, AbstractMatrix)
+                v[1, :]
+            elseif isa(v, AbstractVector)
+                v[1]
+            else
+                v
+            end
+            @test isequal(getfield(s, f), want)
+        end
+        @test s_one.names == ["forecast_1"]
         # The oracle's `summary()` rows and its `bias_statistic_summary()`, at full digits:
         # its own step kernel and summaries, run on this closed-form fixture.
-        ours = [s.mahalanobis_mean[1], s.mahalanobis_median[1], s.mahalanobis_p5[1],
-                s.mahalanobis_p95[1], s.diagonal_mean[1], s.diagonal_median[1],
-                s.diagonal_p5[1], s.diagonal_p95[1], s.portfolio_qlike_mean[1],
-                s.bias_statistic[1], s.bias_p5[1], s.bias_p25[1], s.bias_p75[1],
-                s.bias_p95[1]]
+        ours = [s.mahalanobis_mean, s.mahalanobis_median, s.mahalanobis_p5,
+                s.mahalanobis_p95, s.diagonal_mean, s.diagonal_median, s.diagonal_p5,
+                s.diagonal_p95, s.portfolio_qlike_mean, s.bias_statistic, s.bias_p5,
+                s.bias_p25, s.bias_p75, s.bias_p95]
         oracle = [0.36458202285745867, 0.315530814251327, 0.05594537562389196,
                   0.8248158884019055, 0.42592521496695807, 0.36461964662163726,
                   0.05789099926930382, 0.9886089390858581, -7.520415207825884,
@@ -619,15 +635,15 @@ end
         @test parity_compare(ours, oracle; name = "cfe summary").ok
         # Its `exceedance_summary()` at (0.95, 0.99): no step exceeds.
         @test s.levels == (0.95, 0.99)
-        @test s.exceedance == [0.0 0.0]
-        @test s.n_steps == [M]
-        @test s.n_portfolios == [2]
+        @test s.exceedance == [0.0, 0.0]
+        @test s.n_steps == M
+        @test s.n_portfolios == 2
         # The Gaussian bands: `1 ± z √(2 / Σ dof)`, with `Σ dof = 4 M` under the horizon
         # return and `M` for one asset's ratio.
         z = 1.959963984540054
-        @test isapprox(s.mahalanobis_band_hi[1], 1 + z * sqrt(2 / (4M)); rtol = 1e-12)
-        @test isapprox(s.mahalanobis_band_lo[1], 1 - z * sqrt(2 / (4M)); rtol = 1e-12)
-        @test isapprox(s.diagonal_band_hi[1], 1 + z * sqrt(2 / M); rtol = 1e-12)
+        @test isapprox(s.mahalanobis_band_hi, 1 + z * sqrt(2 / (4M)); rtol = 1e-12)
+        @test isapprox(s.mahalanobis_band_lo, 1 - z * sqrt(2 / (4M)); rtol = 1e-12)
+        @test isapprox(s.diagonal_band_hi, 1 + z * sqrt(2 / M); rtol = 1e-12)
         @test s.alpha == 0.05
         # The realised covariance has `N h` degrees of freedom per step, so its band is
         # narrower by `√h` and its exceedance threshold sits at `χ²_{N h}`.
@@ -638,14 +654,14 @@ end
                                                  cfer.frobenius, cfer.standardised_return,
                                                  cfer.portfolio_qlike, W, nothing, nothing)
         sr = covariance_forecast_summary(cfr; alpha = 0.1, levels = (0.5,))
-        @test isapprox(sr.mahalanobis_band_hi[1], 1 + 1.6448536269514722 * sqrt(2 / (12M));
+        @test isapprox(sr.mahalanobis_band_hi, 1 + 1.6448536269514722 * sqrt(2 / (12M));
                        rtol = 1e-12)
         @test sr.levels == (0.5,)
-        @test size(sr.exceedance) == (1, 1)
+        @test size(sr.exceedance) == (1,)
         # Two evaluations are one Result of length two, and the length-1 method agrees.
         s2 = covariance_forecast_summary([cfer, cfr]; names = ["a", "b"])
         @test s2.names == ["a", "b"]
-        @test s2.mahalanobis_mean[1] == s.mahalanobis_mean[1]
+        @test s2.mahalanobis_mean[1] == s.mahalanobis_mean
         @test s2.qlike_mean == fill(mean(cfer.qlike), 2)
         # Every column has one entry per evaluation.
         for f in fieldnames(CovarianceForecastSummaryResult)
@@ -742,12 +758,11 @@ end
         one = cfe(Covariance(), rd, IndexWalkForward(T - h, h))
         @test length(one.dates) == 1
         s1 = covariance_forecast_summary(one)
-        @test s1.mahalanobis_mean == one.mahalanobis_ratio
-        @test s1.mahalanobis_p5 == one.mahalanobis_ratio
+        @test s1.mahalanobis_mean == only(one.mahalanobis_ratio)
+        @test s1.mahalanobis_p5 == only(one.mahalanobis_ratio)
         @test all(isnan,
-                  (s1.bias_statistic[1], s1.bias_p5[1], s1.bias_p25[1], s1.bias_p75[1],
-                   s1.bias_p95[1]))
-        @test isfinite(s1.portfolio_qlike_mean[1])
+                  (s1.bias_statistic, s1.bias_p5, s1.bias_p25, s1.bias_p75, s1.bias_p95))
+        @test isfinite(s1.portfolio_qlike_mean)
         @test isnan(po.summary_quantile([1.0, NaN, 3.0], 0.5))
         # The `NaN` is read off the column, so it keeps the element type of the data.
         @test po.summary_quantile(Float32[1, NaN, 3], 0.5) isa Float32
@@ -759,10 +774,10 @@ end
         @test length(unique(g.n_valid)) > 1
         sg = covariance_forecast_summary(g)
         nu = g.n_valid .* g.horizon
-        @test sg.mahalanobis_mean[1] ≈ dot(nu, g.mahalanobis_ratio) / sum(nu)
-        @test !isapprox(sg.mahalanobis_mean[1], mean(g.mahalanobis_ratio); rtol = 1e-4)
+        @test sg.mahalanobis_mean ≈ dot(nu, g.mahalanobis_ratio) / sum(nu)
+        @test !isapprox(sg.mahalanobis_mean, mean(g.mahalanobis_ratio); rtol = 1e-4)
         dbar = [mean(filter(isfinite, r)) for r in eachrow(g.diagonal_ratio)]
-        @test sg.diagonal_mean[1] ≈ mean(dbar)
+        @test sg.diagonal_mean ≈ mean(dbar)
         # One step has no long-run variance, so its test is `NaN`; two steps answer.
         one_b = cfe(ExpWeightedCovariance(; decay = 0.8), rd, IndexWalkForward(T - h, h))
         c1 = covariance_forecast_compare(one, one_b)
@@ -818,17 +833,17 @@ end
             dbar = po.covariance_diagonal_mean(r)[k]
             snu = po.target_step_dof.(Ref(r.target), r.horizon[k])
             # The plain mean, and the band of the plain mean: Var = 2 sum(1 / nu_t) / M^2.
-            @test se.mahalanobis_mean[1] ≈ mean(m) rtol = 1e-14
-            @test se.diagonal_mean[1] ≈ mean(dbar) rtol = 1e-14
+            @test se.mahalanobis_mean ≈ mean(m) rtol = 1e-14
+            @test se.diagonal_mean ≈ mean(dbar) rtol = 1e-14
             M = length(m)
-            @test se.mahalanobis_band_hi[1] - 1 ≈ z * sqrt(2 * sum(inv, nu)) / M rtol = 1e-14
-            @test 1 - se.diagonal_band_lo[1] ≈ z * sqrt(2 * sum(inv, snu)) / M rtol = 1e-14
+            @test se.mahalanobis_band_hi - 1 ≈ z * sqrt(2 * sum(inv, nu)) / M rtol = 1e-14
+            @test 1 - se.diagonal_band_lo ≈ z * sqrt(2 * sum(inv, snu)) / M rtol = 1e-14
             # The default band is the chi-squared variance 2 / sum(nu), to the last bit.
-            @test sd.mahalanobis_band_hi[1] == 1 + z * sqrt(2 / sum(nu))
-            @test sd.diagonal_band_lo[1] == 1 - z * sqrt(2 / sum(snu))
-            @test sd.mahalanobis_mean[1] == dot(nu, m) / sum(nu)
+            @test sd.mahalanobis_band_hi == 1 + z * sqrt(2 / sum(nu))
+            @test sd.diagonal_band_lo == 1 - z * sqrt(2 / sum(snu))
+            @test sd.mahalanobis_mean == dot(nu, m) / sum(nu)
             # The plain mean has the wider band: sum(1/nu) / M^2 >= 1 / sum(nu).
-            @test se.mahalanobis_band_hi[1] > sd.mahalanobis_band_hi[1]
+            @test se.mahalanobis_band_hi > sd.mahalanobis_band_hi
             # Every other column reads no weight.
             for f in (:mahalanobis_median, :mahalanobis_p5, :diagonal_p95, :bias_statistic,
                       :qlike_mean, :exceedance, :n_steps)
@@ -838,8 +853,8 @@ end
         # The two rules agree when every step has the same degrees of freedom.
         r = cfe(Covariance(), rd, batch_cv)
         @test allequal(r.n_valid) && allequal(r.horizon)
-        @test covariance_forecast_summary(r; step_weighting = EqualStepWeighting()).mahalanobis_mean[1] ≈
-              covariance_forecast_summary(r).mahalanobis_mean[1] rtol = 1e-14
+        @test covariance_forecast_summary(r; step_weighting = EqualStepWeighting()).mahalanobis_mean ≈
+              covariance_forecast_summary(r).mahalanobis_mean rtol = 1e-14
         @test po.covariance_step_weights(DofStepWeighting(), [8, 8, 7]) == [8, 8, 7]
         @test po.covariance_step_weights(EqualStepWeighting(), [8, 8, 7]) == [1, 1, 1]
         @test DofStepWeighting() isa po.AbstractStepWeighting

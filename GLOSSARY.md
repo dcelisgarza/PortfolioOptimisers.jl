@@ -1209,6 +1209,10 @@ Portfolio returns adjusted for fees and turnover costs. The library computes the
 **Drawdowns**
 Peak-to-trough declines computed from Net Returns, and the input series to drawdown-based risk measures.
 
+**Performance Summary**
+The headline figures of one or more realised Net Return series, which `performance_summary` gives as one `PerformanceSummaryResult`. Each series is one **entry**, and three keys name it: the **candidate** (`names`), the **path** of a population (`paths`) and the **member** of a prediction whose optimiser gives many portfolios (`members`). A key that does not apply is `nothing`. The shape follows the type of the input, never the count at run time. An input that holds exactly one series gives scalar fields, and every other input gives one vector entry for each series, in the order candidate, path, member. The figures of a path are point estimates, and the summary does no reduction over the paths. The caller adds risk measures by name with `measures`, each evaluated on the same series, and `DataFrame(ps)` writes the summary as a table with one row for each entry. ADR 0227.
+*Avoid*: a Forecast Evaluation summary, whose entries are paired forecasts on one sample. The entries of a Performance Summary pair nothing, so they can cover different rows. Also backtest report, tear sheet.
+
 **Fees**
 The composite of holding and trading costs: **long** (management), **short** (borrowing, or a credit at a negative rate), **turnover** (commission) and **fixed** (a constant charge on any non-zero weight). The long, short and turnover rates are charged **every period**, at the frequency of the returns. The two fixed amounts are charged **one time** for the whole holding period. See issue #898. A return series reads the two fixed amounts as a fraction of capital, and an Allocation Fee reads them as a currency amount.
 The short rate `s` may be negative down to `-l`, which keeps the fee convex. A negative rate credits a short position, and `s = -l` is the linear fee `l w` (#1518).

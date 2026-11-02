@@ -161,7 +161,7 @@ $(DocStringExtensions.TYPEDEF)
 
 The headline statistics of one or more covariance forecast evaluations, one entry per evaluation.
 
-`CovarianceForecastSummaryResult` is what [`covariance_forecast_summary`](@ref) returns. Each column has one entry per evaluation, so one evaluation is the length-1 case and two forecasts side by side are the length-2 case. So, like [`ForecastSummaryResult`](@ref) for the return forecasts, it needs no separate comparison type. The summary reads every column from the per-step diagnostics of a [`CovarianceForecastEvaluationResult`](@ref). The bands are Gaussian references, and the summary does not correct them for heavy tails.
+`CovarianceForecastSummaryResult` is what [`covariance_forecast_summary`](@ref) returns. The shape follows the type of the input, as for [`PerformanceSummaryResult`](@ref). The method for one evaluation gives scalar fields, equal to entry 1 of the vector method on `[cfer]`, and `exceedance` is then a vector over the levels. The vector method gives one entry per evaluation, so two forecasts side by side are the length-2 case. So, like [`ForecastSummaryResult`](@ref) for the return forecasts, it needs no separate comparison type. Breaking: a summary of one evaluation held length-1 vectors before. The summary reads every column from the per-step diagnostics of a [`CovarianceForecastEvaluationResult`](@ref). The bands are Gaussian references, and the summary does not correct them for heavy tails.
 
 # Mathematical definition
 
@@ -344,7 +344,7 @@ end
 
 Summarise one or more covariance forecast evaluations, one entry per evaluation.
 
-For each evaluation, the summary gives the mean, the median and the tail percentiles of the two calibration ratios, the Gaussian band on each mean, the bias statistic of the test portfolios with its percentiles over the portfolios, the mean of each loss, and the exceedance rate of the Mahalanobis statistic at each level. The method for one Result is the length-1 case.
+For each evaluation, the summary gives the mean, the median and the tail percentiles of the two calibration ratios, the Gaussian band on each mean, the bias statistic of the test portfolios with its percentiles over the portfolios, the mean of each loss, and the exceedance rate of the Mahalanobis statistic at each level. The method for one Result gives scalar fields, through [`covariance_summary_entry`](@ref), and the vector method gives one entry per evaluation, also for a vector of one. Breaking: the method for one Result gave length-1 vectors before.
 
 The mean of a ratio weights each step by `step_weighting`. The default, [`DofStepWeighting`](@ref), gives a ratio of sums, which weights each step by its degrees of freedom under the target of the evaluation ([`target_dof`](@ref), [`target_step_dof`](@ref)). A date walk-forward whose folds differ in length then weights each step by its length. A listing or a delisting also changes the weight of a step of the Mahalanobis ratio, because its degrees of freedom count the active assets. So the Mahalanobis mean is the plain mean only when every step has the same horizon and the same active count, and the diagonal mean is the plain mean when every step has the same horizon. [`EqualStepWeighting`](@ref) gives the plain mean in every case, with the band of the plain mean.
 
@@ -468,7 +468,36 @@ function covariance_forecast_summary(cfers::AbstractVector{<:CovarianceForecastE
                                            pql, levels, ex, ns, np, alpha, step_weighting)
 end
 function covariance_forecast_summary(cfer::CovarianceForecastEvaluationResult; kwargs...)
-    return covariance_forecast_summary([cfer]; kwargs...)
+    return covariance_summary_entry(covariance_forecast_summary([cfer]; kwargs...))
+end
+"""
+    covariance_summary_entry(s::CovarianceForecastSummaryResult) -> CovarianceForecastSummaryResult
+
+The summary of one covariance forecast evaluation, with scalar fields, from a summary of one evaluation with length-1 columns.
+
+Each field becomes its entry 1 through [`first_summary_entry`](@ref). `levels` is the axis of the confidence levels and not of the evaluations, so it stays as it is, and `exceedance` becomes a vector over the levels.
+
+# Arguments
+
+  - `s`: The summary of the vector of one evaluation.
+
+# Returns
+
+  - `s1::CovarianceForecastSummaryResult`: The summary with scalar fields.
+
+# Related
+
+  - [`covariance_forecast_summary`](@ref)
+  - [`first_summary_entry`](@ref)
+"""
+function covariance_summary_entry(s::CovarianceForecastSummaryResult)
+    return CovarianceForecastSummaryResult((if f === :levels
+                                                getfield(s, f)
+                                            else
+                                                first_summary_entry(getfield(s, f))
+                                            end
+                                            for f in
+                                                fieldnames(CovarianceForecastSummaryResult))...)
 end
 """
     summary_quantile(x::VecNum, p::Number)

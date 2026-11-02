@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.3"
 julia_syntax = "1.0.2"
-commit = "2b82178f7e"
+commit = "c52a30fc7f"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { code = 287, doc = 0, comment = 12, blank = 2, total = 301 }
@@ -407,7 +407,10 @@ commit = "2b82178f7e"
 "src/17_Optimisation/10_OnlinePortfolioSelection/12_AllocationSetProgramme.jl" = { code = 467, doc = 614, comment = 10, blank = 287, total = 1378 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/13_SparsePortfolioAlgorithms.jl" = { code = 100, doc = 236, comment = 1, blank = 88, total = 425 }
 "src/17_Optimisation/11_ProjectionWeightFinalisers.jl" = { code = 85, doc = 207, comment = 13, blank = 101, total = 406 }
-"src/18_ExpectedReturns.jl" = { code = 434, doc = 1272, comment = 65, blank = 474, total = 2245 }
+"src/18_ExpectedReturns/01_ExpectedReturns.jl" = { code = 234, doc = 690, comment = 43, blank = 241, total = 1208 }
+"src/18_ExpectedReturns/02_BrinsonAttribution.jl" = { code = 37, doc = 62, comment = 2, blank = 34, total = 135 }
+"src/18_ExpectedReturns/03_PerformanceSummary.jl" = { code = 336, doc = 608, comment = 11, blank = 252, total = 1207 }
+"src/18_ExpectedReturns/04_SharpeRatioInference.jl" = { code = 91, doc = 290, comment = 17, blank = 132, total = 530 }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { code = 494, doc = 1211, comment = 11, blank = 494, total = 2210 }
 "src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { code = 455, doc = 974, comment = 6, blank = 405, total = 1840 }
 "src/19_FactorAttribution/03_FactorAttributionRealisedMethods.jl" = { code = 317, doc = 454, comment = 2, blank = 232, total = 1005 }

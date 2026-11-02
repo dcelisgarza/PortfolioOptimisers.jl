@@ -407,6 +407,12 @@ end
 const FORECAST_SUMMARY_LABELS = ["Spearman IC", "Spearman IR", "Pearson IC", "Pearson IR",
                                  "Rank Ann. Return", "Rank Sharpe", "Z-Score Ann. Return",
                                  "Z-Score Sharpe", "Calibration Slope", "Mean Coverage"]
+# A summary of one forecast holds scalar fields, and each spread is a vector over the tail
+# fractions (#1934). The two readers below put it on the axis of a summary of many.
+forecast_summary_name_axis(names::AbstractVector) = names
+forecast_summary_name_axis(name) = [name]
+forecast_summary_spread_column(S::AbstractMatrix, j::Integer) = S[:, j]
+forecast_summary_spread_column(S::AbstractVector, j::Integer) = S[j]
 function forecast_summary_columns(fs::PortfolioOptimisers.ForecastSummaryResult)
     vals = Any[fs.spearman_mean_ic, fs.spearman_ic_ir, fs.pearson_mean_ic, fs.pearson_ic_ir,
                fs.rank_ann_return, fs.rank_sharpe, fs.zscore_ann_return, fs.zscore_sharpe,
@@ -414,14 +420,13 @@ function forecast_summary_columns(fs::PortfolioOptimisers.ForecastSummaryResult)
     labels = copy(FORECAST_SUMMARY_LABELS)
     partial = isnothing(fs.spread_sharpe)
     if !partial
-        S::MatNum = fs.spread_sharpe
         qs::AbstractVector = fs.quantiles
         for j in eachindex(qs)
-            push!(vals, S[:, j])
+            push!(vals, forecast_summary_spread_column(fs.spread_sharpe, j))
             push!(labels, "Spread Sharpe q = $(qs[j])")
         end
     end
-    K = length(fs.names)
+    K = length(forecast_summary_name_axis(fs.names))
     M = Matrix{Float64}(undef, length(vals), K)
     for r in eachindex(vals)
         v = vals[r]
@@ -435,7 +440,7 @@ function PortfolioOptimisers.plot_forecast_evaluation_summary(fs::PortfolioOptim
                                                               kwargs...)
     M, labels, partial = forecast_summary_columns(fs)
     K = size(M, 2)
-    names::AbstractVector = fs.names
+    names::AbstractVector = forecast_summary_name_axis(fs.names)
     title = if partial
         "Forecast Evaluation Summary (no quantile spread)"
     else

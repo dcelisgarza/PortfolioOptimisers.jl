@@ -406,7 +406,10 @@ commit = "2b7a0e8c15"
 "src/17_Optimisation/10_OnlinePortfolioSelection/12_AllocationSetProgramme.jl" = { cyc = 4, cog = 4, arg = 4, cyc_sum = 91, cog_sum = 39, arg_sum = 101, macros = [] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/13_SparsePortfolioAlgorithms.jl" = { cyc = 3, cog = 3, arg = 5, cyc_sum = 17, cog_sum = 10, arg_sum = 26, macros = [] }
 "src/17_Optimisation/11_ProjectionWeightFinalisers.jl" = { cyc = 9, cog = 13, arg = 3, cyc_sum = 35, cog_sum = 34, arg_sum = 15, macros = [] }
-"src/18_ExpectedReturns.jl" = { cyc = 6, cog = 10, arg = 9, cyc_sum = 80, cog_sum = 55, arg_sum = 162, macros = ["@propagatable"] }
+"src/18_ExpectedReturns/01_ExpectedReturns.jl" = { cyc = 3, cog = 4, arg = 9, cyc_sum = 55, cog_sum = 27, arg_sum = 175, macros = ["@propagatable"] }
+"src/18_ExpectedReturns/02_BrinsonAttribution.jl" = { cyc = 4, cog = 4, arg = 7, cyc_sum = 4, cog_sum = 4, arg_sum = 7, macros = [] }
+"src/18_ExpectedReturns/03_PerformanceSummary.jl" = { cyc = 6, cog = 10, arg = 7, cyc_sum = 63, cog_sum = 28, arg_sum = 97, macros = [] }
+"src/18_ExpectedReturns/04_SharpeRatioInference.jl" = { cyc = 5, cog = 5, arg = 4, cyc_sum = 21, cog_sum = 17, arg_sum = 26, macros = [] }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { cyc = 3, cog = 6, arg = 13, cyc_sum = 90, cog_sum = 37, arg_sum = 127, macros = [] }
 "src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { cyc = 3, cog = 3, arg = 11, cyc_sum = 75, cog_sum = 22, arg_sum = 164, macros = [] }
 "src/19_FactorAttribution/03_FactorAttributionRealisedMethods.jl" = { cyc = 5, cog = 5, arg = 8, cyc_sum = 82, cog_sum = 34, arg_sum = 140, macros = [] }

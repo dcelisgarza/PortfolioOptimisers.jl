@@ -509,7 +509,9 @@ not make a forecast useful.
 
 [`forecast_evaluation_summary`](@ref) collects the statistics above in one call. It gives a columnar
 [`ForecastSummaryResult`](@ref) whose axis is the forecast, thirty columns with one entry per
-forecast. A single evaluation gives a result of length one, and two evaluations give the comparison.
+forecast. A vector of two evaluations gives the comparison, with one entry per forecast. A single
+evaluation, passed alone and not in a vector, gives the same columns with a scalar in each, as
+[`performance_summary`](@ref) does for one series.
 
 It computes nothing of its own. Every column is one of the functions above, evaluated on the same
 dates under the same parameters. That is why the alignment of section 2 comes first. The summary

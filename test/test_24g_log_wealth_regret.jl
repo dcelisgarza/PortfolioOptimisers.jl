@@ -286,10 +286,19 @@ form compares a prediction result against the benchmark of its own rows (#1664).
                 @test isequal(getproperty(off, f), getproperty(ps, f))
             end
         end
-        # A population reads its first benchmark series, and returns data with no
-        # benchmark give the three as `NaN`, as before.
-        @test same_fields(performance_summary(bench_prediction([a, b], [b, a], tsh)),
-                          performance_summary(a; benchmark = b))
+        # A prediction with two members gives one entry for each member, each against its
+        # own benchmark series (#1934). Returns data with no benchmark give the three as
+        # `NaN`, as before.
+        two = performance_summary(bench_prediction([a, b], [b, a], tsh))
+        @test two.members == [1, 2]
+        for (j, (x, y)) in enumerate(((a, b), (b, a)))
+            alone = performance_summary(x; benchmark = y)
+            for f in (:n_periods, :ann_return, :ann_volatility, :sharpe, :sharpe_stderr,
+                      :sortino, :calmar, :max_drawdown, :cvar, :excess_ret, :tracking_error,
+                      :information_ratio)
+                @test isequal(getfield(two, f)[j], getfield(alone, f))
+            end
+        end
         ew = performance_summary(cross_val_predict(EqualWeighted(), rd, cv))
         @test isnan(ew.excess_ret) &&
               isnan(ew.tracking_error) &&
@@ -574,9 +583,19 @@ and be-the-leader collapses onto the static comparator.
         @test occursin("2 members", err.msg) && occursin("holds 3", err.msg)
         # A one-series pair keeps the released scalar.
         @test isa(log_wealth_regret(ew, ew; mt = mt), LogWealthRegretResult)
-        # The summary still reads the first member, series and benchmark alike (#1934).
-        @test isequal(performance_summary(fr).sharpe,
-                      performance_summary(fr.mrd.X[1]; benchmark = fr.mrd.B[1]).sharpe)
+        # The summary gives one entry for each member, each with its own series, benchmark,
+        # turnover and weights (#1934).
+        psf = performance_summary(fr)
+        @test psf.members == [1, 2, 3]
+        for j in 1:3
+            alone = performance_summary(fr.mrd.X[j]; benchmark = fr.mrd.B[j])
+            @test isequal(psf.sharpe[j], alone.sharpe)
+            @test isequal(psf.excess_ret[j], alone.excess_ret)
+            @test isequal(psf.turnover[j], po.held_path_turnover(fr, j))
+            @test psf.n_eff[j] ≈
+                  mean(f -> number_effective_assets(po.fold_target(f, j)), fr.pred)
+        end
+        @test !allequal(psf.turnover)
     end
 
     @testset "The benchmark fields of the performance summary" begin

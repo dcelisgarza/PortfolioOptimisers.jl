@@ -15,4 +15,6 @@ forecast_summary_scored
 forecast_summary_coverage
 forecast_summary_row
 forecast_summary_spreads
+first_summary_entry
+forecast_summary_entry
 ```

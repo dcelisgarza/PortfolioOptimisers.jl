@@ -274,9 +274,9 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :ps_compound => "`compound`: `true` when the drawdown statistics read a compounded wealth path, and `false` when they read the cumulative sum of the returns.",#
                  :ps_ann_return => "`ann_return`: Annualised arithmetic mean return.",#
                  :ps_ann_volatility => "`ann_volatility`: Annualised sample standard deviation.",#
-                 :ps_sharpe => "`sharpe`: Annualised Sharpe ratio at a zero risk-free rate. It is `NaN` when the volatility is zero.",#
+                 :ps_sharpe => "`sharpe`: Annualised Sharpe ratio, the excess of the mean return over the risk-free rate `rf`, divided by the volatility. It is `NaN` when the volatility is zero.",#
                  :ps_sharpe_stderr => "`sharpe_stderr`: Standard error of `sharpe`. It corrects for the skewness and the excess kurtosis of the returns, and **not** for their serial dependence. A series scored under a Weight Drift is serially dependent through the weights that it held, so on such a series this figure is less than the true standard error.",#
-                 :ps_sortino => "`sortino`: Annualised Sortino ratio, at a zero minimum acceptable return. It is `NaN` when the downside deviation is zero.",#
+                 :ps_sortino => "`sortino`: Annualised Sortino ratio, the excess of the mean return over the risk-free rate `rf`, divided by the downside deviation below zero. It is `NaN` when the downside deviation is zero.",#
                  :ps_calmar => "`calmar`: Annualised return divided by the absolute value of the maximum drawdown. It is `NaN` when the series has no drawdown.",#
                  :ps_max_drawdown => "`max_drawdown`: Maximum drawdown, in return space, so it is not positive.",#
                  :ps_cvar => "`cvar`: Conditional Value-at-Risk at `alpha`, in return space, so a tail loss is negative.",#
