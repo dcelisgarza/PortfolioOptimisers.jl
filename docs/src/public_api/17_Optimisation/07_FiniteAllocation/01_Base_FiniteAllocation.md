@@ -4,7 +4,7 @@ Description = "Base finite allocation, public API of PortfolioOptimisers.jl: Abs
 
 # Base finite allocation
 
-A new collateral algorithm subtypes `AbstractCollateralAlgorithm` and adds the two call methods that its docstring states. A new rule for the weight of an Unpriced Asset subtypes `AbstractUnpricedWeightAlgorithm` and adds the call method that its docstring states.
+A new collateral algorithm subtypes `AbstractCollateralAlgorithm` and adds the two call methods that its docstring states. A new rule for the target weight of an asset with no price on the allocation date subtypes `AbstractUnpricedWeightAlgorithm` and adds the call method that its docstring states.
 
 ```@docs
 PortfolioOptimisers.AbstractCollateralAlgorithm

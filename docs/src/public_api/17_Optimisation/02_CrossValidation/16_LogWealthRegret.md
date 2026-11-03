@@ -10,7 +10,7 @@ The comparator can be the same estimator run causally. It can also be a hindsigh
 
 Run through a [`HindsightSplit`](@ref), the same estimators give the comparators of dynamic regret, which can change at each row. These are be-the-leader, the best constant rebalanced portfolio over the rows up to and including each row, and the best portfolio of each period. The result reports the path length of these comparators next to the regret. [`BudgetedHindsightPath`](@ref) is the third comparator of dynamic regret, the best sequence of weights whose path length stays within a budget. Like the others, it is an estimator. Its fit is one optimisation over the whole panel, and its prediction result has one fold per row.
 
-[`fold_target`](@ref) and [`fold_held`](@ref) read one fold of a prediction result. They give the weights that the fold started from and the weights that it held after its last observation, on the names `rd.nx` of the fold. When the fit drops an asset through the Investable Mask, `res.w` and `rd.nx` do not agree in length, and these two readers do.
+[`fold_target`](@ref) and [`fold_held`](@ref) read one fold of a prediction result. They give the weights that the fold started from and the weights that it held after its last observation, on the names `rd.nx` of the fold. When the fit drops an asset that it cannot hold, `res.w` has fewer entries than `rd.nx`. These two readers give one entry for each name of `rd.nx`.
 
 ```@docs
 LogWealthRegretResult

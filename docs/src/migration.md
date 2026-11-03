@@ -603,10 +603,18 @@ v0.33 also brings the cross-sectional factor prior to parity with the oracle, an
 
 ## From v0.33 to v0.34
 
+### [Calls that now raise](@id migration-0-34-raises)
+
+| Call | v0.33 | v0.34 |
+| --- | --- | --- |
+| `Covariance`, `Coskewness`, `Cokurtosis`, `SecondMoment`, `EvenMoment`, `FourthMoment`, `EWVolatility` or `EWResidualVolatility` with an `alg` that is a Gerber, Smyth-Broby or Gerber IQ algorithm or a shrinkage target, such as `Covariance(; alg = IdentityTarget())` | Built the estimator. `cov` then overflowed the stack, and `coskewness` and `cokurtosis` raised a `MethodError`. | Raises a `TypeError` when you build the estimator. The `alg` of these types is `FullMoment()` or `SemiMoment()`. Give a Gerber algorithm to `GerberCovariance`, `SmythBrobyCovariance` or `GerberIQCovariance`, and a shrinkage target to `GeodesicShrinkageCovariance`. |
+
 ### [Calls that now answer](@id migration-0-34-answers)
 
 | Call | v0.33 | v0.34 |
 | --- | --- | --- |
+| `CrossSectionalFactorPrior` with `ve = SimpleVariance()`, `ve = Covariance()` or another estimator with no variance series of its own, and the same prior inside an entropy pooling prior with `w` | Raised a `DimensionMismatch`, because the variance series did not cut the masks and the weights of the fit to the rows of each refit. | Fits. Row `t` of the series reads the masks, the implied volatility and the observation weights of the rows `1` to `t`. A covariance estimator that is not a variance estimator, such as `Covariance()`, states no count, so `ResidualInflation` on that prior raises an `IsNothingError` that names the fix. |
+| `WindowedVariance` or `WindowedCovariance` with no weights of its own over an inner estimator with observation weights, such as `WindowedVariance(; ve = SimpleVariance(; w), window = 20)` | Raised a `DimensionMismatch`. | Cuts the weights of the inner estimator to the window. |
 | `JuMPOptimiser`, `ProgrammeAllocationSet` or `FactorRiskContribution` with a vector field that mixes the members of its element type, such as `tn = [Turnover(…), TurnoverEstimator(…)]`; and `GridSearchCrossValidation`, `RandomisedSearchCrossValidation` or `WeightMassScorer` with a vector of grids whose types differ | `TypeError` or `MethodError`, unless the caller narrowed the literal with `concrete_typed_array` | The keyword constructor narrows the literal. A wrong element raises an `ArgumentError` that names the field. |
 
 ### [Results that move](@id migration-0-34-numbers)
@@ -615,6 +623,8 @@ v0.33 also brings the cross-sectional factor prior to parity with the oracle, an
 - **`forecast_evaluation_summary(fe)` and `covariance_forecast_summary(cfer)` give scalar fields.** v0.33 gave a vector of length one in each field of a summary of one evaluation. Read `fs.spearman_mean_ic` where v0.33 read `fs.spearman_mean_ic[1]`. A spread of the forecast summary and `exceedance` of the covariance summary become a vector over the tail fractions or the levels. Pass a vector, `[fe]`, to keep the shape of v0.33.
 
 ### [If you extend the library](@id migration-0-34-extending)
+
+- **The Gerber, Smyth-Broby and Gerber IQ algorithms and the shrinkage targets are not moment forms.** `GerberCovarianceAlgorithm`, `SmythBrobyCovarianceAlgorithm`, `GerberIQCovarianceAlgorithm` and `AbstractCovarianceShrinkageTarget` subtype `AbstractAlgorithm`, where v0.33 had `AbstractMomentAlgorithm`. A method that you wrote on `AbstractMomentAlgorithm` no longer reaches their members. An algorithm of your own in one of these families keeps working with the estimator that owns the family.
 
 - **`GridSearchCrossValidation` and `RandomisedSearchCrossValidation`** have a field `n_best` after `scorer`, the count of the best candidates that the search keeps. Their positional constructors take one more argument. The keyword constructors keep every v0.33 keyword, and `n_best = 1` gives the v0.33 search.
 - **`SearchCrossValidationResult`** has the fields `ranked`, `rank_idx`, `rank_scores` and `path_ids` after `idx`, so its positional constructor takes 10 arguments, where v0.33 took 6. The keyword constructor keeps every v0.33 keyword, and the new keywords default to `[opt]`, `[idx]`, `nothing` and `nothing`.

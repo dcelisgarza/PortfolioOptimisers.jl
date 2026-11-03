@@ -731,7 +731,7 @@ An algorithm that selects something other than a form of the deviations is not a
 
 # Interfaces
 
-A subtype needs no method of its own. A moment estimator holds the form in its `alg` field and dispatches on its type. A new form needs a method of each verb of every type that bounds `alg` to `AbstractMomentAlgorithm`, and a method of `coverage_comoment_deviations`.
+A form holds no data, and no verb takes it alone. A moment estimator holds the form in its `alg` field, and each verb of the estimator dispatches on the type of that field. So a new form needs a method of each verb of every type that bounds `alg` to `AbstractMomentAlgorithm`, and a method of `coverage_comoment_deviations`.
 
 # Related
 

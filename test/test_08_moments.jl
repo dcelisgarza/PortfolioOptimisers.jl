@@ -2635,6 +2635,9 @@
         end
     end
 end
+# The methods below extend `Statistics` at the top level. The `using` of the first test set does
+# not run when `run_files.jl --testset` selects a later test set, so the file loads it here too.
+using Statistics
 """
 Records the shape of the `iv` its `cov`/`cor` receive, so a windowed wrapper's `iv`
 subsetting can be asserted without depending on a real implied-volatility estimator.
