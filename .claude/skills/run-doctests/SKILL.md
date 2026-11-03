@@ -17,8 +17,7 @@ julia -t 1 --project=docs docs/doctest_files.jl --all
 ```
 
   It prints `DOCTEST all seconds=… status=green|red`. A green run records the stamp `doctest`,
-  which the pre-push guard requires of a branch whose change to `src/` reaches code or a string
-  literal. The run holds a slot of
+  which also satisfies the pre-push guard. The run holds a slot of
   `code_health/julia_slot.jl`, so it waits for free memory, and the system does not kill it for
   lack of memory. Shut down your own kaimon REPL first. The REPL holds a GB that the run needs.
 
@@ -41,11 +40,14 @@ julia -t 1 --project=docs docs/doctest_files.jl --fix src/01_Base/11_VecScalar.j
   The script prints `DOCTEST files=… docstrings=… blocks=… status=green|red`, and a green run
   without `--fix` records the stamp `doctest-files`.
 
-- **The scoped run does not replace the full run.** A change in one file can change what a block
-  in another file prints, and the scoped run skips the manual pages under `docs/src`. Before the
-  push, run the stage that `bash code_health/gate_stamp.sh reach` names. `doctest` is the full
-  run, and `doctest-files` is the scoped run. A change to docstring prose outside every
-  `jldoctest` block needs neither.
+- **The pre-push guard asks for the scoped run.** When `bash code_health/gate_stamp.sh reach`
+  names `doctest-files`, run `docs/doctest_files.jl --against origin/dev` before the push. The
+  guard takes it as it takes a scoped run of JET. A change to docstring prose outside every
+  `jldoctest` block needs no doctest run.
+- **The scoped run does not see every block.** A change in one file can change what a block in
+  another file prints, and the scoped run skips the manual pages under `docs/src`. The doctest
+  job of CI runs every block. Run the full run before the push when your change alters a `show`
+  method, a default, or a value that the blocks of other files print.
 
 - The shipped default of `set_show_nothing_fields!` is `false`, which hides a field that holds
   `nothing` at the REPL. The doctests set it to `true` in both places, so a rendered docstring shows

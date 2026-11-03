@@ -12,13 +12,15 @@ files under `src/` and `ext/` that the branch changes against `ref`, from the me
 `code_health/CodeHealth.jl` finds them. `--fix` writes the output of each failed block back into its
 docstring, as `doctest(...; fix = true)` does. `--all` runs the full doctest step of the CI job:
 every docstring of the module and the manual pages under `docs/src`. A green `--all` run records
-the gate stamp `doctest`, which the push guard requires of a branch that changes `src/`.
+the gate stamp `doctest`.
 
 The full run of the `run-doctests` skill checks every docstring of the module and the manual pages
 under `docs/src`, which takes about nine minutes. This script checks the docstrings that the named
-files hold, and nothing else. It is the check of a branch's own blocks between rebases. It does not
-replace the full run before the push, because a change in one file can change what a block in
-another file prints.
+files hold, and nothing else. A green run of `--against origin/dev` records the stamp
+`doctest-files`, which the push guard requires of a branch whose change to `src/` reaches a
+doctest. The guard takes the scoped run as it takes a scoped run of JET. A change in one file can
+change what a block in another file prints, and the doctest job of CI, which runs every block, is
+the gate for that case.
 
 The script runs the setup of the doctest job of `.github/workflows/Docs.yml` from the text of that
 file, so its `DocTestSetup` and its two show settings cannot drift from CI. It then copies each

@@ -23,7 +23,8 @@ that interpolates a key that no dictionary holds stops the load. The `explicit-i
 `.pre-commit-config.yaml` loads the package on each push that changes `src/`, and it refuses that
 push. The hook reads `src/` alone, so a docstring under `ext/` that interpolates a value has no
 such check. `code_health/gate_stamp.sh` reads the last line: its push guard demands `jet` for
-`code` alone, and `doctest` for `literal` and `code`. Sessions ran an eight-minute doctest run and
+`code` alone, and the scoped doctest stamp `doctest-files` for `block`, `literal` and `code`.
+Sessions ran an eight-minute doctest run and
 JET on prose-only pushes, which were four in five of the ticket commits of October 2026. The script
 loads no package, and it runs in about a second.
 =#

@@ -351,12 +351,14 @@ end
         # No stamp at all: both gates are absent.
         code, out = stamp(dir, "check"; push...)
         @test code == 1
-        @test occursin("no stamp records these gates: jet doctest", out)
+        # The guard asks for the scoped doctest run, not the full one.
+        @test occursin("no stamp records these gates: jet doctest-files\n", out)
         @test first(stamp(dir, "record", "jet")) == 0
         code, out = stamp(dir, "check"; push...)
         @test code == 1
-        @test occursin("these gates: doctest", out)
-        # A waiver carries its reason, and `list` shows it.
+        @test occursin("these gates: doctest-files\n", out)
+        # A waiver carries its reason, and `list` shows it. A waiver of `doctest` covers the
+        # scoped run.
         @test first(stamp(dir, "waive", "doctest", "no", "docstring", "changed")) == 0
         @test occursin("doctest\twaived: no docstring changed", last(stamp(dir, "list")))
         @test first(stamp(dir, "check"; push...)) == 0
@@ -397,10 +399,14 @@ end
         @test demand(reach_text(; doc = "Other prose.")) == (0, "")
         # A changed literal moves no counter, so it needs no `coverage` stamp (#1912).
         code, out = demand(reach_text(; msg = "other"))
-        @test occursin("(literal), and no stamp records these gates: doctest\n", out)
-        code, out = demand(reach_text(; body = "x + 2"))
-        @test occursin("(code), and no stamp records these gates: jet doctest coverage\n",
+        @test occursin("(literal), and no stamp records these gates: doctest-files\n", out)
+        # A change to the code needs the scoped doctest run, as it needs a scoped run of JET.
+        dir, c0, c1 = reach_repo(reach_text(; body = "x + 2"))
+        code, out = guard(dir, c0, c1)
+        @test occursin("(code), and no stamp records these gates: jet doctest-files coverage\n",
                        out)
+        @test first(stamp(dir, "record", "jet", "doctest-files", "coverage")) == 0
+        @test guard(dir, c0, c1) == (0, "")
         # A changed block needs the scoped run, and the full run covers it.
         dir, c0, c1 = reach_repo(reach_text(; out = "3"))
         code, out = guard(dir, c0, c1)

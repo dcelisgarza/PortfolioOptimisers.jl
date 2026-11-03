@@ -28,9 +28,13 @@
 #   - A push that changes a `.jl` file under src/ or ext/ needs a stamp of each gate in
 #     GATE_STAMP_REQUIRED, the gates of the `sweep-conform` skill, that the change reaches.
 #     `code_health/gate_reach.jl` names the class of the change. A change to docstring prose
-#     reaches neither `jet` nor `doctest`. A changed `jldoctest` block needs only `doctest-files`,
-#     and a changed string literal needs `doctest` but not `jet`. `waive` records the reason a
-#     gate does not apply.
+#     reaches neither `jet` nor `doctest`. A changed `jldoctest` block, a changed string literal
+#     and a change to the code need the doctest stamp, and a changed literal does not need `jet`.
+#     `waive` records the reason a gate does not apply.
+#   - The doctest stamp is the scoped one, `doctest-files`, as JET and the other gates take a
+#     scoped run. `docs/doctest_files.jl --against origin/dev` runs the blocks of the changed
+#     files, and the full run of `--all` covers it too. A change can alter what a block of another
+#     file prints. The doctest job of CI runs every block and stays the gate for that case.
 #   - `coverage` is required of a `code` change alone. `test/run_files.jl --coverage=<dir>` records
 #     it when the targeted files ran green and no line that the branch adds is a line that CI
 #     reads as a miss (#1912, ADR 0082). A line that no test can reach carries a Coverage
@@ -205,7 +209,7 @@ reached() {
         case "$2:$gate" in
         prose:jet | prose:doctest | block:jet | literal:jet) ;;
         prose:coverage | block:coverage | literal:coverage) ;;
-        block:doctest) echo doctest-files ;;
+        *:doctest) echo doctest-files ;;
         *) echo "$gate" ;;
         esac
     done
