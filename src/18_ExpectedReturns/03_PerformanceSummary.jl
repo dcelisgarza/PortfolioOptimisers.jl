@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 The headline performance statistics of one or more realised return series.
 
-[`performance_summary`](@ref) returns a `PerformanceSummaryResult`. It holds the eleven numbers that [`plot_performance_summary`](@ref) draws, the standard error of the Sharpe ratio, the effective number of assets, the extra risk measures of the caller, and the inputs of the statistics. A caller can put a summary in a table with `DataFrames.DataFrame(ps)`, compare it across runs, test it, or give it to a search, with no plotting package installed.
+[`performance_summary`](@ref) returns a `PerformanceSummaryResult`. It holds the eleven numbers that [`plot_performance_summary`](@ref) draws, the standard error of the Sharpe ratio, the effective number of assets, the four exposures of the book, the extra risk measures of the caller, and the inputs of the statistics. A caller can put a summary in a table with `DataFrames.DataFrame(ps)`, compare it across runs, test it, or give it to a search, with no plotting package installed.
 
 # Entries and shape
 
@@ -11,7 +11,7 @@ Each **entry** is one series. Three keys name it: `names` is the candidate, `pat
 
 The shape follows the **type** of the input of [`performance_summary`](@ref), and never the count at run time. An input that holds exactly one series gives one scalar in each field of an entry. Every other input gives one vector entry for each series, in the order candidate, then path, then member. `ppy`, `alpha`, `compound`, `rf` and `measures` are one value for the whole summary.
 
-The excess statistics, the turnover and the effective number of assets read inputs that a bare return series does not hold. Each is `NaN` when its input is absent. The three excess statistics need a `benchmark` series. A prediction result reads that series from its own rows when the returns data held a `B`. The turnover needs the weight path of a multi-period prediction result. The effective number of assets needs weights.
+The excess statistics, the turnover, the effective number of assets and the exposures read inputs that a bare return series does not hold. Each is `NaN` when its input is absent. The three excess statistics need a `benchmark` series. A prediction result reads that series from its own rows when the returns data held a `B`. The turnover needs the weight path of a multi-period prediction result. The effective number of assets and the four exposures need weights.
 
 # Sign convention
 
@@ -27,7 +27,8 @@ $(DocStringExtensions.FIELDS)
         names, paths, members, date0, date1, n_periods, ppy, alpha, compound, rf,
         ann_return, ann_volatility, sharpe, sharpe_stderr,
         sortino, calmar, max_drawdown, cvar,
-        excess_ret, tracking_error, information_ratio, turnover, n_eff, measures, risk
+        excess_ret, tracking_error, information_ratio, turnover, n_eff,
+        long_exposure, short_exposure, gross_exposure, net_exposure, measures, risk
     ) -> PerformanceSummaryResult
 
 The arguments are the fields of the struct, in the order of the declaration. The type is a
@@ -36,7 +37,9 @@ keyword constructor, and it does no validation of its own.
 
 Breaking: the struct gained the fields `names`, `paths`, `members`, `date0`, `date1`, `rf`,
 `n_eff`, `measures` and `risk`, so a positional call of the old sixteen arguments raises a
-`MethodError`.
+`MethodError`. It then gained `long_exposure`, `short_exposure`, `gross_exposure` and
+`net_exposure` after `n_eff`, so a positional call of twenty-five arguments raises a
+`MethodError` too.
 
 # Related
 
@@ -140,6 +143,22 @@ Breaking: the struct gained the fields `names`, `paths`, `members`, `date0`, `da
     """
     n_eff
     """
+    `long_exposure`: Sum of the positive weights of the entry. A path and a weight path take the mean, as `n_eff` does. It is `NaN` for a bare series.
+    """
+    long_exposure
+    """
+    `short_exposure`: Sum of the absolute values of the negative weights of the entry, so it is not negative. A path and a weight path take the mean, as `n_eff` does. It is `NaN` for a bare series.
+    """
+    short_exposure
+    """
+    `gross_exposure`: `long_exposure + short_exposure`, the sum of the absolute weights, or the leverage of the book. It is `NaN` for a bare series.
+    """
+    gross_exposure
+    """
+    `net_exposure`: `long_exposure - short_exposure`, the sum of the weights. It is `NaN` for a bare series.
+    """
+    net_exposure
+    """
     `measures`: The extra risk measures of the caller, a `NamedTuple` by name. It is empty when the caller gives none.
     """
     measures
@@ -195,6 +214,8 @@ A method that takes a prediction also gives the **turnover** of the held path, t
 
 The **effective number of assets** `n_eff` reads the weights of the entry with [`number_effective_assets`](@ref). Weights, and one [`OptimisationResult`](@ref) on its investable view, give the value of their weights. A path gives the mean over its folds of the value of each fold target, and a weight path the mean over its rows. The mean weight vector of a path is not used, because when the folds hold different assets, its value is larger than the value of any fold. A bare series holds no weights, so its `n_eff` is `NaN`. The risk contribution of each asset is not a figure of the summary, because its axis is the asset. [`risk_contribution`](@ref) gives it.
 
+The four **exposures** read the same weights as `n_eff`, and they take the mean in the same way. `long_exposure` and `short_exposure` are the sizes of the two sides of the book, and both are not negative. `gross_exposure` is their sum and `net_exposure` their difference. A long-only book with a budget of one has `1`, `0`, `1` and `1`. A 130/30 book has `1.3`, `0.3`, `1.6` and `1`, and a dollar-neutral book has a `net_exposure` of zero. [`weight_statistics`](@ref) computes `n_eff` and the four exposures of one weight vector.
+
 # Extra risk measures
 
 The keyword `measures` takes a vector of pairs `name::Symbol => r::AbstractBaseRiskMeasure`. The value of each measure on each entry is `expected_risk_from_returns(r, ret)` on the same net series as the headline figures, with the sign of the measure. `ps.risk.name` reads it, and [`bigger_is_better`](@ref) gives its orientation. A name, and not the type of a measure, keys each value, because two CVaR levels have one type.
@@ -234,6 +255,18 @@ The three excess statistics against a benchmark, and the turnover of the held pa
 \\end{align}
 ```
 
+The effective number of assets and the four exposures of one weight vector ``\\boldsymbol{w}``:
+
+```math
+\\begin{align}
+\\mathrm{n\\_eff} &= \\dfrac{\\lVert \\boldsymbol{w} \\rVert_1^{2}}{\\lVert \\boldsymbol{w} \\rVert_2^{2}}\\\\
+\\mathrm{long\\_exposure} &= \\sum_{i} \\max(w_{i}, 0)\\\\
+\\mathrm{short\\_exposure} &= \\sum_{i} \\max(-w_{i}, 0)\\\\
+\\mathrm{gross\\_exposure} &= \\mathrm{long\\_exposure} + \\mathrm{short\\_exposure} = \\lVert \\boldsymbol{w} \\rVert_1\\\\
+\\mathrm{net\\_exposure} &= \\mathrm{long\\_exposure} - \\mathrm{short\\_exposure} = \\boldsymbol{1}^{\\intercal} \\boldsymbol{w}\\,.
+\\end{align}
+```
+
 The standard error of the Sharpe ratio corrects for the skewness and the excess kurtosis of the returns. Its variance is the asymptotic variance of Equation 2 of [mertens2002](@cite), divided by ``T - 1`` as in Section 2.5 of [sharpe_stderr](@cite), and annualised:
 
 ```math
@@ -253,6 +286,7 @@ Where:
   - ``\\boldsymbol{d}``: Drawdown path of the cumulative wealth of ``\\boldsymbol{x}``, compounded or not as `compound` states, with ``d_{t} \\leq 0``.
   - ``m_e``, ``s_e``: Sample mean and corrected sample standard deviation of the excess series ``\\boldsymbol{e} = \\boldsymbol{x} - \\boldsymbol{b}``.
   - ``F``: Number of folds of the multi-period result.
+  - $(math_dict[:w_i_asset])
   - ``\\boldsymbol{w}_f``: Weights at the start of fold ``f``, its target on a solved fold.
   - ``\\hat{\\boldsymbol{w}}_f``: Weights of fold ``f`` after its last observation. They are the drifted holding when the fold has a Held Weights record, and ``\\boldsymbol{w}_f`` otherwise.
   - ``g_{1}``, ``g_{2}``: Sample skewness and sample excess kurtosis of ``\\boldsymbol{x}``.
@@ -281,7 +315,7 @@ Every method checks its keywords with [`summary_options`](@ref) first, so no fig
  8. Make the Sharpe ratio per period `sr_p`, from `m - rf` and `s`. Correct its variance `var_sr` for the sample skewness and the sample excess kurtosis of `ret`. Annualise the square root, to get `sharpe_se`. When `var_sr` is not positive, `sharpe_se` is `NaN`.
  9. Compute the three excess statistics with [`excess_statistics`](@ref). With a `benchmark`, the function checks its length and takes `e = ret - benchmark`. It annualises the mean of `e`, clamped as in step 2, and the standard deviation of `e` about that mean, to get `excess_ret` and `tracking_error`. It divides them, to get `information_ratio`, which is `NaN` when `tracking_error` is not positive. With no benchmark, all three are `NaN`.
 10. Take the turnover that the entry carries, from [`held_path_turnover`](@ref). A `nothing` from that function, and every input that holds no prediction, gives a `NaN`.
-11. Take the effective number of assets that the entry carries. An entry with no weights gives a `NaN`.
+11. Take the effective number of assets and the four exposures that the entry carries, with [`entry_weight_statistics`](@ref). An entry with no weights gives a `NaN` for each.
 12. Evaluate each extra measure on `ret` with [`expected_risk_from_returns`](@ref), to get `risk`.
 13. Read `date0` and `date1` from the timestamps of the entry with [`series_dates`](@ref). Put the keys, the inputs and the statistics into a [`PerformanceSummaryResult`](@ref).
 
@@ -440,7 +474,7 @@ end
 
 Compute the [`PerformanceSummaryResult`](@ref) of one entry, with scalar fields.
 
-This function is the one site that computes the figures of a summary. It does the steps of [`performance_summary`](@ref) on the series of one entry. Every `performance_summary` method calls it once for each entry. An entry that holds no weight path gives `nothing` for the turnover, and an entry that holds no weights gives `nothing` for the effective number of assets. This function writes each `nothing` as `NaN`.
+This function is the one site that computes the figures of a summary. It does the steps of [`performance_summary`](@ref) on the series of one entry. Every `performance_summary` method calls it once for each entry. An entry that holds no weight path gives `nothing` for the turnover, and an entry that holds no weights gives `nothing` for its weight statistics. This function writes each `nothing` as `NaN`.
 
 # Arguments
 
@@ -461,6 +495,7 @@ This function is the one site that computes the figures of a summary. It does th
   - [`summarise_entries`](@ref)
   - [`excess_statistics`](@ref)
   - [`held_path_turnover`](@ref)
+  - [`entry_weight_statistics`](@ref)
 """
 function summarise_returns(e::NamedTuple, opts::NamedTuple)::PerformanceSummaryResult
     ret = e.ret
@@ -510,20 +545,21 @@ function summarise_returns(e::NamedTuple, opts::NamedTuple)::PerformanceSummaryR
                                                                       m)
     risk = map(r -> expected_risk_from_returns(r, ret), opts.measures)
     date0, date1 = series_dates(e.ts)
+    ws = entry_weight_statistics(e.ws, oftype(ann_ret, NaN))
     return PerformanceSummaryResult(e.name, e.path, e.member, date0, date1, T, ann, alpha,
                                     compound, opts.rf, ann_ret, ann_vol, sharpe, sharpe_se,
                                     sortino, calmar, max_dd, cvar_val, excess_ret,
                                     tracking_error, information_ratio,
-                                    something(e.turnover, oftype(ann_ret, NaN)),
-                                    something(e.n_eff, oftype(ann_ret, NaN)), opts.measures,
-                                    risk)
+                                    something(e.turnover, oftype(ann_ret, NaN)), ws.n_eff,
+                                    ws.long_exposure, ws.short_exposure, ws.gross_exposure,
+                                    ws.net_exposure, opts.measures, risk)
 end
 """
     performance_summary_columns()
 
 The columns of the table of a [`PerformanceSummaryResult`](@ref), each with the field that it reads.
 
-[`DataFrames.DataFrame(ps::PerformanceSummaryResult)`](@ref) writes the columns in this order: the three keys, the two dates and the number of periods, the twelve released figures in the order of the struct, and the effective number of assets. The column of each extra measure comes after them. [`summary_measures`](@ref) refuses a measure whose name is one of these columns.
+[`DataFrames.DataFrame(ps::PerformanceSummaryResult)`](@ref) writes the columns in this order: the three keys, the two dates and the number of periods, the twelve released figures in the order of the struct, the effective number of assets, and the four exposures. The column of each extra measure comes after them. [`summary_measures`](@ref) refuses a measure whose name is one of these columns.
 
 # Returns
 
@@ -541,7 +577,9 @@ function performance_summary_columns()
             sharpe_stderr = :sharpe_stderr, sortino = :sortino, calmar = :calmar,
             max_drawdown = :max_drawdown, cvar = :cvar, excess_ret = :excess_ret,
             tracking_error = :tracking_error, information_ratio = :information_ratio,
-            turnover = :turnover, n_eff = :n_eff)
+            turnover = :turnover, n_eff = :n_eff, long_exposure = :long_exposure,
+            short_exposure = :short_exposure, gross_exposure = :gross_exposure,
+            net_exposure = :net_exposure)
 end
 """
     summary_measures(measures::Tuple{})
@@ -686,7 +724,7 @@ function row_benchmark(bm::Some, ::Any)
 end
 """
     summary_entry(ret::VecNum, benchmark::Option{<:VecNum}, turnover::Option{<:Number},
-                  n_eff::Option{<:Number}, ts::Option{<:AbstractVector};
+                  ws::Option{<:NamedTuple}, ts::Option{<:AbstractVector};
                   path = nothing, member = nothing) -> NamedTuple
 
 One entry of a [`PerformanceSummaryResult`](@ref): a series, with the inputs of its figures and its keys.
@@ -698,7 +736,7 @@ One entry of a [`PerformanceSummaryResult`](@ref): a series, with the inputs of 
   - `ret`: The net return series.
   - `benchmark`: The benchmark series of the entry, or `nothing`.
   - `turnover`: The mean turnover of the held path, or `nothing`.
-  - `n_eff`: The effective number of assets, or `nothing` when the entry holds no weights.
+  - `ws`: The effective number of assets and the four exposures, from [`weight_statistics`](@ref), or `nothing` when the entry holds no weights.
   - `ts`: The timestamps of the series, or `nothing`.
   - `path`: The key of the path in a population, or `nothing`.
   - `member`: The index of the member, or `nothing`.
@@ -713,9 +751,9 @@ One entry of a [`PerformanceSummaryResult`](@ref): a series, with the inputs of 
   - [`input_entries`](@ref)
 """
 function summary_entry(ret::VecNum, benchmark::Option{<:VecNum}, turnover::Option{<:Number},
-                       n_eff::Option{<:Number}, ts::Option{<:AbstractVector};
+                       ws::Option{<:NamedTuple}, ts::Option{<:AbstractVector};
                        path = nothing, member = nothing)
-    return (; ret = ret, benchmark = benchmark, turnover = turnover, n_eff = n_eff, ts = ts,
+    return (; ret = ret, benchmark = benchmark, turnover = turnover, ws = ws, ts = ts,
             name = nothing, path = path, member = member)
 end
 """
@@ -744,10 +782,12 @@ function series_dates(ts::AbstractVector)
     return first(ts), last(ts)
 end
 """
-    weights_n_eff(w::VecNum)
-    weights_n_eff(w::MatNum)
+    weight_statistics(w::VecNum)
+    weight_statistics(w::MatNum)
 
-The effective number of assets of a weight vector, or the mean over the rows of a weight path `observations × assets`, as [`performance_summary`](@ref) gives it.
+The effective number of assets and the four exposures of a weight vector, or their means over the rows of a weight path `observations × assets`, as [`performance_summary`](@ref) gives them.
+
+The closed forms are the `n_eff` and exposure rows of the `# Mathematical definition` of [`performance_summary`](@ref). A weight path takes the mean of each figure over its rows, with [`mean_weight_statistics`](@ref).
 
 # Arguments
 
@@ -755,26 +795,88 @@ The effective number of assets of a weight vector, or the mean over the rows of 
 
 # Returns
 
-  - `neff::Number`: The effective number of assets.
+  - `ws::NamedTuple`: `n_eff`, `long_exposure`, `short_exposure`, `gross_exposure` and `net_exposure`.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.weight_statistics([0.65, 0.65, -0.3])
+(n_eff = 2.737967914438503, long_exposure = 1.3, short_exposure = 0.3, gross_exposure = 1.6, net_exposure = 1.0)
+```
 
 # Related
 
   - [`number_effective_assets`](@ref)
-  - [`prediction_n_eff`](@ref)
+  - [`prediction_weight_statistics`](@ref)
+  - [`mean_weight_statistics`](@ref)
 """
-function weights_n_eff(w::VecNum)
-    return number_effective_assets(w)
+function weight_statistics(w::VecNum)
+    long = sum(x -> max(x, zero(x)), w)
+    short = sum(x -> max(-x, zero(x)), w)
+    return (; n_eff = number_effective_assets(w), long_exposure = long,
+            short_exposure = short, gross_exposure = long + short,
+            net_exposure = long - short)
 end
-function weights_n_eff(w::MatNum)
-    return mean(number_effective_assets, eachrow(w))
+function weight_statistics(w::MatNum)
+    return mean_weight_statistics([weight_statistics(r) for r in eachrow(w)])
 end
 """
-    prediction_n_eff(pred::PredictionResult, j::Integer)
-    prediction_n_eff(pred::MultiPeriodPredictionResult, j::Integer)
+    mean_weight_statistics(ss::AbstractVector{<:NamedTuple{K}}) where {K}
 
-The effective number of assets of member `j` of a prediction, as [`performance_summary`](@ref) gives it.
+The mean of each figure of the weight statistics of many weight vectors, as [`weight_statistics`](@ref) gives them.
 
-A single prediction gives the value of its target. A multi-period prediction gives the mean over its folds of the value of each fold target, and not the value of the mean target. When the folds hold different assets, the mean target spreads over the union of their universes, and its value is larger than the value of any fold.
+A weight path and a multi-period prediction take the mean of each figure, and not the figure of the mean weight vector. When the vectors hold different assets, the mean vector spreads over the union of their universes, and its effective number of assets is larger than that of any vector.
+
+# Arguments
+
+  - `ss`: The weight statistics of each weight vector.
+
+# Returns
+
+  - `ws::NamedTuple`: The mean of each figure, with the keys of `ss`.
+
+# Related
+
+  - [`weight_statistics`](@ref)
+  - [`prediction_weight_statistics`](@ref)
+"""
+function mean_weight_statistics(ss::AbstractVector{<:NamedTuple{K}}) where {K}
+    return NamedTuple{K}(map(k -> mean(s -> getfield(s, k), ss), K))
+end
+"""
+    entry_weight_statistics(ws::Nothing, x::Number)
+    entry_weight_statistics(ws::NamedTuple, x::Number)
+
+The weight statistics of one entry of [`performance_summary`](@ref): the statistics of its weights, or `x` for each figure when the entry holds no weights.
+
+# Arguments
+
+  - `ws`: The weight statistics of the entry, from [`weight_statistics`](@ref), or `nothing`.
+  - `x`: The value of each figure of an entry with no weights, a `NaN` of the number type of the figures.
+
+# Returns
+
+  - `ws::NamedTuple`: `n_eff`, `long_exposure`, `short_exposure`, `gross_exposure` and `net_exposure`.
+
+# Related
+
+  - [`summarise_returns`](@ref)
+  - [`weight_statistics`](@ref)
+"""
+function entry_weight_statistics(::Nothing, x::Number)
+    return (; n_eff = x, long_exposure = x, short_exposure = x, gross_exposure = x,
+            net_exposure = x)
+end
+function entry_weight_statistics(ws::NamedTuple, ::Number)
+    return ws
+end
+"""
+    prediction_weight_statistics(pred::PredictionResult, j::Integer)
+    prediction_weight_statistics(pred::MultiPeriodPredictionResult, j::Integer)
+
+The effective number of assets and the four exposures of member `j` of a prediction, as [`performance_summary`](@ref) gives them.
+
+A single prediction gives the statistics of its target. A multi-period prediction gives the mean over its folds of the statistics of each fold target, with [`mean_weight_statistics`](@ref).
 
 # Arguments
 
@@ -783,26 +885,26 @@ A single prediction gives the value of its target. A multi-period prediction giv
 
 # Returns
 
-  - `neff::Number`: The effective number of assets.
+  - `ws::NamedTuple`: `n_eff`, `long_exposure`, `short_exposure`, `gross_exposure` and `net_exposure`.
 
 # Related
 
-  - [`number_effective_assets`](@ref)
+  - [`weight_statistics`](@ref)
   - [`fold_target`](@ref)
-  - [`weights_n_eff`](@ref)
+  - [`mean_weight_statistics`](@ref)
 """
-function prediction_n_eff(pred::PredictionResult, j::Integer)
-    return number_effective_assets(fold_target(pred, j))
+function prediction_weight_statistics(pred::PredictionResult, j::Integer)
+    return weight_statistics(fold_target(pred, j))
 end
-function prediction_n_eff(pred::MultiPeriodPredictionResult, j::Integer)
-    return mean(f -> number_effective_assets(fold_target(f, j)), pred.pred)
+function prediction_weight_statistics(pred::MultiPeriodPredictionResult, j::Integer)
+    return mean_weight_statistics([weight_statistics(fold_target(f, j)) for f in pred.pred])
 end
 """
     prediction_entries(pred::PredRes_MultiPredRes, bm::Option{<:Some}, path = nothing)
 
 The entries of a prediction: one entry when it holds one series, and one entry for each member when its optimiser gives many portfolios.
 
-The function does not read the first member of a prediction alone, as [`regret_series`](@ref) gives the series. Each member reads its own series, its own benchmark series through [`member_vector`](@ref), its own turnover through [`held_path_turnover`](@ref) and its own weights through [`prediction_n_eff`](@ref).
+The function does not read the first member of a prediction alone, as [`regret_series`](@ref) gives the series. Each member reads its own series, its own benchmark series through [`member_vector`](@ref), its own turnover through [`held_path_turnover`](@ref) and its own weights through [`prediction_weight_statistics`](@ref).
 
 # Arguments
 
@@ -829,14 +931,15 @@ end
 function prediction_entries(X::VecNum, ts::Option{<:AbstractVector}, B::Option{<:VecNum},
                             pred::PredRes_MultiPredRes, bm::Option{<:Some}, path)
     return summary_entry(X, row_benchmark(bm, B), held_path_turnover(pred),
-                         prediction_n_eff(pred, 1), ts; path = path)
+                         prediction_weight_statistics(pred, 1), ts; path = path)
 end
 function prediction_entries(X::VecVecNum, ts::Option{<:AbstractVector},
                             B::Option{<:VecNum_VecVecNum}, pred::PredRes_MultiPredRes,
                             bm::Option{<:Some}, path)
     return [summary_entry(X[j], row_benchmark(bm, member_vector(B, j)),
-                          held_path_turnover(pred, j), prediction_n_eff(pred, j), ts;
-                          path = path, member = j) for j in eachindex(X)]
+                          held_path_turnover(pred, j),
+                          prediction_weight_statistics(pred, j), ts; path = path,
+                          member = j) for j in eachindex(X)]
 end
 """
     population_entries(ppred::PopulationPredictionResult, bm::Option{<:Some}) -> Vector
@@ -922,7 +1025,7 @@ end
 
 The entries of one input of [`performance_summary`](@ref): one entry for an input that holds one series, and a vector of entries otherwise.
 
-A bare series holds no weights. Weights give their net returns through [`calc_net_returns`](@ref) and their effective number of assets through [`weights_n_eff`](@ref), and a `VecVecNum` gives one entry for each member. An [`OptimisationResult`](@ref) reads its weights, its returns and its fee on its investable universe through [`result_investable_view`](@ref).
+A bare series holds no weights. Weights give their net returns through [`calc_net_returns`](@ref), and their effective number of assets and their exposures through [`weight_statistics`](@ref). A `VecVecNum` gives one entry for each member. An [`OptimisationResult`](@ref) reads its weights, its returns and its fee on its investable universe through [`result_investable_view`](@ref).
 
 # Arguments
 
@@ -949,15 +1052,14 @@ function input_entries(bm::Option{<:Some}, w::ArrNum, X::MatNum,
                        fees::Option{<:Fees} = nothing,
                        ts::Option{<:AbstractVector} = nothing)
     return summary_entry(calc_net_returns(w, X, fees), row_benchmark(bm, nothing), nothing,
-                         weights_n_eff(w), ts)
+                         weight_statistics(w), ts)
 end
 function input_entries(bm::Option{<:Some}, w::VecVecNum, X::MatNum,
                        fees::Option{<:Fees} = nothing,
                        ts::Option{<:AbstractVector} = nothing)
     b = row_benchmark(bm, nothing)
     return [summary_entry(calc_net_returns(w[j], X, fees), b, nothing,
-                          number_effective_assets(w[j]), ts; member = j)
-            for j in eachindex(w)]
+                          weight_statistics(w[j]), ts; member = j) for j in eachindex(w)]
 end
 function input_entries(bm::Option{<:Some}, w::Union{ArrNum, VecVecNum}, rd::ReturnsResult,
                        fees::Option{<:Fees} = nothing)
@@ -1065,8 +1167,10 @@ function stack_summaries(rs::AbstractVector{<:PerformanceSummaryResult}, opts::N
                                     col(Val(:calmar)), col(Val(:max_drawdown)),
                                     col(Val(:cvar)), col(Val(:excess_ret)),
                                     col(Val(:tracking_error)), col(Val(:information_ratio)),
-                                    col(Val(:turnover)), col(Val(:n_eff)), opts.measures,
-                                    risk)
+                                    col(Val(:turnover)), col(Val(:n_eff)),
+                                    col(Val(:long_exposure)), col(Val(:short_exposure)),
+                                    col(Val(:gross_exposure)), col(Val(:net_exposure)),
+                                    opts.measures, risk)
 end
 """
     summarise_input(kwargs, args...) -> PerformanceSummaryResult
@@ -1178,7 +1282,7 @@ end
 
 Write a [`PerformanceSummaryResult`](@ref) as a table, with one row for each entry.
 
-A summary of one series gives one row. The columns are the columns of [`performance_summary_columns`](@ref), in that order: the three keys `:name`, `:path` and `:member`, then `:date0`, `:date1` and `:n_periods`, then the twelve released figures in the order of the struct, then `:n_eff`. One column for each extra measure follows, named by its key, in the order of `measures`. `ppy`, `alpha`, `compound` and `rf` are one value for the whole summary, so they are table-level metadata, and `DataFrames.metadata(df, "rf")` reads one.
+A summary of one series gives one row. The columns are the columns of [`performance_summary_columns`](@ref), in that order: the three keys `:name`, `:path` and `:member`, then `:date0`, `:date1` and `:n_periods`, then the twelve released figures in the order of the struct, then `:n_eff`, `:long_exposure`, `:short_exposure`, `:gross_exposure` and `:net_exposure`. One column for each extra measure follows, named by its key, in the order of `measures`. `ppy`, `alpha`, `compound` and `rf` are one value for the whole summary, so they are table-level metadata, and `DataFrames.metadata(df, "rf")` reads one.
 
 # Algorithm
 
@@ -1206,7 +1310,7 @@ julia> ps = performance_summary([[0.01, -0.02, 0.03], [0.02, 0.01, -0.01]]; name
 julia> df = DataFrame(ps);
 
 julia> (size(df), names(df)[1:3], names(df)[end])
-((2, 20), ["name", "path", "member"], "mdd")
+((2, 24), ["name", "path", "member"], "mdd")
 
 julia> metadata(df, \"ppy\")
 1

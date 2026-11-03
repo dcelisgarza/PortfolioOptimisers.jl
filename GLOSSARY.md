@@ -993,6 +993,10 @@ The layer that adds numeric constraint data to a JuMP model: the budget constrai
 **Net vs Gross Budget**
 `bgt` is the net exposure `1ᵀw`, `sbgt` the short side, and `gbgt` the gross exposure or leverage `‖w‖₁`. `gbgt` exists for the one combination that the other two cannot reach, a pinned gross exposure with a free net exposure.
 
+**Effective Number of Assets**
+The number of assets of equal absolute weight that have the concentration of a book, `number_effective_assets`. It is the participation ratio `‖w‖₁² / ‖w‖₂²` of the absolute weights. So it does not change when the book is scaled, and it reads the concentration of a book and not its leverage. On weights whose absolute values sum to one, it is the inverse of the Herfindahl-Hirschman index, `1 / ‖w‖₂²`. A norm ceiling bounds the form of order `p` of this count on such weights (#1962).
+*Avoid*: a count of the weights that are not zero, and the Kish effective sample size of a vector of observation weights.
+
 **Exact vs Bounded Budgets**
 The distinction between a budget that *bounds* the realised exposure and one that *pins* it. A pin needs a sign bit for each asset, which makes the problem mixed-integer. So a pin is opt-in.
 
@@ -1219,6 +1223,7 @@ Peak-to-trough declines computed from Net Returns, and the input series to drawd
 
 **Performance Summary**
 The headline figures of one or more realised Net Return series, which `performance_summary` gives as one `PerformanceSummaryResult`. Each series is one **entry**, and three keys name it: the **candidate** (`names`), the **path** of a population (`paths`) and the **member** of a prediction whose optimiser gives many portfolios (`members`). A key that does not apply is `nothing`. The shape follows the type of the input, never the count at run time. An input that holds exactly one series gives scalar fields, and every other input gives one vector entry for each series, in the order candidate, path, member. The figures of a path are point estimates, and the summary does no reduction over the paths. The caller adds risk measures by name with `measures`, each evaluated on the same series, and `DataFrame(ps)` writes the summary as a table with one row for each entry. ADR 0227.
+An entry that holds weights also gives its Effective Number of Assets and the four exposures of its book: long, short, gross and net, as the Net vs Gross Budget (§4.4) names the last two (#1962).
 *Avoid*: a Forecast Evaluation summary, whose entries are paired forecasts on one sample. The entries of a Performance Summary pair nothing, so they can cover different rows. Also backtest report, tear sheet.
 
 **Portfolio Report**

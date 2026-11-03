@@ -142,7 +142,9 @@ DataFrame(ps)
 #=
 A result that holds many portfolios, such as the frontier, gives one entry for each member. The
 column `member` keys each entry, and `n_eff`, the effective number of assets, shows how the
-concentration changes along the frontier.
+concentration changes along the frontier. The columns `long_exposure`, `short_exposure`,
+`gross_exposure` and `net_exposure` give the size of each side of the book. A long-only book with
+a budget of one gives `1`, `0`, `1` and `1`, and a long-short book shows its leverage there.
 =#
 
 DataFrame(performance_summary(frontier, rd; ppy = 252, rf = rf))[:,

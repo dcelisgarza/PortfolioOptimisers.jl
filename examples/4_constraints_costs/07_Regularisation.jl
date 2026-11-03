@@ -236,8 +236,9 @@ than L1. How much a penalty changes the weights depends on its size against
 the rest of the objective, which here is the risk. The penalty is the coefficient times the
 norm of the weights.
 
-The number of effective assets, [`number_effective_assets`](@ref), is `1/(w ⋅ w)`. It measures
-how concentrated the weights are, and it is not a count of the weights that are not zero. A
+The number of effective assets, [`number_effective_assets`](@ref), is
+`sum(abs, w)^2 / (w ⋅ w)`. On these long-only weights, which sum to one, it is `1/(w ⋅ w)`. It
+measures how concentrated the weights are, and it is not a count of the weights that are not zero. A
 portfolio that holds fewer assets can still have more effective assets, if its weights are more
 even. A larger number of effective assets means a less concentrated portfolio.
 

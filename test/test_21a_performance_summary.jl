@@ -565,15 +565,18 @@ end
 
     # A path is scored as the series that path produces, on the method that already takes a
     # series. Every statistic agrees, not only the first. The path holds weights and the
-    # series does not, so only `n_eff` differs: the mean over the rows of the path (#1934).
+    # series does not, so only the weight statistics differ: the mean over the rows of the
+    # path of `n_eff` (#1934) and of each exposure (#1962).
     ps_path = performance_summary(U, X, fees; ppy = 4)
     ps_ret = performance_summary(calc_net_returns(U, X, fees); ppy = 4)
+    wfs = (:n_eff, :long_exposure, :short_exposure, :gross_exposure, :net_exposure)
     for f in fieldnames(typeof(ps_path))
-        f === :n_eff && continue
+        f in wfs && continue
         @test isequal(getfield(ps_path, f), getfield(ps_ret, f))
     end
-    @test isnan(ps_ret.n_eff)
+    @test all(f -> isnan(getfield(ps_ret, f)), wfs)
     @test ps_path.n_eff ≈ mean(number_effective_assets(U[i, :]) for i in axes(U, 1))
+    @test ps_path.gross_exposure ≈ mean(sum(abs, U[i, :]) for i in axes(U, 1))
 
     # It is the series the drift route forms from the same window under the same drift.
     @test isapprox(ps_path.ann_return,
@@ -693,7 +696,8 @@ function ps_prediction(r, ts; w = [1.0], nx = ["P"], B = nothing)
 end
 const PS_FIGS = (:n_periods, :ann_return, :ann_volatility, :sharpe, :sharpe_stderr,
                  :sortino, :calmar, :max_drawdown, :cvar, :excess_ret, :tracking_error,
-                 :information_ratio, :turnover, :n_eff, :date0, :date1)
+                 :information_ratio, :turnover, :n_eff, :long_exposure, :short_exposure,
+                 :gross_exposure, :net_exposure, :date0, :date1)
 const PS_TS = Date(2024, 1, 1) .+ Day.(0:59)
 const PS_RD = ReturnsResult(; nx = ["A", "B", "C", "D"], X = ER_X, ts = PS_TS)
 
@@ -920,14 +924,64 @@ end
     cols = ["name", "path", "member", "date0", "date1", "n_periods", "ann_return",
             "ann_volatility", "sharpe", "sharpe_stderr", "sortino", "calmar",
             "max_drawdown", "cvar", "excess_ret", "tracking_error", "information_ratio",
-            "turnover", "n_eff", "mdd"]
+            "turnover", "n_eff", "long_exposure", "short_exposure", "gross_exposure",
+            "net_exposure", "mdd"]
     @test names(df) == cols
     @test size(df, 1) == 2
     @test df.name == ["a", "b"] && df.n_periods == [60, 30] && df.mdd == ps.risk.mdd
     @test metadata(df, "ppy") == 12 && metadata(df, "rf") == 0.001
     @test metadata(df, "alpha") == 0.05 && metadata(df, "compound") == false
     one = DataFrame(performance_summary(ret))
-    @test size(one) == (1, 19)
+    @test size(one) == (1, 23)
     @test one.sharpe == [performance_summary(ret).sharpe]
-    @test collect(keys(PO.performance_summary_columns())) == Symbol.(cols[1:19])
+    @test collect(keys(PO.performance_summary_columns())) == Symbol.(cols[1:23])
+end
+
+@testset "#1962: the exposures of a book, and an effective number free of its scale" begin
+    # The count reads the concentration of the book and not its leverage.
+    @test number_effective_assets([1.0, -1.0]) == 2
+    @test number_effective_assets([0.5, -0.5]) == 2
+    @test number_effective_assets([0.65, 0.65, -0.3]) ≈ 1.6^2 / (2 * 0.65^2 + 0.3^2)
+    @test number_effective_assets(3 .* ER_W) ≈ number_effective_assets(ER_W)
+    # On weights whose absolute values sum to one, it is the inverse of the HHI.
+    @test number_effective_assets(ER_W) ≈ inv(sum(abs2, ER_W))
+    # A book with no position holds no asset.
+    @test isnan(number_effective_assets(zeros(3)))
+    @test number_effective_assets([1, -1]) == 2
+
+    X = ER_X[:, 1:3]
+    ls = [0.65, 0.65, -0.3]
+    ps = performance_summary(ls, X)
+    @test ps.long_exposure ≈ 1.3 && ps.short_exposure ≈ 0.3
+    @test ps.gross_exposure ≈ 1.6 && ps.net_exposure ≈ 1.0
+    @test ps.n_eff ≈ number_effective_assets(ls)
+    # A dollar-neutral book has a net exposure of zero, and an integer book keeps its type.
+    dn = performance_summary([1, -1, 0], X)
+    @test dn.net_exposure == 0 && dn.gross_exposure == 2 && dn.n_eff == 2
+    ws = PO.weight_statistics([1, -1, 0])
+    @test ws.long_exposure isa Int && ws.short_exposure === 1
+    # A long-only book with a budget of one.
+    lo = performance_summary(ER_W, ER_X)
+    @test lo.long_exposure ≈ 1 && lo.short_exposure == 0
+    @test lo.gross_exposure ≈ 1 && lo.net_exposure ≈ 1
+    # A weight path takes the mean of each figure over its rows.
+    U = [0.6 0.4 0.0; 0.7 0.5 -0.2; 0.5 0.5 0.0; 0.6 0.6 -0.2]
+    pu = performance_summary(U, X[1:4, :])
+    @test pu.gross_exposure ≈ 1.2 && pu.short_exposure ≈ 0.1 && pu.net_exposure ≈ 1.0
+    @test pu.n_eff ≈ mean(number_effective_assets, eachrow(U))
+    # Many members give one entry for each member.
+    pv = performance_summary([ls, [0.5, -0.5, 0.0]], X)
+    @test pv.net_exposure ≈ [1.0, 0.0] && pv.gross_exposure ≈ [1.6, 1.0]
+    @test pv.n_eff ≈ [number_effective_assets(ls), 2.0]
+    # A multi-period prediction takes the mean over its folds of each figure of the target.
+    pred = cross_val_predict(InverseVolatility(), PS_RD, IndexWalkForward(30, 10))
+    pp = performance_summary(pred)
+    @test pp.gross_exposure ≈ mean(f -> sum(abs, PO.fold_target(f)), pred.pred)
+    @test pp.long_exposure ≈ pp.gross_exposure && pp.short_exposure == 0
+    one = performance_summary(pred.pred[1])
+    @test one.net_exposure ≈ sum(PO.fold_target(pred.pred[1]))
+    # A bare series holds no weights.
+    pr = performance_summary(vec(X * ls))
+    @test all(isnan,
+              (pr.long_exposure, pr.short_exposure, pr.gross_exposure, pr.net_exposure))
 end

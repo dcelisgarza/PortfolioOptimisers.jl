@@ -2781,7 +2781,7 @@ Where:
   - $(math_dict[:N])
   - ``p``: Norm order of the constraint of the ceiling.
 
-The effective number of assets of order ``p`` is ``N_{\\mathrm{eff},\\, p}(\\boldsymbol{w}) = \\left(\\sum_{i} \\lvert w_{i} \\rvert^{p}\\right)^{1/(1 - p)}``. So for ``p > 1``, ``N_{\\mathrm{eff},\\, p} \\geq m`` is ``\\lVert \\boldsymbol{w} \\rVert_{p} \\leq m^{1/p - 1}``. At ``p = 2``, this count is the number that [`number_effective_assets`](@ref) gives. At every order, a portfolio with equal weights over ``m`` assets gives exactly ``m``. The exponent is also ``-1/q`` for the conjugate order ``q``, because ``1/p - 1 = -1/q``. At ``p = 1`` the ceiling is one for every ``m``.
+The effective number of assets of order ``p`` is ``N_{\\mathrm{eff},\\, p}(\\boldsymbol{w}) = \\left(\\sum_{i} \\lvert w_{i} \\rvert^{p}\\right)^{1/(1 - p)}``. So for ``p > 1``, ``N_{\\mathrm{eff},\\, p} \\geq m`` is ``\\lVert \\boldsymbol{w} \\rVert_{p} \\leq m^{1/p - 1}``. At ``p = 2``, on weights whose absolute values sum to one, this count is the number that [`number_effective_assets`](@ref) gives. At every order, a portfolio with equal weights over ``m`` assets gives exactly ``m``. The exponent is also ``-1/q`` for the conjugate order ``q``, because ``1/p - 1 = -1/q``. At ``p = 1`` the ceiling is one for every ``m``.
 
 The infinite branch is the limit of the finite branch. ``m^{1/p - 1} \\to m^{-1}`` as ``p`` increases. A cap of ``1/m`` on the largest weight of a fully invested portfolio spreads it over at least ``m`` assets. So the two branches agree, and as a caller increases ``p``, the ceiling moves towards ``1/m``.
 

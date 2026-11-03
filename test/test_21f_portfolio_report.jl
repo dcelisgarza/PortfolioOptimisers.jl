@@ -64,6 +64,10 @@ end
     @test names(st.df) == ["figure", "value"]
     @test st.df.value[st.df.figure .== "sharpe"][1] == df.sharpe[1]
     @test !("path" in st.df.figure) && !("name" in st.df.figure)
+    # The four exposures of the book come from the summary, so the report computes none (#1962).
+    for c in ("long_exposure", "short_exposure", "gross_exposure", "net_exposure")
+        @test isequal(st.df.value[st.df.figure .== c][1], df[1, c])
+    end
     # A population gives one sortable row for each path, and the distribution of each figure.
     pst = r.entries[3].sections[1].blocks
     @test length(pst) == 2

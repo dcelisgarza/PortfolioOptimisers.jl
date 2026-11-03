@@ -906,15 +906,19 @@ end
 """
     number_effective_assets(w::VecNum)
 
-Compute the effective number of assets of a portfolio, the inverse of the Herfindahl-Hirschman index of its weights.
+Compute the effective number of assets of a portfolio, the participation ratio of its absolute weights.
 
-The result is the number of equally weighted assets that have the same concentration as `w`. For a long-only portfolio whose weights sum to one, it lies between `1`, when one asset holds all of the weight, and `N`, at equal weights.
+The result is the number of assets of equal absolute weight that have the same concentration as `w`. It lies between `1`, when one asset holds all of the exposure, and `N`, at equal absolute weights. The ratio does not change when the book is scaled, so it reads the concentration of the book and not its leverage. A book with one long and one short position of the same size gives `2`, at any gross exposure. On weights whose absolute values sum to one, the ratio is the inverse of the Herfindahl-Hirschman index of the weights, ``1 / \\sum_{i} w_i^2``.
+
+A book whose weights are all zero holds no asset, so the ratio is `0 / 0`, a `NaN`.
+
+Breaking: the function was ``1 / \\sum_{i} w_i^2`` on every book. That form gives `0.5` for the book `[1.0, -1.0]` and `2` for the same book at half the scale. The value moves on every book whose absolute weights do not sum to one, and only there.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-N_{\\mathrm{eff}} &= \\frac{1}{\\sum_{i=1}^{N} w_i^2}\\,.
+N_{\\mathrm{eff}} &= \\frac{\\left(\\sum_{i=1}^{N} \\lvert w_i \\rvert\\right)^{2}}{\\sum_{i=1}^{N} w_i^2}\\,.
 \\end{align}
 ```
 
@@ -937,6 +941,9 @@ Where:
 ```jldoctest
 julia> number_effective_assets([0.5, 0.25, 0.25])
 2.6666666666666665
+
+julia> number_effective_assets([1.0, -1.0]) == number_effective_assets([0.5, -0.5]) == 2
+true
 ```
 
 # Related
@@ -944,9 +951,10 @@ julia> number_effective_assets([0.5, 0.25, 0.25])
   - [`set_weight_norm_2_constraints!`](@ref)
   - [`EqualRisk`](@ref)
   - [`risk_contribution`](@ref)
+  - [`performance_summary`](@ref)
 """
 function number_effective_assets(w::VecNum)
-    return inv(LinearAlgebra.dot(w, w))
+    return sum(abs, w)^2 / LinearAlgebra.dot(w, w)
 end
 """
     adjusted_risk(ps::Nothing, q, r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum,
