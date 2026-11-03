@@ -26,9 +26,8 @@ end
 # eye, and computes no statistic the library does not already hold.
 function forecast_rolling_mean(x::AbstractVector{<:Real}, window::Integer)
     T = length(x)
-    # A mean holds a fraction and a `NaN`, so an integer series averages in `Float64`, and
-    # every other series keeps its own type: a `Float32` series stays in `Float32`.
-    Tf = PortfolioOptimisers.float_if_integer(eltype(x))
+    # The series keeps its own type: a `Float32` series stays in `Float32`.
+    Tf = eltype(x)
     out = fill(Tf(NaN), T)
     for t in window:T
         s = zero(Tf)
@@ -137,7 +136,7 @@ function PortfolioOptimisers.plot_forecast_rolling_ic(fe::PortfolioOptimisers.Fo
     end
     # The same derivation `forecast_rolling_mean` makes, over the same values, so the matrix
     # it fills and the vectors it answers agree on their element type.
-    Tf = PortfolioOptimisers.float_if_integer(real(eltype(ic)))
+    Tf = real(eltype(ic))
     roll = Matrix{Tf}(undef, T, 2)
     for k in 1:2
         roll[:, k] = forecast_rolling_mean(view(ic, :, k), window)

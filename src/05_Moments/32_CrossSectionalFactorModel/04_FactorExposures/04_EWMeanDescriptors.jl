@@ -146,7 +146,7 @@ Where:
 
 # Returns
 
-  - `S::Matrix{<:Real}`: The series, `observations × assets`, `NaN` before the warm-up of an asset ends. An integer input gives a floating point series.
+  - `S::Matrix{<:Real}`: The series, `observations × assets`, `NaN` before the warm-up of an asset ends.
 
 # Examples
 
@@ -198,7 +198,7 @@ The batch call starts it from zeros, and a step of the carry fold from the state
 function ew_mean_series!(s::AbstractVector{<:Real}, n::AbstractVector{<:Integer},
                          R::AbstractMatrix{<:Real}, decay::Real,
                          min_obs::Integer)::Matrix{<:Real}
-    Tf = float_if_integer(eltype(R))
+    Tf = eltype(R)
     S = fill(Tf(NaN), size(R))
     for i in axes(R, 2)
         si = s[i]
@@ -753,7 +753,7 @@ function descriptor(de::EWMean, rd::ReturnsResult)::Matrix{<:Real}
     pnl = descriptor_asset_panel(rd)
     X = rd.X
     assert_log_returns(X)
-    Tf = float_if_integer(eltype(X))
+    Tf = eltype(X)
     R = fill(Tf(NaN), size(X))
     skip = de.skip
     for i in axes(X, 2), t in (skip + 1):size(X, 1)
@@ -922,7 +922,7 @@ The value of a new state takes the type of the input and the decay, as the batch
 """
 function ew_mean_state(::Nothing, X::AbstractMatrix{<:Real}, decay::Real,
                        cap::Option{<:Integer})::EWMeanState
-    Tf = float_if_integer(eltype(X))
+    Tf = eltype(X)
     N = size(X, 2)
     return EWMeanState(zeros(promote_type(Tf, typeof(decay)), N), zeros(Int, N),
                        ew_state_buffer(Tf, cap))

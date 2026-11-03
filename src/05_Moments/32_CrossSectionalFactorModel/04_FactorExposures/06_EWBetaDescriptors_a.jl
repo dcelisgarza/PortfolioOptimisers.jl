@@ -12,7 +12,7 @@ An asset outside the universe has no return, so its cell must not advance a recu
 
 # Returns
 
-  - `Xm::Matrix{<:Real}`: The returns, `NaN` wherever the active mask is `false`. Integer returns become floating point numbers, so that a cell can hold `NaN`. Every other element type is kept.
+  - `Xm::Matrix{<:Real}`: The returns, `NaN` wherever the active mask is `false`. The element type of the returns is kept.
 
 # Related
 
@@ -22,7 +22,7 @@ An asset outside the universe has no return, so its cell must not advance a recu
   - [`descriptor_active_fill!`](@ref)
 """
 function ew_active_returns(X::AbstractMatrix{<:Number}, pnl::AssetPanel)
-    Xm = Matrix{float_if_integer(eltype(X))}(X)
+    Xm = Matrix{eltype(X)}(X)
     descriptor_active_fill!(Xm, pnl)
     return Xm
 end
@@ -56,7 +56,7 @@ Where:
 
 # Returns
 
-  - `B::Matrix{<:Real}`: The aggregated series, `div(observations, agg_obs) × assets`. An integer series gives floating point means, and every other element type is kept.
+  - `B::Matrix{<:Real}`: The aggregated series, `div(observations, agg_obs) × assets`. The element type of the series is kept.
 
 # Examples
 
@@ -73,7 +73,7 @@ julia> PortfolioOptimisers.ew_agg_series([1.0 2.0; 3.0 NaN; 5.0 6.0], 2)
   - [`EWMacroSensitivity`](@ref)
 """
 function ew_agg_series(A::AbstractMatrix{<:Real}, agg_obs::Integer)
-    Tf = float_if_integer(eltype(A))
+    Tf = eltype(A)
     T, N = size(A)
     K = div(T, agg_obs)
     B = Matrix{Tf}(undef, K, N)
@@ -144,7 +144,7 @@ The recursion advances once per complete window, so each observation takes the b
 
 # Returns
 
-  - `B::Matrix{<:Real}`: The betas, `T × assets`. Integer betas become floating point numbers, and every other element type is kept.
+  - `B::Matrix{<:Real}`: The betas, `T × assets`. The element type of the inputs is kept.
 
 # Examples
 
@@ -167,7 +167,7 @@ julia> PortfolioOptimisers.ew_beta_expand([1.0 2.0; 3.0 4.0], 5, 2)
 function ew_beta_expand(Ba::AbstractMatrix{<:Number}, T::Integer, agg_obs::Integer,
                         b0::Option{<:AbstractVector{<:Number}} = nothing,
                         r0::Integer = 0)::Matrix
-    Tf = float_if_integer(eltype(Ba))
+    Tf = eltype(Ba)
     B = Matrix{Tf}(undef, T, size(Ba, 2))
     for t in 1:T
         k = div(r0 + t, agg_obs)
@@ -416,9 +416,9 @@ julia> PortfolioOptimisers.ew_beta_residual_variance([0.1 0.2; -0.1 0.3; 0.05 -0
 """
 function ew_beta_residual_variance(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
                                    B::AbstractMatrix{<:Real}, decay::Real, min_obs::Integer,
-                                   v0::AbstractVector{<:Real} = zeros(float_if_integer(promote_type(eltype(X),
-                                                                                                    eltype(rm),
-                                                                                                    eltype(B))),
+                                   v0::AbstractVector{<:Real} = zeros(promote_type(eltype(X),
+                                                                                   eltype(rm),
+                                                                                   eltype(B)),
                                                                       size(X, 2)),
                                    b0::AbstractVector{<:Real} = similar(B, size(X, 2)),
                                    k0::Integer = 0)
@@ -934,13 +934,11 @@ function ew_beta_output(group::AbstractString, de::EWBeta, rd::ReturnsResult,
                         b0::AbstractVector{<:Real}, st::EWBlockState)
     W = Matrix(descriptor_field_values(rd, de.mcap))
     L = cross_sectional_groups(descriptor_asset_panel(rd), group)
-    Tf = float_if_integer(eltype(Ba))
+    Tf = eltype(Ba)
     T, N = size(W)
     k0 = st.st.t
     r0 = size(st.X, 1)
-    v0 = something(st.v,
-                   zeros(float_if_integer(promote_type(eltype(Xa), eltype(rma), eltype(Ba))),
-                         N))
+    v0 = something(st.v, zeros(promote_type(eltype(Xa), eltype(rma), eltype(Ba)), N))
     Vr = ew_beta_residual_variance(Xa, rma, Ba, de.decay, de.min_obs, v0, b0, k0)
     en = 2 * decay_half_life(de.decay)
     agg_obs = de.agg_obs

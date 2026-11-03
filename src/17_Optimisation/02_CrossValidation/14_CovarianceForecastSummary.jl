@@ -818,7 +818,7 @@ One entry is one step of a walk-forward, or one row of a return series, and two 
 """
 function loss_difference_test(mt::AbstractMeanTestEstimator, d::VecNum,
                               k::AbstractVector{Bool}, rng)
-    Tm = float_if_integer(real(eltype(d)))
+    Tm = real(eltype(d))
     if any(t -> k[t] && !isfinite(d[t]), eachindex(d, k))
         nan = typeof(sqrt(one(Tm)))(NaN)
         return (; t_stat = nan, p_value = nan, mean_ci_lower = nan, mean_ci_upper = nan)

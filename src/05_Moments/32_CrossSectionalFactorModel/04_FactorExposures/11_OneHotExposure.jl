@@ -239,7 +239,7 @@ function factor_exposure(xe::OneHotExposure, rd::ReturnsResult)::Array{<:Real, 3
     @argcheck(size(amsk) == size(codes),
               DimensionMismatch("a one-hot Factor Exposure is observations × assets × factors, so its first two axes must match the active mask of the Asset Panel, got size(codes) = $(size(codes)) and size(pnl.amsk) = $(size(amsk))"))
     live = isnothing(f.omsk) ? amsk : f.omsk .& amsk
-    Tf = float_if_integer(real(eltype(rd.X)))
+    Tf = real(eltype(rd.X))
     B = Array{Tf}(undef, size(codes, 1), size(codes, 2), length(f.levels))
     one_hot_fill!(B, codes, live)
     return B

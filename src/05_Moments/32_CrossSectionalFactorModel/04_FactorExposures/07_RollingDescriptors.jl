@@ -30,11 +30,11 @@ function assert_rolling_sign(sign::Real)::Nothing
     return nothing
 end
 """
-    descriptor_returns(rd::ReturnsResult) -> Tuple{Matrix{<:Real}, AssetPanel}
+    descriptor_returns(rd::ReturnsResult) -> Tuple{AbstractMatrix{<:Real}, AssetPanel}
 
 Read the returns and the Asset Panel a rolling Descriptor works on.
 
-Returns are not a Panel Field, so a Descriptor that reads them reads `rd.X` and not the feature matrix. Every rolling Descriptor reads the pair through this function. The returns come back as a new matrix in `float_if_integer(eltype(rd.X))`. An integer panel is floated, so its Descriptor can hold the `NaN` of the warm-up. A `Rational` panel is kept, and it cannot hold that `NaN`.
+Returns are not a Panel Field, so a Descriptor that reads them reads `rd.X` and not the feature matrix. Every rolling Descriptor reads the pair through this function. The returns come back as `rd.X` itself, with no copy. The [`ReturnsResult`](@ref) holds floating-point returns, so a Descriptor can hold the `NaN` of the warm-up. A `Rational` panel cannot hold that `NaN`.
 
 A return that is missing is a `NaN`, and a Descriptor tests for it. A return that is infinite is refused, because a sum over a window is one difference of two cumulative sums. One infinite return makes every later cumulative sum infinite, and the difference of two of them is `NaN`, also in a window that does not hold the infinite return.
 
@@ -51,7 +51,7 @@ The two shapes need no check of their own. [`ReturnsResult`](@ref) binds the obs
 
 # Returns
 
-  - `X::Matrix{<:Real}`: The returns, `observations × assets`, in `float_if_integer(eltype(rd.X))`.
+  - `X::AbstractMatrix{<:Real}`: The returns `rd.X`, `observations × assets`.
   - `pnl::AssetPanel`: The Asset Panel of the `ReturnsResult`.
 
 # Related
@@ -67,12 +67,11 @@ function descriptor_returns(rd::ReturnsResult)
     @argcheck(!isnothing(X),
               IsNothingError("a rolling Descriptor reads returns, and rd.X is nothing. Build the ReturnsResult with the returns matrix the Asset Panel was drawn on."))
     pnl = returns_with_universe(rd).pnl
-    Xf = Matrix{float_if_integer(eltype(X))}(X)
-    k = findfirst(isinf, Xf)
+    k = findfirst(isinf, X)
     @argcheck(isnothing(k),
-              DomainError(Xf[k],
-                          "a rolling Descriptor reads every return that is not missing as a finite number, and it is $(Xf[k]) at observation $(k[1]) for asset $(k[2]). An infinite return is a data error, so clean the input rather than pass it through."))
-    return Xf, pnl
+              DomainError(X[k],
+                          "a rolling Descriptor reads every return that is not missing as a finite number, and it is $(X[k]) at observation $(k[1]) for asset $(k[2]). An infinite return is a data error, so clean the input rather than pass it through."))
+    return X, pnl
 end
 """
     rolling_window_max(X::AbstractMatrix{<:Real}, amsk::AbstractMatrix{Bool},
@@ -340,7 +339,7 @@ Both methods read the returns of `rd.X` and the active mask of the Asset Panel, 
 
 # Algorithm
 
- 1. Read the returns and the Asset Panel through [`descriptor_returns`](@ref), which floats integer returns and refuses an infinite return.
+ 1. Read the returns and the Asset Panel through [`descriptor_returns`](@ref), which refuses an infinite return.
  2. For [`RollingLogReturn`](@ref), refuse a return at or below `-1` through [`assert_log_returns`](@ref). Then take the cumulative sums of `log1p` of the returns and of the active mask along the observations. A missing return adds zero. The window of observation `t` runs from `t - skip - window + 1` to `t - skip`, and its sum is one difference of the cumulative sums. Where the active count of the window equals `window`, write that sum multiplied by `sign`, or `expm1` of that product when `exponentiate` is set.
  3. For [`RollingMax`](@ref), scan the window of each observation through [`rolling_window_max`](@ref). It gives the largest return that is not missing where every observation of the window is active and one return exists.
  4. Write `NaN` into every inactive cell through [`descriptor_active_fill!`](@ref).

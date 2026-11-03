@@ -446,32 +446,6 @@
         @test PortfolioOptimisers.cv_data_eltype(ReturnsResult(; nx = rd.nx,
                                                                X = Float32.(rd.X))) ===
               Float32
-        # integer prices: a score is a fraction and a failed fold scores NaN, so the score
-        # matrix is floating point, and the search agrees with the same prices as Float64
-        Xi = round.(Int, 100 .+ cumsum(randn(StableRNG(1), 120, 5); dims = 1))
-        ts = make_ts()
-        pri = PricesResult(; X = TimeArray(ts, Xi, string.("A", 1:5)))
-        prf = PricesResult(; X = TimeArray(ts, float.(Xi), string.("A", 1:5)))
-        @test PortfolioOptimisers.cv_data_eltype(pri) === Float64
-        pipe = Pipeline(;
-                        steps = (PricesToReturns(), "prior" => EmpiricalPrior(),
-                                 EqualWeighted()))
-        gscv = GridSearchCrossValidation(["opt" => [EqualWeighted(), InverseVolatility()]];
-                                         cv = IndexWalkForward(60, 20),
-                                         r = ConditionalValueatRisk(), train_score = true)
-        resi = search_cross_validation(pipe, gscv, pri)
-        resf = search_cross_validation(pipe, gscv, prf)
-        @test eltype(resi.test_scores) === Float64
-        @test resi.test_scores ≈ resf.test_scores
-        @test resi.idx == resf.idx
-        cgscv = GridSearchCrossValidation(["opt" => [EqualWeighted(), InverseVolatility()]];
-                                          cv = CombinatorialCrossValidation(; n_folds = 4,
-                                                                            n_test_folds = 2),
-                                          r = ConditionalValueatRisk(), train_score = true)
-        cresi = search_cross_validation(pipe, cgscv, pri)
-        cresf = search_cross_validation(pipe, cgscv, prf)
-        @test eltype(cresi.test_scores) === Float64
-        @test cresi.test_scores ≈ cresf.test_scores
     end
 
     @testset "the scores, the train scores and the winner, checked against the fold loop" begin

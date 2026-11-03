@@ -44,8 +44,9 @@ then takes the values of the last observation of each period, whatever timestamp
 of a week both come from its last day.
 
 The element type of the result comes from the input series. A `Float32` panel stays `Float32`,
-`Float32` next to `Float64` gives `Float64`, and an integer panel takes the floating-point type of
-its returns. A type that has no value for an absent number throws an error that names the type.
+`Float32` next to `Float64` gives `Float64`. The ingestion layer is an entry point of integer data,
+so an integer panel converts here, once, to its floating-point type, and every kernel downstream
+reads floating-point data. A type that has no value for an absent number throws an error that names the type.
 The error comes at a gap, before a join that can pad, and when `PriceIngestion` aligns the implied
 volatilities, even if the join or the alignment then pads nothing. An absent implied volatility
 is kept like an absent price, and [`ImpliedVolatility`](@ref) then fits only on the columns whose

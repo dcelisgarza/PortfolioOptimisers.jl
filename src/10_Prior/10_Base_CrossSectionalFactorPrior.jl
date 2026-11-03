@@ -314,7 +314,7 @@ Build the exposure history of a factor list, and the factor axis it is written o
  2. Take the dependency layers with [`cross_sectional_exposure_order`](@ref).
  3. Compute the layers in order, and the members of one layer under `ex` through [`cross_sectional_foreach`](@ref). Give a [`DerivedExposure`](@ref) the exposure of its source, which an earlier layer has already written. Each member writes its own columns of `Ms`, so every executor gives the same history.
  4. When `n` is an integer, give each member the rows of `rd` that [`cross_sectional_exposure_rows`](@ref) names, and keep the last `n` rows of its exposure. Those rows equal the rows of the exposure over every row of `rd`. A [`DerivedExposure`](@ref) has a look-back of one, so it reads the `n` rows of its source that `Ms` holds.
- 5. Write each Factor Exposure into `Ms` with [`cross_sectional_exposure_write!`](@ref). `Ms` takes the element type `float_if_integer(real(eltype(X)))`, so integer returns give a float history that can hold a fractional exposure and the `NaN` of an inactive cell.
+ 5. Write each Factor Exposure into `Ms` with [`cross_sectional_exposure_write!`](@ref). `Ms` takes the element type `real(eltype(X))`, which holds a fractional exposure and the `NaN` of an inactive cell.
 
 # Arguments
 
@@ -357,7 +357,7 @@ function cross_sectional_exposure_history(factors::AbstractVector{<:Pair},
     end
     X = rd.X
     m = something(n, size(X, 1))
-    Tf = float_if_integer(real(eltype(X)))
+    Tf = real(eltype(X))
     Ms = Array{Tf, 3}(undef, m, size(X, 2), length(nf))
     for cur in lay
         cross_sectional_foreach(ex, cur) do i
@@ -1873,7 +1873,7 @@ function cross_sectional_alpha_split(cre::AbstractCrossSectionalRegressionEstima
     if !any(x -> x > zero(x), wv)
         return (; g = zeros(Tf, K), ap = zeros(Tf, N))
     end
-    csr = cross_sectional_regression(cre, reshape(Tf.(L), 1, N, K), reshape(Tf.(mu), 1, N),
+    csr = cross_sectional_regression(cre, reshape(L, 1, N, K), reshape(mu, 1, N),
                                      reshape(wv, 1, N))
     g = csr.f[1, :]
     return (; g = g, ap = mu - L * g)

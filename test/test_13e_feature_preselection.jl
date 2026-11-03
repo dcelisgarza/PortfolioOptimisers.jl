@@ -641,10 +641,11 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
                                  [1, 3])
         @test ag.w isa StatsBase.ProbabilityWeights && ag.w == [1.0, 3.0]
     end
-    @testset "An integer window holds a fraction, and a metric with parameters per coordinate refuses by name (#1459)" begin
+    @testset "A window holds a fraction, and a metric with parameters per coordinate refuses by name (#1459)" begin
         # Cityblock measures the pair at 4, 6 and 9 on the three rows. The mean is 19 / 3,
-        # and the mean over rows 1 and 3 is 13 / 2. An `Int` matrix raised an InexactError.
-        Z = reshape([1, 2, 4, 0, 3, 1, 5, 5, 2, 2, 0, 8], 3, 2, 2)
+        # and the mean over rows 1 and 3 is 13 / 2. Issue #1972 removed the integer case:
+        # integer data convert at the carrier.
+        Z = reshape([1.0, 2, 4, 0, 3, 1, 5, 5, 2, 2, 0, 8], 3, 2, 2)
         A = Bool[1 1; 1 0; 1 1]
         de = fdist(AggregateDistances(); metric = Cityblock())
         @test distance(de, Z) == [0 19 / 3; 19 / 3 0]
@@ -659,7 +660,7 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
         # The fallback of an empty pair, and the rescale of a pair that shares two of three
         # rows, each give a fraction too. `a` holds (1, 0) and (2, 1) on rows 1 and 2, `b`
         # holds (1, 0) on row 3, and `c` holds (2, 1), (3, 2) and (4, 3).
-        Z3 = reshape(collect(1:18), 3, 3, 2) .% 5
+        Z3 = Float64.(reshape(collect(1:18), 3, 3, 2) .% 5)
         Ae = Bool[1 0 1; 1 0 1; 0 1 1]
         fb = fdist(AggregateDistances(; pair = FeatureFallback()); metric = Cityblock())
         # The fallback: `a` collapses to (1.5, 0.5) against (1, 0).
@@ -676,8 +677,7 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
             (WeightedHamming(ones(6)), PeriodicEuclidean(fill(10.0, 6)), Mahalanobis(I6),
              SqMahalanobis(I6))
             msg = "Add a method `PortfolioOptimisers.stack_rescale(metric::$(nameof(typeof(m))), d, idx, len)`"
-            @test_throws msg distance(fdist(StackObservations(); metric = m), float.(Z3);
-                                      amsk = Ap)
+            @test_throws msg distance(fdist(StackObservations(); metric = m), Z3; amsk = Ap)
         end
         Q = [2.0 1 0; 1 3 0; 0 0 4]
         @test PO.stack_metric(Mahalanobis(Q), [1, 3]).qmat == [2.0 0; 0 4]
@@ -687,13 +687,12 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
         # A weighted metric of the stack takes one weight per coordinate of the long vector,
         # the three observations of the first feature first (R7 of #1817). Weights on those
         # three measure the first feature alone, and one weight per feature does not fit.
-        Zf = float.(Z3)
         dwe = distance(fdist(StackObservations();
-                             metric = WeightedEuclidean([1.0, 1, 1, 0, 0, 0])), Zf)
-        @test dwe ≈ [Euclidean()(Zf[:, i, 1], Zf[:, j, 1]) for i in 1:3, j in 1:3] rtol = 1e-15
+                             metric = WeightedEuclidean([1.0, 1, 1, 0, 0, 0])), Z3)
+        @test dwe ≈ [Euclidean()(Z3[:, i, 1], Z3[:, j, 1]) for i in 1:3, j in 1:3] rtol = 1e-15
         @test_throws DimensionMismatch distance(fdist(StackObservations();
                                                       metric = WeightedEuclidean([1.0, 1])),
-                                                Zf)
+                                                Z3)
     end
 end
 

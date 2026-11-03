@@ -106,7 +106,7 @@ function factor_exposure(::ConstantExposure, rd::ReturnsResult)::Matrix{<:Real}
     pnl = returns_with_universe(rd).pnl
     @argcheck(!isnothing(pnl),
               IsNothingError("a constant Factor Exposure takes its shape from the active mask of an Asset Panel, and rd holds neither a panel nor asset returns. Build the ReturnsResult with its returns, or with the `pnl` that asset_panel returns."))
-    L = ones(float_if_integer(eltype(rd.X)), size(pnl.amsk))
+    L = ones(eltype(rd.X), size(pnl.amsk))
     exposure_active_fill!(L, pnl)
     return L
 end

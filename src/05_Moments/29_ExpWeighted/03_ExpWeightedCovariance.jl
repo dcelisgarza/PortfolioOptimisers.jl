@@ -262,7 +262,7 @@ Covariance method of [`exp_weighted_pass!`](@ref). Runs one forward pass of the 
 
  1. Check `dims`, and check that `active_mask` has the size of `X` when it is not `nothing`.
  2. Take `N` as the number of assets.
- 3. When `state` is `nothing`, make a zero state of `N` assets in the type `T` of `X`, floated where it is an integer. Its `covariance`, `weight` and `obs_count` are zero, its `active` entries are `true`, its `location` is `NaN`, its `rows` is a `Ref` of zero, and its `overlap` is [`centring_overlap`](@ref) of `est.centring`. When `state` is given, check that it holds `N` assets and take it as it is.
+ 3. When `state` is `nothing`, make a zero state of `N` assets in the type `T` of `X`. Its `covariance`, `weight` and `obs_count` are zero, its `active` entries are `true`, its `location` is `NaN`, its `rows` is a `Ref` of zero, and its `overlap` is [`centring_overlap`](@ref) of `est.centring`. When `state` is given, check that it holds `N` assets and take it as it is.
  4. For each observation `i`, fold the observation and its row of `active_mask` into the state with [`process_observation!`](@ref), then call `f(i, cache)`.
  5. Return the state.
 
@@ -304,11 +304,9 @@ function exp_weighted_pass!(f, est::ExpWeightedCovariance, X::MatNum, dims::Int,
     end
     N = size(X, setdiff((1, 2), (dims,))[1])
 
-    # The state takes the type of the returns, widened to a float only when it is an
-    # integer, so an integer panel gets a floating-point state and a `Float32` panel keeps a
-    # `Float32` state. The location starts as `NaN`, which marks an asset with no valid
-    # observation.
-    T = float_if_integer(eltype(X))
+    # The state takes the type of the returns, so a `Float32` panel keeps a `Float32` state.
+    # The location starts as `NaN`, which marks an asset with no valid observation.
+    T = eltype(X)
     cache = if isnothing(state)
         ExpWeightedCovarianceState(zeros(T, N, N), zeros(T, N, N), fill(convert(T, NaN), N),
                                    centring_overlap(est.centring, T, N), zeros(Int, N),

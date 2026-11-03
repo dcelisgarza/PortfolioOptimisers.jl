@@ -1002,7 +1002,7 @@ function StatsAPI.fit(tgt::ElasticNet, X::MatNum, y::VecNum)
         pen[tgt.ic] = false
     end
     nrm2 = vec(sum(P .* Q; dims = 1))
-    z = zeros(float_if_integer(promote_type(eltype(Q), eltype(y))), n)
+    z = zeros(promote_type(eltype(Q), eltype(y)), n)
     r = copyto!(similar(y, eltype(z)), y)
     if !isnothing(tgt.ic)
         z[tgt.ic] = LinearAlgebra.dot(view(Q, :, tgt.ic), y) / nrm2[tgt.ic]

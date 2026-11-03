@@ -310,6 +310,8 @@ $(DocStringExtensions.FIELDS)
                       omsk::Option{<:AbstractArray{Bool}} = nothing,
                       pmsk::Option{<:AbstractArray{Bool}} = nothing)
 
+An integer element type of `vals` converts once to its floating-point type through [`float_if_integer`](@ref), so every kernel downstream reads floating-point data. The codes of a [`CategoricalPanelField`](@ref) stay integers.
+
 # Validation
 
   - `!isempty(name)`. Raises an [`IsEmptyError`](@ref).
@@ -347,6 +349,8 @@ $(DocStringExtensions.FIELDS)
     function NumericPanelField(name::AbstractString, vals::AbstractArray{<:Real},
                                omsk::Option{<:AbstractArray{Bool}},
                                pmsk::Option{<:AbstractArray{Bool}})
+        # The one entry point of integer data: every kernel downstream reads a float.
+        vals = float_if_integer(vals)
         assert_panel_field_name(name)
         assert_panel_field_shape(vals, name, 1, 2)
         assert_panel_finite(vals, name)
@@ -476,6 +480,8 @@ $(DocStringExtensions.FIELDS)
                      omsk::Option{<:AbstractArray{Bool}} = nothing,
                      pmsk::Option{<:AbstractArray{Bool}} = nothing)
 
+An integer element type of `vals` converts once to its floating-point type through [`float_if_integer`](@ref), so every kernel downstream reads floating-point data.
+
 # Validation
 
   - `!isempty(name)`. Raises an [`IsEmptyError`](@ref).
@@ -552,6 +558,8 @@ julia> f.vals[:, :, f.groups .== \"momentum\"]
                               groups::Option{<:VecStr}, vals::AbstractArray{<:Real},
                               omsk::Option{<:AbstractArray{Bool}},
                               pmsk::Option{<:AbstractArray{Bool}})
+        # The one entry point of integer data: every kernel downstream reads a float.
+        vals = float_if_integer(vals)
         assert_panel_field_name(name)
         @argcheck(!isempty(axis),
                   IsEmptyError("the trailing-axis name (axis) of the tensor Panel Field \"$name\" cannot be empty: it names what the axis represents, such as \"factor\""))

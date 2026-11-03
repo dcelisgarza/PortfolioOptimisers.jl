@@ -22,7 +22,7 @@ An available-case fit under observation weights reads each asset over its own va
   - [`coverage_valid_block`](@ref)
 """
 function weighted_coverage_centres(Xo::MatNum, msk::AbstractMatrix{Bool}, w::ObsWeights)
-    Tf = float_if_integer(eltype(Xo))
+    Tf = eltype(Xo)
     return map(axes(Xo, 2)) do j
         x, wj = observed_sample(view(Xo, :, j), w, view(msk, :, j))
         return has_positive_weight(wj, length(x)) ? Tf(Statistics.mean(x, wj)) : Tf(NaN)
@@ -85,7 +85,7 @@ The function reads the observations that `obs` marks, with their weights, throug
 function weighted_observed_variance(x::VecNum, w::ObsWeights, obs::AbstractVector{Bool},
                                     corrected::Bool)
     xo, wo = observed_sample(x, w, obs)
-    Tf = float_if_integer(eltype(x))
+    Tf = eltype(x)
     return if has_positive_weight(wo, length(xo))
         Tf(weighted_moment_guard(Statistics.var(xo, wo; corrected = corrected), wo,
                                  corrected))
@@ -151,7 +151,7 @@ function coverage_variance(f::F, ve::SimpleVariance{<:Any, <:ObsWeights},
     v = if admits(cvg.alg, count(obs) / max(length(X), 1), true, 0, cvg.min_coverage)
         weighted_observed_variance(X, ve.w, obs, ve.corrected)
     else
-        float_if_integer(eltype(X))(NaN)
+        eltype(X)(NaN)
     end
     return coverage_moment_map(f, v)
 end
@@ -324,7 +324,7 @@ function weighted_pair_covariance(D::MatNum, Xo::MatNum, msk::AbstractMatrix{Boo
                                   mean)
     obs = view(msk, :, i) .& view(msk, :, j)
     _, wo = observed_sample(view(Xo, :, [i, j]), w, obs)
-    Tf = float_if_integer(eltype(D))
+    Tf = eltype(D)
     if !has_positive_weight(wo, count(obs))
         return Tf(NaN)
     end
@@ -380,7 +380,7 @@ function weighted_coverage_covariance(f::F, ce::Covariance, cvg::CoveragePolicy,
     Xo, msk, _, active, stale = coverage_valid_block(X, active_mask, cvg.alg; dims = dims)
     D, m = weighted_pair_sample(ce.alg, Xo, msk, ce.w)
     N = size(Xo, 2)
-    sigma = Matrix{float_if_integer(eltype(D))}(undef, N, N)
+    sigma = Matrix{eltype(D)}(undef, N, N)
     nu = Matrix{Int}(undef, N, N)
     for j in 1:N, i in 1:j
         sigma[i, j] = sigma[j, i] = weighted_pair_covariance(D, Xo, msk, ce.w, i, j,

@@ -146,7 +146,7 @@ The vectors take the type of the returns, of the market return and of the refere
 function ew_macro_sensitivity_state(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
                                     rf::AbstractVector{<:Real},
                                     decay::Real)::EWMacroSensitivityState
-    Tf = float_if_integer(promote_type(eltype(X), eltype(rm), eltype(rf)))
+    Tf = promote_type(eltype(X), eltype(rm), eltype(rf))
     N = size(X, 2)
     z = zero(promote_type(Tf, typeof(decay)))
     return EWMacroSensitivityState(fill(Tf(NaN), N), zeros(Tf, N), zeros(Tf, N),
@@ -653,7 +653,7 @@ The co-moment of a new state takes the type of the returns and of the market ret
 function ew_downside_beta_state(::Nothing, X::AbstractMatrix{<:Real},
                                 rm::AbstractVector{<:Real},
                                 decay::Real)::EWDownsideBetaState
-    Tf = float_if_integer(promote_type(eltype(X), eltype(rm)))
+    Tf = promote_type(eltype(X), eltype(rm))
     N = size(X, 2)
     return EWDownsideBetaState(zeros(Tf, N), zeros(Int, N),
                                zero(promote_type(Tf, typeof(decay))), 0)

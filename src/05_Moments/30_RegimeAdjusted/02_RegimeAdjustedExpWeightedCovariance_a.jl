@@ -1814,9 +1814,8 @@ function regime_adjusted_covariance_pass!(f, ce::RegimeAdjustedExpWeightedCovari
     N = size(X, setdiff((1, 2), (dims,))[1])
     assert_regime_target(ce.regime_target, N)
 
-    # The state holds a covariance and a `NaN`, so an integer panel computes in its floating
-    # point type, and every other type is kept: a `Float32` panel keeps a `Float32` state.
-    Tf = float_if_integer(eltype(X))
+    # The state takes the type of the panel: a `Float32` panel keeps a `Float32` state.
+    Tf = eltype(X)
     # The location starts as `NaN`, which marks an asset with no valid observation.
     location = fill(convert(Tf, NaN), N)
     cache = if isnothing(state)

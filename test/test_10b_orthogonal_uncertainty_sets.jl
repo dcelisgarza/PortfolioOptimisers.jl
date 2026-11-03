@@ -340,17 +340,6 @@ struct ProbeMatrixProcessing1955 <: PortfolioOptimisers.AbstractMatrixProcessing
                 @test s.kappa == base.kappa
             end
         end
-        @testset "An integer loadings block fits as its floating-point copy does" begin
-            Bi = [1 0; 0 1; 1 1; 2 1; 0 3; 1 2]
-            for metric in (nothing, InverseIdiosyncraticVarianceMetric())
-                ue = OrthogonalUncertaintySet(; metric = metric)
-                mi, si = ucs(ue, prior777(Bi, D; rw = RW, bw = BW))
-                mf, sf = ucs(ue, prior777(float.(Bi), D; rw = RW, bw = BW))
-                @test isapprox(mi.L * transpose(mi.L), mf.L * transpose(mf.L); atol = 1e-14)
-                @test isapprox(si.Q * transpose(si.Q), sf.Q * transpose(sf.Q); atol = 1e-14)
-                @test mi.kappa == mf.kappa
-            end
-        end
         @testset "The rank tolerance reads the larger dimension of the loadings" begin
             # A second singular value of 8e-16 sits between the tolerance of the smaller
             # dimension, 2 * eps, and that of the larger one, 6 * eps. `LinearAlgebra.rank`

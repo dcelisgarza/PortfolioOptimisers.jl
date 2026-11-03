@@ -671,19 +671,17 @@ end
     end
 
     @testset "The builder derives its number type from the data" begin
-        # One-hot integer exposures and integer weights. Integer data float, a Rational
-        # history stays exact, and a Float32 history stays Float32.
+        # A Rational history stays exact, and a Float32 history stays Float32. Issue #1972
+        # removed the integer case: integer data convert at the carrier.
         sel = [1, 3, 4, 5]
-        Mi = round.(Int, Ms[:, :, sel])
-        wi = rand(StableRNG(724_005), 1:5, T, N)
+        Mf = Float64.(round.(Int, Ms[:, :, sel]))
+        wf = Float64.(rand(StableRNG(724_005), 1:5, T, N))
+        Mi = Rational{Int}.(Mf)
+        wi = Rational{Int}.(wf)
         nfi, fami = nf[sel], fam[sel]
         exact(M, w) = factor_family_basis(["ind" => nothing], M, w, nfi, fami)
-        fi64 = exact(Float64.(Mi), Float64.(wi))
-        fint = exact(Mi, wi)
-        @test eltype(fint.ratios) == Float64
-        @test fint.ratios ≈ fi64.ratios rtol = 1e-14
-        @test fint.di == fi64.di
-        frat = exact(Rational{Int}.(Mi), Rational{Int}.(wi))
+        fi64 = exact(Mf, wf)
+        frat = exact(Mi, wi)
         @test eltype(frat.ratios) == Rational{Int}
         @test Float64.(frat.ratios) ≈ fi64.ratios rtol = 1e-14
         # The Rational answer is the closed form in exact arithmetic.
@@ -692,7 +690,7 @@ end
         F = [2, 3, 4]
         dr = F[frat.di[1]]
         @test frat.ratios == cr[:, filter(!=(dr), F)] ./ cr[:, dr]
-        f32 = exact(Float32.(Mi), Float32.(wi))
+        f32 = exact(Float32.(Mf), Float32.(wf))
         @test eltype(f32.ratios) == Float32
         @test f32.ratios ≈ fi64.ratios rtol = 1e-5
         # A dropped member that no asset takes is refused as a non-finite ratio in every type,
@@ -956,16 +954,9 @@ end
         @test isequal(Y, Z)
     end
 
-    @testset "A type without a residual and an infinite exposure are refused" begin
+    @testset "An infinite exposure is refused" begin
+        # Issue #1972 removed the integer history: integer data convert at the carrier.
         cre = CrossSectionalLinearRegression()
-        Mi = round.(Int, 3 .* replace(Ms, NaN => 0.0))
-        @test_throws ArgumentError PO.neutralise_exposures!(copy(Mi), ["size" => "value"],
-                                                            cre, bw, nf, fam)
-        # No entry writes a residual, so an integer history passes unchanged.
-        Y = copy(Mi)
-        @test PO.neutralise_exposures!(Y, Pair{String, String}[], cre, bw, nf, fam) ===
-              nothing
-        @test Y == Mi
         for (k, s) in ((2, 1.0), (3, -1.0))
             Minf = copy(Ms)
             Minf[1, 2, k] = s * Inf
@@ -1223,11 +1214,6 @@ end
                                     W).P
         @test eltype(last(only(P))) == Rational{Int}
         @test last(only(P))[3, 2] == -3//4
-        fi = FactorFamilyBasis(; fnm = ["ind"], fi = [[2, 3, 4]], di = [3],
-                               ratios = [1 2; 1 2], K = 4)
-        P = PO.unseen_member_design(ZeroUnseenMember(), fi, B, PO.reduce_exposures(fi, B),
-                                    W).P
-        @test eltype(last(only(P))) == Float64
     end
     @testset "The fitted prior of the delisting panel does not depend on the dropped member" begin
         fx = parity_panel(; T = 300, N = 60, seed = 1601)

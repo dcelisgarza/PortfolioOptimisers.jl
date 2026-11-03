@@ -716,7 +716,7 @@ Run the stacking optimisation.
 # Algorithm
 
  1. Resolve every [`TimeDependent`](@ref) field of `st` to its static default, with [`reset_time_dependent_estimator`](@ref).
- 2. Fit the prior `pr` with `st.pe` on `rd`, and take the element type `Tf` of the weights, fees and bounds from `pr.X` with [`float_if_integer`](@ref). The prior reads the returns in the frame that its own `x_src` states. `rd` keeps its raw returns, and the readers of the inner and outer optimisers state their own sources.
+ 2. Fit the prior `pr` with `st.pe` on `rd`, and take the element type `Tf` of the weights, fees and bounds as `eltype(pr.X)`. The prior reads the returns in the frame that its own `x_src` states. `rd` keeps its raw returns, and the readers of the inner and outer optimisers state their own sources.
  3. Find the Investable Mask `imsk` of `pr`. Resolve the fees `fees` on the full universe, and place them on the assets of `imsk` with [`investable_fees_view`](@ref).
  4. Remove the two liquidation charges, `lq` and `flq`, from `fees`, giving `cfees`, the fees that the returns of the synthetic assets pay.
  5. Reduce `pr`, `st` and `rd` to the assets of `imsk` with [`investable_reduction`](@ref), giving `rdr`. `X` is the returns matrix of the reduced `pr`.
@@ -752,8 +752,8 @@ function _optimise(st::Stacking, rd::ReturnsResult; branchorder::Symbol = :optim
                    str_names::Bool = false, save::Bool = true, kwargs...)
     st = reset_time_dependent_estimator(st)
     pr = prior(st.pe, rd)
-    # A weight and a fee are fractions, so integer returns take a floating point type.
-    Tf = float_if_integer(eltype(pr.X))
+    # A weight and a fee take the element type of the returns.
+    Tf = eltype(pr.X)
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
     # A name stated over that universe must not be refused because the data delisted the
     # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on

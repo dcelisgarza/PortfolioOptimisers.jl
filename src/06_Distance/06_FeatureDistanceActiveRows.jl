@@ -636,7 +636,7 @@ Turn a window of time-varying features that holds an inactive cell into a distan
 
 `win` holds the window `Z`, its layout `dims`, its active mask `A` and the asset names `nx`. `Z` holds a zero at each cell that `A` marks `false`, from [`blank_unreadable`](@ref), so no step of a collapse reads the stored value of such a cell. [`distance`](@ref) calls this function only when a cell of the window is inactive, and only after [`assert_feature_readable`](@ref) checked that the collapse can read each asset. A window with no inactive cell takes the path of [`feature_distance`](@ref), so its result does not change.
 
-Under [`AggregateDistances`](@ref) and [`StackObservations`](@ref), an entry can be a weighted mean or a rescaled distance. So [`float_if_integer`](@ref) turns an integer result type of the metric, such as that of `Distances.Cityblock` on a window of integers, into a floating point type. The matrix of a `Rational` window stays exact.
+Under [`AggregateDistances`](@ref) and [`StackObservations`](@ref), an entry can be a weighted mean or a rescaled distance. So [`float_if_integer`](@ref) turns an integer result type of the metric, such as the count of `Distances.Hamming`, into a floating point type. The matrix of a `Rational` window stays exact.
 
 # Mathematical definition
 
@@ -714,7 +714,8 @@ function active_feature_distance(de::FeatureDistance{<:Any, <:AggregateDistances
     (; Z, dims, A) = win
     w = collapse_weights(de.alg.w, Z)
     metric = de.metric
-    #! The entries are weighted means, so an integer distance or weight needs a float type.
+    #! The entries are weighted means, so the integer count of a metric such as `Hamming`
+    #! needs a float type.
     Td = Distances.result_type(metric, eltype(Z), eltype(Z))
     T = float_if_integer(isnothing(w) ? Td : promote_type(Td, eltype(w)))
     N = size(A, 2)
@@ -777,7 +778,8 @@ function active_feature_distance(de::FeatureDistance{<:Any, <:StackObservations}
                                  win::NamedTuple)
     (; Z, dims, A) = win
     Zs = stack_observations(Z, dims)
-    #! A rescale and a fallback can give a fraction, so an integer distance needs a float type.
+    #! A rescale and a fallback can give a fraction, so the integer count of a metric such as
+    #! `Hamming` needs a float type.
     Ds = feature_distance(de.metric, Zs, 1)
     D = convert(Matrix{float_if_integer(eltype(Ds))}, Ds)
     E = Tuple{Int, Int}[]

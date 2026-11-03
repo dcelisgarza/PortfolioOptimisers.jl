@@ -849,11 +849,9 @@ end
         end
     end
 
-    @testset "The forward mean floats integer returns, keeps a float type, and refuses a Rational" begin
+    @testset "The forward mean keeps a float type, and refuses a Rational" begin
+        # Issue #1972 removed the integer case: integer data convert at the carrier.
         Xi = [1 2; 3 4; 5 7; 6 1]
-        Yi = PO.forward_mean_returns(Xi, 2, 1)
-        @test eltype(Yi) === Float64
-        @test isequal(Yi, [4.0 5.5; 5.5 4.0; NaN NaN; NaN NaN])
         @test eltype(PO.forward_mean_returns(Float32.(X), 3, 1)) === Float32
         Yb = PO.forward_mean_returns(big.(X), 3, 1)
         @test eltype(Yb) === BigFloat
@@ -900,9 +898,6 @@ end
         @test all(isnan, B[1:2, :])
         @test B[3:6, :] == A[3:6, :]
         @test isnothing(PO.return_forecast_pad(nothing, 3:6, 6))
-        Bi = PO.return_forecast_pad([1 2; 3 4], 2:3, 3)
-        @test eltype(Bi) === Float64
-        @test isequal(Bi, [NaN NaN; 1.0 2.0; 3.0 4.0])
         @test eltype(PO.return_forecast_pad(Float32[1 2; 3 4], 2:3, 3)) === Float32
         @test_throws ArgumentError PO.return_forecast_pad(Rational{Int}[1 2; 3 4], 2:3, 3)
     end

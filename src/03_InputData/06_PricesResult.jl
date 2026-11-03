@@ -106,6 +106,8 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+`PricesResult` is an entry point of integer data. A time array `X`, `F`, `B`, `E` or `iv` with an integer element type converts once to its floating-point type through [`float_if_integer`](@ref), so every kernel downstream reads floating-point data. Every other element type stays.
+
 ## Validation
 
   - `!isempty(X)`, and `allunique(TimeSeries.timestamp(X))`.
@@ -181,6 +183,12 @@ julia> size(values(pr.X))
                           E::Option{<:TimeSeries.TimeArray},
                           iv::Option{<:TimeSeries.TimeArray}, ivpa::Option{<:Num_VecNum},
                           pnl::Option{<:AssetPanel}, span::Option{<:AbstractMatrix{Bool}})
+        # The one entry point of integer data: every kernel downstream reads a float.
+        X = float_if_integer(X)
+        F = float_if_integer(F)
+        B = float_if_integer(B)
+        E = float_if_integer(E)
+        iv = float_if_integer(iv)
         @argcheck(!isempty(X), IsEmptyError)
         ts = TimeSeries.timestamp(X)
         @argcheck(allunique(ts),

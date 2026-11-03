@@ -315,7 +315,7 @@ The pairwise test takes the sign of the sum of its slopes, and the regression te
 """
 function trend_sign(::PairwiseSlopeSum, P::AbstractMatrix)
     K = size(P, 1)
-    s = zeros(float_if_integer(eltype(P)), size(P, 2))
+    s = zeros(eltype(P), size(P, 2))
     for a in 1:(K - 1), b in (a + 1):K
         @views s .+= (P[b, :] .- P[a, :]) ./ (b - a)
     end

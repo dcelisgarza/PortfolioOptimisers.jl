@@ -1138,3 +1138,59 @@ using Accessors: Accessors
     @test getfield(s3, :L) == 1.5
     @test s3 isa mk.KSwap{Float64}
 end
+using Dates
+@testset "A carrier converts integer data once, and fits as its float copy does (#1972)" begin
+    # Integer data are supported only where an integer is the natural type. The carriers
+    # that a user builds convert integer data at construction, so a continuous kernel
+    # reads floating-point data and takes its type with `eltype`.
+    PO = PortfolioOptimisers
+    Xi = [1 -2; -1 3; 2 -1; 0 1]
+    Xf = [1.0 -2.0; -1.0 3.0; 2.0 -1.0; 0.0 1.0]
+    # The array method copies an integer array, and keeps every other array as it is.
+    @test PO.float_if_integer(Xi) == Xf
+    @test PO.float_if_integer(Xi) isa Matrix{Float64}
+    @test PO.float_if_integer(Xf) === Xf
+    v = view(Xf, :, 1:1)
+    @test PO.float_if_integer(v) === v
+    @test PO.float_if_integer(Float32.(Xf)) isa Matrix{Float32}
+    @test PO.float_if_integer(Xi .// 2) isa Matrix{Rational{Int}}
+    @test isnothing(PO.float_if_integer(nothing))
+    # A lift converts its parent and stays lazy.
+    R = PO.float_if_integer(PO.RepeatedLeading([1, 2], 3))
+    @test R isa PO.RepeatedLeading{Float64}
+    @test R == [1.0 2.0; 1.0 2.0; 1.0 2.0]
+    # `ReturnsResult` converts every returns matrix, and a prior and an optimiser fit the
+    # integer input as they fit its float copy.
+    nx = ["A", "B"]
+    rdi = ReturnsResult(; nx = nx, X = Xi, nf = ["f"], F = Xi[:, 1:1], B = Xi[:, 2],
+                        ne = ["e"], E = Xi[:, 2:2], iv = abs.(Xi) .+ 1)
+    rdf = ReturnsResult(; nx = nx, X = Xf, nf = ["f"], F = Xf[:, 1:1], B = Xf[:, 2],
+                        ne = ["e"], E = Xf[:, 2:2], iv = abs.(Xf) .+ 1)
+    @test all(x -> eltype(x) === Float64, (rdi.X, rdi.F, rdi.B, rdi.E, rdi.iv))
+    pri = prior(EmpiricalPrior(), rdi)
+    prf = prior(EmpiricalPrior(), rdf)
+    @test isequal(pri.mu, prf.mu)
+    @test isequal(pri.sigma, prf.sigma)
+    @test optimise(InverseVolatility(), rdi).w == optimise(InverseVolatility(), rdf).w
+    # A view of float returns stays a view.
+    @test ReturnsResult(; nx = nx, X = view(Xf, :, :)).X isa SubArray
+    # `PricesResult` converts its time arrays and keeps their columns.
+    ts = Date(2020, 1, 1):Day(1):Date(2020, 1, 5)
+    P = [10 20; 11 19; 12 21; 13 22; 12 20]
+    ppi = PricesResult(; X = TimeArray(ts, P, [:A, :B]))
+    ppf = PricesResult(; X = TimeArray(ts, P .+ 0.0, [:A, :B]))
+    @test eltype(values(ppi.X)) === Float64
+    @test colnames(ppi.X) == [:A, :B]
+    @test isequal(prices_to_returns(ppi).X, prices_to_returns(ppf).X)
+    # The numeric Panel Fields convert their values.
+    fi = NumericPanelField(; name = "mc", vals = [1, 2])
+    @test fi.vals == [1.0, 2.0]
+    @test eltype(fi.vals) === Float64
+    ti = TensorPanelField(; name = "t", axis = "f", labels = ["x"],
+                          vals = reshape([1, 2], 2, 1))
+    @test eltype(ti.vals) === Float64
+    @test eltype(NumericPanelField(; name = "f32", vals = Float32[1, 2]).vals) === Float32
+    # The codes of a categorical field are a natural integer, and they stay one.
+    ci = CategoricalPanelField(; name = "sector", levels = ["a", "b"], codes = [1, 2, 1])
+    @test ci.codes isa Vector{Int}
+end

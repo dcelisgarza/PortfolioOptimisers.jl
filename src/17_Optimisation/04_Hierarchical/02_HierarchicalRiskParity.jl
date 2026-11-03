@@ -412,9 +412,9 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on
     # the complement while `sets` sits on the mask. `investable_fees_view` then places the
     # resolved fee on the axes the mask leaves.
-    # A weight is a quotient of two risks, so an integer sample takes a float weight type,
-    # and every other sample keeps its own type.
-    T = float_if_integer(eltype(pr.X))
+    # A weight is a quotient of two risks, so it takes the type of the returns. A `Float32`
+    # sample stays in `Float32`.
+    T = eltype(pr.X)
     # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
@@ -578,9 +578,9 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on
     # the complement while `sets` sits on the mask. `investable_fees_view` then places the
     # resolved fee on the axes the mask leaves.
-    # A weight is a quotient of two risks, so an integer sample takes a float weight type,
-    # and every other sample keeps its own type.
-    T = float_if_integer(eltype(pr.X))
+    # A weight is a quotient of two risks, so it takes the type of the returns. A `Float32`
+    # sample stays in `Float32`.
+    T = eltype(pr.X)
     # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).

@@ -747,8 +747,8 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; branchorder::Symbol 
                    str_names::Bool = false, save::Bool = true, kwargs...)
     sr = reset_time_dependent_estimator(sr)
     pr = prior(sr.pe, rd)
-    # A weight and a fee are fractions, so integer returns take a floating point type.
-    Tf = float_if_integer(eltype(pr.X))
+    # A weight and a fee take the element type of the returns.
+    Tf = eltype(pr.X)
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
     # A name stated over that universe must not be refused because the data delisted the
     # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on

@@ -561,22 +561,11 @@ end
         @test isapprox(wh, ws; atol = 1e-14) == same
     end
 
-    # An integer returns matrix allocates in floating point, and gives the weights of the
-    # same matrix in Float64. A Float32 matrix stays in Float32.
-    Xi = rand(StableRNG(3), -5:5, 100, 6)
-    rdi = ReturnsResult(; nx = ["A$i" for i in 1:6], X = Xi)
-    rdf = ReturnsResult(; nx = ["A$i" for i in 1:6], X = float.(Xi))
-    for params in (SchurComplementParams(; alg = NonMonotonicSchurComplement()),
-                   SchurComplementParams(),
-                   [SchurComplementParams(; gamma = 0),
-                    SchurComplementParams(; r = StandardDeviation(), gamma = 0.3)])
-        sh = SchurComplementHierarchicalRiskParity(; params = params)
-        resi = optimise(sh, rdi)
-        @test eltype(resi.w) == Float64
-        @test resi.w == optimise(sh, rdf).w
-    end
+    # A Float32 matrix stays in Float32. Issue #1972 removed the integer case: integer
+    # data convert at the carrier.
+    X32 = Float32.(rand(StableRNG(3), -5:5, 100, 6))
     res32 = optimise(SchurComplementHierarchicalRiskParity(),
-                     ReturnsResult(; nx = ["A$i" for i in 1:6], X = Float32.(Xi)))
+                     ReturnsResult(; nx = ["A$i" for i in 1:6], X = X32))
     @test eltype(res32.w) == Float32
 
     # A vector of bundles blends the portfolios by the scale of each measure. Its result
@@ -843,22 +832,11 @@ end
                        optimise(HierarchicalEqualRiskContribution(), rdx).w; atol = 1e-15)
     end
 
-    # An integer returns matrix allocates in floating point, and gives the weights of the
-    # same matrix in Float64. A Float32 matrix stays in Float32.
-    Xi = rand(StableRNG(3), -5:5, 200, 6)
-    rdi = ReturnsResult(; nx = ["A$i" for i in 1:6], X = Xi)
-    rdf = ReturnsResult(; nx = ["A$i" for i in 1:6], X = float.(Xi))
-    for (ri, ro) in
-        ((Variance(), Variance()), ([Variance(), StandardDeviation()], Variance()),
-         (Variance(), [Variance(), StandardDeviation()]))
-        h = HierarchicalEqualRiskContribution(; ri = ri, ro = ro)
-        resi = optimise(h, rdi)
-        @test eltype(resi.w) == Float64
-        @test resi.w == optimise(h, rdf).w
-    end
+    # A Float32 matrix stays in Float32. Issue #1972 removed the integer case: integer
+    # data convert at the carrier.
+    X32 = Float32.(rand(StableRNG(3), -5:5, 200, 6))
     @test eltype(optimise(HierarchicalEqualRiskContribution(),
-                          ReturnsResult(; nx = ["A$i" for i in 1:6], X = Float32.(Xi))).w) ==
-          Float32
+                          ReturnsResult(; nx = ["A$i" for i in 1:6], X = X32)).w) == Float32
 
     # The view reads the prior's X, keeps ri and ro one object, and views each measure.
     r0 = Variance()

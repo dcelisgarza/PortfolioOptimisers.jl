@@ -507,7 +507,7 @@ end
 
 Build the compact change of basis of the requested constrained Factor Families.
 
-The element type of the ratios is the promoted type of `Ms` and `bw`, and an integer type becomes a floating-point type. So a `Rational` history gives exact ratios, and a `Float32` history gives `Float32` ratios. A dropped factor whose benchmark-weighted exposure is small but not zero gives large finite ratios. The builder accepts them, and they are ill-conditioned. To avoid them, state a dropped factor with a large exposure, or let the automatic choice pick one.
+The element type of the ratios is the promoted type of `Ms` and `bw`. So a `Rational` history gives exact ratios, and a `Float32` history gives `Float32` ratios. A dropped factor whose benchmark-weighted exposure is small but not zero gives large finite ratios. The builder accepts them, and they are ill-conditioned. To avoid them, state a dropped factor with a large exposure, or let the automatic choice pick one.
 
 # Mathematical definition
 
@@ -599,7 +599,7 @@ function factor_family_basis(families::AbstractVector{<:Pair}, Ms::Arr3Num, bw::
     assert_factor_axis_length(length(nf), K, :nf)
     assert_factor_axis_length(length(fam), K, :fam)
     @argcheck(allunique(nf), ArgumentError("nf must not repeat a factor name"))
-    Tf = float_if_integer(promote_type(real(eltype(Ms)), real(eltype(bw))))
+    Tf = promote_type(real(eltype(Ms)), real(eltype(bw)))
     c = weighted_family_exposures(Ms, bw, Tf)
     fnm = String[]
     fi = Vector{Int}[]

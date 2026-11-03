@@ -470,9 +470,9 @@ end
 
 @testset "A narrow weight type keeps the step of the finite difference" begin
     # The step widens the type of the weights. Before, `Float16` weights rounded the step
-    # away, so every contribution was zero, `Float32` weights rounded it 1.3 % off, and
-    # integer weights raised `InexactError`. The differences left are the rounding of the
-    # weights themselves.
+    # away, so every contribution was zero, and `Float32` weights rounded it 1.3 % off. The
+    # differences left are the rounding of the weights themselves. Issue #1972 removed the
+    # integer case: integer weights are outside the domain.
     r = StandardDeviation()
     N = length(pr.mu)
     w = fill(inv(N), N)
@@ -481,14 +481,9 @@ end
     @test isapprox(risk_contribution(r, Float32.(w), pr), rc; rtol = 1e-6)
     @test isapprox(risk_contribution(r, Float16.(w), pr), rc; rtol = 1e-3)
     @test isapprox(risk_gradient(r, Float32.(w), pr), risk_gradient(r, w, pr); rtol = 1e-6)
-    @test isapprox(risk_contribution(r, [1; zeros(Int, N - 1)], pr),
-                   risk_contribution(r, [1.0; zeros(N - 1)], pr))
     # A vector of measures sums the gradients in the promoted type. Before, the sum took the
-    # type of the weights: integer weights raised `InexactError`, and `Float16` weights
-    # rounded each term to `Float16`.
+    # type of the weights, and `Float16` weights rounded each term to `Float16`.
     rs = [StandardDeviation(), ConditionalValueatRisk()]
-    @test isapprox(risk_gradient(rs, [1; zeros(Int, N - 1)], pr),
-                   risk_gradient(rs, [1.0; zeros(N - 1)], pr))
     @test isapprox(risk_gradient(rs, Float16.(w), pr), risk_gradient(rs, w, pr);
                    rtol = 1e-8)
 end

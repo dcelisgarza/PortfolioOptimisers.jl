@@ -1463,7 +1463,7 @@ A series whose spread is round-off of its mean is constant: every entry of `d` i
   - [`round_off_unit`](@ref)
 """
 function mean_test_centred(c::VecNum, span::AbstractMeanTestSpan)
-    Tm = float_if_integer(real(eltype(c)))
+    Tm = real(eltype(c))
     n, s, i1, i2 = finite_sum_bounds(c, Tm)
     m = n > 0 ? s / n : Tm(NaN)
     P = iszero(n) ? 0 : i2 - i1 + 1

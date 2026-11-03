@@ -603,16 +603,11 @@ carries that half, and `VERB_EXEMPT` in `test/moment_family_setup.jl` still name
     @test_throws ArgumentError std(RegimeAdjustedExpWeightedVariance())
 end
 #=
-Integer returns. Both regime-adjusted passes built their state in the element type of `X`, so an
-integer panel raised an `InexactError` at the first `NaN` the state holds, in every verb of both
-estimators. The state now takes `float_if_integer(eltype(X))`: an integer panel computes in
-`Float64` and gives the answer of the same panel in `Float64` bit for bit, and a `Float32` panel
-keeps a `Float32` variance.
+A `Float32` panel keeps a `Float32` variance in both regime-adjusted passes. Issue #1972
+removed the integer case: integer data convert at the carrier.
 =#
-@testset "an integer panel is the same panel in floating point" begin
-    Xi = [1 2 0; -1 0 1; 1 1 -2; 0 -1 1; 2 1 0; -1 2 1]
-    Xf = Float64.(Xi)
-    X32 = Float32.(Xi) ./ 100
+@testset "a Float32 panel keeps a Float32 variance" begin
+    X32 = Float32[1 2 0; -1 0 1; 1 1 -2; 0 -1 1; 2 1 0; -1 2 1] ./ 100
     ves = (RegimeAdjustedExpWeightedVariance(; decay = 0.5, min_obs = 1,
                                              regime_min_obs = 1),
            RegimeAdjustedExpWeightedVariance(; decay = 0.5, min_obs = 1, regime_min_obs = 1,
@@ -621,18 +616,6 @@ keeps a `Float32` variance.
                                              centring = PreCentred(), hac_lags = 2,
                                              regime_method = nothing))
     for ce in ves
-        @test isequal(var(ce, Xi), var(ce, Xf))
-        @test isequal(std(ce, Xi), std(ce, Xf))
-        @test isequal(PO.variance_series(ce, Xi), PO.variance_series(ce, Xf))
-        @test isequal(var(partial_fit!(ce, Xi)), var(partial_fit!(ce, Xf)))
         @test eltype(PO.variance_series(ce, X32)) == Float32
-    end
-    ces = (RegimeAdjustedExpWeightedCovariance(; decay = 0.5, min_obs = 1,
-                                               regime_min_obs = 1),
-           RegimeAdjustedExpWeightedCovariance(; decay = 0.5, min_obs = 1,
-                                               regime_min_obs = 1, hac_lags = 2))
-    for ce in ces
-        @test isequal(cov(ce, Xi), cov(ce, Xf))
-        @test isequal(PO.variance_series(ce, Xi), PO.variance_series(ce, Xf))
     end
 end

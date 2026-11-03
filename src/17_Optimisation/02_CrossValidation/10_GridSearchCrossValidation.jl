@@ -138,7 +138,7 @@ A candidate that failed one fold is never selected, whatever the scorer computes
  5. Split `rd` by `scheme`, giving `cv`.
  6. Read the rows of the folds through [`score_rows`](@ref), giving `rows`.
  7. Set `sgn` to ``s``.
- 8. Allocate `test_scores`, of size `M × N` for `M` folds and `N` candidates, with the element type of `rd.X` through [`float_if_integer`](@ref), because a score is a fraction. When `gscv.train_score` is `true`, allocate `train_scores` of the same size.
+ 8. Allocate `test_scores`, of size `M × N` for `M` folds and `N` candidates, with the element type of `rd.X`. When `gscv.train_score` is `true`, allocate `train_scores` of the same size.
  9. When `gscv.train_score` is `true`, view the training returns of each fold through [`fold_train_returns`](@ref), giving `train_X`.
 10. For each candidate `i`, in parallel over `gscv.ex`, do steps 11 to 13.
 11. Build `opti` through [`search_candidate`](@ref).
@@ -189,9 +189,9 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
     M = length(cv.train_idx)
     r = gscv.r
     sgn = ifelse(bigger_is_better(r), 1, -1)
-    test_scores = Matrix{float_if_integer(eltype(rd.X))}(undef, M, N)
+    test_scores = Matrix{eltype(rd.X)}(undef, M, N)
     train_scores = if gscv.train_score
-        Matrix{float_if_integer(eltype(rd.X))}(undef, M, N)
+        Matrix{eltype(rd.X)}(undef, M, N)
     else
         nothing
     end
@@ -262,7 +262,7 @@ A candidate that failed one path is never selected, whatever the scorer computes
  4. Split `rd` by `gscv.cv`, giving `cv`.
  5. Set `M`, the count of the paths, to the greatest entry of `cv.path_ids`.
  6. Set `sgn` to ``s``.
- 7. Allocate `test_scores`, of size `M × N` for `N` candidates, with the element type of `rd.X` through [`float_if_integer`](@ref), because a score is a fraction. When `gscv.train_score` is `true`, allocate `train_scores`, one matrix per path, with one row per fold of the path and one column per candidate.
+ 7. Allocate `test_scores`, of size `M × N` for `N` candidates, with the element type of `rd.X`. When `gscv.train_score` is `true`, allocate `train_scores`, one matrix per path, with one row per fold of the path and one column per candidate.
  8. View the training returns of each fold of each path through [`fold_train_returns`](@ref), giving `path_X`. The entries of a path in `cv.path_ids` are read in column order, and the column is the fold, which is the order of the folds in the path that [`sort_predictions`](@ref) gives.
  9. For each candidate `i`, in sequence, do steps 10 to 13.
 10. Build `opti` through [`search_candidate`](@ref).
@@ -312,13 +312,12 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
     M = maximum(cv.path_ids)          # one score per recombined backtest path
     r = gscv.r
     sgn = ifelse(bigger_is_better(r), 1, -1)
-    test_scores = Matrix{float_if_integer(eltype(rd.X))}(undef, M, N)
+    test_scores = Matrix{eltype(rd.X)}(undef, M, N)
     # Train scores are per fold, and each path holds a different number of folds, so they
     # are kept as one `folds × candidates` matrix per path (a Vector of matrices) rather
     # than collapsed. Test scores stay one per path.
     train_scores = if gscv.train_score
-        [Matrix{float_if_integer(eltype(rd.X))}(undef, count(==(p), cv.path_ids), N)
-         for p in 1:M]
+        [Matrix{eltype(rd.X)}(undef, count(==(p), cv.path_ids), N) for p in 1:M]
     else
         nothing
     end

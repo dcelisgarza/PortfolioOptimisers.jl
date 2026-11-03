@@ -654,15 +654,8 @@ end
     @test all(isnan, view(got, :, 4))
     @test findall(isfinite, view(PO.variance_series(vc, Xlist, pnl_full), :, 4)) == 32:T
 
-    # A variance divides, so an integer sample gives the series of the same sample in Float64,
-    # bit for bit, and a Float32 sample stays Float32. The frame took `eltype(X)` and an integer
-    # sample threw `InexactError: Int64(NaN)`.
-    Xi = rand(StableRNG(33), -5:5, T, N)
-    for est in (ve, vc)
-        vi = PO.variance_series(est, Xi, pnl_inactive)
-        @test eltype(vi) == Float64
-        @test isequal(vi, PO.variance_series(est, Float64.(Xi), pnl_inactive))
-    end
+    # A Float32 sample stays Float32. Issue #1972 removed the integer case: integer data
+    # convert at the carrier.
     @test eltype(PO.variance_series(ve, Float32.(Xhol), pnl_full)) == Float32
     @test eltype(PO.variance_series(vc, Float32.(Xhol), nothing)) == Float32
 end

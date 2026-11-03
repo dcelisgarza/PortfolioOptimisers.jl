@@ -87,7 +87,7 @@ Every Descriptor Estimator reads its Panel Fields through this function. A blank
 # Algorithm
 
  1. Check that the Panel Field is numeric and time-varying.
- 2. Read it through [`panel_field_values`](@ref) with `inactive = NaN` and `unobserved = NaN`. An integer field reads in `Float64`, and a `Float32` field stays `Float32`.
+ 2. Read it through [`panel_field_values`](@ref) with `inactive = NaN` and `unobserved = NaN`. A `Float32` field stays `Float32`.
  3. For a vector of `name => coefficient` pairs, read each named field the same way and multiply it by its coefficient. Return the sum of those terms in the type that all of them promote to, so the order of the terms does not change the result. A `NaN` in any term is a `NaN` in the sum.
 
 # Arguments
@@ -228,7 +228,7 @@ end
 
 Return `NaN` in the element type of an array that a fill writes into in place, and refuse an element type that cannot hold it.
 
-A fill changes an array that its caller owns, so it cannot widen the element type the way a function that allocates its result does with `float_if_integer`. An `Integer`, a `Rational` or a `Complex{Int}` holds no `NaN`, and the conversion would raise an `InexactError` at the first inactive cell. This function converts once, before the fill writes anything. Every element type that holds `NaN` passes, a number type from another package included. Every other type raises an `ArgumentError` whose message names the repair.
+A fill changes an array that its caller owns, so it cannot widen the element type. An `Integer`, a `Rational` or a `Complex{Int}` holds no `NaN`, and the conversion would raise an `InexactError` at the first inactive cell. This function converts once, before the fill writes anything. Every element type that holds `NaN` passes, a number type from another package included. Every other type raises an `ArgumentError` whose message names the repair.
 
 # Arguments
 
@@ -256,7 +256,7 @@ function nan_fill_value(A::AbstractArray{<:Number})::Number
         if !(err isa InexactError)
             rethrow()
         end
-        throw(ArgumentError("a fill writes NaN into the cells that hold no value, in place, so the element type of the array must hold NaN, and $T does not. Convert the array to a floating point type before the call, for example with float_if_integer."))
+        throw(ArgumentError("a fill writes NaN into the cells that hold no value, in place, so the element type of the array must hold NaN, and $T does not. Convert the array to a floating point type before the call."))
     end
 end
 """
@@ -690,7 +690,7 @@ The vectors of a new state take the type of the returns and of the market return
 """
 function ew_beta_state(::Nothing, X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
                        decay::Real)::EWBetaState
-    Tf = float_if_integer(promote_type(eltype(X), eltype(rm)))
+    Tf = promote_type(eltype(X), eltype(rm))
     N = size(X, 2)
     Tm = promote_type(Tf, typeof(decay))
     return EWBetaState(fill(Tf(NaN), N), zeros(Tf, N), zeros(Tf, N), zeros(Int, N),

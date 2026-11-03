@@ -421,6 +421,6 @@ Where:
   - [`weights_bound_tolerance`](@ref)
 """
 function clip_at_zero(w::AbstractVector, lb = zero(eltype(w)))
-    tol = weights_bound_tolerance(float_if_integer(eltype(w)))
+    tol = weights_bound_tolerance(eltype(w))
     return ifelse.(w .<= tol, zero.(w) .+ lb, w)
 end

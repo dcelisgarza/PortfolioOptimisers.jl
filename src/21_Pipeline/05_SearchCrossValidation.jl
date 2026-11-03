@@ -57,7 +57,7 @@ pipeline_asset_view(data::AbstractPricesResult, cols) = port_opt_view(data, :, c
 
 Return the element type of the score matrices of a Pipeline search over the data `rd` or `pr`.
 
-The type comes from the data. A score is a fraction, and a failed fold scores `NaN`, so [`float_if_integer`](@ref) changes an integer type to a floating point type. Every other type stays as it is.
+The type comes from the data. The carriers of the data hold floating-point values, so the type holds the `NaN` of a failed fold.
 
 # Arguments
 
@@ -66,15 +66,14 @@ The type comes from the data. A score is a fraction, and a failed fold scores `N
 
 # Returns
 
-  - `T::Type`: The element type of `rd.X`, or of the values of the time array `pr.X`, through [`float_if_integer`](@ref).
+  - `T::Type`: The element type of `rd.X`, or of the values of the time array `pr.X`.
 
 # Related
 
-  - [`float_if_integer`](@ref)
   - [`search_cross_validation`](@ref)
 """
-cv_data_eltype(rd::AbstractReturnsResult) = float_if_integer(eltype(rd.X))
-cv_data_eltype(pr::AbstractPricesResult) = float_if_integer(eltype(TimeSeries.values(pr.X)))
+cv_data_eltype(rd::AbstractReturnsResult) = eltype(rd.X)
+cv_data_eltype(pr::AbstractPricesResult) = eltype(TimeSeries.values(pr.X))
 """
     is_pipeline_raw_path(key::AbstractString) -> Bool
 

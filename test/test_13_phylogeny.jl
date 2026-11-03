@@ -502,10 +502,8 @@
             @test isapprox(Se, one(eltype(De)) .- De)
             # `dims` retargets to `Z`, so a transposed matrix gives the same answer.
             @test isapprox(distance(de, permutedims(Zc); dims = 2), distance(de, Zc))
-            # Producer #4's square adjacency is integer-valued and needs no promotion.
-            Zi = [1 0 1; 0 1 1; 1 1 0]
-            @test eltype(distance(de, Zi)) === Float64
             # Asset views are `SubArray`s and need no `collect`.
+            Zi = [1.0 0.0 1.0; 0.0 1.0 1.0; 1.0 1.0 0.0]
             @test isapprox(distance(de, view(Zi, 1:2, :)), distance(de, Zi[1:2, :]))
         end
         @testset "Degenerate 2-D inputs" begin
@@ -775,25 +773,16 @@
                 end
             end
         end
-        @testset "A median collapse of an integer window" begin
+        @testset "A median collapse keeps the type of its window" begin
             #=
-            The median of an even window is the mean of two order statistics, so a window
-            of integers has a fractional median. Preallocating the result at the window's
-            element type threw `InexactError` there; the collapse now takes its element
-            type from the values it computes.
+            The median of an even window is the mean of two order statistics, so it can
+            fall outside the grid of the window. A window whose median stays inside its own
+            type keeps that type. Issue #1972 removed the integer case: integer data
+            convert at the carrier.
             =#
-            Zi = rand(rng, 1:9, 4, 5, 3)
-            wc = pweights([1.0, 2.0, 3.0, 4.0])
-            for alg in (AggregateFeatures(; alg = MedianCollapse()),
-                        AggregateFeatures(; w = wc, alg = MedianCollapse()))
-                D = distance(FeatureDistance(; alg = alg), Zi)
-                @test eltype(D) === Float64
-                @test issymmetric(D)
-                @test !any(isnan, D)
-            end
+            Zi = Float64.(rand(rng, 1:9, 4, 5, 3))
             @test eltype(PortfolioOptimisers.collapse_features(MedianCollapse(), Zi,
                                                                nothing)) === Float64
-            # A window whose median stays inside its own type keeps that type.
             @test eltype(PortfolioOptimisers.collapse_features(MedianCollapse(),
                                                                Float32.(Zi), nothing)) ===
                   Float32
@@ -4705,17 +4694,9 @@ end
     using PortfolioOptimisers, Test, StableRNGs, LinearAlgebra
     rng = StableRNG(471)
     X471 = randn(rng, 200, 10)
-    # `graph_weight_matrix` floats an integer matrix before the repair, because an `Integer`
-    # has no smallest positive value. A matrix that needs no repair is not copied.
-    Di = [0 0 1; 0 0 1; 1 1 0]
-    Wi = PortfolioOptimisers.graph_weight_matrix(Di)
-    @test eltype(Wi) == Float64
-    @test Wi[1, 2] == Wi[2, 1] == nextfloat(0.0)
-    @test Wi[1, 3] == 1 && all(iszero, diag(Wi))
+    # `graph_weight_matrix` does not copy a matrix that needs no repair.
     Df = [0.0 0.5; 0.5 0.0]
     @test PortfolioOptimisers.graph_weight_matrix(Df) === Df
-    gi = PortfolioOptimisers.calc_weighted_adjacency_graph(KruskalTree(), Di)
-    @test PortfolioOptimisers.Graphs.ne(gi) == 2
     # `phylogeny_matrix` of a clustering estimator has one row per asset under either `dims`.
     cle = ClustersEstimator()
     p1 = phylogeny_matrix(cle, X471)

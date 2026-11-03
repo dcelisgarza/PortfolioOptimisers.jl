@@ -1143,10 +1143,9 @@ Where:
 function attribution_sandwich(Bt::MatNum, q::VecNum, s2::VecNum,
                               keep::AbstractVector{<:Integer})
     idx = findall(x -> x > zero(x), q)
-    # A decomposition leaves an integer or a `Rational` type, as a square root does.
-    Tf = typeof(sqrt(one(float_if_integer(promote_type(real(eltype(Bt)), real(eltype(q)),
-                                                       real(eltype(s2)))))))
-    D = Tf.(sqrt.(view(q, idx)) .* view(Bt, idx, keep))
+    # A decomposition leaves a `Rational` type, as a square root does.
+    Tf = typeof(sqrt(one(promote_type(real(eltype(Bt)), real(eltype(q)), real(eltype(s2))))))
+    D = sqrt.(view(q, idx)) .* view(Bt, idx, keep)
     r = cross_sectional_rank(D)
     if iszero(r)
         return zeros(Tf, length(keep), length(keep))
@@ -1232,8 +1231,8 @@ function attribution_dropped_observation(dc::AbstractMatrix{Bool}, Bt::MatNum,
     end
     Bd = copy(Bt)
     Bd[:, view(keep, d)] .= zero(eltype(Bd))
-    # A decomposition leaves an integer or a `Rational` type, as a square root does.
-    Tp = typeof(sqrt(one(float_if_integer(real(eltype(Bt))))))
+    # A decomposition leaves a `Rational` type, as a square root does.
+    Tp = typeof(sqrt(one(real(eltype(Bt)))))
     return (; B = Bd, P = cs_dropped_change(Pt, d, keep, nr, Tp))
 end
 function attribution_changed_covariance(Pt::AbstractMatrix, V::MatNum,

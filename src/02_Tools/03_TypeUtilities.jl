@@ -209,27 +209,39 @@ function narrow_mixed_vector(x, ::Type, ::Symbol)
 end
 """
     float_if_integer(::Type{T}) -> Type
+    float_if_integer(X::AbstractArray) -> AbstractArray
+    float_if_integer(A::TimeSeries.TimeArray) -> TimeSeries.TimeArray
+    float_if_integer(::Nothing) -> Nothing
 
-Numeric type that holds the values of a computation over data of element type `T`. It is the floating-point type that Base `float` gives for `T` when `T` is an `Integer`, and `T` for every other type.
+Numeric type that holds the values of a computation over data of element type `T`, or the data `X` in that type. The type is the floating-point type that Base `float` gives for `T` when `T` is an `Integer`, and `T` for every other type.
 
-This function is the one place where the library changes a derived numeric type to a floating-point type. An integer type cannot hold a mean, a variance, a weight or a `NaN`. So an integer sample must use a floating-point working type, or the first write of a fraction raises an `InexactError`. The function keeps every other type. A `Float32` sample stays in `Float32`, and a `Rational` sample stays exact. The function does not convert an automatic-differentiation dual, or a number type from another package, to the type that `float` gives. A call of `float` on `T` does not make that distinction. The type of a division such as `one(T) / one(T)` does not make it either, because a number type can define the division in a different type. A site that must repair an integer input calls this function on the type of its data, and never calls `float`.
+This function is the one place where the library changes a numeric type to a floating-point type. An integer type cannot hold a mean, a variance, a weight or a `NaN`. Integer data are supported only where an integer is the natural type of the data, and a continuous kernel reads floating-point data. So the carriers that a user builds convert integer data once, at construction, through the array method: [`ReturnsResult`](@ref), [`PricesResult`](@ref), [`NumericPanelField`](@ref) and [`TensorPanelField`](@ref). A kernel downstream takes the type of its data with `eltype` and does not call this function. A few sites still call the type method, where an integer is the natural type of their input: the price type of the ingestion layer, the integer codes of a [`CategoricalPanelField`](@ref) that a read fills with a fraction, and the `Bool` connection matrix of a graph traversal. `test/test_55_numeric_coercion_census.jl` holds the list of those sites.
 
-Some operations change the type, for example the square root of a `Rational`. A site with such an operation takes its type from that operation, applied to the result of this function.
+The function keeps every other type. A `Float32` sample stays in `Float32`, and a `Rational` sample stays exact. The function does not convert an automatic-differentiation dual, or a number type from another package, to the type that `float` gives. A call of `float` on `T` does not make that distinction. The type of a division such as `one(T) / one(T)` does not make it either, because a number type can define the division in a different type.
 
 # Algorithm
 
+The method that Julia selects is the algorithm.
+
  1. `T` is a subtype of `Integer`, which includes `Bool`: return the floating-point type that Base `float` gives for `T`, for example `Float64` for `Int` and `BigFloat` for `BigInt`.
  2. `T` is any other type: return `T`.
+ 3. `X` has an `Integer` element type: return a copy of `X` in the type of step 1. A [`RepeatedLeading`](@ref) lift converts its parent and stays lazy.
+ 4. `X` has any other element type: return `X` itself, with no copy, so a view stays a view.
+ 5. A time array `A` with an `Integer` element type: return a time array with the same timestamps, column names and metadata, and its values converted as in step 3. A time array with any other element type: return `A` itself.
+ 6. `nothing`: return `nothing`, so an absent series of a carrier passes through.
 
-Dispatch on `Type{T}` makes the choice, which costs nothing at run time. Inference reads the returned type as a constant.
+Dispatch makes the choice, which costs nothing at run time. Inference reads the returned type as a constant.
 
 # Arguments
 
   - `T`: The element type of the data, usually `eltype` of an argument, or a `promote_type` of the element types of several arguments.
+  - `X`: An array of data, or `nothing`.
+  - `A`: A time array of data.
 
 # Returns
 
   - `Tf::Type`: The floating-point type of `T` if `T <: Integer`, else `T`.
+  - `Xf`: `X` or `A` in that type, or the argument itself.
 
 # Examples
 
@@ -242,14 +254,36 @@ Float32
 
 julia> PortfolioOptimisers.float_if_integer(Rational{Int})
 Rational{Int64}
+
+julia> PortfolioOptimisers.float_if_integer([1 2; 3 4])
+2×2 Matrix{Float64}:
+ 1.0  2.0
+ 3.0  4.0
+
+julia> X = [0.5 1.5];
+
+julia> PortfolioOptimisers.float_if_integer(X) === X
+true
 ```
 
 # Related
 
   - [`concrete_typed_array`](@ref)
+  - [`ReturnsResult`](@ref)
+  - [`PricesResult`](@ref)
 """
 float_if_integer(::Type{T}) where {T <: Integer} = float(T)
 float_if_integer(::Type{T}) where {T} = T
+function float_if_integer(X::AbstractArray{T}) where {T <: Integer}
+    return convert(AbstractArray{float_if_integer(T)}, X)
+end
+float_if_integer(X::AbstractArray) = X
+function float_if_integer(A::TimeSeries.TimeArray{T}) where {T <: Integer}
+    return TimeSeries.TimeArray(TimeSeries.timestamp(A), float_if_integer(values(A)),
+                                TimeSeries.colnames(A), TimeSeries.meta(A))
+end
+float_if_integer(A::TimeSeries.TimeArray) = A
+float_if_integer(::Nothing) = nothing
 
 export concrete_typed_array
 public traverse_concrete_subtypes

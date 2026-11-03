@@ -971,7 +971,7 @@ function coverage_valid_block(X::MatNum, active_mask::Option{<:AbstractMatrix{<:
     T, N = size(Xo)
     stale = [T - something(findlast(view(F, :, j)), 0) for j in axes(F, 2)]
     coverage_inactive_block!(alg, F, amsk)
-    Tf = float_if_integer(eltype(Xo))
+    Tf = eltype(Xo)
     mu = zeros(Tf, N)
     for j in axes(Xo, 2)
         c = count(view(F, :, j))
@@ -1407,7 +1407,7 @@ Where:
 """
 function coverage_divide(M::AbstractArray, nu::AbstractArray, corrected::Bool,
                          cmsk::Option{BitVector})
-    Tf = float_if_integer(promote_type(eltype(M), eltype(nu)))
+    Tf = promote_type(eltype(M), eltype(nu))
     val = Array{Tf}(undef, size(M))
     for k in eachindex(val, M, nu)
         d = nu[k] - corrected

@@ -179,6 +179,8 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+`ReturnsResult` is an entry point of integer data. An integer element type of `X`, `F`, `B`, `E` or `iv` converts once to its floating-point type through [`float_if_integer`](@ref), so every kernel downstream reads floating-point data. Every other element type stays, and a view stays a view.
+
 ## Validation
 
   - If `nx` or `X` is not `nothing`, [`check_names_and_returns_matrix`](@ref) holds for the pair: both are given, `allunique(nx)`, `!isempty(nx)`, `!isempty(X)`, and `length(nx) == size(X, 2)`.
@@ -282,6 +284,12 @@ ReturnsResult
                            B::Option{<:VecNum_MatNum}, ne::Option{<:VecStr},
                            E::Option{<:MatNum}, ts::Option{<:VecDate}, iv::Option{<:MatNum},
                            ivpa::Option{<:Num_VecNum}, pnl::Option{<:AssetPanel})
+        # The one entry point of integer data: every kernel downstream reads a float.
+        X = float_if_integer(X)
+        F = float_if_integer(F)
+        B = float_if_integer(B)
+        E = float_if_integer(E)
+        iv = float_if_integer(iv)
         check_names_and_returns_matrix(nx, X, :nx, :X)
         check_names_and_returns_matrix(nf, F, :nf, :F)
         if isa(B, VecNum) && !isnothing(nb)

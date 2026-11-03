@@ -1485,6 +1485,11 @@ end
 function panel_mask_lift(m::AbstractArray{Bool}, n::Integer)
     return RepeatedLeading(m, n)
 end
+# A lift of integer values converts its parent, so a numeric Panel Field that a caller builds
+# on such a lift stays lazy.
+function float_if_integer(R::RepeatedLeading{<:Integer})
+    return RepeatedLeading(float_if_integer(R.parent), R.n)
+end
 """
     panel_build_observations(inputs::AbstractVector{<:AbstractPanelFieldInput},
                              amsk::Option{<:AbstractMatrix{Bool}},

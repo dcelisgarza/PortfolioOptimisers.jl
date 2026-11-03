@@ -2138,16 +2138,14 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
         end
     end
 
-    @testset "The working type is the one a division of the panel lands in" begin
+    @testset "The working type is the promotion of the panel" begin
+        # Issue #1972 removed the integer case: integer data convert at the carrier.
         Zi = ones(Int, 2, 3, 1)
         Zi[:, 2, 1] .= 2
         Zi[:, 3, 1] .= 3
         Xi = [1 2 3; 2 4 6]
         Wi = ones(Int, 2, 3)
-        csr = cross_sectional_regression(CrossSectionalLinearRegression(), Zi, Xi, Wi)
-        @test eltype(csr.f) == Float64
-        @test csr.f ≈ [1.0; 2.0;;]
-        # The division widens nothing that is already wide enough.
+        # The fit widens nothing that is already wide enough.
         csr32 = cross_sectional_regression(CrossSectionalLinearRegression(),
                                            Array{Float32}(Zi), Float32.(Xi), Float32.(Wi))
         @test eltype(csr32.f) == Float32
@@ -2159,7 +2157,6 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
         @test r2 ≈ ones(Float32, 2)
         @test mean_cross_sectional_r2(csr32, Array{Float32}(Zi), Float32.(Xi),
                                       Float32.(Wi)) isa Float32
-        @test eltype(cross_sectional_r2(csr, Zi, Xi, Wi)) == Float64
         # A `Rational` panel keeps its type in `f`, but both members solve in floating
         # point, so the fit lands near the exact slope 13//14 rather than on it, #1352. The
         # float reference carries the tolerance, because `≈` of two `Rational`s has none.

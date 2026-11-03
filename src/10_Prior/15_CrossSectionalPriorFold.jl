@@ -908,7 +908,7 @@ function cross_sectional_fold_sums(::Nothing, ::Any, ::Arr3Num, ::MatNum)
     return nothing
 end
 function cross_sectional_fold_sums(::AbstractVector{<:Pair}, sums, Ms::Arr3Num, bw::MatNum)
-    Tf = float_if_integer(promote_type(real(eltype(Ms)), real(eltype(bw))))
+    Tf = promote_type(real(eltype(Ms)), real(eltype(bw)))
     c = weighted_family_exposures(Ms, bw, Tf)
     s = isnothing(sums) ? zeros(Tf, size(Ms, 3)) : copy(sums)
     for t in axes(c, 1)

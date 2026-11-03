@@ -537,9 +537,8 @@ Run the inverse volatility portfolio optimisation.
 function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult(); kwargs...)
     iv = reset_time_dependent_estimator(iv)
     pr = prior(iv.pe, rd)
-    # A weight, a bound and a fee hold fractions and infinities, so an integer sample takes
-    # a float type for them, and every other sample keeps its own type.
-    Tf = float_if_integer(eltype(pr.X))
+    # A weight, a bound and a fee take the element type of the returns.
+    Tf = eltype(pr.X)
     # Resolve the fee on the caller's own universe, before `investable_reduction` below
     # narrows `sets`, for the reason the hierarchical heads do; `investable_fees_view` then
     # places it on the axes the mask leaves.
@@ -767,9 +766,8 @@ function _optimise(ew::EqualWeighted, rd::ReturnsResult; kwargs...)
     # The fee is resolved on the caller's own universe before `coverage_reduction` below
     # narrows `sets`, and placed on the axes the mask leaves after it.
     Nf = size(rd.X, 2)
-    # A weight, a bound and a fee hold fractions and infinities, so an integer sample takes
-    # a float type for them, and every other sample keeps its own type.
-    Tf = float_if_integer(eltype(rd.X))
+    # A weight, a bound and a fee take the element type of the returns.
+    Tf = eltype(rd.X)
     fees = fees_constraints(ew.fees, ew.sets; strict = ew.strict, datatype = Tf)
     # This head fits no prior, so it derives the Coverage Universe of its own window and
     # reduces once, here: the weight bounds and the sets are stated over the full universe
@@ -1035,9 +1033,8 @@ function _optimise(rw::RandomWeighted, rd::ReturnsResult; kwargs...)
     end
     # The fee is resolved on the caller's own universe before `coverage_reduction` below
     # narrows `sets`, and placed on the axes the mask leaves after it.
-    # A weight, a bound and a fee hold fractions and infinities, so an integer sample takes
-    # a float type for them, and every other sample keeps its own type.
-    Tf = float_if_integer(eltype(rd.X))
+    # A weight, a bound and a fee take the element type of the returns.
+    Tf = eltype(rd.X)
     fees = fees_constraints(rw.fees, rw.sets; strict = rw.strict, datatype = Tf)
     # This head fits no prior, so it derives the Coverage Universe of its own window and
     # reduces once, here: the concentrations, the weight bounds and the sets are stated over
@@ -1381,9 +1378,8 @@ function _optimise(bcrp::BestConstantRebalancedPortfolio, rd::ReturnsResult; kwa
     # The fee is resolved on the caller's own universe before `coverage_reduction` below
     # narrows `sets`, and placed on the axes the mask leaves after it.
     Nf = size(rd.X, 2)
-    # A weight, a bound and a fee hold fractions and infinities, so an integer sample takes
-    # a float type for them, and every other sample keeps its own type.
-    Tf = float_if_integer(eltype(rd.X))
+    # A weight, a bound and a fee take the element type of the returns.
+    Tf = eltype(rd.X)
     fees = fees_constraints(bcrp.fees, bcrp.sets; strict = bcrp.strict, datatype = Tf)
     # This head fits no prior, so it derives the Coverage Universe of its own window and
     # reduces once, here, as `EqualWeighted` does. `NaiveOptimisationResult` expands back.
@@ -1596,7 +1592,7 @@ end
 
 Return the weights of a [`PreviousWeights`](@ref) that has nothing to hold.
 
-The weights are `NaN` at every column of `X`, or `nothing` when `X` is `nothing`. They take the element type of `X`, or a float type when `X` holds integers, because an integer cannot hold `NaN`.
+The weights are `NaN` at every column of `X`, or `nothing` when `X` is `nothing`. They take the element type of `X`, which must hold `NaN`.
 
 # Related
 
@@ -1607,9 +1603,7 @@ function failed_hold_weights(::Nothing)
     return nothing
 end
 function failed_hold_weights(X::MatNum)
-    # An integer sample cannot hold `NaN`, so it takes a float type, and every other sample
-    # keeps its own type.
-    return fill(convert(float_if_integer(eltype(X)), NaN), size(X, 2))
+    return fill(convert(eltype(X), NaN), size(X, 2))
 end
 """
     optimise(pw::PreviousWeights{<:Any, <:Any, Nothing}, rd::ReturnsResult = ReturnsResult();

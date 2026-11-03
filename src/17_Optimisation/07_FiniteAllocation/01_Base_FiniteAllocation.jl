@@ -764,7 +764,7 @@ Give the target weights that a finite allocation buys when some of its assets ar
 
 The method on `nothing` sets the weight of each Unpriced Asset to zero, and changes no other weight. The allocation then reads an Unpriced Asset as an asset with a zero target weight, so it does not spend its weight. The method on a rule calls the rule, and checks the vector that it returns. [`prepare_finite_allocation`](@ref) calls this method only when the prices hold a `NaN`.
 
-The method on `nothing` returns a vector of `float_if_integer(eltype(w))`, so a rule that starts from it can add a fraction to integer weights.
+The method on `nothing` returns a vector of `eltype(w)`. The target weights are continuous.
 
 # Validation
 
@@ -787,7 +787,7 @@ The method on `nothing` returns a vector of `float_if_integer(eltype(w))`, so a 
   - [`prepare_finite_allocation`](@ref)
 """
 function unpriced_weights(::Nothing, w::VecNum, umsk::AbstractVector{Bool})
-    wt = zeros(float_if_integer(eltype(w)), length(w))
+    wt = zeros(eltype(w), length(w))
     pmsk = .!umsk
     wt[pmsk] = view(w, pmsk)
     return wt

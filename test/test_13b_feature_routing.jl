@@ -633,9 +633,6 @@ const PO = PortfolioOptimisers
             pcat = asset_panel([CategoricalPanelInput(; name = "sector",
                                                       vals = ["a", "b", "a"])])
             @test eltype(feature_matrix(pcat)) === Float64
-            # An integer field stacks as it is: the type comes from the data.
-            pint = asset_panel([NumericPanelInput(; name = "n", vals = [1, 2, 3])])
-            @test eltype(feature_matrix(pint)) === Int
         end
         @testset "a numeric Panel Field paired with a key names the forms it takes" begin
             # A numeric Panel Field has no levels or labels, so the diagnostic says so and

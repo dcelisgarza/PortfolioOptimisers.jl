@@ -1030,7 +1030,6 @@ An asset enters when it carries a positive cross-sectional weight, a positive an
 """
 function target_forecast_calibration_design(P::MatNum, fwd::MatNum, vs::MatNum, w::MatNum,
                                             t::Integer)
-    Tf = promote_type(real(eltype(P)), real(eltype(fwd)), real(eltype(vs)), real(eltype(w)))
     idx = Int[]
     for i in axes(P, 2)
         if w[t, i] > zero(w[t, i]) &&
@@ -1040,8 +1039,7 @@ function target_forecast_calibration_design(P::MatNum, fwd::MatNum, vs::MatNum, 
             push!(idx, i)
         end
     end
-    return Tf.(view(P, t, idx)), Tf.(view(fwd, t, idx)),
-           Tf.(view(w, t, idx)) ./ Tf.(view(vs, t, idx))
+    return P[t, idx], fwd[t, idx], view(w, t, idx) ./ view(vs, t, idx)
 end
 """
     target_forecast_calibration(P::MatNum, fwd::MatNum, vs::MatNum, w::MatNum,

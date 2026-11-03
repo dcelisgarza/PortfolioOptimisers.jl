@@ -813,22 +813,8 @@ end
     fdecay(::ReciprocalDecay, d, B) = (1 + d)^(-1.5)
     fdecay(::Nothing, d, B) = 1.0
 
-    # Integer returns hold a fractional score. Every decay under both separations threw
-    # `InexactError` on the element type `eltype(X)` except the two whose scores are
-    # integers under a hop count; each now gives the matrix of the Float64 copy.
-    Xi = round.(Int, rd.X .* 1000)
-    Xf = Float64.(Xi)
-    for dk in decays, sep in (HopCount(; n = 2), PathLength())
-        pl = NetworkEstimator(; sep = sep)
-        Zi = phylogeny_features(Proximity(; decay = dk), pl, Xi)
-        @test isa(Zi, Matrix{Float64})
-        @test Zi == phylogeny_features(Proximity(; decay = dk), pl, Xf)
-    end
-    Zi = phylogeny_features(Proximity(), CLE, Xi)
-    @test isa(Zi, Matrix{Float64})
-    @test Zi == phylogeny_features(Proximity(), CLE, Xf)
-    @test isa(proxmat(PhylogenyPanel(), nothing, Xi), Matrix{Float64})
-    # Every other type is kept.
+    # Issue #1972 removed the integer case: integer data convert at the carrier.
+    # A float type is kept.
     @test isa(phylogeny_features(Proximity(; decay = ExponentialDecay()), NTE,
                                  Float32.(rd.X)), Matrix{Float32})
     @test isa(phylogeny_features(Proximity(), CLE, Float32.(rd.X)), Matrix{Float32})

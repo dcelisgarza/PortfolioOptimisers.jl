@@ -78,13 +78,6 @@ end
         @test W1[1:2, :] ≈ W0[1:2, :] ./ sum(W0[1:2, :]; dims = 2)
     end
 
-    @testset "A lagged inverse of integer variances holds NaN" begin
-        IV = PO.cross_sectional_lagged_inverse([1 2; 4 8], trues(2, 2))
-        @test eltype(IV) == Float64
-        @test all(isnan, IV[1, :])
-        @test IV[2, :] == [1.0, 0.5]
-    end
-
     @testset "A row of zero capitalisations returns NaN for its eligible pairs" begin
         alg = BlendedInverseVarianceWeights(; lambda = 0.5)
         mask = [true true false; true true true; true true true]

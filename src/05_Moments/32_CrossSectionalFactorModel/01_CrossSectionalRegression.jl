@@ -650,7 +650,7 @@ Fits one weighted least squares per observation across the assets, in closed for
 
 The solve runs on the weighted design ``\\sqrt{w_{t,i}} \\, \\boldsymbol{z}_{t,i}`` rather than on the normal matrix ``\\mathbf{Z}_{t}^{\\intercal} \\mathbf{W}_{t} \\mathbf{Z}_{t}``. The condition number of the normal matrix is the square of the condition number of the weighted design. `alg` decides what happens when the weighted design is rank deficient.
 
-The square root sets the arithmetic of the solve. An integer and a `Rational` weight have a floating-point square root, so the solve of a `Rational` panel runs in floating point. `f` keeps the `Rational` type of the panel, and holds the floating-point answer written as a `Rational`, not the exact least-squares answer. A caller who needs the exact answer solves the weighted normal equations in `Rational` arithmetic.
+The square root sets the arithmetic of the solve. A `Rational` weight has a floating-point square root, so the solve of a `Rational` panel runs in floating point. `f` keeps the `Rational` type of the panel, and holds the floating-point answer written as a `Rational`, not the exact least-squares answer. A caller who needs the exact answer solves the weighted normal equations in `Rational` arithmetic.
 
 The leverage check and the solve read one column-pivoted `QR` of the weighted design, so the check costs a triangular solve on top of the factorisation of the solve. `leverage = false` skips the check, and with [`NormalEquationsSolve`](@ref) the fit then takes no `QR` of a well-conditioned design.
 
@@ -1821,13 +1821,11 @@ function cross_sectional_block_regression(cre::Union{CrossSectionalLinearRegress
                                           t0::Integer)::CrossSectionalRegression
     act = cross_sectional_design_mask(Z, X, W)
     # The coefficients answer a weighted least squares, so the working type is the inputs'
-    # own promotion, widened to a float only when it is an integer: an integer panel
-    # regresses in `Float64`, and a `Float32` panel in `Float32`. A `Rational` panel keeps
-    # its type in `f`, but it is not fitted exactly, issue #1352. The linear member scales
-    # by `sqrt.(w)`, which is a float, and the default target `LinearModel` fits in floating
+    # own promotion: a `Float32` panel regresses in `Float32`. A `Rational` panel keeps its
+    # type in `f`, but it is not fitted exactly, issue #1352. The linear member scales by
+    # `sqrt.(w)`, which is a float, and the default target `LinearModel` fits in floating
     # point too.
-    Ts = promote_type(real(eltype(Z)), real(eltype(X)), real(eltype(W)))
-    Tf = float_if_integer(Ts)
+    Tf = promote_type(real(eltype(Z)), real(eltype(X)), real(eltype(W)))
     K = size(Z, 3)
     f = zeros(Tf, size(X, 1), K)
     b = cre.intercept ? zeros(Tf, size(X, 1)) : nothing
@@ -1839,9 +1837,9 @@ function cross_sectional_block_regression(cre::Union{CrossSectionalLinearRegress
     cross_sectional_foreach(cre.ex, axes(X, 1)) do t
         idx = findall(view(act, t, :))
         n[t] = length(idx)
-        w = Tf.(view(W, t, idx))
-        A = Tf.(view(Z, t, idx, :))
-        y = Tf.(view(X, t, idx))
+        w = W[t, idx]
+        A = Z[t, idx, :]
+        y = X[t, idx]
         ybar = zero(Tf)
         xbar = zeros(Tf, K)
         # The fit of the centred design leaves the weighted mean, which the intercept spends
@@ -2043,8 +2041,7 @@ function cross_sectional_r2(csr::CrossSectionalRegression, Z::Arr3Num, X::MatNum
     Xh = StatsAPI.predict(csr, Z)
     # The ratio keeps the type of the inputs, so a `Float32` fit answers a `Float32` ratio
     # rather than one widened by a `Float64` `NaN`.
-    Ts = promote_type(real(eltype(Xh)), real(eltype(X)), real(eltype(W)))
-    Tf = float_if_integer(Ts)
+    Tf = promote_type(real(eltype(Xh)), real(eltype(X)), real(eltype(W)))
     r2 = fill(convert(Tf, NaN), size(X, 1))
     for t in axes(X, 1)
         idx = findall(view(act, t, :))

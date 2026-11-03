@@ -244,7 +244,8 @@ rd59 = prices_to_returns(ptr59, price_ingestion(PriceIngestion(), X59))
         @test values(prm.X) == Float64.(P5)
 
         # An integer panel takes the floating-point type that represents it, derived from
-        # the division a return performs rather than named.
+        # the division a return performs rather than named. The ingestion layer is the
+        # entry point of integer prices (#1972): the one test of that entry point.
         Xi = TimeArray(ts5, P5, ["A", "B"])
         pri = price_ingestion(PriceIngestion(), Xi)
         @test eltype(values(pri.X)) === typeof(one(Int) / one(Int))

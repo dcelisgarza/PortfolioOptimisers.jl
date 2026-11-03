@@ -496,7 +496,7 @@ Row `t` reads row `t - 1` of the series. Row `1` is `NaN`, because no variance p
 
 # Algorithm
 
- 1. Fill the result with `NaN`, which is what row `1` and every pair outside `mask` keep. Both blend components then normalise over the same universe. Integer data takes a float type, because an integer cannot hold `NaN`.
+ 1. Fill the result with `NaN`, which is what row `1` and every pair outside `mask` keep. Both blend components then normalise over the same universe.
  2. Write the reciprocal of row `t - 1` of the series into every eligible pair of row `t`, for every later observation.
 
 # Arguments
@@ -520,7 +520,7 @@ Row `t` reads row `t - 1` of the series. Row `1` is `NaN`, because no variance p
 function cross_sectional_lagged_inverse(V::MatNum, mask::AbstractMatrix{Bool})::MatNum
     @argcheck(size(V) == size(mask),
               DimensionMismatch("V ($(size(V, 1))×$(size(V, 2))) must match mask ($(size(mask, 1))×$(size(mask, 2)))"))
-    Tf = float_if_integer(real(eltype(V)))
+    Tf = real(eltype(V))
     IV = fill(Tf(NaN), size(V))
     for t in 2:size(V, 1), i in axes(V, 2)
         if mask[t, i]

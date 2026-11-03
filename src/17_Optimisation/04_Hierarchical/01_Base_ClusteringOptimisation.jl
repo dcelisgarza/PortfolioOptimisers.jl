@@ -780,7 +780,7 @@ Where:
 
 # Algorithm
 
- 1. Make the weight vector `wk`, all zero, of length `size(X, 2)`. Its entries take the type of the quotient of two returns, so an integer `X` gives fractional weights.
+ 1. Make the weight vector `wk`, all zero, of length `size(X, 2)`. Its entries take the element type of `X`.
  2. For each asset `i`, set `wk[i]` to one, evaluate `expected_risk(r, wk, X, fees)` as the `i`-th risk, and set `wk[i]` back to zero.
  3. Collect the risks into `rk`, whose element type is the type that `expected_risk` returns.
 
@@ -802,10 +802,9 @@ Where:
 """
 function unitary_expected_risks(r::OptimisationRiskMeasure, X::MatNum,
                                 fees::Option{<:Fees} = nothing)
-    # A risk is not an entry of `X`: an integer returns matrix has a fractional variance.
-    # The weights take the type of the returns, widened to a float only when it is an
-    # integer, and `map` takes the type of the risks from the values `expected_risk` returns.
-    wk = zeros(float_if_integer(eltype(X)), size(X, 2))
+    # The weights take the element type of the returns, and `map` takes the type of the
+    # risks from the values `expected_risk` returns.
+    wk = zeros(eltype(X), size(X, 2))
     return map(eachindex(wk)) do i
         wk[i] = one(eltype(wk))
         rki = expected_risk(r, wk, X, fees)
@@ -829,7 +828,7 @@ This is the in-place form of [`unitary_expected_risks`](@ref), which states the 
 # Arguments
 
   - `wk`: Scratch weight vector, of length `size(X, 2)`. It must be all zero on entry, and it is all zero on exit, because each step sets one entry to one and then back to zero.
-  - `rk`: Output risk vector, of length `size(X, 2)`. It is overwritten in full. Its element type must hold a risk, so for an integer `X` it is a floating-point type.
+  - `rk`: Output risk vector, of length `size(X, 2)`. It is overwritten in full. Its element type must hold a risk.
   - `r`: Risk measure, already resolved by [`factory`](@ref).
   - `X`: Asset return matrix, observations by assets.
   - `fees`: Fees to charge against each unit portfolio, or `nothing`.

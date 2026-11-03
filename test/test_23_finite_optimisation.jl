@@ -1129,12 +1129,13 @@ end
     @test EvenRedistribution()([0.5, 0.5, -0.2], [false, false, true]) ≈ [0.5, 0.5, 0.0]
     @test ProportionalRedistribution()([0.5, 0.5, -0.2], [false, false, true]) ≈
           [0.5, 0.5, 0.0]
-    # A zero weight takes no part of an even split, and integer weights take a fraction.
+    # A zero weight takes no part of an even split. Issue #1972 removed the integer-weight
+    # case: the target weights are continuous.
     @test EvenRedistribution()([0.5, 0.3, 0.2, 0.0], [false, false, true, false]) ≈
           [0.6, 0.4, 0.0, 0.0]
-    @test ProportionalRedistribution()([1, 1, 0, 2], [false, false, false, true]) ==
+    @test ProportionalRedistribution()([1.0, 1, 0, 2], [false, false, false, true]) ==
           [2.0, 2.0, 0.0, 0.0]
-    @test PO.unpriced_weights(nothing, [1, 2], [false, true]) == [1.0, 0.0]
+    @test PO.unpriced_weights(nothing, [1.0, 2], [false, true]) == [1.0, 0.0]
     for alg in (ga, da)
         r = optimise(alg,
                      FiniteAllocationInput(; w = w, prices = pls, cash = 1000.0,

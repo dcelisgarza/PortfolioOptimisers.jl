@@ -26,7 +26,7 @@ Where:
 
 # Returns
 
-  - `v::Vector{<:Real}`: The entries of column `k` that are not `NaN`, in the order of the observations. An integer series gives a floating-point vector.
+  - `v::Vector{<:Real}`: The entries of column `k` that are not `NaN`, in the order of the observations.
 
 # Related
 
@@ -35,7 +35,7 @@ Where:
   - [`factor_model_summary`](@ref)
 """
 function factor_summary_finite_column(A::MatNum, k::Integer)
-    Tf = float_if_integer(real(eltype(A)))
+    Tf = real(eltype(A))
     v = Vector{Tf}(undef, 0)
     for t in axes(A, 1)
         a = A[t, k]
@@ -221,7 +221,7 @@ For each factor `k`:
 """
 function factor_summary_return_stats(f::MatNum, ppy::Number)
     K = size(f, 2)
-    Tr = promote_type(float_if_integer(real(eltype(f))), real(typeof(ppy)))
+    Tr = promote_type(real(eltype(f)), real(typeof(ppy)))
     Tv = typeof(sqrt(one(Tr)))
     ann_return = Vector{Tr}(undef, K)
     ann_volatility = Vector{Tv}(undef, K)
@@ -287,7 +287,7 @@ The coefficient is not defined for ``T < 2``, nor for a series with a constant h
 """
 function factor_summary_autocorrelation(f::MatNum)
     T, K = size(f)
-    Tf = typeof(sqrt(one(float_if_integer(real(eltype(f))))))
+    Tf = typeof(sqrt(one(real(eltype(f)))))
     ac = fill(Tf(NaN), K)
     if T < 2
         return ac
@@ -483,7 +483,7 @@ Where:
   - [`factor_model_summary`](@ref)
 """
 function factor_summary_mapped(v::VecNum, pos::AbstractVector{Int})
-    Tf = float_if_integer(real(eltype(v)))
+    Tf = real(eltype(v))
     m = fill(Tf(NaN), length(pos))
     for k in eachindex(pos)
         j = pos[k]
@@ -602,7 +602,7 @@ The variance is not defined for an empty ``\\mathcal{N}_{tk}``. An infinite expo
   - [`factor_summary_constant_exposures`](@ref)
 """
 function factor_summary_exposure_variance(Ms::Arr3Num, t::Integer, k::Integer)
-    Tf = float_if_integer(real(eltype(Ms)))
+    Tf = real(eltype(Ms))
     n = 0
     s = zero(Tf)
     lo = Tf(Inf)
@@ -737,7 +737,7 @@ function factor_summary_stability(Ms::Arr3Num, csfm::CrossSectionalFactorModel;
                                   step::Integer = 21, weighting = BenchmarkWeightMetric())
     con = factor_summary_constant_exposures(Ms)
     K = size(Ms, 3)
-    Tf = float_if_integer(real(eltype(Ms)))
+    Tf = real(eltype(Ms))
     if size(Ms, 1) <= step
         return Tf[con[k] ? one(Tf) : Tf(NaN) for k in 1:K]
     end

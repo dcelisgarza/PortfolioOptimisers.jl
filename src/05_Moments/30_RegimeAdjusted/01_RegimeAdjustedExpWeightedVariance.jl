@@ -1611,9 +1611,8 @@ function regime_adjusted_variance_pass!(f, ce::RegimeAdjustedExpWeightedVariance
     end
     N = size(X, setdiff((1, 2), (dims,))[1])
 
-    # The state holds a variance and a `NaN`, so an integer panel computes in its floating
-    # point type, and every other type is kept: a `Float32` panel keeps a `Float32` state.
-    Tf = float_if_integer(eltype(X))
+    # The state takes the type of the panel: a `Float32` panel keeps a `Float32` state.
+    Tf = eltype(X)
     # The location starts as `NaN`, which marks an asset with no valid observation.
     cache = if isnothing(state)
         RegimeAdjustedVarianceState(if isnothing(ce.hac_lags)
@@ -1854,8 +1853,7 @@ function variance_series(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims:
                          estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                          active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     assert_dims(dims)
-    val = Matrix{float_if_integer(eltype(X))}(undef, size(X, dims),
-                                              size(X, setdiff((1, 2), (dims,))[1]))
+    val = Matrix{eltype(X)}(undef, size(X, dims), size(X, setdiff((1, 2), (dims,))[1]))
     regime_adjusted_variance_pass!(ce, X, dims, estimation_mask, active_mask) do i, cache
         val[i, :] = regime_adjusted_variance(cache, ce)
         return nothing

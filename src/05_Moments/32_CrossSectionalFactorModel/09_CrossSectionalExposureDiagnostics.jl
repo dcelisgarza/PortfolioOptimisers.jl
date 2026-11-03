@@ -99,8 +99,7 @@ julia> PortfolioOptimisers.cs_weighted_correlation([1.0, 2.0, 3.0], [2.0, 4.0, 6
 """
 function cs_weighted_correlation(a::AbstractVector, b::AbstractVector, u::AbstractVector;
                                  min_count::Integer = 3, eps::Real = 1e-12)
-    Tf = typeof(sqrt(one(float_if_integer(promote_type(real(eltype(a)), real(eltype(b)),
-                                                       real(eltype(u)))))))
+    Tf = typeof(sqrt(one(promote_type(real(eltype(a)), real(eltype(b)), real(eltype(u))))))
     N = length(a)
     n = 0
     ws = zero(Tf)
@@ -242,7 +241,7 @@ julia> PortfolioOptimisers.cs_ranks([3.0, 1.0, 1.0, 2.0], trues(4), :ordinal)
 function cs_ranks(key::AbstractVector, valid::AbstractVector{Bool}, ties::Symbol)
     @argcheck(ties in (:average, :ordinal),
               ConflictingArgumentError("ties must be :average or :ordinal, got :$(ties)"))
-    Tf = float_if_integer(real(eltype(key)))
+    Tf = real(eltype(key))
     N = length(key)
     p = sortperm(key)
     # `NaN` is written at a masked entry alone, so a key type that holds no `NaN`, such as a
@@ -333,7 +332,7 @@ julia> PortfolioOptimisers.cs_spearman_correlation(a, [1.0, 2.0, 3.0, 4.0]; ties
 function cs_spearman_correlation(a::AbstractVector, b::AbstractVector;
                                  min_count::Integer = 3, eps::Real = 1e-12,
                                  ties::Symbol = :average)
-    Tf = typeof(sqrt(one(float_if_integer(promote_type(real(eltype(a)), real(eltype(b)))))))
+    Tf = typeof(sqrt(one(promote_type(real(eltype(a)), real(eltype(b))))))
     N = length(a)
     ka = Vector{Tf}(undef, N)
     kb = Vector{Tf}(undef, N)
@@ -415,7 +414,7 @@ Where:
 function exposure_correlation(B::Arr3Num, w::Option{<:MatNum} = nothing)
     u = exposure_weights(B, w)
     K = size(B, 3)
-    Tf = typeof(sqrt(one(float_if_integer(promote_type(real(eltype(B)), real(eltype(u)))))))
+    Tf = typeof(sqrt(one(promote_type(real(eltype(B)), real(eltype(u))))))
     Cm = Matrix{Tf}(undef, K, K)
     for l in 1:K, k in 1:l
         v = k == l ? one(Tf) : Tf(exposure_pair_correlation(B, u, k, l))
@@ -453,7 +452,7 @@ The verb correlates the pair at each observation, and averages the answers over 
   - [`exposure_pair_observation`](@ref)
 """
 function exposure_pair_correlation(B::Arr3Num, u::MatNum, k::Integer, l::Integer)
-    Tf = typeof(sqrt(one(float_if_integer(promote_type(real(eltype(B)), real(eltype(u)))))))
+    Tf = typeof(sqrt(one(promote_type(real(eltype(B)), real(eltype(u))))))
     T = size(B, 1)
     acc = zero(Tf)
     cnt = 0
@@ -497,7 +496,7 @@ The correlation reads the assets at which both exposures are finite and the weig
 """
 function exposure_pair_observation(B::Arr3Num, u::MatNum, t::Integer, k::Integer,
                                    l::Integer)
-    Tf = typeof(sqrt(one(float_if_integer(promote_type(real(eltype(B)), real(eltype(u)))))))
+    Tf = typeof(sqrt(one(promote_type(real(eltype(B)), real(eltype(u))))))
     m = exposure_pair_sums(B, u, t, k, l)
     if !(m.W > zero(Tf)) || m.nv < 3
         return Tf(NaN), false
@@ -535,7 +534,7 @@ An asset enters when both of its exposures are finite and its weight is finite a
   - [`exposure_pair_observation`](@ref)
 """
 function exposure_pair_sums(B::Arr3Num, u::MatNum, t::Integer, k::Integer, l::Integer)
-    Tf = typeof(sqrt(one(float_if_integer(promote_type(real(eltype(B)), real(eltype(u)))))))
+    Tf = typeof(sqrt(one(promote_type(real(eltype(B)), real(eltype(u))))))
     N = size(B, 2)
     nv = 0
     W = zero(Tf)
@@ -624,7 +623,7 @@ function exposure_stability(B::Arr3Num, w::Option{<:MatNum} = nothing; step::Int
     @argcheck(step >= 1, DomainError(step, "step must be >= 1"))
     @argcheck(T > step,
               DimensionMismatch("B ($T observations) must carry more observations than step ($step)"))
-    Tf = typeof(sqrt(one(float_if_integer(promote_type(real(eltype(B)), real(eltype(u)))))))
+    Tf = typeof(sqrt(one(promote_type(real(eltype(B)), real(eltype(u))))))
     P = T - step
     S = Matrix{Tf}(undef, P, K)
     for k in 1:K, t in 1:P
@@ -692,7 +691,7 @@ Where:
 function exposure_dispersion(B::Arr3Num, w::Option{<:MatNum} = nothing)
     u = exposure_weights(B, w)
     T, N, K = size(B)
-    Tf = typeof(sqrt(one(float_if_integer(promote_type(real(eltype(B)), real(eltype(u)))))))
+    Tf = typeof(sqrt(one(promote_type(real(eltype(B)), real(eltype(u))))))
     D = Matrix{Tf}(undef, T, K)
     for k in 1:K, t in 1:T
         D[t, k] = Tf(exposure_cross_section_std(B, u, t, k))
@@ -722,7 +721,7 @@ The function normalises the weights over the assets at which the exposure is fin
   - [`exposure_dispersion`](@ref)
 """
 function exposure_cross_section_std(B::Arr3Num, u::MatNum, t::Integer, k::Integer)
-    Tf = typeof(sqrt(one(float_if_integer(promote_type(real(eltype(B)), real(eltype(u)))))))
+    Tf = typeof(sqrt(one(promote_type(real(eltype(B)), real(eltype(u))))))
     N = size(B, 2)
     ws = zero(Tf)
     s = zero(Tf)
@@ -816,7 +815,7 @@ Where:
 function exposure_coverage(B::Arr3Num, w::Option{<:MatNum} = nothing)
     u = exposure_weights(B, w)
     T, N, K = size(B)
-    Tf = float_if_integer(promote_type(real(eltype(B)), real(eltype(u))))
+    Tf = promote_type(real(eltype(B)), real(eltype(u)))
     c = zeros(Tf, K)
     for t in 1:T
         ne = exposure_universe_size(u, t)
@@ -1068,8 +1067,8 @@ Return the variance inflation factors of a design whose mask a caller has alread
 """
 function cs_masked_vif(B::Arr3Num, mask::AbstractMatrix{Bool}, u::MatNum)
     T, _, K = size(B)
-    # A decomposition leaves an integer or a `Rational` type, as a square root does.
-    Tf = typeof(sqrt(one(float_if_integer(promote_type(real(eltype(B)), real(eltype(u)))))))
+    # A decomposition leaves a `Rational` type, as a square root does.
+    Tf = typeof(sqrt(one(promote_type(real(eltype(B)), real(eltype(u))))))
     # The answer starts absent, so an observation with no degrees of freedom needs no branch.
     vif = fill(Tf(NaN), T, K)
     for t in 1:T
@@ -1140,7 +1139,7 @@ julia> exposure_condition_number(cs_gram(B))
 function exposure_condition_number(G::Arr3Num)
     T = size(G, 1)
     K = size(G, 2)
-    Tf = typeof(sqrt(one(float_if_integer(real(eltype(G))))))
+    Tf = typeof(sqrt(one(real(eltype(G)))))
     kappa = Vector{Tf}(undef, T)
     Gt = Matrix{Tf}(undef, K, K)
     for t in 1:T
@@ -1179,8 +1178,8 @@ Return the condition numbers of a design whose mask a caller has already resolve
 """
 function cs_masked_condition_number(B::Arr3Num, mask::AbstractMatrix{Bool}, u::MatNum)
     T, _, K = size(B)
-    # A decomposition leaves an integer or a `Rational` type, as a square root does.
-    Tf = typeof(sqrt(one(float_if_integer(promote_type(real(eltype(B)), real(eltype(u)))))))
+    # A decomposition leaves a `Rational` type, as a square root does.
+    Tf = typeof(sqrt(one(promote_type(real(eltype(B)), real(eltype(u))))))
     kappa = fill(Tf(NaN), T)
     for t in 1:T
         if count(view(mask, t, :)) > K

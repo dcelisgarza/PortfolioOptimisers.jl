@@ -41,7 +41,7 @@ function exposure_forward_mean_return(R::MatNum, horizon::Integer)
     T, N = size(R)
     @argcheck(T > horizon,
               DimensionMismatch("R ($T observations) must carry more observations than horizon ($horizon)"))
-    Tf = float_if_integer(real(eltype(R)))
+    Tf = real(eltype(R))
     P = T - horizon
     y = Matrix{Tf}(undef, P, N)
     for i in 1:N, t in 1:P
@@ -142,8 +142,7 @@ function exposure_ic(B::Arr3Num, R::MatNum, w::Option{<:MatNum} = nothing;
               DimensionMismatch("R ($(size(R, 1))×$(size(R, 2))) must match B ($T×$N on its first two axes)"))
     @argcheck(horizon >= 1, DomainError(horizon, "horizon must be >= 1"))
     y = exposure_forward_mean_return(R, horizon)
-    Tf = typeof(sqrt(one(float_if_integer(promote_type(real(eltype(B)), real(eltype(y)),
-                                                       real(eltype(u)))))))
+    Tf = typeof(sqrt(one(promote_type(real(eltype(B)), real(eltype(y)), real(eltype(u))))))
     P = T - horizon
     ic = Matrix{Tf}(undef, P, K)
     for k in 1:K, t in 1:P
@@ -348,7 +347,7 @@ function exposure_ic_summary(ic::MatNum; lags::Integer = 0, window::Real = lags 
     @argcheck(!isempty(ic), IsEmptyError("ic cannot be empty"))
     resolve_mean_test_window(lags, window)
     P, K = size(ic)
-    Tm = float_if_integer(real(eltype(ic)))
+    Tm = real(eltype(ic))
     Ts = typeof(sqrt(one(Tm)))
     mean_ic = Vector{Tm}(undef, K)
     std_ic = Vector{Ts}(undef, K)
@@ -425,7 +424,7 @@ function exposure_ic_factor_summary(ic::MatNum, k::Integer; lags::Integer = 0,
                                     rng = mean_test_rng(mt))
     w = resolve_mean_test_window(lags, window)
     P = size(ic, 1)
-    Tm = float_if_integer(real(eltype(ic)))
+    Tm = real(eltype(ic))
     Ts = typeof(sqrt(one(Tm)))
     n = 0
     s = zero(Tm)
@@ -541,8 +540,7 @@ function exposure_ic_data(csfm::CrossSectionalFactorModel, Ms::Arr3Num,
     K = size(Bd, 3)
     @argcheck(size(F, 1) == T && size(F, 2) == K,
               DimensionMismatch("the factor returns ($(size(F, 1))×$(size(F, 2))) must match Ms ($T observations) and the reduced exposures ($K factors)"))
-    Tf = float_if_integer(promote_type(real(eltype(Ms)), real(eltype(F)),
-                                       real(eltype(csr.eps))))
+    Tf = promote_type(real(eltype(Ms)), real(eltype(F)), real(eltype(csr.eps)))
     start = max(1, lag)
     P = T - start + 1
     R = fill(Tf(NaN), P, N)

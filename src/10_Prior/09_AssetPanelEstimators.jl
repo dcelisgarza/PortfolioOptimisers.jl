@@ -137,7 +137,7 @@ end
 
 Turn a graph source or a partition source into a square `assets × assets` feature matrix.
 
-This is the kernel of [`PhylogenyPanel`](@ref). Every method returns a matrix of element type `float_if_integer(eltype(X))`, which is the element type of the returns, or `Float64` for integer returns. It is never the `Int` or `BitMatrix` that the phylogeny routines give, so [`AngularDist`](@ref) keeps its BLAS `gemm` path, a `Float32` history gives a `Float32` matrix, and a fractional score fits into the matrix of an integer history.
+This is the kernel of [`PhylogenyPanel`](@ref). Every method returns a matrix of element type `eltype(X)`, which is the element type of the returns. It is never the `Int` or `BitMatrix` that the phylogeny routines give, so [`AngularDist`](@ref) keeps its BLAS `gemm` path and a `Float32` history gives a `Float32` matrix.
 
 `pl` is an estimator, a [`NetworkEstimator`](@ref) or a [`ClustersEstimator`](@ref). It is never a precomputed [`PhylogenyResult`](@ref) or [`Clusters`](@ref), because an Estimator does not hold a Result. So each call builds the structure from `X`, and the structure follows a cross-validation fold or the subproblem of a meta-optimiser.
 
@@ -175,11 +175,11 @@ Over a graph source, under [`Proximity`](@ref):
  1. Build the structure from `X` through [`separation_graph`](@ref), giving `g`.
  2. Resolve the separation algorithm against the structure through [`resolve_separation`](@ref), giving `sep`.
  3. Measure the separations through [`separation_matrix`](@ref), giving `d`.
- 4. Read the budget through [`separation_budget`](@ref), and score `d` in the element type `float_if_integer(eltype(X))` through [`_proximity_features`](@ref), giving `Z`.
+ 4. Read the budget through [`separation_budget`](@ref), and score `d` in the element type `eltype(X)` through [`_proximity_features`](@ref), giving `Z`.
 
 Over a partition source, under any algorithm:
 
- 1. Build the co-membership matrix from `X` through [`phylogeny_matrix`](@ref), and convert it to the element type `float_if_integer(eltype(X))`.
+ 1. Build the co-membership matrix from `X` through [`phylogeny_matrix`](@ref), and convert it to the element type `eltype(X)`.
  2. Add the identity, which restores the diagonal that [`phylogeny_matrix`](@ref) subtracts, giving `Z`.
 
 # Arguments
@@ -191,7 +191,7 @@ Over a partition source, under any algorithm:
 
 # Returns
 
-  - `Z::Matrix`: Square `assets × assets` feature matrix of element type `float_if_integer(eltype(X))`.
+  - `Z::Matrix`: Square `assets × assets` feature matrix of element type `eltype(X)`.
 
 # Related
 
@@ -209,7 +209,7 @@ function phylogeny_features end
 # the docstring's caveat -- the resulting distance carries the partition and nothing more.
 function phylogeny_features(::AbstractPhylogenyFeatureAlgorithm,
                             pl::AbstractClustersEstimator, X::MatNum; kwargs...)::Matrix
-    return Matrix{float_if_integer(eltype(X))}(phylogeny_matrix(pl, X; dims = 1, kwargs...).X) +
+    return Matrix{eltype(X)}(phylogeny_matrix(pl, X; dims = 1, kwargs...).X) +
            LinearAlgebra.I
 end
 """
@@ -232,7 +232,7 @@ This is the loop of the [`Proximity`](@ref) method of [`phylogeny_features`](@re
   - `sep`: Separation algorithm that measured `d`, forwarded to [`is_related`](@ref).
   - `d`: Separation matrix from [`separation_matrix`](@ref).
   - `dmax`: Separation budget from [`separation_budget`](@ref).
-  - `et`: Element type of the result. [`phylogeny_features`](@ref) passes `float_if_integer(eltype(X))`, so that [`AngularDist`](@ref) keeps its BLAS `gemm` path.
+  - `et`: Element type of the result. [`phylogeny_features`](@ref) passes `eltype(X)`, so that [`AngularDist`](@ref) keeps its BLAS `gemm` path.
 
 # Returns
 
@@ -275,8 +275,7 @@ function phylogeny_features(alg::Proximity, pl::AbstractNetworkEstimator, X::Mat
     g = separation_graph(pl.sep, pl, X; dims = 1, kwargs...)
     sep = resolve_separation(pl.sep, pl, X, g; dims = 1, kwargs...)
     d = separation_matrix(sep, g)
-    return _proximity_features(alg, sep, d, separation_budget(sep, pl, d),
-                               float_if_integer(eltype(X)))
+    return _proximity_features(alg, sep, d, separation_budget(sep, pl, d), eltype(X))
 end
 """
     panel_axis_labels(names::Nothing, n::Integer) -> Vector{String}

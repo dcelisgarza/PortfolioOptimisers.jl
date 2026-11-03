@@ -266,7 +266,7 @@ function leverage_one_nan(h1::AbstractMatrix{Bool}, A::MatNum)::MatNum
     if !any(h1)
         return A
     end
-    B = typeof(sqrt(one(float_if_integer(real(eltype(A)))))).(A)
+    B = typeof(sqrt(one(real(eltype(A))))).(A)
     B[h1] .= NaN
     return B
 end

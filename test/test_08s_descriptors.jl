@@ -227,13 +227,14 @@ end
     # A field that cannot blank carries no observed-mask column, and reads back whole.
     @test PortfolioOptimisers.descriptor_field_values(rdc, "mcap") == ones(2, 2)
     # The read lands in the type a division of the field lands in, which is the one that
-    # carries a NaN: an exact integer field reads in Float64, a Float32 field stays Float32,
-    # and every archetype that reads it can then write NaN on an inactive or blank cell.
+    # carries a NaN: a Float32 field stays Float32, and every archetype that reads it can
+    # then write NaN on an inactive or blank cell. Issue #1972 removed the integer field:
+    # integer values convert at the field.
     ami = [true true; true false]
-    pint = asset_panel([NumericPanelInput(; name = "shares", vals = [10 20; 30 40]),
+    pint = asset_panel([NumericPanelInput(; name = "shares", vals = [10.0 20.0; 30.0 40.0]),
                         NumericPanelInput(; name = "gap",
-                                          vals = Union{Missing, Int}[10 missing; 30 40],
-                                          alg = ConstantPanelFill(; val = 0)),
+                                          vals = Union{Missing, Float64}[10 missing; 30 40],
+                                          alg = ConstantPanelFill(; val = 0.0)),
                         NumericPanelInput(; name = "f32", vals = Float32[1 2; 3 4])];
                        amsk = ami, emsk = ami)
     rdi = ReturnsResult(; nx = ["A1", "A2"], X = zeros(2, 2), pnl = pint)
@@ -1253,17 +1254,7 @@ end
 end
 
 @testset "The rolling Descriptors derive their number type from the returns (#741)" begin
-    # An integer panel raised InexactError: Int64(NaN) at the first NaN of the warm-up. It
-    # is now floated, and gives the answer of the same panel in Float64 bit for bit.
-    Xi = [0 1; 2 0; 1 3; 4 2; 0 1]
-    Xf = Float64.(Xi)
-    for de in
-        (RollingMax(; window = 2), MaxReturn(; window = 3), RollingLogReturn(; window = 2),
-         Reversal(; window = 1))
-        Di = descriptor(de, rolling_hand_panel(Xi))
-        @test eltype(Di) == Float64
-        @test isequal(Di, descriptor(de, rolling_hand_panel(Xf)))
-    end
+    # Issue #1972 removed the integer case: integer data convert at the carrier.
     # A Float32 panel keeps a Float32 Descriptor.
     X32 = Float32[0.1 0.2; 0.05 -0.1; 0.3 0.0]
     for de in (RollingLogReturn(; window = 2), RollingMax(; window = 2))
@@ -1994,18 +1985,9 @@ end
 end
 
 @testset "The volatility Descriptors derive their number type from the returns" begin
-    Xi = [1 2; -1 0; 1 1; 0 -2; 2 1]
-    Xf = Float64.(Xi)
-    rdi = ew_hand_panel(["market_cap" => ones(size(Xi))], Xi)
-    rdf = ew_hand_panel(["market_cap" => ones(size(Xi))], Xf)
-    # The default estimator built its state in the type of the returns, so an integer panel
-    # raised an `InexactError` at the first `NaN` of the warm-up.
-    for de in (EWVolatility(; half_life = 2), EWDownsideVolatility(; half_life = 2),
-               EWResidualVolatility(; half_life = 2, beta_half_life = 2),
-               EWResidualDownsideVolatility(; half_life = 2, beta_half_life = 2))
-        @test isequal(descriptor(de, rdi), descriptor(de, rdf))
-    end
-    rd32 = ew_hand_panel(["market_cap" => ones(size(Xi))], Float32.(Xi) ./ 100)
+    # Issue #1972 removed the integer case: integer data convert at the carrier.
+    Xf = [1.0 2.0; -1.0 0.0; 1.0 1.0; 0.0 -2.0; 2.0 1.0]
+    rd32 = ew_hand_panel(["market_cap" => ones(size(Xf))], Float32.(Xf) ./ 100)
     @test eltype(descriptor(EWVolatility(; half_life = 2), rd32)) == Float32
 end
 
@@ -2026,21 +2008,10 @@ end
 end
 
 @testset "The mean Descriptors derive their number type from the returns" begin
-    Xi = [0 1; 1 0; 2 1; 0 0; 1 2]
-    Xf = Float64.(Xi)
+    # Issue #1972 removed the integer case: integer data convert at the carrier.
+    Xf = [0.0 1.0; 1.0 0.0; 2.0 1.0; 0.0 0.0; 1.0 2.0]
     vol = [10.0 20.0; 30.0 40.0; 50.0 60.0; 70.0 80.0; 90.0 100.0]
-    rdi = ew_hand_panel(["adj_volume" => copy(vol)], Xi)
-    rdf = ew_hand_panel(["adj_volume" => copy(vol)], Xf)
-    # `EWMean` built its delayed input, and `ew_mean_series` its series, in the type of the
-    # returns, so an integer panel raised an `InexactError` at the first `NaN`.
-    for de in
-        (EWMean(; decay = 0.5, min_obs = 1), EWMean(; decay = 0.5, min_obs = 2, skip = 1),
-         EWVolumeRatio(; num = nothing, den = "adj_volume", decay = 0.5, min_obs = 1))
-        @test isequal(descriptor(de, rdi), descriptor(de, rdf))
-    end
-    @test isequal(PortfolioOptimisers.ew_mean_series(Xi, 0.5, 1),
-                  PortfolioOptimisers.ew_mean_series(Xf, 0.5, 1))
-    rd32 = ew_hand_panel(["adj_volume" => copy(vol)], Float32.(Xi) ./ 100)
+    rd32 = ew_hand_panel(["adj_volume" => copy(vol)], Float32.(Xf) ./ 100)
     @test eltype(descriptor(EWMean(; decay = 0.5, min_obs = 1), rd32)) == Float32
 end
 
@@ -2889,10 +2860,6 @@ end
         @test isnan(E[2, 1])
         @test E[1, 1] ≈ 0.0
         @test E[2, 2] ≈ 0.1
-        # Integer arguments hold the `NaN` of a missing cell in their floating point type.
-        Ei = PortfolioOptimisers.ew_residual_returns([1 2; 3 4], [1, 2], [1 1; 2 2],
-                                                     [true false; true true])
-        @test isequal(Ei, [0.0 NaN; -1.0 0.0])
     end
     @testset "At the first valid observation the residual is zero up to the floor" begin
         # The beta includes observation 1, so β = (1 - λ) x r_m / ((1 - λ) r_m² + min_val) and
@@ -3127,70 +3094,18 @@ end
 end
 
 @testset "EW beta descriptors: the number type comes from the data" begin
-    Xi = [1 2
-          -1 0
-          1 1
-          2 -1
-          0 3]
-    W = [1.0 2.0
-         3.0 4.0
-         5.0 6.0
-         1.0 1.0
-         2.0 1.0]
-    amsk = trues(5, 2)
-    amsk[3, 2] = false
-    rdi = ewb_hand_panel(Xi, W; amsk = amsk)
-    rdf = ewb_hand_panel(Float64.(Xi), W; amsk = amsk)
-    @testset "Integer returns give the Descriptor of the same returns as floats" begin
-        @test isequal(descriptor(EWMarketBeta(; half_life = 1), rdi),
-                      descriptor(EWMarketBeta(; half_life = 1), rdf))
-        @test isequal(descriptor(EWMarketBeta(; half_life = 1, agg_obs = 2), rdi),
-                      descriptor(EWMarketBeta(; half_life = 1, agg_obs = 2), rdf))
-        @test isequal(descriptor(EWDownsideBeta(; half_life = 1), rdi),
-                      descriptor(EWDownsideBeta(; half_life = 1), rdf))
-        @test isequal(descriptor(EWMacroSensitivity(; half_life = 1, agg_obs = 2), rdi;
-                                 ref = [1, 0, -1, 2, 1]),
-                      descriptor(EWMacroSensitivity(; half_life = 1, agg_obs = 2), rdf;
-                                 ref = [1.0, 0.0, -1.0, 2.0, 1.0]))
-    end
-    @testset "The helpers float an integer and keep every other type" begin
-        A = PortfolioOptimisers.ew_agg_series([1 2; 3 4], 2)
-        @test A == [2.0 3.0]
-        @test eltype(A) == Float64
+    # Issue #1972 removed the integer case: integer data convert at the carrier.
+    @testset "The helpers keep every non-integer type" begin
         R = PortfolioOptimisers.ew_agg_series([1//2 1//3; 1//4 1//5], 2)
         @test R == [3//8 4//15]
         @test eltype(R) == Rational{Int}
         @test eltype(PortfolioOptimisers.ew_agg_series(Float32[1 2; 3 4], 2)) == Float32
-        @test isequal(PortfolioOptimisers.ew_beta_expand([1 2; 3 4], 3, 2),
-                      [NaN NaN; 1.0 2.0; 1.0 2.0])
         @test PortfolioOptimisers.ew_beta_expand([1//2 1//3; 1//4 1//5], 2, 1) ==
               [1//2 1//3; 1//4 1//5]
-        # The kernels run from a new state, as the batch call does.
-        function downside(X, rm, mar)
-            st = PortfolioOptimisers.ew_downside_beta_state(nothing, X, rm, 0.5)
-            return PortfolioOptimisers.ew_downside_beta_series!(st, X, rm, 0.5, 1, mar,
-                                                                1e-12).B
-        end
-        B = downside([1 2; -1 0], [1, -1], 0)
-        @test eltype(B) == Float64
-        @test B ≈ downside([1.0 2.0; -1.0 0.0], [1.0, -1.0], 0.0) nans = true
-        function partial(X, rm, rf)
-            st = PortfolioOptimisers.ew_macro_sensitivity_state(X, rm, rf, 0.5)
-            return PortfolioOptimisers.ew_macro_sensitivity_series!(st, X, rm, rf, 0.5, 1,
-                                                                    1e-12).B
-        end
-        M = partial([1 2; -1 0; 2 1], [1, -1, 0], [1, 0, 2])
-        @test isequal(M,
-                      partial([1.0 2.0; -1.0 0.0; 2.0 1.0], [1.0, -1.0, 0.0],
-                              [1.0, 0.0, 2.0]))
-        Bi, Vi = PortfolioOptimisers.ew_beta_series([1 2; -1 0; 2 1], [1, -1, 0], 0.5, 1,
-                                                    1e-12)
-        Bf, Vf = PortfolioOptimisers.ew_beta_series([1.0 2.0; -1.0 0.0; 2.0 1.0],
-                                                    [1.0, -1.0, 0.0], 0.5, 1, 1e-12)
-        @test isequal(Bi, Bf)
-        @test isequal(Vi, Vf)
-        V = PortfolioOptimisers.ew_beta_residual_variance([1 2; -1 0; 2 1], [1, -1, 0],
-                                                          [1 2; 1 1; 1 1], 0.5, 1)
+        V = PortfolioOptimisers.ew_beta_residual_variance([1.0 2.0; -1.0 0.0; 2.0 1.0],
+                                                          [1.0, -1.0, 0.0],
+                                                          [1.0 2.0; 1.0 1.0; 1.0 1.0], 0.5,
+                                                          1)
         @test V[2, :] ≈ [0.5 * (-1 - 1 * -1)^2, 0.5 * (0 - 2 * -1)^2]
         @test eltype(V) == Float64
     end

@@ -42,7 +42,7 @@ end
 
 Return the element type that holds the stored type `T` and the policy value `v` of a read.
 
-[`panel_field_values`](@ref) and [`feature_matrix`](@ref) derive the element type of their answer through this function. The type is derived from the two arguments, and never forced. A policy of `nothing` writes no cell, so it keeps `T`. An integer value keeps `T` too. The value converts to `T` only when it writes a cell, so `T` must hold it. A value of `-1` in an unsigned type raises an `InexactError` there. Any other value, such as `NaN` or `0.5`, needs a type that holds a fraction. It floats an integer `T` through [`float_if_integer`](@ref) and keeps every other `T`. A `Float32` field read with `NaN` stays `Float32`.
+[`panel_field_values`](@ref) and [`feature_matrix`](@ref) derive the element type of their answer through this function. The type is derived from the two arguments, and never forced. A policy of `nothing` writes no cell, so it keeps `T`. An integer value keeps `T` too. The value converts to `T` only when it writes a cell, so `T` must hold it. A value of `-1` in an unsigned type raises an `InexactError` there. Any other value, such as `NaN` or `0.5`, needs a type that holds a fraction. It floats an integer `T` through [`float_if_integer`](@ref) and keeps every other `T`. A numeric Panel Field holds floating-point values, so the integer case is the codes of a [`CategoricalPanelField`](@ref), whose natural type is an integer. A `Float32` field read with `NaN` stays `Float32`.
 
 # Algorithm
 
@@ -210,10 +210,10 @@ julia> panel_field_values(pnl, \"mcap\"; inactive = NaN)
  5.0    6.0
 
 julia> panel_field_values(pnl, \"mcap\"; inactive = 0, unobserved = nothing)
-3×2 Matrix{Int64}:
- 1  0
- 3  4
- 5  6
+3×2 Matrix{Float64}:
+ 1.0  0.0
+ 3.0  4.0
+ 5.0  6.0
 ```
 
 # Related

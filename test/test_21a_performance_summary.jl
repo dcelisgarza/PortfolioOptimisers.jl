@@ -947,7 +947,6 @@ end
     @test number_effective_assets(ER_W) ≈ inv(sum(abs2, ER_W))
     # A book with no position holds no asset.
     @test isnan(number_effective_assets(zeros(3)))
-    @test number_effective_assets([1, -1]) == 2
 
     X = ER_X[:, 1:3]
     ls = [0.65, 0.65, -0.3]
@@ -955,11 +954,10 @@ end
     @test ps.long_exposure ≈ 1.3 && ps.short_exposure ≈ 0.3
     @test ps.gross_exposure ≈ 1.6 && ps.net_exposure ≈ 1.0
     @test ps.n_eff ≈ number_effective_assets(ls)
-    # A dollar-neutral book has a net exposure of zero, and an integer book keeps its type.
-    dn = performance_summary([1, -1, 0], X)
+    # A dollar-neutral book has a net exposure of zero. Issue #1972 removed the integer
+    # case: integer weights are outside the domain.
+    dn = performance_summary([1.0, -1.0, 0.0], X)
     @test dn.net_exposure == 0 && dn.gross_exposure == 2 && dn.n_eff == 2
-    ws = PO.weight_statistics([1, -1, 0])
-    @test ws.long_exposure isa Int && ws.short_exposure === 1
     # A long-only book with a budget of one.
     lo = performance_summary(ER_W, ER_X)
     @test lo.long_exposure ≈ 1 && lo.short_exposure == 0

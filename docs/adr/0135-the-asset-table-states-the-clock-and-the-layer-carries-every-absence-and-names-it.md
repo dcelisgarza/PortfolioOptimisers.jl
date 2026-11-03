@@ -249,3 +249,22 @@ number type is free to define its division in a different type, and
 states do not change: `Float32` answers itself, `Int` answers `Float64`, `BigInt` answers
 `BigFloat`, and a `Rational` answers itself. A number type the library has not seen now answers
 itself, and `absent_value` refuses it by name when it cannot hold an absence.
+
+## Amendment (2026-11-03)
+
+Issue #1972. The maintainer ruled that integer data are supported only where an integer is the
+natural type of the data: share counts and lot sizes, cardinalities, counts and indices, `ddof`,
+`Bool` masks, the codes of a `CategoricalPanelField`, and the `Int` result of
+`phylogeny_matrix`. The continuous kernels, which read returns, prices, exposures, weights,
+moments, regressions and distances, no longer repair an integer type. They take the type of their
+data with `eltype`.
+
+So the layer is one of the few entry points of integer data, and this record keeps its answers:
+`absence_type` still floats an integer price type through `float_if_integer`, and `Int` answers
+`Float64`. The other entry points are the carriers that a user builds by hand: `ReturnsResult`,
+`PricesResult`, `NumericPanelField` and `TensorPanelField`. Each converts an integer element type
+once, at construction, through the array method of `float_if_integer`, and keeps every other array
+as it is. The amendment of 2026-09-26 called `float_if_integer` the one guard of every site. It is
+now the one guard of the entry points, and `test/test_55_numeric_coercion_census.jl` holds the list
+of the files that may call it. A verb called with a bare integer matrix is outside the supported
+domain. `Rational` is a separate decision, and this amendment does not take it.

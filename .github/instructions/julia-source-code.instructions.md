@@ -159,16 +159,33 @@ through a change here. Every forced type closes the library to one of them.
 ```julia
 Tf = eltype(X)                                  # the element type of one argument
 Tf = promote_type(real(eltype(X)), typeof(p))   # the element type of several
-Tf = float_if_integer(eltype(X))                # the same, when an integer must be repaired
 ```
 
-**Repair an integer type with `float_if_integer`, and with nothing else.** An integer element
-type cannot hold a mean, a variance, a weight or a `NaN`, so a site whose data can be an integer
-must widen that one type. Take the type of the data, and pass it to `float_if_integer` in
+**Integer data are supported only where an integer is the natural type of the data** (#1972).
+An integer stays where it is the natural type: share counts and lot sizes of the finite
+allocators, cardinalities, integer programming, `ddof`, counts and indices, the codes of a
+`CategoricalPanelField`, `Bool` masks, the `Int` result of `phylogeny_matrix`, and the integer
+count of a metric such as `Hamming`. An integer goes from the continuous kernels: returns, prices,
+exposures, weights, moments, regressions, distances and their diagnostics. An integer there holds
+no mean, variance, weight or `NaN`, so integer data make no sense in those kernels.
+
+**Integer data enter at one place.** The carriers that a user builds convert an integer element
+type once, at construction: `ReturnsResult`, `PricesResult`, `NumericPanelField`,
+`TensorPanelField`, and the price ingestion layer. They call `float_if_integer` in
 [`src/02_Tools/03_TypeUtilities.jl`](../../src/02_Tools/03_TypeUtilities.jl). It returns the
-floating-point type of `T` when `T <: Integer`, and `T` itself for every other type. So an
-integer panel computes in `Float64`, a `Float32` panel stays in `Float32`, and a `Rational`
-panel stays exact. That function holds the one call of `float` in `src/` and `ext/`.
+floating-point type of `T` when `T <: Integer`, and `T` itself for every other type, and its array
+method returns a float copy of an integer array and every other array itself. So a `Float32` panel
+stays in `Float32`, and a `Rational` panel stays exact. That function holds the one call of
+`float` in `src/` and `ext/`.
+
+**A continuous kernel does not repair an integer.** It takes the type of its data with `eltype`
+and `promote_type`, and it does not call `float_if_integer`. A verb called with a bare integer
+matrix is outside the supported domain, and it needs no guard. A verb that gives a wrong answer
+silently for an integer input, rather than raise, takes a refusal in its constructor or at its
+entry. A site whose integer is a natural type, such as the codes of a categorical field filled
+with a fraction, still calls `float_if_integer` on that type.
+`test/test_55_numeric_coercion_census.jl` holds the list of the files that call it, so a new call
+is a decision that the reviewer sees.
 
 **Do not repair an integer type with `float`.** `float(Int)` is `Float64`, so one integer
 argument inside a `promote_type` widens the whole computation to `Float64`, and a `Float32` caller
@@ -185,7 +202,7 @@ returns after the census refused `float(`, and each such repair was reverted.
 
 **Derive from the operation only when the operation leaves every type.** A square root of a
 `Rational` is not a `Rational`, so a site that stores a square root takes
-`typeof(sqrt(one(float_if_integer(T))))`. A site that answers `NaN` for the other branch of a
+`typeof(sqrt(one(T)))`. A site that answers `NaN` for the other branch of a
 real quotient `a / b` takes `oftype(one(a) / one(b), NaN)`, because that value is a quotient.
 Neither is a repair of an integer input.
 

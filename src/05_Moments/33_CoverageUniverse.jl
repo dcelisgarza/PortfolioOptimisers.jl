@@ -1018,11 +1018,11 @@ A plain fold has one observation count for every asset, so it cannot skip one ce
 # Validation
 
   - `active_mask` must have the size of `x`.
-  - The type that [`float_if_integer`](@ref) gives for the element type of `x` must hold `NaN`. A `Rational` raises an `ArgumentError`.
+  - The element type of `x` must hold `NaN`. An `Integer` or a `Rational` raises an `ArgumentError`.
 
 # Returns
 
-  - `x` itself when `active_mask` is `nothing`, and otherwise a copy of `x` that carries `NaN` at each inactive cell. The copy takes the type of the data through [`float_if_integer`](@ref).
+  - `x` itself when `active_mask` is `nothing`, and otherwise a copy of `x` that carries `NaN` at each inactive cell. The copy takes the element type of `x`.
 
 # Related
 
@@ -1036,7 +1036,7 @@ end
 function inactive_as_nonfinite(x::ArrNum, active_mask::AbstractArray{<:Bool})
     @argcheck(size(active_mask) == size(x),
               DimensionMismatch("the active mask names one cell of the sample at each entry, so it must have the size of the sample, got $(size(active_mask)) for the active mask against $(size(x)) for the sample"))
-    xg = coverage_nan_frame(similar(x, float_if_integer(eltype(x))))
+    xg = coverage_nan_frame(similar(x, eltype(x)))
     xg .= ifelse.(active_mask, x, xg)
     return xg
 end
@@ -1074,13 +1074,13 @@ Allocate the `NaN` frame of a point-in-time variance series, and read the active
 
 Row `t` of the series is a fit on rows `1` to `t` of `X` and of the active mask, so the series pairs the two by position, and the mask must have the size of `X`. [`coverage_mask`](@ref) pairs no rows, and it lets the two observation axes differ.
 
-A variance divides, so the frame takes [`float_if_integer`](@ref) of the element type of `X`. An integer sample gives a `Float64` frame, and a `Float32` sample gives a `Float32` frame. A `Rational` sample keeps its type, which has no `NaN`, so [`coverage_nan_frame`](@ref) refuses it.
+A variance divides, so the frame takes the element type of `X`. A `Float32` sample gives a `Float32` frame. A `Rational` sample keeps its type, which has no `NaN`, so [`coverage_nan_frame`](@ref) refuses it.
 
 # Algorithm
 
  1. Read `amsk`, the active mask of `pnl`, with [`panel_moment_masks`](@ref).
  2. Check that `amsk` has the size of `X` when the panel carries one.
- 3. Allocate an array of the size of `X` with the element type [`float_if_integer`](@ref) of `eltype(X)`, and give it to [`coverage_nan_frame`](@ref), which refuses a type with no `NaN` and returns `val`, the array filled with `NaN`.
+ 3. Allocate an array of the size of `X` with the element type `eltype(X)`, and give it to [`coverage_nan_frame`](@ref), which refuses a type with no `NaN` and returns `val`, the array filled with `NaN`.
 
 # Arguments
 
@@ -1100,13 +1100,12 @@ A variance divides, so the frame takes [`float_if_integer`](@ref) of the element
 
   - [`coverage_variance_series`](@ref)
   - [`panel_moment_masks`](@ref)
-  - [`float_if_integer`](@ref)
 """
 function coverage_series_frame(X::MatNum, pnl::Option{<:AssetPanel})
     amsk, _ = panel_moment_masks(pnl)
     @argcheck(isnothing(amsk) || size(amsk) == size(X),
               DimensionMismatch("a variance series pairs row t of the active mask of the Asset Panel with row t of the returns matrix, so the two must be the same size, got $(size(X)) for X, oriented to observations × assets, against $(isnothing(amsk) ? nothing : size(amsk)) for pnl.amsk"))
-    val = coverage_nan_frame(similar(X, float_if_integer(eltype(X)), size(X)))
+    val = coverage_nan_frame(similar(X, eltype(X), size(X)))
     return val, amsk
 end
 """

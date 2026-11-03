@@ -1410,10 +1410,9 @@ end
         @test isnan(PO.attribution_safe_corr(0.1, 0.0, 0.2))
         @test isnan(PO.attribution_safe_corr(0.1, NaN, 0.2))
     end
-    @testset "Integer weights and an integer ppy keep the float type of the data" begin
-        fi = factor_attribution([1, 0, 0], pr)
-        @test fi.total.vol ≈ sqrt(pr.sigma[1, 1])
-        @test fi.sys.mu_contrib ≈ dot(B[1, :], muf)
+    @testset "An integer ppy keeps the float type of the data" begin
+        # Issue #1972 removed the integer-weight case: integer weights are outside the
+        # domain.
         f32 = factor_attribution(Float32[0.5, 0.3, 0.2], fa_hand_prior(; T = Float32);
                                  assets = true)
         # The default `ppy = 1` is an `Int`, and its bare square root is a `Float64`. The scale

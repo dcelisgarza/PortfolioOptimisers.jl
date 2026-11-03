@@ -528,7 +528,7 @@ Where:
 # Algorithm
 
  1. Resolve `w` against `Z` with [`collapse_weights`](@ref) to get a weight vector with one entry per observation, or `nothing`.
- 2. Allocate the accumulator `D` and the buffer `Dt` for one observation, both `assets × assets`, and set the weight total `sw` to zero. Their element type `T` is the result type of the metric, promoted with the type of the weights and passed through [`float_if_integer`](@ref). So a metric with an integer result on a window of integers, such as `Distances.Cityblock`, gives a matrix of floating point numbers, and a `Rational` window gives an exact one.
+ 2. Allocate the accumulator `D` and the buffer `Dt` for one observation, both `assets × assets`, and set the weight total `sw` to zero. Their element type `T` is the result type of the metric, promoted with the type of the weights and passed through [`float_if_integer`](@ref). A metric that counts, such as `Distances.Hamming`, has an integer result type on floating-point features. The weighted mean of counts is a fraction, so such a metric gives a matrix of floating point numbers. A `Rational` window gives an exact matrix.
  3. For each observation `t`, measure that slice of `Z` into `Dt`, and apply the convention for a zero feature vector to `Dt`. Then add `wt .* Dt` to `D`, and add `wt` to `sw`. The weight `wt` of the observation is `one(T)` when `w` is `nothing`.
  4. Divide `D` by `sw`. The result is the convex combination of the distance matrices of the observations.
 
@@ -1240,7 +1240,8 @@ function feature_distance(de::FeatureDistance{<:Any, <:AggregateDistances}, Z::A
                           dims::Integer)
     w = collapse_weights(de.alg.w, Z)
     metric = de.metric
-    #! The result is a weighted mean, so an integer distance or weight needs a float type.
+    #! The result is a weighted mean, so the integer count of a metric such as `Hamming`
+    #! needs a float type.
     Td = Distances.result_type(metric, eltype(Z), eltype(Z))
     T = float_if_integer(isnothing(w) ? Td : promote_type(Td, eltype(w)))
     N = size(Z, dims == 1 ? 2 : 3)

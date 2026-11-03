@@ -75,7 +75,7 @@ end
 
 Gather the design, the target and the weights of one observation of an [`ExpWeightedReturnForecast`](@ref).
 
-The function copies the three arrays into their promoted element type, so the accumulation reads one number type.
+The function copies the rows of the valid assets. Each array keeps its own element type.
 
 # Arguments
 
@@ -97,9 +97,8 @@ The function copies the three arrays into their promoted element type, so the ac
 """
 function ew_forecast_design(S::Arr3Num, y::MatNum, W::MatNum, t::Integer,
                             valid::AbstractMatrix{Bool})
-    Tf = promote_type(real(eltype(S)), real(eltype(y)), real(eltype(W)))
     idx = findall(view(valid, t, :))
-    return Tf.(view(S, t, idx, :)), Tf.(view(y, t, idx)), Tf.(view(W, t, idx))
+    return S[t, idx, :], y[t, idx], W[t, idx]
 end
 """
     ew_forecast_accumulate!(A::AbstractMatrix{<:Real}, c::AbstractVector{<:Real},

@@ -504,33 +504,20 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
     @testset "the numeric types" begin
         rng9 = StableRNG(13572468)
         Tn, Nn, Kn = 3, 7, 2
-        Bi = rand(rng9, -3:3, Tn, Nn, Kn)
-        Bi[:, :, 1] .= 1
-        fi = rand(rng9, -3:3, Tn, Kn)
-        ei = rand(rng9, -3:3, Tn, Nn)
-        wi = rand(rng9, 1:3, Tn, Nn)
-        Bf, ff, ef, wf = float.(Bi), float.(fi), float.(ei), float.(wi)
-        # An integer history keeps an exact Gram history, and an integer weight scales it.
-        @test cs_gram(Bi, wi) isa Array{Int, 3}
-        @test cs_gram(Bi, wi) == cs_gram(Bf, wf)
-        # Every other verb answers in `Float64`, and agrees with the float history.
-        @test exposure_vif(Bi, wi) ≈ exposure_vif(Bf, wf)
-        @test exposure_condition_number(Bi, wi) ≈ exposure_condition_number(Bf, wf)
-        @test cs_regression_t_stats(Bi, fi, ei, wi) ≈ cs_regression_t_stats(Bf, ff, ef, wf)
-        for verb in (cs_regression_r2, cs_regression_adjusted_r2, cs_regression_aic,
-                     cs_regression_bic)
-            @test verb(Bi, fi, ei, wi) isa Vector{Float64}
-            @test verb(Bi, fi, ei, wi) ≈ verb(Bf, ff, ef, wf)
-        end
-        @test cs_regression_t_stat_exceedance_rate([3 1; 1 1]) == [0.5, 0.0]
+        # Issue #1972 removed the integer history: integer data convert at the carrier.
+        Bf = float.(rand(rng9, -3:3, Tn, Nn, Kn))
+        Bf[:, :, 1] .= 1
+        ff = float.(rand(rng9, -3:3, Tn, Kn))
+        ef = float.(rand(rng9, -3:3, Tn, Nn))
+        wf = float.(rand(rng9, 1:3, Tn, Nn))
         # A `Rational` history keeps its Gram history and its scores exact. The
         # decomposition and the logarithm answer in `Float64`.
-        Br, fr, er = Rational{Int}.(Bi), Rational{Int}.(fi), ei .// 7
+        Br, fr, er = Rational{Int}.(Bf), Rational{Int}.(ff), Rational{Int}.(ef) .// 7
         @test cs_gram(Br) isa Array{Rational{Int}, 3}
         @test cs_regression_r2(Br, fr, er) isa Vector{Rational{Int}}
-        @test cs_regression_r2(Br, fr, er) ≈ cs_regression_r2(Bf, ff, ei ./ 7)
+        @test cs_regression_r2(Br, fr, er) ≈ cs_regression_r2(Bf, ff, ef ./ 7)
         @test exposure_vif(Br, nothing) ≈ exposure_vif(Bf, nothing)
-        @test cs_regression_aic(Br, fr, er) ≈ cs_regression_aic(Bf, ff, ei ./ 7)
+        @test cs_regression_aic(Br, fr, er) ≈ cs_regression_aic(Bf, ff, ef ./ 7)
         @test cs_regression_t_stat_exceedance_rate([3//1 1; 1 1]) == [1//2, 0]
         # A `Float32` history stays `Float32`.
         B32, f32, e32, w32 = Float32.(Bf), Float32.(ff), Float32.(ef), Float32.(wf)
@@ -1224,33 +1211,20 @@ using Statistics
 
     @testset "the verbs derive their types from the data" begin
         rng10 = StableRNG(3842)
-        Bi = rand(rng10, -3:3, 8, 5, 2)
-        Ri = rand(rng10, -3:3, 8, 5)
-        Bf = float.(Bi)
-        Rf = float.(Ri)
-        # An integer panel answers in `Float64`, with the numbers of the same panel in floats.
-        @test exposure_correlation(Bi) ≈ exposure_correlation(Bf)
-        @test isequal(exposure_ic(Bi, Ri), exposure_ic(Bf, Rf))
-        @test isequal(exposure_ic(Bi, Ri; rank = false), exposure_ic(Bf, Rf; rank = false))
-        @test isequal(exposure_stability(Bi; step = 2), exposure_stability(Bf; step = 2))
-        @test exposure_dispersion(Bi) ≈ exposure_dispersion(Bf)
-        @test exposure_coverage(Bi) == exposure_coverage(Bf)
-        @test PortfolioOptimisers.cs_ranks([3, 1, 1, 2], trues(4), :average) ==
-              [4.0, 1.5, 1.5, 3.0]
-        ici = rand(rng10, -1:1, 6, 2)
-        @test isequal(exposure_ic_summary(ici; lags = 1, mt = OverlapMeanTest()),
-                      exposure_ic_summary(float.(ici); lags = 1, mt = OverlapMeanTest()))
+        # Issue #1972 removed the integer panel: integer data convert at the carrier.
+        Bf = float.(rand(rng10, -3:3, 8, 5, 2))
+        Rf = float.(rand(rng10, -3:3, 8, 5))
+        icf = float.(rand(rng10, -1:1, 6, 2))
         # A `Rational` panel keeps its means exact, and a square root answers in `Float64`.
-        Rr = Rational{Int}.(Ri)
+        Rr = Rational{Int}.(Rf)
         @test PortfolioOptimisers.exposure_forward_mean_return(Rr, 2) isa
               Matrix{Rational{Int}}
-        @test exposure_coverage(Rational{Int}.(Bi)) isa Vector{Rational{Int}}
-        sr = exposure_ic_summary(Rational{Int}.(ici); lags = 1, mt = OverlapMeanTest())
+        @test exposure_coverage(Rational{Int}.(Bf)) isa Vector{Rational{Int}}
+        sr = exposure_ic_summary(Rational{Int}.(icf); lags = 1, mt = OverlapMeanTest())
         @test sr.mean_ic isa Vector{Rational{Int}}
         @test sr.hit_rate isa Vector{Rational{Int}}
-        @test sr.std_ic ≈
-              exposure_ic_summary(float.(ici); lags = 1, mt = OverlapMeanTest()).std_ic
-        @test exposure_correlation(Rational{Int}.(Bi)) ≈ exposure_correlation(Bf)
+        @test sr.std_ic ≈ exposure_ic_summary(icf; lags = 1, mt = OverlapMeanTest()).std_ic
+        @test exposure_correlation(Rational{Int}.(Bf)) ≈ exposure_correlation(Bf)
         # A `Float32` panel stays in `Float32`.
         B32 = Float32.(Bf)
         R32 = Float32.(Rf)
@@ -1682,11 +1656,7 @@ end
     @testset "An inactive cell is NaN across every level" begin
         @test all(isnan, factor_exposure(xe, rd)[2, 2, :])
     end
-    @testset "Integer returns take a float exposure, which holds the inactive NaN" begin
-        # The levels used to take the element type of the returns, so integer returns threw
-        # `InexactError: Int64(NaN)` at the first inactive cell.
-        rdi = ReturnsResult(; nx = rd.nx, X = zeros(Int, 2, 2), pnl = rd.pnl)
-        @test isequal(factor_exposure(xe, rdi), factor_exposure(xe, rd))
+    @testset "Float32 returns take a Float32 exposure" begin
         rdf = ReturnsResult(; nx = rd.nx, X = zeros(Float32, 2, 2), pnl = rd.pnl)
         @test eltype(factor_exposure(xe, rdf)) == Float32
     end
@@ -1726,11 +1696,7 @@ end
         L = factor_exposure(ConstantExposure(), rd)
         @test isequal(L, [1.0 1.0; 1.0 NaN])
     end
-    @testset "Integer returns take a float exposure, which holds the inactive NaN" begin
-        # The ones used to take the element type of the returns, so integer returns threw
-        # `InexactError: Int64(NaN)` at the first inactive cell.
-        rdi = ReturnsResult(; nx = rd.nx, X = zeros(Int, 2, 2), pnl = rd.pnl)
-        @test isequal(factor_exposure(ConstantExposure(), rdi), [1.0 1.0; 1.0 NaN])
+    @testset "Float32 returns take a Float32 exposure" begin
         rdf = ReturnsResult(; nx = rd.nx, X = zeros(Float32, 2, 2), pnl = rd.pnl)
         @test eltype(factor_exposure(ConstantExposure(), rdf)) == Float32
     end
@@ -2051,7 +2017,7 @@ using Statistics
         @test all(isnan, (m.m2, m.m3, m.m4))
     end
 
-    @testset "a constant cross-section, an infinite entry and an integer input" begin
+    @testset "a constant cross-section and an infinite entry" begin
         # A cross-section of equal non-zero values has no skewness and no kurtosis. Its mean
         # carries round-off, so a centred moment computed from it is often a tiny positive
         # number and not zero: before the exact test, 4195 of 20000 such rows of 3 to 7
@@ -2067,13 +2033,6 @@ using Statistics
         # An infinite entry enters neither the count nor the sum of the tail rate, so the
         # rate over the finite entries 0.5, 4 and -5 is two in three, never one.
         @test idio_tail_rate([Inf 0.5 4.0 NaN -5.0]) == [2 / 3]
-        # An integer history answers in floating point rather than raising `InexactError`.
-        e_int = [1 -2 3 0; 3 4 -1 2; 0 1 2 -3]
-        v_int = [1 4 1 0; 1 0 4 1; 1 1 1 1]
-        z_int = standardised_idio_returns(e_int, v_int; ahead = false)
-        @test eltype(z_int) == Float64
-        @test isequal(z_int, [1.0 -1.0 3.0 NaN; 3.0 NaN -0.5 2.0; 0.0 1.0 2.0 -3.0])
-        @test idio_calibration([1 2 3; 4 5 7]) ≈ [1.0, std([4, 5, 7])]
         # A Float32 history keeps its element type through every series.
         rng32 = StableRNG(7)
         e32 = randn(rng32, Float32, 6, 9)
@@ -2573,24 +2532,12 @@ using Statistics
                                                                                4, 1))[1])
     end
 
-    @testset "an integer history" begin
-        # An integer series holds neither a mean nor a NaN, so it computes in floating point
-        # and gives the answers of the same series in Float64.
-        fi = [1 2; 3 5; 4 1; 2 2]
-        ri, vi, si = PortfolioOptimisers.factor_summary_return_stats(fi, 12)
-        rf, vf, sf = PortfolioOptimisers.factor_summary_return_stats(Float64.(fi), 12)
-        @test ri == rf && vi == vf && si == sf
-        @test eltype(ri) == Float64
-        @test PortfolioOptimisers.factor_summary_autocorrelation(fi) ==
-              PortfolioOptimisers.factor_summary_autocorrelation(Float64.(fi))
-        Mi = reshape([1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 1], 2, 3, 2)
-        @test PortfolioOptimisers.factor_summary_exposure_variance(Mi, 1, 1) ≈ 2 / 9
-        @test PortfolioOptimisers.factor_summary_mapped([1, 2], [2, 0]) isa Vector{Float64}
-        # A Float32 history stays in Float32.
-        r32, v32, s32 = PortfolioOptimisers.factor_summary_return_stats(Float32.(fi), 12)
+    @testset "a Float32 history" begin
+        # Issue #1972 removed the integer case: integer data convert at the carrier.
+        fi = Float32[1 2; 3 5; 4 1; 2 2]
+        r32, v32, s32 = PortfolioOptimisers.factor_summary_return_stats(fi, 12)
         @test eltype(r32) == eltype(v32) == eltype(s32) == Float32
-        @test eltype(PortfolioOptimisers.factor_summary_autocorrelation(Float32.(fi))) ==
-              Float32
+        @test eltype(PortfolioOptimisers.factor_summary_autocorrelation(fi)) == Float32
     end
 end
 

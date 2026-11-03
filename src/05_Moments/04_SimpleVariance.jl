@@ -380,7 +380,7 @@ function coverage_variance(f::F, ve::SimpleVariance, cvg::CoveragePolicy, X::Vec
     @argcheck(isnothing(mean),
               ArgumentError("an available-case variance centres each asset on that asset's own observations, so it cannot take a centre fitted over the whole window. Pass `mean = nothing`, or clear `cvg`."))
     Xf = filter(isfinite, X)
-    Tf = float_if_integer(eltype(X))
+    Tf = eltype(X)
     return if length(Xf) - ve.corrected < 1 ||
               !admits(cvg.alg, length(Xf) / max(length(X), 1), true, 0, cvg.min_coverage)
         Tf(NaN)
@@ -1178,14 +1178,13 @@ The seed is in this function and not in [`partial_fit!`](@ref), so the fold is o
 """
 function variance_state_seed(::Nothing, x::VecNum, cvg::Option{<:CoveragePolicy} = nothing)
     N = length(x)
-    Tf = float_if_integer(eltype(x))
+    Tf = eltype(x)
     return SimpleVarianceState(0, zeros(Tf, N), zeros(Tf, N),
                                coverage_counts_seed(cvg, nothing, N, Tf, false))
 end
 function variance_state_seed(cache::SimpleVarianceState, x::VecNum,
                              cvg::Option{<:CoveragePolicy} = nothing)
-    counts = coverage_counts_seed(cvg, cache.cvg, length(x), float_if_integer(eltype(x)),
-                                  false)
+    counts = coverage_counts_seed(cvg, cache.cvg, length(x), eltype(x), false)
     return if counts === cache.cvg
         cache
     else

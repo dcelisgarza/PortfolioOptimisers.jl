@@ -237,19 +237,12 @@ end
     end
 
     @testset "The pair is scored in its own element type, which must hold a fraction and NaN" begin
-        # The evaluation neither converts nor refuses a pair by its type, so an integer pair
-        # fails where a statistic first writes a fraction or a NaN, and a caller converts it.
-        ai = rand(StableRNG(1), -5:5, 30, 8)
-        yi = rand(StableRNG(2), -5:5, 30, 8)
+        # The evaluation neither converts nor refuses a pair by its type. Issue #1972
+        # removed the integer pair: integer data convert at the carrier.
+        ai = float.(rand(StableRNG(1), -5:5, 30, 8))
+        yi = float.(rand(StableRNG(2), -5:5, 30, 8))
         umsk = rand(StableRNG(3), Bool, 30, 8)
-        fe = forecast_evaluation(ai, yi)
-        @test eltype(fe.alpha) == Int
-        @test_throws InexactError forecast_ic(fe)
-        @test_throws InexactError forecast_portfolio(fe)
-        @test_throws InexactError forecast_calibration(fe)
-        @test_throws InexactError forecast_quantile_spread(fe)
-        @test_throws InexactError forecast_evaluation(ai, yi; umsk = umsk)
-        @test eltype(forecast_ic(forecast_evaluation(float.(ai), float.(yi)))) == Float64
+        @test eltype(forecast_ic(forecast_evaluation(ai, yi))) == Float64
 
         fe32 = forecast_evaluation(Float32.(ai), Float32.(yi); umsk = umsk)
         @test eltype(fe32.alpha) == Float32

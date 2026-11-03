@@ -1930,10 +1930,6 @@ end
 Issue #828 swept `10_Base_CrossSectionalFactorPrior.jl`. Each testset below checks one closed form
 that a docstring of that file states, against a loop that writes the form out. The fixtures are
 small random arrays, so each check reads one helper alone.
-
-The integer testset fails on the code before the sweep. `cross_sectional_exposure_history`
-allocated the exposure history in the element type of the returns, so integer returns threw
-`InexactError` at the first fractional exposure.
 =#
 @testset "The docstrings of 10_Base_CrossSectionalFactorPrior.jl against numbers" begin
     PO = PortfolioOptimisers
@@ -2209,21 +2205,15 @@ allocated the exposure history in the element type of the returns, so integer re
               rep.sigma
         @test isnothing(PO.assert_systematic_repair(nothing, mp))
     end
-    @testset "Integer returns fit, and equal the fit of their float copy" begin
+    @testset "A non-investable asset carries NaN in every scenario" begin
+        # Issue #1972 removed the integer case: integer data convert at the carrier.
         rd = csfp_panel(; n_assets = 40, n_observations = 80, n_industries = 3,
                         seed = 828_002).rd
-        rdi = ReturnsResult(; nx = rd.nx,
-                            X = map(x -> isfinite(x) ? round(Int, 100 * x) : 0, rd.X),
+        rdf = ReturnsResult(; nx = rd.nx,
+                            X = map(x -> isfinite(x) ? round(100 * x) : 0.0, rd.X),
                             pnl = rd.pnl)
-        rdf = ReturnsResult(; nx = rd.nx, X = Float64.(rdi.X), pnl = rd.pnl)
         pe = CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors(), minra = 5)
-        pint = prior(pe, rdi)
         pflt = prior(pe, rdf)
-        @test eltype(pint.rr.Ms) == Float64
-        @test isequal(pint.mu, pflt.mu)
-        @test isequal(pint.sigma, pflt.sigma)
-        @test isequal(pint.X, pflt.X)
-        @test isequal(pint.rr.Ms, pflt.rr.Ms)
         # A non-investable asset carries NaN in every scenario, as it does on the diagonal of
         # sigma: its latest exposures or its latest idiosyncratic variance are NaN.
         j = setdiff(eachindex(pflt.mu), csfp_investable(pflt))

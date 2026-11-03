@@ -25,11 +25,14 @@ whole repository.
   `real` and `promote_type`, or off the operation that widens it, and take an index with the
   in-function conversion `ceil(Int, x)` rather than `Int(ceil(x))`. Never wrap a derived type in
   `float`, and never read it off a division such as `typeof(one(T) / one(T))`. Both replace a
-  `Rational`, and every other type that needed no repair. When integer data must hold a fraction or
-  a `NaN`, pass the type of the data to `float_if_integer`. It converts an `Integer` to a float
-  type and keeps every other type. The library must stay open to number types it has never seen,
-  such as an AD dual, a unit-carrying quantity, a `Rational`, or a number type that another package
-  defines. Every forced type closes the library to one of them. [`.github/instructions/julia-source-code.instructions.md`](../.github/instructions/julia-source-code.instructions.md)
+  `Rational`, and every other type that needed no repair. Integer data are supported only where an
+  integer is the natural type: share counts, lot sizes, cardinalities, counts, indices, `Bool`
+  masks and the codes of a `CategoricalPanelField`. A continuous kernel (returns, prices, exposures,
+  weights, moments, regressions, distances and their diagnostics) takes the type of its data and
+  never repairs an integer. The carriers that a user builds convert integer data once, at
+  construction, through `float_if_integer` (#1972). The library must stay open to number types it
+  has never seen, such as an AD dual, a unit-carrying quantity, a `Rational`, or a number type
+  that another package defines. Every forced type closes the library to one of them. [`.github/instructions/julia-source-code.instructions.md`](../.github/instructions/julia-source-code.instructions.md)
   § *Numeric types come from the data* owns the rule, and
   `test/test_55_numeric_coercion_census.jl` gates it.
 - **Spell a skipped procedure or a trivial default with `nothing`, never with a singleton.** No

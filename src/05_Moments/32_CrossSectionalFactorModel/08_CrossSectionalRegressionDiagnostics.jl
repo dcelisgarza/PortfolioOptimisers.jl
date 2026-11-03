@@ -93,7 +93,7 @@ Where:
 
  1. Take the mask and the weights with [`cs_estimation_mask_weights`](@ref).
  2. For each observation and each pair of factors ``(k, l)`` with ``k \\le l``, sum ``u_{t,i} \\, B_{t,i,k} \\, B_{t,i,l}`` over the assets inside the mask.
- 3. Copy each sum to the entry ``(l, k)``, so the slice is exactly symmetric. The kernel takes no square root, so an integer or `Rational` history gives an exact Gram history.
+ 3. Copy each sum to the entry ``(l, k)``, so the slice is exactly symmetric. The kernel takes no square root, so a `Rational` history gives an exact Gram history.
 
 # Arguments
 
@@ -219,8 +219,8 @@ Where:
 function cs_gram_inverse_diagonal(G::Arr3Num)
     T = size(G, 1)
     K = size(G, 2)
-    # A decomposition leaves an integer or a `Rational` type, as a square root does.
-    Tf = typeof(sqrt(one(float_if_integer(real(eltype(G))))))
+    # A decomposition leaves a `Rational` type, as a square root does.
+    Tf = typeof(sqrt(one(real(eltype(G)))))
     D = Matrix{Tf}(undef, T, K)
     Gt = Matrix{Tf}(undef, K, K)
     for t in 1:T
@@ -577,8 +577,7 @@ end
 function cs_regression_design(fcb::FactorFamilyBasis, rule::AbstractUnseenMemberRule,
                               B::Arr3Num, w::Option{<:MatNum}, no::Integer)
     fb = factor_basis_slice(fcb, axes(B, 1))
-    u = cs_estimation_weights_only(w, size(B, 1), size(B, 2),
-                                   float_if_integer(real(eltype(B))))
+    u = cs_estimation_weights_only(w, size(B, 1), size(B, 2), real(eltype(B)))
     ud = unseen_member_design(rule, fb, B, reduce_exposures(fb, B), u)
     ke = 1:(size(ud.Z, 3) - no)
     return (; B = ud.Z[:, :, ke], P = map(p -> first(p) => last(p)[ke, ke], ud.P))
@@ -714,9 +713,8 @@ function cs_regression_t_stats(B::Arr3Num, f::MatNum, eps::MatNum,
     mask, u = cs_diagnostic_mask_weights(B, eps, w)
     cs_assert_gram(G, B)
     T = size(B, 1)
-    # A decomposition leaves an integer or a `Rational` type, as a square root does.
-    Td = typeof(sqrt(one(float_if_integer(promote_type(real(eltype(B)), real(eltype(u)),
-                                                       cs_gram_eltype(G))))))
+    # A decomposition leaves a `Rational` type, as a square root does.
+    Td = typeof(sqrt(one(promote_type(real(eltype(B)), real(eltype(u)), cs_gram_eltype(G)))))
     D = Matrix{Td}(undef, T, K)
     Tf = promote_type(Td, real(eltype(f)), real(eltype(eps)))
     # The answer starts absent, so an observation the loop skips needs no branch of its own.
@@ -992,7 +990,7 @@ julia> cs_regression_t_stat_exceedance_rate([3.0 1.0; 1.0 1.0; NaN 1.0])
 function cs_regression_t_stat_exceedance_rate(t::MatNum; threshold::Number = 2)
     @argcheck(!isempty(t), IsEmptyError("t cannot be empty"))
     K = size(t, 2)
-    Tf = float_if_integer(real(eltype(t)))
+    Tf = real(eltype(t))
     rate = zeros(Tf, K)
     for k in 1:K
         n = 0
@@ -1070,7 +1068,7 @@ function cs_regression_score_parts(B::Arr3Num, f::MatNum, eps::MatNum, w::Option
               DimensionMismatch("f ($(size(f, 1))×$(size(f, 2))) must match B ($T observations, $K factors)"))
     @argcheck(size(eps, 1) == T && size(eps, 2) == N,
               DimensionMismatch("eps ($(size(eps, 1))×$(size(eps, 2))) must match B ($T×$N on its first two axes)"))
-    Tf = float_if_integer(promote_type(real(eltype(B)), real(eltype(f)), real(eltype(eps))))
+    Tf = promote_type(real(eltype(B)), real(eltype(f)), real(eltype(eps)))
     u0 = cs_estimation_weights_only(w, T, N, Tf)
     n = zeros(Int, T)
     rss = Vector{Tf}(undef, T)
@@ -1114,8 +1112,8 @@ function cs_score_regressors(k::Integer, B::Arr3Num, ::MatNum)
     return fill(k, size(B, 1))
 end
 function cs_score_regressors(::Nothing, B::Arr3Num, Q::MatNum)
-    # A decomposition leaves an integer or a `Rational` type, as a square root does.
-    Tf = typeof(sqrt(one(float_if_integer(promote_type(real(eltype(B)), real(eltype(Q)))))))
+    # A decomposition leaves a `Rational` type, as a square root does.
+    Tf = typeof(sqrt(one(promote_type(real(eltype(B)), real(eltype(Q))))))
     return [cross_sectional_rank(cs_design_slice(B, Q, t, Tf)) for t in axes(B, 1)]
 end
 """

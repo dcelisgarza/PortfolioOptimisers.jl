@@ -772,8 +772,7 @@ function covariance_forecast_step(sigma::MatNum, Z::MatNum, c::VecNum,
                 vec(any(isfinite, Z; dims = 1)))
     if isempty(a)
         ws = resolve_forecast_weights(w, a, sigma[a, a], N)
-        nan = float_if_integer(promote_type(real(eltype(sigma)), real(eltype(Z)),
-                                            real(eltype(c))))(NaN)
+        nan = promote_type(real(eltype(sigma)), real(eltype(Z)), real(eltype(c)))(NaN)
         return (; n_valid = 0, mahalanobis_ratio = nan, diagonal_ratio = fill(nan, N),
                 qlike = nan, frobenius = nan, standardised_return = fill(nan, length(ws)),
                 portfolio_qlike = fill(nan, length(ws)))

@@ -7,9 +7,9 @@ A distance matrix and a weighted graph give `0` different meanings. A distance o
 
 A zero distance does not show bad data. `SimpleAbsoluteDistance` and `LogDistance` read `abs(rho)`, so a pair with a correlation of `-1` is at distance zero. An inverse ETF and its index are such a pair, and the two are as related as two assets can be. The square-root algorithms reach zero at the other end, because their `clamp!` sets the radicand to zero for every `rho >= 1`.
 
-The function repairs a zero distance, and does not refuse it. Each off-diagonal zero moves to `nextfloat(zero(T))`, the smallest positive value of `T = float_if_integer(eltype(D))`. It is the value nearest to zero that an edge weight can hold. It is far below any distance that a caller can mean, and a sum with a distance of normal size does not change when it enters. When no entry moves, the function returns `D` and makes no copy.
+The function repairs a zero distance, and does not refuse it. Each off-diagonal zero moves to `nextfloat(zero(T))`, the smallest positive value of `T = eltype(D)`. It is the value nearest to zero that an edge weight can hold. It is far below any distance that a caller can mean, and a sum with a distance of normal size does not change when it enters. When no entry moves, the function returns `D` and makes no copy.
 
-An `Integer` has no smallest positive value, so the repaired copy of an integer matrix has a floating point element type. A `Rational` also has no smallest positive value, and `nextfloat` raises a `MethodError` for it.
+The function reads `D` in its own element type. An integer distance matrix is outside the supported domain, because an `Integer` has no smallest positive value. A `Rational` also has none. `nextfloat` raises a `MethodError` for both.
 
 The function refuses a negative entry and a `NaN`, because neither has a nearest value that an edge weight can hold. A negative distance inverts the order that it states, and the shortest path routines that read these weights return an answer for it with no error. An asset with zero variance gives a `NaN` correlation, and so a `NaN` distance. A `NaN` is false in every comparison that the tree algorithms make.
 
@@ -19,7 +19,7 @@ The function keeps `Inf`. [`LogDistance`](@ref) gives `Inf` for two uncorrelated
 
  1. Read every off-diagonal entry of `D`. Throw a `DomainError` on a negative entry and on a `NaN`. Set `repair` to `true` if an entry is zero.
  2. Return `D` when `repair` is `false`. The function makes no copy of an input that needs no repair.
- 3. Copy `D` into `W`, whose element type is `T = float_if_integer(eltype(D))`. Set `tiny` to the smallest positive value of `T`.
+ 3. Copy `D` into `W`, whose element type is `T = eltype(D)`. Set `tiny` to the smallest positive value of `T`.
  4. Set every off-diagonal zero of `W` to `tiny`, and return `W`.
 
 # Arguments
@@ -55,8 +55,7 @@ function graph_weight_matrix(D::MatNum)
     if !repair
         return D
     end
-    # An `Integer` has no smallest positive value, so the repaired copy floats it.
-    T = float_if_integer(eltype(D))
+    T = eltype(D)
     W = copyto!(similar(D, T), D)
     tiny = nextfloat(zero(T))
     for j in axes(W, 2), i in axes(W, 1)

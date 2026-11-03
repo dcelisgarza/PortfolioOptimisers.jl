@@ -927,8 +927,8 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; branchorder::Symbol 
                    str_names::Bool = false, save::Bool = true, kwargs...)
     nco = reset_time_dependent_estimator(nco)
     pr = prior(nco.pe, rd)
-    # A weight and a fee are fractions, so integer returns take a floating point type.
-    Tf = float_if_integer(eltype(pr.X))
+    # A weight and a fee take the element type of the returns.
+    Tf = eltype(pr.X)
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
     # A name stated over that universe must not be refused because the data delisted the
     # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on
@@ -999,7 +999,7 @@ The `# Mathematical definition` of [`NestedClustered`](@ref) states the weights 
 
  1. Replace the schedules in the fields of `nco` with their static defaults, through [`reset_time_dependent_estimator`](@ref).
  2. Fit the prior of `nco.pe` to `rd`, giving `pr`. The prior reads the returns in the frame that its own `x_src` states. `rd` keeps its raw returns, and the clustering reads the frame that its own `x_src` states. The readers of the inner and outer optimisers state their own sources.
- 3. Take the element type of the weights, the fees and the weight bounds from `pr.X` with [`float_if_integer`](@ref), giving `Tf`. Integer returns take a floating point type, because a weight and a fee are fractions.
+ 3. Take the element type of the weights, the fees and the weight bounds as `eltype(pr.X)`, giving `Tf`.
  4. Read the investable mask of `pr` with [`investable_mask`](@ref), giving `imsk`.
  5. Resolve the fees of `nco.fees` over the universe of the caller with [`fees_constraints`](@ref), and place them on the investable assets with [`investable_fees_view`](@ref), giving `fees`.
  6. Remove the liquidation charges from `fees` with [`strip_liquidation_charges`](@ref), giving `cfees`. The result charges a forced exit one time, and no cluster holds an asset that exits.

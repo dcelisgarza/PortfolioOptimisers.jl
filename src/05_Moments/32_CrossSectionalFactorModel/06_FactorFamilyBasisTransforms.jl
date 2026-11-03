@@ -855,7 +855,7 @@ function unseen_member_design(::ZeroUnseenMember, fcb::FactorFamilyBasis, B::Arr
     @argcheck(size(W) == (size(B, 1), size(B, 2)),
               DimensionMismatch("W ($(size(W, 1))×$(size(W, 2))) must match B ($(size(B, 1))×$(size(B, 2))) on the observation and asset axes"))
     act = W .> zero(eltype(W))
-    Tp = float_if_integer(real(eltype(fcb.ratios)))
+    Tp = real(eltype(fcb.ratios))
     P = Pair{Int, Matrix{Tp}}[]
     for t in axes(B, 1)
         Pt = unseen_member_change(fcb, view(B, t, :, :), view(act, t, :), t)
@@ -900,7 +900,7 @@ A family needs a change when the sample does not see its dropped member, or when
 """
 function unseen_member_change(fcb::FactorFamilyBasis, Bt::MatNum, at::AbstractVector{Bool},
                               t::Integer)
-    Tp = float_if_integer(real(eltype(fcb.ratios)))
+    Tp = real(eltype(fcb.ratios))
     seen(i) = any(n -> at[n] && !iszero(Bt[n, i]), eachindex(at))
     Pt = nothing
     for j in eachindex(fcb.fnm)
@@ -1053,8 +1053,8 @@ function cs_dropped_design(B::Arr3Num, P, dc::AbstractMatrix{Bool})
         return (; B = B, P = P)
     end
     K = size(B, 3)
-    # A decomposition leaves an integer or a `Rational` type, as a square root does.
-    Tp = typeof(sqrt(one(float_if_integer(real(eltype(B))))))
+    # A decomposition leaves a `Rational` type, as a square root does.
+    Tp = typeof(sqrt(one(real(eltype(B)))))
     Bd = copy(B)
     Pd = Pair{Int, Matrix{Tp}}[]
     for t in axes(B, 1)

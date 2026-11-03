@@ -348,11 +348,11 @@ The rows before the block carry no information of the factor model, so they are 
 
 # Validation
 
-  - The element type of `A` holds `NaN` after [`float_if_integer`](@ref). A `Rational` element type raises an `ArgumentError`.
+  - The element type of `A` holds `NaN`. A `Rational` element type raises an `ArgumentError`.
 
 # Returns
 
-  - `A`: The same history on the axis of the returns data, `NaN` before the block, or `nothing`. Its element type is [`float_if_integer`](@ref) of the element type of `A`, so an integer history becomes a floating-point history.
+  - `A`: The same history on the axis of the returns data, `NaN` before the block, or `nothing`. Its element type is the element type of `A`.
 
 # Related
 
@@ -364,7 +364,7 @@ function return_forecast_pad(::Nothing, ::AbstractUnitRange, ::Integer)::Nothing
     return nothing
 end
 function return_forecast_pad(A::MatNum, rows::AbstractUnitRange, T::Integer)::MatNum
-    Tf = float_if_integer(real(eltype(A)))
+    Tf = real(eltype(A))
     @argcheck(!(Tf <: Rational),
               ArgumentError("a factor model history is NaN on the observations before the block, and its element type $Tf cannot hold NaN. Convert the history to a floating-point type."))
     B = fill(Tf(NaN), T, size(A, 2))
@@ -559,11 +559,11 @@ So the last ``\\ell + h - 1`` observations are `NaN`.
 
 # Validation
 
-  - The element type of `X` holds `NaN` after [`float_if_integer`](@ref). A `Rational` element type raises an `ArgumentError`.
+  - The element type of `X` holds `NaN`. A `Rational` element type raises an `ArgumentError`.
 
 # Returns
 
-  - `Y::Matrix{<:Real}`: Forward mean returns, `observations × assets`. Its element type is [`float_if_integer`](@ref) of the element type of `X`, so integer returns give a floating-point mean.
+  - `Y::Matrix{<:Real}`: Forward mean returns, `observations × assets`. Its element type is the element type of `X`.
 
 # Examples
 
@@ -584,7 +584,7 @@ julia> PortfolioOptimisers.forward_mean_returns([1.0; 2.0; NaN; 4.0; 5.0;;], 2, 
   - [`return_forecast`](@ref)
 """
 function forward_mean_returns(X::MatNum, horizon::Integer, lag::Integer)::Matrix{<:Real}
-    Tf = float_if_integer(real(eltype(X)))
+    Tf = real(eltype(X))
     @argcheck(!(Tf <: Rational),
               ArgumentError("a forward mean is NaN where its window holds no finite return and on the last lag + horizon - 1 observations, and the element type $Tf cannot hold NaN. Convert the returns to a floating-point type."))
     T = size(X, 1)

@@ -427,7 +427,7 @@ A `NaN` score is outside every selection rule and every redundancy algorithm, so
 
  1. Find `ok`, the positions of the assets whose count is at least `min_folds`.
  2. Evaluate `score_of` at each position of `ok` into `v`. The function calls `score_of` at no other position, so an aggregation never reads an empty set of folds.
- 3. Read the number type of `v`, or `T` when `v` is empty, and pass it to `float_if_integer`, so that the type can hold a `NaN`.
+ 3. Read the number type `S` of `v`, or `T` when `v` is empty.
  4. Return the vector of that type that holds `v` at `ok`, and `NaN` at every other position.
 
 # Arguments
@@ -450,7 +450,7 @@ A `NaN` score is outside every selection rule and every redundancy algorithm, so
 function min_folds_scores(score_of, counts::VecInt, min_folds::Integer, ::Type{T}) where {T}
     ok = findall(>=(min_folds), counts)
     v = [score_of(i) for i in ok]
-    S = float_if_integer(isempty(v) ? T : eltype(v))
+    S = isempty(v) ? T : eltype(v)
     scores = fill!(Vector{S}(undef, length(counts)), NaN)
     scores[ok] = v
     return scores

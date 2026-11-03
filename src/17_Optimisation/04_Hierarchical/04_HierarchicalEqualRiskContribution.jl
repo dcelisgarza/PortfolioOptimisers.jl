@@ -542,7 +542,7 @@ The risk of one measure carries no scale. Every cluster would carry the same sca
 """
 function herc_cluster_risk(sca::Scalariser, r::OptimisationRiskMeasure, rku::VecNum,
                            cl::VecInt, X::MatNum, fees::Option{<:Fees})
-    w = zeros(float_if_integer(eltype(X)), size(X, 2))
+    w = zeros(eltype(X), size(X, 2))
     w[cl] = herc_intra_cluster_weights(sca, r, rku, cl)
     return expected_risk(r, w, X, fees)
 end
@@ -590,9 +590,9 @@ function herc_risk(hec::HierarchicalEqualRiskContribution, pr::AbstractPriorResu
     riku = herc_unitary_risks(ri, X, fees)
     ro = hec.ri === hec.ro ? ri : factory(hec.ro, pr, hec.opt.slv)
     roku = hec.ri === hec.ro ? riku : herc_unitary_risks(ro, X, fees)
-    # A weight is a quotient of two risks, so an integer sample takes a float weight type,
-    # and every other sample keeps its own type.
-    T = float_if_integer(eltype(X))
+    # A weight is a quotient of two risks, so it takes the type of the returns. A `Float32`
+    # sample stays in `Float32`.
+    T = eltype(X)
     w = Vector{T}(undef, size(X, 2))
     rkcl = Vector{T}(undef, length(cls))
     FLoops.@floop hec.ex for (i, cl) in pairs(cls)
@@ -639,9 +639,9 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on
     # the complement while `sets` sits on the mask. `investable_fees_view` then places the
     # resolved fee on the axes the mask leaves.
-    # A weight is a quotient of two risks, so an integer sample takes a float weight type,
-    # and every other sample keeps its own type.
-    T = float_if_integer(eltype(pr.X))
+    # A weight is a quotient of two risks, so it takes the type of the returns. A `Float32`
+    # sample stays in `Float32`.
+    T = eltype(pr.X)
     # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).

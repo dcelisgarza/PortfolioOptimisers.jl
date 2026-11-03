@@ -146,9 +146,6 @@ end
         @test count(isnan, Z) == 1
         @test feature_matrix(tv; placeholder = nothing)[3, 2, 1] == 1e6
         @test feature_matrix(tv; placeholder = 0)[3, 2, 1] == 0
-        # An integer panel with no observed mask cannot blank, and keeps its type.
-        pint = AssetPanel(; pf = [NumericPanelField(; name = "i", vals = [1, 2])])
-        @test eltype(feature_matrix(pint)) === Int
     end
     @testset "FeatureDistance reads the last readable row" begin
         # x at row 3 (7), y at row 2 (5), z at row 3 (9).

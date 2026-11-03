@@ -768,14 +768,13 @@ The seed is in this function and not in [`partial_fit!`](@ref), so the fold is o
 function expected_returns_state_seed(::Nothing, x::VecNum,
                                      cvg::Option{<:CoveragePolicy} = nothing)
     N = length(x)
-    Tf = float_if_integer(eltype(x))
+    Tf = eltype(x)
     return SimpleExpectedReturnsState(0, zeros(Tf, N),
                                       coverage_counts_seed(cvg, nothing, N, Tf, false))
 end
 function expected_returns_state_seed(cache::SimpleExpectedReturnsState, x::VecNum,
                                      cvg::Option{<:CoveragePolicy} = nothing)
-    counts = coverage_counts_seed(cvg, cache.cvg, length(x), float_if_integer(eltype(x)),
-                                  false)
+    counts = coverage_counts_seed(cvg, cache.cvg, length(x), eltype(x), false)
     return if counts === cache.cvg
         cache
     else

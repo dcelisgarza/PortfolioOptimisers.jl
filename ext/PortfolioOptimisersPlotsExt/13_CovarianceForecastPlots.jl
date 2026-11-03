@@ -353,7 +353,7 @@ end
 
 Evaluate a statistic of one window at each point of a rolling series.
 
-Point `t` of the series is `f(r, nan)`, where `t => r` is the pair of `wins` for that point. A point with no pair has no window, and it stays `NaN`. `nan` is the `NaN` of the element type of `v`, from [`float_if_integer`](@ref), so an integer series gives a float series.
+Point `t` of the series is `f(r, nan)`, where `t => r` is the pair of `wins` for that point. A point with no pair has no window, and it stays `NaN`. `nan` is the `NaN` of the element type of `v`.
 
 # Arguments
 
@@ -372,7 +372,7 @@ Point `t` of the series is `f(r, nan)`, where `t => r` is the pair of `wins` for
   - `covariance_rolling_std`
 """
 function covariance_rolling(f, v::VecNum, wins::AbstractVector{<:Pair})
-    nan = PortfolioOptimisers.float_if_integer(eltype(v))(NaN)
+    nan = eltype(v)(NaN)
     out = fill(nan, length(v))
     for (t, r) in wins
         out[t] = f(r, nan)

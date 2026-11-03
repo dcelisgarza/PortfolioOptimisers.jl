@@ -1523,14 +1523,13 @@ The two covariance estimators, [`GeneralCovariance`](@ref) and [`Covariance`](@r
 function covariance_state_seed(::Nothing, x::VecNum,
                                cvg::Option{<:CoveragePolicy} = nothing)
     N = length(x)
-    Tf = float_if_integer(eltype(x))
+    Tf = eltype(x)
     return CovarianceState(0, zeros(Tf, N), zeros(Tf, N, N),
                            coverage_counts_seed(cvg, nothing, N, Tf, true))
 end
 function covariance_state_seed(cache::CovarianceState, x::VecNum,
                                cvg::Option{<:CoveragePolicy} = nothing)
-    counts = coverage_counts_seed(cvg, cache.cvg, length(x), float_if_integer(eltype(x)),
-                                  true)
+    counts = coverage_counts_seed(cvg, cache.cvg, length(x), eltype(x), true)
     return if counts === cache.cvg
         cache
     else

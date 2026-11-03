@@ -468,7 +468,8 @@ end
     @test eltype(PortfolioOptimisers.panel_field(pint, "x").vals) === Float64
     pkeep = asset_panel([NumericPanelInput(; name = "x", vals = vint,
                                            alg = ConstantPanelFill(; val = 0))])
-    @test eltype(PortfolioOptimisers.panel_field(pkeep, "x").vals) === Int
+    # An integer field converts to its float type at construction (#1972).
+    @test eltype(PortfolioOptimisers.panel_field(pkeep, "x").vals) === Float64
 
     @test ConstantPanelFill().val == 0.0
     @test ForwardPanelFill().lim === nothing
@@ -970,9 +971,8 @@ end
                                            alg = ConstantPanelFill(; val = 0.0))])
     @test eltype(PortfolioOptimisers.panel_field(pmiss, "a").vals) === Float64
 
-    # An integer field stays exact, and a heterogeneous raw field promotes over its cells.
-    pint = asset_panel([NumericPanelInput(; name = "a", vals = [1, 2, 3])])
-    @test eltype(PortfolioOptimisers.panel_field(pint, "a").vals) === Int
+    # A heterogeneous raw field promotes over its cells. Issue #1972 removed the integer
+    # case: integer values convert to Float64 at the field.
     pany = asset_panel([NumericPanelInput(; name = "a", vals = Any[1, 2.0f0, 3])])
     @test eltype(PortfolioOptimisers.panel_field(pany, "a").vals) === Float32
 
@@ -987,7 +987,6 @@ end
     @test eltype(feature_matrix(p32)) === Float32
     @test eltype(panel_feature_matrix(p32)[2]) === Float32
     @test eltype(feature_matrix(pmiss)) === Float64
-    @test eltype(feature_matrix(pint)) === Int
 
     # A selection of indicators alone has nothing to derive from, and stacks in Float64.
     pcat = asset_panel([CategoricalPanelInput(; name = "s", vals = ["x", "y", "x"])])
@@ -1028,7 +1027,8 @@ end
                         NumericPanelInput(; name = "b", vals = [1 2; 3 4],
                                           alg = BackwardPanelFill())]; amsk = trues(2, 2))
     @test eltype(PortfolioOptimisers.panel_field(pfwd, "a").vals) === Float32
-    @test eltype(PortfolioOptimisers.panel_field(pfwd, "b").vals) === Int
+    # An integer column converts to its float type at the field (#1972).
+    @test eltype(PortfolioOptimisers.panel_field(pfwd, "b").vals) === Float64
     pgap = asset_panel([NumericPanelInput(; name = "a",
                                           vals = Union{Missing, Float32}[1 missing; 3 4],
                                           alg = ForwardPanelFill(; val = 0.0f0)),
@@ -1706,7 +1706,6 @@ stored type and the two policies.
     pnl = asset_panel([NumericPanelInput(; name = "mcap",
                                          vals = [1.0 NaN; 3.0 4.0; NaN 6.0],
                                          alg = ForwardPanelFill(; val = 0.0)),
-                       NumericPanelInput(; name = "shares", vals = [10 20; 30 40; 50 60]),
                        NumericPanelInput(; name = "f32", vals = Float32[1 2; 3 4; 5 6]),
                        CategoricalPanelInput(; name = "sector",
                                              vals = ["a" "b"; "b" "b"; "a" "a"])];
@@ -1735,19 +1734,9 @@ stored type and the two policies.
         @test panel_field_values(pnl, "mcap"; inactive = -1)[1, 2] == -1.0
         @test isnan(panel_field_values(pnl, "mcap"; inactive = nothing)[1, 2])
     end
-    @testset "An integer field" begin
-        # An integer policy keeps the integer type, and a NaN policy floats it.
-        V = panel_field_values(pnl, "shares"; inactive = 0, unobserved = nothing)
-        @test V == [10 0; 30 40; 50 60]
-        @test eltype(V) === Int
-        W = panel_field_values(pnl, "shares"; inactive = NaN)
-        @test isequal(W, [10.0 NaN; 30.0 40.0; 50.0 60.0])
-        @test eltype(W) === Float64
-        # The default unobserved policy is NaN, so the default read is floated too.
-        @test eltype(panel_field_values(pnl, "shares")) === Float64
-        @test eltype(panel_field_values(pnl, "shares"; inactive = 0.5,
-                                        unobserved = nothing)) === Float64
-        # A Float32 field stays Float32 under a NaN policy.
+    @testset "A Float32 field" begin
+        # A Float32 field stays Float32 under a NaN policy. Issue #1972 removed the
+        # integer field: integer values convert at the field.
         F = panel_field_values(pnl, "f32"; inactive = NaN)
         @test eltype(F) === Float32
         @test isequal(F, Float32[1 NaN; 3 4; 5 6])
@@ -1774,9 +1763,10 @@ stored type and the two policies.
         @test isequal(B[.!isnan.(B)], tp.pf[1].vals[.!isnan.(B)])
     end
     @testset "A static panel has no inactive cell" begin
-        sp = AssetPanel(; pf = [NumericPanelField(; name = "m", vals = [1, 2, 3])])
+        sp = AssetPanel(; pf = [NumericPanelField(; name = "m", vals = [1.0, 2.0, 3.0])])
         @test panel_field_values(sp, "m"; inactive = NaN) == [1.0, 2.0, 3.0]
-        @test panel_field_values(sp, "m"; inactive = 0, unobserved = nothing) == [1, 2, 3]
+        @test panel_field_values(sp, "m"; inactive = 0, unobserved = nothing) ==
+              [1.0, 2.0, 3.0]
     end
     @testset "A ReturnsResult reads its panel, and the read is a copy" begin
         rd = ReturnsResult(; nx = ["A", "B"], X = zeros(3, 2), pnl = pnl)
@@ -1798,16 +1788,7 @@ stored type and the two policies.
         @test_throws InexactError panel_field_values(rp, "r"; inactive = NaN)
         @test panel_field_values(rp, "r"; inactive = 0) == [1//2 0//1; 1//4 1//5]
         @test eltype(panel_field_values(rp, "r"; inactive = 0)) === Rational{Int}
-        # An integer policy keeps the integer type, so the type must hold the value.
-        up = AssetPanel(; pf = [NumericPanelField(; name = "u", vals = UInt[1 2; 3 4])],
-                        amsk = [true false; true true], emsk = [true false; true true])
-        @test_throws InexactError panel_field_values(up, "u"; inactive = -1,
-                                                     unobserved = nothing)
-        @test eltype(panel_field_values(up, "u"; inactive = 0, unobserved = nothing)) ===
-              UInt
-        # The default `unobserved = NaN` floats the field, so `-1` fits (R7 of #1817).
-        @test panel_field_values(up, "u"; inactive = -1) == [1.0 -1.0; 3.0 4.0]
-        @test eltype(panel_field_values(up, "u"; inactive = -1)) === Float64
+        # Issue #1972 removed the integer field: integer values convert at the field.
         # A float type converts every integer, and one past its range reads as an infinity.
         hp = AssetPanel(; pf = [NumericPanelField(; name = "h", vals = Float16[1 2; 3 4])],
                         amsk = [true false; true true], emsk = [true false; true true])
@@ -2014,7 +1995,8 @@ end
         # The wide layout keeps every cell, so the round trip is exact.
         w = panel_1399_trip(pnl; nx, ts = TS_1399, layout = :wide, decode)
         @test panel_1399_equal(pnl, w)
-        @test eltype(panel_field(w, "count").vals) == Int
+        # A numeric field holds floats, an integer input included (#1972).
+        @test eltype(panel_field(w, "count").vals) == Float64
         # The long layout keeps the cells in the universe. The manifest restores the asset
         # that is never active and the observation with no active asset.
         l = panel_1399_trip(pnl; nx, ts = TS_1399, layout = :long, decode)
