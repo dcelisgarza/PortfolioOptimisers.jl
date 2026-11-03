@@ -5,7 +5,7 @@
 julia = "1.13.3"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "7dd23b4ac8"
+commit = "86f8da502e"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { cyc = 5, cog = 7, arg = 8, cyc_sum = 53, cog_sum = 57, arg_sum = 99, macros = [] }
@@ -43,7 +43,7 @@ commit = "7dd23b4ac8"
 "src/01_Base/06_Messages.jl" = { cyc = 5, cog = 9, arg = 6, cyc_sum = 26, cog_sum = 27, arg_sum = 37, macros = [] }
 "src/01_Base/07_Errors.jl" = { cyc = 2, cog = 1, arg = 2, cyc_sum = 2, cog_sum = 1, arg_sum = 2, macros = [] }
 "src/01_Base/08_TypeAliases.jl" = { cyc = 0, cog = 0, arg = 0, cyc_sum = 0, cog_sum = 0, arg_sum = 0, macros = [] }
-"src/01_Base/09_ObservationWeights.jl" = { cyc = 3, cog = 4, arg = 3, cyc_sum = 14, cog_sum = 4, arg_sum = 25, macros = [] }
+"src/01_Base/09_ObservationWeights.jl" = { cyc = 3, cog = 4, arg = 5, cyc_sum = 28, cog_sum = 13, arg_sum = 57, macros = [] }
 "src/01_Base/10_Assertions.jl" = { cyc = 3, cog = 3, arg = 4, cyc_sum = 39, cog_sum = 7, arg_sum = 8, macros = [] }
 "src/01_Base/11_VecScalar.jl" = { cyc = 1, cog = 1, arg = 2, cyc_sum = 2, cog_sum = 1, arg_sum = 4, macros = [] }
 "src/01_Base/12_NormError.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 28, cog_sum = 6, arg_sum = 52, macros = [] }

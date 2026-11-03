@@ -122,6 +122,8 @@ Abstract supertype for dynamically computed observation weight estimators.
 
 A subtype of `DynamicAbstractWeights` computes the observation weights from the data, and the caller does not give them as a numeric vector. The caller passes it to an estimator that takes an `ObsWeights` argument, and the estimator evaluates it when it fits.
 
+A fit that drops an observation that it cannot read, such as an observation with a `NaN` return, resolves the weights on the observed sample, through [`observed_sample`](@ref). So a method receives only the observations that the fit reads, and a decay ages each observation by those observations. [`observed_weights`](@ref) states the rule.
+
 # Interfaces
 
 To implement a new dynamic observation weight estimator, subtype `DynamicAbstractWeights` with a struct that holds its parameters, and implement the two methods below.

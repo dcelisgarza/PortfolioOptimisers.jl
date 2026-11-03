@@ -55,6 +55,19 @@ show_fields(::PSHook) = (:keep,)
 # A `DynamicAbstractWeights` with no `get_observation_weights` method of its own. The whole
 # point of the type is that the unimplemented shape raises rather than computing unweighted.
 struct NoWeightsProbe <: PortfolioOptimisers.DynamicAbstractWeights end
+# A decay that halves the weight of each older observation. It counts the observations that it
+# reads, so on an observed sample it ages each observation by the observations that the fit reads.
+struct HalvingWeightsProbe <: PortfolioOptimisers.DynamicAbstractWeights end
+function PortfolioOptimisers.get_observation_weights(::HalvingWeightsProbe,
+                                                     X::PortfolioOptimisers.VecNum;
+                                                     kwargs...)
+    return eweights(1:length(X), 0.5; scale = true)
+end
+function PortfolioOptimisers.get_observation_weights(::HalvingWeightsProbe,
+                                                     X::PortfolioOptimisers.MatNum;
+                                                     dims::Int = 1, kwargs...)
+    return eweights(1:size(X, dims), 0.5; scale = true)
+end
 
 # Three partial-fit state probes. `PFSBare` implements nothing, so it reaches the generic
 # `merge_states` that names the method its family owes. `PFSOther` is a second struct, so a pair
@@ -752,6 +765,74 @@ end
     # already the weights.
     @test isnothing(pe.get_observation_weights(nothing, ones(3, 10)))
     @test pe.get_observation_weights([1.0, 2.0]) == [1.0, 2.0]
+end
+@testset "An observed sample drops each observation with its own weight (#1959)" begin
+    pe = PortfolioOptimisers
+    x = [0.01, NaN, -0.02, 0.03, 0.05]
+    obs = isfinite.(x)
+    v = [0.1, 0.2, 0.3, 0.15, 0.25]
+    # Every weight type drops the observation and keeps its type, so `StatsBase` reads the
+    # correction of that type on the observed sample. The weights are not scaled: the kept
+    # frequency weights still count their copies.
+    for (W, corrected) in
+        ((weights, false), (aweights, true), (fweights, true), (pweights, true))
+        x_obs, w_obs = pe.observed_sample(x, W(v), obs)
+        @test x_obs == x[obs]
+        @test typeof(w_obs) === typeof(W(v))
+        @test w_obs == v[obs]
+        @test var(x_obs, w_obs; corrected = corrected) ≈
+              var(x[obs], W(v[obs]); corrected = corrected)
+    end
+    _, w_unit = pe.observed_sample(x, uweights(5), obs)
+    @test w_unit isa UnitWeights
+    @test length(w_unit) == 4
+    @test isnothing(pe.observed_sample(x, nothing, obs)[2])
+    @test pe.observed_sample(x, [1.0, 2.0, 3.0, 4.0, 5.0], obs)[2] == [1.0, 3.0, 4.0, 5.0]
+    # A dynamic weight resolves on the observed sample: the observation before the gap is one
+    # observed step older than its successor, not two.
+    @test pe.observed_sample(x, HalvingWeightsProbe(), obs)[2] == [0.125, 0.25, 0.5, 1.0]
+    # A matrix drops the observations along `dims`, and passes `dims` to a dynamic weight.
+    X = [x 2 .* x]
+    X1, w1 = pe.observed_sample(X, aweights(v), obs)
+    X2, w2 = pe.observed_sample(permutedims(X), HalvingWeightsProbe(), obs; dims = 2)
+    @test X1 == X[obs, :]
+    @test X2 == permutedims(X1)
+    @test w1 == v[obs]
+    @test w2 == [0.125, 0.25, 0.5, 1.0]
+    # With no mask, an observation is observed when every entry of it is finite.
+    @test pe.observed_sample(x, aweights(v)) == pe.observed_sample(x, aweights(v), obs)
+    Y = [1.0 Inf; 2.0 3.0; NaN 4.0; 5.0 6.0]
+    Y1, wy1 = pe.observed_sample(Y, fweights([1, 2, 3, 4]))
+    @test Y1 == Y[[2, 4], :]
+    @test wy1 == [2, 4]
+    Y2, wy2 = pe.observed_sample(permutedims(Y), HalvingWeightsProbe(); dims = 2)
+    @test Y2 == permutedims(Y1)
+    @test wy2 == [0.5, 1.0]
+    @test_throws DomainError pe.observed_sample(Y, nothing; dims = 0)
+    # A mask that keeps every observation returns the sample and the weights themselves.
+    w = aweights(v)
+    X_all, w_all = pe.observed_sample(X, w, trues(5))
+    @test X_all === X
+    @test w_all === w
+    @test pe.observed_sample(x, w, trues(5))[1] === x
+    # The checks name the mask and the weights.
+    err = try
+        pe.observed_sample(x, aweights(v[1:4]), obs)
+    catch e
+        e
+    end
+    @test err isa DimensionMismatch
+    @test occursin("length(w) == length(obs)", err.msg)
+    @test_throws DimensionMismatch pe.observed_sample(x, nothing, obs[1:4])
+    @test_throws DimensionMismatch pe.observed_sample(X, nothing, obs; dims = 2)
+    @test_throws DomainError pe.observed_sample(X, nothing, obs; dims = 3)
+    # A sample with no observation of positive weight has no weighted value.
+    @test pe.has_positive_weight(nothing, 3)
+    @test !pe.has_positive_weight(nothing, 0)
+    @test pe.has_positive_weight(uweights(2), 2)
+    @test !pe.has_positive_weight(aweights([0.0, 0.0]), 2)
+    @test !pe.has_positive_weight(pe.observed_sample(x, fweights([0, 1, 0, 0, 0]), obs)[2],
+                                  4)
 end
 
 @testset "A partial-fit state is a Result under its own root" begin
