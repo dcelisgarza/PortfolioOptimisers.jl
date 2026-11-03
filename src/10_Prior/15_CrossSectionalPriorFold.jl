@@ -968,8 +968,8 @@ function cross_sectional_fold_rows(pe::CrossSectionalFactorPrior,
     p = 1:n
     (; Zn, der) = cross_sectional_observed_carry(cc, Xl, n, pe.lag)
     if isnothing(st.Ms)
-        Mo = isnothing(cc) ? Ms : cat(Ms, Zn[p, :, :]; dims = 3)
-        elig = cross_sectional_eligible(Xu[q, :], Mo, emsk[q, :])
+        Zo = isnothing(cc) ? nothing : view(Zn, p, :, :)
+        elig = cross_sectional_eligible(Xu[q, :], Ms, emsk[q, :], Zo)
         s = something(findfirst(any, eachrow(elig)), n + 1)
         q = q[s:end]
         p = p[s:end]

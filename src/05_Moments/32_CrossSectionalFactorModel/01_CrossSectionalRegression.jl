@@ -860,9 +860,9 @@ Every answer is a least-squares fit, so its fitted values are the projection of 
 
  1. [`UncheckedSolve`](@ref) returns `A \\ y`, with no rank test. A square `A` that `\\` solves has full rank. On every other `A`, `\\` solves through the column-pivoted `QR` of `A`, so the method takes that factorisation, solves through it, and reads the rank off it, with one factorisation of the design.
  2. [`MinimumNormSolve`](@ref) returns `LinearAlgebra.pinv(A) * y`, and counts the rank that [`cross_sectional_rank`](@ref) reads.
- 3. [`PseudoInverseFallback`](@ref) takes [`cross_sectional_rank`](@ref). It returns `A \\ y` when the rank equals the factor count, and `LinearAlgebra.pinv(A) * y` otherwise.
- 4. [`RankDeficiencyRefusal`](@ref) refuses a rank-deficient `A` with [`assert_cross_sectional_rank`](@ref), and returns `A \\ y` otherwise.
- 5. [`DependentColumnDrop`](@ref) takes [`cross_sectional_rank`](@ref). It returns `A \\ y` when the rank equals the factor count, and the answer of [`cross_sectional_column_drop`](@ref) otherwise.
+ 3. [`PseudoInverseFallback`](@ref) takes the column-pivoted `QR` of `A` and reads [`cross_sectional_rank`](@ref) off it. It returns [`cross_sectional_full_solve`](@ref), the answer of `A \\ y` through the same factorisation, when the rank equals the factor count, and `LinearAlgebra.pinv(A) * y` otherwise.
+ 4. [`RankDeficiencyRefusal`](@ref) takes the same factorisation, refuses a rank-deficient `A` with [`assert_cross_sectional_rank`](@ref), and returns [`cross_sectional_full_solve`](@ref) otherwise.
+ 5. [`DependentColumnDrop`](@ref) takes the same factorisation and reads the rank off it. It returns [`cross_sectional_full_solve`](@ref) when the rank equals the factor count, and the answer of [`cross_sectional_column_drop`](@ref) on the pivot of the factorisation otherwise.
 
 # Arguments
 
@@ -900,22 +900,53 @@ function cross_sectional_solve(::MinimumNormSolve, A::MatNum, y::VecNum, ::Integ
     return (; f = LinearAlgebra.pinv(A) * y, edof = size(A, 1) - cross_sectional_rank(A))
 end
 function cross_sectional_solve(::PseudoInverseFallback, A::MatNum, y::VecNum, ::Integer)
-    r = cross_sectional_rank(A)
-    return (; f = r == size(A, 2) ? A \ y : LinearAlgebra.pinv(A) * y,
-            edof = size(A, 1) - r)
+    F = LinearAlgebra.qr(A, LinearAlgebra.ColumnNorm())
+    r = cross_sectional_rank(A; R = F.R)
+    return (; f = if r == size(A, 2)
+                cross_sectional_full_solve(F, A, y)
+            else
+                LinearAlgebra.pinv(A) * y
+            end, edof = size(A, 1) - r)
 end
 function cross_sectional_solve(::RankDeficiencyRefusal, A::MatNum, y::VecNum, t::Integer)
-    assert_cross_sectional_rank(A, t)
-    return (; f = A \ y, edof = size(A, 1) - size(A, 2))
+    F = LinearAlgebra.qr(A, LinearAlgebra.ColumnNorm())
+    assert_cross_sectional_rank(A, t; R = F.R)
+    return (; f = cross_sectional_full_solve(F, A, y), edof = size(A, 1) - size(A, 2))
 end
 function cross_sectional_solve(::DependentColumnDrop, A::MatNum, y::VecNum, ::Integer)
-    r = cross_sectional_rank(A)
+    F = LinearAlgebra.qr(A, LinearAlgebra.ColumnNorm())
+    r = cross_sectional_rank(A; R = F.R)
     return if r == size(A, 2)
-        (; f = A \ y, edof = size(A, 1) - r)
+        (; f = cross_sectional_full_solve(F, A, y), edof = size(A, 1) - r)
     else
         cross_sectional_column_drop(keep -> (; f = A[:, keep] \ y, edof = size(A, 1) - r),
-                                    A, y, r)
+                                    A, y, r; F = F)
     end
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the least-squares answer of a weighted design of full rank, through the column-pivoted `QR` that the caller already took.
+
+`A \\ y` factorises a design that is not square through `LinearAlgebra.qr(A, LinearAlgebra.ColumnNorm())`, so the solve through `F` is the same computation with no second factorisation. A square design takes `A \\ y`, which factorises it by `LU`, so the answer is the one that `A \\ y` gives on every shape.
+
+# Arguments
+
+  - `F`: Column-pivoted `QR` of `A`, as `LinearAlgebra.qr(A, LinearAlgebra.ColumnNorm())` returns it.
+  - `A::MatNum`: Weighted design of one observation, `eligible assets × factors`, of full rank.
+  - `y::VecNum`: Weighted target of the observation.
+
+# Returns
+
+  - `f::VecNum`: Factor returns of the observation, of length `size(A, 2)`.
+
+# Related
+
+  - [`cross_sectional_solve`](@ref)
+  - [`cross_sectional_rank`](@ref)
+"""
+function cross_sectional_full_solve(F, A::MatNum, y::VecNum)::VecNum
+    return size(A, 1) == size(A, 2) ? A \ y : F \ y
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -928,6 +959,7 @@ Refuse the weighted design of one observation when its rank falls short of its f
 
   - `D::MatNum`: Weighted design of one observation, `eligible assets × factors`.
   - `t::Integer`: Index of the observation, named by the refusal.
+  - `R::MatNum`: Triangular factor of the column-pivoted `QR` of `D`. A caller that solves through the factorisation passes it, so the design is factorised once.
 
 # Validation
 
@@ -943,8 +975,10 @@ Refuse the weighted design of one observation when its rank falls short of its f
   - [`cross_sectional_solve`](@ref)
   - [`cross_sectional_target_solve`](@ref)
 """
-function assert_cross_sectional_rank(D::MatNum, t::Integer)::Nothing
-    r = cross_sectional_rank(D)
+function assert_cross_sectional_rank(D::MatNum, t::Integer;
+                                     R::MatNum = LinearAlgebra.qr(D,
+                                                                  LinearAlgebra.ColumnNorm()).R)::Nothing
+    r = cross_sectional_rank(D; R = R)
     @argcheck(r == size(D, 2),
               ArgumentError("the weighted design of observation $t has rank $r over $(size(D, 2)) factors and $(size(D, 1)) eligible assets, so its weighted least squares has no unique solution. Use PseudoInverseFallback() to take the minimum-norm solution, DependentColumnDrop() to give the dependent factors a return of zero, UncheckedSolve() to take the answer unchecked, or widen the eligible cross-section"))
     return nothing
@@ -957,7 +991,7 @@ Return the factor returns and the residual count of a rank-deficient observation
 # Algorithm
 
  1. Return zero for every factor when `r` is zero. The fit spends no parameter, so its residual count is `size(D, 1)`.
- 2. Take the column-pivoted `LinearAlgebra.qr` of `D`, and keep the columns that its first `r` pivots name, in their order on the factor axis.
+ 2. Keep the columns that the first `r` pivots of the column-pivoted `QR` `F` of `D` name, in their order on the factor axis, with [`cross_sectional_kept_columns`](@ref).
  3. Fit the kept columns with `fit_cols`, and give every other factor a return of zero. The residual count is the count of that fit.
 
 # Arguments
@@ -966,6 +1000,7 @@ Return the factor returns and the residual count of a rank-deficient observation
   - `D::MatNum`: Weighted design of one observation, `eligible assets × factors`.
   - `y::VecNum`: Target of the observation. Its type and the type of `D` give the type of the zero answer of rank zero.
   - `r::Integer`: Rank of `D`, read by [`cross_sectional_rank`](@ref), below `size(D, 2)`.
+  - `F`: Column-pivoted `QR` of `D`, as `LinearAlgebra.qr(D, LinearAlgebra.ColumnNorm())` returns it. A caller that read the rank off a factorisation passes it, so the design is factorised once.
 
 # Returns
 
@@ -980,12 +1015,13 @@ Return the factor returns and the residual count of a rank-deficient observation
   - [`cross_sectional_solve`](@ref)
   - [`cross_sectional_target_solve`](@ref)
 """
-function cross_sectional_column_drop(fit_cols, D::MatNum, y::VecNum, r::Integer)::NamedTuple
+function cross_sectional_column_drop(fit_cols, D::MatNum, y::VecNum, r::Integer;
+                                     F = LinearAlgebra.qr(D, LinearAlgebra.ColumnNorm()))::NamedTuple
     if iszero(r)
         return (; f = zeros(promote_type(eltype(D), eltype(y)), size(D, 2)),
                 edof = size(D, 1))
     end
-    keep = cross_sectional_kept_columns(D, r)
+    keep = cross_sectional_kept_columns(D, r; F = F)
     c = fit_cols(keep)
     f = zeros(eltype(c.f), size(D, 2))
     f[keep] = c.f
@@ -1002,6 +1038,7 @@ They are the columns that the first `r` pivots of the column-pivoted `QR` of `D`
 
   - `D::MatNum`: Weighted design of one observation, `eligible assets × factors`.
   - `r::Integer`: Rank of `D`, read by [`cross_sectional_rank`](@ref).
+  - `F`: Column-pivoted `QR` of `D`, as `LinearAlgebra.qr(D, LinearAlgebra.ColumnNorm())` returns it. A caller that read the rank off a factorisation passes it, so the design is factorised once.
 
 # Returns
 
@@ -1012,11 +1049,12 @@ They are the columns that the first `r` pivots of the column-pivoted `QR` of `D`
   - [`cross_sectional_column_drop`](@ref)
   - [`cross_sectional_mark_dropped!`](@ref)
 """
-function cross_sectional_kept_columns(D::MatNum, r::Integer)::Vector{Int}
+function cross_sectional_kept_columns(D::MatNum, r::Integer;
+                                      F = LinearAlgebra.qr(D, LinearAlgebra.ColumnNorm()))::Vector{Int}
     if iszero(r)
         return Int[]
     end
-    return sort!(LinearAlgebra.qr(D, LinearAlgebra.ColumnNorm()).p[1:r])
+    return sort!(F.p[1:r])
 end
 """
     cross_sectional_drop_mask(alg::AbstractCrossSectionalSolveAlgorithm, T::Integer,
@@ -1109,10 +1147,11 @@ end
 function cross_sectional_mark_dropped!(dc::AbstractMatrix{Bool}, A::MatNum, w::VecNum,
                                        t::Integer)::Nothing
     D = A .* sqrt.(w)
-    r = cross_sectional_rank(D)
+    F = LinearAlgebra.qr(D, LinearAlgebra.ColumnNorm())
+    r = cross_sectional_rank(D; R = F.R)
     if r < size(D, 2)
         dc[t, :] .= true
-        dc[t, cross_sectional_kept_columns(D, r)] .= false
+        dc[t, cross_sectional_kept_columns(D, r; F = F)] .= false
     end
     return nothing
 end
@@ -1174,8 +1213,8 @@ The count is [`residual_count`](@ref) of the fitted target and the design that i
 # Algorithm
 
  1. [`UncheckedSolve`](@ref) fits `tgt` to `A` and `y`, with no rank test.
- 2. [`RankDeficiencyRefusal`](@ref) refuses a rank-deficient `D` with [`assert_cross_sectional_rank`](@ref), and fits `tgt` to `A` and `y` through [`cross_sectional_target_coef`](@ref) otherwise.
- 3. [`DependentColumnDrop`](@ref) and [`PseudoInverseFallback`](@ref) take the rank `r` of `D` with [`cross_sectional_rank`](@ref). When `r` equals the factor count, they fit `tgt` to `A` and `y` through [`cross_sectional_target_coef`](@ref). Otherwise they fit `tgt` the same way to the columns of `A` that [`cross_sectional_column_drop`](@ref) keeps, and [`PseudoInverseFallback`](@ref) projects the answer onto the row space of `D` with [`cross_sectional_row_space`](@ref).
+ 2. [`RankDeficiencyRefusal`](@ref) takes the column-pivoted `QR` of `D`, refuses a rank-deficient `D` with [`assert_cross_sectional_rank`](@ref), and fits `tgt` to `A` and `y` through [`cross_sectional_target_coef`](@ref) on the same factorisation otherwise.
+ 3. [`DependentColumnDrop`](@ref) and [`PseudoInverseFallback`](@ref) take the column-pivoted `QR` of `D`, and read its rank `r` off it with [`cross_sectional_rank`](@ref). Every later step reads the same factorisation. When `r` equals the factor count, they fit `tgt` to `A` and `y` through [`cross_sectional_target_coef`](@ref). Otherwise they fit `tgt` the same way to the columns of `A` that [`cross_sectional_column_drop`](@ref) keeps, and [`PseudoInverseFallback`](@ref) projects the answer onto the row space of `D` with [`cross_sectional_row_space`](@ref).
 
 So every member but [`UncheckedSolve`](@ref) fits a basis-invariant target at the rank and at the precision of `D`, which the fit of [`CrossSectionalLinearRegression`](@ref) reads too.
 
@@ -1219,20 +1258,22 @@ function cross_sectional_target_solve(::UncheckedSolve, tgt::AbstractRegressionT
 end
 function cross_sectional_target_solve(::RankDeficiencyRefusal,
                                       tgt::AbstractRegressionTarget, obs::NamedTuple)
-    assert_cross_sectional_rank(obs.D, obs.t)
-    return cross_sectional_target_coef(tgt, obs.A, obs.y, obs.D)
+    F = LinearAlgebra.qr(obs.D, LinearAlgebra.ColumnNorm())
+    assert_cross_sectional_rank(obs.D, obs.t; R = F.R)
+    return cross_sectional_target_coef(tgt, obs.A, obs.y, obs.D; F = F)
 end
 function cross_sectional_target_solve(alg::Union{DependentColumnDrop,
                                                  PseudoInverseFallback},
                                       tgt::AbstractRegressionTarget, obs::NamedTuple)
     (; A, y, D) = obs
-    r = cross_sectional_rank(D)
+    F = LinearAlgebra.qr(D, LinearAlgebra.ColumnNorm())
+    r = cross_sectional_rank(D; R = F.R)
     if r == size(A, 2)
-        return cross_sectional_target_coef(tgt, A, y, D)
+        return cross_sectional_target_coef(tgt, A, y, D; F = F)
     end
     fit = cross_sectional_column_drop(keep -> cross_sectional_target_coef(tgt, A[:, keep],
                                                                           y, D[:, keep]), D,
-                                      y, r)
+                                      y, r; F = F)
     # The projection keeps the fitted values, so it keeps the residual count.
     return if isa(alg, PseudoInverseFallback)
         (; f = cross_sectional_row_space(fit.f, D, r), edof = fit.edof)
@@ -1272,6 +1313,7 @@ The residual count is [`residual_count`](@ref) of the fit and the design that it
   - `A::MatNum`: Exposures of the eligible assets, `eligible assets × factors`, of full rank.
   - `y::VecNum`: Returns of the eligible assets.
   - `D::MatNum`: Weighted design `sqrt.(w) .* A`.
+  - `F`: Column-pivoted `QR` of `D`, or `nothing` to take it here. A caller that read the rank off a factorisation passes it, so the design is factorised once.
 
 # Returns
 
@@ -1288,16 +1330,46 @@ The residual count is [`residual_count`](@ref) of the fit and the design that it
   - [`residual_count`](@ref)
 """
 function cross_sectional_target_coef(tgt::AbstractRegressionTarget, A::MatNum, y::VecNum,
-                                     D::MatNum)::NamedTuple
+                                     D::MatNum; F = nothing)::NamedTuple
     if !is_basis_invariant(tgt)
         m = StatsAPI.fit(tgt, A, y)
         return (; f = StatsAPI.coef(m), edof = residual_count(m, A))
     end
-    F = LinearAlgebra.qr(D, LinearAlgebra.ColumnNorm())
+    # A target that is not basis invariant never reads the factorisation, so it is taken here.
+    F = isnothing(F) ? LinearAlgebra.qr(D, LinearAlgebra.ColumnNorm()) : F
     M = F.P / LinearAlgebra.UpperTriangular(F.R)
     AM = A * M
     m = StatsAPI.fit(tgt, AM, y)
     return (; f = M * StatsAPI.coef(m), edof = residual_count(m, AM))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the mask of the `(observation, asset)` pairs whose exposure to every factor is finite.
+
+The factor axis is the slowest axis of `Z`, so the pass reads `Z` in its memory order, with the factor axis as the outer loop. A test of each pair across the factors instead jumps `size(Z, 1) * size(Z, 2)` entries at each step.
+
+# Arguments
+
+  - `Z::Arr3Num`: Exposure tensor `observations × assets × factors`.
+
+# Returns
+
+  - `fin::BitMatrix`: Mask `observations × assets`, true where every exposure of the pair is finite.
+
+# Related
+
+  - [`cross_sectional_design_mask`](@ref)
+  - [`cross_sectional_eligible`](@ref)
+"""
+function cross_sectional_finite_exposures(Z::Arr3Num)::BitMatrix
+    fin = trues(size(Z, 1), size(Z, 2))
+    for k in axes(Z, 3), i in axes(Z, 2), t in axes(Z, 1)
+        if !isfinite(Z[t, i, k])
+            fin[t, i] = false
+        end
+    end
+    return fin
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1339,10 +1411,11 @@ function cross_sectional_design_mask(Z::Arr3Num, X::MatNum, W::MatNum)::BitMatri
               DimensionMismatch("W ($(size(W, 1))×$(size(W, 2))) must match X ($(size(X, 1))×$(size(X, 2)))"))
     @argcheck(all(isfinite, W), IsNonFiniteError("all entries of W must be finite"))
     @argcheck(all(x -> x >= zero(x), W), DomainError(W, "all entries of W must be >= 0"))
+    fin = cross_sectional_finite_exposures(Z)
     act = falses(size(X))
     for t in axes(X, 1), i in axes(X, 2)
         if W[t, i] > zero(eltype(W))
-            @argcheck(isfinite(X[t, i]) && all(isfinite, view(Z, t, i, :)),
+            @argcheck(isfinite(X[t, i]) && fin[t, i],
                       IsNonFiniteError("observation $t and asset $i carry the positive weight $(W[t, i]), so their return and all $(size(Z, 3)) of their exposures must be finite. Set the weight to zero to exclude the pair from the fit"))
             act[t, i] = true
         end
@@ -1423,8 +1496,8 @@ The tolerance ``\\sqrt{\\epsilon}`` absorbs the round-off of ``h_{i}``, which is
 # Algorithm
 
  1. Scale the rows of `A` by `sqrt.(w)`, giving the weighted design `D`, and put the column `sqrt.(w)` in front of it when `intercept` is `true`.
- 2. Read the numerical rank `r` of `D` through [`cross_sectional_rank`](@ref), which answers zero for a design with no row or no column. Return an all-false mask at rank zero.
- 3. Take the column-pivoted `LinearAlgebra.qr` of `D` and the first `r` columns of its `Q`, and sum the squares of each row, giving the leverage `h`.
+ 2. Take the column-pivoted `LinearAlgebra.qr` of `D`, and read the numerical rank `r` of `D` off its triangular factor through [`cross_sectional_rank`](@ref), which answers zero for a design with no row or no column. Return an all-false mask at rank zero.
+ 3. Take the first `r` columns of the `Q` of the same factorisation, and sum the squares of each row, giving the leverage `h`.
  4. Mark each row whose `1 - h` is at most `sqrt(eps)`.
 
 # Arguments
@@ -1446,11 +1519,11 @@ The tolerance ``\\sqrt{\\epsilon}`` absorbs the round-off of ``h_{i}``, which is
 function cross_sectional_leverage_one(A::MatNum, w::VecNum, intercept::Bool)::BitVector
     sq = sqrt.(w)
     D = intercept ? hcat(sq, A .* sq) : A .* sq
-    r = cross_sectional_rank(D)
+    F = LinearAlgebra.qr(D, LinearAlgebra.ColumnNorm())
+    r = cross_sectional_rank(D; R = F.R)
     if iszero(r)
         return falses(size(D, 1))
     end
-    F = LinearAlgebra.qr(D, LinearAlgebra.ColumnNorm())
     h = vec(sum(abs2, F.Q * Matrix{eltype(F.R)}(LinearAlgebra.I, size(D, 1), r); dims = 2))
     return BitVector(one.(h) .- h .<= sqrt(eps(real(eltype(h)))))
 end

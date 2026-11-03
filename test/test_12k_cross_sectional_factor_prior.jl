@@ -1928,6 +1928,23 @@ allocated the exposure history in the element type of the returns, so integer re
         @test PO.cross_sectional_warmup(X, Ms, emsk) ==
               findfirst(t -> any(m[t, :]), 1:nT) - 1
         @test PO.cross_sectional_warmup(X, Ms, emsk) == 3
+        # Issue #1970: an observed block that the caller holds apart reads as the history that
+        # joins it, so the fit tests the two blocks with no copy. Its own generator keeps the
+        # fixtures below unchanged.
+        rz = StableRNG(1_970)
+        Zo = randn(rz, nT, nN, 2)
+        Zo[rand(rz, nT, nN, 2) .< 0.1] .= NaN
+        Zo[4, :, 2] .= NaN
+        J = cat(Ms, Zo; dims = 3)
+        @test PO.cross_sectional_finite_exposures(J) ==
+              [all(isfinite, J[t, i, :]) for t in 1:nT, i in 1:nN]
+        @test PO.cross_sectional_eligible(X, Ms, emsk, Zo) ==
+              PO.cross_sectional_eligible(X, J, emsk)
+        @test PO.cross_sectional_warmup(X, Ms, emsk, Zo) ==
+              PO.cross_sectional_warmup(X, J, emsk) >
+              PO.cross_sectional_warmup(X, Ms, emsk)
+        @test_throws DimensionMismatch PO.cross_sectional_eligible(X, Ms, emsk,
+                                                                   Zo[1:(end - 1), :, :])
         amsk = rand(rng, nN) .< 0.7
         L = randn(rng, nN, nK)
         L[2, 3] = NaN

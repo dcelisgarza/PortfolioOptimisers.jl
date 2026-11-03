@@ -9,8 +9,10 @@ Description = "Cross-Sectional Regression, private API of PortfolioOptimisers.jl
 ```@docs
 cross_sectional_design_mask
 cross_sectional_residual_dof
+cross_sectional_finite_exposures
 cross_sectional_block_regression
 cross_sectional_coefficients
+cross_sectional_full_solve
 cross_sectional_leverage_one
 leverage_one_nan
 cross_sectional_least_squares

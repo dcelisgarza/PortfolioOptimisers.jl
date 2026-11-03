@@ -379,34 +379,6 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return whether one asset carries a finite Factor Exposure to every factor at one observation.
-
-# Arguments
-
-  - `Ms`: The exposure history, `observations × assets × factors`.
-  - `t`: The observation.
-  - `i`: The asset.
-
-# Returns
-
-  - `ans::Bool`: Whether every exposure of the pair is finite.
-
-# Related
-
-  - [`cross_sectional_warmup`](@ref)
-  - [`cross_sectional_eligible`](@ref)
-"""
-function cross_sectional_exposures_finite(Ms::Arr3Num, t::Integer, i::Integer)::Bool
-    for k in axes(Ms, 3)
-        if !isfinite(Ms[t, i, k])
-            return false
-        end
-    end
-    return true
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
 Return the eligibility mask of a cross-sectional fit.
 
 An asset enters the fit of an observation when it is in the estimation universe, its return is finite, and its lagged Factor Exposure is finite for every factor. The weight policy writes its weights on this mask, so an ineligible pair takes a weight of zero and does not enter the fit.
@@ -432,10 +404,11 @@ Where:
   - `X`: Asset returns, `observations × assets`.
   - `Ms`: The lagged exposure history, `observations × assets × factors`, aligned with `X`.
   - `emsk`: The estimation mask, `observations × assets`, aligned with `X`.
+  - `Zo`: The exposure history of the observed factors, aligned with `X`, or `nothing`. Its factors join the product beside those of `Ms`, so a caller that holds the two histories apart does not join them to test them.
 
 # Validation
 
-  - `Ms` matches `X` on the observation and asset axes, and `emsk` matches `X`. Raises a `DimensionMismatch`.
+  - `Ms` and `Zo` match `X` on the observation and asset axes, and `emsk` matches `X`. Raises a `DimensionMismatch`.
 
 # Returns
 
@@ -447,19 +420,19 @@ Where:
   - [`cross_sectional_design_mask`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
 """
-function cross_sectional_eligible(X::MatNum, Ms::Arr3Num,
-                                  emsk::AbstractMatrix{Bool})::BitMatrix
+function cross_sectional_eligible(X::MatNum, Ms::Arr3Num, emsk::AbstractMatrix{Bool},
+                                  Zo::Option{<:Arr3Num} = nothing)::BitMatrix
     @argcheck(size(Ms, 1) == size(X, 1) && size(Ms, 2) == size(X, 2),
               DimensionMismatch("Ms ($(size(Ms, 1))×$(size(Ms, 2))) must match X ($(size(X, 1))×$(size(X, 2))) on the observation and asset axes"))
+    @argcheck(isnothing(Zo) || (size(Zo, 1) == size(X, 1) && size(Zo, 2) == size(X, 2)),
+              DimensionMismatch("Zo ($(size(Zo, 1))×$(size(Zo, 2))) must match X ($(size(X, 1))×$(size(X, 2))) on the observation and asset axes"))
     @argcheck(size(emsk) == size(X),
               DimensionMismatch("emsk ($(size(emsk, 1))×$(size(emsk, 2))) must match X ($(size(X, 1))×$(size(X, 2)))"))
-    msk = falses(size(X))
-    for t in axes(X, 1), i in axes(X, 2)
-        msk[t, i] = emsk[t, i] &&
-                    isfinite(X[t, i]) &&
-                    cross_sectional_exposures_finite(Ms, t, i)
+    fin = cross_sectional_finite_exposures(Ms)
+    if !isnothing(Zo)
+        fin .&= cross_sectional_finite_exposures(Zo)
     end
-    return msk
+    return emsk .& isfinite.(X) .& fin
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

@@ -209,6 +209,35 @@ end
         @test PO.cross_sectional_rank(design(1e17)) < Kc
     end
 
+    @testset "One factorisation gives the rank, the solve and the pivot (#1970)" begin
+        # `A \ y` factorises a tall design by a pivoted QR and a square one by LU, so the
+        # solve through the factorisation that the rank test took is bit-equal to it.
+        rng = StableRNG(1970)
+        for (m, n) in ((30, 5), (6, 6), (9, 1))
+            A = randn(rng, m, n)
+            y = randn(rng, m)
+            F = qr(A, ColumnNorm())
+            @test PO.cross_sectional_full_solve(F, A, y) == A \ y
+            for alg in
+                (PseudoInverseFallback(), RankDeficiencyRefusal(), DependentColumnDrop())
+                @test PO.cross_sectional_solve(alg, A, y, 1).f == A \ y
+            end
+        end
+        A = randn(rng, 20, 4)
+        A[:, 4] = A[:, 1] + A[:, 2]
+        y = randn(rng, 20)
+        F = qr(A, ColumnNorm())
+        r = PO.cross_sectional_rank(A; R = F.R)
+        @test r == 3
+        @test PO.cross_sectional_kept_columns(A, r; F = F) ==
+              PO.cross_sectional_kept_columns(A, r)
+        @test_throws ArgumentError PO.assert_cross_sectional_rank(A, 7; R = F.R)
+        fit = PO.cross_sectional_solve(DependentColumnDrop(), A, y, 1)
+        keep = PO.cross_sectional_kept_columns(A, r)
+        @test fit.f[keep] == A[:, keep] \ y
+        @test all(iszero, fit.f[setdiff(1:4, keep)])
+    end
+
     @testset "The coefficient of determination is the weighted formula" begin
         csr = cross_sectional_regression(CrossSectionalLinearRegression(), Z, X, W)
         r2 = cross_sectional_r2(csr, Z, X, W)

@@ -1124,9 +1124,11 @@ Where:
   - `X`: Asset returns, `observations × assets`.
   - `Ms`: The exposure history, `observations × assets × factors`.
   - `emsk`: The estimation mask, `observations × assets`.
+  - `Zo`: The exposure history of the observed factors, on the axes of `Ms`, or `nothing`. Its factors join the factors of the definition beside those of `Ms`, so a caller that holds the two histories apart does not join them to test them.
 
 # Validation
 
+  - The rules of [`cross_sectional_eligible`](@ref).
   - At least one observation is not cold. Raises an `ArgumentError`.
 
 # Returns
@@ -1135,16 +1137,16 @@ Where:
 
 # Related
 
+  - [`cross_sectional_eligible`](@ref)
   - [`cross_sectional_exposure_history`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
 """
-function cross_sectional_warmup(X::MatNum, Ms::Arr3Num, emsk::AbstractMatrix{Bool})::Int
-    for t in axes(Ms, 1)
-        for i in axes(Ms, 2)
-            if emsk[t, i] && isfinite(X[t, i]) && cross_sectional_exposures_finite(Ms, t, i)
-                return t - 1
-            end
-        end
+function cross_sectional_warmup(X::MatNum, Ms::Arr3Num, emsk::AbstractMatrix{Bool},
+                                Zo::Option{<:Arr3Num} = nothing)::Int
+    # The first observation that holds an eligible pair, as the carry fold finds it.
+    t = findfirst(any, eachrow(cross_sectional_eligible(X, Ms, emsk, Zo)))
+    if !isnothing(t)
+        return t - 1
     end
     return throw(ArgumentError("no observation of this Asset Panel carries an asset of the estimation universe with both a finite return and a finite Factor Exposure to every factor, so the whole history is Descriptor warm-up. Give more observations, or shorten the warm-up of the Descriptors."))
 end
@@ -1201,8 +1203,8 @@ function cross_sectional_exposure_stage(pe::CrossSectionalFactorPrior, X::MatNum
                                          ivpa = ivpa)
     # An observed member warms up too: one that wraps a Descriptor gives no exposure over the
     # warm-up of the Descriptor, and its derived net return is then not finite.
-    Mo = isnothing(st.cc) ? st.Ms : cat(st.Ms, st.cc.Z; dims = 3)
-    rw = (cross_sectional_warmup(st.Xu, Mo, st.emsk) + 1):size(X, 1)
+    Zo = isnothing(st.cc) ? nothing : st.cc.Z
+    rw = (cross_sectional_warmup(st.Xu, st.Ms, st.emsk, Zo) + 1):size(X, 1)
     return merge(st, (; rw = rw))
 end
 """

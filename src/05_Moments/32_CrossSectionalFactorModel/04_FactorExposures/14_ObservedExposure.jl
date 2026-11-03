@@ -281,7 +281,7 @@ The block is the one [`OneHotExposure`](@ref) gives on the same Panel Field, so 
 # Algorithm
 
  1. Compute the one-hot block with [`factor_exposure`](@ref) of a [`OneHotExposure`](@ref) on `xe.field`.
- 2. Keep the columns of the levels that [`currency_level_columns`](@ref) keeps.
+ 2. Keep the columns of the levels that [`currency_level_columns`](@ref) keeps. When it keeps every column, return the block itself.
 
 # Arguments
 
@@ -330,7 +330,9 @@ julia> factor_exposure(CurrencyExposure(; base = \"USD\"), rd)[1, :, :]
 """
 function factor_exposure(xe::CurrencyExposure, rd::ReturnsResult)::Array{<:Real, 3}
     B = factor_exposure(OneHotExposure(xe.field, xe.family), rd)
-    return B[:, :, currency_level_columns(xe, rd)]
+    idx = currency_level_columns(xe, rd)
+    # With no base currency every column is kept, so the block is returned with no copy.
+    return length(idx) == size(B, 3) ? B : B[:, :, idx]
 end
 function observed_series(xe::CurrencyExposure, rd::ReturnsResult)::Vector{String}
     return String.(one_hot_field(rd, xe.field).levels[currency_level_columns(xe, rd)])

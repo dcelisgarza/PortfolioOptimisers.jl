@@ -169,19 +169,17 @@ An asset that belongs to no level of the classification has no exposure to any o
 """
 function one_hot_level_fill!(B::AbstractArray{<:Real, 3})::Nothing
     nan = nan_fill_value(B)
-    for t in axes(B, 1), i in axes(B, 2)
-        set = false
-        for l in axes(B, 3)
-            v = B[t, i, l]
-            if isfinite(v) && !iszero(v)
-                set = true
-                break
-            end
+    # The level axis is the slowest axis of `B`, so it is the outer loop of both passes.
+    set = falses(size(B, 1), size(B, 2))
+    for l in axes(B, 3), i in axes(B, 2), t in axes(B, 1)
+        v = B[t, i, l]
+        if isfinite(v) && !iszero(v)
+            set[t, i] = true
         end
-        if !set
-            for l in axes(B, 3)
-                B[t, i, l] = nan
-            end
+    end
+    for l in axes(B, 3), i in axes(B, 2), t in axes(B, 1)
+        if !set[t, i]
+            B[t, i, l] = nan
         end
     end
     return nothing
@@ -220,11 +218,10 @@ end
 function one_hot_observed_fill!(B::AbstractArray{<:Number, 3},
                                 omsk::AbstractMatrix{Bool})::Nothing
     nan = nan_fill_value(B)
-    for t in axes(B, 1), i in axes(B, 2)
+    # The level axis is the slowest axis of `B`, so it is the outer loop.
+    for l in axes(B, 3), i in axes(B, 2), t in axes(B, 1)
         if !omsk[t, i]
-            for l in axes(B, 3)
-                B[t, i, l] = nan
-            end
+            B[t, i, l] = nan
         end
     end
     return nothing
