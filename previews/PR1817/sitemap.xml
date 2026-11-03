@@ -841,6 +841,9 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/09_ConstraintGeneration/09_CrossSectionalFactorAxis/</loc>
   </url>
   <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/09_ConstraintGeneration/10_LotUnitConstraintGeneration/</loc>
+  </url>
+  <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/10_Prior/01_Base_Prior/</loc>
   </url>
   <url>
@@ -2051,6 +2054,9 @@
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/09_ConstraintGeneration/09_CrossSectionalFactorAxis/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/09_ConstraintGeneration/10_LotUnitConstraintGeneration/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/10_Prior/01_Base_Prior/</loc>
