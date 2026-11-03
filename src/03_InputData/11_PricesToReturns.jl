@@ -687,7 +687,7 @@ end
 
 Hold the last value of each cash total-return index of `K` across each gap inside its span.
 
-A deposit accrues interest on every day, so a cash index has a value at every observation from its first value to its last one, and a gap inside that span is a value that was not published. The function reads the span of each column with [`listing_span`](@ref), and fills each gap inside it with the walk of [`CarriedPrice`](@ref), see [`PortfolioOptimisers.gap_fill_column!`](@ref). A gap before the first value or after the last value stays a gap. The function changes a copy, so the caller's array does not change, also when [`unify_gaps`](@ref) returned it unchanged.
+A deposit accrues interest on every day, so a cash index has a value at every observation from its first value to its last one, and a gap inside that span is a value that was not published. The function finds the first and the last value of each column, and writes onto each gap between them the value of the observation before it, which the walk has already filled. That is the rule of [`CarriedPrice`](@ref) on one listed run. A gap before the first value or after the last value stays a gap. The function changes a copy, so the caller's array does not change, also when [`unify_gaps`](@ref) returned it unchanged.
 
 # Arguments
 
@@ -695,22 +695,28 @@ A deposit accrues interest on every day, so a cash index has a value at every ob
 
 # Returns
 
-  - `K̃::AbstractMatrix`: A copy of `K`, with each gap inside the span of its column filled. An empty `K` is returned as it is, because it holds no gap.
+  - `K̃::AbstractMatrix`: A copy of `K`, with each gap inside the span of its column filled.
 
 # Related
 
   - [`currency_excess_index`](@ref)
   - [`CarriedPrice`](@ref)
-  - [`listing_span`](@ref)
+  - [`is_missing_value`](@ref)
 """
 function carry_cash_index(K::AbstractMatrix)
-    if isempty(K)
-        return K
-    end
     K = copy(K)
-    span = listing_span(K)
     for j in axes(K, 2)
-        gap_fill_column!(CarriedPrice(), K, span, j, missing, size(K, 1) + 1)
+        k = view(K, :, j)
+        i1 = findfirst(!is_missing_value, k)
+        i2 = findlast(!is_missing_value, k)
+        if isnothing(i1) || isnothing(i2)
+            continue
+        end
+        for t in (i1 + 1):i2
+            if is_missing_value(k[t])
+                k[t] = k[t - 1]
+            end
+        end
     end
     return K
 end
