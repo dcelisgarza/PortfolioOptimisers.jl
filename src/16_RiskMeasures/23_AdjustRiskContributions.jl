@@ -752,6 +752,58 @@ function resolve_owa_weights(::Union{Function, AbstractOrderedWeightsArrayFuncti
     return nothing
 end
 """
+    owa_weights(w::OWA_Func_VecNum, T::Integer, sym::Symbol = :w) -> VecNum
+
+Return the OWA weights of the weight slot `w` on `T` observations, and refuse weights whose length is not `T`.
+
+An OWA risk pairs the `k`-th weight with the `k`-th smallest return, so it reads one weight for each observation. A weight builder gives the weights of every sample length. A weight vector is fixed at construction, so it holds the weights of one sample length only. The value of [`OrderedWeightsArray`](@ref) and of [`OrderedWeightsArrayRange`](@ref), and every JuMP model of the two, read their weights through this function. So the optimisation and the risk of its answer refuse the same vector.
+
+# Algorithm
+
+ 1. Resolve `w` on `T` observations with [`resolve_owa_weights`](@ref).
+ 2. Refuse the weights when their length is not `T`, and return them otherwise.
+
+# Arguments
+
+  - `w::OWA_Func_VecNum`: A weight vector or a weight builder.
+  - `T::Integer`: The number of observations of the returns that the measure reads.
+  - `sym::Symbol`: The name of the weight slot in the message of the error.
+
+# Validation
+
+  - `length(w) == T`. Raises a `DimensionMismatch`.
+
+# Returns
+
+  - `w::VecNum`: The weights of the `T` observations.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.owa_weights(owa_gmd, 3) == owa_gmd(3)
+true
+
+julia> PortfolioOptimisers.owa_weights(owa_gmd(4), 3)
+ERROR: DimensionMismatch: length(w) == 3 must hold: an OWA risk measure holds one weight for each observation, and the returns have 3 observations. Got
+length(w) => 4
+A weight vector is fixed at construction, so give the weights of exactly these observations, or give a weight builder such as `owa_gmd`, which builds the weights of every sample length.
+[...]
+```
+
+# Related
+
+  - [`resolve_owa_weights`](@ref)
+  - [`OrderedWeightsArray`](@ref)
+  - [`OrderedWeightsArrayRange`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
+function owa_weights(w::OWA_Func_VecNum, T::Integer, sym::Symbol = :w)
+    ow = resolve_owa_weights(w, T)
+    @argcheck(length(ow) == T,
+              DimensionMismatch("length($sym) == $T must hold: an OWA risk measure holds one weight for each observation, and the returns have $T observations. Got\nlength($sym) => $(length(ow))\nA weight vector is fixed at construction, so give the weights of exactly these observations, or give a weight builder such as `owa_gmd`, which builds the weights of every sample length."))
+    return ow
+end
+"""
     scalarised_degree(r::BaseRM_VecBaseRM, sca::Scalariser, fees::Option{<:Fees} = nothing,
                       T::Option{<:Integer} = nothing) -> Option{<:Integer}
 

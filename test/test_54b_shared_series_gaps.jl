@@ -842,3 +842,87 @@ struct DynamicWeights1960 <: PO.DynamicAbstractWeights end
     end
     @test PO.obs_weights_view(PO.LinearModel(), trues(T)) isa PO.LinearModel
 end
+
+@testset "The pin of a Choice Rule on a buffer drops the weights of the marked observation (#1964)" begin
+    # Before #1964 the pin fitted the buffer with the marked observation dropped and the
+    # fixed weights of the regression target at the full length, so the target raised. The
+    # oracle is the batch fit with the observation removed by hand from the data and from the
+    # weights. The step keeps the weights of every observation of the buffer, because a later
+    # buffer marks other observations.
+    Fg = copy(F0)
+    Fg[gap, 2] = NaN
+    rdF = ReturnsResult(; nx = nx, X = X0, nf = nf, F = Fg)
+    rdFk = ReturnsResult(; nx = nx, X = X0[keep, :], nf = nf, F = F0[keep, :])
+    w = aweights(rand(StableRNG(19640001), T) .+ 0.1)
+    online(est) = PO.update_online_estimator(PO.Online(est))
+    sw(w) = StepwiseRegression(; tgt = PO.LinearModel(; kwargs = (; weights = w)),
+                               choice = PinnedChoice())
+    dr(w) = DimensionReductionRegression(; drtgt = PCA(; kwargs = (; maxoutdim = 1)),
+                                         ve = SimpleVariance(; w = w),
+                                         retgt = PO.LinearModel(; kwargs = (; weights = w)),
+                                         choice = PinnedChoice())
+    oracle = [PO._regression(sw(w[keep]), X0[keep, i], F0[keep, :]) for i in 1:N]
+
+    @testset "A regression: $name" for (name, re, get_w) in (("StepwiseRegression", sw,
+                                                              x -> x.tgt.kwargs.weights),
+                                                             ("DimensionReductionRegression", dr, x -> x.ve.w))
+        e = partial_fit!(online(FactorPrior(; re = re(w))), rdF)
+        p1 = prior(e)
+        p2 = prior(FactorPrior(; re = re(w[keep])), rdFk)
+        @test p1.mu ≈ p2.mu
+        @test p1.sigma ≈ p2.sigma
+        @test !PO.pending_choice(e)
+        @test get_w(e.re) === w
+    end
+
+    @testset "A host: $name" for (name, host, read) in (("EntropyPoolingPrior",
+                                                         w -> EntropyPoolingPrior(; pe = FactorPrior(; re = sw(w))),
+                                                         e -> e.pe.re),
+                                                        ("OpinionPoolingPrior",
+                                                         w -> OpinionPoolingPrior(;
+                                                                                  pes = [EntropyPoolingPrior(;
+                                                                                                             pe = FactorPrior(;
+                                                                                                                              re = sw(w)))]),
+                                                         e -> e.pes[1].pe.re))
+        re = read(partial_fit!(online(host(w)), rdF))
+        @test re.included == oracle
+        @test re.tgt.kwargs.weights === w
+    end
+
+    # A buffer that keeps one observation pins nothing yet, and the step keeps `proj` empty.
+    d = partial_fit!(online(FactorPrior(; re = dr(w[1:2]))),
+                     ReturnsResult(; nx = nx, X = X0[(gap - 1):gap, :], nf = nf,
+                                   F = Fg[(gap - 1):gap, :]))
+    @test isnothing(d.re.proj)
+    @test PO.adopt_pinned_choice(nothing, nothing) === nothing
+end
+
+@testset "A ReturnsTracking series loses the benchmark return of the marked observation (#1964)" begin
+    # Before #1964 the solve dropped the observation and the series kept its full length,
+    # so `tracking_benchmark` refused it. A benchmark return at a dropped observation drops
+    # with it, as an observation weight does.
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 settings = Dict("verbose" => false))
+    Bg = copy(Bv0)
+    Bg[gap] = NaN
+    rdB = ReturnsResult(; nx = nx, X = X0, nb = ["BM"], B = Bg)
+    rdBk = ReturnsResult(; nx = nx, X = X0[keep, :], nb = ["BM"], B = Bv0[keep])
+    b = randn(StableRNG(19640002), T) ./ 100
+    jo(; kwargs...) = JuMPOptimiser(; pe = EmpiricalPrior(; x_src = ExcessSource()),
+                                    slv = slv, kwargs...)
+    trm(b) = MeanRisk(; r = TrackingRiskMeasure(; tr = ReturnsTracking(; w = b)),
+                      opt = jo())
+    te(b) = MeanRisk(;
+                     opt = jo(;
+                              tr = TrackingError(; tr = ReturnsTracking(; w = b),
+                                                 err = 0.05)))
+    @testset "$name" for (name, f) in (("TrackingRiskMeasure", trm), ("TrackingError", te))
+        @test isapprox(optimise(f(b), rdB).w, optimise(f(b[keep]), rdBk).w; rtol = 1e-6)
+    end
+    obs = trues(T)
+    obs[gap] = false
+    @test PO.obs_weights_view(ReturnsTracking(; w = b), obs).w == b[keep]
+    @test PO.obs_weights_view(ReturnsTracking(; w = b), 1:5).w == b[1:5]
+    # A series of the wrong length raises, and is not cut short with no message.
+    @test_throws DimensionMismatch PO.obs_weights_view(ReturnsTracking(; w = b[keep]), obs)
+end

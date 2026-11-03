@@ -8,7 +8,7 @@ jet = "0.13.1"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "StatsPlots"]
-commit = "fa92260809"
+commit = "8c81357c41"
 
 [run.main]
 load_set = ["GraphRecipes", "StatsPlots"]
@@ -259,7 +259,8 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/10_Prior/09_AssetPanelEstimators.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/10_Base_CrossSectionalFactorPrior.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/11_CrossSectionalFactorPrior.jl" = { raw = 0, reviewed = 0 }
-"src/10_Prior/12_PriorPartialFit.jl" = { raw = 0, reviewed = 0 }
+"src/10_Prior/12_PriorPartialFit_a.jl" = { raw = 0, reviewed = 0 }
+"src/10_Prior/12_PriorPartialFit_b.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/13_PriorExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/14_LowDimensionEnsemblePrior.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/15_CrossSectionalPriorFold.jl" = { raw = 0, reviewed = 0 }
@@ -686,7 +687,8 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/10_Prior/09_AssetPanelEstimators.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/10_Base_CrossSectionalFactorPrior.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/11_CrossSectionalFactorPrior.jl" = { raw = 0, reviewed = 0 }
-"src/10_Prior/12_PriorPartialFit.jl" = { raw = 0, reviewed = 0 }
+"src/10_Prior/12_PriorPartialFit_a.jl" = { raw = 0, reviewed = 0 }
+"src/10_Prior/12_PriorPartialFit_b.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/13_PriorExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/14_LowDimensionEnsemblePrior.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/15_CrossSectionalPriorFold.jl" = { raw = 0, reviewed = 0 }

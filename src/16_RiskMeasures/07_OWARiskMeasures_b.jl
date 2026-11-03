@@ -853,8 +853,8 @@ function range_tails(r::OrderedWeightsArrayRange{<:Any, <:Any, <:Any,
             gain = OrderedWeightsArray(; settings = settings, w = r.w2, alg = r.alg))
 end
 function (r::OrderedWeightsArrayRange)(x::VecNum)
-    w1 = isa(r.w1, VecNum) ? r.w1 : r.w1(length(x))
-    w2 = isa(r.w2, VecNum) ? r.w2 : r.w2(length(x))
+    w1 = owa_weights(r.w1, length(x), :w1)
+    w2 = owa_weights(r.w2, length(x), :w2)
     w = w1 - w2
     return LinearAlgebra.dot(w, sort(x))
 end

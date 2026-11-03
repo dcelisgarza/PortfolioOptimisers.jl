@@ -83,6 +83,10 @@ Where:
   - $(arg_dict[:opt_rjumpe])
   - $(arg_dict[:pr_X])
 
+# Validation
+
+  - The weight vector has one entry for each observation, through [`owa_weights`](@ref). Raises a `DimensionMismatch`.
+
 # Keyword arguments
 
   - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
@@ -116,7 +120,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     state_set!(model, prefix, :owa_b_, i, owa_b)
     owa_risk = state_set!(model, prefix, :owa_risk_, i,
                           JuMP.@expression(model, sum(owa_a + owa_b)))
-    owa_w = isa(r.w, VecNum) ? r.w : r.w(T)
+    owa_w = owa_weights(r.w, T, :w)
     state_set!(model, prefix, :cowa_, i,
                JuMP.@constraint(model,
                                 sc * (owa * transpose(owa_w) - ovec * transpose(owa_a) -
@@ -169,6 +173,10 @@ Where:
   - $(arg_dict[:opt_rjumpe])
   - $(arg_dict[:pr_X])
 
+# Validation
+
+  - Each tail weight vector has one entry for each observation, through [`owa_weights`](@ref). Raises a `DimensionMismatch`.
+
 # Keyword arguments
 
   - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
@@ -202,8 +210,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     state_set!(model, prefix, :owa_range_b_, i, owa_b)
     owa_range_risk = state_set!(model, prefix, :owa_range_risk_, i,
                                 JuMP.@expression(model, sum(owa_a + owa_b)))
-    owa_w1 = isa(r.w1, VecNum) ? r.w1 : r.w1(T)
-    owa_w2 = isa(r.w2, VecNum) ? r.w2 : r.w2(T)
+    owa_w1 = owa_weights(r.w1, T, :w1)
+    owa_w2 = owa_weights(r.w2, T, :w2)
     owa_w = owa_w1 - owa_w2
     state_set!(model, prefix, :cowa_range_, i,
                JuMP.@constraint(model,
@@ -315,6 +323,10 @@ $(val_dict[:relax])
   - $(arg_dict[:opt_rjumpe])
   - $(arg_dict[:pr_X])
 
+# Validation
+
+  - The weight vector has one entry for each observation, through [`owa_weights`](@ref). Raises a `DimensionMismatch`. The formulation reads only the sum, the extremes and the norms of the weights, so without the check a vector of the wrong length solves a different problem with no error.
+
 # Keyword arguments
 
   - `loss::Bool`: If `true` (default), the measure is applied to the net portfolio returns;
@@ -349,7 +361,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     if !loss
         net_X = -net_X
     end
-    owa_w = isa(r.w, VecNum) ? -r.w : -r.w(T)
+    owa_w = -owa_weights(r.w, T, :w)
     owa_s = sum(owa_w)
     owa_l, owa_h = extrema(owa_w)
     # With at most one entry strictly inside the box, the box and the sum describe the convex
@@ -439,6 +451,10 @@ OWA expressions. Each tail brings its own power cone block.
   - $(arg_dict[:opt_rjumpe])
   - $(arg_dict[:pr_X])
 
+# Validation
+
+  - Each tail weight vector has one entry for each observation, through [`owa_weights`](@ref). Raises a `DimensionMismatch` that names `w1` or `w2`.
+
 # Returns
 
   - `aowa_range_risk`: The combined `loss + gain` risk expression added to the model.
@@ -455,6 +471,11 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                            <:ApproxOrderedWeightsArray},
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
                                prefix::Symbol = Symbol(""), kwargs...)
+    # Each tail checks its own weights, but under the name `w` of the tail. Check them here
+    # under the names that the caller gave.
+    T = get_T(model)
+    owa_weights(r.w1, T, :w1)
+    owa_weights(r.w2, T, :w2)
     return set_range_risk_constraints!(model, i, r, :aowa_range_risk_, opt, pr, args...;
                                        prefix = prefix, kwargs...)
 end
@@ -577,6 +598,7 @@ Where:
 
 # Validation
 
+  - The weight vector has one entry for each observation, through [`owa_weights`](@ref). Raises a `DimensionMismatch`.
   - The weight vector is nondecreasing. Raises a `DomainError`.
 
 # Keyword arguments
@@ -604,7 +626,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
                                prefix::Symbol = Symbol(""), kwargs...)
     T = get_T(model)
-    owa_w = isa(r.w, VecNum) ? r.w : r.w(T)
+    owa_w = owa_weights(r.w, T, :w)
     net = set_sorting_network_owa!(model, r.alg, pr.X, owa_w; prefix = prefix)
     state_set!(model, prefix, :sowa_z_, i, net.z)
     state_set!(model, prefix, :csowa_eq_, i, net.c_eq)
@@ -651,6 +673,7 @@ Where:
 
 # Validation
 
+  - Each tail weight vector has one entry for each observation, through [`owa_weights`](@ref). Raises a `DimensionMismatch`.
   - The range weight vector is nondecreasing. Raises a `DomainError`.
 
 # Keyword arguments
@@ -678,8 +701,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
                                prefix::Symbol = Symbol(""), kwargs...)
     T = get_T(model)
-    owa_w1 = isa(r.w1, VecNum) ? r.w1 : r.w1(T)
-    owa_w2 = isa(r.w2, VecNum) ? r.w2 : r.w2(T)
+    owa_w1 = owa_weights(r.w1, T, :w1)
+    owa_w2 = owa_weights(r.w2, T, :w2)
     net = set_sorting_network_owa!(model, r.alg, pr.X, owa_w1 - owa_w2; prefix = prefix)
     state_set!(model, prefix, :sowa_range_z_, i, net.z)
     state_set!(model, prefix, :csowa_range_eq_, i, net.c_eq)

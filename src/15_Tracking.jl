@@ -559,6 +559,47 @@ true
 function tracking_benchmark(tr::ReturnsTracking)
     return tr.w
 end
+"""
+    obs_weights_view(tr::ReturnsTracking, i) -> ReturnsTracking
+
+Return the benchmark return series of `tr` at the observations `i`.
+
+A [`ReturnsTracking`](@ref) holds one benchmark return for each observation, as a fixed observation weight vector holds one weight. So a cut of the observations of a fit, such as the drop of a Shared Series gap, drops the benchmark return of each dropped observation with it, see [`shared_series_estimator`](@ref). The series is not an observation weight, so [`factory`](@ref) does not replace it. A [`TrackingRiskMeasure`](@ref) and a [`TrackingError`](@ref) reach this method through their `tr` field.
+
+# Arguments
+
+  - `tr`: The [`ReturnsTracking`](@ref) that holds the benchmark return series.
+  - `i`: The observations to keep: a mask of the full sample, or their positions.
+
+# Validation
+
+  - For a mask, the rules of [`observed_weights`](@ref): the series has one entry for each entry of the mask. Raises a `DimensionMismatch`.
+
+# Returns
+
+  - `tr::ReturnsTracking`: The series at the kept observations.
+
+# Examples
+
+```jldoctest
+julia> tr = ReturnsTracking(; w = [0.01, 0.02, 0.03]);
+
+julia> PortfolioOptimisers.obs_weights_view(tr, [true, false, true]).w
+2-element Vector{Float64}:
+ 0.01
+ 0.03
+```
+
+# Related
+
+  - [`ReturnsTracking`](@ref)
+  - [`obs_weights_view`](@ref)
+  - [`obs_weights_index`](@ref)
+  - [`shared_series_estimator`](@ref)
+"""
+function obs_weights_view(tr::ReturnsTracking, i)
+    return ReturnsTracking(; w = obs_weights_index(tr.w, i))
+end
 function tracking_benchmark(tr::ReturnsTracking, X::VecNum_MatNum)
     T = size(X, 1)
     @argcheck(length(tr.w) == T,

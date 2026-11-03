@@ -551,5 +551,47 @@
             resn = optimise(MeanRisk(; r = rg(0.1), obj = MinimumRisk(), opt = opt))
             @test isapprox(resr.w, resn.w; rtol = 1e-6)
         end
+        @testset "A fixed weight vector of the wrong length is refused (#1963)" begin
+            # Before #1963 the approximate formulation read only the sum, the extremes and
+            # the norms of `w`, so a vector of the wrong length solved a different problem
+            # with no error, and the value of the same measure refused it.
+            slv = Solver(; name = :c, solver = Clarabel.Optimizer,
+                         settings = Dict("verbose" => false))
+            T = 39
+            X = randn(StableRNG(1963), T, 4) ./ 100
+            rd = ReturnsResult(; nx = string.('a':'d'), X = X)
+            opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv)
+            for alg in (ApproxOrderedWeightsArray(), ExactOrderedWeightsArray(),
+                        SortingNetworkOrderedWeightsArray()), n in (T - 1, T + 5)
+
+                owa = OrderedWeightsArray(; w = owa_cvar(n), alg = alg)
+                @test_throws "length(w) == $T must hold" optimise(MeanRisk(; r = owa,
+                                                                           opt = opt), rd)
+                rg = OrderedWeightsArrayRange(; w1 = owa_tg(n), alg = alg)
+                @test_throws "length(w1) == $T must hold" optimise(MeanRisk(; r = rg,
+                                                                            opt = opt), rd)
+                # The second tail is checked under its own name.
+                rg2 = OrderedWeightsArrayRange(; w1 = owa_tg, w2 = reverse(owa_tg(n)),
+                                               alg = alg)
+                @test_throws "length(w2) == $T must hold" optimise(MeanRisk(; r = rg2,
+                                                                            opt = opt), rd)
+            end
+            # A vector of the right length solves as the builder does.
+            vec = optimise(MeanRisk(; r = OrderedWeightsArray(; w = owa_cvar(T)),
+                                    opt = opt), rd)
+            bld = optimise(MeanRisk(; r = OrderedWeightsArray(; w = owa_cvar), opt = opt),
+                           rd)
+            @test isapprox(vec.w, bld.w; rtol = 1e-6)
+            # The value refuses the same vector with the same error.
+            x = randn(StableRNG(19631), T)
+            @test_throws DimensionMismatch OrderedWeightsArray(; w = owa_cvar(T + 5))(x)
+            @test_throws DimensionMismatch OrderedWeightsArrayRange(; w1 = owa_tg(T - 1))(x)
+            @test OrderedWeightsArray(; w = owa_cvar(T))(x) ≈
+                  OrderedWeightsArray(; w = owa_cvar)(x)
+            # A plain function of the caller is checked too.
+            @test_throws DimensionMismatch PortfolioOptimisers.owa_weights(n -> owa_gmd(n +
+                                                                                        1),
+                                                                           T)
+        end
     end
 end

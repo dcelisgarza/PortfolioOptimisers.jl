@@ -1473,7 +1473,7 @@ This is the step of a [`PinnedChoice`](@ref). It runs the steps of the fit that 
 # Algorithm
 
  1. Answer `nothing` when `pe.families` is `nothing`, or names the dropped member of every family. Nothing is left to pin.
- 2. Answer `nothing` when every observation of the buffer has a Shared Series gap, because the fit keeps none, which [`buffer_fits_none`](@ref) answers. Otherwise drop the observations with a gap with [`shared_series_buffer`](@ref), as the call with no data drops them.
+ 2. Answer `nothing` when every observation of the buffer has a Shared Series gap, because the fit keeps none, which [`buffer_fits_none`](@ref) answers. Otherwise drop the observations with a gap from the buffer and from a copy of `pe` with [`shared_series_buffer_fit`](@ref), as the call with no data drops them. A fixed weight vector of the copy loses the weights of the dropped observations. The later steps read the copy, and `pe` keeps its weights.
  3. Answer `nothing` when the buffer records no Asset Panel. The call with no data refuses that buffer, so no fit is made.
  4. Run [`cross_sectional_exposure_stage`](@ref) over the rows of the buffer, with the Exogenous Series that the buffer records. Answer `nothing` when fewer than `pe.lag + 2` rows remain after the Descriptor warm-up, because the fit refuses them, so no first fit is made yet.
  5. Neutralise the exposures after the warm-up with [`cross_sectional_neutralise!`](@ref), and build the Factor Family Basis with [`factor_family_basis`](@ref).
@@ -1505,21 +1505,24 @@ function cross_sectional_pinned_families(pe::CrossSectionalFactorPrior)
     if buffer_fits_none(state)
         return nothing
     end
-    state = shared_series_buffer(state)
+    # The fit reads a copy cut at the kept observations, so a fixed weight vector of the tree
+    # loses the weights of the marked observations. The answer is the choice alone, so the
+    # copy never becomes the estimator of the step.
+    cut, state = shared_series_buffer_fit(pe, state)
     pnl = sample_buffer_panel(state)
     if isnothing(pnl)
         return nothing
     end
-    (; BW, Ms, nf, fam, rw) = cross_sectional_exposure_stage(pe, sample_buffer(state),
+    (; BW, Ms, nf, fam, rw) = cross_sectional_exposure_stage(cut, sample_buffer(state),
                                                              nothing, pnl;
                                                              exogenous_buffer_kwargs(state)...,
                                                              implied_volatility_buffer_kwargs(state)...)
-    if length(rw) - pe.lag < 2
+    if length(rw) - cut.lag < 2
         return nothing
     end
     Msw = Ms[rw, :, :]
     bww = BW[rw, :]
-    cross_sectional_neutralise!(pe.neutralise, Msw, pe.cre, bww, nf, fam)
+    cross_sectional_neutralise!(cut.neutralise, Msw, cut.cre, bww, nf, fam)
     return cross_sectional_dropped_names(pe.families,
                                          factor_family_basis(pe.families, Msw, bww, nf,
                                                              fam), nf)

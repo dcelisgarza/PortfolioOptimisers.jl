@@ -252,7 +252,8 @@ commit = "8610300"
 "src/10_Prior/09_AssetPanelEstimators.jl" = { lines = 41, misses = 0 }
 "src/10_Prior/10_Base_CrossSectionalFactorPrior.jl" = { lines = 227, misses = 0 }
 "src/10_Prior/11_CrossSectionalFactorPrior.jl" = { lines = 71, misses = 0 }
-"src/10_Prior/12_PriorPartialFit.jl" = { lines = 76, misses = 0 }
+"src/10_Prior/12_PriorPartialFit_a.jl" = { lines = 260, misses = 0 }
+"src/10_Prior/12_PriorPartialFit_b.jl" = { lines = 38, misses = 0 }
 "src/10_Prior/13_PriorExpectedReturns.jl" = { lines = 17, misses = 0 }
 "src/10_Prior/14_LowDimensionEnsemblePrior.jl" = { lines = 38, misses = 0 }
 "src/10_Prior/15_CrossSectionalPriorFold.jl" = { lines = 228, misses = 2 }

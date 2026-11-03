@@ -267,6 +267,12 @@ Keywords correspond to the struct's fields.
 
   - `tr`: Recursively viewed through [`port_opt_view`](@ref).
 
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `tr`: Recursively indexed through [`obs_weights_view`](@ref). A [`ReturnsTracking`](@ref) holds one benchmark return for each observation, so a Shared Series gap drops the benchmark return of the dropped observation with it.
+
 # Functor
 
     (r::TrackingRiskMeasure)(w::VecNum, X::MatNum, fees = nothing)
@@ -317,6 +323,7 @@ TrackingRiskMeasure
   - [`NormError`](@ref)
   - [`norm_error`](@ref)
   - [`port_opt_view`](@ref)
+  - [`obs_weights_view`](@ref)
   - [`expected_risk`](@ref)
 
 # References
@@ -336,7 +343,7 @@ TrackingRiskMeasure
     """
     $(field_dict[:tr_spec])
     """
-    @vprop tr
+    @vprop @oprop tr
     """
     $(field_dict[:tralg])
     """

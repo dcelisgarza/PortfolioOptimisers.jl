@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.3"
 julia_syntax = "1.0.2"
-commit = "fa92260809"
+commit = "3a4325194a"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { code = 287, doc = 0, comment = 12, blank = 2, total = 301 }
@@ -254,7 +254,8 @@ commit = "fa92260809"
 "src/10_Prior/09_AssetPanelEstimators.jl" = { code = 119, doc = 424, comment = 14, blank = 191, total = 748 }
 "src/10_Prior/10_Base_CrossSectionalFactorPrior.jl" = { code = 497, doc = 1044, comment = 17, blank = 475, total = 2033 }
 "src/10_Prior/11_CrossSectionalFactorPrior.jl" = { code = 454, doc = 947, comment = 57, blank = 361, total = 1819 }
-"src/10_Prior/12_PriorPartialFit.jl" = { code = 498, doc = 994, comment = 25, blank = 469, total = 1986 }
+"src/10_Prior/12_PriorPartialFit_a.jl" = { code = 464, doc = 912, comment = 17, blank = 426, total = 1819 }
+"src/10_Prior/12_PriorPartialFit_b.jl" = { code = 58, doc = 118, comment = 10, blank = 55, total = 241 }
 "src/10_Prior/13_PriorExpectedReturns.jl" = { code = 37, doc = 114, comment = 1, blank = 46, total = 198 }
 "src/10_Prior/14_LowDimensionEnsemblePrior.jl" = { code = 96, doc = 171, comment = 16, blank = 50, total = 333 }
 "src/10_Prior/15_CrossSectionalPriorFold.jl" = { code = 491, doc = 612, comment = 13, blank = 266, total = 1382 }

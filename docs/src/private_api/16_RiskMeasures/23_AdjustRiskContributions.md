@@ -20,6 +20,7 @@ reads_fees
 cancels_constant_fee
 sums_to_zero
 resolve_owa_weights
+owa_weights
 scalarised_degree
 degree_difference
 adjust_risk_contribution

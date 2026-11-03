@@ -1,8 +1,8 @@
 ```@meta
-Description = "Prior partial fit, public API of PortfolioOptimisers.jl: partial_fit!, port_opt_view, merge_states, prior."
+Description = "Prior partial fit (a), public API of PortfolioOptimisers.jl: partial_fit!, port_opt_view, merge_states, prior."
 ```
 
-# Prior partial fit
+# Prior partial fit (a)
 
 A prior updates with `partial_fit!` in one of two ways, and the type of the state it carries shows which.
 
@@ -22,7 +22,4 @@ prior(pe::PortfolioOptimisers.AbstractPriorEstimator; kwargs...)
 PortfolioOptimisers.partial_fit!(pe::PortfolioOptimisers.AbstractPriorEstimator, X::PortfolioOptimisers.VecNum_MatNum, F::PortfolioOptimisers.Option{<:PortfolioOptimisers.VecNum_MatNum} = nothing; dims::Int = 1, active_mask = nothing, estimation_mask = nothing)
 PortfolioOptimisers.partial_fit!(pe::PortfolioOptimisers.AbstractPriorEstimator, rd::ReturnsResult)
 PortfolioOptimisers.partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any, <:Option{<:PortfolioOptimisers.PriorCarryState}}, x::PortfolioOptimisers.VecNum, ::PortfolioOptimisers.Option{<:PortfolioOptimisers.VecNum_MatNum} = nothing; kwargs...)
-prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any, <:Option{<:PortfolioOptimisers.PriorCarryState}}; strict::Bool = false, kwargs...)
-PortfolioOptimisers.partial_fit!(pe::BlackLittermanPrior, X::PortfolioOptimisers.VecNum_MatNum, F::PortfolioOptimisers.Option{<:PortfolioOptimisers.VecNum_MatNum} = nothing; kwargs...)
-prior(pe::BlackLittermanPrior; strict::Bool = false, kwargs...)
 ```

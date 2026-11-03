@@ -62,7 +62,7 @@ unique_key_dict!(math_dict, :math_dict,
                  :k_tail_count => "``k``: The number of assets that a rule takes from one end of the order of the scores.",#
                  :N_F_finite_count => "``N_{\\mathcal{F}}``: The number of assets with a finite score. A `NaN` or an infinite score does not count.",#
                  :t_corr_threshold => "``t``: The correlation at or above which two assets are redundant.",#
-                 # The online step of the prior family. `12_PriorPartialFit.jl` states the
+                 # The online step of the prior family. `12_PriorPartialFit_a.jl` states the
                  # result of `prior(pe)` with no data as the batch prior of the rows that
                  # `pe` folded.
                  :P_batch_prior => "``\\mathcal{P}(\\cdot)``: Batch prior, the result that the estimator's batch verb gives on the matrices in the parentheses.",#

@@ -996,10 +996,16 @@ function pin_regression_choice(re::StepwiseRegression{<:Any, <:Any, <:Any, <:Pin
     end
     return rebuild_estimator(re, (; included = included))
 end
-# A method of `pending_choice`, which `src/10_Prior/12_PriorPartialFit.jl` documents. It lives
+# A method of `pending_choice`, which `src/10_Prior/12_PriorPartialFit_a.jl` documents. It lives
 # beside the pin it answers for.
 function pending_choice(re::StepwiseRegression{<:Any, <:Any, <:Any, <:PinnedChoice})
     return isnothing(re.included) || any(isnothing, re.included)
+end
+# A method of `adopt_pinned_choice`, which `src/10_Prior/12_PriorPartialFit_a.jl` documents. It
+# lives beside the pin whose choice it writes.
+function adopt_pinned_choice(re::StepwiseRegression{<:Any, <:Any, <:Any, <:PinnedChoice},
+                             pinned::StepwiseRegression)
+    return rebuild_estimator(re, (; included = pinned.included))
 end
 
 export PValue, ForwardSelection, BackwardElimination, StepwiseRegression

@@ -2414,7 +2414,7 @@ function factory(x::OrderedWeightsArray, pr::AbstractPriorResult, args...; kwarg
     return resolve_deferred_quantities(x, pr)
 end
 function (r::OrderedWeightsArray)(x::VecNum)
-    w = isa(r.w, VecNum) ? r.w : r.w(length(x))
+    w = owa_weights(r.w, length(x), :w)
     return LinearAlgebra.dot(w, sort(x))
 end
 

@@ -632,7 +632,7 @@ end
         @test isapprox(o.mu[isfinite.(o.mu)], b.mu[isfinite.(b.mu)]; rtol = 1e-12)
     end
 
-    @testset "The docstrings of 12_PriorPartialFit.jl against numbers" begin
+    @testset "The docstrings of 12_PriorPartialFit_a.jl and _b.jl against numbers" begin
         # `dims = 2` reaches the batch fit on both arms, and the carry state holds the rows
         # in the observation-by-row orientation.
         for est in (EmpiricalPrior(), EmpiricalPrior(; horizon = 21))
@@ -744,6 +744,8 @@ end
         @test v.named == Set([1, 2])
         @test pe.sample_buffer(v) == X[:, [2, 5, 6]]
         @test pe.port_opt_view(s, 5).named == Set([1])
+        # A tree with no estimator in the slot needs no factor returns.
+        @test pe.assert_factor_returns(nothing, nothing) === nothing
         # The refusal names both routes that give a factor matrix.
         msg = try
             pe.assert_factor_returns(EntropyPoolingPrior(; pe = FactorPrior()), nothing)

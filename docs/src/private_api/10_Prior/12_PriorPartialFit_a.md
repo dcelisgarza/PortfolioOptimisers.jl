@@ -1,8 +1,8 @@
 ```@meta
-Description = "Prior partial fit, private API of PortfolioOptimisers.jl: PriorCarryState, sample_buffer, returns_buffer, prior_returns_buffer, fold_carry, Base.copy, …"
+Description = "Prior partial fit (a), private API of PortfolioOptimisers.jl: PriorCarryState, sample_buffer, returns_buffer, prior_returns_buffer, fold_carry, Base.copy, …"
 ```
 
-# Prior partial fit: private API
+# Prior partial fit (a): private API
 
 ```@docs
 PortfolioOptimisers.PriorCarryState
@@ -25,6 +25,7 @@ PortfolioOptimisers.refit_prior_fold
 PortfolioOptimisers.pin_buffer_choice
 PortfolioOptimisers.pin_prior_choice
 PortfolioOptimisers.pending_choice
+PortfolioOptimisers.adopt_pinned_choice
 PortfolioOptimisers.refit_step_kwargs
 PortfolioOptimisers.exogenous_step_kwargs
 PortfolioOptimisers.step_panel_fields
@@ -35,5 +36,4 @@ PortfolioOptimisers.read_member
 PortfolioOptimisers.fold_prior_step(pe::EmpiricalPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:PortfolioOptimisers.Option{<:PortfolioOptimisers.PriorCarryState}}, rd::ReturnsResult, gaps::PortfolioOptimisers.Option{<:AbstractVector{Bool}})
 PortfolioOptimisers.assert_carry_step_panel
 PortfolioOptimisers.step_active_kwargs
-PortfolioOptimisers.update_online_estimator(pe::Union{HighOrderPriorEstimator, BlackLittermanPrior})
 ```

@@ -93,10 +93,25 @@ entry for each buffered observation, so `shared_series_buffer_estimator` cuts it
 observations of the buffer. A member that folds reads its own state, which never folded a marked
 observation, and it refuses fixed weights, so `buffer_refit_member` leaves it as it is.
 
-The walk reaches observation weights only. A fixed series of one value for each observation that is
-not a weight, such as the benchmark returns of a `ReturnsTracking`, keeps the full length, and the
-measure refuses it by name. Issue #1964 holds that case and the pin of a Choice Rule on a buffer.
-The fixed vector of an `OrderedWeightsArray` has a defect of its own with no gap, issue #1963.
+A fixed series of one value for each observation that is not a weight follows the same rule
+(#1964). The benchmark returns of a `ReturnsTracking` are the one such series. A benchmark return
+at a dropped observation drops with it, as a weight does. `ReturnsTracking` has a hand-written
+`obs_weights_view` that gives its series to `obs_weights_index`. `TrackingRiskMeasure` reaches it
+through `@oprop tr`, because `factory` must not replace the series, and `TrackingError` reaches it
+through `@fprop tr`.
+
+The pin of a Choice Rule on a buffer (#1964) fits the buffer with the marked observations dropped,
+so it pins a copy of the prior cut by `shared_series_buffer_fit`. The online step keeps its
+estimator for every later step, and a later buffer marks other observations, so the cut copy must
+not become that estimator. `adopt_pinned_choice` writes the choice fields of the pinned copy, the
+`included` of a `StepwiseRegression` and the `proj` of a `DimensionReductionRegression`, into the
+uncut prior. The pin of a Cross-Sectional Factor Prior returns the dropped members alone, so it
+fits the cut copy and writes nothing back.
+
+The fixed vector of an `OrderedWeightsArray` is a weight for each sorted observation, not for each
+row, so the cut does not reach it. It has a rule of its own with no gap (#1963): `owa_weights`
+refuses a vector whose length is not the number of observations, in the value and in every JuMP
+formulation.
 
 ## Consequences
 
