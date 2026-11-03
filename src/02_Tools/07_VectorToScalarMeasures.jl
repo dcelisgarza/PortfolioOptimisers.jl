@@ -700,7 +700,7 @@ The method that Julia selects is the algorithm. `measure` names the reduction. T
  3. `measure` is a [`MinValue`](@ref), a [`MaxValue`](@ref), a [`SumValue`](@ref) or a [`ProdValue`](@ref): return `minimum`, `maximum`, `sum` or `prod` of `val`.
  4. `measure` is a [`ModeValue`](@ref): return `StatsBase.mode` of `val`.
  5. `measure` is a [`MeanValue`](@ref) or a [`MedianValue`](@ref): return `Statistics.mean` or `Statistics.median` of `val`, with weights when the measure holds them. On the weighted branch, `collect` a tuple first, and resolve the weights against `val` with [`get_observation_weights`](@ref). That call returns a `StatsBase.AbstractWeights` itself, and it evaluates a [`DynamicAbstractWeights`](@ref) on `val`.
- 6. `measure` is a [`StdValue`](@ref) or a [`VarValue`](@ref): return `Statistics.std` or `Statistics.var` of `val`, with `corrected = measure.corrected`, with weights when the measure holds them, and with `kwargs...`. The weighted branch resolves its weights as step 5 does.
+ 6. `measure` is a [`StdValue`](@ref) or a [`VarValue`](@ref): return `Statistics.std` or `Statistics.var` of `val`, with `corrected = measure.corrected`, with weights when the measure holds them, and with `kwargs...`. The weighted branch resolves its weights as step 5 does. It returns `NaN` when the divisor of the weights is not positive, with [`weighted_moment_guard`](@ref), as the unweighted branch does on one entry.
  7. `measure` is a [`StandardisedValue`](@ref): follow the algorithm of that type, which reduces two times and guards the denominator.
 
 Because of step 1, a plain number is a valid `measure`. A caller that already has the value writes it where a reduction goes, and `vec_to_real_measure` needs no second signature.
@@ -776,8 +776,11 @@ function vec_to_real_measure(sv::StdValue{Nothing},
     return Statistics.std(val; corrected = sv.corrected, kwargs...)
 end
 function vec_to_real_measure(sv::StdValue{<:ObsWeights}, val::VecNum; kwargs...)
-    return Statistics.std(val, get_observation_weights(sv.w, val); corrected = sv.corrected,
-                          kwargs...)
+    w = get_observation_weights(sv.w, val)
+    # The guard reads the variance, because a divisor below zero gives a variance below zero,
+    # which has no square root. `StatsBase` takes the same square root.
+    return sqrt(weighted_moment_guard(Statistics.var(val, w; corrected = sv.corrected,
+                                                     kwargs...), w, sv.corrected))
 end
 function vec_to_real_measure(sv::StdValue{<:ObsWeights}, val::NTuple{N, <:Number} where {N};
                              kwargs...)
@@ -788,8 +791,9 @@ function vec_to_real_measure(vv::VarValue{Nothing},
     return Statistics.var(val; corrected = vv.corrected, kwargs...)
 end
 function vec_to_real_measure(vv::VarValue{<:ObsWeights}, val::VecNum; kwargs...)
-    return Statistics.var(val, get_observation_weights(vv.w, val); corrected = vv.corrected,
-                          kwargs...)
+    w = get_observation_weights(vv.w, val)
+    return weighted_moment_guard(Statistics.var(val, w; corrected = vv.corrected,
+                                                kwargs...), w, vv.corrected)
 end
 function vec_to_real_measure(vv::VarValue{<:ObsWeights}, val::NTuple{N, <:Number} where {N};
                              kwargs...)

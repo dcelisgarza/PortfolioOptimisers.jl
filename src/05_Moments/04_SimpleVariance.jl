@@ -26,6 +26,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - $(val_dict[:oow])
+  - $(val_dict[:cvg_me])
   - `corrected = true` needs a weight type that has a bias correction. The constructor does not check it, and `StatsBase` throws an `ArgumentError` at the fit. See the bias-correction bullet of [`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref).
 
 ## Propagated parameters
@@ -111,6 +112,7 @@ SimpleVariance
                             cvg::Option{<:CoveragePolicy},
                             cache::Option{<:AbstractPartialFitState})
         assert_nonempty_nonneg_finite_val(w, :w)
+        assert_coverage_fittable(cvg, me, w, "SimpleVariance")
         return new{typeof(me), typeof(w), typeof(corrected), typeof(cvg), typeof(cache)}(me,
                                                                                          w,
                                                                                          corrected,
@@ -163,13 +165,15 @@ The matrix method:
  2. Get the centring vector `mu` from `me` and `ve.w` with [`weighted_centre`](@ref). It uses `mean` if the caller gave one.
  3. Get the observation weights `w` from `ve.w` and `X` with [`get_observation_weights`](@ref).
  4. When `w` is `nothing`, call `f(X; dims = dims, corrected = ve.corrected, mean = mu)`.
- 5. Otherwise call `f(X, w, dims; corrected = ve.corrected, mean = mu)`.
+ 5. Otherwise call `Statistics.var(X, w, dims; corrected = ve.corrected, mean = mu)`. Write `NaN` in each entry when the divisor of `w` is not positive, with [`weighted_moment_guard`](@ref). Then change the variance to the result of `f` with [`coverage_moment_map`](@ref).
 
 The vector method:
 
  1. Get the observation weights `w` from `ve.w` and `X`.
  2. When `w` is `nothing`, call `f(X; corrected = ve.corrected, mean = mean)`.
- 3. Otherwise call `f(X, w; corrected = ve.corrected, mean = mean)`.
+ 3. Otherwise call `Statistics.var(X, w; corrected = ve.corrected, mean = mean)`. Return `NaN` when the divisor of `w` is not positive, with [`weighted_moment_guard`](@ref). Then change the variance to the result of `f` with [`coverage_moment_map`](@ref).
+
+A corrected fit on one observation of positive weight has a divisor of zero. Its result is then `NaN`, as the unweighted fit on one observation is, and not the `Inf` that the rounding of the weighted mean gives. The guard reads the variance before the square root, because a divisor below zero gives a variance below zero. `StatsBase` takes the weighted standard deviation as the square root of the weighted variance, so a valid result does not change.
 
 The two methods get one centre by two routes. The matrix method gets a centre before it calls `f`. [`weighted_centre`](@ref) takes that centre from `me` after [`factory`](@ref) writes `ve.w` into `me`. The vector method passes `mean` to `f` without change, so a `mean` of `nothing` lets `f` centre on the weighted mean of `X`.
 
@@ -264,7 +268,11 @@ function coverage_variance(f::F, ve::SimpleVariance, ::Nothing,
     return if isnothing(w)
         f(X; dims = dims, corrected = ve.corrected, mean = mu)
     else
-        f(X, w, dims; corrected = ve.corrected, mean = mu)
+        coverage_moment_map(f,
+                            weighted_moment_guard(Statistics.var(X, w, dims;
+                                                                 corrected = ve.corrected,
+                                                                 mean = mu), w,
+                                                  ve.corrected))
     end
 end
 """
@@ -301,31 +309,31 @@ function coverage_variance(f::F, ve::SimpleVariance, cvg::CoveragePolicy,
     return isone(dims) ? permutedims(val) : reshape(val, :, 1)
 end
 """
-    coverage_moment_map(f::typeof(Statistics.var), v::VecNum) -> VecNum
-    coverage_moment_map(f::typeof(Statistics.std), v::VecNum) -> VecNum
+    coverage_moment_map(f::typeof(Statistics.var), v::Num_ArrNum) -> Num_ArrNum
+    coverage_moment_map(f::typeof(Statistics.std), v::Num_ArrNum) -> Num_ArrNum
 
-Changes an available-case variance to the result that the verb of the caller asks for.
+Changes a variance to the result that the verb of the caller asks for.
 
-[`coverage_variance`](@ref) fits a variance for both verbs, because the state holds only a second-moment accumulator. The standard deviation is the square root of that variance. The method dispatches on the verb and does not compare it, so the compiler makes the choice.
+[`coverage_variance`](@ref) fits a variance for both verbs. In the available-case arm, the state holds only a second-moment accumulator. In the weighted Coverage Universe arm, [`weighted_moment_guard`](@ref) reads the variance before the square root, because a divisor below zero gives a variance below zero, which has no square root. The standard deviation is the square root of that variance, as in `StatsBase`. The method dispatches on the verb and does not compare it, so the compiler makes the choice.
 
 # Arguments
 
   - `f`: `Statistics.var` or `Statistics.std`.
-  - `v`: The available-case variance.
+  - `v`: The variance, one number or an array.
 
 # Returns
 
-  - `val::VecNum`: `v` without change, or its element-wise square root.
+  - `val::Num_ArrNum`: `v` without change, or its element-wise square root.
 
 # Related
 
   - [`coverage_variance`](@ref)
   - [`SimpleVariance`](@ref)
 """
-function coverage_moment_map(::typeof(Statistics.var), v::VecNum)
+function coverage_moment_map(::typeof(Statistics.var), v::Num_ArrNum)
     return v
 end
-function coverage_moment_map(::typeof(Statistics.std), v::VecNum)
+function coverage_moment_map(::typeof(Statistics.std), v::Num_ArrNum)
     return sqrt.(v)
 end
 function simple_variance_kernel(f::F, ve::SimpleVariance, X::VecNum;
@@ -349,7 +357,11 @@ function coverage_variance(f::F, ve::SimpleVariance, ::Nothing, X::VecNum;
     return if isnothing(w)
         f(X; corrected = ve.corrected, mean = mean)
     else
-        f(X, w; corrected = ve.corrected, mean = mean)
+        coverage_moment_map(f,
+                            weighted_moment_guard(Statistics.var(X, w;
+                                                                 corrected = ve.corrected,
+                                                                 mean = mean), w,
+                                                  ve.corrected))
     end
 end
 """
@@ -1378,10 +1390,13 @@ function simple_variance_count(w::StatsBase.AbstractWeights, corrected::Bool,
     n = s^2 / sum(abs2, wf)
     return (; n = n, m = n / (s * StatsBase.varcorrection(wf, corrected)))
 end
+# Each column reads its finite rows with their weights, through `observed_sample`, so a dynamic
+# weight resolves on the rows that the column reads, as the weighted available-case fit does.
 function variance_count(ve::SimpleVariance, X::MatNum)
-    w = get_observation_weights(ve.w, X; dims = 1)
-    cnt = [simple_variance_count(w, ve.corrected, isfinite.(view(X, :, i)))
-           for i in axes(X, 2)]
+    cnt = map(axes(X, 2)) do i
+        x, w = observed_sample(view(X, :, i), ve.w)
+        return simple_variance_count(w, ve.corrected, trues(length(x)))
+    end
     return (; n = getindex.(cnt, :n), m = getindex.(cnt, :m))
 end
 export SimpleVariance, var, std

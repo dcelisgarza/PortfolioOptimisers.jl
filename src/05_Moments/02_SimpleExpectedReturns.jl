@@ -82,6 +82,7 @@ SimpleExpectedReturns
     function SimpleExpectedReturns(w::Option{<:ObsWeights}, cvg::Option{<:CoveragePolicy},
                                    cache::Option{<:AbstractPartialFitState})::SimpleExpectedReturns
         assert_nonempty_nonneg_finite_val(w, :w)
+        assert_coverage_fittable(cvg, nothing, w, "SimpleExpectedReturns")
         return new{typeof(w), typeof(cvg), typeof(cache)}(w, cvg, cache)
     end
 end
@@ -89,6 +90,76 @@ function SimpleExpectedReturns(; w::Option{<:ObsWeights} = nothing,
                                cvg::Option{<:CoveragePolicy} = nothing,
                                cache::Option{<:AbstractPartialFitState} = nothing)::SimpleExpectedReturns
     return SimpleExpectedReturns(w, cvg, cache)
+end
+"""
+    assert_coverage_fittable(cvg::Nothing, args...)
+    assert_coverage_fittable(cvg::CoveragePolicy,
+                             me::Option{<:AbstractExpectedReturnsEstimator}, w::Nothing,
+                             name::AbstractString)
+    assert_coverage_fittable(cvg::CoveragePolicy,
+                             me::Option{<:AbstractExpectedReturnsEstimator}, w::ObsWeights,
+                             name::AbstractString)
+    assert_coverage_fittable(cvg::CoveragePolicy,
+                             me::Option{<:AbstractExpectedReturnsEstimator},
+                             w::Option{<:ObsWeights}, name::AbstractString,
+                             ce::StatsBase.CovarianceEstimator)
+
+Refuses, at construction, an estimator whose [`CoveragePolicy`](@ref) cannot fit with the rest of its configuration.
+
+The available-case arm of each batch verb centres each asset on its own observations, and the type of `w` selects the arm.
+
+  - **No weights.** The arm folds the block through [`partial_fit!`](@ref), so it takes only a configuration that an incremental fit takes. The centre is the running sample mean, and the inner estimator of a [`Covariance`](@ref) must be a `StatsBase.SimpleCovariance` with no weights.
+  - **Observation weights.** The arm makes one pass over the block. It fits each asset, each pair and each cell of a co-moment over its own valid observations, with their weights, as [`observed_sample`](@ref) states. The centre is the weighted mean of the observations of each asset, so `me` must be `nothing` or a [`SimpleExpectedReturns`](@ref), whose weights `w` replaces. The inner estimator of a `Covariance` must read as a `StatsBase.SimpleCovariance`, through [`coverage_inner_corrected`](@ref).
+
+The configuration alone decides the refusal, so the constructor makes it, and not the fit. [`factory`](@ref) rebuilds an estimator through its constructor, so the rules hold on the estimator that a prior builds. The [`SimpleExpectedReturns`](@ref), [`SimpleVariance`](@ref), [`Covariance`](@ref), [`Coskewness`](@ref) and [`Cokurtosis`](@ref) constructors call the function. An estimator with no `me` field passes `nothing`.
+
+# Arguments
+
+  - `cvg`: The policy of the estimator. The `Nothing` method checks nothing.
+  - `me`: The estimator that centres the fit, or `nothing`.
+  - `w`: The observation weights of the estimator, or `nothing`.
+  - `name`: The name of the estimator, for the message.
+  - `ce`: The inner covariance estimator of a [`Covariance`](@ref).
+
+# Validation
+
+  - With no weights, `me` is `nothing` or a [`SimpleExpectedReturns`](@ref) with no weights, through [`assert_partial_fittable`](@ref). With weights, `me` is `nothing` or a [`SimpleExpectedReturns`](@ref). An `ArgumentError` is thrown otherwise.
+  - `ce` reads the sample as a `StatsBase.SimpleCovariance`, through [`partial_fit_corrected`](@ref) with no weights and through [`coverage_inner_corrected`](@ref) with weights. With no weights, it holds no weights of its own. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`CoveragePolicy`](@ref)
+  - [`assert_partial_fittable`](@ref)
+  - [`partial_fit_corrected`](@ref)
+  - [`coverage_inner_corrected`](@ref)
+  - [`observed_sample`](@ref)
+"""
+function assert_coverage_fittable(::Nothing, args...)
+    return nothing
+end
+function assert_coverage_fittable(::CoveragePolicy,
+                                  me::Option{<:AbstractExpectedReturnsEstimator}, ::Nothing,
+                                  name::AbstractString)
+    return assert_partial_fittable(me, nothing, name)
+end
+function assert_coverage_fittable(::CoveragePolicy,
+                                  me::Option{<:AbstractExpectedReturnsEstimator},
+                                  ::ObsWeights, name::AbstractString)
+    @argcheck(isnothing(me) || isa(me, SimpleExpectedReturns),
+              ArgumentError("$name cannot take `me = $(typeof(me))` with a `CoveragePolicy`, because its weighted available-case fit centres each asset on the weighted mean of that asset's own observations. Set `me = SimpleExpectedReturns()`, or clear `cvg`."))
+    return nothing
+end
+function assert_coverage_fittable(cvg::CoveragePolicy,
+                                  me::Option{<:AbstractExpectedReturnsEstimator},
+                                  w::Option{<:ObsWeights}, name::AbstractString,
+                                  ce::StatsBase.CovarianceEstimator)
+    assert_coverage_fittable(cvg, me, w, name)
+    coverage_fittable_estimator(w, ce)
+    return nothing
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

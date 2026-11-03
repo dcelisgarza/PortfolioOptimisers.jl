@@ -276,7 +276,7 @@ function assert_partial_fittable(me::AbstractExpectedReturnsEstimator,
     @argcheck(isnothing(w),
               ArgumentError("$name cannot be fitted incrementally while `w` is set, because observation weights reweight every past observation when a new one arrives. Set `w = nothing`, or run the batch verb."))
     @argcheck(isa(me, SimpleExpectedReturns) && isnothing(me.w),
-              ArgumentError("$name cannot be fitted incrementally with `me = $(typeof(me))`, because a partial-fit state carries the running sample mean and no other centre. Set `me = SimpleExpectedReturns()`, or run the batch verb."))
+              ArgumentError("$name cannot be fitted incrementally with `me = $(typeof(me))`, because a partial-fit state carries the running sample mean and no other centre. The available-case fit of a `CoveragePolicy` centres each asset on that mean too. Set `me = SimpleExpectedReturns()`, or clear `cvg` and run the batch verb."))
     return nothing
 end
 """

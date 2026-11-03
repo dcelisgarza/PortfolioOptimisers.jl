@@ -236,6 +236,88 @@ end
                   vcat(ivm[1:1, :], ivm[1:(end - 1), :] .+ ivm[2:end, :]))
 end
 
+#=
+Issue 1954. The weighted mean of one observation can differ from it by one unit in the last
+place, so a corrected weighted fit on one observation divided a sum of squares of about `1e-36`
+by zero, and gave `Inf` for about one asset in four. The unweighted fit gives `NaN`. Row 1 of a
+weighted series is a fit on one observation, so the cross-sectional inverse variance of row 2 gave
+such an asset a weight of `0`, where the unweighted fit drops it as `NaN`.
+=#
+@testset "a corrected fit on one weighted observation is NaN, as the unweighted fit is (#1954)" begin
+    eps = randn(StableRNG(11), 8, 6) .* 0.02
+    wv = StatsBase.aweights(rand(StableRNG(12), 8) .+ 0.1)
+    m = trues(size(eps))
+    @test all(isnan, PO.variance_series(SimpleVariance(; w = wv), eps)[1, :])
+    @test all(isnan, PO.variance_series(Covariance(; w = wv), eps)[1, :])
+    @test all(isnan,
+              PO.cross_sectional_lagged_inverse_variance(SimpleVariance(; w = wv), eps, m)[2,
+                                                                                           :])
+    @test isequal(PO.cross_sectional_lagged_inverse_variance(SimpleVariance(; w = wv), eps,
+                                                             m)[2, :],
+                  PO.cross_sectional_lagged_inverse_variance(SimpleVariance(), eps, m)[2,
+                                                                                       :])
+    # Over many draws of one observation, every weight type and every verb is `NaN` under the
+    # correction, with no `Inf` among them. The unweighted fit is `NaN` too. A frequency weight
+    # counts copies, so the weight is at most one: more than one copy has a variance.
+    rng = StableRNG(1954)
+    for W in (StatsBase.aweights, StatsBase.pweights, StatsBase.fweights), _ in 1:200
+        x = randn(rng, 1, 3) .* 0.02
+        w1 = W([0.1 + 0.9 * rand(rng)])
+        ce = Covariance(; w = w1)
+        @test all(isnan, var(SimpleVariance(; w = w1), x))
+        @test all(isnan, std(SimpleVariance(; w = w1), x))
+        @test isnan(var(SimpleVariance(; w = w1), x[:, 1]))
+        @test isnan(std(SimpleVariance(; w = w1), x[:, 1]))
+        @test all(isnan, cov(ce, x))
+        @test all(isnan, cov(Covariance(; w = w1, alg = SemiMoment()), x))
+        @test all(isnan, var(ce, x))
+        # A correlation needs two observations, under either correction. The diagonal stays
+        # one, as the unweighted fit keeps it.
+        for c in (true, false)
+            rho = cor(Covariance(; w = w1,
+                                 ce = GeneralCovariance(;
+                                                        ce = StatsBase.SimpleCovariance(;
+                                                                                        corrected = c))),
+                      x)
+            @test isequal(rho, cor(Covariance(), x))
+        end
+    end
+    @test all(isnan, var(SimpleVariance(), randn(StableRNG(1), 1, 3)))
+    # Frequency weights that sum to less than one have a negative divisor, which gave a negative
+    # variance.
+    @test all(isnan, var(SimpleVariance(; w = StatsBase.fweights([0.4])), [0.01 0.02]))
+    # A correlation does not read the divisor, so two observations under such weights have a
+    # correlation. The square root of the negative diagonal threw before.
+    Xf = [0.01 0.03; -0.02 0.01; 0.02 -0.01]
+    wf = StatsBase.fweights([0.2, 0.3, 0.1])
+    @test all(isnan, cov(GeneralCovariance(; w = wf), Xf))
+    @test cor(GeneralCovariance(; w = wf), Xf) ≈ cor(GeneralCovariance(; w = wf,
+                                                                       ce = StatsBase.SimpleCovariance(; corrected = false)), Xf)
+    @test PO.weighted_correlation_estimator(StatsBase.SimpleCovariance(), wf) ==
+          StatsBase.SimpleCovariance(; corrected = false)
+    gce = PO.GerberCovariance()
+    @test PO.weighted_correlation_estimator(gce, wf) === gce
+    # A fit with a positive divisor does not change: an uncorrected fit, and a corrected fit on
+    # one observation that a frequency weight counts twice.
+    x1 = [0.01 -0.02 0.03]
+    @test all(isfinite,
+              var(SimpleVariance(; w = StatsBase.aweights([0.4]), corrected = false), x1))
+    @test all(isfinite, var(SimpleVariance(; w = StatsBase.fweights([2.0])), x1))
+    X2 = randn(StableRNG(2), 2, 3)
+    w2 = StatsBase.aweights([0.3, 0.7])
+    @test var(SimpleVariance(; w = w2), X2) == var(X2, w2, 1; corrected = true)
+    @test cor(GeneralCovariance(; w = w2), X2) == cor(X2, w2, 1)
+    # The guard reads the divisor of `StatsBase` and does not change a valid estimate. A
+    # covariance estimator other than `StatsBase.SimpleCovariance` has a divisor that the
+    # library does not know, so it keeps its value.
+    @test PO.weighted_moment_guard(2.0, StatsBase.aweights([0.3, 0.7]), true) == 2.0
+    @test isnan(PO.weighted_moment_guard(2.0f0, StatsBase.pweights([0.0, 0.7]), true))
+    @test PO.weighted_moment_guard(2.0f0, StatsBase.pweights([0.0, 0.7]), true) isa Float32
+    @test PO.weighted_comoment_guard(Statistics.cov, PO.GerberCovariance(),
+                                     [1.0 2.0; 2.0 1.0], StatsBase.aweights([1.0])) ==
+          [1.0 2.0; 2.0 1.0]
+end
+
 @testset "an observation the pass cannot use leaves the cache where it was" begin
     rng = StableRNG(4327)
     X = randn(rng, 30, 3) .* 0.02

@@ -1244,6 +1244,11 @@ end
 function effective_observation_count(ce::ExpWeightedCovariance, X::MatNum; kwargs...)
     return exp_weighted_covariance_count(ce.decay, size(X, 1), ce.centring)
 end
+# The diagonal of the covariance is the variance of `ExpWeightedVariance` at the same decay and
+# centring, so the two read one count.
+function variance_count(ce::ExpWeightedCovariance, X::MatNum)
+    return exp_weighted_variance_count(ce.decay, X, ce.centring)
+end
 function effective_observation_count(ce::ExpWeightedCovariance,
                                      state::ExpWeightedCovarianceState; kwargs...)
     return exp_weighted_covariance_count(ce.decay, observation_count(state), ce.centring)

@@ -145,6 +145,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - $(val_dict[:oow])
+  - $(val_dict[:cvg_me])
 
 ## Propagated parameters
 
@@ -234,6 +235,7 @@ Cokurtosis
                         w::Option{<:ObsWeights}, cvg::Option{<:CoveragePolicy},
                         cache::Option{<:AbstractPartialFitState})
         assert_nonempty_nonneg_finite_val(w, :w)
+        assert_coverage_fittable(cvg, me, w, "Cokurtosis")
         return new{typeof(me), typeof(mp), typeof(alg), typeof(w), typeof(cvg),
                    typeof(cache)}(me, mp, alg, w, cvg, cache)
     end

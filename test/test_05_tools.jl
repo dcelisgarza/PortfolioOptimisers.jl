@@ -347,6 +347,15 @@ end
     # The same call with a weights type that does support the correction answers a number.
     @test PO.vec_to_real_measure(factory(StandardisedValue(), aweights(wv)), v) ==
           wm / sqrt(10 / 7)
+    # Issue 1954. A corrected weighted reduction of one entry has a divisor of zero. It is
+    # `NaN`, as the unweighted reduction of one entry is, and not the `Inf` that the rounding of
+    # the weighted mean gives. So the standardised value of one entry is the entry itself.
+    for W in (aweights, pweights, fweights), x in (0.013, -0.37, 0.1)
+        @test isnan(PO.vec_to_real_measure(StdValue(; w = W([0.4])), [x]))
+        @test isnan(PO.vec_to_real_measure(VarValue(; w = W([0.4])), (x,)))
+        @test PO.vec_to_real_measure(factory(StandardisedValue(), W([0.4])), [x]) ≈ x
+    end
+    @test isnan(PO.vec_to_real_measure(StdValue(), [0.013]))
     #=
     ADR 0087, the consistency the written default buys. The variance path and the covariance
     path answer the same number over the same data, on both branches, and they refuse a plain

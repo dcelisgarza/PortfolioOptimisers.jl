@@ -692,5 +692,16 @@ function effective_observation_count(ce::PortfolioOptimisersCovariance{<:Any, <:
                                                                        Nothing}; kwargs...)
     return effective_observation_count(ce.ce; kwargs...)
 end
+# The repair, the denoising and the detoning of `MatrixProcessing` act on the correlation, and
+# each one gives the diagonal back without change. So the variance of the composite is the
+# variance of `ce.ce`, and it reads the count of `ce.ce`. A custom `alg` step can change the
+# diagonal, so a composite with one states no count.
+function variance_count(ce::PortfolioOptimisersCovariance{<:Any,
+                                                          <:MatrixProcessing{<:Any, <:Any,
+                                                                             <:Any,
+                                                                             Nothing}},
+                        X::MatNum)
+    return variance_count(ce.ce, X)
+end
 
 export PortfolioOptimisersCovariance

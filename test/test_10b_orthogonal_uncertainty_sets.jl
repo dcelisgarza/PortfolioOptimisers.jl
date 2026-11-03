@@ -17,6 +17,10 @@ file against itself.
 # The synthetic point-in-time Asset Panel of the last testset.
 include(joinpath(@__DIR__, "test06c_setup.jl"))
 include(joinpath(@__DIR__, "parity_harness.jl"))
+using CovarianceEstimation: CovarianceEstimation
+# A custom processing step of a caller's. It can change the diagonal, so a composite that holds
+# one states no variance count (#1955).
+struct ProbeMatrixProcessing1955 <: PortfolioOptimisers.AbstractMatrixProcessingAlgorithm end
 @testset "Orthogonal uncertainty sets" begin
     using PortfolioOptimisers, Test, StableRNGs, Random, Clarabel, Statistics,
           LinearAlgebra, Distributions
@@ -1083,7 +1087,63 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
             @test isnothing(invoke(PO.variance_count,
                                    Tuple{PO.AbstractCovarianceEstimator, PO.MatNum},
                                    SimpleVariance(), X1334))
-            @test isnothing(PO.variance_count(Covariance(), X1334))
+            @test isnothing(PO.variance_count(Covariance(; alg = SemiMoment()), X1334))
+        end
+
+        #=
+        Issue 1955. A covariance estimator whose diagonal is the variance of a variance
+        estimator with a count states that count. `ve = Covariance()` refused a
+        `ResidualInflation` before, where `ve = SimpleVariance()` of the same numbers worked.
+        =#
+        @testset "A covariance estimator states the count of its variance sibling (#1955)" begin
+            w1955 = aweights(rand(StableRNG(1955), T1334))
+            f1955 = fweights(rand(StableRNG(19551), 1:3, T1334))
+            pairs1955 = [(Covariance(), SimpleVariance()),
+                         (Covariance(; w = w1955), SimpleVariance(; w = w1955)),
+                         (Covariance(;
+                                     ce = StatsBase.SimpleCovariance(; corrected = false)),
+                          SimpleVariance(; corrected = false)),
+                         (GeneralCovariance(; w = f1955), SimpleVariance(; w = f1955)),
+                         (ExpWeightedCovariance(), ExpWeightedVariance()),
+                         (ExpWeightedCovariance(; decay = 0.9, centring = PreCentred()),
+                          ExpWeightedVariance(; decay = 0.9, centring = PreCentred())),
+                         (WindowedCovariance(; window = 20),
+                          WindowedVariance(; window = 20)),
+                         (WindowedCovariance(; window = 20, w = w1955),
+                          WindowedVariance(; window = 20, w = w1955)),
+                         (PortfolioOptimisersCovariance(;
+                                                        mp = MatrixProcessing(;
+                                                                              dn = Denoise(),
+                                                                              dt = Detone())),
+                          SimpleVariance())]
+            Xg1955 = copy(X1334)
+            Xg1955[1:5, 2] .= NaN
+            for (c, v) in pairs1955
+                @test vec(var(c, X1334)) ≈ vec(var(v, X1334))
+                @test PO.variance_count(c, X1334) == PO.variance_count(v, X1334)
+                # A column reads its finite rows alone, as the sibling reads them.
+                @test PO.variance_count(c, Xg1955) == PO.variance_count(v, Xg1955)
+            end
+            # The regime multiplier of the covariance differs from the one of the variance on
+            # this sample, so the two diagonals differ. Both weight the squares at `decay`, and
+            # not at the correlation decay, and the count ignores the multiplier, so the two
+            # counts are one count.
+            for c in (RegimeAdjustedExpWeightedCovariance(),
+                      RegimeAdjustedExpWeightedCovariance(; cor_decay = 0.8))
+                v = RegimeAdjustedExpWeightedVariance()
+                @test PO.variance_count(c, X1334) == PO.variance_count(v, X1334)
+                @test PO.variance_count(c, Xg1955) == PO.variance_count(v, Xg1955)
+            end
+            # An inner estimator with no count of its own gives no count, and a custom
+            # processing step can change the diagonal.
+            @test isnothing(PO.variance_count(Covariance(; ce = GerberCovariance()), X1334))
+            @test isnothing(PO.variance_count(GeneralCovariance(;
+                                                                ce = CovarianceEstimation.LinearShrinkage(CovarianceEstimation.DiagonalUnitVariance())),
+                                              X1334))
+            @test isnothing(PO.variance_count(PortfolioOptimisersCovariance(;
+                                                                            mp = MatrixProcessing(;
+                                                                                                  alg = ProbeMatrixProcessing1955())),
+                                              X1334))
         end
 
         F1334 = randn(rng1334, T1334, K1334) * 0.01
@@ -1186,6 +1246,24 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
             @test 0 < phi < 1
             k = sigma_ucs(OrthogonalUncertaintySet(; kappa = ResidualInflation()), prp).kappa
             @test isfinite(k) && k > 0
+            # The covariance estimator of one variance gives the counts of the variance
+            # estimator, so `ResidualInflation` gives one radius. It refused before (#1955).
+            # The panel has gaps, which a plain fit refuses, so the sample pair reads them
+            # through a policy.
+            for (c, v) in ((Covariance(; cvg = CoveragePolicy()),
+                            SimpleVariance(; cvg = CoveragePolicy())),
+                           (RegimeAdjustedExpWeightedCovariance(; centring = PreCentred()), pe.ve))
+                prc = prior(CrossSectionalFactorPrior(; lambda = 1, factors = pe.factors,
+                                                      ve = c), rdp)
+                prv = prior(CrossSectionalFactorPrior(; lambda = 1, factors = pe.factors,
+                                                      ve = v), rdp)
+                @test prc.rr.edof ≈ prv.rr.edof
+                @test prc.rr.ediv == prv.rr.ediv
+                @test sigma_ucs(OrthogonalUncertaintySet(; kappa = ResidualInflation()),
+                                prc).kappa ≈
+                      sigma_ucs(OrthogonalUncertaintySet(; kappa = ResidualInflation()),
+                                prv).kappa
+            end
         end
 
         @testset "A view, an expansion and the constructors carry the counts" begin

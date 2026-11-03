@@ -18,6 +18,7 @@ robust_cor
 compat_cov
 compat_cor
 library_covariance_estimator
+weighted_comoment_guard
 ```
 
 ## Covariance
@@ -25,6 +26,7 @@ library_covariance_estimator
 ```@docs
 show_fields(::Covariance)
 covariance_centre_and_estimator
+covariance_inner_estimator
 ```
 
 ## Incremental fit

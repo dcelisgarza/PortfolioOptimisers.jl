@@ -403,6 +403,59 @@ function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum,
     return compat_cor(ce, densify(X), w; dims = dims, mean = mean, kwargs...)
 end
 """
+    weighted_comoment_guard(f::typeof(Statistics.cov), ce::StatsBase.SimpleCovariance,
+                            sigma::AbstractMatrix, w::StatsBase.AbstractWeights) -> AbstractMatrix
+    weighted_comoment_guard(f::typeof(Statistics.cor), ce::StatsBase.SimpleCovariance,
+                            rho::AbstractMatrix, w::StatsBase.AbstractWeights) -> AbstractMatrix
+    weighted_comoment_guard(f, ce::StatsBase.CovarianceEstimator, val::AbstractMatrix,
+                            w::StatsBase.AbstractWeights) -> AbstractMatrix
+
+Return the weighted covariance or correlation matrix that `ce` computed, or `NaN` where the sample gives the moment no value.
+
+The weighted mean of one observation can differ from it by one unit in the last place, so the deviations of a weighted fit on one observation are not zero. The unweighted fit on one observation has deviations of exactly zero, and its moments are `NaN` where a division by zero makes them undefined. The function gives the weighted fit the same values.
+
+  - **Covariance.** The method returns `NaN` in each entry when the divisor of the weights is not positive, with [`weighted_moment_guard`](@ref). Without the guard, a corrected fit on one observation of positive weight is `Inf`.
+  - **Correlation.** A correlation needs two observations of positive weight. With fewer, the method writes `NaN` off the diagonal and keeps the diagonal of `rho`, as the unweighted fit on one observation does. Without the guard, the rounding gives an entry of `1` or `-1`.
+  - **Other estimators.** The library does not know the divisor of a `StatsBase.CovarianceEstimator` other than `StatsBase.SimpleCovariance`, so the fallback returns `val` without change.
+
+# Arguments
+
+  - `f`: `Statistics.cov` or `Statistics.cor`.
+  - `ce`: The `StatsBase` estimator that computed the matrix.
+  - `val`: The matrix that `ce` computed with `w`. The `StatsBase.SimpleCovariance` methods write into it.
+  - `w`: The resolved observation weights of the fit.
+
+# Returns
+
+  - `val::AbstractMatrix`: The matrix, with `NaN` in each entry that has no value.
+
+# Related
+
+  - [`weighted_moment_guard`](@ref)
+  - [`cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+"""
+function weighted_comoment_guard(::typeof(Statistics.cov), ce::StatsBase.SimpleCovariance,
+                                 sigma::AbstractMatrix, w::StatsBase.AbstractWeights)
+    return weighted_moment_guard(sigma, w, ce.corrected)
+end
+function weighted_comoment_guard(::typeof(Statistics.cor), ::StatsBase.SimpleCovariance,
+                                 rho::AbstractMatrix, w::StatsBase.AbstractWeights)
+    if count(>(zero(eltype(w))), w) < 2
+        nan = convert(eltype(rho), NaN)
+        for j in axes(rho, 2), i in axes(rho, 1)
+            if i != j
+                rho[i, j] = nan
+            end
+        end
+    end
+    return rho
+end
+function weighted_comoment_guard(::Any, ::StatsBase.CovarianceEstimator,
+                                 val::AbstractMatrix, ::StatsBase.AbstractWeights)
+    return val
+end
+"""
     Statistics.cov(
         ce::GeneralCovariance,
         X::MatNum;
@@ -420,7 +473,7 @@ The method calls [`robust_cov`](@ref) with or without observation weights, as `c
  1. Refuse a gapped sample with [`assert_finite_sample`](@ref).
  2. Get the observation weights `w` from `ce.w` and `X`.
  3. When `w` is `nothing`, call [`robust_cov`](@ref) with `ce.ce` and `X` only.
- 4. Otherwise call [`robust_cov`](@ref) with `ce.ce`, `X` and `w`.
+ 4. Otherwise call [`robust_cov`](@ref) with `ce.ce`, `X` and `w`. Write `NaN` where the sample gives the covariance no value, with [`weighted_comoment_guard`](@ref). A corrected `StatsBase.SimpleCovariance` on one observation of positive weight is then `NaN`, as the unweighted fit is.
 
 # Arguments
 
@@ -459,7 +512,9 @@ function Statistics.cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = 
     return if isnothing(w)
         robust_cov(ce.ce, X; dims = dims, mean = mean, kwargs...)
     else
-        robust_cov(ce.ce, X, w; dims = dims, mean = mean, kwargs...)
+        weighted_comoment_guard(Statistics.cov, ce.ce,
+                                robust_cov(ce.ce, X, w; dims = dims, mean = mean,
+                                           kwargs...), w)
     end
 end
 """
@@ -480,7 +535,7 @@ The method calls [`robust_cor`](@ref) with or without observation weights, as `c
  1. Refuse a gapped sample with [`assert_finite_sample`](@ref).
  2. Get the observation weights `w` from `ce.w` and `X`.
  3. When `w` is `nothing`, call [`robust_cor`](@ref) with `ce.ce` and `X` only.
- 4. Otherwise call [`robust_cor`](@ref) with `ce.ce`, `X` and `w`.
+ 4. Otherwise call [`robust_cor`](@ref) with the estimator of [`weighted_correlation_estimator`](@ref), `X` and `w`. Write `NaN` where the sample gives the correlation no value, with [`weighted_comoment_guard`](@ref). A `StatsBase.SimpleCovariance` on one observation of positive weight is then `NaN` off the diagonal, as the unweighted fit is.
 
 # Arguments
 
@@ -516,10 +571,12 @@ function Statistics.cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = 
                         kwargs...)
     assert_finite_sample(X)
     w = get_observation_weights(ce.w, X; dims = dims, kwargs...)
-    if isnothing(w)
+    return if isnothing(w)
         robust_cor(ce.ce, X; dims = dims, mean = mean, kwargs...)
     else
-        robust_cor(ce.ce, X, w; dims = dims, mean = mean, kwargs...)
+        weighted_comoment_guard(Statistics.cor, ce.ce,
+                                robust_cor(weighted_correlation_estimator(ce.ce, w), X, w;
+                                           dims = dims, mean = mean, kwargs...), w)
     end
 end
 """
@@ -594,6 +651,8 @@ Keywords correspond to the struct's fields.
 
   - $(val_dict[:ce_cov])
   - $(val_dict[:oow])
+  - $(val_dict[:cvg_me])
+  - $(val_dict[:cvg_ce])
 
 ## Propagated parameters
 
@@ -692,6 +751,7 @@ Covariance
                         cache::Option{<:AbstractPartialFitState})
         assert_covariance_estimator(ce, :ce)
         assert_nonempty_nonneg_finite_val(w, :w)
+        assert_coverage_fittable(cvg, me, w, "Covariance", ce)
         return new{typeof(me), typeof(ce), typeof(alg), typeof(w), typeof(cvg),
                    typeof(cache)}(me, ce, alg, w, cvg, cache)
     end
@@ -795,11 +855,35 @@ Step 2 is for performance and is not a second contract. `ce.w` is a field, so it
 function covariance_centre_and_estimator(ce::Covariance, X::MatNum; dims::Int = 1,
                                          mean = nothing, kwargs...)
     mu = weighted_centre(X, ce.me, ce.w; dims = dims, mean = mean, kwargs...)
-    return mu, library_covariance_estimator(if isnothing(ce.w)
-                                                ce.ce
-                                            else
-                                                factory_child(ce.ce, ce.w)
-                                            end)
+    return mu, covariance_inner_estimator(ce)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the inner covariance estimator of a [`Covariance`](@ref), with the weights of `ce` and in a form that takes all the calls of the library.
+
+This is steps 2 to 4 of [`covariance_centre_and_estimator`](@ref). [`variance_count`](@ref) reads the same estimator, so the count and the fit read one rule for the weights.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+
+# Returns
+
+  - `cel::AbstractCovarianceEstimator`: `ce.ce` without change when `ce.w` is `nothing`, and `ce.ce` through [`factory_child`](@ref) with `ce.w` otherwise, through [`library_covariance_estimator`](@ref).
+
+# Related
+
+  - [`covariance_centre_and_estimator`](@ref)
+  - [`library_covariance_estimator`](@ref)
+  - [`factory_child`](@ref)
+"""
+function covariance_inner_estimator(ce::Covariance)
+    return library_covariance_estimator(if isnothing(ce.w)
+                                            ce.ce
+                                        else
+                                            factory_child(ce.ce, ce.w)
+                                        end)
 end
 # `ce.w` replaces the weights of `ce.ce` when it is set, as `covariance_centre_and_estimator`
 # does, so only an unweighted `Covariance` reads the count of its inner estimator. The fit takes
@@ -1409,7 +1493,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 This is the fallback method of [`partial_fit_corrected`](@ref). It refuses each covariance estimator that an incremental fit cannot reproduce, and its error names the type of the estimator.
 """
 function partial_fit_corrected(ce::StatsBase.CovarianceEstimator)
-    return throw(ArgumentError("an incremental covariance fit folds one observation into a Welford accumulator, which reproduces the full-moment sample covariance of `StatsBase.SimpleCovariance` and no other estimator. `$(typeof(ce))` is not one, so use the batch method."))
+    return throw(ArgumentError("an incremental covariance fit folds one observation into a Welford accumulator, which reproduces the full-moment sample covariance of `StatsBase.SimpleCovariance` and no other estimator. `$(typeof(ce))` is not one. The available-case fit of a `CoveragePolicy` folds in the same way. Use `StatsBase.SimpleCovariance`, or clear `cvg` and run the batch method."))
 end
 """
     covariance_state_seed(cache::Nothing, x::VecNum,

@@ -325,6 +325,12 @@ function regime_correlation_count(ce::RegimeAdjustedExpWeightedCovariance, n::In
         exp_weighted_covariance_count(ce.decay, n, ce.centring)
     end
 end
+# The diagonal of the covariance weights the squares at `decay`, and not at the correlation decay
+# `cor_decay`, as `RegimeAdjustedExpWeightedVariance` weights them. The two regime multipliers can
+# differ, and the count ignores the multiplier, so the two estimators read one count.
+function variance_count(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum)
+    return exp_weighted_variance_count(ce.decay, X, ce.centring)
+end
 function effective_observation_count(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum;
                                      kwargs...)
     return regime_correlation_count(ce, size(X, 1))

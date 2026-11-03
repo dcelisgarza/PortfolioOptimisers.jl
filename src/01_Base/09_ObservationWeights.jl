@@ -199,6 +199,67 @@ function observation_weight_count(w::AbstractVector, ::Integer)
     return weight_observation_count(KishObservationCount(), w)
 end
 """
+    weighted_moment_guard(val::Number, w::StatsBase.AbstractWeights, corrected::Bool) -> Number
+    weighted_moment_guard(val::AbstractArray, w::StatsBase.AbstractWeights,
+                          corrected::Bool) -> AbstractArray
+
+Return a weighted variance or covariance that `StatsBase` computed, or `NaN` in each entry when the divisor of the weights is not positive.
+
+`StatsBase` divides a weighted sum of squares by the divisor ``D`` of the weights. A corrected fit on one observation of positive weight has ``D = 0``, as an unweighted corrected fit on one observation does. But the weighted mean of one observation can differ from it by one unit in the last place. So the sum of squares is about ``10^{-36}`` and not zero, and the fit is `Inf` in place of the `NaN` of the unweighted fit. Frequency weights that sum to less than one give ``D < 0``, and a variance below zero. A divisor that is not positive gives no variance, so the function returns `NaN`, as the unweighted fit on one observation does.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+D &= \\begin{cases}
+\\sum_{t} w_{t} & \\textrm{uncorrected}\\\\
+\\sum_{t} w_{t} - \\dfrac{\\sum_{t} w_{t}^{2}}{\\sum_{t} w_{t}} & \\textrm{corrected analytic weights}\\\\
+\\sum_{t} w_{t} - 1 & \\textrm{corrected frequency weights}\\\\
+\\dfrac{\\left(\\sum_{t} w_{t}\\right) \\left(n_{+} - 1\\right)}{n_{+}} & \\textrm{corrected probability weights}
+\\end{cases}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``D``: The divisor of the weighted sum of squares. It is the inverse of `StatsBase.varcorrection(w, corrected)`.
+  - $(math_dict[:w_t_obs])
+  - ``n_{+}``: The number of observations of positive weight.
+
+# Arguments
+
+  - `val`: The variance or the covariance matrix that `StatsBase` computed with `w`. The array method writes into it. A caller that needs a standard deviation takes the square root after the guard, because a variance below zero has no square root.
+  - `w`: The resolved observation weights of the fit. [`get_observation_weights`](@ref) resolves them.
+  - `corrected`: The bias correction of the fit.
+
+# Returns
+
+  - `val`: `val` without change when ``D > 0``. Otherwise `NaN` of the element type of `val`, in each entry.
+
+# Related
+
+  - [`get_observation_weights`](@ref)
+  - [`SimpleVariance`](@ref)
+  - [`GeneralCovariance`](@ref)
+  - [`StdValue`](@ref)
+  - [`VarValue`](@ref)
+"""
+function weighted_moment_guard(val::Number, w::StatsBase.AbstractWeights, corrected::Bool)
+    return if inv(StatsBase.varcorrection(w, corrected)) > zero(val)
+        val
+    else
+        convert(typeof(val), NaN)
+    end
+end
+function weighted_moment_guard(val::AbstractArray, w::StatsBase.AbstractWeights,
+                               corrected::Bool)
+    return if inv(StatsBase.varcorrection(w, corrected)) > zero(eltype(val))
+        val
+    else
+        fill!(val, convert(eltype(val), NaN))
+    end
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all rules that count the observations that a vector of weights is worth.

@@ -294,12 +294,20 @@ end
     variance_count(ve::ExpWeightedVariance, X::MatNum)
     variance_count(ve::RegimeAdjustedExpWeightedVariance, X::MatNum)
     variance_count(ve::WindowedVariance, X::MatNum)
+    variance_count(ve::GeneralCovariance{<:StatsBase.SimpleCovariance}, X::MatNum)
+    variance_count(ve::Covariance{<:Any, <:Any, <:FullMoment}, X::MatNum)
+    variance_count(ve::ExpWeightedCovariance, X::MatNum)
+    variance_count(ve::RegimeAdjustedExpWeightedCovariance, X::MatNum)
+    variance_count(ve::WindowedCovariance, X::MatNum)
+    variance_count(ve::PortfolioOptimisersCovariance{<:Any,
+                                                     <:MatrixProcessing{<:Any, <:Any, <:Any,
+                                                                        Nothing}}, X::MatNum)
 
 Return the effective count and the divisor of the variance that `ve` measures on each column of `X`.
 
 A consumer that prices the sampling error of a variance needs two facts that only the estimator knows. The first fact is the number of observations that the estimate is worth. The second fact is the divisor of the sum of squares. This function returns both. A prior that writes the idiosyncratic variances of a loadings block calls this function on the residuals. The prior writes the result next to the variances, so that [`ResidualInflation`](@ref) reads it from the block.
 
-The method for [`AbstractCovarianceEstimator`](@ref) returns `nothing`, which means that the estimator states no count. `nothing` is not a default count. A consumer that needs a count refuses a block that has none, and its error names the fix. The fallback is on the covariance family and not on the variance family alone, because [`CrossSectionalFactorPrior`](@ref) takes any covariance estimator as its variance estimator, and it asks each one for its count.
+The method for [`AbstractCovarianceEstimator`](@ref) returns `nothing`, which means that the estimator states no count. `nothing` is not a default count. A consumer that needs a count refuses a block that has none, and its error names the fix. The fallback is on the covariance family and not on the variance family alone, because [`CrossSectionalFactorPrior`](@ref) takes any covariance estimator as its variance estimator, and it asks each one for its count. A covariance estimator whose diagonal weights the squares as a variance estimator with a count does states that count, so the two estimators give one count.
 
 # Mathematical definition
 
@@ -326,9 +334,13 @@ On an unweighted sample of ``T`` observations, ``n_{i} = T``. Then ``m_{i}`` is 
 # Algorithm
 
  1. On [`AbstractCovarianceEstimator`](@ref), return `nothing`.
- 2. On [`SimpleVariance`](@ref), take the finite rows of each column, and read the count from the observation weights with [`simple_variance_count`](@ref).
+ 2. On [`SimpleVariance`](@ref), take the finite rows of each column with their weights, through [`observed_sample`](@ref), and read the count from those weights with [`simple_variance_count`](@ref). A dynamic weight resolves on the rows of the column.
  3. On [`ExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedVariance`](@ref), take the Kish count of the exponential weights over the finite rows of each column with [`exp_weighted_variance_count`](@ref). The weights sum to one after the correction of the cold start, so the divisor equals the count. The count ignores the regime multiplier and the lags of a Heteroskedasticity and Autocorrelation Consistent (HAC) adjustment.
- 4. On [`WindowedVariance`](@ref), apply the window and the weights of the wrapper with [`windowed_preamble`](@ref). Then return the count of the inner estimator.
+ 4. On [`WindowedVariance`](@ref) and [`WindowedCovariance`](@ref), apply the window and the weights of the wrapper with [`windowed_preamble`](@ref). Then return the count of the inner estimator.
+ 5. On a [`GeneralCovariance`](@ref) over a `StatsBase.SimpleCovariance`, return the count of a [`SimpleVariance`](@ref) with the weights of the estimator and the `corrected` flag of `StatsBase.SimpleCovariance`. The diagonal of the covariance is that variance.
+ 6. On a [`Covariance`](@ref) with [`FullMoment`](@ref), return the count of its inner estimator, with the weights of `ve`, from [`covariance_inner_estimator`](@ref). An inner estimator with no count of its own, such as a shrinkage estimator, gives `nothing`. A [`SemiMoment`](@ref) variance is not a sum of squares of every residual, so it states no count.
+ 7. On [`ExpWeightedCovariance`](@ref) and [`RegimeAdjustedExpWeightedCovariance`](@ref), take the count of step 3 at the `decay` and the `centring` of the estimator. The diagonal of the covariance weights the squares as the matching variance estimator does. The regime multiplier of the covariance can differ from the one of [`RegimeAdjustedExpWeightedVariance`](@ref), and the count ignores it, as step 3 states.
+ 8. On a [`PortfolioOptimisersCovariance`](@ref) whose [`MatrixProcessing`](@ref) has no custom `alg` step, return the count of its `ce`. The repair, the denoising and the detoning act on the correlation, and they give the diagonal back without change. A custom `alg` step can change the diagonal, so the composite then states no count.
 
 # Arguments
 
@@ -349,6 +361,17 @@ On an unweighted sample of ``T`` observations, ``n_{i} = T``. Then ``m_{i}`` is 
 """
 function variance_count(::AbstractCovarianceEstimator, ::MatNum)::Nothing
     return nothing
+end
+# The diagonal of a full-moment `Covariance` is the variance of its inner estimator, centred on
+# the centre of `ce.me`. The count ignores the centre, as the count of `SimpleVariance` does.
+function variance_count(ce::Covariance{<:Any, <:Any, <:FullMoment}, X::MatNum)
+    return variance_count(covariance_inner_estimator(ce), X)
+end
+# The diagonal of a `GeneralCovariance` over a `StatsBase.SimpleCovariance` is the variance of a
+# `SimpleVariance` with the same weights and the same bias correction.
+function variance_count(ce::GeneralCovariance{<:StatsBase.SimpleCovariance}, X::MatNum)
+    return variance_count(SimpleVariance(; me = nothing, w = ce.w,
+                                         corrected = ce.ce.corrected), X)
 end
 """
     effective_observation_count(ce::StatsBase.CovarianceEstimator, X::MatNum; kwargs...) -> Real

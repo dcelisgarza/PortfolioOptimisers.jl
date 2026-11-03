@@ -9,6 +9,7 @@ ObsWeights
 ScenarioProbabilities
 scenario_probabilities
 observation_weight_count
+weighted_moment_guard
 observed_sample
 assert_observation_mask
 observed_weights
