@@ -1285,6 +1285,38 @@ using Dates, Statistics
         @test_throws ArgumentError currency_excess_index(fx, cash[:JPY], base)
         @test_throws DimensionMismatch currency_excess_index(fx, cash, cash)
     end
+
+    @testset "currency_excess_index holds a cash index across a gap inside its span" begin
+        S = [2.0 1.0; 2.5 1.1; 3.0 1.2; 2.8 1.3; 2.6 1.4]
+        K = [1.0 NaN; 1.01 2.0; NaN 2.1; 1.03 NaN; 1.04 2.3]
+        Kb = [1.0; NaN; NaN; 1.2; NaN;;]
+        t5 = ts[1:5]
+        fx = TimeArray(t5, S, ["EUR", "JPY"])
+        cash = TimeArray(t5, K, ["EUR", "JPY"])
+        base = TimeArray(t5, Kb, ["USD"])
+        I = values(currency_excess_index(fx, cash, base))
+        # Inside the span of each index a gap holds the last value, and the exchange rate keeps
+        # the move of the day.
+        Kc = [1.0 NaN; 1.01 2.0; 1.01 2.1; 1.03 2.1; 1.04 2.3]
+        Kbc = [1.0, 1.0, 1.0, 1.2, NaN]
+        @test isequal(I, S .* Kc ./ Kbc)
+        # A gap before the first value or after the last value stays a gap.
+        @test isnan(I[1, 2]) && all(isnan, I[5, :])
+        # The compounded cash return across a gap is the ratio of the two published values.
+        @test prod(Kbc[2:4] ./ Kbc[1:3]) ≈ Kb[4] / Kb[1]
+        # A gap of an exchange rate stays a gap.
+        fxg = TimeArray(t5, [2.0; NaN; 3.0; 2.8; 2.6;;], ["EUR"])
+        Ig = values(currency_excess_index(fxg, cash[:EUR], base))
+        @test isnan(Ig[2, 1]) && Ig[3, 1] == 3.0 * 1.01 / 1.0
+        # The caller's arrays do not change, also when unify_gaps returns them as they are.
+        @test isequal(values(base), Kb) && isequal(values(cash), K)
+        # A gap written as `missing` carries the same way.
+        basem = TimeArray(t5,
+                          Union{Missing, Float64}[1.0; missing; missing; 1.2; missing;;],
+                          ["USD"])
+        @test isequal(values(currency_excess_index(fx, cash, basem)), I)
+        @test size(PortfolioOptimisers.carry_cash_index(zeros(0, 1))) == (0, 1)
+    end
 end
 
 @testset "A block with no panel joins a block with a mask-only panel (#1882)" begin

@@ -167,3 +167,31 @@ currency can hold it. With log returns the split has no cross term.
   keyword names no series, so it keeps its released rule: the state of the recursion holds its
   value at such a window. An infinite value is not a gap, so both paths refuse it on every
   observation.
+
+## Amendment (2026-11-03)
+
+**`currency_excess_index` holds a cash index across a gap inside its span.** Fact 7 defines the
+index as `FX_C(t) * cash_C(t) / cash_base(t)`, and a cash total-return index accumulates the cash
+rate of each period. A deposit accrues interest on every day, a holiday of its market included.
+So the index has a value at every observation from its first published value to its last one,
+and a gap inside that span is a value that was not published, not a value that does not exist.
+The function now fills each such gap with the last published value, by the walk of
+`CarriedPrice`. The cash return inside the gap is zero, the observation that ends the gap carries
+the accrual of the whole gap, and the compounded return across the gap is unchanged.
+
+### What forced it
+
+On a clock that joins two markets, the cash index of each currency has a gap on each holiday of
+its own market. The index divided by the gap, so every Currency Factor was `NaN` on a holiday of
+the base market, while the assets of the other markets traded. A `CrossSectionalFactorPrior` with
+Currency Factors then found no estimable asset at that observation, and it refused the fit by
+design. A fill of the index itself was rejected: the exchange rate moves on that day, and the
+assets of the other currency carry the move, so the index must carry it on the same observation.
+
+### What stays
+
+- A gap of `fx` stays a gap. An exchange rate has no value between two quotes, so the index is
+  `NaN` there, and point 3 holds for it.
+- A gap before the first value or after the last value of a cash index stays a gap.
+- The conversion of `E` fills nothing. Point 3 holds for every series of `E`. The carry is a part
+  of the definition of the index, and it happens before the series reaches a `PricesResult`.

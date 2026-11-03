@@ -452,7 +452,7 @@ The Cross-Sectional Factor Model block stores the rule, so the regression diagno
 *Avoid*: an Empty Factor, which no asset loads on at any observation of the fit.
 
 **Currency Excess Index**
-The value in the base currency of a deposit in one currency, funded in the base currency. It is the exchange rate times the cash total-return index of the currency, divided by the cash total-return index of the base currency. It is the level series whose return is the Currency Excess Return, and `currency_excess_index` builds it. See ADR 0184.
+The value in the base currency of a deposit in one currency, funded in the base currency. It is the exchange rate times the cash total-return index of the currency, divided by the cash total-return index of the base currency. It is the level series whose return is the Currency Excess Return, and `currency_excess_index` builds it. A cash total-return index has a value on every day inside its span, because a deposit accrues on every day, so the index holds its last value across a gap there, such as a holiday of its market. A gap of the exchange rate stays a gap. See ADR 0184.
 *Avoid*: an exchange rate, which leaves out the two cash returns.
 
 **Currency Excess Return**

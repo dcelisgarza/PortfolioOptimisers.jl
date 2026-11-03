@@ -584,11 +584,16 @@ and the local excess return plus the log return of the index is the base-currenc
 
 The index of the base currency itself is constant, so its return is zero, and a Currency Factor of it would have no variance. Give the base currency to the `base` of [`CurrencyExposure`](@ref) instead: it then takes no factor and needs no index, and an asset of the base currency carries a zero exposure on every Currency Factor.
 
+## A gap of a cash index
+
+A cash total-return index has a value at every observation from its first value to its last one, because a deposit accrues interest on every day, a holiday of its market included. A gap inside that span is a value that was not published, and the index holds its last value across it, by the walk of [`CarriedPrice`](@ref). So ``r_{t,\\,c} = 0`` inside the gap, and the observation that ends the gap carries the accrual of the whole gap. The compounded cash return across the gap is the ratio of the two published values, as it is without a gap. On a clock that joins two markets, the index of every currency then has a value on a holiday of the market of one cash index, and the observation keeps the exchange-rate return of that day. A gap before the first value or after the last value stays a gap. An exchange rate has no value between two quotes, so a gap of `fx` stays a gap, and the index is `NaN` there.
+
 # Algorithm
 
  1. Check that the three series state one clock, that `cash` holds a column for every currency of `fx`, and that `cash_base` holds one column.
  2. Write every absent value as `NaN` with [`unify_gaps`](@ref).
- 3. Read the cash index of each currency of `fx` by its name, and compute the index of each currency.
+ 3. Hold the last value of each cash index across each gap inside its span, see [`PortfolioOptimisers.carry_cash_index`](@ref). The exchange rates keep their gaps.
+ 4. Read the cash index of each currency of `fx` by its name, and compute the index of each currency.
 
 # Arguments
 
@@ -624,12 +629,31 @@ julia> values(currency_excess_index(fx, cash, base))
  2.5  0.5
 ```
 
+The cash index of the base currency has no value on a holiday of its market. It holds its last value there, and the index keeps the exchange-rate move of that day:
+
+```jldoctest
+julia> ts = Date(2020, 1, 1):Day(1):Date(2020, 1, 3);
+
+julia> fx = TimeArray(ts, [2.0; 2.5; 3.0;;], [\"EUR\"]);
+
+julia> cash = TimeArray(ts, [1.0; 1.0; 1.0;;], [\"EUR\"]);
+
+julia> base = TimeArray(ts, [1.0; NaN; 1.5;;], [\"USD\"]);
+
+julia> values(currency_excess_index(fx, cash, base))
+3×1 Matrix{Float64}:
+ 2.0
+ 2.5
+ 2.0
+```
+
 # Related
 
   - [`PricesResult`](@ref)
   - [`prices_to_returns`](@ref)
   - [`CurrencyExposure`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
+  - [`CarriedPrice`](@ref)
   - [`unify_gaps`](@ref)
 """
 function currency_excess_index(fx::TimeSeries.TimeArray, cash::TimeSeries.TimeArray,
@@ -654,9 +678,41 @@ function currency_excess_index(fx::TimeSeries.TimeArray, cash::TimeSeries.TimeAr
     @argcheck(length(TimeSeries.colnames(cash_base)) == 1,
               DimensionMismatch("`cash_base` is the cash index of the base currency, so it holds one column; got $(length(TimeSeries.colnames(cash_base)))"))
     S = values(unify_gaps(fx))
-    K = values(unify_gaps(cash))[:, j]
-    Kb = values(unify_gaps(cash_base))
+    K = carry_cash_index(values(unify_gaps(cash))[:, j])
+    Kb = carry_cash_index(values(unify_gaps(cash_base)))
     return TimeSeries.TimeArray(ts, S .* K ./ view(Kb, :, 1), nc)
+end
+"""
+    carry_cash_index(K::AbstractMatrix) -> AbstractMatrix
+
+Hold the last value of each cash total-return index of `K` across each gap inside its span.
+
+A deposit accrues interest on every day, so a cash index has a value at every observation from its first value to its last one, and a gap inside that span is a value that was not published. The function reads the span of each column with [`listing_span`](@ref), and fills each gap inside it with the walk of [`CarriedPrice`](@ref), see [`PortfolioOptimisers.gap_fill_column!`](@ref). A gap before the first value or after the last value stays a gap. The function changes a copy, so the caller's array does not change, also when [`unify_gaps`](@ref) returned it unchanged.
+
+# Arguments
+
+  - `K`: Cash total-return indices, `observations × currencies`, with every gap written as `NaN`.
+
+# Returns
+
+  - `K̃::AbstractMatrix`: A copy of `K`, with each gap inside the span of its column filled. An empty `K` is returned as it is, because it holds no gap.
+
+# Related
+
+  - [`currency_excess_index`](@ref)
+  - [`CarriedPrice`](@ref)
+  - [`listing_span`](@ref)
+"""
+function carry_cash_index(K::AbstractMatrix)
+    if isempty(K)
+        return K
+    end
+    K = copy(K)
+    span = listing_span(K)
+    for j in axes(K, 2)
+        gap_fill_column!(CarriedPrice(), K, span, j, missing, size(K, 1) + 1)
+    end
+    return K
 end
 """
 $(DocStringExtensions.TYPEDEF)
