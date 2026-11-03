@@ -777,3 +777,4 @@ function assert_prediction_series(A::MatNum, X::Option{<:VecNum_VecVecNum},
 end
 
 export fit, fit_predict
+public folds_are_time_ordered

@@ -2410,3 +2410,4 @@ end
 export FeesEstimator, Fees, AmortisedFees, FirstObservationFees, fees_constraints,
        calc_fees, calc_fixed_fees, calc_asset_fees, calc_asset_fixed_fees, calc_total_fees,
        calc_total_asset_fees
+public investable_fees_view

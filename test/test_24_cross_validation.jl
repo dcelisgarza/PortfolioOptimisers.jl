@@ -1500,6 +1500,49 @@
             @test isapprox(bb[end] - bn[end], -oneoff / Ti)
         end
     end
+    @testset "A fold with a fee rebuilds through public names (#1968)" begin
+        @test Base.ispublic(PortfolioOptimisers, :investable_fees_view)
+        @test Base.ispublic(PortfolioOptimisers, :folds_are_time_ordered)
+        Xr = 0.01 .* randn(StableRNG(5), 130, 4)
+        # D leaves the mask of the folds whose training window holds these rows.
+        Xr[35:45, 4] .= NaN
+        tsr = collect(Date(2024, 1, 1):Day(1):(Date(2024, 1, 1) + Day(129)))
+        rdr = ReturnsResult(; nx = ["A", "B", "C", "D"], X = Xr, ts = tsr)
+        feer = Fees(; tn = Turnover(; w = fill(0.25, 4), val = 0.01), l = 0.001,
+                    lq = Turnover(; w = fill(0.25, 4), val = 0.02))
+        # The rebuild of fold `k` from its target weights on the full universe and its mask.
+        # The fold loop threads the target of fold `k - 1` into the fee of fold `k` exactly
+        # when `folds_are_time_ordered(cv)` holds, because the fee needs previous weights.
+        function rebuild_matches(p, cv, threaded)
+            return map(eachindex(p.pred)) do k
+                fk = p.pred[k]
+                imsk = BitVector(in(fk.rd.nx).(rdr.nx))
+                feek = if k > 1 && threaded
+                    PortfolioOptimisers.factory(feer, p.pred[k - 1].res.w)
+                else
+                    feer
+                end
+                red = PortfolioOptimisers.investable_fees_view(feek, imsk, 4)
+                res = NaiveOptimisationResult(; pr = nothing, wb = nothing, fees = red,
+                                              retcode = OptimisationSuccess(),
+                                              w = fk.res.w[imsk], imsk = imsk, fb = nothing)
+                rdk = PortfolioOptimisers.port_opt_view(rdr, fk.idx, :)
+                return isapprox(predict(res, rdk).rd.X, fk.rd.X)
+            end
+        end
+        for cv in (IndexWalkForward(30, 20), KFold())
+            p = cross_val_predict(InverseVolatility(; fees = feer), rdr, cv)
+            ordered = PortfolioOptimisers.folds_are_time_ordered(cv)
+            @test ordered == (cv isa IndexWalkForward)
+            @test all(rebuild_matches(p, cv, ordered))
+            if ordered
+                # A fold of the walk-forward is reduced, so the rebuild reaches the mask.
+                @test any(f -> length(f.rd.nx) < 4, p.pred)
+                # The fee of every later fold read the weights of the fold before it.
+                @test !any(rebuild_matches(p, cv, false)[2:end])
+            end
+        end
+    end
     @testset "The rolling window measure reads a prediction's own series (#770)" begin
         # The realised-history reading takes a fold result and reads nothing but the series
         # `predict` already stored, so it needs neither weights nor fees. The four
