@@ -165,7 +165,9 @@ unique_key_dict!(math_dict, :math_dict,
                  # A finite allocation solves one integer programme per side of the book,
                  # so its symbols are those of one side. `DiscreteAllocation` and its
                  # model builders state one programme, and share these symbols.
-                 :x_shares => "``\\boldsymbol{x} \\in \\mathbb{Z}_{\\geq 0}^{N}``: Share count vector of one side of a finite allocation, the model variable `x`.",#
+                 :x_shares => "``\\boldsymbol{x}``: Share count vector of one side of a finite allocation, the model expression `x`. Each entry is a non-negative integer multiple of the lot unit of its asset.",#
+                 :z_lots => "``\\boldsymbol{z} \\in \\mathbb{Z}_{\\geq 0}^{N}``: Lot count vector of one side of a finite allocation, the number of whole lots of each asset, the model variable `z`.",#
+                 :l_lot_unit => "``\\boldsymbol{l}``: Lot unit of each asset of one side of a finite allocation, the number of shares in one lot. A scalar applies to every asset.",#
                  :p_prices => "``\\boldsymbol{p}``: Asset price vector of one side of a finite allocation.",#
                  :C_side_cash => "``C``: Side cash, the cash that one side of a finite allocation can spend.",#
                  :w_side_target => "``\\boldsymbol{w}``: Side target weights, the weights of one side of a finite allocation normalised to sum to one. The short side is negated first, so every entry is non-negative.",#

@@ -62,7 +62,7 @@ To make a new constraint family, subtype `AbstractConstraintEstimator` and put i
 
   - `<family>_constraints(ce::AbstractConstraintEstimator, sets::UniverseSets)`: Assemble the constraint of the family over the declared universe.
 
-Each family has its own verb, and the library has no shared verb name. The verbs are [`linear_constraints`](@ref), [`weight_bounds_constraints`](@ref), [`threshold_constraints`](@ref), [`risk_budget_constraints`](@ref), [`asset_sets_matrix`](@ref), [`phylogeny_constraints`](@ref) and [`centrality_constraints`](@ref). A family that fits its structure to data takes a [`ReturnsResult`](@ref) in place of the sets. A caller calls this method directly, and the pipeline step below calls it too.
+Each family has its own verb, and the library has no shared verb name. The verbs are [`linear_constraints`](@ref), [`weight_bounds_constraints`](@ref), [`threshold_constraints`](@ref), [`risk_budget_constraints`](@ref), [`lot_unit_constraints`](@ref), [`asset_sets_matrix`](@ref), [`phylogeny_constraints`](@ref) and [`centrality_constraints`](@ref). A family that fits its structure to data takes a [`ReturnsResult`](@ref) in place of the sets. A caller calls this method directly, and the pipeline step below calls it too.
 
 ### Arguments
 
@@ -75,7 +75,7 @@ Each family has its own verb, and the library has no shared verb name. The verbs
 
 ## Pipeline step
 
-Implement both methods, or neither. The fallback of [`pipe_constraint_targets`](@ref) is an empty tuple. That tuple declares that the family computes no value for the `constraints` slot, so the family is not a [`Pipeline`](@ref) step. `resolve_constraint_target` raises on the empty tuple before it reads the value. [`JuMPConstraintEstimator`](@ref) is the family that takes the fallback, because it configures the model and computes nothing from data.
+Implement both methods, or neither. The fallback of [`pipe_constraint_targets`](@ref) is an empty tuple. That tuple declares that the family computes no value for the `constraints` slot, so the family is not a [`Pipeline`](@ref) step. `resolve_constraint_target` raises on the empty tuple before it reads the value. Two families take the fallback. [`JuMPConstraintEstimator`](@ref) configures the model and computes nothing from data. [`LotUnitEstimator`](@ref) reaches only a finite allocator, which is not a step of a pipeline.
 
   - `PortfolioOptimisers.pipe_constraint_targets(ce::AbstractConstraintEstimator) -> Tuple`: The [routing targets](@ref PIPELINE_ROUTING_TARGETS) that the result of the family can go to. With one target, the step places the value with no annotation. With more than one, the [`PipelineStep`](@ref) wrapper must name one.
   - `PortfolioOptimisers.constraint_step_value(ce::AbstractConstraintEstimator, ctx::PipelineContext)`: The value that the step adds. The method calls the generation verb of the family to compute it.

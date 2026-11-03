@@ -2965,9 +2965,18 @@ end
             end
             return out
         end
+        #=
+        Two families take the empty fallback by design. A JuMP constraint configures the
+        model and computes nothing from data, and a lot unit reaches only a finite
+        allocator, which is not a step of a Pipeline.
+        =#
         families = [S
                     for S in concrete_subtypes(PO.AbstractConstraintEstimator)
-                    if parentmodule(S) === PO && !(S <: PO.JuMPConstraintEstimator)]
+                    if parentmodule(S) === PO &&
+                           !(S <: PO.JuMPConstraintEstimator) &&
+                           S !== LotUnitEstimator]
+        @test which(PO.pipe_constraint_targets, Tuple{LotUnitEstimator}) ===
+              which(PO.pipe_constraint_targets, Tuple{PO.AbstractConstraintEstimator})
         @test !isempty(families)
         #=
         Asked of the type rather than of an instance: a family declares by defining a

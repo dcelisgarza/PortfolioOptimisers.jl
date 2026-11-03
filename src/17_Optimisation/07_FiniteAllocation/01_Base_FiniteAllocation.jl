@@ -1171,6 +1171,55 @@ function prepare_finite_allocation(fai::FiniteAllocationInput)
     return w, lbgt, sbgt, lidx, sidx, lsf, ssf
 end
 """
+    allocation_lot_unit(unit::LuE_Lu, sets::Option{<:UniverseSets}, strict::Bool,
+                        fai::FiniteAllocationInput)
+
+Give the lot unit of each asset of a finite allocation, on the axis of `w`.
+
+Both allocators call this method before they solve a side, so they read one resolution of the lot unit and one check of its length. Each side then views a vector lot unit with its own mask from [`prepare_finite_allocation`](@ref), as it views the prices. An Unpriced Asset is on no side, so no side reads its lot unit.
+
+# Algorithm
+
+ 1. Resolve `unit` to a [`LotUnit`](@ref) with [`lot_unit_constraints`](@ref) against `sets`, with `strict`. The number type of the fill value is `promote_type(eltype(fai.w), eltype(fai.prices))`.
+ 2. If the lot unit is a vector, check that it has one entry for each entry of `fai.w`.
+ 3. Return the `val` of the [`LotUnit`](@ref).
+
+# Arguments
+
+  - `unit::LuE_Lu`: The `unit` field of the allocator, a [`LotUnit`](@ref) or a [`LotUnitEstimator`](@ref).
+  - `sets::Option{<:UniverseSets}`: The `sets` field of the allocator. The constructor of the allocator refuses `nothing` when `unit` is a [`LotUnitEstimator`](@ref).
+  - `strict::Bool`: The `strict` field of the allocator.
+  - `fai::FiniteAllocationInput`: The input of the allocation.
+
+# Validation
+
+  - A vector lot unit has `length(fai.w)` entries, else a `DimensionMismatch`.
+
+# Returns
+
+  - `lu::Num_VecNum`: The lot unit, one scalar for every asset or one value for each asset in the order of `w`.
+
+# Related
+
+  - [`LotUnit`](@ref)
+  - [`LotUnitEstimator`](@ref)
+  - [`lot_unit_constraints`](@ref)
+  - [`DiscreteAllocation`](@ref)
+  - [`GreedyAllocation`](@ref)
+  - [`prepare_finite_allocation`](@ref)
+"""
+function allocation_lot_unit(unit::LuE_Lu, sets::Option{<:UniverseSets}, strict::Bool,
+                             fai::FiniteAllocationInput)
+    lu = lot_unit_constraints(unit, sets;
+                              datatype = promote_type(eltype(fai.w), eltype(fai.prices)),
+                              strict = strict).val
+    if isa(lu, AbstractVector)
+        @argcheck(length(lu) == length(fai.w),
+                  DimensionMismatch("the lot unit ($(length(lu))) must match w ($(length(fai.w)))"))
+    end
+    return lu
+end
+"""
     allocation_turnover_money(::Nothing, ::Number, ::Any, ::Bool)
     allocation_turnover_money(tn::Turnover, prev_cash::Number, idx, short::Bool)
 

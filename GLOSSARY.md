@@ -1121,6 +1121,10 @@ The rule that gives each side of a Finite Allocation its cash. The short side tr
 An asset of a Finite Allocation whose price is `NaN`, because it has no bar on the allocation date. No allocator can buy it, so each side solves over its priced assets, and the price reaches no number of the result. The `upw` field of the FiniteAllocationInput states what its target weight becomes. `nothing` reads it as a zero weight, whose money stays in the `cash` of the result. A rule of `AbstractUnpricedWeightAlgorithm` (`ProportionalRedistribution`, `EvenRedistribution`, `AssetRedistribution`) moves it to priced assets of the same side, so both budgets stay. `SideRedistribution` takes one rule for each side. One rule covers every weight, because a zero weight has nothing to move. A held Unpriced Asset ends with no money, so the turnover fee charges the sale of its old position. The rule is a field of the input, as the Collateral Algorithm is, so a fallback chain reads one rule. An infinite price is refused, because `NaN` is the one spelling of an absent price.
 *Avoid*: delisted asset (one cause among several), missing price (the price is present and `NaN`), and a test on the weight to decide what a `NaN` price means.
 
+**Lot Unit**
+The number of shares in one lot of an asset of a Finite Allocation. Both allocators buy each asset in whole lots, so a share count is a non-negative integer multiple of the lot unit of its asset. A lot unit below one buys fractional shares, and a lot unit above one buys board lots. One book can mix both. The `unit` field of the allocator holds it: a `LotUnit` states one number for every asset or one value for each asset, and a `LotUnitEstimator` names it by asset or group and resolves against the `sets` of the allocator. Its `nothing` fill is one whole share. The integer variable of `DiscreteAllocation` counts lots, and the share count is the lot count times the lot unit. A lot unit is not a Pipeline step, because no optimiser of a pipeline buys shares.
+*Avoid*: lot size (the same idea, but the field is `unit`), and `unit` alone for the type, which is `LotUnit`.
+
 ## 5. Risk Measures
 
 **Risk Measure**

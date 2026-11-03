@@ -106,6 +106,9 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :asets_val => "`val`: Group name key for asset set membership matrix extraction.",#
                  :thr_val => "`val`: Minimum-holding thresholds, as a map from asset or group names to values, a scalar, a vector or an algorithmic rule.",#
                  :thr_res_val => "`val`: Minimum-holding thresholds of the portfolio weights, as one scalar for every asset or one value for each asset. A position is zero, or it is at least its threshold. The threshold bounds the held weight and not the trade, so no reference portfolio enters it.",#
+                 :lu_val => "`val`: Lot unit of each asset, the number of shares in one lot, as a map from asset or group names to values, a scalar, a vector or an algorithmic rule.",#
+                 :lu_res_val => "`val`: Lot unit of each asset, as one scalar for every asset or one value for each asset. A share count of an asset is a non-negative integer multiple of its lot unit. A lot unit below one buys fractional shares, and a lot unit above one buys board lots.",#
+                 :lu_dval => "`dval`: Lot unit of each asset that `val` does not name. `nothing` gives `one(datatype)`, one whole share.",#
                  # Preselection. `20_AssetSelection.jl` pairs two redundancy
                  # algorithms over one correlation matrix, and two selection
                  # rules over one taken set, so each of the five descriptions

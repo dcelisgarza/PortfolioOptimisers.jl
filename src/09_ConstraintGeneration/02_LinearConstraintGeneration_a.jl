@@ -1305,7 +1305,7 @@ The function fills a vector with `val` and writes the values of `dict` into it, 
 
  1. Take `val` as the fill value, or `zero(datatype)` when `val` is `nothing`.
  2. Take `key` as the universe key `nxkey`, or `sets.xkey` when `key` is `nothing`, and read the universe `nx` from `sets.dict` under it.
- 3. Allocate `arr`, one entry per name of `nx`, filled with the value of step 1.
+ 3. Allocate `arr`, one entry per name of `nx`, filled with the value of step 1. Its element type is the type of the fill value. An integer fill value cannot hold a fraction, so it takes the `promote_type` of its type and of the type of each value of `dict`.
  4. Read the counterpart axis with [`counterpart_axis_names`](@ref), the other of the two asset axes [`UniverseSets`](@ref) declares.
  5. For each `(key, val)` pair of `dict`, in the order `dict` iterates in, write `val` into `arr` through [`name_to_val!`](@ref). A key that names an asset writes one entry, a key that names a group writes one entry per member, a key that names the counterpart axis is skipped in silence, and a key that names none of them is reported through the `strict` flag.
  6. Return `arr`.
@@ -1341,7 +1341,15 @@ function estimator_to_val(dict::MultiEstValType, sets::UniverseSets,
     nxkey = ifelse(isnothing(key), sets.xkey, key)
     nx = sets.dict[nxkey]
     other = counterpart_axis_names(sets, nxkey)
-    arr = fill(val, length(nx))
+    # An integer fill value cannot hold a fractional value of the map, so it takes the type
+    # that the values of the map promote it to. Any other fill value keeps its own type,
+    # which `datatype` states when `val` is `nothing`.
+    T = if typeof(val) <: Integer
+        mapreduce(kv -> typeof(last(kv)), promote_type, dict; init = typeof(val))
+    else
+        typeof(val)
+    end
+    arr = fill(convert(T, val), length(nx))
     for (key, val) in dict
         name_to_val!(nx, sets.dict, key, val, arr, strict, nxkey, other)
     end
@@ -1354,7 +1362,8 @@ function estimator_to_val(dict::PairStrNum, sets::UniverseSets,
     val = ifelse(isnothing(val), zero(datatype), val)
     nxkey = ifelse(isnothing(key), sets.xkey, key)
     nx = sets.dict[nxkey]
-    arr = fill(val, length(nx))
+    T = typeof(val) <: Integer ? promote_type(typeof(val), typeof(last(dict))) : typeof(val)
+    arr = fill(convert(T, val), length(nx))
     key, val = dict
     name_to_val!(nx, sets.dict, key, val, arr, strict, nxkey,
                  counterpart_axis_names(sets, nxkey))

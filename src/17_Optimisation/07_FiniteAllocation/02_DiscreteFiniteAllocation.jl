@@ -110,7 +110,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Discrete Allocation portfolio optimiser.
 
-`DiscreteAllocation` turns target weights into whole share counts by solving a Mixed-Integer Programming (MIP) problem. [martin2021](@cite) states only that the package it describes converts optimal weights into a discrete allocation, in its Methods on page 3. It does not state the programme. The book tracks the target as closely as the error of `wf` measures it, and leaves as little cash idle as it can.
+`DiscreteAllocation` turns target weights into share counts in whole lots by solving a Mixed-Integer Programming (MIP) problem. [martin2021](@cite) states only that the package it describes converts optimal weights into a discrete allocation, in its Methods on page 3. It does not state the programme. The book tracks the target as closely as the error of `wf` measures it, and leaves as little cash idle as it can.
+
+The integer variable of the model counts lots. `unit` states the lot unit of each asset, so the share count of an asset is its lot count times its lot unit. The default `LotUnit(1)` buys whole shares. A lot unit below one buys fractional shares, and a lot unit above one buys board lots. A [`LotUnitEstimator`](@ref) resolves the lot unit against `sets`.
 
 The long and the short side of a book are two separate sub-problems, each with its own cash and its own budget. Each sub-problem holds a non-negative share vector, and [`optimise`](@ref) negates the short side when it recombines the two. `s_retcode` and `l_retcode` of the result carry the two return codes.
 
@@ -120,8 +122,9 @@ One sub-problem, under the default `ErrorWeightFinaliser(; dev = AbsoluteWeightD
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{x} \\in \\mathbb{Z}_{\\geq 0}^{N}}{\\min} \\quad & u + r\\,, \\\\
-\\text{s.t.} \\quad & u \\geq \\lVert C \\boldsymbol{w} - \\boldsymbol{x} \\odot \\boldsymbol{p} \\rVert_1\\,, \\\\
+\\underset{\\boldsymbol{z} \\in \\mathbb{Z}_{\\geq 0}^{N}}{\\min} \\quad & u + r\\,, \\\\
+\\text{s.t.} \\quad & \\boldsymbol{x} = \\boldsymbol{l} \\odot \\boldsymbol{z}\\,, \\\\
+& u \\geq \\lVert C \\boldsymbol{w} - \\boldsymbol{x} \\odot \\boldsymbol{p} \\rVert_1\\,, \\\\
 & r = C - \\boldsymbol{x}^\\intercal \\boldsymbol{p}\\,, \\\\
 & r - F(\\boldsymbol{x}) \\geq 0\\,.
 \\end{align}
@@ -129,6 +132,8 @@ One sub-problem, under the default `ErrorWeightFinaliser(; dev = AbsoluteWeightD
 
 Where:
 
+  - $(math_dict[:z_lots])
+  - $(math_dict[:l_lot_unit])
   - $(math_dict[:x_shares])
   - $(math_dict[:u_alloc_err])
   - $(math_dict[:r_cash_left])
@@ -174,38 +179,48 @@ $(DocStringExtensions.FIELDS)
         so::Number = 1,
         wf::JuMPWeightFinaliserFormulation = ErrorWeightFinaliser(;
                                                  dev = AbsoluteWeightDeviation()),
-        fb::Option{<:FOptE_FOpt} = GreedyAllocation()
+        unit::LuE_Lu = LotUnit(),
+        sets::Option{<:UniverseSets} = nothing,
+        strict::Bool = false,
+        fb::Option{<:FOptE_FOpt} = GreedyAllocation(; unit = unit, sets = sets,
+                                                    strict = strict)
     ) -> DiscreteAllocation
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. The default fallback reads the same `unit`, `sets` and `strict`, so a failed solve falls back to the same lots.
 
 ## Validation
 
   - If `slv` is a vector: `!isempty(slv)`.
   - `sc > 0`, `so > 0`.
+  - $(val_dict[:unit])
 
 # Examples
 
 ```jldoctest
 julia> DiscreteAllocation(; slv = Solver(; solver = nothing))
 DiscreteAllocation
-  slv ┼ Solver
-      │          name ┼ String: ""
-      │        solver ┼ nothing
-      │      settings ┼ nothing
-      │     check_sol ┼ @NamedTuple{}: NamedTuple()
-      │   add_bridges ┴ Bool: true
-   sc ┼ Int64: 1
-   so ┼ Int64: 1
-   wf ┼ ErrorWeightFinaliser
-      │   alg ┼ L1Norm
-      │       │   ddof ┴ Int64: 0
-      │   dev ┴ AbsoluteWeightDeviation()
-   fb ┼ GreedyAllocation
-      │     unit ┼ Int64: 1
-      │     args ┼ Tuple{}: ()
-      │   kwargs ┼ @NamedTuple{}: NamedTuple()
-      │       fb ┴ nothing
+     slv ┼ Solver
+         │          name ┼ String: ""
+         │        solver ┼ nothing
+         │      settings ┼ nothing
+         │     check_sol ┼ @NamedTuple{}: NamedTuple()
+         │   add_bridges ┴ Bool: true
+      sc ┼ Int64: 1
+      so ┼ Int64: 1
+      wf ┼ ErrorWeightFinaliser
+         │   alg ┼ L1Norm
+         │       │   ddof ┴ Int64: 0
+         │   dev ┴ AbsoluteWeightDeviation()
+    unit ┼ LotUnit
+         │   val ┴ Int64: 1
+    sets ┼ nothing
+  strict ┼ Bool: false
+      fb ┼ GreedyAllocation
+         │     unit ┼ LotUnit
+         │          │   val ┴ Int64: 1
+         │     sets ┼ nothing
+         │   strict ┼ Bool: false
+         │       fb ┴ nothing
 ```
 
 # Related
@@ -238,26 +253,48 @@ DiscreteAllocation
     """
     wf
     """
+    $(field_dict[:unit])
+    """
+    unit
+    """
+    $(field_dict[:sets_alloc])
+    """
+    sets
+    """
+    $(field_dict[:strict_opt])
+    """
+    strict
+    """
     $(field_dict[:fb])
     """
     fb
     function DiscreteAllocation(slv::Slv_VecSlv, sc::Number, so::Number,
-                                wf::JuMPWeightFinaliserFormulation,
+                                wf::JuMPWeightFinaliserFormulation, unit::LuE_Lu,
+                                sets::Option{<:UniverseSets}, strict::Bool,
                                 fb::Option{<:FOptE_FOpt})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
         @argcheck(sc > zero(sc), DomainError(sc, "sc must be > 0"))
         @argcheck(so > zero(so), DomainError(so, "so must be > 0"))
-        return new{typeof(slv), typeof(sc), typeof(so), typeof(wf), typeof(fb)}(slv, sc, so,
-                                                                                wf, fb)
+        if isa(unit, LotUnitEstimator)
+            @argcheck(!isnothing(sets),
+                      IsNothingError("sets cannot be nothing when unit is a LotUnitEstimator"))
+        end
+        return new{typeof(slv), typeof(sc), typeof(so), typeof(wf), typeof(unit),
+                   typeof(sets), typeof(strict), typeof(fb)}(slv, sc, so, wf, unit, sets,
+                                                             strict, fb)
     end
 end
 function DiscreteAllocation(; slv::Slv_VecSlv, sc::Number = 1, so::Number = 1,
                             wf::JuMPWeightFinaliserFormulation = ErrorWeightFinaliser(;
                                                                                       dev = AbsoluteWeightDeviation()),
-                            fb::Option{<:FOptE_FOpt} = GreedyAllocation())::DiscreteAllocation
-    return DiscreteAllocation(slv, sc, so, wf, fb)
+                            unit::LuE_Lu = LotUnit(),
+                            sets::Option{<:UniverseSets} = nothing, strict::Bool = false,
+                            fb::Option{<:FOptE_FOpt} = GreedyAllocation(; unit = unit,
+                                                                        sets = sets,
+                                                                        strict = strict))::DiscreteAllocation
+    return DiscreteAllocation(slv, sc, so, wf, unit, sets, strict, fb)
 end
 """
     set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Number,
@@ -321,7 +358,8 @@ function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Numb
     return deviation_error_term(wf.dev, u, cash)
 end
 """
-    set_allocation_fees!(model::JuMP.Model, p::VecNum, cash::Number, sf::Option{<:NamedTuple})
+    set_allocation_fees!(model::JuMP.Model, p::VecNum, lu::Num_VecNum, cash::Number,
+                         sf::Option{<:NamedTuple})
 
 Write one side's fee in the allocation model's own variables, and return it.
 
@@ -353,12 +391,13 @@ The rates `l`, `s` and `tn` charge on each of the `T` periods, and the fixed amo
 
 ## Variables
 
-  - `x`: Share count vector, read from the model.
+  - `z`: Lot count vector, read from the model.
   - `t_ftn`: Epigraph of the money traded, created when `sf` states a turnover rate.
   - `b`: Binary indicator of a held position, created when `sf` states a fixed fee.
 
 ## Expressions
 
+  - `x`: Share count vector, read from the model.
   - `money`: ``\\boldsymbol{m}``.
   - `fee_prop`: ``\\boldsymbol{f}_{\\text{p}}^\\intercal \\boldsymbol{m}``, when `sf` states a proportional rate.
   - `fee_tn`: ``\\boldsymbol{f}_{\\text{Tn}}^\\intercal \\boldsymbol{t}``, when `sf` states a turnover rate.
@@ -369,14 +408,16 @@ The rates `l`, `s` and `tn` charge on each of the `T` periods, and the fixed amo
 
   - `cftn_ub`: ``s_c (\\boldsymbol{m} - \\boldsymbol{m}_{0} - \\boldsymbol{t}) \\leq \\boldsymbol{0}``.
   - `cftn_lb`: ``s_c (\\boldsymbol{m}_{0} - \\boldsymbol{m} - \\boldsymbol{t}) \\leq \\boldsymbol{0}``.
-  - `cb_ub`: ``s_c (\\boldsymbol{x} - \\lfloor C \\oslash (\\boldsymbol{p} \\odot \\boldsymbol{c}) \\rfloor \\odot \\boldsymbol{b}) \\leq \\boldsymbol{0}``, with ``c_i = 1 + T \\min(f_{\\text{p},i}, 0)``.
-  - `cb_lb`: ``s_c (\\boldsymbol{b} - \\boldsymbol{x}) \\leq \\boldsymbol{0}``.
+  - `cb_ub`: ``s_c (\\boldsymbol{z} - \\lfloor C \\oslash (\\boldsymbol{p} \\odot \\boldsymbol{c} \\odot \\boldsymbol{l}) \\rfloor \\odot \\boldsymbol{b}) \\leq \\boldsymbol{0}``, with ``c_i = 1 + T \\min(f_{\\text{p},i}, 0)``.
+  - `cb_lb`: ``s_c (\\boldsymbol{b} - \\boldsymbol{z}) \\leq \\boldsymbol{0}``.
 
-`x` is integer and non-negative, so `cb_lb` holds ``b_i`` at zero when ``x_i = 0``, and `cb_ub` holds it at one when ``x_i \\geq 1``. `cb_ub` removes no book: the budget of [`finite_sub_allocation`](@ref) holds ``x_i p_i c_i \\leq C``, so ``x_i \\leq \\lfloor C / (p_i c_i) \\rfloor``. Under a non-negative rate ``c_i = 1``. A negative short rate of [`Fees`](@ref) is a credit, which lowers the cost of a share to ``p_i c_i``. The binary is an exact indicator.
+`z` is integer and non-negative, so `cb_lb` holds ``b_i`` at zero when ``z_i = 0``, and `cb_ub` holds it at one when ``z_i \\geq 1``. The rows read the lot count and not the share count, because a held position of a lot unit below one has ``x_i < 1``. `cb_ub` removes no book: the budget of [`finite_sub_allocation`](@ref) holds ``l_i z_i p_i c_i \\leq C``, so ``z_i \\leq \\lfloor C / (p_i c_i l_i) \\rfloor``. Under a non-negative rate ``c_i = 1``. A negative short rate of [`Fees`](@ref) is a credit, which lowers the cost of a share to ``p_i c_i``. The binary is an exact indicator.
 
 Where:
 
   - $(math_dict[:x_shares])
+  - $(math_dict[:z_lots])
+  - $(math_dict[:l_lot_unit])
   - $(math_dict[:m_money])
   - ``\\boldsymbol{m}_{0}``: Money in each position before the trade, `sf.prev_money`.
   - ``\\boldsymbol{t}``: Epigraph of the money traded, `t_ftn`.
@@ -405,7 +446,8 @@ $(val_dict[:relax])
 
   - $(arg_dict[:model])
   - `p::VecNum`: Asset prices of this side.
-  - `cash::Number`: Cash of this side. It bounds the shares a binary can switch on.
+  - `lu::Num_VecNum`: Lot unit of this side, one scalar for every asset or one value for each asset.
+  - `cash::Number`: Cash of this side. It bounds the lots a binary can switch on.
   - `sf::Option{<:NamedTuple}`: This side's charge, or `nothing`.
 
 # Returns
@@ -420,11 +462,14 @@ $(val_dict[:relax])
   - [`DiscreteAllocation`](@ref)
   - [`Fees`](@ref)
 """
-function set_allocation_fees!(model::JuMP.Model, ::VecNum, ::Number, ::Nothing)
+function set_allocation_fees!(model::JuMP.Model, ::VecNum, ::Num_VecNum, ::Number,
+                              ::Nothing)
     return model[:fee] = zero(JuMP.AffExpr)
 end
-function set_allocation_fees!(model::JuMP.Model, p::VecNum, cash::Number, sf::NamedTuple)
+function set_allocation_fees!(model::JuMP.Model, p::VecNum, lu::Num_VecNum, cash::Number,
+                              sf::NamedTuple)
     x = model[:x]
+    z = model[:z]
     sc = get_constraint_scale(model)
     N = length(p)
     T = sf.T
@@ -455,18 +500,20 @@ function set_allocation_fees!(model::JuMP.Model, p::VecNum, cash::Number, sf::Na
     fixed = sf.fixed
     if !isnothing(fixed)
         # One time: a fixed fee is charged per position held, so it needs a bit saying
-        # whether the position is there at all. `ub` is the most shares this cash can buy.
-        # A negative rate is a credit, which lowers the cost of a share to `p (1 + T prop)`
-        # and so raises that count. A credit that pays the whole share leaves no count.
+        # whether the position is there at all. `ub` is the most whole lots this cash can
+        # buy. A negative rate is a credit, which lowers the cost of a share to
+        # `p (1 + T prop)` and so raises that count. A credit that pays the whole share
+        # leaves no count. Both rows read the lot count, because a held position of less
+        # than one share is one lot.
         cf = isnothing(prop) ? 1 : 1 .+ T .* min.(prop, 0)
         @argcheck(all(>(0), cf),
                   DomainError(prop,
                               "a fixed fee needs `1 + horizon * s > 0` on every asset of the short side: the credit of a negative short rate `s` over the horizon must not pay for the whole position, or the cash bounds no share count"))
-        ub = floor.(cash ./ (p .* cf))
+        ub = floor.(cash ./ (p .* cf .* lu))
         JuMP.@variable(model, b[1:N], Bin)
         JuMP.@constraints(model, begin
-                              cb_ub, sc * (x .- ub .* b) .<= 0
-                              cb_lb, sc * (b .- x) .<= 0
+                              cb_ub, sc * (z .- ub .* b) .<= 0
+                              cb_lb, sc * (b .- z) .<= 0
                           end)
         JuMP.@expression(model, fee_fixed, dot_scalar(fixed, b))
         JuMP.add_to_expression!(fee, fee_fixed)
@@ -474,20 +521,20 @@ function set_allocation_fees!(model::JuMP.Model, p::VecNum, cash::Number, sf::Na
     return model[:fee] = fee
 end
 """
-    finite_sub_allocation(w::VecNum, p::VecNum, cash::Number, bgt::Number,
+    finite_sub_allocation(w::VecNum, p::VecNum, lu::Num_VecNum, cash::Number, bgt::Number,
                           sf::Option{<:NamedTuple}, da::DiscreteAllocation,
                           str_names::Bool = false)
 
 Build and solve the discrete allocation MIP for one side, long or short, of the book.
 
-This is the sub-problem of [`DiscreteAllocation`](@ref). The share vector is integer and non-negative, so a short side must come in with its weights already negated.
+This is the sub-problem of [`DiscreteAllocation`](@ref). The lot count vector is integer and non-negative, so a short side must come in with its weights already negated.
 
 # Algorithm
 
  1. On an empty `w`, return three empty vectors, `cash` less the fee of the empty book, that fee, and `nothing` for the return code and for the model. The fee is [`allocation_fee`](@ref) of the empty book, because a side that buys nothing can still owe a turnover fee or the forced exit.
  2. Normalise `w` to sum to one. A side whose weights sum to zero keeps them.
  3. Build the model of the `# JuMP formulation` below, and solve it with `da.slv`.
- 4. Read the share vector back with `round(Int, ...)`, because a MIP solver returns an integer only to within its own tolerance. A model that holds no finite value gives an empty book. A solver that never ran holds no value, and a fee larger than the cash makes the budget infeasible, so neither model has a finite value.
+ 4. Read the lot count vector back with `round(Int, ...)`, because a MIP solver returns an integer only to within its own tolerance, and multiply it by `lu` to get the share vector. A model that holds no finite value gives an empty book. A solver that never ran holds no value, and a fee larger than the cash makes the budget infeasible, so neither model has a finite value.
  5. Make the cost `shares .* p`, and the realised weights `cost / sum(cost) * bgt`. The realised weights are all zero when nothing was bought.
  6. Price the fee with [`allocation_fee`](@ref) of the realised shares, and not with the value of `model[:fee]`, which can lie above it. See the `## Relaxation` of [`set_allocation_fees!`](@ref).
  7. Make the leftover cash, `cash` less the cost and the fee.
@@ -496,11 +543,12 @@ This is the sub-problem of [`DiscreteAllocation`](@ref). The share vector is int
 
 ## Variables
 
-  - `x`: Share count vector, integer and non-negative.
+  - `z`: Lot count vector, integer and non-negative.
   - `u`: Allocation error bound.
 
 ## Expressions
 
+  - `x`: ``\\boldsymbol{l} \\odot \\boldsymbol{z}``, the share count vector.
   - `sc`: ``s_c``, `da.sc`.
   - `so`: ``s_o``, `da.so`.
   - `r`: ``r``.
@@ -517,6 +565,8 @@ This is the sub-problem of [`DiscreteAllocation`](@ref). The share vector is int
 
 Where:
 
+  - $(math_dict[:z_lots])
+  - $(math_dict[:l_lot_unit])
   - $(math_dict[:x_shares])
   - $(math_dict[:u_alloc_err])
   - $(math_dict[:r_cash_left])
@@ -531,6 +581,7 @@ Where:
 
   - `w::VecNum`: Target weights of this side, non-negative.
   - `p::VecNum`: Asset prices of this side, in the same order as `w`.
+  - `lu::Num_VecNum`: Lot unit of this side, one scalar for every asset or one value for each asset in the order of `w`.
   - `cash::Number`: Cash of this side.
   - `bgt::Number`: Budget of this side, used to rescale the realised weights.
   - `sf::Option{<:NamedTuple}`: This side's charge, of [`allocation_side_fees`](@ref), or `nothing`.
@@ -539,7 +590,7 @@ Where:
 
 # Returns
 
-  - `shares::VecNum`: Share count per asset.
+  - `shares::VecNum`: Share count per asset, a whole number of lots of its lot unit.
   - `cost::VecNum`: `shares .* p`.
   - `aw::VecNum`: Realised weights, rescaled to sum to `bgt`.
   - `acash::Number`: Cash left over, `cash` less the cost of the shares and the fee.
@@ -555,9 +606,9 @@ Where:
   - [`setup_alloc_optim`](@ref)
   - [`AbstractCollateralAlgorithm`](@ref)
 """
-function finite_sub_allocation(w::VecNum, p::VecNum, cash::Number, bgt::Number,
-                               sf::Option{<:NamedTuple}, da::DiscreteAllocation,
-                               str_names::Bool = false)
+function finite_sub_allocation(w::VecNum, p::VecNum, lu::Num_VecNum, cash::Number,
+                               bgt::Number, sf::Option{<:NamedTuple},
+                               da::DiscreteAllocation, str_names::Bool = false)
     if isempty(w)
         # An empty side buys nothing, but it can still owe the forced exit: a delisted asset
         # carries a zero target weight, so it lands on the long side even when that side
@@ -575,14 +626,16 @@ function finite_sub_allocation(w::VecNum, p::VecNum, cash::Number, bgt::Number,
     JuMP.@expression(model, sc, da.sc)
     JuMP.@expression(model, so, da.so)
     N = length(w)
-    # x: the share counts. u: the bound on the allocation error.
+    # z: the lot counts. u: the bound on the allocation error.
     JuMP.@variables(model, begin
-                        x[1:N] >= 0, Int
+                        z[1:N] >= 0, Int
                         u
                     end)
+    # x: the share counts, whole lots of the lot unit of each asset.
+    JuMP.@expression(model, x, lu .* z)
     # r: the cash left before the fee.
     JuMP.@expression(model, r, cash - LinearAlgebra.dot(x, p))
-    fee = set_allocation_fees!(model, p, cash, sf)
+    fee = set_allocation_fees!(model, p, lu, cash, sf)
     JuMP.@constraint(model, cr, sc * (r - fee) >= 0)
     err = set_discrete_error!(model, w, p, cash, da.wf)
     JuMP.@objective(model, Min, so * (err + r))
@@ -597,12 +650,14 @@ function finite_sub_allocation(w::VecNum, p::VecNum, cash::Number, bgt::Number,
     # than the cash makes the budget constraint infeasible, and an infeasible model holds no
     # solution, so its values are not finite. Either way `res` carries the failure, and the
     # book is read as empty rather than raising, so the fallback chain can walk on.
-    xv = if JuMP.has_values(model)
-        JuMP.value.(x)
+    zv = if JuMP.has_values(model)
+        JuMP.value.(z)
     else
         fill(convert(JuMP.value_type(typeof(model)), NaN), N)
     end
-    shares = all(isfinite, xv) ? round.(Int, xv) : zeros(Int, N)
+    # The solver returns an integer only to within its tolerance, so the lot count rounds
+    # first. The shares are then exact multiples of the lot unit, and take its type.
+    shares = lu .* (all(isfinite, zv) ? round.(Int, zv) : zeros(Int, N))
     cost = shares .* p
     aw = if any(!iszero, cost)
         cost / sum(cost) * bgt
@@ -621,14 +676,19 @@ function _optimise(da::DiscreteAllocation, fai::FiniteAllocationInput;
                    str_names::Bool = false, save::Bool = true, kwargs...)
     p, cash, ca = fai.prices, fai.cash, fai.ca
     w, lbgt, sbgt, lidx, sidx, lsf, ssf = prepare_finite_allocation(fai)
+    lu = allocation_lot_unit(da.unit, da.sets, da.strict, fai)
     sshares, scost, sw, _, sfee, sretcode, smodel = finite_sub_allocation(-view(w, sidx),
                                                                           view(p, sidx),
+                                                                          nothing_scalar_array_view(lu,
+                                                                                                    sidx),
                                                                           ca(w, p, cash),
                                                                           sbgt, ssf, da,
                                                                           str_names)
     lcash = ca(w, p, cash, sum(scost), sfee)
     lshares, lcost, lw, _, lfee, lretcode, lmodel = finite_sub_allocation(view(w, lidx),
                                                                           view(p, lidx),
+                                                                          nothing_scalar_array_view(lu,
+                                                                                                    lidx),
                                                                           lcash, lbgt, lsf,
                                                                           da, str_names)
     # The account keeps the cash that no side received, so the rule states it.
@@ -663,24 +723,25 @@ function _optimise(da::DiscreteAllocation, fai::FiniteAllocationInput;
                                     l_model = ifelse(save, lmodel, nothing), fb = nothing)
 end
 """
-    optimise(da::DiscreteAllocation{<:Any, <:Any, <:Any, <:Any, Nothing},
+    optimise(da::DiscreteAllocation{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
              fai::FiniteAllocationInput; str_names::Bool = false,
              save::Bool = true, kwargs...) -> DiscreteAllocationResult
 
-Allocate a book into whole shares with a [`DiscreteAllocation`](@ref) that carries no fallback.
+Allocate a book into whole lots with a [`DiscreteAllocation`](@ref) that carries no fallback.
 
 This method takes `da.fb === nothing` only. An allocator with a fallback goes through the generic `optimise` of an [`OptimisationEstimator`](@ref), which walks the fallback chain and runs the same steps.
 
 # Algorithm
 
  1. Read the target weights, the long and the short side, and the charge of each side with [`prepare_finite_allocation`](@ref). It removes each Unpriced Asset from its side, and gives its target weight to the rule `fai.upw`.
- 2. Start every share count, cost and weight at zero, so an Unpriced Asset holds zero in each.
- 3. Solve the short side with [`finite_sub_allocation`](@ref), on its negated weights, with the short cash that `fai.ca` gives.
- 4. Compute the long side's cash with `fai.ca`, from the money of the shares that the short side sold and the fee that it paid. See [`AbstractCollateralAlgorithm`](@ref).
- 5. Solve the long side with [`finite_sub_allocation`](@ref).
- 6. Recombine the two sides over the whole universe, and negate the short side's shares, cost and weights.
- 7. Compute `cash`, the cash that the account holds after the trade, with the third method of `fai.ca`. It includes the cash that no side received, such as the weight of an Unpriced Asset under `upw = nothing`.
- 8. Set `retcode` to an [`OptimisationFailure`](@ref) when either side failed, with one warning per failed side, and to an [`OptimisationSuccess`](@ref) otherwise.
+ 2. Resolve the lot unit of each asset with [`allocation_lot_unit`](@ref). Each side views a vector lot unit with its own mask.
+ 3. Start every share count, cost and weight at zero, so an Unpriced Asset holds zero in each.
+ 4. Solve the short side with [`finite_sub_allocation`](@ref), on its negated weights, with the short cash that `fai.ca` gives.
+ 5. Compute the long side's cash with `fai.ca`, from the money of the shares that the short side sold and the fee that it paid. See [`AbstractCollateralAlgorithm`](@ref).
+ 6. Solve the long side with [`finite_sub_allocation`](@ref).
+ 7. Recombine the two sides over the whole universe, and negate the short side's shares, cost and weights.
+ 8. Compute `cash`, the cash that the account holds after the trade, with the third method of `fai.ca`. It includes the cash that no side received, such as the weight of an Unpriced Asset under `upw = nothing`.
+ 9. Set `retcode` to an [`OptimisationFailure`](@ref) when either side failed, with one warning per failed side, and to an [`OptimisationSuccess`](@ref) otherwise.
 
 # Arguments
 
@@ -700,9 +761,9 @@ This method takes `da.fb === nothing` only. An allocator with a fallback goes th
   - [`DiscreteAllocationResult`](@ref)
   - [`FiniteAllocationInput`](@ref)
 """
-function optimise(da::DiscreteAllocation{<:Any, <:Any, <:Any, <:Any, Nothing},
-                  fai::FiniteAllocationInput; str_names::Bool = false, save::Bool = true,
-                  kwargs...)
+function optimise(da::DiscreteAllocation{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                         Nothing}, fai::FiniteAllocationInput;
+                  str_names::Bool = false, save::Bool = true, kwargs...)
     return _optimise(da, fai; str_names = str_names, save = save, kwargs...)
 end
 

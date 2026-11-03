@@ -8,7 +8,7 @@ Description = "Discrete finite allocation, public API of PortfolioOptimisers.jl:
 DiscreteAllocationResult
 DiscreteAllocation
 factory(res::DiscreteAllocationResult, fb::Option{<:FOptE_FOpt_FbChain})
-optimise(::DiscreteAllocation{<:Any, <:Any, <:Any, <:Any, Nothing}, ::FiniteAllocationInput)
+optimise(::DiscreteAllocation{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing}, ::FiniteAllocationInput)
 ```
 
 ## References

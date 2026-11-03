@@ -50,8 +50,8 @@ end
         @test_throws DomainError NearestQuantilePrediction(; q = -0.1)
         @test_throws DomainError KatzCentrality(; alpha = 0.0)
         @test_throws DomainError KatzCentrality(; alpha = -0.3)
-        @test_throws DomainError GreedyAllocation(; unit = 0)
-        @test_throws DomainError GreedyAllocation(; unit = -1)
+        @test_throws DomainError GreedyAllocation(; unit = LotUnit(0))
+        @test_throws DomainError GreedyAllocation(; unit = LotUnit(-1))
         # FiniteAllocationInput (U4)
         @test isa(FiniteAllocationInput(; w = [0.5, 0.5], prices = [10.0, 20.0]),
                   PortfolioOptimisers.AbstractEstimator)

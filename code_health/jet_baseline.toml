@@ -8,7 +8,7 @@ jet = "0.13.1"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "StatsPlots"]
-commit = "8c81357c41"
+commit = "e3f1925ee2"
 
 [run.main]
 load_set = ["GraphRecipes", "StatsPlots"]
@@ -235,6 +235,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/09_ConstraintGeneration/07_ThresholdConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { raw = 2, reviewed = 2 }
 "src/09_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { raw = 0, reviewed = 0 }
+"src/09_ConstraintGeneration/10_LotUnitConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/01_Base_Prior.jl" = { raw = 1, reviewed = 1 }
 "src/10_Prior/02_EmpiricalPrior.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/03_FactorPrior.jl" = { raw = 0, reviewed = 0 }
@@ -663,6 +664,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/09_ConstraintGeneration/07_ThresholdConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
 "src/09_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { raw = 0, reviewed = 0 }
+"src/09_ConstraintGeneration/10_LotUnitConstraintGeneration.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/01_Base_Prior.jl" = { raw = 2, reviewed = 2 }
 "src/10_Prior/02_EmpiricalPrior.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/03_FactorPrior.jl" = { raw = 0, reviewed = 0 }

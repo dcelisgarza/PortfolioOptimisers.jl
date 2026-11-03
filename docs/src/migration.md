@@ -616,8 +616,22 @@ v0.33 also brings the cross-sectional factor prior to parity with the oracle, an
 | `CrossSectionalFactorPrior` with `ve = SimpleVariance()`, `ve = Covariance()` or another estimator with no variance series of its own, and the same prior inside an entropy pooling prior with `w` | Raised a `DimensionMismatch`, because the variance series did not cut the masks and the weights of the fit to the rows of each refit. | Fits. Row `t` of the series reads the masks, the implied volatility and the observation weights of the rows `1` to `t`. A covariance estimator that is not a variance estimator, such as `Covariance()`, states no count, so `ResidualInflation` on that prior raises an `IsNothingError` that names the fix. |
 | `WindowedVariance` or `WindowedCovariance` with no weights of its own over an inner estimator with observation weights, such as `WindowedVariance(; ve = SimpleVariance(; w), window = 20)` | Raised a `DimensionMismatch`. | Cuts the weights of the inner estimator to the window. |
 | `JuMPOptimiser`, `ProgrammeAllocationSet` or `FactorRiskContribution` with a vector field that mixes the members of its element type, such as `tn = [Turnover(…), TurnoverEstimator(…)]`; and `GridSearchCrossValidation`, `RandomisedSearchCrossValidation` or `WeightMassScorer` with a vector of grids whose types differ | `TypeError` or `MethodError`, unless the caller narrowed the literal with `concrete_typed_array` | The keyword constructor narrows the literal. A wrong element raises an `ArgumentError` that names the field. |
+| A constraint estimator whose `val` maps names to fractions and whose `dval` is an integer, such as `ThresholdEstimator(; val = "A" => 0.05, dval = 0)` | Raised an `InexactError` when it resolved against a `UniverseSets`. | Resolves. An integer `dval` takes the type that the values of the map promote it to. Any other `dval` keeps its type, as in v0.33. |
+
+### [Lot units of a finite allocation](@id migration-0-34-lot-units)
+
+Both finite allocators buy each asset in whole lots of its own lot unit, for fractional shares and for board lots. The `unit` field takes a `LotUnit`, one number for every asset or one value for each asset, or a `LotUnitEstimator`, which names the lot units by asset or group and resolves against the new `sets` field of the allocator.
+
+| v0.33 | v0.34 |
+| --- | --- |
+| `GreedyAllocation(; unit = 10)` | `GreedyAllocation(; unit = LotUnit(10))`. A bare number raises a `TypeError`. |
+| `GreedyAllocation(; unit = 0.01, kwargs = (; digits = 2))` | `GreedyAllocation(; unit = LotUnit(0.01))`. The `args` and `kwargs` fields are gone. The first pass floors the lot count, so a fractional lot unit buys whole lots with no rounding keyword. |
+| `PortfolioOptimisers.roundmult` | Gone, with the rounding that it did. |
+| `DiscreteAllocation(; slv)`, which bought whole shares only | Takes `unit`, `sets` and `strict`. The default `LotUnit(1)` buys whole shares, as in v0.33, and the default fallback reads the same `unit`. |
 
 ### [Results that move](@id migration-0-34-numbers)
+
+- **`GreedyAllocation` with a lot unit below one.** v0.33 rounded the first pass with `Base.round`, which rounds to a whole share under the default `kwargs`. So a target could round above itself and stop the first pass early. v0.34 floors the lot count of each target. The shares of such an allocation differ, and they are multiples of the lot unit. A lot unit of one or more gives the v0.33 shares.
 
 - **`performance_summary` of a prediction whose optimiser gives many portfolios gives one entry for each member.** v0.33 gave the scalar figures of the first member and dropped the others. Each field is now a vector with one entry for each member, and each member reads its own series, benchmark, turnover and weights. Read `ps.sharpe[1]` to keep the v0.33 number. The same holds for weights in a `VecVecNum`, and for an `OptimisationResult` of a frontier, which v0.33 refused.
 - **`forecast_evaluation_summary(fe)` and `covariance_forecast_summary(cfer)` give scalar fields.** v0.33 gave a vector of length one in each field of a summary of one evaluation. Read `fs.spearman_mean_ic` where v0.33 read `fs.spearman_mean_ic[1]`. A spread of the forecast summary and `exceedance` of the covariance summary become a vector over the tail fractions or the levels. Pass a vector, `[fe]`, to keep the shape of v0.33.
@@ -625,6 +639,8 @@ v0.33 also brings the cross-sectional factor prior to parity with the oracle, an
 ### [If you extend the library](@id migration-0-34-extending)
 
 - **The Gerber, Smyth-Broby and Gerber IQ algorithms and the shrinkage targets are not moment forms.** `GerberCovarianceAlgorithm`, `SmythBrobyCovarianceAlgorithm`, `GerberIQCovarianceAlgorithm` and `AbstractCovarianceShrinkageTarget` subtype `AbstractAlgorithm`, where v0.33 had `AbstractMomentAlgorithm`. A method that you wrote on `AbstractMomentAlgorithm` no longer reaches their members. An algorithm of your own in one of these families keeps working with the estimator that owns the family.
+
+- **`DiscreteAllocation` and `GreedyAllocation`** have the fields `unit`, `sets` and `strict` before `fb`. `DiscreteAllocation` takes eight positional arguments, where v0.33 took five, and `GreedyAllocation` takes `unit`, `sets`, `strict` and `fb`, where v0.33 took `unit`, `args`, `kwargs` and `fb`. A method that names the type parameters of `DiscreteAllocation` by position moves, because `fb` is now the eighth. In the model of `DiscreteAllocation`, the integer variable is the lot count `z`, and `x` is the expression `lu .* z`. `finite_sub_allocation`, `finite_sub_allocation!` and `set_allocation_fees!` take the lot unit after the prices.
 
 - **`GridSearchCrossValidation` and `RandomisedSearchCrossValidation`** have a field `n_best` after `scorer`, the count of the best candidates that the search keeps. Their positional constructors take one more argument. The keyword constructors keep every v0.33 keyword, and `n_best = 1` gives the v0.33 search.
 - **`SearchCrossValidationResult`** has the fields `ranked`, `rank_idx`, `rank_scores` and `path_ids` after `idx`, so its positional constructor takes 10 arguments, where v0.33 took 6. The keyword constructor keeps every v0.33 keyword, and the new keywords default to `[opt]`, `[idx]`, `nothing` and `nothing`.
