@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Result type for [`DiscreteAllocation`](@ref).
 
-`shares`, `cost` and `w` are signed, so a short position carries a negative share count, a negative cost and a negative weight. `fees` is the charge the two sub-problems paid over the whole horizon, and it is never signed. `retcode` is a failure when either sub-problem failed. `s_retcode` and `l_retcode` carry the return code of the short and of the long side, and `s_model` and `l_model` carry the two JuMP models when `save` is `true`.
+`shares`, `cost` and `w` are signed, so a short position carries a negative share count, a negative cost and a negative weight. `fees` is the charge the two sub-problems paid over the whole horizon, and it is never signed. `cash` is the cash that the account holds after both sides trade, as the collateral algorithm of the input states it. It includes the cash that no side received, and it is negative when the book borrows. Under the default [`ProceedsCollateral`](@ref), `sum(cost) + cash + fees` is the cash of the input. `retcode` is a failure when either sub-problem failed. `s_retcode` and `l_retcode` carry the return code of the short and of the long side, and `s_model` and `l_model` carry the two JuMP models when `save` is `true`.
 
 # Fields
 
@@ -627,11 +627,12 @@ function _optimise(da::DiscreteAllocation, fai::FiniteAllocationInput;
                                                                           sbgt, ssf, da,
                                                                           str_names)
     lcash = ca(w, p, cash, sum(scost), sfee)
-    lshares, lcost, lw, lcash, lfee, lretcode, lmodel = finite_sub_allocation(view(w, lidx),
-                                                                              view(p, lidx),
-                                                                              lcash, lbgt,
-                                                                              lsf, da,
-                                                                              str_names)
+    lshares, lcost, lw, _, lfee, lretcode, lmodel = finite_sub_allocation(view(w, lidx),
+                                                                          view(p, lidx),
+                                                                          lcash, lbgt, lsf,
+                                                                          da, str_names)
+    # The account keeps the cash that no side received, so the rule states it.
+    rcash = ca(w, p, cash, sum(scost), sfee, sum(lcost), lfee)
 
     # An unpriced asset is on neither side, so its row keeps the zero it starts with.
     res = zeros(eltype(w), length(w), 3)
@@ -657,7 +658,7 @@ function _optimise(da::DiscreteAllocation, fai::FiniteAllocationInput;
     return DiscreteAllocationResult(; retcode = retcode, s_retcode = sretcode,
                                     l_retcode = lretcode, shares = view(res, :, 1),
                                     cost = view(res, :, 2), w = view(res, :, 3),
-                                    cash = lcash, fees = lfee + sfee,
+                                    cash = rcash, fees = lfee + sfee,
                                     s_model = ifelse(save, smodel, nothing),
                                     l_model = ifelse(save, lmodel, nothing), fb = nothing)
 end
@@ -678,7 +679,8 @@ This method takes `da.fb === nothing` only. An allocator with a fallback goes th
  4. Compute the long side's cash with `fai.ca`, from the money of the shares that the short side sold and the fee that it paid. See [`AbstractCollateralAlgorithm`](@ref).
  5. Solve the long side with [`finite_sub_allocation`](@ref).
  6. Recombine the two sides over the whole universe, and negate the short side's shares, cost and weights.
- 7. Set `retcode` to an [`OptimisationFailure`](@ref) when either side failed, with one warning per failed side, and to an [`OptimisationSuccess`](@ref) otherwise.
+ 7. Compute `cash`, the cash that the account holds after the trade, with the third method of `fai.ca`. It includes the cash that no side received, such as the weight of an Unpriced Asset under `upw = nothing`.
+ 8. Set `retcode` to an [`OptimisationFailure`](@ref) when either side failed, with one warning per failed side, and to an [`OptimisationSuccess`](@ref) otherwise.
 
 # Arguments
 
@@ -690,7 +692,7 @@ This method takes `da.fb === nothing` only. An allocator with a fallback goes th
 
 # Returns
 
-  - `res::DiscreteAllocationResult`: The realised allocation. `cash` is the cash that the long side leaves, and `fees` is the sum of the two sides' fees.
+  - `res::DiscreteAllocationResult`: The realised allocation. `cash` is the cash that the account holds after the trade, and `fees` is the sum of the two sides' fees.
 
 # Related
 

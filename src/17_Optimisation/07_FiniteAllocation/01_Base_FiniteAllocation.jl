@@ -68,16 +68,17 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the rules that give each side of a finite allocation its cash.
 
-A finite allocation solves the short side first and the long side second. A collateral algorithm states how much cash the short side can spend, and how much cash the long side can spend after the short side trades. [`FiniteAllocationInput`](@ref) holds one in its `ca` field, so every allocator of a fallback chain reads the same rule.
+A finite allocation solves the short side first and the long side second. A collateral algorithm states how much cash the short side can spend, and how much cash the long side can spend after the short side trades. It also states how much cash the account holds after both sides trade, because only the rule knows if a short sale gives cash. [`FiniteAllocationInput`](@ref) holds one in its `ca` field, so every allocator of a fallback chain reads the same rule.
 
 All concrete subtypes must subtype `AbstractCollateralAlgorithm`.
 
 # Interfaces
 
-To implement a new collateral algorithm, subtype `AbstractCollateralAlgorithm` and make it callable with these two methods:
+To implement a new collateral algorithm, subtype `AbstractCollateralAlgorithm` and make it callable with these three methods:
 
   - `(ca::MyCollateral)(w::VecNum, prices::VecNum, cash::Number) -> Number`: Returns the cash of the short side, before it trades.
   - `(ca::MyCollateral)(w::VecNum, prices::VecNum, cash::Number, smoney::Number, sfee::Number) -> Number`: Returns the cash of the long side, after the short side trades.
+  - `(ca::MyCollateral)(w::VecNum, prices::VecNum, cash::Number, smoney::Number, sfee::Number, lmoney::Number, lfee::Number) -> Number`: Returns the cash that the account holds uninvested after both sides trade. The allocators report it as the `cash` of their result. It includes the cash that no side received, such as the cash outside a budget below one, or the weight of an Unpriced Asset under `upw = nothing`.
 
 Where:
 
@@ -86,8 +87,10 @@ Where:
   - `cash`: Cash of the allocation, the `cash` of [`FiniteAllocationInput`](@ref).
   - `smoney`: Money of the shares that the short side sold, a non-negative number.
   - `sfee`: Fee that the short side paid over the whole horizon.
+  - `lmoney`: Money of the shares that the long side bought, a non-negative number.
+  - `lfee`: Fee that the long side paid over the whole horizon.
 
-Each method must return a non-negative number. The allocators do not check it. A plain function with the same two methods is also a valid `ca`, as [`CollateralAlg_Func`](@ref) states.
+The first two methods must return a non-negative number. The allocators do not check it. The third method returns a negative number when the book borrows, for example when the long side spends more than the cash. A plain function with the same three methods is also a valid `ca`, as [`CollateralAlg_Func`](@ref) states. A rule that has only the first two methods throws a `MethodError` when an allocator reports its cash.
 
 # Examples
 
@@ -98,6 +101,8 @@ julia> (::MyNoShortCollateral)(w, prices, cash) = zero(cash)
 
 julia> (::MyNoShortCollateral)(w, prices, cash, smoney, sfee) = cash * sum(x -> max(x, zero(x)), w)
 
+julia> (::MyNoShortCollateral)(w, prices, cash, smoney, sfee, lmoney, lfee) = cash - lmoney - lfee
+
 julia> fai = FiniteAllocationInput(; w = [0.7, 0.5, -0.2], prices = [10.0, 20.0, 5.0],
                                    cash = 1000.0, ca = MyNoShortCollateral());
 
@@ -107,9 +112,14 @@ julia> optimise(GreedyAllocation(), fai).shares
  25.0
  -0.0
 
+julia> optimise(GreedyAllocation(), fai).cash
+-200.0
+
 julia> no_short(w, prices, cash) = zero(cash);
 
 julia> no_short(w, prices, cash, smoney, sfee) = cash * sum(x -> max(x, zero(x)), w);
+
+julia> no_short(w, prices, cash, smoney, sfee, lmoney, lfee) = cash - lmoney - lfee;
 
 julia> optimise(GreedyAllocation(),
                 FiniteAllocationInput(; w = [0.7, 0.5, -0.2], prices = [10.0, 20.0, 5.0],
@@ -134,37 +144,45 @@ $(DocStringExtensions.TYPEDEF)
 
 Pays for the long side of a finite allocation with the proceeds of its short sales.
 
-A short sale gives cash, and the long side can spend it. The long side receives its target, less the part of the short target that the short side did not sell, less the fee of the short side. So the net money of the book, long less short with both fees, is at most ``C_{\\text{tot}}\\, b``, whatever the short side sells. It is the default `ca` of [`FiniteAllocationInput`](@ref).
+A short sale gives cash, and the long side can spend it. The long side receives its target, less the part of the short target that the short side did not sell, less the fee of the short side. So the net money of the book, long less short with both fees, is at most ``C_{\\text{tot}}\\, b``, whatever the short side sells. The account keeps the cash, the short proceeds less the long money and both fees. It is the default `ca` of [`FiniteAllocationInput`](@ref).
 
 # Mathematical definition
 
 ```math
 \\begin{align}
 C_S^{\\prime} &= C_S\\,, \\\\
-C_L^{\\prime} &= \\max\\left(0,\\, C_L - C_S + m_S - F_S\\right)\\,.
+C_L^{\\prime} &= \\max\\left(0,\\, C_L - C_S + m_S - F_S\\right)\\,, \\\\
+R &= C_{\\text{tot}} + m_S - F_S - m_L - F_L\\,.
 \\end{align}
 ```
 
 ``C_L - C_S = C_{\\text{tot}}\\, b`` is the net money of the book. When the short side sells its whole target and pays no fee, ``m_S = C_S`` and ``F_S = 0``, so ``C_L^{\\prime} = C_L``. Each unit of target that the short side does not sell is a unit of cash that the long side does not get. The floor at zero applies to a book with ``b < 0`` whose short side sells less than ``-C_{\\text{tot}}\\, b``. Its long side then buys nothing.
 
+``R`` also holds the cash that no side received. When the floor does not apply and the long side spends its whole cash, ``m_L + F_L = C_L^{\\prime}``, so ``R = C_{\\text{tot}} (1 - b)``. A book with ``b < 1`` then keeps that cash, and a book with ``b > 1`` borrows it, so its ``R`` is negative. With the signed costs of the result, ``\\sum_i \\mathrm{cost}_i + R + F_L + F_S = C_{\\text{tot}}`` for every book.
+
 Where:
 
   - $(math_dict[:C_S_prime_alloc])
   - $(math_dict[:C_L_prime_alloc])
+  - $(math_dict[:R_alloc])
   - $(math_dict[:C_S_alloc])
   - $(math_dict[:C_L_alloc])
   - $(math_dict[:C_tot_alloc])
   - $(math_dict[:b_alloc])
   - $(math_dict[:m_S_alloc])
   - $(math_dict[:F_S_alloc])
+  - $(math_dict[:m_L_alloc])
+  - $(math_dict[:F_L_alloc])
 
 # Functor
 
     (ca::ProceedsCollateral)(w::VecNum, prices::VecNum, cash::Number)
     (ca::ProceedsCollateral)(w::VecNum, prices::VecNum, cash::Number, smoney::Number,
                              sfee::Number)
+    (ca::ProceedsCollateral)(w::VecNum, prices::VecNum, cash::Number, smoney::Number,
+                             sfee::Number, lmoney::Number, lfee::Number)
 
-The first method returns ``C_S^{\\prime}``, with `cash` as ``C_{\\text{tot}}``. The second method returns ``C_L^{\\prime}``, with `smoney` as ``m_S`` and `sfee` as ``F_S``. Neither method reads `prices`.
+The first method returns ``C_S^{\\prime}``, with `cash` as ``C_{\\text{tot}}``. The second method returns ``C_L^{\\prime}``, with `smoney` as ``m_S`` and `sfee` as ``F_S``. The third method returns ``R``, with `lmoney` as ``m_L`` and `lfee` as ``F_L``. No method reads `prices`, and the third method does not read `w`.
 
 # Examples
 
@@ -177,6 +195,9 @@ julia> ca([1.2, -0.5], [1.0, 1000.0], 100.0)
 
 julia> ca([1.2, -0.5], [1.0, 1000.0], 100.0, 0.0, 0.0)
 70.0
+
+julia> ca([1.2, -0.5], [1.0, 1000.0], 100.0, 0.0, 0.0, 70.0, 0.0)
+30.0
 ```
 
 # Related
@@ -197,28 +218,36 @@ function (::ProceedsCollateral)(w::VecNum, ::VecNum, cash::Number, smoney::Numbe
             smoney - sfee
     return max(zero(lcash), lcash)
 end
+function (::ProceedsCollateral)(::VecNum, ::VecNum, cash::Number, smoney::Number,
+                                sfee::Number, lmoney::Number, lfee::Number)
+    return cash + smoney - sfee - lmoney - lfee
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
 Caps the money that a finite allocation ties up at a collateral amount.
 
-A short sale gives no cash that the long side can spend, and the short position ties up collateral equal to its money. The long money, the short money and the fees of the two sides are together at most ``K``. The long side takes the collateral that the short side did not use, so it buys more than its target when the short side sells less than its target and ``K`` is large enough. With `amount = nothing`, ``K`` is the cash of the allocation, so the book never ties up more than its cash.
+A short sale gives no cash that the long side can spend, and the short position ties up collateral equal to its money. The long money, the short money and the fees of the two sides are together at most ``K``. The long side takes the collateral that the short side did not use, so it buys more than its target when the short side sells less than its target and ``K`` is large enough. With `amount = nothing`, ``K`` is the cash of the allocation, so the book never ties up more than its cash. The account keeps the cash less the money of both sides and both fees.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
 C_S^{\\prime} &= \\min\\left(C_S,\\, K\\right)\\,, \\\\
-C_L^{\\prime} &= \\max\\left(0,\\, \\min\\left(C_{\\text{tot}} \\left(b_L + b_S\\right),\\, K\\right) - m_S - F_S\\right)\\,.
+C_L^{\\prime} &= \\max\\left(0,\\, \\min\\left(C_{\\text{tot}} \\left(b_L + b_S\\right),\\, K\\right) - m_S - F_S\\right)\\,, \\\\
+R &= C_{\\text{tot}} - m_S - F_S - m_L - F_L\\,.
 \\end{align}
 ```
 
 When ``K \\geq C_{\\text{tot}} (b_L + b_S)``, ``C_L^{\\prime} = C_L + C_S - m_S - F_S``, the long target plus the collateral that the short side did not use. When ``K`` is smaller, ``K`` binds the whole book.
 
+``R`` also holds the cash that no side received. When the floor does not apply and the long side spends its whole cash, ``R = C_{\\text{tot}} - \\min\\left(C_{\\text{tot}} (b_L + b_S),\\, K\\right)``. A ``K`` above the cash lets the book borrow, so its ``R`` can be negative. With the absolute costs of the result, ``\\sum_i \\left|\\mathrm{cost}_i\\right| + R + F_L + F_S = C_{\\text{tot}}`` for every book.
+
 Where:
 
   - $(math_dict[:C_S_prime_alloc])
   - $(math_dict[:C_L_prime_alloc])
+  - $(math_dict[:R_alloc])
   - $(math_dict[:C_S_alloc])
   - $(math_dict[:C_L_alloc])
   - ``K``: Collateral, `amount`, or ``C_{\\text{tot}}`` when `amount` is `nothing`.
@@ -227,6 +256,8 @@ Where:
   - $(math_dict[:b_S_alloc])
   - $(math_dict[:m_S_alloc])
   - $(math_dict[:F_S_alloc])
+  - $(math_dict[:m_L_alloc])
+  - $(math_dict[:F_L_alloc])
 
 # Fields
 
@@ -249,8 +280,10 @@ Keywords correspond to the struct's fields.
     (ca::CashCollateral)(w::VecNum, prices::VecNum, cash::Number)
     (ca::CashCollateral)(w::VecNum, prices::VecNum, cash::Number, smoney::Number,
                          sfee::Number)
+    (ca::CashCollateral)(w::VecNum, prices::VecNum, cash::Number, smoney::Number,
+                         sfee::Number, lmoney::Number, lfee::Number)
 
-The first method returns ``C_S^{\\prime}``, with `cash` as ``C_{\\text{tot}}``. The second method returns ``C_L^{\\prime}``, with `smoney` as ``m_S`` and `sfee` as ``F_S``. Neither method reads `prices`.
+The first method returns ``C_S^{\\prime}``, with `cash` as ``C_{\\text{tot}}``. The second method returns ``C_L^{\\prime}``, with `smoney` as ``m_S`` and `sfee` as ``F_S``. The third method returns ``R``, with `lmoney` as ``m_L`` and `lfee` as ``F_L``. No method reads `prices`, and the third method reads neither `w` nor `amount`.
 
 # Examples
 
@@ -264,6 +297,9 @@ julia> ca([1.2, -0.5], [1.0, 1000.0], 100.0)
 
 julia> ca([1.2, -0.5], [1.0, 1000.0], 100.0, 0.0, 0.0)
 100.0
+
+julia> ca([1.2, -0.5], [1.0, 1000.0], 100.0, 0.0, 0.0, 100.0, 0.0)
+0.0
 ```
 
 # Related
@@ -295,13 +331,17 @@ function (ca::CashCollateral)(w::VecNum, ::VecNum, cash::Number, smoney::Number,
     lcash = min(cash * sum(abs, w), something(ca.amount, cash)) - smoney - sfee
     return max(zero(lcash), lcash)
 end
+function (::CashCollateral)(::VecNum, ::VecNum, cash::Number, smoney::Number, sfee::Number,
+                            lmoney::Number, lfee::Number)
+    return cash - smoney - sfee - lmoney - lfee
+end
 export ProceedsCollateral, CashCollateral
 """
     const CollateralAlg_Func = Union{AbstractCollateralAlgorithm, Function}
 
-Alias for a rule that gives each side of a finite allocation its cash: a rule of the family, or a plain function with the two methods of the family.
+Alias for a rule that gives each side of a finite allocation its cash: a rule of the family, or a plain function with the three methods of the family.
 
-It is the bound of the `ca` field of [`FiniteAllocationInput`](@ref). [`AbstractCollateralAlgorithm`](@ref) states the two methods.
+It is the bound of the `ca` field of [`FiniteAllocationInput`](@ref). [`AbstractCollateralAlgorithm`](@ref) states the three methods.
 
 # Related
 
@@ -315,7 +355,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the rules that move the target weight of an Unpriced Asset to other assets of a finite allocation.
 
-An Unpriced Asset has a `NaN` price on the allocation date, because it has no bar on that date. An example is an asset that was delisted after the date of the weights. No allocator can buy such an asset. With `upw = nothing`, [`FiniteAllocationInput`](@ref) reads the weight of an Unpriced Asset as a zero weight, so the allocation does not spend it. A rule of this family moves that weight to priced assets of the same side, so the long and the short budget of the book do not change. The rule is the `upw` field of the input, not a field of the allocator, so every allocator of a fallback chain reads one rule.
+An Unpriced Asset has a `NaN` price on the allocation date, because it has no bar on that date. An example is an asset that was delisted after the date of the weights. No allocator can buy such an asset. With `upw = nothing`, [`FiniteAllocationInput`](@ref) reads the weight of an Unpriced Asset as a zero weight, so the allocation does not spend it. That money stays in the `cash` of the result. A rule of this family moves that weight to priced assets of the same side, so the long and the short budget of the book do not change. The rule is the `upw` field of the input, not a field of the allocator, so every allocator of a fallback chain reads one rule.
 
 # Interfaces
 
@@ -770,7 +810,7 @@ Holds the target weights, prices and cash that a finite allocation reads.
 
 An optimisation over a reduced universe solves on its Investable Mask, and expands the weights back to the full universe. Its result then has a full-length `w` and a fee on two reduced axes. `imsk` records the reduction. [`allocation_side_fees`](@ref) calls [`lift_fees`](@ref) to put the fee back on the axis of `w` and `prices`, so the allocation charges the forced exit of an asset that left the universe on the money that the exit sold. The fee records its mask in its own `imsk` field too, and the constructor makes the two agree through [`mark_fees`](@ref). A stated `imsk` marks a fee that has no mask. A marked fee gives its mask when `imsk` is `nothing`. The constructor refuses two masks that differ.
 
-An Unpriced Asset has a `NaN` price, the price of an asset with no bar on the allocation date. Both allocators solve each side over its priced assets only, so they buy no Unpriced Asset, and its shares, cost and realised weight are zero. Its price reaches no other number of the result. `upw` states what its target weight becomes. With `upw = nothing`, the weight is read as a zero weight. A rule of [`AbstractUnpricedWeightAlgorithm`](@ref) moves it to priced assets of the same side. A held Unpriced Asset ends the trade with no money, so its turnover fee charges the sale of the whole previous position, as [`allocation_side_fees`](@ref) states.
+An Unpriced Asset has a `NaN` price, the price of an asset with no bar on the allocation date. Both allocators solve each side over its priced assets only, so they buy no Unpriced Asset, and its shares, cost and realised weight are zero. Its price reaches no other number of the result. `upw` states what its target weight becomes. With `upw = nothing`, the weight is read as a zero weight, and the money of that weight stays in the `cash` of the result. A rule of [`AbstractUnpricedWeightAlgorithm`](@ref) moves it to priced assets of the same side. A held Unpriced Asset ends the trade with no money, so its turnover fee charges the sale of the whole previous position, as [`allocation_side_fees`](@ref) states.
 
 # Fields
 
@@ -887,11 +927,11 @@ FiniteAllocationInput
     """
     imsk
     """
-    Collateral algorithm, which gives the short side its cash, and the long side its cash after the short side trades. A rule of [`AbstractCollateralAlgorithm`](@ref), or a plain function with its two methods. The default [`ProceedsCollateral`](@ref) pays for the long side with the proceeds of the short sales.
+    Collateral algorithm, which gives the short side its cash, and the long side its cash after the short side trades. It also gives the cash that the account holds after the trade, which is the `cash` of the result. A rule of [`AbstractCollateralAlgorithm`](@ref), or a plain function with its three methods. The default [`ProceedsCollateral`](@ref) pays for the long side with the proceeds of the short sales.
     """
     ca
     """
-    Rule for the target weight of an Unpriced Asset, an asset whose price is not finite. `nothing` reads the weight as a zero weight, so the allocation does not spend it. A rule of [`AbstractUnpricedWeightAlgorithm`](@ref), or a plain function with its signature, moves the weight to priced assets of the same side.
+    Rule for the target weight of an Unpriced Asset, an asset whose price is not finite. `nothing` reads the weight as a zero weight, so the allocation does not spend it, and its money stays in the `cash` of the result. A rule of [`AbstractUnpricedWeightAlgorithm`](@ref), or a plain function with its signature, moves the weight to priced assets of the same side.
     """
     upw
     function FiniteAllocationInput(w::VecNum, prices::VecNum, cash::Number,
@@ -1024,7 +1064,7 @@ end
 
 Split a portfolio into its long and its short side.
 
-Both finite allocators solve one sub-problem per side. A zero weight is on the long side. The method gives no side its cash. The `ca` of [`FiniteAllocationInput`](@ref) does that, through the two methods of [`AbstractCollateralAlgorithm`](@ref). The method charges no fee. Each sub-problem charges the fee of its own side on the money that it buys, through [`allocation_fee`](@ref) or [`set_allocation_fees!`](@ref).
+Both finite allocators solve one sub-problem per side. A zero weight is on the long side. The method gives no side its cash. The `ca` of [`FiniteAllocationInput`](@ref) does that, through the first two methods of [`AbstractCollateralAlgorithm`](@ref). The method charges no fee. Each sub-problem charges the fee of its own side on the money that it buys, through [`allocation_fee`](@ref) or [`set_allocation_fees!`](@ref).
 
 # Mathematical definition
 

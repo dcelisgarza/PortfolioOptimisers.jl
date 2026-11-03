@@ -133,7 +133,7 @@ println("long cost + short cost = cost = $(sum(mip_res1.cost))")
 println("long cost: $(sum(mip_res1.cost[mip_res1.cost .>= zero(eltype(mip_res1.cost))]))")
 println("short cost: $(sum(mip_res1.cost[mip_res1.cost .< zero(eltype(mip_res1.cost))]))")
 println("remaining cash: $(mip_res1.cash)")
-println("used cash ≈ available cash: $(isapprox(sum(mip_res1.cost) + mip_res1.cash, 4206.9 * sum(res1.w)))")
+println("used cash ≈ available cash: $(isapprox(sum(mip_res1.cost) + mip_res1.cash, 4206.9))")
 
 #=
 #### 3.1.2 Market neutral portfolio with the maximum ratio of return to risk
@@ -168,9 +168,10 @@ of each asset.
 
 The discrete allocation splits the cash between the long and the short positions from the
 weights, so you do not split it yourself. By default the short sales pay for the long positions,
-which is what `ProceedsCollateral` states. The last line is `true` when the costs plus the
-remaining cash equal the cash times the budget, which is zero here. `CashCollateral` is the other
-rule: the short sales give no cash, and the long and short costs together stay within the cash.
+which is what `ProceedsCollateral` states. The proceeds of the short sales stay in the account,
+so the remaining cash is close to the cash. The last line is `true` when the costs plus the
+remaining cash equal the cash. `CashCollateral` is the other rule: the short sales give no cash,
+and the long and short costs together stay within the cash.
 =#
 
 mip_res2 = optimise(da,
@@ -183,7 +184,7 @@ println("long cost + short cost = cost = $(sum(mip_res2.cost))")
 println("long cost: $(sum(mip_res2.cost[mip_res2.cost .>= zero(eltype(mip_res2.cost))]))")
 println("short cost: $(sum(mip_res2.cost[mip_res2.cost .< zero(eltype(mip_res2.cost))]))")
 println("remaining cash: $(mip_res2.cash)")
-println("used cash ≈ available cash: $(isapprox(sum(mip_res2.cost) + mip_res2.cash, 4206.9 * sum(res2.w); atol = 1e-6))")
+println("used cash ≈ available cash: $(isapprox(sum(mip_res2.cost) + mip_res2.cash, 4206.9))")
 
 #=
 #### 3.1.3 Short-only portfolio
@@ -201,8 +202,9 @@ println("short budget: $(sum(res3.w[res3.w .< zero(eltype(res3.w))]))")
 println("weight bounds: $(all(x -> -one(x) <= x <= zero(x), res3.w))")
 
 #=
-We allocate the same cash to the short-only portfolio. The last line is `true` when the costs,
-less the remaining cash, equal the cash times the budget.
+We allocate the same cash to the short-only portfolio. The proceeds of the short sales stay in
+the account beside the cash, so the remaining cash is close to twice the cash. The last line is
+`true` when the costs plus the remaining cash equal the cash.
 =#
 
 mip_res3 = optimise(da,
@@ -215,7 +217,7 @@ println("long cost + short cost = cost = $(sum(mip_res3.cost))")
 println("long cost: $(sum(mip_res3.cost[mip_res3.cost .>= zero(eltype(mip_res3.cost))]))")
 println("short cost: $(sum(mip_res3.cost[mip_res3.cost .< zero(eltype(mip_res3.cost))]))")
 println("remaining cash: $(mip_res3.cash)")
-println("used cash ≈ available cash: $(isapprox(sum(mip_res3.cost) - mip_res3.cash, 4206.9 * sum(res3.w)))")
+println("used cash ≈ available cash: $(isapprox(sum(mip_res3.cost) + mip_res3.cash, 4206.9))")
 
 #=
 #### 3.1.4 Leveraged portfolios
@@ -233,8 +235,9 @@ println("short budget: $(sum(res4.w[res4.w .< zero(eltype(res4.w))]))")
 println("weight bounds: $(all(x -> zero(x) <= x <= one(x), res4.w))")
 
 #=
-We allocate the same cash. The costs and the remaining cash sum to 1.3 times the cash, because
-the budget is 1.3.
+We allocate the same cash. The costs sum to about 1.3 times the cash, because the budget is 1.3.
+The portfolio borrows 0.3 times the cash, so the remaining cash is negative, and the costs plus
+the remaining cash equal the cash.
 =#
 
 mip_res4 = optimise(da,
@@ -247,7 +250,7 @@ println("long cost + short cost = cost = $(sum(mip_res4.cost))")
 println("long cost: $(sum(mip_res4.cost[mip_res4.cost .>= zero(eltype(mip_res4.cost))]))")
 println("short cost: $(sum(mip_res4.cost[mip_res4.cost .< zero(eltype(mip_res4.cost))]))")
 println("remaining cash: $(mip_res4.cash)")
-println("used cash ≈ available cash: $(isapprox(sum(mip_res4.cost) + mip_res4.cash, 4206.9 * sum(res4.w)))")
+println("used cash ≈ available cash: $(isapprox(sum(mip_res4.cost) + mip_res4.cash, 4206.9))")
 
 #=
 We now make a long-short portfolio with a budget of `0.5` and a short budget of `1`, with
@@ -270,7 +273,8 @@ println("weight bounds: $(all(x -> -one(x) <= x <= one(x), res5.w))")
 
 #=
 This time we allocate `4506.9` units of cash. The long and short costs sum to about half of it,
-because the budget is 0.5, and the costs plus the remaining cash equal half of it.
+because the budget is 0.5. The other half stays in the account as remaining cash, so the costs
+plus the remaining cash equal the cash.
 =#
 
 mip_res5 = optimise(da,
@@ -283,7 +287,7 @@ println("long cost + short cost = cost = $(sum(mip_res5.cost))")
 println("long cost: $(sum(mip_res5.cost[mip_res5.cost .>= zero(eltype(mip_res5.cost))]))")
 println("short cost: $(sum(mip_res5.cost[mip_res5.cost .< zero(eltype(mip_res5.cost))]))")
 println("remaining cash: $(mip_res5.cash)")
-println("used cash ≈ available cash: $(isapprox(sum(mip_res5.cost) + mip_res5.cash, 4506.9 * sum(res5.w)))")
+println("used cash ≈ available cash: $(isapprox(sum(mip_res5.cost) + mip_res5.cash, 4506.9))")
 
 #=
 We plot the weights of the five portfolios side by side.

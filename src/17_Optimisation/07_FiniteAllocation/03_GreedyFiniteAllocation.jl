@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Result type for [`GreedyAllocation`](@ref).
 
-`shares`, `cost` and `w` carry the sign of the position. A short position has a negative share count, a negative cost and a negative weight. `fees` is the charge that the two sides paid over the whole horizon, and the short side's part of it is not negated. `cash` is the cash left over after the allocation of the long side.
+`shares`, `cost` and `w` carry the sign of the position. A short position has a negative share count, a negative cost and a negative weight. `fees` is the charge that the two sides paid over the whole horizon, and the short side's part of it is not negated. `cash` is the cash that the account holds after both sides trade, as the collateral algorithm of the input states it. It includes the cash that no side received, and it is negative when the book borrows. Under the default [`ProceedsCollateral`](@ref), `sum(cost) + cash + fees` is the cash of the input.
 
 # Fields
 
@@ -438,8 +438,10 @@ function _optimise(ga::GreedyAllocation, fai::FiniteAllocationInput; kwargs...)
     sshares, scost, sw, _, sfee = finite_sub_allocation!(-view(w, sidx), view(p, sidx),
                                                          ca(w, p, cash), sbgt, ssf, ga)
     lcash = ca(w, p, cash, sum(scost), sfee)
-    lshares, lcost, lw, lcash, lfee = finite_sub_allocation!(view(w, lidx), view(p, lidx),
-                                                             lcash, lbgt, lsf, ga)
+    lshares, lcost, lw, _, lfee = finite_sub_allocation!(view(w, lidx), view(p, lidx),
+                                                         lcash, lbgt, lsf, ga)
+    # The account keeps the cash that no side received, so the rule states it.
+    rcash = ca(w, p, cash, sum(scost), sfee, sum(lcost), lfee)
     # An unpriced asset is on neither side, so its row keeps the zero it starts with.
     res = zeros(eltype(w), length(w), 3)
     res[lidx, 1] = lshares
@@ -450,7 +452,7 @@ function _optimise(ga::GreedyAllocation, fai::FiniteAllocationInput; kwargs...)
     res[sidx, 3] = -sw
     return GreedyAllocationResult(; retcode = OptimisationSuccess(),
                                   shares = view(res, :, 1), cost = view(res, :, 2),
-                                  w = view(res, :, 3), cash = lcash, fees = lfee + sfee,
+                                  w = view(res, :, 3), cash = rcash, fees = lfee + sfee,
                                   fb = nothing)
 end
 """
@@ -469,7 +471,7 @@ This method takes a `GreedyAllocation` with no fallback. The generic `optimise` 
  4. Compute the long side's cash with `fai.ca`, from the money of the shares that the short side sold and the fee that it paid. See [`AbstractCollateralAlgorithm`](@ref).
  5. Allocate the long side with [`finite_sub_allocation!`](@ref).
  6. Negate the short side's shares, costs and weights, and put the two sides into one vector per quantity, in the caller's asset order.
- 7. Return the long side's leftover cash as `cash`, and the sum of the fees of the two sides as `fees`.
+ 7. Return the cash that the account holds after the trade as `cash`, from the third method of `fai.ca`, and the sum of the fees of the two sides as `fees`. The cash includes the cash that no side received, such as the weight of an Unpriced Asset under `upw = nothing`.
 
 # Arguments
 

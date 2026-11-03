@@ -202,7 +202,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  # Allocation.
                  :shares => "`shares`: Number of shares allocated per asset.",#
                  :cost_alloc => "`cost`: Cost of the allocation.",#
-                 :cash_alloc => "`cash`: Remaining uninvested cash after allocation.",#
+                 :cash_alloc => "`cash`: Remaining uninvested cash after allocation, from the third method of the collateral algorithm of the input. It includes the cash that no side received, and it is negative when the book borrows.",#
                  :fees_alloc => "`fees`: Fee the allocation paid over the whole horizon. It is the sum of the two sides' charges, and it is never signed.",#
                  :unit => "`unit`: Number of shares that one purchase buys, such as a lot size. A fractional `unit` buys fractional shares.",#
                  # Hierarchical and Schur complement optimisers.

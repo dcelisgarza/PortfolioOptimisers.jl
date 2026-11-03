@@ -187,6 +187,9 @@ unique_key_dict!(math_dict, :math_dict,
                  :C_L_prime_alloc => "``C_L^{\\prime}``: Long cash, the cash that the long side can spend after the short side trades.",#
                  :m_S_alloc => "``m_S``: Short money, the money of the shares that the short side sold. It is non-negative.",#
                  :F_S_alloc => "``F_S``: Short fee, the fee that the short side paid over the whole horizon.",#
+                 :m_L_alloc => "``m_L``: Long money, the money of the shares that the long side bought. It is non-negative.",#
+                 :F_L_alloc => "``F_L``: Long fee, the fee that the long side paid over the whole horizon.",#
+                 :R_alloc => "``R``: Uninvested cash, the cash that the account holds after both sides trade, the `cash` of the allocation result. It is negative when the book borrows.",#
                  :T_alloc => "``T``: Allocation horizon, the number of periods over which a finite allocation charges its rates, the `horizon` of [`FiniteAllocationInput`](@ref).",#
                  :C_prev_alloc => "``C^{\\text{prev}}``: Previous cash, the cash that the portfolio held before the trade, the `prev_cash` of [`FiniteAllocationInput`](@ref).",#
                  :m_prev_alloc => "``\\boldsymbol{m}^{\\text{prev}}``: Previous money vector, the money in each position of one side before the trade.",#

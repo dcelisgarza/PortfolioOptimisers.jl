@@ -43,9 +43,10 @@
                       FiniteAllocationInput(; w = res.w, prices = vec(values(X[end])),
                                             cash = 4206.9))
     # Each side's targets sum to its cash, so the book spends the budget down to a leftover
-    # that buys no further long share.
-    @test isapprox(sum(res_da.cost) + res_da.cash, 4206.9 * 1.2)
-    @test 0 <= res_da.cash < minimum(vec(values(X[end]))[res.w .>= 0])
+    # that buys no further long share. The cash is what the account holds: a net budget of
+    # 1.2 borrows 0.2 of the cash, so the leftover sits above `4206.9 * (1 - 1.2)`.
+    @test isapprox(sum(res_da.cost) + res_da.cash, 4206.9)
+    @test 0 <= res_da.cash - 4206.9 * (1 - 1.2) < minimum(vec(values(X[end]))[res.w .>= 0])
     @test isapprox(sum(res.w[res.w .< 0]), -1, rtol = 1e-3)
     @test isapprox(res_da.shares .* vec(values(X[end])), res_da.cost)
     @test isapprox(rmsd(res.w, res_da.w), 0.011295820717513184, rtol = 5e-4)
@@ -66,8 +67,9 @@
                       FiniteAllocationInput(; w = res.w, prices = vec(values(X[end])),
                                             cash = 4206.9))
 
-    @test isapprox(sum(res_da.cost) + res_da.cash, 4206.9 * 0.8)
-    @test 0 <= res_da.cash < minimum(vec(values(X[end]))[res.w .> 0])
+    # A budget of 0.8 keeps 0.2 of the cash out of the book, and the cash reports it (#1961).
+    @test isapprox(sum(res_da.cost) + res_da.cash, 4206.9)
+    @test 0 <= res_da.cash - 4206.9 * (1 - 0.8) < minimum(vec(values(X[end]))[res.w .> 0])
     @test isapprox(res_da.shares .* vec(values(X[end])), res_da.cost)
     @test isapprox(rmsd(res.w, res_da.w), 0.001331170818965931, rtol = 5e-2)
     res_ga = optimise(ga,
@@ -587,7 +589,8 @@ end
                                         cash = 100.0))
     @test collect(rz.shares) == [-10.0, 0.0]
     @test collect(rz.w) == [-1.0, 0.0]
-    @test rz.cash == 0.0
+    # The short sale gives its 100 to the account, beside the cash of 100 (#1961).
+    @test rz.cash == 200.0
 
     # `finite_sub_allocation!` changes none of its arguments.
     ga = GreedyAllocation()
@@ -719,12 +722,13 @@ using JuMP
 
     @testset "a side's targets sum to its cash" begin
         # A long-only book with a budget of 0.8 spends the whole side cash, 1000 of 1250,
-        # and the exact book of the target is reachable.
+        # and the exact book of the target is reachable. The 250 outside the budget is the
+        # cash of the account (#1961).
         fai = FiniteAllocationInput(; w = [0.4, 0.4], prices = [10.0, 100.0], cash = 1250.0)
         for wf in wfs
             r = optimise(da(wf), fai)
             @test collect(r.shares) == [50.0, 5.0]
-            @test iszero(r.cash)
+            @test r.cash == 250.0
             @test collect(r.w) == [0.4, 0.4]
         end
         # A long-short book: each side's targets sum to its own cash.
@@ -949,6 +953,11 @@ end
     # A long-only book: no short cash, and the long target.
     @test iszero(pc([0.5, 0.5], p, C))
     @test pc([0.5, 0.5], p, C, 0.0, 0.0) ≈ 100.0
+    # The third method is the cash of the account, R = C + m_S - F_S - m_L - F_L (#1961).
+    @test pc(w, p, C, 50.0, 0.0, 120.0, 0.0) ≈ 30.0
+    @test pc(w, p, C, 30.0, 2.0, 90.0, 3.0) ≈ 100.0 + 30.0 - 2.0 - 90.0 - 3.0
+    # A long side that spends more than the cash borrows.
+    @test pc([1.5], [1.0], C, 0.0, 0.0, 150.0, 0.0) ≈ -50.0
 
     cc = CashCollateral()
     @test isnothing(cc.amount)
@@ -966,6 +975,10 @@ end
     @test iszero(cs(w, p, C, 30.0, 0.0))
     # A long-only book above a unit budget is capped at K.
     @test cc([0.9, 0.6], p, C, 0.0, 0.0) ≈ 100.0
+    # The third method is the cash of the account, R = C - m_S - F_S - m_L - F_L (#1961).
+    @test cc(w, p, C, 30.0, 2.0, 68.0, 0.0) ≈ 0.0 atol = 1e-12
+    @test ck(w, p, C, 50.0, 0.0, 120.0, 0.0) ≈ -70.0
+    @test cs(w, p, C, 30.0, 0.0, 0.0, 0.0) ≈ 70.0
     @test_throws DomainError CashCollateral(; amount = 0.0)
     @test_throws DomainError CashCollateral(; amount = -1)
 
@@ -993,9 +1006,10 @@ end
     end
 
     # The cash identity of each algorithm, on books whose short side sells and pays a fee.
-    # `sum(cost)` is the long money less the short money, and `fees` holds both sides' fees,
-    # so the reported cash is the long cash less the long money and the long fee. A long
-    # cash floored at zero buys nothing and pays no fee here, so its cash is zero.
+    # `sum(cost)` is the long money less the short money, and `fees` holds both sides' fees.
+    # The reported cash is what the account holds (#1961): the proceeds model credits the
+    # short money, so the signed costs close the books, and the collateral model ties it
+    # up, so the absolute costs close them.
     rng = StableRNG(1337)
     fees = Fees(; l = 0.002, s = 0.003, fl = 0.5, fs = 0.7)
     for _ in 1:20
@@ -1007,13 +1021,17 @@ end
                                         fees = fees)
             r = optimise(ga, fai)
             cost = collect(r.cost)
-            @test r.cash ≈ max(0.0, C * sum(w) - sum(cost) - r.fees) atol = 1e-8
+            @test r.cash ≈ C - sum(cost) - r.fees atol = 1e-8
+            # The long side spends no more than its long cash.
+            @test r.cash >= C * (1 - sum(w)) - 1e-8 || iszero(sum(c -> max(c, 0.0), cost))
             K = 0.9 * C
             fai = FiniteAllocationInput(; w = w, prices = p, cash = C, horizon = 3,
                                         fees = fees, ca = CashCollateral(; amount = K))
             r = optimise(ga, fai)
             cost = collect(r.cost)
-            @test r.cash ≈ max(0.0, min(C * sum(abs, w), K) - sum(abs, cost) - r.fees) atol = 1e-8
+            @test r.cash ≈ C - sum(abs, cost) - r.fees atol = 1e-8
+            # The collateral that the book did not tie up stays in the account.
+            @test r.cash >= C - K - 1e-8
             @test sum(abs, cost) + r.fees <= min(C * sum(abs, w), K) + 1e-8
         end
     end
@@ -1027,11 +1045,14 @@ end
     @test collect(r.shares) == collect(optimise(GreedyAllocation(), fai).shares)
     @test collect(r.shares) == [100.0, 0.0]
 
-    # A plain function with the two methods of the family is a collateral algorithm, and
+    # A plain function with the three methods of the family is a collateral algorithm, and
     # both allocators read it as they read the type it copies.
     cash_fun(w, prices, cash) = CashCollateral()(w, prices, cash)
     cash_fun(w, prices, cash, smoney, sfee) = CashCollateral()(w, prices, cash, smoney,
                                                                sfee)
+    function cash_fun(w, prices, cash, smoney, sfee, lmoney, lfee)
+        return CashCollateral()(w, prices, cash, smoney, sfee, lmoney, lfee)
+    end
     ffun = FiniteAllocationInput(; w = [1.2, -0.5], prices = [1.0, 1000.0], cash = 100.0,
                                  ca = cash_fun)
     @test ffun.ca === cash_fun
@@ -1151,4 +1172,43 @@ end
     @test_throws IsEmptyError AssetRedistribution(; idx = Int[])
     @test_throws DomainError AssetRedistribution(; idx = 0)
     @test_throws BoundsError AssetRedistribution(; idx = 9)([0.5, 0.5], [false, true])
+end
+@testset "The cash of a finite allocation is the cash that the account holds (#1961)" begin
+    using PortfolioOptimisers, Test, HiGHS
+    slv = Solver(; name = :highs1, solver = HiGHS.Optimizer,
+                 settings = Dict("log_to_console" => false),
+                 check_sol = (; allow_local = true, allow_almost = true))
+    ga = GreedyAllocation()
+    da = DiscreteAllocation(; slv = slv, fb = nothing)
+    # The two books of the issue spend 700 of 1000. The weight of the Unpriced Asset under
+    # `upw = nothing`, and the weight outside a budget of 0.7, are 300 that no side gets,
+    # and the cash reports them.
+    books = [FiniteAllocationInput(; w = [0.5, 0.3, 0.2], prices = [10.0, NaN, 20.0],
+                                   cash = 1000.0),
+             FiniteAllocationInput(; w = [0.5, 0.2], prices = [10.0, 20.0], cash = 1000.0)]
+    for fai in books, alg in (ga, da)
+        r = optimise(alg, fai)
+        @test sum(collect(r.cost)) == 700.0
+        @test r.cash == 300.0
+        @test sum(collect(r.cost)) + r.cash + r.fees == 1000.0
+    end
+    # A rule that moves the weight spends it, so the cash holds only the leftover. The
+    # greedy walk stops with one share of 10 unbought, because no asset has a deficit left.
+    for alg in (ga, da)
+        r = optimise(alg,
+                     FiniteAllocationInput(; w = [0.5, 0.3, 0.2],
+                                           prices = [10.0, NaN, 20.0], cash = 1000.0,
+                                           upw = ProportionalRedistribution()))
+        @test 0 <= r.cash <= 10.0
+    end
+    # Under `CashCollateral` the short money ties up cash, so the absolute costs close the
+    # books, and the cash outside the gross budget of 0.8 stays in the account.
+    for alg in (ga, da)
+        r = optimise(alg,
+                     FiniteAllocationInput(; w = [0.5, -0.3], prices = [10.0, 10.0],
+                                           cash = 1000.0, ca = CashCollateral()))
+        @test collect(r.shares) == [50.0, -30.0]
+        @test r.cash == 200.0
+        @test sum(abs, collect(r.cost)) + r.cash + r.fees == 1000.0
+    end
 end

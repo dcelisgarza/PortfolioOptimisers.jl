@@ -78,3 +78,31 @@ the second.
 - **A fourth argument `C` to `adjust_long_cash`.** It fixes the collateral at the cash, and a
   function of four numbers has no place to hold a collateral amount or a rating table.
 - **The algorithm as a field of each allocator.** See decision 4.
+
+## Amendment (2026-11-03)
+
+A collateral algorithm has a third method (#1961).
+`ca(w, prices, cash, smoney, sfee, lmoney, lfee)` returns the cash that the account holds after
+both sides trade, and both allocators report it as the `cash` of their result. Before, the result
+reported the leftover of the long side, `C_L' - m_L - F_L`. That number leaves out the cash that
+no side received: the cash outside a budget below one, and the weight of an Unpriced Asset under
+`upw = nothing`. So `sum(cost) + cash + fees` was less than the input cash by `C (1 - b)`, and the
+field text "Remaining uninvested cash after allocation" was not true.
+
+The account cash depends on the model of decision 1, because only the model knows if a short sale
+gives cash. So the rule states it, and the allocator does not:
+
+- `ProceedsCollateral` credits the proceeds: `R = C + m_S - F_S - m_L - F_L`. With the signed
+  costs of the result, `sum(cost) + cash + fees = C` for every book. A book with `b > 1` borrows,
+  so its cash is negative.
+- `CashCollateral` ties the short money up: `R = C - m_S - F_S - m_L - F_L`. With the absolute
+  costs, `sum(abs, cost) + cash + fees = C`. A `K` above the cash lets the book borrow.
+
+A second field for the cash outside the budget, beside a side leftover in `cash`, was the other
+form. It needs the same third method to compute, and it keeps a field whose text is not true.
+
+The change breaks a rule that a user wrote with two methods: the allocator throws a `MethodError`
+when it reports the cash. Add the third method. The change also moves the reported `cash` of a book
+whose long cash is not all the cash of the account: a book whose budget is not one under the
+default, a book whose long cash the floor at zero sets, and a `CashCollateral` book whose gross
+budget is below one or whose `amount` is not the cash.
