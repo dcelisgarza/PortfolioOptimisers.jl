@@ -599,7 +599,8 @@ Compute the entropy pooling prior moments of the asset returns, with moment view
 # Algorithm
 
  1. Orient `X` and `F` to observations by assets with [`dims_oriented`](@ref), so every step below reads one observation in each row.
- 2. Dispatch on `pe.alg` through [`ep_prior`](@ref), and return the [`LowOrderPrior`](@ref) that it makes.
+ 2. When `pe.sets` is set, check that the length of its asset universe is equal to the number of columns of `X`, with [`assert_ep_views_axis`](@ref).
+ 3. Dispatch on `pe.alg` through [`ep_prior`](@ref), and return the [`LowOrderPrior`](@ref) that it makes.
 
 # Arguments
 
@@ -614,6 +615,7 @@ Compute the entropy pooling prior moments of the asset returns, with moment view
 # Validation
 
   - `dims in (1, 2)`.
+  - If `pe.sets` is not `nothing`, `length(pe.sets.dict[pe.sets.xkey]) == size(X, 2)`. Raises a `DimensionMismatch`.
 
 # Returns
 
@@ -623,13 +625,59 @@ Compute the entropy pooling prior moments of the asset returns, with moment view
 
   - [`EntropyPoolingPrior`](@ref)
   - [`ep_prior`](@ref)
+  - [`assert_ep_views_axis`](@ref)
   - [`LowOrderPrior`](@ref)
 """
 function prior(pe::EntropyPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing,
                pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, strict::Bool = false,
                kwargs...)
     X, F = dims_oriented(dims, X, F)
+    assert_ep_views_axis(pe.sets, X)
     return ep_prior(pe.alg, pe, X, F, pnl; strict = strict, kwargs...)
+end
+"""
+    assert_ep_views_axis(::Nothing, ::MatNum)
+    assert_ep_views_axis(sets::UniverseSets, X::MatNum)
+
+Refuse the asset universe of an entropy pooling prior when it does not match the returns matrix.
+
+The views of an [`EntropyPoolingPrior`](@ref) and of a [`MeucciEntropyPoolingPrior`](@ref) resolve asset names against `sets`. Each name maps to the column of `X` at its position in the asset list. An asset list with a different length maps the names to the wrong columns, or to no column, and the fit then fails in a matrix product with an error that names no field. This guard refuses the input first, with a message that names `sets`. It is the entropy pooling twin of [`assert_bl_views_axis`](@ref). The guard reads the asset list whenever `sets` is set, because each view of these estimators resolves names. The constructor refuses a view with no `sets`.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `sets` is `nothing`: no view resolves a name, so return `nothing`.
+ 2. `sets` is a [`UniverseSets`](@ref): check that the length of `sets.dict[sets.xkey]` is equal to `size(X, 2)`, and return `nothing`.
+
+# Arguments
+
+  - `sets`: The universe sets of the estimator, `pe.sets`, or `nothing`.
+  - `X`: Asset returns, `observations × assets`.
+
+# Validation
+
+  - `length(sets.dict[sets.xkey]) == size(X, 2)` when `sets` is not `nothing`. Raises a `DimensionMismatch`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`EntropyPoolingPrior`](@ref)
+  - [`MeucciEntropyPoolingPrior`](@ref)
+  - [`OpinionPoolingPrior`](@ref)
+  - [`assert_bl_views_axis`](@ref)
+"""
+function assert_ep_views_axis(::Nothing, ::MatNum)
+    return nothing
+end
+function assert_ep_views_axis(sets::UniverseSets, X::MatNum)
+    nx = sets.dict[sets.xkey]
+    @argcheck(length(nx) == size(X, 2),
+              DimensionMismatch("length(pe.sets.dict[pe.sets.xkey]) ($(length(nx))) must match size(X, 2) ($(size(X, 2))). The views resolve each asset name to the column of `X` at its position in the asset list, so the list must hold one name for each column."))
+    return nothing
 end
 """
     ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<:MatNum},

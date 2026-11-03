@@ -2867,3 +2867,70 @@ end
               PO.entropy_pooling(w, b, PO.AbstractEntropyPoolingTailView[], opt)
     end
 end
+@testset "A view of an opinion pool views each opinion (#1957)" begin
+    # The view of a vector of priors returned the vector unchanged, so each opinion kept its
+    # `sets` on every asset, and a fit of the view on the selected assets raised a bare
+    # `DimensionMismatch` from a matrix product.
+    PO = PortfolioOptimisers
+    X = randn(StableRNG(11), 300, 3) ./ 100
+    sets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"]))
+    ep = EntropyPoolingPrior(; sets = sets,
+                             mu_views = LinearConstraintEstimator(; val = ["A == 0.001"]))
+    mep = MeucciEntropyPoolingPrior(; sets = sets,
+                                    mu_views = LinearConstraintEstimator(;
+                                                                         val = ["C == 0.002"]))
+    # Two opinions of two types, so the element type of the view is narrowed to a `Union`
+    # that meets the bound of `pes`.
+    op = OpinionPoolingPrior(; pes = Union{typeof(ep), typeof(mep)}[ep, mep])
+    i = [1, 3]
+    opv = PO.port_opt_view(op, i)
+    @test [p.sets.dict["nx"] for p in opv.pes] == [["A", "C"], ["A", "C"]]
+    @test [p.sets.dict["nx"] for p in op.pes] == [["A", "B", "C"], ["A", "B", "C"]]
+    @test isa(opv.pes, PO.VecEP)
+    Xi = X[:, i]
+    pv = prior(opv, Xi)
+    pf = prior(OpinionPoolingPrior(;
+                                   pes = Union{typeof(ep), typeof(mep)}[PO.port_opt_view(ep,
+                                                                                         i),
+                                                                        PO.port_opt_view(mep,
+                                                                                         i)]),
+               Xi)
+    @test pv.w == pf.w
+    @test pv.mu == pf.mu
+    # A vector of prior results views each member on the asset axis too.
+    prs = [prior(EmpiricalPrior(), X), prior(EmpiricalPrior(), X)]
+    v = PO.port_opt_view(prs, i)
+    @test length(v) == 2
+    @test all(p -> p.X == Xi, v)
+    @test all(p -> p.mu == prs[1].mu[i], v)
+end
+@testset "An entropy pooling prior refuses an asset universe that does not match X (#1958)" begin
+    # A `sets` that listed more assets than `X` has columns raised a bare `DimensionMismatch`
+    # inside a matrix product, which named no field. The guard names `sets` and both lengths.
+    PO = PortfolioOptimisers
+    X = randn(StableRNG(12), 300, 2) ./ 100
+    sets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"]))
+    mv = LinearConstraintEstimator(; val = ["A == 0.001"])
+    long = r"length\(pe\.sets\.dict\[pe\.sets\.xkey\]\) \(3\) must match size\(X, 2\) \(2\)"
+    for mk in (EntropyPoolingPrior, MeucciEntropyPoolingPrior)
+        ep = mk(; sets = sets, mu_views = mv)
+        @test_throws DimensionMismatch prior(ep, X)
+        @test_throws long prior(ep, X)
+        @test_throws long prior(ep, permutedims(X); dims = 2)
+        # Each opinion of a pool fits through the same `prior`, so the pool refuses it too.
+        op = OpinionPoolingPrior(; pes = [ep, ep], ex = PO.FLoops.SequentialEx())
+        @test_throws long prior(op, X)
+    end
+    # A shorter list is refused as well, and a list of the right length fits.
+    short = UniverseSets(; dict = Dict("nx" => ["A"]))
+    @test_throws r"\(1\) must match size\(X, 2\) \(2\)" prior(EntropyPoolingPrior(;
+                                                                                  sets = short,
+                                                                                  mu_views = mv),
+                                                              X)
+    ok = UniverseSets(; dict = Dict("nx" => ["A", "B"]))
+    for mk in (EntropyPoolingPrior, MeucciEntropyPoolingPrior)
+        @test isapprox(prior(mk(; sets = ok, mu_views = mv), X).mu[1], 0.001; rtol = 1e-6)
+    end
+    # With no `sets`, no view resolves a name, and the guard reads nothing.
+    @test isnothing(PO.assert_ep_views_axis(nothing, X))
+end

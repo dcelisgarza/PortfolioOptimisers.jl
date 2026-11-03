@@ -777,24 +777,34 @@ end
 """
     port_opt_view(pr::Option{<:AbstractPriorEstimator}, ::Any, args...; kwargs...)
     port_opt_view(pr::AbstractVector{<:Union{AbstractPriorResult, AbstractPriorEstimator}},
-                  ::Any, args...; kwargs...)
+                  i, args...; kwargs...)
 
-Pass a prior estimator, or a vector of priors, through a view unchanged.
+Pass a prior estimator through a view unchanged, or view each member of a vector of priors.
 
-These two methods of [`port_opt_view`](@ref) cut nothing. An estimator holds a configuration and no data on an asset axis, so the view has nothing to cut. The subproblem fits the estimator again on its own universe. A vector holds one entry for each subproblem, such as each cluster or each subset. The caller picks the entry before it takes the view. A cut of the vector by an asset index cuts the wrong axis.
+The first method cuts nothing. It catches an estimator that has no view method of its own. Such an estimator holds a configuration and no data on an asset axis, so the view has nothing to cut. The subproblem fits the estimator again on its own universe. A `@propagatable` estimator, such as an [`EntropyPoolingPrior`](@ref), has a more specific method, which cuts each field with a `@vprop` tag.
+
+The second method views each member of the vector at `i`. A vector of priors is a field of one estimator, such as the opinions `pes` of an [`OpinionPoolingPrior`](@ref), and each member reads the same asset axis as its parent. So the index goes to each member and never to the vector. A vector that returns unchanged keeps the `sets` of each member on every asset, and a fit of the view on the selected assets then fails. The method narrows the element type of the result with [`concrete_typed_array_if_abstract`](@ref), so a vector of members of different types still meets the bound of its field.
 
 The prior result types that hold data on the asset axis have their own methods. See [`port_opt_view`](@ref) on [`LowOrderPrior`](@ref) and on [`HighOrderPrior`](@ref).
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A prior estimator, or `nothing`: return `pr` unchanged.
+ 2. A vector of priors: call [`port_opt_view`](@ref) on each member at `i`, with `args...` and `kwargs...`, in the order of `pr`. Narrow the element type of the result with [`concrete_typed_array_if_abstract`](@ref), and return it.
 
 # Arguments
 
   - $(arg_dict[:per])
-  - The second positional argument is the asset index. It has no name, because neither method reads it.
-  - `args...`: Additional arguments (ignored).
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `i`: The asset index. The first method does not read it, so that argument has no name.
+  - `args...`: Additional arguments. The first method ignores them, and the second method forwards them to each member.
+  - `kwargs...`: Additional keyword arguments. The first method ignores them, and the second method forwards them to each member.
 
 # Returns
 
-  - `pr`: The input, unchanged.
+  - `pr`: The input, unchanged, from the first method.
+  - `v::AbstractVector`: The views of the members, from the second method. It has the length of `pr`.
 
 # Related
 
@@ -802,6 +812,8 @@ The prior result types that hold data on the asset axis have their own methods. 
   - [`AbstractPriorResult`](@ref)
   - [`LowOrderPrior`](@ref)
   - [`HighOrderPrior`](@ref)
+  - [`OpinionPoolingPrior`](@ref)
+  - [`concrete_typed_array_if_abstract`](@ref)
   - [`port_opt_view`](@ref)
 """
 function port_opt_view(pr::Option{<:AbstractPriorEstimator}, ::Any, args...;
@@ -809,9 +821,10 @@ function port_opt_view(pr::Option{<:AbstractPriorEstimator}, ::Any, args...;
     return pr
 end
 function port_opt_view(pr::AbstractVector{<:Union{AbstractPriorResult,
-                                                  AbstractPriorEstimator}}, ::Any, args...;
+                                                  AbstractPriorEstimator}}, i, args...;
                        kwargs...)
-    return pr
+    return concrete_typed_array_if_abstract([port_opt_view(p, i, args...; kwargs...)
+                                             for p in pr])
 end
 """
 $(DocStringExtensions.TYPEDEF)

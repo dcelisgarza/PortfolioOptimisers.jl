@@ -2774,8 +2774,9 @@ end
 @testset "A prior with nothing on the asset axis passes through a view unchanged" begin
     #=
     An estimator carries a recipe rather than data on an asset axis, so a subproblem refits
-    it on its own universe. A vector arrives already resolved per subproblem, so the entry
-    has been chosen by the time the view is taken. Both are returned by identity.
+    it on its own universe, and it is returned by identity. A vector of priors is a field of
+    one estimator, such as the opinions of an opinion pool, and each member reads the asset
+    axis of its parent. So the view reaches each member, and never the vector (#1957).
     =#
     i = [1, 3]
     pe = EmpiricalPrior()
@@ -2791,10 +2792,17 @@ end
     lo = LowOrderPrior(; X = X, mu = [0.02, 0.03, 0.04],
                        sigma = [0.001 0.0 0.0; 0.0 0.001 0.0; 0.0 0.0 0.001])
     prs = [lo, lo]
-    @test PortfolioOptimisers.port_opt_view(prs, i) === prs
+    vprs = PortfolioOptimisers.port_opt_view(prs, i)
+    @test length(vprs) == 2
+    @test all(v -> v.X == X[:, i] && v.mu == lo.mu[i] && v.sigma == lo.sigma[i, i], vprs)
+    # A member with nothing on the asset axis passes through, and the vector keeps its
+    # length and its order.
     pes = [pe, EmpiricalPrior(; horizon = 252)]
-    @test PortfolioOptimisers.port_opt_view(pes, i) === pes
-    @test PortfolioOptimisers.port_opt_view(pes, i, :ignored; also = :ignored) === pes
+    vpes = PortfolioOptimisers.port_opt_view(pes, i)
+    @test length(vpes) == 2
+    @test all(((a, b),) -> a === b, zip(vpes, pes))
+    vpes = PortfolioOptimisers.port_opt_view(pes, i, :ignored; also = :ignored)
+    @test all(((a, b),) -> a === b, zip(vpes, pes))
 end
 
 @testset "The property pool is the union of both carriers' fields, in a stable order" begin

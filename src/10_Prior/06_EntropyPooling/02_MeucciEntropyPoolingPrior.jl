@@ -730,7 +730,8 @@ Compute the entropy pooling prior moments of the asset returns.
 # Algorithm
 
  1. Orient `X` and `F` to observations by assets with [`dims_oriented`](@ref), so every step below reads one observation in each row.
- 2. Dispatch on `pe.alg` through [`ep_prior`](@ref), and return the [`LowOrderPrior`](@ref) that it makes.
+ 2. When `pe.sets` is set, check that the length of its asset universe is equal to the number of columns of `X`, with [`assert_ep_views_axis`](@ref).
+ 3. Dispatch on `pe.alg` through [`ep_prior`](@ref), and return the [`LowOrderPrior`](@ref) that it makes.
 
 # Arguments
 
@@ -745,6 +746,7 @@ Compute the entropy pooling prior moments of the asset returns.
 # Validation
 
   - `dims in (1, 2)`.
+  - If `pe.sets` is not `nothing`, `length(pe.sets.dict[pe.sets.xkey]) == size(X, 2)`. Raises a `DimensionMismatch`.
 
 # Returns
 
@@ -754,12 +756,14 @@ Compute the entropy pooling prior moments of the asset returns.
 
   - [`MeucciEntropyPoolingPrior`](@ref)
   - [`ep_prior`](@ref)
+  - [`assert_ep_views_axis`](@ref)
   - [`LowOrderPrior`](@ref)
 """
 function prior(pe::MeucciEntropyPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing,
                pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, strict::Bool = false,
                kwargs...)
     X, F = dims_oriented(dims, X, F)
+    assert_ep_views_axis(pe.sets, X)
     return ep_prior(pe.alg, pe, X, F, pnl; strict = strict, kwargs...)
 end
 """
