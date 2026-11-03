@@ -326,6 +326,18 @@ Keywords correspond to the struct's fields.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - $(val_dict[:oow_rm])
 
+## Propagated parameters
+
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
+
 # Functor
 
     (r::EntropicValueatRisk)(x::VecNum)
@@ -359,6 +371,7 @@ EntropicValueatRisk
   - [`EntropicDrawdownatRisk`](@ref)
   - [`ERM`](@ref)
   - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
@@ -381,7 +394,7 @@ EntropicValueatRisk
     """
     $(field_dict[:oow])
     """
-    @pprop w
+    @pprop @wprop w
     function EntropicValueatRisk(settings::RiskMeasureSettings, slv::Option{<:Slv_VecSlv},
                                  alpha::Num_SigCal, w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
@@ -453,6 +466,18 @@ Keywords correspond to the struct's fields.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - $(val_dict[:oow_rm])
 
+## Propagated parameters
+
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
+
 # Functor
 
     (r::EntropicValueatRiskRange)(x::VecNum)
@@ -486,6 +511,8 @@ EntropicValueatRiskRange
   - [`RelativisticValueatRiskRange`](@ref)
   - [`range_tails`](@ref)
   - [`ERM`](@ref)
+  - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
@@ -513,7 +540,7 @@ EntropicValueatRiskRange
     """
     $(field_dict[:oow])
     """
-    @pprop w
+    @pprop @wprop w
     function EntropicValueatRiskRange(settings::RiskMeasureSettings,
                                       slv::Option{<:Slv_VecSlv}, alpha::Num_SigCal,
                                       beta::Num_SigCal, w::Option{<:ObsWeights})
@@ -625,6 +652,18 @@ Keywords correspond to the struct's fields.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - $(val_dict[:oow_rm])
 
+## Propagated parameters
+
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
+
 # Functor
 
     (r::EntropicDrawdownatRisk)(x::VecNum)
@@ -658,6 +697,8 @@ EntropicDrawdownatRisk
   - [`RelativeEntropicDrawdownatRisk`](@ref)
   - [`absolute_drawdown_vec`](@ref)
   - [`ERM`](@ref)
+  - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
@@ -681,7 +722,7 @@ EntropicDrawdownatRisk
     """
     $(field_dict[:oow])
     """
-    @pprop w
+    @pprop @wprop w
     function EntropicDrawdownatRisk(settings::RiskMeasureSettings,
                                     slv::Option{<:Slv_VecSlv}, alpha::Num_SigCal,
                                     w::Option{<:ObsWeights})
@@ -767,6 +808,18 @@ Keywords correspond to the struct's fields.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - $(val_dict[:oow_rm])
 
+## Propagated parameters
+
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
+
 # Functor
 
     (r::RelativeEntropicDrawdownatRisk)(x::VecNum)
@@ -797,6 +850,8 @@ RelativeEntropicDrawdownatRisk
   - [`RelativeRelativisticDrawdownatRisk`](@ref)
   - [`relative_drawdown_vec`](@ref)
   - [`ERM`](@ref)
+  - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
@@ -820,7 +875,7 @@ RelativeEntropicDrawdownatRisk
     """
     $(field_dict[:oow])
     """
-    @pprop w
+    @pprop @wprop w
     function RelativeEntropicDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                             slv::Option{<:Slv_VecSlv}, alpha::Num_SigCal,
                                             w::Option{<:ObsWeights})

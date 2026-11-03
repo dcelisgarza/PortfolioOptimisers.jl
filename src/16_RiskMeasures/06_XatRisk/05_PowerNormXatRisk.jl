@@ -373,6 +373,18 @@ Keywords correspond to the struct's fields.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - $(val_dict[:oow_rm])
 
+## Propagated parameters
+
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
+
 # Functor
 
     (r::PowerNormValueatRisk)(x::VecNum)
@@ -410,6 +422,7 @@ PowerNormValueatRisk
   - [`WorstRealisation`](@ref): the value of the measure when the largest loss carries a probability of at least ``\\alpha^{p}``.
   - [`PRM`](@ref)
   - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
@@ -436,7 +449,7 @@ PowerNormValueatRisk
     """
     $(field_dict[:oow])
     """
-    @pprop w
+    @pprop @wprop w
     function PowerNormValueatRisk(settings::RiskMeasureSettings, slv::Option{<:Slv_VecSlv},
                                   alpha::Num_SigCal, p::Number,
                                   w::Option{<:StatsBase.AbstractWeights})
@@ -515,6 +528,18 @@ Keywords correspond to the struct's fields.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - $(val_dict[:oow_rm])
 
+## Propagated parameters
+
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
+
 # Functor
 
     (r::PowerNormValueatRiskRange)(x::VecNum)
@@ -551,6 +576,8 @@ PowerNormValueatRiskRange
   - [`GenericValueatRiskRange`](@ref): the same value, with two [`PowerNormValueatRisk`](@ref) tails.
   - [`range_tails`](@ref)
   - [`PRM`](@ref)
+  - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
@@ -584,7 +611,7 @@ PowerNormValueatRiskRange
     """
     $(field_dict[:oow])
     """
-    @pprop w
+    @pprop @wprop w
     function PowerNormValueatRiskRange(settings::RiskMeasureSettings,
                                        slv::Option{<:Slv_VecSlv}, alpha::Num_SigCal,
                                        beta::Num_SigCal, pa::Number, pb::Number,
@@ -702,6 +729,18 @@ Keywords correspond to the struct's fields.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - $(val_dict[:oow_rm])
 
+## Propagated parameters
+
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
+
 # Functor
 
     (r::PowerNormDrawdownatRisk)(x::VecNum)
@@ -739,6 +778,8 @@ PowerNormDrawdownatRisk
   - [`MaximumDrawdown`](@ref)
   - [`absolute_drawdown_vec`](@ref)
   - [`PRM`](@ref)
+  - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
@@ -765,7 +806,7 @@ PowerNormDrawdownatRisk
     """
     $(field_dict[:oow])
     """
-    @pprop w
+    @pprop @wprop w
     function PowerNormDrawdownatRisk(settings::RiskMeasureSettings,
                                      slv::Option{<:Slv_VecSlv}, alpha::Num_SigCal,
                                      p::Number, w::Option{<:ObsWeights})
@@ -858,6 +899,18 @@ Keywords correspond to the struct's fields.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - $(val_dict[:oow_rm])
 
+## Propagated parameters
+
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
+
 # Functor
 
     (r::RelativePowerNormDrawdownatRisk)(x::VecNum)
@@ -890,6 +943,8 @@ RelativePowerNormDrawdownatRisk
   - [`RelativeEntropicDrawdownatRisk`](@ref)
   - [`relative_drawdown_vec`](@ref)
   - [`PRM`](@ref)
+  - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
@@ -916,7 +971,7 @@ RelativePowerNormDrawdownatRisk
     """
     $(field_dict[:oow])
     """
-    @pprop w
+    @pprop @wprop w
     function RelativePowerNormDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                              slv::Option{<:Slv_VecSlv}, alpha::Num_SigCal,
                                              p::Number, w::Option{<:ObsWeights})

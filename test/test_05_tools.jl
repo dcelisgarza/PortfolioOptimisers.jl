@@ -200,12 +200,21 @@ end
     @test PO.prop_channel_active(:obs, wonly)
     @test !PO.prop_channel_active(:view, wonly)
     @test !PO.prop_channel_active(:prior, wonly)
-    # `@fprop` is in the observation channel's precedence but not its gate, so a struct with
-    # composed children and no weights of its own emits no `obs_weights_view` method and
-    # falls through to the identity.
+    # `@fprop` opens the observation channel too (#1960), so a cut of the observations
+    # reaches the weights of a child at any depth, through a wrapper with no weights of its
+    # own.
     fonly = merge(untagged, Dict(:fprop => [:a]))
     @test PO.prop_channel_active(:factory, fonly)
-    @test !PO.prop_channel_active(:obs, fonly)
+    @test PO.prop_channel_active(:obs, fonly)
+    # `@oprop` opens the observation channel alone, and only that channel reads it.
+    oonly = merge(untagged, Dict(:oprop => [:a]))
+    @test PO.prop_channel_active(:obs, oonly)
+    @test !PO.prop_channel_active(:factory, oonly)
+    @test !PO.prop_channel_active(:view, oonly)
+    @test !PO.prop_channel_active(:prior, oonly)
+    @test only(PO.prop_channel_pairs(:obs, oonly, [:a], :x, PO, (:i,))).args[2] ==
+          :($(PO).obs_weights_view(x.a, i))
+    @test only(PO.prop_channel_pairs(:factory, oonly, [:a], :x, PO, ())).args[2] == :(x.a)
     # The precedence is data, and the prior channel puts `@pprop` above `@fprop` (ADR 0012).
     pairs = PO.prop_channel_pairs(:prior, tagged, all_fields, :xr, PO, (:pr,))
     @test [p.args[1] for p in pairs] == all_fields
@@ -229,13 +238,13 @@ end
     @test [p.args[1] for p in obs_pairs] == all_fields
     # `@fprop` recurses, `@wprop` indexes, everything else is carried through.
     @test obs_pairs[1].args[2] == :($(PO).obs_weights_view(x.a, i))
-    @test obs_pairs[2].args[2] == :($(PO).nothing_scalar_array_getindex(x.w, i))
+    @test obs_pairs[2].args[2] == :($(PO).obs_weights_index(x.w, i))
     @test obs_pairs[4].args[2] == :(x.plain)
     # The same field, the same tag, a different channel, a different transform.
     factory_w = PO.prop_channel_pairs(:factory, wonly, [:w], :x, PO, ())[1].args[2]
     obs_w = PO.prop_channel_pairs(:obs, wonly, [:w], :x, PO, (:i,))[1].args[2]
     @test factory_w == :($(PO)._wprop(x.w, args...; kwargs...))
-    @test obs_w == :($(PO).nothing_scalar_array_getindex(x.w, i))
+    @test obs_w == :($(PO).obs_weights_index(x.w, i))
     @test factory_w != obs_w
     # Indexing, not viewing: a `view` of an `AbstractWeights` is a `SubArray`, which the
     # weighted `Statistics.std` methods do not accept.

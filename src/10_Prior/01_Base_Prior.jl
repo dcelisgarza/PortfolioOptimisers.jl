@@ -412,7 +412,7 @@ Compute a prior result from the returns data with a prior estimator.
  1. Check that `rd` carries asset returns, so that the estimator does not receive `nothing` for `X`.
  2. When [`needs_factor_returns`](@ref) answers `true`, check that `rd` carries factor returns. The predicate reads the whole tree, so it finds a factor estimator inside an outer estimator whose factor argument is optional. The check runs here, so the caller gets a named error about `rd.F`. Without it, the caller gets a `MethodError` from the inner estimator one call later.
  3. Read the source that `pe` states with [`returns_source`](@ref). Call it `x_src`.
- 4. Drop the observations of a Shared Series gap with [`shared_series_view`](@ref). These are a gap of a vector benchmark under `x_src = ExcessSource()`, and a gap of the factor returns when [`needs_factor_returns`](@ref) answers `true`. Every field of `rd` loses the same observations.
+ 4. Drop the observations of a Shared Series gap with [`shared_series_view`](@ref). These are a gap of a vector benchmark under `x_src = ExcessSource()`, and a gap of the factor returns when [`needs_factor_returns`](@ref) answers `true`. Every field of `rd` loses the same observations, and every fixed observation weight in the tree of `pe` loses them too, through [`shared_series_estimator`](@ref).
  5. Read the asset returns `X` with [`benchmark_relative_returns`](@ref) under `x_src`. `X` is `rd.X`, or `rd.X - rd.B` under `ExcessSource()`.
  6. Call the returns-matrix method of the estimator with `X`, `rd.F` and `rd.pnl`. Pass `rd.iv`, `rd.ivpa`, `rd.ne`, `rd.E`, `strict` and `cache_reg` as keyword arguments. A wrapper prior passes its keyword arguments to the estimator that it holds. The Exogenous Series gets to a [`CrossSectionalFactorPrior`](@ref) whose observed factors read it, and every other estimator ignores it. The call passes `dims = 1`, because a `ReturnsResult` holds its observations along the rows. The keyword `dims` has no effect.
  7. Record the observations that step 4 dropped with [`shared_series_record`](@ref). A reader that holds `rd` then pairs the rows of `X` with the correct observations.
@@ -457,9 +457,9 @@ function prior(pe::AbstractPriorEstimator, rd::ReturnsResult; strict::Bool = fal
     T = size(rd.X, 1)
     rows = shared_series_rows(rd, x_src, rf)
     rd = shared_series_view(rd, x_src, rf)
-    pr = prior(pe, benchmark_relative_returns(rd, x_src), rd.F, rd.pnl; iv = rd.iv,
-               ivpa = rd.ivpa, ne = rd.ne, E = rd.E, strict = strict, dims = 1,
-               cache_reg = cache_reg)
+    pr = prior(shared_series_estimator(pe, rows, T), benchmark_relative_returns(rd, x_src),
+               rd.F, rd.pnl; iv = rd.iv, ivpa = rd.ivpa, ne = rd.ne, E = rd.E,
+               strict = strict, dims = 1, cache_reg = cache_reg)
     return stamp_returns_source(shared_series_record(pr, rows, T), pe)
 end
 """

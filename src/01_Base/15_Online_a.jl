@@ -752,6 +752,75 @@ function shared_series_buffer(state::SampleBufferState)::SampleBufferState
                              max_history = state.max_history)
 end
 """
+    shared_series_buffer_fit(est, state::SampleBufferState) -> Tuple{typeof(est), SampleBufferState}
+
+Return the estimator and the buffer that a fit reads, with the observations of a Shared Series gap dropped from both.
+
+This is the buffer form of [`shared_series_fit`](@ref). [`shared_series_buffer`](@ref) drops the marked observations from the buffer. A member that refits on the buffer can hold a fixed weight vector, one entry for each observation of the buffer, so the weights of the marked observations must drop too, as [`observed_weights`](@ref) states. The function cuts `est` at the observations that the buffer keeps, with [`obs_weights_view`](@ref).
+
+# Algorithm
+
+ 1. Cut `est` with [`shared_series_buffer_estimator`](@ref), which returns `est` when the buffer marks no observation.
+ 2. Drop the marked observations from the buffer with [`shared_series_buffer`](@ref).
+
+# Arguments
+
+  - `est`: The estimator that refits on the buffer.
+  - `state`: The buffer to read.
+
+# Validation
+
+  - The rules of [`shared_series_buffer`](@ref), and of [`observed_weights`](@ref) for each fixed weight vector of `est`.
+
+# Returns
+
+  - `est`: The estimator at the kept observations.
+  - `state::SampleBufferState`: The buffer at the kept observations.
+
+# Related
+
+  - [`shared_series_buffer`](@ref)
+  - [`shared_series_fit`](@ref)
+  - [`obs_weights_view`](@ref)
+"""
+function shared_series_buffer_fit(est, state::SampleBufferState)
+    return shared_series_buffer_estimator(est, state), shared_series_buffer(state)
+end
+"""
+    shared_series_buffer_estimator(est, state::SampleBufferState) -> typeof(est)
+
+Return `est` cut at the observations of the buffer `state` that a fit keeps, with [`obs_weights_view`](@ref).
+
+[`shared_series_buffer_fit`](@ref) calls it, and a host that refits one member on the buffer calls it for that member. A host passes the cut member as the `batch` of [`read_member`](@ref), so a member that folds still reads its own state, and a member that refits on the buffer loses the weights of the dropped observations.
+
+# Algorithm
+
+ 1. Return `est` when the buffer marks no observation of its valid region.
+ 2. Otherwise cut `est` at the mask of the kept observations, see [`buffer_gap_marks`](@ref).
+
+# Arguments
+
+  - `est`: The estimator that refits on the buffer.
+  - `state`: The buffer to read.
+
+# Validation
+
+  - The rules of [`observed_weights`](@ref) for each fixed weight vector of `est`.
+
+# Returns
+
+  - `est`: The estimator at the kept observations.
+
+# Related
+
+  - [`shared_series_buffer_fit`](@ref)
+  - [`buffer_gap_marks`](@ref)
+"""
+function shared_series_buffer_estimator(est, state::SampleBufferState)
+    marks = buffer_gap_marks(state)
+    return any(marks) ? obs_weights_view(est, .!marks) : est
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Returns the sample buffer an estimator carries, and refuses an estimator that carries none.

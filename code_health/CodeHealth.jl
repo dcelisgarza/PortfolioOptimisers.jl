@@ -703,7 +703,7 @@ end
     macro_call_sites(file; root = REPO_ROOT) -> Vector{Tuple{String, Expr}}
 
 Every macro call a file makes outside a struct body, with the name and the call expression. The
-five field-prefix macros — `@fprop`, `@vprop`, `@pprop`, `@cprop` and `@wprop` — declare nothing of
+six field-prefix macros — `@fprop`, `@vprop`, `@pprop`, `@cprop`, `@wprop` and `@oprop` — declare nothing of
 their own and appear only inside a struct body, so this is what separates them from the seven
 Declaration Macros of ADR 0072.
 """

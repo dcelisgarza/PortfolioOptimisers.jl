@@ -360,7 +360,7 @@ function prior(pe::AbstractPriorEstimator; kwargs...)
     return stamp_returns_source(prior(pe, partial_fit_cache(pe); kwargs...), pe)
 end
 function prior(pe::AbstractPriorEstimator, state::SampleBufferState; kwargs...)
-    fit = shared_series_buffer(state)
+    pe, fit = shared_series_buffer_fit(pe, state)
     pr = buffer_prior(pe, fit, sample_buffer_panel(fit); kwargs...)
     return buffer_row_key(shared_series_record(pr, state), state.max_history)
 end
@@ -1822,23 +1822,24 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any,
                kwargs...)
     state = partial_fit_cache(pe)
     fill_limit = resolve_fill_limit(pe.fill_limit, coverage_floor(pe))
-    buf = shared_series_buffer(state.buf)
+    # A member that refits on the buffer loses the weights of the dropped observations (#1960).
+    pb, buf = buffer_refit_members(pe, state.buf)
     X = sample_buffer(buf)
     pnl = buffer_asset_panel(buf)
     vols = implied_volatility_buffer_kwargs(buf)
-    mu, T_mu = read_member(mean_with_count, pe.me, X, pnl; vols..., kwargs...)
+    mu, T_mu = read_member(mean_with_count, pb.me, X, pnl; vols..., kwargs...)
     # A raw `StatsBase` estimator has no Coverage Policy, so it peels nothing and takes no
     # `strict`.
-    shared = isa(pe.ce, AbstractCovarianceEstimator) ? (; strict = strict) : (;)
-    sigma = read_member(Statistics.cov, pe.ce, X, pnl;
-                        batch = library_covariance_estimator(pe.ce), shared = shared,
+    shared = isa(pb.ce, AbstractCovarianceEstimator) ? (; strict = strict) : (;)
+    sigma = read_member(Statistics.cov, pb.ce, X, pnl;
+                        batch = library_covariance_estimator(pb.ce), shared = shared,
                         vols..., kwargs...)
     # Materialised, not viewed: the buffer's backing matrix is written and reallocated by the
     # next fold, and a Result holding a view of it would change under its holder.
     Xs = Matrix(scenario_window(pe.max_scenarios, X))
     pr = LowOrderPrior(; X = scenario_fill(Xs, mu, sigma, strict, fill_limit, state.named),
                        mu = mu, sigma = sigma,
-                       eoc = scenario_moment_counts(pe, X, size(Xs, 1), T_mu; vols...,
+                       eoc = scenario_moment_counts(pb, X, size(Xs, 1), T_mu; vols...,
                                                     kwargs...), x_src = pe.x_src)
     return shared_series_record(pr, state.buf)
 end
@@ -1847,25 +1848,26 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
                kwargs...)
     state = partial_fit_cache(pe)
     fill_limit = resolve_fill_limit(pe.fill_limit, coverage_floor(pe))
-    buf = shared_series_buffer(state.buf)
+    # A member that refits on the buffer loses the weights of the dropped observations (#1960).
+    pb, buf = buffer_refit_members(pe, state.buf)
     X = sample_buffer(buf)
     # The arms were folded on the log-returns, so a member that did not fold is refitted on
     # them too. The carried rows are the arithmetic ones the caller handed in.
     Xl = log1p.(X)
     pnl = buffer_asset_panel(buf)
     vols = implied_volatility_buffer_kwargs(buf)
-    mu, T_mu = read_member(mean_with_count, pe.me, Xl, pnl; vols..., kwargs...)
+    mu, T_mu = read_member(mean_with_count, pb.me, Xl, pnl; vols..., kwargs...)
     # A raw `StatsBase` estimator has no Coverage Policy, so it peels nothing and takes no
     # `strict`.
-    shared = isa(pe.ce, AbstractCovarianceEstimator) ? (; strict = strict) : (;)
-    sigma = read_member(Statistics.cov, pe.ce, Xl, pnl;
-                        batch = library_covariance_estimator(pe.ce), shared = shared,
+    shared = isa(pb.ce, AbstractCovarianceEstimator) ? (; strict = strict) : (;)
+    sigma = read_member(Statistics.cov, pb.ce, Xl, pnl;
+                        batch = library_covariance_estimator(pb.ce), shared = shared,
                         vols..., kwargs...)
     horizon_moments!(mu, sigma, pe.horizon)
     Xs = Matrix(scenario_window(pe.max_scenarios, X))
     pr = LowOrderPrior(; X = scenario_fill(Xs, mu, sigma, strict, fill_limit, state.named),
                        mu = mu, sigma = sigma,
-                       eoc = scenario_moment_counts(pe, Xl, size(Xs, 1), T_mu; vols...,
+                       eoc = scenario_moment_counts(pb, Xl, size(Xs, 1), T_mu; vols...,
                                                     kwargs...), x_src = pe.x_src)
     return shared_series_record(pr, state.buf)
 end

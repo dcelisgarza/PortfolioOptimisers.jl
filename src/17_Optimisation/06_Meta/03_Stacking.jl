@@ -331,6 +331,17 @@ Keywords correspond to the struct's fields.
   - `fb` recurses through [`view_child`](@ref) with that matrix.
   - `scale` stays unchanged. It holds one entry for each inner optimiser, not one for each asset.
 
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `pe`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `fees`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `opti`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `opto`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `fb`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `cache`: Removed by [`obs_weights_view`](@ref), because a state has no slice on the observation axis.
+
 # Related
 
   - [`optimise`](@ref)
@@ -341,6 +352,7 @@ Keywords correspond to the struct's fields.
   - [`predict_outer_returns`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
@@ -350,7 +362,7 @@ Keywords correspond to the struct's fields.
     """
     $(field_dict[:pe])
     """
-    pe
+    @oprop pe
     """
     $(field_dict[:wb_jmp])
     """

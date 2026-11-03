@@ -285,6 +285,21 @@ function ArithmeticReturn(; settings::JuMPReturnsSettings = JuMPReturnsSettings(
     return ArithmeticReturn(settings, ucs, mu, mtx_sqrt)
 end
 """
+    obs_weights_view(rt::ArithmeticReturn, i) -> ArithmeticReturn
+
+Return the estimator with the observation weights of its uncertainty set estimator cut to the observations `i`, through [`obs_weights_fields`](@ref).
+
+The estimator is not [`@propagatable`](@ref), so it needs this method of [`obs_weights_view`](@ref). An uncertainty set estimator in `ucs` fits its prior on the returns of the solve, so a cut of those returns, such as the drop of a Shared Series gap, must reach its weights, see [`shared_series_estimator`](@ref).
+
+# Related
+
+  - [`ArithmeticReturn`](@ref)
+  - [`obs_weights_view`](@ref)
+"""
+function obs_weights_view(rt::ArithmeticReturn, i)::ArithmeticReturn
+    return obs_weights_fields(rt, i)
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve a Deferred Quantity in [`ArithmeticReturn`](@ref)'s `mu` slot against prior result `pr`.
@@ -556,6 +571,21 @@ function factory(rt::LogarithmicReturn, pr::AbstractPriorResult, args...; kwargs
 end
 function no_bounds_returns_estimator(r::LogarithmicReturn, args...)
     return LogarithmicReturn(; settings = no_bounds_returns_settings(r.settings), w = r.w)
+end
+"""
+    obs_weights_view(rt::LogarithmicReturn, i) -> LogarithmicReturn
+
+Return the estimator with its observation weights cut to the observations `i`, through [`obs_weights_index`](@ref).
+
+The estimator is not [`@propagatable`](@ref), so it needs this method of [`obs_weights_view`](@ref). A cut of the observations of a fit, such as the drop of a Shared Series gap, then cuts the weights of the objective too, see [`shared_series_estimator`](@ref).
+
+# Related
+
+  - [`LogarithmicReturn`](@ref)
+  - [`obs_weights_view`](@ref)
+"""
+function obs_weights_view(rt::LogarithmicReturn, i)::LogarithmicReturn
+    return LogarithmicReturn(; settings = rt.settings, w = obs_weights_index(rt.w, i))
 end
 """
 $(DocStringExtensions.TYPEDEF)

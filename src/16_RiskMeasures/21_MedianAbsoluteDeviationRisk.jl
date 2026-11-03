@@ -118,6 +118,18 @@ Keywords correspond to the struct's fields.
 
     A stated `mu` is pinned. It crosses a Cross-Validation fold or a subset view as the value of the whole universe, so it does not follow the refit that the optimisation runs on. A caller who wants it to follow the fit names a **Deferred Quantity** in `mu`, or keeps a [`MedianCenteringFunction`](@ref), which recomputes the centre from the portfolio series at every call.
 
+## Propagated parameters
+
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
+
 # Functor
 
     (r::MedianAbsoluteDeviation)(w::VecNum, X::MatNum, fees = nothing)
@@ -158,6 +170,8 @@ MedianAbsoluteDeviation
   - [`MeanCentering`](@ref)
   - [`calc_moment_target`](@ref)
   - [`StandardDeviation`](@ref): the dispersion that `flag = true` estimates on a Gaussian series.
+  - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
@@ -172,7 +186,7 @@ MedianAbsoluteDeviation
     """
     $(field_dict[:oow])
     """
-    @pprop w
+    @pprop @wprop w
     """
     $(field_dict[:mu_mad_slot])
     """

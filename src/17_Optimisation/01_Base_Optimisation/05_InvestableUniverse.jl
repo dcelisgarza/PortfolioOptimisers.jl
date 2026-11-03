@@ -370,7 +370,7 @@ The prior that the solve fits then sees no gap, and it counts its rows among the
 
 The method that Julia selects is the algorithm.
 
- 1. A [`ReturnsResult`](@ref) first: find the kept observations with [`optimiser_shared_series_rows`](@ref), which reads the group of `opt` and its prior, see [`group_source`](@ref). Solve `opt` with [`_optimise`](@ref) on the cut of [`optimiser_shared_series_view`](@ref). When the cut dropped an observation and the solve fitted its prior, replace the prior of the result with its record, through [`set_result_prior`](@ref).
+ 1. A [`ReturnsResult`](@ref) first: find the kept observations with [`optimiser_shared_series_rows`](@ref), which reads the group of `opt` and its prior, see [`group_source`](@ref). Solve `opt` with [`_optimise`](@ref) on the cut of [`optimiser_shared_series_view`](@ref). When the cut drops an observation, the solve reads `opt` cut at the same observations with [`shared_series_estimator`](@ref), so each fixed observation weight in its tree loses them too. When the cut dropped an observation and the solve fitted its prior, replace the prior of the result with its record, through [`set_result_prior`](@ref).
  2. Any other data: solve `opt` with `_optimise` on it unchanged.
 
 # Arguments
@@ -393,11 +393,16 @@ The method that Julia selects is the algorithm.
 """
 function shared_series_solve(opt, rd::ReturnsResult, args...; kwargs...)
     rows = optimiser_shared_series_rows(rd, opt)
-    res = _optimise(opt, optimiser_shared_series_view(rd, opt, rows), args...; kwargs...)
-    if isnothing(rows) || !fits_prior(opt)
-        return res
+    if isnothing(rows)
+        return _optimise(opt, optimiser_shared_series_view(rd, opt, rows), args...;
+                         kwargs...)
     end
     T = size(rd.X, 1)
+    res = _optimise(shared_series_estimator(opt, rows, T),
+                    optimiser_shared_series_view(rd, opt, rows), args...; kwargs...)
+    if !fits_prior(opt)
+        return res
+    end
     return set_result_prior(res, pr -> shared_series_record(pr, rows, T))
 end
 function shared_series_solve(opt, args...; kwargs...)

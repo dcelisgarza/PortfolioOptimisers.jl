@@ -24,6 +24,7 @@ supports_precomputed_returns(::TrackingRiskMeasure{<:Any, <:WeightsTracking})
 supports_precomputed_returns(::TrackingRiskMeasure{<:Any, <:ReturnsTracking})
 supports_precomputed_returns(::TrackingRiskMeasure{<:Any, <:DataBenchmarkTracking})
 supports_precomputed_returns(::RiskTrackingRiskMeasure)
+obs_weights_view(r::Union{RiskTrackingError, RiskTrackingRiskMeasure}, i)
 ```
 
 ## References

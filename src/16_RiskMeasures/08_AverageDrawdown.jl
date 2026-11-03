@@ -60,6 +60,18 @@ Keywords correspond to the struct's fields.
 
   - $(val_dict[:oow_rm])
 
+## Propagated parameters
+
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
+
 # Functor
 
     (r::AverageDrawdown)(x::VecNum)
@@ -103,6 +115,8 @@ julia> AverageDrawdown(; w = pweights([1.0, 1.0, 1.0, 1.0, 4.0]))(x)
   - [`ConditionalDrawdownatRisk`](@ref)
   - [`RelativeAverageDrawdown`](@ref)
   - [`average_drawdown`](@ref)
+  - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
@@ -116,7 +130,7 @@ julia> AverageDrawdown(; w = pweights([1.0, 1.0, 1.0, 1.0, 4.0]))(x)
     """
     $(field_dict[:oow])
     """
-    @pprop w
+    @pprop @wprop w
     function AverageDrawdown(settings::RiskMeasureSettings, w::Option{<:ObsWeights})
         assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(w)}(settings, w)
@@ -229,6 +243,18 @@ Keywords correspond to the struct's fields.
 
   - $(val_dict[:oow_rm])
 
+## Propagated parameters
+
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
+
 # Functor
 
     (r::RelativeAverageDrawdown)(x::VecNum)
@@ -266,6 +292,8 @@ julia> RelativeAverageDrawdown()(x)
   - [`RelativeMaximumDrawdown`](@ref)
   - [`RelativeConditionalDrawdownatRisk`](@ref)
   - [`average_drawdown`](@ref)
+  - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
@@ -279,7 +307,7 @@ julia> RelativeAverageDrawdown()(x)
     """
     $(field_dict[:oow])
     """
-    @pprop w
+    @pprop @wprop w
     function RelativeAverageDrawdown(settings::HierarchicalRiskMeasureSettings,
                                      w::Option{<:ObsWeights})
         assert_observation_weights(w, :w)

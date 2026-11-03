@@ -883,6 +883,39 @@ function factory(opt::JuMPOptimiser, w::AbstractVector)::JuMPOptimiser
                               cobj = factory(opt.cobj, w)))
 end
 """
+    obs_weights_view(opt::JuMPOptimiser, i) -> JuMPOptimiser
+
+Return a copy of `opt` whose fields hold their observation weights cut to the observations `i`.
+
+The optimiser is not [`@propagatable`](@ref), so it needs this method of [`obs_weights_view`](@ref). Its prior, its phylogeny and centrality estimators, its tracking measure and its returns estimator all read the observations of the sample, and each can hold fixed observation weights. A cut of the observations of a solve, such as the drop of a Shared Series gap, must reach each of them, see [`shared_series_estimator`](@ref).
+
+# Algorithm
+
+ 1. Cut every field of `opt` with [`obs_weights_view`](@ref), and rebuild the optimiser with its keyword constructor, through [`obs_weights_fields`](@ref). A field that holds no estimator, such as a solver, a bound or a set of names, comes back with no change, and a partial-fit state in `cache` comes back as `nothing`. The constructor checks the cut fields again.
+
+# Arguments
+
+  - `opt::JuMPOptimiser`: The JuMP optimiser.
+  - `i`: The observations to keep: a mask of the full sample, or their positions.
+
+# Validation
+
+  - The rules of [`obs_weights_index`](@ref) for each weights field in the tree of `opt`.
+
+# Returns
+
+  - `JuMPOptimiser`: The optimiser at the kept observations.
+
+# Related
+
+  - [`JuMPOptimiser`](@ref)
+  - [`obs_weights_view`](@ref)
+  - [`shared_series_estimator`](@ref)
+"""
+function obs_weights_view(opt::JuMPOptimiser, i)::JuMPOptimiser
+    return obs_weights_fields(opt, i)
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Returns a copy of `opt` restricted to the assets at the indices `i`.

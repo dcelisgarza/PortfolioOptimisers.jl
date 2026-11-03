@@ -23,4 +23,6 @@ nothing_scalar_array_getindex
 nothing_scalar_array_getindex_odd_order
 fourth_moment_index_generator
 view_child
+obs_weights_index
+obs_weights_fields
 ```

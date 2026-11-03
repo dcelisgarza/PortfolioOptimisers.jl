@@ -646,6 +646,43 @@ function regression_target_weights(tgt::ElasticNet)
     return tgt.w
 end
 """
+    obs_weights_view(tgt::ElasticNet, i) -> ElasticNet
+
+Return an [`ElasticNet`](@ref) whose observation weights, and the weights of its variance estimator, are cut to the observations `i`.
+
+The target is not [`@propagatable`](@ref), so it needs this method of [`obs_weights_view`](@ref). A cut of the observations of a fit, such as the drop of a Shared Series gap, then cuts the weights of the regression too, see [`shared_series_estimator`](@ref).
+
+# Algorithm
+
+ 1. Index `tgt.w` with [`obs_weights_index`](@ref).
+ 2. Cut the variance estimator `tgt.ve` with [`obs_weights_view`](@ref).
+ 3. Build the target again with its keyword constructor. The other fields keep their values.
+
+# Arguments
+
+  - `tgt`: The regression target.
+  - `i`: The observations to keep: a mask of the full sample, or their positions.
+
+# Validation
+
+  - The rules of [`obs_weights_index`](@ref).
+
+# Returns
+
+  - `tgt::ElasticNet`: The target at the kept observations.
+
+# Related
+
+  - [`ElasticNet`](@ref)
+  - [`obs_weights_view`](@ref)
+  - [`regression_target_weights(::ElasticNet)`](@ref)
+"""
+function obs_weights_view(tgt::ElasticNet, i)::ElasticNet
+    return ElasticNet(; theta = tgt.theta, strength = tgt.strength, sdiv = tgt.sdiv,
+                      ve = obs_weights_view(tgt.ve, i), iters = tgt.iters, tol = tgt.tol,
+                      w = obs_weights_index(tgt.w, i), ic = tgt.ic)
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Holds the coefficients of a fitted [`ElasticNet`](@ref), the strength at which the fit ran, and the counts that its scores read.

@@ -994,6 +994,21 @@ function UncertaintySetVariance(; settings::RiskMeasureSettings = RiskMeasureSet
     return UncertaintySetVariance(settings, ucs, sigma, mtx_sqrt, ratio_alg, corner)
 end
 """
+    obs_weights_view(r::UncertaintySetVariance, i) -> UncertaintySetVariance
+
+Return the measure with the observation weights of its uncertainty set estimator cut to the observations `i`, through [`obs_weights_fields`](@ref).
+
+The measure is not [`@propagatable`](@ref), so it needs this method of [`obs_weights_view`](@ref). An uncertainty set estimator in `ucs` fits its prior on the returns of the solve, so a cut of those returns, such as the drop of a Shared Series gap, must reach its weights, see [`shared_series_estimator`](@ref).
+
+# Related
+
+  - [`UncertaintySetVariance`](@ref)
+  - [`obs_weights_view`](@ref)
+"""
+function obs_weights_view(r::UncertaintySetVariance, i)::UncertaintySetVariance
+    return obs_weights_fields(r, i)
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve a **Deferred Quantity** in the `sigma` slot of an [`UncertaintySetVariance`](@ref) against prior result `pr`.

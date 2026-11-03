@@ -11,4 +11,5 @@ JuMPOptimiser
 factory(opt::JuMPOptimiser, w::AbstractVector)
 port_opt_view(opt::JuMPOptimiser, i, X::MatNum, args...)
 needs_previous_weights(opt::JuMPOptimiser)
+obs_weights_view(opt::JuMPOptimiser, i)
 ```

@@ -322,6 +322,15 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
   - `fb`: Recursively viewed through [`port_opt_view`](@ref), except a precomputed result, which is kept (see [`view_child`](@ref)).
   - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).
 
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `pe`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `fees`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `fb`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `cache`: Removed by [`obs_weights_view`](@ref), because a state has no slice on the observation axis.
+
 # Examples
 
 ```jldoctest
@@ -371,6 +380,7 @@ InverseVolatility
   - [`RandomWeighted`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
@@ -382,7 +392,7 @@ InverseVolatility
     """
     $(field_dict[:pe])
     """
-    @vprop pe
+    @vprop @oprop pe
     """
     $(field_dict[:wb])
     """

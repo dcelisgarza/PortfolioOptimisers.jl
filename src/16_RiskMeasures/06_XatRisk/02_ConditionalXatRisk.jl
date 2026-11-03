@@ -79,6 +79,18 @@ Keywords correspond to the struct's fields.
   - $(val_dict[:alpha_tail0])
   - $(val_dict[:oow_rm])
 
+## Propagated parameters
+
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
+
 # Functor
 
     (r::ConditionalValueatRisk)(x::VecNum)
@@ -110,6 +122,8 @@ ConditionalValueatRisk
   - [`DistributionallyRobustConditionalValueatRisk`](@ref)
   - [`ConditionalValueatRiskRange`](@ref)
   - [`ConditionalDrawdownatRisk`](@ref)
+  - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
@@ -128,7 +142,7 @@ ConditionalValueatRisk
     """
     $(field_dict[:oow])
     """
-    @pprop w
+    @pprop @wprop w
     function ConditionalValueatRisk(settings::RiskMeasureSettings, alpha::Num_SigCal,
                                     w::Option{<:ObsWeights})
         assert_half_open_unit_interval(alpha, :alpha)
@@ -222,6 +236,18 @@ Keywords correspond to the struct's fields.
   - If `r` is a number: `r > 0` and finite.
   - $(val_dict[:oow_rm])
 
+## Propagated parameters
+
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
+
 # Functor
 
     (r::DistributionallyRobustConditionalValueatRisk)(x::VecNum)
@@ -256,6 +282,8 @@ DistributionallyRobustConditionalValueatRisk
   - [`ConditionalValueatRisk`](@ref)
   - [`DistributionallyRobustConditionalValueatRiskRange`](@ref)
   - [`DistributionallyRobustConditionalDrawdownatRisk`](@ref)
+  - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
@@ -282,7 +310,7 @@ DistributionallyRobustConditionalValueatRisk
     """
     $(field_dict[:oow])
     """
-    @pprop w
+    @pprop @wprop w
     function DistributionallyRobustConditionalValueatRisk(settings::RiskMeasureSettings,
                                                           alpha::Num_SigCal,
                                                           l::Num_AmbTwtCal,
@@ -474,6 +502,18 @@ Keywords correspond to the struct's fields.
   - If `beta` is a number: `0 < beta < 1`.
   - $(val_dict[:oow_rm])
 
+## Propagated parameters
+
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
+
 # Functor
 
     (r::ConditionalValueatRiskRange)(x::VecNum)
@@ -505,6 +545,8 @@ ConditionalValueatRiskRange
   - [`ConditionalValueatRisk`](@ref)
   - [`ValueatRiskRange`](@ref)
   - [`DistributionallyRobustConditionalValueatRiskRange`](@ref)
+  - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
@@ -529,7 +571,7 @@ ConditionalValueatRiskRange
     """
     $(field_dict[:oow])
     """
-    @pprop w
+    @pprop @wprop w
     function ConditionalValueatRiskRange(settings::RiskMeasureSettings, alpha::Num_SigCal,
                                          beta::Num_SigCal, w::Option{<:ObsWeights})
         assert_unit_interval(alpha, :alpha)
@@ -608,6 +650,18 @@ Keywords correspond to the struct's fields.
   - Each of `l_a`, `r_a`, `l_b` and `r_b` that is a number: `> 0` and finite.
   - $(val_dict[:oow_rm])
 
+## Propagated parameters
+
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
+
 # Functor
 
     (r::DistributionallyRobustConditionalValueatRiskRange)(x::VecNum)
@@ -644,6 +698,8 @@ DistributionallyRobustConditionalValueatRiskRange
   - [`RiskMeasureSettings`](@ref)
   - [`ConditionalValueatRiskRange`](@ref)
   - [`DistributionallyRobustConditionalValueatRisk`](@ref)
+  - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
@@ -683,7 +739,7 @@ DistributionallyRobustConditionalValueatRiskRange
     """
     $(field_dict[:oow])
     """
-    @pprop w
+    @pprop @wprop w
     function DistributionallyRobustConditionalValueatRiskRange(settings::RiskMeasureSettings,
                                                                alpha::Num_SigCal,
                                                                l_a::Num_AmbTwtCal,
@@ -936,6 +992,18 @@ Keywords correspond to the struct's fields.
   - $(val_dict[:alpha_tail0])
   - $(val_dict[:oow_rm])
 
+## Propagated parameters
+
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
+
 # Functor
 
     (r::ConditionalDrawdownatRisk)(x::VecNum)
@@ -967,6 +1035,8 @@ ConditionalDrawdownatRisk
   - [`DistributionallyRobustConditionalDrawdownatRisk`](@ref)
   - [`RelativeConditionalDrawdownatRisk`](@ref)
   - [`conditional_drawdown_at_risk`](@ref)
+  - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
@@ -985,7 +1055,7 @@ ConditionalDrawdownatRisk
     """
     $(field_dict[:oow])
     """
-    @pprop w
+    @pprop @wprop w
     function ConditionalDrawdownatRisk(settings::RiskMeasureSettings, alpha::Num_SigCal,
                                        w::Option{<:ObsWeights})
         assert_half_open_unit_interval(alpha, :alpha)
@@ -1065,6 +1135,18 @@ Keywords correspond to the struct's fields.
   - If `r` is a number: `r > 0` and finite.
   - $(val_dict[:oow_rm])
 
+## Propagated parameters
+
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
+
 # Functor
 
     (r::DistributionallyRobustConditionalDrawdownatRisk)(x::VecNum)
@@ -1099,6 +1181,8 @@ DistributionallyRobustConditionalDrawdownatRisk
   - [`ConditionalDrawdownatRisk`](@ref)
   - [`DistributionallyRobustConditionalValueatRisk`](@ref)
   - [`conditional_drawdown_at_risk`](@ref)
+  - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
@@ -1126,7 +1210,7 @@ DistributionallyRobustConditionalDrawdownatRisk
     """
     $(field_dict[:oow])
     """
-    @pprop w
+    @pprop @wprop w
     function DistributionallyRobustConditionalDrawdownatRisk(settings::RiskMeasureSettings,
                                                              alpha::Num_SigCal,
                                                              l::Num_AmbTwtCal,
@@ -1381,6 +1465,18 @@ Keywords correspond to the struct's fields.
   - $(val_dict[:alpha_tail0])
   - $(val_dict[:oow_rm])
 
+## Propagated parameters
+
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
+
 # Functor
 
     (r::RelativeConditionalDrawdownatRisk)(x::VecNum)
@@ -1409,6 +1505,8 @@ RelativeConditionalDrawdownatRisk
   - [`ConditionalDrawdownatRisk`](@ref)
   - [`RelativeDrawdownatRisk`](@ref)
   - [`conditional_drawdown_at_risk`](@ref)
+  - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
@@ -1427,7 +1525,7 @@ RelativeConditionalDrawdownatRisk
     """
     $(field_dict[:oow])
     """
-    @pprop w
+    @pprop @wprop w
     function RelativeConditionalDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                                alpha::Num_SigCal, w::Option{<:ObsWeights})
         assert_half_open_unit_interval(alpha, :alpha)

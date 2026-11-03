@@ -74,10 +74,35 @@ themselves, borrowed in the sense of `get_observation_weights`. A weight vector 
 raises a `DimensionMismatch` that names `w`, and a mask of the wrong length raises one that names
 `obs`.
 
+### The cut of an estimator before the fit (#1960)
+
+A Shared Series gap drops observations from the returns data before the fit, and the weights sit
+in the fields of the estimator tree, not beside a sample. So the fix of #1960 cuts the tree.
+`observed_weights(w, obs)` is the rule for one weights field before the fit. It checks the length
+of `w`, indexes it with the type kept, and keeps a `DynamicAbstractWeights` and `nothing`, by
+items 2 and 4. `shared_series_estimator(est, rows, T)` builds the mask of the full sample and walks
+the tree with `obs_weights_view`, which gives each weights field to `obs_weights_index` and so to
+this rule. `shared_series_fit` cuts the estimator and the returns data together, and the batch
+entries of a prior, a regression, an uncertainty set, an optimiser, a pipeline group and a
+covariance forecast evaluation call it. ADR 0061 and ADR 0107 record the change of the walk: the
+observation channel opens on `@fprop`, and `@oprop` marks a child that only the cut reads.
+
+A buffer fit of an online estimator drops the observations that its buffer marks, through
+`shared_series_buffer`. A member that refits on the buffer can hold a fixed weight vector with one
+entry for each buffered observation, so `shared_series_buffer_estimator` cuts it at the kept
+observations of the buffer. A member that folds reads its own state, which never folded a marked
+observation, and it refuses fixed weights, so `buffer_refit_member` leaves it as it is.
+
+The walk reaches observation weights only. A fixed series of one value for each observation that is
+not a weight, such as the benchmark returns of a `ReturnsTracking`, keeps the full length, and the
+measure refuses it by name. Issue #1964 holds that case and the pin of a Choice Rule on a buffer.
+The fixed vector of an `OrderedWeightsArray` has a defect of its own with no gap, issue #1963.
+
 ## Consequences
 
-- The fixes of #1622, #1956 and #1960 call `observed_sample` and `has_positive_weight`. They state
-  no rule of their own for the weights. #1956 can then fit an available-case sample under
+- The fixes of #1622 and #1956 call `observed_sample` and `has_positive_weight`. The fix of #1960
+  calls `observed_weights(w, obs)` on each weights field of the estimator tree. They state no rule
+  of their own for the weights. #1956 can then fit an available-case sample under
   observation weights, in place of a refusal of the pair `w` and `cvg`.
 - The extension contract of `DynamicAbstractWeights` states that a method receives only the
   observations that the fit reads.

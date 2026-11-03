@@ -1222,6 +1222,41 @@ function regression_target_weights(tgt::Union{LinearModel, GeneralisedLinearMode
     return get(tgt.kwargs, :weights, nothing)
 end
 """
+    obs_weights_view(tgt::Union{LinearModel, GeneralisedLinearModel}, i)
+
+Return a library target whose observation weights are cut to the observations `i`.
+
+A target keeps its weights in `tgt.kwargs`, outside the tags of [`@propagatable`](@ref), so it needs this method of [`obs_weights_view`](@ref). A cut of the observations of a fit, such as the drop of a Shared Series gap, then cuts the weights of the regression too, see [`shared_series_estimator`](@ref).
+
+# Algorithm
+
+ 1. Read the weights with [`regression_target_weights`](@ref). Return `tgt` when it holds none.
+ 2. Otherwise index them with [`obs_weights_index`](@ref), and put them back with [`factory`](@ref).
+
+# Arguments
+
+  - `tgt`: A [`LinearModel`](@ref) or a [`GeneralisedLinearModel`](@ref).
+  - `i`: The observations to keep: a mask of the full sample, or their positions.
+
+# Validation
+
+  - The rules of [`obs_weights_index`](@ref).
+
+# Returns
+
+  - `tgt`: The target with its weights at the kept observations.
+
+# Related
+
+  - [`obs_weights_view`](@ref)
+  - [`regression_target_weights`](@ref)
+  - [`factory(::LinearModel, ::ObsWeights)`](@ref)
+"""
+function obs_weights_view(tgt::Union{LinearModel, GeneralisedLinearModel}, i)
+    w = regression_target_weights(tgt)
+    return isnothing(w) ? tgt : factory(tgt, obs_weights_index(w, i))
+end
+"""
     is_basis_invariant(tgt::Union{LinearModel, GeneralisedLinearModel}) -> Bool
     is_basis_invariant(tgt::AbstractRegressionTarget) -> Bool
 
@@ -2000,7 +2035,7 @@ The method calls `regression(re, X, rd.F)` on the observations that it keeps. A 
 
  1. Check that `rd` carries both matrices, as `# Validation` states.
  2. Read the source of `re` with [`returns_source`](@ref), and call it `x_src`. A regression that reads the returns data itself states its source in its `x_src` field.
- 3. With [`shared_series_view`](@ref), drop the observations at which a factor return is not finite. Under `x_src = ExcessSource()`, also drop the observations of a gap of a vector benchmark. A regression on such an observation has no regressor for any asset.
+ 3. With [`shared_series_fit`](@ref), drop the observations at which a factor return is not finite. Under `x_src = ExcessSource()`, also drop the observations of a gap of a vector benchmark. A regression on such an observation has no regressor for any asset. Each fixed observation weight in the tree of `re` loses the same observations.
  4. Read the asset returns with [`benchmark_relative_returns`](@ref) under `x_src`, and call them `X`. `X` is `rd.X`, or `rd.X - rd.B` under `ExcessSource()`.
  5. Call `regression(re, X, rd.F)` on the kept observations, and return its result.
 
@@ -2028,7 +2063,7 @@ function regression(re::AbstractTimeSeriesRegressionEstimator, rd::ReturnsResult
     @argcheck(!isnothing(rd.X), IsNothingError)
     @argcheck(!isnothing(rd.F), IsNothingError)
     x_src = returns_source(re)
-    rd = shared_series_view(rd, x_src, true)
+    re, rd = shared_series_fit(re, rd, x_src, true)
     return regression(re, benchmark_relative_returns(rd, x_src), rd.F)
 end
 """

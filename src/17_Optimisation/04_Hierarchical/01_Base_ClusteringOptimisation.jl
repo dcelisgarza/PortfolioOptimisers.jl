@@ -490,6 +490,15 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref) or [`TD_O
   - `sets`: Sliced to the selected indices through [`port_opt_view`](@ref).
   - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).
 
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `pe`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `cle`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `fees`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `cache`: Removed by [`obs_weights_view`](@ref), because a state has no slice on the observation axis.
+
 # Examples
 
 ```jldoctest
@@ -570,16 +579,17 @@ HierarchicalOptimiser
   - [`SchurComplementHierarchicalRiskParity`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
+  - [`obs_weights_view`](@ref)
 """
 @propagatable @concrete struct HierarchicalOptimiser <: BaseClusteringOptimisationEstimator
     """
     $(field_dict[:pe])
     """
-    @vprop pe
+    @vprop @oprop pe
     """
     $(field_dict[:cle])
     """
-    cle
+    @oprop cle
     """
     $(field_dict[:slv])
     """

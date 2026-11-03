@@ -26,7 +26,7 @@ load the module when a row has no stub macro, no channel or no branch.
   - [`check_prop_tag_macros`](@ref)
   - [`@propagatable`](@ref)
 """
-const PROP_TAG_NAMES = (:fprop, :vprop, :pprop, :cprop, :wprop)
+const PROP_TAG_NAMES = (:fprop, :vprop, :pprop, :cprop, :wprop, :oprop)
 
 """
     PROP_TAG_MACRO_NAMES
@@ -72,6 +72,13 @@ and `@fprop` tags as `factory`, and it gives them different transforms. `factory
 the channel as well as the tag. A weights field joins [`obs_weights_view`](@ref)
 through its `@wprop` tag, and it needs no second tag.
 
+**The `obs` channel opens on a `@wprop`, a `@fprop` or an `@oprop` field.** Every reader in
+a fit reads the observations of the same sample, so a composed child that holds weights
+deep in its tree must take the cut too, see [`shared_series_estimator`](@ref). A struct whose
+only tags are `@fprop` therefore gets an [`obs_weights_view`](@ref) method that recurses into
+its children. [`@oprop`](@ref) marks a child that the `obs` channel alone reads, for a child
+that `factory` must not reach.
+
 # Related
 
   - [`PROP_TAG_NAMES`](@ref)
@@ -84,7 +91,8 @@ const PROP_TAG_CHANNELS = (factory = (gate = (:fprop, :wprop),
                            view = (gate = (:vprop,), precedence = (:vprop,)),
                            prior = (gate = (:pprop, :cprop),
                                     precedence = (:pprop, :cprop, :wprop, :fprop)),
-                           obs = (gate = (:wprop,), precedence = (:wprop, :fprop)))
+                           obs = (gate = (:wprop, :fprop, :oprop),
+                                  precedence = (:wprop, :oprop, :fprop)))
 
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -221,8 +229,8 @@ another tag without a sign.
 The function reads the channel first, and then the tag, because one tag has two transforms.
 
  1. `channel` is `:obs`:
-     1. `tag` is `:wprop`: return `nothing_scalar_array_getindex(xf, thread...)`. The field **is** the weights, so the method indexes it at the selected observations. An index keeps the `AbstractWeights` subtype, and a view does not.
-     2. `tag` is `:fprop`: return `obs_weights_view(xf, thread...)`. The field is a composed child, so the verb recurses into it.
+     1. `tag` is `:wprop`: return `obs_weights_index(xf, thread...)`. The field **is** the weights, so the method indexes it at the selected observations. An index keeps the `AbstractWeights` subtype, and a view does not. [`obs_weights_index`](@ref) states the rule for a mask of the full sample.
+     2. `tag` is `:oprop` or `:fprop`: return `obs_weights_view(xf, thread...)`. The field is a composed child, so the verb recurses into it.
  2. `channel` is any other channel:
      1. `tag` is `:fprop`: return `factory_child(xf, thread..., args...; kwargs...)`.
      2. `tag` is `:vprop`: return `view_child(xf, thread..., args...)`, which calls [`port_opt_view`](@ref) on every value but a precomputed optimisation result. This channel forwards no keywords.
@@ -259,11 +267,13 @@ function prop_tag_expr(channel::Symbol, tag::Symbol, fname::Symbol, xf, mod::Mod
         # different transforms. `@wprop` holds the weights themselves, so the field is
         # INDEXED rather than replaced; `@fprop` holds a composed child, so the verb
         # recurses into it. Indexing preserves the `AbstractWeights` subtype, which a
-        # `view` would not.
+        # `view` would not. `@oprop` is a child that only this channel reads.
         if tag === :wprop
-            return :($mod.nothing_scalar_array_getindex($xf, $(thread...)))
+            return :($mod.obs_weights_index($xf, $(thread...)))
         end
-        tag === :fprop && return :($mod.obs_weights_view($xf, $(thread...)))
+        if tag === :fprop || tag === :oprop
+            return :($mod.obs_weights_view($xf, $(thread...)))
+        end
     else
         if tag === :fprop
             return :($mod.factory_child($xf, $(thread...), args...; kwargs...))
@@ -295,7 +305,7 @@ A channel is active when at least one field carries a tag of the `gate` of the c
  1. Read the `gate` tuple of the channel from [`PROP_TAG_CHANNELS`](@ref).
  2. Return `true` when at least one tag of `gate` has a non-empty entry in `tagged`, and `false` otherwise.
 
-This function does **not** read the `precedence` tuple. So a tag that a channel reads, but does not gate on, never makes that channel emit a method alone. The `obs` channel gates on `@wprop` alone and reads `@fprop`, so a type with `@fprop` and no `@wprop` gets no `obs` method.
+This function does **not** read the `precedence` tuple. So a tag that a channel reads, but does not gate on, never makes that channel emit a method alone. The `prior` channel reads `@wprop` and `@fprop`, but it gates on `@pprop` and `@cprop`, so a type with `@fprop` alone gets no `prior` method.
 
 # Arguments
 
@@ -667,7 +677,7 @@ The tag never expands, because [`@propagatable`](@ref) runs first and removes it
 
  1. [`propagatable_parse_body`](@ref) peels the tag off the field, records the field name under `:fprop`, and puts the **stripped** field into the struct body. Neither Julia nor a wrapped macro such as `@concrete` ever sees the tag.
 
- 2. [`prop_channel_active`](@ref) reads the recorded name. This tag gates the `factory` channel alone, and an active channel makes [`@propagatable`](@ref) emit one method. The `obs` channel reads the tag, but it does not gate on it.
+ 2. [`prop_channel_active`](@ref) reads the recorded name. This tag gates the `factory` channel and the `obs` channel, and each active channel makes [`@propagatable`](@ref) emit one method.
 
  3. [`prop_channel_pairs`](@ref) builds the keyword pair of the field for each emitted method, and [`prop_tag_expr`](@ref) gives the value:
 
@@ -676,7 +686,7 @@ The tag never expands, because [`@propagatable`](@ref) runs first and removes it
 
  4. The generated method builds the struct again with its keyword constructor, so every check of the constructor runs again on the propagated value.
 
-Step 3 gives the meaning of the tag. The same tag has two transforms, because a channel decides what a tag means. The `obs` channel does not gate on `@fprop`, so a struct whose only tag is `@fprop` gets no [`obs_weights_view`](@ref) method. That channel reads the tag only when another field of the struct carries [`@wprop`](@ref).
+Step 3 gives the meaning of the tag. The same tag has two transforms, because a channel decides what a tag means. The `obs` channel gates on `@fprop`, so a struct whose only tag is `@fprop` gets an [`obs_weights_view`](@ref) method. A cut of the observations then reaches a weights field at any depth of the tree, through every wrapper above it.
 
 The body of this macro raises an error. Julia runs it only when the tag is outside a [`@propagatable`](@ref) struct body, where no macro removed it.
 
@@ -825,11 +835,13 @@ The tag never expands, because [`@propagatable`](@ref) runs first and removes it
  3. [`prop_channel_pairs`](@ref) builds the keyword pair of the field for each emitted method, and [`prop_tag_expr`](@ref) gives the value:
 
       + `factory` channel: `_wprop(x.field, args...; kwargs...)`, which **replaces** the field with an incoming [`ObsWeights`](@ref), and keeps it when none is threaded.
-      + `obs` channel: `nothing_scalar_array_getindex(x.field, i)`, which **indexes** the value of the field at the selected observations. An index keeps the `AbstractWeights` subtype, and a view does not.
+      + `obs` channel: `obs_weights_index(x.field, i)`, which **indexes** the value of the field at the selected observations. An index keeps the `AbstractWeights` subtype, and a view does not.
 
  4. The generated method builds the struct again with its keyword constructor, so every check of the constructor runs again on the propagated value.
 
-Step 3 gives the meaning of the tag. **The two channels do different operations on the same field**, so [`factory`](@ref) and [`obs_weights_view`](@ref) are not two names for one operation. `@wprop` is also the only tag that gates the `obs` channel. One `@wprop` field gives the struct an [`obs_weights_view`](@ref) method, with no second tag.
+Step 3 gives the meaning of the tag. **The two channels do different operations on the same field**, so [`factory`](@ref) and [`obs_weights_view`](@ref) are not two names for one operation. One `@wprop` field gives the struct an [`obs_weights_view`](@ref) method, with no second tag.
+
+A risk measure stacks `@pprop @wprop` on its weights field. The `prior` channel then selects the field against the weights of the prior result, and the `obs` channel indexes it.
 
 The body of this macro raises an error. Julia runs it only when the tag is outside a [`@propagatable`](@ref) struct body, where no macro removed it.
 
@@ -846,6 +858,45 @@ The body of this macro raises an error. Julia runs it only when the tag is outsi
 """
 macro wprop(expr)
     return error("@wprop may only appear inside a @propagatable struct body")
+end
+
+"""
+    @oprop field
+
+Field tag for a [`@propagatable`](@ref) struct body. It marks a composed child that only the
+**observation** channel reads. A cut of the observations, through [`obs_weights_view`](@ref),
+recurses into the child. [`factory`](@ref), [`port_opt_view`](@ref) and the prior selection
+do not read the tag.
+
+Use `@oprop` for a child that reads the observations of the sample, when the `factory`
+channel must not reach it. The prior of an optimiser is an example. `factory(opt, w)` passes
+the portfolio weights `w` to the fees of the optimiser, and not to its prior, but a cut of
+the observations must reach the observation weights of the prior. A child that `factory`
+reaches carries [`@fprop`](@ref), which the `obs` channel reads too, so it needs no second
+tag.
+
+# Algorithm
+
+The tag never expands, because [`@propagatable`](@ref) runs first and removes it. The steps below tell what happens to the tagged field, not what this macro does.
+
+ 1. [`propagatable_parse_body`](@ref) peels the tag off the field, records the field name under `:oprop`, and puts the **stripped** field into the struct body. Neither Julia nor a wrapped macro such as `@concrete` ever sees the tag.
+ 2. [`prop_channel_active`](@ref) reads the recorded name. This tag gates the `obs` channel alone, and an active channel makes [`@propagatable`](@ref) emit one method.
+ 3. [`prop_channel_pairs`](@ref) builds the keyword pair of the field for the `obs` method, and [`prop_tag_expr`](@ref) gives the value `obs_weights_view(x.field, i)`, which recurses into the child on the observation axis. Every other channel keeps the value of the field.
+ 4. The generated method builds the struct again with its keyword constructor, so every check of the constructor runs again on the propagated value.
+
+The body of this macro raises an error. Julia runs it only when the tag is outside a [`@propagatable`](@ref) struct body, where no macro removed it.
+
+# Related
+
+  - [`@propagatable`](@ref)
+  - [`@fprop`](@ref)
+  - [`@wprop`](@ref)
+  - [`obs_weights_view`](@ref)
+  - [`shared_series_estimator`](@ref)
+  - [`PROP_TAG_CHANNELS`](@ref)
+"""
+macro oprop(expr)
+    return error("@oprop may only appear inside a @propagatable struct body")
 end
 
 """
@@ -1067,7 +1118,7 @@ end
 """
     @propagatable expr
 
-Define a struct, and make its propagation methods from five field tags. The tags are
+Define a struct, and make its propagation methods from six field tags. The tags are
 independent, and a field can carry more than one:
 
   - [`@fprop`](@ref) (factory propagation): a call of [`factory`](@ref) calls
@@ -1090,6 +1141,9 @@ independent, and a field can carry more than one:
   - [`@cprop`](@ref) (context selection): the prior method selects each tagged field
     against a threaded optimiser value, a solver, that it finds by type, through
     `sel(getfield(x, :f), _ctx(args...))`.
+  - [`@oprop`](@ref) (observation child): a cut of the observations through
+    [`obs_weights_view`](@ref) recurses into each tagged field. No other method reads the
+    tag.
 
 When at least one field carries `@pprop` or `@cprop`, the macro makes a second method,
 `factory(x, pr::AbstractPriorResult, args...)`. This method selects the `@pprop` and
@@ -1149,7 +1203,9 @@ end
 `@wprop` gates two channels, and they do different operations on the same field.
 `factory` **replaces** the field with an incoming [`ObsWeights`](@ref) value.
 [`obs_weights_view`](@ref) **indexes** the value of the field at a set of observations.
-A weights field needs no second tag to join the view on the observation axis.
+A weights field needs no second tag to join the view on the observation axis. The
+observation method also opens on a `@fprop` or an `@oprop` field, and it recurses into each
+of them, so a cut reaches a weights field at any depth of the tree.
 
 The macro adds the generated `factory`, `port_opt_view` and `obs_weights_view` methods to
 the functions of `PortfolioOptimisers`. So `@propagatable` also works for a type that an
@@ -1166,7 +1222,7 @@ external package defines.
  5. Bind `POMOD` to the module that **defines** the macro, and qualify every emitted name with it. A bare name resolves in the module of the caller. There, `function factory(…)` declares a new function of the caller, and the method never gets to `PortfolioOptimisers.factory`. That failure gives no error, because the declaration compiles and the type never joins the propagation chain.
  6. Emit the `factory` method. When [`prop_channel_active`](@ref) holds for the `factory` channel, the body is a call to the keyword constructor, with the pairs from [`prop_channel_pairs`](@ref). Otherwise, the body is `x`. **The macro always emits this method**, so a [`@propagatable`](@ref) struct with no tags returns itself from [`factory`](@ref).
  7. When the `view` channel is active, emit `port_opt_view(x::StructName, i, args...)`. Its channel threads `i` before `args...`.
- 8. When the `obs` channel is active, emit `obs_weights_view(x::StructName, i)`. Its channel threads `i` and takes no tail.
+ 8. When the `obs` channel is active, emit `obs_weights_view(x::StructName, i)`. Its channel threads `i` and takes no tail. A `@wprop`, a `@fprop` or an `@oprop` field opens the channel.
  9. When the `prior` channel is active, emit `factory(x::StructName, pr::AbstractPriorResult, args...; kwargs...)`. Its body selects every tagged field from `x`, and then gives the selected struct to [`resolve_deferred_quantities`](@ref), which makes **the Deferred-Quantity resolution the last operation**. A Deferred Quantity and a **Calibration Rule** see the solver, the observation weights and the children in the state that the optimisation gave them, and a rule can call [`ERM`](@ref) or [`RRM`](@ref). This method is more specific than the method of step 6, so Julia selects it for a call that threads a prior.
 10. Build `pprop_tuple`, the names of the `@pprop` fields as a tuple of quoted symbols.
 11. Return one escaped block. It holds `Base.@__doc__ chain`, so a docstring on the declaration gets to the struct. Then it holds the emitted methods, and last the call to [`propagatable_register!`](@ref) that records the type and `pprop_tuple`.
@@ -1180,6 +1236,7 @@ Steps 6 to 9 differ only in the method head and in the arguments that the channe
   - [`@pprop`](@ref)
   - [`@cprop`](@ref)
   - [`@wprop`](@ref)
+  - [`@oprop`](@ref)
   - [`PROP_TAG_NAMES`](@ref)
   - [`PROP_TAG_CHANNELS`](@ref)
   - [`prop_channel_active`](@ref)
@@ -1254,9 +1311,10 @@ macro propagatable(expr)
         push!(defs, view_def)
     end
 
-    # --- observation-weights view (@wprop) — emit only when a weights field exists ---
+    # --- observation-weights view (@wprop, @fprop, @oprop) — emit when a field opts in ---
     # The same `@wprop` tag the factory channel reads, given the other transform: the
-    # weights field is indexed to `i` rather than replaced, and `@fprop` children recurse.
+    # weights field is indexed to `i` rather than replaced, and `@fprop` and `@oprop`
+    # children recurse.
     if prop_channel_active(:obs, tagged)
         obs_body = Expr(:call, struct_name,
                         Expr(:parameters,
@@ -1353,4 +1411,4 @@ function check_propagatable_contracts(contracts = PROPAGATABLE_CONTRACTS,
     return nothing
 end
 
-public @propagatable, @fprop, @vprop, @pprop, @cprop, @wprop
+public @propagatable, @fprop, @vprop, @pprop, @cprop, @wprop, @oprop

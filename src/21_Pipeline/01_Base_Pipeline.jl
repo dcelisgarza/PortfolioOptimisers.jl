@@ -767,6 +767,21 @@ function PipelineStep(; est::Union{AbstractEstimator, Function}, writes::Symbol,
                       target::Option{Symbol} = nothing)::PipelineStep
     return PipelineStep(est, reads, writes, target)
 end
+"""
+    obs_weights_view(ps::PipelineStep, i) -> PipelineStep
+
+Return the step with the observation weights of its estimator cut to the observations `i`, through [`obs_weights_fields`](@ref).
+
+A step of an Excess group of a [`Pipeline`](@ref) reads the returns with each gap of a vector benchmark dropped, so the fixed observation weights of its estimator must lose the same observations, see [`group_returns_view`](@ref). A callable step comes back with no change.
+
+# Related
+
+  - [`PipelineStep`](@ref)
+  - [`obs_weights_view`](@ref)
+"""
+function obs_weights_view(ps::PipelineStep, i)::PipelineStep
+    return obs_weights_fields(ps, i)
+end
 pipe_writes(ps::PipelineStep) = ps.writes
 pipe_reads(ps::PipelineStep) = ps.reads
 """

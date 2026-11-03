@@ -247,6 +247,14 @@ Keywords correspond to the struct's fields. A field of the type [`TD`](@ref), [`
   - `wi` is sliced to the selected assets.
   - `alg` and `mtx_sqrt` pass unchanged.
 
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `opt`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `rba`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `fb`: Recursively indexed through [`obs_weights_view`](@ref).
+
 # Related
 
   - [`optimise`](@ref)
@@ -258,6 +266,7 @@ Keywords correspond to the struct's fields. A field of the type [`TD`](@ref), [`
   - [`FactorRiskBudgeting`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
@@ -275,7 +284,7 @@ Keywords correspond to the struct's fields. A field of the type [`TD`](@ref), [`
     """
     $(field_dict[:rba])
     """
-    rba
+    @oprop rba
     """
     $(field_dict[:wi])
     """

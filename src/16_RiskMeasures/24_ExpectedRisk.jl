@@ -515,7 +515,7 @@ Fit the factor loadings of a regression reader on the returns that its source na
 # Algorithm
 
  1. Check that `rd.X` and `rd.F` are present.
- 2. Drop the observations of a Shared Series gap with [`shared_series_view`](@ref) under `x_src`: a gap of the factor returns, and a gap of a vector benchmark under `ExcessSource()`.
+ 2. Drop the observations of a Shared Series gap with [`shared_series_fit`](@ref) under `x_src`: a gap of the factor returns, and a gap of a vector benchmark under `ExcessSource()`. Each fixed observation weight in the tree of `re` loses the same observations.
  3. Read the asset returns with [`benchmark_relative_returns`](@ref) under `x_src`, giving `X`. Fit and return `regression(re, X, rd.F)`.
 
 # Arguments
@@ -537,7 +537,7 @@ Fit the factor loadings of a regression reader on the returns that its source na
 
   - [`resolve_factor_regression`](@ref)
   - [`factor_space_regression`](@ref)
-  - [`shared_series_view`](@ref)
+  - [`shared_series_fit`](@ref)
 """
 function refit_factor_regression(re::AbstractTimeSeriesRegressionEstimator,
                                  rd::ReturnsResult,
@@ -545,7 +545,7 @@ function refit_factor_regression(re::AbstractTimeSeriesRegressionEstimator,
     x_src = returns_source(re)
     @argcheck(!isnothing(rd.X) && !isnothing(rd.F),
               IsNothingError("a factor decomposition needs loadings, and none of the three arguments `re`, `pr` and `rd` holds any. `re` is an estimator (`$(nameof(typeof(re)))`), so it must fit them from `rd.X` and `rd.F`; the prior carries no factor block to read them from instead.\nSupply the data as `rd`, or pass a precomputed `Regression` as `re`, or pass a prior fitted through a factor model (e.g. `FactorPrior`), which carries its own loadings in `rr`.\nGot\nisnothing(rd.X) => $(isnothing(rd.X))\nisnothing(rd.F) => $(isnothing(rd.F))\nisnothing(pr) => $(isnothing(pr))"))
-    rd = shared_series_view(rd, x_src, true)
+    re, rd = shared_series_fit(re, rd, x_src, true)
     return regression(re, benchmark_relative_returns(rd, x_src), rd.F)
 end
 # The prior route of the value-level `expected_risk`. A non-investable asset carries `NaN`

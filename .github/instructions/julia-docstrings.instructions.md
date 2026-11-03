@@ -426,10 +426,11 @@ Then write a bullet list of high-level details. Cover these points, in this orde
 
 Describe the method. Do not copy its code into prose. A field that the method passes through, with nothing to state about it, needs no bullet.
 
-`## Observation weight parameters` documents the **observation** channel, which `@wprop` alone opens. A type with no `@wprop` field never has this subsection, whatever other tags it carries. The subsection lists each field and how the channel indexes it:
+`## Observation weight parameters` documents the **observation** channel. A `@wprop`, a `@fprop` or an `@oprop` field opens the channel (ADR 0061, amended for #1960). Write the subsection when a field carries `@wprop` or `@oprop`, because there the channel does what `## Propagated parameters` does not state: it indexes a weights field that `factory` replaces, or it recurses into a child that `factory` does not read. A type whose only open fields carry `@fprop` has no subsection. Both channels recurse into such a field, and the docstring of [`@fprop`](@ref) states that the channel drops a `cache`. The subsection lists each field that the channel reads, and how the channel indexes it:
 
 - For an **observation-weight field**, which carries `@wprop`, write `` `fieldname`: Indexed to the selected observations through [`obs_weights_view`](@ref). ``
-- For an **estimator, algorithm, or result field**, which carries `@fprop`, write `` `fieldname`: Recursively indexed through [`obs_weights_view`](@ref). ``
+- For an **estimator, algorithm, or result field**, which carries `@fprop` or `@oprop`, write `` `fieldname`: Recursively indexed through [`obs_weights_view`](@ref). ``
+- For **the partial-fit state**, `@fprop cache`, write `` `cache`: Removed by [`obs_weights_view`](@ref), because a state has no slice on the observation axis. ``
 
 > **The same field appears in two subsections, and the two state different things.** A `@wprop` field is *replaced* under `## Propagated parameters` and *indexed* under `## Observation weight parameters`. Do not merge the two. This is the one place where a reader learns that `factory` and `obs_weights_view` treat the field differently. A `@fprop` sibling also appears in both, and it recurses in both.
 

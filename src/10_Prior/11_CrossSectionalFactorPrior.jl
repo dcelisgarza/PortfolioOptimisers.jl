@@ -1417,8 +1417,9 @@ function prior(pe::CrossSectionalFactorPrior, rd::ReturnsResult; strict::Bool = 
     T = size(rd.X, 1)
     rows = shared_series_rows(rd, pe.x_src, false)
     rd = shared_series_view(rd, pe.x_src, false)
-    pr = prior(pe, benchmark_relative_returns(rd, pe.x_src), rd.F, rd.pnl; ne = rd.ne,
-               E = rd.E, iv = rd.iv, ivpa = rd.ivpa, ts = rd.ts, strict = strict, dims = 1,
+    pr = prior(shared_series_estimator(pe, rows, T),
+               benchmark_relative_returns(rd, pe.x_src), rd.F, rd.pnl; ne = rd.ne, E = rd.E,
+               iv = rd.iv, ivpa = rd.ivpa, ts = rd.ts, strict = strict, dims = 1,
                cache_reg = cache_reg)
     return stamp_returns_source(shared_series_record(pr, rows, T), pe)
 end

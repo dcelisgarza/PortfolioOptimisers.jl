@@ -1,5 +1,5 @@
 using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, TimeSeries,
-      Clarabel
+      Clarabel, StatsBase
 
 # Gaps in the benchmark, the implied volatilities and the factor returns, issue #1672, under
 # ADR 0117 amended for #1672. The online step drops the same observations, issue #1675.
@@ -657,4 +657,188 @@ end
         @test ro.pr.ss_gaps == rb.pr.ss_gaps
         @test ro.pr.rr.idx == rb.pr.rr.idx == keep
     end
+end
+
+struct DynamicWeights1960 <: PO.DynamicAbstractWeights end
+
+@testset "Fixed observation weights lose the observations of a Shared Series gap (#1960)" begin
+    # Before #1960 the drop cut the returns data and left the weights of the estimators at
+    # the full length, so `StatsBase` raised a bare `DimensionMismatch`. The oracle is the
+    # same fit with the gapped observation removed by hand from the data and from the
+    # weights (ADR 0229).
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 settings = Dict("verbose" => false))
+    Bg = copy(Bv0)
+    Bg[gap] = NaN
+    Fg = copy(F0)
+    Fg[gap, 2] = NaN
+    rdB = ReturnsResult(; nx = nx, X = X0, nb = ["BM"], B = Bg)
+    rdBk = ReturnsResult(; nx = nx, X = X0[keep, :], nb = ["BM"], B = Bv0[keep])
+    rdF = ReturnsResult(; nx = nx, X = X0, nf = nf, F = Fg)
+    rdFk = ReturnsResult(; nx = nx, X = X0[keep, :], nf = nf, F = F0[keep, :])
+    w = aweights(rand(StableRNG(19600001), T) .+ 0.1)
+    cov_w(w) = PortfolioOptimisersCovariance(;
+                                             ce = Covariance(; w = w,
+                                                             me = SimpleExpectedReturns(;
+                                                                                        w = w)))
+    emp(w) = EmpiricalPrior(; ce = cov_w(w), me = SimpleExpectedReturns(; w = w))
+    emp_x(w) = EmpiricalPrior(; ce = cov_w(w), me = SimpleExpectedReturns(; w = w),
+                              x_src = ExcessSource())
+
+    @testset "A prior: $name" for (name, f, rd, rdk) in
+                                  (("EmpiricalPrior", emp_x, rdB, rdBk),
+                                   ("HighOrderPriorEstimator",
+                                    w -> HighOrderPriorEstimator(; pe = emp(w),
+                                                                 kte = Cokurtosis(; w = w),
+                                                                 ske = Coskewness(; w = w),
+                                                                 x_src = ExcessSource()),
+                                    rdB, rdBk),
+                                   ("EntropyPoolingPrior",
+                                    w -> EntropyPoolingPrior(; pe = emp(w), w = w,
+                                                             x_src = ExcessSource()), rdB,
+                                    rdBk),
+                                   ("FactorPrior",
+                                    w -> FactorPrior(; pe = emp(w),
+                                                     ve = SimpleVariance(; w = w),
+                                                     re = StepwiseRegression(;
+                                                                             tgt = PO.LinearModel(;
+                                                                                                  kwargs = (;
+                                                                                                            weights = w)))),
+                                    rdF, rdFk))
+        p1 = prior(f(w), rd)
+        p2 = prior(f(w[keep]), rdk)
+        @test p1.mu ≈ p2.mu
+        @test p1.sigma ≈ p2.sigma
+    end
+
+    @testset "A regression and an uncertainty set" begin
+        re(w) = StepwiseRegression(; tgt = PO.LinearModel(; kwargs = (; weights = w)))
+        @test regression(re(w), rdF).L ≈ regression(re(w[keep]), rdFk).L
+        uc(w) = NormalUncertaintySet(; pe = emp_x(w), seed = 1)
+        @test mu_ucs(uc(w), rdB).ub ≈ mu_ucs(uc(w[keep]), rdBk).ub
+        @test sigma_ucs(uc(w), rdB).ub ≈ sigma_ucs(uc(w[keep]), rdBk).ub
+        @test ucs(uc(w), rdB)[2].lb ≈ ucs(uc(w[keep]), rdBk)[2].lb
+    end
+
+    @testset "An optimiser: $name" for (name, f) in (("MeanRisk",
+                                                      w -> MeanRisk(;
+                                                                    r = ConditionalValueatRisk(; w = w),
+                                                                    opt = JuMPOptimiser(; pe = emp_x(w),
+                                                                                        slv = slv,
+                                                                                        ret = LogarithmicReturn(;
+                                                                                                                w = w)))),
+                                                     ("MeanRisk LowOrderMoment",
+                                                      w -> MeanRisk(; r = LowOrderMoment(; w = w),
+                                                                    opt = JuMPOptimiser(; pe = emp_x(w),
+                                                                                        slv = slv))),
+                                                     ("HierarchicalRiskParity",
+                                                      w -> HierarchicalRiskParity(;
+                                                                                  r = ConditionalValueatRisk(;
+                                                                                                             w = w),
+                                                                                  opt = HierarchicalOptimiser(;
+                                                                                                              pe = emp_x(w),
+                                                                                                              cle = ClustersEstimator(;
+                                                                                                                                      ce = cov_w(w),
+                                                                                                                                      x_src = ExcessSource())))),
+                                                     ("InverseVolatility",
+                                                      w -> InverseVolatility(; pe = emp_x(w))))
+        o1 = optimise(f(w), rdB)
+        o2 = optimise(f(w[keep]), rdBk)
+        @test isapprox(o1.w, o2.w; rtol = 1e-5)
+    end
+
+    @testset "A buffer drops the weights of the marked observation" begin
+        mkb(w) = EmpiricalPrior(; ce = cov_w(w), me = SimpleExpectedReturns(; w = w),
+                                x_src = ExcessSource())
+        o = PO.update_online_estimator(PO.Online(mkb(w)))
+        o = partial_fit!(o, ReturnsResult(; nx = nx, X = X0[1:30, :], B = Bg[1:30]))
+        o = partial_fit!(o, ReturnsResult(; nx = nx, X = X0[31:T, :], B = Bg[31:T]))
+        p1 = prior(o)
+        p2 = prior(mkb(w[keep]), rdBk)
+        @test p1.mu ≈ p2.mu
+        @test p1.sigma ≈ p2.sigma
+        # A buffer with no mark leaves the estimator as it is.
+        state = PO.prior_returns_buffer(o)
+        clean = PO.shared_series_buffer(state)
+        @test PO.shared_series_buffer_estimator(o.ce, clean) === o.ce
+        @test first(PO.buffer_refit_members(o, clean)) === o
+        # A member that folds keeps its state.
+        folded = PO.update_online_estimator(PO.Online(EmpiricalPrior(;
+                                                                     x_src = ExcessSource())))
+        @test PO.buffer_refit_member(folded.me, state) === folded.me
+    end
+
+    @testset "The cut of one weights field" begin
+        obs = trues(T)
+        obs[gap] = false
+        # A weight vector of the wrong length raises, and is not cut short with no message.
+        @test_throws DimensionMismatch prior(emp_x(aweights(rand(T + 5))), rdB)
+        @test_throws DimensionMismatch PO.observed_weights(aweights(rand(T - 1)), obs)
+        # Weights that store a range keep their type (the defect that #1959 left).
+        wr = PO.observed_weights(aweights(1.0:T), obs)
+        @test wr isa StatsBase.AnalyticWeights
+        @test wr == (1.0:T)[keep]
+        @test PO.observed_weights(nothing, obs) === nothing
+        @test PO.observed_weights(w, trues(T)) === w
+        # A dynamic weight resolves on the sample that the fit reads, so the cut keeps it.
+        @test PO.observed_weights(DynamicWeights1960(), obs) isa DynamicWeights1960
+        # A set of positions indexes with no length check, as a window does.
+        @test PO.obs_weights_index(w, 1:5) == w[1:5]
+        @test PO.shared_series_estimator(emp(w), nothing, T) isa EmpiricalPrior
+        est, rdv = PO.shared_series_fit(emp(w), rdBk, ExcessSource(), false)
+        @test est.me.w === w && rdv === rdBk
+    end
+
+    @testset "A hand-written cut: $(nameof(typeof(x)))" for (x, get_w) in
+                                                            ((PO.LinearModel(;
+                                                                             kwargs = (;
+                                                                                       weights = w)),
+                                                              y -> y.kwargs.weights),
+                                                             (PO.GeneralisedLinearModel(;
+                                                                                        kwargs = (;
+                                                                                                  weights = w)),
+                                                              y -> y.kwargs.weights),
+                                                             (ElasticNet(; w = w,
+                                                                         ve = SimpleVariance(;
+                                                                                             w = w)),
+                                                              y -> y.ve.w),
+                                                             (LowOrderMoment(; w = w),
+                                                              y -> y.w),
+                                                             (HighOrderMoment(; w = w,
+                                                                              ve = SimpleVariance(;
+                                                                                                  w = w)),
+                                                              y -> y.ve.w),
+                                                             (LogarithmicReturn(; w = w),
+                                                              y -> y.w),
+                                                             (ArithmeticReturn(;
+                                                                               ucs = NormalUncertaintySet(;
+                                                                                                          pe = emp(w))),
+                                                              y -> y.ucs.pe.me.w),
+                                                             (UncertaintySetVariance(;
+                                                                                     ucs = NormalUncertaintySet(;
+                                                                                                                pe = emp(w))),
+                                                              y -> y.ucs.pe.ce.ce.w),
+                                                             (RiskTrackingRiskMeasure(;
+                                                                                      tr = WeightsTracking(;
+                                                                                                           w = fill(1 /
+                                                                                                                    N,
+                                                                                                                    N)),
+                                                                                      r = ConditionalValueatRisk(;
+                                                                                                                 w = w)),
+                                                              y -> y.r.w),
+                                                             (PipelineStep(; est = emp(w),
+                                                                           writes = :prior),
+                                                              y -> y.est.me.w),
+                                                             (JuMPOptimiser(; pe = emp(w),
+                                                                            slv = slv),
+                                                              y -> y.pe.me.w),
+                                                             (InverseVolatility(;
+                                                                                pe = emp(w)),
+                                                              y -> y.pe.me.w))
+        obs = trues(T)
+        obs[gap] = false
+        @test get_w(PO.obs_weights_view(x, obs)) == w[keep]
+        @test get_w(PO.obs_weights_view(x, obs)) isa StatsBase.AnalyticWeights
+    end
+    @test PO.obs_weights_view(PO.LinearModel(), trues(T)) isa PO.LinearModel
 end

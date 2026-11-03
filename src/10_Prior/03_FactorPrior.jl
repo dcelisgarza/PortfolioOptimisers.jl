@@ -713,7 +713,8 @@ function prior(pe::FactorPrior, rd::ReturnsResult; strict::Bool = false, dims::I
     T = size(rd.X, 1)
     rows = shared_series_rows(rd, pe.x_src, true)
     rd = shared_series_view(rd, pe.x_src, true)
-    pr = prior(pe, benchmark_relative_returns(rd, pe.x_src), rd.F, rd.pnl; iv = rd.iv,
+    pr = prior(shared_series_estimator(pe, rows, T),
+               benchmark_relative_returns(rd, pe.x_src), rd.F, rd.pnl; iv = rd.iv,
                ivpa = rd.ivpa, ne = rd.ne, E = rd.E, ts = rd.ts, strict = strict, dims = 1,
                cache_reg = cache_reg)
     return stamp_returns_source(shared_series_record(pr, rows, T), pe)

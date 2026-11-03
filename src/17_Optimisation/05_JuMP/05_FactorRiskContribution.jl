@@ -227,6 +227,16 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
   - `wi` is not changed, because it holds start values of the **factor** weights. The asset selection does not index the factor axis.
   - `obj`, `frc_ple`, `sets` and `flag` are not changed.
 
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `opt`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `re`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `r`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `frc_ple`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `fb`: Recursively indexed through [`obs_weights_view`](@ref).
+
 # Related
 
   - [`optimise`](@ref)
@@ -238,6 +248,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
   - [`set_factor_risk_contribution_constraints!`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
@@ -253,7 +264,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
     """
     $(field_dict[:re])
     """
-    re
+    @oprop re
     """
     $(field_dict[:r_opt])
     """
@@ -265,7 +276,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
     """
     Phylogeny constraints on the factor weights, an estimator or a result, or a vector of them. A semidefinite entry adds rows through [`set_sdp_frc_phylogeny_constraints!`](@ref), and an integer entry through [`set_frc_iplg_constraints!`](@ref), which needs a MIP solver and finite asset weight bounds.
     """
-    frc_ple
+    @oprop frc_ple
     """
     $(field_dict[:sets])
     """
@@ -533,8 +544,10 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     assemble_jump_model!(model, frc, frc.opt, attrs, rd, frc.r, frc.obj, b, false)
     # After the model is assembled, so the factor phylogeny reads the marks that the
     # variance builders and `mark_risk_minimised!` write, as the asset phylogeny does.
-    # A factor phylogeny reads the factor returns, so it drops their gaps as the loadings do.
-    frc_plr = phylogeny_constraints(frc.frc_ple, shared_series_view(rd, nothing, true).F)
+    # A factor phylogeny reads the factor returns, so it drops their gaps as the loadings do,
+    # and its fixed observation weights lose the same observations (#1960).
+    frc_ple, rdf = shared_series_fit(frc.frc_ple, rd, nothing, true)
+    frc_plr = phylogeny_constraints(frc_ple, rdf.F)
     set_sdp_frc_phylogeny_constraints!(model, frc_plr)
     set_frc_iplg_constraints!(model, frc_plr, attrs.wb, transpose(rr.L), frc.opt.ss)
     set_portfolio_objective_function!(model, frc.obj, frc, attrs)

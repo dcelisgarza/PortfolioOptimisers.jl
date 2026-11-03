@@ -191,3 +191,19 @@ can, and a new state holds the new scalar fields, so an estimator that the calle
 the call still holds moved arrays and an old count. The three pitfalls of the Decision stand, and
 `partial_fit` keeps its value semantics. The review of #1817 (R6) measured each fold of the commit
 against its parent: the same fields, the same bytes on each step.
+
+## Amendment (2026-11-03)
+
+The amendment of 2026-09-26 named the fix for a caller that takes an observation view of a type
+with no `@wprop` field: open the observation channel on `@fprop` for every type at once.
+Issue #1960 is that caller. A Shared Series gap drops observations from the returns data of a prior, a
+regression, an uncertainty set and an optimiser, and `shared_series_estimator` cuts the estimator
+of the fit at the same observations through `obs_weights_view`. The weights of a covariance
+estimator sit two levels under an `EmpiricalPrior`, which has no `@wprop` field, so the identity
+did not reach them.
+
+The `obs` row of `PROP_TAG_CHANNELS` now opens on `@wprop`, `@fprop` and the new `@oprop`
+(ADR 0061). Every type with a `@fprop` field emits an `obs_weights_view` method, so its `cache`
+is dropped, as the table of the Decision says. `PortfolioOptimisersCovariance` and
+`EmpiricalPrior` now drop their state in an observation view. A batch fit reads no state, so the
+drop changes no batch answer, and the view is a copy that only the fit of the cut reads.

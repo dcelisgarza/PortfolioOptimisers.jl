@@ -573,6 +573,18 @@ An entry of a schedule in `opti` or `opto` must be an estimator, as the static v
   - `fees`, `opti` and `opto` recurse through [`port_opt_view`](@ref) with the index and the matrix, and `fb` through [`view_child`](@ref).
   - `cle` passes through unchanged, because the clustering runs again over the viewed assets.
 
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `pe`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `cle`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `fees`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `opti`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `opto`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `fb`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `cache`: Removed by [`obs_weights_view`](@ref), because a state has no slice on the observation axis.
+
 # Related
 
   - [`optimise`](@ref)
@@ -583,6 +595,7 @@ An entry of a schedule in `opti` or `opto` must be an estimator, as the static v
   - [`predict_outer_returns`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
@@ -594,11 +607,11 @@ An entry of a schedule in `opti` or `opto` must be an estimator, as the static v
     """
     $(field_dict[:pe])
     """
-    pe
+    @oprop pe
     """
     $(field_dict[:cle])
     """
-    cle
+    @oprop cle
     """
     $(field_dict[:wb_jmp])
     """

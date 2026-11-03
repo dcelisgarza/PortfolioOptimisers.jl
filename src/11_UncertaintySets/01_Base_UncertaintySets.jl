@@ -544,7 +544,7 @@ The method reads the fields of the container and calls the matrix method. The ma
  1. Check that `rd.X` is not `nothing`. If it is, throw an error.
  2. If [`needs_factor_returns`](@ref) returns `true` for `uc.pe`, check that `rd.F` is not `nothing`. If it is, throw an error. A factor leaf at any position in the estimator tree reads the factor returns, and no other prior reads them.
  3. Read the source `x_src` that `uc.pe` states, with [`returns_source`](@ref). The set holds no source of its own. It gives the returns to its prior, and the prior states the source. A set with `pe = nothing` reads `rd.X`.
- 4. Remove the observations of a Shared Series gap with [`shared_series_view`](@ref). These are the gaps of a vector benchmark under `x_src = ExcessSource()`, and the gaps of the factor returns when [`reads_factor_returns`](@ref) returns `true` for `uc.pe`.
+ 4. Remove the observations of a Shared Series gap from the data and from the observation weights of `uc`, with [`shared_series_fit`](@ref). These are the gaps of a vector benchmark under `x_src = ExcessSource()`, and the gaps of the factor returns when [`reads_factor_returns`](@ref) returns `true` for `uc.pe`.
  5. Read the asset returns `X` with [`benchmark_relative_returns`](@ref) under `x_src`. `X` is `rd.X`, or `rd.X - rd.B` under `ExcessSource()`.
  6. Call `ucs(uc, X, rd.F; iv = rd.iv, ivpa = rd.ivpa, dims = 1)`, and return the pair of fitted sets. The method gives the implied volatility fields with the returns, because a prior that reads them takes them by keyword. `dims = 1` states that a `ReturnsResult` holds its observations in the rows.
 
@@ -575,7 +575,7 @@ function ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; dims::Int =
     @argcheck(!isnothing(rd.X), IsNothingError)
     assert_factor_returns(uc.pe, rd.F)
     x_src = returns_source(uc.pe)
-    rd = shared_series_view(rd, x_src, reads_factor_returns(uc.pe))
+    uc, rd = shared_series_fit(uc, rd, x_src, reads_factor_returns(uc.pe))
     return ucs(uc, benchmark_relative_returns(rd, x_src), rd.F; iv = rd.iv, ivpa = rd.ivpa,
                dims = 1)
 end
@@ -591,7 +591,7 @@ The method reads the fields of the container and calls the matrix method. A call
  1. Check that `rd.X` is not `nothing`. If it is, throw an error.
  2. If [`needs_factor_returns`](@ref) returns `true` for `uc.pe`, check that `rd.F` is not `nothing`. If it is, throw an error. A factor leaf at any position in the estimator tree reads the factor returns, and no other prior reads them.
  3. Read the source `x_src` that `uc.pe` states, with [`returns_source`](@ref). The set holds no source of its own. It gives the returns to its prior, and the prior states the source. A set with `pe = nothing` reads `rd.X`.
- 4. Remove the observations of a Shared Series gap with [`shared_series_view`](@ref). These are the gaps of a vector benchmark under `x_src = ExcessSource()`, and the gaps of the factor returns when [`reads_factor_returns`](@ref) returns `true` for `uc.pe`.
+ 4. Remove the observations of a Shared Series gap from the data and from the observation weights of `uc`, with [`shared_series_fit`](@ref). These are the gaps of a vector benchmark under `x_src = ExcessSource()`, and the gaps of the factor returns when [`reads_factor_returns`](@ref) returns `true` for `uc.pe`.
  5. Read the asset returns `X` with [`benchmark_relative_returns`](@ref) under `x_src`. `X` is `rd.X`, or `rd.X - rd.B` under `ExcessSource()`.
  6. Call `mu_ucs(uc, X, rd.F; iv = rd.iv, ivpa = rd.ivpa, dims = 1)`, and return the fitted set of the mean. The method gives the implied volatility fields with the returns, because a prior that reads them takes them by keyword. `dims = 1` states that a `ReturnsResult` holds its observations in the rows.
 
@@ -622,7 +622,7 @@ function mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; dims::In
     @argcheck(!isnothing(rd.X), IsNothingError)
     assert_factor_returns(uc.pe, rd.F)
     x_src = returns_source(uc.pe)
-    rd = shared_series_view(rd, x_src, reads_factor_returns(uc.pe))
+    uc, rd = shared_series_fit(uc, rd, x_src, reads_factor_returns(uc.pe))
     return mu_ucs(uc, benchmark_relative_returns(rd, x_src), rd.F; iv = rd.iv,
                   ivpa = rd.ivpa, dims = 1)
 end
@@ -638,7 +638,7 @@ The method reads the fields of the container and calls the matrix method. An est
  1. Check that `rd.X` is not `nothing`. If it is, throw an error.
  2. If [`needs_factor_returns`](@ref) returns `true` for `uc.pe`, check that `rd.F` is not `nothing`. If it is, throw an error. A factor leaf at any position in the estimator tree reads the factor returns, and no other prior reads them.
  3. Read the source `x_src` that `uc.pe` states, with [`returns_source`](@ref). The set holds no source of its own. It gives the returns to its prior, and the prior states the source. A set with `pe = nothing` reads `rd.X`.
- 4. Remove the observations of a Shared Series gap with [`shared_series_view`](@ref). These are the gaps of a vector benchmark under `x_src = ExcessSource()`, and the gaps of the factor returns when [`reads_factor_returns`](@ref) returns `true` for `uc.pe`.
+ 4. Remove the observations of a Shared Series gap from the data and from the observation weights of `uc`, with [`shared_series_fit`](@ref). These are the gaps of a vector benchmark under `x_src = ExcessSource()`, and the gaps of the factor returns when [`reads_factor_returns`](@ref) returns `true` for `uc.pe`.
  5. Read the asset returns `X` with [`benchmark_relative_returns`](@ref) under `x_src`. `X` is `rd.X`, or `rd.X - rd.B` under `ExcessSource()`.
  6. Call `sigma_ucs(uc, X, rd.F; iv = rd.iv, ivpa = rd.ivpa, dims = 1)`, and return the fitted set of the covariance. The method gives the implied volatility fields with the returns, because a prior that reads them takes them by keyword. `dims = 1` states that a `ReturnsResult` holds its observations in the rows.
 
@@ -669,9 +669,34 @@ function sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; dims:
     @argcheck(!isnothing(rd.X), IsNothingError)
     assert_factor_returns(uc.pe, rd.F)
     x_src = returns_source(uc.pe)
-    rd = shared_series_view(rd, x_src, reads_factor_returns(uc.pe))
+    uc, rd = shared_series_fit(uc, rd, x_src, reads_factor_returns(uc.pe))
     return sigma_ucs(uc, benchmark_relative_returns(rd, x_src), rd.F; iv = rd.iv,
                      ivpa = rd.ivpa, dims = 1)
+end
+"""
+    obs_weights_view(uc::AbstractUncertaintySetEstimator, i)
+
+Return the uncertainty set estimator with the observation weights of its children cut to the observations `i`.
+
+An uncertainty set estimator fits its prior, and some also fit a covariance and a mean estimator, on the returns that it receives. Each child can hold fixed observation weights. A Shared Series gap drops observations from those returns, so the weights of the children must lose the same observations, see [`shared_series_fit`](@ref). The estimators are not [`@propagatable`](@ref), so this method cuts every field through [`obs_weights_fields`](@ref).
+
+# Arguments
+
+  - `uc`: The uncertainty set estimator. Its keyword constructor takes every field name, as the constructors of the library do.
+  - `i`: The observations to keep: a mask of the full sample, or their positions.
+
+# Returns
+
+  - `uc`: The estimator at the kept observations.
+
+# Related
+
+  - [`AbstractUncertaintySetEstimator`](@ref)
+  - [`obs_weights_view`](@ref)
+  - [`shared_series_fit`](@ref)
+"""
+function obs_weights_view(uc::AbstractUncertaintySetEstimator, i)
+    return obs_weights_fields(uc, i)
 end
 """
     ucs(ue::AbstractPriorUncertaintySetEstimator, ::AbstractPriorResult; kwargs...)

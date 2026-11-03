@@ -558,6 +558,22 @@ function RiskTrackingRiskMeasure(; settings::RiskMeasureSettings = RiskMeasureSe
                                  alg::VariableTracking = IndependentVariableTracking())
     return RiskTrackingRiskMeasure(settings, tr, r, alg)
 end
+"""
+    obs_weights_view(r::Union{RiskTrackingError, RiskTrackingRiskMeasure}, i)
+
+Return the tracking measure with the observation weights of the measure that it tracks cut to the observations `i`, through [`obs_weights_fields`](@ref).
+
+The two types are not [`@propagatable`](@ref), so they need this method of [`obs_weights_view`](@ref). The tracked measure `r` can hold fixed observation weights, so a cut of the returns of the solve, such as the drop of a Shared Series gap, must reach them, see [`shared_series_estimator`](@ref). The benchmark weights of `tr` are portfolio weights, and they keep their value.
+
+# Related
+
+  - [`RiskTrackingError`](@ref)
+  - [`RiskTrackingRiskMeasure`](@ref)
+  - [`obs_weights_view`](@ref)
+"""
+function obs_weights_view(r::Union{RiskTrackingError, RiskTrackingRiskMeasure}, i)
+    return obs_weights_fields(r, i)
+end
 # Deferrable slots — see `deferred_slots`. The tracked measure carries its own, so both the
 # check and the derived recursion in `resolve_deferred_quantities` reach them through `r`.
 # `tr` holds the benchmark weights and `alg` the tracking variable, neither of which defers.

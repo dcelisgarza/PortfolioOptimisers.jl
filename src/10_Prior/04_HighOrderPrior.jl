@@ -1295,7 +1295,7 @@ The equality holds for the embedded result and for every co-moment, both the co-
 # Algorithm
 
  1. Read the embedded result `pr` out of `pe.pe` with [`prior`](@ref).
- 2. Read the rows that the embedded prior folded, with [`prior_returns_buffer`](@ref). Drop the rows of a Shared Series gap with [`shared_series_buffer`](@ref), as the embedded prior and the members that fold drop them. Read the rows that remain with [`sample_buffer`](@ref), and call them `X`.
+ 2. Read the rows that the embedded prior folded, with [`prior_returns_buffer`](@ref). Drop the rows of a Shared Series gap with [`shared_series_buffer`](@ref), as the embedded prior and the members that fold drop them. A member that refits drops the fixed observation weights of the same rows, through [`buffer_refit_member`](@ref). Read the rows that remain with [`sample_buffer`](@ref), and call them `X`.
  3. Rebuild the Asset Panel of the rows from the same buffer with [`buffer_asset_panel`](@ref), and call it `pnl`. The batch method gives `rd.pnl` to both co-moments in the same way.
  4. Read `kt` out of `pe.kte` with [`read_comoment`](@ref) under `pr.w`. It refits the member over `X` and `pnl` when the member did not fold, and under `pr.w` when `pr.w` is not `nothing`.
  5. Read `sk` and `V` out of `pe.ske` with [`read_comoment`](@ref), in the same way.
@@ -1330,12 +1330,17 @@ The equality holds for the embedded result and for every co-moment, both the co-
 """
 function prior(pe::HighOrderPriorEstimator; kwargs...)
     pr = prior(pe.pe; kwargs...)
-    buf = shared_series_buffer(prior_returns_buffer(pe.pe))
+    state = prior_returns_buffer(pe.pe)
+    buf = shared_series_buffer(state)
+    # A co-moment that refits on the buffer loses the weights of the dropped observations
+    # (#1960).
+    kte = buffer_refit_member(pe.kte, state)
+    ske = buffer_refit_member(pe.ske, state)
     X = sample_buffer(buf)
     pnl = buffer_asset_panel(buf)
-    kt = read_comoment(cokurtosis, pe.kte, pr.w, X, pnl; kwargs...)
-    sk, V = read_comoment(coskewness, pe.ske, pr.w, X, pnl; kwargs...)
-    eoc = high_order_moment_counts(pe.ske, pe.kte, pr.w, scenario_rows(pr.w, X, pnl)[1],
+    kt = read_comoment(cokurtosis, kte, pr.w, X, pnl; kwargs...)
+    sk, V = read_comoment(coskewness, ske, pr.w, X, pnl; kwargs...)
+    eoc = high_order_moment_counts(ske, kte, pr.w, scenario_rows(pr.w, X, pnl)[1],
                                    size(pr.X, 1); kwargs...)
     return stamp_returns_source(assemble_high_order_prior(pe, pr, kt, sk, V, eoc), pe)
 end

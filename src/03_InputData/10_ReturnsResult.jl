@@ -969,6 +969,105 @@ function shared_series_cut(rd::ReturnsResult, x_src::Option{<:AbstractReturnsSou
     return benchmark_estimation_mask(rd, x_src)
 end
 """
+    shared_series_estimator(est, rows::Option{<:VecInt}, T::Integer) -> typeof(est)
+
+Return the estimator that a fit reads after a Shared Series gap, with each observation weight of the dropped observations dropped.
+
+[`shared_series_view`](@ref) drops the observations of a gap from every field of the returns data. An estimator can hold fixed observation weights, one for each observation of the full sample, at any depth of its tree: the weights of a covariance estimator inside a prior inside an optimiser, or the weights of a risk measure. [`observed_weights`](@ref) states the rule: an observation that the fit drops takes its weight with it, and the kept weights keep their type. So each fit that drops the rows also cuts the estimator that reads them, at the same rows.
+
+A [`DynamicAbstractWeights`](@ref) keeps its value, because it resolves on the sample that the fit reads, which has no gap left.
+
+# Algorithm
+
+ 1. Return `est` when `rows` is `nothing`, because the fit keeps every observation.
+ 2. Mark the kept observations in a mask of `T` entries, and cut `est` with [`obs_weights_view`](@ref) at the mask. Each weights field goes through [`obs_weights_index`](@ref), which checks that a weight vector has `T` entries.
+
+# Arguments
+
+  - `est`: The estimator of the fit: a prior, a regression, an uncertainty set, an optimiser, or a risk measure. Any other value comes back with no change.
+  - `rows`: The positions of the kept observations, from [`shared_series_rows`](@ref), or `nothing`.
+  - `T`: The number of observations of the full sample.
+
+# Validation
+
+  - Each fixed weight vector in the tree of `est` has `T` entries, as [`observed_weights`](@ref) checks. A `DimensionMismatch` that names `w` is thrown otherwise.
+
+# Returns
+
+  - `est`: The estimator with each fixed weight vector cut to the kept observations.
+
+# Examples
+
+```jldoctest
+julia> ce = Covariance(; w = aweights([1.0, 2.0, 3.0, 4.0]));
+
+julia> PortfolioOptimisers.shared_series_estimator(ce, [1, 3, 4], 4).w
+3-element AnalyticWeights{Float64, Float64, Vector{Float64}}:
+ 1.0
+ 3.0
+ 4.0
+```
+
+# Related
+
+  - [`shared_series_view`](@ref)
+  - [`shared_series_rows`](@ref)
+  - [`obs_weights_view`](@ref)
+  - [`observed_weights`](@ref)
+"""
+function shared_series_estimator(est, rows::Option{<:VecInt}, T::Integer)
+    if isnothing(rows)
+        return est
+    end
+    obs = falses(T)
+    obs[rows] .= true
+    return obs_weights_view(est, obs)
+end
+"""
+    shared_series_fit(est, rd::ReturnsResult, x_src::Option{<:AbstractReturnsSource},
+                      rf::Bool) -> Tuple{typeof(est), ReturnsResult}
+
+Return the estimator and the returns data that a fit reads, with the observations of a Shared Series gap dropped from both.
+
+This is [`shared_series_view`](@ref) for a fit that holds an estimator. The data loses the observations of the gap, and every fixed observation weight in the tree of `est` loses the same observations, through [`shared_series_estimator`](@ref). A fit that needs the kept rows after the cut, to record them, calls the three functions itself.
+
+# Algorithm
+
+ 1. Find the kept observations with [`shared_series_rows`](@ref).
+ 2. When it keeps every observation, return `est` and the data of [`shared_series_cut`](@ref).
+ 3. Otherwise count the observations of the Shared Series, cut `est` with [`shared_series_estimator`](@ref), and cut `rd` with [`shared_series_cut`](@ref).
+
+# Arguments
+
+  - `est`: The estimator of the fit.
+  - $(arg_dict[:rd])
+  - $(arg_dict[:x_src_read])
+  - `rf`: `true` when the fit reads the factor returns of `rd`.
+
+# Validation
+
+  - The rules of [`shared_series_cut`](@ref) and [`shared_series_estimator`](@ref).
+
+# Returns
+
+  - `est`: The estimator at the kept observations.
+  - `rd::ReturnsResult`: The returns data at the kept observations.
+
+# Related
+
+  - [`shared_series_view`](@ref)
+  - [`shared_series_estimator`](@ref)
+"""
+function shared_series_fit(est, rd::ReturnsResult, x_src::Option{<:AbstractReturnsSource},
+                           rf::Bool)
+    rows = shared_series_rows(rd, x_src, rf)
+    if isnothing(rows)
+        return est, shared_series_cut(rd, x_src, rows)
+    end
+    T = shared_series_length(shared_benchmark(rd.B, x_src), rf ? rd.F : nothing)
+    return shared_series_estimator(est, rows, T), shared_series_cut(rd, x_src, rows)
+end
+"""
     shared_series_gaps(rd::ReturnsResult, x_src::Option{<:AbstractReturnsSource}, rf::Bool)
         -> Option{BitVector}
 

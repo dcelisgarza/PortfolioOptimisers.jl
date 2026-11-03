@@ -415,6 +415,12 @@ Keywords correspond to the struct's fields.
   - `re`: Loadings sliced to the selected assets through [`port_opt_view`](@ref).
   - `sets`: Sliced through [`port_opt_view`](@ref), which keeps the selected entries of the **asset** axis and leaves the factor entries unchanged. The field takes a view because it can hold both axes. `rkb` takes no view, because a factor budget has no asset index.
 
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `re`: Recursively indexed through [`obs_weights_view`](@ref).
+
 # Related
 
   - [`RiskBudgetingAlgorithm`](@ref)
@@ -423,6 +429,7 @@ Keywords correspond to the struct's fields.
   - [`set_factor_risk_contribution_constraints!`](@ref)
   - [`risk_budget_universe_key`](@ref)
   - [`port_opt_view`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
@@ -433,7 +440,7 @@ Keywords correspond to the struct's fields.
     """
     $(field_dict[:re])
     """
-    @vprop re
+    @vprop @oprop re
     """
     $(field_dict[:rkb])
     """
@@ -637,6 +644,15 @@ Keywords correspond to the struct's fields. A field of the type [`TD`](@ref), [`
   - `fb` recurses through [`view_child`](@ref) with that matrix.
   - `wi` is sliced to the selected assets.
 
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `opt`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `r`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `rba`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `fb`: Recursively indexed through [`obs_weights_view`](@ref).
+
 # Related
 
   - [`optimise`](@ref)
@@ -650,6 +666,7 @@ Keywords correspond to the struct's fields. A field of the type [`TD`](@ref), [`
   - [`FactorRiskBudgeting`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
@@ -672,7 +689,7 @@ Keywords correspond to the struct's fields. A field of the type [`TD`](@ref), [`
     """
     $(field_dict[:rba])
     """
-    rba
+    @oprop rba
     """
     $(field_dict[:wi])
     """

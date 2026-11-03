@@ -759,6 +759,48 @@ The two measures have the same first four fields in the same order, `settings`, 
 const LoHiOrderMoment{T1, T2, T3, T4} = Union{LowOrderMoment{T1, T2, T3, T4},
                                               HighOrderMoment{T1, T2, T3, T4}}
 """
+    obs_weights_view(r::LowOrderMoment, i) -> LowOrderMoment
+    obs_weights_view(r::HighOrderMoment, i) -> HighOrderMoment
+
+Return the measure with its observation weights, and the weights of its children, cut to the observations `i`.
+
+The two measures are not [`@propagatable`](@ref), so they need these methods of [`obs_weights_view`](@ref). A cut of the observations of a fit, such as the drop of a Shared Series gap, then cuts the weights of the measure too, see [`shared_series_estimator`](@ref).
+
+# Algorithm
+
+ 1. Index `r.w` with [`obs_weights_index`](@ref).
+ 2. Cut `r.alg` with [`obs_weights_view`](@ref), and `r.ve` for a [`HighOrderMoment`](@ref).
+ 3. Build the measure again with its keyword constructor. `settings` and `mu` keep their values.
+
+# Arguments
+
+  - `r`: The risk measure.
+  - `i`: The observations to keep: a mask of the full sample, or their positions.
+
+# Validation
+
+  - The rules of [`obs_weights_index`](@ref).
+
+# Returns
+
+  - `r`: The measure at the kept observations.
+
+# Related
+
+  - [`LowOrderMoment`](@ref)
+  - [`HighOrderMoment`](@ref)
+  - [`obs_weights_view`](@ref)
+"""
+function obs_weights_view(r::LowOrderMoment, i)::LowOrderMoment
+    return LowOrderMoment(; settings = r.settings, w = obs_weights_index(r.w, i), mu = r.mu,
+                          alg = obs_weights_view(r.alg, i))
+end
+function obs_weights_view(r::HighOrderMoment, i)::HighOrderMoment
+    return HighOrderMoment(; settings = r.settings, w = obs_weights_index(r.w, i),
+                           mu = r.mu, alg = obs_weights_view(r.alg, i),
+                           ve = obs_weights_view(r.ve, i))
+end
+"""
     calc_moment_target(::LoHiOrderMoment{<:Any, Nothing, Nothing, <:Any},
                        ::Any, x::VecNum)
 

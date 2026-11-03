@@ -261,7 +261,11 @@ Sub-select an estimator's **observation weights** to the observations `i`.
 
  1. Return `x` with no change. This universal fallback reads neither its index nor the fields of `x`. An estimator that holds no weights, and an estimator whose struct is not [`@propagatable`](@ref), come back with no change.
 
-A [`@propagatable`](@ref) struct with at least one `@wprop` field has a generated method that is more specific than this one. That method builds the struct again with the same constructor. It indexes each `@wprop` field at `i` through [`nothing_scalar_array_getindex`](@ref), and it calls this verb on each `@fprop` field. A hand-written type that holds weights outside that tag must define its own method. If it does not, its weights keep the length of the full sample, and the call on a window raises an error.
+A [`@propagatable`](@ref) struct with at least one `@wprop`, `@fprop` or [`@oprop`](@ref) field has a generated method that is more specific than this one. That method builds the struct again with the same constructor. It indexes each `@wprop` field at `i` through [`obs_weights_index`](@ref), and it calls this verb on each `@fprop` and `@oprop` field. A hand-written type that holds weights or children outside these tags must define its own method. If it does not, its weights keep the length of the full sample, and the fit raises an error.
+
+# The index is a mask of the full sample or a set of positions
+
+[`shared_series_estimator`](@ref) passes a mask of the full sample, a vector of `Bool`, because a Shared Series gap drops observations from the returns data, and every reader of the fit must lose the same observations. A mask lets [`obs_weights_index`](@ref) check the length of each weight vector against the sample. A window passes the positions of its observations.
 
 # Arguments
 
@@ -280,7 +284,9 @@ A [`@propagatable`](@ref) struct with at least one `@wprop` field has a generate
   - [`PROP_TAG_CHANNELS`](@ref)
   - [`nothing_scalar_array_getindex`](@ref)
   - [`ObsWeights`](@ref)
-  - [`realised_vol`](@ref): the caller of this verb in the library.
+  - [`obs_weights_index`](@ref)
+  - [`shared_series_estimator`](@ref): the caller of this verb at a Shared Series gap.
+  - [`realised_vol`](@ref): a caller of this verb on a window.
 """
 obs_weights_view(x, ::Any) = x
 """
@@ -303,6 +309,79 @@ The result has the length of `x`, because `i` selects observations inside each e
 function obs_weights_view(x::AbstractVector{<:Union{Nothing, AbstractEstimator,
                                                     AbstractAlgorithm, AbstractResult}}, i)
     return [obs_weights_view(xi, i) for xi in x]
+end
+"""
+    obs_weights_index(w, i) -> typeof(w)
+    obs_weights_index(w, obs::AbstractVector{Bool}) -> typeof(w)
+
+Index one observation-weights field at the observations `i`, for [`obs_weights_view`](@ref).
+
+[`@propagatable`](@ref) calls this function on each [`@wprop`](@ref) field of the method that it makes for [`obs_weights_view`](@ref). A hand-written method of that verb calls it on each weights field of its own type.
+
+# Algorithm
+
+The method that Julia selects on the type of `i` is the algorithm.
+
+ 1. `i` is a mask of the full sample, a vector of `Bool`: return [`observed_weights(w, obs)`](@ref observed_weights). That method checks that a weight vector has one entry for each observation, so a weight vector of the wrong length raises an error and is not cut to a wrong vector with no message.
+ 2. `i` is any other index, such as the positions of a window: return [`nothing_scalar_array_getindex(w, i)`](@ref nothing_scalar_array_getindex). A window is a part of the sample that the caller chose, so its positions are inside the weights.
+
+Both methods keep the type of a `StatsBase.AbstractWeights`, keep a [`DynamicAbstractWeights`](@ref), and keep `nothing`.
+
+# Arguments
+
+  - $(arg_dict[:oow])
+  - `i`: The observations to keep: a mask of the full sample, or their positions.
+
+# Validation
+
+  - For a mask, the rules of [`observed_weights`](@ref).
+
+# Returns
+
+  - `w`: The weights at the kept observations.
+
+# Related
+
+  - [`obs_weights_view`](@ref)
+  - [`observed_weights`](@ref)
+  - [`nothing_scalar_array_getindex`](@ref)
+"""
+function obs_weights_index(w, i)
+    return nothing_scalar_array_getindex(w, i)
+end
+function obs_weights_index(w, obs::AbstractVector{Bool})
+    return observed_weights(w, obs)
+end
+"""
+    obs_weights_fields(x, i) -> typeof(x)
+
+Rebuild `x` with [`obs_weights_view`](@ref) applied to every field, through the keyword constructor of its type.
+
+A hand-written method of [`obs_weights_view`](@ref) calls this function for a type that is not [`@propagatable`](@ref) and whose fields hold estimators that read the observations, such as [`JuMPOptimiser`](@ref) and the uncertainty set estimators. A field that holds no estimator comes back with no change from the fallback of the verb. The function derives the field list from the type, so a new field joins the cut with no edit here.
+
+# Algorithm
+
+ 1. Apply [`obs_weights_view`](@ref) at `i` to each field of `x`, in the order of the struct.
+ 2. Call the keyword constructor of the type of `x` with every field name and its cut value.
+
+# Arguments
+
+  - `x`: A struct whose keyword constructor takes every field name as a keyword.
+  - `i`: The observations to keep: a mask of the full sample, or their positions.
+
+# Returns
+
+  - `x`: The struct at the kept observations.
+
+# Related
+
+  - [`obs_weights_view`](@ref)
+  - [`obs_weights_index`](@ref)
+"""
+function obs_weights_fields(x, i)
+    fns = fieldnames(typeof(x))
+    vals = map(f -> obs_weights_view(getfield(x, f), i), fns)
+    return Base.typename(typeof(x)).wrapper(; NamedTuple{fns}(vals)...)
 end
 """
     get_window(window::Option{<:Colon}, args...) -> Colon

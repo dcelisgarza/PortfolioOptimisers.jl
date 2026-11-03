@@ -40,7 +40,7 @@ end
     root = normpath(joinpath(@__DIR__, ".."))
 
     tags = (Symbol("@fprop"), Symbol("@vprop"), Symbol("@wprop"), Symbol("@pprop"),
-            Symbol("@cprop"))
+            Symbol("@cprop"), Symbol("@oprop"))
 
     # The struct a docstring documents, under any number of macros, or `nothing`.
     function documented_struct(ex)

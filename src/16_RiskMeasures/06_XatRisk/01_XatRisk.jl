@@ -660,6 +660,7 @@ Keywords correspond to the struct's fields.
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
   - `alg`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
@@ -667,6 +668,13 @@ Keywords correspond to the struct's fields.
 [`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
   - `alg`: Recursively viewed through [`port_opt_view`](@ref).
+
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
+  - `alg`: Recursively indexed through [`obs_weights_view`](@ref).
 
 # Functor
 
@@ -706,6 +714,7 @@ ValueatRisk
   - [`ValueatRiskRange`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
@@ -724,7 +733,7 @@ ValueatRisk
     """
     $(field_dict[:oow])
     """
-    @pprop w
+    @pprop @wprop w
     """
     $(field_dict[:alg])
     """
@@ -862,6 +871,7 @@ Keywords correspond to the struct's fields.
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
   - `alg`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
@@ -869,6 +879,13 @@ Keywords correspond to the struct's fields.
 [`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
   - `alg`: Recursively viewed through [`port_opt_view`](@ref).
+
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
+  - `alg`: Recursively indexed through [`obs_weights_view`](@ref).
 
 # Functor
 
@@ -907,6 +924,7 @@ ValueatRiskRange
   - [`ConditionalValueatRiskRange`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
@@ -930,7 +948,7 @@ ValueatRiskRange
     """
     $(field_dict[:oow])
     """
-    @pprop w
+    @pprop @wprop w
     """
     $(field_dict[:alg])
     """
@@ -1092,6 +1110,18 @@ Keywords correspond to the struct's fields.
   - If `s` is not `nothing`: `s > 0` and finite.
   - If both `b` and `s` are not `nothing`: `b > s`.
 
+## Propagated parameters
+
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
+
 # Functor
 
     (r::DrawdownatRisk)(x::VecNum)
@@ -1125,6 +1155,8 @@ DrawdownatRisk
   - [`RelativeDrawdownatRisk`](@ref)
   - [`MIPValueatRisk`](@ref)
   - [`empirical_value_at_risk`](@ref)
+  - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
@@ -1143,7 +1175,7 @@ DrawdownatRisk
     """
     $(field_dict[:oow])
     """
-    @pprop w
+    @pprop @wprop w
     """
     $(field_dict[:b_mip])
     """
@@ -1376,6 +1408,18 @@ Keywords correspond to the struct's fields.
   - If `alpha` is a number: `0 < alpha < 1`.
   - $(val_dict[:oow_rm])
 
+## Propagated parameters
+
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
+
 # Functor
 
     (r::RelativeDrawdownatRisk)(x::VecNum)
@@ -1404,6 +1448,8 @@ RelativeDrawdownatRisk
   - [`DrawdownatRisk`](@ref)
   - [`RelativeConditionalDrawdownatRisk`](@ref)
   - [`empirical_value_at_risk`](@ref)
+  - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
@@ -1421,7 +1467,7 @@ RelativeDrawdownatRisk
     """
     $(field_dict[:oow])
     """
-    @pprop w
+    @pprop @wprop w
     function RelativeDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                     alpha::Num_SigCal, w::Option{<:ObsWeights})
         assert_unit_interval(alpha, :alpha)

@@ -345,13 +345,25 @@ The loop inside `SubsetResampling` is over asset subsets, not over time folds. N
   - `fees` and `opt` recurse with the index and `X`.
   - `fb` recurses through [`view_child`](@ref) with the index and `X`.
 
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `pe`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `fees`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `opt`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `fb`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `cache`: Removed by [`obs_weights_view`](@ref), because a state has no slice on the observation axis.
+
 # Related
 
   - [`optimise`](@ref)
   - [`SubsetResamplingResult`](@ref)
   - [`BaseSubsetResamplingOptimisationEstimator`](@ref)
   - [`MeanRisk`](@ref)
+  - [`factory`](@ref)
   - [`port_opt_view`](@ref)
+  - [`obs_weights_view`](@ref)
   - [`subset_resampling_finaliser`](@ref)
   - [`PowerSubsetSize`](@ref)
 
@@ -363,7 +375,7 @@ The loop inside `SubsetResampling` is over asset subsets, not over time folds. N
     """
     $(field_dict[:pe])
     """
-    pe
+    @oprop pe
     """
     $(field_dict[:wb_jmp])
     """

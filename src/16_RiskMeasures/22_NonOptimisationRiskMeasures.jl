@@ -55,6 +55,18 @@ Keywords correspond to the struct's fields.
 
   - $(val_dict[:oow_rm])
 
+## Propagated parameters
+
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
+
 # Functor
 
     (r::MeanReturn)(x::VecNum)
@@ -81,6 +93,8 @@ MeanReturn
   - [`NonOptimisationRiskMeasure`](@ref)
   - [`MeanReturnRiskRatio`](@ref)
   - [`ExpectedReturn`](@ref): the expected return of a prior, which a `JuMP` optimiser reads.
+  - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
 """
 @propagatable @concrete struct MeanReturn <: NonOptimisationRiskMeasure
     """
@@ -90,7 +104,7 @@ MeanReturn
     """
     $(field_dict[:oow])
     """
-    @pprop w
+    @pprop @wprop w
     """
     If `true`, the measure takes the mean of `log1p.(x)`, the logarithmic returns. If `false`, it takes the mean of `x`.
     """
@@ -350,6 +364,18 @@ Keywords correspond to the struct's fields. A `w` that is not `nothing` is passe
 
     A stated `mu` is pinned. It crosses a Cross-Validation fold or a subset view as the value of the whole universe, so it does not follow the refit that the optimisation runs on. A caller who wants it to follow the fit names a **Deferred Quantity** in `mu`, or leaves the slot `nothing` and lets the prior supply it.
 
+## Propagated parameters
+
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
+
 # Functor
 
     (r::ThirdCentralMoment)(w::VecNum, X::MatNum, fees = nothing)
@@ -400,6 +426,8 @@ The second value is the first divided by the cube of the standard deviation of `
   - [`Skewness`](@ref): the third moment read from a coskewness matrix.
   - [`calc_moment_target`](@ref)
   - [`bigger_is_better`](@ref)
+  - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
 """
 @propagatable @concrete struct ThirdCentralMoment <: NonOptimisationRiskMeasure
     """
@@ -409,7 +437,7 @@ The second value is the first divided by the cube of the standard deviation of `
     """
     $(field_dict[:oow])
     """
-    @pprop w
+    @pprop @wprop w
     """
     $(field_dict[:mu_slot])
     """

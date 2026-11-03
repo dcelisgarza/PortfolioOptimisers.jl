@@ -61,6 +61,18 @@ Keywords correspond to the struct's fields.
 
   - $(val_dict[:oow_rm])
 
+## Propagated parameters
+
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
+
 # Functor
 
     (r::UlcerIndex)(x::VecNum)
@@ -103,6 +115,8 @@ julia> UlcerIndex(; w = pweights([1.0, 1.0, 1.0, 1.0, 4.0]))(x)
   - [`MaximumDrawdown`](@ref)
   - [`RelativeUlcerIndex`](@ref)
   - [`ulcer_index`](@ref)
+  - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
@@ -117,7 +131,7 @@ julia> UlcerIndex(; w = pweights([1.0, 1.0, 1.0, 1.0, 4.0]))(x)
     """
     $(field_dict[:oow])
     """
-    @pprop w
+    @pprop @wprop w
     function UlcerIndex(settings::RiskMeasureSettings, w::Option{<:ObsWeights})
         assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(w)}(settings, w)
@@ -231,6 +245,18 @@ Keywords correspond to the struct's fields.
 
   - $(val_dict[:oow_rm])
 
+## Propagated parameters
+
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
+
 # Functor
 
     (r::RelativeUlcerIndex)(x::VecNum)
@@ -269,6 +295,8 @@ true
   - [`UlcerIndex`](@ref)
   - [`RelativeAverageDrawdown`](@ref)
   - [`ulcer_index`](@ref)
+  - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
@@ -283,7 +311,7 @@ true
     """
     $(field_dict[:oow])
     """
-    @pprop w
+    @pprop @wprop w
     function RelativeUlcerIndex(settings::HierarchicalRiskMeasureSettings,
                                 w::Option{<:ObsWeights})
         assert_observation_weights(w, :w)
