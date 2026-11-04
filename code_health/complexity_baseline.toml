@@ -5,7 +5,7 @@
 julia = "1.13.3"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "b1d571f7a0"
+commit = "58e09f2643"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { cyc = 5, cog = 7, arg = 8, cyc_sum = 53, cog_sum = 57, arg_sum = 99, macros = [] }
@@ -141,7 +141,7 @@ commit = "b1d571f7a0"
 "src/05_Moments/30_RegimeAdjusted/08_SeparatePortfolioBias.jl" = { cyc = 5, cog = 6, arg = 6, cyc_sum = 22, cog_sum = 17, arg_sum = 31, macros = [] }
 "src/05_Moments/30_RegimeAdjusted/09_MahalanobisLevelClosure.jl" = { cyc = 6, cog = 7, arg = 8, cyc_sum = 45, cog_sum = 43, arg_sum = 63, macros = [] }
 "src/05_Moments/31_HigherMomentPartialFit.jl" = { cyc = 3, cog = 2, arg = 5, cyc_sum = 37, cog_sum = 16, arg_sum = 73, macros = [] }
-"src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl" = { cyc = 5, cog = 9, arg = 8, cyc_sum = 91, cog_sum = 58, arg_sum = 73, macros = [] }
+"src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl" = { cyc = 5, cog = 9, arg = 8, cyc_sum = 88, cog_sum = 60, arg_sum = 119, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/02_CrossSectionalWeights.jl" = { cyc = 5, cog = 6, arg = 4, cyc_sum = 28, cog_sum = 22, arg_sum = 5, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/03_CrossSectionalFactorModel.jl" = { cyc = 8, cog = 15, arg = 25, cyc_sum = 80, cog_sum = 39, arg_sum = 77, macros = ["@forward_properties"] }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/01_Base_Descriptor.jl" = { cyc = 7, cog = 12, arg = 8, cyc_sum = 46, cog_sum = 39, arg_sum = 26, macros = [] }
@@ -181,7 +181,7 @@ commit = "b1d571f7a0"
 "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { cyc = 6, cog = 8, arg = 5, cyc_sum = 55, cog_sum = 51, arg_sum = 52, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/11_CrossSectionalIdiosyncraticDiagnostics.jl" = { cyc = 6, cog = 8, arg = 4, cyc_sum = 61, cog_sum = 67, arg_sum = 65, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/12_CrossSectionalExposureIC.jl" = { cyc = 11, cog = 15, arg = 7, cyc_sum = 44, cog_sum = 49, arg_sum = 68, macros = [] }
-"src/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalLeverage.jl" = { cyc = 3, cog = 3, arg = 3, cyc_sum = 23, cog_sum = 11, arg_sum = 3, macros = [] }
+"src/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalLeverage.jl" = { cyc = 4, cog = 4, arg = 5, cyc_sum = 39, cog_sum = 19, arg_sum = 18, macros = [] }
 "src/05_Moments/33_CoverageUniverse.jl" = { cyc = 7, cog = 12, arg = 9, cyc_sum = 125, cog_sum = 76, arg_sum = 254, macros = [] }
 "src/05_Moments/34_PriceLevelExpectedReturns.jl" = { cyc = 9, cog = 13, arg = 6, cyc_sum = 97, cog_sum = 77, arg_sum = 103, macros = [] }
 "src/05_Moments/35_CompositePriceLevelStatistics.jl" = { cyc = 7, cog = 10, arg = 5, cyc_sum = 67, cog_sum = 57, arg_sum = 61, macros = [] }

@@ -358,6 +358,232 @@ function cross_sectional_least_squares(::AbstractRegressionTarget)::Bool
     return false
 end
 """
+    cross_sectional_qr(D::MatNum, F::Nothing) -> LinearAlgebra.QRPivoted
+    cross_sectional_qr(D::MatNum, F) -> typeof(F)
+    cross_sectional_qr(D::MatNum, F::Nothing, Q::MatNum) -> LinearAlgebra.QRPivoted
+
+Return the column-pivoted `QR` of the weighted design `D`, or the factorisation `F` that the caller already took.
+
+The leverage check, the solve and the mark of the dropped columns of one observation read one factorisation. The first reader that runs takes it, and every later reader receives it.
+
+`LinearAlgebra.qr` copies `D` into a new matrix and factorises the copy in place. With a buffer `Q`, the method copies `D` into `Q` and factorises `Q` in place, which is the same computation, so a loop over observations factorises into one allocation.
+
+# Arguments
+
+  - `D::MatNum`: Weighted design of one observation, `eligible assets × factors`.
+  - `F`: Column-pivoted `QR` of `D`, or `nothing`.
+  - `Q::MatNum`: A buffer of the size and the element type of `D`, which receives the factors. The factorisation reads it until the caller writes it again.
+
+# Returns
+
+  - `F`: `LinearAlgebra.qr(D, LinearAlgebra.ColumnNorm())`, or the factorisation that the caller passed.
+
+# Related
+
+  - [`cross_sectional_solve`](@ref)
+  - [`cross_sectional_leverage_one`](@ref)
+  - [`cross_sectional_regression`](@ref)
+"""
+function cross_sectional_qr(D::MatNum, ::Nothing)
+    return LinearAlgebra.qr(D, LinearAlgebra.ColumnNorm())
+end
+function cross_sectional_qr(::MatNum, F)
+    return F
+end
+function cross_sectional_qr(D::MatNum, ::Nothing, Q::MatNum)
+    copyto!(Q, D)
+    return LinearAlgebra.qr!(Q, LinearAlgebra.ColumnNorm())
+end
+"""
+    cross_sectional_gram_factor(D::MatNum) -> Option{<:LinearAlgebra.CholeskyPivoted}
+    cross_sectional_gram_factor(D::MatNum, gram) -> Option{<:LinearAlgebra.CholeskyPivoted}
+
+Return the pivoted Cholesky factorisation of the Gram matrix of a weighted design, or `nothing` when [`NormalEquationsSolve`](@ref) must not solve the normal equations of the design.
+
+The ratio of the first to the last diagonal entry of the factor estimates the condition number of the design, as the diagonal of the `R` of a column-pivoted `QR` does. The verb passes the factorisation when the estimate is at most ``\\epsilon^{-1/4}``. The condition number of the Gram matrix is then at most ``\\epsilon^{-1/2}``, so the normal equations keep at least about half of the digits of the element type.
+
+`LinearAlgebra.cholesky` factorises a copy of the Gram matrix. With a buffer `gram` of the element type of a design of BLAS type, the verb forms the Gram matrix in the buffer and factorises it there, which is the same computation, so a loop over observations allocates neither matrix.
+
+# Algorithm
+
+ 1. Return `nothing` for a design with no row or no column.
+ 2. Form the Gram matrix `G = D' * D`, in `gram` when it is a buffer of the element type of `D` and `D` is of BLAS type, and take its factorisation with `LinearAlgebra.RowMaximum()` and the tolerance `sqrt(eps) * maximum(diag(G))` on the pivots, in place in that buffer. A pivot is the square of a diagonal entry of the factor, so the tolerance bounds the ratio of the entries by ``\\epsilon^{-1/4}``.
+ 3. Return the factorisation when its rank is the factor count, and `nothing` otherwise.
+
+# Arguments
+
+  - `D::MatNum`: Weighted design of one observation, `eligible assets × factors`.
+  - `gram`: A `factors × factors` buffer, overwritten with the factor, or `nothing`.
+
+# Returns
+
+  - `C::Option{<:LinearAlgebra.CholeskyPivoted}`: The factorisation, or `nothing`.
+
+# Related
+
+  - [`NormalEquationsSolve`](@ref)
+  - [`cross_sectional_normal_solve`](@ref)
+  - [`cross_sectional_solve`](@ref)
+  - [`cross_sectional_target_solve`](@ref)
+"""
+function cross_sectional_gram_factor(D::MatNum)
+    if iszero(size(D, 1)) || iszero(size(D, 2))
+        return nothing
+    end
+    G = LinearAlgebra.Hermitian(D' * D)
+    tol = sqrt(eps(real(eltype(G)))) * maximum(real, LinearAlgebra.diag(G))
+    C = LinearAlgebra.cholesky(G, LinearAlgebra.RowMaximum(); tol = tol, check = false)
+    return C.rank == size(D, 2) ? C : nothing
+end
+function cross_sectional_gram_factor(D::MatNum, ::Any)
+    return cross_sectional_gram_factor(D)
+end
+function cross_sectional_gram_factor(D::StridedMatrix{T},
+                                     gram::Matrix{T}) where {T <: LinearAlgebra.BlasFloat}
+    if iszero(size(D, 1)) || iszero(size(D, 2))
+        return nothing
+    end
+    # The steps of `cholesky(Hermitian(D' * D), RowMaximum())`, in the buffer.
+    LinearAlgebra.mul!(gram, D', D)
+    tol = sqrt(eps(real(T))) * maximum(real, LinearAlgebra.diag(gram))
+    C = LinearAlgebra.cholesky!(LinearAlgebra.Hermitian(gram), LinearAlgebra.RowMaximum();
+                                tol = tol, check = false)
+    return C.rank == size(D, 2) ? C : nothing
+end
+"""
+    cross_sectional_normal_solve(C, A::MatNum, y::VecNum, v) -> VecNum
+
+Return the answer of the normal equations of a weighted design through the pivoted Cholesky factorisation of its Gram matrix, `C \\ (A' * y)`.
+
+`C \\ (A' * y)` forms `A' * y` in a new vector and solves on a copy of it. With a buffer `v` of the element type of a factorisation of BLAS type, the verb takes the same steps in `v`, so the answer has the same bits and a loop over observations forms the right side into one allocation.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. No buffer, or one of another element type: return `C \\ (A' * y)`.
+ 2. A buffer: write `A' * y` into `v`, solve in place with `LinearAlgebra.ldiv!`, and return a copy of `v`.
+
+# Arguments
+
+  - `C`: Pivoted Cholesky factorisation of `A' * A`, as [`cross_sectional_gram_factor`](@ref) returns it.
+  - `A::MatNum`: Weighted design of one observation, `eligible assets × factors`.
+  - `y::VecNum`: Weighted target of the observation.
+  - `v`: A buffer of length `size(A, 2)`, overwritten, or `nothing`.
+
+# Returns
+
+  - `f::VecNum`: Factor returns of the observation, of length `size(A, 2)`.
+
+# Related
+
+  - [`NormalEquationsSolve`](@ref)
+  - [`cross_sectional_gram_factor`](@ref)
+  - [`cross_sectional_solve`](@ref)
+"""
+function cross_sectional_normal_solve(C, A::MatNum, y::VecNum, ::Any)::VecNum
+    return C \ (A' * y)
+end
+function cross_sectional_normal_solve(C::LinearAlgebra.CholeskyPivoted{T},
+                                      A::StridedMatrix{T}, y::StridedVector{T},
+                                      v::Vector{T})::VecNum where {T <:
+                                                                   LinearAlgebra.BlasFloat}
+    LinearAlgebra.mul!(v, A', y)
+    LinearAlgebra.ldiv!(C, v)
+    return copy(v)
+end
+"""
+    cross_sectional_full_solve(F, A::MatNum, y::VecNum) -> VecNum
+    cross_sectional_full_solve(F, A::MatNum, y::VecNum, b::Option{<:AbstractVector}) -> VecNum
+
+Return the least-squares answer of a weighted design of full rank, through the column-pivoted `QR` that the caller already took.
+
+`A \\ y` factorises a design that is not square through `LinearAlgebra.qr(A, LinearAlgebra.ColumnNorm())`, so the solve through `F` is the same computation with no second factorisation. A square design takes `A \\ y`, which factorises it by `LU`, so the answer is the one that `A \\ y` gives on every shape.
+
+`F \\ y` copies `y` into a new work vector and solves in place on it. With a work vector `b` of the element type of `F` and `y`, the solve takes the same steps in `b`, so the answer has the same bits and a loop over observations allocates the work vector once.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. No work vector, or one whose element type differs from that of `F` or `y`: return `A \\ y` on a square design and `F \\ y` otherwise.
+ 2. A work vector of the element type of a column-pivoted `QR` of BLAS type: on a square design return `A \\ y`. Otherwise zero the entries of `b` past `size(A, 1)` up to `size(A, 2)`, copy `y` into its first entries, solve in place with `LinearAlgebra.ldiv!`, and return the first `size(A, 2)` entries.
+
+# Arguments
+
+  - `F`: Column-pivoted `QR` of `A`, as `LinearAlgebra.qr(A, LinearAlgebra.ColumnNorm())` returns it.
+  - `A::MatNum`: Weighted design of one observation, `eligible assets × factors`, of full rank.
+  - `y::VecNum`: Weighted target of the observation.
+  - `b`: A work vector of length at least `max(size(A)...)`, overwritten, or `nothing`.
+
+# Returns
+
+  - `f::VecNum`: Factor returns of the observation, of length `size(A, 2)`.
+
+# Related
+
+  - [`cross_sectional_solve`](@ref)
+  - [`cross_sectional_rank`](@ref)
+  - [`cross_sectional_loop_buffers`](@ref)
+"""
+function cross_sectional_full_solve(F, A::MatNum, y::VecNum)::VecNum
+    return size(A, 1) == size(A, 2) ? A \ y : F \ y
+end
+function cross_sectional_full_solve(F, A::MatNum, y::VecNum,
+                                    ::Option{<:AbstractVector})::VecNum
+    return cross_sectional_full_solve(F, A, y)
+end
+function cross_sectional_full_solve(F::LinearAlgebra.QRPivoted{T, <:StridedMatrix},
+                                    A::MatNum, y::AbstractVector{T},
+                                    b::Vector{T})::VecNum where {T <:
+                                                                 LinearAlgebra.BlasFloat}
+    if size(A, 1) == size(A, 2)
+        return A \ y
+    end
+    m, n = size(F)
+    # The steps of `F \ y`: the rows of a wide design past `m` start at zero, `y` fills the
+    # first `m`, and `ldiv!` reads and writes only the first `max(m, n)`.
+    fill!(view(b, (m + 1):max(m, n)), zero(T))
+    copyto!(b, 1, y, 1, m)
+    LinearAlgebra.ldiv!(F, b)
+    return b[1:n]
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Refuse the weighted design of one observation when its rank falls short of its factor count.
+
+[`RankDeficiencyRefusal`](@ref) reads it under both cross-sectional regression estimators, so the two refuse the same observation with the same message.
+
+# Arguments
+
+  - `D::MatNum`: Weighted design of one observation, `eligible assets × factors`.
+  - `t::Integer`: Index of the observation, named by the refusal.
+  - `R::MatNum`: Triangular factor of the column-pivoted `QR` of `D`. A caller that solves through the factorisation passes it, so the design is factorised once.
+
+# Validation
+
+  - [`cross_sectional_rank`](@ref) of `D` equals `size(D, 2)`. The `ArgumentError` names the observation, the rank, the factor count and the count of eligible assets.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`RankDeficiencyRefusal`](@ref)
+  - [`cross_sectional_solve`](@ref)
+  - [`cross_sectional_target_solve`](@ref)
+"""
+function assert_cross_sectional_rank(D::MatNum, t::Integer;
+                                     R::MatNum = LinearAlgebra.qr(D,
+                                                                  LinearAlgebra.ColumnNorm()).R)::Nothing
+    r = cross_sectional_rank(D; R = R)
+    @argcheck(r == size(D, 2),
+              ArgumentError("the weighted design of observation $t has rank $r over $(size(D, 2)) factors and $(size(D, 1)) eligible assets, so its weighted least squares has no unique solution. Use PseudoInverseFallback() to take the minimum-norm solution, DependentColumnDrop() to give the dependent factors a return of zero, UncheckedSolve() to take the answer unchecked, or widen the eligible cross-section"))
+    return nothing
+end
+"""
     cross_sectional_shared_qr(h1::Nothing, dc::Nothing,
                               alg::AbstractCrossSectionalSolveAlgorithm, D::MatNum,
                               Q::MatNum) -> Nothing

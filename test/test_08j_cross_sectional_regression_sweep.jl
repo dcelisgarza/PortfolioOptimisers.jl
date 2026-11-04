@@ -318,16 +318,34 @@ end
             # of another element type falls back to `F \ y`.
             y = randn(rng, T, 9)
             b = fill(T(NaN), 12)
+            ws = (; b = b, gram = fill(T(NaN), 4, 4), v = fill(T(NaN), 4))
             @test PO.cross_sectional_full_solve(F1, D, y, b) == F0 \ y
-            @test PO.cross_sectional_solve(pif, D, y, 1, F1, b) ==
+            @test PO.cross_sectional_solve(pif, D, y, 1, F1, ws) ==
                   PO.cross_sectional_solve(pif, D, y, 1)
             Dw, yw = randn(rng, T, 3, 4), randn(rng, T, 3)
             Fw = qr(Dw, ColumnNorm())
             @test PO.cross_sectional_full_solve(Fw, Dw, yw, b) == Fw \ yw
             @test PO.cross_sectional_full_solve(F0, D, y, zeros(BigFloat, 12)) == F0 \ y
-            # The root drops `F` and `b`, so a member of a caller implements four arguments.
-            @test PO.cross_sectional_solve(NormalEquationsSolve(), D, y, 1, F1, b) ==
-                  PO.cross_sectional_solve(NormalEquationsSolve(), D, y, 1)
+            # The normal equations: the Gram matrix and its factor in `gram`, the right side
+            # in `v`, each with the bits of `cholesky` and `C \ (A' * y)`.
+            C0 = PO.cross_sectional_gram_factor(D)
+            C1 = PO.cross_sectional_gram_factor(D, ws.gram)
+            # The factor is the upper triangle. `cholesky` leaves the strict lower triangle of
+            # its copy uninitialised and the buffer keeps the Gram matrix there, and no reader
+            # of the factorisation reads it.
+            @test C1.U == C0.U && C1.piv == C0.piv && C1.rank == C0.rank
+            @test isnothing(PO.cross_sectional_gram_factor(zeros(T, 0, 4), ws.gram))
+            @test PO.cross_sectional_normal_solve(C1, D, y, ws.v) == C0 \ (D' * y)
+            nes = NormalEquationsSolve()
+            @test PO.cross_sectional_solve(nes, D, y, 1, F1, ws) ==
+                  PO.cross_sectional_solve(nes, D, y, 1)
+            # A rank-deficient design falls back to the pseudo-inverse with the same `QR`.
+            Dd = hcat(D[:, 1:3], D[:, 1])
+            @test PO.cross_sectional_solve(nes, Dd, y, 1, qr(Dd, ColumnNorm()), ws) ==
+                  PO.cross_sectional_solve(pif, Dd, y, 1)
+            # The root drops `F` and `ws`, so a member of a caller implements four arguments.
+            @test PO.cross_sectional_solve(CsrsUserSolve(), D, y, 1, F1, ws) ==
+                  PO.cross_sectional_solve(CsrsUserSolve(), D, y, 1)
         end
     end
 
