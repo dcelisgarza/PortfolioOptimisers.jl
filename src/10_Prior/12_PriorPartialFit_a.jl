@@ -670,38 +670,46 @@ function reads_panel_fields(pe::OpinionPoolingPrior)
     return any(reads_panel_fields, (pe.pe1, pe.pe2, pe.pes...))
 end
 """
-    reads_exogenous_series(est::AbstractEstimator) -> false
-    reads_exogenous_series(est::Nothing) -> false
-    reads_exogenous_series(ests::AbstractVector) -> Bool
-    reads_exogenous_series(xe::Union{CurrencyExposure, ObservedExposure}) -> true
-    reads_exogenous_series(de::EWMacroSensitivity) -> Bool
-    reads_exogenous_series(xe::CompositeExposure) -> Bool
-    reads_exogenous_series(ds::DescriptorScores) -> Bool
+    reads_exogenous_series(est::AbstractEstimator, rd::Option{<:ReturnsResult} = nothing) -> false
+    reads_exogenous_series(est::Nothing, rd::Option{<:ReturnsResult} = nothing) -> false
+    reads_exogenous_series(ests::AbstractVector, rd::Option{<:ReturnsResult} = nothing) -> Bool
+    reads_exogenous_series(xe::ObservedExposure, rd::Option{<:ReturnsResult} = nothing) -> true
+    reads_exogenous_series(xe::CurrencyExposure, rd::Nothing = nothing) -> true
+    reads_exogenous_series(xe::CurrencyExposure, rd::ReturnsResult) -> Bool
+    reads_exogenous_series(de::EWMacroSensitivity, rd::Option{<:ReturnsResult} = nothing) -> Bool
+    reads_exogenous_series(xe::CompositeExposure, rd::Option{<:ReturnsResult} = nothing) -> Bool
+    reads_exogenous_series(ds::DescriptorScores, rd::Option{<:ReturnsResult} = nothing) -> Bool
     reads_exogenous_series(rfe::Union{FixedWeightedReturnForecast, ExpWeightedReturnForecast,
-                                      TargetReturnForecast}) -> Bool
-    reads_exogenous_series(pe::CrossSectionalFactorPrior) -> Bool
-    reads_exogenous_series(pe::Online) -> Bool
+                                      TargetReturnForecast},
+                           rd::Option{<:ReturnsResult} = nothing) -> Bool
+    reads_exogenous_series(pe::CrossSectionalFactorPrior, rd::Option{<:ReturnsResult} = nothing)
+        -> Bool
+    reads_exogenous_series(pe::Online, rd::Option{<:ReturnsResult} = nothing) -> Bool
     reads_exogenous_series(pe::Union{HighOrderPriorEstimator, BlackLittermanPrior,
                                      BayesianBlackLittermanPrior,
                                      HighOrderFactorPriorEstimator,
-                                     MeucciEntropyPoolingPrior, EntropyPoolingPrior}) -> Bool
-    reads_exogenous_series(pe::AugmentedBlackLittermanPrior) -> Bool
-    reads_exogenous_series(pe::OpinionPoolingPrior) -> Bool
+                                     MeucciEntropyPoolingPrior, EntropyPoolingPrior},
+                           rd::Option{<:ReturnsResult} = nothing) -> Bool
+    reads_exogenous_series(pe::AugmentedBlackLittermanPrior,
+                           rd::Option{<:ReturnsResult} = nothing) -> Bool
+    reads_exogenous_series(pe::OpinionPoolingPrior, rd::Option{<:ReturnsResult} = nothing)
+        -> Bool
 
-Answers whether the fit of an estimator reads the Exogenous Series `rd.E`, from its estimator tree.
+Answers whether the fit of an estimator reads the Exogenous Series `rd.E`, from its estimator tree, and on the data of a step when `rd` is given.
 
 A prior that reads the series needs it at every fitted row, so for it the series is sample and not fold context. The refit route of the online step and the carry fold of a [`CrossSectionalFactorPrior`](@ref) read this predicate. Each gives the series to the buffer of a prior whose tree reads it, and refuses a step of such a prior that brings no series. The buffer then records every column of the series, and the Fold Context reads the series back from it.
 
-The predicate is per type, so a member that reads the series answers for itself, whatever abstract type it has. An observed member, [`CurrencyExposure`](@ref) or [`ObservedExposure`](@ref), reads the return of its factor from the series. An [`EWMacroSensitivity`](@ref) that names a column in `series` reads its reference return from the series, and one with `series = nothing` reads none. A member that holds Descriptors answers for them, and so does a Return Forecast Estimator through its [`DescriptorScores`](@ref). A [`CrossSectionalFactorPrior`](@ref) answers for its factor list and its Return Forecast Estimator. Each outer prior answers for the prior it embeds, as [`reads_panel_fields`](@ref) does, and an [`Online`](@ref) answers for the estimator it wraps. A caller's own member that reads the series must define a method that answers `true`.
+The predicate is per type, so a member that reads the series answers for itself, whatever abstract type it has. An observed member, [`CurrencyExposure`](@ref) or [`ObservedExposure`](@ref), reads the return of its factor from the series. A [`CurrencyExposure`](@ref) reads no series when every level of its Panel Field is its base currency, and the levels come from the data. So without `rd` it answers `true`, and with `rd` it answers whether it names a series on `rd`, with [`observed_series`](@ref). Every other member answers the same with or without `rd`, and each node of the tree passes `rd` to its parts. An [`EWMacroSensitivity`](@ref) that names a column in `series` reads its reference return from the series, and one with `series = nothing` reads none. A member that holds Descriptors answers for them, and so does a Return Forecast Estimator through its [`DescriptorScores`](@ref). A [`CrossSectionalFactorPrior`](@ref) answers for its factor list and its Return Forecast Estimator. Each outer prior answers for the prior it embeds, as [`reads_panel_fields`](@ref) does, and an [`Online`](@ref) answers for the estimator it wraps. A caller's own member that reads the series must define a method that answers `true`.
 
 # Arguments
 
   - `est`: An estimator of the tree, or `nothing`.
   - `ests`: A vector of estimators.
+  - `rd`: The returns data of a step, or `nothing` to answer from the configuration alone.
 
 # Returns
 
-  - `reads::Bool`: `true` when the tree holds a member that reads the Exogenous Series.
+  - `reads::Bool`: `true` when the tree holds a member that reads the Exogenous Series, on `rd` when it is given.
 
 # Related
 
@@ -710,45 +718,58 @@ The predicate is per type, so a member that reads the series answers for itself,
   - [`exogenous_step_kwargs`](@ref)
   - [`ReturnsResult`](@ref)
 """
-function reads_exogenous_series(::AbstractEstimator)
+function reads_exogenous_series(::AbstractEstimator, ::Option{<:ReturnsResult} = nothing)
     return false
 end
-function reads_exogenous_series(::Nothing)
+function reads_exogenous_series(::Nothing, ::Option{<:ReturnsResult} = nothing)
     return false
 end
-function reads_exogenous_series(ests::AbstractVector)
-    return any(reads_exogenous_series, ests)
+function reads_exogenous_series(ests::AbstractVector, rd::Option{<:ReturnsResult} = nothing)
+    return any(e -> reads_exogenous_series(e, rd), ests)
 end
-function reads_exogenous_series(::Union{CurrencyExposure, ObservedExposure})
+function reads_exogenous_series(::ObservedExposure, ::Option{<:ReturnsResult} = nothing)
     return true
 end
-function reads_exogenous_series(de::EWMacroSensitivity)
+function reads_exogenous_series(::CurrencyExposure, ::Nothing = nothing)
+    return true
+end
+function reads_exogenous_series(xe::CurrencyExposure, rd::ReturnsResult)
+    return !isempty(observed_series(xe, rd))
+end
+function reads_exogenous_series(de::EWMacroSensitivity, ::Option{<:ReturnsResult} = nothing)
     return !isnothing(de.series)
 end
-function reads_exogenous_series(xe::Union{CompositeExposure, DescriptorScores})
-    return reads_exogenous_series(xe.descriptors)
+function reads_exogenous_series(xe::Union{CompositeExposure, DescriptorScores},
+                                rd::Option{<:ReturnsResult} = nothing)
+    return reads_exogenous_series(xe.descriptors, rd)
 end
 function reads_exogenous_series(rfe::Union{FixedWeightedReturnForecast,
-                                           ExpWeightedReturnForecast, TargetReturnForecast})
-    return reads_exogenous_series(rfe.scores)
+                                           ExpWeightedReturnForecast, TargetReturnForecast},
+                                rd::Option{<:ReturnsResult} = nothing)
+    return reads_exogenous_series(rfe.scores, rd)
 end
-function reads_exogenous_series(pe::CrossSectionalFactorPrior)
-    return reads_exogenous_series(map(last, pe.factors)) || reads_exogenous_series(pe.rfe)
+function reads_exogenous_series(pe::CrossSectionalFactorPrior,
+                                rd::Option{<:ReturnsResult} = nothing)
+    return reads_exogenous_series(map(last, pe.factors), rd) ||
+           reads_exogenous_series(pe.rfe, rd)
 end
-function reads_exogenous_series(pe::Online)
-    return reads_exogenous_series(pe.est)
+function reads_exogenous_series(pe::Online, rd::Option{<:ReturnsResult} = nothing)
+    return reads_exogenous_series(pe.est, rd)
 end
 function reads_exogenous_series(pe::Union{HighOrderPriorEstimator, BlackLittermanPrior,
                                           BayesianBlackLittermanPrior,
                                           HighOrderFactorPriorEstimator,
-                                          MeucciEntropyPoolingPrior, EntropyPoolingPrior})
-    return reads_exogenous_series(pe.pe)
+                                          MeucciEntropyPoolingPrior, EntropyPoolingPrior},
+                                rd::Option{<:ReturnsResult} = nothing)
+    return reads_exogenous_series(pe.pe, rd)
 end
-function reads_exogenous_series(pe::AugmentedBlackLittermanPrior)
-    return reads_exogenous_series(pe.a_pe)
+function reads_exogenous_series(pe::AugmentedBlackLittermanPrior,
+                                rd::Option{<:ReturnsResult} = nothing)
+    return reads_exogenous_series(pe.a_pe, rd)
 end
-function reads_exogenous_series(pe::OpinionPoolingPrior)
-    return any(reads_exogenous_series, (pe.pe1, pe.pe2, pe.pes...))
+function reads_exogenous_series(pe::OpinionPoolingPrior,
+                                rd::Option{<:ReturnsResult} = nothing)
+    return any(p -> reads_exogenous_series(p, rd), (pe.pe1, pe.pe2, pe.pes...))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1372,7 +1393,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads the keywords that the refit route of a prior, and the carry fold of a [`CrossSectionalFactorPrior`](@ref), fold from the Exogenous Series of a step, and refuses a step that brings no series to a prior that reads it.
 
-A prior whose tree reads the series, as [`reads_exogenous_series`](@ref) answers, owns it on the online step. Its buffer records every column of `rd.E` and the names `rd.ne`, and the first step fixes the names. A step that brings no series would leave the buffer with rows that the fit cannot read, so it is refused. A prior that reads no series gives no keyword, and the Fold Context keeps the series. A non-finite value of the series is not refused here. The fit refuses it on the rows that it reads, and a later cap can drop such a row.
+A prior whose tree reads the series, as [`reads_exogenous_series`](@ref) answers, owns it on the online step. Its buffer records every column of `rd.E` and the names `rd.ne`, and the first step fixes the names. A step that brings no series would leave the buffer with rows that the fit cannot read, so it is refused when the fit reads a series on the data of the step, as `reads_exogenous_series(pe, rd)` answers. A [`CurrencyExposure`](@ref) whose every level is its base currency reads none, so such a step gives no keyword, and the buffer records no series. The first step fixes whether the buffer records the series, and the buffer refuses a later step that disagrees. A prior that reads no series gives no keyword, and the Fold Context keeps the series. A non-finite value of the series is not refused here. The fit refuses it on the rows that it reads, and a later cap can drop such a row.
 
 # Arguments
 
@@ -1381,11 +1402,11 @@ A prior whose tree reads the series, as [`reads_exogenous_series`](@ref) answers
 
 # Validation
 
-  - `rd.E` is not `nothing` when `reads_exogenous_series(pe)` is `true`. An `IsNothingError` is thrown otherwise.
+  - `rd.E` is not `nothing` when `reads_exogenous_series(pe, rd)` is `true`. An `IsNothingError` is thrown otherwise.
 
 # Returns
 
-  - `kwargs::NamedTuple`: `ne` and `E` of `rd` when the prior reads the series, and an empty `NamedTuple` otherwise.
+  - `kwargs::NamedTuple`: `ne` and `E` of `rd` when the prior reads the series and the step carries it, and an empty `NamedTuple` otherwise.
 
 # Related
 
@@ -1397,8 +1418,16 @@ function exogenous_step_kwargs(pe::AbstractPriorEstimator, rd::ReturnsResult)
     if !reads_exogenous_series(pe)
         return (;)
     end
-    @argcheck(!isnothing(rd.E),
+    return exogenous_step_kwargs(pe, rd, rd.E)
+end
+function exogenous_step_kwargs(pe::AbstractPriorEstimator, rd::ReturnsResult, ::Nothing)
+    # A tree can read no series on the data of a step, as a Currency Exposure whose every
+    # level is its base currency reads none, so only a step whose fit reads one is refused.
+    @argcheck(!reads_exogenous_series(pe, rd),
               IsNothingError("the estimator tree of `$(nameof(typeof(pe)))` reads the Exogenous Series, which its buffer records at every step, and this step carries no `rd.E`. Give every step the series, with one column per name that the first step fixed."))
+    return (;)
+end
+function exogenous_step_kwargs(::AbstractPriorEstimator, rd::ReturnsResult, ::MatNum)
     return (; ne = rd.ne, E = rd.E)
 end
 """

@@ -17,7 +17,7 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ## `observed_series`
 
-  - `observed_series(xe::MyObservedExposure, rd::ReturnsResult) -> Vector{String}`: The name of the column of `rd.E` that holds the return of each factor of the member, in column order.
+  - `observed_series(xe::MyObservedExposure, rd::ReturnsResult) -> Vector{String}`: The name of the column of `rd.E` that holds the return of each factor of the member, in column order. An empty vector states that the member gives no factor on `rd`, and the prior then fits as if the member were not in its factor list.
 
 ### Arguments
 
@@ -187,7 +187,7 @@ A universe held across currencies earns, in the base currency, the return of eac
 
 The factors are observed. The return of each is the Currency Excess Return of its currency, which the prior reads from the Exogenous Series `rd.E` by the currency level, for example `\"USD\"`. [`currency_excess_index`](@ref) builds the level series that [`prices_to_returns`](@ref) converts to those returns.
 
-The base currency earns no Currency Excess Return, so its index is constant and a factor of it would have no variance. `base` names it. The member then gives the base currency no factor, and an asset of the base currency carries a zero exposure on every Currency Factor, so its local return is its base-currency return. No rule refuses a factor of the base currency, but its zero variance makes the default covariance of the factor prior throw, because it divides by a zero volatility.
+The base currency earns no Currency Excess Return, so its index is constant and a factor of it would have no variance. `base` names it. The member then gives the base currency no factor, and an asset of the base currency carries a zero exposure on every Currency Factor, so its local return is its base-currency return. No rule refuses a factor of the base currency. Its zero variance gives a zero row and a zero column in the factor covariance, so the factor adds no risk, and the asset covariance is the one that `base` gives. When every level of the field is `base`, the member gives no factor and reads no series, and the prior is the prior without the member.
 
 # Mathematical definition
 
@@ -516,13 +516,15 @@ Read the observed factors of a [`CrossSectionalFactorPrior`](@ref) off the retur
 
 A prior with no observed factor gets `nothing`. Otherwise each member gives its exposures and names, with [`factor_exposure`](@ref) and [`exposure_axis_names`](@ref), and the column of the Exogenous Series of each of its factors, with [`observed_series`](@ref).
 
+A member that names no series gives no factor, as a [`CurrencyExposure`](@ref) does when every level of its Panel Field is its base currency. The levels come from the data, so the configuration cannot refuse the case. The member enters no stage, and no column of `rd.E` is read for it. So a prior whose observed members all give no factor gets `nothing`, and its fit is the fit of the prior without them. [`cross_sectional_factor_axis`](@ref) gives such a member no name, so the axis declared before the fit agrees.
+
 The members are read in two stages, as [`observed_reads_returns`](@ref) sorts them. The members that read no returns, such as [`CurrencyExposure`](@ref), read `rd`. The members that can read returns read a copy of `rd` whose `X` is net of the factors of the first stage, derived with [`cross_sectional_local_returns`](@ref). So a Descriptor of the returns inside an [`ObservedExposure`](@ref) measures the local move of an asset, as the estimated members do, and never the net returns its own factor enters. The copy is derived also when `lx` names a Panel Field of net returns, because that field is net of every observed factor, the member's own among them. When one stage is empty, every member reads `rd`.
 
 The carry fold of a [`CrossSectionalFactorPrior`](@ref) reads the rows that it carries and the rows of a step. It gives the derived rows of the carried rows in `kept`, and the number of observations before the first row of `rd` in `g0`. So the function derives the rows of the step alone, as the batch fit derives them. The carry gives the number of rows of the step in `n` too, and the members as it folded them in `obs`. Each member folds the rows of the step into its Descriptors that carry a state, with [`descriptor_carry`](@ref), and computes the exposures of those rows alone, from the last rows of `rd` that [`cross_sectional_exposure_rows`](@ref) names. The derivation of a row reads the exposures of the row `lag` observations before it, and a Descriptor that carries a state cannot give a row before the step again. So `kept` holds the observed exposures of the last `lag` rows before the step too, and the exposures of the function are those rows followed by the rows of the step.
 
 # Algorithm
 
- 1. `obs` is empty: return `nothing`.
+ 1. Drop every member for which [`observed_series`](@ref) names no series. If no member is left, return `nothing`.
  2. Read the members for which [`observed_reads_returns`](@ref) answers `false` on `rd`, with [`cross_sectional_observed_member`](@ref). When `n` is an integer, fold the rows of the step into each member with [`descriptor_carry`](@ref), compute the exposures of those rows alone with [`cross_sectional_observed_rows`](@ref), and put the columns of the member in `kept.Zo` before them.
  3. If a member answers `true` and a member answers `false`, stack the members of step 2 with [`cross_sectional_observed_stack`](@ref), and derive the returns net of their factors with [`cross_sectional_local_returns`](@ref). Copy `rd` with those returns in `X`.
  4. Read the members for which [`observed_reads_returns`](@ref) answers `true` on the copy, or on `rd` when step 3 made no copy, as step 2 reads them.
@@ -545,7 +547,7 @@ The carry fold of a [`CrossSectionalFactorPrior`](@ref) reads the rows that it c
 
 # Returns
 
-  - `cc::Option{<:NamedTuple}`: `nothing`, or `(; Z, R, lv, nf, fam, Xn, xf)`: the exposures `assets × factors × observations` at the last rows of `rd`, or at every row when `n` is `nothing`; the observed returns `observations × factors` over every observation of `rd`; the series names; the factor names; the family labels; the returns net of the first stage that the second stage read, or `nothing` when step 3 derived none; and the Pairs of `obs` with the state of each Descriptor after the rows of the step.
+  - `cc::Option{<:NamedTuple}`: `nothing`, or `(; Z, R, lv, nf, fam, Xn, xf)`: the exposures `assets × factors × observations` at the last rows of `rd`, or at every row when `n` is `nothing`; the observed returns `observations × factors` over every observation of `rd`; the series names; the factor names; the family labels; the returns net of the first stage that the second stage read, or `nothing` when step 3 derived none; and the Pairs of `obs` with the state of each Descriptor after the rows of the step, where a member that step 1 dropped keeps its Pair unchanged.
 
 # Related
 
@@ -560,40 +562,49 @@ The carry fold of a [`CrossSectionalFactorPrior`](@ref) reads the rows that it c
 function cross_sectional_observed(obs::AbstractVector{<:Pair}, rd::ReturnsResult,
                                   lag::Integer, kept::Option{<:NamedTuple} = nothing,
                                   g0::Integer = 0, n::Option{<:Integer} = nothing)
-    if isempty(obs)
+    sa = [observed_series(last(p), rd) for p in obs]
+    # A member that names no series gives no factor, as a `CurrencyExposure` whose every level
+    # is its base currency does. It enters no stage, so no Exogenous Series is read for it, and
+    # a prior whose members all give no factor is a prior with no observed factor (#1969).
+    ko = findall(!isempty, sa)
+    if isempty(ko)
         return nothing
     end
-    srs = [observed_series(last(p), rd) for p in obs]
-    # The carried exposures of the last `lag` rows hold the factors in the order of `obs`.
+    ob = obs[ko]
+    srs = sa[ko]
+    # The carried exposures of the last `lag` rows hold the factors in the order of `ob`.
     col = cumsum(vcat(0, length.(srs)))
     kx = something(kept, (; Xn = nothing, Zo = nothing))
     function member(k, r)
-        return cross_sectional_observed_member(obs[k], r, n, srs[k], kx.Zo,
+        return cross_sectional_observed_member(ob[k], r, n, srs[k], kx.Zo,
                                                (col[k] + 1):col[k + 1])
     end
-    rr = [observed_reads_returns(last(p)) for p in obs]
-    ms = Vector{Any}(undef, length(obs))
-    for k in findall(!, rr)
-        ms[k] = member(k, rd)
-    end
+    rr = [observed_reads_returns(last(p)) for p in ob]
+    i1 = findall(!, rr)
+    i2 = findall(rr)
+    m1 = [member(k, rd) for k in i1]
     # The members that can read returns read the returns net of the members that read none,
     # so a Descriptor of the returns measures the local move of an asset, and no member reads
     # net returns that its own factor enters.
     Xn = nothing
     rdn = rd
-    if any(rr) && !all(rr)
-        Xn = cross_sectional_local_returns(nothing,
-                                           cross_sectional_observed_stack(ms[.!rr], rd), rd.X,
-                                           rd, lag, kx.Xn, g0)
+    if !isempty(i1) && !isempty(i2)
+        Xn = cross_sectional_local_returns(nothing, cross_sectional_observed_stack(m1, rd),
+                                           rd.X, rd, lag, kx.Xn, g0)
         rdn = ReturnsResult(; nx = rd.nx, X = Xn, nf = rd.nf, F = rd.F, nb = rd.nb,
                             B = rd.B, ne = rd.ne, E = rd.E, ts = rd.ts, iv = rd.iv,
                             ivpa = rd.ivpa, pnl = rd.pnl)
     end
-    for k in findall(rr)
-        ms[k] = member(k, rdn)
-    end
-    return merge(cross_sectional_observed_stack(ms, rd),
-                 (; Xn = Xn, xf = [m.xf for m in ms]))
+    m2 = [member(k, rdn) for k in i2]
+    # The two stages put the members back in the order of `ob`. An empty stage takes an inferred
+    # element type, so `identity.` narrows the joined vector to the type of its values.
+    ms = identity.(vcat(m1, m2)[invperm(vcat(i1, i2))])
+    # A member that gives no factor keeps its place in the folded list, unchanged.
+    # A fold can change the type of a member, so the copy takes the type of both.
+    fo = [m.xf for m in ms]
+    xf = Vector{promote_type(eltype(obs), eltype(fo))}(obs)
+    xf[ko] = fo
+    return merge(cross_sectional_observed_stack(ms, rd), (; Xn = Xn, xf = xf))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -793,8 +804,9 @@ function cross_sectional_observed_stack(ms::AbstractVector, rd::ReturnsResult)
             R = rd.E[:, Int.(j)], lv = lv, nf = nf, fam = fam)
 end
 """
-    cross_sectional_local_returns(lx::Nothing, cc::Nothing, X::MatNum, rd::ReturnsResult,
-                                  lag::Integer, kept::Option{<:MatNum} = nothing,
+    cross_sectional_local_returns(lx::Option{<:AbstractString}, cc::Nothing, X::MatNum,
+                                  rd::ReturnsResult, lag::Integer,
+                                  kept::Option{<:MatNum} = nothing,
                                   g0::Integer = 0) -> MatNum
     cross_sectional_local_returns(lx::Nothing, cc::NamedTuple, X::MatNum, rd::ReturnsResult,
                                   lag::Integer, kept::Option{<:MatNum} = nothing,
@@ -806,7 +818,7 @@ end
 
 Return the returns a Cross-Sectional Factor Prior regresses on its estimated exposures: the returns net of its observed factors.
 
-The observed factors carry the part of each return that their observed returns explain, so the regression reads what is left. A prior with no observed factor regresses on `X` itself. A prior whose `lx` names a Panel Field reads the net returns off that field, so a caller's own measure enters the fit unchanged. Otherwise the prior derives them from `X` and the observed returns. Under Currency Factors the net returns are the local returns of the assets, and `X` stays in the base currency.
+The observed factors carry the part of each return that their observed returns explain, so the regression reads what is left. A prior with no observed factor regresses on `X` itself. This holds also when `lx` names a Panel Field, because the observed members can give no factor on the data, and then no return is net of a factor. A prior whose `lx` names a Panel Field reads the net returns off that field, so a caller's own measure enters the fit unchanged. Otherwise the prior derives them from `X` and the observed returns. Under Currency Factors the net returns are the local returns of the assets, and `X` stays in the base currency.
 
 # Mathematical definition
 
@@ -858,9 +870,9 @@ The carry fold of a [`CrossSectionalFactorPrior`](@ref) gives the rows that it c
   - [`cross_sectional_observed`](@ref)
   - [`currency_excess_index`](@ref)
 """
-function cross_sectional_local_returns(::Nothing, ::Nothing, X::MatNum, ::ReturnsResult,
-                                       ::Integer, ::Option{<:MatNum} = nothing,
-                                       ::Integer = 0)
+function cross_sectional_local_returns(::Option{<:AbstractString}, ::Nothing, X::MatNum,
+                                       ::ReturnsResult, ::Integer,
+                                       ::Option{<:MatNum} = nothing, ::Integer = 0)
     return X
 end
 function cross_sectional_local_returns(::Nothing, cc::NamedTuple, X::MatNum,
