@@ -569,6 +569,43 @@ Keep the branches apart in two cases, because the merge makes the text harder to
 merge makes the text harder to read for a different reason goes on its `KEEP` list with that
 reason.
 
+## A hot path is measured, and its results stay bit-identical
+
+A **hot path** is code whose time grows with the observations, the assets or the folds: a loop
+over observations, a fit that a fold repeats, a kernel that each step of an online fold calls.
+The static gate of ADR 0175 reads a trap from the text of one definition. These rules cover what
+only a measurement shows. [`.github/prompts/performance-pass.prompt.md`](../prompts/performance-pass.prompt.md)
+is the workflow that applies them.
+
+- **The slice that a kernel reads is contiguous.** An array of rank three holds its observations
+  on its last axis (ADR 0230), so `view(A, :, :, t)` is one block in memory and BLAS takes it
+  directly. A matrix stays `observations × assets`, as `X` is. When a hot loop reads a strided
+  slice, change the layout of the array that it reads, not the loop.
+- **A stage reads a view of the history that the stage before it wrote.** A copy of a history
+  costs its full size at each fit, and it was the largest saving of #1973.
+- **A loop allocates its buffers once for each task.** A threaded loop over observations takes its
+  buffers from `FLoops.@init`, sized for the largest observation, and writes each observation into
+  them. A buffer takes the element type of the arrays that it holds, as the numeric rule above
+  states.
+- **Arrays that grow together share one backing.** Two histories that a fold appends to at the
+  same rows are views of one array. An append writes into spare capacity that the backing holds,
+  and the backing doubles when the capacity runs out. A `vcat` at each step copies every row that
+  the history holds.
+- **Each block of a result is computed once.** Do not form a product to read one block of it, and
+  do not compute again a block that an earlier step holds.
+- **A branch that a speed-up adds is a method.** The fast case and the general case dispatch on a
+  type or a `Val`, as § *A branch that a type decides is a method* states, so the complexity gate
+  stays green.
+- **A speed-up keeps every output bit-identical.** A probe of the configurations that the change
+  reaches, mixed element types among them, compares every output with the base bit for bit. One
+  cause of a difference is accepted: a change of the order of a sum, or a BLAS call that now
+  takes a contiguous slice, which moves the last few bits. The commit, the ADR of the change and
+  `docs/src/migration.md` then state the largest relative change and its cause. Any other
+  difference is a defect of the change.
+- **A claim of speed is a measurement of one run.** The base and the change run in the same
+  process order, single-threaded, as the median of five fits after a warm-up. A comparison with a
+  reference implementation times the reference in that same run.
+
 ## Return Type Annotations
 
 - `.github/instructions/julia-return-types.instructions.md` holds the full guidelines.
