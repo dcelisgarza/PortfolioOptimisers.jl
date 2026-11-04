@@ -45,11 +45,11 @@ the base prints `BIT-IDENTICAL`.
 1. Write the **timing driver**: it warms up on small data, then runs each configuration five times
    on the case, with `GC.gc(true)` before each run, and prints the median of `@timed`.
 2. Measure the allocations of one fit with `@allocated`.
-3. If the issue compares with a reference implementation, time the reference in the same session,
-   on the same case.
+3. If the issue compares with another library, time that library in the same session, on the
+   same case.
 
 The step is done when one table holds the median time and the allocations of each configuration
-at the base, and the time of the reference.
+at the base, and the time of the other library when the issue compares with one.
 
 ## Step 3. Profile, then plan the parts
 
@@ -97,8 +97,8 @@ bound on each one, and each part has a measured gain. Drop a part that gains not
 
 1. Land the branch as the `sweep-conform` skill § *Land the branch* states.
 2. Post the table of the pass on the issue: the median time of each configuration at the base
-   and after the pass, the change in percent, the allocations, and the time of the reference from
-   the same session.
+   and after the pass, the change in percent, and the allocations. A time of another library
+   stays in the report of the session, not on the tracker.
 3. File an issue for each layout or hot path that the pass found and left, with its measurement.
 
 The step is done when the issue holds the table and every finding that the pass left has an issue.

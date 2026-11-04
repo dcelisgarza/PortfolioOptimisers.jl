@@ -603,8 +603,8 @@ is the workflow that applies them.
   `docs/src/migration.md` then state the largest relative change and its cause. Any other
   difference is a defect of the change.
 - **A claim of speed is a measurement of one run.** The base and the change run in the same
-  process order, single-threaded, as the median of five fits after a warm-up. A comparison with a
-  reference implementation times the reference in that same run.
+  process order, single-threaded, as the median of five fits after a warm-up. A comparison with
+  another library times that library in that same run.
 
 ## Return Type Annotations
 
