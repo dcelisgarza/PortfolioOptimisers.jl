@@ -1287,15 +1287,89 @@ function cross_sectional_exposure_series(pe::CrossSectionalFactorPrior, X::MatNu
     end
     dc = cross_sectional_descriptor_carry(est, rde, n)
     # The batch fit joins the observed exposures to the history after its regression, so the
-    # history keeps spare factors for them, and the join is a view (#1973). The fold holds
-    # `pe.lag` more observed rows than rows of the history, and keeps the two apart.
-    Zo = isnothing(n) && !isnothing(cc) ? cc.Z : nothing
+    # history keeps spare factors for them, and the join is a view (#1973).
+    Zo = cross_sectional_history_observed(cc, n)
     (; Ms, nf, fam, Zo) = cross_sectional_exposure_history(dc.xv, rde, pe.ex; n = n,
                                                            Zo = Zo)
-    cc = isnothing(Zo) ? cc : merge(cc, (; Z = Zo))
+    cc = cross_sectional_observed_rebacked(cc, Zo)
     return (; amsk = amsk, emsk = emsk, mcap = mcap, BW = BW, Xu = Xu, cc = cc, Xl = Xl,
             rde = rde, Ms = Ms, nf = nf, fam = fam,
             xf = cross_sectional_factor_join(fl, dc.xf, isnothing(cc) ? obs : cc.xf))
+end
+"""
+    cross_sectional_history_observed(cc::Nothing, n) -> nothing
+    cross_sectional_history_observed(cc::NamedTuple, n::Nothing) -> AbstractArray
+    cross_sectional_history_observed(cc::NamedTuple, n::Integer) -> nothing
+
+Return the observed exposures that the exposure history of [`cross_sectional_exposure_series`](@ref) shares a backing with, or `nothing`.
+
+The batch fit joins the observed exposures to the history after its regression, so the two can share one backing, as [`cross_sectional_history_backing`](@ref) states. The carry fold computes the rows of a step alone, and its observed exposures hold `pe.lag` more rows than its history, so the two keep their own arrays.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. No observed factor: return `nothing`.
+ 2. Every row of the batch fit, `n = nothing`: return `cc.Z`.
+ 3. The rows of a step of the carry fold: return `nothing`.
+
+# Arguments
+
+  - `cc`: The observed factors, as [`cross_sectional_observed`](@ref) returns them, or `nothing`.
+  - `n`: Number of last rows of the step, or `nothing` for every row.
+
+# Returns
+
+  - `Zo::Option{<:AbstractArray}`: The observed exposures, or `nothing`.
+
+# Related
+
+  - [`cross_sectional_exposure_series`](@ref)
+  - [`cross_sectional_observed_rebacked`](@ref)
+"""
+function cross_sectional_history_observed(::Nothing, ::Any)
+    return nothing
+end
+function cross_sectional_history_observed(cc::NamedTuple, ::Nothing)
+    return cc.Z
+end
+function cross_sectional_history_observed(::NamedTuple, ::Integer)
+    return nothing
+end
+"""
+    cross_sectional_observed_rebacked(cc, Zo::Nothing) -> Option{<:NamedTuple}
+    cross_sectional_observed_rebacked(cc::NamedTuple, Zo::AbstractArray{<:Any, 3}) -> NamedTuple
+
+Put the observed exposures that the exposure history returns into the observed factors `cc`.
+
+When the history shares a backing with the observed exposures, it returns them as a view of that backing, and the observed factors carry the view, so the later join of the two is a view too. With no shared backing, the observed factors are unchanged.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. No observed exposures: return `cc`.
+ 2. Observed exposures: return `cc` with `Z = Zo`.
+
+# Arguments
+
+  - `cc`: The observed factors, as [`cross_sectional_observed`](@ref) returns them, or `nothing`.
+  - `Zo`: The observed exposures that [`cross_sectional_exposure_history`](@ref) returns, or `nothing`.
+
+# Returns
+
+  - `cc::Option{<:NamedTuple}`: The observed factors.
+
+# Related
+
+  - [`cross_sectional_exposure_series`](@ref)
+  - [`cross_sectional_history_observed`](@ref)
+"""
+function cross_sectional_observed_rebacked(cc, ::Nothing)
+    return cc
+end
+function cross_sectional_observed_rebacked(cc::NamedTuple, Zo::AbstractArray{<:Any, 3})
+    return merge(cc, (; Z = Zo))
 end
 """
     cross_sectional_benchmark_stage(pe::CrossSectionalFactorPrior, X::MatNum,

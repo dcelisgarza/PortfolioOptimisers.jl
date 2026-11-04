@@ -24,5 +24,6 @@ cross_sectional_mark_dropped!
 cross_sectional_row_space
 cross_sectional_target_coef
 cross_sectional_systematic
+cross_sectional_loop_buffers
 cross_sectional_foreach
 ```

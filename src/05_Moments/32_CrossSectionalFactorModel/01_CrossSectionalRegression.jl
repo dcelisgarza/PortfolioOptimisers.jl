@@ -1650,6 +1650,56 @@ function cross_sectional_coefficients(cre::CrossSectionalTargetRegression, A::Ma
     return cross_sectional_target_solve(cre.alg, tgt, (; A = A, y = y, D = D, t = t, F = F))
 end
 """
+    cross_sectional_loop_buffers(intercept::Val{false}, Z::Arr3Num, X::MatNum, W::MatNum,
+                                 Tf::Type) -> NamedTuple
+    cross_sectional_loop_buffers(intercept::Val{true}, Z::Arr3Num, X::MatNum, W::MatNum,
+                                 Tf::Type) -> NamedTuple
+
+Allocate the buffers that one task of the loop of [`cross_sectional_regression`](@ref) gathers each observation into.
+
+Each buffer holds every asset, and an observation reads its first rows, so one allocation serves every observation of the task. Each buffer takes the type of the copy that it replaces, so a fit of mixed element types computes in the types that a copy gives. The gathers keep the types of `Z`, `X` and `W`. The centred exposures and returns of an intercept take the working type `Tf`, as `A .- transpose(xbar)` gives it. The weighted design takes the type that `sqrt.(w)` widens its input to.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. No intercept: the centred buffers have no row, and the weighted design widens the type of `Z`.
+ 2. An intercept: the centred buffers hold every asset in the type `Tf`, and the weighted design widens `Tf`.
+
+# Arguments
+
+  - `intercept`: `Val(cre.intercept)` of the estimator.
+  - `Z::Arr3Num`: Exposure tensor `observations × assets × factors`.
+  - `X::MatNum`: Asset returns matrix `observations × assets`.
+  - `W::MatNum`: Cross-sectional weights matrix `observations × assets`.
+  - `Tf::Type`: The working type of the fit.
+
+# Returns
+
+  - `buf::NamedTuple`: `(; w, A, y, Ac, yc, D)`: the gathered weights, exposures and returns, the centred exposures and returns, and the weighted design.
+
+# Related
+
+  - [`cross_sectional_regression`](@ref)
+  - [`cross_sectional_foreach`](@ref)
+"""
+function cross_sectional_loop_buffers(::Val{false}, Z::Arr3Num, X::MatNum, W::MatNum,
+                                      ::Type{T}) where {T}
+    N, K = size(Z, 2), size(Z, 3)
+    Td = promote_type(eltype(Z), typeof(sqrt(oneunit(eltype(W)))))
+    return (; w = similar(W, N), A = similar(Z, N, K), y = similar(X, N),
+            Ac = Matrix{T}(undef, 0, K), yc = Vector{T}(undef, 0),
+            D = Matrix{Td}(undef, N, K))
+end
+function cross_sectional_loop_buffers(::Val{true}, Z::Arr3Num, X::MatNum, W::MatNum,
+                                      ::Type{T}) where {T}
+    N, K = size(Z, 2), size(Z, 3)
+    Td = promote_type(T, typeof(sqrt(oneunit(eltype(W)))))
+    return (; w = similar(W, N), A = similar(Z, N, K), y = similar(X, N),
+            Ac = Matrix{T}(undef, N, K), yc = Vector{T}(undef, N),
+            D = Matrix{Td}(undef, N, K))
+end
+"""
     cross_sectional_foreach(f, ex::FLoops.Transducers.Executor, idx::AbstractVector) -> nothing
     cross_sectional_foreach(f, ex::FLoops.Transducers.Executor, idx::AbstractVector,
                             init) -> nothing
@@ -1850,17 +1900,8 @@ function cross_sectional_block_regression(cre::Union{CrossSectionalLinearRegress
     edof = zeros(Tf, size(X, 1))
     # Each task gathers an observation into buffers of its own, and reads the first rows of
     # each. The rows are a range, so every product of the loop reads a block of unit stride and
-    # runs in BLAS, and the loop allocates no gather (#1973). Each buffer takes the type of the
-    # copy it replaces: the gathers keep the types of `Z`, `X` and `W`, the centred values take
-    # the working type, and the weighted design the type that `sqrt.(w)` widens its input to.
-    # The buffers that a fit does not use have no row.
-    Tw = typeof(sqrt(oneunit(eltype(W))))
-    N = size(Z, 2)
-    Nc = cre.intercept ? N : 0
-    init = () -> (; w = similar(W, N), A = similar(Z, N, K), y = similar(X, N),
-                  Ac = Matrix{Tf}(undef, Nc, K), yc = Vector{Tf}(undef, Nc),
-                  D = Matrix{promote_type(eltype(Z), Tw)}(undef, N - Nc, K),
-                  Dc = Matrix{promote_type(Tf, Tw)}(undef, Nc, K))
+    # runs in BLAS, and the loop allocates no gather (#1973).
+    init = () -> cross_sectional_loop_buffers(Val(cre.intercept), Z, X, W, Tf)
     cross_sectional_foreach(cre.ex, axes(X, 1), init) do t, buf
         idx = findall(view(act, t, :))
         n[t] = length(idx)
@@ -1889,7 +1930,7 @@ function cross_sectional_block_regression(cre::Union{CrossSectionalLinearRegress
             Ac .= A .- transpose(xbar)
             A = Ac
         end
-        D = view(cre.intercept ? buf.Dc : buf.D, 1:n[t], :)
+        D = view(buf.D, 1:n[t], :)
         D .= A .* sqrt.(w)
         F = cross_sectional_shared_qr(h1, dc, D)
         cross_sectional_mark_leverage!(h1, A, w, cre.intercept, t, idx; D = D, F = F)
