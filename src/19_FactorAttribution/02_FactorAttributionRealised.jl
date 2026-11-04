@@ -24,7 +24,7 @@ function attribution_slice(B::MatNum, ::Integer)
     return B
 end
 function attribution_slice(B::Arr3Num, t::Integer)
-    return view(B, t, :, :)
+    return view(B, :, :, t)
 end
 """
     attribution_weights(w::VecNum, t::Integer)
@@ -201,7 +201,7 @@ function attribution_trim_exposures(B::MatNum, ::Integer)
     return B
 end
 function attribution_trim_exposures(B::Arr3Num, lag::Integer)
-    return B[1:(size(B, 1) - lag), :, :]
+    return B[:, :, 1:(size(B, 3) - lag)]
 end
 """
     attribution_zero_inactive(B::MatNum, eps::MatNum)
@@ -233,7 +233,7 @@ Where:
 
 # Arguments
 
-  - `B`: The static loadings, `assets × factors`, or the exposure history, `observations × assets × factors`.
+  - `B`: The static loadings, `assets × factors`, or the exposure history, `assets × factors × observations`.
   - `eps`: The idiosyncratic returns, `observations × assets`.
 
 # Validation
@@ -259,15 +259,18 @@ function attribution_zero_inactive(B::MatNum, eps::MatNum)
                 eps = ifelse.(act, eps, zero(eltype(eps))), act = act)
     end
     # Some observation zeroes a live asset, so the exposures become a history: `B` at every
-    # observation, zero where the pair is inactive.
-    return (; B = ifelse.(act, reshape(B, 1, size(B)...), zero(eltype(B))),
+    # observation, zero where the pair is inactive. The mask reads `assets × 1 × observations`
+    # against the history.
+    a3 = reshape(permutedims(act), size(act, 2), 1, size(act, 1))
+    return (; B = ifelse.(a3, B, zero(eltype(B))),
             eps = ifelse.(act, eps, zero(eltype(eps))), act = act)
 end
 function attribution_zero_inactive(B::Arr3Num, eps::MatNum)
-    @argcheck(size(B, 1) == size(eps, 1),
-              DimensionMismatch("the exposure history ($(size(B, 1)) observations after the lag) must carry the observations of the idiosyncratic returns ($(size(eps, 1)) observations after the lag)"))
-    act = isfinite.(eps) .& dropdims(all(isfinite, B; dims = 3); dims = 3)
-    return (; B = ifelse.(act, B, zero(eltype(B))),
+    @argcheck(size(B, 3) == size(eps, 1),
+              DimensionMismatch("the exposure history ($(size(B, 3)) observations after the lag) must carry the observations of the idiosyncratic returns ($(size(eps, 1)) observations after the lag)"))
+    act = isfinite.(eps) .& transpose(dropdims(all(isfinite, B; dims = 2); dims = 2))
+    a3 = reshape(permutedims(act), size(act, 2), 1, size(act, 1))
+    return (; B = ifelse.(a3, B, zero(eltype(B))),
             eps = ifelse.(act, eps, zero(eltype(eps))), act = act)
 end
 """
@@ -407,7 +410,7 @@ function attribution_window_exposures(B::MatNum, ::Any)
     return B
 end
 function attribution_window_exposures(B::Arr3Num, rows)
-    return B[rows, :, :]
+    return B[:, :, rows]
 end
 """
     attribution_window_basis(fcb::Nothing, rows)
@@ -1035,7 +1038,7 @@ function attribution_reduce_for_errors(fcb::FactorFamilyBasis,
     Bb = attribution_broadcast_exposures(B, T)
     ud = unseen_member_design(rule, fcb, Bb, reduce_exposures(fcb, Bb), rw)
     gr = project_factor_coordinates(fcb, g)
-    nr = size(ud.Z, 3)
+    nr = size(ud.Z, 2)
     return (; B = ud.Z, g = gr, observed = attribution_observed_flags(no, nr), nr = nr,
             P = ud.P)
 end
@@ -1076,7 +1079,7 @@ The sandwich covariance runs per observation, and the basis transforms it reads 
 
 # Returns
 
-  - `Ms::Arr3Num`: The exposure history, `observations × assets × factors`.
+  - `Ms::Arr3Num`: The exposure history, `assets × factors × observations`.
 
 # Related
 
@@ -1084,9 +1087,9 @@ The sandwich covariance runs per observation, and the basis transforms it reads 
 """
 function attribution_broadcast_exposures(B::MatNum, T::Integer)
     N, K = size(B)
-    Ms = Array{eltype(B), 3}(undef, T, N, K)
-    for k in 1:K, i in 1:N, t in 1:T
-        Ms[t, i, k] = B[i, k]
+    Ms = Array{eltype(B), 3}(undef, N, K, T)
+    for t in 1:T
+        Ms[:, :, t] = B
     end
     return Ms
 end
@@ -1251,7 +1254,7 @@ Under a family re-basis, the function maps the covariance of each observation fr
 # Arguments
 
   - `fcb`: The family re-basis, or `nothing`.
-  - `V`: The covariance of each observation on the regression axis, `observations × factors × factors`, from [`attribution_scatter`](@ref).
+  - `V`: The covariance of each observation on the regression axis, `factors × factors × observations`, from [`attribution_scatter`](@ref).
 
 # Returns
 
@@ -1283,16 +1286,16 @@ A factor the regression does not estimate carries no estimation uncertainty, so 
 
 # Returns
 
-  - `S::Arr3Num`: The covariance of each observation on the full axis, `observations × factors × factors`.
+  - `S::Arr3Num`: The covariance of each observation on the full axis, `factors × factors × observations`.
 
 # Related
 
   - [`attribution_expand_errors`](@ref)
 """
 function attribution_scatter(V::AbstractVector{<:MatNum}, keep, nr::Integer)
-    S = zeros(eltype(eltype(V)), length(V), nr, nr)
+    S = zeros(eltype(eltype(V)), nr, nr, length(V))
     for t in eachindex(V), b in eachindex(keep), a in eachindex(keep)
-        S[t, keep[a], keep[b]] = V[t][a, b]
+        S[keep[a], keep[b], t] = V[t][a, b]
     end
     return S
 end
@@ -1328,7 +1331,7 @@ Where:
 
   - `fam`: The family label of each raw factor, or `nothing`.
   - `g`: The per-observation portfolio exposure on the raw axis.
-  - `Vf`: The sandwich covariance of each observation, on the raw axis, `observations × factors × factors`.
+  - `Vf`: The sandwich covariance of each observation, on the raw axis, `factors × factors × observations`.
   - `s1`: The factor a mean takes under the annualisation.
   - `T`: The number of aligned observations.
   - `obs`: The raw factors that are observed, from [`attribution_observed_indices`](@ref).
@@ -1350,7 +1353,7 @@ function attribution_family_errors(fam::VecStr, g::MatNum, Vf::Arr3Num, s1::Numb
                                    T::Integer, obs::AbstractVector{<:Integer})
     fi = attribution_family_index(fam)
     se(v) = s1 * sqrt(max(zero(v), v)) / T
-    out = [se(sum(LinearAlgebra.dot(view(g, t, i), view(Vf, t, i, i), view(g, t, i))
+    out = [se(sum(LinearAlgebra.dot(view(g, t, i), view(Vf, i, i, t), view(g, t, i))
                   for t in 1:T)) for i in fi.idx]
     for j in eachindex(out)
         if any(in(obs), fi.idx[j])

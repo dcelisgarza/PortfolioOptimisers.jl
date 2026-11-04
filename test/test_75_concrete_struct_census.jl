@@ -40,7 +40,7 @@ end
     below the census holds that.
     =#
     hand_allowed = Dict(:ScopedConfig => "a `mutable` holder whose `@atomic` default and whose `ScopedValue{Union{Nothing, T}}` share one parameter",
-                        :RepeatedLeading => "an `AbstractArray{T, N}`, whose supertype reads the element type and the rank",
+                        :RepeatedObservations => "an `AbstractArray{T, N}`, whose supertype reads the element type and the rank",
                         :MinimumSquaredDistance => "the parameter is the one of its supertype `SquaredOrderedWeightsArrayAlgorithm{T}`",
                         :MinimumSumSquares => "the parameter is the one of its supertype `SquaredOrderedWeightsArrayAlgorithm{T}`")
     #=

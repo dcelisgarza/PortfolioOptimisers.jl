@@ -279,15 +279,16 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         Pv = 100 .+ cumsum(rand(StableRNG(987654321), 10, 3); dims = 1)
         Pv[:, 2] .= NaN                       # asset "A2" is entirely missing
         Px = TimeArray(collect(ts), Pv, ["A1", "A2", "A3"])
-        # Z3[i, j, k] == i + 10(j - 1) + 30(k - 1), so every entry names its own position.
-        Z3 = reshape(Float64.(1:60), 10, 3, 2)
+        # Z3[j, k, t] == t + 10(j - 1) + 30(k - 1), so every entry names its own position.
+        # The array is `assets × features × observations`.
+        Z3 = permutedims(reshape(Float64.(1:60), 10, 3, 2), (2, 3, 1))
         nz = ["f1", "f2"]
         pipe = Pipeline(; steps = (MissingDataFilter(; col_thr = 0.5), PricesToReturns()))
 
         rd = fit(pipe, PricesResult(; X = Px, pnl = matrix_panel(nz, Z3))).ctx.returns
         @test !isnothing(rd.pnl)
         @test rd.nx == ["A1", "A3"]
-        @test panel_feature_matrix(rd.pnl)[2] == Z3[2:10, [1, 3], :]
+        @test panel_feature_matrix(rd.pnl)[2] == Z3[[1, 3], :, 2:10]
         @test panel_feature_matrix(rd.pnl)[1] == nz
         # Both universe masks are the carrier's own two axes.
         @test size(rd.pnl.amsk) == size(rd.pnl.emsk) == size(rd.X)

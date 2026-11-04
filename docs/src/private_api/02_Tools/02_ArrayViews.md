@@ -1,5 +1,5 @@
 ```@meta
-Description = "Array views, private API of PortfolioOptimisers.jl: get_window, nothing_scalar_array_view, nothing_scalar_array_view_odd_order, …"
+Description = "Array views, private API of PortfolioOptimisers.jl: get_window, observation_axis, nothing_scalar_array_view, nothing_scalar_array_view_odd_order, …"
 ```
 
 # Array views: private API
@@ -8,8 +8,11 @@ Description = "Array views, private API of PortfolioOptimisers.jl: get_window, n
 
 Most functions below serve the macros that declare the types of the library. A field tagged [`@pprop`](@ref) or `@cprop` takes its value from the prior or from the optimiser when the caller leaves it empty, and [`sel`](@ref) makes that choice. [`@propagatable`](@ref) records the tagged fields of each type it declares, and [`@forward_properties`](@ref) gives a type properties that read through to the fields it holds. The rest are helpers that many files share, such as [`get_window`](@ref), which gives the index range of an observation window.
 
+A history of rank three holds its observations on its last axis, and a matrix holds them on its first. [`observation_axis`](@ref) names the axis of each rank, so a helper that cuts or appends the rows of a history of any rank reads it there.
+
 ```@docs
 get_window
+observation_axis
 ```
 
 ## View functions

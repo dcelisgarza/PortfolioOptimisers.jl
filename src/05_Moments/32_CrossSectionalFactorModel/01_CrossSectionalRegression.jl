@@ -273,13 +273,13 @@ In order to implement a new concrete type that works seamlessly with the library
 
   - `rule`: The member of the family.
   - `fcb`: The Factor Family Basis of the lagged exposures, one row per observation of `Zl`.
-  - `B`: Lagged exposures on the raw axis, `observations × assets × factors`.
-  - `Zl`: Lagged exposures on the reduced axis, which `fcb` gives from `B`.
+  - `B`: Lagged exposures on the raw axis, `assets × factors × observations`. Earlier releases held the observations on the first axis. A method written for them reads `B[t, :, :]`, and it must now read `B[:, :, t]`.
+  - `Zl`: Lagged exposures on the reduced axis, which `fcb` gives from `B`, in the same layout.
   - `W`: Cross-sectional weights matrix `observations × assets`. The pairs of positive weight are the sample of each observation.
 
 ### Returns
 
-  - `Z::Arr3Num`: The design to regress on.
+  - `Z::Arr3Num`: The design to regress on, `assets × factors × observations`.
   - `P`: One `t => P_t` pair per observation that the rule changes, where `P_t` is a `reduced factors × reduced factors` matrix, and the factor returns of `t` are `P_t` times the coefficients of `t`. It is empty when the rule changes no observation.
 
 # Related
@@ -1526,11 +1526,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the mask of the `(observation, asset)` pairs whose exposure to every factor is finite.
 
-The factor axis is the slowest axis of `Z`, so the pass reads `Z` in its memory order, with the factor axis as the outer loop. A test of each pair across the factors instead jumps `size(Z, 1) * size(Z, 2)` entries at each step.
+The pass reads `Z` in its memory order: the observation axis is the outer loop, and the asset axis is the inner loop.
 
 # Arguments
 
-  - `Z::Arr3Num`: Exposure tensor `observations × assets × factors`.
+  - `Z::Arr3Num`: Exposure tensor `assets × factors × observations`.
 
 # Returns
 
@@ -1542,9 +1542,9 @@ The factor axis is the slowest axis of `Z`, so the pass reads `Z` in its memory 
   - [`cross_sectional_eligible`](@ref)
 """
 function cross_sectional_finite_exposures(Z::Arr3Num)::BitMatrix
-    fin = trues(size(Z, 1), size(Z, 2))
-    for k in axes(Z, 3), i in axes(Z, 2), t in axes(Z, 1)
-        if !isfinite(Z[t, i, k])
+    fin = trues(size(Z, 3), size(Z, 1))
+    for t in axes(Z, 3), k in axes(Z, 2), i in axes(Z, 1)
+        if !isfinite(Z[i, k, t])
             fin[t, i] = false
         end
     end
@@ -1559,14 +1559,14 @@ An `(observation, asset)` pair is eligible when its cross-sectional weight is po
 
 # Arguments
 
-  - `Z::Arr3Num`: Exposure tensor `observations × assets × factors`.
+  - `Z::Arr3Num`: Exposure tensor `assets × factors × observations`.
   - `X::MatNum`: Asset returns matrix `observations × assets`.
   - `W::MatNum`: Cross-sectional weights matrix `observations × assets`.
 
 # Validation
 
   - `!isempty(Z)`, `!isempty(X)` and `!isempty(W)`.
-  - `size(Z, 1) == size(X, 1)` and `size(Z, 2) == size(X, 2)`.
+  - `size(Z, 3) == size(X, 1)` and `size(Z, 1) == size(X, 2)`.
   - `size(W) == size(X)`.
   - `all(isfinite, W)` and `all(x -> x >= 0, W)`.
   - Every pair with a positive weight carries a finite return and finite exposures. The `IsNonFiniteError` names the observation, the asset and the weight.
@@ -1584,8 +1584,8 @@ function cross_sectional_design_mask(Z::Arr3Num, X::MatNum, W::MatNum)::BitMatri
     @argcheck(!isempty(Z), IsEmptyError("Z cannot be empty"))
     @argcheck(!isempty(X), IsEmptyError("X cannot be empty"))
     @argcheck(!isempty(W), IsEmptyError("W cannot be empty"))
-    @argcheck(size(Z, 1) == size(X, 1) && size(Z, 2) == size(X, 2),
-              DimensionMismatch("Z ($(size(Z, 1))×$(size(Z, 2))×$(size(Z, 3))) must match X ($(size(X, 1))×$(size(X, 2))) on the observation and asset axes"))
+    @argcheck(size(Z, 3) == size(X, 1) && size(Z, 1) == size(X, 2),
+              DimensionMismatch("Z ($(size(Z, 1))×$(size(Z, 2))×$(size(Z, 3))) must match X ($(size(X, 1))×$(size(X, 2))) on the asset and observation axes"))
     @argcheck(size(W) == size(X),
               DimensionMismatch("W ($(size(W, 1))×$(size(W, 2))) must match X ($(size(X, 1))×$(size(X, 2)))"))
     @argcheck(all(isfinite, W), IsNonFiniteError("all entries of W must be finite"))
@@ -1595,7 +1595,7 @@ function cross_sectional_design_mask(Z::Arr3Num, X::MatNum, W::MatNum)::BitMatri
     for t in axes(X, 1), i in axes(X, 2)
         if W[t, i] > zero(eltype(W))
             @argcheck(isfinite(X[t, i]) && fin[t, i],
-                      IsNonFiniteError("observation $t and asset $i carry the positive weight $(W[t, i]), so their return and all $(size(Z, 3)) of their exposures must be finite. Set the weight to zero to exclude the pair from the fit"))
+                      IsNonFiniteError("observation $t and asset $i carry the positive weight $(W[t, i]), so their return and all $(size(Z, 2)) of their exposures must be finite. Set the weight to zero to exclude the pair from the fit"))
             act[t, i] = true
         end
     end
@@ -1669,7 +1669,7 @@ The method that Julia selects is the algorithm.
 # Arguments
 
   - `intercept`: `Val(cre.intercept)` of the estimator.
-  - `Z::Arr3Num`: Exposure tensor `observations × assets × factors`.
+  - `Z::Arr3Num`: Exposure tensor `assets × factors × observations`.
   - `X::MatNum`: Asset returns matrix `observations × assets`.
   - `W::MatNum`: Cross-sectional weights matrix `observations × assets`.
   - `Tf::Type`: The working type of the fit.
@@ -1685,7 +1685,7 @@ The method that Julia selects is the algorithm.
 """
 function cross_sectional_loop_buffers(::Val{false}, Z::Arr3Num, X::MatNum, W::MatNum,
                                       ::Type{T}) where {T}
-    N, K = size(Z, 2), size(Z, 3)
+    N, K = size(Z, 1), size(Z, 2)
     Td = promote_type(eltype(Z), typeof(sqrt(oneunit(eltype(W)))))
     return (; w = similar(W, N), A = similar(Z, N, K), y = similar(X, N),
             Ac = Matrix{T}(undef, 0, K), yc = Vector{T}(undef, 0),
@@ -1693,7 +1693,7 @@ function cross_sectional_loop_buffers(::Val{false}, Z::Arr3Num, X::MatNum, W::Ma
 end
 function cross_sectional_loop_buffers(::Val{true}, Z::Arr3Num, X::MatNum, W::MatNum,
                                       ::Type{T}) where {T}
-    N, K = size(Z, 2), size(Z, 3)
+    N, K = size(Z, 1), size(Z, 2)
     Td = promote_type(T, typeof(sqrt(oneunit(eltype(W)))))
     return (; w = similar(W, N), A = similar(Z, N, K), y = similar(X, N),
             Ac = Matrix{T}(undef, N, K), yc = Vector{T}(undef, N),
@@ -1787,7 +1787,7 @@ A refusal names an observation by its row of `X`. The verb fits [`cross_sectiona
 
   - `cre`: Cross-sectional regression estimator.
   - `csr`: A cross-sectional regression result.
-  - `Z::Arr3Num`: Exposure tensor `observations × assets × factors`.
+  - `Z::Arr3Num`: Exposure tensor `assets × factors × observations`.
   - `X::MatNum`: Asset returns matrix `observations × assets`.
   - `W::MatNum`: Cross-sectional weights matrix `observations × assets`.
   - `args...`: Additional positional arguments (ignored by the passthrough).
@@ -1803,7 +1803,7 @@ A refusal names an observation by its row of `X`. The verb fits [`cross_sectiona
 # Examples
 
 ```jldoctest
-julia> Z = reshape([1.0, 0.0, 0.5, 0.0, 1.0, 0.5], 1, 3, 2);
+julia> Z = reshape([1.0, 0.0, 0.5, 0.0, 1.0, 0.5], 3, 2, 1);
 
 julia> cross_sectional_regression(CrossSectionalLinearRegression(), Z, [1.0 2.0 1.5], ones(1, 3))
 CrossSectionalRegression
@@ -1856,7 +1856,7 @@ The algorithm of [`cross_sectional_regression`](@ref), with `t0 + t` as the inde
 # Arguments
 
   - `cre`: Cross-sectional regression estimator.
-  - `Z::Arr3Num`: Exposure tensor `observations × assets × factors`.
+  - `Z::Arr3Num`: Exposure tensor `assets × factors × observations`.
   - `X::MatNum`: Asset returns matrix `observations × assets`.
   - `W::MatNum`: Cross-sectional weights matrix `observations × assets`.
   - `t0::Integer`: Number of fitted observations before the block.
@@ -1890,7 +1890,7 @@ function cross_sectional_block_regression(cre::Union{CrossSectionalLinearRegress
     # `sqrt.(w)`, which is a float, and the default target `LinearModel` fits in floating
     # point too.
     Tf = promote_type(real(eltype(Z)), real(eltype(X)), real(eltype(W)))
-    K = size(Z, 3)
+    K = size(Z, 2)
     f = zeros(Tf, size(X, 1), K)
     b = cre.intercept ? zeros(Tf, size(X, 1)) : nothing
     n = zeros(Int, size(X, 1))
@@ -1900,7 +1900,8 @@ function cross_sectional_block_regression(cre::Union{CrossSectionalLinearRegress
     edof = zeros(Tf, size(X, 1))
     # Each task gathers an observation into buffers of its own, and reads the first rows of
     # each. The rows are a range, so every product of the loop reads a block of unit stride and
-    # runs in BLAS, and the loop allocates no gather (#1973).
+    # runs in BLAS, and the loop allocates no gather. The slice of an observation is one
+    # contiguous block of `Z`, so the gather reads it in memory order (#1973).
     init = () -> cross_sectional_loop_buffers(Val(cre.intercept), Z, X, W, Tf)
     cross_sectional_foreach(cre.ex, axes(X, 1), init) do t, buf
         idx = findall(view(act, t, :))
@@ -1908,7 +1909,7 @@ function cross_sectional_block_regression(cre::Union{CrossSectionalLinearRegress
         w = view(buf.w, 1:n[t])
         w .= view(W, t, idx)
         A = view(buf.A, 1:n[t], :)
-        A .= view(Z, t, idx, :)
+        A .= view(Z, idx, :, t)
         y = view(buf.y, 1:n[t])
         y .= view(X, t, idx)
         ybar = zero(Tf)
@@ -1973,11 +1974,11 @@ Where:
 
   - `f::MatNum`: Factor returns matrix `observations × factors`.
   - `b::Option{<:VecNum}`: Intercept vector, or `nothing` when none was fitted.
-  - `Z::Arr3Num`: Exposure tensor `observations × assets × factors`. The asset axis may differ from the one the fit saw. The observation axis and the factor axis must match `f`.
+  - `Z::Arr3Num`: Exposure tensor `assets × factors × observations`. The asset axis may differ from the one the fit saw. The observation axis and the factor axis must match `f`.
 
 # Validation
 
-  - `size(Z, 1) == size(f, 1)` and `size(Z, 3) == size(f, 2)`.
+  - `size(Z, 3) == size(f, 1)` and `size(Z, 2) == size(f, 2)`.
 
 # Returns
 
@@ -1990,11 +1991,11 @@ Where:
   - [`cross_sectional_regression`](@ref)
 """
 function cross_sectional_systematic(f::MatNum, b::Option{<:VecNum}, Z::Arr3Num)::MatNum
-    @argcheck(size(Z, 1) == size(f, 1) && size(Z, 3) == size(f, 2),
-              DimensionMismatch("Z ($(size(Z, 1))×$(size(Z, 2))×$(size(Z, 3))) must match f ($(size(f, 1))×$(size(f, 2))) on the observation and factor axes"))
-    Xh = similar(f, size(Z, 1), size(Z, 2))
-    for t in axes(Z, 1), i in axes(Z, 2)
-        Xh[t, i] = LinearAlgebra.dot(view(Z, t, i, :), view(f, t, :))
+    @argcheck(size(Z, 3) == size(f, 1) && size(Z, 2) == size(f, 2),
+              DimensionMismatch("Z ($(size(Z, 1))×$(size(Z, 2))×$(size(Z, 3))) must match f ($(size(f, 1))×$(size(f, 2))) on the factor and observation axes"))
+    Xh = similar(f, size(Z, 3), size(Z, 1))
+    for t in axes(Z, 3), i in axes(Z, 1)
+        Xh[t, i] = LinearAlgebra.dot(view(Z, i, :, t), view(f, t, :))
     end
     return isnothing(b) ? Xh : Xh .+ b
 end
@@ -2012,7 +2013,7 @@ For the `X` that the fit saw, the residuals of the result are `X - predict(csr, 
 # Arguments
 
   - `csr`: A cross-sectional regression result.
-  - `Z::Arr3Num`: Exposure tensor `observations × assets × factors`. The asset axis may differ from the one the fit saw. The observation axis and the factor axis must match `csr.f`.
+  - `Z::Arr3Num`: Exposure tensor `assets × factors × observations`. The asset axis may differ from the one the fit saw. The observation axis and the factor axis must match `csr.f`.
 
 # Validation
 
@@ -2025,7 +2026,7 @@ For the `X` that the fit saw, the residuals of the result are `X - predict(csr, 
 # Examples
 
 ```jldoctest
-julia> Z = reshape([1.0, 0.0, 0.5, 0.0, 1.0, 0.5], 1, 3, 2);
+julia> Z = reshape([1.0, 0.0, 0.5, 0.0, 1.0, 0.5], 3, 2, 1);
 
 julia> csr = cross_sectional_regression(CrossSectionalLinearRegression(), Z, [1.0 2.0 1.5],
                                         ones(1, 3));

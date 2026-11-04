@@ -489,12 +489,13 @@ println("S is cos(πD): ", S_fea ≈ cos.(π .* D_fea))
 ## 6. Both shapes: static and time-varying
 
 A panel is static or time-varying, and the whole panel is one shape. A static panel carries no
-mask, and every field is `assets` or `assets × labels`. A time-varying panel leads every field
-with an observation axis, and carries two `observations × assets` masks of `true` and `false`
-beside the fields. The active mask marks when each asset was in the universe, and the
+mask, and every field is `assets` or `assets × labels`. A time-varying panel adds an
+observation axis to every field, and carries two `observations × assets` masks of `true` and
+`false` beside the fields. The active mask marks when each asset was in the universe, and the
 estimation mask marks the active cells a fit may use.
 [`feature_matrix`](@ref) follows the shape. A static panel stacks to `assets × features`, and a
-time-varying one to `observations × assets × features`.
+time-varying one to `assets × features × observations`. The observations are the last axis, so
+the matrix of one observation, `Ztv[:, :, t]`, is one contiguous block.
 
 A time-varying matrix must give one distance matrix, and the `alg` field says how. The library
 ships four collapse rules, and you can write your own.
@@ -524,7 +525,7 @@ collapses = ["LastRow()" => LastRow(), "AggregateFeatures()" => AggregateFeature
 collapse_rows = DataFrame()
 for (cname, alg) in collapses
     Dc = distance(FeatureDistance(; alg = alg), Ztv; dims = 1)
-    D1 = distance(FeatureDistance(; alg = alg), reshape(Ztv[end, :, :], 1, N, 2); dims = 1)
+    D1 = distance(FeatureDistance(; alg = alg), reshape(Ztv[:, :, end], N, 2, 1); dims = 1)
     append!(collapse_rows,
             DataFrame("Collapse" => cname, "Mean distance" => round(mean(Dc); digits = 4),
                       "Maximum distance" => round(maximum(Dc); digits = 4),

@@ -106,13 +106,13 @@ end
     Zsq = block_features(StableRNG(707), N, blocks)
     # Z3[t, i, j] names its own position, so a mis-indexed observation axis shows up in the
     # values and not merely in the shape.
-    Z3 = reshape(Float64.(1:(T * N * K)), T, N, K) ./ 1000
+    Z3 = reshape(Float64.(1:(T * N * K)), N, K, T) ./ 1000
     # The collapse of a bare matrix, driven through the panel that holds it.
     function collapse(Z, sq::Bool, W)
         pnl = if sq
             sqpanel(nx, Z)
         else
-            rectpanel([string("c", k) for k in axes(Z, ndims(Z))], Z)
+            rectpanel([string("c", k) for k in axes(Z, 2)], Z)
         end
         c = PO.collapse_asset_panel(pnl, W, sq ? nx : nothing, RenormaliseActive())
         return PO.panel_field(c, sq ? "prox" : "beta").vals
@@ -150,17 +150,17 @@ end
         crect = PO.collapse_asset_panel(rectpanel(nf, Zr), Wl, nx, RenormaliseActive())
         @test !features_are_assets(PO.panel_field(crect, "beta"), ["_$i" for i in 1:k])
 
-        # Time-varying: the same arithmetic per observation, observation axis leading.
+        # Time-varying: the same arithmetic per observation, observation axis last.
         C3 = collapse(Z3, false, Wl)
-        @test size(C3) == (T, k, K)
-        @test all(t -> C3[t, :, :] ≈ transpose(saw(Wl)) * Z3[t, :, :], 1:T)
-        Z3sq = Array{Float64}(undef, T, N, N)
+        @test size(C3) == (k, K, T)
+        @test all(t -> C3[:, :, t] ≈ transpose(saw(Wl)) * Z3[:, :, t], 1:T)
+        Z3sq = Array{Float64}(undef, N, N, T)
         for t in 1:T
-            Z3sq[t, :, :] = Zsq
+            Z3sq[:, :, t] = Zsq
         end
         C3s = collapse(Z3sq, true, Wl)
-        @test size(C3s) == (T, k, k)
-        @test all(t -> C3s[t, :, :] ≈ Cs, 1:T)
+        @test size(C3s) == (k, k, T)
+        @test all(t -> C3s[:, :, t] ≈ Cs, 1:T)
 
         # A numeric Panel Field stays numeric, and contracts on its one axis.
         num = asset_panel([NumericPanelInput(; name = "mcap", vals = Zr[:, 1])])
@@ -280,7 +280,7 @@ end
 
         _, _, _, _, pnl_3, _ = PO.prepare_outer_rd(rd_3d, wi, RenormaliseActive())
         @test PO.panel_feature_names(pnl_3) == nf
-        @test size(panel_feature_matrix(pnl_3)[2]) == (T, k, K)
+        @test size(panel_feature_matrix(pnl_3)[2]) == (k, K, T)
 
         #=
         `predict_outer_returns` is a documented overload point, so extending the tuple is a
@@ -330,7 +330,7 @@ end
                 Zo = ro.seen[1]
                 wi = weights_of(res)
                 @test Zo ≈ collapse(Zsrc, sq, wi)
-                @test size(Zo, ndims(Zo) - 1) == size(wi, 2)
+                @test size(Zo, 1) == size(wi, 2)
                 @test all(isfinite, Zo)
             end
         end
@@ -364,8 +364,8 @@ end
                 @test isapprox(sum(res.w), 1)
                 Zo = ro.seen[1]
                 @test ndims(Zo) == 3
-                @test size(Zo, 1) == T
-                @test size(Zo, 3) == nfeat
+                @test size(Zo, 3) == T
+                @test size(Zo, 2) == nfeat
                 @test all(isfinite, Zo)
             end
 
@@ -374,8 +374,8 @@ end
             ro = RecordingDistance(FeatureDistance(; alg = StackObservations()))
             optimise(mk(ro), rd_r)
             Zo = ro.seen[1]
-            for i in axes(Zo, 2)
-                @test length(unique(eachrow(Zo[:, i, :]))) == n_folds
+            for i in axes(Zo, 1)
+                @test length(unique(eachcol(Zo[i, :, :]))) == n_folds
             end
         end
     end
@@ -462,12 +462,12 @@ end
         res = optimise(st, rd_sq)
         @test isapprox(sum(res.w), 1)
         Zo = ro.seen[1]
-        @test size(Zo) == (T, 2, 2)
-        @test size(Zo, 3) != N
+        @test size(Zo) == (2, 2, T)
+        @test size(Zo, 1) != N
         # Two-sided against a symmetric source, so every observation is symmetric, and the
         # feature axis being the synthetic asset axis is what keeps `features_are_assets`
         # true for a `Stacking` nested inside something that collapses again.
-        @test all(t -> Zo[t, :, :] ≈ transpose(Zo[t, :, :]), 1:T)
+        @test all(t -> Zo[:, :, t] ≈ transpose(Zo[:, :, t]), 1:T)
         @test all(isfinite, Zo)
 
         #=
@@ -485,17 +485,17 @@ end
         @test isapprox(sum(res.w), 1)
         Zn = rn.seen[1]
         @test ndims(Zn) == 3
-        @test size(Zn, 1) == T
-        @test size(Zn, 2) == size(Zn, 3)
-        @test size(Zn, 3) != N
-        @test all(t -> Zn[t, :, :] ≈ transpose(Zn[t, :, :]), 1:T)
+        @test size(Zn, 3) == T
+        @test size(Zn, 1) == size(Zn, 2)
+        @test size(Zn, 1) != N
+        @test all(t -> Zn[:, :, t] ≈ transpose(Zn[:, :, t]), 1:T)
         @test all(isfinite, Zn)
 
         # A 3-D square source reaches the same place, and gets genuine per-observation
         # variation inside each fold on top of the per-fold weight variation.
-        Z3sq = Array{Float64}(undef, T, N, N)
+        Z3sq = Array{Float64}(undef, N, N, T)
         for t in 1:T
-            Z3sq[t, :, :] = Zsq .* (1 + t / T)
+            Z3sq[:, :, t] = Zsq .* (1 + t / T)
         end
         rd_3dsq = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts,
                                 pnl = sqpanel(nx, Z3sq))
@@ -506,9 +506,9 @@ end
                                ex = seq)
         optimise(nco3, rd_3dsq)
         Z3o = r3.seen[1]
-        @test size(Z3o, 1) == T
-        @test size(Z3o, 2) == size(Z3o, 3)
-        @test length(unique(eachrow(reshape(Z3o, T, :)))) == T
+        @test size(Z3o, 3) == T
+        @test size(Z3o, 1) == size(Z3o, 2)
+        @test length(unique(eachcol(reshape(Z3o, :, T)))) == T
     end
 
     @testset "cv and non-cv agree: the seam makes the same collapse call" begin
@@ -546,8 +546,8 @@ end
                 Ws = [PO.fold_weight_matrix(predictions, u, f, N)
                       for f in eachindex(test_idx)]
                 rdo = PO.rebuild_returns_result(rd, predictions, u, RenormaliseActive())
-                @test size(panel_feature_matrix(rdo.pnl)[2], 1) == size(rdo.X, 1) == T
-                @test size(panel_feature_matrix(rdo.pnl)[2], 2) == length(rdo.nx)
+                @test size(panel_feature_matrix(rdo.pnl)[2], 3) == size(rdo.X, 1) == T
+                @test size(panel_feature_matrix(rdo.pnl)[2], 1) == length(rdo.nx)
                 @test any(f -> PO.features_are_assets(f, rdo.nx), rdo.pnl.pf) == sq
                 r = 0
                 for (f, rows) in enumerate(test_idx)
@@ -555,14 +555,10 @@ end
                                                                                 :), Ws[f],
                                                                RenormaliseActive())
                     nz_e, Z_e = panel_feature_matrix(pnl_e)
-                    blk = panel_feature_matrix(rdo.pnl)[2][(r + 1):(r + length(rows)), :, :]
+                    blk = panel_feature_matrix(rdo.pnl)[2][:, :, (r + 1):(r + length(rows))]
                     # A static source has no observation axis of its own, so the non-`cv`
                     # result is the fold's constant; a time-varying one already carries one.
-                    expected = if ndims(Z_e) == 3
-                        Z_e
-                    else
-                        permutedims(repeat(Z_e, 1, 1, length(rows)), (3, 1, 2))
-                    end
+                    expected = ndims(Z_e) == 3 ? Z_e : repeat(Z_e, 1, 1, length(rows))
                     @test blk ≈ expected
                     @test panel_feature_matrix(rdo.pnl)[1] == nz_e
                     r += length(rows)
@@ -593,11 +589,11 @@ end
                                         RenormaliseActive())
         # The folds cover fewer rows than the clock has, which is the point: a cumulative
         # count would have started at row 1 and run out before the last fold.
-        @test size(panel_feature_matrix(rdo.pnl)[2], 1) == sum(length, test_idx) < T
+        @test size(panel_feature_matrix(rdo.pnl)[2], 3) == sum(length, test_idx) < T
         r = 0
         for (f, rows) in enumerate(test_idx)
-            @test panel_feature_matrix(rdo.pnl)[2][(r + 1):(r + length(rows)), :, :] ≈
-                  collapse(Z3[rows, :, :], false, Ws[f])
+            @test panel_feature_matrix(rdo.pnl)[2][:, :, (r + 1):(r + length(rows))] ≈
+                  collapse(Z3[:, :, rows], false, Ws[f])
             r += length(rows)
         end
     end
@@ -635,7 +631,7 @@ end
         @test size(panel_feature_matrix(PO.rebuild_returns_result(rd_r_nots, preds_r,
                                                                   PO.FullUniverse(),
                                                                   RenormaliseActive()).pnl)[2]) ==
-              (T, 2, K)
+              (2, K, T)
 
         # Recovering by time is only sound on a uniquely-keyed axis, so `ReturnsResult`
         # now refuses a repeated timestamp outright.
@@ -681,13 +677,13 @@ end
         o[2, 1] = false
         o[3, 3] = false
         codes = [1 2 2; 1 1 2; 2 1 2]
-        S = reshape(Float64.(1:27), 3, 3, 3)
+        S = permutedims(reshape(Float64.(1:27), 3, 3, 3), (2, 3, 1))
         pnl = AssetPanel(;
                          pf = [NumericPanelField(; name = "a", vals = a, omsk = o,
                                                  pmsk = .!o),
                                NumericPanelField(; name = "lift",
-                                                 vals = PO.RepeatedLeading([10.0, 20.0,
-                                                                            30.0], 3)),
+                                                 vals = PO.RepeatedObservations([10.0, 20.0,
+                                                                                 30.0], 3)),
                                CategoricalPanelField(; name = "c", levels = ["x", "y"],
                                                      codes = codes),
                                TensorPanelField(; name = "s", axis = "asset", labels = nx3,
@@ -708,9 +704,9 @@ end
         @test vals(cr, "lift") ≈ [17.5 20.0; 50 / 3 0.0; 30.0 0.0]
         @test vals(cc, "lift") ≈ [17.5 20.0; 12.5 0.0; 7.5 0.0]
         # The membership fractions of a categorical field sum to one under the default.
-        @test vals(cr, "c")[:, 1, :] ≈ [0.5 0.5; 2 / 3 1 / 3; 0.0 1.0]
-        @test vals(cr, "c")[:, 2, :] ≈ [0.0 1.0; 0.0 0.0; 0.0 0.0]
-        @test vals(cc, "c")[:, 1, :] ≈ [0.5 0.5; 0.5 0.25; 0.0 0.25]
+        @test permutedims(vals(cr, "c")[1, :, :]) ≈ [0.5 0.5; 2 / 3 1 / 3; 0.0 1.0]
+        @test permutedims(vals(cr, "c")[2, :, :]) ≈ [0.0 1.0; 0.0 0.0; 0.0 0.0]
+        @test permutedims(vals(cc, "c")[1, :, :]) ≈ [0.5 0.5; 0.5 0.25; 0.0 0.25]
         # A square field restricts both axes: S°_t = D_tᵀ S_t D_t.
         Wt = [0.5 0.0; 0.25 1.0; 0.25 0.0]
         for (c, renorm) in ((cr, true), (cc, false)), t in 1:3
@@ -719,7 +715,7 @@ end
             if renorm
                 D = D ./ map(x -> iszero(x) ? 1.0 : x, s)
             end
-            @test vals(c, "s")[t, :, :] ≈ transpose(D) * S[t, :, :] * D
+            @test vals(c, "s")[:, :, t] ≈ transpose(D) * S[:, :, t] * D
         end
         # The universe masks keep their rule, and a sub-portfolio with no active member is
         # inactive. The observed mask counts a member that is active and observed.
@@ -853,20 +849,20 @@ end
         @test Z[1, 1] ≈ 9.0
         # A time-varying tensor field whose data mask holds everywhere collapses as the
         # plain contraction of the active members does, one observation at a time.
-        A3 = reshape(Float64.(1:(T * N * 2)), T, N, 2) ./ 1000
+        A3 = reshape(Float64.(1:(T * N * 2)), N, 2, T) ./ 1000
         Z, Wn = outer_features(rd_with(AssetPanel(;
                                                   pf = [TensorPanelField(; name = "t",
                                                                          axis = "factor",
                                                                          labels = ["p",
                                                                                    "q"],
                                                                          vals = A3,
-                                                                         omsk = trues(T, N,
-                                                                                      2),
-                                                                         pmsk = falses(T, N,
-                                                                                       2))],
+                                                                         omsk = trues(N, 2,
+                                                                                      T),
+                                                                         pmsk = falses(N, 2,
+                                                                                       T))],
                                                   amsk = trues(T, N), emsk = trues(T, N))))
-        @test size(Z) == (T, 2, 2)
-        @test all(t -> Z[t, :, :] ≈ transpose(Wn) * A3[t, :, :], 1:T)
+        @test size(Z) == (2, 2, T)
+        @test all(t -> Z[:, :, t] ≈ transpose(Wn) * A3[:, :, t], 1:T)
         # A static tensor field whose data mask holds everywhere collapses as the plain
         # contraction.
         Z, Wn = outer_features(rd_with(AssetPanel(;
@@ -910,7 +906,8 @@ end
         ivpaa = collect(1.0:N)
         function all_active_rd(msk)
             pnl = AssetPanel(;
-                             pf = [NumericPanelField(; name = "z", vals = Z3[:, :, 1]),
+                             pf = [NumericPanelField(; name = "z",
+                                                     vals = permutedims(Z3[:, 1, :])),
                                    TensorPanelField(; name = "beta", axis = "factor",
                                                     labels = nf, vals = Z3)], amsk = msk,
                              emsk = msk)
@@ -924,7 +921,7 @@ end
             @test iv == PO.collapse_panel_numeric(iva, wn)
             @test ivpa == PO.collapse_panel_numeric(ivpaa, wn)
             @test PO.panel_field(pnl, "z").vals ==
-                  PO.collapse_panel_numeric(Z3[:, :, 1], wn)
+                  PO.collapse_panel_numeric(permutedims(Z3[:, 1, :]), wn)
             @test PO.panel_field(pnl, "beta").vals ==
                   PO.collapse_panel_tensor(Z3, wn, false)
         end
@@ -969,7 +966,9 @@ end
                             ivpa = collect(1.0:N),
                             pnl = AssetPanel(;
                                              pf = [NumericPanelField(; name = "z",
-                                                                     vals = Z3[:, :, 1])],
+                                                                     vals = permutedims(Z3[:,
+                                                                                           1,
+                                                                                           :]))],
                                              amsk = m, emsk = m))
         cvg = CoveragePolicy()
         pec = EmpiricalPrior(; me = SimpleExpectedReturns(; cvg = cvg),

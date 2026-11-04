@@ -65,8 +65,8 @@ end
         @test cor(rr.csr.f[:, 1], fx.fl[2:end]) > 0.99
         # The combined model reproduces the base-currency returns exactly.
         X = fx.rd.X
-        for t in 2:size(rr.Ms, 1)
-            @test X[t + 1, :] ≈ rr.Ms[t - 1, :, :] * pr.fpr.X[t, :] + rr.csr.eps[t, :]
+        for t in 2:size(rr.Ms, 3)
+            @test X[t + 1, :] ≈ rr.Ms[:, :, t - 1] * pr.fpr.X[t, :] + rr.csr.eps[t, :]
         end
         @test pr.o_X == X[2:end, :]
         # The axis a caller declares before the fit is the axis of the block.
@@ -155,9 +155,9 @@ end
         amsk[1:10, 1] .= false
         fx = obs_fixture(; amsk = amsk)
         rr = prior(obs_prior(), fx.rd).rr
-        @test all(isnan, rr.Ms[1:9, 1, 2:3])
-        @test all(isfinite, rr.Ms[10:end, 1, 2:3])
-        @test all(isfinite, rr.Ms[:, 2:end, 2:3])
+        @test all(isnan, rr.Ms[1, 2:3, 1:9])
+        @test all(isfinite, rr.Ms[1, 2:3, 10:end])
+        @test all(isfinite, rr.Ms[2:end, 2:3, :])
     end
 
     @testset "A gap in the rows the warm-up and the lag consume is accepted" begin
@@ -343,7 +343,7 @@ end
         pr = prior(obs_prior(; factors = fb), rd)
         @test pr.rr.nf == ["beta", "currency=EUR"]
         usd = findall(==(2), fz.code)
-        @test all(iszero, pr.rr.Ms[:, usd, 2])
+        @test all(iszero, pr.rr.Ms[usd, 2, :])
         @test all(isfinite, pr.sigma)
         @test cross_sectional_factor_axis(obs_prior(; factors = fb), rd).nf == pr.rr.nf
         # A factor of the base currency has no variance. The factor covariance keeps its zero

@@ -867,7 +867,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Raw form of a Panel Field whose third axis carries its own labels, and optionally its own groups.
+Raw form of a Panel Field whose label axis, its second axis, carries its own labels, and optionally its own groups.
 
 # Fields
 
@@ -891,17 +891,17 @@ Keywords correspond to the struct's fields.
   - `!isempty(name)`.
   - `!isempty(vals)`.
   - `ndims(vals)` is `2` or `3`.
-  - `size(vals, ndims(vals)) == length(labels)`. The last axis of `vals` carries the labels, in the static shape and in the time-varying one.
+  - `size(vals, 2) == length(labels)`. The second axis of `vals` carries the labels, in the static shape and in the time-varying one.
   - A fill policy that carries a `val` carries a number. See [`assert_panel_fill_value`](@ref).
   - [`TensorPanelField`](@ref), which this input builds, checks `axis`, `labels` and `groups`.
 
 # Examples
 
 ```jldoctest
-julia> TensorPanelInput(; name = \"beta\", vals = ones(2, 2, 1), axis = \"factor\", labels = [\"size\"])
+julia> TensorPanelInput(; name = \"beta\", vals = ones(2, 1, 2), axis = \"factor\", labels = [\"size\"])
 TensorPanelInput
     name ┼ String: "beta"
-    vals ┼ Array{Float64, 3}: [1.0 1.0; 1.0 1.0;;;]
+    vals ┼ Array{Float64, 3}: [1.0; 1.0;;; 1.0; 1.0]
     axis ┼ String: "factor"
   labels ┼ Vector{String}: ["size"]
   groups ┼ nothing
@@ -924,19 +924,19 @@ TensorPanelInput
     """
     name
     """
-    Raw values, blanks included, `assets × labels` when static and `observations × assets × labels` when time-varying. A blank is a `missing`, a `nothing` or a `NaN`.
+    Raw values, blanks included, `assets × labels` when static and `assets × labels × observations` when time-varying. A blank is a `missing`, a `nothing` or a `NaN`.
     """
     vals
     """
-    Name of what the third axis represents, such as `"factor"`.
+    Name of what the label axis, the second axis, represents, such as `"factor"`.
     """
     axis
     """
-    Labels of the third-axis entries, one per third-axis entry of `vals`.
+    Labels of the label-axis entries, one per entry of the second axis of `vals`.
     """
     labels
     """
-    Optional group of each third-axis entry, such as a Factor Family, one per label.
+    Optional group of each label-axis entry, such as a Factor Family, one per label.
     """
     groups
     """
@@ -948,8 +948,8 @@ TensorPanelInput
                               groups::Option{<:VecStr},
                               alg::Option{<:AbstractPanelFillAlgorithm})
         assert_panel_input(name, vals, 2, 3)
-        @argcheck(size(vals, ndims(vals)) == length(labels),
-                  DimensionMismatch("the tensor Panel Field \"$name\" needs one label per trailing-axis entry of vals, got $(size(vals, ndims(vals))) trailing entries and length(labels) = $(length(labels))"))
+        @argcheck(size(vals, 2) == length(labels),
+                  DimensionMismatch("the tensor Panel Field \"$name\" needs one label per entry of the second axis of vals, the label axis, got $(size(vals, 2)) entries and length(labels) = $(length(labels))"))
         assert_panel_fill_value(alg, Number, name)
         return new{typeof(name), typeof(vals), typeof(axis), typeof(labels), typeof(groups),
                    typeof(alg)}(name, vals, axis, labels, groups, alg)
@@ -1010,7 +1010,7 @@ end
 
 Return whether a raw Panel Field carries no observation axis.
 
-The rank of the raw values sets the shape. A numeric or a categorical input is `assets` when static and `observations × assets` when time-varying. A tensor input is `assets × labels` when static and `observations × assets × labels` when time-varying.
+The rank of the raw values sets the shape. A numeric or a categorical input is `assets` when static and `observations × assets` when time-varying. A tensor input is `assets × labels` when static and `assets × labels × observations` when time-varying.
 
 # Algorithm
 
@@ -1078,20 +1078,25 @@ function assert_panel_input_fill(inp::AbstractPanelFieldInput)::Nothing
     return nothing
 end
 """
-    panel_fill_array(vals::AbstractArray, alg::Option{<:AbstractPanelFillAlgorithm}, name::AbstractString, amsk::Option{<:AbstractMatrix{Bool}})
+    panel_fill_array(vals::AbstractArray, alg::Option{<:AbstractPanelFillAlgorithm}, name::AbstractString, amsk::Nothing)
+    panel_fill_array(vals::AbstractMatrix, alg::Option{<:AbstractPanelFillAlgorithm}, name::AbstractString, amsk::AbstractMatrix{Bool})
+    panel_fill_array(vals::AbstractArray{<:Any, 3}, alg::Option{<:AbstractPanelFillAlgorithm}, name::AbstractString, amsk::AbstractMatrix{Bool})
 
 Resolve the blanks of one raw Panel Field, and return the filled array.
 
 The fill runs per asset, along the observation axis. A point-in-time panel has blanks along this axis only. An asset lists late or delists, so its history has a head or a tail of blanks.
 
-A time-varying raw Panel Field resolves each column with the active mask of its asset, the second axis of `vals`, so a directional fill never crosses an inactive stretch.
+A time-varying raw Panel Field resolves each series of one asset with the active mask of that asset, so a directional fill never crosses an inactive stretch. A numeric or a categorical field is `observations × assets`, so a series is a column. A tensor field is `assets × labels × observations`, so a series is the last axis at one asset and one label.
 
 A static raw Panel Field has no observation axis. Its two admitted policies resolve each cell on its own, so the function resolves the whole array as one flat run and gives it back its shape.
 
 # Algorithm
 
- 1. When `amsk` is `nothing`, the raw Panel Field is static. Resolve `vec(vals)` with [`panel_fill`](@ref), and reshape the result.
- 2. Otherwise walk the trailing axes, and resolve each column of the observation axis with [`panel_fill`](@ref) and the column of `amsk` for its asset.
+The method that Julia selects is the algorithm.
+
+ 1. `amsk` is `nothing`, so the raw Panel Field is static: resolve `vec(vals)` with [`panel_fill`](@ref), and reshape the result.
+ 2. A matrix: resolve each column with [`panel_fill`](@ref) and the column of `amsk` for its asset.
+ 3. An array of rank three: resolve the series of each asset and each label with [`panel_fill`](@ref) and the column of `amsk` for its asset.
 
 # Arguments
 
@@ -1116,15 +1121,27 @@ function panel_fill_array(vals::AbstractArray, alg::Option{<:AbstractPanelFillAl
                           name::AbstractString, ::Nothing)
     return reshape(panel_fill(alg, vec(vals), name), size(vals))
 end
-function panel_fill_array(vals::AbstractArray, alg::Option{<:AbstractPanelFillAlgorithm},
+function panel_fill_array(vals::AbstractMatrix, alg::Option{<:AbstractPanelFillAlgorithm},
                           name::AbstractString, amsk::AbstractMatrix{Bool})
-    cols = CartesianIndices(size(vals)[2:end])
-    first = panel_fill(alg, view(vals, :, cols[1]), view(amsk, :, cols[1][1]), name)
+    first = panel_fill(alg, view(vals, :, 1), view(amsk, :, 1), name)
     out = Array{eltype(first)}(undef, size(vals))
-    out[:, cols[1]] = first
-    for k in 2:length(cols)
-        out[:, cols[k]] = panel_fill(alg, view(vals, :, cols[k]), view(amsk, :, cols[k][1]),
-                                     name)
+    out[:, 1] = first
+    for i in 2:size(vals, 2)
+        out[:, i] = panel_fill(alg, view(vals, :, i), view(amsk, :, i), name)
+    end
+    return out
+end
+function panel_fill_array(vals::AbstractArray{<:Any, 3},
+                          alg::Option{<:AbstractPanelFillAlgorithm}, name::AbstractString,
+                          amsk::AbstractMatrix{Bool})
+    first = panel_fill(alg, view(vals, 1, 1, :), view(amsk, :, 1), name)
+    out = Array{eltype(first)}(undef, size(vals))
+    for l in axes(vals, 2), i in axes(vals, 1)
+        out[i, l, :] = if i == 1 && l == 1
+            first
+        else
+            panel_fill(alg, view(vals, i, l, :), view(amsk, :, i), name)
+        end
     end
     return out
 end
@@ -1138,7 +1155,7 @@ A static raw Panel Field has no observation axis, so its fill reads no mask. A t
 # Algorithm
 
  1. Return `nothing` when the raw Panel Field is static.
- 2. Return an all-`true` mask of the first two axes of the raw values when `amsk` is `nothing`.
+ 2. Return an all-`true` mask of the observation and asset axes of the raw values when `amsk` is `nothing`.
  3. Otherwise check the shape of `amsk`, and return it.
 
 # Arguments
@@ -1148,7 +1165,7 @@ A static raw Panel Field has no observation axis, so its fill reads no mask. A t
 
 # Validation
 
-  - `size(amsk)` equals the first two axes of the raw values of a time-varying input. Raises a `DimensionMismatch`.
+  - `size(amsk)` equals the observation and asset axes of the raw values of a time-varying input. Raises a `DimensionMismatch`.
 
 # Returns
 
@@ -1166,13 +1183,20 @@ function panel_input_mask(inp::AbstractPanelFieldInput,
     if panel_input_is_static(inp)
         return nothing
     end
-    return panel_input_mask(inp, amsk, (size(inp.vals, 1), size(inp.vals, 2)))
+    v = inp.vals
+    # A tensor input is `assets × labels × observations`; the rank is a property of the type.
+    ax = if ndims(v) == 2
+        (size(v, 1), size(v, 2))
+    else
+        (size(v, 3), size(v, 1))
+    end
+    return panel_input_mask(inp, amsk, ax)
 end
 panel_input_mask(::AbstractPanelFieldInput, ::Nothing, ax::Tuple) = trues(ax)
 function panel_input_mask(inp::AbstractPanelFieldInput, amsk::AbstractMatrix{Bool},
                           ax::Tuple)
     @argcheck(size(amsk) == ax,
-              DimensionMismatch("the active mask of an Asset Panel is observations × assets, so it matches the first two axes of the Panel Field \"$(inp.name)\", got size(amsk) = $(size(amsk)) and a Panel Field of $(ax[1]) observations and $(ax[2]) assets"))
+              DimensionMismatch("the active mask of an Asset Panel is observations × assets, so it matches the observation and asset axes of the Panel Field \"$(inp.name)\", got size(amsk) = $(size(amsk)) and a Panel Field of $(ax[1]) observations and $(ax[2]) assets"))
     return amsk
 end
 """
@@ -1318,11 +1342,13 @@ function panel_input_field(inp::TensorPanelInput, vals::AbstractArray{<:Real},
                             omsk = isnothing(inp.alg) ? nothing : obs)
 end
 """
-    panel_placeholder_array(vals::AbstractArray, alg::Option{<:AbstractPanelFillAlgorithm}, amsk::Option{<:AbstractMatrix{Bool}}) -> BitArray
+    panel_placeholder_array(vals::AbstractArray, alg::Option{<:AbstractPanelFillAlgorithm}, amsk::Nothing) -> BitArray
+    panel_placeholder_array(vals::AbstractMatrix, alg::Option{<:AbstractPanelFillAlgorithm}, amsk::AbstractMatrix{Bool}) -> BitArray
+    panel_placeholder_array(vals::AbstractArray{<:Any, 3}, alg::Option{<:AbstractPanelFillAlgorithm}, amsk::AbstractMatrix{Bool}) -> BitArray
 
 Mark the placeholders of one raw Panel Field, the cells that [`panel_fill_array`](@ref) resolves to a value that holds no data.
 
-The walk is the one of [`panel_fill_array`](@ref). A time-varying raw Panel Field marks each column with the active mask of its asset, and a static one marks the whole array as one flat run.
+The walk is the one of [`panel_fill_array`](@ref). A time-varying raw Panel Field marks each series of one asset with the active mask of that asset: a column of a matrix, and the last axis at one asset and one label of a tensor. A static one marks the whole array as one flat run.
 
 # Arguments
 
@@ -1345,12 +1371,21 @@ function panel_placeholder_array(vals::AbstractArray,
                                  alg::Option{<:AbstractPanelFillAlgorithm}, ::Nothing)
     return reshape(BitVector(panel_placeholder(alg, vec(vals), nothing)), size(vals))
 end
-function panel_placeholder_array(vals::AbstractArray,
+function panel_placeholder_array(vals::AbstractMatrix,
                                  alg::Option{<:AbstractPanelFillAlgorithm},
                                  amsk::AbstractMatrix{Bool})
     plc = falses(size(vals))
-    for col in CartesianIndices(size(vals)[2:end])
-        plc[:, col] = panel_placeholder(alg, view(vals, :, col), view(amsk, :, col[1]))
+    for i in axes(vals, 2)
+        plc[:, i] = panel_placeholder(alg, view(vals, :, i), view(amsk, :, i))
+    end
+    return plc
+end
+function panel_placeholder_array(vals::AbstractArray{<:Any, 3},
+                                 alg::Option{<:AbstractPanelFillAlgorithm},
+                                 amsk::AbstractMatrix{Bool})
+    plc = falses(size(vals))
+    for l in axes(vals, 2), i in axes(vals, 1)
+        plc[i, l, :] = panel_placeholder(alg, view(vals, i, l, :), view(amsk, :, i))
     end
     return plc
 end
@@ -1429,11 +1464,11 @@ end
 
 Lift a static Panel Field onto `n` observations, lazily.
 
-A static input that meets a time-varying one, or that meets the two universe masks, joins the panel at the panel's observation count. The values are wrapped in a [`RepeatedLeading`](@ref), which stores them once. The observed mask and the placeholder mask are wrapped in the same way, so a cell that a fill policy wrote, or that holds a placeholder, keeps that state at every observation.
+A static input that meets a time-varying one, or that meets the two universe masks, joins the panel at the panel's observation count. The values are wrapped in a [`RepeatedObservations`](@ref), which stores them once. The observed mask and the placeholder mask are wrapped in the same way, so a cell that a fill policy wrote, or that holds a placeholder, keeps that state at every observation.
 
 # Algorithm
 
-The method that Julia selects is the algorithm. Each kind rebuilds itself with its value array and its two masks wrapped in a [`RepeatedLeading`](@ref), through [`panel_mask_lift`](@ref).
+The method that Julia selects is the algorithm. Each kind rebuilds itself with its value array and its two masks wrapped in a [`RepeatedObservations`](@ref), through [`panel_mask_lift`](@ref).
 
 # Arguments
 
@@ -1446,49 +1481,49 @@ The method that Julia selects is the algorithm. Each kind rebuilds itself with i
 
 # Related
 
-  - [`RepeatedLeading`](@ref)
+  - [`RepeatedObservations`](@ref)
   - [`panel_mask_lift`](@ref)
   - [`asset_panel`](@ref)
   - [`AbstractPanelField`](@ref)
 """
 function panel_field_lift(f::NumericPanelField, n::Integer)
-    return NumericPanelField(; name = f.name, vals = RepeatedLeading(f.vals, n),
+    return NumericPanelField(; name = f.name, vals = RepeatedObservations(f.vals, n),
                              omsk = panel_mask_lift(f.omsk, n),
                              pmsk = panel_mask_lift(f.pmsk, n))
 end
 function panel_field_lift(f::CategoricalPanelField, n::Integer)
     return CategoricalPanelField(; name = f.name, levels = f.levels,
-                                 codes = RepeatedLeading(f.codes, n),
+                                 codes = RepeatedObservations(f.codes, n),
                                  omsk = panel_mask_lift(f.omsk, n),
                                  pmsk = panel_mask_lift(f.pmsk, n))
 end
 function panel_field_lift(f::TensorPanelField, n::Integer)
     return TensorPanelField(; name = f.name, axis = f.axis, labels = f.labels,
-                            groups = f.groups, vals = RepeatedLeading(f.vals, n),
+                            groups = f.groups, vals = RepeatedObservations(f.vals, n),
                             omsk = panel_mask_lift(f.omsk, n),
                             pmsk = panel_mask_lift(f.pmsk, n))
 end
 """
     panel_mask_lift(m::Nothing, n::Integer) -> nothing
-    panel_mask_lift(m::AbstractArray{Bool}, n::Integer) -> RepeatedLeading
+    panel_mask_lift(m::AbstractArray{Bool}, n::Integer) -> RepeatedObservations
 
 Lift one mask of a static Panel Field onto `n` observations, as [`panel_field_lift`](@ref) lifts its values. `nothing` stays `nothing`.
 
 # Related
 
   - [`panel_field_lift`](@ref)
-  - [`RepeatedLeading`](@ref)
+  - [`RepeatedObservations`](@ref)
 """
 function panel_mask_lift(::Nothing, ::Integer)
     return nothing
 end
 function panel_mask_lift(m::AbstractArray{Bool}, n::Integer)
-    return RepeatedLeading(m, n)
+    return RepeatedObservations(m, n)
 end
 # A lift of integer values converts its parent, so a numeric Panel Field that a caller builds
 # on such a lift stays lazy.
-function float_if_integer(R::RepeatedLeading{<:Integer})
-    return RepeatedLeading(float_if_integer(R.parent), R.n)
+function float_if_integer(R::RepeatedObservations{<:Integer})
+    return RepeatedObservations(float_if_integer(R.parent), R.n)
 end
 """
     panel_build_observations(inputs::AbstractVector{<:AbstractPanelFieldInput},
@@ -1501,8 +1536,8 @@ The build is time-varying when an input carries an observation axis, or when a u
 
 # Algorithm
 
- 1. Return the leading axis of the first time-varying input, when there is one.
- 2. Otherwise return the leading axis of `amsk`, then of `emsk`, whichever is given.
+ 1. Return the length of the observation axis of the first time-varying input, as [`observation_axis`](@ref) names it, when there is one.
+ 2. Otherwise return the length of the first axis of `amsk`, then of `emsk`, whichever is given.
  3. Otherwise return `nothing`, which is the static build.
 
 # Arguments
@@ -1519,7 +1554,7 @@ The build is time-varying when an input carries an observation axis, or when a u
 
   - [`asset_panel`](@ref)
   - [`panel_field_lift`](@ref)
-  - [`RepeatedLeading`](@ref)
+  - [`RepeatedObservations`](@ref)
   - [`panel_input_is_static`](@ref)
   - [`AssetPanel`](@ref)
 """
@@ -1528,7 +1563,7 @@ function panel_build_observations(inputs::AbstractVector{<:AbstractPanelFieldInp
                                   emsk::Option{<:AbstractMatrix{Bool}})
     for inp in inputs
         if !panel_input_is_static(inp)
-            return size(inp.vals, 1)
+            return size(inp.vals, observation_axis(inp.vals))
         end
     end
     return panel_build_observations(amsk, emsk)
@@ -1553,7 +1588,7 @@ The result goes straight into the `pnl` keyword that `PricesResult` and `Returns
 
 The rank of the raw values marks a static input. An input whose values carry no observation axis is static, such as a fundamentals table or a sector classification with no history. A static input refuses [`ForwardPanelFill`](@ref) and [`BackwardPanelFill`](@ref), because it has no observation axis to carry a value along.
 
-A set of static inputs with no mask builds a static panel. A static input that meets a time-varying input, or a mask, is lifted. [`panel_build_observations`](@ref) reads the observation count of the build, and [`panel_field_lift`](@ref) wraps the static values in a [`RepeatedLeading`](@ref), which stores them once and indexes a leading observation axis. A lifted Panel Field keeps its observed mask and its placeholder mask, lifted in the same way.
+A set of static inputs with no mask builds a static panel. A static input that meets a time-varying input, or a mask, is lifted. [`panel_build_observations`](@ref) reads the observation count of the build, and [`panel_field_lift`](@ref) wraps the static values in a [`RepeatedObservations`](@ref), which stores them once and indexes the observation axis that [`observation_axis`](@ref) names for its rank. A lifted Panel Field keeps its observed mask and its placeholder mask, lifted in the same way.
 
 # Algorithm
 
@@ -1575,7 +1610,7 @@ A set of static inputs with no mask builds a static panel. A static input that m
   - `!isempty(inputs)`. Raises an [`IsEmptyError`](@ref).
   - The Panel Field names are non-empty and unique. See [`assert_panel_labels`](@ref).
   - A static input carries no directional fill policy. See [`assert_panel_input_fill`](@ref).
-  - `size(amsk)` matches the first two axes of each time-varying input. See [`panel_input_mask`](@ref).
+  - `size(amsk)` matches the observation and asset axes of each time-varying input. See [`panel_input_mask`](@ref).
   - An input whose fill policy is `nothing` carries no blank. See [`panel_fill`](@ref).
   - A numeric or a tensor input resolves to finite values. See [`assert_panel_finite`](@ref).
   - Each resolved label of a categorical input is one of its levels. See [`panel_input_field`](@ref).
@@ -1607,7 +1642,7 @@ julia> panel_feature_matrix(pnl)[1]
   - [`panel_input_placeholder`](@ref)
   - [`panel_build_observations`](@ref)
   - [`panel_field_lift`](@ref)
-  - [`RepeatedLeading`](@ref)
+  - [`RepeatedObservations`](@ref)
   - [`panel_feature_matrix`](@ref)
   - [`ReturnsResult`](@ref)
   - [`prices_to_returns`](@ref)
@@ -1640,7 +1675,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for every producer that builds an [`AssetPanel`](@ref) at the point of use.
 
-A producer is configuration, not data. [`FeatureDistance`](@ref) holds one in its `ape` slot, a view passes it through unchanged, and a fold fits it again on the prior of the subproblem. It answers one verb, `asset_panel(ape, pr, rd, X)`, and returns a static [`AssetPanel`](@ref) that holds one [`TensorPanelField`](@ref). A loadings matrix and a proximity matrix are each one quantity with a labelled third axis.
+A producer is configuration, not data. [`FeatureDistance`](@ref) holds one in its `ape` slot, a view passes it through unchanged, and a fold fits it again on the prior of the subproblem. It answers one verb, `asset_panel(ape, pr, rd, X)`, and returns a static [`AssetPanel`](@ref) that holds one [`TensorPanelField`](@ref). A loadings matrix and a proximity matrix are each one quantity with a labelled second axis.
 
 The family is open. A producer that reads a source that no member of the library reads defines a member and an `asset_panel` method for it.
 

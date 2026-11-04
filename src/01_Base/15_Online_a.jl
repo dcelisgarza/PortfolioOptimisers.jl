@@ -860,7 +860,7 @@ This is the block arm of the [`partial_fit!`](@ref) interface, and all of the fo
 
 The masks, the factor rows, the Exogenous Series, the implied volatilities and the Panel Fields stay with their rows through each step: the orientation, the truncation, the growth and the copy. The first append fixes whether the buffer records a mask, whether it records factor rows, whether it records the Exogenous Series, whether it records implied volatilities and whether it records Panel Fields, as it fixes the width and the element type. It also fixes the names of the series and the adjustment `ivpa`. [`assert_buffer_presence_agreement`](@ref) refuses a later fold that disagrees. A side that gives neither mask, where the other side records masks, is not a disagreement: [`buffer_universe_masks`](@ref) writes the masks that its finiteness states. A buffer that knows the activity of some of its rows and not of others answers neither question. A buffer with factor rows for some observations and not for others describes no regression. A buffer that holds no observations has nothing to disagree with, so the fold seeds it again from the block.
 
-The Panel Fields are observations first whatever `dims` is, as the Panel Fields of an [`AssetPanel`](@ref) always are. They keep the rows of the buffer that the cap keeps, and [`panel_fields_append`](@ref) joins them to the rows of the block.
+The Panel Fields keep the layout of the Panel Fields of an [`AssetPanel`](@ref) whatever `dims` is: a numeric or a categorical field is `observations × assets`, and a tensor field is `assets × labels × observations`. They keep the rows of the buffer that the cap keeps, and [`panel_fields_append`](@ref) joins them to the rows of the block.
 
 The marks `gaps` of the Shared Series gaps are one entry for each observation whatever `dims` is. They travel with their rows as the masks do, but they have no presence rule: a buffer with no marks has no gap, so [`append_buffer_gaps`](@ref) writes the marks of a later fold onto `false` marks for the rows before it, and a fold with no marks gives `false` to a buffer that has them.
 
@@ -888,7 +888,7 @@ The marks `gaps` of the Shared Series gaps are one entry for each observation wh
   - `E`: The Exogenous Series of the block, oriented as `X` is, or `nothing`.
   - `iv`: The implied volatilities of the block, oriented as `X` is, or `nothing`.
   - `ivpa`: The implied volatility risk premium adjustment, or `nothing`.
-  - `panel_fields`: The time-varying Panel Fields of the block, observations first, or `nothing`.
+  - `panel_fields`: The time-varying Panel Fields of the block, in the layout of an [`AssetPanel`](@ref), or `nothing`.
   - `gaps`: One mark for each observation of the block, `true` at an observation with a Shared Series gap, or `nothing` when the block has none.
 
 # Validation

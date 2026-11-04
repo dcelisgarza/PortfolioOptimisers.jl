@@ -377,7 +377,7 @@ The search draws its trials from `rng`, so the trials, and the order of the `n_b
 julia> RandomisedSearchCrossValidation(Dict(\"alpha\" => [0.1, 0.2, 0.3],
                                             \"beta\" => Normal(1.0, 0.5)))
 RandomisedSearchCrossValidation
-            p ┼ Dict{String, Any}: Dict{String, Any}("alpha" => [0.1, 0.2, 0.3], "beta" => Normal(1.0, 0.5))
+            p ┼ Dict{String, Any}: Dict{String, Any}("alpha" => [0.1, 0.2, 0.3], "beta" => Distributions.Normal{Float64}(μ=1.0, σ=0.5))
            cv ┼ KFold
               │                   n ┼ Int64: 5
               │         purged_size ┼ Int64: 0

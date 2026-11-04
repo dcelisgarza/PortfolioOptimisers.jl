@@ -250,11 +250,11 @@ function PortfolioOptimisers.plot_exposure_distribution(csfm::PortfolioOptimiser
                                                         nf::Option{<:AbstractVector} = nothing,
                                                         kwargs...)
     Ms = PortfolioOptimisers.cs_diagnostic_exposures(csfm)
-    labels = exposure_diagnostic_labels(csfm, nf, size(Ms, 3))
+    labels = exposure_diagnostic_labels(csfm, nf, size(Ms, 2))
     slice = if isnothing(observation)
-        vec(view(Ms, :, :, factor))
+        vec(view(Ms, :, factor, :))
     else
-        vec(view(Ms, observation, :, factor))
+        vec(view(Ms, :, factor, observation))
     end
     values = filter(isfinite, slice)
     span = isnothing(observation) ? "all observations" : "observation $observation"

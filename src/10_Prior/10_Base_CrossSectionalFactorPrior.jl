@@ -227,26 +227,29 @@ function cross_sectional_exposure_widths(factors::AbstractVector{<:Pair},
     return wid
 end
 """
-    cross_sectional_exposure_write!(Ms::AbstractArray{<:Number, 3}, A::MatNum, c::Integer,
-                                    w::Integer, nm::AbstractString) -> nothing
-    cross_sectional_exposure_write!(Ms::AbstractArray{<:Number, 3}, A::Arr3Num, c::Integer,
-                                    w::Integer, nm::AbstractString) -> nothing
+    cross_sectional_exposure_write!(Ms::AbstractArray{<:Number, 3}, A::MatNum,
+                                    rows::AbstractUnitRange, c::Integer, w::Integer,
+                                    nm::AbstractString) -> nothing
+    cross_sectional_exposure_write!(Ms::AbstractArray{<:Number, 3}, A::Arr3Num,
+                                    rows::AbstractUnitRange, c::Integer, w::Integer,
+                                    nm::AbstractString) -> nothing
 
-Write one factor's Factor Exposure into the exposure history, in place.
+Write the rows `rows` of one member's Factor Exposure into the exposure history, in place.
 
-A member gives a matrix when it contributes one factor, and a three-dimensional array when it contributes several. Each shape has its own method.
+A member gives a matrix `observations × assets` when it contributes one factor, as the returns are, and an array `assets × factors × observations` when it contributes several. Each shape has its own method, and each cuts the rows on its own observation axis.
 
 # Arguments
 
-  - `Ms`: The exposure history, `observations × assets × factors`, changed in place.
+  - `Ms`: The exposure history, `assets × factors × observations`, changed in place.
   - `A`: The Factor Exposure of one member.
+  - `rows`: The observations of `A` that `Ms` holds.
   - `c`: First column of the member on the factor axis.
   - `w`: Number of columns the member contributes.
   - `nm`: Name of the factor, for the messages.
 
 # Validation
 
-  - `A` matches the observation and asset axes of `Ms`, and its factor axis is `w`. Raises a `DimensionMismatch`.
+  - The rows of `A` match the observation and asset axes of `Ms`, and its factor axis is `w`. Raises a `DimensionMismatch`.
 
 # Returns
 
@@ -258,21 +261,21 @@ A member gives a matrix when it contributes one factor, and a three-dimensional 
   - [`cross_sectional_exposure_history`](@ref)
 """
 function cross_sectional_exposure_write!(Ms::AbstractArray{<:Number, 3}, A::MatNum,
-                                         c::Integer, w::Integer,
+                                         rows::AbstractUnitRange, c::Integer, w::Integer,
                                          nm::AbstractString)::Nothing
     @argcheck(isone(w),
               DimensionMismatch("the Factor Exposure $nm answers one factor, but the factor axis expects $w columns for it"))
-    @argcheck(size(A) == (size(Ms, 1), size(Ms, 2)),
-              DimensionMismatch("the Factor Exposure $nm is observations × assets, got $(size(A)) against $((size(Ms, 1), size(Ms, 2))))"))
-    Ms[:, :, c] = A
+    @argcheck((length(rows), size(A, 2)) == (size(Ms, 3), size(Ms, 1)),
+              DimensionMismatch("the Factor Exposure $nm is observations × assets, got $((length(rows), size(A, 2))) against $((size(Ms, 3), size(Ms, 1))))"))
+    Ms[:, c, :] = transpose(view(A, rows, :))
     return nothing
 end
 function cross_sectional_exposure_write!(Ms::AbstractArray{<:Number, 3}, A::Arr3Num,
-                                         c::Integer, w::Integer,
+                                         rows::AbstractUnitRange, c::Integer, w::Integer,
                                          nm::AbstractString)::Nothing
-    @argcheck(size(A) == (size(Ms, 1), size(Ms, 2), w),
-              DimensionMismatch("the Factor Exposure $nm is observations × assets × factors, got $(size(A)) against $((size(Ms, 1), size(Ms, 2), w))"))
-    Ms[:, :, c:(c + w - 1)] = A
+    @argcheck((size(A, 1), size(A, 2), length(rows)) == (size(Ms, 1), w, size(Ms, 3)),
+              DimensionMismatch("the Factor Exposure $nm is assets × factors × observations, got $((size(A, 1), size(A, 2), length(rows))) against $((size(Ms, 1), w, size(Ms, 3)))"))
+    Ms[:, c:(c + w - 1), :] = view(A, :, :, rows)
     return nothing
 end
 """
@@ -283,7 +286,7 @@ end
                                    rd::ReturnsResult, k::Integer, c::Integer, w::Integer,
                                    nm::AbstractString) -> nothing
 
-Write the Factor Exposure of one member of a factor list into its columns of the exposure history `Ms`, at the last `size(Ms, 1)` of the `k` rows of `rd`.
+Write the Factor Exposure of one member of a factor list into its columns of the exposure history `Ms`, at the last `size(Ms, 3)` of the `k` rows of `rd`.
 
 A [`OneHotExposure`](@ref) expands its codes straight into the columns of the history with [`one_hot_fill!`](@ref), so the fit makes no one-hot block of its own. Every other member gives its Factor Exposure with [`factor_exposure`](@ref), and [`cross_sectional_exposure_write!`](@ref) copies it into the history. Both write the same values.
 
@@ -296,7 +299,7 @@ The method that Julia selects is the algorithm.
 
 # Arguments
 
-  - `Ms`: The exposure history, `observations × assets × factors`, changed in place.
+  - `Ms`: The exposure history, `assets × factors × observations`, changed in place.
   - `xe`: Exposure Estimator.
   - $(arg_dict[:rd]) It carries the Asset Panel the member reads.
   - `k`: Number of rows of `rd`.
@@ -322,18 +325,17 @@ function cross_sectional_exposure_fill!(Ms::AbstractArray{<:Number, 3}, xe,
                                         rd::ReturnsResult, k::Integer, c::Integer,
                                         w::Integer, nm::AbstractString)::Nothing
     A = factor_exposure(xe, rd)
-    return cross_sectional_exposure_write!(Ms, selectdim(A, 1, (k - size(Ms, 1) + 1):k), c,
-                                           w, nm)
+    return cross_sectional_exposure_write!(Ms, A, (k - size(Ms, 3) + 1):k, c, w, nm)
 end
 function cross_sectional_exposure_fill!(Ms::AbstractArray{<:Number, 3}, xe::OneHotExposure,
                                         rd::ReturnsResult, k::Integer, c::Integer,
                                         w::Integer, nm::AbstractString)::Nothing
     (; codes, live, nl) = one_hot_inputs(xe, rd)
-    m = size(Ms, 1)
-    @argcheck(size(codes, 2) == size(Ms, 2) && nl == w,
-              DimensionMismatch("the Factor Exposure $nm is observations × assets × factors, got $((m, size(codes, 2), nl)) against $((m, size(Ms, 2), w))"))
+    m = size(Ms, 3)
+    @argcheck(size(codes, 2) == size(Ms, 1) && nl == w,
+              DimensionMismatch("the Factor Exposure $nm is assets × factors × observations, got $((size(codes, 2), nl, m)) against $((size(Ms, 1), w, m))"))
     rows = (k - m + 1):k
-    one_hot_fill!(view(Ms, :, :, c:(c + w - 1)), view(codes, rows, :), view(live, rows, :))
+    one_hot_fill!(view(Ms, :, c:(c + w - 1), :), view(codes, rows, :), view(live, rows, :))
     return nothing
 end
 """
@@ -393,7 +395,7 @@ Build the exposure history of a factor list, and the factor axis it is written o
 
 # Returns
 
-  - `Ms::AbstractArray{<:Real, 3}`: The exposure history, `observations × assets × factors`, of the last `n` rows of `rd`, or of every row. It is a view of a backing that it shares with `Zo` when [`cross_sectional_history_backing`](@ref) gives one.
+  - `Ms::AbstractArray{<:Real, 3}`: The exposure history, `assets × factors × observations`, of the last `n` rows of `rd`, or of every row. It is a view of a backing that it shares with `Zo` when [`cross_sectional_history_backing`](@ref) gives one.
   - `nf::Vector{String}`: Name of each factor.
   - `fam::Vector{String}`: Family label of each factor.
   - `Zo`: The observed exposures, as a view of the shared backing, or the input `Zo`.
@@ -431,9 +433,9 @@ function cross_sectional_exposure_history(factors::AbstractVector{<:Pair},
             (; rdi, k) = cross_sectional_exposure_rows(xe, rd, m)
             # A derived member reads a copy of its source, which an earlier layer wrote.
             if src[i] > 0
-                A = factor_exposure(xe, rdi, Ms[:, :, col[src[i]]])
-                return cross_sectional_exposure_write!(Ms, selectdim(A, 1, (k - m + 1):k),
-                                                       col[i], wid[i], nm)
+                A = factor_exposure(xe, rdi, permutedims(view(Ms, :, col[src[i]], :)))
+                return cross_sectional_exposure_write!(Ms, A, (k - m + 1):k, col[i], wid[i],
+                                                       nm)
             end
             return cross_sectional_exposure_fill!(Ms, xe, rdi, k, col[i], wid[i], nm)
         end
@@ -456,9 +458,9 @@ The batch fit of a [`CrossSectionalFactorPrior`](@ref) joins the observed exposu
 
 The method that Julia selects is the algorithm.
 
- 1. No `Zo`: allocate `m × N × K` of `T`, and return no `Zo`.
- 2. `Zo` of another element type than `T`: allocate `m × N × K` of `T`, and return `Zo` unchanged.
- 3. `Zo` of the element type `T`: allocate `m × N × (K + size(Zo, 3))` of `T`, copy `Zo` into its last factors, and return the views of its first `K` factors and of its last factors.
+ 1. No `Zo`: allocate `N × K × m` of `T`, and return no `Zo`.
+ 2. `Zo` of another element type than `T`: allocate `N × K × m` of `T`, and return `Zo` unchanged.
+ 3. `Zo` of the element type `T`: allocate `N × (K + size(Zo, 2)) × m` of `T`, copy `Zo` into its last factors, and return the views of its first `K` factors and of its last factors. The slice of one observation of each view is one contiguous block.
 
 # Arguments
 
@@ -466,7 +468,7 @@ The method that Julia selects is the algorithm.
   - `m::Integer`: Number of observations of the history.
   - `N::Integer`: Number of assets.
   - `K::Integer`: Number of estimated factors.
-  - `Zo`: The observed exposures, `observations × assets × factors`, or `nothing`.
+  - `Zo`: The observed exposures, `assets × factors × observations`, or `nothing`.
 
 # Validation
 
@@ -483,20 +485,20 @@ The method that Julia selects is the algorithm.
 """
 function cross_sectional_history_backing(::Type{T}, m::Integer, N::Integer, K::Integer,
                                          ::Nothing) where {T}
-    return (; Ms = Array{T, 3}(undef, m, N, K), Zo = nothing)
+    return (; Ms = Array{T, 3}(undef, N, K, m), Zo = nothing)
 end
 function cross_sectional_history_backing(::Type{T}, m::Integer, N::Integer, K::Integer,
                                          Zo::AbstractArray{<:Any, 3}) where {T}
     assert_history_backing_axes(Zo, m, N)
-    return (; Ms = Array{T, 3}(undef, m, N, K), Zo = Zo)
+    return (; Ms = Array{T, 3}(undef, N, K, m), Zo = Zo)
 end
 function cross_sectional_history_backing(::Type{T}, m::Integer, N::Integer, K::Integer,
                                          Zo::AbstractArray{T, 3}) where {T}
     assert_history_backing_axes(Zo, m, N)
-    P = Array{T, 3}(undef, m, N, K + size(Zo, 3))
-    Zb = view(P, :, :, (K + 1):size(P, 3))
+    P = Array{T, 3}(undef, N, K + size(Zo, 2), m)
+    Zb = view(P, :, (K + 1):size(P, 2), :)
     copyto!(Zb, Zo)
-    return (; Ms = view(P, :, :, 1:K), Zo = Zb)
+    return (; Ms = view(P, :, 1:K, :), Zo = Zb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -505,13 +507,13 @@ Check that the observed exposures share the observation and asset axes of the ex
 
 # Arguments
 
-  - `Zo`: The observed exposures, `observations × assets × factors`.
+  - `Zo`: The observed exposures, `assets × factors × observations`.
   - `m::Integer`: Number of observations of the history.
   - `N::Integer`: Number of assets.
 
 # Validation
 
-  - `size(Zo, 1) == m` and `size(Zo, 2) == N`. Raises a `DimensionMismatch`.
+  - `size(Zo, 3) == m` and `size(Zo, 1) == N`. Raises a `DimensionMismatch`.
 
 # Returns
 
@@ -522,8 +524,8 @@ Check that the observed exposures share the observation and asset axes of the ex
   - [`cross_sectional_history_backing`](@ref)
 """
 function assert_history_backing_axes(Zo::AbstractArray{<:Any, 3}, m::Integer, N::Integer)
-    @argcheck(size(Zo, 1) == m && size(Zo, 2) == N,
-              DimensionMismatch("the observed exposures ($(size(Zo, 1))×$(size(Zo, 2))) must share the $(m) observations and $(N) assets of the exposure history"))
+    @argcheck(size(Zo, 3) == m && size(Zo, 1) == N,
+              DimensionMismatch("the observed exposures ($(size(Zo, 1))×$(size(Zo, 2))×$(size(Zo, 3))) must share the $(N) assets and $(m) observations of the exposure history"))
     return nothing
 end
 """
@@ -552,7 +554,7 @@ Where:
 # Arguments
 
   - `X`: Asset returns, `observations × assets`.
-  - `Ms`: The lagged exposure history, `observations × assets × factors`, aligned with `X`.
+  - `Ms`: The lagged exposure history, `assets × factors × observations`, aligned with `X`.
   - `emsk`: The estimation mask, `observations × assets`, aligned with `X`.
   - `Zo`: The exposure history of the observed factors, aligned with `X`, or `nothing`. Its factors join the product beside those of `Ms`, so a caller that holds the two histories apart does not join them to test them.
 
@@ -572,10 +574,10 @@ Where:
 """
 function cross_sectional_eligible(X::MatNum, Ms::Arr3Num, emsk::AbstractMatrix{Bool},
                                   Zo::Option{<:Arr3Num} = nothing)::BitMatrix
-    @argcheck(size(Ms, 1) == size(X, 1) && size(Ms, 2) == size(X, 2),
-              DimensionMismatch("Ms ($(size(Ms, 1))×$(size(Ms, 2))) must match X ($(size(X, 1))×$(size(X, 2))) on the observation and asset axes"))
-    @argcheck(isnothing(Zo) || (size(Zo, 1) == size(X, 1) && size(Zo, 2) == size(X, 2)),
-              DimensionMismatch("Zo ($(size(Zo, 1))×$(size(Zo, 2))) must match X ($(size(X, 1))×$(size(X, 2))) on the observation and asset axes"))
+    @argcheck(size(Ms, 3) == size(X, 1) && size(Ms, 1) == size(X, 2),
+              DimensionMismatch("Ms ($(size(Ms, 1))×$(size(Ms, 2))×$(size(Ms, 3))) must match X ($(size(X, 1))×$(size(X, 2))) on the observation and asset axes"))
+    @argcheck(isnothing(Zo) || (size(Zo, 3) == size(X, 1) && size(Zo, 1) == size(X, 2)),
+              DimensionMismatch("Zo ($(size(Zo, 1))×$(size(Zo, 2))×$(size(Zo, 3))) must match X ($(size(X, 1))×$(size(X, 2))) on the observation and asset axes"))
     @argcheck(size(emsk) == size(X),
               DimensionMismatch("emsk ($(size(emsk, 1))×$(size(emsk, 2))) must match X ($(size(X, 1))×$(size(X, 2)))"))
     fin = cross_sectional_finite_exposures(Ms)
@@ -1395,7 +1397,7 @@ A prior that states no Neutralisation runs none, which is the `nothing` method.
 # Arguments
 
   - `neutralise`: Pairs of `key => targets`, or `nothing`.
-  - `Ms`: The exposure history, `observations × assets × factors`, changed in place.
+  - `Ms`: The exposure history, `assets × factors × observations`, changed in place.
   - `cre`: The prior's own Cross-Sectional Regression Estimator.
   - `bw`: The benchmark weights, `observations × assets`.
   - `nf`: Name of each factor.
@@ -1435,7 +1437,7 @@ A prior that constrains no Factor Family fits on the raw axis. The `nothing` met
 # Arguments
 
   - `families`: Pairs of `family label => dropped member`, or `nothing`.
-  - `Ms`: The exposure history on the raw axis, `observations × assets × factors`.
+  - `Ms`: The exposure history on the raw axis, `assets × factors × observations`.
   - `bw`: The benchmark weights, `observations × assets`.
   - `nf`: Name of each raw factor.
   - `fam`: Family label of each raw factor.

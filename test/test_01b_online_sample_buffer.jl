@@ -707,7 +707,8 @@ end
                                                  codes = rand(rng, 1:2, T, N)),
                            TensorPanelField(; name = "expo", axis = "factor",
                                             labels = ["f1", "f2"],
-                                            vals = randn(rng, T, N, 2))], amsk = M,
+                                            vals = permutedims(randn(rng, T, N, 2),
+                                                               (2, 3, 1)))], amsk = M,
                      emsk = Em)
     fields_of(r, c = :) = po.port_opt_view(pnl, r, c).pf
     values_of(P) = [po.panel_field_array(f) for f in P]

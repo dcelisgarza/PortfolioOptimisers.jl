@@ -207,7 +207,7 @@ end
             end
             @test fitted == 2
             st = last(s).pe.cache
-            @test size(st.fsc.S, 1) - size(st.Ms, 1) == a
+            @test size(st.fsc.S, 3) - size(st.Ms, 3) == a
             @test size(st.win.X, 1) == po.cross_sectional_carry_rows(pe)
         end
         # The rows that train, read off a score the test controls (#1770). The block starts at

@@ -670,5 +670,54 @@ function fourth_moment_index_generator(N::Integer, i)
     end
     return idx
 end
+"""
+    observation_axis(A::AbstractVector) -> Int
+    observation_axis(A::AbstractMatrix) -> Int
+    observation_axis(A::AbstractArray{<:Any, 3}) -> Int
+
+Return the axis of a history that holds its observations.
+
+A history of rank one or two holds one observation per row, as the returns `observations × assets` do. A history of rank three, such as an exposure history `assets × factors × observations`, holds them on its last axis, so the slice of one observation is one contiguous block. A helper that cuts or appends the rows of a history of any rank reads the axis here, so the library states the rule of the layout once.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A vector or a matrix: return `1`.
+ 2. An array of rank three: return `3`.
+
+# Arguments
+
+  - `A`: A history.
+
+# Returns
+
+  - `d::Int`: The observation axis of `A`.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.observation_axis(zeros(4, 2))
+1
+
+julia> PortfolioOptimisers.observation_axis(zeros(2, 3, 4))
+3
+```
+
+# Related
+
+  - [`Arr3Num`](@ref)
+  - [`cross_sectional_fold_append`](@ref)
+  - [`cross_sectional_window_trim`](@ref)
+"""
+function observation_axis(::AbstractVector)::Int
+    return 1
+end
+function observation_axis(::AbstractMatrix)::Int
+    return 1
+end
+function observation_axis(::AbstractArray{<:Any, 3})::Int
+    return 3
+end
 
 public port_opt_view, obs_weights_view

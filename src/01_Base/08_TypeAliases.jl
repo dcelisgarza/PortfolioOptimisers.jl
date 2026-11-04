@@ -50,13 +50,14 @@ const ArrNum = AbstractArray{<:Union{Number, JuMP.AbstractJuMPScalar}}
 
 Alias for an abstract 3-dimensional array of numeric types or JuMP scalar types.
 
-It is [`ArrNum`](@ref) with the rank fixed at three, for data that is a stack of matrices and not one matrix. A window of time-varying features is such data, and its first axis holds the observations. A method that dispatches on this alias keeps the 2-D and 3-D entry points apart with no `ndims` branch at run time.
+It is [`ArrNum`](@ref) with the rank fixed at three, for data that is a stack of matrices and not one matrix. A window of time-varying features and an exposure history are such data. Every rank-3 array of the library holds its observations on its **last** axis, so the matrix of one observation, `view(A, :, :, t)`, is one contiguous block. A matrix over observations, such as the returns, holds them on its first axis. [`observation_axis`](@ref) states the rule. A method that dispatches on this alias keeps the 2-D and 3-D entry points apart with no `ndims` branch at run time.
 
 # Related
 
   - [`VecNum`](@ref)
   - [`MatNum`](@ref)
   - [`ArrNum`](@ref)
+  - [`observation_axis`](@ref)
 """
 const Arr3Num = AbstractArray{<:Union{Number, JuMP.AbstractJuMPScalar}, 3}
 """
@@ -75,7 +76,7 @@ const VecNum_MatNum = Union{VecNum, MatNum}
 
 Alias for a union of an abstract matrix and an abstract 3-dimensional array of numeric types.
 
-A Feature Matrix has one of two shapes. It is a static `assets × features` matrix, or a window of time-varying features, `observations × assets × features`, whose first axis holds the observations. [`PricesResult`](@ref) and [`ReturnsResult`](@ref) hold both shapes. [`FeatureDistance`](@ref) reads both, and it tells them apart by dispatch and not by an `ndims` branch.
+A Feature Matrix has one of two shapes. It is a static `assets × features` matrix, or a window of time-varying features, `assets × features × observations`, whose last axis holds the observations. [`PricesResult`](@ref) and [`ReturnsResult`](@ref) hold both shapes. [`FeatureDistance`](@ref) reads both, and it tells them apart by dispatch and not by an `ndims` branch.
 
 # Related
 

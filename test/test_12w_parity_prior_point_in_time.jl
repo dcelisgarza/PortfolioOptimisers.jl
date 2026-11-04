@@ -56,7 +56,7 @@ end
                                              ve = ve, kw...)
     load(c, o) = parity_load("CrossSectionalFactorPrior", c, o)
     loadv(c, o) = vec(load(c, o))
-    flat(Ms) = reshape(permutedims(Ms, (1, 3, 2)), size(Ms, 1), :)
+    flat(Ms) = reshape(permutedims(Ms, (3, 2, 1)), size(Ms, 3), :)
     fxs = parity_small_panel()
     fxl = parity_large_panel()
     prs = prior(est(; minra = 5), fxs.rd)
@@ -676,12 +676,12 @@ end
         p1 = rec_fit(rd; factors = facs, bp = 0.0, wa = eqw(),
                      neutralise = ["momentum" => ["size"]])
         E0, E1 = p0.rr.Ms, p1.rr.Ms
-        @test abs(cor(E0[end, :, 2], E0[end, :, 3])) > 0.65
+        @test abs(cor(E0[:, 2, end], E0[:, 3, end])) > 0.65
         cv(a, b) = mean((a .- mean(a)) .* (b .- mean(b)))
-        @test all(t -> abs(cv(E1[t, :, 2], E1[t, :, 3])) < 1e-10, axes(E1, 1))
-        @test all(t -> abs(mean(E1[t, :, 3])) < 1e-10 && abs(std(E1[t, :, 3]) - 1) < 1e-10,
-                  axes(E1, 1))
-        @test isapprox(E1[:, :, 2], E0[:, :, 2]; rtol = 1e-10)
+        @test all(t -> abs(cv(E1[:, 2, t], E1[:, 3, t])) < 1e-10, axes(E1, 3))
+        @test all(t -> abs(mean(E1[:, 3, t])) < 1e-10 && abs(std(E1[:, 3, t]) - 1) < 1e-10,
+                  axes(E1, 3))
+        @test isapprox(E1[:, 2, :], E0[:, 2, :]; rtol = 1e-10)
         n = size(fhat(p0), 1)
         @test cor(fhat(p0)[:, 2], fs[(end - n + 1):end]) > 0.98
         @test cor(fhat(p0)[:, 3], fmo[(end - n + 1):end]) > 0.98
@@ -904,9 +904,9 @@ end
         neu = rec_fit(rd; neutralise = ["style" => ["industry"]], kw...)
         ctl = rec_fit(rd; kw...)
         E, W = neu.rr.Ms, neu.rr.bw
-        @test all(abs(sum(W[t, :] .* E[t, :, s] .* E[t, :, j])) < 1e-8
-                  for t in axes(E, 1), s in 5:6, j in 2:4)
-        @test all(s -> maximum(abs, E[:, :, s] - ctl.rr.Ms[:, :, s]) > 0.01, 5:6)
+        @test all(abs(sum(W[t, :] .* E[:, s, t] .* E[:, j, t])) < 1e-8
+                  for t in axes(E, 3), s in 5:6, j in 2:4)
+        @test all(s -> maximum(abs, E[:, s, :] - ctl.rr.Ms[:, s, :]) > 0.01, 5:6)
     end
 
     @testset "14a and 14b. A spanned and an orthogonal alpha" begin

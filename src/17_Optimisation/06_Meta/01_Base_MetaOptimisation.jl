@@ -781,11 +781,11 @@ end
 function panel_field_stack(fs::AbstractVector{<:TensorPanelField})
     return TensorPanelField(; name = fs[1].name, axis = fs[1].axis, labels = fs[1].labels,
                             groups = fs[1].groups,
-                            vals = cat((f.vals for f in fs)...; dims = 1),
+                            vals = cat((f.vals for f in fs)...; dims = 3),
                             omsk = if isnothing(fs[1].omsk)
                                 nothing
                             else
-                                cat((f.omsk for f in fs)...; dims = 1)
+                                cat((f.omsk for f in fs)...; dims = 3)
                             end,
                             pmsk = panel_pmsk_vcat([f.pmsk for f in fs],
                                                    [f.vals for f in fs]))
@@ -950,7 +950,7 @@ Column `k` of the result is the out-of-sample prediction of sub-portfolio `k`, a
 
 `u` is positional and has no default. With a full-universe default, a two-argument call still runs. That is correct for [`Stacking`](@ref), but for [`NestedClustered`](@ref) it writes the weights of every cluster to the wrong rows and gives a wrong Asset Panel with no error. `alg` is the rule of the panel collapse, and it has no default for the same reason: the fold-less path reads the rule of the meta-optimiser, and this path must read the same one.
 
-The folds carry no Asset Panel. The method collapses the original `rd.pnl` again for each fold, with the same [`collapse_asset_panel`](@ref) call as [`prepare_outer_rd`](@ref) makes on the fold-less path, and stacks the fold results along the observation axis (see [`rebuild_asset_panel`](@ref)). The stack has the `observations × assets × features` shape of a time-varying panel, and a [`FeatureDistance`](@ref) with its default [`LastRow`](@ref) reads the collapse of the last fold. The inner solves still see the panel of their own cluster. The collapse of the original panel also serves a square panel under [`NestedClustered`](@ref). Its folds see the returns of one cluster each, so their own panels have different feature axes and do not stack.
+The folds carry no Asset Panel. The method collapses the original `rd.pnl` again for each fold, with the same [`collapse_asset_panel`](@ref) call as [`prepare_outer_rd`](@ref) makes on the fold-less path, and stacks the fold results along the observation axis (see [`rebuild_asset_panel`](@ref)). The stack has the `assets × features × observations` shape of a time-varying panel, and a [`FeatureDistance`](@ref) with its default [`LastRow`](@ref) reads the collapse of the last fold. The inner solves still see the panel of their own cluster. The collapse of the original panel also serves a square panel under [`NestedClustered`](@ref). Its folds see the returns of one cluster each, so their own panels have different feature axes and do not stack.
 
 # Algorithm
 

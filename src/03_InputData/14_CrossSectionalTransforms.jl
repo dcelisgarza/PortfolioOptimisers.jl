@@ -1454,7 +1454,7 @@ Panel form:
 
 # Arguments
 
-  - `B::AbstractArray{<:Real, 3}`: One-hot block `observations × assets × levels`.
+  - `B::AbstractArray{<:Real, 3}`: One-hot block `assets × levels × observations`.
   - `pnl::AssetPanel`: Asset Panel holding the categorical Panel Field.
   - `name::AbstractString`: Name of the categorical Panel Field to read.
 
@@ -1470,16 +1470,11 @@ Panel form:
 # Examples
 
 ```jldoctest
-julia> B = reshape([1.0, 0.0, 0.0, 1.0, 0.0, 0.0], 1, 2, 3)
-1×2×3 Array{Float64, 3}:
+julia> B = reshape([1.0, 0.0, 0.0, 1.0, 0.0, 0.0], 2, 3, 1)
+2×3×1 Array{Float64, 3}:
 [:, :, 1] =
- 1.0  0.0
-
-[:, :, 2] =
- 0.0  1.0
-
-[:, :, 3] =
- 0.0  0.0
+ 1.0  0.0  0.0
+ 0.0  1.0  0.0
 
 julia> cross_sectional_groups(B)
 1×2 Matrix{Int64}:
@@ -1498,10 +1493,10 @@ julia> cross_sectional_groups(B)
   - [`descriptor_field_values`](@ref)
 """
 function cross_sectional_groups(B::AbstractArray{<:Real, 3})::Matrix{Int}
-    G = fill(CS_MISSING_GROUP, size(B, 1), size(B, 2))
-    for t in axes(B, 1), i in axes(B, 2)
-        for l in axes(B, 3)
-            if !iszero(B[t, i, l])
+    G = fill(CS_MISSING_GROUP, size(B, 3), size(B, 1))
+    for t in axes(B, 3), i in axes(B, 1)
+        for l in axes(B, 2)
+            if !iszero(B[i, l, t])
                 G[t, i] = l
                 break
             end

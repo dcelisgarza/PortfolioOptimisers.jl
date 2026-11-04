@@ -131,9 +131,9 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
     @testset "The Descriptor Scores, $(c)" for (c, d) in scores
         (_, rd, pr) = panels[1]
         S = descriptor_scores(d, rd, pr.rr).S
-        for k in axes(S, 3)
-            @test same(S[:, :, k], load("DescriptorScores", "Small$(c)", "Scores$(k)"),
-                       "$(c) $(k)")
+        for k in axes(S, 2)
+            @test same(permutedims(S[:, k, :]),
+                       load("DescriptorScores", "Small$(c)", "Scores$(k)"), "$(c) $(k)")
         end
     end
 
@@ -141,7 +141,8 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         (_, rd, pr) = panels[1]
         S = descriptor_scores(scores[4][2], rd, pr.rr).S
         for k in 1:2
-            @test isequal(S[:, :, k], load("DescriptorScores", "SmallRaw", "Scores$(k)"))
+            @test isequal(permutedims(S[:, k, :]),
+                          load("DescriptorScores", "SmallRaw", "Scores$(k)"))
         end
     end
 

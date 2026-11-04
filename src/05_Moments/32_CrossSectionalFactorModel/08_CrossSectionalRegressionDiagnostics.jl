@@ -8,13 +8,13 @@ An asset enters the fit of an observation when every one of its exposures is fin
 
 # Arguments
 
-  - `B`: Exposure history `observations × assets × factors`, already lagged.
+  - `B`: Exposure history `assets × factors × observations`, already lagged.
   - `w`: Regression weight history `observations × assets`, or `nothing` for equal weights.
 
 # Validation
 
   - `!isempty(B)`.
-  - `size(w) == (size(B, 1), size(B, 2))`, when `w` is present.
+  - `size(w) == (size(B, 3), size(B, 1))`, when `w` is present.
 
 # Returns
 
@@ -29,14 +29,14 @@ An asset enters the fit of an observation when every one of its exposures is fin
 """
 function cs_estimation_mask_weights(B::Arr3Num, ::Nothing)
     @argcheck(!isempty(B), IsEmptyError("B cannot be empty"))
-    T, N, K = size(B)
+    N, K, T = size(B)
     Tf = real(eltype(B))
     mask = fill(false, T, N)
     u = zeros(Tf, T, N)
     for i in 1:N, t in 1:T
         ok = true
         for k in 1:K
-            if !isfinite(B[t, i, k])
+            if !isfinite(B[i, k, t])
                 ok = false
                 break
             end
@@ -48,9 +48,9 @@ function cs_estimation_mask_weights(B::Arr3Num, ::Nothing)
 end
 function cs_estimation_mask_weights(B::Arr3Num, w::MatNum)
     @argcheck(!isempty(B), IsEmptyError("B cannot be empty"))
-    T, N, K = size(B)
+    N, K, T = size(B)
     @argcheck(size(w, 1) == T && size(w, 2) == N,
-              DimensionMismatch("w ($(size(w, 1))×$(size(w, 2))) must match B ($T×$N on its first two axes)"))
+              DimensionMismatch("w ($(size(w, 1))×$(size(w, 2))) must match B ($N assets, $T observations)"))
     Tf = promote_type(real(eltype(B)), real(eltype(w)))
     mask = fill(false, T, N)
     u = zeros(Tf, T, N)
@@ -58,7 +58,7 @@ function cs_estimation_mask_weights(B::Arr3Num, w::MatNum)
         ok = w[t, i] > zero(eltype(w))
         if ok
             for k in 1:K
-                if !isfinite(B[t, i, k])
+                if !isfinite(B[i, k, t])
                     ok = false
                     break
                 end
@@ -97,29 +97,27 @@ Where:
 
 # Arguments
 
-  - `B`: Exposure history `observations × assets × factors`, already lagged.
+  - `B`: Exposure history `assets × factors × observations`, already lagged.
   - `w`: Regression weight history `observations × assets`, or `nothing` for equal weights. A weight of zero excludes the pair.
 
 # Validation
 
   - `!isempty(B)`.
-  - `size(w) == (size(B, 1), size(B, 2))`, when `w` is present.
+  - `size(w) == (size(B, 3), size(B, 1))`, when `w` is present.
 
 # Returns
 
-  - `G::Array{<:Real, 3}`: Gram history `observations × factors × factors`.
+  - `G::Array{<:Real, 3}`: Gram history `factors × factors × observations`.
 
 # Examples
 
 ```jldoctest
-julia> B = reshape([1.0, 1.0, 0.0, 1.0], 1, 2, 2);
+julia> B = reshape([1.0, 1.0, 0.0, 1.0], 2, 2, 1);
 
 julia> cs_gram(B)
-1×2×2 Array{Float64, 3}:
+2×2×1 Array{Float64, 3}:
 [:, :, 1] =
  2.0  1.0
-
-[:, :, 2] =
  1.0  1.0
 ```
 
@@ -143,12 +141,12 @@ Return the weighted Gram history from a mask that a caller has already resolved.
 
 # Arguments
 
-  - `B`: Exposure history `observations × assets × factors`, already lagged.
+  - `B`: Exposure history `assets × factors × observations`, already lagged.
   - `u`: Resolved weight history `observations × assets`, zero outside the mask.
 
 # Returns
 
-  - `G::Array{<:Real, 3}`: Gram history `observations × factors × factors`.
+  - `G::Array{<:Real, 3}`: Gram history `factors × factors × observations`.
 
 # Related
 
@@ -156,17 +154,17 @@ Return the weighted Gram history from a mask that a caller has already resolved.
   - [`cs_estimation_mask_weights`](@ref)
 """
 function cs_gram_from_weights(B::Arr3Num, u::MatNum)
-    T, N, K = size(B)
+    N, K, T = size(B)
     Tf = promote_type(real(eltype(B)), real(eltype(u)))
-    G = zeros(Tf, T, K, K)
-    for l in 1:K, k in 1:l, i in 1:N, t in 1:T
+    G = zeros(Tf, K, K, T)
+    for t in 1:T, l in 1:K, k in 1:l, i in 1:N
         # A pair outside the mask can carry an exposure that is not finite.
         if !iszero(u[t, i])
-            G[t, k, l] += Tf(u[t, i]) * Tf(B[t, i, k]) * Tf(B[t, i, l])
+            G[k, l, t] += Tf(u[t, i]) * Tf(B[i, k, t]) * Tf(B[i, l, t])
         end
     end
-    for l in 1:K, k in (l + 1):K, t in 1:T
-        G[t, k, l] = G[t, l, k]
+    for t in 1:T, l in 1:K, k in (l + 1):K
+        G[k, l, t] = G[l, k, t]
     end
     return G
 end
@@ -202,7 +200,7 @@ Where:
 
 # Arguments
 
-  - `G`: Gram history `observations × factors × factors`.
+  - `G`: Gram history `factors × factors × observations`.
 
 # Returns
 
@@ -217,8 +215,8 @@ Where:
   - [`cs_regression_t_stats`](@ref)
 """
 function cs_gram_inverse_diagonal(G::Arr3Num)
-    T = size(G, 1)
-    K = size(G, 2)
+    T = size(G, 3)
+    K = size(G, 1)
     # A decomposition leaves a `Rational` type, as a square root does.
     Tf = typeof(sqrt(one(real(eltype(G)))))
     D = Matrix{Tf}(undef, T, K)
@@ -239,7 +237,7 @@ The verbs that read a Gram history read a slice: [`cs_gram_inverse_diagonal`](@r
 # Arguments
 
   - `Gt`: Working matrix `factors × factors`, written in place.
-  - `G`: Gram history `observations × factors × factors`.
+  - `G`: Gram history `factors × factors × observations`.
   - `t`: Observation to copy.
 
 # Returns
@@ -255,7 +253,7 @@ The verbs that read a Gram history read a slice: [`cs_gram_inverse_diagonal`](@r
 function cs_gram_slice!(Gt::AbstractMatrix, G::Arr3Num, t::Integer)::Nothing
     Tf = eltype(Gt)
     for l in axes(Gt, 2), k in axes(Gt, 1)
-        Gt[k, l] = Tf(G[t, k, l])
+        Gt[k, l] = Tf(G[k, l, t])
     end
     return nothing
 end
@@ -396,7 +394,7 @@ The rows are the eligible assets of the observation, each scaled by the square r
 
 # Arguments
 
-  - `B`: Exposure history `observations × assets × factors`, already lagged.
+  - `B`: Exposure history `assets × factors × observations`, already lagged.
   - `u`: Resolved weight history `observations × assets`, zero outside the mask.
   - `t`: Observation to read.
   - `T`: Element type of the answer.
@@ -413,10 +411,10 @@ The rows are the eligible assets of the observation, each scaled by the square r
   - [`exposure_condition_number`](@ref)
 """
 function cs_design_slice(B::Arr3Num, u::MatNum, t::Integer, ::Type{T}) where {T}
-    idx = findall(i -> u[t, i] > zero(u[t, i]), axes(B, 2))
-    Dt = Matrix{T}(undef, length(idx), size(B, 3))
+    idx = findall(i -> u[t, i] > zero(u[t, i]), axes(B, 1))
+    Dt = Matrix{T}(undef, length(idx), size(B, 2))
     for k in axes(Dt, 2), j in eachindex(idx)
-        Dt[j, k] = sqrt(T(u[t, idx[j]])) * T(B[t, idx[j], k])
+        Dt[j, k] = sqrt(T(u[t, idx[j]])) * T(B[idx[j], k, t])
     end
     return Dt
 end
@@ -470,18 +468,18 @@ end
 function cs_regression_data(csfm::CrossSectionalFactorModel, Ms::Arr3Num,
                             csr::CrossSectionalRegression)
     lag = cs_regression_lag(csfm.lag)
-    T = size(Ms, 1)
+    T = size(Ms, 3)
     @argcheck(T > lag,
               DimensionMismatch("Ms ($T observations) must carry more observations than lag ($lag)"))
-    B = Ms[1:(T - lag), :, :]
+    B = Ms[:, :, 1:(T - lag)]
     rows = (lag + 1):size(csr.f, 1)
     f = csr.f[rows, :]
     eps = csr.eps[rows, :]
     w = cs_lagged_rows(csfm.rw, rows)
     rd = cs_regression_design(csfm.fcb, csfm.unseen, B, w,
                               isnothing(csfm.fx) ? 0 : size(csfm.fx, 2))
-    @argcheck(size(rd.B, 3) == size(f, 2),
-              DimensionMismatch("the regression of the block ran on $(size(rd.B, 3)) factors, the reduced axis less the observed ones, and csr.f carries $(size(f, 2)). A block states csr.f on the axis the fit estimated, which is the reduced axis under a family re-basis"))
+    @argcheck(size(rd.B, 2) == size(f, 2),
+              DimensionMismatch("the regression of the block ran on $(size(rd.B, 2)) factors, the reduced axis less the observed ones, and csr.f carries $(size(f, 2)). A block states csr.f on the axis the fit estimated, which is the reduced axis under a family re-basis"))
     return (; B = rd.B, f = f, eps = eps, w = w, P = rd.P,
             dc = nothing_scalar_array_getindex_odd_order(csr.dc, rows, :))
 end
@@ -553,7 +551,7 @@ At an observation with an Unseen Member, the fit regressed on the reduced exposu
 
   - `fcb`: The `fcb` field of a [`CrossSectionalFactorModel`](@ref), or `nothing`.
   - `rule`: The `unseen` field of the block.
-  - `B`: Lag-aligned exposure history `observations × assets × factors`, on the raw axis.
+  - `B`: Lag-aligned exposure history `assets × factors × observations`, on the raw axis.
   - `w`: Lag-aligned regression weight history `observations × assets`, or `nothing` for equal weights.
   - `no`: The number of observed factors.
 
@@ -572,15 +570,15 @@ At an observation with an Unseen Member, the fit regressed on the reduced exposu
 """
 function cs_regression_design(::Nothing, ::AbstractUnseenMemberRule, B::Arr3Num,
                               ::Option{<:MatNum}, no::Integer)
-    return (; B = B[:, :, 1:(size(B, 3) - no)], P = ())
+    return (; B = B[:, 1:(size(B, 2) - no), :], P = ())
 end
 function cs_regression_design(fcb::FactorFamilyBasis, rule::AbstractUnseenMemberRule,
                               B::Arr3Num, w::Option{<:MatNum}, no::Integer)
-    fb = factor_basis_slice(fcb, axes(B, 1))
-    u = cs_estimation_weights_only(w, size(B, 1), size(B, 2), real(eltype(B)))
+    fb = factor_basis_slice(fcb, axes(B, 3))
+    u = cs_estimation_weights_only(w, size(B, 3), size(B, 1), real(eltype(B)))
     ud = unseen_member_design(rule, fb, B, reduce_exposures(fb, B), u)
-    ke = 1:(size(ud.Z, 3) - no)
-    return (; B = ud.Z[:, :, ke], P = map(p -> first(p) => last(p)[ke, ke], ud.P))
+    ke = 1:(size(ud.Z, 2) - no)
+    return (; B = ud.Z[:, ke, :], P = map(p -> first(p) => last(p)[ke, ke], ud.P))
 end
 """
     cs_diagnostic_mask_weights(B::Arr3Num, eps::MatNum, w::Option{<:MatNum})
@@ -591,13 +589,13 @@ A diagnostic of the fit reads the residual of every pair it counts, so a pair wh
 
 # Arguments
 
-  - `B`: Exposure history `observations × assets × factors`, already lagged.
+  - `B`: Exposure history `assets × factors × observations`, already lagged.
   - `eps`: Residual matrix `observations × assets`, already lagged.
   - `w`: Regression weight history `observations × assets`, or `nothing` for equal weights.
 
 # Validation
 
-  - `size(eps) == (size(B, 1), size(B, 2))`.
+  - `size(eps) == (size(B, 3), size(B, 1))`.
 
 # Returns
 
@@ -610,8 +608,8 @@ A diagnostic of the fit reads the residual of every pair it counts, so a pair wh
   - [`cs_regression_t_stats`](@ref)
 """
 function cs_diagnostic_mask_weights(B::Arr3Num, eps::MatNum, w::Option{<:MatNum})
-    @argcheck(size(eps, 1) == size(B, 1) && size(eps, 2) == size(B, 2),
-              DimensionMismatch("eps ($(size(eps, 1))×$(size(eps, 2))) must match B ($(size(B, 1))×$(size(B, 2)) on its first two axes)"))
+    @argcheck(size(eps, 1) == size(B, 3) && size(eps, 2) == size(B, 1),
+              DimensionMismatch("eps ($(size(eps, 1))×$(size(eps, 2))) must match B ($(size(B, 1)) assets, $(size(B, 3)) observations)"))
     mask, u = cs_estimation_mask_weights(B, w)
     for i in axes(mask, 2), t in axes(mask, 1)
         if mask[t, i] && !isfinite(eps[t, i])
@@ -668,11 +666,11 @@ Where:
 
 # Arguments
 
-  - `B`: Exposure history `observations × assets × factors`, already lagged.
+  - `B`: Exposure history `assets × factors × observations`, already lagged.
   - `f`: Factor return matrix `observations × factors`, already lagged.
   - `eps`: Residual matrix `observations × assets`, already lagged.
   - `w`: Regression weight history `observations × assets`, or `nothing` for equal weights.
-  - `G`: Gram history `observations × factors × factors` the caller already holds, or `nothing` to read the design. A caller that supplies one states that it built the history from the same mask. The verb does not check this. A Gram history formed in floating point squares the condition number of the design, so on a design whose condition number exceeds about ``10^{8}`` it drops a direction that the fit kept, and the t-statistics of the near-dependent factors are `NaN`. Leave `G` unset to read the design.
+  - `G`: Gram history `factors × factors × observations` the caller already holds, or `nothing` to read the design. A caller that supplies one states that it built the history from the same mask. The verb does not check this. A Gram history formed in floating point squares the condition number of the design, so on a design whose condition number exceeds about ``10^{8}`` it drops a direction that the fit kept, and the t-statistics of the near-dependent factors are `NaN`. Leave `G` unset to read the design.
   - `P`: The `t => P_t` pairs of [`unseen_member_design`](@ref) on the rows of `B`, where `B` is the changed design and `f` holds the factor returns. The block method passes the pairs of [`cs_regression_data`](@ref). It is `()` for a design that no rule changed.
   - `csfm`: A cross-sectional factor model block. The answer is on the reduced factor axis when the block carries a family re-basis. When the fit states a dropped-column mask, the block method reads the design after [`cs_dropped_design`](@ref), so a factor that [`DependentColumnDrop`](@ref) dropped has no t-statistic, and the kept factors of its dependent group have the t-statistics of the kept columns.
 
@@ -689,7 +687,7 @@ Where:
 # Examples
 
 ```jldoctest
-julia> B = reshape([1.0, 1.0, 1.0, -1.0, 1.0, 0.0], 1, 3, 2);
+julia> B = reshape([1.0, 1.0, 1.0, -1.0, 1.0, 0.0], 3, 2, 1);
 
 julia> round.(cs_regression_t_stats(B, [2.0 1.0], [0.1 -0.1 0.05]); digits = 4)
 1×2 Matrix{Float64}:
@@ -707,12 +705,12 @@ julia> round.(cs_regression_t_stats(B, [2.0 1.0], [0.1 -0.1 0.05]); digits = 4)
 function cs_regression_t_stats(B::Arr3Num, f::MatNum, eps::MatNum,
                                w::Option{<:MatNum} = nothing;
                                G::Option{<:Arr3Num} = nothing, P = ())
-    K = size(B, 3)
-    @argcheck(size(f, 1) == size(B, 1) && size(f, 2) == K,
-              DimensionMismatch("f ($(size(f, 1))×$(size(f, 2))) must match B ($(size(B, 1)) observations, $K factors)"))
+    K = size(B, 2)
+    @argcheck(size(f, 1) == size(B, 3) && size(f, 2) == K,
+              DimensionMismatch("f ($(size(f, 1))×$(size(f, 2))) must match B ($(size(B, 3)) observations, $K factors)"))
     mask, u = cs_diagnostic_mask_weights(B, eps, w)
     cs_assert_gram(G, B)
-    T = size(B, 1)
+    T = size(B, 3)
     # A decomposition leaves a `Rational` type, as a square root does.
     Td = typeof(sqrt(one(promote_type(real(eltype(B)), real(eltype(u)), cs_gram_eltype(G)))))
     D = Matrix{Td}(undef, T, K)
@@ -842,11 +840,11 @@ Check that a Gram history a caller supplied matches the design.
 # Arguments
 
   - `G`: Gram history the caller holds, or `nothing`.
-  - `B`: Exposure history `observations × assets × factors`, already lagged.
+  - `B`: Exposure history `assets × factors × observations`, already lagged.
 
 # Validation
 
-  - `size(G) == (size(B, 1), size(B, 3), size(B, 3))`, when `G` is present. Raises a `DimensionMismatch`.
+  - `size(G) == (size(B, 2), size(B, 2), size(B, 3))`, when `G` is present. Raises a `DimensionMismatch`.
 
 # Returns
 
@@ -861,10 +859,10 @@ function cs_assert_gram(::Nothing, ::Arr3Num)::Nothing
     return nothing
 end
 function cs_assert_gram(G::Arr3Num, B::Arr3Num)::Nothing
-    @argcheck(size(G, 1) == size(B, 1) &&
-              size(G, 2) == size(B, 3) &&
+    @argcheck(size(G, 1) == size(B, 2) &&
+              size(G, 2) == size(B, 2) &&
               size(G, 3) == size(B, 3),
-              DimensionMismatch("G ($(size(G, 1))×$(size(G, 2))×$(size(G, 3))) must match B ($(size(B, 1)) observations, $(size(B, 3)) factors)"))
+              DimensionMismatch("G ($(size(G, 1))×$(size(G, 2))×$(size(G, 3))) must match B ($(size(B, 2)) factors, $(size(B, 3)) observations)"))
     return nothing
 end
 """
@@ -907,7 +905,7 @@ Without a Gram history the verb reads the weighted design through [`cs_inverse_d
 
   - `D`: Answer `observations × factors`, written in place.
   - `G`: Gram history the caller holds, or `nothing`.
-  - `B`: Exposure history `observations × assets × factors`, already lagged.
+  - `B`: Exposure history `assets × factors × observations`, already lagged.
   - `u`: Resolved weight history `observations × assets`, zero outside the mask.
   - `t`: Observation to write.
   - `Pt`: The change of the observation, or `nothing`.
@@ -928,7 +926,7 @@ function cs_slice_inverse_diagonal!(D::AbstractMatrix, ::Nothing, B::Arr3Num, u:
 end
 function cs_slice_inverse_diagonal!(D::AbstractMatrix, G::Arr3Num, ::Arr3Num, ::MatNum,
                                     t::Integer, Pt::Option{<:AbstractMatrix})::Int
-    Gt = Matrix{eltype(D)}(undef, size(G, 2), size(G, 3))
+    Gt = Matrix{eltype(D)}(undef, size(G, 1), size(G, 2))
     cs_gram_slice!(Gt, G, t)
     return cs_gram_inverse_diagonal!(D, Gt, t, Pt)
 end
@@ -1037,7 +1035,7 @@ The mask of a score is the finiteness of the asset return, which the exposures, 
 
 # Arguments
 
-  - `B`: Exposure history `observations × assets × factors`, already lagged.
+  - `B`: Exposure history `assets × factors × observations`, already lagged.
   - `f`: Factor return matrix `observations × factors`, already lagged.
   - `eps`: Residual matrix `observations × assets`, already lagged.
   - `w`: Regression weight history `observations × assets`, or `nothing` for equal weights.
@@ -1062,12 +1060,12 @@ The mask of a score is the finiteness of the asset return, which the exposures, 
   - [`cs_regression_bic`](@ref)
 """
 function cs_regression_score_parts(B::Arr3Num, f::MatNum, eps::MatNum, w::Option{<:MatNum})
-    T, N, K = size(B)
+    N, K, T = size(B)
     @argcheck(!isempty(B), IsEmptyError("B cannot be empty"))
     @argcheck(size(f, 1) == T && size(f, 2) == K,
               DimensionMismatch("f ($(size(f, 1))×$(size(f, 2))) must match B ($T observations, $K factors)"))
     @argcheck(size(eps, 1) == T && size(eps, 2) == N,
-              DimensionMismatch("eps ($(size(eps, 1))×$(size(eps, 2))) must match B ($T×$N on its first two axes)"))
+              DimensionMismatch("eps ($(size(eps, 1))×$(size(eps, 2))) must match B ($N assets, $T observations)"))
     Tf = promote_type(real(eltype(B)), real(eltype(f)), real(eltype(eps)))
     u0 = cs_estimation_weights_only(w, T, N, Tf)
     n = zeros(Int, T)
@@ -1094,7 +1092,7 @@ A fit spends one degree of freedom on each direction of its design, which is the
 # Arguments
 
   - `k`: Number of regressors, or `nothing` for the rank of each observation.
-  - `B`: Exposure history `observations × assets × factors`, already lagged.
+  - `B`: Exposure history `assets × factors × observations`, already lagged.
   - `Q`: Normalised weight history `observations × assets` of the score, zero outside its mask.
 
 # Returns
@@ -1109,12 +1107,12 @@ A fit spends one degree of freedom on each direction of its design, which is the
   - [`cs_regression_bic`](@ref)
 """
 function cs_score_regressors(k::Integer, B::Arr3Num, ::MatNum)
-    return fill(k, size(B, 1))
+    return fill(k, size(B, 3))
 end
 function cs_score_regressors(::Nothing, B::Arr3Num, Q::MatNum)
     # A decomposition leaves a `Rational` type, as a square root does.
     Tf = typeof(sqrt(one(promote_type(real(eltype(B)), real(eltype(Q))))))
-    return [cross_sectional_rank(cs_design_slice(B, Q, t, Tf)) for t in axes(B, 1)]
+    return [cross_sectional_rank(cs_design_slice(B, Q, t, Tf)) for t in axes(B, 3)]
 end
 """
     cs_score_observation!(
@@ -1135,7 +1133,7 @@ The mask of a cross-sectional regression score is the finiteness of the reconstr
 
   - `r`: Reconstructed asset returns of the observation, written in place.
   - `q`: Normalised weights of the observation, written in place.
-  - `B`: Exposure history `observations × assets × factors`, already lagged.
+  - `B`: Exposure history `assets × factors × observations`, already lagged.
   - `f`: Factor return matrix `observations × factors`, already lagged.
   - `eps`: Residual matrix `observations × assets`, already lagged.
   - `u0`: Regression weights `observations × assets`, zero where the weight is not positive.
@@ -1180,7 +1178,7 @@ Return the part of one asset's return the factors of one observation span.
 
 # Arguments
 
-  - `B`: Exposure history `observations × assets × factors`, already lagged.
+  - `B`: Exposure history `assets × factors × observations`, already lagged.
   - `f`: Factor return matrix `observations × factors`, already lagged.
   - `t`: Observation to read.
   - `i`: Asset to read.
@@ -1198,8 +1196,8 @@ Return the part of one asset's return the factors of one observation span.
 function cs_systematic_return(B::Arr3Num, f::MatNum, t::Integer, i::Integer,
                               ::Type{T}) where {T}
     sys = zero(T)
-    for k in axes(B, 3)
-        sys += T(B[t, i, k]) * T(f[t, k])
+    for k in axes(B, 2)
+        sys += T(B[i, k, t]) * T(f[t, k])
     end
     return sys
 end
@@ -1324,7 +1322,7 @@ Where:
 
 # Arguments
 
-  - `B`: Exposure history `observations × assets × factors`, already lagged.
+  - `B`: Exposure history `assets × factors × observations`, already lagged.
   - `f`: Factor return matrix `observations × factors`, already lagged.
   - `eps`: Residual matrix `observations × assets`, already lagged.
   - `w`: Regression weight history `observations × assets`, or `nothing` for equal weights.
@@ -1342,7 +1340,7 @@ Where:
 # Examples
 
 ```jldoctest
-julia> B = reshape([1.0, 1.0, -1.0, 1.0], 1, 2, 2);
+julia> B = reshape([1.0, 1.0, -1.0, 1.0], 2, 2, 1);
 
 julia> cs_regression_r2(B, [1.0 1.0], [0.0 0.0])
 1-element Vector{Float64}:
@@ -1395,7 +1393,7 @@ Where:
 
 # Arguments
 
-  - `B`: Exposure history `observations × assets × factors`, already lagged.
+  - `B`: Exposure history `assets × factors × observations`, already lagged.
   - `f`: Factor return matrix `observations × factors`, already lagged.
   - `eps`: Residual matrix `observations × assets`, already lagged.
   - `w`: Regression weight history `observations × assets`, or `nothing` for equal weights.
@@ -1414,7 +1412,7 @@ Where:
 # Examples
 
 ```jldoctest
-julia> B = reshape([1.0, 1.0, 1.0, -1.0, 1.0, 0.0], 1, 3, 2);
+julia> B = reshape([1.0, 1.0, 1.0, -1.0, 1.0, 0.0], 3, 2, 1);
 
 julia> cs_regression_adjusted_r2(B, [1.0 0.0], [0.0 0.0 0.0])
 1-element Vector{Float64}:
@@ -1480,7 +1478,7 @@ Where:
 
 # Arguments
 
-  - `B`: Exposure history `observations × assets × factors`, already lagged.
+  - `B`: Exposure history `assets × factors × observations`, already lagged.
   - `f`: Factor return matrix `observations × factors`, already lagged.
   - `eps`: Residual matrix `observations × assets`, already lagged.
   - `w`: Regression weight history `observations × assets`, or `nothing` for equal weights.
@@ -1499,7 +1497,7 @@ Where:
 # Examples
 
 ```jldoctest
-julia> B = reshape([1.0, 1.0, 1.0, -1.0, 1.0, 0.0], 1, 3, 2);
+julia> B = reshape([1.0, 1.0, 1.0, -1.0, 1.0, 0.0], 3, 2, 1);
 
 julia> cs_regression_aic(B, [1.0 0.0], [0.1 0.1 0.1]; k = 1)
 1-element Vector{Float64}:
@@ -1560,7 +1558,7 @@ Where:
 
 # Arguments
 
-  - `B`: Exposure history `observations × assets × factors`, already lagged.
+  - `B`: Exposure history `assets × factors × observations`, already lagged.
   - `f`: Factor return matrix `observations × factors`, already lagged.
   - `eps`: Residual matrix `observations × assets`, already lagged.
   - `w`: Regression weight history `observations × assets`, or `nothing` for equal weights.
@@ -1579,7 +1577,7 @@ Where:
 # Examples
 
 ```jldoctest
-julia> B = reshape([1.0, 1.0, 1.0, -1.0, 1.0, 0.0], 1, 3, 2);
+julia> B = reshape([1.0, 1.0, 1.0, -1.0, 1.0, 0.0], 3, 2, 1);
 
 julia> cs_regression_bic(B, [1.0 0.0], [0.1 0.1 0.1]; k = 1)
 1-element Vector{Float64}:
@@ -1643,7 +1641,7 @@ Where:
 # Arguments
 
   - `csr`: A cross-sectional regression result.
-  - `Z::Arr3Num`: Exposure tensor `observations × assets × factors`.
+  - `Z::Arr3Num`: Exposure tensor `assets × factors × observations`.
   - `X::MatNum`: Asset returns matrix `observations × assets`.
   - `W::MatNum`: Cross-sectional weights matrix `observations × assets`.
 
@@ -1658,7 +1656,7 @@ Where:
 # Examples
 
 ```jldoctest
-julia> Z = reshape([1.0, 0.0, 0.5, 0.0, 1.0, 0.5], 1, 3, 2);
+julia> Z = reshape([1.0, 0.0, 0.5, 0.0, 1.0, 0.5], 3, 2, 1);
 
 julia> csr = cross_sectional_regression(CrossSectionalLinearRegression(), Z, [1.0 2.0 1.5],
                                         ones(1, 3));
@@ -1715,7 +1713,7 @@ The mean skips every observation whose ratio is undefined, and it is `NaN` when 
 # Arguments
 
   - `csr`: A cross-sectional regression result.
-  - `Z::Arr3Num`: Exposure tensor `observations × assets × factors`.
+  - `Z::Arr3Num`: Exposure tensor `assets × factors × observations`.
   - `X::MatNum`: Asset returns matrix `observations × assets`.
   - `W::MatNum`: Cross-sectional weights matrix `observations × assets`.
 
@@ -1730,7 +1728,7 @@ The mean skips every observation whose ratio is undefined, and it is `NaN` when 
 # Examples
 
 ```jldoctest
-julia> Z = reshape([1.0, 0.0, 0.5, 0.0, 1.0, 0.5], 1, 3, 2);
+julia> Z = reshape([1.0, 0.0, 0.5, 0.0, 1.0, 0.5], 3, 2, 1);
 
 julia> csr = cross_sectional_regression(CrossSectionalLinearRegression(), Z, [1.0 2.0 1.5],
                                         ones(1, 3));

@@ -186,11 +186,12 @@ function return_forecast_weights(rd::ReturnsResult)::MatNum
 end
 """
     return_forecast_history_rows(A::Nothing) -> Nothing
-    return_forecast_history_rows(A::MatNum_Arr3Num) -> Integer
+    return_forecast_history_rows(A::MatNum) -> Integer
+    return_forecast_history_rows(A::Arr3Num) -> Integer
 
 Return the observation count of one history of a factor-model block, or `nothing`.
 
-Every history of a block lays its observations on the first axis, whatever its rank, so one method reads a per-asset history and an exposure history. An absent history gives `nothing`. So [`return_forecast_block_observations`](@ref) reads the first history that the block carries with no `isnothing` test of its own.
+A per-asset history lays its observations on its first axis, as the returns do, and an exposure history lays them on its last axis. The method that Julia selects reads the axis of the rank. An absent history gives `nothing`. So [`return_forecast_block_observations`](@ref) reads the first history that the block carries with no `isnothing` test of its own.
 
 # Arguments
 
@@ -209,8 +210,11 @@ Every history of a block lays its observations on the first axis, whatever its r
 function return_forecast_history_rows(::Nothing)::Nothing
     return nothing
 end
-function return_forecast_history_rows(A::MatNum_Arr3Num)::Integer
+function return_forecast_history_rows(A::MatNum)::Integer
     return size(A, 1)
+end
+function return_forecast_history_rows(A::Arr3Num)::Integer
+    return size(A, 3)
 end
 """
     return_forecast_block_observations(csfm::CrossSectionalFactorModel) -> Option{<:Integer}
@@ -330,7 +334,7 @@ function return_forecast_cut(A::MatNum, rows::AbstractUnitRange)::MatNum
     return A[rows, :]
 end
 function return_forecast_cut(A::Arr3Num, rows::AbstractUnitRange)::Arr3Num
-    return A[rows, :, :]
+    return A[:, :, rows]
 end
 """
     return_forecast_pad(A::Nothing, rows::AbstractUnitRange, T::Integer) -> Nothing

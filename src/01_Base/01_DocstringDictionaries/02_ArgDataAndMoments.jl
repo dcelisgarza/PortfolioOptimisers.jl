@@ -124,7 +124,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :Xv => "`X`: Data vector `observations × 1`.",#
                  :X_sub => "`X`: Returns matrix of the subproblem, `observations × assets`.",#
                  :X_Xv => "`X`: Data matrix or vector.",#
-                 :Z => "`Z`: Feature matrix, `assets × features` when `dims = 1` and `features × assets` when `dims = 2`. It can also be a 3-D array of time-varying features, whose first axis is always the observation axis: `observations × assets × features` when `dims = 1`, and `observations × features × assets` when `dims = 2`.",#
+                 :Z => "`Z`: Feature matrix, `assets × features` when `dims = 1` and `features × assets` when `dims = 2`. It can also be a 3-D array of time-varying features, whose last axis is always the observation axis: `assets × features × observations` when `dims = 1`, and `features × assets × observations` when `dims = 2`.",#
                  :plfe => "`pl`: Structure source, always an estimator so that it refits per fold: a network estimator (a graph, whose `sep` measures the separations `alg` grades) or a clustering estimator (a partition, for which `alg` is inert). A precomputed result is not accepted -- an Estimator does not hold a Result.",#
                  :plfalg => "`alg`: Phylogeny feature algorithm: the rule turning the source's separations into feature values. Inert for a partition source, which has no separation to grade.",#
                  :dims => "`dims`: Dimension along which the computation runs.",#

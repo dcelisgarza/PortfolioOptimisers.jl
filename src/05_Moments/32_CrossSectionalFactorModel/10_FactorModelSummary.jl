@@ -589,7 +589,7 @@ The variance is not defined for an empty ``\\mathcal{N}_{tk}``. An infinite expo
 
 # Arguments
 
-  - `Ms`: Exposure history `observations × assets × factors`, unlagged.
+  - `Ms`: Exposure history `assets × factors × observations`, unlagged.
   - `t`: Position of the observation.
   - `k`: Position of the factor.
 
@@ -607,8 +607,8 @@ function factor_summary_exposure_variance(Ms::Arr3Num, t::Integer, k::Integer)
     s = zero(Tf)
     lo = Tf(Inf)
     hi = -Tf(Inf)
-    for i in axes(Ms, 2)
-        a = Ms[t, i, k]
+    for i in axes(Ms, 1)
+        a = Ms[i, k, t]
         if !isnan(a)
             n += 1
             s += Tf(a)
@@ -622,8 +622,8 @@ function factor_summary_exposure_variance(Ms::Arr3Num, t::Integer, k::Integer)
     # mean the common value, so every deviation is exactly zero.
     m = clamp(s / n, lo, hi)
     q = zero(Tf)
-    for i in axes(Ms, 2)
-        a = Ms[t, i, k]
+    for i in axes(Ms, 1)
+        a = Ms[i, k, t]
         if !isnan(a)
             q += (Tf(a) - m)^2
         end
@@ -658,7 +658,7 @@ A factor with no exposure anywhere is not constant.
 
 # Arguments
 
-  - `Ms`: Exposure history `observations × assets × factors`, unlagged.
+  - `Ms`: Exposure history `assets × factors × observations`, unlagged.
 
 # Returns
 
@@ -671,8 +671,8 @@ A factor with no exposure anywhere is not constant.
   - [`factor_model_summary`](@ref)
 """
 function factor_summary_constant_exposures(Ms::Arr3Num)
-    T = size(Ms, 1)
-    K = size(Ms, 3)
+    T = size(Ms, 3)
+    K = size(Ms, 2)
     c = falses(K)
     for k in 1:K
         m = -Inf
@@ -718,7 +718,7 @@ The median is not defined for an empty ``\\mathcal{T}_{k}``, and that is the cas
 
 # Arguments
 
-  - `Ms`: Exposure history `observations × assets × factors`, unlagged.
+  - `Ms`: Exposure history `assets × factors × observations`, unlagged.
   - `csfm`: A cross-sectional factor model block.
   - `step`: Number of observations between the two cross-sections that the coefficient reads.
   - `weighting`: The [`AbstractOrthogonalityMetric`](@ref) whose weight history the coefficient reads.
@@ -736,9 +736,9 @@ The median is not defined for an empty ``\\mathcal{T}_{k}``, and that is the cas
 function factor_summary_stability(Ms::Arr3Num, csfm::CrossSectionalFactorModel;
                                   step::Integer = 21, weighting = BenchmarkWeightMetric())
     con = factor_summary_constant_exposures(Ms)
-    K = size(Ms, 3)
+    K = size(Ms, 2)
     Tf = real(eltype(Ms))
-    if size(Ms, 1) <= step
+    if size(Ms, 3) <= step
         return Tf[con[k] ? one(Tf) : Tf(NaN) for k in 1:K]
     end
     S = exposure_stability(csfm; step = step, weighting = weighting).X

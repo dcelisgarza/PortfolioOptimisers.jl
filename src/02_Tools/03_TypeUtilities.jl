@@ -225,7 +225,7 @@ The method that Julia selects is the algorithm.
 
  1. `T` is a subtype of `Integer`, which includes `Bool`: return the floating-point type that Base `float` gives for `T`, for example `Float64` for `Int` and `BigFloat` for `BigInt`.
  2. `T` is any other type: return `T`.
- 3. `X` has an `Integer` element type: return a copy of `X` in the type of step 1. A [`RepeatedLeading`](@ref) lift converts its parent and stays lazy.
+ 3. `X` has an `Integer` element type: return a copy of `X` in the type of step 1. A [`RepeatedObservations`](@ref) lift converts its parent and stays lazy.
  4. `X` has any other element type: return `X` itself, with no copy, so a view stays a view.
  5. A time array `A` with an `Integer` element type: return a time array with the same timestamps, column names and metadata, and its values converted as in step 3. A time array with any other element type: return `A` itself.
  6. `nothing`: return `nothing`, so an absent series of a carrier passes through.

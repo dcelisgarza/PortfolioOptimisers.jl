@@ -10,7 +10,7 @@ const PO = PortfolioOptimisers
 
 const CSRS_Z, CSRS_X, CSRS_W = let rng = StableRNG(694)
     T, N, K = 5, 30, 3
-    Z = randn(rng, T, N, K)
+    Z = permutedims(randn(rng, T, N, K), (2, 3, 1))
     X = randn(rng, T, N)
     W = 0.5 .+ rand(rng, T, N)
     W[2, 1:4] .= 0.0
@@ -22,7 +22,7 @@ end
 # intercept and the factor returns together, and holds the intercept at zero otherwise.
 function csrs_normal_equations(Z, X, W, t; intercept)
     idx = findall(W[t, :] .> 0)
-    G = Z[t, idx, :]
+    G = Z[idx, :, t]
     if intercept
         G = hcat(ones(length(idx)), G)
     end
@@ -45,7 +45,7 @@ end
 
 @testset "Cross-sectional regression: the sweep (#694)" begin
     Z, X, W = CSRS_Z, CSRS_X, CSRS_W
-    T, N, K = size(Z)
+    N, K, T = size(Z)
 
     @testset "The fit minimises over the intercept and the factor returns together" begin
         for intercept in (false, true),
@@ -60,7 +60,7 @@ end
                     @test csr.b[t]≈b atol=1e-12
                 end
                 # The residual is the return less the intercept and the systematic part.
-                @test csr.eps[t, :] ≈ X[t, :] .- b .- Z[t, :, :] * f
+                @test csr.eps[t, :] ≈ X[t, :] .- b .- Z[:, :, t] * f
             end
             @test intercept ? !isnothing(csr.b) : isnothing(csr.b)
             # Observation 2 lost the four assets of zero weight.
@@ -69,7 +69,7 @@ end
         # A small move of the intercept or of the factor returns raises the objective.
         csr = cross_sectional_regression(CrossSectionalLinearRegression(; intercept = true),
                                          Z, X, W)
-        obj(b, f) = sum(W[1, i] * (X[1, i] - b - dot(Z[1, i, :], f))^2 for i in 1:N)
+        obj(b, f) = sum(W[1, i] * (X[1, i] - b - dot(Z[i, :, 1], f))^2 for i in 1:N)
         o0 = obj(csr.b[1], csr.f[1, :])
         rng = StableRNG(6941)
         @test all(obj(csr.b[1] + 1e-3 * randn(rng), csr.f[1, :] + 1e-3 * randn(rng, K)) >
@@ -128,12 +128,12 @@ end
         # so the trace is the rank of the design, and a dependent column spends nothing.
         function trace_count(Z, W, t; intercept)
             idx = findall(W[t, :] .> 0)
-            D = Z[t, idx, :] .* sqrt.(W[t, idx])
+            D = Z[idx, :, t] .* sqrt.(W[t, idx])
             D = intercept ? hcat(sqrt.(W[t, idx]), D) : D
             return length(idx) - round(Int, tr(D * pinv(D)))
         end
         Zd = copy(Z)
-        Zd[:, :, 3] = Zd[:, :, 1] .- 2 .* Zd[:, :, 2]
+        Zd[:, 3, :] = Zd[:, 1, :] .- 2 .* Zd[:, 2, :]
         for Zc in (Z, Zd), intercept in (false, true),
             alg in
             (PseudoInverseFallback(), DependentColumnDrop(), RankDeficiencyRefusal(),
@@ -162,9 +162,9 @@ end
         w1 = PO.StatsBase.aweights(W[1, :])
         for tgt in (LinearModel(), GeneralisedLinearModel(),
                     GeneralisedLinearModel(; args = (PO.Distributions.Poisson(),)))
-            m = PO.StatsAPI.fit(PO.factory(tgt, w1), Zd[1, :, :],
+            m = PO.StatsAPI.fit(PO.factory(tgt, w1), Zd[:, :, 1],
                                 round.(abs.(10 .* X[1, :])))
-            @test PO.residual_count(m, Zd[1, :, :]) === N - 2
+            @test PO.residual_count(m, Zd[:, :, 1]) === N - 2
         end
         # An observation with no eligible asset spends nothing, the intercept included.
         W0 = copy(W)
@@ -183,7 +183,7 @@ end
             csr = cross_sectional_regression(cre, Z, X, W)
             for t in 1:T
                 idx = findall(W[t, :] .> 0)
-                w, A, y = W[t, idx], Z[t, idx, :], X[t, idx]
+                w, A, y = W[t, idx], Z[idx, :, t], X[t, idx]
                 if intercept
                     A = A .- (A' * w / sum(w))'
                     y = y .- dot(w, y) / sum(w)
@@ -292,10 +292,10 @@ end
         rng = StableRNG(19712)
         Tl, Nl = 4, 12
         lvl = [i == 1 ? 2 : 1 for i in 1:Nl]
-        Zl = zeros(Tl, Nl, 3)
-        Zl[:, :, 1] .= randn(rng, Tl, Nl)
+        Zl = zeros(Nl, 3, Tl)
+        Zl[:, 1, :] .= permutedims(randn(rng, Tl, Nl))
         for i in 1:Nl
-            Zl[:, i, 1 + lvl[i]] .= 1.0
+            Zl[i, 1 + lvl[i], :] .= 1.0
         end
         Xl = randn(rng, Tl, Nl)
         Wl = 0.5 .+ rand(rng, Tl, Nl)
@@ -355,7 +355,7 @@ end
             end
         end
         Zd = copy(Z)
-        Zd[:, :, 3] = Zd[:, :, 1] .+ Zd[:, :, 2]
+        Zd[:, 3, :] = Zd[:, 1, :] .+ Zd[:, 2, :]
         for mk in (CrossSectionalLinearRegression, CrossSectionalTargetRegression)
             @test cross_sectional_regression(mk(; alg = NE), Zd, X, W).f ==
                   cross_sectional_regression(mk(; alg = PIF), Zd, X, W).f
@@ -365,7 +365,7 @@ end
     @testset "A member of a caller reads no factorisation (#1971)" begin
         # The regression hands the QR of its leverage check as a fifth argument, and the
         # method of the root drops it for a member that states four.
-        A = CSRS_Z[1, :, :]
+        A = CSRS_Z[:, :, 1]
         y = CSRS_X[1, :]
         @test PO.cross_sectional_solve(CsrsUserSolve(), A, y, 1, qr(A, ColumnNorm())) ==
               PO.cross_sectional_solve(CsrsUserSolve(), A, y, 1)
@@ -384,7 +384,7 @@ end
             idx = findall(W[t, :] .> 0)
             w = W[t, idx]
             y = X[t, idx]
-            yh = Z[t, idx, :] * csr.f[t, :]
+            yh = Z[idx, :, t] * csr.f[t, :]
             ybar = sum(w .* y) / sum(w)
             @test r2[t] ≈ 1 - sum(w .* (y - yh) .^ 2) / sum(w .* (y .- ybar) .^ 2)
         end

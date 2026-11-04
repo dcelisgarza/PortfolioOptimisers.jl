@@ -30,9 +30,13 @@ include(joinpath(@__DIR__, "panel_census.jl"))
 
 # The blanks: about one active cell in twenty of every Panel Field becomes a placeholder, label
 # by label on a tensor Panel Field. An inactive cell keeps its masks.
+# A tensor Panel Field holds `assets × labels × observations`, so it reads the active mask
+# transposed, with a label axis of length one.
+census_active(amsk, ::NTuple{2, Int}) = amsk
+census_active(amsk, sz::NTuple{3, Int}) = reshape(permutedims(amsk), sz[1], 1, sz[3])
 function census_blank_masks(f, amsk::AbstractMatrix{Bool}, sz::Tuple, rng)
     b = rand(rng, sz...) .< 0.05
-    b .&= amsk
+    b .&= census_active(amsk, sz)
     o = (isnothing(f.omsk) ? trues(sz) : BitArray(f.omsk)) .& .!b
     p = (isnothing(f.pmsk) ? falses(sz) : BitArray(f.pmsk)) .| b
     return o, p
@@ -142,10 +146,10 @@ end
     fd(alg) = FeatureDistance(; sel = ["a"], alg = alg, metric = euc)
     @testset "feature_matrix holds NaN at a placeholder" begin
         Z = feature_matrix(tv)
-        @test isnan(Z[3, 2, 1])
+        @test isnan(Z[2, 1, 3])
         @test count(isnan, Z) == 1
-        @test feature_matrix(tv; placeholder = nothing)[3, 2, 1] == 1e6
-        @test feature_matrix(tv; placeholder = 0)[3, 2, 1] == 0
+        @test feature_matrix(tv; placeholder = nothing)[2, 1, 3] == 1e6
+        @test feature_matrix(tv; placeholder = 0)[2, 1, 3] == 0
     end
     @testset "FeatureDistance reads the last readable row" begin
         # x at row 3 (7), y at row 2 (5), z at row 3 (9).

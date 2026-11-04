@@ -504,14 +504,14 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
               distance(fdist(StackObservations()), Z)
     end
     @testset "The raw 3-D entry takes the active mask as a keyword" begin
-        Z = reshape([1.0 2 9; 2 4 9; 3 9 5; 4 9 7], 4, 3, 1)
+        Z = permutedims(reshape([1.0 2 9; 2 4 9; 3 9 5; 4 9 7], 4, 3, 1), (2, 3, 1))
         A = Bool[1 1 0; 1 1 0; 1 0 1; 1 0 1]
         de = FeatureDistance(; metric = Euclidean(),
                              alg = AggregateDistances(; pair = FeatureFallback()))
         @test distance(de, Z; amsk = A) ==
               hand_distance(fdist(AggregateDistances(; pair = FeatureFallback())), rd)
         # The same window with the assets on the last axis.
-        @test distance(de, permutedims(Z, (1, 3, 2)); dims = 2, amsk = A) ==
+        @test distance(de, permutedims(Z, (2, 1, 3)); dims = 2, amsk = A) ==
               distance(de, Z; amsk = A)
         # With no names, a refusal quotes positions.
         msg = "the assets at the positions (2, 3)"
@@ -531,7 +531,7 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
         end
         # A pair whose shared rows hold a zero vector takes the zero-feature-vector convention.
         Zz = copy(Z)
-        Zz[1:2, 2, 1] .= 0
+        Zz[2, 1, 1:2] .= 0
         de = fdist(StackObservations(; pair = FeatureFallback());
                    metric = PortfolioOptimisers.Distances.CosineDist())
         @test distance(de, Zz; amsk = A)[1, 2] == 1
@@ -540,7 +540,7 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
     @testset "The checks read only the readable cells (#1734)" begin
         # The cell (1, 3) is inactive. Its value refuses nothing and moves no distance, under
         # each collapse that reads the window and each metric, in either layout.
-        Z = reshape([1.0 2 9; 2 4 9; 3 9 5; 4 9 7], 4, 3, 1)
+        Z = permutedims(reshape([1.0 2 9; 2 4 9; 3 9 5; 4 9 7], 4, 3, 1), (2, 3, 1))
         A = Bool[1 1 0; 1 1 0; 1 0 1; 1 0 1]
         fb = FeatureFallback()
         metrics = (Euclidean(), AngularDist(), ChiSqDist(), BrayCurtis(), Jaccard())
@@ -548,10 +548,10 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
                 StackObservations(; pair = fb))
         for v in (-9.0, NaN, Inf), metric in metrics, alg in algs
             Zv = copy(Z)
-            Zv[1, 3, 1] = v
+            Zv[3, 1, 1] = v
             de = FeatureDistance(; metric = metric, alg = alg)
             @test distance(de, Zv; amsk = A) == distance(de, Z; amsk = A)
-            @test distance(de, permutedims(Zv, (1, 3, 2)); dims = 2, amsk = A) ==
+            @test distance(de, permutedims(Zv, (2, 1, 3)); dims = 2, amsk = A) ==
                   distance(de, Z; amsk = A)
             @test cor_and_dist(de, Zv; amsk = A) == cor_and_dist(de, Z; amsk = A)
         end
@@ -645,7 +645,7 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
         # Cityblock measures the pair at 4, 6 and 9 on the three rows. The mean is 19 / 3,
         # and the mean over rows 1 and 3 is 13 / 2. Issue #1972 removed the integer case:
         # integer data convert at the carrier.
-        Z = reshape([1.0, 2, 4, 0, 3, 1, 5, 5, 2, 2, 0, 8], 3, 2, 2)
+        Z = permutedims(reshape([1.0, 2, 4, 0, 3, 1, 5, 5, 2, 2, 0, 8], 3, 2, 2), (2, 3, 1))
         A = Bool[1 1; 1 0; 1 1]
         de = fdist(AggregateDistances(); metric = Cityblock())
         @test distance(de, Z) == [0 19 / 3; 19 / 3 0]
@@ -660,7 +660,7 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
         # The fallback of an empty pair, and the rescale of a pair that shares two of three
         # rows, each give a fraction too. `a` holds (1, 0) and (2, 1) on rows 1 and 2, `b`
         # holds (1, 0) on row 3, and `c` holds (2, 1), (3, 2) and (4, 3).
-        Z3 = Float64.(reshape(collect(1:18), 3, 3, 2) .% 5)
+        Z3 = permutedims(Float64.(reshape(collect(1:18), 3, 3, 2) .% 5), (2, 3, 1))
         Ae = Bool[1 0 1; 1 0 1; 0 1 1]
         fb = fdist(AggregateDistances(; pair = FeatureFallback()); metric = Cityblock())
         # The fallback: `a` collapses to (1.5, 0.5) against (1, 0).
@@ -689,7 +689,7 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
         # three measure the first feature alone, and one weight per feature does not fit.
         dwe = distance(fdist(StackObservations();
                              metric = WeightedEuclidean([1.0, 1, 1, 0, 0, 0])), Z3)
-        @test dwe ≈ [Euclidean()(Z3[:, i, 1], Z3[:, j, 1]) for i in 1:3, j in 1:3] rtol = 1e-15
+        @test dwe ≈ [Euclidean()(Z3[i, 1, :], Z3[j, 1, :]) for i in 1:3, j in 1:3] rtol = 1e-15
         @test_throws DimensionMismatch distance(fdist(StackObservations();
                                                       metric = WeightedEuclidean([1.0, 1])),
                                                 Z3)

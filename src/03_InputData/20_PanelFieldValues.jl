@@ -71,15 +71,19 @@ function panel_read_eltype(::Type{T}, ::Real) where {T}
 end
 """
     panel_read_write!(V::AbstractArray, msk::Option{<:AbstractArray{Bool}}, v::Option{<:Real}) -> nothing
+    panel_read_write!(V::AbstractArray{<:Any, 3}, msk::AbstractMatrix{Bool}, v::Real) -> nothing
 
 Write the policy value `v` into every cell of `V` where the mask `msk` is `false`, in place.
 
-[`panel_field_values`](@ref) writes its two policies through this function, and [`feature_matrix`](@ref) writes its `placeholder`. `msk` covers the leading axes of `V`. A mask with the shape of `V` marks one entry for each cell. The observed mask of a Panel Field is one, and so is the data mask of one column of a Feature Matrix. The active mask of a time-varying panel is `observations × assets`, so on a tensor Panel Field one `false` entry covers every label of that observation and asset.
+[`panel_field_values`](@ref) writes its two policies through this function, and [`feature_matrix`](@ref) writes its `placeholder`. A mask with the shape of `V` marks one entry for each cell. The observed mask of a Panel Field is one, and so is the data mask of one column of a Feature Matrix. The active mask of a time-varying panel is `observations × assets`, and a tensor Panel Field is `assets × labels × observations`, so on a tensor Panel Field one `false` entry `(t, i)` covers every label of that observation and asset.
 
 # Algorithm
 
+The method that Julia selects is the algorithm.
+
  1. Return at once when `msk` or `v` is `nothing`. A mask of `nothing` marks no cell, and a policy of `nothing` keeps the stored value.
- 2. Otherwise, for each `false` entry of `msk`, write `v` into the slab of `V` at that entry.
+ 2. A mask of the shape of `V`: write `v` into each cell whose entry of `msk` is `false`.
+ 3. An array of rank three with a matrix mask: for each `false` entry `(t, i)` of `msk`, write `v` into `V[i, :, t]`.
 
 # Arguments
 
@@ -104,10 +108,22 @@ function panel_read_write!(::AbstractArray, ::Nothing, ::Real)::Nothing
     return nothing
 end
 function panel_read_write!(V::AbstractArray, msk::AbstractArray{Bool}, v::Real)::Nothing
-    tail = ntuple(Returns(Colon()), ndims(V) - ndims(msk))
+    @argcheck(size(msk) == size(V),
+              DimensionMismatch("the mask ($(size(msk))) must have the shape of the values ($(size(V)))"))
     for k in CartesianIndices(msk)
         if !msk[k]
-            view(V, Tuple(k)..., tail...) .= v
+            V[k] = v
+        end
+    end
+    return nothing
+end
+function panel_read_write!(V::AbstractArray{<:Any, 3}, msk::AbstractMatrix{Bool},
+                           v::Real)::Nothing
+    @argcheck(size(msk) == (size(V, 3), size(V, 1)),
+              DimensionMismatch("the mask ($(size(msk))) must be observations × assets of the values ($(size(V)))"))
+    for k in CartesianIndices(msk)
+        if !msk[k]
+            view(V, k[2], :, k[1]) .= v
         end
     end
     return nothing
@@ -188,7 +204,7 @@ Where:
 
 # Returns
 
-  - `V::AbstractArray`: A copy of the values, with the shape of the Panel Field: `assets` or `observations × assets`, with a trailing label axis on a tensor Panel Field.
+  - `V::AbstractArray`: A copy of the values, with the shape of the Panel Field: `assets` or `observations × assets`, or `assets × labels` or `assets × labels × observations` on a tensor Panel Field.
 
 # Examples
 

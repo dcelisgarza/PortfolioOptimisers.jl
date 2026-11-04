@@ -281,9 +281,9 @@ end
     panel_axis_labels(names::Nothing, n::Integer) -> Vector{String}
     panel_axis_labels(names::VecStr, n::Integer) -> Vector{String}
 
-Name the trailing axis of a [`TensorPanelField`](@ref) that a producer builds, from the returns data or by position.
+Name the label axis of a [`TensorPanelField`](@ref) that a producer builds, from the returns data or by position.
 
-The field of a producer has a labelled trailing axis, and neither a loadings matrix nor a proximity matrix holds names for that axis. The returns data is the one place that holds them. `rd.nx` names the assets of a proximity field, and `rd.nf` names the factors of a loadings field. When the returns data gives no names, or a wrong number of them, the labels are the positions `"1"` to `"n"`.
+The field of a producer has a labelled label axis, and neither a loadings matrix nor a proximity matrix holds names for that axis. The returns data is the one place that holds them. `rd.nx` names the assets of a proximity field, and `rd.nf` names the factors of a loadings field. When the returns data gives no names, or a wrong number of them, the labels are the positions `"1"` to `"n"`.
 
 The function checks the count. A reduced or re-based `L` has fewer columns than the returns data has factors, and the names of the returns data then belong to other columns.
 
@@ -301,7 +301,7 @@ The method that Julia selects is the algorithm.
 
 # Returns
 
-  - `labels::Vector{String}`: One label per entry of the trailing axis.
+  - `labels::Vector{String}`: One label per entry of the label axis.
 
 # Related
 
@@ -320,7 +320,7 @@ end
     returns_asset_names(rd::Nothing) -> nothing
     returns_asset_names(rd::AbstractReturnsResult) -> Option{<:VecStr}
 
-Read the asset names that label the trailing axis of a producer's field, or `nothing`.
+Read the asset names that label the label axis of a producer's field, or `nothing`.
 
 The kernel hands a producer the two values that it received, `pr` and `rd`. Only `rd` names the assets, so this function reads `rd`, and returns `nothing` when there is none.
 
@@ -404,7 +404,7 @@ Builds an Asset Panel that holds the factor loadings of the wrapped prior.
 
 `L` is `assets × reduced_dimensions`, and [`DimensionReductionRegression`](@ref) sets it. It holds the coordinates of each asset in the reduced space. `M` holds the loadings on every factor, rebuilt from `L`. `pr.rr.L` always has a value, because [`Regression`](@ref) returns `M` when `L` is unset. So this producer needs no branch, and it works behind the time-series and the cross-sectional regression estimators alike.
 
-Both matrices have one row per asset, so the asset axis of the panel is the asset axis of the returns data, with no transpose. The trailing axis holds factors or reduced dimensions, not assets, so a loadings panel is never square in the sense of [`features_are_assets`](@ref).
+Both matrices have one row per asset, so the asset axis of the panel is the asset axis of the returns data, with no transpose. The label axis holds factors or reduced dimensions, not assets, so a loadings panel is never square in the sense of [`features_are_assets`](@ref).
 
 # Validation
 
@@ -436,7 +436,7 @@ Builds an Asset Panel that holds a square proximity matrix, graded from a graph 
 
 In an `assets × assets` proximity matrix, feature `k` of a row reads "is close to asset `k`". So a metric over the rows measures the overlap of two neighbourhoods, which is a standard measure of topological similarity, and it needs almost no new estimation code. `PhylogenyPanel` returns the matrix as one tensor Panel Field, `"proximity"` on the axis `"asset"`.
 
-It is the one producer whose trailing axis is the asset axis, and it needs no flag for that. It refits, so a subproblem gets its own square matrix over its own assets, not a slice of a larger matrix. Where a panel supplied by hand meets a view, [`features_are_assets`](@ref) compares the labels of the field with the asset names of the returns data.
+It is the one producer whose label axis is the asset axis, and it needs no flag for that. It refits, so a subproblem gets its own square matrix over its own assets, not a slice of a larger matrix. Where a panel supplied by hand meets a view, [`features_are_assets`](@ref) compares the labels of the field with the asset names of the returns data.
 
 # Fields
 
@@ -564,7 +564,7 @@ end
 
 Build the static [`AssetPanel`](@ref) of a producer, at the point of use.
 
-Each method returns a panel that holds one [`TensorPanelField`](@ref), because a loadings matrix and a proximity matrix are each one quantity with a labelled third axis. The labels of the trailing axis come from the returns data or from the regression block where a name exists, and are positions otherwise. [`panel_axis_labels`](@ref) and [`regression_factor_names`](@ref) state the rule.
+Each method returns a panel that holds one [`TensorPanelField`](@ref), because a loadings matrix and a proximity matrix are each one quantity with a labelled second axis. The labels of the label axis come from the returns data or from the regression block where a name exists, and are positions otherwise. [`panel_axis_labels`](@ref) and [`regression_factor_names`](@ref) state the rule.
 
 A producer runs on the prior and the returns of its own subproblem, so no view reads the panel that it builds, and a fold refits it. Called on its own, on a prior fitted on a point-in-time Asset Panel, a [`RegressionPanel`](@ref) reads the loadings on the Investable Mask of the prior and answers for the full universe. Outside the mask each asset gets a zero row and a false observed mask, so an optimiser can take the panel back. [`expand_investable_loadings`](@ref) states the rule.
 
@@ -583,7 +583,7 @@ A [`RegressionPanel`](@ref) takes seven steps:
 A [`PhylogenyPanel`](@ref) takes three steps:
 
  1. Grade the structure into an `assets × assets` matrix with [`phylogeny_features`](@ref), giving `Zp`.
- 2. Label the trailing axis with [`panel_axis_labels`](@ref), from [`returns_asset_names`](@ref).
+ 2. Label the label axis with [`panel_axis_labels`](@ref), from [`returns_asset_names`](@ref).
  3. Return the panel that holds `Zp` as the field `"proximity"` on the axis `"asset"`.
 
 # Arguments

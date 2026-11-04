@@ -309,7 +309,7 @@ const PO = PortfolioOptimisers
     end
 
     @testset "collapse_weights rejects a window-length mismatch" begin
-        Z3 = abs.(randn(rng, 6, 5, 4))
+        Z3 = permutedims(abs.(randn(rng, 6, 5, 4)), (2, 3, 1))
         # A static `AbstractWeights` is fixed at construction and outlives the fold. A
         # longer one used to be read positionally, silently giving the oldest weights to
         # the newest observations.
@@ -329,7 +329,7 @@ const PO = PortfolioOptimisers
         for alg in (AggregateDistances, AggregateFeatures)
             dw = FeatureDistance(; alg = alg(; w = WindowLengthWeights()))
             D6 = distance(dw, Z3)
-            D3 = distance(dw, Z3[4:6, :, :])
+            D3 = distance(dw, Z3[:, :, 4:6])
             @test size(D6) == size(D3) == (5, 5)
             @test D6 != D3
         end
@@ -457,21 +457,22 @@ const PO = PortfolioOptimisers
             ov = rand(rng, Bool, Tt, Nt)
             tv = NumericPanelField(; name = "mcap", vals = abs.(randn(rng, Tt, Nt)) .+ 1,
                                    omsk = ov, pmsk = .!ov)
-            ot = rand(rng, Bool, Tt, Nt, 2)
+            ot = permutedims(rand(rng, Bool, Tt, Nt, 2), (2, 3, 1))
             tt = TensorPanelField(; name = "beta", axis = "factor", labels = ["mkt", "smb"],
-                                  vals = randn(rng, Tt, Nt, 2), omsk = ot, pmsk = .!ot)
+                                  vals = permutedims(randn(rng, Tt, Nt, 2), (2, 3, 1)),
+                                  omsk = ot, pmsk = .!ot)
             tc = PortfolioOptimisers.panel_field_lift(gcat, Tt)
             tpnl = AssetPanel(; pf = [tv, tt, tc], amsk = trues(Tt, Nt),
                               emsk = trues(Tt, Nt))
-            @test isa(tc.codes, PortfolioOptimisers.RepeatedLeading)
+            @test isa(tc.codes, PortfolioOptimisers.RepeatedObservations)
             sel = ["mcap", "mcap" => :observed, "beta", "beta" => :observed, "sector"]
             Zt = feature_matrix(tpnl, sel)
-            @test size(Zt) == (Tt, Nt, 7)
+            @test size(Zt) == (Nt, 7, Tt)
             # `rows` cuts the observation axis alone, keeps it, and every writer agrees
             # with the full stack row for row.
-            @test isequal(feature_matrix(tpnl, sel; rows = Tt:Tt), Zt[Tt:Tt, :, :])
-            @test isequal(feature_matrix(tpnl, sel; rows = [2, 5]), Zt[[2, 5], :, :])
-            @test isequal(feature_matrix(tpnl, sel; rows = 3:5), Zt[3:5, :, :])
+            @test isequal(feature_matrix(tpnl, sel; rows = Tt:Tt), Zt[:, :, Tt:Tt])
+            @test isequal(feature_matrix(tpnl, sel; rows = [2, 5]), Zt[:, :, [2, 5]])
+            @test isequal(feature_matrix(tpnl, sel; rows = 3:5), Zt[:, :, 3:5])
             @test eltype(feature_matrix(tpnl, sel; rows = Tt:Tt)) == eltype(Zt)
             # The rows must lie on the observation axis, and a static panel has none.
             @test_throws ArgumentError feature_matrix(tpnl, sel; rows = [0, 2])
@@ -480,7 +481,7 @@ const PO = PortfolioOptimisers
             # `true` at, as `selectdim` reads it. Its length is the observation count and
             # not the stack's, which threw a DimensionMismatch before #845.
             bmsk = [false, true, false, false, true, false, false]
-            @test isequal(feature_matrix(tpnl, sel; rows = bmsk), Zt[[2, 5], :, :])
+            @test isequal(feature_matrix(tpnl, sel; rows = bmsk), Zt[:, :, [2, 5]])
             @test PortfolioOptimisers.stacked_axes((Tt, Nt), bmsk) == (2, Nt)
             @test_throws ArgumentError feature_matrix(tpnl, sel; rows = [true, false])
             @test_throws ArgumentError feature_matrix(gpnl; rows = 1:1)
@@ -516,8 +517,8 @@ const PO = PortfolioOptimisers
                 de_r = FeatureDistance(; sel = sel, alg = alg)
                 Zr = feature_matrix(de_r, nothing, trd, trd.X)
                 rr = PortfolioOptimisers.readable_window_rows(alg, tpnl, R)
-                @test size(Zr, 1) == length((1:Tt)[rr])
-                @test isequal(Zr, Z0[rr, :, :])
+                @test size(Zr, 3) == length((1:Tt)[rr])
+                @test isequal(Zr, Z0[:, :, rr])
                 @test isequal(res(() -> distance(de_r, nothing, trd.X; rd = trd)),
                               res(() -> distance(de_r, Z0; amsk = R, nx = trd.nx)))
             end
@@ -558,9 +559,9 @@ const PO = PortfolioOptimisers
             # The routed entry point always stacks assets-major, so `dims` is meaningful
             # only where a caller hands a matrix in directly.
             @test distance(fde, permutedims(Zd[:, 1:2]); dims = 2) == D_cut
-            Z3s = permutedims(cat(Zd, 2 * Zd; dims = 3), (3, 1, 2))
-            @test distance(fde, Z3s[:, :, 1:2]; dims = 1) ==
-                  distance(fde, Z3s[:, :, 1:2]; dims = 1)
+            Z3s = cat(Zd, 2 * Zd; dims = 3)
+            @test distance(fde, Z3s[:, 1:2, :]; dims = 1) ==
+                  distance(fde, Z3s[:, 1:2, :]; dims = 1)
         end
 
         @testset "the square case selects reference assets, not assets" begin
@@ -672,11 +673,11 @@ const PO = PortfolioOptimisers
             # documented slice of the values by group is the same array.
             tv = TensorPanelField(; name = "expo", axis = "factor", labels = tg.labels,
                                   groups = tg.groups,
-                                  vals = reshape(collect(1.0:24.0), 2, 3, 4))
+                                  vals = reshape(collect(1.0:24.0), 3, 4, 2))
             tvp = AssetPanel(; pf = [tv], amsk = trues(2, 3), emsk = trues(2, 3))
-            @test feature_matrix(tvp, mom) == tv.vals[:, :, tv.groups .== "momentum"]
+            @test feature_matrix(tvp, mom) == tv.vals[:, tv.groups .== "momentum", :]
             @test feature_matrix(tvp, mom; rows = [2]) ==
-                  tv.vals[2:2, :, tv.groups .== "momentum"]
+                  tv.vals[:, tv.groups .== "momentum", 2:2]
             # The routed distance reads the same columns as the label list.
             @test FeatureDistance(; sel = mom).sel == mom
 
@@ -749,10 +750,10 @@ end
     end
     @testset "AggregateDistances runs the kernel's two steps once per observation" begin
         rng = StableRNG(1066)
-        Z3 = randn(rng, 5, 4, 3)
+        Z3 = permutedims(randn(rng, 5, 4, 3), (2, 3, 1))
         w = aweights(rand(rng, 5))
         de = FeatureDistance(; alg = AggregateDistances(; w = w))
-        Dref = sum(w[t] * PortfolioOptimisers.feature_distance(de.metric, Z3[t, :, :], 1)
+        Dref = sum(w[t] * PortfolioOptimisers.feature_distance(de.metric, Z3[:, :, t], 1)
                    for t in 1:5) / sum(w)
         @test isapprox(distance(de, Z3), Dref; rtol = 1e-14)
     end

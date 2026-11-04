@@ -92,7 +92,7 @@ To add a cross-sectional regression estimator, subtype `AbstractCrossSectionalRe
 ### Arguments
 
   - `cre`: The cross-sectional regression estimator.
-  - `Z`: The exposure tensor `observations × assets × factors`.
+  - `Z`: The exposure tensor `assets × factors × observations`. The observations are the last axis, so the design of observation `t`, `view(Z, :, :, t)`, is one contiguous block. Earlier releases held the observations on the first axis. A method written for them reads `Z[t, :, :]`, and it must now read `Z[:, :, t]`.
   - `X`: The asset returns matrix `observations × assets`.
   - `W`: The cross-sectional weights matrix `observations × assets`.
 
@@ -112,14 +112,14 @@ julia> function PortfolioOptimisers.cross_sectional_regression(::MyCrossSectiona
                                                                Z::PortfolioOptimisers.Arr3Num,
                                                                X::PortfolioOptimisers.MatNum,
                                                                W::PortfolioOptimisers.MatNum)
-           f = permutedims(reduce(hcat, Z[t, :, :] \\ X[t, :] for t in axes(X, 1)))
-           eps = X - permutedims(reduce(hcat, Z[t, :, :] * f[t, :] for t in axes(X, 1)))
+           f = permutedims(reduce(hcat, Z[:, :, t] \\ X[t, :] for t in axes(X, 1)))
+           eps = X - permutedims(reduce(hcat, Z[:, :, t] * f[t, :] for t in axes(X, 1)))
            return PortfolioOptimisers.CrossSectionalRegression(; f = f, eps = eps,
                                                                n = fill(size(X, 2), size(X, 1)))
        end
 
 julia> cross_sectional_regression(MyCrossSectionalRegressionEstimator(),
-                                  reshape([1.0, 0.0, 0.5, 0.0, 1.0, 0.5], 1, 3, 2), [1.0 2.0 1.5],
+                                  reshape([1.0, 0.0, 0.5, 0.0, 1.0, 0.5], 3, 2, 1), [1.0 2.0 1.5],
                                   ones(1, 3))
 CrossSectionalRegression
      f ┼ 1×2 Matrix{Float64}
@@ -1065,7 +1065,7 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> GeneralisedLinearModel()
 GeneralisedLinearModel
-     args ┼ Tuple{Distributions.Normal{Float64}}: (Normal(0.0, 1.0),)
+     args ┼ Tuple{Distributions.Normal{Float64}}: (Distributions.Normal{Float64}(μ=0.0, σ=1.0),)
    kwargs ┼ @NamedTuple{}: NamedTuple()
   variant ┴ nothing
 ```

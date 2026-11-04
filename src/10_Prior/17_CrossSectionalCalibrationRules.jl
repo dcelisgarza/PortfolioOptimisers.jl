@@ -135,7 +135,7 @@ The block carries the raw exposure history `Ms` and the Factor Family Basis `fcb
 # Arguments
 
   - `fcb`: The Factor Family Basis of the block, or `nothing`.
-  - `Ms`: The exposure history of the block on the raw axis, `observations × assets × factors`.
+  - `Ms`: The exposure history of the block on the raw axis, `assets × factors × observations`.
 
 # Validation
 
@@ -143,7 +143,7 @@ The block carries the raw exposure history `Ms` and the Factor Family Basis `fcb
 
 # Returns
 
-  - `Ms::Arr3Num`: The exposure history on the reduced axis, `observations × assets × reduced factors`.
+  - `Ms::Arr3Num`: The exposure history on the reduced axis, `assets × reduced factors × observations`.
 
 # Related
 
@@ -203,8 +203,8 @@ function cross_sectional_split_history(cs::NamedTuple)
     Lh::Arr3Num = cross_sectional_reduced_history(csfm.fcb, csfm.Ms)
     rw::MatNum = csfm.rw
     Tb, N = size(H)
-    @argcheck(size(Lh, 1) == Tb == size(rw, 1),
-              DimensionMismatch("the Return Forecast history has $Tb rows, the exposure history $(size(Lh, 1)) and the regression weight history $(size(rw, 1)). The three must have one row per observation of the block."))
+    @argcheck(size(Lh, 3) == Tb == size(rw, 1),
+              DimensionMismatch("the Return Forecast history has $Tb rows, the exposure history $(size(Lh, 3)) and the regression weight history $(size(rw, 1)). The three must have one row per observation of the block."))
     Tf = promote_type(real(eltype(H)), real(eltype(Lh)), real(eltype(rw)))
     g = fill(Tf(NaN), Ke, Tb)
     ap = fill(Tf(NaN), Tb, N)
@@ -212,7 +212,7 @@ function cross_sectional_split_history(cs::NamedTuple)
         if !any(isfinite, view(H, t, :))
             continue
         end
-        sp = cross_sectional_alpha_split(cs.cre, view(H, t, :), view(Lh, t, :, 1:Ke),
+        sp = cross_sectional_alpha_split(cs.cre, view(H, t, :), view(Lh, :, 1:Ke, t),
                                          view(rw, t, :))
         g[:, t] = sp.g
         ap[t, :] = sp.ap

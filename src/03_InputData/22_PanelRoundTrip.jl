@@ -64,7 +64,7 @@ A cell that the kind of the row does not use holds `missing`. A text reader writ
   - `kind`: The kind of the row.
   - `field`: The name of the Panel Field of the row, or `missing`.
   - `label`: The label of the row, or `missing`.
-  - `group`: The group of a trailing-axis label, `"grouped"` or `"ungrouped"` on a `"tensor"` row, or `missing`.
+  - `group`: The group of a label-axis label, `"grouped"` or `"ungrouped"` on a `"tensor"` row, or `missing`.
   - `observed`: Whether the Panel Field carries an observed mask, or `missing`.
   - `placeholder`: Whether the Panel Field carries a placeholder mask, or `missing`.
 
@@ -98,7 +98,7 @@ The method that Julia selects is the algorithm.
 
  1. [`NumericPanelField`](@ref): one `"numeric"` row.
  2. [`CategoricalPanelField`](@ref): one `"categorical"` row with the label `"levels"` when `decode` is `true` and `"codes"` when it is `false`, then one `"level"` row per level, in the order of the codes. A level that no cell holds keeps its row.
- 3. [`TensorPanelField`](@ref): one `"tensor"` row with the axis name as its label, and the group `"grouped"` when the Panel Field carries groups and `"ungrouped"` when it does not. Then one `"label"` row per trailing-axis label with its group.
+ 3. [`TensorPanelField`](@ref): one `"tensor"` row with the axis name as its label, and the group `"grouped"` when the Panel Field carries groups and `"ungrouped"` when it does not. Then one `"label"` row per label-axis label with its group.
 
 The first row of each Panel Field records in `observed` whether it carries an observed mask, and in `placeholder` whether it carries a placeholder mask.
 
@@ -543,7 +543,7 @@ A cell that a long table does not hold is outside the universe, and the table ho
 
  1. `"numeric"`: read the column named after the Panel Field into an array of the element type of the column, through [`panel_table_read!`](@ref).
  2. `"categorical"`: read the same column into an array of the code type of [`panel_code_eltype`](@ref). When the manifest records that the column holds the levels, find the code of the level in each cell. When it records the codes, each cell holds the code.
- 3. `"tensor"`: read the column `"<field>=<label>"` of each label into its slice of the trailing axis.
+ 3. `"tensor"`: read the column `"<field>=<label>"` of each label into its slice of the label axis, through the transpose that [`panel_column_transpose`](@ref) states.
  4. Read the observed mask from the columns named `"<column>::observed"` when the manifest records one, and the placeholder mask from the columns named `"<column>::placeholder"` in the same way.
 
 # Arguments
@@ -592,9 +592,13 @@ function panel_read_field(s::NamedTuple, lin, tab::NamedTuple, sz::Tuple)
                                                             "$(s.name)::placeholder", sz))
     end
     cols = ["$(s.name)=$l" for l in s.labels]
-    vals = fill(zero(panel_table_eltype(lin, tab, cols)), sz..., length(cols))
+    # The panel shape `sz` is `(N,)` or `(T, N)`, and a tensor field holds the observations
+    # last, so each label reads through the transpose of its slice.
+    vals = fill(zero(panel_table_eltype(lin, tab, cols)), last(sz), length(cols),
+                Base.front(sz)...)
     for (l, c) in pairs(cols)
-        panel_table_read!(selectdim(vals, ndims(vals), l), lin, tab, c, identity)
+        panel_table_read!(panel_column_transpose(panel_tensor_view(vals, :, :, l)), lin,
+                          tab, c, identity)
     end
     return TensorPanelField(s.name, s.axis, s.labels, s.grouped ? s.groups : nothing, vals,
                             panel_field_table_mask(s.observed, lin, tab,
@@ -608,7 +612,7 @@ end
 
 Read one mask of a Panel Field from a table, the observed mask or the placeholder mask, when its manifest entry records one.
 
-The mask of the column `"<column>"` is the column `"<column>::observed"` or `"<column>::placeholder"`. A numeric or a categorical Panel Field has one mask column, and its mask has the shape `sz`. A tensor Panel Field has one mask column per label, and its mask has a trailing label axis.
+The mask of the column `"<column>"` is the column `"<column>::observed"` or `"<column>::placeholder"`. A numeric or a categorical Panel Field has one mask column, and its mask has the shape `sz`. A tensor Panel Field has one mask column per label, and its mask is `assets × labels`, or `assets × labels × observations`, as its values are.
 
 # Arguments
 
@@ -637,9 +641,10 @@ function panel_field_table_mask(on::Bool, lin, tab::NamedTuple, cols::VecStr, sz
     if !on
         return nothing
     end
-    M = falses(sz..., length(cols))
+    M = falses(last(sz), length(cols), Base.front(sz)...)
     for (l, c) in pairs(cols)
-        panel_table_read!(selectdim(M, ndims(M), l), lin, tab, c, identity)
+        panel_table_read!(panel_column_transpose(panel_tensor_view(M, :, :, l)), lin, tab,
+                          c, identity)
     end
     return M
 end
@@ -741,7 +746,7 @@ end
 
 Read the entry of each Panel Field from a manifest that [`panel_manifest`](@ref) wrote.
 
-An entry is the named tuple `(; kind, name, observed, placeholder, decode, grouped, axis, labels, groups)`. `labels` holds the levels of a categorical Panel Field and the trailing-axis labels of a tensor Panel Field. `groups` holds one entry per label: the group of a trailing-axis label, and `""` for a level. `decode` belongs to a categorical Panel Field, and is `false` for the other kinds. `axis` and `grouped` belong to a tensor Panel Field, and are `""` and `false` for the other kinds. A numeric Panel Field has no label and no group.
+An entry is the named tuple `(; kind, name, observed, placeholder, decode, grouped, axis, labels, groups)`. `labels` holds the levels of a categorical Panel Field and the label-axis labels of a tensor Panel Field. `groups` holds one entry per label: the group of a label-axis label, and `""` for a level. `decode` belongs to a categorical Panel Field, and is `false` for the other kinds. `axis` and `grouped` belong to a tensor Panel Field, and are `""` and `false` for the other kinds. A numeric Panel Field has no label and no group.
 
 # Algorithm
 
@@ -848,8 +853,8 @@ The entry of the Panel Field is the last entry of `specs`, because [`panel_manif
   - `r`: The row of the manifest, for the error message.
   - `k`: The kind of the row.
   - `field`: The name of the Panel Field of the row.
-  - `label`: The level or the trailing-axis label.
-  - `group`: The group of a trailing-axis label, or `""`.
+  - `label`: The level or the label-axis label.
+  - `group`: The group of a label-axis label, or `""`.
 
 # Validation
 
@@ -985,7 +990,7 @@ The function compares names and labels as text, so a reader that types a column 
 
 The codes of a categorical column that holds the codes keep the integer type of the column, so `Int32` codes come back as `Int32` codes when the reader keeps the column type. A column that holds the levels carries no code type, and its codes are the positions of the levels, which are `Int`. See [`panel_code_eltype`](@ref).
 
-A static Panel Field that a time-varying panel lifts, see [`RepeatedLeading`](@ref), comes back as an ordinary array with the same values.
+A static Panel Field that a time-varying panel lifts, see [`RepeatedObservations`](@ref), comes back as an ordinary array with the same values.
 
 # Algorithm
 

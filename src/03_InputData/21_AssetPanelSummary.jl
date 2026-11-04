@@ -39,7 +39,7 @@ end
 
 Return the count of cells that one pair of observation and asset holds in a Panel Field.
 
-A numeric and a categorical Panel Field hold one cell for each pair. A tensor Panel Field holds one cell for each label of its trailing axis.
+A numeric and a categorical Panel Field hold one cell for each pair. A tensor Panel Field holds one cell for each label of its label axis.
 
 # Algorithm
 
@@ -75,7 +75,7 @@ A cell is missing when the observed mask of the Panel Field is false there. A fi
 
  1. Read the axes of the Panel Field with [`panel_field_axes`](@ref).
  2. If the observed mask is `nothing`, return zeros over the axes.
- 3. Otherwise put the cells of each pair in one row, and count the false cells of each row.
+ 3. Otherwise count the false cells of each pair: one cell on a field with no label axis, and the cells of every label, on the second axis, on a tensor field. The count is over the observation and asset axes, so the count of a time-varying tensor field takes the observations first.
 
 # Arguments
 
@@ -96,8 +96,18 @@ function panel_field_missing(f::AbstractPanelField)
     return panel_field_missing(f.omsk, panel_field_axes(f))
 end
 panel_field_missing(::Nothing, ax::Dims) = zeros(Int, ax)
-function panel_field_missing(omsk::AbstractArray{Bool}, ax::Dims)
+# A field with no label axis has one cell for each pair.
+function panel_field_missing(omsk::AbstractArray{Bool, D}, ax::NTuple{D, Int}) where {D}
     return reshape(count(!, reshape(omsk, prod(ax), :); dims = 2), ax)
+end
+# A static tensor field is `assets × labels`.
+function panel_field_missing(omsk::AbstractMatrix{Bool}, ::Tuple{Int})
+    return vec(count(!, omsk; dims = 2))
+end
+# A time-varying tensor field is `assets × labels × observations`, and the count is
+# `observations × assets`.
+function panel_field_missing(omsk::AbstractArray{Bool, 3}, ::Tuple{Int, Int})
+    return permutedims(dropdims(count(!, omsk; dims = 2); dims = 2))
 end
 """
     panel_active_cells(pnl::AssetPanel) -> AbstractArray{Bool}

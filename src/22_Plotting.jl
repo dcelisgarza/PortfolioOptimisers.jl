@@ -3943,7 +3943,7 @@ The figure takes the evaluation and not the block, for the reason [`plot_forecas
 # Arguments
 
   - `fe`: The evaluation to draw, from [`forecast_evaluation`](@ref).
-  - `B`: Exposure history `observations × assets × factors`, on the axis of the forecast.
+  - `B`: Exposure history `assets × factors × observations`, on the axis of the forecast.
   - `w`: Cross-sectional weight history `observations × assets`, on the axis of the forecast, or `nothing` for equal weights.
   - `csfm`: A cross-sectional factor model block, whose exposure history and weight history are read.
   - `c`: The answer of the block method of [`forecast_factor_correlation`](@ref), or a view of it from [`port_opt_view`](@ref). The figure draws it and labels it with the names it carries.

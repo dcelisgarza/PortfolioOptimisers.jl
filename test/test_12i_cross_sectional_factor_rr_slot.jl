@@ -702,7 +702,7 @@ function cscr_history(rr)
         if !(any(isfinite, view(H, t, :)))
             continue
         end
-        g, ap = cscr_split(H[t, :], rr.Ms[t, :, 1:K], rr.rw[t, :])
+        g, ap = cscr_split(H[t, :], rr.Ms[:, 1:K, t], rr.rw[t, :])
         G[:, t] = g
         AP[t, :] = ap
     end

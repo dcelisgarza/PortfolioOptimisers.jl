@@ -393,9 +393,9 @@ end
     rows = [Tx - Tb + lag + j for j in 1:n]
     # A pair with no idiosyncratic return or no exposure adds nothing to the net series, so it
     # is zero in both the exposure and the idiosyncratic return (#1388).
-    act = [all(isfinite, rr.Ms[j, i, :]) && isfinite(rr.csr.eps[j + lag, i])
+    act = [all(isfinite, rr.Ms[i, :, j]) && isfinite(rr.csr.eps[j + lag, i])
            for j in 1:n, i in 1:N]
-    B = [act[j, :] .* fin.(rr.Ms[j, :, :]) for j in 1:n]
+    B = [act[j, :] .* fin.(rr.Ms[:, :, j]) for j in 1:n]
     F = fin.(rr.csr.f[(1:n) .+ lag, :])
     E = act .* fin.(rr.csr.eps[(1:n) .+ lag, :])
     W = Wh[rows, :]
@@ -412,7 +412,7 @@ end
         for j in 1:n
             cov_i = [i
                      for i in 1:N
-                     if all(isfinite, rr.Ms[j, i, :]) && isfinite(rr.csr.eps[j + lag, i])]
+                     if all(isfinite, rr.Ms[i, :, j]) && isfinite(rr.csr.eps[j + lag, i])]
             res = [X0[rows[j], i] - S[j, i] - E[j, i] for i in cov_i]
             @test maximum(res) - minimum(res) < 1e-10
         end
@@ -494,15 +494,15 @@ end
     end
     # The sandwich fixture below in Float32, with a currency factor: the errors stay Float32,
     # and the currency row and family carry a Float32 NaN.
-    Ms = Array{Float32, 3}(undef, 2, 3, 2)
-    Ms[1, :, :] = [1 0.5; 1 -0.5; 1 1.5]
-    Ms[2, :, :] = [1 0.4; 1 -0.6; 1 1.2]
+    Ms = Array{Float32, 3}(undef, 3, 2, 2)
+    Ms[:, :, 1] = [1 0.5; 1 -0.5; 1 1.5]
+    Ms[:, :, 2] = [1 0.4; 1 -0.6; 1 1.2]
     f = Float32[0.01 0.02; -0.005 0.03]
     eps = Float32[0.001 -0.002 0.0015; -0.0005 0.001 -0.0008]
     rw = Float32[0.4 0.35 0.25; 0.3 0.45 0.25]
     vs = Float32[1.0e-4 2.0e-4 1.5e-4; 1.2e-4 1.8e-4 1.6e-4]
     csr = CrossSectionalRegression(; f = f[:, 1:1], eps = eps, n = [3, 3])
-    rr = CrossSectionalFactorModel(; M = Ms[2, :, :], b = Float32[0.001, 0.0005, 0.0012],
+    rr = CrossSectionalFactorModel(; M = Ms[:, :, 2], b = Float32[0.001, 0.0005, 0.0012],
                                    csr = csr, Ms = Ms, vs = vs,
                                    esigma = Float32[1.2e-4, 1.8e-4, 1.6e-4], rw = rw,
                                    bw = rw, nf = ["market", "usd"],
@@ -540,7 +540,7 @@ end
     pr, rd = fa_prior(; ve = FA_VE1)
     w = fa_weights(pr)
     al = PO.attribution_align(pr.rr, pr, size(rd.X, 1))
-    G = transpose(view(al.B, 1, :, :)) * Diagonal(view(al.rw, 1, :)) * view(al.B, 1, :, :)
+    G = transpose(view(al.B, :, :, 1)) * Diagonal(view(al.rw, 1, :)) * view(al.B, :, :, 1)
     @test PO.cross_sectional_rank(G) < size(G, 2)
     fa = factor_attribution(w, pr, rd.X; se = true)
     @test isfinite(fa.sys.mu_se)
@@ -625,15 +625,15 @@ end
     # A hand-built block with no lag, two observations and two factors, so the sandwich is small
     # enough to write out beside the verb's own answer.
     M = [1.0 0.5; 1.0 -0.5; 1.0 1.5]
-    Ms = Array{Float64, 3}(undef, 2, 3, 2)
-    Ms[1, :, :] = M
-    Ms[2, :, :] = [1.0 0.4; 1.0 -0.6; 1.0 1.2]
+    Ms = Array{Float64, 3}(undef, 3, 2, 2)
+    Ms[:, :, 1] = M
+    Ms[:, :, 2] = [1.0 0.4; 1.0 -0.6; 1.0 1.2]
     f = [0.01 0.02; -0.005 0.03]
     eps = [0.001 -0.002 0.0015; -0.0005 0.001 -0.0008]
     rw = [0.4 0.35 0.25; 0.3 0.45 0.25]
     vs = [1.0e-4 2.0e-4 1.5e-4; 1.2e-4 1.8e-4 1.6e-4]
     csr = CrossSectionalRegression(; f = f, eps = eps, n = [3, 3])
-    rr = CrossSectionalFactorModel(; M = Ms[2, :, :], b = [0.001, 0.0005, 0.0012],
+    rr = CrossSectionalFactorModel(; M = Ms[:, :, 2], b = [0.001, 0.0005, 0.0012],
                                    csr = csr, Ms = Ms, vs = vs,
                                    esigma = [1.2e-4, 1.8e-4, 1.6e-4], rw = rw, bw = rw,
                                    nf = ["market", "style"], fam = ["market", "style"],
@@ -649,9 +649,9 @@ end
     fa = factor_attribution(w, pr, X; se = true)
     # The sandwich of each observation, written out: `G^-1 B' W Omega W B G^-1`.
     scale = 1 / 2
-    g = [transpose(Ms[t, :, :]) * w for t in 1:2]
+    g = [transpose(Ms[:, :, t]) * w for t in 1:2]
     V = map(1:2) do t
-        B = Ms[t, :, :]
+        B = Ms[:, :, t]
         W = Diagonal(rw[t, :])
         G = transpose(B) * W * B
         S = transpose(B) * Diagonal(rw[t, :] .^ 2 .* vs[t, :]) * B
@@ -932,7 +932,7 @@ end
         function bare(rows, args...)
             br = rows .- 1
             return factor_attribution(repeat(transpose(w), length(rows)),
-                                      blk.B[br .- blk.lag, :, :], blk.f[br, :],
+                                      blk.B[:, :, br .- blk.lag], blk.f[br, :],
                                       blk.eps[br, :], ret[rows], args...; lag = 0,
                                       fam = blk.fam)
         end
@@ -1021,7 +1021,7 @@ end
         rows = reduce(vcat, p.idx for p in mp.pred)
         k = findall(>=(3), rows)
         br = rows[k] .- 1
-        ref = factor_attribution(W[k, :], blk.B[br .- blk.lag, :, :], blk.f[br, :],
+        ref = factor_attribution(W[k, :], blk.B[:, :, br .- blk.lag], blk.f[br, :],
                                  blk.eps[br, :], ret[k]; lag = 0, fam = blk.fam,
                                  h1 = blk.h1[br, :])
         return gap(factor_attribution(mp, prr), ref)
@@ -1269,9 +1269,9 @@ end
     w = fa_weights(pr)
     @testset "The read answers the raw factor axis, not the basis the fit solved in" begin
         @test PO.has_family_rebasis(rr)
-        @test size(rr.csr.f, 2) < size(rr.Ms, 3)
+        @test size(rr.csr.f, 2) < size(rr.Ms, 2)
         f = PO.attribution_factor_returns(rr, pr)
-        @test size(f, 2) == size(rr.Ms, 3) == length(rr.nf)
+        @test size(f, 2) == size(rr.Ms, 2) == length(rr.nf)
         # The block carries the raw-axis history itself. With no Scenario Cap to trim the
         # nested factor prior, that prior holds the same rows (#1422).
         @test f === rr.fr
@@ -1303,16 +1303,16 @@ end
         ret = fa_net_returns(w, pr, rd)
         al = PO.attribution_align(rr, pr, length(ret))
         T = size(al.f, 1)
-        g = reduce(vcat, [transpose(transpose(al.B[t, :, :]) * w) for t in 1:T])
+        g = reduce(vcat, [transpose(transpose(al.B[:, :, t]) * w) for t in 1:T])
         red = PO.attribution_reduce_for_errors(al.fcb, al.unseen, al.B, al.rw, g, al.no, T)
         @test red.nr < size(g, 2)
         keep = findall(!, red.observed)
-        V = [PO.attribution_sandwich(view(red.B, t, :, :), view(al.rw, t, :),
+        V = [PO.attribution_sandwich(view(red.B, :, :, t), view(al.rw, t, :),
                                      view(al.vs, t, :), keep) for t in 1:T]
         Vf = PO.attribution_expand_errors(al.fcb, PO.attribution_scatter(V, keep, red.nr))
-        @test fa.sys.mu_se ≈ sqrt(sum(dot(g[t, :], Vf[t, :, :], g[t, :]) for t in 1:T)) / T
+        @test fa.sys.mu_se ≈ sqrt(sum(dot(g[t, :], Vf[:, :, t], g[t, :]) for t in 1:T)) / T
         @test fa.fbd.mu_se ≈
-              [sqrt(sum(g[t, k]^2 * Vf[t, k, k] for t in 1:T)) / T for k in axes(g, 2)]
+              [sqrt(sum(g[t, k]^2 * Vf[k, k, t] for t in 1:T)) / T for k in axes(g, 2)]
         @test all(isfinite, fa.fmbd.mu_se)
     end
     @testset "The predicted decomposition answers the same axis" begin
@@ -1436,8 +1436,8 @@ end
     seq = PO.FLoops.SequentialEx()
     T, N = 6, 30
     rng = StableRNG(1719)
-    Z = randn(rng, T, N, 3)
-    Z[:, :, 3] = Z[:, :, 1]
+    Z = permutedims(randn(rng, T, N, 3), (2, 3, 1))
+    Z[:, 3, :] = Z[:, 1, :]
     X = randn(rng, T, N) ./ 100
     W = 1.0 .+ rand(rng, T, N)
     vs = fill(1e-4, T, N)
@@ -1454,7 +1454,7 @@ end
     se(args...; kw...) = factor_attribution(w, args..., ret; lag = 0, rw = W, vs = vs,
                                             se = true, kw...)
     fd = se(Z, r.f, r.eps; dc = r.dc)
-    f2 = se(Z[:, :, 1:2], r.f[:, 1:2], r.eps)
+    f2 = se(Z[:, 1:2, :], r.f[:, 1:2], r.eps)
     f0 = se(Z, r.f, r.eps)
     @test fd.fbd.mu_se[1:2] ≈ f2.fbd.mu_se
     @test fd.fbd.mu_se[3] == 0
@@ -1463,21 +1463,21 @@ end
     # A nearly dependent pair keeps both columns in the fit, so the sandwich keeps both too.
     # A rank test on the Gram matrix truncated it from a design condition number of 1e8.
     Zn = copy(Z)
-    Zn[:, :, 3] = Z[:, :, 1] .+ 1e-9 .* randn(StableRNG(2), T, N)
+    Zn[:, 3, :] = Z[:, 1, :] .+ 1e-9 .* transpose(randn(StableRNG(2), T, N))
     q = W[1, :]
     s2 = vs[1, :]
-    V = PO.attribution_sandwich(Zn[1, :, :], q, s2, 1:3)
-    B = Zn[1, :, :]
+    V = PO.attribution_sandwich(Zn[:, :, 1], q, s2, 1:3)
+    B = Zn[:, :, 1]
     Dp = LinearAlgebra.pinv(sqrt.(q) .* B; rtol = 0)
     @test V≈Dp * LinearAlgebra.Diagonal(q .* s2) * Dp' rtol=1e-4
     @test V[1, 1] > 1e10 * V[2, 2]
     # A weight of zero leaves the pair out of the design, as the fit leaves it out.
     q0 = copy(q)
     q0[1] = 0
-    @test PO.attribution_sandwich(Z[1, :, :], q0, s2, 1:2) ≈
-          PO.attribution_sandwich(Z[1, 2:end, :], q[2:end], s2[2:end], 1:2)
+    @test PO.attribution_sandwich(Z[:, :, 1], q0, s2, 1:2) ≈
+          PO.attribution_sandwich(Z[2:end, :, 1], q[2:end], s2[2:end], 1:2)
     @test PO.attribution_sandwich(zeros(N, 2), q, s2, 1:2) == zeros(2, 2)
-    @test PO.attribution_dropped_observation(r.dc, Z[1, :, :], nothing, 1:3, 3, 1).P ==
+    @test PO.attribution_dropped_observation(r.dc, Z[:, :, 1], nothing, 1:3, 3, 1).P ==
           LinearAlgebra.Diagonal([1.0, 1.0, 0.0])
     # A mask that drops no column at any observation answers as no mask does, and an
     # observation that drops nothing among others that drop a column keeps its own error

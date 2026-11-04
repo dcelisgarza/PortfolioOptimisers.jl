@@ -147,12 +147,12 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Write a one-hot Factor Exposure into `B` in one pass, in place.
 
-A live cell takes one at the level of its code and zero at every other level. A cell that is not live takes `NaN` across every level. The codes of a categorical Panel Field lie in its levels, so every live cell sets exactly one level. A blank never reaches a `ReturnsResult`: the builder resolves it to a fill value and records the resolution in an observed mask. So the caller marks a cell that the Panel Field does not observe as not live, and a level that a fill wrote does not become a classification the asset never carried. The level axis is the slowest axis of `B`, so it is the outer loop, and the pass writes `B` in its memory order.
+A live cell takes one at the level of its code and zero at every other level. A cell that is not live takes `NaN` across every level. The codes of a categorical Panel Field lie in its levels, so every live cell sets exactly one level. A blank never reaches a `ReturnsResult`: the builder resolves it to a fill value and records the resolution in an observed mask. So the caller marks a cell that the Panel Field does not observe as not live, and a level that a fill wrote does not become a classification the asset never carried. The observation axis is the slowest axis of `B`, so it is the outer loop, and the pass writes `B` in its memory order.
 
 # Arguments
 
-  - `B`: The one-hot block, `observations × assets × levels`, written in place. Its element type must hold `NaN`.
-  - `codes`: The codes of the Panel Field, `observations × assets`, each in `1:size(B, 3)`.
+  - `B`: The one-hot block, `assets × levels × observations`, written in place. Its element type must hold `NaN`.
+  - `codes`: The codes of the Panel Field, `observations × assets`, each in `1:size(B, 2)`.
   - `live`: Mask `observations × assets`, `true` where the Panel Field observes the cell and the Asset Panel activates it.
 
 # Validation
@@ -173,8 +173,8 @@ function one_hot_fill!(B::AbstractArray{<:Number, 3}, codes::AbstractMatrix{<:In
                        live::AbstractMatrix{Bool})::Nothing
     nan = nan_fill_value(B)
     on, off = one(eltype(B)), zero(eltype(B))
-    for l in axes(B, 3), i in axes(B, 2), t in axes(B, 1)
-        B[t, i, l] = live[t, i] ? (codes[t, i] == l ? on : off) : nan
+    for t in axes(B, 3), l in axes(B, 2), i in axes(B, 1)
+        B[i, l, t] = live[t, i] ? (codes[t, i] == l ? on : off) : nan
     end
     return nothing
 end
@@ -202,7 +202,7 @@ Compute the Factor Exposure of a categorical Panel Field, one factor per level.
 
 # Returns
 
-  - `L::Array{<:Real, 3}`: The Factor Exposure, `observations × assets × levels`, in the level order the Panel Field declares.
+  - `L::Array{<:Real, 3}`: The Factor Exposure, `assets × levels × observations`, in the level order the Panel Field declares.
 
 # Examples
 
@@ -216,12 +216,12 @@ julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = zeros(2, 2), pnl = pnl);
 julia> factor_exposure(OneHotExposure(; field = \"sector\", family = \"sector\"), rd)
 2×2×2 Array{Float64, 3}:
 [:, :, 1] =
- 0.0    1.0
- 0.0  NaN
+ 0.0  1.0
+ 1.0  0.0
 
 [:, :, 2] =
- 1.0    0.0
- 1.0  NaN
+   0.0    1.0
+ NaN    NaN
 ```
 
 # Related
@@ -235,7 +235,7 @@ julia> factor_exposure(OneHotExposure(; field = \"sector\", family = \"sector\")
 function factor_exposure(xe::OneHotExposure, rd::ReturnsResult)::Array{<:Real, 3}
     (; codes, live, nl) = one_hot_inputs(xe, rd)
     Tf = real(eltype(rd.X))
-    B = Array{Tf}(undef, size(codes, 1), size(codes, 2), nl)
+    B = Array{Tf}(undef, size(codes, 2), nl, size(codes, 1))
     one_hot_fill!(B, codes, live)
     return B
 end
@@ -273,7 +273,7 @@ function one_hot_inputs(xe::OneHotExposure, rd::ReturnsResult)
     codes = f.codes
     amsk = rd.pnl.amsk
     @argcheck(size(amsk) == size(codes),
-              DimensionMismatch("a one-hot Factor Exposure is observations × assets × factors, so its first two axes must match the active mask of the Asset Panel, got size(codes) = $(size(codes)) and size(pnl.amsk) = $(size(amsk))"))
+              DimensionMismatch("the codes of a one-hot Factor Exposure must match the active mask of the Asset Panel, got size(codes) = $(size(codes)) and size(pnl.amsk) = $(size(amsk))"))
     live = isnothing(f.omsk) ? amsk : f.omsk .& amsk
     return (; codes = codes, live = live, nl = length(f.levels))
 end

@@ -22,7 +22,7 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ### Returns
 
-  - `L::Array{<:Real}`: The Factor Exposure, `observations × assets` for a member producing one factor, `observations × assets × factors` for a member expanding one Panel Field into many, `NaN` wherever the active mask is `false`.
+  - `L::Array{<:Real}`: The Factor Exposure, `observations × assets` for a member producing one factor, `assets × factors × observations` for a member expanding one Panel Field into many, `NaN` wherever the active mask is `false`.
 
 ## `lookback` (optional)
 
@@ -48,7 +48,7 @@ abstract type AbstractExposureEstimator <: AbstractEstimator end
 
 Compute the Factor Exposure of a [`ReturnsResult`](@ref).
 
-This is the verb every Exposure Estimator answers. A member that produces one factor returns an `observations × assets` matrix, and a member that expands one Panel Field into many returns an `observations × assets × factors` array. Every member follows two conventions: the value at an observation uses information up to and including that observation, and every cell where the active mask of the Asset Panel is `false` is `NaN`.
+This is the verb every Exposure Estimator answers. A member that produces one factor returns an `observations × assets` matrix, and a member that expands one Panel Field into many returns an `assets × factors × observations` array. Every member follows two conventions: the value at an observation uses information up to and including that observation, and every cell where the active mask of the Asset Panel is `false` is `NaN`.
 
 [`DerivedExposure`](@ref) reads the exposure of another factor, so it answers a three-argument method and refuses this one. The caller that holds the factor list computes the factors in dependency order and passes the source exposure.
 
@@ -274,12 +274,12 @@ An asset that is not listed at an observation has no Factor Exposure there, what
 
 # Arguments
 
-  - `L`: The Factor Exposure, `observations × assets` or `observations × assets × factors`, changed in place. Its element type must hold `NaN`.
+  - `L`: The Factor Exposure, `observations × assets` or `assets × factors × observations`, changed in place. Its element type must hold `NaN`.
   - `pnl`: The Asset Panel whose active mask is read.
 
 # Validation
 
-  - The first two axes of `L` match the active mask. Raises a `DimensionMismatch`.
+  - The asset axis and the observation axis of `L` match the active mask. Raises a `DimensionMismatch`.
   - `eltype(L)` holds `NaN`, through [`nan_fill_value`](@ref). Raises an `ArgumentError`.
 
 # Returns
@@ -298,11 +298,11 @@ function exposure_active_fill!(L::AbstractMatrix{<:Number}, pnl::AssetPanel)::No
 end
 function exposure_active_fill!(L::AbstractArray{<:Number, 3}, pnl::AssetPanel)::Nothing
     amsk = pnl.amsk
-    @argcheck(size(L)[1:2] == size(amsk),
-              DimensionMismatch("a one-hot Factor Exposure is observations × assets × factors, so its first two axes must match the active mask of the Asset Panel, got size(L) = $(size(L)) and size(pnl.amsk) = $(size(amsk))"))
+    @argcheck((size(L, 3), size(L, 1)) == size(amsk),
+              DimensionMismatch("a one-hot Factor Exposure is assets × factors × observations, so its asset axis and its observation axis must match the active mask of the Asset Panel, got size(L) = $(size(L)) and size(pnl.amsk) = $(size(amsk))"))
     nan = nan_fill_value(L)
     for k in CartesianIndices(L)
-        if !amsk[k[1], k[2]]
+        if !amsk[k[3], k[1]]
             L[k] = nan
         end
     end

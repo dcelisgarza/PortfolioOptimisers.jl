@@ -629,8 +629,24 @@ Both finite allocators buy each asset in whole lots of its own lot unit, for fra
 | `PortfolioOptimisers.roundmult` | Gone, with the rounding that it did. |
 | `DiscreteAllocation(; slv)`, which bought whole shares only | Takes `unit`, `sets` and `strict`. The default `LotUnit(1)` buys whole shares, as in v0.33, and the default fallback reads the same `unit`. |
 
+### [Arrays of rank three hold their observations last](@id migration-0-34-layout)
+
+Every array of rank three that the library takes or gives holds its observations on its last axis, so the matrix of one observation is one contiguous block. A v0.33 array of shape `T × N × K` is a v0.34 array of shape `N × K × T`, and `permutedims(A, (2, 3, 1))` converts one. A matrix over observations, such as the returns `X`, the weights `W`, a mask, the factor returns `f` or a one-factor exposure, does not change.
+
+| Where | v0.33 | v0.34 |
+| --- | --- | --- |
+| `Z` of `cross_sectional_regression`, `predict` and `cross_sectional_r2`; the field `Ms` of `CrossSectionalFactorModel`; `B` of `factor_attribution`, `forecast_factor_correlation`, `exposure_ic`, the `exposure_*` diagnostics and the `cs_regression_*` diagnostics | `observations × assets × factors` | `assets × factors × observations` |
+| `factor_exposure` of `OneHotExposure` and `CurrencyExposure` | `observations × assets × levels` | `assets × levels × observations` |
+| `cs_gram`, and a stack given to `expand_factor_covariance` or `reduce_factor_covariance` | `observations × factors × factors` | `factors × factors × observations` |
+| `descriptor_scores(...).S` | `observations × assets × descriptors` | `assets × descriptors × observations` |
+| `vals`, `omsk` and `pmsk` of a time-varying `TensorPanelField` or `TensorPanelInput` | `observations × assets × labels` | `assets × labels × observations` |
+| `feature_matrix` of a time-varying panel, and the `Z` of `distance(::FeatureDistance, Z)` | `observations × assets × features` | `assets × features × observations` |
+
+A static `TensorPanelField` and a static Feature Matrix keep `assets × labels` and `assets × features`.
+
 ### [Results that move](@id migration-0-34-numbers)
 
+- **The last bits of a few kernels on arrays of rank three.** The matrix of one observation is now contiguous, so a product on it runs in BLAS. The stack of `expand_factor_covariance`, the standard errors of a realised `factor_attribution`, the panel collapse of a meta-optimiser and the mean of `AggregateFeatures` can differ from v0.33 in the last bits, a relative difference of about `1e-15`. A `CrossSectionalFactorPrior` gives the v0.33 numbers bit for bit.
 - **`GreedyAllocation` with a lot unit below one.** v0.33 rounded the first pass with `Base.round`, which rounds to a whole share under the default `kwargs`. So a target could round above itself and stop the first pass early. v0.34 floors the lot count of each target. The shares of such an allocation differ, and they are multiples of the lot unit. A lot unit of one or more gives the v0.33 shares.
 
 - **`performance_summary` of a prediction whose optimiser gives many portfolios gives one entry for each member.** v0.33 gave the scalar figures of the first member and dropped the others. Each field is now a vector with one entry for each member, and each member reads its own series, benchmark, turnover and weights. Read `ps.sharpe[1]` to keep the v0.33 number. The same holds for weights in a `VecVecNum`, and for an `OptimisationResult` of a frontier, which v0.33 refused.
@@ -638,6 +654,7 @@ Both finite allocators buy each asset in whole lots of its own lot unit, for fra
 
 ### [If you extend the library](@id migration-0-34-extending)
 
+- **A method of yours that reads an array of rank three reads the observations last.** A method of `cross_sectional_regression` for an estimator of your own, of `unseen_member_design` for an Unseen Member rule, of `factor_exposure` for an observed exposure of several factors, or of `attribution_leverage_split` for a rule of your own reads `Z[:, :, t]` where v0.33 read `Z[t, :, :]`, and gives an array of rank three with the observations last. See [Arrays of rank three hold their observations last](@ref migration-0-34-layout).
 - **The Gerber, Smyth-Broby and Gerber IQ algorithms and the shrinkage targets are not moment forms.** `GerberCovarianceAlgorithm`, `SmythBrobyCovarianceAlgorithm`, `GerberIQCovarianceAlgorithm` and `AbstractCovarianceShrinkageTarget` subtype `AbstractAlgorithm`, where v0.33 had `AbstractMomentAlgorithm`. A method that you wrote on `AbstractMomentAlgorithm` no longer reaches their members. An algorithm of your own in one of these families keeps working with the estimator that owns the family.
 
 - **`DiscreteAllocation` and `GreedyAllocation`** have the fields `unit`, `sets` and `strict` before `fb`. `DiscreteAllocation` takes eight positional arguments, where v0.33 took five, and `GreedyAllocation` takes `unit`, `sets`, `strict` and `fb`, where v0.33 took `unit`, `args`, `kwargs` and `fb`. A method that names the type parameters of `DiscreteAllocation` by position moves, because `fb` is now the eighth. In the model of `DiscreteAllocation`, the integer variable is the lot count `z`, and `x` is the expression `lu .* z`. `finite_sub_allocation`, `finite_sub_allocation!` and `set_allocation_fees!` take the lot unit after the prices.

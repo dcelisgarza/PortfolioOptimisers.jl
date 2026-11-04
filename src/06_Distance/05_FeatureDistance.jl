@@ -173,7 +173,7 @@ An unweighted collapse sets every ``w_{t}`` to ``1``.
 
 # Algorithm
 
- 1. For each asset `j` and each feature `k`, take the observation series `view(Z, :, j, k)`.
+ 1. For each asset `j` and each feature `k`, take the observation series `view(Z, j, k, :)`.
  2. Reduce that series with `Statistics.median`, weighted by `w` when `w` is not `nothing`, to get the entry of the collapsed matrix.
 
 # Related
@@ -188,7 +188,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all feature collapse algorithms.
 
-A feature collapse algorithm reduces a window of time-varying features, `observations × assets × features`, to one `assets × assets` distance matrix. It is the `alg` field of [`FeatureDistance`](@ref). It has no effect on a 2-D feature matrix, because a static feature matrix has no observation axis to collapse. At `observations == 1`, every algorithm of the family gives the same result.
+A feature collapse algorithm reduces a window of time-varying features, `assets × features × observations`, to one `assets × assets` distance matrix. It is the `alg` field of [`FeatureDistance`](@ref). It has no effect on a 2-D feature matrix, because a static feature matrix has no observation axis to collapse. At `observations == 1`, every algorithm of the family gives the same result.
 
 # Related
 
@@ -208,7 +208,7 @@ The default member, [`LastRow`](@ref), is the default collapse of [`FeatureDista
 
 # Algorithm
 
- 1. Under [`LastRow`](@ref), or when every asset is readable at the last row, take the last slice of the observation axis, `view(Z, size(Z, 1), :, :)`. This is an `assets × features` matrix.
+ 1. Under [`LastRow`](@ref), or when every asset is readable at the last row, take the last slice of the observation axis, `view(Z, :, :, size(Z, 3))`. This is an `assets × features` matrix.
  2. Under [`LastActiveRow`](@ref), take for each asset the row of its last readable observation, to make an `assets × features` matrix.
  3. Apply the metric to that matrix once.
 
@@ -622,7 +622,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Concatenates the window into one long feature vector per asset, so the collapse aggregates nothing.
 
-It turns `observations × assets × features` into an `assets × (observations · features)` matrix, and applies the metric once. Two assets are near only when their whole trajectories agree. For the same reason, the observations with the largest magnitudes have the largest effect on the result. Standardise features of different scales before you use it.
+It turns `assets × features × observations` into an `assets × (observations · features)` matrix, and applies the metric once. Two assets are near only when their whole trajectories agree. For the same reason, the observations with the largest magnitudes have the largest effect on the result. Standardise features of different scales before you use it.
 
 A metric with one parameter per coordinate, such as `Distances.WeightedEuclidean`, measures the long vector. So it takes `observations · features` entries, not one entry per feature. The entries follow the columns of step 2 of the algorithm: the first `observations` entries are the observations of the first feature, and so on.
 
@@ -1073,7 +1073,7 @@ end
 """
     collapse_features(alg::AbstractCollapseAlgorithm, Z::Arr3Num, w::Option{<:VecNum})
 
-Aggregate a window of time-varying features along its first axis, the observation axis. The result is a matrix with the two last axes of `Z`. [`AggregateFeatures`](@ref) calls it.
+Aggregate a window of time-varying features along its last axis, the observation axis. The result is a matrix with the two first axes of `Z`. [`AggregateFeatures`](@ref) calls it.
 
 The element type of the result comes from the aggregate, not from the window. The mean and the median of a window of integers can be fractions. A window with an even count of observations can have a fractional median even when each value in it is a whole number. For this reason, both routes make their result from the values that they compute.
 
@@ -1081,12 +1081,12 @@ The element type of the result comes from the aggregate, not from the window. Th
 
 The [`MeanCollapse`](@ref) route:
 
- 1. Reduce the first axis of `Z` with `Statistics.mean`, weighted by `w` when `w` is not `nothing`.
+ 1. Reduce the last axis of `Z` with `Statistics.mean`, weighted by `w` when `w` is not `nothing`.
  2. Drop the reduced axis.
 
 The [`MedianCollapse`](@ref) route:
 
- 1. For each asset `j` and each feature `k`, take the observation series `view(Z, :, j, k)`.
+ 1. For each entry `(j, k)` of the two first axes, take the observation series `view(Z, j, k, :)`.
  2. Reduce that series with `Statistics.median`, weighted by `w` when `w` is not `nothing`, to get one entry of the result.
 
 # Arguments
@@ -1097,7 +1097,7 @@ The [`MedianCollapse`](@ref) route:
 
 # Returns
 
-  - `Zc::Matrix{<:Number}`: Collapsed feature matrix, with the two last axes of `Z`.
+  - `Zc::Matrix{<:Number}`: Collapsed feature matrix, with the two first axes of `Z`.
 
 # Related
 
@@ -1107,25 +1107,25 @@ The [`MedianCollapse`](@ref) route:
   - [`collapse_weights`](@ref)
 """
 function collapse_features(::MeanCollapse, Z::Arr3Num, ::Nothing)
-    return dropdims(Statistics.mean(Z; dims = 1); dims = 1)
+    return dropdims(Statistics.mean(Z; dims = 3); dims = 3)
 end
 function collapse_features(::MeanCollapse, Z::Arr3Num, w::VecNum)
-    return dropdims(Statistics.mean(Z, w; dims = 1); dims = 1)
+    return dropdims(Statistics.mean(Z, w; dims = 3); dims = 3)
 end
 function collapse_features(::MedianCollapse, Z::Arr3Num, ::Nothing)
-    return [Statistics.median(view(Z, :, j, k)) for j in axes(Z, 2), k in axes(Z, 3)]
+    return [Statistics.median(view(Z, j, k, :)) for j in axes(Z, 1), k in axes(Z, 2)]
 end
 function collapse_features(::MedianCollapse, Z::Arr3Num, w::VecNum)
-    return [Statistics.median(view(Z, :, j, k), w) for j in axes(Z, 2), k in axes(Z, 3)]
+    return [Statistics.median(view(Z, j, k, :), w) for j in axes(Z, 1), k in axes(Z, 2)]
 end
 """
     stack_observations(Z::Arr3Num, dims::Integer)
 
-Reshape a window of time-varying features into an `assets × (observations · features)` matrix. Its rows are the assets, on whichever of the two last axes `dims` puts them.
+Reshape a window of time-varying features into an `assets × (observations · features)` matrix. Its rows are the assets, on whichever of the two first axes `dims` puts them.
 
 # Algorithm
 
- 1. Permute `Z` so that the asset axis is first: `(2, 1, 3)` at `dims = 1`, and `(3, 1, 2)` at `dims = 2`. Both permutations put the observation axis second and the feature axis third.
+ 1. Permute `Z` so that the asset axis is first: `(1, 3, 2)` at `dims = 1`, and `(2, 3, 1)` at `dims = 2`. Both permutations put the observation axis second and the feature axis third.
  2. Reshape the permuted array to `assets × (observations · features)`, one long feature vector per asset.
 
 # Arguments
@@ -1143,7 +1143,7 @@ Reshape a window of time-varying features into an `assets × (observations · fe
   - [`FeatureDistance`](@ref)
 """
 function stack_observations(Z::Arr3Num, dims::Integer)
-    Za = dims == 1 ? permutedims(Z, (2, 1, 3)) : permutedims(Z, (3, 1, 2))
+    Za = dims == 1 ? permutedims(Z, (1, 3, 2)) : permutedims(Z, (2, 3, 1))
     return reshape(Za, size(Za, 1), size(Za, 2) * size(Za, 3))
 end
 """
@@ -1157,7 +1157,7 @@ Observation weights for a cross-validation need a [`DynamicAbstractWeights`](@re
 
 # Algorithm
 
- 1. Reshape `Z` to `observations × (assets · features)`, so that the observation axis is the first axis of a matrix.
+ 1. Permute and reshape `Z` to `observations × (assets · features)`, so that the observation axis is the first axis of a matrix, as the returns hold it.
  2. Resolve `w` against that matrix with [`get_observation_weights`](@ref), along its first axis.
  3. Check the resolved length against the count of observations of `Z`, unless the resolution gave `nothing`.
 
@@ -1168,7 +1168,7 @@ Observation weights for a cross-validation need a [`DynamicAbstractWeights`](@re
 
 # Validation
 
-  - `length(w) == size(Z, 1)` after the resolution. Raises a `DimensionMismatch` that names both lengths.
+  - `length(w) == size(Z, 3)` after the resolution. Raises a `DimensionMismatch` that names both lengths.
 
 # Returns
 
@@ -1182,11 +1182,12 @@ Observation weights for a cross-validation need a [`DynamicAbstractWeights`](@re
   - [`DynamicAbstractWeights`](@ref)
 """
 function collapse_weights(w::Option{<:ObsWeights}, Z::Arr3Num)
-    w = get_observation_weights(w, reshape(Z, size(Z, 1), size(Z, 2) * size(Z, 3));
-                                dims = 1)
+    w = get_observation_weights(w,
+                                reshape(permutedims(Z, (3, 1, 2)), size(Z, 3),
+                                        size(Z, 1) * size(Z, 2)); dims = 1)
     if !isnothing(w)
-        @argcheck(length(w) == size(Z, 1),
-                  DimensionMismatch("length(w) == size(Z, 1) must hold. Got\nlength(w) => $(length(w))\nsize(Z, 1) => $(size(Z, 1)).\nCross-fold weighting requires a DynamicAbstractWeights, which resolves against the feature window it is given."))
+        @argcheck(length(w) == size(Z, 3),
+                  DimensionMismatch("length(w) == size(Z, 3) must hold. Got\nlength(w) => $(length(w))\nsize(Z, 3) => $(size(Z, 3)).\nCross-fold weighting requires a DynamicAbstractWeights, which resolves against the feature window it is given."))
     end
     return w
 end
@@ -1225,7 +1226,7 @@ The type of `de.alg` selects one of four methods. The docstring of each type sta
 """
 function feature_distance(de::FeatureDistance{<:Any, <:LastObservation}, Z::Arr3Num,
                           dims::Integer)
-    return feature_distance(de.metric, view(Z, size(Z, 1), :, :), dims)
+    return feature_distance(de.metric, view(Z, :, :, size(Z, 3)), dims)
 end
 function feature_distance(de::FeatureDistance{<:Any, <:StackObservations}, Z::Arr3Num,
                           dims::Integer)
@@ -1244,12 +1245,12 @@ function feature_distance(de::FeatureDistance{<:Any, <:AggregateDistances}, Z::A
     #! needs a float type.
     Td = Distances.result_type(metric, eltype(Z), eltype(Z))
     T = float_if_integer(isnothing(w) ? Td : promote_type(Td, eltype(w)))
-    N = size(Z, dims == 1 ? 2 : 3)
+    N = size(Z, dims)
     D = zeros(T, N, N)
     Dt = Matrix{T}(undef, N, N)
     sw = zero(T)
-    @inbounds for t in axes(Z, 1)
-        Zt = view(Z, t, :, :)
+    @inbounds for t in axes(Z, 3)
+        Zt = view(Z, :, :, t)
         Distances.pairwise!(metric, Dt, Zt; dims = dims)
         patch_zero_feature_vectors!(Dt, Zt, dims)
         wt = isnothing(w) ? one(T) : T(w[t])
@@ -1403,7 +1404,7 @@ Name the observation rows that a collapse algorithm reads, so that the kernel st
 
 The kernel stacks a time-varying Feature Matrix from an Asset Panel, and then collapses it along its observation axis. A collapse that reads one row does not need the other rows.
 
-  - [`LastRow`](@ref) reads the last row, so it names that row, and the kernel stacks a window of one observation. The kernel then reads a lifted static Panel Field, whose values are a [`RepeatedLeading`](@ref), once and not once per observation. Under the default collapse, the work of the kernel is the `assets × features` slice that it measures.
+  - [`LastRow`](@ref) reads the last row, so it names that row, and the kernel stacks a window of one observation. The kernel then reads a lifted static Panel Field, whose values are a [`RepeatedObservations`](@ref), once and not once per observation. Under the default collapse, the work of the kernel is the `assets × features` slice that it measures.
   - [`LastActiveRow`](@ref) names the rows from the earliest last active row of an asset to the last row. These rows hold the last active row of each asset that has one.
   - Every other member returns `Colon()`, which names every row. The two aggregates resolve their weights against the stacked window, as [`collapse_weights`](@ref) states, so the rows that they could cut are not known before the stack exists. [`StackObservations`](@ref) reads the whole stack by definition.
 
@@ -1475,7 +1476,7 @@ The collapse algorithm names the rows through [`readable_window_rows`](@ref). Un
 
 # Returns
 
-  - `Z::Array`: The Feature Matrix, `assets × features` or `observations × assets × features`, where the observation count is the one that `de.alg` reads.
+  - `Z::Array`: The Feature Matrix, `assets × features` or `assets × features × observations`, where the observation count is the one that `de.alg` reads.
 
 # Related
 

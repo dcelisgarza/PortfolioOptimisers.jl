@@ -10,12 +10,12 @@ A block writes its exposure history on its own rows, and [`forecast_history`](@r
 # Arguments
 
   - `alpha`: Return Forecast history `observations × assets`.
-  - `B`: Exposure history `observations × assets × factors`, unlagged.
+  - `B`: Exposure history `assets × factors × observations`, unlagged.
 
 # Validation
 
   - `!isempty(B)`. Raises an [`IsEmptyError`](@ref).
-  - `size(B, 1) == size(alpha, 1)` and `size(B, 2) == size(alpha, 2)`. Raises a `DimensionMismatch`.
+  - `size(B, 3) == size(alpha, 1)` and `size(B, 1) == size(alpha, 2)`. Raises a `DimensionMismatch`.
 
 # Returns
 
@@ -30,7 +30,7 @@ A block writes its exposure history on its own rows, and [`forecast_history`](@r
 """
 function forecast_factor_exposures(alpha::MatNum, B::Arr3Num)
     @argcheck(!isempty(B), IsEmptyError("B cannot be empty"))
-    @argcheck(size(B, 1) == size(alpha, 1) && size(B, 2) == size(alpha, 2),
+    @argcheck(size(B, 3) == size(alpha, 1) && size(B, 1) == size(alpha, 2),
               DimensionMismatch("B ($(size(B, 1))×$(size(B, 2))×$(size(B, 3))) must match alpha ($(size(alpha, 1))×$(size(alpha, 2))) on its observation and asset axes"))
     return B
 end
@@ -86,7 +86,7 @@ Where:
 # Arguments
 
   - `fe`: The evaluation, from [`forecast_evaluation`](@ref).
-  - `B`: Exposure history `observations × assets × factors`, unlagged, on the axis of `fe.alpha`.
+  - `B`: Exposure history `assets × factors × observations`, unlagged, on the axis of `fe.alpha`.
   - `w`: Cross-sectional weight history `observations × assets`, on the axis of `fe.alpha`, or `nothing` for equal weights. The rank form reads no weights.
   - `csfm`: The fitted factor-model block that the evaluation was built on. [`cs_diagnostic_exposures`](@ref) reads the exposure history from it, and [`cs_diagnostic_weights`](@ref) reads the weight history that `weighting` names.
   - `dates`: Row indices of `fe.alpha` at which the verb reads the correlation. The default is every observation. `fe.dates` reads the evaluation grid, which puts each correlation on the date of a coefficient of [`forecast_ic`](@ref).
@@ -115,7 +115,7 @@ julia> y = PortfolioOptimisers.forward_mean_returns(alpha, 1, 1);
 
 julia> G = [1.0 0.0 1.0 0.0; 0.0 1.0 0.0 1.0; 1.0 1.0 0.0 0.0; 0.0 0.0 1.0 1.0];
 
-julia> B = cat(alpha, G; dims = 3);
+julia> B = permutedims(cat(alpha, G; dims = 3), (2, 3, 1));
 
 julia> fe = forecast_evaluation(alpha, y);
 
@@ -163,11 +163,11 @@ function forecast_factor_correlation(fe::ForecastEvaluationResult, B::Arr3Num,
     Bf = forecast_factor_exposures(alpha, B)
     u = forecast_ic_weights(alpha, w)
     Tf = promote_type(real(eltype(alpha)), real(eltype(Bf)), real(eltype(u)))
-    K = size(Bf, 3)
+    K = size(Bf, 2)
     c = Matrix{Tf}(undef, length(dates), K)
     for k in 1:K, (j, t) in enumerate(dates)
         a = view(alpha, t, :)
-        b = view(Bf, t, :, k)
+        b = view(Bf, :, k, t)
         c[j, k] = if rank
             Tf(cs_spearman_correlation(a, b; min_count = min_count, ties = ties))
         else

@@ -518,11 +518,11 @@
         # because the diagnostics read only the histories the block carries.
         rng_cs = MersenneTwister(798)
         Tc, Nc, Kc = 10, 8, 3
-        Ms_cs = randn(rng_cs, Tc, Nc, Kc)
+        Ms_cs = permutedims(randn(rng_cs, Tc, Nc, Kc), (2, 3, 1))
         csr_cs = CrossSectionalRegression(; f = 0.02 * randn(rng_cs, Tc, Kc),
                                           eps = 0.01 * randn(rng_cs, Tc, Nc),
                                           n = fill(Nc, Tc))
-        csfm_cs = CrossSectionalFactorModel(; M = Ms_cs[Tc, :, :], b = zeros(Nc),
+        csfm_cs = CrossSectionalFactorModel(; M = Ms_cs[:, :, Tc], b = zeros(Nc),
                                             csr = csr_cs, Ms = Ms_cs,
                                             rw = abs.(randn(rng_cs, Tc, Nc)) .+ 0.1,
                                             nf = ["value", "size", "momentum"], lag = 1)
@@ -549,7 +549,7 @@
         @test is_plot(plot_cs_regression_t_stat_exceedance_rate(csfm_cs; threshold = 1,
                                                                 nf = ["a", "b", "c"]))
         # A block that names no factor is labelled by position.
-        bare = CrossSectionalFactorModel(; M = Ms_cs[Tc, :, :], b = zeros(Nc), csr = csr_cs,
+        bare = CrossSectionalFactorModel(; M = Ms_cs[:, :, Tc], b = zeros(Nc), csr = csr_cs,
                                          Ms = Ms_cs, lag = 1)
         @test is_plot(plot_exposure_vif(bare))
         # Each figure draws a view of the answer, labelled with the names the view keeps.
@@ -578,16 +578,16 @@
         # factors sit in two families, and the block keeps every history the realised attribution
         # and its standard errors read.
         rng_fa = StableRNG(782_101)
-        Ms_fa = Array{Float64, 3}(undef, 4, 3, 2)
+        Ms_fa = Array{Float64, 3}(undef, 3, 2, 4)
         for t in 1:4
-            Ms_fa[t, :, :] = [1.0 0.5+0.1*t; 1.0 -0.5; 1.0 1.5]
+            Ms_fa[:, :, t] = [1.0 0.5+0.1*t; 1.0 -0.5; 1.0 1.5]
         end
         f_fa = randn(rng_fa, 4, 2) ./ 50
         eps_fa = randn(rng_fa, 4, 3) ./ 200
         csr_fa = CrossSectionalRegression(; f = f_fa, eps = eps_fa, n = [3, 3, 3, 3])
         rw_fa = fill(1 / 3, 4, 3)
         vs_fa = fill(1.0e-4, 4, 3)
-        rr_fa = CrossSectionalFactorModel(; M = Ms_fa[4, :, :], b = [0.001, 0.0005, 0.0012],
+        rr_fa = CrossSectionalFactorModel(; M = Ms_fa[:, :, 4], b = [0.001, 0.0005, 0.0012],
                                           csr = csr_fa, Ms = Ms_fa, vs = vs_fa,
                                           esigma = [1.2e-4, 1.8e-4, 1.6e-4], rw = rw_fa,
                                           bw = rw_fa, nf = ["market", "value"],
@@ -634,11 +634,11 @@
         # because the default weighting of the exposure group reads it.
         rng_ex = MersenneTwister(799)
         Te, Ne, Ke = 12, 8, 3
-        Ms_ex = randn(rng_ex, Te, Ne, Ke)
+        Ms_ex = permutedims(randn(rng_ex, Te, Ne, Ke), (2, 3, 1))
         csr_ex = CrossSectionalRegression(; f = 0.02 * randn(rng_ex, Te, Ke),
                                           eps = 0.01 * randn(rng_ex, Te, Ne),
                                           n = fill(Ne, Te))
-        csfm_ex = CrossSectionalFactorModel(; M = Ms_ex[Te, :, :], b = zeros(Ne),
+        csfm_ex = CrossSectionalFactorModel(; M = Ms_ex[:, :, Te], b = zeros(Ne),
                                             csr = csr_ex, Ms = Ms_ex,
                                             rw = abs.(randn(rng_ex, Te, Ne)) .+ 0.1,
                                             bw = fill(1 / Ne, Te, Ne),
@@ -668,7 +668,7 @@
         @test is_plot(plot_exposure_distribution(csfm_ex; factor = 3, observation = 4,
                                                  nf = ["a", "b", "c"]))
         # A block that names no factor is labelled by position.
-        bare_ex = CrossSectionalFactorModel(; M = Ms_ex[Te, :, :], b = zeros(Ne),
+        bare_ex = CrossSectionalFactorModel(; M = Ms_ex[:, :, Te], b = zeros(Ne),
                                             csr = csr_ex, Ms = Ms_ex, lag = 1)
         @test is_plot(plot_exposure_correlation(bare_ex; weighting = nothing))
         @test is_plot(plot_exposure_distribution(bare_ex))
@@ -677,11 +677,11 @@
         fcb_ex = FactorFamilyBasis(; fnm = ["industry"], fi = [[1, 2]], di = [2],
                                    ratios = reshape(collect(range(0.4, 0.9; length = Te)),
                                                     Te, 1), K = Ke)
-        reb_ex = CrossSectionalFactorModel(; M = Ms_ex[Te, :, :],
+        reb_ex = CrossSectionalFactorModel(; M = Ms_ex[:, :, Te],
                                            L = PortfolioOptimisers.reduce_loadings(fcb_ex,
-                                                                                   Ms_ex[Te,
+                                                                                   Ms_ex[:,
                                                                                          :,
-                                                                                         :]),
+                                                                                         Te]),
                                            b = zeros(Ne),
                                            # A re-based fit states its factor returns on the
                                            # reduced axis (#1367).
@@ -725,11 +725,11 @@
         # covariance the prior carries.
         rng_fs = MersenneTwister(801)
         Tf, Nf, Kf = 12, 8, 3
-        Ms_fs = randn(rng_fs, Tf, Nf, Kf)
+        Ms_fs = permutedims(randn(rng_fs, Tf, Nf, Kf), (2, 3, 1))
         csr_fs = CrossSectionalRegression(; f = 0.02 * randn(rng_fs, Tf, Kf),
                                           eps = 0.01 * randn(rng_fs, Tf, Nf),
                                           n = fill(Nf, Tf))
-        csfm_fs = CrossSectionalFactorModel(; M = Ms_fs[Tf, :, :], b = zeros(Nf),
+        csfm_fs = CrossSectionalFactorModel(; M = Ms_fs[:, :, Tf], b = zeros(Nf),
                                             csr = csr_fs, Ms = Ms_fs,
                                             rw = abs.(randn(rng_fs, Tf, Nf)) .+ 0.1,
                                             bw = fill(1 / Nf, Tf, Nf),
@@ -753,7 +753,7 @@
                                                 nf = ["a", "b", "c"], weighting = nothing,
                                                 coverage_weighting = nothing))
         # A block with no exposure history draws its four factor return columns alone.
-        bare_fs = CrossSectionalFactorModel(; M = Ms_fs[Tf, :, :], b = zeros(Nf),
+        bare_fs = CrossSectionalFactorModel(; M = Ms_fs[:, :, Tf], b = zeros(Nf),
                                             csr = csr_fs, lag = 1)
         @test is_plot(plot_factor_model_summary(bare_fs; ppy = 252))
 
@@ -771,7 +771,7 @@
         # An absent factor return contributes nothing to the running sum.
         f_gap = copy(csr_fs.f)
         f_gap[4, 2] = NaN
-        gap_fs = CrossSectionalFactorModel(; M = Ms_fs[Tf, :, :], b = zeros(Nf),
+        gap_fs = CrossSectionalFactorModel(; M = Ms_fs[:, :, Tf], b = zeros(Nf),
                                            csr = CrossSectionalRegression(; f = f_gap,
                                                                           eps = csr_fs.eps,
                                                                           n = csr_fs.n),
@@ -793,9 +793,9 @@
         csr2_fs = CrossSectionalRegression(; f = 2 .* fr_fs .+ 0.01, eps = csr_fs.eps,
                                            n = csr_fs.n)
         @test csr2_fs.f != fr_fs
-        rebased_fs = CrossSectionalFactorModel(; M = Ms_fs[Tf, :, 1:2], L = Ms_fs[Tf, :, :],
+        rebased_fs = CrossSectionalFactorModel(; M = Ms_fs[:, 1:2, Tf], L = Ms_fs[:, :, Tf],
                                                b = zeros(Nf), csr = csr2_fs,
-                                               Ms = Ms_fs[:, :, 1:2],
+                                               Ms = Ms_fs[:, 1:2, :],
                                                nf = ["value", "size"], lag = 1,
                                                fcb = fcb_fs, fr = fr_fs)
         p_rb = plot_factor_cumulative_returns(rebased_fs)
@@ -871,10 +871,10 @@
         alpha_fp = [t < T_fp ? eps_fp[t + 1, i] + randn(rng_fp) / 400 : randn(rng_fp) / 100
                     for t in 1:T_fp, i in 1:N_fp]
         fe_fp = forecast_evaluation(alpha_fp, y_fp; ppy = 252)
-        Ms_fp = randn(rng_fp, T_fp, N_fp, K_fp)
+        Ms_fp = permutedims(randn(rng_fp, T_fp, N_fp, K_fp), (2, 3, 1))
         csr_fp = CrossSectionalRegression(; f = 0.02 * randn(rng_fp, T_fp, K_fp),
                                           eps = eps_fp, n = fill(N_fp, T_fp))
-        csfm_fp = CrossSectionalFactorModel(; M = Ms_fp[T_fp, :, :], b = zeros(N_fp),
+        csfm_fp = CrossSectionalFactorModel(; M = Ms_fp[:, :, T_fp], b = zeros(N_fp),
                                             csr = csr_fp, Ms = Ms_fp,
                                             rw = abs.(randn(rng_fp, T_fp, N_fp)) .+ 0.1,
                                             bw = fill(1 / N_fp, T_fp, N_fp),
@@ -1556,11 +1556,11 @@
         @test length(plot_measures(mpred_sw.pred[1]).series_list[1][:x]) == 1
 
         # ── the cross-sectional and forecast reference lines ─────────────────────────
-        Ms_sw = randn(rng_sw, 10, 8, 3)
+        Ms_sw = permutedims(randn(rng_sw, 10, 8, 3), (2, 3, 1))
         csr_sw = CrossSectionalRegression(; f = 0.02 * randn(rng_sw, 10, 3),
                                           eps = 0.01 * randn(rng_sw, 10, 8),
                                           n = fill(8, 10))
-        csfm_sw = CrossSectionalFactorModel(; M = Ms_sw[10, :, :], b = zeros(8),
+        csfm_sw = CrossSectionalFactorModel(; M = Ms_sw[:, :, 10], b = zeros(8),
                                             csr = csr_sw, Ms = Ms_sw,
                                             rw = abs.(randn(rng_sw, 10, 8)) .+ 0.1,
                                             nf = ["value", "size", "momentum"], lag = 1)

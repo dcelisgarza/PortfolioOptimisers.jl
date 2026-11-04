@@ -39,8 +39,8 @@ function forecast_history_block(csfm::CrossSectionalFactorModel,
     vs = csfm.vs
     rw = csfm.rw
     bw = csfm.bw
-    Mb = isnothing(Ms) ? nothing : Ms[1:tb, :, :]
-    return CrossSectionalFactorModel(; M = isnothing(Mb) ? csfm.M : Mb[end, :, :],
+    Mb = isnothing(Ms) ? nothing : Ms[:, :, 1:tb]
+    return CrossSectionalFactorModel(; M = isnothing(Mb) ? csfm.M : Mb[:, :, end],
                                      b = csfm.b,
                                      csr = if isnothing(csr)
                                          nothing

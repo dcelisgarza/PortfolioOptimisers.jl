@@ -548,10 +548,10 @@ Where:
 # Arguments
 
   - `families`: Pairs of `family label => dropped factor name`, in the order the families take columns of `ratios`. A `nothing` on the right asks for the automatic choice of the dropped factor.
-  - `Ms::Arr3Num`: Exposure history, `observations × assets × factors`.
+  - `Ms::Arr3Num`: Exposure history, `assets × factors × observations`.
   - `bw::MatNum`: Benchmark weight history, `observations × assets`.
-  - `nf::VecStr`: Names of the raw factor axis, of length `size(Ms, 3)`.
-  - `fam::VecStr`: Family label of each raw factor, of length `size(Ms, 3)`.
+  - `nf::VecStr`: Names of the raw factor axis, of length `size(Ms, 2)`.
+  - `fam::VecStr`: Family label of each raw factor, of length `size(Ms, 2)`.
 
 # Validation
 
@@ -571,7 +571,7 @@ Where:
 # Examples
 
 ```jldoctest
-julia> Ms = reshape([1.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0], 2, 2, 2);
+julia> Ms = reshape([1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0], 2, 2, 2);
 
 julia> factor_family_basis([\"ind\" => nothing], Ms, [0.5 0.5; 0.5 0.5], [\"ind=a\", \"ind=b\"],
                            [\"ind\", \"ind\"])
@@ -593,7 +593,7 @@ function factor_family_basis(families::AbstractVector{<:Pair}, Ms::Arr3Num, bw::
                              nf::VecStr, fam::VecStr)::FactorFamilyBasis
     @argcheck(!isempty(families), IsEmptyError("families cannot be empty"))
     @argcheck(!isempty(Ms), IsEmptyError("Ms cannot be empty"))
-    T, N, K = size(Ms)
+    N, K, T = size(Ms)
     @argcheck(size(bw) == (T, N),
               DimensionMismatch("bw ($(size(bw, 1))×$(size(bw, 2))) must match Ms ($T×$N) on the observation and asset axes"))
     assert_factor_axis_length(length(nf), K, :nf)
@@ -640,7 +640,7 @@ Return the benchmark-weighted exposure of every raw factor at every observation.
 
 # Arguments
 
-  - `Ms::Arr3Num`: Exposure history, `observations × assets × factors`.
+  - `Ms::Arr3Num`: Exposure history, `assets × factors × observations`.
   - `bw::MatNum`: Benchmark weight history, `observations × assets`.
   - `Tf::Type{<:Real}`: Element type of the answer.
 
@@ -658,7 +658,7 @@ Return the benchmark-weighted exposure of every raw factor at every observation.
   - [`factor_family_basis`](@ref)
 """
 function weighted_family_exposures(Ms::Arr3Num, bw::MatNum, Tf::Type{<:Real})
-    T, N, K = size(Ms)
+    N, K, T = size(Ms)
     c = zeros(Tf, T, K)
     w = zeros(Tf, N)
     for t in 1:T
@@ -677,7 +677,7 @@ function weighted_family_exposures(Ms::Arr3Num, bw::MatNum, Tf::Type{<:Real})
         @argcheck(s > zero(s),
                   ArgumentError("the benchmark weights of observation $t sum to $s, and they must sum to a strictly positive number once a non-finite weight is read as zero"))
         for k in 1:K, i in 1:N
-            x = Ms[t, i, k]
+            x = Ms[i, k, t]
             if isfinite(x)
                 c[t, k] += w[i] * Tf(x) / s
             end

@@ -45,9 +45,10 @@ function descriptor_raw_field(rd::ReturnsResult, name::AbstractString)
     Z = panel_feature_matrix(rd.pnl)[2]
     col = findfirst(==(name), panel_feature_matrix(rd.pnl)[1])
     ocol = findfirst(==(name * "::observed"), panel_feature_matrix(rd.pnl)[1])
-    V = Matrix{Float64}(Z[:, :, col])
+    # `Z` is `assets × features × observations` (ADR 0230); `V` is `observations × assets`.
+    V = Matrix{Float64}(permutedims(Z[:, col, :]))
     if !isnothing(ocol)
-        V[iszero.(Z[:, :, ocol])] .= NaN
+        V[iszero.(permutedims(Z[:, ocol, :]))] .= NaN
     end
     return V
 end
@@ -647,12 +648,12 @@ end
 
     L3 = fill(one(Complex{Float64}), 2, 2, 2)
     PortfolioOptimisers.exposure_active_fill!(L3, pnl)
-    @test isnan(real(L3[1, 2, 1])) && L3[1, 1, 1] == 1
+    @test isnan(real(L3[2, 1, 1])) && L3[1, 1, 1] == 1
 
     B = Array{Complex{Float64}}(undef, 2, 2, 2)
     PortfolioOptimisers.one_hot_fill!(B, [1 2; 2 1], [true false; true true])
-    @test isnan(real(B[1, 2, 1])) && isnan(real(B[1, 2, 2]))
-    @test B[1, 1, 1] == 1 && iszero(B[1, 1, 2]) && B[2, 1, 2] == 1 && iszero(B[2, 1, 1])
+    @test isnan(real(B[2, 1, 1])) && isnan(real(B[2, 2, 1]))
+    @test B[1, 1, 1] == 1 && iszero(B[1, 2, 1]) && B[1, 2, 2] == 1 && iszero(B[1, 1, 2])
 
     X = Complex{Float64}[1 2; 3 4]
     @test isnan(real(PortfolioOptimisers.ew_active_returns(X, pnl)[1, 2]))
@@ -676,10 +677,12 @@ end
     @test PortfolioOptimisers.ew_volatility_input(FullMoment(), X, 0) === X
 
     Ms = zeros(Complex{Float64}, 2, 2, 2)
-    PortfolioOptimisers.cross_sectional_exposure_write!(Ms, X, 1, 1, "f")
-    @test Ms[:, :, 1] == X
-    PortfolioOptimisers.cross_sectional_exposure_write!(Ms, reshape(X, 2, 2, 1), 2, 1, "f")
-    @test Ms[:, :, 2] == X
+    PortfolioOptimisers.cross_sectional_exposure_write!(Ms, X, 1:2, 1, 1, "f")
+    @test Ms[:, 1, :] == transpose(X)
+    PortfolioOptimisers.cross_sectional_exposure_write!(Ms,
+                                                        reshape(Matrix(transpose(X)), 2, 1,
+                                                                2), 1:2, 2, 1, "f")
+    @test Ms[:, 2, :] == transpose(X)
 
     @test PortfolioOptimisers.target_forecast_multiplier(true, 2 + 0im) == 2 + 0im
     @test PortfolioOptimisers.target_forecast_multiplier(false, 2 + 0im) == 1
@@ -963,10 +966,13 @@ end
             L = PO.lookback(xe)
             B = factor_exposure(xe, rd)
             Bc = factor_exposure(xe, lookback_cut(rd, L))
-            @test size(Bc, 1) == L
-            @test any(isfinite, selectdim(B, 1, size(B, 1)))
-            @test lookback_agrees(vec(selectdim(Bc, 1, L)),
-                                  vec(selectdim(B, 1, size(B, 1))), exact)
+            # A one-factor member is observations × assets, a rank-3 block holds its
+            # observations last.
+            od = ndims(B) == 3 ? 3 : 1
+            @test size(Bc, od) == L
+            @test any(isfinite, selectdim(B, od, size(B, od)))
+            @test lookback_agrees(vec(selectdim(Bc, od, L)),
+                                  vec(selectdim(B, od, size(B, od))), exact)
         end
         # A derived member reads the exposure of its source on the same rows, so the prior
         # counts the rows of the source.
@@ -1567,9 +1573,10 @@ function ew_raw_field(rd::ReturnsResult, name::AbstractString)
     Z = panel_feature_matrix(rd.pnl)[2]
     col = findfirst(==(name), panel_feature_matrix(rd.pnl)[1])
     ocol = findfirst(==(name * "::observed"), panel_feature_matrix(rd.pnl)[1])
-    V = Matrix{Float64}(Z[:, :, col])
+    # `Z` is `assets × features × observations` (ADR 0230); `V` is `observations × assets`.
+    V = Matrix{Float64}(permutedims(Z[:, col, :]))
     if !isnothing(ocol)
-        V[iszero.(Z[:, :, ocol])] .= NaN
+        V[iszero.(permutedims(Z[:, ocol, :]))] .= NaN
     end
     return V
 end

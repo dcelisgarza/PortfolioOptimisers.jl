@@ -7,12 +7,15 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
 
 const CENSUS_PO = PortfolioOptimisers
 
-# The poison: every inactive cell of every Panel Field changes, and reads as observed.
+# The poison: every inactive cell of every Panel Field changes, and reads as observed. A
+# numeric or a categorical field holds `observations × assets`, and a tensor field holds
+# `assets × labels × observations`, so the cell of observation `t` and asset `i` is a row there.
+census_cell(V::AbstractMatrix, t, i) = view(V, t, i)
+census_cell(V::AbstractArray{<:Any, 3}, t, i) = view(V, i, :, t)
 function census_poison_cells!(V::AbstractArray, amsk::AbstractMatrix{Bool}, f)
-    tail = ntuple(Returns(Colon()), ndims(V) - ndims(amsk))
     for k in CartesianIndices(amsk)
         if !amsk[k]
-            w = view(V, Tuple(k)..., tail...)
+            w = census_cell(V, Tuple(k)...)
             w .= f.(w)
         end
     end
@@ -252,7 +255,7 @@ function census_fixture(poison = census_poison, blank = identity)
     push!(pf, NumericPanelField(; name = "bench", vals = rand(rng, T, N)))
     push!(pf,
           TensorPanelField(; name = "loadings", axis = "factor", labels = ["x", "y"],
-                           vals = randn(rng, T, N, 2)))
+                           vals = permutedims(randn(rng, T, N, 2), (2, 3, 1))))
     rdc = blank(ReturnsResult(; nx = rd.nx, X = rd.X, ne = rd.ne, E = rd.E,
                               pnl = AssetPanel(pf, pnl.amsk, pnl.emsk)))
     return rdc, poison(rdc)
@@ -267,12 +270,14 @@ function census_collapse_fixture(rd::ReturnsResult, poison = census_poison,
     rng = StableRNG(1456)
     pf = CENSUS_PO.AbstractPanelField[pnl.pf;
                                       NumericPanelField(; name = "lift",
-                                                        vals = CENSUS_PO.RepeatedLeading(rand(rng,
-                                                                                              N),
-                                                                                         T));
+                                                        vals = CENSUS_PO.RepeatedObservations(rand(rng,
+                                                                                                   N),
+                                                                                              T));
                                       TensorPanelField(; name = "adjacency", axis = "asset",
                                                        labels = rd.nx,
-                                                       vals = rand(rng, T, N, N))]
+                                                       vals = permutedims(rand(rng, T, N,
+                                                                               N),
+                                                                          (2, 3, 1)))]
     ts = CENSUS_PO.Dates.Date(2020, 1, 1) .+ CENSUS_PO.Dates.Day.(0:(T - 1))
     rdc = blank(ReturnsResult(; nx = rd.nx, X = rd.X, ne = rd.ne, E = rd.E, ts = ts,
                               iv = 0.1 .+ rand(rng, T, N), ivpa = 0.5 .+ rand(rng, N),

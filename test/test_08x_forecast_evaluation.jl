@@ -355,9 +355,9 @@ end
     @testset "The block prefix cuts the observation axis and keeps the asset axis" begin
         tb = 20
         cut = PO.forecast_history_block(csfm, tb)
-        @test size(cut.Ms) == (tb, fx.N, size(csfm.Ms, 3))
-        @test isequal(cut.Ms, csfm.Ms[1:tb, :, :])
-        @test isequal(cut.M, csfm.Ms[tb, :, :])
+        @test size(cut.Ms) == (fx.N, size(csfm.Ms, 2), tb)
+        @test isequal(cut.Ms, csfm.Ms[:, :, 1:tb])
+        @test isequal(cut.M, csfm.Ms[:, :, tb])
         @test isequal(cut.csr.eps, csfm.csr.eps[1:tb, :])
         @test size(cut.csr.f, 1) == tb
         @test length(cut.csr.n) == tb
@@ -441,7 +441,8 @@ end
         b_after = (tb + 1):fx.Tb
         csfmp.csr.eps[b_after, :] .= 5 .* randn(rng, length(b_after), fx.N)
         csfmp.vs[b_after, :] .= 9.0
-        csfmp.Ms[b_after, :, :] .= randn(rng, length(b_after), fx.N, size(csfm.Ms, 3))
+        csfmp.Ms[:, :, b_after] .= permutedims(randn(rng, length(b_after), fx.N,
+                                                     size(csfm.Ms, 2)), (2, 3, 1))
         histp = forecast_history(tgt, rdp, csfmp)
         @test isequal(view(histp, 1:tb, :), view(hist, 1:tb, :))
         @test !isequal(view(histp, tb + 1, :), view(hist, tb + 1, :))
@@ -2041,7 +2042,7 @@ const FC_ALPHA = [1.0 2.0 3.0 4.0
                   3.0 4.0 5.0 6.0]
 const FC_TIED = repeat([1.0 2.0 3.0 4.0], 4, 1)
 const FC_ORTHO = repeat([3.0 1.0 4.0 2.0], 4, 1)
-const FC_B = cat(FC_TIED, FC_ORTHO; dims = 3)
+const FC_B = permutedims(cat(FC_TIED, FC_ORTHO; dims = 3), (2, 3, 1))
 # A weight that breaks the orthogonality of `FC_ORTHO`. `IC_W` does not: its rows happen to
 # leave the weighted covariance of `[1, 2, 3, 4]` against `[3, 1, 4, 2]` at exactly zero.
 const FC_W = repeat([1.0 1.0 1.0 5.0], 4, 1)
@@ -2053,7 +2054,7 @@ const FC_G = [1.0 0.0 1.0 0.0
               0.0 1.0 0.0 1.0
               1.0 1.0 0.0 0.0
               0.0 0.0 1.0 1.0]
-const FC_BG = cat(FC_G, reverse(FC_G; dims = 2); dims = 3)
+const FC_BG = permutedims(cat(FC_G, reverse(FC_G; dims = 2); dims = 3), (2, 3, 1))
 
 @testset "The exposure axis is checked against the forecast, once" begin
     PO = PortfolioOptimisers
@@ -2070,10 +2071,10 @@ const FC_BG = cat(FC_G, reverse(FC_G; dims = 2); dims = 3)
                                                                                     0))
         # One observation short, and one asset short.
         @test_throws DimensionMismatch PO.forecast_factor_exposures(fe.alpha,
-                                                                    FC_B[1:3, :, :])
+                                                                    FC_B[:, :, 1:3])
         @test_throws DimensionMismatch PO.forecast_factor_exposures(fe.alpha,
-                                                                    FC_B[:, 1:3, :])
-        @test_throws DimensionMismatch forecast_factor_correlation(fe, FC_B[1:3, :, :])
+                                                                    FC_B[1:3, :, :])
+        @test_throws DimensionMismatch forecast_factor_correlation(fe, FC_B[:, :, 1:3])
     end
 
     @testset "A threshold below one is refused" begin
@@ -2108,7 +2109,7 @@ end
         u = ones(size(FC_ALPHA, 2))
         for k in 1:2, t in 1:T
             a = view(fe.alpha, t, :)
-            b = view(FC_B, t, :, k)
+            b = view(FC_B, :, k, t)
             @test c[t, k] == PO.cs_weighted_correlation(a, b, u; min_count = fe.min_count)
             @test cr[t, k] == PO.cs_spearman_correlation(a, b; min_count = fe.min_count)
         end
@@ -2146,7 +2147,7 @@ end
         # ranks are equal, so it has no rank correlation either. Under `:ordinal`, equal
         # values take their position on the asset axis, so the rank form answers the rank
         # correlation of the forecast with that order.
-        bc = cat(FC_TIED, fill(1.0, size(FC_ALPHA)); dims = 3)
+        bc = permutedims(cat(FC_TIED, fill(1.0, size(FC_ALPHA)); dims = 3), (2, 3, 1))
         @test all(isnan, forecast_factor_correlation(fe, bc)[:, 2])
         @test all(isnan, forecast_factor_correlation(fe, bc; rank = true)[:, 2])
         fo = forecast_evaluation(FC_ALPHA, PO.forward_mean_returns(FC_ALPHA, 1, 1);
@@ -2179,14 +2180,14 @@ end
         fro = forecast_evaluation(FC_ALPHA[:, rv], yt[:, rv]; ties = :ordinal)
         ca = forecast_factor_correlation(fe, FC_BG; rank = true)
         co = forecast_factor_correlation(fo, FC_BG; rank = true)
-        @test ca ≈ forecast_factor_correlation(far, FC_BG[:, rv, :]; rank = true)
-        @test !isapprox(co, forecast_factor_correlation(fro, FC_BG[:, rv, :]; rank = true))
+        @test ca ≈ forecast_factor_correlation(far, FC_BG[rv, :, :]; rank = true)
+        @test !isapprox(co, forecast_factor_correlation(fro, FC_BG[rv, :, :]; rank = true))
         # Row 1: the ranks of `[1, 2, 3, 4]` against the midranks of `[1, 0, 1, 0]`.
         @test ca[1, 1] ≈ -2 / sqrt(20)
         @test co[1, 1] ≈ 0.0 atol = 1e-12
         for k in 1:2, t in 1:T
             @test co[t, k] ==
-                  PO.cs_spearman_correlation(view(fe.alpha, t, :), view(FC_BG, t, :, k);
+                  PO.cs_spearman_correlation(view(fe.alpha, t, :), view(FC_BG, :, k, t);
                                              min_count = fe.min_count, ties = :ordinal)
         end
     end
@@ -2305,7 +2306,7 @@ end
         # standardiser after the fit: it maps each cross-section by one affine map, so it
         # keeps the zero weighted mean and the orthogonality that the intercept gives.
         PO = PortfolioOptimisers
-        X = csfm.Ms[:, :, 1]
+        X = permutedims(csfm.Ms[:, 1, :])
         function worst(cre)
             d = DescriptorScores(; descriptors = ds.descriptors, neutralise = "style",
                                  cre = cre, outlier = ds.outlier, scoring = ds.scoring)
@@ -2313,8 +2314,8 @@ end
             w = PO.return_forecast_weights(rd)[r.rows, :]
             wc = 0.0
             wo = 0.0
-            for k in axes(r.S, 3), t in axes(X, 1)
-                s = r.S[r.rows[t], :, k]
+            for k in axes(r.S, 2), t in axes(X, 1)
+                s = r.S[:, k, r.rows[t]]
                 m = isfinite.(s) .& isfinite.(view(X, t, :)) .& (view(w, t, :) .> 0)
                 u, s, x = w[t, m], s[m], X[t, m]
                 sc = s .- sum(u .* s) / sum(u)
@@ -4518,7 +4519,7 @@ end
     members = (fw, ew, tgt, tgtc)
 
     @testset "No member reads b, esigma, L, fcb, rf, or the values of M" begin
-        K = size(csfm.Ms, 3)
+        K = size(csfm.Ms, 2)
         fcb = PO.FactorFamilyBasis(; fnm = ["industry"], fi = [collect(2:K)], di = [K - 1],
                                    ratios = ones(Tb, K - 2), K = K)
         full = CrossSectionalFactorModel(; M = 3 .* csfm.M .+ 1,
@@ -4538,7 +4539,7 @@ end
                           forecast_history(m, rd, csfm; step = 3))
         end
         cut = PO.forecast_history_block(full, 10)
-        @test isequal(cut.M, full.Ms[10, :, :])
+        @test isequal(cut.M, full.Ms[:, :, 10])
         @test cut.b == full.b
         @test cut.esigma == full.esigma
         @test isnothing(getfield(cut, :L))

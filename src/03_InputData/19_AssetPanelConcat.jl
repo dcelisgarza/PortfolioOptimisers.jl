@@ -7,7 +7,7 @@ Each part holds the same Panel Fields. The function joins the values, the observ
 
 The panel holds no asset names and no timestamps. The [`ReturnsResult`](@ref) or the [`PricesResult`](@ref) that holds the panel holds them, and each of the two refuses a repeated timestamp. To join two blocks of returns data, concatenate `X`, `ts` and each other series with `vcat`. Then concatenate the panels with this function, and make a new `ReturnsResult`.
 
-The element types promote as `vcat` promotes them, so a `Float32` part and a `Float64` part give a `Float64` field. A field that each part lifts from an equal static array stays a lazy [`RepeatedLeading`](@ref) array, and masks that are true everywhere stay an [`AllTrueMask`](@ref).
+The element types promote as `vcat` promotes them, so a `Float32` part and a `Float64` part give a `Float64` field. A field that each part lifts from an equal static array stays a lazy [`RepeatedObservations`](@ref) array, and masks that are true everywhere stay an [`AllTrueMask`](@ref).
 
 # Algorithm
 
@@ -191,7 +191,7 @@ function assert_panel_field_concat(f::TensorPanelField, g::TensorPanelField,
     @argcheck(isequal(f.axis, g.axis) &&
               isequal(f.labels, g.labels) &&
               isequal(f.groups, g.groups),
-              ArgumentError("the tensor Panel Field \"$(f.name)\" has the axis $(pinned_repr(g.axis)), the labels $(pinned_repr(g.labels)) and the groups $(pinned_repr(g.groups)) in part $k, against $(pinned_repr(f.axis)), $(pinned_repr(f.labels)) and $(pinned_repr(f.groups)) in the first part. Each entry of the trailing axis is one column of the derived Feature Matrix, so each part must hold the same entries."))
+              ArgumentError("the tensor Panel Field \"$(f.name)\" has the axis $(pinned_repr(g.axis)), the labels $(pinned_repr(g.labels)) and the groups $(pinned_repr(g.groups)) in part $k, against $(pinned_repr(f.axis)), $(pinned_repr(f.labels)) and $(pinned_repr(f.groups)) in the first part. Each entry of the label axis is one column of the derived Feature Matrix, so each part must hold the same entries."))
     return nothing
 end
 """
@@ -249,7 +249,7 @@ function panel_field_vcat(f::TensorPanelField, fs::AbstractVector)
                             pmsk = panel_pmsk_vcat([g.pmsk for g in fs], vals))
 end
 """
-    panel_values_vcat(vs::AbstractVector{<:RepeatedLeading}) -> AbstractArray
+    panel_values_vcat(vs::AbstractVector{<:RepeatedObservations}) -> AbstractArray
     panel_values_vcat(vs::AbstractVector) -> AbstractArray
 
 Concatenates the value arrays of the parts of one Panel Field along the observation axis.
@@ -260,11 +260,11 @@ The element type of the result is the element type that `vcat` of the parts give
 
 The method that Julia selects is the algorithm.
 
- 1. Every part is a [`RepeatedLeading`](@ref) array:
+ 1. Every part is a [`RepeatedObservations`](@ref) array:
      1. Read the lifted array `p` of the first part. When a part lifts an array that `isequal` does not find equal to `p`, go to step 2.
      2. Find the element type `T` with `promote_type` over the element types of the parts.
      3. Return one lazy lift of `p`, converted to `T`, over the observations of every part.
- 2. Any other parts: concatenate them with `vcat`.
+ 2. Any other parts: concatenate them along the observation axis that [`observation_axis`](@ref) names.
 
 # Arguments
 
@@ -277,21 +277,21 @@ The method that Julia selects is the algorithm.
 # Related
 
   - [`panel_field_vcat`](@ref)
-  - [`RepeatedLeading`](@ref)
+  - [`RepeatedObservations`](@ref)
 """
-function panel_values_vcat(vs::AbstractVector{<:RepeatedLeading})
+function panel_values_vcat(vs::AbstractVector{<:RepeatedObservations})
     p = first(vs).parent
     return if all(v -> isequal(v.parent, p), vs)
         #! `isequal` holds across element types, as for `[1, 2]` and `[1.0, 2.0]`, so the lift
         #! takes the element type that `vcat` of the parts gives.
         T = mapreduce(eltype, promote_type, vs)
-        RepeatedLeading(convert(AbstractArray{T}, p), sum(v -> v.n, vs))
+        RepeatedObservations(convert(AbstractArray{T}, p), sum(v -> v.n, vs))
     else
-        reduce(vcat, vs)
+        cat(vs...; dims = observation_axis(first(vs)))
     end
 end
 function panel_values_vcat(vs::AbstractVector)
-    return reduce(vcat, vs)
+    return cat(vs...; dims = observation_axis(first(vs)))
 end
 """
     panel_omsk_vcat(ms::AbstractVector{Nothing}, vals::AbstractVector) -> Nothing
@@ -307,7 +307,7 @@ The method that Julia selects is the algorithm.
 
  1. No part has an observed mask: return `nothing`.
  2. Any other parts: put an array of `true` values, of the size of the values of the part, in place of each missing mask.
- 3. Concatenate the masks with `vcat`.
+ 3. Concatenate the masks along the observation axis that [`observation_axis`](@ref) names.
 
 # Arguments
 
@@ -327,7 +327,8 @@ function panel_omsk_vcat(::AbstractVector{Nothing}, ::AbstractVector)
     return nothing
 end
 function panel_omsk_vcat(ms::AbstractVector, vals::AbstractVector)
-    return reduce(vcat, [isnothing(m) ? trues(size(v)) : m for (m, v) in zip(ms, vals)])
+    parts = [isnothing(m) ? trues(size(v)) : m for (m, v) in zip(ms, vals)]
+    return cat(parts...; dims = observation_axis(first(parts)))
 end
 """
     panel_pmsk_vcat(ms::AbstractVector{Nothing}, vals::AbstractVector) -> Nothing
@@ -343,7 +344,7 @@ The method that Julia selects is the algorithm.
 
  1. No part has a placeholder mask: return `nothing`.
  2. Any other parts: put an array of `false` values, of the size of the values of the part, in place of each missing mask.
- 3. Concatenate the masks with `vcat`.
+ 3. Concatenate the masks along the observation axis that [`observation_axis`](@ref) names.
 
 # Arguments
 
@@ -364,7 +365,8 @@ function panel_pmsk_vcat(::AbstractVector{Nothing}, ::AbstractVector)
     return nothing
 end
 function panel_pmsk_vcat(ms::AbstractVector, vals::AbstractVector)
-    return reduce(vcat, [isnothing(m) ? falses(size(v)) : m for (m, v) in zip(ms, vals)])
+    parts = [isnothing(m) ? falses(size(v)) : m for (m, v) in zip(ms, vals)]
+    return cat(parts...; dims = observation_axis(first(parts)))
 end
 """
     panel_field_isequal(f::AbstractPanelField, g::AbstractPanelField) -> Bool
@@ -455,7 +457,7 @@ Concatenates one universe mask of the parts of a time-varying Asset Panel along 
 The method that Julia selects is the algorithm.
 
  1. Every part is an [`AllTrueMask`](@ref): return one `AllTrueMask` over the observations of every part, which stores no cell.
- 2. Any other parts: concatenate them with `vcat`.
+ 2. Any other parts: concatenate them along the observation axis that [`observation_axis`](@ref) names.
 
 # Arguments
 
@@ -700,8 +702,8 @@ function panel_fields_append(P::AbstractVector{<:AbstractPanelField},
                              Po::AbstractVector{<:AbstractPanelField}, n::Integer)
     b = panel_fields_panel(Po)
     assert_panel_concat(panel_fields_panel(P), b, 2)
-    tp = size(panel_field_array(first(P)), 1)
-    keep = n - size(panel_field_array(first(Po)), 1)
+    tp = first(panel_field_axes(first(P)))
+    keep = n - first(panel_field_axes(first(Po)))
     if iszero(keep)
         return Po
     end

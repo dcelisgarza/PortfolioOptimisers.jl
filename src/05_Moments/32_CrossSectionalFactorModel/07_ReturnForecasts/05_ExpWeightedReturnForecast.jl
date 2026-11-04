@@ -43,7 +43,7 @@ A pair enters the fit when it carries a positive cross-sectional weight, a finit
 
 # Arguments
 
-  - `S`: The Descriptor scores, `observations × assets × descriptors`.
+  - `S`: The Descriptor scores, `assets × descriptors × observations`.
   - `y`: Forward mean idiosyncratic returns, `observations × assets`.
   - `vs`: Idiosyncratic variance history, `observations × assets`.
   - `w`: Cross-sectional weights, `observations × assets`.
@@ -62,8 +62,8 @@ function ew_forecast_valid(S::Arr3Num, y::MatNum, vs::MatNum, w::MatNum)::BitMat
     valid = falses(size(w))
     for idx in CartesianIndices(valid)
         ok = w[idx] > zero(w[idx]) && isfinite(y[idx]) && zero(vs[idx]) < vs[idx] < Inf
-        for k in axes(S, 3)
-            ok &= isfinite(S[idx, k])
+        for k in axes(S, 2)
+            ok &= isfinite(S[idx[2], k, idx[1]])
         end
         valid[idx] = ok
     end
@@ -79,7 +79,7 @@ The function copies the rows of the valid assets. Each array keeps its own eleme
 
 # Arguments
 
-  - `S`: The Descriptor scores, `observations × assets × descriptors`.
+  - `S`: The Descriptor scores, `assets × descriptors × observations`.
   - `y`: The target in the Forecast Unit, `observations × assets`.
   - `W`: Regression weights, `observations × assets`.
   - `t`: Index of the observation.
@@ -98,7 +98,7 @@ The function copies the rows of the valid assets. Each array keeps its own eleme
 function ew_forecast_design(S::Arr3Num, y::MatNum, W::MatNum, t::Integer,
                             valid::AbstractMatrix{Bool})
     idx = findall(view(valid, t, :))
-    return S[t, idx, :], y[t, idx], W[t, idx]
+    return S[idx, :, t], y[t, idx], W[t, idx]
 end
 """
     ew_forecast_accumulate!(A::AbstractMatrix{<:Real}, c::AbstractVector{<:Real},
@@ -235,7 +235,7 @@ The forecast at observation `t` uses the coefficients estimated from the targets
 
 # Arguments
 
-  - `S`: The Descriptor scores, `observations × assets × descriptors`.
+  - `S`: The Descriptor scores, `assets × descriptors × observations`.
   - `coefs`: The coefficient history, `trainable observations × descriptors`.
   - `gap`: `lag + horizon - 1`, the number of observations a target takes to mature.
 
@@ -251,12 +251,12 @@ The forecast at observation `t` uses the coefficients estimated from the targets
 """
 function ew_forecast_history(S::Arr3Num, coefs::MatNum, gap::Integer)::Matrix{<:Real}
     Tf = promote_type(real(eltype(S)), real(eltype(coefs)))
-    T = size(S, 1)
-    H = fill(Tf(NaN), T, size(S, 2))
-    for t in (gap + 1):T, i in axes(S, 2)
+    T = size(S, 3)
+    H = fill(Tf(NaN), T, size(S, 1))
+    for t in (gap + 1):T, i in axes(S, 1)
         h = zero(Tf)
-        for k in axes(S, 3)
-            h += S[t, i, k] * coefs[t - gap, k]
+        for k in axes(S, 2)
+            h += S[i, k, t] * coefs[t - gap, k]
         end
         H[t, i] = h
     end
@@ -605,7 +605,7 @@ The fold state `fs` holds the normal equations `A` and `c`, the count `n` of the
 function return_forecast_step(rfe::ExpWeightedReturnForecast, P::NamedTuple,
                               csfm::CrossSectionalFactorModel,
                               fs::Option{<:NamedTuple})::NamedTuple
-    Sb = descriptor_neutralised_scores(rfe.scores, P, csfm, axes(P.S, 1))
+    Sb = descriptor_neutralised_scores(rfe.scores, P, csfm, axes(P.S, 3))
     emsk::MatNum = P.w
     vs = forecast_idiosyncratic_variances(csfm)
     fwd = forward_mean_returns(forecast_idiosyncratic_returns(csfm), rfe.horizon, rfe.lag)
@@ -613,7 +613,7 @@ function return_forecast_step(rfe::ExpWeightedReturnForecast, P::NamedTuple,
     W = ew_forecast_weights(rfe.unit, emsk, vs)
     valid = ew_forecast_valid(Sb, fwd, vs, emsk)
     T = size(emsk, 1)
-    K = size(Sb, 3)
+    K = size(Sb, 2)
     gap = forecast_target_gap(rfe)
     # The state holds the decay and the ridge as well as the data, so a hyperparameter of a
     # wider type widens the state and is not truncated into the type of the data.

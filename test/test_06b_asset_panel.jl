@@ -41,7 +41,7 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
           (4, 3)
     @test PortfolioOptimisers.panel_field_axes(TensorPanelField(; name = "b", axis = "f",
                                                                 labels = ["a"],
-                                                                vals = ones(4, 3, 1))) ==
+                                                                vals = ones(3, 1, 4))) ==
           (4, 3)
 
     # The name, the label and the shape rules, each raising on its own condition.
@@ -189,18 +189,21 @@ end
                                                  codes = [1 2; 1 2]),
                            TensorPanelField(; name = "beta", axis = "factor",
                                             labels = ["size"],
-                                            vals = reshape(1.0:4.0, 2, 2, 1))],
+                                            vals = permutedims(reshape(1.0:4.0, 2, 2, 1),
+                                                               (2, 3, 1)))],
                      amsk = trues(2, 2), emsk = trues(2, 2))
     nz, Z = panel_feature_matrix(pnl)
     @test nz == ["mcap", "mcap::observed", "sector=T", "sector=E", "beta=size"]
     @test nz == PortfolioOptimisers.panel_feature_names(pnl)
-    @test size(Z) == (2, 2, 5)
-    @test Z[:, :, 1] == [1.0 2.0; 3.0 4.0]
-    @test Z[:, :, 2] == [1.0 0.0; 1.0 1.0]
+    # The matrix is `assets × features × observations`, so a column is `assets ×
+    # observations`, the transpose of the panel axes.
+    @test size(Z) == (2, 5, 2)
+    @test permutedims(Z[:, 1, :]) == [1.0 2.0; 3.0 4.0]
+    @test permutedims(Z[:, 2, :]) == [1.0 0.0; 1.0 1.0]
     # One-hot: exactly one 1 per cell across the level columns.
-    @test Z[:, :, 3] == [1.0 0.0; 1.0 0.0]
-    @test Z[:, :, 4] == [0.0 1.0; 0.0 1.0]
-    @test Z[:, :, 5] == [1.0 3.0; 2.0 4.0]
+    @test permutedims(Z[:, 3, :]) == [1.0 0.0; 1.0 0.0]
+    @test permutedims(Z[:, 4, :]) == [0.0 1.0; 0.0 1.0]
+    @test permutedims(Z[:, 5, :]) == [1.0 3.0; 2.0 4.0]
     @test all(isfinite, Z)
 
     # A static panel derives an `assets × features` matrix.
@@ -249,8 +252,8 @@ end
     nz, Z = panel_feature_matrix(pnl)
     @test nz == ["sector=T", "sector=E", "sector=F", "sector::observed"]
     @test nz == PortfolioOptimisers.panel_feature_names(pnl)
-    @test Z[:, :, 4] == omsk
-    @test Z[:, :, 1] == [1.0 0.0 0.0 1.0; 0.0 0.0 1.0 0.0]
+    @test permutedims(Z[:, 4, :]) == omsk
+    @test permutedims(Z[:, 1, :]) == [1.0 0.0 0.0 1.0; 0.0 0.0 1.0 0.0]
 
     # Five levels over two assets.
     c5 = CategoricalPanelField(; name = "s", levels = ["a", "b", "c", "d", "e"],
@@ -258,7 +261,7 @@ end
     nz5, Z5 = panel_feature_matrix(AssetPanel(; pf = [c5], amsk = trues(2, 2),
                                               emsk = trues(2, 2)))
     @test nz5 == ["s=a", "s=b", "s=c", "s=d", "s=e", "s::observed"]
-    @test Z5[:, :, 6] == [1.0 0.0; 1.0 1.0]
+    @test permutedims(Z5[:, 6, :]) == [1.0 0.0; 1.0 1.0]
 
     # A static categorical Panel Field.
     snz, sZ = panel_feature_matrix(AssetPanel(;
@@ -277,15 +280,17 @@ end
     also when it has one label. The table of `panel_dataframe` uses the same name.
     =#
     t1 = TensorPanelField(; name = "b", axis = "f", labels = ["x"],
-                          vals = reshape([1.0, 2.0, 3.0, 4.0], 2, 2, 1),
-                          omsk = reshape([true, false, true, true], 2, 2, 1))
+                          vals = permutedims(reshape([1.0, 2.0, 3.0, 4.0], 2, 2, 1),
+                                             (2, 3, 1)),
+                          omsk = permutedims(reshape([true, false, true, true], 2, 2, 1),
+                                             (2, 3, 1)))
     tnz, tZ = panel_feature_matrix(AssetPanel(; pf = [t1], amsk = trues(2, 2),
                                               emsk = trues(2, 2)))
     @test tnz == ["b=x", "b=x::observed"]
-    @test tZ[:, :, 2] == [1.0 1.0; 0.0 1.0]
+    @test permutedims(tZ[:, 2, :]) == [1.0 1.0; 0.0 1.0]
 
     # A Panel Field with no observed mask writes no mask column, whatever its kind.
-    W = zeros(2, 2, 1)
+    W = zeros(2, 1, 2)
     @test PortfolioOptimisers.panel_field_stack_observed!(W,
                                                           NumericPanelField(; name = "n",
                                                                             vals = ones(2,
@@ -295,8 +300,8 @@ end
                                                           TensorPanelField(; name = "t",
                                                                            axis = "f",
                                                                            labels = ["x"],
-                                                                           vals = ones(2, 2,
-                                                                                       1)),
+                                                                           vals = ones(2, 1,
+                                                                                       2)),
                                                           [1]) === nothing
     @test iszero(W)
 
@@ -348,7 +353,7 @@ end
     carrier's asset names is cut on its label axis by the same asset index. Nothing records the
     fact, and the comparison is `features_are_assets`.
     =#
-    Zt = reshape(collect(1.0:18.0), 2, 3, 3)
+    Zt = permutedims(reshape(collect(1.0:18.0), 2, 3, 3), (2, 3, 1))
     nx = ["A", "B", "C"]
     sq = asset_panel([TensorPanelInput(; name = "prox", axis = "asset", labels = nx,
                                        vals = Zt)])
@@ -358,7 +363,7 @@ end
     sqv = PortfolioOptimisers.port_opt_view(sq, 1:2, 2:3, nx)
     @test PortfolioOptimisers.panel_field(sqv, "prox").labels == ["B", "C"]
     @test PortfolioOptimisers.panel_feature_names(sqv) == ["prox=B", "prox=C"]
-    @test PortfolioOptimisers.panel_field(sqv, "prox").vals == Zt[1:2, 2:3, 2:3]
+    @test PortfolioOptimisers.panel_field(sqv, "prox").vals == Zt[2:3, 2:3, 1:2]
 
     # The groups belong to the labels, so the square case cuts them by the same index (#807
     # decision 1, ADR 0102), and a field without groups keeps its `nothing`.
@@ -368,7 +373,7 @@ end
     sqgv = PortfolioOptimisers.port_opt_view(sqg, 1:2, [3, 1], nx)
     @test PortfolioOptimisers.panel_field(sqgv, "prox").labels == ["C", "A"]
     @test PortfolioOptimisers.panel_field(sqgv, "prox").groups == ["g2", "g1"]
-    @test PortfolioOptimisers.panel_field(sqgv, "prox").vals == Zt[1:2, [3, 1], [3, 1]]
+    @test PortfolioOptimisers.panel_field(sqgv, "prox").vals == Zt[[3, 1], [3, 1], 1:2]
     # Outside the square case the groups travel whole with the labels.
     rectg = asset_panel([TensorPanelInput(; name = "beta", axis = "factor",
                                           labels = ["f1", "f2", "f3"],
@@ -385,7 +390,7 @@ end
                                                    nx)
     rv = PortfolioOptimisers.port_opt_view(rect, 1:2, 2:3, nx)
     @test PortfolioOptimisers.panel_field(rv, "beta").labels == ["f1", "f2", "f3"]
-    @test PortfolioOptimisers.panel_field(rv, "beta").vals == Zt[1:2, 2:3, :]
+    @test PortfolioOptimisers.panel_field(rv, "beta").vals == Zt[2:3, :, 1:2]
 
     # A numeric or categorical Panel Field has no trailing axis, so it is never square.
     @test !PortfolioOptimisers.features_are_assets(PortfolioOptimisers.panel_field(pnl,
@@ -456,7 +461,7 @@ end
     # cell takes it, and not with a conversion error at the first cell that does.
     @test_throws ArgumentError NumericPanelInput(; name = "x", vals = [1.0 missing],
                                                  alg = ConstantPanelFill(; val = "a"))
-    @test_throws ArgumentError TensorPanelInput(; name = "b", vals = ones(2, 2, 1),
+    @test_throws ArgumentError TensorPanelInput(; name = "b", vals = ones(2, 1, 2),
                                                 axis = "f", labels = ["s"],
                                                 alg = ForwardPanelFill(; val = "a"))
     # A constant fill types each column alike, so a first column with no blank does not
@@ -566,15 +571,15 @@ end
                                 amsk = amsk, emsk = amsk), "y")
     # An observed inactive cell carries within its own stretch, and never into the active one.
     @test b.vals[4:8, 1] == [-1.0, 50.0, 60.0, 70.0, 9.0]
-    # A tensor Panel Field reads the active mask of its asset, the second axis, in every slice.
-    t = cat(x, x .+ 100; dims = 3)
+    # A tensor Panel Field reads the active mask of its asset, the first axis, in every slice.
+    t = permutedims(cat(x, x .+ 100; dims = 3), (2, 3, 1))
     tf = panel_field(asset_panel([TensorPanelInput(; name = "t", vals = t, axis = "f",
                                                    labels = ["a", "b"],
                                                    alg = ForwardPanelFill(; val = -1.0))];
                                  amsk = amsk, emsk = amsk), "t")
-    @test tf.vals[5:8, 1, 1] == fill(-1.0, 4)
-    @test tf.vals[5:8, 1, 2] == fill(-1.0, 4)
-    @test tf.vals[:, 2, :] == t[:, 2, :]
+    @test tf.vals[1, 1, 5:8] == fill(-1.0, 4)
+    @test tf.vals[1, 2, 5:8] == fill(-1.0, 4)
+    @test tf.vals[2, :, :] == t[2, :, :]
     # The one-argument resolution reads no mask, so the column is one stretch.
     inp = NumericPanelInput(; name = "x", vals = x, alg = ForwardPanelFill(; val = -1.0))
     @test PortfolioOptimisers.panel_resolve(inp)[1][8, 1] == 4.0
@@ -636,12 +641,12 @@ end
     bv, bo = PortfolioOptimisers.panel_resolve(bad)
     @test_throws ArgumentError PortfolioOptimisers.panel_input_field(bad, bv, bo)
 
-    ten = TensorPanelInput(; name = "beta", vals = reshape([1.0, NaN, 3.0, 4.0], 2, 1, 2),
+    ten = TensorPanelInput(; name = "beta", vals = reshape([1.0, NaN, 3.0, 4.0], 1, 2, 2),
                            axis = "factor", labels = ["a", "b"],
                            alg = ConstantPanelFill(; val = 0.0))
     tv, to = PortfolioOptimisers.panel_resolve(ten)
-    @test tv == reshape([1.0, 0.0, 3.0, 4.0], 2, 1, 2)
-    @test to == reshape([true, false, true, true], 2, 1, 2)
+    @test tv == reshape([1.0, 0.0, 3.0, 4.0], 1, 2, 2)
+    @test to == reshape([true, false, true, true], 1, 2, 2)
     @test PortfolioOptimisers.panel_input_field(ten, tv, to).labels == ["a", "b"]
 
     # A static input carries one axis fewer, and resolves cell by cell.
@@ -678,14 +683,15 @@ end
                        CategoricalPanelInput(; name = "sector", vals = ["T" "E"; "T" "E"],
                                              levels = ["T", "E"]),
                        TensorPanelInput(; name = "beta",
-                                        vals = reshape(collect(1.0:4.0), 2, 2, 1),
+                                        vals = permutedims(reshape(collect(1.0:4.0), 2, 2,
+                                                                   1), (2, 3, 1)),
                                         axis = "factor", labels = ["size"])])
     nz, Z = panel_feature_matrix(pnl)
     @test nz == ["mcap", "mcap::observed", "sector=T", "sector=E", "beta=size"]
-    @test size(Z) == (2, 2, 5)
-    @test Z[:, :, 1] == [1.0 0.0; 3.0 4.0]
-    @test Z[:, :, 2] == [1.0 0.0; 1.0 1.0]
-    @test Z[:, :, 5] == [1.0 3.0; 2.0 4.0]
+    @test size(Z) == (2, 5, 2)
+    @test permutedims(Z[:, 1, :]) == [1.0 0.0; 3.0 4.0]
+    @test permutedims(Z[:, 2, :]) == [1.0 0.0; 1.0 1.0]
+    @test permutedims(Z[:, 5, :]) == [1.0 3.0; 2.0 4.0]
     @test all(isfinite, Z)
     # A field with the fill policy `nothing` carries no observed mask.
     @test PortfolioOptimisers.panel_field(pnl, "sector").omsk === nothing
@@ -723,7 +729,7 @@ end
     @test PortfolioOptimisers.panel_field(lifted, "a").omsk === nothing
     # The values are stored once.
     @test isa(PortfolioOptimisers.panel_field(lifted, "a").vals,
-              PortfolioOptimisers.RepeatedLeading)
+              PortfolioOptimisers.RepeatedObservations)
     @test PortfolioOptimisers.panel_field(lifted, "a").vals.parent == [1.0, 2.0]
     # A view of a lifted field is an ordinary `SubArray`, sliced like any other.
     lv = PortfolioOptimisers.port_opt_view(lifted, 2:3, [2])
@@ -735,12 +741,12 @@ end
     @test PortfolioOptimisers.panel_field(mixed, "s").codes == [2 1; 2 1]
     @test PortfolioOptimisers.panel_feature_matrix(mixed)[1] == ["t", "s=E", "s=T"]
     # The lazy array owes `show` too.
-    @test occursin("RepeatedLeading",
+    @test occursin("RepeatedObservations",
                    sprint(show, PortfolioOptimisers.panel_field(lifted, "a").vals))
-    @test occursin("RepeatedLeading",
+    @test occursin("RepeatedObservations",
                    sprint(show, MIME"text/plain"(),
                           PortfolioOptimisers.panel_field(lifted, "a").vals))
-    @test_throws DomainError PortfolioOptimisers.RepeatedLeading([1.0, 2.0], 0)
+    @test_throws DomainError PortfolioOptimisers.RepeatedObservations([1.0, 2.0], 0)
     @test_throws ArgumentError asset_panel([NumericPanelInput(; name = "a",
                                                               vals = [1.0, 2.0],
                                                               alg = BackwardPanelFill())])
@@ -766,7 +772,7 @@ end
     rd = ReturnsResult(; nx = nx, X = X,
                        ts = [Dates.Date(2020, 1, 1), Dates.Date(2020, 1, 2)], pnl = pnl)
     @test rd.pnl.amsk == [true true false; true true true]
-    @test size(panel_feature_matrix(rd.pnl)[2]) == (2, 3, 2)
+    @test size(panel_feature_matrix(rd.pnl)[2]) == (3, 2, 2)
 
     # The asset arity slices the assets out of every value, and keeps the feature axis.
     va = PortfolioOptimisers.port_opt_view(rd, 2:3)
@@ -778,7 +784,7 @@ end
     vb = PortfolioOptimisers.port_opt_view(rd, 2:2, 1:2)
     @test vb.pnl.amsk == [true true]
     @test vb.pnl.emsk == [true true]
-    @test size(panel_feature_matrix(vb.pnl)[2]) == (1, 2, 2)
+    @test size(panel_feature_matrix(vb.pnl)[2]) == (2, 2, 1)
 
     # The panel describes the carrier's universe, so its axes must be the carrier's.
     @test_throws DimensionMismatch ReturnsResult(; nx = ["A", "B"], X = [0.1 0.2; 0.3 0.4],
@@ -1061,14 +1067,16 @@ end
 end
 
 @testset "The lazy lift checks its bounds on every axis" begin
-    R = PortfolioOptimisers.RepeatedLeading([1.0, 2.0], 3)
+    R = PortfolioOptimisers.RepeatedObservations([1.0, 2.0], 3)
     @test size(R) == (3, 2)
     @test R[3, 2] == 2.0
     @test_throws BoundsError R[4, 1]
     @test_throws BoundsError R[0, 1]
     @test_throws BoundsError R[1, 3]
-    M = PortfolioOptimisers.RepeatedLeading([1 2; 3 4], 2)
-    @test M[2, 2, 1] == 3
+    M = PortfolioOptimisers.RepeatedObservations([1 2; 3 4], 2)
+    @test size(M) == (2, 2, 2)
+    @test M[2, 1, 2] == 3
+    @test_throws BoundsError M[1, 1, 3]
     @test_throws BoundsError M[3, 1, 1]
 end
 
@@ -1102,7 +1110,7 @@ using Statistics, Dates
 
     # Twenty numeric Panel Fields, each with its observed-mask column, then the one-hot
     # industry block.
-    @test size(panel_feature_matrix(rd.pnl)[2]) == (T, N, 43)
+    @test size(panel_feature_matrix(rd.pnl)[2]) == (N, 43, T)
     @test length(panel_feature_matrix(rd.pnl)[1]) == 43
     @test panel_feature_matrix(rd.pnl)[1][1] == "adj_close"
     @test panel_feature_matrix(rd.pnl)[1][2] == "adj_close::observed"
@@ -1141,9 +1149,10 @@ end
     # A cell that is not active carries a `NaN` return and no observed value.
     @test all(isnan, res.rd.X[.!amsk])
     @test all(isfinite, res.rd.X[amsk])
-    obs = panel_feature_matrix(res.rd.pnl)[2][:, :,
-                                              findfirst(==("market_cap::observed"),
-                                                        panel_feature_matrix(res.rd.pnl)[1])]
+    obs = permutedims(panel_feature_matrix(res.rd.pnl)[2][:,
+                                                          findfirst(==("market_cap::observed"),
+                                                                    panel_feature_matrix(res.rd.pnl)[1]),
+                                                          :])
     @test all(iszero, obs[.!amsk])
     @test all(isone, obs[amsk])
 
@@ -1223,9 +1232,10 @@ end
     rd = res.rd
     amsk = rd.pnl.amsk
     obs_share = name -> begin
-        col = panel_feature_matrix(rd.pnl)[2][:, :,
-                                              findfirst(==(name * "::observed"),
-                                                        panel_feature_matrix(rd.pnl)[1])]
+        col = permutedims(panel_feature_matrix(rd.pnl)[2][:,
+                                                          findfirst(==(name * "::observed"),
+                                                                    panel_feature_matrix(rd.pnl)[1]),
+                                                          :])
         return sum(col[amsk]) / sum(amsk)
     end
 
@@ -1241,9 +1251,10 @@ end
     # one, so the observed columns of the unnamed fields are the active mask itself.
     none = synthetic_asset_panel(; n_assets = 6, n_observations = 40, n_industries = 2,
                                  missing_ratio = 0.0, rng = StableRNG(56))
-    ncol = panel_feature_matrix(none.rd.pnl)[2][:, :,
-                                                findfirst(==("sales_ttm::observed"),
-                                                          panel_feature_matrix(none.rd.pnl)[1])]
+    ncol = permutedims(panel_feature_matrix(none.rd.pnl)[2][:,
+                                                            findfirst(==("sales_ttm::observed"),
+                                                                      panel_feature_matrix(none.rd.pnl)[1]),
+                                                            :])
     @test ncol == none.rd.pnl.amsk
 end
 
@@ -1252,9 +1263,10 @@ end
                                 missing_ratio = 0.0, rng = StableRNG(99))
     rd = res.rd
     amsk = rd.pnl.amsk
-    field = name -> panel_feature_matrix(rd.pnl)[2][:, :,
-                                                    findfirst(==(name),
-                                                              panel_feature_matrix(rd.pnl)[1])]
+    field = name -> permutedims(panel_feature_matrix(rd.pnl)[2][:,
+                                                                findfirst(==(name),
+                                                                          panel_feature_matrix(rd.pnl)[1]),
+                                                                :])
 
     # The market capitalisation is the price times the share count, on every active cell.
     mcap = field("market_cap")[amsk]
@@ -1371,9 +1383,11 @@ function panel_929_timevarying()
                                                   codes = [1 2 1; 2 2 1]),
                             TensorPanelField(; name = "beta", axis = "factor",
                                              labels = ["size", "value"],
-                                             vals = reshape(collect(1.0:12.0), 2, 3, 2),
-                                             omsk = reshape(trues(12), 2, 3, 2))],
-                      amsk = amsk, emsk = emsk)
+                                             vals = permutedims(reshape(collect(1.0:12.0),
+                                                                        2, 3, 2),
+                                                                (2, 3, 1)),
+                                             omsk = trues(3, 2, 2))], amsk = amsk,
+                      emsk = emsk)
 end
 @testset "panel_frame_columns, the one place a table and a Feature Matrix differ" begin
     pnl = panel_929_static()
@@ -1754,11 +1768,13 @@ stored type and the two policies.
         tp = AssetPanel(;
                         pf = [TensorPanelField(; name = "b", axis = "factor",
                                                labels = ["x", "y"],
-                                               vals = reshape(collect(1.0:12.0), 3, 2, 2))],
-                        amsk = amsk, emsk = amsk)
+                                               vals = permutedims(reshape(collect(1.0:12.0),
+                                                                          3, 2, 2),
+                                                                  (2, 3, 1)))], amsk = amsk,
+                        emsk = amsk)
         B = panel_field_values(tp, "b"; inactive = NaN)
-        @test size(B) == (3, 2, 2)
-        @test all(isnan, B[1, 2, :])
+        @test size(B) == (2, 2, 3)
+        @test all(isnan, B[2, :, 1])
         @test count(isnan, B) == 2
         @test isequal(B[.!isnan.(B)], tp.pf[1].vals[.!isnan.(B)])
     end
@@ -1813,16 +1829,18 @@ stored type and the two policies.
         @test panel_field_values(pnl, "sector") == [1.0 2.0; 2.0 2.0; 1.0 1.0]
     end
     @testset "A tensor field takes the unobserved policy on one label" begin
-        om = trues(3, 2, 2)
-        om[3, 1, 2] = false
+        om = trues(2, 2, 3)
+        om[1, 2, 3] = false
         tp = AssetPanel(;
                         pf = [TensorPanelField(; name = "b", axis = "factor",
                                                labels = ["x", "y"],
-                                               vals = reshape(collect(1.0:12.0), 3, 2, 2),
-                                               omsk = om)], amsk = amsk, emsk = amsk)
+                                               vals = permutedims(reshape(collect(1.0:12.0),
+                                                                          3, 2, 2),
+                                                                  (2, 3, 1)), omsk = om)],
+                        amsk = amsk, emsk = amsk)
         B = panel_field_values(tp, "b"; inactive = 0)
-        @test B[:, :, 1] == [1.0 0.0; 2.0 5.0; 3.0 6.0]
-        @test isequal(B[:, :, 2], [7.0 0.0; 8.0 11.0; NaN 12.0])
+        @test permutedims(B[:, 1, :]) == [1.0 0.0; 2.0 5.0; 3.0 6.0]
+        @test isequal(permutedims(B[:, 2, :]), [7.0 0.0; 8.0 11.0; NaN 12.0])
     end
 end
 
@@ -1872,9 +1890,13 @@ end
 panel_1399_values(f::CategoricalPanelField) = f.codes
 panel_1399_values(f::PortfolioOptimisers.AbstractPanelField) = f.vals
 # The cells of a Panel Field array where the active mask is true, one entry per trailing label.
-function panel_1399_active(A::AbstractArray, amsk::AbstractMatrix{Bool})
-    return [A[t, k, l...] for l in Iterators.product(axes(A)[3:end]...)
-            for t in axes(A, 1), k in axes(A, 2) if amsk[t, k]]
+function panel_1399_active(A::AbstractVecOrMat, amsk::AbstractMatrix{Bool})
+    return [A[t, k] for t in axes(A, 1), k in axes(A, 2) if amsk[t, k]]
+end
+# A tensor Panel Field holds `assets × labels × observations`.
+function panel_1399_active(A::AbstractArray{<:Any, 3}, amsk::AbstractMatrix{Bool})
+    return [A[k, l, t] for l in axes(A, 2)
+            for t in axes(A, 3), k in axes(A, 1) if amsk[t, k]]
 end
 function panel_1399_equal(p1::AssetPanel, p2::AssetPanel; active_only::Bool = false)
     fs1 = PortfolioOptimisers.each_panel_field(p1)
@@ -1928,10 +1950,13 @@ function panel_1399_timevarying()
                             TensorPanelField(; name = "beta", axis = "factor",
                                              labels = ["size", "value", "mom"],
                                              groups = ["style", "style", "momentum"],
-                                             vals = randn(rng, 4, 3, 3),
-                                             omsk = rand(rng, Bool, 4, 3, 3)),
+                                             vals = permutedims(randn(rng, 4, 3, 3),
+                                                                (2, 3, 1)),
+                                             omsk = permutedims(rand(rng, Bool, 4, 3, 3),
+                                                                (2, 3, 1))),
                             TensorPanelField(; name = "load", axis = "pc", labels = ["pc1"],
-                                             vals = randn(rng, 4, 3, 1))], amsk = amsk,
+                                             vals = permutedims(randn(rng, 4, 3, 1),
+                                                                (2, 3, 1)))], amsk = amsk,
                       emsk = emsk)
 end
 const TS_1399 = Date(2024, 1, 1) .+ Day.(0:3)
@@ -2067,7 +2092,7 @@ end
                                          vals = [10.0 20.0; 11.0 21.0; 12.0 22.0]),
                        CategoricalPanelInput(; name = "sector", vals = ["Fin", "Tech"])];
                       amsk = amsk, emsk = amsk)
-    @test panel_field(pnl, "sector").codes isa PortfolioOptimisers.RepeatedLeading
+    @test panel_field(pnl, "sector").codes isa PortfolioOptimisers.RepeatedObservations
     p2 = panel_1399_trip(pnl)
     @test panel_field(p2, "sector").codes isa Matrix{Int}
     @test panel_1399_equal(pnl, p2)
@@ -2178,7 +2203,7 @@ end
 @testset "asset_panel(df, mf): numeric-looking groups and levels survive CSV (#1735)" begin
     g = AssetPanel(;
                    pf = [TensorPanelField(; name = "b", axis = "f", labels = ["u", "v"],
-                                          groups = ["01", "02"], vals = ones(3, 2, 2)),
+                                          groups = ["01", "02"], vals = ones(2, 2, 3)),
                          CategoricalPanelField(; name = "c", levels = ["2", "1"],
                                                codes = [1 2; 2 1; 1 1])],
                    amsk = trues(3, 2), emsk = trues(3, 2))
@@ -2207,8 +2232,9 @@ end
                                              alg = ForwardPanelFill(; val = "z")),
                        TensorPanelInput(; name = "beta", axis = "factor",
                                         labels = ["u", "v"],
-                                        vals = cat([NaN 1.0; 2.0 3.0; 4.0 5.0],
-                                                   [1.0 NaN; 2.0 3.0; 4.0 5.0]; dims = 3),
+                                        vals = permutedims(cat([NaN 1.0; 2.0 3.0; 4.0 5.0],
+                                                               [1.0 NaN; 2.0 3.0; 4.0 5.0];
+                                                               dims = 3), (2, 3, 1)),
                                         alg = ForwardPanelFill())]; amsk = amsk)
     @test panel_field(pnl, "mcap").pmsk == Bool[1 0; 0 0; 0 0]
     @test panel_field(pnl, "sector").pmsk == Bool[1 0; 0 0; 0 0]

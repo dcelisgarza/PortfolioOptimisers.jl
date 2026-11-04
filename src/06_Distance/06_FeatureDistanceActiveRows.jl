@@ -19,7 +19,7 @@ The active mask marks, for each observation of the window and each asset, whethe
 
 # Validation
 
-  - `size(amsk) == (size(Z, 1), assets)`. Raises a `DimensionMismatch`.
+  - `size(amsk) == (size(Z, 3), assets)`. Raises a `DimensionMismatch`.
 
 # Returns
 
@@ -34,7 +34,7 @@ function active_window(::Nothing, ::Arr3Num, ::Integer)
     return nothing
 end
 function active_window(amsk::AbstractMatrix{Bool}, Z::Arr3Num, dims::Integer)
-    ax = (size(Z, 1), size(Z, dims == 1 ? 2 : 3))
+    ax = (size(Z, 3), size(Z, dims))
     @argcheck(size(amsk) == ax,
               DimensionMismatch("the active mask of a window of time-varying features is observations × assets, so size(amsk) == $(ax) must hold. Got\nsize(amsk) => $(size(amsk))"))
     return all(amsk) ? nothing : amsk
@@ -48,7 +48,7 @@ A collapse reads each asset, or each pair of assets, only at its own readable ro
 
 # Algorithm
 
- 1. Lay the mask `A` out against `Z`, giving `M`. At `dims = 1`, `M` is `A`. At `dims = 2`, `M` is `A` reshaped to `observations × 1 × assets`.
+ 1. Lay the mask `A` out against `Z`, giving `M`. At `dims = 1`, `M` is the transpose of `A` reshaped to `assets × 1 × observations`. At `dims = 2`, it is reshaped to `1 × assets × observations`.
  2. Broadcast `ifelse` over `M` and `Z`. Keep each cell of `Z` where `M` is `true`, and write `zero(eltype(Z))` elsewhere.
 
 # Arguments
@@ -69,7 +69,13 @@ A collapse reads each asset, or each pair of assets, only at its own readable ro
   - [`feature_window`](@ref)
 """
 function blank_unreadable(Z::Arr3Num, A::AbstractMatrix{Bool}, dims::Integer)
-    M = dims == 1 ? A : reshape(A, size(A, 1), 1, size(A, 2))
+    # `A` is `observations × assets`, and the window holds the observations last.
+    At = permutedims(A)
+    M = if dims == 1
+        reshape(At, size(At, 1), 1, size(At, 2))
+    else
+        reshape(At, 1, size(At, 1), size(At, 2))
+    end
     return ifelse.(M, Z, zero(eltype(Z)))
 end
 """
@@ -220,12 +226,12 @@ end
 """
     asset_major(Z::Arr3Num, dims::Integer)
 
-Give a window of time-varying features in the layout `observations × assets × features`, whichever trailing axis `dims` says the assets occupy.
+Give a window of time-varying features in the layout `assets × features × observations`, whichever of the two first axes `dims` says the assets occupy.
 
 # Algorithm
 
  1. At `dims = 1`, return `Z`.
- 2. At `dims = 2`, return a `PermutedDimsArray` of `Z` that swaps its two last axes. It copies nothing.
+ 2. At `dims = 2`, return a `PermutedDimsArray` of `Z` that swaps its two first axes. It copies nothing.
 
 # Arguments
 
@@ -234,14 +240,14 @@ Give a window of time-varying features in the layout `observations × assets × 
 
 # Returns
 
-  - `Zd::AbstractArray{<:Number, 3}`: The window, `observations × assets × features`.
+  - `Zd::AbstractArray{<:Number, 3}`: The window, `assets × features × observations`.
 
 # Related
 
   - [`active_feature_distance`](@ref)
 """
 function asset_major(Z::Arr3Num, dims::Integer)
-    return dims == 1 ? Z : PermutedDimsArray(Z, (1, 3, 2))
+    return dims == 1 ? Z : PermutedDimsArray(Z, (2, 1, 3))
 end
 """
     active_collapse(alg::AbstractCollapseAlgorithm, Zd::Arr3Num, w, A, nx)
@@ -278,7 +284,7 @@ Where:
 # Arguments
 
   - `alg`: The collapse algorithm.
-  - `Zd`: The window, `observations × assets × features`.
+  - `Zd`: The window, `assets × features × observations`.
   - `w`: The resolved observation weights of the window, or `nothing`.
   - `A`: The active mask of the window, `observations × assets`.
   - `nx`: The asset names, or `nothing`.
@@ -302,7 +308,7 @@ function active_collapse(alg::AbstractCollapseAlgorithm, Zd::Arr3Num, w, A, nx)
     i = findall(r -> !(isnothing(w) || sum(active_weights(w, r)) > zero(eltype(w))), rows)
     @argcheck(isempty(i),
               ArgumentError("FeatureDistance collapses each asset over its active rows, and the observation weights of those rows sum to zero for $(feature_asset_labels(nx, i)), so the collapse has no value to read. Give a positive weight to one active row of each asset."))
-    zs = [vec(collapse_features(alg, view(Zd, rows[i], i:i, :), active_weights(w, rows[i])))
+    zs = [vec(collapse_features(alg, view(Zd, i:i, :, rows[i]), active_weights(w, rows[i])))
           for i in axes(A, 2)]
     return permutedims(reduce(hcat, zs))
 end
@@ -560,9 +566,9 @@ function empty_pair_distance!(D::MatNum, fb::FeatureFallback, E::AbstractVector,
     for (i, j) in E
         D[i, j] = D[j, i] = pair_distance(de.metric,
                                           fallback_features(de.alg, view(Zf, i, :),
-                                                            size(Z, 1)),
+                                                            size(Z, 3)),
                                           fallback_features(de.alg, view(Zf, j, :),
-                                                            size(Z, 1)))
+                                                            size(Z, 3)))
     end
     return D
 end
@@ -696,10 +702,10 @@ function active_feature_distance(de::FeatureDistance{<:Any, <:LastObservation},
                                  win::NamedTuple)
     (; Z, dims, A) = win
     if isa(de.alg, LastRow) || all(view(A, size(A, 1), :))
-        return feature_distance(de.metric, view(Z, size(Z, 1), :, :), dims)
+        return feature_distance(de.metric, view(Z, :, :, size(Z, 3)), dims)
     end
     Zd = asset_major(Z, dims)
-    zs = [view(Zd, findlast(view(A, :, i))::Int, i, :) for i in axes(A, 2)]
+    zs = [view(Zd, i, :, findlast(view(A, :, i))::Int) for i in axes(A, 2)]
     return feature_distance(de.metric, permutedims(reduce(hcat, zs)), 1)
 end
 function active_feature_distance(de::FeatureDistance{<:Any, <:AggregateFeatures},
@@ -722,8 +728,8 @@ function active_feature_distance(de::FeatureDistance{<:Any, <:AggregateDistances
     D = zeros(T, N, N)
     S = zeros(T, N, N)
     Dt = Matrix{T}(undef, N, N)
-    for t in axes(Z, 1)
-        Zt = view(Z, t, :, :)
+    for t in axes(Z, 3)
+        Zt = view(Z, :, :, t)
         Distances.pairwise!(metric, Dt, Zt; dims = dims)
         patch_zero_feature_vectors!(Dt, Zt, dims)
         wt = isnothing(w) ? one(T) : T(w[t])

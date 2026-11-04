@@ -270,8 +270,9 @@
         ro = PO.rebuild_returns_result(rdc, preds, PO.FullUniverse(), RenormaliseActive())
         f = PO.panel_field(ro.pnl, "sector")
         @test f isa TensorPanelField
-        @test size(f.vals) == (T, 3, 2)
-        @test all(sum(f.vals; dims = 3) .≈ 1)
+        # `assets × labels × observations` (ADR 0230): the labels of each cell sum to one.
+        @test size(f.vals) == (3, 2, T)
+        @test all(sum(f.vals; dims = 2) .≈ 1)
         # Neither removed method exists: no path gives either of them an argument.
         @test !hasmethod(PO.panel_field_stack, Tuple{Vector{PO.CategoricalPanelField}})
         @test !hasmethod(PO.fold_asset_panel,

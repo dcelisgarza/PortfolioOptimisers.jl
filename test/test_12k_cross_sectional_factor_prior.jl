@@ -88,7 +88,7 @@ function csfp_reconciliation(pr, rd, lag)
     d = 0.0
     n = 0
     for t in (lag + 1):T, i in 1:N
-        v = LinearAlgebra.dot(view(Ms, t - lag, i, :), view(f, t, :)) + eps[t, i]
+        v = LinearAlgebra.dot(view(Ms, i, :, t - lag), view(f, t, :)) + eps[t, i]
         if isfinite(v) && isfinite(X[t, i])
             d = max(d, abs(v - X[t, i]))
             n += 1
@@ -113,7 +113,7 @@ function csfp_zero_sum(rr, f, ind, lag)
         for k in ind
             c = 0.0
             for a in axes(bw, 2)
-                e = Ms[t, a, k]
+                e = Ms[a, k, t]
                 if isfinite(e)
                     c += bw[t, a] * e
                 end
@@ -130,11 +130,11 @@ end
 function csfp_orthogonality(rr, a, b)
     bw, Ms = rr.bw, rr.Ms
     o = 0.0
-    for t in axes(Ms, 1), p in a, q in b
+    for t in axes(Ms, 3), p in a, q in b
         s = 0.0
         for j in axes(bw, 2)
-            x = Ms[t, j, p]
-            y = Ms[t, j, q]
+            x = Ms[j, p, t]
+            y = Ms[j, q, t]
             if isfinite(x) && isfinite(y)
                 s += bw[t, j] * x * y
             end
@@ -385,8 +385,9 @@ end
         # The factor axis keeps the order the caller wrote, whatever order the fit took.
         @test hist.nf == ["size2", "size", "market"]
         @test hist.fam == ["style", "style", "market"]
-        @test size(hist.Ms) == (size(rd.X, 1), size(rd.X, 2), 3)
-        @test isequal(hist.Ms[:, :, 1], factor_exposure(last(f[1]), rdb, hist.Ms[:, :, 2]))
+        @test size(hist.Ms) == (size(rd.X, 2), 3, size(rd.X, 1))
+        @test isequal(permutedims(hist.Ms[:, 1, :]),
+                      factor_exposure(last(f[1]), rdb, permutedims(hist.Ms[:, 2, :])))
     end
     @testset "An unknown source, a self-reference and a cycle are refused" begin
         @test_throws ArgumentError PO.cross_sectional_exposure_order(["a" =>
@@ -414,10 +415,10 @@ end
     @testset "A history that is all warm-up, and a blank market capitalisation" begin
         # Every exposure is NaN, so no observation carries a usable asset and the whole
         # history is warm-up.
-        Ms = fill(NaN, size(rd.X, 1), size(rd.X, 2), 2)
+        Ms = fill(NaN, size(rd.X, 2), 2, size(rd.X, 1))
         @test_throws ArgumentError PO.cross_sectional_warmup(rd.X, Ms, rd.pnl.emsk)
         # The first observation is warm, so the count of leading cold observations is zero.
-        Ms[1, 1, :] .= 0.0
+        Ms[1, :, 1] .= 0.0
         @test iszero(PO.cross_sectional_warmup(rd.X, Ms, rd.pnl.emsk))
         # A pair with no market capitalisation leaves the two weight masks.
         msk = trues(2, 2)
@@ -490,9 +491,9 @@ end
         @test iszero(rr.b)
     end
     @testset "The block carries the fourteen facts of the fit" begin
-        @test size(rr.Ms) == (size(rr.csr.f, 1), size(rd.X, 2), length(rr.nf))
+        @test size(rr.Ms) == (size(rd.X, 2), length(rr.nf), size(rr.csr.f, 1))
         # `isequal`, not `==`: an inactive asset carries a NaN Factor Exposure.
-        @test isequal(rr.Ms[end, :, :], rr.M)
+        @test isequal(rr.Ms[:, :, end], rr.M)
         @test size(rr.vs) == size(rr.rw) == size(rr.bw) == size(rr.csr.eps)
         @test rr.nf ==
               ["market", "industry=Real Estate", "industry=Software", "industry=Banks",
@@ -861,8 +862,8 @@ end
     @test csfp_orthogonality(ctl.rr, sty, ind) > 1e3
     @test csfp_orthogonality(pr.rr, sty, ind) < 1e-8
     # The market and the industry blocks are untouched: only the key's columns are rewritten.
-    @test isequal(pr.rr.Ms[:, :, ind], ctl.rr.Ms[:, :, ind])
-    @test isequal(pr.rr.Ms[:, :, 1], ctl.rr.Ms[:, :, 1])
+    @test isequal(pr.rr.Ms[:, ind, :], ctl.rr.Ms[:, ind, :])
+    @test isequal(pr.rr.Ms[:, 1, :], ctl.rr.Ms[:, 1, :])
 end
 
 @testset "The weight policy, the overlay and the lag" begin
@@ -1444,7 +1445,7 @@ end
         a = Float64[]
         b = Float64[]
         for t in 2:T, i in axes(rr.csr.eps, 2)
-            u = LinearAlgebra.dot(view(rr.Ms, t - 1, i, :), view(pr.fpr.X, t, :))
+            u = LinearAlgebra.dot(view(rr.Ms, i, :, t - 1), view(pr.fpr.X, t, :))
             v = LinearAlgebra.dot(view(truth.B, i, :), view(tf, t, :))
             if isfinite(u) && isfinite(v)
                 push!(a, u)
@@ -1764,26 +1765,26 @@ function csfp_oracle(pe, rd; alpha = nothing)
                                                                                  BW)).Ms
     ell = pe.lag
     ts = (PO.cross_sectional_warmup(X, Z, emsk) + ell + 1):Tn
-    K = size(Z, 3)
+    K = size(Z, 2)
     F = zeros(length(ts), K)
     Q = zeros(length(ts), N)
     for (u, t) in enumerate(ts)
         for i in 1:N
             if emsk[t, i] &&
                isfinite(X[t, i]) &&
-               all(isfinite, view(Z, t - ell, i, :)) &&
+               all(isfinite, view(Z, i, :, t - ell)) &&
                isfinite(mcap[t - ell, i])
                 Q[u, i] = mcap[t - ell, i]^pe.wa.p
             end
         end
         e = findall(>(0), view(Q, u, :))
         s = sqrt.(Q[u, e])
-        F[u, :] = LinearAlgebra.pinv(s .* Z[t - ell, e, :]) * (s .* X[t, e])
+        F[u, :] = LinearAlgebra.pinv(s .* Z[e, :, t - ell]) * (s .* X[t, e])
     end
     fp = prior(pe.pe, F)
     muf = fp.mu
     Sf = fp.sigma
-    ZT = Z[Tn, :, :]
+    ZT = Z[:, :, Tn]
     g = zeros(K)
     b = zeros(N)
     if !isnothing(alpha)
@@ -1938,11 +1939,11 @@ small random arrays, so each check reads one helper alone.
         nT, nN, nK = 12, 7, 3
         X = randn(rng, nT, nN)
         X[rand(rng, nT, nN) .< 0.15] .= NaN
-        Ms = randn(rng, nT, nN, nK)
-        Ms[rand(rng, nT, nN, nK) .< 0.1] .= NaN
-        Ms[1:3, :, 1] .= NaN
+        Ms = permutedims(randn(rng, nT, nN, nK), (2, 3, 1))
+        Ms[permutedims(rand(rng, nT, nN, nK) .< 0.1, (2, 3, 1))] .= NaN
+        Ms[:, 1, 1:3] .= NaN
         emsk = rand(rng, nT, nN) .< 0.8
-        m = [emsk[t, i] && isfinite(X[t, i]) && all(isfinite, Ms[t, i, :])
+        m = [emsk[t, i] && isfinite(X[t, i]) && all(isfinite, Ms[i, :, t])
              for t in 1:nT, i in 1:nN]
         @test PO.cross_sectional_eligible(X, Ms, emsk) == m
         @test PO.cross_sectional_warmup(X, Ms, emsk) ==
@@ -1952,19 +1953,19 @@ small random arrays, so each check reads one helper alone.
         # joins it, so the fit tests the two blocks with no copy. Its own generator keeps the
         # fixtures below unchanged.
         rz = StableRNG(1_970)
-        Zo = randn(rz, nT, nN, 2)
-        Zo[rand(rz, nT, nN, 2) .< 0.1] .= NaN
-        Zo[4, :, 2] .= NaN
-        J = cat(Ms, Zo; dims = 3)
+        Zo = permutedims(randn(rz, nT, nN, 2), (2, 3, 1))
+        Zo[permutedims(rand(rz, nT, nN, 2) .< 0.1, (2, 3, 1))] .= NaN
+        Zo[:, 2, 4] .= NaN
+        J = cat(Ms, Zo; dims = 2)
         @test PO.cross_sectional_finite_exposures(J) ==
-              [all(isfinite, J[t, i, :]) for t in 1:nT, i in 1:nN]
+              [all(isfinite, J[i, :, t]) for t in 1:nT, i in 1:nN]
         @test PO.cross_sectional_eligible(X, Ms, emsk, Zo) ==
               PO.cross_sectional_eligible(X, J, emsk)
         @test PO.cross_sectional_warmup(X, Ms, emsk, Zo) ==
               PO.cross_sectional_warmup(X, J, emsk) >
               PO.cross_sectional_warmup(X, Ms, emsk)
         @test_throws DimensionMismatch PO.cross_sectional_eligible(X, Ms, emsk,
-                                                                   Zo[1:(end - 1), :, :])
+                                                                   Zo[:, :, 1:(end - 1)])
         amsk = rand(rng, nN) .< 0.7
         L = randn(rng, nN, nK)
         L[2, 3] = NaN
@@ -2238,12 +2239,12 @@ end
         end
     end
     rng = StableRNG(1407)
-    Z = randn(rng, 30, 20, 3)
+    Z = permutedims(randn(rng, 30, 20, 3), (2, 3, 1))
     X = randn(rng, 30, 20)
     W = rand(rng, 30, 20)
     # A pair with a non-finite entry must carry a zero weight, or the design check refuses it.
     X[3, 4] = NaN
-    Z[5, 6, 2] = NaN
+    Z[6, 2, 5] = NaN
     W[3, 4] = 0.0
     W[5, 6] = 0.0
     @testset "Both regressions fit every observation alike" begin
@@ -2264,8 +2265,8 @@ end
     @testset "A refusal is the one of the first observation that fails, unwrapped" begin
         # Observations 7 and 12 carry two equal columns, so the refusal names observation 7.
         Zd = copy(Z)
-        Zd[7, :, 3] = Zd[7, :, 2]
-        Zd[12, :, 3] = Zd[12, :, 2]
+        Zd[:, 3, 7] = Zd[:, 2, 7]
+        Zd[:, 3, 12] = Zd[:, 2, 12]
         mk(ex) = CrossSectionalLinearRegression(; alg = RankDeficiencyRefusal(), ex = ex)
         et = csfp_error(() -> cross_sectional_regression(mk(tex), Zd, X, W))
         es = csfp_error(() -> cross_sectional_regression(mk(sex), Zd, X, W))
@@ -2480,17 +2481,17 @@ end
 
 @testset "The exposure history shares one backing with the observed exposures (#1973)" begin
     PO = PortfolioOptimisers
-    Zo = rand(StableRNG(197_301), 4, 3, 2)
+    Zo = permutedims(rand(StableRNG(197_301), 4, 3, 2), (2, 3, 1))
     h = PO.cross_sectional_history_backing(Float64, 4, 3, 5, Zo)
     @test h.Ms isa SubArray && h.Zo isa SubArray
     @test parent(h.Ms) === parent(h.Zo)
-    @test size(h.Ms) == (4, 3, 5)
+    @test size(h.Ms) == (3, 5, 4)
     @test h.Zo == Zo
     # The batch fit joins the rows it fitted, and the join of two views of the backing is a
     # view of it, with no copy.
-    J = PO.cross_sectional_joined_exposures(view(h.Ms, 2:4, :, :), view(h.Zo, 2:4, :, :))
+    J = PO.cross_sectional_joined_exposures(view(h.Ms, :, :, 2:4), view(h.Zo, :, :, 2:4))
     @test parent(J) === parent(h.Ms)
-    @test size(J) == (3, 3, 7)
+    @test size(J) == (3, 7, 3)
     # A backing holds one element type, so observed exposures of another type keep their own
     # array, and the history keeps the type of its returns.
     Zf = Float32.(Zo)
@@ -2498,7 +2499,7 @@ end
     @test hf.Ms isa Array{Float64, 3}
     @test hf.Zo === Zf
     h0 = PO.cross_sectional_history_backing(Float64, 4, 3, 5, nothing)
-    @test h0.Ms isa Array{Float64, 3} && size(h0.Ms) == (4, 3, 5)
+    @test h0.Ms isa Array{Float64, 3} && size(h0.Ms) == (3, 5, 4)
     @test isnothing(h0.Zo)
     @test_throws DimensionMismatch PO.cross_sectional_history_backing(Float64, 5, 3, 5, Zo)
     @test_throws DimensionMismatch PO.cross_sectional_history_backing(Float64, 4, 2, 5, Zf)

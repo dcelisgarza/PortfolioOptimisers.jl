@@ -481,7 +481,7 @@ The predicted method reads an asset mask and one set of loadings, through [`attr
   - `w`: Portfolio weights.
   - `W`: Portfolio weights, or the weight history, `observations × assets`.
   - `M`: Loadings, `assets × factors`.
-  - `B`: Loadings, or the exposure history, `observations × assets × factors`, zero at an inactive pair.
+  - `B`: Loadings, or the exposure history, `assets × factors × observations`, zero at an inactive pair.
 
 # Returns
 
@@ -514,7 +514,7 @@ end
 function attribution_leverage_split(::EntrywiseUnknown, h1::AbstractMatrix{Bool},
                                     W::VecNum_MatNum, B::MatNum_Arr3Num)
     held = falses(size(h1, 2))
-    fac = falses(size(B, ndims(B)))
+    fac = falses(size(B, 2))
     for t in axes(h1, 1)
         wt = attribution_weights(W, t)
         for i in findall(view(h1, t, :) .& .!iszero.(wt))
@@ -673,7 +673,7 @@ function attribution_error_pass(s2::AbstractMatrix, g::MatNum, al::NamedTuple,
     keep = findall(!, red.observed)
     se(v) = s1 * sqrt(max(zero(v), v)) / T
     function obs_covariance(t)
-        ob = attribution_dropped_observation(al.dc, view(red.B, t, :, :),
+        ob = attribution_dropped_observation(al.dc, view(red.B, :, :, t),
                                              unseen_member_change_at(red.P, t), keep,
                                              red.nr, t)
         Vt = attribution_sandwich(ob.B, view(al.rw, t, :), view(s2, t, :), keep)
@@ -683,7 +683,7 @@ function attribution_error_pass(s2::AbstractMatrix, g::MatNum, al::NamedTuple,
     sys = se(sum(LinearAlgebra.dot(view(red.g, t, keep), V[t], view(red.g, t, keep))
                  for t in 1:T))
     Vf = attribution_expand_errors(al.fcb, attribution_scatter(V, keep, red.nr))
-    factor = [se(sum(g[t, k]^2 * Vf[t, k, k] for t in 1:T)) for k in 1:K]
+    factor = [se(sum(g[t, k]^2 * Vf[k, k, t] for t in 1:T)) for k in 1:K]
     for k in cur
         factor[k] = oftype(factor[k], NaN)
     end

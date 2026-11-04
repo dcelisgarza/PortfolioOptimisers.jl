@@ -1156,8 +1156,8 @@ using Dates
     @test PO.float_if_integer(Xi .// 2) isa Matrix{Rational{Int}}
     @test isnothing(PO.float_if_integer(nothing))
     # A lift converts its parent and stays lazy.
-    R = PO.float_if_integer(PO.RepeatedLeading([1, 2], 3))
-    @test R isa PO.RepeatedLeading{Float64}
+    R = PO.float_if_integer(PO.RepeatedObservations([1, 2], 3))
+    @test R isa PO.RepeatedObservations{Float64}
     @test R == [1.0 2.0; 1.0 2.0; 1.0 2.0]
     # `ReturnsResult` converts every returns matrix, and a prior and an optimiser fit the
     # integer input as they fit its float copy.

@@ -122,7 +122,7 @@
     Every file that may call `float_if_integer`, with the count of its calls (#1972).
 
       - The four carriers that a user builds convert integer data at construction: the
-        Panel Fields (and the lazy lift `RepeatedLeading`), `PricesResult` and
+        Panel Fields (and the lazy lift `RepeatedObservations`), `PricesResult` and
         `ReturnsResult`.
       - The price ingestion layer floats an integer price type in `absence_type`.
       - `panel_read_eltype` reads the integer codes of a `CategoricalPanelField`, which a

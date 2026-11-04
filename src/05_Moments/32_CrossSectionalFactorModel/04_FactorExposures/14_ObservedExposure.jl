@@ -13,7 +13,7 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ## `factor_exposure`
 
-  - `factor_exposure(xe::MyObservedExposure, rd::ReturnsResult) -> Array{<:Real}`: The Factor Exposure, `observations × assets` for one factor or `observations × assets × factors` for several, `NaN` wherever the active mask is `false`.
+  - `factor_exposure(xe::MyObservedExposure, rd::ReturnsResult) -> Array{<:Real}`: The Factor Exposure, `observations × assets` for one factor or `assets × factors × observations` for several, `NaN` wherever the active mask is `false`. Earlier releases took several factors as `observations × assets × factors`, and a method written for them must now put the observations last.
 
 ## `observed_series`
 
@@ -161,7 +161,7 @@ Compute the Factor Exposure of an observed factor, through the Exposure Estimato
 function factor_exposure(xe::ObservedExposure, rd::ReturnsResult)::Matrix{<:Real}
     L = factor_exposure(xe.xe, rd)
     @argcheck(ndims(L) == 2,
-              DimensionMismatch("an ObservedExposure reads one column of the Exogenous Series, \"$(xe.series)\", so the member it wraps must give one factor, and a $(nameof(typeof(xe.xe))) gave $(size(L, 3))"))
+              DimensionMismatch("an ObservedExposure reads one column of the Exogenous Series, \"$(xe.series)\", so the member it wraps must give one factor, and a $(nameof(typeof(xe.xe))) gave $(size(L, 2))"))
     return L
 end
 function observed_series(xe::ObservedExposure, ::ReturnsResult)::Vector{String}
@@ -294,7 +294,7 @@ The block is the one [`OneHotExposure`](@ref) gives on the same Panel Field, so 
 
 # Returns
 
-  - `L::Array{<:Real, 3}`: The Factor Exposure, `observations × assets × currencies`, in the level order the Panel Field declares, less the base currency.
+  - `L::Array{<:Real, 3}`: The Factor Exposure, `assets × currencies × observations`, in the level order the Panel Field declares, less the base currency.
 
 # Examples
 
@@ -305,7 +305,7 @@ julia> pnl = asset_panel([CategoricalPanelInput(; name = \"currency\",
 
 julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = zeros(2, 2), pnl = pnl);
 
-julia> factor_exposure(CurrencyExposure(), rd)[1, :, :]
+julia> factor_exposure(CurrencyExposure(), rd)[:, :, 1]
 2×2 Matrix{Float64}:
  0.0  1.0
  1.0  0.0
@@ -315,7 +315,7 @@ julia> PortfolioOptimisers.observed_series(CurrencyExposure(), rd)
  \"EUR\"
  \"USD\"
 
-julia> factor_exposure(CurrencyExposure(; base = \"USD\"), rd)[1, :, :]
+julia> factor_exposure(CurrencyExposure(; base = \"USD\"), rd)[:, :, 1]
 2×1 Matrix{Float64}:
  0.0
  1.0
@@ -332,7 +332,7 @@ function factor_exposure(xe::CurrencyExposure, rd::ReturnsResult)::Array{<:Real,
     B = factor_exposure(OneHotExposure(xe.field, xe.family), rd)
     idx = currency_level_columns(xe, rd)
     # With no base currency every column is kept, so the block is returned with no copy.
-    return length(idx) == size(B, 3) ? B : B[:, :, idx]
+    return length(idx) == size(B, 2) ? B : B[:, idx, :]
 end
 function observed_series(xe::CurrencyExposure, rd::ReturnsResult)::Vector{String}
     return String.(one_hot_field(rd, xe.field).levels[currency_level_columns(xe, rd)])
@@ -545,7 +545,7 @@ The carry fold of a [`CrossSectionalFactorPrior`](@ref) reads the rows that it c
 
 # Returns
 
-  - `cc::Option{<:NamedTuple}`: `nothing`, or `(; Z, R, lv, nf, fam, Xn, xf)`: the exposures `observations × assets × factors` at the last rows of `rd`, or at every row when `n` is `nothing`; the observed returns `observations × factors` over every observation of `rd`; the series names; the factor names; the family labels; the returns net of the first stage that the second stage read, or `nothing` when step 3 derived none; and the Pairs of `obs` with the state of each Descriptor after the rows of the step.
+  - `cc::Option{<:NamedTuple}`: `nothing`, or `(; Z, R, lv, nf, fam, Xn, xf)`: the exposures `assets × factors × observations` at the last rows of `rd`, or at every row when `n` is `nothing`; the observed returns `observations × factors` over every observation of `rd`; the series names; the factor names; the family labels; the returns net of the first stage that the second stage read, or `nothing` when step 3 derived none; and the Pairs of `obs` with the state of each Descriptor after the rows of the step.
 
 # Related
 
@@ -617,7 +617,7 @@ When `n` is an integer, the member folds the rows of the step into its Descripto
 
 # Returns
 
-  - `m::NamedTuple`: `(; Z, lv, nf, fam, xf)`: the exposures `observations × assets × factors`, the series names, the factor names, the family labels, and the Pair `p` with the state of each Descriptor after the rows of the step.
+  - `m::NamedTuple`: `(; Z, lv, nf, fam, xf)`: the exposures `assets × factors × observations`, the series names, the factor names, the family labels, and the Pair `p` with the state of each Descriptor after the rows of the step.
 
 # Related
 
@@ -634,10 +634,10 @@ function cross_sectional_observed_member(p::Pair, rd::ReturnsResult, n::Option{<
     c = descriptor_carry(xe, rd, n)
     Z = cross_sectional_observed_rows(c.xv, rd, n)
     nm, f = exposure_axis_names(String(key), xe, rd)
-    @argcheck(length(sr) == length(nm) == size(Z, 3),
-              DimensionMismatch("the observed factor \"$key\" gives $(size(Z, 3)) exposures and $(length(nm)) names, and names $(length(sr)) series of the Exogenous Series; each factor reads one series"))
+    @argcheck(length(sr) == length(nm) == size(Z, 2),
+              DimensionMismatch("the observed factor \"$key\" gives $(size(Z, 2)) exposures and $(length(nm)) names, and names $(length(sr)) series of the Exogenous Series; each factor reads one series"))
     if !isnothing(Zo)
-        Z = cat(Zo[:, :, cols], Z; dims = 1)
+        Z = cat(Zo[:, cols, :], Z; dims = 3)
     end
     return (; Z = Z, lv = sr, nf = nm, fam = f, xf = key => c.xf)
 end
@@ -663,7 +663,7 @@ The batch fit gives `n = nothing`, and the member reads every row. The carry fol
 
 # Returns
 
-  - `Z::Array{<:Real, 3}`: The exposures, `observations × assets × factors`.
+  - `Z::Array{<:Real, 3}`: The exposures, `assets × factors × observations`.
 
 # Related
 
@@ -673,13 +673,14 @@ The batch fit gives `n = nothing`, and the member reads every row. The carry fol
 function cross_sectional_observed_rows(xe::AbstractObservedExposureEstimator,
                                        rd::ReturnsResult, ::Nothing)::Array{<:Real, 3}
     A = factor_exposure(xe, rd)
-    return ndims(A) == 2 ? reshape(A, size(A, 1), size(A, 2), 1) : A
+    # A member of one factor gives `observations × assets`, as the returns are.
+    return ndims(A) == 2 ? reshape(permutedims(A), size(A, 2), 1, size(A, 1)) : A
 end
 function cross_sectional_observed_rows(xe::AbstractObservedExposureEstimator,
                                        rd::ReturnsResult, n::Integer)::Array{<:Real, 3}
     (; rdi, k) = cross_sectional_exposure_rows(xe, rd, n)
     A = cross_sectional_observed_rows(xe, rdi, nothing)
-    return k == n ? A : A[(k - n + 1):k, :, :]
+    return k == n ? A : A[:, :, (k - n + 1):k]
 end
 """
     cross_sectional_observed_carry(cc::Nothing, Xl, n::Integer, lag::Integer) -> NamedTuple
@@ -712,9 +713,9 @@ function cross_sectional_observed_carry(::Nothing, ::Any, ::Integer, ::Integer)
 end
 function cross_sectional_observed_carry(cc::NamedTuple, Xl::MatNum, n::Integer,
                                         lag::Integer)
-    T = size(cc.Z, 1)
-    return (; Zn = cc.Z[(T - n + 1):T, :, :],
-            der = (; Xn = cc.Xn, Xl = Xl, Zo = cc.Z[(T - min(lag, T) + 1):T, :, :]))
+    T = size(cc.Z, 3)
+    return (; Zn = cc.Z[:, :, (T - n + 1):T],
+            der = (; Xn = cc.Xn, Xl = Xl, Zo = cc.Z[:, :, (T - min(lag, T) + 1):T]))
 end
 """
     cross_sectional_observed_stack(ms::AbstractVector, rd::ReturnsResult) -> NamedTuple
@@ -725,7 +726,7 @@ The function selects the columns of the series from `rd.E` and ignores every oth
 
 # Arguments
 
-  - `ms`: One NamedTuple `(; Z, lv, nf, fam)` for each member: its exposures `observations × assets × factors`, its series names, its factor names and its family labels.
+  - `ms`: One NamedTuple `(; Z, lv, nf, fam)` for each member: its exposures `assets × factors × observations`, its series names, its factor names and its family labels.
   - $(arg_dict[:rd]) It carries the Exogenous Series.
 
 # Validation
@@ -735,7 +736,7 @@ The function selects the columns of the series from `rd.E` and ignores every oth
 
 # Returns
 
-  - `cc::NamedTuple`: `(; Z, R, lv, nf, fam)`: the exposures `observations × assets × factors`, the observed returns `observations × factors` over every observation of `rd`, the series names, the factor names and the family labels, in the order of `ms`.
+  - `cc::NamedTuple`: `(; Z, R, lv, nf, fam)`: the exposures `assets × factors × observations`, the observed returns `observations × factors` over every observation of `rd`, the series names, the factor names and the family labels, in the order of `ms`.
 
 # Related
 
@@ -757,7 +758,7 @@ function cross_sectional_observed_stack(ms::AbstractVector, rd::ReturnsResult)
     miss = unique(lv[isnothing.(j)])
     @argcheck(isempty(miss),
               ArgumentError("the observed factors read their returns from the columns of the Exogenous Series with these names, and rd.ne has no column for $miss. Every series needs a column, even one no asset loads on, because its factor enters the factor covariance. Got rd.ne => $(rd.ne)"))
-    return (; Z = reduce((a, b) -> cat(a, b; dims = 3), [m.Z for m in ms]),
+    return (; Z = reduce((a, b) -> cat(a, b; dims = 2), [m.Z for m in ms]),
             R = rd.E[:, Int.(j)], lv = lv, nf = nf, fam = fam)
 end
 """
@@ -841,12 +842,12 @@ function cross_sectional_local_returns(::Nothing, cc::NamedTuple, X::MatNum,
     k = size(K, 1)
     Xl[1:k, :] .= K
     # On the carry fold `Z` holds the last rows of `X` alone.
-    zo = size(X, 1) - size(Z, 1)
+    zo = size(X, 1) - size(Z, 3)
     for t in (k + 1):size(X, 1), i in axes(X, 2)
         x = X[t, i]
         s = g0 + t > lag ? t - lag : t
-        for c in axes(Z, 3)
-            z = Z[s - zo, i, c]
+        for c in axes(Z, 2)
+            z = Z[i, c, s - zo]
             if !iszero(z)
                 x -= z * R[t, c]
             end
@@ -881,7 +882,7 @@ A `NaN` marks a gap, such as a series that starts after the first fitted observa
 
 # Returns
 
-  - `cb::Option{<:NamedTuple}`: `nothing`, or `(; R, Zr, Zt, nf, fam)`: the observed returns of the fitted observations, the exposures of the fitted observations as a view of `cc.Z`, those of the latest observation, the factor names and the family labels.
+  - `cb::Option{<:NamedTuple}`: `nothing`, or `(; R, Zr, Zt, nf, fam)`: the observed returns of the fitted observations, the exposures of the fitted observations and those of the latest observation as views of `cc.Z`, the factor names and the family labels.
 
 # Related
 
@@ -900,8 +901,8 @@ function cross_sectional_observed_block(cc::NamedTuple, rw, r, o::Integer = 0)
         t = findfirst(t -> any(isinf, view(R, t, :)), axes(R, 1))
         throw(IsNonFiniteError("the observed factor returns must not be infinite on an observation the fit reads, and the series $(unique(cc.lv[bad])) are, first at observation $(o + rows[t]) of the returns data. A NaN marks a gap and is accepted."))
     end
-    return (; R = R, Zr = view(cc.Z, rows, :, :), Zt = cc.Z[rows[end], :, :], nf = cc.nf,
-            fam = cc.fam)
+    return (; R = R, Zr = view(cc.Z, :, :, rows), Zt = view(cc.Z, :, :, rows[end]),
+            nf = cc.nf, fam = cc.fam)
 end
 """
     cross_sectional_observed_gap(cb::Nothing, t::Integer) -> String
@@ -949,7 +950,7 @@ The regression runs on the estimated exposures alone. This function puts the obs
   - `cb`: The observed factors of the fitted observations, from [`cross_sectional_observed_block`](@ref), or `nothing`.
   - `f`: The estimated factor returns on the reduced axis, `observations × factors`.
   - `L`: The estimated loadings of the latest observation on the reduced axis, `assets × factors`.
-  - `Ms`: The exposure history of the fitted observations on the raw axis, `observations × assets × factors`.
+  - `Ms`: The exposure history of the fitted observations on the raw axis, `assets × factors × observations`.
   - `nf`: Name of each raw factor.
   - `fam`: Family label of each raw factor.
   - `fcb`: The Factor Family Basis over the post-warm-up observations, or `nothing`.
@@ -991,7 +992,7 @@ The carry fold keeps the two histories as views of one backing, whose factor axi
 
 # Arguments
 
-  - `Ms`: The exposure history of the estimated factors, `observations × assets × factors`.
+  - `Ms`: The exposure history of the estimated factors, `assets × factors × observations`.
   - `Zo`: The exposure history of the observed factors over the same observations and assets.
 
 # Returns
@@ -1005,20 +1006,20 @@ The carry fold keeps the two histories as views of one backing, whose factor axi
 """
 function cross_sectional_joined_exposures(Ms::AbstractArray{<:Any, 3},
                                           Zo::AbstractArray{<:Any, 3})
-    return cat(Ms, Zo; dims = 3)
+    return cat(Ms, Zo; dims = 2)
 end
 function cross_sectional_joined_exposures(Ms::SubArray{<:Any, 3}, Zo::SubArray{<:Any, 3})
     P = parent(Ms)
     i, j = parentindices(Ms), parentindices(Zo)
-    K = size(Ms, 3)
+    K = size(Ms, 2)
     return if P === parent(Zo) &&
               i[1] == j[1] &&
-              i[2] == j[2] &&
-              i[3] == 1:K &&
-              j[3] == (K + 1):size(P, 3)
-        view(P, i[1], i[2], :)
+              i[3] == j[3] &&
+              i[2] == 1:K &&
+              j[2] == (K + 1):size(P, 2)
+        view(P, i[1], :, i[3])
     else
-        cat(Ms, Zo; dims = 3)
+        cat(Ms, Zo; dims = 2)
     end
 end
 

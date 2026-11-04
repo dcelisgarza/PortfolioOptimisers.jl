@@ -303,7 +303,7 @@ end
         st2, st4 = s[2].pe.cache, s[4].pe.cache
         @test st4.Ms isa SubArray && parent(st4.Ms) === parent(st2.Ms)
         @test parent(st4.csr.f) === parent(st2.csr.f) && parent(st4.vs) === parent(st2.vs)
-        @test size(st2.Ms, 1) + 2 == size(st4.Ms, 1)
+        @test size(st2.Ms, 3) + 2 == size(st4.Ms, 3)
         # An earlier estimator reads its own rows after a later step. The factor prior folds
         # in place, so its moments read the later state, and the rows are compared alone.
         function rows_agree(x, b)
@@ -335,7 +335,7 @@ end
         st2, st4 = s[2].pe.cache, s[4].pe.cache
         P = parent(st4.Ms)
         @test P === parent(st4.obs.Z) && P === parent(st2.Ms)
-        @test size(P, 3) == size(st4.Ms, 3) + size(st4.obs.Z, 3)
+        @test size(P, 2) == size(st4.Ms, 2) + size(st4.obs.Z, 2)
         @test parent(s[4].pr.rr.Ms) === P
         @test all(k -> agrees(s[k].pr, batch(pe, k, rd, e)), 1:4)
         # A copy keeps the two histories in one backing, and shares no array with the state.
@@ -386,8 +386,8 @@ end
             end
             st = last(s).pe.cache
             @test size(st.win.X, 1) == L + lag
-            @test size(st.der.Zo) == (lag, N, size(st.obs.Z, 3))
-            @test isequal(st.der.Zo, st.obs.Z[(end - lag + 1):end, :, :])
+            @test size(st.der.Zo) == (N, size(st.obs.Z, 2), lag)
+            @test isequal(st.der.Zo, st.obs.Z[:, :, (end - lag + 1):end])
             # The state keeps the folded member at its place in the factor list.
             @test [first(p) for p in st.xf] == [first(p) for p in pe.factors]
             if L == 1

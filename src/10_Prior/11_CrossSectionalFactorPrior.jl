@@ -968,7 +968,7 @@ function cross_sectional_assemble(pe::CrossSectionalFactorPrior, f_pr::NamedTupl
     L = ca.L
     Msr = ca.Ms
     Tb = promote_type(real(eltype(L)), real(eltype(f_pr.mu)))
-    csfm = CrossSectionalFactorModel(; M = Msr[end, :, :],
+    csfm = CrossSectionalFactorModel(; M = view(Msr, :, :, size(Msr, 3)),
                                      L = cross_sectional_reduced_loadings(fnow, L),
                                      b = zeros(Tb, size(Xo, 2)), csr = csr, Ms = Msr,
                                      vs = vs, esigma = esigma, edof = edof, ediv = ediv,
@@ -1122,7 +1122,7 @@ Where:
 # Arguments
 
   - `X`: Asset returns, `observations × assets`.
-  - `Ms`: The exposure history, `observations × assets × factors`.
+  - `Ms`: The exposure history, `assets × factors × observations`.
   - `emsk`: The estimation mask, `observations × assets`.
   - `Zo`: The exposure history of the observed factors, on the axes of `Ms`, or `nothing`. Its factors join the factors of the definition beside those of `Ms`, so a caller that holds the two histories apart does not join them to test them.
 
@@ -1603,7 +1603,7 @@ function cross_sectional_pinned_families(pe::CrossSectionalFactorPrior)
         return nothing
     end
     # The choice reads `Ms` through `Msw` alone, so the Neutralisation can write into it (#1973).
-    Msw = view(Ms, rw, :, :)
+    Msw = view(Ms, :, :, rw)
     bww = BW[rw, :]
     cross_sectional_neutralise!(cut.neutralise, Msw, cut.cre, bww, nf, fam)
     return cross_sectional_dropped_names(pe.families,
@@ -1798,7 +1798,7 @@ The method with `lv` regresses on the factors that a caller marks. The carry fol
 # Arguments
 
   - `cre`: Cross-sectional regression estimator.
-  - `Z`: Exposure tensor `observations × assets × factors`.
+  - `Z`: Exposure tensor `assets × factors × observations`.
   - `X`: Asset returns matrix `observations × assets`.
   - `W`: Cross-sectional weights matrix `observations × assets`.
   - `lv`: `true` at each factor to regress on.
@@ -1824,7 +1824,7 @@ function cross_sectional_live_regression(cre::AbstractCrossSectionalRegressionEs
                                          Z::Arr3Num, X::MatNum, W::MatNum)
     lv = cross_sectional_live_factors(Z, X, W)
     @argcheck(any(lv),
-              ArgumentError("every one of the $(size(Z, 3)) factors is empty: no factor has a nonzero exposure at an (observation, asset) pair of positive weight, so the regression has nothing to fit. Widen the eligible cross-section, or give factors that the assets load on."))
+              ArgumentError("every one of the $(size(Z, 2)) factors is empty: no factor has a nonzero exposure at an (observation, asset) pair of positive weight, so the regression has nothing to fit. Widen the eligible cross-section, or give factors that the assets load on."))
     return cross_sectional_live_regression(cre, Z, X, W, lv)
 end
 function cross_sectional_live_regression(cre::AbstractCrossSectionalRegressionEstimator,
@@ -1834,8 +1834,8 @@ function cross_sectional_live_regression(cre::AbstractCrossSectionalRegressionEs
         csr = cross_sectional_block_regression(cre, Z, X, W, t0)
         return (; csr = rebuild_estimator(csr, (; lv = lv)), lv = lv)
     end
-    csl = cross_sectional_block_regression(cre, Z[:, :, lv], X, W, t0)
-    f = zeros(eltype(csl.f), size(csl.f, 1), size(Z, 3))
+    csl = cross_sectional_block_regression(cre, Z[:, lv, :], X, W, t0)
+    f = zeros(eltype(csl.f), size(csl.f, 1), size(Z, 2))
     f[:, lv] = csl.f
     return (;
             csr = CrossSectionalRegression(; f = f, eps = csl.eps, n = csl.n,
@@ -1889,7 +1889,7 @@ A factor is empty when its exposure is zero at every (observation, asset) pair o
 
 # Arguments
 
-  - `Z`: Exposure tensor `observations × assets × factors`.
+  - `Z`: Exposure tensor `assets × factors × observations`.
   - `X`: Asset returns matrix `observations × assets`.
   - `W`: Cross-sectional weights matrix `observations × assets`.
 
@@ -1908,7 +1908,7 @@ A factor is empty when its exposure is zero at every (observation, asset) pair o
 """
 function cross_sectional_live_factors(Z::Arr3Num, X::MatNum, W::MatNum)::BitVector
     act = findall(cross_sectional_design_mask(Z, X, W))
-    return BitVector([any(c -> !iszero(Z[c[1], c[2], k]), act) for k in axes(Z, 3)])
+    return BitVector([any(c -> !iszero(Z[c[2], k, c[1]]), act) for k in axes(Z, 2)])
 end
 function lookback(pe::CrossSectionalFactorPrior)::Option{<:Integer}
     return cross_sectional_lookback(pe, lookback(map(last, pe.factors)), lookback)

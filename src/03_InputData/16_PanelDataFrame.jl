@@ -7,7 +7,7 @@ Return the table columns one Panel Field contributes to a [`panel_dataframe`](@r
 
 A column is the tuple `(name, vals, omsk, pmsk)`. `name` is the column name, `vals` is the slab of values over the axes of the panel, `omsk` is the slab of the observed mask, or `nothing` when the Panel Field carries no observed mask, and `pmsk` is the slab of the placeholder mask, or `nothing` when the Panel Field holds no placeholder. Every slab is `assets` on a static panel and `observations × assets` on a time-varying one, so [`panel_array_view`](@ref) slices each of them by asset.
 
-A table and a Feature Matrix give a categorical Panel Field a different number of columns. A Feature Matrix holds numbers, so it gives the Panel Field one indicator column per level. A table column can hold a string, so it gives the Panel Field one column that holds the level. A tensor Panel Field gets the same columns in both, one column per trailing-axis label under the `"<field>=<label>"` name that [`panel_field_labels`](@ref) gives it. A table has two axes, and the labels are a third axis, so each label becomes a column.
+A table and a Feature Matrix give a categorical Panel Field a different number of columns. A Feature Matrix holds numbers, so it gives the Panel Field one indicator column per level. A table column can hold a string, so it gives the Panel Field one column that holds the level. A tensor Panel Field gets the same columns in both, one column per label-axis label under the `"<field>=<label>"` name that [`panel_field_labels`](@ref) gives it. A table has two axes, and the labels are a third axis, so each label becomes a column.
 
 # Algorithm
 
@@ -15,7 +15,7 @@ The method that Julia selects is the algorithm.
 
  1. [`NumericPanelField`](@ref): one column with the name of the Panel Field, which holds its values.
  2. [`CategoricalPanelField`](@ref): one column with the name of the Panel Field. It holds the level that each code names when `decode` is `true`, and the codes when `decode` is `false`.
- 3. [`TensorPanelField`](@ref): one column per trailing-axis label, named `"<field>=<label>"`, which holds the slice of that label.
+ 3. [`TensorPanelField`](@ref): one column per label-axis label, named `"<field>=<label>"`, which holds the slice of that label, transposed to the axes of the panel with [`panel_column_transpose`](@ref).
 
 # Arguments
 
@@ -41,12 +41,10 @@ function panel_frame_columns(f::CategoricalPanelField, decode::Bool)
     return Tuple{String, Any, Any, Any}[(String(f.name), vals, f.omsk, f.pmsk)]
 end
 function panel_frame_columns(f::TensorPanelField, ::Bool)
-    d = ndims(f.vals)
-    omsk, pmsk = f.omsk, f.pmsk
-    return Tuple{String, Any, Any, Any}[("$(f.name)=$(f.labels[l])",
-                                         selectdim(f.vals, d, l),
-                                         isnothing(omsk) ? nothing : selectdim(omsk, d, l),
-                                         isnothing(pmsk) ? nothing : selectdim(pmsk, d, l))
+    # A label slice is `assets` or `assets × observations`, and a slab is the transpose.
+    slab(A, l) = panel_column_transpose(panel_tensor_view(A, :, :, l))
+    return Tuple{String, Any, Any, Any}[("$(f.name)=$(f.labels[l])", slab(f.vals, l),
+                                         slab(f.omsk, l), slab(f.pmsk, l))
                                         for l in eachindex(f.labels)]
 end
 """
@@ -147,7 +145,7 @@ end
 
 Add one column to a table that [`panel_dataframe`](@ref) writes, and refuse a column name that the table already holds.
 
-A Panel Field name, a trailing-axis label and an asset name are free text, so two columns can get the same name. For example, a Panel Field named `"asset"` gets the name of the asset key of the long layout, and a numeric Panel Field named `"beta=size"` gets the name of the `"size"` column of a tensor Panel Field `"beta"`. `df[!, name] = v` replaces a column with the same name and raises no error, so the table loses a column. This function raises an error in its place.
+A Panel Field name, a label-axis label and an asset name are free text, so two columns can get the same name. For example, a Panel Field named `"asset"` gets the name of the asset key of the long layout, and a numeric Panel Field named `"beta=size"` gets the name of the `"size"` column of a tensor Panel Field `"beta"`. `df[!, name] = v` replaces a column with the same name and raises no error, so the table loses a column. This function raises an error in its place.
 
 The table gets a copy of `v`. A slab can be the array of a Panel Field or a view of it, so without the copy a change to a cell of the table changes the panel.
 
@@ -181,7 +179,7 @@ The table gets a copy of `v`. A slab can be the array of a Panel Field or a view
 function panel_frame_column!(df::DataFrames.DataFrame, name::AbstractString,
                              v::AbstractVector)::Nothing
     @argcheck(iszero(DataFrames.columnindex(df, name)),
-              ArgumentError("the table already holds a column named \"$name\", and a second column with this name replaces the first. A Panel Field name, a trailing-axis label or an asset name gives this name to two columns. Rename the Panel Field or the asset, or leave one of them out with `fields` or `assets`."))
+              ArgumentError("the table already holds a column named \"$name\", and a second column with this name replaces the first. A Panel Field name, a label-axis label or an asset name gives this name to two columns. Rename the Panel Field or the asset, or leave one of them out with `fields` or `assets`."))
     df[:, name] = v
     return nothing
 end
@@ -246,7 +244,7 @@ Write one Panel Field as a table with one row per observation and one column per
 
 A [`panel_dataframe`](@ref) call that names one Panel Field returns this table. The values of a numeric or a categorical Panel Field are `observations × assets`, which is the shape of the table, so the table needs no asset key and no layout. It holds no universe mask and no observed mask. A static panel has no observation axis, so its table has one row.
 
-This function refuses a [`TensorPanelField`](@ref). Its values are `observations × assets × labels`, and a table with one column per asset has no place for the labels. The long and the wide layouts hold it, with one column per label.
+This function refuses a [`TensorPanelField`](@ref). Its values are `assets × labels × observations`, and a table with one column per asset has no place for the labels. The long and the wide layouts hold it, with one column per label.
 
 # Algorithm
 
@@ -496,7 +494,7 @@ The table has one of three shapes:
   - `layout = :long`: [`panel_frame_long`](@ref) gives one row per pair of observation and asset in the universe. Each Panel Field column is one table column.
   - `layout = :wide`: [`panel_frame_wide`](@ref) gives one row per observation and one column per pair of Panel Field column and asset. It keeps every cell and both universe masks.
 
-In both layouts a tensor Panel Field gives one column per trailing-axis label, with the `"<field>=<label>"` name that the label has in a Feature Matrix.
+In both layouts a tensor Panel Field gives one column per label-axis label, with the `"<field>=<label>"` name that the label has in a Feature Matrix.
 
 # Algorithm
 

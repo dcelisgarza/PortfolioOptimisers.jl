@@ -468,8 +468,8 @@
             Z = randn(rng, 6, 4)
             @test isapprox(DS.pairwise(AngularDist(), Float32.(Z); dims = 1),
                            DS.pairwise(AngularDist(), Z; dims = 1); atol = 1e-5)
-            Z3 = rand(rng, Float32, 5, 4, 3)
-            @test eltype(distance(FeatureDistance(), Z3[end, :, :])) === Float32
+            Z3 = permutedims(rand(rng, Float32, 5, 4, 3), (2, 3, 1))
+            @test eltype(distance(FeatureDistance(), Z3[:, :, end])) === Float32
             for alg in
                 (LastRow(), AggregateFeatures(), AggregateDistances(), StackObservations(),
                  AggregateFeatures(; alg = MedianCollapse()))
@@ -532,7 +532,7 @@
             @test iszero(De[2, 3])
         end
         @testset "Collapse algorithms" begin
-            Z3 = abs.(randn(rng, 6, 5, 4))
+            Z3 = permutedims(abs.(randn(rng, 6, 5, 4)), (2, 3, 1))
             algs = (LastRow(), AggregateFeatures(), AggregateDistances(),
                     StackObservations(), AggregateFeatures(; alg = MedianCollapse()))
             Ds = [distance(FeatureDistance(; alg = alg), Z3) for alg in algs]
@@ -548,36 +548,36 @@
                 @test !isapprox(Ds[i], Ds[j])
             end
             # `LastObservation` discards the window.
-            @test Ds[1] == distance(FeatureDistance(), Z3[6, :, :])
-            # `dims = 2` swaps the two trailing axes, for every rule.
-            Z3p = permutedims(Z3, (1, 3, 2))
+            @test Ds[1] == distance(FeatureDistance(), Z3[:, :, 6])
+            # `dims = 2` swaps the asset and the feature axes, for every rule.
+            Z3p = permutedims(Z3, (2, 1, 3))
             for (alg, D) in zip(algs, Ds)
                 @test isapprox(distance(FeatureDistance(; alg = alg), Z3p; dims = 2), D)
             end
             # At T == 1 there is nothing to collapse, so all four agree exactly.
-            Z1 = Z3[6:6, :, :]
+            Z1 = Z3[:, :, 6:6]
             D1 = [distance(FeatureDistance(; alg = alg), Z1) for alg in algs]
             @test all(D -> D == D1[1], D1)
             @test D1[1] == Ds[1]
             # `AggregateDistances` applies the zero-feature convention per observation, so
             # an asset that is zero at *some* observations differs from the stacked form.
-            Zs = zeros(2, 3, 2)
-            Zs[1, :, :] = [1.0 0.0; 0.0 0.0; 0.0 1.0]
-            Zs[2, :, :] = [1.0 1.0; 1.0 0.0; 1.0 0.0]
+            Zs = zeros(3, 2, 2)
+            Zs[:, :, 1] = [1.0 0.0; 0.0 0.0; 0.0 1.0]
+            Zs[:, :, 2] = [1.0 1.0; 1.0 0.0; 1.0 0.0]
             @test !isapprox(distance(FeatureDistance(; alg = StackObservations()), Zs),
                             distance(FeatureDistance(; alg = AggregateDistances()), Zs))
             # A median of distance matrices is not a metric, so it is rejected outright.
             @test_throws ArgumentError AggregateDistances(; alg = MedianCollapse())
             @test AggregateFeatures(; alg = MedianCollapse()).alg === MedianCollapse()
             # The 2-D method never consults `alg`.
-            Z2 = Z3[6, :, :]
+            Z2 = Z3[:, :, 6]
             for alg in algs
                 @test distance(FeatureDistance(; alg = alg), Z2) ==
                       distance(FeatureDistance(), Z2)
             end
         end
         @testset "Observation weights" begin
-            Z3 = abs.(randn(rng, 6, 5, 4))
+            Z3 = permutedims(abs.(randn(rng, 6, 5, 4)), (2, 3, 1))
             w = pweights([1.0, 1, 1, 1, 1, 5])
             pairs = [(AggregateFeatures(), AggregateFeatures(; w = w)),
                      (AggregateDistances(), AggregateDistances(; w = w)),
@@ -660,28 +660,28 @@
             array hides a permuted axis. `Euclidean` is non-linear in the features, so
             `AggregateFeatures` and `AggregateDistances` cannot agree by accident.
             =#
-            Zc = abs.(randn(rng, 4, 5, 3)) .+ 0.1
+            Zc = permutedims(abs.(randn(rng, 4, 5, 3)) .+ 0.1, (2, 3, 1))
             metric = DS.Euclidean()
             de(alg) = FeatureDistance(; metric = metric, alg = alg)
             # `LastRow` takes the last slice of the observation axis.
             @test isapprox(distance(de(LastRow()), Zc),
-                           DS.pairwise(metric, Zc[4, :, :]; dims = 1))
+                           DS.pairwise(metric, Zc[:, :, 4]; dims = 1))
             # `AggregateFeatures` collapses the features, then measures once.
-            Zm = [mean(Zc[:, j, k]) for j in 1:5, k in 1:3]
+            Zm = [mean(Zc[j, k, :]) for j in 1:5, k in 1:3]
             @test isapprox(distance(de(AggregateFeatures()), Zc),
                            DS.pairwise(metric, Zm; dims = 1))
-            Zmed = [median(Zc[:, j, k]) for j in 1:5, k in 1:3]
+            Zmed = [median(Zc[j, k, :]) for j in 1:5, k in 1:3]
             @test isapprox(distance(de(AggregateFeatures(; alg = MedianCollapse())), Zc),
                            DS.pairwise(metric, Zmed; dims = 1))
             # `AggregateDistances` measures every observation, then collapses the matrices.
-            Dad = mean([DS.pairwise(metric, Zc[t, :, :]; dims = 1) for t in 1:4])
+            Dad = mean([DS.pairwise(metric, Zc[:, :, t]; dims = 1) for t in 1:4])
             @test isapprox(distance(de(AggregateDistances()), Zc), Dad)
             # `StackObservations` concatenates the window into one vector per asset.
             Zst = PortfolioOptimisers.stack_observations(Zc, 1)
             @test size(Zst) == (5, 12)
             Zst_hand = Matrix{Float64}(undef, 5, 12)
             for j in 1:5
-                Zst_hand[j, :] = vec(permutedims(Zc, (2, 1, 3))[j, :, :])
+                Zst_hand[j, :] = vec(permutedims(Zc[j, :, :]))
             end
             @test Zst == Zst_hand
             @test isapprox(distance(de(StackObservations()), Zc),
@@ -689,8 +689,9 @@
             # The two aggregations differ in *what* they aggregate, so on a non-linear
             # metric they must give different answers.
             @test !isapprox(distance(de(AggregateFeatures()), Zc), Dad)
-            # `dims = 2` swaps the two trailing axes, for every rule and both kernels.
-            Zp = permutedims(Zc, (1, 3, 2))
+            # `dims = 2` swaps the asset and the feature axes, for every rule and both
+            # kernels.
+            Zp = permutedims(Zc, (2, 1, 3))
             @test size(PortfolioOptimisers.stack_observations(Zp, 2)) == (5, 12)
             for alg in
                 (LastRow(), AggregateFeatures(), AggregateDistances(), StackObservations(),
@@ -699,16 +700,16 @@
             end
         end
         @testset "The weighted collapses, and the weighted median interpolates" begin
-            Zc = abs.(randn(rng, 4, 5, 3)) .+ 0.1
+            Zc = permutedims(abs.(randn(rng, 4, 5, 3)) .+ 0.1, (2, 3, 1))
             metric = DS.Euclidean()
             wc = pweights([1.0, 2.0, 3.0, 4.0])
             # The weighted mean is the convex combination the docstring states.
-            Zm = [sum(wc .* Zc[:, j, k]) / sum(wc) for j in 1:5, k in 1:3]
+            Zm = [sum(wc .* Zc[j, k, :]) / sum(wc) for j in 1:5, k in 1:3]
             @test isapprox(distance(FeatureDistance(; metric = metric,
                                                     alg = AggregateFeatures(; w = wc)), Zc),
                            DS.pairwise(metric, Zm; dims = 1))
             # `AggregateDistances` weights the matrices and divides by the weight total.
-            Dad = sum(wc[t] .* DS.pairwise(metric, Zc[t, :, :]; dims = 1) for t in 1:4) ./
+            Dad = sum(wc[t] .* DS.pairwise(metric, Zc[:, :, t]; dims = 1) for t in 1:4) ./
                   sum(wc)
             @test isapprox(distance(FeatureDistance(; metric = metric,
                                                     alg = AggregateDistances(; w = wc)),
@@ -718,7 +719,7 @@
             so a weighted median need not be an element of the window. Check the collapse
             against that function rather than against a value of `v`.
             =#
-            Zmed = [median(Zc[:, j, k], wc) for j in 1:5, k in 1:3]
+            Zmed = [median(Zc[j, k, :], wc) for j in 1:5, k in 1:3]
             @test isapprox(distance(FeatureDistance(; metric = metric,
                                                     alg = AggregateFeatures(; w = wc,
                                                                             alg = MedianCollapse())),
@@ -742,7 +743,7 @@
         @testset "The estimator is not mutated by a call" begin
             # An in-place broadcast on a weight field has written into an estimator in this
             # library before, so the whole configuration is compared before and after.
-            Zc = abs.(randn(rng, 4, 5, 3)) .+ 0.1
+            Zc = permutedims(abs.(randn(rng, 4, 5, 3)) .+ 0.1, (2, 3, 1))
             wc = pweights([1.0, 2.0, 3.0, 4.0])
             for alg in (AggregateFeatures(; w = wc), AggregateDistances(; w = wc),
                         AggregateFeatures(; w = wc, alg = MedianCollapse()))
@@ -761,8 +762,8 @@
             @test Zc == Zk
         end
         @testset "cor_and_dist carries the distance this call produced" begin
-            Zc = abs.(randn(rng, 4, 5, 3)) .+ 0.1
-            for Zin in (Zc[4, :, :], Zc)
+            Zc = permutedims(abs.(randn(rng, 4, 5, 3)) .+ 0.1, (2, 3, 1))
+            for Zin in (Zc[:, :, 4], Zc)
                 for alg in (LastRow(), AggregateFeatures(), AggregateDistances(),
                             StackObservations())
                     fde = FeatureDistance(; alg = alg)

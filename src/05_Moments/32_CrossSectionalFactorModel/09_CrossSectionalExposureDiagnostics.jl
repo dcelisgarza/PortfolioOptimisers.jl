@@ -8,13 +8,13 @@ Every diagnostic of this file weights the assets of one observation, and an abse
 
 # Arguments
 
-  - `B`: Exposure history `observations × assets × factors`, unlagged.
+  - `B`: Exposure history `assets × factors × observations`, unlagged.
   - `w`: Cross-sectional weight history `observations × assets`, or `nothing` for equal weights.
 
 # Validation
 
   - `!isempty(B)`.
-  - `size(w) == (size(B, 1), size(B, 2))`, when `w` is present.
+  - `size(w) == (size(B, 3), size(B, 1))`, when `w` is present.
   - No finite entry of `w` is negative.
 
 # Returns
@@ -30,12 +30,12 @@ Every diagnostic of this file weights the assets of one observation, and an abse
 """
 function exposure_weights(B::Arr3Num, ::Nothing)
     @argcheck(!isempty(B), IsEmptyError("B cannot be empty"))
-    return ones(real(eltype(B)), size(B, 1), size(B, 2))
+    return ones(real(eltype(B)), size(B, 3), size(B, 1))
 end
 function exposure_weights(B::Arr3Num, w::MatNum)
     @argcheck(!isempty(B), IsEmptyError("B cannot be empty"))
-    @argcheck(size(w, 1) == size(B, 1) && size(w, 2) == size(B, 2),
-              DimensionMismatch("w ($(size(w, 1))×$(size(w, 2))) must match B ($(size(B, 1))×$(size(B, 2)) on its first two axes)"))
+    @argcheck(size(w, 1) == size(B, 3) && size(w, 2) == size(B, 1),
+              DimensionMismatch("w ($(size(w, 1))×$(size(w, 2))) must match B ($(size(B, 1)) assets, $(size(B, 3)) observations)"))
     @argcheck(all(x -> !isfinite(x) || x >= zero(x), w),
               DomainError(w, "w cannot carry a negative weight"))
     return w
@@ -386,7 +386,7 @@ Where:
 
 # Arguments
 
-  - `B`: Exposure history `observations × assets × factors`, unlagged.
+  - `B`: Exposure history `assets × factors × observations`, unlagged.
   - `w`: Cross-sectional weight history `observations × assets`, or `nothing` for equal weights.
   - `csfm`: A cross-sectional factor model block.
   - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), or `nothing` for equal weights. It names the weight history that the verb reads off the block, and [`cs_diagnostic_weights`](@ref) resolves it over the whole observation axis.
@@ -394,7 +394,7 @@ Where:
 # Validation
 
   - `!isempty(B)`.
-  - `size(w) == (size(B, 1), size(B, 2))`, when `w` is present.
+  - `size(w) == (size(B, 3), size(B, 1))`, when `w` is present.
   - `csfm.Ms` is not `nothing`. Otherwise the verb raises an `IsNothingError` that names `Ms`.
   - The field that `weighting` names is not `nothing`. Otherwise the verb raises an `IsNothingError` that names it.
 
@@ -413,7 +413,7 @@ Where:
 """
 function exposure_correlation(B::Arr3Num, w::Option{<:MatNum} = nothing)
     u = exposure_weights(B, w)
-    K = size(B, 3)
+    K = size(B, 2)
     Tf = typeof(sqrt(one(promote_type(real(eltype(B)), real(eltype(u))))))
     Cm = Matrix{Tf}(undef, K, K)
     for l in 1:K, k in 1:l
@@ -438,7 +438,7 @@ The verb correlates the pair at each observation, and averages the answers over 
 
 # Arguments
 
-  - `B`: Exposure history `observations × assets × factors`, unlagged.
+  - `B`: Exposure history `assets × factors × observations`, unlagged.
   - `u`: Resolved weight history `observations × assets`.
   - `k`, `l`: Positions of the two factors.
 
@@ -453,7 +453,7 @@ The verb correlates the pair at each observation, and averages the answers over 
 """
 function exposure_pair_correlation(B::Arr3Num, u::MatNum, k::Integer, l::Integer)
     Tf = typeof(sqrt(one(promote_type(real(eltype(B)), real(eltype(u))))))
-    T = size(B, 1)
+    T = size(B, 3)
     acc = zero(Tf)
     cnt = 0
     degen = false
@@ -479,7 +479,7 @@ The correlation reads the assets at which both exposures are finite and the weig
 
 # Arguments
 
-  - `B`: Exposure history `observations × assets × factors`, unlagged.
+  - `B`: Exposure history `assets × factors × observations`, unlagged.
   - `u`: Resolved weight history `observations × assets`.
   - `t`: Position of the observation.
   - `k`, `l`: Positions of the two factors.
@@ -520,7 +520,7 @@ An asset enters when both of its exposures are finite and its weight is finite a
 
 # Arguments
 
-  - `B`: Exposure history `observations × assets × factors`, unlagged.
+  - `B`: Exposure history `assets × factors × observations`, unlagged.
   - `u`: Resolved weight history `observations × assets`.
   - `t`: Position of the observation.
   - `k`, `l`: Positions of the two factors.
@@ -535,7 +535,7 @@ An asset enters when both of its exposures are finite and its weight is finite a
 """
 function exposure_pair_sums(B::Arr3Num, u::MatNum, t::Integer, k::Integer, l::Integer)
     Tf = typeof(sqrt(one(promote_type(real(eltype(B)), real(eltype(u))))))
-    N = size(B, 2)
+    N = size(B, 1)
     nv = 0
     W = zero(Tf)
     Sk = zero(Tf)
@@ -544,8 +544,8 @@ function exposure_pair_sums(B::Arr3Num, u::MatNum, t::Integer, k::Integer, l::In
     Ql = zero(Tf)
     C = zero(Tf)
     for i in 1:N
-        bk = B[t, i, k]
-        bl = B[t, i, l]
+        bk = B[i, k, t]
+        bl = B[i, l, t]
         ui = u[t, i]
         if isfinite(bk) && isfinite(bl) && 0 < ui < Inf
             nv += 1
@@ -592,7 +592,7 @@ Where:
 
 # Arguments
 
-  - `B`: Exposure history `observations × assets × factors`, unlagged.
+  - `B`: Exposure history `assets × factors × observations`, unlagged.
   - `w`: Cross-sectional weight history `observations × assets`, or `nothing` for equal weights.
   - `step`: Number of observations between the two cross-sections.
   - `csfm`: A cross-sectional factor model block.
@@ -601,7 +601,7 @@ Where:
 # Validation
 
   - `!isempty(B)`.
-  - `step >= 1` and `size(B, 1) > step`.
+  - `step >= 1` and `size(B, 3) > step`.
   - `csfm.Ms` is not `nothing`. Otherwise the verb raises an `IsNothingError` that names `Ms`.
 
 # Returns
@@ -619,7 +619,7 @@ Where:
 """
 function exposure_stability(B::Arr3Num, w::Option{<:MatNum} = nothing; step::Integer = 21)
     u = exposure_weights(B, w)
-    T, N, K = size(B)
+    N, K, T = size(B)
     @argcheck(step >= 1, DomainError(step, "step must be >= 1"))
     @argcheck(T > step,
               DimensionMismatch("B ($T observations) must carry more observations than step ($step)"))
@@ -627,7 +627,7 @@ function exposure_stability(B::Arr3Num, w::Option{<:MatNum} = nothing; step::Int
     P = T - step
     S = Matrix{Tf}(undef, P, K)
     for k in 1:K, t in 1:P
-        S[t, k] = Tf(cs_weighted_correlation(view(B, t, :, k), view(B, t + step, :, k),
+        S[t, k] = Tf(cs_weighted_correlation(view(B, :, k, t), view(B, :, k, t + step),
                                              view(u, t, :)))
     end
     return S
@@ -665,7 +665,7 @@ Where:
 
 # Arguments
 
-  - `B`: Exposure history `observations × assets × factors`, unlagged.
+  - `B`: Exposure history `assets × factors × observations`, unlagged.
   - `w`: Cross-sectional weight history `observations × assets`, or `nothing` for equal weights.
   - `csfm`: A cross-sectional factor model block.
   - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), or `nothing` for equal weights. It names the weight history that the verb reads off the block, and [`cs_diagnostic_weights`](@ref) resolves it over the whole observation axis.
@@ -690,7 +690,7 @@ Where:
 """
 function exposure_dispersion(B::Arr3Num, w::Option{<:MatNum} = nothing)
     u = exposure_weights(B, w)
-    T, N, K = size(B)
+    N, K, T = size(B)
     Tf = typeof(sqrt(one(promote_type(real(eltype(B)), real(eltype(u))))))
     D = Matrix{Tf}(undef, T, K)
     for k in 1:K, t in 1:T
@@ -707,7 +707,7 @@ The function normalises the weights over the assets at which the exposure is fin
 
 # Arguments
 
-  - `B`: Exposure history `observations × assets × factors`, unlagged.
+  - `B`: Exposure history `assets × factors × observations`, unlagged.
   - `u`: Resolved weight history `observations × assets`.
   - `t`: Position of the observation.
   - `k`: Position of the factor.
@@ -722,13 +722,13 @@ The function normalises the weights over the assets at which the exposure is fin
 """
 function exposure_cross_section_std(B::Arr3Num, u::MatNum, t::Integer, k::Integer)
     Tf = typeof(sqrt(one(promote_type(real(eltype(B)), real(eltype(u))))))
-    N = size(B, 2)
+    N = size(B, 1)
     ws = zero(Tf)
     s = zero(Tf)
     lo = Tf(Inf)
     hi = Tf(-Inf)
     for i in 1:N
-        x = B[t, i, k]
+        x = B[i, k, t]
         wi = u[t, i]
         if isfinite(x) && 0 < wi < Inf
             ws += Tf(wi)
@@ -745,7 +745,7 @@ function exposure_cross_section_std(B::Arr3Num, u::MatNum, t::Integer, k::Intege
     m = clamp(s / ws, lo, hi)
     v = zero(Tf)
     for i in 1:N
-        x = B[t, i, k]
+        x = B[i, k, t]
         wi = u[t, i]
         if isfinite(x) && 0 < wi < Inf
             d = Tf(x) - m
@@ -788,7 +788,7 @@ Where:
 
 # Arguments
 
-  - `B`: Exposure history `observations × assets × factors`, unlagged.
+  - `B`: Exposure history `assets × factors × observations`, unlagged.
   - `w`: Cross-sectional weight history `observations × assets`, or `nothing` for every asset.
   - `csfm`: A cross-sectional factor model block.
   - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), or `nothing` for equal weights. It names the weight history that sets the universe, and [`exposure_coverage_weights`](@ref) resolves it over the whole observation axis.
@@ -814,7 +814,7 @@ Where:
 """
 function exposure_coverage(B::Arr3Num, w::Option{<:MatNum} = nothing)
     u = exposure_weights(B, w)
-    T, N, K = size(B)
+    N, K, T = size(B)
     Tf = promote_type(real(eltype(B)), real(eltype(u)))
     c = zeros(Tf, K)
     for t in 1:T
@@ -861,7 +861,7 @@ Return the number of assets of the universe of one observation at which one fact
 
 # Arguments
 
-  - `B`: Exposure history `observations × assets × factors`, unlagged.
+  - `B`: Exposure history `assets × factors × observations`, unlagged.
   - `u`: Resolved weight history `observations × assets`.
   - `t`: Position of the observation.
   - `k`: Position of the factor.
@@ -877,8 +877,8 @@ Return the number of assets of the universe of one observation at which one fact
 """
 function exposure_covered_count(B::Arr3Num, u::MatNum, t::Integer, k::Integer)
     n = 0
-    for i in 1:size(B, 2)
-        n += 0 < u[t, i] < Inf && isfinite(B[t, i, k])
+    for i in 1:size(B, 1)
+        n += 0 < u[t, i] < Inf && isfinite(B[i, k, t])
     end
     return n
 end
@@ -945,7 +945,7 @@ The exposure group reads the history as the panel wrote it, so it takes no lag a
 
 # Returns
 
-  - `Ms::Arr3Num`: Exposure history `observations × assets × factors`.
+  - `Ms::Arr3Num`: Exposure history `assets × factors × observations`.
 
 # Related
 
@@ -993,14 +993,14 @@ Where:
 
 # Arguments
 
-  - `G`: Gram history `observations × factors × factors`, which [`cs_gram`](@ref) returns.
-  - `B`: Exposure history `observations × assets × factors`, already lagged.
+  - `G`: Gram history `factors × factors × observations`, which [`cs_gram`](@ref) returns.
+  - `B`: Exposure history `assets × factors × observations`, already lagged.
   - `w`: Regression weight history `observations × assets`, or `nothing` for equal weights.
   - `csfm`: A cross-sectional factor model block. The answer is on the reduced factor axis when the block carries a family re-basis. At an observation with an Unseen Member the answer reads the design that the fit regressed on, which [`cs_regression_design`](@ref) changes. An Unseen Member has a zero column there, and so has the member that carries the condition when the family drops an Unseen Member, so their factor is `NaN`.
 
 # Validation
 
-  - `!isempty(B)`, and `size(w) == (size(B, 1), size(B, 2))` when `w` is present.
+  - `!isempty(B)`, and `size(w) == (size(B, 3), size(B, 1))` when `w` is present.
   - On the block method, `csfm.Ms` and `csfm.csr` are not `nothing`.
 
 # Returns
@@ -1011,7 +1011,7 @@ Where:
 # Examples
 
 ```jldoctest
-julia> B = reshape([1.0, 0.0, 0.0, 1.0], 1, 2, 2);
+julia> B = reshape([1.0, 0.0, 0.0, 1.0], 2, 2, 1);
 
 julia> exposure_vif(cs_gram(B))
 1×2 Matrix{Float64}:
@@ -1027,13 +1027,13 @@ julia> exposure_vif(cs_gram(B))
   - [`CrossSectionalFactorModel`](@ref)
 """
 function exposure_vif(G::Arr3Num)
-    T = size(G, 1)
-    K = size(G, 2)
+    T = size(G, 3)
+    K = size(G, 1)
     D = cs_gram_inverse_diagonal(G)
     Tf = eltype(D)
     vif = Matrix{Tf}(undef, T, K)
     for k in 1:K, t in 1:T
-        vif[t, k] = Tf(G[t, k, k]) * D[t, k]
+        vif[t, k] = Tf(G[k, k, t]) * D[t, k]
     end
     return vif
 end
@@ -1053,7 +1053,7 @@ Return the variance inflation factors of a design whose mask a caller has alread
 
 # Arguments
 
-  - `B`: Exposure history `observations × assets × factors`, already lagged.
+  - `B`: Exposure history `assets × factors × observations`, already lagged.
   - `mask`: Eligibility mask `observations × assets`.
   - `u`: Resolved weight history `observations × assets`, zero outside the mask.
 
@@ -1066,7 +1066,7 @@ Return the variance inflation factors of a design whose mask a caller has alread
   - [`exposure_vif`](@ref)
 """
 function cs_masked_vif(B::Arr3Num, mask::AbstractMatrix{Bool}, u::MatNum)
-    T, _, K = size(B)
+    _, K, T = size(B)
     # A decomposition leaves a `Rational` type, as a square root does.
     Tf = typeof(sqrt(one(promote_type(real(eltype(B)), real(eltype(u))))))
     # The answer starts absent, so an observation with no degrees of freedom needs no branch.
@@ -1106,14 +1106,14 @@ Where:
 
 # Arguments
 
-  - `G`: Gram history `observations × factors × factors`, which [`cs_gram`](@ref) returns.
-  - `B`: Exposure history `observations × assets × factors`, already lagged.
+  - `G`: Gram history `factors × factors × observations`, which [`cs_gram`](@ref) returns.
+  - `B`: Exposure history `assets × factors × observations`, already lagged.
   - `w`: Regression weight history `observations × assets`, or `nothing` for equal weights.
   - `csfm`: A cross-sectional factor model block. The answer is on the reduced factor axis when the block carries a family re-basis. At an observation with an Unseen Member the answer reads the design that the fit regressed on, which [`cs_regression_design`](@ref) changes.
 
 # Validation
 
-  - `!isempty(B)`, and `size(w) == (size(B, 1), size(B, 2))` when `w` is present.
+  - `!isempty(B)`, and `size(w) == (size(B, 3), size(B, 1))` when `w` is present.
   - On the block method, `csfm.Ms` and `csfm.csr` are not `nothing`.
 
 # Returns
@@ -1123,7 +1123,7 @@ Where:
 # Examples
 
 ```jldoctest
-julia> B = reshape([1.0, 0.0, 0.0, 1.0], 1, 2, 2);
+julia> B = reshape([1.0, 0.0, 0.0, 1.0], 2, 2, 1);
 
 julia> exposure_condition_number(cs_gram(B))
 1-element Vector{Float64}:
@@ -1137,8 +1137,8 @@ julia> exposure_condition_number(cs_gram(B))
   - [`CrossSectionalFactorModel`](@ref)
 """
 function exposure_condition_number(G::Arr3Num)
-    T = size(G, 1)
-    K = size(G, 2)
+    T = size(G, 3)
+    K = size(G, 1)
     Tf = typeof(sqrt(one(real(eltype(G)))))
     kappa = Vector{Tf}(undef, T)
     Gt = Matrix{Tf}(undef, K, K)
@@ -1164,7 +1164,7 @@ Return the condition numbers of a design whose mask a caller has already resolve
 
 # Arguments
 
-  - `B`: Exposure history `observations × assets × factors`, already lagged.
+  - `B`: Exposure history `assets × factors × observations`, already lagged.
   - `mask`: Eligibility mask `observations × assets`.
   - `u`: Resolved weight history `observations × assets`, zero outside the mask.
 
@@ -1177,7 +1177,7 @@ Return the condition numbers of a design whose mask a caller has already resolve
   - [`exposure_condition_number`](@ref)
 """
 function cs_masked_condition_number(B::Arr3Num, mask::AbstractMatrix{Bool}, u::MatNum)
-    T, _, K = size(B)
+    _, K, T = size(B)
     # A decomposition leaves a `Rational` type, as a square root does.
     Tf = typeof(sqrt(one(promote_type(real(eltype(B)), real(eltype(u))))))
     kappa = fill(Tf(NaN), T)

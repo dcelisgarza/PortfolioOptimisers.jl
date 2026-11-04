@@ -210,7 +210,7 @@ end
         E = 0.005 .* randn(rg, Tn, Nn)
         wn = fill(1 / Nn, Nn)
         retn = (Fr * transpose(B) + E) * wn
-        Bh = repeat(reshape(B, 1, Nn, 2), Tn, 1, 1)
+        Bh = repeat(reshape(B, Nn, 2, 1), 1, 1, Tn)
         rw = 1 .+ rand(rg, Tn, Nn)
         vs = fill(1e-4, Tn, Nn)
         a = factor_attribution(wn, B, Fr, E, retn; rw = rw, vs = vs, se = true)

@@ -210,7 +210,7 @@ end
         blk = PO.attribution_block_arrays(pr.rr, pr)
         function wf_attr(W, ret, rows)
             br = rows .- 1
-            return factor_attribution(W, blk.B[br .- blk.lag, :, :], blk.f[br, :],
+            return factor_attribution(W, blk.B[:, :, br .- blk.lag], blk.f[br, :],
                                       blk.eps[br, :], ret; lag = 0, rw = blk.rw[br, :],
                                       vs = blk.vs[br, :], fam = blk.fam, se = true,
                                       ppy = 252)

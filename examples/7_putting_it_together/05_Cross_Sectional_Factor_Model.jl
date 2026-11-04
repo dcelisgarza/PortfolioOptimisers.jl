@@ -194,7 +194,7 @@ pretty_table(DataFrame("Factor" => rr.nf, "Family" => rr.fam);
 The result is an ordinary [`LowOrderPrior`](@ref) over the whole asset universe, so every
 optimiser and estimator that takes a prior takes this one unchanged. The new part is the field
 `rr`. It is a
-[`CrossSectionalFactorModel`](@ref), and it holds the exposure history `Ms`, the realised factor
+[`CrossSectionalFactorModel`](@ref), and it holds the exposure history `Ms`, `assets × factors × observations`, the realised factor
 returns, the idiosyncratic returns and variances, the regression and benchmark weights, and the
 family basis.
 
@@ -203,7 +203,7 @@ descriptors and the exposure lag.
 =#
 
 pretty_table(DataFrame("Fit rows" => size(pr.X, 1), "Warm-up rows" => T - size(pr.X, 1),
-                       "Factors" => size(rr.Ms, 3),
+                       "Factors" => size(rr.Ms, 2),
                        "Investable assets" => count(isfinite, pr.mu));
              formatters = [numfmt], title = "What the fit kept")
 
@@ -242,7 +242,7 @@ function systematic_pairs(pr, B, f)
     fitted = Float64[]
     truth = Float64[]
     for t in (1 + rr.lag):Tf, i in axes(rr.csr.eps, 2)
-        u = dot(view(rr.Ms, t - rr.lag, i, :), view(pr.fpr.X, t, :))
+        u = dot(view(rr.Ms, i, :, t - rr.lag), view(pr.fpr.X, t, :))
         v = dot(view(B, i, :), view(ftail, t, :))
         if isfinite(u) && isfinite(v)
             push!(fitted, u)
@@ -279,7 +279,7 @@ function reconciliation(pr, X)
     worst = 0.0
     n = 0
     for t in (1 + rr.lag):Tf, i in axes(rr.csr.eps, 2)
-        v = dot(view(rr.Ms, t - rr.lag, i, :), view(pr.fpr.X, t, :)) + rr.csr.eps[t, i]
+        v = dot(view(rr.Ms, i, :, t - rr.lag), view(pr.fpr.X, t, :)) + rr.csr.eps[t, i]
         if isfinite(v) && isfinite(Xtail[t, i])
             worst = max(worst, abs(v - Xtail[t, i]))
             n += 1
@@ -319,7 +319,7 @@ function family_zero_sum(pr, family)
         for k in family
             c = 0.0
             for a in axes(rr.bw, 2)
-                e = rr.Ms[t, a, k]
+                e = rr.Ms[a, k, t]
                 isfinite(e) && (c += rr.bw[t, a] * e)
             end
             total += c * pr.fpr.X[u, k]

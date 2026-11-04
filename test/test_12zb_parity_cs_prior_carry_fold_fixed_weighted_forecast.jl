@@ -194,7 +194,7 @@ end
                 end
                 @test size(x.pe.cache.win.X, 1) == pe.lag + 1
                 @test size(st.fh) == size(st.vs) == size(b.rr.rf.hist)
-                @test size(st.fsc.S, 1) == size(st.Ms, 1)
+                @test size(st.fsc.S, 3) == size(st.Ms, 3)
                 @test relerr(x.pr.mu, b.mu) < 1e-14 &&
                       relerr(x.pr.sigma, b.sigma) < 1e-14 &&
                       relerr(x.pr.rr.rf.hist, b.rr.rf.hist) < 1e-14 &&
