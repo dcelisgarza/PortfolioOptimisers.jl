@@ -779,6 +779,18 @@ function record_stamp(gate::AbstractString)
 end
 
 """
+    coverage_child(cmd; out = stdout, err = stderr) -> Base.Process
+
+Start the child of a coverage run without a wait, with its output on `out` and its errors on
+`err`. `run` with `wait = false` sends the streams of a process to `devnull` unless a stream is
+given, so the child printed no failure text and no `RESULT` line, and only the `--done` file
+held its verdict.
+"""
+function coverage_child(cmd::Cmd; out::IO = stdout, err::IO = stderr)
+    return run(pipeline(ignorestatus(cmd); stdout = out, stderr = err); wait = false)
+end
+
+"""
     run_coverage(dir, rest) -> Int
 
 Run the driver again in a child process under `--code-coverage=@<dir>`, then report the counter
@@ -792,7 +804,7 @@ function run_coverage(dir::AbstractString, rest::Vector{String})
         error("`--coverage` needs a source directory that exists, such as <worktree>/src. Got $dir")
     end
     cmd = `$(Base.julia_cmd()) -t 1 --project=$(Base.active_project()) --code-coverage=@$dir $(@__FILE__) $rest`
-    p = run(ignorestatus(cmd); wait = false)
+    p = coverage_child(cmd)
     # A process that has exited has no PID to read, so read it before the wait.
     pid = getpid(p)
     wait(p)

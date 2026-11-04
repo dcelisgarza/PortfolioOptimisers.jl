@@ -588,6 +588,16 @@ end
         missing_dir = joinpath(mktempdir(), "no_such_dir")
         @test occursin("a source directory that exists",
                        msg(() -> RF.run_coverage(missing_dir, String[])))
+        # The child of a coverage run gives its output and its errors to the run, so a red
+        # file shows its failure text in the log of the run, beside its `RESULT` line.
+        out = IOBuffer()
+        err = IOBuffer()
+        p = RF.coverage_child(`$(Base.julia_cmd()) --startup-file=no -e 'println("RESULT x"); error("boom")'`;
+                              out = out, err = err)
+        wait(p)
+        @test !success(p)
+        @test occursin("RESULT x", String(take!(out)))
+        @test occursin("boom", String(take!(err)))
     end
 
     @testset "run_files --testset prunes to the selected sets, --time-depth times them" begin
