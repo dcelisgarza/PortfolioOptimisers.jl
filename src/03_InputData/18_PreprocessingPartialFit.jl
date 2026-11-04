@@ -826,13 +826,13 @@ end
 
 Reads a stepped [`PriceGapFill`](@ref) out as the [`PriceGapFillResult`](@ref) that the batch fit over the same rows gives.
 
-The result holds each asset that the folded blocks priced, with its last observed price, and the last folded timestamp as the end of the training window. An asset whose carried price an absence retired has a `missing` seed.
+The result holds each asset of the folded blocks, with its last observed price, and the last folded timestamp as the end of the training window. An asset whose carried price an absence retired has a `missing` seed. An asset that no block priced also has a `missing` seed.
 
 # Algorithm
 
  1. Read the state with [`partial_fit_cache`](@ref).
- 2. Keep the assets with a carried price, giving `keep`. Read into `v` the price of each kept asset whose flag in `held` is set, and `missing` for the others. The element type of `v` drops `Missing` when no seed is `missing`.
- 3. Build the [`PriceGapFillResult`](@ref) from the kept names, `v`, the end `te` of the state, and the `fill` and `strict` of the step.
+ 2. Read into `v` the carried price of each asset whose flag in `held` is set, and `missing` for the others. An asset that no block priced has no carried price, so its entry is `missing` too. The element type of `v` drops `Missing` when no seed is `missing`.
+ 3. Build the [`PriceGapFillResult`](@ref) from a copy of the names of the state, `v`, the end `te` of the state, and the `fill` and `strict` of the step.
 
 # Validation
 
@@ -849,9 +849,10 @@ The result holds each asset that the folded blocks priced, with its last observe
 """
 function fit_preprocessing(est::PriceGapFill)
     state = partial_fit_cache(est)
-    keep = findall(!ismissing, state.v)
-    v = identity.([state.held[j] ? state.v[j] : missing for j in keep])
-    return PriceGapFillResult(state.nx[keep], v, state.te, est.fill, est.strict)
+    #! An asset that no block priced keeps its entry with a `missing` seed, as in the batch
+    #! fit, so a later window fills its gaps from its own prices (#1974).
+    v = identity.([state.held[j] ? state.v[j] : missing for j in eachindex(state.v)])
+    return PriceGapFillResult(copy(state.nx), v, state.te, est.fill, est.strict)
 end
 function supports_partial_fit(est::PriceGapFill)
     return isa(est.fill, CarriedPrice)

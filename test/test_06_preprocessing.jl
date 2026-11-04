@@ -2470,12 +2470,14 @@ end
     res = fit_preprocessing(PriceGapFill(), pr)
     @test isa(res, PriceGapFillResult)
     @test isa(res.fill, CarriedPrice)
-    # A column with no observed price gets no fitted value and no entry, so it is untouched.
-    @test res.nx == [:A, :B, :C]
+    # A column with no observed price keeps its entry with a `missing` seed (#1974). The
+    # window holds no price of it to carry, so the replay leaves it untouched.
+    @test res.nx == [:A, :B, :C, :D]
     # C is delisted after its last price, so the window ends outside its listing and C gets
     # no seed (#1330). It keeps its entry.
-    @test isequal(res.v, [122.0, 205.0, missing])
+    @test isequal(res.v, [122.0, 205.0, missing, missing])
     Xc = values(pgf_970_quiet_apply(res, pr).X)
+    @test isequal(Xc[:, 4], X[:, 4])
     # The k = 2 interior gap takes the last priced observation, and nothing else moved.
     @test Xc[4:5, 1] == [102.0, 102.0]
     @test Xc[[1, 2, 3, 6, 7, 8], 1] == X[[1, 2, 3, 6, 7, 8], 1]
@@ -2488,6 +2490,8 @@ end
     # The same gap under a per-asset reduction: two fabricated moves instead of one real one.
     resm = fit_preprocessing(PriceGapFill(; fill = MedianValue()), pr)
     @test resm.fill === MedianValue()
+    # A statistic has no price of D to reduce, so D gets no entry.
+    @test resm.nx == [:A, :B, :C]
     @test resm.v[1] ≈ 111.0
     Xm = values(pgf_970_quiet_apply(resm, pr).X)
     @test Xm[4:5, 1] ≈ [111.0, 111.0]
@@ -2789,16 +2793,18 @@ end
     @test vec(PortfolioOptimisers.gap_fill_column!(CarriedPrice(), copy(P), trues(6, 1), 1,
                                                    9.0, 1))[4] == 50.0
     # The fitted value: the last observed training price, or the reduction of the observed
-    # training prices. An asset with no observed price has no fitted value.
+    # training prices. An asset with no observed price has no statistic, but it keeps its
+    # entry with a `missing` seed under the carry (#1974).
     P = [100.0 NaN 5.0; NaN NaN 6.0; 103.0 NaN NaN]
     ts = Date(2020, 1, 1):Day(1):Date(2020, 1, 3)
     pr = PricesResult(; X = TimeArray(collect(ts), P, [:a, :b, :c]), span = listing_span(P))
     held = fit_preprocessing(PriceGapFill(), pr)
-    @test held.nx == [:a, :c]
+    @test held.nx == [:a, :b, :c]
     # The window ends after the delisting of `c`, so its carried seed is retired (#1330).
-    @test isequal(held.v, [103.0, missing])
+    @test isequal(held.v, [103.0, missing, missing])
     @test held.te == Date(2020, 1, 3)
     med = fit_preprocessing(PriceGapFill(; fill = MedianValue()), pr)
+    @test med.nx == [:a, :c]
     @test med.v == [median([100.0, 103.0]), median([5.0, 6.0])]
     @test PortfolioOptimisers.gap_fill_seed(CarriedPrice(), [1.0, 2.0, 7.0], true) == 7.0
     @test PortfolioOptimisers.gap_fill_seed(MeanValue(), [1.0, 2.0, 6.0], true) == 3.0
@@ -2925,6 +2931,38 @@ a later window fills as the same rows of the full clock do, and that the online 
         @test isequal(m.v, b[1].cache.v)
         @test m.held == b[1].cache.held
     end
+end
+
+#=
+Issue #1974. The carry skipped, at fit time, an asset with no observed training price, so the
+replay on a later window left every gap of that asset open. The online step fills the same gap
+from the earlier prices of the block. The asset now keeps its entry with a `missing` seed, and
+the batch replay matches the online step on the two windows of the issue.
+=#
+@testset "A carry keeps an asset with no training price (#1974)" begin
+    # Training window: `A` is priced, `B` is not listed yet.
+    train = PricesResult(; X = TimeArray([Date(2024, 1, 2)], [1.0 NaN], [:A, :B]),
+                         span = BitMatrix([true false]))
+    # Test window: `B` is listed from the first row and has a gap on the second row.
+    ts = collect(Date(2024, 1, 3):Day(1):Date(2024, 1, 6))
+    test = PricesResult(; X = TimeArray(ts, [NaN 5.0; 2.0 NaN; NaN 6.0; 3.0 7.0], [:A, :B]),
+                        span = trues(4, 2))
+    res = fit_preprocessing(PriceGapFill(), train)
+    @test res.nx == [:A, :B]
+    @test isequal(res.v, [1.0, missing])
+    want = [1.0 5.0; 2.0 5.0; 2.0 6.0; 3.0 7.0]
+    @test values(apply_preprocessing(res, test).X) == want
+    pft = PortfolioOptimisers.partial_fit_transform
+    est, _ = pft(PriceGapFill(), train)
+    @test values(last(pft(est, test)).X) == want
+    # The online read-out keeps the unpriced asset as the batch fit does.
+    out = fit_preprocessing(est)
+    @test out.nx == res.nx
+    @test isequal(out.v, res.v)
+    @test values(apply_preprocessing(out, test).X) == want
+    # A statistic has no price to reduce, so the asset still gets no entry.
+    med = fit_preprocessing(PriceGapFill(; fill = MedianValue()), train)
+    @test med.nx == [:A]
 end
 
 #=

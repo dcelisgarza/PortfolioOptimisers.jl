@@ -119,9 +119,9 @@ Where:
 ## Fit
 
  1. For each asset column, find `t`, the row of the last observed price of the training window. The step leaves out every entry that [`is_missing_value`](@ref) accepts.
- 2. Skip an asset whose column holds no observed price. The asset gets no fitted value and no entry in the result, so the apply step does not change it.
+ 2. For an asset whose column holds no observed price, the step depends on the convention. Under a [`Num_VecToScaM`](@ref) skip the asset, because there is no price to reduce. The asset gets no entry in the result, so the apply step does not change it. Under [`CarriedPrice`](@ref) the asset keeps its entry with a `missing` value, so a later window fills its gaps from the prices of that window alone.
  3. Collect the observed prices of the column into `obs`. Read with [`PortfolioOptimisers.gap_fill_open`](@ref) whether the Listing Span of the price data holds from `t` to the end of the training window. Price data that states no span states no absence.
- 4. Reduce `obs` to one value with [`PortfolioOptimisers.gap_fill_seed`](@ref), giving the fitted value of the asset. Under [`CarriedPrice`](@ref) the value is `missing` when the span does not hold from `t` to the end.
+ 4. Reduce `obs` to one value with [`PortfolioOptimisers.gap_fill_seed`](@ref), giving the fitted value of the asset. Under [`CarriedPrice`](@ref) the value is `missing` when the span does not hold from `t` to the end, or when the column holds no observed price.
  5. Return a [`PriceGapFillResult`](@ref) that holds the fitted asset names, their values, the last timestamp of the training window, the convention and `strict`.
 
 ## Apply
@@ -216,11 +216,11 @@ $(DocStringExtensions.FIELDS)
 """
 @concrete struct PriceGapFillResult <: AbstractPricesPreprocessingResult
     """
-    Names of the assets with an observed training price.
+    Names of the fitted assets. Under [`CarriedPrice`](@ref) these are all the assets of the training window. Under a [`Num_VecToScaM`](@ref) these are the assets with an observed training price.
     """
     nx
     """
-    Fitted values, aligned with `nx`. Under [`CarriedPrice`](@ref) each value is the last observed training price of its asset, or `missing` when an absence from the listing follows that price in the training window. A `missing` seed is never written. Under a [`Num_VecToScaM`](@ref) each value is the reduction of the observed training prices of its asset.
+    Fitted values, aligned with `nx`. Under [`CarriedPrice`](@ref) each value is the last observed training price of its asset, or `missing` when an absence from the listing follows that price in the training window, or when the asset has no observed training price. A `missing` seed is never written. Under a [`Num_VecToScaM`](@ref) each value is the reduction of the observed training prices of its asset.
     """
     v
     """
@@ -386,7 +386,7 @@ v_{i} &= p_{\\max \\mathcal{O}_{i},\\,i} \\quad \\text{when } o_{i} = 1\\,.
 \\end{align}
 ```
 
-When ``o_{i} = 0``, ``v_{i}`` does not exist.
+When ``o_{i} = 0``, or when ``\\mathcal{O}_{i}`` is empty, ``v_{i}`` does not exist.
 
 Under a [`Num_VecToScaM`](@ref):
 
@@ -416,8 +416,8 @@ The method that Julia selects is the algorithm.
 # Arguments
 
   - `fill`: The convention, read off [`PriceGapFill`](@ref).
-  - `obs`: The observed training prices of one asset, in observation order.
-  - `open`: Whether the listing holds from the last observed price to the end of the training window, from [`PortfolioOptimisers.gap_fill_open`](@ref).
+  - `obs`: The observed training prices of one asset, in observation order. Under [`CarriedPrice`](@ref) it can be empty, and then `open` is `false`.
+  - `open`: Whether the listing holds from the last observed price to the end of the training window, from [`PortfolioOptimisers.gap_fill_open`](@ref). It is `false` when the asset has no observed training price.
 
 # Returns
 
@@ -558,14 +558,17 @@ function fit_preprocessing(est::PriceGapFill, pr::PricesResult)::PriceGapFillRes
     span = prices_listing_span(pr)
     for i in axes(vals, 2)
         t = findlast(!is_missing_value, view(vals, :, i))
-        if isnothing(t)
+        #! A statistic has no price to reduce, so an unpriced asset gets no entry. A carry
+        #! keeps the asset with a `missing` seed, so a later window fills its gaps from the
+        #! prices of that window, as the online step does (#1974).
+        if isnothing(t) && !isa(est.fill, CarriedPrice)
             continue
         end
         append!(empty!(obs), Iterators.filter(!is_missing_value, view(vals, :, i)))
         #! A later window cannot see an absence at the end of this one, so the seed is
         #! retired here when the listing breaks after the last observed price.
         push!(keep, i)
-        push!(v, gap_fill_seed(est.fill, obs, gap_fill_open(span, i, t)))
+        push!(v, gap_fill_seed(est.fill, obs, !isnothing(t) && gap_fill_open(span, i, t)))
     end
     return PriceGapFillResult(names[keep], identity.(v), last(TimeSeries.timestamp(pr.X)),
                               est.fill, est.strict)
