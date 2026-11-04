@@ -173,15 +173,14 @@ end
 # the released figures, unscaled, under its own name.
 function performance_summary_figures(ps::PerformanceSummaryResult)
     conf = round((1 - ps.alpha) * 100; digits = 1)
-    vals = Any[ps.ann_return * 100, ps.ann_volatility * 100, ps.sharpe, ps.sortino,
-               ps.calmar, ps.max_drawdown * 100, ps.cvar * 100, ps.excess_ret * 100,
-               ps.tracking_error * 100, ps.information_ratio, ps.turnover * 100]
+    # The literal promotes the figures, as the plot does, and takes their element type (#1979).
+    vals = [ps.ann_return * 100, ps.ann_volatility * 100, ps.sharpe, ps.sortino, ps.calmar,
+            ps.max_drawdown * 100, ps.cvar * 100, ps.excess_ret * 100,
+            ps.tracking_error * 100, ps.information_ratio, ps.turnover * 100,
+            values(ps.risk)...]
     labels = ["Ann. Return %", "Ann. Vol %", "Sharpe", "Sortino", "Calmar", "Max DD %",
-              "$(conf)% CVaR %", "Excess Ret %", "Track. Err %", "Info Ratio", "Turnover %"]
-    for (k, v) in pairs(ps.risk)
-        push!(vals, v)
-        push!(labels, string(k))
-    end
+              "$(conf)% CVaR %", "Excess Ret %", "Track. Err %", "Info Ratio", "Turnover %",
+              (string(k) for k in keys(ps.risk))...]
     return vals, labels
 end
 # The label of each entry names the keys that are not `nothing`: the candidate, the path and
@@ -217,9 +216,11 @@ function performance_summary_plot(::AbstractVector, ps::PerformanceSummaryResult
     vals, labels = performance_summary_figures(ps)
     names = performance_summary_entry_labels(ps)
     K = length(names)
-    panels = [bar(1:K, v; xticks = (1:K, names), xrotation = 30, title = l, legend = false,
-                  color = performance_summary_bar_colours(v))
-              for (v, l) in zip(vals, labels)]
+    # An index, not a destructure of `zip`: JET reads the element type of `vals` now, and it
+    # refused the `getfield` of the destructure (#1979).
+    panels = [bar(1:K, vals[i]; xticks = (1:K, names), xrotation = 30, title = labels[i],
+                  legend = false, color = performance_summary_bar_colours(vals[i]))
+              for i in eachindex(vals, labels)]
     return plot(panels...; layout = length(panels), kwargs...)
 end
 function PortfolioOptimisers.plot_performance_summary(ps::PerformanceSummaryResult;

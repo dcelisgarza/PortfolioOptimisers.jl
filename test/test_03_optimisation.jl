@@ -1870,13 +1870,14 @@ end
                                            nothing) == Bool[1 1 1; 0 0 0]
         om = BitMatrix([true false false; false true false])
         cm = PO.collapse_categorical_mask(om, W, 2, trues(2, 3))
+        # The mask is `sub-portfolios × levels × observations` since part E of #1973.
         @test size(cm) == (2, 2, 2)
-        @test cm[:, :, 1] == Bool[1 0; 1 1]
-        @test cm[:, :, 2] == cm[:, :, 1]
+        @test cm[:, 1, :] == Bool[1 1; 0 1]
+        @test cm[:, 2, :] == cm[:, 1, :]
         # An observed member that is inactive does not count.
         cmi = PO.collapse_categorical_mask(om, W, 2,
                                            BitMatrix([true true true; true false true]))
-        @test cmi[:, :, 1] == Bool[1 0; 0 0]
+        @test cmi[:, 1, :] == Bool[1 0; 0 0]
         @test isnothing(PO.collapse_categorical_mask(nothing, W, 2, nothing))
     end
 

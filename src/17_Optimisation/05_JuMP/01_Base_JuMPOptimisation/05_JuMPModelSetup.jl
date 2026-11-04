@@ -137,7 +137,8 @@ A solution is acceptable when JuMP reports it solved and feasible under the `che
 """
 function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
                               datatype::DataType = Float64)
-    trials = Dict()
+    # A solver has a `Sym_Str` name, and each trial is a dictionary of its stages (#1979).
+    trials = Dict{Sym_Str, AbstractDict{Symbol}}()
     success = false
     for solver in opt.opt.slv
         try
@@ -153,6 +154,8 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
             trials[solver.name] = Dict(:optimize! => err)
             continue
         end
+        # `Any` is the last resort (#1979): a trial holds values of unrelated types, the
+        # settings, an exception, a termination status and a solution summary.
         trial = Dict{Symbol, Any}(:settings => solver.settings)
         try
             JuMP.assert_is_solved_and_feasible(model; solver.check_sol...)

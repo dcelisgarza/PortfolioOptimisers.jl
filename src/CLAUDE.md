@@ -41,8 +41,8 @@ whole repository.
   with `promote_type`, and build a container that is filled out of order in parts. Keep `Any`
   only where no narrower type exists, such as the arguments of an `Expr`, with a comment that
   states why. [`.github/instructions/julia-source-code.instructions.md`](../.github/instructions/julia-source-code.instructions.md)
-  § *A container takes the element type of its values* owns the rule, and issue #1979 holds the
-  sweep of the older sites.
+  § *A container takes the element type of its values* owns the rule, and
+  `test/test_87_any_container_census.jl` gates it.
 - **Spell a skipped procedure or a trivial default with `nothing`, never with a singleton.** No
   data-less type for "no slack", "the raw statistic" or "no scaling", and no named alias of
   `nothing`. The field takes `Option{<:AbstractX}`, and the method on `Nothing` holds the

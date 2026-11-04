@@ -419,17 +419,9 @@ end
 function Pipeline(; steps::Union{Tuple, AbstractVector},
                   cache::Option{<:AbstractPartialFitState} = nothing)::Pipeline
     @argcheck(!isempty(steps), IsEmptyError("steps cannot be empty"))
-    ests = Vector{Any}(undef, length(steps))
-    explicit = Vector{Union{Nothing, String}}(undef, length(steps))
-    for (i, s) in enumerate(steps)
-        if isa(s, Pair)
-            explicit[i] = String(s.first)
-            ests[i] = s.second
-        else
-            explicit[i] = nothing
-            ests[i] = s
-        end
-    end
+    # The steps take the element type of their values (#1979).
+    ests = [isa(s, Pair) ? s.second : s for s in steps]
+    explicit = Option{String}[isa(s, Pair) ? String(s.first) : nothing for s in steps]
     assert_split_position(ests)
     assert_opt_last(ests)
     assert_step_declarations(ests)
@@ -439,7 +431,7 @@ function Pipeline(; steps::Union{Tuple, AbstractVector},
     assert_pipeline_data_benchmark(ests)
     slots = Symbol[pipe_writes(e) for e in ests]
     avail = Set{Symbol}(PIPELINE_DATA_SLOTS)
-    written = Dict{Symbol, Any}()
+    written = Dict{Symbol, eltype(ests)}()
     for (e, slot) in zip(ests, slots)
         for r in pipe_reads(e)
             @argcheck(r in avail,
@@ -775,7 +767,7 @@ Split the `constraints` slot into [routing targets](@ref PIPELINE_ROUTING_TARGET
 # Algorithm
 
  1. For each element `c` of the `constraints` slot, in write order, read its target with [`constraint_target_of`](@ref) and its value with [`constraint_value_of`](@ref).
- 2. Add the value to the group of its target in `out`. A target seen for the first time starts a new group.
+ 2. Collect the values of each target into its group, in write order. The groups follow the order of the first write to each target, and each group takes the element type of its values.
  3. Return the value itself for a group of one value. This is the scalar shape that the fields accept outside a pipeline. For a larger group, combine the values with [`accumulate_constraint_values`](@ref). It puts them in a vector in write order, or merges them into one constraint for `:cte`.
 
 # Arguments
@@ -799,24 +791,17 @@ Split the `constraints` slot into [routing targets](@ref PIPELINE_ROUTING_TARGET
   - [`PIPELINE_ACCUMULATING_TARGETS`](@ref)
 """
 function constraint_targets(cs)
-    out = Pair{Symbol, Any}[]
-    for c in constraint_results(cs)
-        target = constraint_target_of(c)
-        val = constraint_value_of(c)
-        i = findfirst(p -> p.first === target, out)
-        if isnothing(i)
-            push!(out, target => Any[val])
-            continue
-        end
-        @argcheck(target in PIPELINE_ACCUMULATING_TARGETS,
-                  ArgumentError("two constraint steps write the :$target routing target, which holds one value; the second would silently replace the first. Drop one of the steps, or combine them into the single value the field expects."))
-        push!(out[i].second, val)
+    rs = constraint_results(cs)
+    # The groups are built in parts, so each takes the element type of its values (#1979).
+    targets = unique(constraint_target_of(c) for c in rs)
+    groups = [[constraint_value_of(c) for c in rs if constraint_target_of(c) === t]
+              for t in targets]
+    for (t, g) in zip(targets, groups)
+        @argcheck(isone(length(g)) || t in PIPELINE_ACCUMULATING_TARGETS,
+                  ArgumentError("two constraint steps write the :$t routing target, which holds one value; the second would silently replace the first. Drop one of the steps, or combine them into the single value the field expects."))
     end
-    return Pair{Symbol, Any}[p.first => (if length(p.second) == 1
-                                             p.second[1]
-                                         else
-                                             accumulate_constraint_values(Val(p.first), p.second)
-                                         end) for p in out]
+    return [t => (isone(length(g)) ? only(g) : accumulate_constraint_values(Val(t), g))
+            for (t, g) in zip(targets, groups)]
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -999,6 +984,8 @@ function StatsAPI.fit(pipe::Pipeline, data::Prices_RR)::PipelineResult
     else
         PipelineContext(; returns = data)
     end
+    # `Any` is the last resort (#1979): a `PipelineStep` that wraps a function fits to the
+    # value that the function returns, which can have any type.
     fitted = Vector{Any}(undef, length(pipe.steps))
     gsrcs = pipeline_gap_sources(pipe.steps)
     for (i, est) in enumerate(pipe.steps)

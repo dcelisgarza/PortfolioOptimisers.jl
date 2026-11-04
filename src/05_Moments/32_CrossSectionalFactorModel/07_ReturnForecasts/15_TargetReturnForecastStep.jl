@@ -386,7 +386,9 @@ function return_forecast_step(rfe::TargetReturnForecast, P::NamedTuple,
     # The uncalibrated prediction of each observation that matures, in return units.
     Pm = fill(Tf(NaN), max(T - g, 0), N)
     p = fill(Tf(NaN), N)
-    rows = Vector{Any}(undef, T - p0)
+    # Each step of the loop carries the state of the regression into the next, so the rows
+    # are not a comprehension. A row is a vector of numbers (#1979).
+    rows = Vector{VecNum}(undef, T - p0)
     for t in (p0 + 1):T
         if t > g
             m = normal_equations_add!(XtX, Xty, Sf, yf, ok, target_forecast_row(t - g, N))

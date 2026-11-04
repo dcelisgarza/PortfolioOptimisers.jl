@@ -7,7 +7,7 @@ A **struct type** is not the same as a concrete type. `InteractiveUtils.subtypes
 
 # Algorithm
 
- 1. When `ctarr` is `nothing`, make it an empty `Vector{Any}`. The recursion passes the same array down, so one array collects every branch.
+ 1. When `ctarr` is `nothing`, make it an empty `Vector{Type}`. A parametric struct is a `UnionAll` and any other struct is a `DataType`, and `Type` is the narrowest type that holds both. The recursion passes the same array down, so one array collects every branch.
  2. Read `sts`, the direct subtypes of `t`, with `InteractiveUtils.subtypes`.
  3. For each subtype `st` of `sts`, take one of two branches:
      1. `st` is not a struct type, so it is a further abstract type: call this function again on `st` with the same `ctarr`.
@@ -23,7 +23,7 @@ The recursion goes through the whole tree below `t`. It opens an abstract type a
 
 # Returns
 
-  - `types::Vector{Any}`: An array holding every struct type that is a subtype, direct or indirect, of `t`. A parametric struct appears as its `UnionAll`.
+  - `types::AbstractVector`: An array holding every struct type that is a subtype, direct or indirect, of `t`. It is `ctarr`, or a new `Vector{Type}` when `ctarr` is `nothing`. A parametric struct appears as its `UnionAll`.
 
 # Examples
 
@@ -35,7 +35,7 @@ julia> struct MyConcrete1 <: MyAbstract end
 julia> struct MyConcrete2 <: MyAbstract end
 
 julia> PortfolioOptimisers.traverse_concrete_subtypes(MyAbstract)
-2-element Vector{Any}:
+2-element Vector{Type}:
  MyConcrete1
  MyConcrete2
 ```
@@ -47,7 +47,7 @@ julia> PortfolioOptimisers.traverse_concrete_subtypes(MyAbstract)
 """
 function traverse_concrete_subtypes(t, ctarr::Option{<:AbstractVector} = nothing)
     if isnothing(ctarr)
-        ctarr = []
+        ctarr = Type[]
     end
     sts = InteractiveUtils.subtypes(t)
     for st in sts

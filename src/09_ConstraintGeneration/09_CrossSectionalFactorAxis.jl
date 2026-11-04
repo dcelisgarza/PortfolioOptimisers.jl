@@ -171,7 +171,7 @@ A widened universe carries every entry that the caller declared. A Factor Family
 # Examples
 
 ```jldoctest
-julia> d = Dict{String, Any}(\"style\" => [\"a\"]);
+julia> d = Dict(\"style\" => [\"a\"]);
 
 julia> PortfolioOptimisers.cross_sectional_sets_write!(d, \"style\", [\"a\"]);
 
@@ -213,24 +213,22 @@ The method for a declared universe copies its dictionary, so every axis that the
 
 # Returns
 
-  - `dict::Dict{String, Any}`: The dictionary to write the axis into.
+  - `dict::Dict{String}`: The dictionary to write the axis into. Its value type is the `typejoin` of the type of the values that it copies and `Vector{String}`, the type of the lists that [`cross_sectional_factor_sets`](@ref) writes into it.
 
 # Related
 
   - [`cross_sectional_factor_sets`](@ref)
   - [`UniverseSets`](@ref)
 """
-function cross_sectional_sets_dict(rd::ReturnsResult, ::Nothing)::Dict{String, Any}
+function cross_sectional_sets_dict(rd::ReturnsResult, ::Nothing)::Dict{String}
     @argcheck(!isnothing(rd.nx),
               ArgumentError("a new UniverseSets needs the asset names, and rd.nx is unset. Pass a declared universe to widen, or set nx on the returns data"))
-    return Dict{String, Any}("nx" => rd.nx)
+    return Dict{String, typejoin(typeof(rd.nx), Vector{String})}("nx" => rd.nx)
 end
-function cross_sectional_sets_dict(::ReturnsResult, sets::UniverseSets)::Dict{String, Any}
-    dict = Dict{String, Any}()
-    for (k, v) in sets.dict
-        dict[k] = v
-    end
-    return dict
+function cross_sectional_sets_dict(::ReturnsResult, sets::UniverseSets)::Dict{String}
+    # `typejoin`, not `promote_type`: `promote_type(Vector{Symbol}, Vector{String})` is
+    # `Vector{Any}`, and the copy would convert each list of names to it (#1979).
+    return Dict{String, typejoin(valtype(sets.dict), Vector{String})}(sets.dict)
 end
 
 export cross_sectional_factor_axis, cross_sectional_factor_sets

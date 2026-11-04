@@ -262,7 +262,8 @@ SimpleVariance = false
   - [`relaxed_preferences_msg`](@ref)
 """
 function apply_preferences!(prefs::AbstractDict{<:AbstractString, <:Any})
-    relaxations = Vector{Tuple{String, Any, Any}}()
+    # A relaxation holds a default and a value that the checks below admit as real numbers.
+    relaxations = Tuple{String, Real, Real}[]
     ml = get(prefs, "equation_max_length", nothing)
     md = get(prefs, "equation_max_depth", nothing)
     if !(isnothing(ml) && isnothing(md))
@@ -376,6 +377,9 @@ The hook also registers [`plots_extension_hint`](@ref) for `MethodError`. A call
 """
 function __init__()
     Base.Experimental.register_error_hint(plots_extension_hint, MethodError)
+    # `Any` is the last resort (#1979): a preference is a TOML value of the type the user
+    # wrote, and `apply_preferences!` must receive a value of the wrong type to refuse it
+    # with a message.
     return apply_preferences!(Dict{String, Any}(key =>
                                                     Preferences.load_preference(@__MODULE__,
                                                                                 key,

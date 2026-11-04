@@ -599,6 +599,8 @@ end
     counted.
     =#
     cts = PO.traverse_concrete_subtypes(PO.VectorToScalarMeasure)
+    # A struct type is a `DataType` or a `UnionAll`, so the default array holds `Type` (#1979).
+    @test cts isa Vector{Type}
     own = filter(T -> parentmodule(T) === PO, cts)
     @test !isempty(own)
     @test all(T -> T <: PO.VectorToScalarMeasure, own)

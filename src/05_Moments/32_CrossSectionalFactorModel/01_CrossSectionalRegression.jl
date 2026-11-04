@@ -1630,6 +1630,8 @@ function cross_sectional_foreach(f, ex::FLoops.Transducers.Executor,
 end
 function cross_sectional_foreach(f, ex::FLoops.Transducers.Executor, idx::AbstractVector,
                                  init)::Nothing
+    # `Any` is the last resort (#1979): `throw` takes a value of any type, so a slot that holds
+    # the caught value must hold any type.
     err = Vector{Any}(nothing, length(idx))
     FLoops.@floop ex for j in eachindex(err)
         FLoops.@init st = init()

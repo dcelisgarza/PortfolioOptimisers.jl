@@ -722,8 +722,9 @@ end
     @test sorted(parse_equation("2e1 + 2f1 <= 1")) == (String[], Float64[], -39.0)
     @test sorted(parse_equation("2*f1 <= 1")) == (["f1"], [2.0], 1.0)
     @test isnothing(PO.collect_terms!(:x, 1.0, []))
-    @test PO._collect_terms(:(2 * 3 * 4)) == Any[(24.0, nothing)]
-    @test PO._collect_terms(:(x + 1)) isa Vector{Any}
+    @test PO._collect_terms(:(2 * 3 * 4)) == [(24.0, nothing)]
+    # The terms take the family of their values, not `Any` (#1979).
+    @test PO._collect_terms(:(x + 1)) isa Vector{Tuple{Number, PO.Option{String}}}
     # The right-hand side is accumulated in `datatype`.
     @test PO._parse_equation(:x, "<=", 1, Rational{Int}).rhs === 1 // 1
     # The uniform value is computed in `datatype`, so a Rational is exact.

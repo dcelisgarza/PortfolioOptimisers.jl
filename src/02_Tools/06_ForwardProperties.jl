@@ -108,6 +108,7 @@ function forward_walk_expr(path, struct_name, broadcast::Bool)
         return :(getfield(x, $(QuoteNode(path[1]))))
     end
     pathstr = join(string.(path), ".")
+    # `Any` is the last resort (#1979): `stmts` becomes the arguments of an `Expr(:block, …)`.
     stmts = Any[:(__v = getfield(x, $(QuoteNode(path[1]))))]
     for k in 2:length(path)
         nodestr = join(string.(view(path, 1:(k - 1))), ".")
@@ -249,6 +250,7 @@ macro forward_properties(T, block)
     if !(block isa Expr && block.head == :block)
         return error("@forward_properties: expected a `begin ... end` block of rules")
     end
+    # `Any` is the last resort (#1979): each list is spliced into the arguments of an `Expr`.
     getprop_branches = Any[]
     swap_branches = Any[]
     source_branches = Any[]

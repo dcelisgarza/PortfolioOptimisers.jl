@@ -785,7 +785,9 @@ function fold_pipeline(pipe::Pipeline, cache::Option{<:ReturnsBufferState}, data
     member = pipeline_online_member(pipe)
     @argcheck(isnothing(member),
               ArgumentError("the `$(member)` step holds an `Online` declaration that no warm-up resolved, and `partial_fit!(pipe, data)` would fold the estimator it wraps with no buffer, so its `max_history` would be ignored. Run the pipeline through an Online Scheme (`OnlineIndexWalkForward` or `OnlineDateWalkForward`), whose warm-up resolves the declaration, or hand the step the plain estimator."))
-    steps = collect(Any, pipe.steps)
+    # A fold can change the type of a step, so the steps stay a `Tuple`, and each fold
+    # replaces one entry with `Base.setindex` (#1979).
+    steps = pipe.steps
     block = data
     for i in 1:(k - 1)
         step = steps[i]
@@ -797,15 +799,15 @@ function fold_pipeline(pipe::Pipeline, cache::Option{<:ReturnsBufferState}, data
             continue
         end
         est, block = partial_fit_transform(est, block)
-        steps[i] = rewrap_step(step, est)
+        steps = Base.setindex(steps, rewrap_step(step, est), i)
     end
     @argcheck(isa(block, ReturnsResult),
               ArgumentError("the rows reach the `$(pipe.names[k])` step, the row owner, as a `$(typeof(block).name.name)`, and a prior or an optimiser folds a `ReturnsResult`: put a `PricesToReturns` step before it."))
     owner = step_estimator(steps[k])
     owner, cache = fold_pipeline_owner(owner, cache, block,
                                        pipeline_gap_sources(pipe.steps)[k])
-    steps[k] = rewrap_step(steps[k], owner)
-    return Pipeline(pipe.names, Tuple(steps), cache)
+    steps = Base.setindex(steps, rewrap_step(steps[k], owner), k)
+    return Pipeline(pipe.names, steps, cache)
 end
 """
     fold_pipeline_owner(pe::AbstractPriorEstimator, cache, rd::ReturnsResult,
@@ -933,6 +935,8 @@ function fit_pipeline_from_state(pipe::Pipeline, cache::Option{<:ReturnsBufferSt
     owner = step_estimator(pipe.steps[k])
     rd0 = pipeline_returns_result(owner, cache, pipe.names[k])
     n = length(pipe.steps)
+    # `Any` is the last resort (#1979): a `PipelineStep` that wraps a function fits to the
+    # value that the function returns, which can have any type.
     fitted = Vector{Any}(undef, n)
     idx = collect(1:length(rd0.nx))
     for i in 1:(k - 1)

@@ -365,7 +365,8 @@ Give each solver of a vector its own `name`. The name is the key of `trials`, an
   - [`Slv_VecSlv`](@ref)
 """
 function optimise_JuMP_model!(model::JuMP.Model, slv::Slv_VecSlv)
-    trials = Dict()
+    # A solver has a `Sym_Str` name, and each trial is a dictionary of its stages (#1979).
+    trials = Dict{Sym_Str, AbstractDict{Symbol}}()
     success = false
     for solver in slv
         try

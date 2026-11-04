@@ -516,13 +516,15 @@ A score of an observation reads the last [`lookback`](@ref) rows of the panel, a
 function descriptor_panel_scores(ds::DescriptorScores, rd::ReturnsResult)
     w = return_forecast_weights(rd)
     groups = exposure_group_labels(rd, ds.group)
-    # Each Descriptor writes its own entry of `sc`. `stack` promotes the number types of the
-    # scores, whatever the element type of `sc`. It reads `sc` through a generator, because
-    # JET reads its method for a `Vector{Any}` as a call to an `Array` method that no type
-    # has. The bound on `S` keeps the `Nothing` method of `return_forecast_cut` out of every
-    # caller's inference, where a `stack` over an abstract Descriptor vector reads as `Any`.
-    # A score is `observations × assets`, and the stack puts the observations last.
-    sc = Vector{Any}(undef, length(ds.descriptors))
+    # Each Descriptor writes its own entry of `sc`, in parallel, so `sc` is filled out of
+    # order. `composite_score` returns a `MatNum`, and the Descriptors vary across the family,
+    # so `MatNum` is the element type (#1979). `stack` promotes the number types of the
+    # scores. It reads `sc` through a generator, because JET reads its method for a vector of
+    # an abstract element type as a call to an `Array` method that no type has. The bound on
+    # `S` keeps the `Nothing` method of `return_forecast_cut` out of every caller's
+    # inference, where a `stack` over an abstract Descriptor vector reads as `Any`. A score
+    # is `observations × assets`, and the stack puts the observations last.
+    sc = Vector{MatNum}(undef, length(ds.descriptors))
     cross_sectional_foreach(ds.ex, eachindex(ds.descriptors)) do k
         return sc[k] = composite_score(ds.descriptors[k], rd, ds.outlier, ds.scoring, w,
                                        groups)

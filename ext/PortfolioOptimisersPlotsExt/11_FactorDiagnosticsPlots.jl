@@ -330,8 +330,9 @@ end
 const FACTOR_SUMMARY_LABELS = ["Ann. Return", "Ann. Vol", "Sharpe", "Autocorr", "Mean |t|",
                                "t Rate", "Mean VIF", "Stability", "Coverage"]
 function factor_summary_columns(fs::PortfolioOptimisers.FactorSummaryResult)
-    vals = Any[fs.ann_return, fs.ann_volatility, fs.sharpe, fs.autocorr, fs.mean_abs_t,
-               fs.t_rate, fs.mean_vif, fs.stability, fs.coverage]
+    # The literal takes the element type of the figures, a vector or `nothing` (#1979).
+    vals = [fs.ann_return, fs.ann_volatility, fs.sharpe, fs.autocorr, fs.mean_abs_t,
+            fs.t_rate, fs.mean_vif, fs.stability, fs.coverage]
     keep = [i for i in eachindex(vals) if !isnothing(vals[i])]
     K = length(fs.ann_return)
     M = Matrix{Float64}(undef, length(keep), K)

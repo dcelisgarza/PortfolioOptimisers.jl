@@ -1368,9 +1368,10 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
                                    strict = sh.opt.strict, datatype = T)
     params = sh.params
     # Each bundle returns the `gamma` it ran at, of that bundle's own type. The vector
-    # literal below promotes them to one type.
-    gammas = Vector{Any}(undef, length(params))
-    rs = Vector{Any}(undef, length(params))
+    # literal below promotes them to one type. The two vectors name the families that the
+    # result admits (#1979).
+    gammas = Vector{Number}(undef, length(params))
+    rs = Vector{Sd_Var}(undef, length(params))
     w = zeros(T, size(X, 2))
     for (i, ps) in enumerate(params)
         wi, gamma, ri = schur_complement_weights(pr, items, wb, ps)

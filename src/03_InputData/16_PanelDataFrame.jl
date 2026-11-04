@@ -24,7 +24,7 @@ The method that Julia selects is the algorithm.
 
 # Returns
 
-  - `cols::Vector{Tuple{String, Any, Any, Any}}`: One `(name, vals, omsk, pmsk)` tuple per column, in column order. The value slab of a numeric or a tensor Panel Field is the array of the Panel Field or a view of it, not a copy.
+  - `cols::Vector{<:Tuple}`: One `(name, vals, omsk, pmsk)` tuple per column, in column order. The vector takes the type of its tuples. The value slab of a numeric or a tensor Panel Field is the array of the Panel Field or a view of it, not a copy.
 
 # Related
 
@@ -34,18 +34,17 @@ The method that Julia selects is the algorithm.
   - [`panel_array_view`](@ref)
 """
 function panel_frame_columns(f::NumericPanelField, ::Bool)
-    return Tuple{String, Any, Any, Any}[(String(f.name), f.vals, f.omsk, f.pmsk)]
+    return [(String(f.name), f.vals, f.omsk, f.pmsk)]
 end
 function panel_frame_columns(f::CategoricalPanelField, decode::Bool)
     vals = decode ? [f.levels[c] for c in f.codes] : f.codes
-    return Tuple{String, Any, Any, Any}[(String(f.name), vals, f.omsk, f.pmsk)]
+    return [(String(f.name), vals, f.omsk, f.pmsk)]
 end
 function panel_frame_columns(f::TensorPanelField, ::Bool)
     # A label slice is `assets` or `assets × observations`, and a slab is the transpose.
     slab(A, l) = panel_column_transpose(panel_tensor_view(A, :, :, l))
-    return Tuple{String, Any, Any, Any}[("$(f.name)=$(f.labels[l])", slab(f.vals, l),
-                                         slab(f.omsk, l), slab(f.pmsk, l))
-                                        for l in eachindex(f.labels)]
+    return [("$(f.name)=$(f.labels[l])", slab(f.vals, l), slab(f.omsk, l), slab(f.pmsk, l))
+            for l in eachindex(f.labels)]
 end
 """
     panel_frame_fields(pnl::AssetPanel, fields::Nothing)

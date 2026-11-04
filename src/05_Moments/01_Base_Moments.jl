@@ -1355,6 +1355,7 @@ function windowed_parse_forward(ex)
     if !(input in WINDOWED_ESTIMATOR_INPUTS)
         windowed_estimator_error("a `forward` entry's input type must be one of $(WINDOWED_ESTIMATOR_INPUTS); got `$(input)`.")
     end
+    # `Any` is the last resort (#1979): the other branch is `rets.args`, a `Vector{Any}`.
     raw = Meta.isexpr(rets, :tuple) ? rets.args : Any[rets]
     keys_ = Symbol[]
     for r in raw
@@ -1520,7 +1521,8 @@ function windowed_method_doc(gen, field::Symbol, name::Symbol, input::Symbol,
     n0 = Int(is_pnl)
     sig = windowed_method_sig(gen, field, name, input, has_mean)
     # The summary names the *generic*, not the type's noun: `std` on a WindowedVariance
-    # computes a standard deviation, not a variance.
+    # computes a standard deviation, not a variance. `Any` is the last resort (#1979): `parts`
+    # becomes the arguments of an `Expr(:string, …)`.
     parts = Any["\n", sig,
                 "\n\nCompute `$(gen)` over a rolling or indexed window of observations, for $(is_pnl ? "an Asset Panel" : is_mat ? "a matrix" : "a vector") input.\n\nThe method selects a window of observations from `X`, and applies the observation weights when the estimator holds them. Then it calls the inner $(lc) estimator.$(is_pnl ? " It cuts the Asset Panel to the same observations and gives it to the inner estimator. A mask-aware inner estimator then reads the active mask of the window, and a plain one reduces to the Coverage Universe of the window." : "")\n\n# Algorithm\n\n$(is_pnl ? " 1. Cut `pnl` to the observations of the window with [`windowed_panel`](@ref).\n" : "") $(1 + n0). Resolve the window and the observation weights with [`windowed_preamble`](@ref). It returns `inner`, a copy of `$(field).$(field)` that holds the windowed weights, and the windowed `X`$(is_mat ? ", the windowed `iv`, and the `active_mask` and `estimation_mask` keywords cut to the window" : "").\n $(2 + n0). Call `$(gen)` on `inner` and the windowed `X`$(is_pnl ? " and `pnl`" : ""), and return its result. The inner estimator alone computes the value. This method changes only the observations and the weights that the inner estimator gets.\n\n# Arguments\n\n  - `$(field)`: Windowed $(lc) estimator.\n  - `X`: Data $(is_mat ? "matrix of asset returns, `observations × assets`" : "vector of returns").\n"]
     if is_pnl
@@ -1589,6 +1591,7 @@ function windowed_method_def(gen, field::Symbol, name::Symbol, input::Symbol,
     inner = Expr(:., field, QuoteNode(field))
     w = Expr(:., field, QuoteNode(:w))
     window = Expr(:., field, QuoteNode(:window))
+    # `Any` is the last resort (#1979): each list below becomes the arguments of an `Expr`.
     if input === :VecNum
         kws = has_mean ? Any[Expr(:kw, :mean, nothing)] : Any[]
         call = has_mean ? Any[:(mean = mean)] : Any[]
@@ -1668,6 +1671,8 @@ function windowed_type_doc(name::Symbol, super, field::Symbol, ftype, default,
                            methods::Vector{String}, refuses_variance::Bool)
     lc = lowercasefirst(noun)
     inner_ref = Meta.isexpr(default, :call) ? default.args[1] : default
+    # `Any` is the last resort (#1979): `validation` and `parts` become the arguments of an
+    # `Expr(:string, …)`.
     validation = if refuses_variance
         Any[:(val_dict[:ce_cov]), "\n  - ", :(val_dict[:oow])]
     else
@@ -1839,6 +1844,7 @@ macro windowed_estimator(head, body)
     specs = [windowed_parse_forward(f) for f in forward]
     append!(specs, [(g, :AssetPanel, m, k) for (g, i, m, k) in specs if i === :MatNum])
     refs = [windowed_method_ref(gen, field, name, input) for (gen, input, _, _) in specs]
+    # `Any` is the last resort (#1979): `defs` becomes the arguments of an `Expr(:block, …)`.
     defs = Any[]
     siblings = String[]
     for (i, (gen, input, has_mean, ret_keys)) in pairs(specs)

@@ -384,7 +384,8 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     end
     T = length(w)
     factor = inv(sqrt(T))
-    blocks = Any[(fill(factor, 1, T), [factor])]
+    #! A block has the type of a value of `epc` (#1979).
+    blocks = Tuple{MatNum, VecNum}[(fill(factor, 1, T), [factor])]
     wbs = AbstractMatrix[[typemin(eltype(w)) typemax(eltype(w))]]
     #! The keys of `epc` are `Symbol`s, which hash by their address, so the order of the
     #! `Dict` moves between two processes. The blocks stack in the sorted order of their keys,
@@ -474,7 +475,8 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     end
     T = length(w)
     factor = inv(sqrt(T))
-    blocks = Any[(fill(factor, 1, T), [factor])]
+    #! A block has the type of a value of `epc` (#1979).
+    blocks = Tuple{MatNum, VecNum}[(fill(factor, 1, T), [factor])]
     wbs = AbstractMatrix[[typemin(eltype(w)) typemax(eltype(w))]]
     #! The keys of `epc` are `Symbol`s, which hash by their address, so the order of the
     #! `Dict` moves between two processes. The blocks stack in the sorted order of their keys,

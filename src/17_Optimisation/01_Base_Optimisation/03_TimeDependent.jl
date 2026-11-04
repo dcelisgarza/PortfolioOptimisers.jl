@@ -1288,12 +1288,10 @@ They are the entries of a vector schedule, and `default` when it is set. A funct
   - [`TimeDependent`](@ref)
 """
 function time_dependent_entries(td::TimeDependent)
-    v = td.val
-    entries = isa(v, AbstractVector) ? collect(Any, v) : Any[]
-    if !isa(td.default, NoDefault)
-        push!(entries, td.default)
-    end
-    return entries
+    v = isa(td.val, AbstractVector) ? td.val : Union{}[]
+    d = isa(td.default, NoDefault) ? Union{}[] : [td.default]
+    # The entries take the join of the two kinds of value, and no value is converted (#1979).
+    return append!(Vector{Base.promote_typejoin(eltype(v), eltype(d))}(v), d)
 end
 """
     reader_frames(td::TimeDependent, path::AbstractString, refit::Bool) -> ReturnsFrames

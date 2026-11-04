@@ -250,7 +250,10 @@ cannot read past it.
   values, such as the join of a part that was empty and took an inferred type.
 - **A copy that takes values of two kinds promotes.** Write
   `Vector{promote_type(eltype(a), eltype(b))}(a)`, never `collect(Any, a)`. Base promotes a `Pair`
-  and a `NamedTuple` field by field, so the result names the family of the values.
+  and a `NamedTuple` field by field, so the result names the family of the values. When a
+  conversion changes a value that must stay as it is, take `typejoin` or `Base.promote_typejoin`
+  in its place: `promote_type(Vector{Symbol}, Vector{String})` is `Vector{Any}`, and the copy
+  converts each list to it (#1979).
 - **A container filled out of order is built in parts.** Build each part with a comprehension,
   and join the parts in order, for example `vcat(m1, m2)[invperm(vcat(i1, i2))]`. Do not
   preallocate `Vector{Any}(undef, n)` to fill it by index.
@@ -260,8 +263,11 @@ cannot read past it.
 
 Keep `Any` only where no narrower type exists, and write a comment beside it that states why. The
 argument list of an `Expr` is the known case, because Julia defines `Expr.args` as a
-`Vector{Any}`, so code generation that builds one keeps `Any[]`. No census holds the rule yet.
-Issue #1979 holds the sweep of the sites that predate it and the census that will gate it.
+`Vector{Any}`, so code generation that builds one keeps `Any[]`. A value of any type is the
+other case, such as a value that `throw` takes or the value that a function step of a `Pipeline`
+returns. `test/test_87_any_container_census.jl` gates the rule. It reads the parse tree of
+`src/` and `ext/`, and its `ALLOWED` list names each definition that keeps `Any`, with the
+reason.
 
 ## A divisor's correction is named by who makes it
 

@@ -314,7 +314,7 @@ function statistics_table(rows::DataFrames.AbstractDataFrame)
     tab = rows[:, cols]
     if DataFrames.nrow(tab) == 1
         return ReportTable(DataFrames.DataFrame(; figure = cols,
-                                                value = Any[tab[1, c] for c in cols]))
+                                                value = [tab[1, c] for c in cols]))
     end
     return ReportTable(tab; caption = "One row for each path and member.", sortable = true)
 end

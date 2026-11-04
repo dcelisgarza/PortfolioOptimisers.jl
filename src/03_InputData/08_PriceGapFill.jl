@@ -552,26 +552,22 @@ end
 function fit_preprocessing(est::PriceGapFill, pr::PricesResult)::PriceGapFillResult
     names = TimeSeries.colnames(pr.X)
     vals = values(pr.X)
-    keep = Vector{Int}(undef, 0)
-    v = Vector{Any}(undef, 0)
     obs = Vector{nonmissingtype(eltype(vals))}(undef, 0)
     span = prices_listing_span(pr)
-    for i in axes(vals, 2)
-        t = findlast(!is_missing_value, view(vals, :, i))
-        #! A statistic has no price to reduce, so an unpriced asset gets no entry. A carry
-        #! keeps the asset with a `missing` seed, so a later window fills its gaps from the
-        #! prices of that window, as the online step does (#1974).
-        if isnothing(t) && !isa(est.fill, CarriedPrice)
-            continue
-        end
-        append!(empty!(obs), Iterators.filter(!is_missing_value, view(vals, :, i)))
-        #! A later window cannot see an absence at the end of this one, so the seed is
-        #! retired here when the listing breaks after the last observed price.
-        push!(keep, i)
-        push!(v, gap_fill_seed(est.fill, obs, !isnothing(t) && gap_fill_open(span, i, t)))
-    end
-    return PriceGapFillResult(names[keep], identity.(v), last(TimeSeries.timestamp(pr.X)),
-                              est.fill, est.strict)
+    ts = [findlast(!is_missing_value, view(vals, :, i)) for i in axes(vals, 2)]
+    #! A statistic has no price to reduce, so an unpriced asset gets no entry. A carry
+    #! keeps the asset with a `missing` seed, so a later window fills its gaps from the
+    #! prices of that window, as the online step does (#1974).
+    keep = [i for i in axes(vals, 2) if !isnothing(ts[i]) || isa(est.fill, CarriedPrice)]
+    #! A later window cannot see an absence at the end of this one, so the seed is
+    #! retired here when the listing breaks after the last observed price. The seeds take
+    #! the element type of their values (#1979).
+    v = [gap_fill_seed(est.fill,
+                       append!(empty!(obs),
+                               Iterators.filter(!is_missing_value, view(vals, :, i))),
+                       !isnothing(ts[i]) && gap_fill_open(span, i, ts[i])) for i in keep]
+    return PriceGapFillResult(names[keep], v, last(TimeSeries.timestamp(pr.X)), est.fill,
+                              est.strict)
 end
 function apply_preprocessing(res::PriceGapFillResult, pr::PricesResult)::PricesResult
     names = TimeSeries.colnames(pr.X)

@@ -1687,7 +1687,7 @@ The walk starts from the coefficient `one(datatype)`, so the coefficients that i
 
 # Returns
 
-  - `terms::Vector{Any}`: A vector of `(coefficient, variable)` pairs, where `variable` is a string for variable terms or `nothing` for constant terms. The vector is untyped, and each coefficient has the type that the arithmetic of the walk gives from `one(datatype)`.
+  - `terms::Vector{Tuple{Number, Option{String}}}`: A vector of `(coefficient, variable)` pairs, where `variable` is a string for variable terms or `nothing` for constant terms. Each coefficient has the type that the arithmetic of the walk gives from `one(datatype)`, and a division can widen it, so the element type names the family of numbers.
 
 # Related
 
@@ -1695,7 +1695,7 @@ The walk starts from the coefficient `one(datatype)`, so the coefficients that i
   - [`_parse_equation`](@ref)
 """
 function _collect_terms(expr, datatype::DataType = Float64)
-    terms = []
+    terms = Tuple{Number, Option{String}}[]
     collect_terms!(expr, one(datatype), terms)
     return terms
 end
@@ -1742,6 +1742,7 @@ function collect_terms!(expr, coeff, terms)::Nothing
         # `2*3*x` parses as one call with three factors, so every numeric factor joins the
         # coefficient, and the factors that are left make the term.
         c = coeff
+        # `Any` is the last resort (#1979): `rest` becomes the arguments of an `Expr`.
         rest = Any[]
         for a in view(expr.args, 2:length(expr.args))
             isa(a, Number) ? (c *= oftype(coeff, a)) : push!(rest, a)

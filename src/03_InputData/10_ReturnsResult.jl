@@ -977,7 +977,8 @@ function shared_series_cut(rd::ReturnsResult, x_src::Option{<:AbstractReturnsSou
     return benchmark_estimation_mask(rd, x_src)
 end
 """
-    shared_series_estimator(est, rows::Option{<:VecInt}, T::Integer) -> typeof(est)
+    shared_series_estimator(est, rows::Nothing, T::Integer) -> typeof(est)
+    shared_series_estimator(est, rows::VecInt, T::Integer)
 
 Return the estimator that a fit reads after a Shared Series gap, with each observation weight of the dropped observations dropped.
 
@@ -987,8 +988,10 @@ A [`DynamicAbstractWeights`](@ref) keeps its value, because it resolves on the s
 
 # Algorithm
 
- 1. Return `est` when `rows` is `nothing`, because the fit keeps every observation.
- 2. Mark the kept observations in a mask of `T` entries, and cut `est` with [`obs_weights_view`](@ref) at the mask. Each weights field goes through [`obs_weights_index`](@ref), which checks that a weight vector has `T` entries.
+The method that Julia selects is the algorithm.
+
+ 1. `rows` is `nothing`: return `est`, because the fit keeps every observation.
+ 2. `rows` is a vector: mark the kept observations in a mask of `T` entries, and cut `est` with [`obs_weights_view`](@ref) at the mask. Each weights field goes through [`obs_weights_index`](@ref), which checks that a weight vector has `T` entries.
 
 # Arguments
 
@@ -1023,10 +1026,10 @@ julia> PortfolioOptimisers.shared_series_estimator(ce, [1, 3, 4], 4).w
   - [`obs_weights_view`](@ref)
   - [`observed_weights`](@ref)
 """
-function shared_series_estimator(est, rows::Option{<:VecInt}, T::Integer)
-    if isnothing(rows)
-        return est
-    end
+function shared_series_estimator(est, ::Nothing, ::Integer)
+    return est
+end
+function shared_series_estimator(est, rows::VecInt, T::Integer)
     obs = falses(T)
     obs[rows] .= true
     return obs_weights_view(est, obs)

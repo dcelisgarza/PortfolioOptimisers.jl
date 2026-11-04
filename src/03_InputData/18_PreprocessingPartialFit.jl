@@ -378,16 +378,8 @@ Puts the series columns of the price data `pr` side by side: the assets, then th
   - [`prices_to_returns`](@ref)
 """
 function series_values(pr::PricesResult)
-    cols = Any[values(unify_gaps(pr.X))]
-    if !isnothing(pr.F)
-        push!(cols, values(unify_gaps(pr.F)))
-    end
-    if !isnothing(pr.B)
-        push!(cols, values(unify_gaps(pr.B)))
-    end
-    if !isnothing(pr.E)
-        push!(cols, values(unify_gaps(pr.E)))
-    end
+    # The blocks take the element type of their values (#1979).
+    cols = [values(unify_gaps(s)) for s in (pr.X, pr.F, pr.B, pr.E) if !isnothing(s)]
     return reduce(hcat, cols)
 end
 """
@@ -588,16 +580,9 @@ Puts the series columns of the returns data `rd` side by side, in the order of [
   - [`returns_with_series`](@ref)
 """
 function series_values_returns(rd::ReturnsResult)
-    cols = Any[Matrix(rd.X)]
-    if !isnothing(rd.F)
-        push!(cols, Matrix(rd.F))
-    end
-    if !isnothing(rd.B)
-        push!(cols, isa(rd.B, AbstractVector) ? reshape(collect(rd.B), :, 1) : Matrix(rd.B))
-    end
-    if !isnothing(rd.E)
-        push!(cols, Matrix(rd.E))
-    end
+    # The blocks take the element type of their values (#1979). Only `B` can be a vector.
+    cols = [isa(s, AbstractVector) ? reshape(collect(s), :, 1) : Matrix(s)
+            for s in (rd.X, rd.F, rd.B, rd.E) if !isnothing(s)]
     return reduce(hcat, cols)
 end
 """

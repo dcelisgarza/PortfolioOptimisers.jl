@@ -482,7 +482,9 @@ function cross_sectional_fold_variance(ve, E::MatNum, em::AbstractMatrix{Bool},
                 V = variance_series(ve, E; dims = 1, estimation_mask = em,
                                     active_mask = am), ve = ve)
     end
-    rows = Vector{Any}(undef, 0)
+    # Each row folds the estimator into the next, so the rows are not a comprehension. A row
+    # is a matrix of numbers (#1979).
+    rows = MatNum[]
     if seed > 0
         b = 1:seed
         push!(rows,

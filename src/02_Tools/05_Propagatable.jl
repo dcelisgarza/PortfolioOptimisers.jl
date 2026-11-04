@@ -368,7 +368,8 @@ function prop_channel_pairs(channel::Symbol, tagged::AbstractDict,
                             all_fields::AbstractVector{Symbol}, obj::Symbol, mod::Module,
                             thread)
     precedence = getproperty(PROP_TAG_CHANNELS, channel).precedence
-    pairs      = Any[]
+    # `Any` is the last resort (#1979): `pairs` becomes the arguments of an `Expr`.
+    pairs = Any[]
     for fname in all_fields
         xf  = Expr(:., obj, QuoteNode(fname))
         idx = findfirst(tag -> fname in tagged[tag], precedence)
@@ -618,7 +619,8 @@ new tag needs no change here.
 function propagatable_parse_body(body)
     tagged     = Dict{Symbol, Vector{Symbol}}(tag => Symbol[] for tag in PROP_TAG_NAMES)
     all_fields = Symbol[]
-    new_args   = Any[]
+    # `Any` is the last resort (#1979): `new_args` becomes the arguments of an `Expr(:block, …)`.
+    new_args = Any[]
     function _record!(fname, tags)
         for tag in tags
             push!(tagged[tag], fname)
@@ -1295,6 +1297,7 @@ macro propagatable(expr)
         end
     end
 
+    # `Any` is the last resort (#1979): `defs` is spliced into the arguments of an `Expr`.
     defs = Any[factory_def]
 
     # --- view propagation (@vprop) — emit only when a field opts in ---

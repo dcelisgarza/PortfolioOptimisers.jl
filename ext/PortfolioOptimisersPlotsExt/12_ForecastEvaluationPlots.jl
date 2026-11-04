@@ -413,18 +413,20 @@ forecast_summary_name_axis(name) = [name]
 forecast_summary_spread_column(S::AbstractMatrix, j::Integer) = S[:, j]
 forecast_summary_spread_column(S::AbstractVector, j::Integer) = S[j]
 function forecast_summary_columns(fs::PortfolioOptimisers.ForecastSummaryResult)
-    vals = Any[fs.spearman_mean_ic, fs.spearman_ic_ir, fs.pearson_mean_ic, fs.pearson_ic_ir,
-               fs.rank_ann_return, fs.rank_sharpe, fs.zscore_ann_return, fs.zscore_sharpe,
-               fs.calibration_slope, fs.mean_coverage]
     labels = copy(FORECAST_SUMMARY_LABELS)
     partial = isnothing(fs.spread_sharpe)
-    if !partial
+    spreads = if partial
+        ()
+    else
         qs::AbstractVector = fs.quantiles
-        for j in eachindex(qs)
-            push!(vals, forecast_summary_spread_column(fs.spread_sharpe, j))
-            push!(labels, "Spread Sharpe q = $(qs[j])")
-        end
+        append!(labels, ["Spread Sharpe q = $(q)" for q in qs])
+        Tuple(forecast_summary_spread_column(fs.spread_sharpe, j) for j in eachindex(qs))
     end
+    # The figures and the spreads are joined in one literal, which takes their element
+    # type (#1979).
+    vals = [fs.spearman_mean_ic, fs.spearman_ic_ir, fs.pearson_mean_ic, fs.pearson_ic_ir,
+            fs.rank_ann_return, fs.rank_sharpe, fs.zscore_ann_return, fs.zscore_sharpe,
+            fs.calibration_slope, fs.mean_coverage, spreads...]
     K = length(forecast_summary_name_axis(fs.names))
     M = Matrix{Float64}(undef, length(vals), K)
     for r in eachindex(vals)

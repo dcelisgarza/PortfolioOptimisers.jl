@@ -425,7 +425,7 @@ function failed_solve_msg(trials::AbstractDict; max_line_length::Integer = 200)
     msg = "Model could not be solved satisfactorily ($(length(trials)) solver trial(s))."
     for name in sort!(collect(keys(trials)); by = string)
         trial = trials[name]
-        stages = trial isa AbstractDict ? trial : Dict{Symbol, Any}(:trial => trial)
+        stages = trial isa AbstractDict ? trial : Dict(:trial => trial)
         for stage in sort!(collect(keys(stages)); by = string)
             if stage in (:settings, :err)
                 continue
