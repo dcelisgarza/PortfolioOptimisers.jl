@@ -1065,7 +1065,7 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> GeneralisedLinearModel()
 GeneralisedLinearModel
-     args ┼ Tuple{Distributions.Normal{Float64}}: (Distributions.Normal{Float64}(μ=0.0, σ=1.0),)
+     args ┼ Tuple{Distributions.Normal{Float64}}: (Normal(0.0, 1.0),)
    kwargs ┼ @NamedTuple{}: NamedTuple()
   variant ┴ nothing
 ```
