@@ -1633,7 +1633,13 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
                                                                                         alg = MinimumNormSolve())
         @test_throws ArgumentError CrossSectionalTargetRegression(LinearModel(),
                                                                   MinimumNormSolve(), false,
+                                                                  true,
                                                                   PortfolioOptimisers.FLoops.SequentialEx())
+        # `NormalEquationsSolve()` gives a design that fails its test to the projection, so
+        # the same rule refuses a target that is not basis invariant, and names the member.
+        @test_throws "NormalEquationsSolve() projects the fit of LeverageTestTarget" CrossSectionalTargetRegression(;
+                                                                                                                    tgt = LeverageTestTarget(),
+                                                                                                                    alg = NormalEquationsSolve())
         # The projection keeps the answer of a target only when the target reads the design
         # through the linear predictor alone, which `is_basis_invariant` states. A target
         # that keeps its default answer is refused under the default, and named.
@@ -1986,12 +1992,15 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
               BitVector([false, false, true])
         # With the intercept column, the constant minus the level's column is the other
         # level's own direction, so a lone member of either level is marked, and a level of
-        # two members on each side marks nothing.
-        @test lo([0.0; 0.0; 1.0;;], [1.0, 1.0, 1.0], true) ==
+        # two members on each side marks nothing. Under an intercept the verb reads the
+        # exposures centred on their weighted means, as the regression hands them over.
+        cen(A, w) = A .- (w' * A) ./ sum(w)
+        @test lo(cen([0.0; 0.0; 1.0;;], ones(3)), ones(3), true) ==
               BitVector([false, false, true])
-        @test lo([0.0; 1.0; 1.0;;], [1.0, 1.0, 1.0], true) ==
+        @test lo(cen([0.0; 1.0; 1.0;;], ones(3)), ones(3), true) ==
               BitVector([true, false, false])
-        @test lo([0.0; 0.0; 1.0; 1.0;;], [1.0, 2.0, 1.0, 3.0], true) == falses(4)
+        w4 = [1.0, 2.0, 1.0, 3.0]
+        @test lo(cen([0.0; 0.0; 1.0; 1.0;;], w4), w4, true) == falses(4)
         # A result a caller builds by hand states no mark, and the constructor checks one.
         f = [1.0 2.0; 3.0 4.0]
         e = [0.1 0.2 0.3; 0.4 0.5 0.6]

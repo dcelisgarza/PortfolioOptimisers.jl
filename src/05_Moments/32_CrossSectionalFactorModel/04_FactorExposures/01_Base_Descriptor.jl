@@ -246,8 +246,7 @@ A fill changes an array that its caller owns, so it cannot widen the element typ
 
   - [`descriptor_active_fill!`](@ref)
   - [`exposure_active_fill!`](@ref)
-  - [`one_hot_level_fill!`](@ref)
-  - [`one_hot_observed_fill!`](@ref)
+  - [`one_hot_fill!`](@ref)
 """
 function nan_fill_value(A::AbstractArray{<:Number})::Number
     T = eltype(A)

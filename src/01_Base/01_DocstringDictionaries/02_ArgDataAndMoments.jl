@@ -73,6 +73,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :dretgt => "`retgt`: Regression model target.",#
                  :drtgt => "`drtgt`: Dimension reduction target.",#
                  :csrint => "`intercept`: Whether a per-observation intercept is fitted. When `false`, the regression runs through the origin of the cross-section.",
+                 :csrlev => "`leverage`: Whether the fit marks the Leverage-One Pairs of each observation in the `h1` field of [`CrossSectionalRegression`](@ref), through [`cross_sectional_leverage_one`](@ref). When `false`, the fit runs no leverage check and `h1` is `nothing`, so every reader of the mask reads every residual as data.",
                  :csalg => "`alg`: Solve algorithm, an [`AbstractCrossSectionalSolveAlgorithm`](@ref). It decides what the fit does with a rank-deficient weighted design.",#
                  :mcap_p => "`p`: Exponent applied to the market capitalisation. A value of `0` needs no capitalisation matrix, because every eligible asset then takes the same weight.",#
                  ## Gerber

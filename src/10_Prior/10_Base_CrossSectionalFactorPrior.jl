@@ -1768,7 +1768,12 @@ function cross_sectional_lift(srep::Option{<:AbstractSystematicRepair},
     Ls = L[sdx, :]
     # The product is symmetric only to rounding, and a covariance is exactly symmetric.
     ss = Matrix(LinearAlgebra.Symmetric(support_product(Ls, f_sigma, Ls)))
-    ss .+= esigma isa AbstractVector ? LinearAlgebra.diagm(esigma[sdx]) : esigma[sdx, sdx]
+    # A vector of variances adds to the diagonal alone, with no dense matrix of it.
+    if esigma isa AbstractVector
+        view(ss, LinearAlgebra.diagind(ss)) .+= view(esigma, sdx)
+    else
+        ss .+= view(esigma, sdx, sdx)
+    end
     # The systematic root of an asset is a root of its factor covariance, so it exists only
     # when its support lies in the ready factors.
     cdx = filter(i -> all(k -> rdy[k] || iszero(L[i, k]), axes(L, 2)), sdx)

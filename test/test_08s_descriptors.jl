@@ -648,11 +648,10 @@ end
     PortfolioOptimisers.exposure_active_fill!(L3, pnl)
     @test isnan(real(L3[1, 2, 1])) && L3[1, 1, 1] == 1
 
-    B = fill(one(Complex{Float64}), 2, 2, 2)
-    PortfolioOptimisers.one_hot_observed_fill!(B, [true false; true true])
-    @test isnan(real(B[1, 2, 1])) && B[1, 1, 1] == 1
-    PortfolioOptimisers.one_hot_observed_fill!(B, nothing)
-    @test B[1, 1, 1] == 1
+    B = Array{Complex{Float64}}(undef, 2, 2, 2)
+    PortfolioOptimisers.one_hot_fill!(B, [1 2; 2 1], [true false; true true])
+    @test isnan(real(B[1, 2, 1])) && isnan(real(B[1, 2, 2]))
+    @test B[1, 1, 1] == 1 && iszero(B[1, 1, 2]) && B[2, 1, 2] == 1 && iszero(B[2, 1, 1])
 
     X = Complex{Float64}[1 2; 3 4]
     @test isnan(real(PortfolioOptimisers.ew_active_returns(X, pnl)[1, 2]))
@@ -709,14 +708,12 @@ Base.convert(::Type{NaNProbe726}, x::Float64) = throw(DomainError(x, "NaNProbe72
                                                                              pnl)
         @test_throws ArgumentError PortfolioOptimisers.exposure_active_fill!(ones(T, 2, 2,
                                                                                   2), pnl)
-        @test_throws ArgumentError PortfolioOptimisers.one_hot_observed_fill!(ones(T, 2, 2,
-                                                                                   2), omsk)
-        @test isnothing(PortfolioOptimisers.one_hot_observed_fill!(ones(T, 2, 2, 2),
-                                                                   nothing))
-    end
-    for T in (Int, Rational{Int})
-        @test_throws ArgumentError PortfolioOptimisers.one_hot_level_fill!(zeros(T, 2, 2,
-                                                                                 2))
+        # The one-hot fill converts NaN before it writes, so it refuses the type even when
+        # every cell is live, as the fill of the unset levels did before #1971.
+        for live in (omsk, trues(2, 2))
+            @test_throws ArgumentError PortfolioOptimisers.one_hot_fill!(ones(T, 2, 2, 2),
+                                                                         [1 2; 2 1], live)
+        end
     end
 
     # The type of the array is kept: a Float32 array takes NaN32, a BigFloat array a BigFloat.

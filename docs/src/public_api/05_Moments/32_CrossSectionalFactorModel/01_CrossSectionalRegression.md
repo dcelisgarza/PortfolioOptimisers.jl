@@ -13,6 +13,7 @@ RankDeficiencyRefusal
 UncheckedSolve
 MinimumNormSolve
 DependentColumnDrop
+NormalEquationsSolve
 AbstractUnseenMemberRule
 ZeroUnseenMember
 SolvedUnseenMember

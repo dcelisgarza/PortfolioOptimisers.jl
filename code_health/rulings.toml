@@ -837,6 +837,28 @@ rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
 # takes no entry here, because the entry would also cover that report. Those files are the
 # entropy pooling moment views, the tail view solve, the Meucci prior and the meta optimisation.
 
+# The leverage read of #1971 takes the forms that the LinearAlgebra manual gives: the division of
+# the gathered columns by the `UpperTriangular` factor of the pivoted QR, and the product of `F.Q`
+# with the first `r` columns of the identity. JET analyses the method under its declared types, an
+# abstract `D` and an untyped `F`, and reports inside the broadcast and the tuple machinery of
+# LinearAlgebra. The product line carried its report in `01_CrossSectionalRegression.jl` before the
+# file split, and the division line replaced the `Q` path of a well-conditioned design. Measured on
+# 2026-11-04 with Julia 1.13.3 and JET 0.13.1: the two reports are the only two of the file.
+
+[[dismissal]]
+file = "src/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalLeverage.jl"
+kind = "MethodErrorReport"
+message = "no matching method found `newindex(::LinearAlgebra.BandIndex, ::Tuple{Bool}, ::Tuple{Int64})`"
+count = 1
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalLeverage.jl"
+kind = "BuiltinErrorReport"
+message = "BoundsError: attempt to access Tuple{Int64} at index [2]: getfield"
+count = 1
+rationale = "a-form-its-package-recommends"
+
 [[dismissal]]
 file = "src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_a.jl"
 kind = "BuiltinErrorReport"

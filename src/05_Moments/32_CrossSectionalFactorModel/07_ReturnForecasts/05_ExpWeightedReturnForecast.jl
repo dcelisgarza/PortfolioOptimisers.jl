@@ -351,6 +351,7 @@ ExpWeightedReturnForecast
             │           cre ┼ CrossSectionalLinearRegression
             │               │         alg ┼ PseudoInverseFallback()
             │               │   intercept ┼ Bool: true
+            │               │    leverage ┼ Bool: true
             │               │          ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
             │       outlier ┼ CrossSectionalWinsoriser
             │               │    low ┼ Float64: 0.01

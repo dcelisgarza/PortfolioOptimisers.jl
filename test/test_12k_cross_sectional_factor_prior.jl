@@ -1900,6 +1900,30 @@ end
               fill((sum(cn.edof) / sum(cn.n)) / (sum(cl.edof) / sum(cl.n)),
                    length(pl.rr.edof))
     end
+    @testset "A fit with no leverage check keeps the prior of a design with no pair to mark (#1971)" begin
+        rdc = csfp_panel(; n_assets = 20, n_observations = 60, n_industries = 3,
+                         seed = 1_971).rd
+        mk(cre; l1mask = MaskedLeverageOne()) = prior(CrossSectionalFactorPrior(;
+                                                                                factors = csfp_factors(),
+                                                                                minra = 5,
+                                                                                cre = cre,
+                                                                                l1mask = l1mask),
+                                                      rdc)
+        on = mk(CrossSectionalLinearRegression())
+        @test !any(on.rr.csr.h1)
+        # With no mark, both Leverage-One Masks read the same residuals, so the skip changes
+        # no moment. The market column is the sum of the industry columns, so
+        # `NormalEquationsSolve` gives every observation to the default and keeps it too.
+        for cre in (CrossSectionalLinearRegression(; leverage = false),
+                    CrossSectionalLinearRegression(; alg = NormalEquationsSolve(), leverage = false)),
+            l1mask in (MaskedLeverageOne(), UnmaskedLeverageOne())
+
+            off = mk(cre; l1mask = l1mask)
+            @test isnothing(off.rr.csr.h1)
+            @test isequal(off.mu, on.mu)
+            @test isequal(off.sigma, on.sigma)
+        end
+    end
 end
 
 #=

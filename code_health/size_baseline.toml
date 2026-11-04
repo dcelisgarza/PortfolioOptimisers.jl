@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.3"
 julia_syntax = "1.0.2"
-commit = "e3f1925ee2"
+commit = "b1d571f7a0"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { code = 287, doc = 0, comment = 12, blank = 2, total = 301 }
@@ -182,6 +182,7 @@ commit = "e3f1925ee2"
 "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { code = 249, doc = 506, comment = 8, blank = 215, total = 978 }
 "src/05_Moments/32_CrossSectionalFactorModel/11_CrossSectionalIdiosyncraticDiagnostics.jl" = { code = 242, doc = 506, comment = 1, blank = 218, total = 967 }
 "src/05_Moments/32_CrossSectionalFactorModel/12_CrossSectionalExposureIC.jl" = { code = 223, doc = 303, comment = 0, blank = 114, total = 640 }
+"src/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalLeverage.jl" = { code = 82, doc = 180, comment = 1, blank = 88, total = 351 }
 "src/05_Moments/33_CoverageUniverse.jl" = { code = 483, doc = 871, comment = 0, blank = 401, total = 1755 }
 "src/05_Moments/34_PriceLevelExpectedReturns.jl" = { code = 374, doc = 796, comment = 10, blank = 341, total = 1521 }
 "src/05_Moments/35_CompositePriceLevelStatistics.jl" = { code = 350, doc = 606, comment = 9, blank = 230, total = 1195 }
