@@ -1599,7 +1599,8 @@ Where:
 function cross_sectional_residual_block(esigma::VecNum, idx::AbstractVector{<:Integer},
                                         ::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
     d = esigma[idx]
-    return (; D = LinearAlgebra.diagm(d), R = LinearAlgebra.diagm(sqrt.(d)))
+    # A diagonal block holds no dense matrix of its zeros (#1973).
+    return (; D = LinearAlgebra.Diagonal(d), R = LinearAlgebra.Diagonal(sqrt.(d)))
 end
 function cross_sectional_residual_block(esigma::MatNum, idx::AbstractVector{<:Integer},
                                         mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
@@ -1787,40 +1788,53 @@ function cross_sectional_lift(srep::Option{<:AbstractSystematicRepair},
     Lf = matrix_square_root(mtx_sqrt, f_sigma[lf, lf])
     Cf = zeros(eltype(Lf), size(f_sigma))
     Cf[lf, lf] = Lf
-    ci = hcat(Li * Cf, R)
     # An asset with finite loadings and no idiosyncratic variance, one in the warm-up of its
     # variance, still has a mean and, under a diagonal block, a covariance with every other
     # asset that the model states. Only the entries that read its variance are `NaN`, and
     # the idiosyncratic block writes them (#1384).
     sdx = findall(i -> all(isfinite, view(L, i, :)), axes(L, 1))
-    Ls = L[sdx, :]
-    # The product is symmetric only to rounding, and a covariance is exactly symmetric.
-    ss = Matrix(LinearAlgebra.Symmetric(support_product(Ls, f_sigma, Ls)))
-    # A vector of variances adds to the diagonal alone, with no dense matrix of it.
-    if esigma isa AbstractVector
-        view(ss, LinearAlgebra.diagind(ss)) .+= view(esigma, sdx)
-    else
-        ss .+= view(esigma, sdx, sdx)
-    end
     # The systematic root of an asset is a root of its factor covariance, so it exists only
     # when its support lies in the ready factors.
     cdx = filter(i -> all(k -> rdy[k] || iszero(L[i, k]), axes(L, 2)), sdx)
     N = size(L, 1)
-    Tf = promote_type(real(eltype(si)), real(eltype(ss)))
+    # The block of the assets of finite loadings is the same product as `si`, so it takes the
+    # element type of `si`.
+    Tf = real(eltype(si))
     mu = fill(Tf(NaN), N)
-    sigma = fill(Tf(NaN), N, N)
-    chol = fill(Tf(NaN), size(ci, 2), N)
-    mu[sdx] = support_product(Ls, f_mu)
-    mu[idx] = mui
-    sigma[sdx, sdx] = ss
-    # The prior states no variance for an asset outside the investable set, so the Investable
-    # Mask, which reads the diagonal, never holds an asset that `idx` leaves out.
-    for i in setdiff(sdx, idx)
-        sigma[i, i] = Tf(NaN)
+    # The investable block writes over every entry of the block of the assets of finite
+    # loadings when they are all investable, so the lift states that block only for an asset
+    # that is not. When the investable assets are every asset in order, the investable block
+    # is the whole covariance (#1973).
+    sigma = idx == axes(L, 1) ? si : fill(Tf(NaN), N, N)
+    if !issubset(sdx, idx)
+        Ls = L[sdx, :]
+        # The product is symmetric only to rounding, and a covariance is exactly symmetric.
+        ss = Matrix(LinearAlgebra.Symmetric(support_product(Ls, f_sigma, Ls)))
+        # A vector of variances adds to the diagonal alone, with no dense matrix of it.
+        if esigma isa AbstractVector
+            view(ss, LinearAlgebra.diagind(ss)) .+= view(esigma, sdx)
+        else
+            ss .+= view(esigma, sdx, sdx)
+        end
+        mu[sdx] = support_product(Ls, f_mu)
+        sigma[sdx, sdx] = ss
+        # The prior states no variance for an asset outside the investable set, so the
+        # Investable Mask, which reads the diagonal, never holds an asset that `idx` leaves
+        # out.
+        for i in setdiff(sdx, idx)
+            sigma[i, i] = Tf(NaN)
+        end
     end
-    sigma[idx, idx] = si
-    chol[axes(Cf, 2), cdx] = transpose(L[cdx, :] * Cf)
-    chol[:, idx] = transpose(ci)
+    mu[idx] = mui
+    if sigma !== si
+        sigma[idx, idx] = si
+    end
+    # The root of the investable assets is `[Li * Cf  R]'`, written by its two blocks.
+    K = size(Cf, 2)
+    chol = fill(Tf(NaN), K + size(R, 2), N)
+    chol[1:K, cdx] = transpose(L[cdx, :] * Cf)
+    chol[1:K, idx] = transpose(Li * Cf)
+    chol[(K + 1):end, idx] = transpose(R)
     return (; mu = mu, sigma = sigma, chol = chol)
 end
 
