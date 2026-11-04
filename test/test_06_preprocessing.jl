@@ -3074,7 +3074,9 @@ end
                         emsk = PO.AllTrueMask(1, 3)))
     @test isa(d.pf[1].vals, PO.RepeatedLeading)
     # Equal lifts of two element types stay lazy, and the element types promote as `vcat`
-    # promotes them.
+    # promotes them. The carrier converts integer data at construction (#1972), so the
+    # expected type reads the values that the field holds.
+    held(v) = NumericPanelField(; name = "size", vals = v).vals
     lift(v, n) = AssetPanel(;
                             pf = [PO.panel_field_lift(NumericPanelField(; name = "size",
                                                                         vals = v), n)],
@@ -3083,7 +3085,7 @@ end
         for (p, q) in ((x, y), (y, x))
             f = only(vcat(lift(p, 2), lift(q, 1)).pf).vals
             @test isa(f, PO.RepeatedLeading)
-            @test eltype(f) === eltype(vcat(repeat(p', 2), q'))
+            @test eltype(f) === eltype(vcat(repeat(held(p)', 2), held(q)'))
             @test f == repeat([1.0 2.0 3.0], 3)
         end
     end
