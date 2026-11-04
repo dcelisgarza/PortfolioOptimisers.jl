@@ -436,7 +436,7 @@ DistributionValueatRisk
      sigma ┼ nothing
       chol ┼ nothing
         pe ┼ nothing
-      dist ┼ Distributions.Normal{Float64}: Distributions.Normal{Float64}(μ=0.0, σ=1.0)
+      dist ┼ Distributions.Normal{Float64}: Normal(0.0, 1.0)
   mtx_sqrt ┴ EigenFallbackSquareRoot()
 ```
 
