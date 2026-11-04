@@ -11,6 +11,10 @@ It is the tree form of a linkage matrix. [`to_tree`](@ref) makes one node per as
 
 [`pre_order`](@ref) sizes its traversal stack as `2 * a.level`. The stack holds the path from `a` to the node that the walk reads, and that path has at most `depth + 1 <= a.level` nodes.
 
+# The type does not hold the shape of the tree
+
+The type is `ClusterNode{T, H}`, with `T` the type of `id` and `H` the type of `height`. Each child is a `ClusterNode{T, H}` too, so all the nodes of one tree have one type. A type that held the types of its children would be a new type for each new dendrogram, and each method that reads a tree would compile again on new data.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -26,6 +30,10 @@ $(DocStringExtensions.FIELDS)
     ) -> ClusterNode
 
 Arguments correspond to the struct's fields. A node with children ignores the `level` argument and takes `left.level + right.level`, so only a leaf takes its `level` from the caller.
+
+## Validation
+
+  - `left` and `right` are each `nothing` or a `ClusterNode{T, H}`, with `T` the type of `id` and `H` the type of `height` of the new node. A child of another type throws a `DomainError` that names its type.
 
 # Examples
 
@@ -51,36 +59,39 @@ ClusterNode
   - $(ref_dict[:virtanen2020]) The type ports `ClusterNode` and `to_tree` of `scipy.cluster.hierarchy`, which that work names and does not describe.
   - $(ref_dict[:cajas2025]) Section 12.1.1, Equation 12.5, for the four columns of a linkage matrix.
 """
-@concrete struct ClusterNode <: AbstractResult
+struct ClusterNode{T, H} <: AbstractResult
     """
     $(field_dict[:id_node])
     """
-    id
+    id::T
     """
     $(field_dict[:left_node])
     """
-    left
+    left::Union{Nothing, ClusterNode{T, H}}
     """
     $(field_dict[:right_node])
     """
-    right
+    right::Union{Nothing, ClusterNode{T, H}}
     """
     $(field_dict[:height_node])
     """
-    height
+    height::H
     """
     $(field_dict[:level_node])
     """
-    level
+    level::Int
     function ClusterNode(id, left::Option{<:ClusterNode} = nothing,
                          right::Option{<:ClusterNode} = nothing, height::Number = 0.0,
                          level::Int = 1)
+        T = typeof(id)
+        H = typeof(height)
+        for child in (left, right)
+            @argcheck(isnothing(child) || child isa ClusterNode{T, H},
+                      DomainError(typeof(child),
+                                  "a child of a ClusterNode whose id is a $T and whose height is a $H must be a ClusterNode{$T, $H}"))
+        end
         ilevel = isnothing(left) ? level : (left.level + right.level)
-        return new{typeof(id), typeof(left), typeof(right), typeof(height), typeof(level)}(id,
-                                                                                           left,
-                                                                                           right,
-                                                                                           height,
-                                                                                           ilevel)
+        return new{T, H}(id, left, right, height, ilevel)
     end
 end
 """
@@ -276,8 +287,8 @@ Reads a `Clustering.Hclust` from [`Clustering.jl`](https://juliastats.org/Cluste
 
 # Algorithm
 
- 1. Read `N`, the number of assets, from the length of `a.order`. Make `d`, a vector of `2N - 1` nodes.
- 2. Make one leaf per asset, `d[i] = ClusterNode(i)`, so the leaves have the ids `1:N` in the asset order of the clustering.
+ 1. Read `N`, the number of assets, from the length of `a.order`, and `H`, the element type of `a.heights`. Make `d`, a vector of `2N - 1` nodes of the type `ClusterNode{Int, H}`.
+ 2. Make one leaf per asset, `d[i] = ClusterNode(i, nothing, nothing, zero(H))`, so the leaves have the ids `1:N` in the asset order of the clustering, and the height type of the merges.
  3. Walk the merges in the order of `a.heights`, which is the order in which they happened.
  4. Resolve each side of row `i` of `a.merges` to an index into `d`. A negative entry `fi` names the asset `-fi`, and a positive entry names the merge `fi + N`.
  5. Make the merge node `ClusterNode(i + N, d[fi], d[fj], height)` and store it at `d[N + i]`, so the merge nodes have the ids `N+1:2N-1` in the order of the merges.
@@ -290,7 +301,7 @@ Reads a `Clustering.Hclust` from [`Clustering.jl`](https://juliastats.org/Cluste
 # Returns
 
   - `root::ClusterNode`: The root of the tree, which is the node of the last merge.
-  - `nodes::Vector{ClusterNode}`: All `2N - 1` nodes, the leaves first and then the merges in their order. The vector is not sorted by height. A caller that needs that order sorts it, as [`valid_k_clusters`](@ref) and [`optimal_number_clusters`](@ref) do.
+  - `nodes::Vector{ClusterNode{Int, H}}`: All `2N - 1` nodes, the leaves first and then the merges in their order. The vector is not sorted by height. A caller that needs that order sorts it, as [`valid_k_clusters`](@ref) and [`optimal_number_clusters`](@ref) do.
 
 # Related
 
@@ -299,12 +310,13 @@ Reads a `Clustering.Hclust` from [`Clustering.jl`](https://juliastats.org/Cluste
 """
 function to_tree(a::Clustering.Hclust)
     N = length(a.order)
-    d = Vector{ClusterNode}(undef, 2 * N - 1)
+    heights = a.heights
+    H = eltype(heights)
+    d = Vector{ClusterNode{Int, H}}(undef, 2 * N - 1)
     for i in eachindex(a.order)
-        d[i] = ClusterNode(i)
+        d[i] = ClusterNode(i, nothing, nothing, zero(H))
     end
     merges = a.merges
-    heights = a.heights
     nd = nothing
     for (i, height) in pairs(heights)
         fi = merges[i, 1]

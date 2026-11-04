@@ -42,7 +42,8 @@ end
     hand_allowed = Dict(:ScopedConfig => "a `mutable` holder whose `@atomic` default and whose `ScopedValue{Union{Nothing, T}}` share one parameter",
                         :RepeatedObservations => "an `AbstractArray{T, N}`, whose supertype reads the element type and the rank",
                         :MinimumSquaredDistance => "the parameter is the one of its supertype `SquaredOrderedWeightsArrayAlgorithm{T}`",
-                        :MinimumSumSquares => "the parameter is the one of its supertype `SquaredOrderedWeightsArrayAlgorithm{T}`")
+                        :MinimumSumSquares => "the parameter is the one of its supertype `SquaredOrderedWeightsArrayAlgorithm{T}`",
+                        :ClusterNode => "`left` and `right` hold a `ClusterNode{T, H}` of the parameters of the node itself. With `@concrete`, the type would hold the shape of the subtree, and each new dendrogram would compile again")
     #=
     ADR 0049 bounds the similarity of the first three fields in the header on purpose. `@concrete`
     also writes a generic positional constructor, and a bound in the header is what makes that

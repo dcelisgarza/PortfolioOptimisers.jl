@@ -3316,6 +3316,39 @@ end
         @test PortfolioOptimisers.get_node_property(PreorderTreeByID(), nds8[3]) == 3
     end
 
+    @testset "Every tree of one height type has one node type, whatever its shape (#1978)" begin
+        res8 = balanced_hclust(3)
+        root, nds8 = PortfolioOptimisers.to_tree(res8)
+        @test nds8 isa Vector{ClusterNode{Int, Float64}}
+        @test typeof(root) === ClusterNode{Int, Float64}
+        # A chain is another shape. A type that held the types of the children gave each
+        # shape its own type, and each method that reads a tree compiled again for it.
+        D = [abs(i - j)^1.5 for i in 1:8, j in 1:8]
+        rootc, ndsc = PortfolioOptimisers.to_tree(Clustering.hclust(D; linkage = :single))
+        @test typeof(rootc) === typeof(root)
+        @test typeof(ndsc) === typeof(nds8)
+        @test rootc.level == 8
+        # A `Float32` linkage gives its leaves a `Float32` height of zero, so its merges can
+        # hold them.
+        res32 = Clustering.Hclust(res8.merges, Float32.(res8.heights), res8.order,
+                                  res8.linkage)
+        root32, nds32 = PortfolioOptimisers.to_tree(res32)
+        @test nds32 isa Vector{ClusterNode{Int, Float32}}
+        @test nds32[1].height === 0.0f0
+        @test root32.height isa Float32
+        @test PortfolioOptimisers.pre_order(root32) == PortfolioOptimisers.pre_order(root)
+        # A child of another height type is refused, and the error names its type.
+        err = try
+            ClusterNode(9, nds32[1], nds32[2], 1.0)
+        catch e
+            e
+        end
+        @test err isa DomainError
+        @test err.val === ClusterNode{Int, Float32}
+        @test occursin("ClusterNode{Int64, Float64}", err.msg)
+        @test_throws DomainError ClusterNode(9, nds8[1], nds32[2], 1.0)
+    end
+
     @testset "`pre_order` collects the strategy's own type (#510)" begin
         res8 = balanced_hclust(3)
         root, _ = PortfolioOptimisers.to_tree(res8)
