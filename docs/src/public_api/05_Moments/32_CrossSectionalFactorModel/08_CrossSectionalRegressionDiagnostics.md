@@ -14,4 +14,6 @@ cs_regression_r2
 cs_regression_adjusted_r2
 cs_regression_aic
 cs_regression_bic
+cross_sectional_r2
+mean_cross_sectional_r2
 ```

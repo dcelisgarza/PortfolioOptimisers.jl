@@ -810,6 +810,331 @@ function cross_sectional_forecast_split(ofit::AbstractOrthogonalForecastFit,
     return orthogonal_forecast_rescale(ofit, rf, g, ap)
 end
 """
+    cross_sectional_alpha_split(cre::AbstractCrossSectionalRegressionEstimator, mu::VecNum,
+                                L::MatNum, w::VecNum) -> NamedTuple
+
+Split a Return Forecast into the part the latest Factor Exposures span and the part they do not.
+
+# Mathematical definition
+
+Under [`CrossSectionalLinearRegression`](@ref), the spanned coefficients solve a weighted least squares over the valid assets. Another Cross-Sectional Regression Estimator fits ``\\boldsymbol{g}`` by its own rule over the same assets and weights.
+
+```math
+\\begin{align}
+\\mathcal{V} &= \\left\\{i : \\alpha_{i} \\in \\mathbb{R},\\ B_{Tik} \\in \\mathbb{R} \\ \\forall k,\\ u_{i} > 0\\right\\}\\,, \\\\
+(c, \\boldsymbol{g}) &= \\underset{c,\\,\\boldsymbol{g}}{\\arg\\min} \\sum_{i \\in \\mathcal{V}} u_{i} \\left(\\alpha_{i} - c - \\sum_{k=1}^{K} B_{Tik} \\, g_{k}\\right)^{2}\\,, \\\\
+\\boldsymbol{\\alpha}^{\\perp} &= \\boldsymbol{\\alpha} - \\mathbf{B}_{T} \\, \\boldsymbol{g}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathcal{V}``: Valid assets of the split.
+  - ``\\alpha_{i}``: Return Forecast of asset ``i``.
+  - ``u_{i}``: Regression weight of asset ``i`` in the latest fit.
+  - ``c``: Intercept of the regression, held at ``0`` when the estimator fits none.
+  - $(math_dict[:alpha_perp])
+  - $(math_dict[:g_span])
+  - $(math_dict[:B_T_cs])
+  - $(math_dict[:K])
+
+The orthogonal part is ``\\boldsymbol{\\alpha} - \\mathbf{B}_{T} \\boldsymbol{g}`` and not the residual of the regression, so the intercept stays in it: the weighted mean of ``\\alpha^{\\perp}_{i}`` over ``\\mathcal{V}`` is ``c``. The split then adds up. The prior's expected return is ``\\mathbf{B}_{T} (\\lambda \\boldsymbol{\\mu}_{f} + (1 - \\lambda) \\boldsymbol{g}) + c_{\\alpha} \\boldsymbol{\\alpha}^{\\perp}``, which is ``\\boldsymbol{\\alpha}`` at ``\\lambda = 0`` and ``c_{\\alpha} = 1``, whatever the intercept. Without an intercept, ``\\mathbf{B}_{T,\\,\\mathcal{V}}^{\\intercal} \\mathbf{U} \\boldsymbol{\\alpha}^{\\perp}_{\\mathcal{V}} = \\boldsymbol{0}``, with ``\\mathbf{U}`` the diagonal matrix of the weights ``u_{i}``. The symbols ``\\lambda``, ``c_{\\alpha}`` and ``\\boldsymbol{\\mu}_{f}`` are the Spanned Shrinkage, the Orthogonal Forecast Scale and the factor mean of [`CrossSectionalFactorPrior`](@ref).
+
+# Algorithm
+
+ 1. If `mu` is zero at every asset, return a zero `g` and a zero `ap`. No regression runs.
+ 2. Copy `w` into `wv`, and set to zero the weight of every asset whose forecast, or whose row of exposures, is not finite. The weights come from the lagged fit, so a positive weight says nothing about the finiteness of the latest forecast. If no weight in `wv` is positive, return the zero split of step 1.
+ 3. Regress `mu` on `L` across the assets under `wv`, through `cre`, giving `g`.
+ 4. Subtract `L * g` from `mu`, giving `ap`.
+
+# Arguments
+
+  - `cre`: Cross-Sectional Regression Estimator of the split.
+  - `mu`: The Return Forecast, one entry per asset of the coverage universe.
+  - `L`: The latest Factor Exposures, `assets × factors`, in the basis the fit ran in.
+  - `w`: The regression weights of the latest fit, one entry per asset.
+
+# Validation
+
+  - The rules of [`cross_sectional_regression`](@ref).
+
+# Returns
+
+  - `g::VecNum`: The spanned coefficients, one per factor of `L`.
+  - `ap::VecNum`: The orthogonal part of the forecast, one entry per asset.
+
+# Related
+
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`cross_sectional_return_forecast`](@ref)
+  - [`cross_sectional_regression`](@ref)
+  - [`AbstractReturnForecastResult`](@ref)
+"""
+function cross_sectional_alpha_split(cre::AbstractCrossSectionalRegressionEstimator,
+                                     mu::VecNum, L::MatNum, w::VecNum)
+    N = size(L, 1)
+    K = size(L, 2)
+    Tf = promote_type(real(eltype(mu)), real(eltype(L)), real(eltype(w)))
+    if all(iszero, mu)
+        return (; g = zeros(Tf, K), ap = zeros(Tf, N))
+    end
+    wv = zeros(Tf, N)
+    for i in 1:N
+        if isfinite(mu[i]) && all(isfinite, view(L, i, :))
+            wv[i] = w[i]
+        end
+    end
+    if !any(x -> x > zero(x), wv)
+        return (; g = zeros(Tf, K), ap = zeros(Tf, N))
+    end
+    csr = cross_sectional_regression(cre, reshape(L, 1, N, K), reshape(mu, 1, N),
+                                     reshape(wv, 1, N))
+    g = csr.f[1, :]
+    return (; g = g, ap = mu - L * g)
+end
+"""
+    cross_sectional_return_forecast(ofit::AbstractOrthogonalForecastFit, rfe::Nothing,
+                                    rd::ReturnsResult, csfm::CrossSectionalFactorModel,
+                                    cre::AbstractCrossSectionalRegressionEstimator,
+                                    reads::Bool, H::Option{<:MatNum},
+                                    rf0::Nothing = nothing) -> NamedTuple
+    cross_sectional_return_forecast(ofit::AbstractOrthogonalForecastFit,
+                                    rfe::AbstractReturnForecastEstimator, rd::ReturnsResult,
+                                    csfm::CrossSectionalFactorModel,
+                                    cre::AbstractCrossSectionalRegressionEstimator,
+                                    reads::Bool, H::Option{<:MatNum},
+                                    rf0::Option{<:AbstractReturnForecastResult} = nothing) -> NamedTuple
+
+Fit the Return Forecast of a [`CrossSectionalFactorPrior`](@ref) under its Orthogonal Forecast Fit, and split it against the latest Factor Exposures.
+
+The split is unscaled by `c`. The Orthogonal Forecast Scale `c` can be a rule that reads the orthogonal part, so [`cross_sectional_calibration`](@ref) resolves `c` after this function, and [`cross_sectional_forecast_block`](@ref) then scales the part. A prior that states no Return Forecast Estimator takes the method over `Nothing`, which returns `nothing` in each entry, so the factor mean and the zero `b` do not change. The batch fit, the online refit and the carry fold all reach the forecast through this function, so the Orthogonal Forecast Fit holds on each of them.
+
+# Algorithm
+
+ 1. Take the member that the prior fits with [`orthogonal_forecast_member`](@ref), giving `rfo`. Under [`ScoreNeutralisation`](@ref) a fitted member neutralises its scores against the estimated factors of `csfm`.
+ 2. Take `rf0` as `rf` when the carry fold gives it. Otherwise fit `rfo` on the coverage universe with [`orthogonal_forecast_result`](@ref), giving `rf`. `rd` holds every observation, so the Descriptors of the forecast warm up over every observation of the panel. [`return_forecast_rows`](@ref) finds the block as a suffix of `rd` by its size.
+ 3. Split `rf.mu` against the latest exposures of the estimated factors with [`cross_sectional_forecast_split`](@ref), giving `g` and `ap`. The observed factors are the trailing columns of `L`, and the split leaves them out, so `g` has one entry per column of `csr.f`. The split scales `ap` with [`orthogonal_forecast_rescale`](@ref), which changes it under [`OrthogonalPartCalibration`](@ref) alone.
+ 4. When `reads` is `true`, take the Return Forecast history of `rfo` once with [`cross_sectional_forecast_history`](@ref) from `rf`, giving `hist`. Otherwise `hist` is `nothing`.
+
+# Arguments
+
+  - `ofit`: The Orthogonal Forecast Fit of the prior.
+  - `rfe`: Return Forecast Estimator, or `nothing`.
+  - $(arg_dict[:rd]) It is the full returns data that the estimated members of the prior read, and the block is a suffix of it. Under observed factors its `X` holds the returns net of them.
+  - `csfm`: The factor-model block, built with a zero `b` and no Return Forecast.
+  - `cre`: Cross-Sectional Regression Estimator of the split.
+  - `reads`: Whether a slot of the prior reads the Return Forecast history, as [`reads_forecast_history`](@ref) answers.
+  - `H`: The rows of the Return Forecast history that the carry fold carries, or `nothing` when the history is made here.
+  - `rf0`: The Return Forecast Result that the carry fold of a forecast that folds carries, as [`folds_forecast_rows`](@ref) answers, or `nothing` to fit the member here.
+
+# Validation
+
+  - The rules of [`return_forecast`](@ref), of [`cross_sectional_alpha_split`](@ref) and, when `reads` is `true`, of [`cross_sectional_forecast_history`](@ref).
+  - The rules of [`DescriptorScores`](@ref) on the rebuilt scores under [`ScoreNeutralisation`](@ref).
+
+# Returns
+
+  - `rf::Option{<:AbstractReturnForecastResult}`: The Return Forecast Result, or `nothing`.
+  - `g::Option{<:VecNum}`: The spanned coefficients, or `nothing`.
+  - `ap::Option{<:VecNum}`: The orthogonal part before the Orthogonal Forecast Scale, one entry per asset, or `nothing`.
+  - `hist::Option{<:MatNum}`: The Return Forecast history, `observations × assets`, or `nothing`.
+
+# Related
+
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`cross_sectional_alpha_split`](@ref)
+  - [`cross_sectional_calibration`](@ref)
+  - [`cross_sectional_forecast_block`](@ref)
+  - [`cross_sectional_forecast_mu`](@ref)
+  - [`return_forecast`](@ref)
+  - [`AbstractOrthogonalForecastFit`](@ref)
+"""
+function cross_sectional_return_forecast(::AbstractOrthogonalForecastFit, ::Nothing,
+                                         ::ReturnsResult, ::CrossSectionalFactorModel,
+                                         ::AbstractCrossSectionalRegressionEstimator,
+                                         ::Bool, ::Option{<:MatNum}, ::Nothing = nothing)
+    return (; rf = nothing, g = nothing, ap = nothing, hist = nothing)
+end
+function cross_sectional_return_forecast(ofit::AbstractOrthogonalForecastFit,
+                                         rfe::AbstractReturnForecastEstimator,
+                                         rd::ReturnsResult, csfm::CrossSectionalFactorModel,
+                                         cre::AbstractCrossSectionalRegressionEstimator,
+                                         reads::Bool, H::Option{<:MatNum},
+                                         rf0::Option{<:AbstractReturnForecastResult} = nothing)
+    rfo = orthogonal_forecast_member(ofit, rfe, csfm)
+    rf = isnothing(rf0) ? orthogonal_forecast_result(ofit, rfo, rd, csfm, cre) : rf0
+    (; g, ap) = cross_sectional_forecast_split(ofit, rf, csfm, cre)
+    hist = reads ? cross_sectional_forecast_history(rf, rfo, rd, csfm, H) : nothing
+    return (; rf = rf, g = g, ap = ap, hist = hist)
+end
+"""
+    cross_sectional_forecast_mu(lambda::Real, mu::VecNum, g::Nothing) -> VecNum
+    cross_sectional_forecast_mu(lambda::Real, mu::VecNum, g::VecNum) -> VecNum
+
+Blend the expected factor returns with the spanned part of a Return Forecast.
+
+A prior that states no Return Forecast Estimator has a spanned part of zero, and the method over `Nothing` takes it. There `lambda` shrinks the factor mean towards zero, and `lambda = 0` gives an expected return of zero. At `lambda = 0` the blend reads no factor mean, so a factor mean that the factor prior does not state gives a finite blend there, and `NaN` at every other `lambda`.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\tilde{\\boldsymbol{\\mu}}_{f} &= \\lambda \\, \\boldsymbol{\\mu}_{f} + (1 - \\lambda) \\, \\boldsymbol{g}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\tilde{\\boldsymbol{\\mu}}_{f}``: Blended expected factor returns.
+  - ``\\lambda``: Shrinkage of the factor mean towards the spanned forecast. At ``\\lambda = 1`` the blend is the factor mean, and at ``\\lambda = 0`` it is the spanned forecast.
+  - $(math_dict[:mu_f_patt])
+  - $(math_dict[:g_span]) It is ``\\boldsymbol{0}`` when the prior states no Return Forecast Estimator.
+
+# Arguments
+
+  - `lambda`: Shrinkage of the factor mean towards the spanned forecast.
+  - `mu`: The expected factor returns of the nested factor prior, on the reduced axis.
+  - `g`: The spanned coefficients of the Return Forecast, or `nothing`.
+
+# Returns
+
+  - `mu::VecNum`: The blended expected factor returns, on the reduced axis.
+
+# Related
+
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`cross_sectional_return_forecast`](@ref)
+  - [`cross_sectional_alpha_split`](@ref)
+"""
+function cross_sectional_forecast_mu(lambda::Real, mu::VecNum, ::Nothing)
+    return lambda * (iszero(lambda) ? zero(mu) : mu)
+end
+function cross_sectional_forecast_mu(lambda::Real, mu::VecNum, g::VecNum)
+    return lambda * (iszero(lambda) ? zero(mu) : mu) + (one(lambda) - lambda) * g
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Divide the scenario weights of the factor prior of a Cross-Sectional Factor Prior by their sum.
+
+A scenario weight vector states a probability measure over the scenarios only when it sums to one. A ratio estimator, such as the weighted mean ``\\sum_t w_t x_t / \\sum_t w_t``, gives the same answer at every scale of ``w``. A consumer that reads the weights as probabilities, such as a scenario risk measure that forms ``\\sum_t w_t L_t`` and divides by nothing, gives a wrong answer at every other scale. So the prior stores the weights divided by their sum, which every consumer reads correctly. A sum that is zero states no measure, so the function refuses it.
+
+The function keeps the kind of `StatsBase.Weights`, `AnalyticWeights` and `ProbabilityWeights`, as [`nothing_scalar_array_getindex`](@ref) does. The corrected variance of each of these kinds is the same at every scale of the weights. `FrequencyWeights` are counts, so their corrected variance divides by ``\\sum_t w_t - 1``, which is zero after the division. So `FrequencyWeights`, and a kind the function cannot rebuild such as `StatsBase.UnitWeights`, become `StatsBase.AnalyticWeights`, as the prior probabilities of [`EntropyPoolingPrior`](@ref) do by default. [`ScenarioProbabilities`](@ref) states the bias correction of that kind.
+
+# Mathematical definition
+
+```math
+\\begin{aligned}
+p_t &= \\frac{w_t}{\\sum_{s = 1}^{T} w_s}\\,.
+\\end{aligned}
+```
+
+Where:
+
+  - ``p_t``: The scenario weight that the prior stores for scenario ``t``.
+  - ``w_t``: The scenario weight of the factor prior for scenario ``t``.
+  - $(math_dict[:T])
+
+# Algorithm
+
+ 1. `w` is `nothing`: return `nothing`, because no weights means unweighted.
+ 2. `w` is a `StatsBase.Weights`, `AnalyticWeights` or `ProbabilityWeights`: refuse a sum that is not positive, and return weights of the same kind over `w.values` divided by the sum.
+ 3. `w` is any other `StatsBase.AbstractWeights`, `FrequencyWeights` among them: wrap its values in `StatsBase.AnalyticWeights`, and apply step 2.
+
+# Arguments
+
+  - `w`: The scenario weights of the factor prior, or `nothing`.
+
+# Validation
+
+  - The sum of `w` is positive. Raises a `DomainError` that holds the sum. StatsBase refuses a weight vector whose sum is not finite when it builds the vector, so a sum that reaches this function is finite.
+
+# Returns
+
+  - `p::Option{<:StatsBase.AbstractWeights}`: The weights `w` divided by their sum, or `nothing`.
+
+# Related
+
+  - [`cross_sectional_factor_moments`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`LowOrderPrior`](@ref)
+"""
+function cross_sectional_scenario_weights(::Nothing)
+    return nothing
+end
+function cross_sectional_scenario_weights(w::Union{StatsBase.Weights,
+                                                   StatsBase.AnalyticWeights,
+                                                   StatsBase.ProbabilityWeights})
+    s = sum(w)
+    @argcheck(s > zero(s),
+              DomainError(s,
+                          "the scenario weights of the factor prior sum to $s, so they state no probability measure over the scenarios. A Cross-Sectional Factor Prior divides its scenario weights by their sum, which must be positive. Give pe a factor prior whose weights are not all zero."))
+    return Base.typename(typeof(w)).wrapper(w.values / s)
+end
+function cross_sectional_scenario_weights(w::StatsBase.AbstractWeights)
+    return cross_sectional_scenario_weights(StatsBase.aweights(collect(w)))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Rebuild the asset return scenarios of a Cross-Sectional Factor Prior.
+
+The function maps the scenarios of the factor prior onto the assets through the latest loadings, rescales the standardised idiosyncratic returns by the latest idiosyncratic volatilities, and adds the two. So a scenario carries the factor risk and the idiosyncratic risk of the latest observation, whatever the risk of the observation it comes from. The two histories can differ in length, and the last rows of each pair up.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+n &= \\min(S, T)\\,, \\\\
+\\hat{x}_{si} &= \\sum_{k=1}^{K} B_{Tik} \\, f_{S - n + s,\\,k} + \\sqrt{v_{Ti}} \\, \\tilde{z}_{T - n + s,\\,i}\\,, \\quad s = 1, \\ldots, n\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``n``: Number of asset return scenarios.
+  - ``S``: Number of factor return scenarios.
+  - ``\\hat{x}_{si}``: Return of asset ``i`` in scenario ``s``.
+  - ``f_{sk}``: Return of factor ``k`` in factor return scenario ``s``.
+  - ``T``: Number of observations of the standardised idiosyncratic returns.
+  - $(math_dict[:B_T_cs])
+  - $(math_dict[:v_ti_idio])
+  - $(math_dict[:ztilde_ti_idio])
+  - $(math_dict[:K])
+
+A non-investable asset has a non-finite latest variance or a non-finite row of ``\\mathbf{B}_{T}``, so its column is `NaN` in every scenario. The contract of [`factor_exposure`](@ref) writes `NaN` at every inactive cell, so this also holds for an asset that is inactive at the latest observation.
+
+# Arguments
+
+  - `Fs`: Factor return scenarios on the reduced axis, `scenarios × factors`.
+  - `L`: The reduced loadings of the latest observation, `assets × factors`.
+  - `S`: The standardised idiosyncratic returns, `observations × assets`.
+  - `ev`: The latest idiosyncratic variances, one per asset.
+
+# Validation
+
+  - `L` matches `Fs` on the factor axis, and `S` and `ev` match `L` on the asset axis. Raises a `DimensionMismatch`.
+
+# Returns
+
+  - `Xs::Matrix{<:Real}`: The asset return scenarios, `scenarios × assets`.
+
+# Related
+
+  - [`cross_sectional_standardised_residuals`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+function cross_sectional_scenarios(Fs::MatNum, L::MatNum, S::MatNum, ev::VecNum)
+    @argcheck(size(L, 2) == size(Fs, 2),
+              DimensionMismatch("L ($(size(L, 2)) columns) must match Fs ($(size(Fs, 2)) columns)"))
+    @argcheck(size(S, 2) == size(L, 1) == length(ev),
+              DimensionMismatch("S ($(size(S, 2)) columns), L ($(size(L, 1)) rows) and ev ($(length(ev))) must agree on the asset axis"))
+    n = min(size(Fs, 1), size(S, 1))
+    Fn = view(Fs, (size(Fs, 1) - n + 1):size(Fs, 1), :)
+    Sn = view(S, (size(S, 1) - n + 1):size(S, 1), :)
+    return Fn * transpose(L) .+ Sn .* transpose(sqrt.(ev))
+end
+"""
     cross_sectional_moment_prior(pe::CrossSectionalFactorPrior, f_pr::NamedTuple,
                                  csfm::CrossSectionalFactorModel, sp::NamedTuple, L::MatNum,
                                  am::AbstractVector{Bool}, Xs::MatNum, oX::Option{<:MatNum};
