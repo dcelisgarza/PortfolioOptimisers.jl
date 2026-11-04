@@ -1651,17 +1651,22 @@ function cross_sectional_coefficients(cre::CrossSectionalTargetRegression, A::Ma
 end
 """
     cross_sectional_foreach(f, ex::FLoops.Transducers.Executor, idx::AbstractVector) -> nothing
-    cross_sectional_foreach(f, ex::FLoops.SequentialEx, idx::AbstractVector) -> nothing
+    cross_sectional_foreach(f, ex::FLoops.Transducers.Executor, idx::AbstractVector,
+                            init) -> nothing
+    cross_sectional_foreach(f, ex::FLoops.SequentialEx, idx::AbstractVector, init) -> nothing
 
 Call `f` on every entry of `idx` under the executor `ex`, and raise the error of the first entry that fails.
 
 The calls must be independent, and each must write a slice of its own. A threaded executor wraps an error in a `TaskFailedException`, and the entry that fails first in time depends on the schedule. So each call records its own error, and after the loop the function raises the recorded error of the lowest position, unchanged. Every executor therefore raises the error that a serial loop raises. Under `SequentialEx` the function runs the serial loop itself, so the error keeps the backtrace of the call that raised it.
 
+With `init`, each task of the executor calls `init()` once, and every call of `f` that the task runs receives that state. The state holds the buffers of the calls, so a loop over many entries allocates them once per task. A call must not keep a buffer of the state after it returns, because the next call of the task writes it. The method with no `init` gives `f` no state.
+
 # Arguments
 
-  - `f`: Function of one entry of `idx`. Its return value is discarded.
+  - `f`: Function of one entry of `idx`, and of the state of the task when `init` is given. Its return value is discarded.
   - $(arg_dict[:ex])
   - `idx`: The entries, in the order of the serial loop.
+  - `init`: Function of no argument that returns the state of one task.
 
 # Returns
 
@@ -1675,10 +1680,15 @@ The calls must be independent, and each must write a slice of its own. A threade
 """
 function cross_sectional_foreach(f, ex::FLoops.Transducers.Executor,
                                  idx::AbstractVector)::Nothing
+    return cross_sectional_foreach((i, _) -> f(i), ex, idx, Returns(nothing))
+end
+function cross_sectional_foreach(f, ex::FLoops.Transducers.Executor, idx::AbstractVector,
+                                 init)::Nothing
     err = Vector{Any}(nothing, length(idx))
     FLoops.@floop ex for j in eachindex(err)
+        FLoops.@init st = init()
         try
-            f(idx[begin + j - 1])
+            f(idx[begin + j - 1], st)
         catch e
             err[j] = e
         end
@@ -1689,8 +1699,12 @@ function cross_sectional_foreach(f, ex::FLoops.Transducers.Executor,
     end
     return nothing
 end
-function cross_sectional_foreach(f, ::FLoops.SequentialEx, idx::AbstractVector)::Nothing
-    foreach(f, idx)
+function cross_sectional_foreach(f, ::FLoops.SequentialEx, idx::AbstractVector,
+                                 init)::Nothing
+    st = init()
+    for i in idx
+        f(i, st)
+    end
     return nothing
 end
 """
@@ -1710,7 +1724,7 @@ A refusal names an observation by its row of `X`. The verb fits [`cross_sectiona
 # Algorithm
 
  1. Take the eligibility mask through [`cross_sectional_design_mask`](@ref).
- 2. For each observation `t`, gather the eligible assets, their weights `w`, their exposures `A` and their returns `y`, and record their count in `n`. The observations are independent problems, and `cre.ex` runs them through [`cross_sectional_foreach`](@ref). Each writes its own row, so every executor gives the same result.
+ 2. For each observation `t`, gather the eligible assets, their weights `w`, their exposures `A` and their returns `y` into buffers of the task, and record their count in `n`. The observations are independent problems, and `cre.ex` runs them through [`cross_sectional_foreach`](@ref), which gives each task its buffers once. Each writes its own row, so every executor gives the same result.
  3. When `cre.intercept` is `true`, take the weighted means `ybar` and `xbar` of `y` and of `A`, and subtract them. An observation with no eligible asset takes zero for both.
  4. Scale `A` by `sqrt.(w)`, giving the weighted design. When `cre.leverage` is `true` or the solve algorithm is [`DependentColumnDrop`](@ref), take its column-pivoted `QR` once. When `cre.leverage` is `true`, mark the eligible assets of leverage one in the row `t` of `h1`, through [`cross_sectional_leverage_one`](@ref) on that factorisation. Otherwise `h1` is `nothing`.
  5. Take the factor returns and the residual count of the observation through [`cross_sectional_coefficients`](@ref), on the same factorisation, and write the factor returns into the row `t` of `f`. An observation with no eligible asset takes zero factor returns under [`CrossSectionalLinearRegression`](@ref), except under [`RankDeficiencyRefusal`](@ref), whose rank test reads an empty design as rank zero and refuses it by name.
@@ -1834,12 +1848,28 @@ function cross_sectional_block_regression(cre::Union{CrossSectionalLinearRegress
     dc = cross_sectional_drop_mask(cre.alg, size(X, 1), K)
     # A penalised fit counts a real number of parameters, so the counts take the working type.
     edof = zeros(Tf, size(X, 1))
-    cross_sectional_foreach(cre.ex, axes(X, 1)) do t
+    # Each task gathers an observation into buffers of its own, and reads the first rows of
+    # each. The rows are a range, so every product of the loop reads a block of unit stride and
+    # runs in BLAS, and the loop allocates no gather (#1973). Each buffer takes the type of the
+    # copy it replaces: the gathers keep the types of `Z`, `X` and `W`, the centred values take
+    # the working type, and the weighted design the type that `sqrt.(w)` widens its input to.
+    # The buffers that a fit does not use have no row.
+    Tw = typeof(sqrt(oneunit(eltype(W))))
+    N = size(Z, 2)
+    Nc = cre.intercept ? N : 0
+    init = () -> (; w = similar(W, N), A = similar(Z, N, K), y = similar(X, N),
+                  Ac = Matrix{Tf}(undef, Nc, K), yc = Vector{Tf}(undef, Nc),
+                  D = Matrix{promote_type(eltype(Z), Tw)}(undef, N - Nc, K),
+                  Dc = Matrix{promote_type(Tf, Tw)}(undef, Nc, K))
+    cross_sectional_foreach(cre.ex, axes(X, 1), init) do t, buf
         idx = findall(view(act, t, :))
         n[t] = length(idx)
-        w = W[t, idx]
-        A = Z[t, idx, :]
-        y = X[t, idx]
+        w = view(buf.w, 1:n[t])
+        w .= view(W, t, idx)
+        A = view(buf.A, 1:n[t], :)
+        A .= view(Z, t, idx, :)
+        y = view(buf.y, 1:n[t])
+        y .= view(X, t, idx)
         ybar = zero(Tf)
         xbar = zeros(Tf, K)
         # The fit of the centred design leaves the weighted mean, which the intercept spends
@@ -1852,10 +1882,15 @@ function cross_sectional_block_regression(cre::Union{CrossSectionalLinearRegress
                 xbar .= vec(transpose(A) * w) ./ sw
                 spent = true
             end
-            y = y .- ybar
-            A = A .- transpose(xbar)
+            yc = view(buf.yc, 1:n[t])
+            yc .= y .- ybar
+            y = yc
+            Ac = view(buf.Ac, 1:n[t], :)
+            Ac .= A .- transpose(xbar)
+            A = Ac
         end
-        D = A .* sqrt.(w)
+        D = view(cre.intercept ? buf.Dc : buf.D, 1:n[t], :)
+        D .= A .* sqrt.(w)
         F = cross_sectional_shared_qr(h1, dc, D)
         cross_sectional_mark_leverage!(h1, A, w, cre.intercept, t, idx; D = D, F = F)
         fi = cross_sectional_coefficients(cre, A, y, w, t0 + t; D = D, F = F)
