@@ -1,5 +1,5 @@
 ```@meta
-Description = "Cross-Sectional Leverage, private API of PortfolioOptimisers.jl: cross_sectional_leverage_one, cross_sectional_leverage, cross_sectional_leverage_rows, …"
+Description = "Cross-Sectional Leverage, private API of PortfolioOptimisers.jl: cross_sectional_leverage_one, cross_sectional_leverage, cross_sectional_pivot_columns, …"
 ```
 
 # [Cross-Sectional Leverage: private API](@id private-api-cross-sectional-leverage)
@@ -9,6 +9,7 @@ Description = "Cross-Sectional Leverage, private API of PortfolioOptimisers.jl: 
 ```@docs
 cross_sectional_leverage_one
 cross_sectional_leverage
+cross_sectional_pivot_columns
 cross_sectional_leverage_rows
 cross_sectional_mark_leverage!
 cross_sectional_zero_marked!

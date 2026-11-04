@@ -1455,6 +1455,31 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
         end
     end
 
+    @testset "The one-pass residuals give the bits of the two-step form" begin
+        # `cross_sectional_residuals` fuses `X - cross_sectional_systematic(f, b, Z)`: same
+        # roundings in the same order, so the bits and the element type agree, with and
+        # without an intercept, and when the returns and the fit differ in element type.
+        rs = StableRNG(1973)
+        nt, na, nk = 7, 5, 3
+        for (TX, TF) in ((Float64, Float64), (Float32, Float64), (Float64, Float32))
+            Xr = randn(rs, TX, nt, na)
+            Xr[2, 3] = NaN
+            fr = randn(rs, TF, nt, nk)
+            Zr = randn(rs, TF, na, nk, nt)
+            for br in (randn(rs, TF, nt), nothing)
+                two = Xr - PortfolioOptimisers.cross_sectional_systematic(fr, br, Zr)
+                one = PortfolioOptimisers.cross_sectional_residuals(Xr, fr, br, Zr)
+                @test isequal(one, two)
+                @test eltype(one) == eltype(two)
+            end
+        end
+        # `X` holds four assets where `Z` holds five.
+        Xw, fw, Zw = randn(rs, nt, na - 1), randn(rs, nt, nk), randn(rs, na, nk, nt)
+        @test_throws DimensionMismatch PortfolioOptimisers.cross_sectional_residuals(Xw, fw,
+                                                                                     nothing,
+                                                                                     Zw)
+    end
+
     @testset "The eligibility contract" begin
         # A positive weight on a pair with a missing exposure is refused, and so is one on a
         # pair with a missing return.

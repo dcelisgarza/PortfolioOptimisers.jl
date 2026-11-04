@@ -46,6 +46,7 @@ The triangular solve for ``\\mathbf{Q}_{1}`` costs about a quarter of the flops 
   - `intercept::Bool`: Whether the fit has an intercept.
   - `D::MatNum`: Weighted design `sqrt.(w) .* A`. A caller that weighted the design already passes it.
   - `F`: Column-pivoted `QR` of `D`, or `nothing` to take it here. The regression passes the factorisation that its solve reads, so the design is factorised once.
+  - `G`: A buffer with the rows and at least the columns of `D` that receives the pivoted columns of the triangular solve, or `nothing` to gather them into a new matrix. The regression passes a buffer of its task.
 
 # Returns
 
@@ -58,10 +59,11 @@ The triangular solve for ``\\mathbf{Q}_{1}`` costs about a quarter of the flops 
   - [`CrossSectionalRegression`](@ref)
 """
 function cross_sectional_leverage_one(A::MatNum, w::VecNum, intercept::Bool;
-                                      D::MatNum = A .* sqrt.(w), F = nothing)::BitVector
+                                      D::MatNum = A .* sqrt.(w), F = nothing,
+                                      G = nothing)::BitVector
     F = cross_sectional_qr(D, F)
     r = cross_sectional_rank(D; R = F.R)
-    h = cross_sectional_leverage(D, F, r)
+    h = cross_sectional_leverage(D, F, r; G = G)
     if intercept && !isempty(w)
         h = h .+ w ./ sum(w)
     end
@@ -79,6 +81,7 @@ Return the leverage of each row of a weighted design in the span of its columns,
   - `D::MatNum`: Weighted design of one observation, `eligible assets × factors`.
   - `F`: Column-pivoted `QR` of `D`.
   - `r::Integer`: Numerical rank of `D`, read by [`cross_sectional_rank`](@ref).
+  - `G`: A buffer for the pivoted columns, or `nothing`, as [`cross_sectional_leverage_one`](@ref) states.
 
 # Returns
 
@@ -88,8 +91,9 @@ Return the leverage of each row of a weighted design in the span of its columns,
 
   - [`cross_sectional_leverage_one`](@ref)
   - [`cross_sectional_rank`](@ref)
+  - [`cross_sectional_pivot_columns`](@ref)
 """
-function cross_sectional_leverage(D::MatNum, F, r::Integer)::VecNum
+function cross_sectional_leverage(D::MatNum, F, r::Integer; G = nothing)::VecNum
     T = real(eltype(F.R))
     if iszero(r)
         return zeros(T, size(D, 1))
@@ -97,12 +101,50 @@ function cross_sectional_leverage(D::MatNum, F, r::Integer)::VecNum
     R = F.R
     Q1 = if abs(R[1, 1]) <= abs(R[r, r]) / sqrt(sqrt(eps(T)))
         # The gather is a copy of its own, so the division runs in place on it.
-        LinearAlgebra.rdiv!(D[:, F.p[1:r]],
+        LinearAlgebra.rdiv!(cross_sectional_pivot_columns(G, D, view(F.p, 1:r)),
                             LinearAlgebra.UpperTriangular(view(R, 1:r, 1:r)))
     else
         F.Q * Matrix{eltype(R)}(LinearAlgebra.I, size(D, 1), r)
     end
     return vec(sum(abs2, Q1; dims = 2))
+end
+"""
+    cross_sectional_pivot_columns(G::Nothing, D::MatNum, p::AbstractVector{<:Integer}) -> MatNum
+    cross_sectional_pivot_columns(G::MatNum, D::MatNum, p::AbstractVector{<:Integer}) -> MatNum
+
+Return the columns `p` of the weighted design `D` as a matrix of its own, which [`cross_sectional_leverage`](@ref) divides in place.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. No buffer: gather the columns into a new matrix, `D[:, p]`.
+ 2. A buffer: copy the columns into its first `length(p)` columns, and return that view. A loop over observations then gathers into one allocation.
+
+# Arguments
+
+  - `G`: A buffer with the rows of `D` and at least `length(p)` columns, or `nothing`.
+  - `D::MatNum`: Weighted design of one observation, `eligible assets × factors`.
+  - `p::AbstractVector{<:Integer}`: The pivoted columns of the leading block of the `QR` of `D`.
+
+# Returns
+
+  - `Dp::MatNum`: The columns `p` of `D`, `eligible assets × length(p)`.
+
+# Related
+
+  - [`cross_sectional_leverage`](@ref)
+  - [`cross_sectional_loop_buffers`](@ref)
+"""
+function cross_sectional_pivot_columns(::Nothing, D::MatNum,
+                                       p::AbstractVector{<:Integer})::MatNum
+    return D[:, p]
+end
+function cross_sectional_pivot_columns(G::MatNum, D::MatNum,
+                                       p::AbstractVector{<:Integer})::MatNum
+    Dp = view(G, :, 1:length(p))
+    Dp .= view(D, :, p)
+    return Dp
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -156,6 +198,7 @@ The method that Julia selects is the algorithm.
   - `idx::AbstractVector`: Columns of the eligible assets in `h1`.
   - `D::MatNum`: Weighted design `sqrt.(w) .* A`.
   - `F`: Column-pivoted `QR` of `D`, as [`cross_sectional_shared_qr`](@ref) returns it.
+  - `G`: A buffer for the pivoted columns, or `nothing`, as [`cross_sectional_leverage_one`](@ref) states.
 
 # Returns
 
@@ -168,13 +211,14 @@ The method that Julia selects is the algorithm.
   - [`cross_sectional_block_regression`](@ref)
 """
 function cross_sectional_mark_leverage!(::Nothing, ::MatNum, ::VecNum, ::Bool, ::Integer,
-                                        ::AbstractVector; D = nothing, F = nothing)::Nothing
+                                        ::AbstractVector; D = nothing, F = nothing,
+                                        G = nothing)::Nothing
     return nothing
 end
 function cross_sectional_mark_leverage!(h1::AbstractMatrix{Bool}, A::MatNum, w::VecNum,
                                         intercept::Bool, t::Integer, idx::AbstractVector;
-                                        D::MatNum, F)::Nothing
-    h1[t, idx] = cross_sectional_leverage_one(A, w, intercept; D = D, F = F)
+                                        D::MatNum, F, G = nothing)::Nothing
+    h1[t, idx] = cross_sectional_leverage_one(A, w, intercept; D = D, F = F, G = G)
     return nothing
 end
 """
@@ -314,25 +358,35 @@ function cross_sectional_least_squares(::AbstractRegressionTarget)::Bool
     return false
 end
 """
-    cross_sectional_shared_qr(h1::Nothing, dc::Nothing, D::MatNum) -> Nothing
-    cross_sectional_shared_qr(h1, dc, D::MatNum) -> LinearAlgebra.QRPivoted
+    cross_sectional_shared_qr(h1::Nothing, dc::Nothing,
+                              alg::AbstractCrossSectionalSolveAlgorithm, D::MatNum,
+                              Q::MatNum) -> Nothing
+    cross_sectional_shared_qr(h1::Nothing, dc::Nothing,
+                              alg::Union{UncheckedSolve, MinimumNormSolve,
+                                         PseudoInverseFallback, RankDeficiencyRefusal,
+                                         DependentColumnDrop}, D::MatNum,
+                              Q::MatNum) -> LinearAlgebra.QRPivoted
+    cross_sectional_shared_qr(h1, dc, alg::AbstractCrossSectionalSolveAlgorithm, D::MatNum,
+                              Q::MatNum) -> LinearAlgebra.QRPivoted
 
 Return the column-pivoted `QR` that every reader of one observation shares, or `nothing` when no reader of the regression needs it.
 
-The leverage check writes `h1`, and the mark of the dropped columns of [`DependentColumnDrop`](@ref) writes `dc`. Both read a `QR` of the weighted design, so the regression takes it once and hands it to the solve as well. With neither mask, the solve takes the factorisation that its own member reads, or none.
+The leverage check writes `h1`, and the mark of the dropped columns of [`DependentColumnDrop`](@ref) writes `dc`. Both read a `QR` of the weighted design, so the regression takes it once and hands it to the solve as well. With neither mask, the regression takes it for a member of the library whose solve reads a `QR`, so that it factorises into the buffer of its task. [`NormalEquationsSolve`](@ref) reads none, and a member of a caller drops it, so both receive `nothing`.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. Both masks are `nothing`: return `nothing`.
- 2. Otherwise: return the column-pivoted `QR` of `D`, through [`cross_sectional_qr`](@ref).
+ 1. Both masks are `nothing`, and the member reads no `QR`: return `nothing`.
+ 2. Otherwise: return [`cross_sectional_qr`](@ref) of `D` into the buffer `Q`.
 
 # Arguments
 
   - `h1`: The leverage-one mask of the fit, or `nothing` when the fit runs no leverage check.
   - `dc`: The dropped-column mask of the fit, or `nothing`.
+  - `alg`: The solve algorithm of the estimator.
   - `D::MatNum`: Weighted design of one observation, `eligible assets × factors`.
+  - `Q::MatNum`: A buffer of the size and the element type of `D`, which receives the factors. The factorisation reads it until the next observation of the task writes it.
 
 # Returns
 
@@ -342,10 +396,20 @@ The method that Julia selects is the algorithm.
 
   - [`cross_sectional_qr`](@ref)
   - [`cross_sectional_block_regression`](@ref)
+  - [`cross_sectional_loop_buffers`](@ref)
 """
-function cross_sectional_shared_qr(::Nothing, ::Nothing, ::MatNum)::Nothing
+function cross_sectional_shared_qr(::Nothing, ::Nothing,
+                                   ::AbstractCrossSectionalSolveAlgorithm, ::MatNum,
+                                   ::MatNum)::Nothing
     return nothing
 end
-function cross_sectional_shared_qr(::Any, ::Any, D::MatNum)
-    return cross_sectional_qr(D, nothing)
+function cross_sectional_shared_qr(::Nothing, ::Nothing,
+                                   ::Union{UncheckedSolve, MinimumNormSolve,
+                                           PseudoInverseFallback, RankDeficiencyRefusal,
+                                           DependentColumnDrop}, D::MatNum, Q::MatNum)
+    return cross_sectional_qr(D, nothing, Q)
+end
+function cross_sectional_shared_qr(::Any, ::Any, ::AbstractCrossSectionalSolveAlgorithm,
+                                   D::MatNum, Q::MatNum)
+    return cross_sectional_qr(D, nothing, Q)
 end

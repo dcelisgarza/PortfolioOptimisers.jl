@@ -927,12 +927,14 @@ end
                           t::Integer) -> NamedTuple
     cross_sectional_solve(alg::AbstractCrossSectionalSolveAlgorithm, A::MatNum, y::VecNum,
                           t::Integer, F) -> NamedTuple
+    cross_sectional_solve(alg::AbstractCrossSectionalSolveAlgorithm, A::MatNum, y::VecNum,
+                          t::Integer, F, b) -> NamedTuple
 
 Solve the weighted design `A` against the weighted target `y` through the branch `alg` selects, and count the residual degrees of freedom of the fit.
 
 Every answer is a least-squares fit, so its fitted values are the projection of `y` onto the span of the columns that it solves. The projection spends the rank `r` of those columns, read by [`cross_sectional_rank`](@ref), and the count is `size(A, 1) - r`. The t-statistics of [`cs_regression_t_stats`](@ref) read the same rank.
 
-The fifth argument is the column-pivoted `QR` of `A` that [`cross_sectional_regression`](@ref) took for its leverage check, or `nothing`. A member of the library that reads a `QR` reads `F`, so the fit factorises the design once. The method of the root drops `F` and calls the method of four arguments, so a member of a caller implements only that one.
+The fifth argument is the column-pivoted `QR` of `A` that [`cross_sectional_regression`](@ref) took, or `nothing`. A member of the library that reads a `QR` reads `F`, so the fit factorises the design once. The sixth argument is a work vector of the task, or `nothing`, and a member of the library that solves through `F` solves in it through [`cross_sectional_full_solve`](@ref), with the bits of `F \\ y`. The methods of the root drop `F` and `b` and call the method of four arguments, so a member of a caller implements only that one.
 
 # Algorithm
 
@@ -950,6 +952,7 @@ The fifth argument is the column-pivoted `QR` of `A` that [`cross_sectional_regr
   - `y::VecNum`: Weighted target of one observation, of length `eligible assets`.
   - `t::Integer`: Index of the observation, named by the refusal of [`RankDeficiencyRefusal`](@ref).
   - `F`: Column-pivoted `QR` of `A`, as `LinearAlgebra.qr(A, LinearAlgebra.ColumnNorm())` returns it, or `nothing` to take it here.
+  - `b`: Work vector of length at least `max(size(A)...)`, overwritten, or `nothing`.
 
 # Validation
 
@@ -973,41 +976,46 @@ function cross_sectional_solve(alg::AbstractCrossSectionalSolveAlgorithm, A::Mat
                                y::VecNum, t::Integer, ::Any)
     return cross_sectional_solve(alg, A, y, t)
 end
+function cross_sectional_solve(alg::AbstractCrossSectionalSolveAlgorithm, A::MatNum,
+                               y::VecNum, t::Integer, ::Any, ::Any)
+    return cross_sectional_solve(alg, A, y, t)
+end
 function cross_sectional_solve(::UncheckedSolve, A::MatNum, y::VecNum, ::Integer,
-                               F = nothing)
+                               F = nothing, b = nothing)
     if size(A, 1) == size(A, 2)
         return (; f = A \ y, edof = size(A, 1) - size(A, 2))
     end
     F = cross_sectional_qr(A, F)
-    return (; f = F \ y, edof = size(A, 1) - cross_sectional_rank(A; R = F.R))
+    return (; f = cross_sectional_full_solve(F, A, y, b),
+            edof = size(A, 1) - cross_sectional_rank(A; R = F.R))
 end
 function cross_sectional_solve(::MinimumNormSolve, A::MatNum, y::VecNum, ::Integer,
-                               F = nothing)
+                               F = nothing, ::Any = nothing)
     return (; f = LinearAlgebra.pinv(A) * y,
             edof = size(A, 1) - cross_sectional_rank(A; R = cross_sectional_qr(A, F).R))
 end
 function cross_sectional_solve(::PseudoInverseFallback, A::MatNum, y::VecNum, ::Integer,
-                               F = nothing)
+                               F = nothing, b = nothing)
     F = cross_sectional_qr(A, F)
     r = cross_sectional_rank(A; R = F.R)
     return (; f = if r == size(A, 2)
-                cross_sectional_full_solve(F, A, y)
+                cross_sectional_full_solve(F, A, y, b)
             else
                 LinearAlgebra.pinv(A) * y
             end, edof = size(A, 1) - r)
 end
 function cross_sectional_solve(::RankDeficiencyRefusal, A::MatNum, y::VecNum, t::Integer,
-                               F = nothing)
+                               F = nothing, b = nothing)
     F = cross_sectional_qr(A, F)
     assert_cross_sectional_rank(A, t; R = F.R)
-    return (; f = cross_sectional_full_solve(F, A, y), edof = size(A, 1) - size(A, 2))
+    return (; f = cross_sectional_full_solve(F, A, y, b), edof = size(A, 1) - size(A, 2))
 end
 function cross_sectional_solve(::DependentColumnDrop, A::MatNum, y::VecNum, ::Integer,
-                               F = nothing)
+                               F = nothing, b = nothing)
     F = cross_sectional_qr(A, F)
     r = cross_sectional_rank(A; R = F.R)
     return if r == size(A, 2)
-        (; f = cross_sectional_full_solve(F, A, y), edof = size(A, 1) - r)
+        (; f = cross_sectional_full_solve(F, A, y, b), edof = size(A, 1) - r)
     else
         cross_sectional_column_drop(keep -> (; f = A[:, keep] \ y, edof = size(A, 1) - r),
                                     A, y, r; F = F)
@@ -1023,15 +1031,19 @@ end
 """
     cross_sectional_qr(D::MatNum, F::Nothing) -> LinearAlgebra.QRPivoted
     cross_sectional_qr(D::MatNum, F) -> typeof(F)
+    cross_sectional_qr(D::MatNum, F::Nothing, Q::MatNum) -> LinearAlgebra.QRPivoted
 
 Return the column-pivoted `QR` of the weighted design `D`, or the factorisation `F` that the caller already took.
 
 The leverage check, the solve and the mark of the dropped columns of one observation read one factorisation. The first reader that runs takes it, and every later reader receives it.
 
+`LinearAlgebra.qr` copies `D` into a new matrix and factorises the copy in place. With a buffer `Q`, the method copies `D` into `Q` and factorises `Q` in place, which is the same computation, so a loop over observations factorises into one allocation.
+
 # Arguments
 
   - `D::MatNum`: Weighted design of one observation, `eligible assets × factors`.
   - `F`: Column-pivoted `QR` of `D`, or `nothing`.
+  - `Q::MatNum`: A buffer of the size and the element type of `D`, which receives the factors. The factorisation reads it until the caller writes it again.
 
 # Returns
 
@@ -1048,6 +1060,10 @@ function cross_sectional_qr(D::MatNum, ::Nothing)
 end
 function cross_sectional_qr(::MatNum, F)
     return F
+end
+function cross_sectional_qr(D::MatNum, ::Nothing, Q::MatNum)
+    copyto!(Q, D)
+    return LinearAlgebra.qr!(Q, LinearAlgebra.ColumnNorm())
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1086,17 +1102,28 @@ function cross_sectional_gram_factor(D::MatNum)
     return C.rank == size(D, 2) ? C : nothing
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    cross_sectional_full_solve(F, A::MatNum, y::VecNum) -> VecNum
+    cross_sectional_full_solve(F, A::MatNum, y::VecNum, b::Option{<:AbstractVector}) -> VecNum
 
 Return the least-squares answer of a weighted design of full rank, through the column-pivoted `QR` that the caller already took.
 
 `A \\ y` factorises a design that is not square through `LinearAlgebra.qr(A, LinearAlgebra.ColumnNorm())`, so the solve through `F` is the same computation with no second factorisation. A square design takes `A \\ y`, which factorises it by `LU`, so the answer is the one that `A \\ y` gives on every shape.
+
+`F \\ y` copies `y` into a new work vector and solves in place on it. With a work vector `b` of the element type of `F` and `y`, the solve takes the same steps in `b`, so the answer has the same bits and a loop over observations allocates the work vector once.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. No work vector, or one whose element type differs from that of `F` or `y`: return `A \\ y` on a square design and `F \\ y` otherwise.
+ 2. A work vector of the element type of a column-pivoted `QR` of BLAS type: on a square design return `A \\ y`. Otherwise zero the entries of `b` past `size(A, 1)` up to `size(A, 2)`, copy `y` into its first entries, solve in place with `LinearAlgebra.ldiv!`, and return the first `size(A, 2)` entries.
 
 # Arguments
 
   - `F`: Column-pivoted `QR` of `A`, as `LinearAlgebra.qr(A, LinearAlgebra.ColumnNorm())` returns it.
   - `A::MatNum`: Weighted design of one observation, `eligible assets × factors`, of full rank.
   - `y::VecNum`: Weighted target of the observation.
+  - `b`: A work vector of length at least `max(size(A)...)`, overwritten, or `nothing`.
 
 # Returns
 
@@ -1106,9 +1133,29 @@ Return the least-squares answer of a weighted design of full rank, through the c
 
   - [`cross_sectional_solve`](@ref)
   - [`cross_sectional_rank`](@ref)
+  - [`cross_sectional_loop_buffers`](@ref)
 """
 function cross_sectional_full_solve(F, A::MatNum, y::VecNum)::VecNum
     return size(A, 1) == size(A, 2) ? A \ y : F \ y
+end
+function cross_sectional_full_solve(F, A::MatNum, y::VecNum,
+                                    ::Option{<:AbstractVector})::VecNum
+    return cross_sectional_full_solve(F, A, y)
+end
+function cross_sectional_full_solve(F::LinearAlgebra.QRPivoted{T, <:StridedMatrix},
+                                    A::MatNum, y::AbstractVector{T},
+                                    b::Vector{T})::VecNum where {T <:
+                                                                 LinearAlgebra.BlasFloat}
+    if size(A, 1) == size(A, 2)
+        return A \ y
+    end
+    m, n = size(F)
+    # The steps of `F \ y`: the rows of a wide design past `m` start at zero, `y` fills the
+    # first `m`, and `ldiv!` reads and writes only the first `max(m, n)`.
+    fill!(view(b, (m + 1):max(m, n)), zero(T))
+    copyto!(b, 1, y, 1, m)
+    LinearAlgebra.ldiv!(F, b)
+    return b[1:n]
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1617,6 +1664,7 @@ Return the factor returns and the residual count of one observation, through the
   - `t::Integer`: Index of the observation.
   - `D::MatNum`: Weighted design `sqrt.(w) .* A`. A caller that weighted the design already passes it.
   - `F`: Column-pivoted `QR` of `D` that the caller already took, or `nothing`. The solve reads it when its member reads a `QR`.
+  - `b`: Work vector of the solve, of length at least `max(size(D)...)`, or `nothing`. [`cross_sectional_full_solve`](@ref) solves in it. The target regression does not read it.
 
 # Validation
 
@@ -1638,12 +1686,12 @@ Return the factor returns and the residual count of one observation, through the
 """
 function cross_sectional_coefficients(cre::CrossSectionalLinearRegression, A::MatNum,
                                       y::VecNum, w::VecNum, t::Integer;
-                                      D::MatNum = A .* sqrt.(w), F = nothing)
-    return cross_sectional_solve(cre.alg, D, y .* sqrt.(w), t, F)
+                                      D::MatNum = A .* sqrt.(w), F = nothing, b = nothing)
+    return cross_sectional_solve(cre.alg, D, y .* sqrt.(w), t, F, b)
 end
 function cross_sectional_coefficients(cre::CrossSectionalTargetRegression, A::MatNum,
                                       y::VecNum, w::VecNum, t::Integer;
-                                      D::MatNum = A .* sqrt.(w), F = nothing)
+                                      D::MatNum = A .* sqrt.(w), F = nothing, b = nothing)
     @argcheck(!isempty(y),
               ArgumentError("observation $t has no asset with a positive cross-sectional weight, and $(nameof(typeof(cre.tgt))) has no cross-section to fit. Widen the eligible cross-section, or use CrossSectionalLinearRegression, which answers an empty observation with zero factor returns"))
     tgt = factory(cre.tgt, StatsBase.aweights(w))
@@ -1676,7 +1724,7 @@ The method that Julia selects is the algorithm.
 
 # Returns
 
-  - `buf::NamedTuple`: `(; w, A, y, Ac, yc, D)`: the gathered weights, exposures and returns, the centred exposures and returns, and the weighted design.
+  - `buf::NamedTuple`: `(; w, A, y, Ac, yc, D, Q, G, b)`: the gathered weights, exposures and returns, the centred exposures and returns, the weighted design, the factors of its column-pivoted `QR`, the pivoted columns that the leverage check divides, and the work vector of the solve, of length `max(assets, factors)`.
 
 # Related
 
@@ -1689,7 +1737,8 @@ function cross_sectional_loop_buffers(::Val{false}, Z::Arr3Num, X::MatNum, W::Ma
     Td = promote_type(eltype(Z), typeof(sqrt(oneunit(eltype(W)))))
     return (; w = similar(W, N), A = similar(Z, N, K), y = similar(X, N),
             Ac = Matrix{T}(undef, 0, K), yc = Vector{T}(undef, 0),
-            D = Matrix{Td}(undef, N, K))
+            D = Matrix{Td}(undef, N, K), Q = Matrix{Td}(undef, N, K),
+            G = Matrix{Td}(undef, N, K), b = Vector{Td}(undef, max(N, K)))
 end
 function cross_sectional_loop_buffers(::Val{true}, Z::Arr3Num, X::MatNum, W::MatNum,
                                       ::Type{T}) where {T}
@@ -1697,7 +1746,8 @@ function cross_sectional_loop_buffers(::Val{true}, Z::Arr3Num, X::MatNum, W::Mat
     Td = promote_type(T, typeof(sqrt(oneunit(eltype(W)))))
     return (; w = similar(W, N), A = similar(Z, N, K), y = similar(X, N),
             Ac = Matrix{T}(undef, N, K), yc = Vector{T}(undef, N),
-            D = Matrix{Td}(undef, N, K))
+            D = Matrix{Td}(undef, N, K), Q = Matrix{Td}(undef, N, K),
+            G = Matrix{Td}(undef, N, K), b = Vector{Td}(undef, max(N, K)))
 end
 """
     cross_sectional_foreach(f, ex::FLoops.Transducers.Executor, idx::AbstractVector) -> nothing
@@ -1933,9 +1983,10 @@ function cross_sectional_block_regression(cre::Union{CrossSectionalLinearRegress
         end
         D = view(buf.D, 1:n[t], :)
         D .= A .* sqrt.(w)
-        F = cross_sectional_shared_qr(h1, dc, D)
-        cross_sectional_mark_leverage!(h1, A, w, cre.intercept, t, idx; D = D, F = F)
-        fi = cross_sectional_coefficients(cre, A, y, w, t0 + t; D = D, F = F)
+        F = cross_sectional_shared_qr(h1, dc, cre.alg, D, view(buf.Q, 1:n[t], :))
+        cross_sectional_mark_leverage!(h1, A, w, cre.intercept, t, idx; D = D, F = F,
+                                       G = view(buf.G, 1:n[t], :))
+        fi = cross_sectional_coefficients(cre, A, y, w, t0 + t; D = D, F = F, b = buf.b)
         f[t, :] = fi.f
         cross_sectional_mark_dropped!(dc, A, w, t; D = D, F = F)
         if cre.intercept
@@ -1944,7 +1995,7 @@ function cross_sectional_block_regression(cre::Union{CrossSectionalLinearRegress
         edof[t] = fi.edof - spent
         return nothing
     end
-    eps = X - cross_sectional_systematic(f, b, Z)
+    eps = cross_sectional_residuals(X, f, b, Z)
     cross_sectional_zero_marked!(eps, h1, cross_sectional_least_squares(cre))
     return CrossSectionalRegression(; f = f, eps = eps, n = n, edof = edof, b = b,
                                     h1 = cross_sectional_bit_mask(h1),
@@ -1998,6 +2049,55 @@ function cross_sectional_systematic(f::MatNum, b::Option{<:VecNum}, Z::Arr3Num):
         Xh[t, i] = LinearAlgebra.dot(view(Z, i, :, t), view(f, t, :))
     end
     return isnothing(b) ? Xh : Xh .+ b
+end
+"""
+    cross_sectional_residuals(X::MatNum, f::MatNum, b::Option{<:VecNum}, Z::Arr3Num) -> MatNum
+
+Return the residuals of a cross-sectional regression, `observations × assets`: the returns `X` less the systematic part of [`cross_sectional_systematic`](@ref), in one pass.
+
+Each element takes the roundings of `X - cross_sectional_systematic(f, b, Z)` in the same order, so the two give the same bits. The pass allocates the residuals alone, where the two-step form also allocates the systematic part and, with an intercept, its shifted copy.
+
+# Algorithm
+
+ 1. For each observation `t` and asset `i`, take the dot product of the exposures `Z[i, :, t]` and the factor returns `f[t, :]`, in the element type of `f`.
+ 2. Add the intercept `b[t]` when one was fitted.
+ 3. Subtract the sum from `X[t, i]`.
+
+# Arguments
+
+  - `X::MatNum`: Returns matrix `observations × assets`.
+  - `f::MatNum`: Factor returns matrix `observations × factors`.
+  - `b::Option{<:VecNum}`: Intercept vector, or `nothing` when none was fitted.
+  - `Z::Arr3Num`: Exposure tensor `assets × factors × observations`.
+
+# Validation
+
+  - The rules of [`cross_sectional_systematic`](@ref), and `size(X) == (size(Z, 3), size(Z, 1))`.
+
+# Returns
+
+  - `eps::MatNum`: Residuals, `observations × assets`.
+
+# Related
+
+  - [`cross_sectional_systematic`](@ref)
+  - [`cross_sectional_regression`](@ref)
+"""
+function cross_sectional_residuals(X::MatNum, f::MatNum, b::Option{<:VecNum},
+                                   Z::Arr3Num)::MatNum
+    @argcheck(size(Z, 3) == size(f, 1) &&
+              size(Z, 2) == size(f, 2) &&
+              size(X) == (size(Z, 3), size(Z, 1)),
+              DimensionMismatch("X ($(size(X, 1))×$(size(X, 2))), f ($(size(f, 1))×$(size(f, 2))) and Z ($(size(Z, 1))×$(size(Z, 2))×$(size(Z, 3))) must agree on the asset, factor and observation axes"))
+    # The element types of the two-step form: the systematic part is stored in the type of
+    # `f`, the intercept promotes it, and the difference promotes again.
+    Ts = isnothing(b) ? eltype(f) : Base.promote_op(+, eltype(f), eltype(b))
+    eps = similar(X, Base.promote_op(-, eltype(X), Ts))
+    for t in axes(Z, 3), i in axes(Z, 1)
+        s = convert(eltype(f), LinearAlgebra.dot(view(Z, i, :, t), view(f, t, :)))
+        eps[t, i] = X[t, i] - (isnothing(b) ? s : s + b[t])
+    end
+    return eps
 end
 """
     StatsAPI.predict(csr::CrossSectionalRegression, Z::Arr3Num) -> MatNum

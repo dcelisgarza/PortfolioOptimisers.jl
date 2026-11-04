@@ -287,6 +287,50 @@ end
               zeros(4)
     end
 
+    @testset "The buffers of a task give the bits of the allocating forms" begin
+        # The loop factorises into a buffer `Q`, gathers the pivoted columns into a buffer
+        # `G`, each a view of the first rows of a larger matrix as a task holds them, and
+        # solves in a work vector `b` longer than the design.
+        rng = StableRNG(19731)
+        pif = PseudoInverseFallback()
+        for T in (Float64, Float32)
+            D = randn(rng, T, 9, 4)
+            Q = view(fill(T(NaN), 12, 4), 1:9, :)
+            G = view(fill(T(NaN), 12, 4), 1:9, :)
+            F0 = qr(D, ColumnNorm())
+            F1 = PO.cross_sectional_shared_qr(trues(1, 9), nothing, NormalEquationsSolve(),
+                                              D, Q)
+            @test F1.factors == F0.factors && F1.τ == F0.τ && F1.p == F0.p
+            # With no mask, a member that reads a `QR` gets one, and one that reads none
+            # gets `nothing`.
+            F2 = PO.cross_sectional_shared_qr(nothing, nothing, pif, D, Q)
+            @test F2.factors == F0.factors && F2.p == F0.p
+            @test isnothing(PO.cross_sectional_shared_qr(nothing, nothing,
+                                                         NormalEquationsSolve(), D, Q))
+            r = PO.cross_sectional_rank(D; R = F0.R)
+            @test PO.cross_sectional_leverage(D, F1, r; G = G) ==
+                  PO.cross_sectional_leverage(D, F0, r)
+            p = F0.p[1:2]
+            @test PO.cross_sectional_pivot_columns(G, D, p) ==
+                  PO.cross_sectional_pivot_columns(nothing, D, p) ==
+                  D[:, p]
+            # The work vector gives the bits of `F \ y`, tall and wide, and a work vector
+            # of another element type falls back to `F \ y`.
+            y = randn(rng, T, 9)
+            b = fill(T(NaN), 12)
+            @test PO.cross_sectional_full_solve(F1, D, y, b) == F0 \ y
+            @test PO.cross_sectional_solve(pif, D, y, 1, F1, b) ==
+                  PO.cross_sectional_solve(pif, D, y, 1)
+            Dw, yw = randn(rng, T, 3, 4), randn(rng, T, 3)
+            Fw = qr(Dw, ColumnNorm())
+            @test PO.cross_sectional_full_solve(Fw, Dw, yw, b) == Fw \ yw
+            @test PO.cross_sectional_full_solve(F0, D, y, zeros(BigFloat, 12)) == F0 \ y
+            # The root drops `F` and `b`, so a member of a caller implements four arguments.
+            @test PO.cross_sectional_solve(NormalEquationsSolve(), D, y, 1, F1, b) ==
+                  PO.cross_sectional_solve(NormalEquationsSolve(), D, y, 1)
+        end
+    end
+
     @testset "A fit with no leverage check marks nothing and keeps every answer (#1971)" begin
         # The lone member of a level of a one-hot family has a leverage of one.
         rng = StableRNG(19712)
