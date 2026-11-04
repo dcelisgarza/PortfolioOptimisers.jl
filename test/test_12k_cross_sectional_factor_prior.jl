@@ -2477,3 +2477,33 @@ refit reads it from the result of that fit, so it runs no regression (#1751, ADR
     @test nfit[] == 1
     @test isapprox(LinearAlgebra.dot(pn.w, pn.X[:, 1]), 0.0021; rtol = 1e-5)
 end
+
+@testset "The exposure history shares one backing with the observed exposures (#1973)" begin
+    PO = PortfolioOptimisers
+    Zo = rand(StableRNG(197_301), 4, 3, 2)
+    h = PO.cross_sectional_history_backing(Float64, 4, 3, 5, Zo)
+    @test h.Ms isa SubArray && h.Zo isa SubArray
+    @test parent(h.Ms) === parent(h.Zo)
+    @test size(h.Ms) == (4, 3, 5)
+    @test h.Zo == Zo
+    # The batch fit joins the rows it fitted, and the join of two views of the backing is a
+    # view of it, with no copy.
+    J = PO.cross_sectional_joined_exposures(view(h.Ms, 2:4, :, :), view(h.Zo, 2:4, :, :))
+    @test parent(J) === parent(h.Ms)
+    @test size(J) == (3, 3, 7)
+    # A backing holds one element type, so observed exposures of another type keep their own
+    # array, and the history keeps the type of its returns.
+    Zf = Float32.(Zo)
+    hf = PO.cross_sectional_history_backing(Float64, 4, 3, 5, Zf)
+    @test hf.Ms isa Array{Float64, 3}
+    @test hf.Zo === Zf
+    h0 = PO.cross_sectional_history_backing(Float64, 4, 3, 5, nothing)
+    @test h0.Ms isa Array{Float64, 3} && size(h0.Ms) == (4, 3, 5)
+    @test isnothing(h0.Zo)
+    @test_throws DimensionMismatch PO.cross_sectional_history_backing(Float64, 5, 3, 5, Zo)
+    @test_throws DimensionMismatch PO.cross_sectional_history_backing(Float64, 4, 2, 5, Zf)
+    # Weights of any other kind divide by their sum as analytic weights.
+    w = PO.cross_sectional_scenario_weights(StatsBase.fweights([1, 2, 1]))
+    @test w isa StatsBase.AnalyticWeights
+    @test w ≈ [0.25, 0.5, 0.25]
+end

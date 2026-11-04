@@ -987,7 +987,7 @@ end
 
 Join the exposure history of the estimated factors and the exposure history of the observed factors along the factor axis, the estimated factors first.
 
-The carry fold keeps the two histories as views of one backing, whose factor axis holds the estimated factors and then the observed ones, with [`cross_sectional_fold_join`](@ref). When `Ms` and `Zo` are views of the same rows and the same assets of one backing, and its factor axis holds `Ms` and then `Zo` and nothing else, the joined history is a view of that backing, and the method copies nothing. Any other pair joins by a copy, as the batch fit joins its histories.
+The carry fold keeps the two histories as views of one backing, whose factor axis holds the estimated factors and then the observed ones, with [`cross_sectional_fold_join`](@ref). The batch fit allocates them in one backing too, with [`cross_sectional_history_backing`](@ref). When `Ms` and `Zo` are views of the same rows and the same assets of one backing, and its factor axis holds `Ms` and then `Zo` and nothing else, the joined history is a view of that backing, and the method copies nothing. Any other pair joins by a copy, as the batch fit joins its histories.
 
 # Arguments
 

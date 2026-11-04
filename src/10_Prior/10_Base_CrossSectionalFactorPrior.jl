@@ -276,6 +276,67 @@ function cross_sectional_exposure_write!(Ms::AbstractArray{<:Number, 3}, A::Arr3
     return nothing
 end
 """
+    cross_sectional_exposure_fill!(Ms::AbstractArray{<:Number, 3}, xe, rd::ReturnsResult,
+                                   k::Integer, c::Integer, w::Integer,
+                                   nm::AbstractString) -> nothing
+    cross_sectional_exposure_fill!(Ms::AbstractArray{<:Number, 3}, xe::OneHotExposure,
+                                   rd::ReturnsResult, k::Integer, c::Integer, w::Integer,
+                                   nm::AbstractString) -> nothing
+
+Write the Factor Exposure of one member of a factor list into its columns of the exposure history `Ms`, at the last `size(Ms, 1)` of the `k` rows of `rd`.
+
+A [`OneHotExposure`](@ref) expands its codes straight into the columns of the history with [`one_hot_fill!`](@ref), so the fit makes no one-hot block of its own. Every other member gives its Factor Exposure with [`factor_exposure`](@ref), and [`cross_sectional_exposure_write!`](@ref) copies it into the history. Both write the same values.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A [`OneHotExposure`](@ref): read its codes and its live cells with [`one_hot_inputs`](@ref), and fill the columns `c:(c + w - 1)` of `Ms` from the last rows of both.
+ 2. Any other member: write the last rows of `factor_exposure(xe, rd)` with [`cross_sectional_exposure_write!`](@ref).
+
+# Arguments
+
+  - `Ms`: The exposure history, `observations × assets × factors`, changed in place.
+  - `xe`: Exposure Estimator.
+  - $(arg_dict[:rd]) It carries the Asset Panel the member reads.
+  - `k`: Number of rows of `rd`.
+  - `c`: First column of the member in `Ms`.
+  - `w`: Number of columns of the member.
+  - `nm`: Name of the member, which a refusal names.
+
+# Validation
+
+  - The rules of [`cross_sectional_exposure_write!`](@ref), and of [`one_hot_inputs`](@ref) for a [`OneHotExposure`](@ref).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`cross_sectional_exposure_history`](@ref)
+  - [`cross_sectional_exposure_write!`](@ref)
+  - [`one_hot_fill!`](@ref)
+"""
+function cross_sectional_exposure_fill!(Ms::AbstractArray{<:Number, 3}, xe,
+                                        rd::ReturnsResult, k::Integer, c::Integer,
+                                        w::Integer, nm::AbstractString)::Nothing
+    A = factor_exposure(xe, rd)
+    return cross_sectional_exposure_write!(Ms, selectdim(A, 1, (k - size(Ms, 1) + 1):k), c,
+                                           w, nm)
+end
+function cross_sectional_exposure_fill!(Ms::AbstractArray{<:Number, 3}, xe::OneHotExposure,
+                                        rd::ReturnsResult, k::Integer, c::Integer,
+                                        w::Integer, nm::AbstractString)::Nothing
+    (; codes, live, nl) = one_hot_inputs(xe, rd)
+    m = size(Ms, 1)
+    @argcheck(size(codes, 2) == size(Ms, 2) && nl == w,
+              DimensionMismatch("the Factor Exposure $nm is observations × assets × factors, got $((m, size(codes, 2), nl)) against $((m, size(Ms, 2), w))"))
+    rows = (k - m + 1):k
+    one_hot_fill!(view(Ms, :, :, c:(c + w - 1)), view(codes, rows, :), view(live, rows, :))
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the rows of the returns data that one member of a factor list reads to give its Factor Exposures at the last `m` rows.
@@ -314,7 +375,7 @@ Build the exposure history of a factor list, and the factor axis it is written o
  2. Take the dependency layers with [`cross_sectional_exposure_order`](@ref).
  3. Compute the layers in order, and the members of one layer under `ex` through [`cross_sectional_foreach`](@ref). Give a [`DerivedExposure`](@ref) the exposure of its source, which an earlier layer has already written. Each member writes its own columns of `Ms`, so every executor gives the same history.
  4. When `n` is an integer, give each member the rows of `rd` that [`cross_sectional_exposure_rows`](@ref) names, and keep the last `n` rows of its exposure. Those rows equal the rows of the exposure over every row of `rd`. A [`DerivedExposure`](@ref) has a look-back of one, so it reads the `n` rows of its source that `Ms` holds.
- 5. Write each Factor Exposure into `Ms` with [`cross_sectional_exposure_write!`](@ref). `Ms` takes the element type `real(eltype(X))`, which holds a fractional exposure and the `NaN` of an inactive cell.
+ 5. Write each Factor Exposure into `Ms` with [`cross_sectional_exposure_fill!`](@ref), and the one of a [`DerivedExposure`](@ref) with [`cross_sectional_exposure_write!`](@ref). `Ms` takes the element type `real(eltype(X))`, which holds a fractional exposure and the `NaN` of an inactive cell.
 
 # Arguments
 
@@ -322,17 +383,20 @@ Build the exposure history of a factor list, and the factor axis it is written o
   - $(arg_dict[:rd]) It carries the Asset Panel every member reads.
   - $(arg_dict[:ex]) It computes the members of one dependency layer.
   - `n`: Number of last rows of `rd` to compute, or `nothing` for every row. The carry fold of a [`CrossSectionalFactorPrior`](@ref) gives the number of rows of a step.
+  - `Zo`: The observed exposures over the rows of `Ms`, which the fit joins to `Ms` later, or `nothing`. [`cross_sectional_history_backing`](@ref) gives the two one backing when it can.
 
 # Validation
 
   - The rules of [`cross_sectional_factor_axis`](@ref) and of [`cross_sectional_exposure_order`](@ref).
   - The source of a [`DerivedExposure`](@ref) contributes one column. Raises an `ArgumentError`.
+  - The rules of [`cross_sectional_history_backing`](@ref).
 
 # Returns
 
-  - `Ms::Array{<:Real, 3}`: The exposure history, `observations × assets × factors`, of the last `n` rows of `rd`, or of every row.
+  - `Ms::AbstractArray{<:Real, 3}`: The exposure history, `observations × assets × factors`, of the last `n` rows of `rd`, or of every row. It is a view of a backing that it shares with `Zo` when [`cross_sectional_history_backing`](@ref) gives one.
   - `nf::Vector{String}`: Name of each factor.
   - `fam::Vector{String}`: Family label of each factor.
+  - `Zo`: The observed exposures, as a view of the shared backing, or the input `Zo`.
 
 # Related
 
@@ -344,7 +408,8 @@ Build the exposure history of a factor list, and the factor axis it is written o
 function cross_sectional_exposure_history(factors::AbstractVector{<:Pair},
                                           rd::ReturnsResult,
                                           ex::FLoops.Transducers.Executor = FLoops.ThreadedEx();
-                                          n::Option{<:Integer} = nothing)
+                                          n::Option{<:Integer} = nothing,
+                                          Zo::Option{<:AbstractArray{<:Any, 3}} = nothing)
     (; nf, fam) = cross_sectional_factor_axis(factors, rd)
     wid = cross_sectional_exposure_widths(factors, rd)
     lay, src = cross_sectional_exposure_order(factors)
@@ -358,23 +423,108 @@ function cross_sectional_exposure_history(factors::AbstractVector{<:Pair},
     X = rd.X
     m = something(n, size(X, 1))
     Tf = real(eltype(X))
-    Ms = Array{Tf, 3}(undef, m, size(X, 2), length(nf))
+    (; Ms, Zo) = cross_sectional_history_backing(Tf, m, size(X, 2), length(nf), Zo)
     for cur in lay
         cross_sectional_foreach(ex, cur) do i
             nm = String(first(factors[i]))
             xe = last(factors[i])
             (; rdi, k) = cross_sectional_exposure_rows(xe, rd, m)
             # A derived member reads a copy of its source, which an earlier layer wrote.
-            A = if src[i] > 0
-                factor_exposure(xe, rdi, Ms[:, :, col[src[i]]])
-            else
-                factor_exposure(xe, rdi)
+            if src[i] > 0
+                A = factor_exposure(xe, rdi, Ms[:, :, col[src[i]]])
+                return cross_sectional_exposure_write!(Ms, selectdim(A, 1, (k - m + 1):k),
+                                                       col[i], wid[i], nm)
             end
-            return cross_sectional_exposure_write!(Ms, selectdim(A, 1, (k - m + 1):k),
-                                                   col[i], wid[i], nm)
+            return cross_sectional_exposure_fill!(Ms, xe, rdi, k, col[i], wid[i], nm)
         end
     end
-    return (; Ms = Ms, nf = nf, fam = fam)
+    return (; Ms = Ms, nf = nf, fam = fam, Zo = Zo)
+end
+"""
+    cross_sectional_history_backing(T::Type, m::Integer, N::Integer, K::Integer,
+                                    Zo::Nothing) -> NamedTuple
+    cross_sectional_history_backing(T::Type, m::Integer, N::Integer, K::Integer,
+                                    Zo::AbstractArray{<:Any, 3}) -> NamedTuple
+    cross_sectional_history_backing(T::Type{Tz}, m::Integer, N::Integer, K::Integer,
+                                    Zo::AbstractArray{Tz, 3}) where {Tz} -> NamedTuple
+
+Allocate the exposure history of [`cross_sectional_exposure_history`](@ref), and give it one backing with the observed exposures `Zo` when the two can share it.
+
+The batch fit of a [`CrossSectionalFactorPrior`](@ref) joins the observed exposures to the exposure history along the factor axis, with [`cross_sectional_joined_exposures`](@ref). When the two are views of one backing, the join is a view of it too, and the fit copies no history of the joined factors. The method copies `Zo` into the spare factors of the backing once. A backing has one element type, so `Zo` of another element type keeps its own array, and the history keeps the type of its returns.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. No `Zo`: allocate `m × N × K` of `T`, and return no `Zo`.
+ 2. `Zo` of another element type than `T`: allocate `m × N × K` of `T`, and return `Zo` unchanged.
+ 3. `Zo` of the element type `T`: allocate `m × N × (K + size(Zo, 3))` of `T`, copy `Zo` into its last factors, and return the views of its first `K` factors and of its last factors.
+
+# Arguments
+
+  - `T::Type`: Element type of the history.
+  - `m::Integer`: Number of observations of the history.
+  - `N::Integer`: Number of assets.
+  - `K::Integer`: Number of estimated factors.
+  - `Zo`: The observed exposures, `observations × assets × factors`, or `nothing`.
+
+# Validation
+
+  - `Zo` has `m` observations and `N` assets. Raises a `DimensionMismatch`.
+
+# Returns
+
+  - `(; Ms, Zo)::NamedTuple`: The history of the estimated factors, to be written, and the observed exposures, or `nothing`.
+
+# Related
+
+  - [`cross_sectional_exposure_history`](@ref)
+  - [`cross_sectional_joined_exposures`](@ref)
+"""
+function cross_sectional_history_backing(::Type{T}, m::Integer, N::Integer, K::Integer,
+                                         ::Nothing) where {T}
+    return (; Ms = Array{T, 3}(undef, m, N, K), Zo = nothing)
+end
+function cross_sectional_history_backing(::Type{T}, m::Integer, N::Integer, K::Integer,
+                                         Zo::AbstractArray{<:Any, 3}) where {T}
+    assert_history_backing_axes(Zo, m, N)
+    return (; Ms = Array{T, 3}(undef, m, N, K), Zo = Zo)
+end
+function cross_sectional_history_backing(::Type{T}, m::Integer, N::Integer, K::Integer,
+                                         Zo::AbstractArray{T, 3}) where {T}
+    assert_history_backing_axes(Zo, m, N)
+    P = Array{T, 3}(undef, m, N, K + size(Zo, 3))
+    Zb = view(P, :, :, (K + 1):size(P, 3))
+    copyto!(Zb, Zo)
+    return (; Ms = view(P, :, :, 1:K), Zo = Zb)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Check that the observed exposures share the observation and asset axes of the exposure history that [`cross_sectional_history_backing`](@ref) allocates.
+
+# Arguments
+
+  - `Zo`: The observed exposures, `observations × assets × factors`.
+  - `m::Integer`: Number of observations of the history.
+  - `N::Integer`: Number of assets.
+
+# Validation
+
+  - `size(Zo, 1) == m` and `size(Zo, 2) == N`. Raises a `DimensionMismatch`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`cross_sectional_history_backing`](@ref)
+"""
+function assert_history_backing_axes(Zo::AbstractArray{<:Any, 3}, m::Integer, N::Integer)
+    @argcheck(size(Zo, 1) == m && size(Zo, 2) == N,
+              DimensionMismatch("the observed exposures ($(size(Zo, 1))×$(size(Zo, 2))) must share the $(m) observations and $(N) assets of the exposure history"))
+    return nothing
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

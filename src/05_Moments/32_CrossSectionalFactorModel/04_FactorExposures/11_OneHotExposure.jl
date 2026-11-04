@@ -233,16 +233,49 @@ julia> factor_exposure(OneHotExposure(; field = \"sector\", family = \"sector\")
   - [`exposure_active_fill!`](@ref)
 """
 function factor_exposure(xe::OneHotExposure, rd::ReturnsResult)::Array{<:Real, 3}
+    (; codes, live, nl) = one_hot_inputs(xe, rd)
+    Tf = real(eltype(rd.X))
+    B = Array{Tf}(undef, size(codes, 1), size(codes, 2), nl)
+    one_hot_fill!(B, codes, live)
+    return B
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return what [`one_hot_fill!`](@ref) reads to expand a [`OneHotExposure`](@ref): the codes of its Panel Field, the cells that are live, and the number of levels.
+
+[`factor_exposure`](@ref) fills a block of its own from them, and the exposure history of a [`CrossSectionalFactorPrior`](@ref) fills the columns of the member in the history, with no block between. Both read the same checks.
+
+# Arguments
+
+  - `xe`: One-hot Exposure Estimator.
+  - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
+
+# Validation
+
+  - The rules of [`one_hot_field`](@ref).
+  - The codes match the active mask of the Asset Panel. Raises a `DimensionMismatch`.
+
+# Returns
+
+  - `codes::AbstractMatrix{<:Integer}`: The codes of the Panel Field, `observations × assets`.
+  - `live::AbstractMatrix{Bool}`: `true` where the Panel Field observes the cell and the active mask activates it.
+  - `nl::Int`: The number of levels, one factor each.
+
+# Related
+
+  - [`factor_exposure`](@ref)
+  - [`one_hot_fill!`](@ref)
+  - [`one_hot_field`](@ref)
+"""
+function one_hot_inputs(xe::OneHotExposure, rd::ReturnsResult)
     f = one_hot_field(rd, xe.field)
     codes = f.codes
     amsk = rd.pnl.amsk
     @argcheck(size(amsk) == size(codes),
               DimensionMismatch("a one-hot Factor Exposure is observations × assets × factors, so its first two axes must match the active mask of the Asset Panel, got size(codes) = $(size(codes)) and size(pnl.amsk) = $(size(amsk))"))
     live = isnothing(f.omsk) ? amsk : f.omsk .& amsk
-    Tf = real(eltype(rd.X))
-    B = Array{Tf}(undef, size(codes, 1), size(codes, 2), length(f.levels))
-    one_hot_fill!(B, codes, live)
-    return B
+    return (; codes = codes, live = live, nl = length(f.levels))
 end
 function lookback(::OneHotExposure)::Integer
     return 1

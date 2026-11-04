@@ -1286,7 +1286,13 @@ function cross_sectional_exposure_series(pe::CrossSectionalFactorPrior, X::MatNu
                       iv = rdb.iv, ivpa = rdb.ivpa, pnl = rdb.pnl)
     end
     dc = cross_sectional_descriptor_carry(est, rde, n)
-    (; Ms, nf, fam) = cross_sectional_exposure_history(dc.xv, rde, pe.ex; n = n)
+    # The batch fit joins the observed exposures to the history after its regression, so the
+    # history keeps spare factors for them, and the join is a view (#1973). The fold holds
+    # `pe.lag` more observed rows than rows of the history, and keeps the two apart.
+    Zo = isnothing(n) && !isnothing(cc) ? cc.Z : nothing
+    (; Ms, nf, fam, Zo) = cross_sectional_exposure_history(dc.xv, rde, pe.ex; n = n,
+                                                           Zo = Zo)
+    cc = isnothing(Zo) ? cc : merge(cc, (; Z = Zo))
     return (; amsk = amsk, emsk = emsk, mcap = mcap, BW = BW, Xu = Xu, cc = cc, Xl = Xl,
             rde = rde, Ms = Ms, nf = nf, fam = fam,
             xf = cross_sectional_factor_join(fl, dc.xf, isnothing(cc) ? obs : cc.xf))
