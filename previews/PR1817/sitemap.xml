@@ -697,6 +697,9 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/05_Moments/32_CrossSectionalFactorModel/12_CrossSectionalExposureIC/</loc>
   </url>
   <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalLeverage/</loc>
+  </url>
+  <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/05_Moments/33_CoverageUniverse/</loc>
   </url>
   <url>
@@ -1913,6 +1916,9 @@
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/05_Moments/32_CrossSectionalFactorModel/12_CrossSectionalExposureIC/</loc>
+  </url>
+  <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalLeverage/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/05_Moments/33_CoverageUniverse/</loc>
