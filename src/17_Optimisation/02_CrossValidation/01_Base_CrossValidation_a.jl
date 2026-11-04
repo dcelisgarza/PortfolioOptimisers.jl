@@ -1416,34 +1416,30 @@ end
 """
     sort_by_measure(ppred::PopulationPredictionResult, r::BaseRM_VecBaseRM; kwargs...)
 
-Sort the successful paths in a [`PopulationPredictionResult`](@ref) by their expected
-risk under `r`. A path in which any fold returned a failure code is left out.
+Sort the successful paths in a [`PopulationPredictionResult`](@ref) from the best to the worst
+under `r`. A path in which any fold returned a failure code is left out.
 
-A path whose measure is not finite goes **after** every finite one, under both directions of
-the ranking, because a non-finite number is not a best and must not be the answer of a
-`first`. The finite members are sorted among themselves, and the non-finite ones keep their own
-order at the end.
+A path whose measure is not finite goes **after** every finite one, because a non-finite
+number is not a best and must not be the answer of a `first`. The finite members are sorted
+among themselves, and the non-finite ones keep their own order at the end.
 
-The direction of the ranking comes from [`bigger_is_better`](@ref), which **throws** on a vector
-of measures that disagree on polarity. [`quantile_by_measure`](@ref) takes an explicit `sign`
-instead, so it admits a mixed vector.
+The rank reads the [`oriented_score`](@ref) of each path, which orients each measure before it
+reduces a vector. So a vector of measures that disagree on orientation is admitted, and the
+reduction reads oriented scores: [`MinScalariser`](@ref) ranks by the worst measure of each
+path and [`MaxScalariser`](@ref) by the best.
 
 # Algorithm
 
  1. Keep the successful members of `ppred` with [`successful_members`](@ref).
- 2. Compute the expected risk of each member under `r`, giving `rks`.
- 3. Sort the members whose `rks` is finite by `rks`, in descending order when [`bigger_is_better`](@ref) holds of `r` and in ascending order otherwise.
+ 2. Compute the oriented score of each member under `r` with [`oriented_score`](@ref), giving `rks`.
+ 3. Sort the members whose `rks` is finite by `rks`, in descending order.
  4. Append the members whose `rks` is not finite, in their own order.
 
 # Arguments
 
   - `ppred::PopulationPredictionResult`: Population prediction to sort.
-  - `r::BaseRM_VecBaseRM`: Risk measure used for ranking, or a vector of them. A vector is scalarised by `kwargs.sca`, defaulting to [`SumScalariser`](@ref).
-  - `kwargs...`: Keyword arguments forwarded to `expected_risk`.
-
-# Validation
-
-  - A vector `r` whose measures disagree on polarity raises in [`bigger_is_better`](@ref).
+  - `r::BaseRM_VecBaseRM`: Risk measure used for ranking, or a vector of them. A vector is reduced by `kwargs.sca`, a [`Sca_VecToScaM`](@ref) that defaults to [`SumScalariser`](@ref).
+  - `kwargs...`: Keyword arguments forwarded to [`oriented_score`](@ref).
 
 # Returns
 
@@ -1452,32 +1448,30 @@ instead, so it admits a mixed vector.
 # Related
 
   - [`quantile_by_measure`](@ref)
-  - [`bigger_is_better`](@ref)
+  - [`oriented_score`](@ref)
   - [`PopulationPredictionResult`](@ref)
-  - [`expected_risk`](@ref)
 """
 function sort_by_measure(ppred::PopulationPredictionResult, r::BaseRM_VecBaseRM; kwargs...)
     pred = successful_members(ppred)
-    rks = [expected_risk(r, x; kwargs...) for x in pred]
+    rks = [oriented_score(r, x; kwargs...) for x in pred]
     fin = isfinite.(rks)
     idx = findall(fin)
-    return [pred[idx[sortperm(rks[idx]; rev = bigger_is_better(r))]]; pred[findall(!, fin)]]
+    return [pred[idx[sortperm(rks[idx]; rev = true)]]; pred[findall(!, fin)]]
 end
 """
     quantile_by_measure(ppred::PopulationPredictionResult, r::BaseRM_VecBaseRM, q::Real;
-                        r_kwargs::NamedTuple = (;), q_kwargs::NamedTuple = (;),
-                        sign::Integer = 1)
+                        r_kwargs::NamedTuple = (;), q_kwargs::NamedTuple = (;))
 
-Select the successful path in `ppred` whose expected risk under `r` is closest to the `q`-th quantile of the risk distribution across all successful paths.
+Select the successful path in `ppred` whose risk under `r` is closest to the `q`-th quantile of the risks across all successful paths.
+
+The risk of a path is its negated [`oriented_score`](@ref), so a larger risk is worse whatever the orientation of `r`. `q = 0` selects the best path and `q = 1` the worst. The score orients each measure before it reduces a vector, so a vector of measures that disagree on orientation is admitted.
 
 A path whose measure is not finite takes no part. It is dropped before the quantile, so one failed path cannot make the quantile non-finite and cannot be the answer.
-
-[`sort_by_measure`](@ref) calls [`bigger_is_better`](@ref) for its direction, so it **throws** on a vector of measures that disagree on polarity. This function takes an explicit `sign` instead. The caller gives the one fact that `bigger_is_better` cannot infer, so a mixed vector is admitted.
 
 # Algorithm
 
  1. Keep the successful members of `ppred` with [`successful_members`](@ref).
- 2. Compute `sign` times the expected risk of each member under `r`, giving `rks`.
+ 2. Compute the negated oriented score of each member under `r` with [`oriented_score`](@ref), giving `rks`.
  3. Drop the members whose `rks` is not finite.
  4. Compute the `q`-th quantile of `rks` with `Statistics.quantile`, giving `rkq`.
  5. Return the first member whose `abs(rks[i] - rkq)` is the smallest.
@@ -1485,11 +1479,10 @@ A path whose measure is not finite takes no part. It is dropped before the quant
 # Arguments
 
   - `ppred::PopulationPredictionResult`: Population prediction result.
-  - `r::BaseRM_VecBaseRM`: Risk measure for computing path risks, or a vector of them. A vector is scalarised by `r_kwargs.sca`, defaulting to [`SumScalariser`](@ref).
+  - `r::BaseRM_VecBaseRM`: Risk measure for computing path risks, or a vector of them. A vector is reduced by `r_kwargs.sca`, a [`Sca_VecToScaM`](@ref) that defaults to [`SumScalariser`](@ref).
   - `q::Real`: Quantile level in `[0, 1]`.
-  - `r_kwargs::NamedTuple = (;)`: Keyword arguments forwarded to `expected_risk`.
+  - `r_kwargs::NamedTuple = (;)`: Keyword arguments forwarded to [`oriented_score`](@ref).
   - `q_kwargs::NamedTuple = (;)`: Keyword arguments forwarded to `Statistics.quantile`.
-  - `sign::Integer = 1`: Orientation of the risk scale. Use `1` when a larger risk is worse, `-1` when it is better. This is what lets a mixed vector through, see below.
 
 # Validation
 
@@ -1502,14 +1495,14 @@ A path whose measure is not finite takes no part. It is dropped before the quant
 # Related
 
   - [`sort_by_measure`](@ref)
+  - [`oriented_score`](@ref)
   - [`PopulationPredictionResult`](@ref)
-  - [`expected_risk`](@ref)
 """
 function quantile_by_measure(ppred::PopulationPredictionResult, r::BaseRM_VecBaseRM,
                              q::Real; r_kwargs::NamedTuple = (;),
-                             q_kwargs::NamedTuple = (;), sign::Integer = 1)
+                             q_kwargs::NamedTuple = (;))
     pred = successful_members(ppred)
-    rks = [sign*expected_risk(r, p; r_kwargs...) for p in pred]
+    rks = [-oriented_score(r, p; r_kwargs...) for p in pred]
     fin = findall(isfinite, rks)
     rks = rks[fin]
     pred = pred[fin]

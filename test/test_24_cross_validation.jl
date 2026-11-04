@@ -1129,18 +1129,16 @@
             @test nqp(0.0) === ppred.pred[argmin(rks)]
             @test nqp(1.0) === ppred.pred[argmax(rks)]
         end
-        # sign = -1 at q selects the path of sign = 1 at 1 - q when alpha equals beta
-        for (a, b) in ((1.0, 1.0), (0.0, 0.0), (0.5, 0.5)), q in 0:0.05:1
-            s(q) = NearestQuantilePrediction(; r = r, q = q,
-                                             q_kwargs = (alpha = a, beta = b))
-            @test s(q)(ppred, -1) === s(1 - q)(ppred, 1)
+        # a measure of which a bigger value is better is negated, so q = 1 is its worst path
+        mr = MeanReturn()
+        mrs = [expected_risk(mr, p) for p in ppred.pred]
+        for q in 0:0.05:1
+            @test NearestQuantilePrediction(; r = mr, q = q)(ppred) ===
+                  ppred.pred[argmin(abs.(-mrs .- quantile(-mrs, q)))]
         end
-        # and not always when alpha differs from beta
-        asym = NearestQuantilePrediction(; r = r, q = 0.3,
-                                         q_kwargs = (alpha = 0.0, beta = 1.0))
-        asym_flip = NearestQuantilePrediction(; r = r, q = 0.7,
-                                              q_kwargs = (alpha = 0.0, beta = 1.0))
-        @test asym(ppred, -1) !== asym_flip(ppred, 1)
+        @test NearestQuantilePrediction(; r = mr, q = 1.0)(ppred) ===
+              ppred.pred[argmin(mrs)]
+        @test sort_by_measure(ppred, mr)[1] === ppred.pred[argmax(mrs)]
         # a tie goes to the first member in population order
         tie = PopulationPredictionResult(;
                                          pred = [member(Xs[1]), member(Xs[1]),
@@ -1149,18 +1147,44 @@
         @test NearestQuantilePrediction(; r = r, q = 0.0)(tie).id ==
               argmin([expected_risk(r, p) for p in tie.pred])
         @test NearestQuantilePrediction(; r = r, q = 1.0)(tie).id == 1
-        # a vector of measures is scalarised through r_kwargs, and sums by default
+        # a vector of measures is reduced through r_kwargs on oriented scores, and sums by
+        # default: MinScalariser reads the worst measure, MaxScalariser the best one
         rv = [ConditionalValueatRisk(), MaximumDrawdown()]
-        vmax = [max(expected_risk(rv[1], p), expected_risk(rv[2], p)) for p in ppred.pred]
-        vsum = [expected_risk(rv[1], p) + expected_risk(rv[2], p) for p in ppred.pred]
-        @test NearestQuantilePrediction(; r = rv, r_kwargs = (sca = MaxScalariser(),))(ppred) ===
-              ppred.pred[argmin(abs.(vmax .- quantile(vmax, 0.5)))]
-        @test NearestQuantilePrediction(; r = rv)(ppred) ===
-              ppred.pred[argmin(abs.(vsum .- quantile(vsum, 0.5)))]
-        # a mixed-polarity vector is admitted here and refused by sort_by_measure
+        c1 = [expected_risk(rv[1], p) for p in ppred.pred]
+        c2 = [expected_risk(rv[2], p) for p in ppred.pred]
+        nearest(v, q = 0.5) = ppred.pred[argmin(abs.(v .- quantile(v, q)))]
+        nqp_sca(sca) = NearestQuantilePrediction(; r = rv, r_kwargs = (sca = sca,))(ppred)
+        @test NearestQuantilePrediction(; r = rv)(ppred) === nearest(c1 .+ c2)
+        @test nqp_sca(MinScalariser()) === nearest(max.(c1, c2))
+        @test nqp_sca(MaxScalariser()) === nearest(min.(c1, c2))
+        middle = PortfolioOptimisers.Statistics.middle
+        @test nqp_sca(MedianValue()) === nearest(middle.(c1, c2))
+        @test nqp_sca(minimum) === nearest(max.(c1, c2))
+        # a scale weighs each oriented score, and a negative scale counts against it
+        rw = [ConditionalValueatRisk(; settings = RiskMeasureSettings(; scale = 2)),
+              MaximumDrawdown(; settings = RiskMeasureSettings(; scale = -1))]
+        @test NearestQuantilePrediction(; r = rw)(ppred) === nearest(2 .* c1 .- c2)
+        #=
+        A vector of mixed orientation gives one orientation (#1982). The raw sum of a mean return
+        and a drawdown with one sign rewarded a higher drawdown, or a lower mean return.
+        =#
         mixed = [MeanReturn(), MaximumDrawdown()]
-        @test NearestQuantilePrediction(; r = mixed)(ppred) isa MultiPeriodPredictionResult
-        @test_throws ArgumentError sort_by_measure(ppred, mixed)
+        mdd = [expected_risk(mixed[2], p) for p in ppred.pred]
+        for q in (0.0, 0.25, 0.5, 0.75, 1.0)
+            @test NearestQuantilePrediction(; r = mixed, q = q)(ppred) ===
+                  nearest(mdd .- mrs, q)
+        end
+        @test sort_by_measure(ppred, mixed) == ppred.pred[sortperm(mrs .- mdd; rev = true)]
+        @test sort_by_measure(ppred, rv; sca = MedianValue()) ==
+              ppred.pred[sortperm(middle.(-c1, -c2); rev = true)]
+        # the scores themselves: one measure ignores the reduction, nothing keeps each score
+        p1 = ppred.pred[1]
+        os = PortfolioOptimisers.oriented_score
+        @test os(mr, p1; sca = nothing) == expected_risk(mr, p1)
+        @test os(rv[1], p1; sca = MaxScalariser()) == -c1[1]
+        @test os(rw, p1; sca = nothing) == [-2 * c1[1], c2[1]]
+        @test os(mixed, p1) == mrs[1] - mdd[1]
+        @test os(mixed, p1; sca = MinValue()) == min(mrs[1], -mdd[1])
         # a failed fold takes its path out, and no solved path leaves nothing to rank
         bad = member(Xs[1]; res = resbad)
         @test !PortfolioOptimisers.member_solved(bad)
@@ -1196,6 +1220,12 @@
         @test findfirst(p -> p === sel, fpop.pred) ==
               argmin(abs.(rks .- quantile(rks, 0.5)))
         @test expected_risk(r, sort_by_measure(fpop, r)[1]) == minimum(rks)
+        # a vector reads the series of a single fold once, as it reads the series of a path
+        f1 = fpop.pred[1]
+        @test PortfolioOptimisers.prediction_returns(f1) === f1.rd.X
+        @test os(rv, f1) == -(expected_risk(rv[1], f1) + expected_risk(rv[2], f1))
+        @test os(mixed, f1; sca = nothing) ==
+              [expected_risk(mixed[1], f1), -expected_risk(mixed[2], f1)]
     end
     @testset "A clustering optimiser in the fold loop refuses a precomputed prior (#1277)" begin
         # A precomputed prior is the full sample's, so every fold would read its test rows.

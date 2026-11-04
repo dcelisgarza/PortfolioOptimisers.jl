@@ -167,7 +167,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :path_ids_search => "`path_ids`: Path of each row of `test_scores`: the path of each fold under a [`MultipleRandomised`](@ref) scheme, `1:M` under a [`CombinatorialCrossValidation`](@ref), whose rows are paths, and `nothing` for a scheme with one path.",#
                  :asset_idx => "`asset_idx`: Asset column indices per fold.",#
                  :q_scorer => "`q`: Quantile level of the population's risks that the selected path is nearest to.",#
-                 :r_kwargs => "`r_kwargs`: Keyword arguments forwarded to [`expected_risk`](@ref), such as the scalariser `sca` of a vector of risk measures.",#
+                 :r_kwargs => "`r_kwargs`: Keyword arguments forwarded to [`oriented_score`](@ref), such as the reduction `sca` of a vector of risk measures.",#
                  :q_kwargs => "`q_kwargs`: Keyword arguments forwarded to `Statistics.quantile`, such as its `alpha` and `beta`.",#
                  :p_cv => "`p`: Hyperparameter search grid.",#
                  :wd => "`wd`: Weight drift the fold's return series is read under, or `nothing` to read it at the target weights of the fold.",#

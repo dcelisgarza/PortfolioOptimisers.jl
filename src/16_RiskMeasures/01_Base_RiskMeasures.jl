@@ -1702,6 +1702,21 @@ function scalarise(f, sca::LogSumExpScalariser, itr; by = nothing)
     return scalarise_map(x -> x / sca.gamma, scalarise_logsumexp(vs))
 end
 """
+    const Sca_VecToScaM = Union{Scalariser, VectorToScalarMeasure, Function}
+
+Union of the reductions that a score of a vector of risk measures accepts: a [`Scalariser`](@ref), a [`VectorToScalarMeasure`](@ref) or a plain function from a vector to a number.
+
+A score reduces numbers that are already computed, so it needs no convex form and no derivative. So it admits the two families and a function, as [`Num_VecToScaM`](@ref) admits a reduction or a function. The readers of a risk, such as [`expected_risk`](@ref), keep the bound [`Scalariser`](@ref).
+
+# Related
+
+  - [`Scalariser`](@ref)
+  - [`VectorToScalarMeasure`](@ref)
+  - [`Num_VecToScaM`](@ref)
+  - [`oriented_score`](@ref)
+"""
+const Sca_VecToScaM = Union{Scalariser, VectorToScalarMeasure, Function}
+"""
     nothing_scalar_array_selector(risk_variable::Nothing, prior_variable::Nothing)
     nothing_scalar_array_selector(risk_variable::Num_ArrNum_VecScalar_DynWeights, ::Any)
     nothing_scalar_array_selector(risk_variable::Nothing, prior_variable::Num_ArrNum_VecScalar_DynWeights)

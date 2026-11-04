@@ -1,5 +1,5 @@
 ```@meta
-Description = "Scoring, private API of PortfolioOptimisers.jl: AbstractCrossValidationScorer, PredictionScorer, PredictionCrossValScorer, member_solved, …"
+Description = "Scoring, private API of PortfolioOptimisers.jl: AbstractCrossValidationScorer, PredictionScorer, PredictionCrossValScorer, oriented_score, …"
 ```
 
 # Scoring: private API
@@ -8,6 +8,14 @@ Description = "Scoring, private API of PortfolioOptimisers.jl: AbstractCrossVali
 AbstractCrossValidationScorer
 PredictionScorer
 PredictionCrossValScorer
+```
+
+A scorer reads the oriented score of a path. The score orients each risk measure before it reduces a vector, so a higher score is always better.
+
+```@docs
+PortfolioOptimisers.oriented_score
+PortfolioOptimisers.oriented_member_score
+PortfolioOptimisers.prediction_returns
 ```
 
 A scorer ranks only the members of a population whose every fold solved.

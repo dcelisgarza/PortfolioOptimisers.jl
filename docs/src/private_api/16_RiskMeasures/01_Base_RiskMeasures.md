@@ -31,6 +31,7 @@ WeightsInput
 scalarise_combine
 scalarise_map
 scalarise_logsumexp
+Sca_VecToScaM
 nothing_scalar_array_selector
 deferred_factors
 fit_deferred_quantity
