@@ -35,6 +35,14 @@ whole repository.
   that another package defines. Every forced type closes the library to one of them. [`.github/instructions/julia-source-code.instructions.md`](../.github/instructions/julia-source-code.instructions.md)
   § *Numeric types come from the data* owns the rule, and
   `test/test_55_numeric_coercion_census.jl` gates it.
+- **A container takes the element type of its values, and `Any` is the last resort.** The rule
+  holds for every container, a `Dict`, a `Matrix`, a `Ref` or a `Tuple` as much as a `Vector`.
+  Let a comprehension, `map` or a broadcast take the type, promote a copy that takes two kinds
+  with `promote_type`, and build a container that is filled out of order in parts. Keep `Any`
+  only where no narrower type exists, such as the arguments of an `Expr`, with a comment that
+  states why. [`.github/instructions/julia-source-code.instructions.md`](../.github/instructions/julia-source-code.instructions.md)
+  § *A container takes the element type of its values* owns the rule, and issue #1979 holds the
+  sweep of the older sites.
 - **Spell a skipped procedure or a trivial default with `nothing`, never with a singleton.** No
   data-less type for "no slack", "the raw statistic" or "no scaling", and no named alias of
   `nothing`. The field takes `Option{<:AbstractX}`, and the method on `Nothing` holds the

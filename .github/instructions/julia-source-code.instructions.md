@@ -236,6 +236,33 @@ case. It is the breach of #1808.
 to `<:Real` only where the body needs an order, and to a concrete type only where the body needs
 that exact representation.
 
+## A container takes the element type of its values
+
+The element type of a container is **derived** from the values that it holds, and `Any` is the
+last resort. The rule holds for every container: `Vector`, `Matrix`, `Array`, `Dict`, `Set`,
+`Ref`, `Pair`, `Tuple`, and a type parameter of a struct that holds values. A container of `Any`
+makes each read a dynamic dispatch, and it boxes each value. Inference then gives `Any` to every
+value that leaves the container, so the instability spreads far from the container, and JET
+cannot read past it.
+
+- **Let the construction take the type.** A comprehension, `map` and a broadcast take the element
+  type of their values. `identity.(v)` narrows a vector whose element type is wider than its
+  values, such as the join of a part that was empty and took an inferred type.
+- **A copy that takes values of two kinds promotes.** Write
+  `Vector{promote_type(eltype(a), eltype(b))}(a)`, never `collect(Any, a)`. Base promotes a `Pair`
+  and a `NamedTuple` field by field, so the result names the family of the values.
+- **A container filled out of order is built in parts.** Build each part with a comprehension,
+  and join the parts in order, for example `vcat(m1, m2)[invperm(vcat(i1, i2))]`. Do not
+  preallocate `Vector{Any}(undef, n)` to fill it by index.
+- **An abstract element type that names a family is correct** when the values vary across the
+  family, such as `Vector{AbstractPriorEstimator}`. It is narrower than `Any`, and it tells the
+  reader what the container holds.
+
+Keep `Any` only where no narrower type exists, and write a comment beside it that states why. The
+argument list of an `Expr` is the known case, because Julia defines `Expr.args` as a
+`Vector{Any}`, so code generation that builds one keeps `Any[]`. No census holds the rule yet.
+Issue #1979 holds the sweep of the sites that predate it and the census that will gate it.
+
 ## A divisor's correction is named by who makes it
 
 The divisor of a spread is the number of observations, less a correction. Two keywords name that

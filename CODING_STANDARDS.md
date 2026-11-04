@@ -46,6 +46,7 @@ silence. A contradiction between two standards files is a defect.
 | Any file in `src/` | [`.github/instructions/julia-source-code.instructions.md`](.github/instructions/julia-source-code.instructions.md) | `pre-commit run -a`, `test/` |
 | A file's numeric prefix, the directory a family of files takes, the API page a file owns, or the `include` list of `src/PortfolioOptimisers.jl` | [`.github/instructions/julia-source-code.instructions.md`](.github/instructions/julia-source-code.instructions.md) § *Code Organization* | `test/test_47_alias_and_module_census.jl` |
 | A numeric working type, an output element type, a type coercion, or the tolerance of a test of a negligible value in `src/` | [`.github/instructions/julia-source-code.instructions.md`](.github/instructions/julia-source-code.instructions.md) § *Numeric types come from the data* | `test/test_55_numeric_coercion_census.jl` |
+| The element type of a container in `src/` or `ext/`: a `Vector`, a `Dict`, a `Matrix`, a `Ref`, a `Tuple` or a type parameter of a struct that holds values, and every `Any` among them | [`.github/instructions/julia-source-code.instructions.md`](.github/instructions/julia-source-code.instructions.md) § *A container takes the element type of its values* | Review. Issue #1979 adds a census |
 | A type annotation in `src/` or `ext/` that holds a `Union{…}` or a `Tuple{…}`: an argument, a `where` bound, an `isa` test, a field, a type alias or a docstring signature | [`.github/instructions/julia-source-code.instructions.md`](.github/instructions/julia-source-code.instructions.md) § *A `Union` or a `Tuple` names its members without a bound* | `test/test_85_keyword_rebuild_allocation_census.jl` |
 | A tolerance, an iteration limit or another setting of a solver in `src/` or `ext/` | [`.github/instructions/julia-source-code.instructions.md`](.github/instructions/julia-source-code.instructions.md) § *The caller owns the settings of a solver* | Review |
 | The keyword for the correction of a divisor, `ddof` or `corrected` | [`.github/instructions/julia-source-code.instructions.md`](.github/instructions/julia-source-code.instructions.md) § *A divisor's correction is named by who makes it* | `test/test_77_correction_keyword_census.jl` |
@@ -126,7 +127,7 @@ silence. A contradiction between two standards files is a defect.
 | `CODING_STANDARDS.md` | this map | the repository |
 | `GLOSSARY.md` | the domain glossary, with terms and one or two sentences for each | the repository |
 | `CLAUDE.md` | working agreements for an agent in this checkout | the repository |
-| `src/CLAUDE.md` | the design rules for library code: the consistent design over the convenient one, Results, numeric types, docstring text, `public` and `export` | `src/` and `ext/` |
+| `src/CLAUDE.md` | the design rules for library code: the consistent design over the convenient one, Results, numeric types, the element types of containers, docstring text, `public` and `export` | `src/` and `ext/` |
 | `docs/paper/CLAUDE.md` | who owns the prose of the paper | `docs/paper/` |
 | `docs/adr/` | decisions and their reasoning, one file per decision | named per ADR |
 | `.github/copilot-instructions.md` | architecture orientation and the before-you-commit checklist | the repository |
