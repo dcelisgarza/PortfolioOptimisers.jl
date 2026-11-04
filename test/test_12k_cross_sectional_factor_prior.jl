@@ -2408,16 +2408,16 @@ refit reads it from the result of that fit, so it runs no regression (#1751, ADR
         @test isequal(cached.rr.c, full.rr.c)
         # The refit keeps the cache, so a later stage reads it too.
         @test PO.cross_sectional_cached_block(pe, cached, rd.X) === cached.rr
-        # The cached refit runs no regression. Measured on this panel: 0.6 MB and 0.2 MB in
-        # place of 5.3 MB and 6.7 MB. The Calibration Slots of the forecast read the factor
-        # moments, so they run again under the new weights, and the refit there allocates
-        # 8.1 MB in place of 12.8 MB.
+        # The cached refit runs no regression stage, so the full refit allocates about one
+        # stage more than it. A ratio of the two refits fails each time the stage gets cheaper
+        # (#1973), and this difference does not.
         f_full() = PO.scenario_prior(pe, w, nothing, rd.X, nothing, rd.pnl; kw...)
         f_cached() = PO.scenario_prior(pe, w, prc, rd.X, nothing, rd.pnl; kw...)
+        f_stage() = PO.cross_sectional_regression_stage(pe, rd.X, nothing, rd.pnl; kw...)
         f_full()
         f_cached()
-        @test @allocated(f_cached()) <
-              @allocated(f_full()) * (isnothing(pe.rfe) ? 1 / 4 : 9 / 10)
+        f_stage()
+        @test @allocated(f_full()) - @allocated(f_cached()) > @allocated(f_stage()) / 2
         # The estimator of the refit reads the same factor returns from the cache.
         a = PO.scenario_factory(pe, w, nothing, rd.X, nothing, rd.pnl; kw...)
         b = PO.scenario_factory(pe, w, prc, rd.X, nothing, rd.pnl; kw...)

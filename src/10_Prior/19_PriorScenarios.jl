@@ -559,7 +559,9 @@ function cross_sectional_regression_stage(pe::CrossSectionalFactorPrior, X::MatN
               DimensionMismatch("ts ($(length(something(ts, ())))) must have one entry for each observation of X ($(size(X, 1)))"))
     st = cross_sectional_exposure_stage(pe, X, F, pnl; ne = ne, E = E, iv = iv, ivpa = ivpa)
     (; amsk, emsk, mcap, BW, cc, Xl, rde, Ms, nf, fam, rw) = st
-    Msw = Ms[rw, :, :]
+    # Every exposure history of the stage is a view of `Ms`, so the stage copies none of them.
+    # The stage reads `Ms` through `Msw` alone, so the Neutralisation can write into it (#1973).
+    Msw = view(Ms, rw, :, :)
     Xw = X[rw, :]
     Xlw = Xl[rw, :]
     bww = BW[rw, :]
@@ -568,7 +570,7 @@ function cross_sectional_regression_stage(pe::CrossSectionalFactorPrior, X::MatN
     fb = cross_sectional_family_basis(pe.families, Msw, bww, nf, fam)
     assert_cross_sectional_lag_rows(length(rw), pe.lag)
     r = (pe.lag + 1):length(rw)
-    Zl = fb.Ms[r .- pe.lag, :, :]
+    Zl = view(fb.Ms, r .- pe.lag, :, :)
     Xr = Xlw[r, :]
     cb = cross_sectional_observed_block(cc, rw, r)
     amr = amsk[rw[r], :]
@@ -580,7 +582,7 @@ function cross_sectional_regression_stage(pe::CrossSectionalFactorPrior, X::MatN
     W = cs_weights_initial(pe.wa, mcl, msk)
     # The Unseen Member rule states the return of a member of a constrained family that no
     # asset of an observation loads on (#1606).
-    Bl = Msw[r .- pe.lag, :, :]
+    Bl = view(Msw, r .- pe.lag, :, :)
     fbl = cross_sectional_basis_now(fb.fcb, r .- pe.lag)
     ud = unseen_member_design(pe.unseen, fbl, Bl, Zl, W)
     (; csr, lv) = cross_sectional_live_regression(pe.cre, ud.Z, Xr, W)
@@ -599,8 +601,8 @@ function cross_sectional_regression_stage(pe::CrossSectionalFactorPrior, X::MatN
         csr = unseen_member_returns(csr, ud.P)
     end
     vs = variance_series(pe.ve, csr.eps; dims = 1, estimation_mask = emr, active_mask = amr)
-    ca = cross_sectional_observed_append(cb, csr.f, fb.Ms[r[end], :, :], Msw[r, :, :], nf,
-                                         fam, fb.fcb)
+    ca = cross_sectional_observed_append(cb, csr.f, fb.Ms[r[end], :, :], view(Msw, r, :, :),
+                                         nf, fam, fb.fcb)
     fit = (; csr = csr, W = W, vs = vs, cnt = variance_count(pe.ve, csr.eps), amr = amr,
            bwr = bwr, Xo = Xw[r, :], r = r, hist = nothing, S = nothing, Sc = nothing,
            ce = nothing, idx = rw[r], ts = isnothing(ts) ? nothing : ts[rw[r]],

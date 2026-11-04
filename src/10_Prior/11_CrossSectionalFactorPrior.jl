@@ -1522,7 +1522,8 @@ function cross_sectional_pinned_families(pe::CrossSectionalFactorPrior)
     if length(rw) - cut.lag < 2
         return nothing
     end
-    Msw = Ms[rw, :, :]
+    # The choice reads `Ms` through `Msw` alone, so the Neutralisation can write into it (#1973).
+    Msw = view(Ms, rw, :, :)
     bww = BW[rw, :]
     cross_sectional_neutralise!(cut.neutralise, Msw, cut.cre, bww, nf, fam)
     return cross_sectional_dropped_names(pe.families,
