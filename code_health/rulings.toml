@@ -859,6 +859,48 @@ message = "BoundsError: attempt to access Tuple{Int64} at index [2]: getfield"
 count = 1
 rationale = "a-form-its-package-recommends"
 
+# The in-place kernels of #1973 call the documented in-place forms of LinearAlgebra on a view of a
+# task buffer: `mul!(gram, D', D)` and `mul!(v, A', y)`, and `ldiv!(F, b)` on a pivoted `QR`. JET
+# reports inside the machinery of those forms (`sizeof`, `getfield`, and a `τ` of the LAPACK
+# wrapper), and the probe of 211 fits gives the bits of the allocating forms.
+[[dismissal]]
+file = "src/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalLeverage.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: sizeof"
+count = 1
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalLeverage.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 2
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalLeverage.jl"
+kind = "UndefVarErrorReport"
+message = "local variable `τ` may be undefined"
+count = 1
+rationale = "a-form-its-package-recommends"
+
+# `DataFrames.DataFrame(::TimeArray)`, the documented conversion of a `TimeArray` to a table,
+# reaches `@sync` of Base (`base/task.jl`), whose locals `c_ex` and `racy` JET reads as maybe
+# undefined. The reports appeared under #1973 part E, which changed no line of this file.
+[[dismissal]]
+file = "src/03_InputData/11_PricesToReturns.jl"
+kind = "UndefVarErrorReport"
+message = "local variable `c_ex` may be undefined"
+count = 3
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/03_InputData/11_PricesToReturns.jl"
+kind = "UndefVarErrorReport"
+message = "local variable `racy` may be undefined"
+count = 1
+rationale = "a-form-its-package-recommends"
+
 [[dismissal]]
 file = "src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_a.jl"
 kind = "BuiltinErrorReport"

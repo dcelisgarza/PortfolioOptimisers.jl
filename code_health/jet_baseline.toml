@@ -8,7 +8,7 @@ jet = "0.13.1"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "StatsPlots"]
-commit = "b1d571f7a0"
+commit = "2b31cd667b"
 
 [run.main]
 load_set = ["GraphRecipes", "StatsPlots"]
@@ -78,15 +78,15 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/03_InputData/08_PriceGapFill.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/09_PriceFilters.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/10_ReturnsResult.jl" = { raw = 0, reviewed = 0 }
-"src/03_InputData/11_PricesToReturns.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/11_PricesToReturns.jl" = { raw = 4, reviewed = 0 }
 "src/03_InputData/12_TrainTestSplit.jl" = { raw = 1, reviewed = 1 }
 "src/03_InputData/13_Base_AssetSelection.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/14_CrossSectionalTransforms.jl" = { raw = 0, reviewed = 0 }
-"src/03_InputData/15_FeatureSelector.jl" = { raw = 1, reviewed = 1 }
+"src/03_InputData/15_FeatureSelector.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/16_PanelDataFrame.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/17_ReturnsBufferState.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/18_PreprocessingPartialFit.jl" = { raw = 0, reviewed = 0 }
-"src/03_InputData/19_AssetPanelConcat.jl" = { raw = 6, reviewed = 6 }
+"src/03_InputData/19_AssetPanelConcat.jl" = { raw = 3, reviewed = 3 }
 "src/03_InputData/20_PanelFieldValues.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/21_AssetPanelSummary.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/22_PanelRoundTrip.jl" = { raw = 0, reviewed = 0 }
@@ -147,7 +147,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/30_RegimeAdjusted/08_SeparatePortfolioBias.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/30_RegimeAdjusted/09_MahalanobisLevelClosure.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/31_HigherMomentPartialFit.jl" = { raw = 0, reviewed = 0 }
-"src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl" = { raw = 4, reviewed = 4 }
+"src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl" = { raw = 2, reviewed = 2 }
 "src/05_Moments/32_CrossSectionalFactorModel/02_CrossSectionalWeights.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/03_CrossSectionalFactorModel.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/01_Base_Descriptor.jl" = { raw = 0, reviewed = 0 }
@@ -187,7 +187,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/11_CrossSectionalIdiosyncraticDiagnostics.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/12_CrossSectionalExposureIC.jl" = { raw = 0, reviewed = 0 }
-"src/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalLeverage.jl" = { raw = 2, reviewed = 0 }
+"src/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalLeverage.jl" = { raw = 8, reviewed = 2 }
 "src/05_Moments/33_CoverageUniverse.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/34_PriceLevelExpectedReturns.jl" = { raw = 1, reviewed = 1 }
 "src/05_Moments/35_CompositePriceLevelStatistics.jl" = { raw = 0, reviewed = 0 }
@@ -547,7 +547,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/17_ExcessExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/18_Coskewness.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/19_Cokurtosis.jl" = { raw = 0, reviewed = 0 }
-"src/05_Moments/20_Base_Regression.jl" = { raw = 18, reviewed = 18 }
+"src/05_Moments/20_Base_Regression.jl" = { raw = 19, reviewed = 19 }
 "src/05_Moments/21_TimeSeriesRegression/01_StepwiseRegression.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/21_TimeSeriesRegression/02_DimensionReductionRegression.jl" = { raw = 13, reviewed = 13 }
 "src/05_Moments/22_ImpliedVolatility.jl" = { raw = 0, reviewed = 0 }

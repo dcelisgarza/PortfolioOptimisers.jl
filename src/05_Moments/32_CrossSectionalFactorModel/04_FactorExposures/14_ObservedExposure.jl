@@ -672,9 +672,40 @@ The batch fit gives `n = nothing`, and the member reads every row. The carry fol
 """
 function cross_sectional_observed_rows(xe::AbstractObservedExposureEstimator,
                                        rd::ReturnsResult, ::Nothing)::Array{<:Real, 3}
-    A = factor_exposure(xe, rd)
-    # A member of one factor gives `observations × assets`, as the returns are.
-    return ndims(A) == 2 ? reshape(permutedims(A), size(A, 2), 1, size(A, 1)) : A
+    return cross_sectional_observed_tensor(factor_exposure(xe, rd))
+end
+"""
+    cross_sectional_observed_tensor(A::AbstractMatrix) -> AbstractArray{<:Real, 3}
+    cross_sectional_observed_tensor(A::AbstractArray{<:Any, 3}) -> AbstractArray{<:Real, 3}
+
+Return the exposures of an observed member in the layout of the exposure history, `assets × factors × observations`.
+
+A member of one factor gives `observations × assets`, as the returns are, and a member of several factors gives the history layout already.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A matrix `observations × assets`: transpose it, and give it a factor axis of one, `assets × 1 × observations`.
+ 2. A rank-3 array: return it unchanged.
+
+# Arguments
+
+  - `A`: The exposures that `factor_exposure` of the member returns.
+
+# Returns
+
+  - `M::AbstractArray{<:Real, 3}`: The exposures, `assets × factors × observations`.
+
+# Related
+
+  - [`cross_sectional_observed_rows`](@ref)
+"""
+function cross_sectional_observed_tensor(A::AbstractMatrix)
+    return reshape(permutedims(A), size(A, 2), 1, size(A, 1))
+end
+function cross_sectional_observed_tensor(A::AbstractArray{<:Any, 3})
+    return A
 end
 function cross_sectional_observed_rows(xe::AbstractObservedExposureEstimator,
                                        rd::ReturnsResult, n::Integer)::Array{<:Real, 3}
