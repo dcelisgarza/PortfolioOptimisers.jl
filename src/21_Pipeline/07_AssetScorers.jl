@@ -1035,17 +1035,24 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Scores each asset by a statistic of its Panel Fields over the observations of the returns data.
+Scores each asset by a statistic of its Panel Fields, or of a Descriptor, over the observations of the returns data.
 
-The score reads the Asset Panel `rd.pnl`, not the returns. At each observation, the value of an asset is the product of the Panel Fields in `fields`. `stat` then reduces the values of the asset over the observations to its score. With a price and a traded volume in `fields` and `stat = MedianValue()`, the score is the median traded amount of the asset, and a [`ThresholdRule`](@ref) with a bound `lo` is a liquidity floor. With one market capitalisation in `fields`, the same rule is a floor of size.
+The score reads the Asset Panel `rd.pnl`, not the returns. `fields` gives the value of an asset at each observation, in one of four forms:
 
-Inside a [`ScoreSelector`](@ref), `rd` is the training window, and its panel holds the observations of that window only. So the score moves with the window, and no observation after the window reaches it.
+ 1. A name reads that one Panel Field. With a market capitalisation, a [`ThresholdRule`](@ref) with a bound `lo` is a floor of size.
+ 2. A vector of `name => coefficient` pairs reads their sum. `[\"a\" => 1, \"b\" => -1]` reads `a - b`.
+ 3. A vector of names reads their product. With a price and a traded volume, the value is the traded amount, and a [`ThresholdRule`](@ref) on its median is a liquidity floor.
+ 4. A Descriptor Estimator, such as an [`EWVolumeRatio`](@ref), reads its Descriptor through [`descriptor`](@ref). A smoothed turnover or an illiquidity then becomes a score.
+
+The first three forms are a [`PanelTermType`](@ref). `stat` then reduces the values of the asset over the observations to its score.
+
+Inside a [`ScoreSelector`](@ref), `rd` is the training window, and its panel holds the observations of that window only. So the score moves with the window, and no observation after the window reaches it. A Descriptor also reads the window alone, so its recursion starts again at the first observation of each window.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-v_{t i} &= \\prod_{k = 1}^{K} z^{(k)}_{t i}\\,, \\\\
+v_{t i} &= \\begin{cases} z^{(1)}_{t i} & \\text{one name} \\\\ \\sum_{k = 1}^{K} c_{k} z^{(k)}_{t i} & \\text{a combination} \\\\ \\prod_{k = 1}^{K} z^{(k)}_{t i} & \\text{a product} \\\\ d_{t i} & \\text{a Descriptor} \\end{cases}\\,, \\\\
 s_{i} &= S\\left(\\left\\{ v_{t i} : t \\in \\mathcal{O}_{i} \\right\\}\\right)\\,.
 \\end{align}
 ```
@@ -1054,20 +1061,22 @@ Where:
 
   - ``v_{t i}``: The value of asset ``i`` at observation ``t``.
   - ``z^{(k)}_{t i}``: The value of the ``k``-th Panel Field of `fields` for asset ``i`` at observation ``t``.
+  - ``c_{k}``: The coefficient of the ``k``-th Panel Field of a combination.
   - ``K``: The number of Panel Fields in `fields`.
+  - ``d_{t i}``: The Descriptor of `fields` for asset ``i`` at observation ``t``.
   - ``\\mathcal{O}_{i}``: The observations at which ``v_{t i}`` is finite.
   - ``S``: The statistic `stat`.
   - ``s_{i}``: The score of asset ``i``.
 
-A value is `NaN` where the asset is outside the universe, and where a fill policy of the panel wrote one of its Panel Fields. A filled volume is not a trade, so the statistic reads only the observed values. An asset with fewer than `min_obs` finite values has the score `NaN`, and every selection rule and every redundancy algorithm drops it. An asset with no observed value then leaves the selection, and the run does not stop.
+A value is `NaN` where the asset is outside the universe, and where a fill policy of the panel wrote one of its Panel Fields. A filled volume is not a trade, so the statistic reads only the observed values. A Descriptor is also `NaN` before its warm-up ends. An asset with fewer than `min_obs` finite values has the score `NaN`, and every selection rule and every redundancy algorithm drops it. An asset with no observed value then leaves the selection, and the run does not stop.
 
 `stat` reads the finite values of one asset in the order of the observations, through [`finite_vec_to_real_measure`](@ref). A measure that holds observation weights, such as `MedianValue(; w)`, holds one weight for each observation of `rd`, and the function cuts them to the finite values, so each value keeps its own weight.
 
-With `bib = nothing`, the orientation of the score is the orientation of its statistic, [`bigger_is_better`](@ref) of `stat`. A statistic of location, such as [`MedianValue`](@ref), answers `true`, so a bigger traded amount is a better score. A statistic of dispersion, [`StdValue`](@ref) or [`VarValue`](@ref), answers `false`, as a risk does. A plain function answers `true`. The orientation of a Panel Field can differ from that of the statistic: a bigger median leverage is worse. A `Bool` in `bib` then overrides the statistic.
+With `bib = nothing`, the orientation of the score is the orientation of its statistic, [`bigger_is_better`](@ref) of `stat`. A statistic of location, such as [`MedianValue`](@ref), answers `true`, so a bigger traded amount is a better score. A statistic of dispersion, [`StdValue`](@ref) or [`VarValue`](@ref), answers `false`, as a risk does. A plain function answers `true`. The orientation of a Panel Field or of a Descriptor can differ from that of the statistic: a bigger median leverage is worse, and so is a bigger median illiquidity. A `Bool` in `bib` then overrides the statistic.
 
 # Algorithm
 
- 1. Read the product of the Panel Fields of `fields` at each observation and asset with [`ew_ratio_values`](@ref), the reader of the product side of an [`EWVolumeRatio`](@ref).
+ 1. Read the value of each asset at each observation with [`descriptor_field_values`](@ref). A Descriptor Estimator gives its [`descriptor`](@ref).
  2. Count the finite values of each asset.
  3. Reduce the finite values of each asset that holds at least `min_obs` of them with [`finite_vec_to_real_measure`](@ref) under `stat`. Write `NaN` at every other asset. [`min_folds_scores`](@ref) does this step.
 
@@ -1078,7 +1087,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     PanelFieldScorer(;
-        fields::VecStr,
+        fields::Union{PanelTermType, AbstractDescriptorEstimator},
         stat::Union{VectorToScalarMeasure, Function} = MedianValue(),
         bib::Option{<:Bool} = nothing,
         min_obs::Integer = 1,
@@ -1088,9 +1097,9 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `!isempty(fields)`, and no name in `fields` is the empty string. Raises an [`IsEmptyError`](@ref).
+  - The rules of [`assert_panel_terms`](@ref) for a [`PanelTermType`](@ref) in `fields`: a name is not the empty string, a combination or a product holds at least one name, no name in it is empty, and each coefficient is finite. Raises an [`IsEmptyError`](@ref) or a `DomainError`. A Descriptor Estimator checks its own fields in its constructor.
   - `min_obs >= 1`. Raises a `DomainError`.
-  - When the scorer scores, the rules of [`descriptor_field_values`](@ref) for each Panel Field of `fields`: `rd.pnl` is a time-varying [`AssetPanel`](@ref), and each name is a [`NumericPanelField`](@ref) of it.
+  - When the scorer scores, the rules of [`descriptor_field_values`](@ref) for each Panel Field of `fields`: `rd.pnl` is a time-varying [`AssetPanel`](@ref), and each name is a [`NumericPanelField`](@ref) of it. A Descriptor Estimator raises the errors of its [`descriptor`](@ref).
 
 # Examples
 
@@ -1113,9 +1122,14 @@ julia> PortfolioOptimisers.asset_scores(s, rd)
 
 julia> PortfolioOptimisers.bigger_is_better(s)
 true
+
+julia> PortfolioOptimisers.asset_scores(PanelFieldScorer(; fields = \"volume\"), rd)
+2-element Vector{Float64}:
+ 200.0
+  60.0
 ```
 
-The close of `B` at the third observation is a fill, so the median of `B` reads its first two traded amounts, `100` and `140`.
+The close of `B` at the third observation is a fill, so the median traded amount of `B` reads its first two traded amounts, `100` and `140`. The median volume of `B` reads all three volumes.
 
 # Related
 
@@ -1124,12 +1138,14 @@ The close of `B` at the third observation is a fill, so the median of `B` reads 
   - [`ThresholdRule`](@ref)
   - [`VectorToScalarMeasure`](@ref)
   - [`AssetPanel`](@ref)
+  - [`PanelTermType`](@ref)
+  - [`AbstractDescriptorEstimator`](@ref)
   - [`EWVolumeRatio`](@ref)
   - [`FoldRiskScorer`](@ref)
 """
 @concrete struct PanelFieldScorer <: AbstractAssetScorer
     """
-    The names of the Panel Fields whose product is the value of an asset at each observation.
+    The value of an asset at each observation: a [`PanelTermType`](@ref), which names one Panel Field, a sum or a product of Panel Fields, or a Descriptor Estimator, whose Descriptor is the value.
     """
     fields
     """
@@ -1144,13 +1160,10 @@ The close of `B` at the third observation is a fill, so the median of `B` reads 
     The smallest number of finite values that an asset must hold. An asset that holds fewer has the score `NaN`.
     """
     min_obs
-    function PanelFieldScorer(fields::VecStr, stat::Union{VectorToScalarMeasure, Function},
+    function PanelFieldScorer(fields::Union{PanelTermType, AbstractDescriptorEstimator},
+                              stat::Union{VectorToScalarMeasure, Function},
                               bib::Option{<:Bool}, min_obs::Integer)
-        @argcheck(!isempty(fields),
-                  IsEmptyError("fields names the Panel Fields of the score, so it needs at least one name"))
-        for (k, name) in enumerate(fields)
-            assert_panel_terms(name, "name $k of fields")
-        end
+        assert_panel_terms(fields, :fields)
         @argcheck(min_obs >= 1,
                   DomainError(min_obs,
                               "min_obs must be at least one, got min_obs = $min_obs"))
@@ -1158,14 +1171,14 @@ The close of `B` at the third observation is a fill, so the median of `B` reads 
                                                                                bib, min_obs)
     end
 end
-function PanelFieldScorer(; fields::VecStr,
+function PanelFieldScorer(; fields::Union{PanelTermType, AbstractDescriptorEstimator},
                           stat::Union{VectorToScalarMeasure, Function} = MedianValue(),
                           bib::Option{<:Bool} = nothing,
                           min_obs::Integer = 1)::PanelFieldScorer
     return PanelFieldScorer(fields, stat, bib, min_obs)
 end
 function asset_scores(s::PanelFieldScorer, rd::AbstractReturnsResult)
-    V = ew_ratio_values(rd, s.fields)
+    V = descriptor_field_values(rd, s.fields)
     counts = [count(isfinite, view(V, :, i)) for i in axes(V, 2)]
     return min_folds_scores(i -> finite_vec_to_real_measure(s.stat, view(V, :, i)), counts,
                             s.min_obs, eltype(V))

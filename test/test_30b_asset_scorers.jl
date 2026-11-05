@@ -328,7 +328,7 @@ struct NoOrientationScorer <: PortfolioOptimisers.AbstractAssetScorer end
               (MeanFoldScore(), WorstFoldScore(; alg = Rank()))
     end
 
-    @testset "PanelFieldScorer is a statistic of the product of its Panel Fields" begin
+    @testset "PanelFieldScorer is a statistic of a Panel Field term or a Descriptor" begin
         T, N = 40, 5
         prng = StableRNG(6301)
         P = 10 .+ rand(prng, T, N)
@@ -370,6 +370,25 @@ struct NoOrientationScorer <: PortfolioOptimisers.AbstractAssetScorer end
                                                     stat = MeanValue()), rdp),
                    [(v = filter(isfinite, Qh[:, i]); isempty(v) ? NaN : mean(v))
                     for i in 1:N])
+        # One name with no vector, and a sum of Panel Fields.
+        hand_of(W, f) = [(v = filter(isfinite, W[:, i]); isempty(v) ? NaN : f(v))
+                         for i in 1:N]
+        @test same(PO.asset_scores(PanelFieldScorer(; fields = "volume"), rdp),
+                   hand_of(Qh, median))
+        Sh = P .+ 2 .* Q
+        Sh[.!amsk] .= NaN
+        @test same(PO.asset_scores(PanelFieldScorer(;
+                                                    fields = ["close" => 1, "volume" => 2]),
+                                   rdp), hand_of(Sh, median))
+        # A Descriptor Estimator gives its Descriptor, and over a window it reads that window
+        # alone.
+        de = EWVolumeRatio(; num = "volume", den = "close", decay = 0.8, min_obs = 3)
+        sde = PanelFieldScorer(; fields = de, bib = false)
+        @test same(PO.asset_scores(sde, rdp), hand_of(descriptor(de, rdp), median))
+        rdk = PO.port_opt_view(rdp, 1:20, :)
+        @test same(PO.asset_scores(sde, rdk), hand_of(descriptor(de, rdk), median))
+        @test !PO.bigger_is_better(sde)
+        @test PO.bigger_is_better(PanelFieldScorer(; fields = de))
         # A weighted statistic keeps the weight of each finite value, and loses the weight of
         # each gap.
         wv = collect(1.0:T)
@@ -420,6 +439,10 @@ struct NoOrientationScorer <: PortfolioOptimisers.AbstractAssetScorer end
         # Validation, at construction and at the read of the panel.
         @test_throws PO.IsEmptyError PanelFieldScorer(; fields = String[])
         @test_throws PO.IsEmptyError PanelFieldScorer(; fields = ["close", ""])
+        @test_throws PO.IsEmptyError PanelFieldScorer(; fields = "")
+        @test_throws PO.IsEmptyError PanelFieldScorer(; fields = Pair{String, Float64}[])
+        @test_throws DomainError PanelFieldScorer(; fields = ["close" => NaN])
+        @test_throws TypeError PanelFieldScorer(; fields = nothing)
         @test_throws DomainError PanelFieldScorer(; fields = ["close"], min_obs = 0)
         @test_throws PO.IsNothingError PO.asset_scores(s, rd)
         @test_throws KeyError PO.asset_scores(PanelFieldScorer(; fields = ["nope"]), rdp)

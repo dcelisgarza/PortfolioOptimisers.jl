@@ -1,5 +1,5 @@
 ```@meta
-Description = "EW mean descriptors, private API of PortfolioOptimisers.jl: EWMeanState, half_life_decay, half_life_min_obs, assert_ew_decay, assert_ew_ratio_side, …"
+Description = "EW mean descriptors, private API of PortfolioOptimisers.jl: EWMeanState, half_life_decay, half_life_min_obs, assert_ew_decay, ew_mean_series, …"
 ```
 
 # EW mean descriptors: private API
@@ -16,8 +16,6 @@ EWMeanState
 half_life_decay
 half_life_min_obs
 assert_ew_decay
-assert_ew_ratio_side
-ew_ratio_values
 ew_mean_series
 ew_mean_series!
 Base.copy(x::PortfolioOptimisers.EWMeanState)

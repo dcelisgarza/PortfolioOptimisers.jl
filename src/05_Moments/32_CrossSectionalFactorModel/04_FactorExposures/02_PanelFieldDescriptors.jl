@@ -1,10 +1,13 @@
 """
+    assert_panel_terms(x::Nothing, sym::Sym_Str) -> nothing
     assert_panel_terms(x::AbstractString, sym::Sym_Str) -> nothing
     assert_panel_terms(x::AbstractVector{<:Pair{<:AbstractString, <:Real}}, sym::Sym_Str) -> nothing
+    assert_panel_terms(x::AbstractVector{<:AbstractString}, sym::Sym_Str) -> nothing
+    assert_panel_terms(x::AbstractDescriptorEstimator, sym::Sym_Str) -> nothing
 
-Check that a Panel Field term is well formed: one non-empty name, or a non-empty vector of `name => coefficient` pairs with non-empty names and finite coefficients.
+Check that a term is well formed, in any of the five forms that [`descriptor_field_values`](@ref) reads.
 
-A term is what the numerator or the denominator of a [`PanelFieldRatio`](@ref) holds. The check runs once, in the constructor, so the read through [`descriptor_field_values`](@ref) can assume a well-formed term.
+A term is what the numerator or the denominator of a [`PanelFieldRatio`](@ref) or an [`EWVolumeRatio`](@ref) holds, or what the `fields` of a [`PanelFieldScorer`](@ref) holds. The check runs once, in the constructor, so the read through [`descriptor_field_values`](@ref) can assume a well-formed term. `nothing` names the absolute returns and reads nothing out of the Asset Panel, so it needs no check. A Descriptor Estimator checked its own fields in its constructor, so it needs no check either.
 
 # Arguments
 
@@ -15,6 +18,7 @@ A term is what the numerator or the denominator of a [`PanelFieldRatio`](@ref) h
 
   - A name is not empty. Raises an [`IsEmptyError`](@ref).
   - A vector of pairs is not empty, no name in it is empty, and every coefficient is finite. Raises an [`IsEmptyError`](@ref) or a `DomainError`.
+  - A vector of names, read as their product, is not empty, and no name in it is empty. Raises an [`IsEmptyError`](@ref).
 
 # Returns
 
@@ -23,9 +27,14 @@ A term is what the numerator or the denominator of a [`PanelFieldRatio`](@ref) h
 # Related
 
   - [`PanelFieldRatio`](@ref)
+  - [`EWVolumeRatio`](@ref)
   - [`panel_term_names`](@ref)
   - [`descriptor_field_values`](@ref)
 """
+function assert_panel_terms(::Union{Nothing, AbstractDescriptorEstimator},
+                            ::Sym_Str)::Nothing
+    return nothing
+end
 function assert_panel_terms(x::AbstractString, sym::Sym_Str)::Nothing
     @argcheck(!isempty(x),
               IsEmptyError("$sym names a Panel Field, so it cannot be the empty string"))
@@ -39,6 +48,15 @@ function assert_panel_terms(x::AbstractVector{<:Pair{<:AbstractString, <:Real}},
         @argcheck(!isempty(name),
                   IsEmptyError("term $k of $sym names a Panel Field, so its name cannot be the empty string"))
         assert_finite(c, "the coefficient of term $k of $sym")
+    end
+    return nothing
+end
+function assert_panel_terms(x::AbstractVector{<:AbstractString}, sym::Sym_Str)::Nothing
+    @argcheck(!isempty(x),
+              IsEmptyError("$sym is a product of Panel Fields, so it needs at least one name"))
+    for (k, name) in enumerate(x)
+        @argcheck(!isempty(name),
+                  IsEmptyError("factor $k of $sym names a Panel Field, so its name cannot be the empty string"))
     end
     return nothing
 end

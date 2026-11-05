@@ -37,23 +37,30 @@ function forecast_summary_names(names::AbstractVector{<:AbstractString}, n::Inte
     return String[String(nm) for nm in names]
 end
 """
-    forecast_summary_same_target(a::AbstractForecastTarget,
-                                 b::AbstractForecastTarget) -> Bool
+    same_configuration(a::Union{AbstractEstimator, AbstractAlgorithm},
+                       b::Union{AbstractEstimator, AbstractAlgorithm}) -> Bool
+    same_configuration(a::Union{AbstractArray, Tuple, NamedTuple},
+                       b::Union{AbstractArray, Tuple, NamedTuple}) -> Bool
+    same_configuration(a, b) -> Bool
 
-Return whether two evaluations scored against the same forward target.
+Return whether two values state the same configuration.
 
-Two evaluations are comparable only when they answer for the same quantity, and that quantity is the [`AbstractForecastTarget`](@ref) of the pairing. The test reads the member and its fields. [`PanelFieldTarget`](@ref) names a field of the panel, so two of them are the same target when they name the same field, and different targets when they do not.
+Two evaluations are comparable only when they answer for the same quantity, and that quantity is the [`AbstractForecastTarget`](@ref) of the pairing. [`forecast_summary_assert_same_question`](@ref) compares the two targets with this function. A [`PanelFieldTarget`](@ref) can hold a Descriptor Estimator, and two estimators with equal fields are the same target.
 
-The library defines no equality on a target, so the test compares the fields one by one, in declaration order, with `isequal`.
+The library defines no equality on an estimator or an algorithm, so `isequal` on two of them falls back to `===`. That compares a field that holds a vector by identity, and two equal estimators that hold two copies of one vector then differ. This function compares by value at each level instead.
+
+ 1. Two estimators or algorithms are the same when their types have one name and each pair of their fields is the same, in declaration order.
+ 2. Two arrays, tuples or named tuples are the same when their keys are equal and each pair of their entries is the same.
+ 3. Any other pair of values is the same under `isequal`.
 
 # Arguments
 
-  - `a`: The forward target of the first evaluation.
-  - `b`: The forward target of the second evaluation.
+  - `a`: The first value, such as the forward target of the first evaluation.
+  - `b`: The second value.
 
 # Returns
 
-  - `same::Bool`: `true` when the two targets are of one type and every pair of their fields is equal under `isequal`.
+  - `same::Bool`: `true` when the two values state the same configuration.
 
 # Related
 
@@ -61,16 +68,24 @@ The library defines no equality on a target, so the test compares the fields one
   - [`AbstractForecastTarget`](@ref)
   - [`PanelFieldTarget`](@ref)
 """
-function forecast_summary_same_target(a::AbstractForecastTarget, b::AbstractForecastTarget)
+function same_configuration(a::Union{AbstractEstimator, AbstractAlgorithm},
+                            b::Union{AbstractEstimator, AbstractAlgorithm})::Bool
     if Base.typename(typeof(a)) !== Base.typename(typeof(b))
         return false
     end
     for i in 1:nfields(a)
-        if !isequal(getfield(a, i), getfield(b, i))
+        if !same_configuration(getfield(a, i), getfield(b, i))
             return false
         end
     end
     return true
+end
+function same_configuration(a::Union{AbstractArray, Tuple, NamedTuple},
+                            b::Union{AbstractArray, Tuple, NamedTuple})::Bool
+    return keys(a) == keys(b) && all(same_configuration(x, y) for (x, y) in zip(a, b))
+end
+function same_configuration(a, b)::Bool
+    return isequal(a, b)
 end
 """
     forecast_summary_assert_same_question(fes::AbstractVector{<:ForecastEvaluationResult})
@@ -109,7 +124,7 @@ The check does not compare the evaluation `dates` either. Two evaluations that a
 
   - [`forecast_summary_assert_comparable`](@ref)
   - [`forecast_evaluation_align`](@ref)
-  - [`forecast_summary_same_target`](@ref)
+  - [`same_configuration`](@ref)
   - [`ForecastEvaluationResult`](@ref)
 """
 function forecast_summary_assert_same_question(fes::AbstractVector{<:ForecastEvaluationResult})
@@ -117,7 +132,7 @@ function forecast_summary_assert_same_question(fes::AbstractVector{<:ForecastEva
     a = first(fes)
     for k in 2:length(fes)
         b = fes[k]
-        @argcheck(forecast_summary_same_target(a.target, b.target),
+        @argcheck(same_configuration(a.target, b.target),
                   ConflictingArgumentError("evaluation $(k) differs from evaluation 1 on `target`: $(b.target) against $(a.target)"))
         @argcheck(a.horizon == b.horizon,
                   ConflictingArgumentError("evaluation $(k) differs from evaluation 1 on `horizon`: $(b.horizon) against $(a.horizon)"))

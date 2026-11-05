@@ -219,108 +219,6 @@ function ew_mean_series!(s::AbstractVector{<:Real}, n::AbstractVector{<:Integer}
     return S
 end
 """
-    assert_ew_ratio_side(x::Nothing, sym::Sym_Str) -> nothing
-    assert_ew_ratio_side(x::Union{AbstractString,
-                                  AbstractVector{<:Pair{<:AbstractString, <:Real}}},
-                         sym::Sym_Str) -> nothing
-    assert_ew_ratio_side(x::AbstractVector{<:AbstractString}, sym::Sym_Str) -> nothing
-
-Check one side of an exponentially weighted ratio.
-
-This function checks the four forms of one side, so [`EWVolumeRatio`](@ref) states each rule once. `nothing` names the returns and reads nothing out of the Asset Panel, so it needs no check.
-
-# Arguments
-
-  - `x`: One side of the ratio, in any of the forms [`ew_ratio_values`](@ref) reads.
-  - `sym`: The field's name, for the message.
-
-# Validation
-
-  - A name is not the empty string, and a combination holds at least one term whose name is not empty and whose coefficient is finite. Raises an [`IsEmptyError`](@ref) or a `DomainError`.
-  - A product holds at least one name, and no name is the empty string. Raises an [`IsEmptyError`](@ref).
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`EWVolumeRatio`](@ref)
-  - [`ew_ratio_values`](@ref)
-  - [`assert_panel_terms`](@ref)
-"""
-function assert_ew_ratio_side(::Nothing, ::Sym_Str)::Nothing
-    return nothing
-end
-function assert_ew_ratio_side(x::Union{AbstractString,
-                                       AbstractVector{<:Pair{<:AbstractString, <:Real}}},
-                              sym::Sym_Str)::Nothing
-    assert_panel_terms(x, sym)
-    return nothing
-end
-function assert_ew_ratio_side(x::AbstractVector{<:AbstractString}, sym::Sym_Str)::Nothing
-    @argcheck(!isempty(x),
-              IsEmptyError("$sym is a product of Panel Fields, so it needs at least one name"))
-    for (k, name) in enumerate(x)
-        @argcheck(!isempty(name),
-                  IsEmptyError("factor $k of $sym names a Panel Field, so its name cannot be the empty string"))
-    end
-    return nothing
-end
-"""
-    ew_ratio_values(rd::ReturnsResult, x::Nothing) -> Matrix{<:Real}
-    ew_ratio_values(rd::ReturnsResult, x::AbstractString) -> Matrix{<:Real}
-    ew_ratio_values(rd::ReturnsResult,
-                    x::AbstractVector{<:Pair{<:AbstractString, <:Real}}) -> Matrix{<:Real}
-    ew_ratio_values(rd::ReturnsResult, x::AbstractVector{<:AbstractString}) -> Matrix{<:Real}
-
-Read one side of an exponentially weighted ratio out of a [`ReturnsResult`](@ref).
-
-A side takes four forms. Julia selects the method from the form, and each method reads the side as follows.
-
- 1. `nothing` reads the absolute returns `abs.(rd.X)`. Returns are not a Panel Field, so this is how a ratio names them.
- 2. A name reads that one Panel Field, through [`descriptor_field_values`](@ref).
- 3. A vector of `name => coefficient` pairs reads their sum, through [`descriptor_field_values`](@ref). `["a" => 1, "b" => -1]` reads `a - b`.
- 4. A vector of names reads their product. `["adj_close", "adj_volume"]` reads a traded amount out of a price and a volume, which no single Panel Field carries.
-
-# Arguments
-
-  - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl` unless `x` is `nothing`.
-  - `x`: One side of the ratio.
-
-# Validation
-
-  - The rules of [`descriptor_field_values`](@ref) for every Panel Field the side names.
-
-# Returns
-
-  - `V::Matrix{<:Real}`: The values, `observations × assets`, `NaN` where a Panel Field the side names was not observed.
-
-# Related
-
-  - [`EWVolumeRatio`](@ref)
-  - [`assert_ew_ratio_side`](@ref)
-  - [`descriptor_field_values`](@ref)
-"""
-function ew_ratio_values(rd::ReturnsResult, ::Nothing)::Matrix{<:Real}
-    return abs.(rd.X)
-end
-function ew_ratio_values(rd::ReturnsResult, x::AbstractString)::Matrix{<:Real}
-    return descriptor_field_values(rd, x)
-end
-function ew_ratio_values(rd::ReturnsResult,
-                         x::AbstractVector{<:Pair{<:AbstractString, <:Real}})::Matrix{<:Real}
-    return descriptor_field_values(rd, x)
-end
-function ew_ratio_values(rd::ReturnsResult,
-                         x::AbstractVector{<:AbstractString})::Matrix{<:Real}
-    V = descriptor_field_values(rd, x[1])
-    for k in 2:length(x)
-        V .*= descriptor_field_values(rd, x[k])
-    end
-    return V
-end
-"""
 $(DocStringExtensions.TYPEDEF)
 
 Exponentially weighted mean of the log returns, at every observation, with an optional skip.
@@ -459,12 +357,8 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     EWVolumeRatio(;
-        num::Union{Nothing, AbstractString,
-                   AbstractVector{<:Pair{<:AbstractString, <:Real}},
-                   AbstractVector{<:AbstractString}},
-        den::Union{Nothing, AbstractString,
-                   AbstractVector{<:Pair{<:AbstractString, <:Real}},
-                   AbstractVector{<:AbstractString}},
+        num::Option{<:PanelTermType},
+        den::Option{<:PanelTermType},
         nonneg::Option{<:VecStr} = nothing,
         gt0::Option{<:VecStr} = nothing,
         decay::Real,
@@ -476,7 +370,7 @@ Keywords correspond to the struct's fields. `decay` and `min_obs` take no defaul
 
 ## Validation
 
-  - The rules of [`assert_ew_ratio_side`](@ref) for `num` and for `den`.
+  - The rules of [`assert_panel_terms`](@ref) for `num` and for `den`.
   - Every name in `nonneg` and in `gt0` is a Panel Field that `num` or `den` reads, see [`assert_panel_guard_names`](@ref).
   - $(val_dict[:decay])
   - $(val_dict[:min_obs])
@@ -501,7 +395,7 @@ EWVolumeRatio
   - [`descriptor`](@ref)
   - [`EWShareTurnover`](@ref)
   - [`EWAmihudIlliquidity`](@ref)
-  - [`ew_ratio_values`](@ref)
+  - [`descriptor_field_values`](@ref)
   - [`DaysToCover`](@ref)
 """
 @concrete struct EWVolumeRatio <: AbstractDescriptorEstimator
@@ -533,16 +427,11 @@ EWVolumeRatio
     $(field_dict[:ew_desc_cache])
     """
     cache
-    function EWVolumeRatio(num::Union{Nothing, AbstractString,
-                                      AbstractVector{<:Pair{<:AbstractString, <:Real}},
-                                      AbstractVector{<:AbstractString}},
-                           den::Union{Nothing, AbstractString,
-                                      AbstractVector{<:Pair{<:AbstractString, <:Real}},
-                                      AbstractVector{<:AbstractString}},
+    function EWVolumeRatio(num::Option{<:PanelTermType}, den::Option{<:PanelTermType},
                            nonneg::Option{<:VecStr}, gt0::Option{<:VecStr}, decay::Real,
                            min_obs::Integer, cache::Option{<:AbstractPartialFitState})
-        assert_ew_ratio_side(num, :num)
-        assert_ew_ratio_side(den, :den)
+        assert_panel_terms(num, :num)
+        assert_panel_terms(den, :den)
         known = vcat(panel_term_names(num), panel_term_names(den))
         assert_panel_guard_names(nonneg, known, :nonneg)
         assert_panel_guard_names(gt0, known, :gt0)
@@ -553,13 +442,7 @@ EWVolumeRatio
                                                    cache)
     end
 end
-function EWVolumeRatio(;
-                       num::Union{Nothing, AbstractString,
-                                  AbstractVector{<:Pair{<:AbstractString, <:Real}},
-                                  AbstractVector{<:AbstractString}},
-                       den::Union{Nothing, AbstractString,
-                                  AbstractVector{<:Pair{<:AbstractString, <:Real}},
-                                  AbstractVector{<:AbstractString}},
+function EWVolumeRatio(; num::Option{<:PanelTermType}, den::Option{<:PanelTermType},
                        nonneg::Option{<:VecStr} = nothing, gt0::Option{<:VecStr} = nothing,
                        decay::Real, min_obs::Integer,
                        cache::Option{<:AbstractPartialFitState} = nothing)::EWVolumeRatio
@@ -693,7 +576,7 @@ Each of the three archetypes builds one `observations × assets` matrix and runs
 The method that Julia selects is the algorithm.
 
  1. [`EWMean`](@ref): check the returns through [`assert_log_returns`](@ref), then run the recursion over `log1p(rd.X)` delayed by `skip` observations. The first `skip` rows have no input. Take `expm1` of the series when `exponentiate` is set.
- 2. [`EWVolumeRatio`](@ref): check the `nonneg` and `gt0` guards through [`assert_panel_field_sign`](@ref), read both sides through [`ew_ratio_values`](@ref), divide them through [`positive_divide`](@ref), and run the recursion over the ratio.
+ 2. [`EWVolumeRatio`](@ref): check the `nonneg` and `gt0` guards through [`assert_panel_field_sign`](@ref), read both sides through [`descriptor_field_values`](@ref), divide them through [`positive_divide`](@ref), and run the recursion over the ratio.
  3. [`DaysToCover`](@ref): check the `nonneg` guard through [`assert_panel_field_sign`](@ref), run the recursion over the denominator's Panel Field, with every value that is not strictly positive read as a `NaN`, then divide the numerator's Panel Field by the series through [`positive_divide`](@ref).
 
 Every method then writes `NaN` into the inactive cells.
@@ -1022,7 +905,8 @@ function ew_mean_fold(de::EWVolumeRatio, rd::ReturnsResult, cache::Option{<:EWMe
     pnl = descriptor_asset_panel(rd)
     assert_panel_field_sign(rd, de.nonneg, false)
     assert_panel_field_sign(rd, de.gt0, true)
-    Q = positive_divide.(ew_ratio_values(rd, de.num), ew_ratio_values(rd, de.den))
+    Q = positive_divide.(descriptor_field_values(rd, de.num),
+                         descriptor_field_values(rd, de.den))
     st = ew_mean_state(cache, Q, de.decay, nothing)
     D = ew_mean_series!(st.s, st.n, Q, de.decay, de.min_obs)
     descriptor_active_fill!(D, pnl)
@@ -1279,7 +1163,7 @@ EWVolumeRatio
   - [`EWVolumeRatio`](@ref)
   - [`descriptor`](@ref)
   - [`EWShareTurnover`](@ref)
-  - [`ew_ratio_values`](@ref)
+  - [`descriptor_field_values`](@ref)
 """
 function EWAmihudIlliquidity(;
                              den::AbstractVector{<:AbstractString} = ["adj_close",

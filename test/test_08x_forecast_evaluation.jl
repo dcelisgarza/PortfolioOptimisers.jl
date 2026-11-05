@@ -138,6 +138,24 @@ include(joinpath(@__DIR__, "forecast_evaluation_fixture.jl"))
         @test isequal(X, PO.panel_field_values(rd, "market_cap")[rows, :])
     end
 
+    @testset "The Panel Field member reads a sum, a product or a Descriptor (#2005)" begin
+        mc = PO.descriptor_field_values(rd, "market_cap")
+        be = PO.descriptor_field_values(rd, "book_equity")
+        Xs = PO.forecast_target_history(PanelFieldTarget(;
+                                                         name = ["market_cap" => 1,
+                                                                 "book_equity" => -1]), rd,
+                                        csfm)
+        @test isequal(Xs, (mc .- be)[rows, :])
+        Xp = PO.forecast_target_history(PanelFieldTarget(;
+                                                         name = ["market_cap",
+                                                                 "book_equity"]), rd, csfm)
+        @test isequal(Xp, (mc .* be)[rows, :])
+        de = PanelFieldLog(; field = "market_cap")
+        Xd = PO.forecast_target_history(PanelFieldTarget(; name = de), rd, csfm)
+        @test size(Xd) == (fx.Tb, fx.N)
+        @test isequal(Xd, descriptor(de, rd)[rows, :])
+    end
+
     @testset "A Panel Field the panel does not hold is refused" begin
         @test_throws KeyError PO.forecast_target_history(PanelFieldTarget(;
                                                                           name = "not_a_field"),
@@ -146,6 +164,9 @@ include(joinpath(@__DIR__, "forecast_evaluation_fixture.jl"))
 
     @testset "A Panel Field target with no name is refused at construction" begin
         @test_throws PO.IsEmptyError PanelFieldTarget(; name = "")
+        @test_throws PO.IsEmptyError PanelFieldTarget(; name = String[])
+        @test_throws DomainError PanelFieldTarget(; name = ["market_cap" => Inf])
+        @test_throws TypeError PanelFieldTarget(; name = nothing)
     end
 
     @testset "A block with no cross-sectional fit refuses the idiosyncratic target" begin
@@ -3650,14 +3671,33 @@ end
     end
 
     @testset "A Panel Field target is the same target only where it names the same field" begin
-        @test PO.forecast_summary_same_target(PO.IdiosyncraticTarget(),
-                                              PO.IdiosyncraticTarget())
-        @test !PO.forecast_summary_same_target(PO.IdiosyncraticTarget(),
-                                               PO.AssetReturnTarget())
-        @test PO.forecast_summary_same_target(PanelFieldTarget(; name = "volume"),
-                                              PanelFieldTarget(; name = "volume"))
-        @test !PO.forecast_summary_same_target(PanelFieldTarget(; name = "volume"),
-                                               PanelFieldTarget(; name = "market_cap"))
+        @test PO.same_configuration(PO.IdiosyncraticTarget(), PO.IdiosyncraticTarget())
+        @test !PO.same_configuration(PO.IdiosyncraticTarget(), PO.AssetReturnTarget())
+        @test PO.same_configuration(PanelFieldTarget(; name = "volume"),
+                                    PanelFieldTarget(; name = "volume"))
+        @test !PO.same_configuration(PanelFieldTarget(; name = "volume"),
+                                     PanelFieldTarget(; name = "market_cap"))
+        @test PO.same_configuration(PanelFieldTarget(; name = ["a" => 1, "b" => -1]),
+                                    PanelFieldTarget(; name = ["a" => 1, "b" => -1]))
+        @test !PO.same_configuration(PanelFieldTarget(; name = ["a", "b"]),
+                                     PanelFieldTarget(; name = ["a" => 1, "b" => 1]))
+    end
+
+    @testset "Two equal Descriptor targets are the same target (#2005)" begin
+        # Each call builds new vectors for `den`, `nonneg` and `gt0`, so `isequal` falls back
+        # to `===` and compares those vectors by identity. That is the defect.
+        a, b = EWAmihudIlliquidity(), EWAmihudIlliquidity()
+        @test !isequal(a, b)
+        @test PO.same_configuration(PanelFieldTarget(; name = a),
+                                    PanelFieldTarget(; name = b))
+        @test !PO.same_configuration(PanelFieldTarget(; name = a),
+                                     PanelFieldTarget(;
+                                                      name = EWAmihudIlliquidity(;
+                                                                                 half_life = 21)))
+        @test !PO.same_configuration(PanelFieldTarget(; name = a),
+                                     PanelFieldTarget(; name = "adj_volume"))
+        @test PO.same_configuration((1, [NaN, 2.0]), (1, [NaN, 2.0]))
+        @test !PO.same_configuration([1.0, 2.0], [1.0, 2.0, 3.0])
     end
 end
 
@@ -4107,11 +4147,11 @@ end
     end
 
     @testset "Two Panel Field targets are one target only when they name one field" begin
-        @test PO.forecast_summary_same_target(PanelFieldTarget(; name = "a"),
-                                              PanelFieldTarget(; name = "a"))
-        @test !PO.forecast_summary_same_target(PanelFieldTarget(; name = "a"),
-                                               PanelFieldTarget(; name = "b"))
-        @test !PO.forecast_summary_same_target(IdiosyncraticTarget(), AssetReturnTarget())
+        @test PO.same_configuration(PanelFieldTarget(; name = "a"),
+                                    PanelFieldTarget(; name = "a"))
+        @test !PO.same_configuration(PanelFieldTarget(; name = "a"),
+                                     PanelFieldTarget(; name = "b"))
+        @test !PO.same_configuration(IdiosyncraticTarget(), AssetReturnTarget())
     end
 end
 

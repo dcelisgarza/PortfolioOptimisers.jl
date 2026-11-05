@@ -81,9 +81,16 @@ struct AssetReturnTarget <: AbstractForecastTarget end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Scores a Return Forecast against the forward mean of a named numeric Panel Field.
+Scores a Return Forecast against the forward mean of numeric Panel Fields, or of a Descriptor.
 
-[`descriptor_field_values`](@ref) reads the field, so a cell the panel fill touched comes back as `NaN` and never enters the target. The target holds the name of the field, not its values. So the Result can carry and print it, and the read refuses a field that the panel does not hold.
+`name` gives the history that the forward window reads, in one of four forms:
+
+ 1. A name reads that one Panel Field, such as an excess return that the panel holds.
+ 2. A vector of `name => coefficient` pairs reads their sum. `[\"total_return\" => 1, \"rf\" => -1]` reads an excess return out of two fields.
+ 3. A vector of names reads their product.
+ 4. A Descriptor Estimator reads its Descriptor through [`descriptor`](@ref).
+
+The first three forms are a [`PanelTermType`](@ref). [`descriptor_field_values`](@ref) reads each form, so a cell the panel fill touched comes back as `NaN` and never enters the target. The target holds the term or the estimator, not its values. So the Result can carry and print it, and the read refuses a field that the panel does not hold. Two targets are the same target when their terms or their estimators state the same configuration, see [`same_configuration`](@ref).
 
 # Fields
 
@@ -91,13 +98,13 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    PanelFieldTarget(; name::AbstractString) -> PanelFieldTarget
+    PanelFieldTarget(; name::Union{PanelTermType, AbstractDescriptorEstimator}) -> PanelFieldTarget
 
 Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `!isempty(name)`. Raises an [`IsEmptyError`](@ref).
+  - The rules of [`assert_panel_terms`](@ref) for a [`PanelTermType`](@ref): a name is not the empty string, a combination or a product holds at least one name, no name in it is empty, and each coefficient is finite. Raises an [`IsEmptyError`](@ref) or a `DomainError`. A Descriptor Estimator checks its own fields in its constructor.
 
 # Examples
 
@@ -112,20 +119,20 @@ PanelFieldTarget
   - [`AbstractForecastTarget`](@ref)
   - [`IdiosyncraticTarget`](@ref)
   - [`AssetReturnTarget`](@ref)
+  - [`PanelTermType`](@ref)
   - [`descriptor_field_values`](@ref)
 """
 @concrete struct PanelFieldTarget <: AbstractForecastTarget
     """
-    Name of the numeric Panel Field the forward target is taken over.
+    The history the forward target is taken over: a [`PanelTermType`](@ref), which names one numeric Panel Field, a sum or a product of them, or a Descriptor Estimator, whose Descriptor is the history.
     """
     name
-    function PanelFieldTarget(name::AbstractString)
-        @argcheck(!isempty(name),
-                  IsEmptyError("a Panel Field target names the field it scores against, so name cannot be empty"))
+    function PanelFieldTarget(name::Union{PanelTermType, AbstractDescriptorEstimator})
+        assert_panel_terms(name, :name)
         return new{typeof(name)}(name)
     end
 end
-function PanelFieldTarget(; name::AbstractString)
+function PanelFieldTarget(; name::Union{PanelTermType, AbstractDescriptorEstimator})
     return PanelFieldTarget(name)
 end
 """
@@ -173,7 +180,8 @@ function forecast_target_history(::AssetReturnTarget, rd::ReturnsResult,
 end
 function forecast_target_history(target::PanelFieldTarget, rd::ReturnsResult,
                                  csfm::CrossSectionalFactorModel)::MatNum
-    return return_forecast_cut(descriptor_field_values(rd, target.name),
+    name::Union{PanelTermType, AbstractDescriptorEstimator} = target.name
+    return return_forecast_cut(descriptor_field_values(rd, name),
                                return_forecast_rows(rd, csfm))
 end
 """

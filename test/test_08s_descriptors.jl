@@ -214,6 +214,15 @@ end
     @test_throws IsEmptyError PortfolioOptimisers.descriptor_field_values(rd,
                                                                           Pair{String, Int}[])
     @test_throws KeyError PortfolioOptimisers.descriptor_field_values(rd, "mcp")
+    # A vector of names reads their product, and a NaN in a factor is a NaN in the product.
+    M = PortfolioOptimisers.descriptor_field_values(rd, ["mcap", "debt"])
+    @test M[1, :] == [0.5, 2.0, 4.5]
+    @test isnan(M[2, 1]) && isnan(M[2, 2])
+    @test_throws IsEmptyError PortfolioOptimisers.descriptor_field_values(rd, String[])
+    # `nothing` reads the absolute returns, and a Descriptor Estimator gives its Descriptor.
+    @test PortfolioOptimisers.descriptor_field_values(rd, nothing) == abs.(rd.X)
+    de = PanelFieldRatio(; num = "debt", den = "mcap")
+    @test isequal(PortfolioOptimisers.descriptor_field_values(rd, de), descriptor(de, rd))
     # A carrier with no panel cannot be read, and a categorical field is not one number.
     bare = ReturnsResult(; nx = ["A1", "A2", "A3"], X = zeros(3, 3))
     @test_throws IsNothingError PortfolioOptimisers.descriptor_field_values(bare, "mcap")
@@ -747,6 +756,13 @@ end
     V3 = PortfolioOptimisers.descriptor_field_values(rd, ["f32" => 2])
     @test eltype(V3) === Float32
     @test V3 == Float32[2 4; 6 8]
+    # A product of Panel Fields takes the promoted type the same way (#2005).
+    P1 = PortfolioOptimisers.descriptor_field_values(rd, ["f32", "f64"])
+    P2 = PortfolioOptimisers.descriptor_field_values(rd, ["f64", "f32"])
+    @test eltype(P1) === Float64 && eltype(P2) === Float64
+    @test P1 == P2
+    @test P1 == [1e-9 0.0; 0.0 10.0]
+    @test eltype(PortfolioOptimisers.descriptor_field_values(rd, ["f32"])) === Float32
 end
 
 @testset "The log-return check names the first return at or below -1 (#726)" begin

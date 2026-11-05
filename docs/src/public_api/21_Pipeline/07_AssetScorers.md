@@ -33,7 +33,7 @@ WeightMassScorer
 
 ## Scores from the panel fields
 
-[`PanelFieldScorer`](@ref) reads the asset panel of the returns data, not the returns. The value of an asset at each observation is the product of its panel fields, and a statistic reduces the values over the observations to the score. A price and a volume give the median traded amount, and a [`ThresholdRule`](@ref) on it is a liquidity floor. The orientation of the score is a trait of the statistic, and the `bib` field can override it.
+[`PanelFieldScorer`](@ref) reads the asset panel of the returns data, not the returns. The value of an asset at each observation is one panel field, a sum or a product of panel fields, or a descriptor such as an [`EWVolumeRatio`](@ref), and a statistic reduces the values over the observations to the score. A price and a volume give the median traded amount, and a [`ThresholdRule`](@ref) on it is a liquidity floor. The orientation of the score is a trait of the statistic, and the `bib` field can override it.
 
 ```@docs
 PanelFieldScorer

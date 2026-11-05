@@ -500,7 +500,9 @@ A unit wider than that stays, because it reduces the complexity of its caller, k
 type of the caller concrete, or names a rule that the caller would otherwise restate:
 
 - **Two methods are dispatch.** A `Nothing`/value pair and a two-family pair save the caller an
-  `isa` branch. They are never candidates, whatever their bodies hold.
+  `isa` branch. The census never flags them. A set of methods that only sends each form of an
+  input on to another function is a wrapper all the same, and § *A wrapper is for convenience or
+  for a dispatch problem* below governs it.
 - **A decision, an operator, an index, a nested call, a comprehension or a string template is
   logic the unit owns.** A ternary that picks a formulation, a message template, an accessor
   that slices, and a helper that names one rule all stay.
@@ -515,6 +517,25 @@ application, and the allow-list is where that application is named.
 `test/test_70_trivial_unit_census.jl` is the census and the allow-list. A flagged name outside
 the list fails the build. An entry whose name is no longer flagged is stale and fails too, so the
 list can only shrink.
+
+### A wrapper is for convenience or for a dispatch problem
+
+Keep indirection to a minimum. Give each form of an input to the function that owns the job, as a
+method of that function, and call that function. A wrapper is a function whose methods only send
+their arguments on to another function, or hold a form that the other function could hold. It
+earns its place for two reasons only:
+
+- **A convenience for the user.** A keyword constructor, a preset such as `BookToPrice`, or a
+  short name for a call that users write often.
+- **A dispatch problem that a method on the owning function cannot solve.** The owning function
+  belongs to another module, so a new method is type piracy. Or a new method makes a method
+  ambiguity that no narrower signature removes.
+
+A new form of an input is a new method of its reader and of its check, not a new function in
+front of them. #2005 is the case. `ew_ratio_values` sent two of its four forms to
+`descriptor_field_values` and held the other two, and `assert_ew_ratio_side` did the same for
+`assert_panel_terms`. Both went, and the generic functions took their methods. The census flags a
+one-method forward only, so a wrapper of more than one method holds by review.
 
 ## The simple form wins
 
