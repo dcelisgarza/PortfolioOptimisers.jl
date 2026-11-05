@@ -248,11 +248,16 @@ factor risk contribution: `set_risk_constraints!` under `Variance`, which reads 
 [rationale.a-form-its-package-recommends]
 text = """
 The code writes a construct in the form that a well-established dependency recommends, and JET \
-reports a call inside the machinery of that dependency. The developers of such a package analyse \
+reports a call inside the machinery of that dependency. The machinery includes the packages that \
+the dependency itself depends on. The developers of such a package analyse \
 it with JET themselves, and their best practice is reasoned with those reports in view. JET has \
 known false positives. Inference can narrow the element type of a container to `Union{}` through \
 a closure or an abstract type parameter, and JET then reports a call to an intrinsic or a builtin, \
-such as `getfield` or `getindex`, that the running code does not make. A JET report alone is \
+such as `getfield` or `getindex`, that the running code does not make. Inference can also split \
+a local of type `Union{Nothing, T}` that the dependency always assigns before the call, because \
+the order of its control flow decides the assignment and inference does not follow that order. \
+JET then reports a `MethodErrorReport` with a `union split` on the `Nothing` branch, which the \
+running code does not take. A JET report alone is \
 therefore not a reason to change the recommended form, and a change made only to silence such a \
 report is rejected. The Rationale covers only a form that the package documents as its \
 recommendation. It does not cover code that departs from that form, or code of this library \
@@ -261,7 +266,9 @@ that JET reports. The maintainer stated the rule on 2026-10-28, in #1870, for th
 an indexed family of rows. JET reads the container through `JuMP.Containers.container` and \
 reports `invalid builtin function call` on `getfield`. Issue #1883 restored the container at four \
 sites where a loop of scalar rows had replaced it to avoid the report. Affirmed against Julia \
-1.13.3, JET 0.13.1 and JuMP 1.32.1."""
+1.13.3, JET 0.13.1 and JuMP 1.32.1. The maintainer extended the rule to the dependencies of the \
+recommended package, and to the union split of a local that the dependency always assigns, on \
+2026-11-05. Affirmed against Julia 1.13.3 and JET 0.13.1."""
 
 # --- exemptions ------------------------------------------------------------
 #
