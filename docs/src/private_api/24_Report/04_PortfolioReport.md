@@ -16,5 +16,13 @@ PortfolioOptimisers.distribution_table
 PortfolioOptimisers.report_statistics
 PortfolioOptimisers.report_weights
 PortfolioOptimisers.weights_table
+PortfolioOptimisers.report_exposure
+PortfolioOptimisers.exposure_section
+PortfolioOptimisers.allocation_weights
+PortfolioOptimisers.exposure_labels
+PortfolioOptimisers.exposure_sums
+PortfolioOptimisers.exposure_table
+PortfolioOptimisers.exposure_group_table
+PortfolioOptimisers.exposure_row_table
 PortfolioOptimisers.report_allocation
 ```

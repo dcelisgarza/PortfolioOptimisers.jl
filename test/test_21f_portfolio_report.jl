@@ -193,6 +193,130 @@ end
     @test_throws ArgumentError portfolio_report(RP_POP; alloc = rp_alloc(4))
 end
 
+const RP_SETS = UniverseSets(;
+                             dict = Dict("nx" => ["A", "B", "C", "D"],
+                                         "nx_sector" =>
+                                             Union{Missing, String}["x", "x", "y", missing],
+                                         "nx_cur" => ["usd", "eur", "usd", "usd"]))
+function rp_exposure(e, key)
+    return rp_section(e, "Exposure").blocks[findfirst(s -> s.title == key,
+                                                      rp_section(e, "Exposure").blocks)]
+end
+
+@testset "the Exposure section sums the weights of each group of a taxonomy column" begin
+    @testset "a single fold, with a short and an asset with no label" begin
+        res = PO.NaiveOptimisationResult(; pr = nothing, wb = nothing,
+                                         retcode = OptimisationSuccess(),
+                                         w = [0.5, 0.7, -0.3, 0.1], fb = nothing)
+        p = predict(res, RP_RD)
+        r = portfolio_report(p; sets = RP_SETS, taxonomy = ["nx_sector", "nx_cur"])
+        e = r.entries[1]
+        @test [s.title for s in e.sections] == ["Statistics", "Weights", "Exposure"]
+        @test [s.title for s in rp_section(e, "Exposure").blocks] == ["nx_sector", "nx_cur"]
+        t = only(rp_exposure(e, "nx_sector").blocks)
+        @test names(t.df) == ["group", "long", "short", "net"] && t.sortable
+        @test t.df.group == ["x", "y", "(none)"]
+        @test t.df.long == [1.2, 0.0, 0.1] && t.df.short == [0.0, -0.3, 0.0]
+        @test t.df.net ≈ [1.2, -0.3, 0.1]
+        @test sum(t.df.net) ≈ sum(res.w)
+        @test occursin("Gross exposure: 1.6.", t.caption)
+        c = only(rp_exposure(e, "nx_cur").blocks)
+        @test Set(c.df.group) == Set(["usd", "eur"])
+        @test c.df.net[c.df.group .== "usd"][1] ≈ 0.3 &&
+              c.df.short[c.df.group .== "usd"][1] ≈ -0.3
+        # An asset that the universe does not name counts in `(none)`.
+        s2 = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"], "nx_g" => ["k", "k", "m"]))
+        t2 = only(rp_exposure(portfolio_report(p; sets = s2, taxonomy = ["nx_g"]).entries[1],
+                              "nx_g").blocks)
+        @test t2.df.group == ["k", "m", "(none)"] && t2.df.net ≈ [1.2, -0.3, 0.1]
+        # A label that is not a string shows as its text.
+        s3 = UniverseSets(;
+                          dict = Dict("nx" => ["A", "B", "C", "D"], "nx_n" => [1, 1, 2, 2]))
+        t3 = only(rp_exposure(portfolio_report(p; sets = s3, taxonomy = ["nx_n"]).entries[1],
+                              "nx_n").blocks)
+        @test t3.df.group == ["1", "2"] && t3.df.net ≈ [1.2, -0.2]
+        # The writers show the section.
+        @test occursin("### Exposure\n\n#### nx\\_sector", rp_md(e))
+        @test occursin("<h3>Exposure</h3>", rp_html(e))
+    end
+    @testset "the allocation of a fold gives a second set of columns" begin
+        t = only(rp_exposure(portfolio_report(RP_ONE; alloc = rp_alloc(4), sets = RP_SETS,
+                                              taxonomy = ["nx_cur"]).entries[1], "nx_cur").blocks)
+        @test names(t.df) ==
+              ["group", "long", "short", "net", "alloc_long", "alloc_short", "alloc_net"]
+        @test t.df.alloc_net[t.df.group .== "usd"][1] ≈ 0.75
+        @test t.df.alloc_net[t.df.group .== "eur"][1] ≈ 0.25
+        @test all(iszero, t.df.alloc_short)
+        @test occursin("realised weights of the allocation, with a gross exposure of 1.0.",
+                       t.caption)
+        e = portfolio_report(RP_ONE; alloc = rp_alloc(4), sets = RP_SETS,
+                             taxonomy = ["nx_cur"]).entries[1]
+        @test [s.title for s in e.sections] ==
+              ["Statistics", "Weights", "Exposure", "Allocation"]
+    end
+    @testset "a path gives one row for each fold, and a row for its allocation" begin
+        r = portfolio_report([RP_PATH]; allocs = [rp_alloc(4)], sets = [RP_SETS],
+                             taxonomy = ["nx_sector"])
+        t = only(rp_exposure(r.entries[1], "nx_sector").blocks)
+        @test names(t.df) == ["portfolio", "x", "y", "(none)", "gross"]
+        @test t.df.portfolio ==
+              [[string(first(f.rd.ts)) for f in RP_PATH.pred]; "allocation"]
+        for (k, f) in enumerate(RP_PATH.pred)
+            w = PO.fold_target(f)
+            @test t.df.x[k] ≈ w[1] + w[2] && t.df.y[k] ≈ w[3] && t.df[k, "(none)"] ≈ w[4]
+            @test t.df.gross[k] ≈ sum(abs, w)
+        end
+        @test t.df.x[end] ≈ 0.5 && t.df.y[end] ≈ 0.25 && t.df.gross[end] ≈ 1.0
+        @test occursin("The row `allocation`", t.caption)
+        # A path with no allocation has no `allocation` row.
+        t0 = only(rp_exposure(portfolio_report(RP_PATH; sets = RP_SETS,
+                                               taxonomy = ["nx_sector"]).entries[1],
+                              "nx_sector").blocks)
+        @test DataFrames.nrow(t0.df) == length(RP_PATH.pred)
+        @test !occursin("allocation", t0.caption)
+    end
+    @testset "a population gives one row for each path" begin
+        t = only(rp_exposure(portfolio_report(RP_POP; sets = RP_SETS,
+                                              taxonomy = ["nx_cur"]).entries[1], "nx_cur").blocks)
+        nm, W, labels = PO.prediction_weights(RP_POP)
+        @test t.df.portfolio == labels
+        cur = Dict("A" => "usd", "B" => "eur", "C" => "usd", "D" => "usd")
+        for i in axes(W, 1)
+            @test t.df.usd[i] ≈ sum(W[i, j] for j in eachindex(nm) if cur[nm[j]] == "usd")
+            @test t.df.usd[i] + t.df.eur[i] ≈ sum(view(W, i, :))
+        end
+    end
+    @testset "a prediction with many members gives one table for each member" begin
+        x = rp_exposure(portfolio_report(RP_FRONT; sets = RP_SETS, taxonomy = ["nx_cur"]).entries[1],
+                        "nx_cur")
+        @test length(x.blocks) == 3
+        @test [startswith(t.caption, "Member $(j). ") for (j, t) in enumerate(x.blocks)] ==
+              trues(3)
+    end
+    @testset "no sets or no taxonomy gives no section" begin
+        r = portfolio_report([RP_ONE, RP_PATH]; names = ["a", "b"],
+                             sets = [RP_SETS, nothing], taxonomy = ["nx_cur"])
+        @test any(s -> s.title == "Exposure", r.entries[1].sections)
+        @test !any(s -> s.title == "Exposure", r.entries[2].sections)
+        @test !any(s -> s.title == "Exposure",
+                   portfolio_report(RP_ONE; sets = RP_SETS).entries[1].sections)
+        @test !any(s -> s.title == "Exposure",
+                   portfolio_report(RP_ONE; taxonomy = ["nx_cur"]).entries[1].sections)
+    end
+    @testset "the refusals" begin
+        @test_throws DimensionMismatch portfolio_report([RP_ONE, RP_PATH]; sets = [RP_SETS])
+        err = try
+            portfolio_report(RP_ONE; sets = RP_SETS, taxonomy = ["nx_sectr"])
+        catch e
+            e
+        end
+        @test err isa KeyError && occursin("Exposure section", string(err.key))
+        bad = UniverseSets(; dict = Dict("nx" => ["A", "B", "C", "D"], "g" => ["k", "m"]))
+        @test_throws DimensionMismatch portfolio_report(RP_ONE; sets = bad,
+                                                        taxonomy = ["g"])
+    end
+end
+
 @testset "#1943: the refusals" begin
     @test_throws PO.IsEmptyError portfolio_report(PredictionResult[])
     @test_throws ArgumentError portfolio_report([RP_ONE, RP_PATH]; names = ["a", "a"])

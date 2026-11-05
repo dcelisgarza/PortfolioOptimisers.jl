@@ -432,5 +432,5 @@ commit = "b1d571f7a0"
 "src/24_Report/01_PredictionWeights.jl" = { code = 36, doc = 54, comment = 0, blank = 30, total = 120 }
 "src/24_Report/02_ReportModel.jl" = { code = 119, doc = 192, comment = 0, blank = 83, total = 394 }
 "src/24_Report/03_ReportWriters.jl" = { code = 317, doc = 231, comment = 2, blank = 130, total = 680 }
-"src/24_Report/04_PortfolioReport.jl" = { code = 186, doc = 220, comment = 1, blank = 108, total = 515 }
+"src/24_Report/04_PortfolioReport.jl" = { code = 305, doc = 377, comment = 2, blank = 179, total = 863 }
 "src/PortfolioOptimisers.jl" = { code = 434, doc = 3, comment = 29, blank = 5, total = 471 }

@@ -962,6 +962,10 @@ A user-defined mapping of names to named groups (sectors, countries), groups, or
 **Universe Prefix Grammar**
 The six key prefixes that a Universe Sets carries, and the rule that each one declares. `xkey` names the asset universe and is the one mandatory axis. A key with the `xkey` prefix is a partition of the asset universe and has the length of the asset universe. `uxkey` prefixes a unique-entry variant, which names the `xkey`-prefixed partition that it draws from. `tfkey` and `utfkey` mean the same on the Time-Series Factor Axis, and `cfkey` and `ucfkey` mean the same on the Cross-Sectional Factor Axis. Both factor axes are optional, and the library demands one only at the point of need. No prefix may be a prefix of another, so a key resolves to exactly one axis. A key that matches no prefix is a plain group. The library expands it by name, and the expansion reads no axis.
 
+**Taxonomy Column**
+A partition of the asset universe in a Universe Sets: a key with the `xkey` prefix, such as `nx_sector`, that holds one group label for each asset, in the order of the asset universe. `asset_sets_matrix`, `panel_input` and the Exposure section of a Portfolio Report read it, and the view of a Universe Sets cuts it by position.
+*Avoid*: a plain group, which is a list of asset names and does not cover the universe.
+
 **Time-Series Factor Axis**
 The factor universe that a time-series regression is written on. A Universe Sets declares it under `tfkey`. Its names are the columns of `F` of a returns result. So a caller copies `rd.nf` into the dict, and the axis always agrees with the loadings.
 *Avoid*: "the factor axis" alone, which no longer names one list.
@@ -1243,6 +1247,7 @@ An entry that holds weights also gives its Effective Number of Assets and the fo
 
 **Portfolio Report**
 A document that compares portfolios, a `Report`. It holds an overview, which compares the portfolios, and one **entry** for each portfolio, a `ReportEntry`. An entry is a list of sections, and a section is a list of **blocks**: a text, a table, a figure or a section. A block knows no format. `portfolio_report` builds a report from prediction results: one entry for each prediction, and the table of their Performance Summary as the overview. A prediction can be one fold, a walk-forward path or a population of paths, and its paths and members are rows inside its entry. `write_report` writes a report as Markdown or as one self-contained HTML file, which loads nothing from the network. ADR 0228.
+With a Universe Sets and the names of its Taxonomy Columns, an entry also holds an Exposure section: the long, short and net sums of its weights in each group, and the gross exposure. An asset with no label counts in the group `(none)`, so the groups sum to the weights. ADR 0235.
 *Avoid*: tear sheet, dashboard. A report is a document with no server.
 
 **Fees**

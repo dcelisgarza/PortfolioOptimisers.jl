@@ -429,5 +429,5 @@ commit = "8610300"
 "src/24_Report/01_PredictionWeights.jl" = { lines = 26, misses = 0 }
 "src/24_Report/02_ReportModel.jl" = { lines = 36, misses = 0 }
 "src/24_Report/03_ReportWriters.jl" = { lines = 238, misses = 0 }
-"src/24_Report/04_PortfolioReport.jl" = { lines = 97, misses = 0 }
+"src/24_Report/04_PortfolioReport.jl" = { lines = 167, misses = 0 }
 "src/PortfolioOptimisers.jl" = { lines = 0, misses = 0 }

@@ -480,5 +480,5 @@
 "src/24_Report/01_PredictionWeights.jl" = { map = 13, units = 3, swept = false }
 "src/24_Report/02_ReportModel.jl" = { map = 13, units = 9, swept = false }
 "src/24_Report/03_ReportWriters.jl" = { map = 13, units = 19, swept = false }
-"src/24_Report/04_PortfolioReport.jl" = { map = 13, units = 13, swept = false }
+"src/24_Report/04_PortfolioReport.jl" = { map = 13, units = 21, swept = false }
 "src/PortfolioOptimisers.jl" = { map = 1, units = 1, algorithm = 0, swept = true, bindings = ["PortfolioOptimisers"] }
