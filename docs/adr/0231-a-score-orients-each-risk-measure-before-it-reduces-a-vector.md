@@ -34,7 +34,7 @@ The readers of a risk do not change.**
 | Item | Rule |
 | --- | --- |
 | The readers of a risk | `expected_risk`, its value siblings, the derivative readers and the optimisers keep `sca::Scalariser`. `JuMPOptimiser.sca` keeps `NonHierarchicalScalariser`. `nothing` is not a value of their `sca`. |
-| The score | `oriented_score(r, p; sca = SumScalariser(), kwargs...)`, internal, in `07_Scoring.jl`. For member `k` it reads `o_k * expected_risk(r_k, p; kwargs...) * r_k.settings.scale`, with `o_k = 1` when `bigger_is_better(r_k)` holds and `-1` otherwise. |
+| The score | `oriented_score(sca, r, p; kwargs...)`, internal, in `07_Scoring.jl`. The caller holds the reduction and passes it first. A keyword form that took `sca` out of `kwargs` is removed (ADR 0232). For member `k` it reads `o_k * expected_risk(r_k, p; kwargs...) * r_k.settings.scale`, with `o_k = 1` when `bigger_is_better(r_k)` holds and `-1` otherwise. |
 | The bound | `const Sca_VecToScaM = Union{Scalariser, VectorToScalarMeasure, Function}`, after the precedent `Num_VecToScaM`. A slot that admits `nothing` binds `Option{<:Sca_VecToScaM}`. A `Number` is not a member, because it gives one score to every candidate. |
 | The seams | Neither seam changes. A `Scalariser` reduces the values through `scalarise` (ADR 0024). A `VectorToScalarMeasure` or a function reduces the vector of values through `vec_to_real_measure`. |
 | The orientation | Every value is "higher is better" before the reduction. So a vector of mixed orientation has one score, and no outer sign exists. `MaxScalariser` and `MaxValue` give the best member, and `MinScalariser` and `MinValue` the worst. The score reads every reduction as "higher is better", so `StdValue` gives the highest score to the largest spread. |
@@ -52,8 +52,8 @@ The scorers of paths take the score now:
   bigger value is better, would invert that measure a second time.
 
 The two searches and `FoldRiskScorer` take the same score in the build tickets of map #1980.
-Issues #1983 and #1984 decide where each search holds the slot, its default, and the shape of
-the scores under `nothing`.
+ADR 0232 (#1983) decides where a search holds the reduction of its risk measures, its default,
+and the shape of the scores under `nothing`. Issue #1984 decides the same for the search scorers.
 
 ## Considered options
 
