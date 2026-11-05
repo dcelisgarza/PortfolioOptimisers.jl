@@ -5,6 +5,28 @@ Abstract supertype for estimators that turn continuous portfolio weights into sh
 
 A finite allocation estimator buys share counts with a stated cash budget at stated prices. The library has two. [`DiscreteAllocation`](@ref) solves a mixed-integer programme, and [`GreedyAllocation`](@ref) buys in two greedy passes. [martin2021](@cite) states only that the package it describes converts optimal weights into a discrete allocation, in its Methods on page 3. It states neither algorithm. [`optimise`](@ref) takes either one with a [`FiniteAllocationInput`](@ref) as its second argument, and allocates the long and the short side of the portfolio as two separate sub-problems.
 
+# Interfaces
+
+To implement a new finite allocation estimator, subtype `FiniteAllocationOptimisationEstimator`, give it an `fb` field, and implement the two methods below. The `fb` field holds a [`FOptE_FOpt`](@ref) or `nothing`.
+
+## `_optimise`
+
+  - `_optimise(fa::MyAllocation, fai::FiniteAllocationInput; kwargs...) -> FiniteAllocationOptimisationResult`: Buys share counts for the weights and the prices in `fai`, and returns a result type that subtypes [`FiniteAllocationOptimisationResult`](@ref).
+
+### Arguments
+
+  - `fa`: An instance of the concrete subtype.
+  - `fai`: The [`FiniteAllocationInput`](@ref) that holds the weights, the prices, the cash and the fees.
+  - `kwargs...`: The keyword arguments that [`optimise`](@ref) forwards.
+
+### Returns
+
+  - `res::FiniteAllocationOptimisationResult`: The realised allocation. Its last field is `fb`.
+
+## `optimise`
+
+  - `optimise(fa::MyAllocation, fai::FiniteAllocationInput; kwargs...)`: Calls `_optimise`. Restrict the method to an `fb` of type `Nothing`, as [`DiscreteAllocation`](@ref) and [`GreedyAllocation`](@ref) do, so that it is more specific than the generic method of [`optimise`](@ref) for an [`OptimisationEstimator`](@ref).
+
 # Related
 
   - [`OptimisationEstimator`](@ref)
@@ -996,7 +1018,8 @@ function FiniteAllocationInput(res::NonFiniteAllocationOptimisationResult; price
                                  upw)
 end
 export FiniteAllocationInput
-public AbstractCollateralAlgorithm, AbstractUnpricedWeightAlgorithm
+public FiniteAllocationOptimisationEstimator, AbstractCollateralAlgorithm,
+       AbstractUnpricedWeightAlgorithm
 """
     allocation_horizon(res::NonFiniteAllocationOptimisationResult,
                        horizon::Option{<:Number} = nothing)

@@ -270,6 +270,7 @@
         :CustomJuMPObjective,
         :DateAdjusterEstimator,
         :DynamicAbstractWeights,
+        :FiniteAllocationOptimisationEstimator,
         :FrontierBoundEstimator,
         :GerberCovarianceAlgorithm,
         :GerberIQCovarianceAlgorithm,

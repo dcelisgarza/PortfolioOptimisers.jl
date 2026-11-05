@@ -1,11 +1,10 @@
 ```@meta
-Description = "Base finite allocation, private API of PortfolioOptimisers.jl: FiniteAllocationOptimisationEstimator, FiniteAllocationOptimisationResult, FOptE_FOpt, …"
+Description = "Base finite allocation, private API of PortfolioOptimisers.jl: FiniteAllocationOptimisationResult, FOptE_FOpt, FOptE_FOpt_FbChain, CollateralAlg_Func, …"
 ```
 
 # Base finite allocation: private API
 
 ```@docs
-FiniteAllocationOptimisationEstimator
 FiniteAllocationOptimisationResult
 FOptE_FOpt
 FOptE_FOpt_FbChain
@@ -21,11 +20,4 @@ allocation_liquidation_fee
 allocation_side_fees
 permute_side_fees
 allocation_fee
-```
-
-## References
-
-```@bibliography
-Pages = [@__FILE__]
-Canonical = false
 ```
