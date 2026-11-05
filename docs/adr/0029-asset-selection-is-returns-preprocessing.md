@@ -190,12 +190,17 @@ at the cut end, and the mask came back empty. `tail_action_mask` with `action = 
 `NaN` that was in neither tail. `QuantileRule` counted a `NaN` in the size of the universe.
 `groups_argbest` kept no asset of a group whose first member had a `NaN`. `find_uncorrelated_indices`
 removed both assets of a pair with one `NaN`. Each of these now ranks, counts and compares only
-the finite scores. `find_uncorrelated_indices` removes an asset with a non-finite drop score
-before its greedy pass, so the partner of that asset survives their pair.
+the finite scores. `find_uncorrelated_indices` removes an asset with a non-finite score in
+`scores` before its greedy pass, so the partner of that asset survives their pair. The default
+drop score, the summary of a column of the correlation matrix, does not take this step. A `ce`
+that returns the correlation with a constant column as `NaN` makes every summary `NaN`, and that
+`NaN` does not mark an asset with no score. Before R30 of #1817 the step read the summary too,
+so one constant column removed every asset.
 
 `asset_scores` on a risk measure keeps its `DomainError` on a non-finite score. A non-finite value
 from a live column is a defect of the measure, for example `ThirdCentralMoment(; ve =
 SimpleVariance())` on a constant series, and an exception names it. A `NaN` that reaches a rule
 comes from a scorer that cannot score an asset, for example a fold scheme that never offered it.
-The two routes disagree on purpose. The interface of `AbstractSelectionRule` states the rule for
-a rule that a user adds: its keep-mask is `false` at every non-finite score.
+The two routes disagree on purpose. The interfaces of `AbstractSelectionRule` and
+`AbstractRedundancyAlgorithm` state the rule for a rule or an algorithm that a user adds: its
+keep-mask is `false` at every non-finite score.

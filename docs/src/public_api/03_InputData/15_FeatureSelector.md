@@ -4,7 +4,7 @@ Description = "Feature selector, public API of PortfolioOptimisers.jl: panel_fea
 
 # Feature selector
 
-A feature selector names the panel fields that a Feature Matrix stacks. [`feature_matrix`](@ref),
+A feature selector names the panel fields that a feature matrix stacks. [`feature_matrix`](@ref),
 [`feature_labels`](@ref) and [`LabelGroup`](@ref) are documented with the feature distance that
 reads the matrix. This page documents the stack of every field of a panel, and the method that a
 new kind of panel field adds to it.

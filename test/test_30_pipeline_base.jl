@@ -2238,6 +2238,19 @@ struct UnimplementedRedundancy <: PortfolioOptimisers.AbstractRedundancyAlgorith
         # Two NaN drop both, and an unpaired NaN asset does not survive either.
         @test POx.find_uncorrelated_indices(X; t = 0.9, scores = [NaN, NaN, 2.0]) == [3]
         @test POx.find_uncorrelated_indices(X; t = 0.9, scores = [1.0, 2.0, NaN]) == [1]
+        # The rule reads a given score alone. A constant column makes the default summary
+        # of every column NaN under a `ce` with no repair. The summary marks no asset as
+        # unscored, so no pair reaches the threshold and every asset survives, as before
+        # #1933. Before R30 of #1817, every asset left and the selector threw.
+        Xc = hcat(randn(rng, 200, 2), zeros(200), randn(rng, 200))
+        rdc = ReturnsResult(; nx = ["A", "B", "C", "D"], X = Xc)
+        @test all(isnan, [mean(c) for c in eachcol(cor(Covariance(), Xc))])
+        @test POx.find_uncorrelated_indices(Xc; ce = Covariance(), t = 0.9) == 1:4
+        @test fit_preprocessing(RedundancySelector(;
+                                                   alg = PairwiseCorrelation(;
+                                                                             ce = Covariance(),
+                                                                             t = 0.9)),
+                                rdc).nx == ["A", "B", "C", "D"]
         # Through the selectors, with a reward score: B is the better finite asset of the
         # pair under both algorithms.
         @test findall(POx.redundancy_keep(PairwiseCorrelation(; t = 0.9), rd,

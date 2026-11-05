@@ -851,7 +851,7 @@ To add a redundancy algorithm, subtype `AbstractRedundancyAlgorithm` and add the
 
 ## Returns
 
-  - `keep::BitVector`: The mask `assets × 1`. It is `true` for every asset that survives.
+  - `keep::BitVector`: The mask `assets × 1`. It is `true` for every asset that survives. It must be `false` at every asset whose score in `scores` is not finite. A `NaN` score marks an asset that has no score, and that asset must not survive a selection.
 
 # Related
 
