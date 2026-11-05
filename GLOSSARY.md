@@ -1050,6 +1050,10 @@ Cross-validation tunes hyperparameters, evaluates out of sample, and gives meta-
 - **MultipleRandomised**: random asset subsets crossed with rolling windows.
 - **Search**: `GridSearchCrossValidation`, `RandomisedSearchCrossValidation`.
 
+**Search Scorer**
+The rule by which a search orders its candidates. It reads the score matrix of the search, one row per fold and one column per candidate, and gives one value per candidate, bigger is better, or the index of one winner. It is a `CrossValidationSearchScorer`, such as `HighestMeanScore`, or a plain function that gives the same. A search takes one Search Scorer or a vector of them. The `s_sca` of the search reduces a vector per candidate, after it multiplies each value by the scale of its scorer, or keeps each scorer apart under `nothing`. ADR 0226, ADR 0233.
+*Avoid*: scorer alone, which another library uses for the risk measure `r` of a search. And Asset Scorer, which gives one score to each asset.
+
 **Fold Loop**
 The one loop every cross-validation entry point runs. Per fold it resolves the estimator, views the data, swaps the Time-Dependent Inputs, and hands the callback one Fold.
 
@@ -1164,7 +1168,7 @@ The per-observation series a conic tail measure reduces. Two exist: the net port
 - **Oriented Score**: the score of a prediction under one risk measure or a vector of them, so that a higher score is always better. `oriented_score` multiplies each measure by `1` when a bigger value is better and by `-1` otherwise, and by its scale, before it reduces the vector. The reduction is a Scalariser, a Vector-to-Scalar Reducer or a function (`Sca_VecToScaM`). So a vector of mixed orientation has one score, `MaxScalariser` gives the best measure and `MinScalariser` the worst. The scorers of paths read it. A reader of a risk, such as `expected_risk`, does not orient. ADR 0231.
   *Avoid*: Polarity, which is a fact about the edge weights of a Centrality algorithm. And the raw scalarised risk with one sign, which has no orientation when the measures disagree.
 - **Degeneracy Guard**: the refusal that an optimiser or objective makes when the expression that it reads is identically zero.
-- **Combination Weight**: the weight that an element carries inside a combination of *several* elements. It has no effect on a lone element. The elements combined are risk measures, return terms, sub-portfolios, or whole portfolios.
+- **Combination Weight**: the weight that an element carries inside a combination of *several* elements. It has no effect on a lone element. The elements combined are risk measures, search scorers, return terms, sub-portfolios, or whole portfolios.
 - **Frontier / FrontierBoundEstimator**: the efficient-frontier point count and the bound transforms `LinearBound`, `SquareRootBound`, `SquaredBound`.
 - **Frontier Sweep**: the sequence of solves a bound-swept optimiser runs. It is a product, so every swept entry on both axes joins the same enumeration.
 

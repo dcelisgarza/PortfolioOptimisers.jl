@@ -28,9 +28,12 @@ better. `HighestMeanScore` returns the column means. Its index form `HighestMean
 not change, and it equals `argmax` of its values.
 
 The fallback, on the alias `CrossValSearchScorer`, returns `nothing`: the scorer gives no value per
-candidate. A function scorer, and a subtype that defines only the index form, take the fallback.
-The search then calls the index form and keeps one candidate, as it did before, and it refuses
-`n_best > 1` with an `ArgumentError` that names the type and the method to add.
+candidate. A subtype that defines only the index form takes the fallback. The search then calls
+the index form and keeps one candidate, as it did before, and it refuses `n_best > 1` with an
+`ArgumentError` that names the type and the method to add. A function scorer gives what a subtype
+gives, in the same form: one value per column, or the index of one winner. The search reads the
+form from the type of the return of its one call, and an index takes the same path as the index
+form of a subtype (ADR 0233).
 
 Issue #1937 asked for a fallback that throws. A fallback that returns `nothing` keeps the same
 refusal at `n_best > 1`, and it lets the search read the values of every scorer that has them,
@@ -41,8 +44,9 @@ rank 1 comes from the same order at every `n_best`. The library spells "no value
 ### 2. `n_best` on both search estimators
 
 `GridSearchCrossValidation` and `RandomisedSearchCrossValidation` take `n_best::Integer = 1` after
-`scorer`. The constructor checks `n_best > 0`, and it refuses a function scorer with `n_best > 1`,
-because the configuration alone decides that refusal. The randomised search forwards `n_best` to
+`scorer`. The constructor checks `n_best > 0`. A function scorer that returns an index is refused
+with `n_best > 1` when the search runs, because only its return shows its form (ADR 0233). The
+randomised search forwards `n_best` to
 the grid search of its trials. Its trials come from `rng`, so its order is the same in two runs only
 when `seed` is set.
 
