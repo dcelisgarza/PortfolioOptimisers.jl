@@ -632,7 +632,7 @@ julia> PortfolioOptimisers.pipe_constraint_targets(WeightBoundsEstimator())
   - [`PIPELINE_ROUTING_TARGETS`](@ref)
 """
 pipe_constraint_targets(::AbstractConstraintEstimator) = ()
-pipe_constraint_targets(::WeightBoundsEstimator) = (:wb,)
+pipe_constraint_targets(::AbstractWeightBoundsEstimator) = (:wb,)
 pipe_constraint_targets(::LinearConstraintEstimator) = (:lcse,)
 pipe_constraint_targets(::ExposureConstraintEstimator) = (:lcse,)
 pipe_constraint_targets(::AbstractCentralityConstraint) = (:cte,)

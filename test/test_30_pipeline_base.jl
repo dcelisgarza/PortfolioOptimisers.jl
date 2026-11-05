@@ -3078,6 +3078,8 @@ end
         fallback's own signature tests for.
         =#
         fallback = which(PO.pipe_constraint_targets, Tuple{PO.AbstractConstraintEstimator})
+        @test PO.pipe_constraint_targets(ScoreWeightBounds(; score = SCM(), val = 0.1)) ==
+              (:wb,)
         for S in families
             @test which(PO.pipe_constraint_targets, Tuple{S}) !== fallback
         end
