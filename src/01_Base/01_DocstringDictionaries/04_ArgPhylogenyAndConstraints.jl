@@ -82,6 +82,12 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :dub => "`dub`: Upper bound of an asset that a dictionary or a pair in `ub` does not name. `nothing` resolves to `one(datatype)`.",#
                  # Weight bounds.
                  :wb => "`wb`: Weight bounds.",#
+                 # Score weight bounds.
+                 :swb_score => "`score`: The risk measure or the Asset Scorer that gives the score of each asset on the returns of the fit, through [`asset_scores`](@ref).",#
+                 :swb_val => "`val`: The multiple of the score that bounds the magnitude of each weight. A number is one multiple for every asset, and a vector holds one multiple per asset. A pair, a dictionary, a vector of pairs or an algorithmic rule names the multiples by asset or by group, and [`estimator_to_val`](@ref) resolves them against `sets`.",#
+                 :swb_wb => "`wb`: The static weight bounds that the score bound tightens. `nothing` states no static bound.",#
+                 :swb_symmetric => "`symmetric`: If `true`, the score bounds both sides of the weight, `-c <= w <= c`. If `false`, it bounds the upper side alone, `w <= c`.",#
+                 :swb_nonfinite => "`nonfinite`: The bound `c` of an asset whose score is not finite. `0` admits no position in the asset. `nothing` states no bound from the score, so only `wb` bounds the asset.",#
                  # Constraint generation.
                  :rkb_val => "`val`: Vector of non-negative risk budgets, one for each entry of the axis that the budget is written against. The estimator method of [`risk_budget_constraints`](@ref) normalises the budget to sum to one. A budget built by hand keeps its own sum. The model reads the budget inside a logarithmic barrier, so only the relative entries change the solution.",#
                  :rkbe_val => "`val`: Map from names to risk budget values. A name can be an asset or a group, and a group gives its value to every asset in the group. A scalar resolves to `RiskBudget(1.0)` for every value of the scalar, so only a one-entry axis can use it. Write the uniform budget as `nothing`.",#

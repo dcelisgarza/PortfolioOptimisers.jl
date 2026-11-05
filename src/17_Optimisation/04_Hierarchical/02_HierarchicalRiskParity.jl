@@ -442,7 +442,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     r = factory(hrp.r, pr, hrp.opt.slv)
     wu = Matrix{T}(undef, size(X, 2), 2)
     rku = unitary_expected_risks(r, X, cfees)
-    wb = weight_bounds_constraints(hrp.opt.wb, hrp.opt.sets; N = size(X, 2),
+    wb = weight_bounds_constraints(hrp.opt.wb, hrp.opt.sets; rd = rd, N = size(X, 2),
                                    strict = hrp.opt.strict, datatype = T)
     w = ones(T, size(X, 2))
     items = [clr.res.order]
@@ -608,7 +608,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     r = factory(hrp.r, pr, hrp.opt.slv)
     wu = Matrix{T}(undef, size(X, 2), 2)
     rkus = [unitary_expected_risks(ri, X, cfees) for ri in r]
-    wb = weight_bounds_constraints(hrp.opt.wb, hrp.opt.sets; N = size(X, 2),
+    wb = weight_bounds_constraints(hrp.opt.wb, hrp.opt.sets; rd = rd, N = size(X, 2),
                                    strict = hrp.opt.strict, datatype = T)
     w = ones(T, size(X, 2))
     items = [clr.res.order]

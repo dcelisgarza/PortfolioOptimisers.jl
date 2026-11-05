@@ -93,8 +93,8 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     _, pr, opt, rd = investable_reduction(imsk, pr, opt, rd)
     X = pr.X
     datatype = eltype(X)
-    wb = weight_bounds_constraints(opt.wb, opt.sets; N = size(X, 2), strict = opt.strict,
-                                   datatype = datatype)
+    wb = weight_bounds_constraints(opt.wb, opt.sets; rd = rd, N = size(X, 2),
+                                   strict = opt.strict, datatype = datatype)
     lt = threshold_constraints(opt.lt, opt.sets; datatype = datatype, strict = opt.strict)
     st = threshold_constraints(opt.st, opt.sets; datatype = datatype, strict = opt.strict)
     lcsr = linear_constraints(opt.lcse, opt.sets; datatype = datatype, strict = opt.strict,

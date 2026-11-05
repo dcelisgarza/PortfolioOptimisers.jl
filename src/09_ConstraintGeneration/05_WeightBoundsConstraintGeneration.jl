@@ -195,6 +195,45 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
+Abstract supertype for every estimator of weight bounds.
+
+A subtype states the bounds of the weights in a form that needs the universe, and [`weight_bounds_constraints`](@ref) resolves it to a [`WeightBounds`](@ref) in each fit. The fit resolves it after it narrows the universe to the investable assets, so the bounds cover the assets of that fit alone. [`WeightBoundsEstimator`](@ref) reads only the names of the universe. [`ScoreWeightBounds`](@ref) also reads the returns of the fit.
+
+Each subtype resolves against `sets`, so an optimiser that holds one in its `wb` field needs `sets`. Its constructor refuses `sets = nothing` with an [`IsNothingError`](@ref).
+
+# Interfaces
+
+To make a new estimator of weight bounds, subtype `AbstractWeightBoundsEstimator`, put its parameters in the fields of the struct, and implement the method below.
+
+  - `weight_bounds_constraints(wb::AbstractWeightBoundsEstimator, sets::UniverseSets; rd::Option{<:ReturnsResult} = nothing, N::Integer = 0, strict::Bool = false, datatype::DataType = Float64, kwargs...) -> WeightBounds`: Resolve the bounds of the `N` assets of `sets`.
+
+Every optimiser that holds a `wb` field gives `rd`, the returns of the fit over the investable assets, in the order of the columns of `sets`. A subtype that reads no returns ignores `rd`. A subtype that reads the returns refuses `rd = nothing` with an [`IsNothingError`](@ref). An Allocation Set of an [`OnlinePortfolioSelection`](@ref) takes only a [`WeightBoundsEstimator`](@ref) or a [`WeightBounds`](@ref). The head resolves the set once for a block of rows, and a bound that reads the returns of the block reads rows after each Online Update. That breaks the Causal Pass.
+
+### Arguments
+
+  - `wb`: The estimator.
+  - `sets`: [`UniverseSets`](@ref) of the assets of the fit.
+  - `rd`: The returns of the fit, or `nothing` on a route with no returns.
+  - `N`: The number of assets. A zero states that the caller gives no count.
+  - $(arg_dict[:strict_opt])
+  - `datatype`: Number type of the resolved bounds.
+
+### Returns
+
+  - `wb::WeightBounds`: The resolved bounds, in the asset order of `sets`.
+
+# Related
+
+  - [`WeightBoundsEstimator`](@ref)
+  - [`ScoreWeightBounds`](@ref)
+  - [`WeightBounds`](@ref)
+  - [`weight_bounds_constraints`](@ref)
+  - [`WbE_Wb`](@ref)
+"""
+abstract type AbstractWeightBoundsEstimator <: AbstractConstraintEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Resolves weight bounds written in asset or group names against a universe.
 
 [`weight_bounds_constraints`](@ref) turns it into a [`WeightBounds`](@ref). It maps every name to its indices in the universe, and it gives an asset with no name in the bound the value `dlb` or `dub`. A bound can also be a scalar, a vector, or an algorithmic rule such as [`UniformValues`](@ref). If `dlb` is `nothing`, the resolution uses `zero(datatype)`. If `dub` is `nothing`, it uses `one(datatype)`.
@@ -257,7 +296,7 @@ WeightBoundsEstimator
   - [`validate_bounds`](@ref): the checks that this constructor runs on a pair of numbers or a pair of vectors.
   - [`port_opt_view`](@ref)
 """
-@propagatable @concrete struct WeightBoundsEstimator <: AbstractConstraintEstimator
+@propagatable @concrete struct WeightBoundsEstimator <: AbstractWeightBoundsEstimator
     """
     $(field_dict[:lb])
     """
@@ -302,21 +341,37 @@ function WeightBoundsEstimator(; lb::Option{<:VectorEstValType} = 0.0,
     return WeightBoundsEstimator(lb, ub, dlb, dub)
 end
 """
-    const WbE_Wb = Union{WeightBoundsEstimator, WeightBounds}
+    const WbE_Wb = Union{AbstractWeightBoundsEstimator, WeightBounds}
 
 Alias for a weight bounds estimator or result.
 
-The alias matches a [`WeightBoundsEstimator`](@ref) or a [`WeightBounds`](@ref). The library uses it for dispatch when it resolves weight bounds.
+The alias matches every [`AbstractWeightBoundsEstimator`](@ref) and a [`WeightBounds`](@ref). The library uses it for dispatch when it resolves weight bounds, and the `wb` field of an optimiser takes it as its bound.
 
 The alias has no vector counterpart, and [`weight_bounds_constraints`](@ref) has no vector method. Weight bounds are one box over the whole universe, so an optimiser holds one of them. [`RkbE_Rkb`](@ref) states why some constraint families are singular and others are not.
 
 # Related
 
+  - [`AbstractWeightBoundsEstimator`](@ref)
   - [`WeightBoundsEstimator`](@ref)
   - [`WeightBounds`](@ref)
+  - [`NameWbE_Wb`](@ref)
   - [`weight_bounds_constraints`](@ref)
 """
-const WbE_Wb = Union{WeightBoundsEstimator, WeightBounds}
+const WbE_Wb = Union{AbstractWeightBoundsEstimator, WeightBounds}
+"""
+    const NameWbE_Wb = Union{WeightBoundsEstimator, WeightBounds}
+
+Alias for weight bounds that read no returns: a [`WeightBoundsEstimator`](@ref), which reads only the names of the universe, or a [`WeightBounds`](@ref).
+
+An Allocation Set of an [`OnlinePortfolioSelection`](@ref) takes this alias as the bound of its `wb` field, and refuses every other [`AbstractWeightBoundsEstimator`](@ref). The head resolves the set once for a block of rows. A bound that reads the returns of the block, such as a [`ScoreWeightBounds`](@ref), reads rows after each Online Update, and the Causal Pass then has a look-ahead.
+
+# Related
+
+  - [`WbE_Wb`](@ref)
+  - [`BoundedAllocationSet`](@ref)
+  - [`ProgrammeAllocationSet`](@ref)
+"""
+const NameWbE_Wb = Union{WeightBoundsEstimator, WeightBounds}
 """
     weight_bounds_constraints(wb::WeightBoundsEstimator, sets::UniverseSets; strict::Bool = false,
                               datatype::DataType = Float64, kwargs...)
@@ -684,3 +739,4 @@ function weight_bounds_constraints(wb::Nothing, args...; N::Integer = 0,
 end
 
 export WeightBoundsEstimator, WeightBounds, weight_bounds_constraints
+public AbstractWeightBoundsEstimator

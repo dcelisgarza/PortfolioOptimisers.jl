@@ -318,7 +318,7 @@ The loop inside `SubsetResampling` is over asset subsets, not over time folds. N
 ## Validation
 
   - `opt` passes [`assert_internal_optimiser`](@ref). A schedule applies the check to each entry and to its `default`.
-  - If `wb` is a [`WeightBoundsEstimator`](@ref), `sets` is not `nothing`. The constructor throws an [`IsNothingError`](@ref) otherwise.
+  - If `wb` is an [`AbstractWeightBoundsEstimator`](@ref), `sets` is not `nothing`. The constructor throws an [`IsNothingError`](@ref) otherwise.
   - If `fees` is a [`FeesEstimator`](@ref), `sets` is not `nothing`. The constructor throws an [`IsNothingError`](@ref) otherwise.
   - If `subset_size` is an `Integer`: `subset_size >= 1`.
   - If `subset_size` is any other real number: `0 < subset_size < 1`.
@@ -444,7 +444,7 @@ The loop inside `SubsetResampling` is over asset subsets, not over time folds. N
         assert_no_nearest_bind_optimiser_schedule(opt, :opt, :SubsetResampling)
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :SubsetResampling)
         assert_internal_optimiser(opt)
-        if isa(wb, WeightBoundsEstimator)
+        if isa(wb, AbstractWeightBoundsEstimator)
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
         if isa(fees, FeesEstimator)
@@ -782,7 +782,8 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; branchorder::Symbol 
         ress[i] = optimise(opti, rdi; branchorder = branchorder, str_names = str_names,
                            save = save, kwargs...)
     end
-    wb = weight_bounds_constraints(sr.wb, sr.sets; N = N, strict = sr.strict, datatype = Tf)
+    wb = weight_bounds_constraints(sr.wb, sr.sets; rd = rdr, N = N, strict = sr.strict,
+                                   datatype = Tf)
     retcode, w = subset_resampling_finaliser(N, n_subsets, asset_idx, wb, sr.wf, ress,
                                              ress[1].w)
     return SubsetResamplingResult(; pr = pr, wb = wb, fees = fees, ress = ress,

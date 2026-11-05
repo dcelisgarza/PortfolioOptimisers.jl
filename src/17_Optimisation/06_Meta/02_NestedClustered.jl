@@ -550,7 +550,7 @@ An entry of a schedule in `opti` or `opto` must be an estimator, as the static v
   - When `cv` is present, `opti` passes `assert_external_optimiser`.
   - `scorer` is `nothing` unless `cv` is a [`CombinatorialCrossValidation`](@ref). The constructor throws an `ArgumentError` otherwise, through [`assert_meta_scorer`](@ref).
   - A schedule in `opto` or `fb` does not bind `:nearest`. A schedule in `opti` that binds `:nearest` has an explicit `default`, and `cv` is present.
-  - A `WeightBoundsEstimator` in `wb`, or a `FeesEstimator` in `fees`, needs `sets`. The constructor throws an `IsNothingError` otherwise.
+  - An [`AbstractWeightBoundsEstimator`](@ref) in `wb`, or a `FeesEstimator` in `fees`, needs `sets`. The constructor throws an `IsNothingError` otherwise.
   - A vector schedule holds no precomputed result, see [`assert_time_dependent_substitution`](@ref).
   - A reader that states no source and reads the raw returns data, beside a reader that states `x_src = ExcessSource()`, logs one warning that names its path, see [`warn_raw_readers`](@ref). The head then builds as configured.
 
@@ -686,7 +686,7 @@ An entry of a schedule in `opti` or `opto` must be an estimator, as the static v
         if !isnothing(cv)
             assert_external_optimiser(opti)
         end
-        if isa(wb, WeightBoundsEstimator)
+        if isa(wb, AbstractWeightBoundsEstimator)
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
         if isa(fees, FeesEstimator)
@@ -977,8 +977,8 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; branchorder::Symbol 
     nco = _update_asset_sets(nco, rdo)
     reso = optimise(nco.opto, rdo; branchorder = branchorder, str_names = str_names,
                     save = save, kwargs...)
-    wb = weight_bounds_constraints(nco.wb, nco.sets; N = size(X, 2), strict = nco.strict,
-                                   datatype = Tf)
+    wb = weight_bounds_constraints(nco.wb, nco.sets; rd = rdr, N = size(X, 2),
+                                   strict = nco.strict, datatype = Tf)
     retcode, w = outer_optimisation_finaliser(wb, nco.wf, resi, reso.retcode, reso.w, wi)
     return NestedClusteredResult(; pr = pr, clr = clr, wb = wb, fees = fees, resi = resi,
                                  reso = reso, cv = nco.cv, scorer = nco.scorer,

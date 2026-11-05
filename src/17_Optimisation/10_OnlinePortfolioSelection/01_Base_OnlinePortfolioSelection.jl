@@ -377,7 +377,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     BoundedAllocationSet(;
-        wb::Option{<:WbE_Wb} = WeightBounds(),
+        wb::Option{<:NameWbE_Wb} = WeightBounds(),
         sets::Option{<:UniverseSets} = nothing
     ) -> BoundedAllocationSet
 
@@ -386,6 +386,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `wb` is a [`WeightBoundsEstimator`](@ref): `!isnothing(sets)`. An `IsNothingError` is thrown otherwise.
+  - `wb` is a [`NameWbE_Wb`](@ref). A bound that reads the returns, such as a [`ScoreWeightBounds`](@ref), would read rows after each Online Update, so the field bound refuses it with a `TypeError`.
 
 ## View parameters
 
@@ -425,7 +426,7 @@ BoundedAllocationSet
     $(field_dict[:sets])
     """
     @vprop sets
-    function BoundedAllocationSet(wb::Option{<:WbE_Wb}, sets::Option{<:UniverseSets})
+    function BoundedAllocationSet(wb::Option{<:NameWbE_Wb}, sets::Option{<:UniverseSets})
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets),
                       IsNothingError("sets cannot be nothing when wb is a WeightBoundsEstimator"))
@@ -433,7 +434,7 @@ BoundedAllocationSet
         return new{typeof(wb), typeof(sets)}(wb, sets)
     end
 end
-function BoundedAllocationSet(; wb::Option{<:WbE_Wb} = WeightBounds(),
+function BoundedAllocationSet(; wb::Option{<:NameWbE_Wb} = WeightBounds(),
                               sets::Option{<:UniverseSets} = nothing)::BoundedAllocationSet
     return BoundedAllocationSet(wb, sets)
 end

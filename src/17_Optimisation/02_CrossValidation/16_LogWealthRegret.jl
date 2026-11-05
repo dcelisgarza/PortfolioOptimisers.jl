@@ -826,7 +826,7 @@ Keywords correspond to the struct's fields. `L` and `slv` are required: a budget
 
   - `0 <= L` and `1 <= p`. A `DomainError` is thrown otherwise.
   - A vector `slv` is not empty. An `IsEmptyError` is thrown otherwise.
-  - If `wb` is a [`WeightBoundsEstimator`](@ref): `!isnothing(sets)`. An `IsNothingError` is thrown otherwise.
+  - If `wb` is an [`AbstractWeightBoundsEstimator`](@ref): `!isnothing(sets)`. An `IsNothingError` is thrown otherwise.
 
 ## View parameters
 
@@ -907,9 +907,9 @@ BudgetedHindsightPath
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        if isa(wb, WeightBoundsEstimator)
+        if isa(wb, AbstractWeightBoundsEstimator)
             @argcheck(!isnothing(sets),
-                      IsNothingError("sets cannot be nothing when wb is a WeightBoundsEstimator"))
+                      IsNothingError("sets cannot be nothing when wb is an AbstractWeightBoundsEstimator"))
         end
         return new{typeof(L), typeof(p), typeof(wb), typeof(sets), typeof(strict),
                    typeof(slv), typeof(fb)}(L, p, wb, sets, strict, slv, fb)
@@ -1185,7 +1185,7 @@ function _optimise(est::BudgetedHindsightPath, rd::ReturnsResult; kwargs...)
     T, N = size(X)
     imsk = path_row_masks(rd)
     msk = isnothing(imsk) ? trues(T, N) : imsk
-    wb = weight_bounds_constraints(est.wb, est.sets; N = N, strict = est.strict,
+    wb = weight_bounds_constraints(est.wb, est.sets; rd = rd, N = N, strict = est.strict,
                                    datatype = eltype(X))
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, false)

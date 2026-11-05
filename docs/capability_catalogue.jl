@@ -774,7 +774,7 @@ const CATALOGUE = [Section("Core abstractions",
                                 :IntegerPhylogenyEstimator, :IntegerPhylogeny,
                                 :CentralityConstraint),
                             Cap(:weight_bounds_constraints, :WeightBoundsEstimator,
-                                :WeightBounds), Cap(:UniverseSets),
+                                :WeightBounds), Cap(:ScoreWeightBounds), Cap(:UniverseSets),
                             Group(Cap(:BudgetEstimator, :BudgetRange;
                                       label = "Budget constraints"),
                                   [Cap(:BudgetCosts), Cap(:BudgetMarketImpact)]),

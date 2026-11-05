@@ -1293,7 +1293,7 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     clr = clusterise(sh.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa)
     assert_clustering_universe(clr, size(X, 2))
     items = [clr.res.order]
-    wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(X, 2),
+    wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; rd = rd, N = size(X, 2),
                                    strict = sh.opt.strict, datatype = T)
     w, gamma, r = schur_complement_weights(pr, items, wb, sh.params)
     assert_schur_weights(w, gamma)
@@ -1364,7 +1364,7 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     clr = clusterise(sh.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa)
     assert_clustering_universe(clr, size(X, 2))
     items = [clr.res.order]
-    wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(X, 2),
+    wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; rd = rd, N = size(X, 2),
                                    strict = sh.opt.strict, datatype = T)
     params = sh.params
     # Each bundle returns the `gamma` it ran at, of that bundle's own type. The vector

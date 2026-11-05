@@ -298,7 +298,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
 
 ## Validation
 
-  - If `wb` is a [`WeightBoundsEstimator`](@ref): `!isnothing(sets)`.
+  - If `wb` is an [`AbstractWeightBoundsEstimator`](@ref): `!isnothing(sets)`.
   - If `fees` is a [`FeesEstimator`](@ref): `!isnothing(sets)`.
   - `fb` schedules: `bind !== :nearest`.
   - A reader that states no source and reads the raw returns data, beside a reader that states `x_src = ExcessSource()`, logs one warning that names its path, see [`warn_raw_readers`](@ref). The head then builds as configured.
@@ -431,9 +431,9 @@ InverseVolatility
                                fb::TDO_Option{<:OptE_Opt}, sq::Bool, strict::Bool,
                                cache::Option{<:ReturnsBufferState})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :InverseVolatility)
-        if isa(wb, WeightBoundsEstimator)
+        if isa(wb, AbstractWeightBoundsEstimator)
             @argcheck(!isnothing(sets),
-                      IsNothingError("sets cannot be nothing when wb is a WeightBoundsEstimator"))
+                      IsNothingError("sets cannot be nothing when wb is an AbstractWeightBoundsEstimator"))
         end
         if isa(fees, FeesEstimator)
             @argcheck(!isnothing(sets),
@@ -555,8 +555,8 @@ function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult(); k
     w = LinearAlgebra.diag(pr.sigma)
     w = inv.(!iv.sq ? sqrt.(w) : w)
     w /= sum(w)
-    wb = weight_bounds_constraints(iv.wb, iv.sets; N = size(X, 2), strict = iv.strict,
-                                   datatype = Tf)
+    wb = weight_bounds_constraints(iv.wb, iv.sets; rd = rd, N = size(X, 2),
+                                   strict = iv.strict, datatype = Tf)
     retcode, w = finalise_weight_bounds(iv.wf, wb, w)
     return NaiveOptimisationResult(; pr = pr, wb = wb, fees = fees, retcode = retcode,
                                    w = w, imsk = imsk, fb = nothing)
@@ -626,7 +626,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
 
 ## Validation
 
-  - If `wb` is a [`WeightBoundsEstimator`](@ref): `!isnothing(sets)`.
+  - If `wb` is an [`AbstractWeightBoundsEstimator`](@ref): `!isnothing(sets)`.
   - If `fees` is a [`FeesEstimator`](@ref): `!isnothing(sets)`.
   - `fb` schedules: `bind !== :nearest`.
 
@@ -708,9 +708,9 @@ EqualWeighted
                            fb::TDO_Option{<:OptE_Opt}, strict::Bool,
                            cache::Option{<:ReturnsBufferState})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :EqualWeighted)
-        if isa(wb, WeightBoundsEstimator)
+        if isa(wb, AbstractWeightBoundsEstimator)
             @argcheck(!isnothing(sets),
-                      IsNothingError("sets cannot be nothing when wb is a WeightBoundsEstimator"))
+                      IsNothingError("sets cannot be nothing when wb is an AbstractWeightBoundsEstimator"))
         end
         if isa(fees, FeesEstimator)
             @argcheck(!isnothing(sets),
@@ -777,7 +777,8 @@ function _optimise(ew::EqualWeighted, rd::ReturnsResult; kwargs...)
     N = size(rd.X, 2)
     # The weight takes the type of the data, not the `Float64` of `inv(N)`.
     w = fill(one(Tf) / N, N)
-    wb = weight_bounds_constraints(ew.wb, ew.sets; N = N, strict = ew.strict, datatype = Tf)
+    wb = weight_bounds_constraints(ew.wb, ew.sets; rd = rd, N = N, strict = ew.strict,
+                                   datatype = Tf)
     retcode, w = finalise_weight_bounds(ew.wf, wb, w)
     return NaiveOptimisationResult(; pr = rd, wb = wb, fees = fees, retcode = retcode,
                                    w = w, imsk = cmsk, fb = nothing)
@@ -854,7 +855,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
 ## Validation
 
   - `alpha`: non-empty, and every element is positive and finite.
-  - If `wb` is a [`WeightBoundsEstimator`](@ref): `!isnothing(sets)`.
+  - If `wb` is an [`AbstractWeightBoundsEstimator`](@ref): `!isnothing(sets)`.
   - If `fees` is a [`FeesEstimator`](@ref): `!isnothing(sets)`.
   - `fb` schedules: `bind !== :nearest`.
 
@@ -952,9 +953,9 @@ RandomWeighted
                             strict::Bool, cache::Option{<:ReturnsBufferState})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :RandomWeighted)
         assert_nonempty_gt0_finite_val(alpha, :alpha)
-        if isa(wb, WeightBoundsEstimator)
+        if isa(wb, AbstractWeightBoundsEstimator)
             @argcheck(!isnothing(sets),
-                      IsNothingError("sets cannot be nothing when wb is a WeightBoundsEstimator"))
+                      IsNothingError("sets cannot be nothing when wb is an AbstractWeightBoundsEstimator"))
         end
         if isa(fees, FeesEstimator)
             @argcheck(!isnothing(sets),
@@ -1050,7 +1051,8 @@ function _optimise(rw::RandomWeighted, rd::ReturnsResult; kwargs...)
     end
     rng = resolve_rng(rw.rng, rw.seed)
     w = rand(rng, dist)
-    wb = weight_bounds_constraints(rw.wb, rw.sets; N = N, strict = rw.strict, datatype = Tf)
+    wb = weight_bounds_constraints(rw.wb, rw.sets; rd = rd, N = N, strict = rw.strict,
+                                   datatype = Tf)
     retcode, w = finalise_weight_bounds(rw.wf, wb, w)
     return NaiveOptimisationResult(; pr = rd, wb = wb, fees = fees, retcode = retcode,
                                    w = w, imsk = cmsk, fb = nothing)
@@ -1137,7 +1139,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
 
 ## Validation
 
-  - If `wb` is a [`WeightBoundsEstimator`](@ref): `!isnothing(sets)`.
+  - If `wb` is an [`AbstractWeightBoundsEstimator`](@ref): `!isnothing(sets)`.
   - If `fees` is a [`FeesEstimator`](@ref): `!isnothing(sets)`.
   - `fb` schedules: `bind !== :nearest`.
   - `iters > 0`.
@@ -1241,9 +1243,9 @@ BestConstantRebalancedPortfolio
                                              tol::Number, strict::Bool,
                                              cache::Option{<:ReturnsBufferState})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :BestConstantRebalancedPortfolio)
-        if isa(wb, WeightBoundsEstimator)
+        if isa(wb, AbstractWeightBoundsEstimator)
             @argcheck(!isnothing(sets),
-                      IsNothingError("sets cannot be nothing when wb is a WeightBoundsEstimator"))
+                      IsNothingError("sets cannot be nothing when wb is an AbstractWeightBoundsEstimator"))
         end
         if isa(fees, FeesEstimator)
             @argcheck(!isnothing(sets),
@@ -1388,7 +1390,7 @@ function _optimise(bcrp::BestConstantRebalancedPortfolio, rd::ReturnsResult; kwa
     X = one(eltype(rd.X)) .+ rd.X
     N = size(X, 2)
     fp = cover_fixed_point(X, bcrp.iters, bcrp.tol)
-    wb = weight_bounds_constraints(bcrp.wb, bcrp.sets; N = N, strict = bcrp.strict,
+    wb = weight_bounds_constraints(bcrp.wb, bcrp.sets; rd = rd, N = N, strict = bcrp.strict,
                                    datatype = Tf)
     retcode, w = finalise_weight_bounds(bcrp.wf, wb, fp.w)
     if isa(retcode, OptimisationSuccess)

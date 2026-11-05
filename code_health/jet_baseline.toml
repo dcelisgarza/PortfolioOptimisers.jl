@@ -8,7 +8,7 @@ jet = "0.13.1"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "StatsPlots"]
-commit = "2b31cd667b"
+commit = "64069d56b1"
 
 [run.main]
 load_set = ["GraphRecipes", "StatsPlots"]
@@ -432,6 +432,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/21_Pipeline/05_SearchCrossValidation.jl" = { raw = 0, reviewed = 0 }
 "src/21_Pipeline/06_OnlinePipeline.jl" = { raw = 0, reviewed = 0 }
 "src/21_Pipeline/07_AssetScorers.jl" = { raw = 0, reviewed = 0 }
+"src/21_Pipeline/08_ScoreWeightBounds.jl" = { raw = 0, reviewed = 0 }
 "src/22_Plotting.jl" = { raw = 0, reviewed = 0 }
 "src/23_Aliases.jl" = { raw = 0, reviewed = 0 }
 "src/24_Report/01_PredictionWeights.jl" = { raw = 0, reviewed = 0 }
@@ -862,6 +863,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/21_Pipeline/05_SearchCrossValidation.jl" = { raw = 0, reviewed = 0 }
 "src/21_Pipeline/06_OnlinePipeline.jl" = { raw = 0, reviewed = 0 }
 "src/21_Pipeline/07_AssetScorers.jl" = { raw = 0, reviewed = 0 }
+"src/21_Pipeline/08_ScoreWeightBounds.jl" = { raw = 0, reviewed = 0 }
 "src/22_Plotting.jl" = { raw = 0, reviewed = 0 }
 "src/23_Aliases.jl" = { raw = 0, reviewed = 0 }
 "src/24_Report/01_PredictionWeights.jl" = { raw = 0, reviewed = 0 }

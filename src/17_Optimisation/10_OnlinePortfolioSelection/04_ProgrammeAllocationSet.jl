@@ -58,7 +58,7 @@ $(DocStringExtensions.FIELDS)
         slv::Slv_VecSlv,
         pe::AbstractPriorEstimator = EmpiricalPrior(),
         r::Option{<:RM_VecRM} = nothing,
-        wb::Option{<:WbE_Wb} = WeightBounds(),
+        wb::Option{<:NameWbE_Wb} = WeightBounds(),
         sbgt::Option{<:Num_BgtRg} = nothing,
         gbgt::Option{<:Num_BgtRg} = nothing,
         xbgt::Bool = false,
@@ -109,6 +109,7 @@ Keywords correspond to the struct's fields. `slv` has no default, because every 
   - An [`LpRegularisation`](@ref) in `lp` holds no norm ceiling rule, and one in `lpc` holds no ambiguity radius rule. An `ArgumentError` is thrown otherwise.
   - The sub-group and sub-grouped MIP slots agree in shape ([`assert_subgroup_mip_fields`](@ref), [`assert_subgrouped_mip_fields`](@ref)).
   - If a slot holds an estimator keyed by name ([`name_keyed`](@ref)): `!isnothing(sets)`. An `IsNothingError` is thrown otherwise.
+  - `wb` is a [`NameWbE_Wb`](@ref). A bound that reads the returns, such as a [`ScoreWeightBounds`](@ref), would read rows after each Online Update, so the field bound refuses it with a `TypeError`.
   - If `tr` or `r` holds a [`DataBenchmarkTracking`](@ref): `pe` must not state `x_src = ExcessSource()`, see [`assert_data_benchmark_prior`](@ref).
 
 ## View parameters
@@ -367,7 +368,7 @@ ProgrammeAllocationSet
     """
     linf
     function ProgrammeAllocationSet(pe::AbstractPriorEstimator, slv::Slv_VecSlv,
-                                    r::Option{<:RM_VecRM}, wb::Option{<:WbE_Wb},
+                                    r::Option{<:RM_VecRM}, wb::Option{<:NameWbE_Wb},
                                     sbgt::Option{<:Num_BgtRg}, gbgt::Option{<:Num_BgtRg},
                                     xbgt::Bool, lt::Option{<:BtE_Bt}, st::Option{<:BtE_Bt},
                                     lcse::Option{<:EcE_LcE_Lc_VecEcE_LcE_Lc},
@@ -455,7 +456,7 @@ end
 function ProgrammeAllocationSet(; slv::Slv_VecSlv,
                                 pe::AbstractPriorEstimator = EmpiricalPrior(),
                                 r::Option{<:RM_VecRM} = nothing,
-                                wb::Option{<:WbE_Wb} = WeightBounds(),
+                                wb::Option{<:NameWbE_Wb} = WeightBounds(),
                                 sbgt::Option{<:Num_BgtRg} = nothing,
                                 gbgt::Option{<:Num_BgtRg} = nothing, xbgt::Bool = false,
                                 lt::Option{<:BtE_Bt} = nothing,
@@ -572,7 +573,7 @@ end
 
 Tells whether a constraint slot holds an estimator that resolves its names over `sets`.
 
-The owner of such a slot must carry `sets`. The estimators are [`WeightBoundsEstimator`](@ref), [`LinearConstraintEstimator`](@ref), [`ExposureConstraintEstimator`](@ref), [`ThresholdEstimator`](@ref), [`AssetSetsMatrixEstimator`](@ref) and [`TurnoverEstimator`](@ref). A vector is keyed by name when one of its entries is.
+The owner of such a slot must carry `sets`. The estimators are every [`AbstractWeightBoundsEstimator`](@ref), [`LinearConstraintEstimator`](@ref), [`ExposureConstraintEstimator`](@ref), [`ThresholdEstimator`](@ref), [`AssetSetsMatrixEstimator`](@ref) and [`TurnoverEstimator`](@ref). A vector is keyed by name when one of its entries is.
 
 # Returns
 
@@ -586,7 +587,7 @@ The owner of such a slot must carry `sets`. The estimators are [`WeightBoundsEst
 function name_keyed(::Any)
     return false
 end
-function name_keyed(::Union{WeightBoundsEstimator, LinearConstraintEstimator,
+function name_keyed(::Union{AbstractWeightBoundsEstimator, LinearConstraintEstimator,
                             ExposureConstraintEstimator, ThresholdEstimator,
                             AssetSetsMatrixEstimator, TurnoverEstimator})
     return true
