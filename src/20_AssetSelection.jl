@@ -621,16 +621,16 @@ assert_scoreable(::AbstractAssetScorer)::Nothing = nothing
 
 Evaluate `score` on every asset column of `X`.
 
-The function gives each column to `score` as a view. The functor of a risk measure reads its argument, and does not write to it.
+The function gives each live column to `score` as a view. The functor of a risk measure reads its argument, and does not write to it. A column is live when it is in the Coverage Universe of the data, as [`coverage_mask`](@ref) states: every one of its returns is finite and, when `rd` carries an [`AssetPanel`](@ref), the asset is active at every row. The matrix method has no panel, so it reads finiteness alone.
 
 The method on `rd` with a risk measure reads `rd.X` and calls the method on the matrix. This is the in-sample score of a selector. The method on an [`AbstractAssetScorer`](@ref) is the interface of that family, and each concrete scorer adds its own.
 
-The two routes treat a non-finite score differently on purpose. A risk measure scores a live column, so a non-finite value is a defect of the measure, and the method throws. An Asset Scorer writes `NaN` at an asset that it cannot score, for example an asset that fewer than `min_folds` folds offered. That entry is a gap in the data, and not a defect. Every selection rule and every redundancy algorithm drops it, as [`rule_keep`](@ref) states.
+The two routes give an asset that they cannot score the same score, `NaN`. A column outside the Coverage Universe, such as a late listing, a gap, a delisting or an asset that the active mask turns off, is not live. A risk measure does not score it, and its entry is `NaN`. An Asset Scorer writes `NaN` at an asset that it cannot score, for example an asset that fewer than `min_folds` folds offered. That entry is a gap in the data, and not a defect. Every selection rule and every redundancy algorithm drops it, as [`rule_keep`](@ref) states. A non-finite score on a live column is different. It is a defect of the measure, and the method throws.
 
 # Algorithm
 
- 1. Evaluate `score` on a view of each asset column of `X`, one column after the other, into `scores`.
- 2. Check that every entry of `scores` is finite.
+ 1. Find the live columns, those in the Coverage Universe, with [`cv_live_assets`](@ref).
+ 2. Evaluate `score` on a view of each live column, one column after the other, check that every score is finite, and write `NaN` at every other column, with [`live_asset_scores`](@ref).
  3. Return `scores`.
 
 # Arguments
@@ -641,11 +641,12 @@ The two routes treat a non-finite score differently on purpose. A risk measure s
 
 # Validation
 
-  - With a risk measure, every score is finite. Otherwise the function throws a `DomainError` that names the columns with a non-finite score. [`ThirdCentralMoment`](@ref) with a variance estimator in `ve`, on a constant series for example, divides by a zero standard deviation and gives `NaN`. A rule drops a `NaN` score, so the defect of the measure becomes silent if the function does not throw.
+  - No column is live. Otherwise [`coverage_mask`](@ref) throws an `IsEmptyError`, as it does for an Asset Scorer.
+  - With a risk measure, every live column has a finite score. Otherwise the function throws a `DomainError` that names those columns. [`ThirdCentralMoment`](@ref) with a variance estimator in `ve`, on a constant series for example, divides by a zero standard deviation and gives `NaN`. A rule drops a `NaN` score, so the defect of the measure becomes silent if the function does not throw. A column that is not live is not scored and raises no error: its entry is `NaN`.
 
 # Returns
 
-  - `scores::VecNum`: The score vector `assets × 1`, with one entry for each asset column of `X`. With an Asset Scorer, an entry is `NaN` at an asset that the scorer cannot score.
+  - `scores::VecNum`: The score vector `assets × 1`, with one entry for each asset column of `X`. An entry is `NaN` at an asset that cannot be scored: a column outside the Coverage Universe under a risk measure, or an asset that the scorer cannot score under an Asset Scorer.
 
 # Related
 
@@ -654,14 +655,52 @@ The two routes treat a non-finite score differently on purpose. A risk measure s
   - [`AbstractAssetScorer`](@ref)
 """
 function asset_scores(score::AbstractBaseRiskMeasure, X::MatNum)
-    scores = [score(view(X, :, i)) for i in axes(X, 2)]
-    @argcheck(all(isfinite, scores),
-              DomainError(scores,
-                          "scoring the asset columns with a $(typeof(score)) produced non-finite values at columns $(findall(!isfinite, scores))"))
-    return scores
+    return live_asset_scores(score, X,
+                             cv_live_assets(coverage_mask(X, nothing; dims = 1),
+                                            size(X, 2)))
 end
 function asset_scores(score::AbstractBaseRiskMeasure, rd::AbstractReturnsResult)
-    return asset_scores(score, rd.X)
+    return live_asset_scores(score, rd.X, cv_live_assets(rd))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Evaluate `score` on the live columns of `X`, and write `NaN` at every other column.
+
+# Algorithm
+
+ 1. Evaluate `score` on a view of each live column, into `live_scores`.
+ 2. Check that every entry of `live_scores` is finite.
+ 3. Fill a vector with `NaN` in the element type of `live_scores`, one entry for each column of `X`.
+ 4. Write `live_scores` at the positions `live`, and return the vector.
+
+# Arguments
+
+  - `score`: The risk measure to evaluate on each live column.
+  - $(arg_dict[:X])
+  - `live`: The positions of the live columns of `X`, in increasing order.
+
+# Validation
+
+  - Every score of a live column is finite. Otherwise the function throws a `DomainError` that names the columns with a non-finite score.
+
+# Returns
+
+  - `scores::VecNum`: The score vector `assets × 1`. It holds the score of each live column and `NaN` at every other column, in the element type of the scores.
+
+# Related
+
+  - [`asset_scores`](@ref)
+"""
+function live_asset_scores(score::AbstractBaseRiskMeasure, X::MatNum, live::VecInt)
+    live_scores = [score(view(X, :, j)) for j in live]
+    bad = live[findall(!isfinite, live_scores)]
+    @argcheck(isempty(bad),
+              DomainError(live_scores,
+                          "scoring the asset columns with a $(typeof(score)) produced non-finite values at columns $bad"))
+    scores = fill(convert(eltype(live_scores), NaN), size(X, 2))
+    scores[live] = live_scores
+    return scores
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -734,7 +773,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Select the assets that a [`ScoreSelector`](@ref) keeps. The method scores every asset, then it applies the rule.
 
-[`fit_preprocessing`](@ref) first reduces the training window to its Coverage Universe. The method ranks only the live assets, and a dead column has no place in the order. [`asset_scores`](@ref) still refuses a non-finite score. A non-finite score from a live column is a defect of the measure, not a gap in the data.
+[`fit_preprocessing`](@ref) first reduces the training window to its Coverage Universe. The method ranks only the live assets, and a dead column has no place in the order. [`asset_scores`](@ref) still refuses a non-finite score on a live column. That is a defect of the measure, not a gap in the data.
 
 # Algorithm
 

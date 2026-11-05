@@ -1522,9 +1522,9 @@ end
         @test fit_preprocessing(ScoreSelector(; score = MeanReturn(),
                                               rule = RankRule(; worst = 1)), rd).nx == ["A"]
 
-        # non-finite scores are rejected rather than sorted arbitrarily
-        @test_throws DomainError PO.asset_scores(MaximumDrawdown(),
-                                                 [NaN 0.1; NaN 0.2; NaN -0.1])
+        # a column outside the Coverage Universe scores NaN rather than being sorted
+        sn = PO.asset_scores(MaximumDrawdown(), [NaN 0.1; NaN 0.2; NaN -0.1])
+        @test isnan(sn[1]) && isfinite(sn[2])
     end
 
     @testset "ZeroVarianceFilter alias" begin
@@ -1698,6 +1698,36 @@ end
         sks = ThirdCentralMoment(; ve = SimpleVariance())
         @test isnan(sks(view(Xc, :, 2)))
         @test_throws DomainError PO.asset_scores(sks, Xc)
+        # a column with a non-finite return is not live: it is not scored and its score is
+        # NaN, as an Asset Scorer gives it
+        Xg = [0.1 NaN -0.2; -0.1 0.1 0.3; 0.2 0.0 -0.1; 0.0 -0.1 0.2]
+        sg = PO.asset_scores(ConditionalValueatRisk(), Xg)
+        @test sg isa Vector{Float64}
+        @test isnan(sg[2]) && !isnan(sg[1]) && !isnan(sg[3])
+        @test sg[[1, 3]] == PO.asset_scores(ConditionalValueatRisk(), Xg[:, [1, 3]])
+        rdg = ReturnsResult(; nx = ["A", "B", "C"], X = Xg)
+        @test isequal(PO.asset_scores(ConditionalValueatRisk(), rdg), sg)
+        # no live column is a refusal of the Coverage Universe, as for an Asset Scorer
+        @test_throws IsEmptyError PO.asset_scores(SCM(), fill(NaN, 3, 2))
+        # an Asset Panel that turns off a column with finite returns makes it not live
+        amsk = trues(4, 3)
+        amsk[2, 1] = false
+        rdp = ReturnsResult(; nx = ["A", "B", "C"], X = Xg[:, [1, 1, 3]],
+                            pnl = AssetPanel(; amsk = amsk, emsk = amsk))
+        sp = PO.asset_scores(ConditionalValueatRisk(), rdp)
+        @test isnan(sp[1]) && !isnan(sp[2]) && !isnan(sp[3])
+        @test sp[2] == PO.asset_scores(ConditionalValueatRisk(), Xg[:, [1]])[1]
+        # a live column with a non-finite score still throws, and names only that column
+        e = try
+            PO.asset_scores(sks, hcat(Xg[1:3, 2], Xc[:, 2], Xg[1:3, 1]))
+        catch err
+            err
+        end
+        @test e isa DomainError && occursin("columns [2]", e.msg)
+        # a score selector drops the gapped asset
+        @test PO.select_assets(ScoreSelector(; score = ConditionalValueatRisk(),
+                                             rule = RankRule(; best = 2)), rdg) ==
+              [true, false, true]
         # A measure that reads a comoment matrix cannot score a column, and the refusal
         # names the measure of the returns that can (#1846).
         @test occursin("ThirdCentralMoment(; ve = SimpleVariance())",
@@ -1806,8 +1836,9 @@ end
                                                        dead)
 
         # The reduction happens once, in the funnel, so a selector that reads values sees a
-        # clean block and `asset_scores` keeps its refusal for a live column.
-        @test_throws DomainError PO.asset_scores(MaximumDrawdown(), [NaN 0.1; NaN 0.2])
+        # clean block and `asset_scores` scores a column that is not live with `NaN`.
+        sn = PO.asset_scores(MaximumDrawdown(), [NaN 0.1; NaN 0.2])
+        @test isnan(sn[1]) && isfinite(sn[2])
     end
 
     @testset "the fitted universe replays" begin
