@@ -1051,8 +1051,13 @@ Cross-validation tunes hyperparameters, evaluates out of sample, and gives meta-
 - **Search**: `GridSearchCrossValidation`, `RandomisedSearchCrossValidation`.
 
 **Search Scorer**
-The rule by which a search orders its candidates. It reads the score matrix of the search, one row per fold and one column per candidate, and gives one value per candidate, bigger is better, or the index of one winner. It is a `CrossValidationSearchScorer`, such as `HighestMeanScore`, or a plain function that gives the same. A search takes one Search Scorer or a vector of them. The `s_sca` of the search reduces a vector per candidate, after it multiplies each value by the scale of its scorer, or keeps each scorer apart under `nothing`. ADR 0226, ADR 0233.
+The rule by which a search orders its candidates. It reads the score matrix of the search, one row per fold and one column per candidate, and gives one value per candidate, bigger is better, or the index of one winner. It is a `CrossValidationSearchScorer`, such as `HighestMeanScore`, or a plain function that gives the same. A search takes one Search Scorer or a vector of them. The scalariser of the scorers of the search reduces a vector per candidate, after it multiplies each value by the scale of its scorer, or keeps each scorer apart under `nothing`. ADR 0226, ADR 0233.
+A search gives one ranking for each value that it keeps apart per candidate, one per measure, one per scorer, or one per pair of the two. Each ranking has its own winner. ADR 0234.
 *Avoid*: scorer alone, which another library uses for the risk measure `r` of a search. And Asset Scorer, which gives one score to each asset.
+
+**Per-Candidate Combination**
+The combination of the risk measures of a search once for each candidate, after the Search Scorer reduces the folds or the paths of each measure. A wrapper around a scalariser spells it. The plain scalariser combines the measures in each fold or path, before the Search Scorer. For a scalariser that is not a sum, the two give different values. ADR 0234.
+*Avoid*: per path, which names the combination in each path of a combinatorial scheme. And after the folds, because in a combinatorial scheme the search scorer reduces paths.
 
 **Fold Loop**
 The one loop every cross-validation entry point runs. Per fold it resolves the estimator, views the data, swaps the Time-Dependent Inputs, and hands the callback one Fold.

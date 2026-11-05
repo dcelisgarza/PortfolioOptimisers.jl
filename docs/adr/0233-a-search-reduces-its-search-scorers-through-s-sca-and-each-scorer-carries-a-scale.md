@@ -50,7 +50,7 @@ Under `s_sca = nothing`, `rank_scores` holds one entry for each scorer.**
 | One scorer | When `scorer` holds one scorer, not a vector, `s_sca` and the scale are inert, as for one risk measure. No search of one scorer changes. |
 | The shape with `nothing` | `rank_scores` is a vector of `L` entries in the order of `scorer`. Entry `l` is what scorer `l` alone gives: the values of the candidates that it keeps, in its own order, as `Option{<:VecNum}`. The shape follows the types of `scorer` and `s_sca`, never the count at run time (ADR 0227), so a vector of one scorer under `nothing` gives a vector of one entry. Each value keeps its scale, so a negative scale reverses the order of that scorer alone. |
 | ADR 0120 | Unchanged. Every scorer reads the same finite columns, and a candidate with a non-finite entry enters no order. |
-| The selection with `nothing` | Out of this ADR. The selection ticket of map #1980 decides what `opt`, `ranked` and `rank_idx` hold under `s_sca = nothing`, and the shape when `r_sca` and `s_sca` are both `nothing`. |
+| The selection with `nothing` | ADR 0234. `opt`, `idx`, `ranked` and `rank_idx` hold one entry per scorer, and a `K × L` matrix when `r_sca` and `s_sca` are both `nothing`. |
 
 ## Considered options
 

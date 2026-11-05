@@ -34,14 +34,14 @@ Four facts bore on the answer.
 
 | Item | Rule |
 | --- | --- |
-| The field | `r_sca::Option{<:Sca_VecToScaM}` on `GridSearchCrossValidation` and `RandomisedSearchCrossValidation`. The constructor refuses a `kwargs.sca`, and the error names `r_sca`. The reduction of the vector of search scorers is `s_sca` (#1984). |
+| The field | `r_sca::Option{<:Sca_VecToScaM}` on `GridSearchCrossValidation` and `RandomisedSearchCrossValidation`. The bound also takes `PerCandidate(sca)`, which combines the measures once per candidate after the search scorer (ADR 0234). The constructor refuses a `kwargs.sca`, and the error names `r_sca`. The reduction of the vector of search scorers is `s_sca` (#1984). |
 | The name of a slot | A type that holds one reduction names its field `sca`. A type that holds two names them `r_sca`, for the risk measures, and `s_sca`, for the search scorers. So `NearestQuantilePrediction` and `FoldRiskScorer` each hold a field `sca`, and `NearestQuantilePrediction` refuses `r_kwargs.sca`. |
 | The default | `SumScalariser()`, as `expected_risk`, `oriented_score` and every reader bound to `BaseRM_VecBaseRM`. For one measure the slot is inert, so no search of one measure changes. |
 | The orientation | ADR 0231. Each measure is oriented before the reduction, so a higher score is better. The local `sgn` of each method goes away. A train score is oriented in the same way, so the build gives `oriented_score` a form for a fitted result. |
 | The shape with `nothing` | `test_scores` is a vector of `K` matrices, each `folds × candidates`, in the order of `r`. `train_scores` takes the same shape, and in the combinatorial form `train_scores[k][p]` is path `p` of measure `k`. The shape follows the types of `r` and `r_sca`, never the count at run time (ADR 0227), so a vector of one measure under `nothing` gives a vector of one matrix. |
 | `path_ids` | One vector. Every matrix has the same rows. |
 | ADR 0120 | Holds for each matrix apart. Each matrix goes through `finite_candidate_order` unchanged. |
-| The selection with `nothing` | Out of this ADR. The selection ticket of map #1980 decides what `opt`, `ranked`, `rank_idx` and `rank_scores` hold. |
+| The selection with `nothing` | ADR 0234. `opt`, `idx`, `ranked`, `rank_idx` and `rank_scores` hold one entry per measure. |
 | The six methods | One writer and one allocator. The combinatorial score becomes a method of `write_candidate_scores!`, and one helper allocates a matrix or a vector of `K` matrices. The two randomised forms forward `r_sca`. |
 | The keyword form of the score | `oriented_score(r, p; sca, kwargs...)` is removed. Every caller holds its reduction and calls `oriented_score(sca, r, p; kwargs...)`. `sort_by_measure` and `quantile_by_measure` take a keyword `sca = SumScalariser()`, as `expected_risk` does. `quantile_by_measure` and `NearestQuantilePrediction` refuse a `sca` in `r_kwargs`, because a reader of a risk would ignore it for one measure. |
 
