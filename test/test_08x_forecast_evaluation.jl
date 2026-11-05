@@ -133,7 +133,7 @@ include(joinpath(@__DIR__, "forecast_evaluation_fixture.jl"))
     end
 
     @testset "The Panel Field member reads the named field, cut to the block" begin
-        X = PO.forecast_target_history(PanelFieldTarget(; name = "market_cap"), rd, csfm)
+        X = PO.forecast_target_history(PanelFieldTarget(; fields = "market_cap"), rd, csfm)
         @test size(X) == (fx.Tb, fx.N)
         @test isequal(X, PO.panel_field_values(rd, "market_cap")[rows, :])
     end
@@ -142,31 +142,32 @@ include(joinpath(@__DIR__, "forecast_evaluation_fixture.jl"))
         mc = PO.descriptor_field_values(rd, "market_cap")
         be = PO.descriptor_field_values(rd, "book_equity")
         Xs = PO.forecast_target_history(PanelFieldTarget(;
-                                                         name = ["market_cap" => 1,
-                                                                 "book_equity" => -1]), rd,
-                                        csfm)
+                                                         fields = ["market_cap" => 1,
+                                                                   "book_equity" => -1]),
+                                        rd, csfm)
         @test isequal(Xs, (mc .- be)[rows, :])
         Xp = PO.forecast_target_history(PanelFieldTarget(;
-                                                         name = ["market_cap",
-                                                                 "book_equity"]), rd, csfm)
+                                                         fields = ["market_cap",
+                                                                   "book_equity"]), rd,
+                                        csfm)
         @test isequal(Xp, (mc .* be)[rows, :])
         de = PanelFieldLog(; field = "market_cap")
-        Xd = PO.forecast_target_history(PanelFieldTarget(; name = de), rd, csfm)
+        Xd = PO.forecast_target_history(PanelFieldTarget(; fields = de), rd, csfm)
         @test size(Xd) == (fx.Tb, fx.N)
         @test isequal(Xd, descriptor(de, rd)[rows, :])
     end
 
     @testset "A Panel Field the panel does not hold is refused" begin
         @test_throws KeyError PO.forecast_target_history(PanelFieldTarget(;
-                                                                          name = "not_a_field"),
+                                                                          fields = "not_a_field"),
                                                          rd, csfm)
     end
 
     @testset "A Panel Field target with no name is refused at construction" begin
-        @test_throws PO.IsEmptyError PanelFieldTarget(; name = "")
-        @test_throws PO.IsEmptyError PanelFieldTarget(; name = String[])
-        @test_throws DomainError PanelFieldTarget(; name = ["market_cap" => Inf])
-        @test_throws TypeError PanelFieldTarget(; name = nothing)
+        @test_throws PO.IsEmptyError PanelFieldTarget(; fields = "")
+        @test_throws PO.IsEmptyError PanelFieldTarget(; fields = String[])
+        @test_throws DomainError PanelFieldTarget(; fields = ["market_cap" => Inf])
+        @test_throws TypeError PanelFieldTarget(; fields = nothing)
     end
 
     @testset "A block with no cross-sectional fit refuses the idiosyncratic target" begin
@@ -226,7 +227,7 @@ end
     end
 
     @testset "Every parameter is carried as given" begin
-        tgt = PanelFieldTarget(; name = "market_cap")
+        tgt = PanelFieldTarget(; fields = "market_cap")
         fe = forecast_evaluation(alpha, y; target = tgt, horizon = 3, lag = 2, step = 1,
                                  min_count = 5, ppy = 252)
         @test fe.target === tgt
@@ -3673,14 +3674,14 @@ end
     @testset "A Panel Field target is the same target only where it names the same field" begin
         @test PO.same_configuration(PO.IdiosyncraticTarget(), PO.IdiosyncraticTarget())
         @test !PO.same_configuration(PO.IdiosyncraticTarget(), PO.AssetReturnTarget())
-        @test PO.same_configuration(PanelFieldTarget(; name = "volume"),
-                                    PanelFieldTarget(; name = "volume"))
-        @test !PO.same_configuration(PanelFieldTarget(; name = "volume"),
-                                     PanelFieldTarget(; name = "market_cap"))
-        @test PO.same_configuration(PanelFieldTarget(; name = ["a" => 1, "b" => -1]),
-                                    PanelFieldTarget(; name = ["a" => 1, "b" => -1]))
-        @test !PO.same_configuration(PanelFieldTarget(; name = ["a", "b"]),
-                                     PanelFieldTarget(; name = ["a" => 1, "b" => 1]))
+        @test PO.same_configuration(PanelFieldTarget(; fields = "volume"),
+                                    PanelFieldTarget(; fields = "volume"))
+        @test !PO.same_configuration(PanelFieldTarget(; fields = "volume"),
+                                     PanelFieldTarget(; fields = "market_cap"))
+        @test PO.same_configuration(PanelFieldTarget(; fields = ["a" => 1, "b" => -1]),
+                                    PanelFieldTarget(; fields = ["a" => 1, "b" => -1]))
+        @test !PO.same_configuration(PanelFieldTarget(; fields = ["a", "b"]),
+                                     PanelFieldTarget(; fields = ["a" => 1, "b" => 1]))
     end
 
     @testset "Two equal Descriptor targets are the same target (#2005)" begin
@@ -3688,14 +3689,14 @@ end
         # to `===` and compares those vectors by identity. That is the defect.
         a, b = EWAmihudIlliquidity(), EWAmihudIlliquidity()
         @test !isequal(a, b)
-        @test PO.same_configuration(PanelFieldTarget(; name = a),
-                                    PanelFieldTarget(; name = b))
-        @test !PO.same_configuration(PanelFieldTarget(; name = a),
+        @test PO.same_configuration(PanelFieldTarget(; fields = a),
+                                    PanelFieldTarget(; fields = b))
+        @test !PO.same_configuration(PanelFieldTarget(; fields = a),
                                      PanelFieldTarget(;
-                                                      name = EWAmihudIlliquidity(;
-                                                                                 half_life = 21)))
-        @test !PO.same_configuration(PanelFieldTarget(; name = a),
-                                     PanelFieldTarget(; name = "adj_volume"))
+                                                      fields = EWAmihudIlliquidity(;
+                                                                                   half_life = 21)))
+        @test !PO.same_configuration(PanelFieldTarget(; fields = a),
+                                     PanelFieldTarget(; fields = "adj_volume"))
         @test PO.same_configuration((1, [NaN, 2.0]), (1, [NaN, 2.0]))
         @test !PO.same_configuration([1.0, 2.0], [1.0, 2.0, 3.0])
     end
@@ -4147,10 +4148,10 @@ end
     end
 
     @testset "Two Panel Field targets are one target only when they name one field" begin
-        @test PO.same_configuration(PanelFieldTarget(; name = "a"),
-                                    PanelFieldTarget(; name = "a"))
-        @test !PO.same_configuration(PanelFieldTarget(; name = "a"),
-                                     PanelFieldTarget(; name = "b"))
+        @test PO.same_configuration(PanelFieldTarget(; fields = "a"),
+                                    PanelFieldTarget(; fields = "a"))
+        @test !PO.same_configuration(PanelFieldTarget(; fields = "a"),
+                                     PanelFieldTarget(; fields = "b"))
         @test !PO.same_configuration(IdiosyncraticTarget(), AssetReturnTarget())
     end
 end

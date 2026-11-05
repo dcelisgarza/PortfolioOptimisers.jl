@@ -414,7 +414,7 @@ function census_cases(rd::ReturnsResult)
                 ((:IdiosyncraticTarget,), "the evaluation", fe(IdiosyncraticTarget())),
                 ((:AssetReturnTarget,), "the evaluation", fe(AssetReturnTarget())),
                 ((:PanelFieldTarget,), "the evaluation",
-                 fe(PanelFieldTarget(; name = "market_cap"))),
+                 fe(PanelFieldTarget(; fields = "market_cap"))),
                 # The summary of a panel. The share of all cells counts every cell by design,
                 # so the case of describe reads its active columns and its levels.
                 ((:panel_align_active,), "the alignment",

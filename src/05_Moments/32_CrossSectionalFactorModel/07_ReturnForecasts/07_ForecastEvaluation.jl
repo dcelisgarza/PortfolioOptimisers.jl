@@ -83,7 +83,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Scores a Return Forecast against the forward mean of numeric Panel Fields, or of a Descriptor.
 
-`name` gives the history that the forward window reads, in one of four forms:
+`fields` gives the history that the forward window reads, in one of four forms:
 
  1. A name reads that one Panel Field, such as an excess return that the panel holds.
  2. A vector of `name => coefficient` pairs reads their sum. `[\"total_return\" => 1, \"rf\" => -1]` reads an excess return out of two fields.
@@ -98,7 +98,7 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    PanelFieldTarget(; name::Union{PanelTermType, AbstractDescriptorEstimator}) -> PanelFieldTarget
+    PanelFieldTarget(; fields::Union{PanelTermType, AbstractDescriptorEstimator}) -> PanelFieldTarget
 
 Keywords correspond to the struct's fields.
 
@@ -109,9 +109,9 @@ Keywords correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> PanelFieldTarget(; name = \"excess_return\")
+julia> PanelFieldTarget(; fields = \"excess_return\")
 PanelFieldTarget
-  name ┴ String: "excess_return"
+  fields ┴ String: "excess_return"
 ```
 
 # Related
@@ -126,14 +126,14 @@ PanelFieldTarget
     """
     The history the forward target is taken over: a [`PanelTermType`](@ref), which names one numeric Panel Field, a sum or a product of them, or a Descriptor Estimator, whose Descriptor is the history.
     """
-    name
-    function PanelFieldTarget(name::Union{PanelTermType, AbstractDescriptorEstimator})
-        assert_panel_terms(name, :name)
-        return new{typeof(name)}(name)
+    fields
+    function PanelFieldTarget(fields::Union{PanelTermType, AbstractDescriptorEstimator})
+        assert_panel_terms(fields, :fields)
+        return new{typeof(fields)}(fields)
     end
 end
-function PanelFieldTarget(; name::Union{PanelTermType, AbstractDescriptorEstimator})
-    return PanelFieldTarget(name)
+function PanelFieldTarget(; fields::Union{PanelTermType, AbstractDescriptorEstimator})
+    return PanelFieldTarget(fields)
 end
 """
     forecast_target_history(target::IdiosyncraticTarget, rd::ReturnsResult,
@@ -180,8 +180,8 @@ function forecast_target_history(::AssetReturnTarget, rd::ReturnsResult,
 end
 function forecast_target_history(target::PanelFieldTarget, rd::ReturnsResult,
                                  csfm::CrossSectionalFactorModel)::MatNum
-    name::Union{PanelTermType, AbstractDescriptorEstimator} = target.name
-    return return_forecast_cut(descriptor_field_values(rd, name),
+    fields::Union{PanelTermType, AbstractDescriptorEstimator} = target.fields
+    return return_forecast_cut(descriptor_field_values(rd, fields),
                                return_forecast_rows(rd, csfm))
 end
 """

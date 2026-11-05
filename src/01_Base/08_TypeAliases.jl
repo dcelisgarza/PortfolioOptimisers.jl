@@ -621,7 +621,7 @@ const Str_Vec = Union{AbstractString, AbstractVector}
 
 Alias for a Panel Field term: the name of one Panel Field, a vector of `name => coefficient` pairs read as their sum, or a vector of names read as their product.
 
-[`descriptor_field_values`](@ref) reads each form, and [`assert_panel_terms`](@ref) checks it. A side of an [`EWVolumeRatio`](@ref) is an `Option{<:PanelTermType}`, where `nothing` names the absolute returns. The `fields` of a [`PanelFieldScorer`](@ref) and the `name` of a [`PanelFieldTarget`](@ref) take a `PanelTermType` or a Descriptor Estimator.
+[`descriptor_field_values`](@ref) reads each form, and [`assert_panel_terms`](@ref) checks it. A side of an [`EWVolumeRatio`](@ref) is an `Option{<:PanelTermType}`, where `nothing` names the absolute returns. The `fields` of a [`PanelFieldScorer`](@ref) and of a [`PanelFieldTarget`](@ref) take a `PanelTermType` or a Descriptor Estimator.
 
 # Related
 

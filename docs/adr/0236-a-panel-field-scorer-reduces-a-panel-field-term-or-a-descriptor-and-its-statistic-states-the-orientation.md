@@ -56,8 +56,10 @@ the fit cannot do this.
 ### `PanelFieldTarget` takes the same forms, and a target compares by configuration
 
 The forward target of a forecast evaluation has the same job: it names the history that a window
-reads. `PanelFieldTarget(; name)` keeps its field and its keyword, so `name = "market_cap"` works
-as before, and the bound widens to `Union{PanelTermType, AbstractDescriptorEstimator}`.
+reads. So it takes the bound of the scorer, `Union{PanelTermType, AbstractDescriptorEstimator}`,
+and the field name of the scorer, `fields`. The released field and keyword `name` go, because a
+Descriptor Estimator is not a name. This is a break: `PanelFieldTarget(; name = "market_cap")`
+becomes `PanelFieldTarget(; fields = "market_cap")`, and the positional form does not change.
 `forecast_target_history` reads it through `descriptor_field_values`. The sum form gives an
 excess return, such as `["total_return" => 1, "rf" => -1]`, with no field of its own.
 
@@ -89,7 +91,7 @@ bigger median leverage is worse, and so is a bigger median illiquidity. The fiel
 | The fields | A vector of names alone. | A single name is the common case, a floor of size, and the sum and the Descriptor are already forms of the reader. One bound that `EWVolumeRatio` shares states them all. |
 | The fields | A second measure `comb` that joins the fields at each cell. | The Panel Field terms already state a sum and a product. |
 | The fields | A field of its own for a Descriptor, or a second scorer type. | A Descriptor gives one matrix of values, as a term does, so the same field and the same reader take it. |
-| The target | Rename the field of `PanelFieldTarget` to `fields`, as the scorer has it. | The keyword `name` is released, and a new capability keeps the old form. |
+| The target | Keep the released field and keyword `name`. | The field holds a sum, a product or a Descriptor Estimator, which are not names, and the sibling with the same job calls it `fields`. The maintainer chose the rename. |
 | The comparison | Define `==` on every estimator. | It changes the equality of every type of the library for one check of a summary. |
 | The reader | Keep `ew_ratio_values`, or add a reader of the scorer. | Each one only sends a form to `descriptor_field_values` or to `descriptor`. One generic function with one method for each form states the rule once. |
 | The orientation | A required `bib::Bool`, after ADR 0225: a guess cuts the wrong end. | The statistic states the orientation, so it is not a guess, and the override covers a field whose orientation differs. |
