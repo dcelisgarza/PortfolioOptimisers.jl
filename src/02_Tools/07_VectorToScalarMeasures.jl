@@ -828,6 +828,54 @@ function vec_to_real_measure(f::Function, val::Union{VecNum, NTuple{N, <:Number}
                              kwargs...)
     return f(val)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Collapse the finite entries of `val` into one number with `measure`.
+
+A non-finite entry is a value that the data do not define, such as the correlation with a constant column. It carries no information about the summary, so the function skips it. The measure reads the finite entries alone. Its observation weights lose the weights of the skipped entries through [`obs_weights_view`](@ref), so each kept entry keeps its own weight. A [`DynamicAbstractWeights`](@ref) stays, because it resolves on the entries that the measure reads.
+
+A measure that a user writes, with weights and with no method of [`obs_weights_view`](@ref), keeps all of its weights. Its weights then have more entries than the vector that it reads.
+
+# Algorithm
+
+ 1. Mark the finite entries of `val` in `fin`.
+ 2. When every entry is finite, return `vec_to_real_measure(measure, val)`. When no entry is finite, the function has no entry to skip to, and it returns the same value. The non-finite entries then reach the measure.
+ 3. Otherwise, cut the weights of `measure` to `fin` with [`obs_weights_view`](@ref). Return the value of the cut measure on `val[fin]`.
+
+# Arguments
+
+  - `measure`: The measure that collapses the vector: a number, a [`VectorToScalarMeasure`](@ref), or a function.
+  - `val`: The vector to collapse.
+
+# Returns
+
+  - `val::Number`: The value of `measure` on the finite entries of `val`.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.finite_vec_to_real_measure(MeanValue(), [1.0, NaN, 3.0])
+2.0
+
+julia> PortfolioOptimisers.finite_vec_to_real_measure(MeanValue(; w = aweights([1.0, 5.0, 3.0])),
+                                                      [1.0, NaN, 3.0])
+2.5
+```
+
+# Related
+
+  - [`vec_to_real_measure`](@ref)
+  - [`obs_weights_view`](@ref)
+  - [`find_uncorrelated_indices`](@ref)
+"""
+function finite_vec_to_real_measure(measure::Num_VecToScaM, val::VecNum)
+    fin = isfinite.(val)
+    if all(fin) || !any(fin)
+        return vec_to_real_measure(measure, val)
+    end
+    return vec_to_real_measure(obs_weights_view(measure, fin), val[fin])
+end
 
 export MinValue, MeanValue, MedianValue, MaxValue, StandardisedValue, StdValue, VarValue,
        SumValue, ProdValue, ModeValue

@@ -1103,7 +1103,7 @@ The method calls [`find_uncorrelated_indices`](@ref). A greedy search gives the 
 # Algorithm
 
  1. Start from a keep-mask of `size(rd.X, 2)` falses.
- 2. Turn `scores` into drop scores with [`drop_scores`](@ref), so that after this step a **lower** number is better. When `scores` is `nothing`, pass `nothing`. [`find_uncorrelated_indices`](@ref) then collapses each column of the correlation matrix with `measure` into its own drop score.
+ 2. Turn `scores` into drop scores with [`drop_scores`](@ref), so that after this step a **lower** number is better. When `scores` is `nothing`, pass `nothing`. [`find_uncorrelated_indices`](@ref) then collapses the finite entries of each column of the correlation matrix with `measure` into its own drop score.
  3. Call [`find_uncorrelated_indices`](@ref) on `rd.X` with the `ce`, `t`, `absolute` and `measure` of the algorithm. It returns `idx`, the indices of the assets that survive.
  4. Set the mask at `idx`, and return it.
 
@@ -1230,7 +1230,7 @@ Keep one representative of each correlated group under [`CorrelationComponents`]
 
  1. Compute the correlation matrix `rho` of `rd.X` with the `ce` of the algorithm.
  2. When `absolute` is `true`, replace each entry of `rho` with its absolute value. This step comes **before** the threshold, so a strongly negative correlation is an edge.
- 3. When `scores` is `nothing`, collapse each column of `rho` with `measure` into the fallback score `s`, and set `sbib` to `false`. A lower summary correlation is then better, so the representative that survives is the asset least correlated with the rest of the universe. Otherwise take `s` from `scores` and `sbib` from `bib`.
+ 3. When `scores` is `nothing`, collapse the finite entries of each column of `rho` with `measure` into the fallback score `s`, through [`finite_vec_to_real_measure`](@ref), and set `sbib` to `false`. The summary skips the undefined correlation with a constant column, so that column does not make every score `NaN`. A lower summary correlation is then better, so the representative that survives is the asset least correlated with the rest of the universe. Otherwise take `s` from `scores` and `sbib` from `bib`.
  4. Group the assets with [`correlation_components`](@ref) on `rho` and `t`.
  5. Return the mask that [`groups_argbest`](@ref) admits for those groups under `s` and `sbib`.
 
@@ -1250,6 +1250,7 @@ Keep one representative of each correlated group under [`CorrelationComponents`]
   - [`CorrelationComponents`](@ref)
   - [`correlation_components`](@ref)
   - [`groups_argbest`](@ref)
+  - [`finite_vec_to_real_measure`](@ref)
 """
 function redundancy_keep(alg::CorrelationComponents, rd::AbstractReturnsResult,
                          scores::Option{<:VecNum}, bib::Bool)::BitVector
@@ -1258,7 +1259,7 @@ function redundancy_keep(alg::CorrelationComponents, rd::AbstractReturnsResult,
         rho = abs.(rho)
     end
     s, sbib = if isnothing(scores)
-        [vec_to_real_measure(alg.measure, x) for x in eachcol(rho)], false
+        [finite_vec_to_real_measure(alg.measure, x) for x in eachcol(rho)], false
     else
         scores, bib
     end

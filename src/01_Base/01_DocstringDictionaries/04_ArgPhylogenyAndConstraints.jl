@@ -117,4 +117,4 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :pre_t_corr => "`t`: The correlation at or above which two assets are redundant.",#
                  :pre_absolute => "`absolute`: If `true`, the algorithm compares the absolute value of the correlation with `t`.",#
                  :pre_action => "`action`: `:keep` keeps the assets that the rule takes, and `:drop` keeps all the other assets.",#
-                 :pre_measure => "`measure`: The measure that collapses each column of the correlation matrix into the fallback drop score. The algorithm ignores it when the selector has a `score`.")
+                 :pre_measure => "`measure`: The measure that collapses the finite entries of each column of the correlation matrix into the fallback drop score. The correlation with a constant column is not defined, and the measure skips it. The algorithm ignores `measure` when the selector has a `score`.")

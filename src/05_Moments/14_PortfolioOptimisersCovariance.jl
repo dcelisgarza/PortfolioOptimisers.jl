@@ -385,17 +385,17 @@ Find the indices of a subset of the assets of a data matrix in which no pair has
 
 The function compares each pair of columns of `X`. If `absolute` is `true`, it compares the absolute value of the correlation. When two assets are too correlated, the function removes the asset with the higher drop score. It returns the indices of the assets that remain.
 
-By default, the drop score of an asset is the summary of its column of the correlation matrix, so the asset that is redundant with the largest part of the universe goes first. The `scores` keyword replaces that criterion, and a higher score removes an asset first. [`RedundancySelector`](@ref) uses `scores` to keep, from each correlated pair, the asset with the better score under a risk measure.
+By default, the drop score of an asset is the summary of the finite entries of its column of the correlation matrix, so the asset that is redundant with the largest part of the universe goes first. The `scores` keyword replaces that criterion, and a higher score removes an asset first. [`RedundancySelector`](@ref) uses `scores` to keep, from each correlated pair, the asset with the better score under a risk measure.
 
 This function is internal. A caller uses [`RedundancySelector`](@ref) with a [`PairwiseCorrelation`](@ref) algorithm.
 
 # Algorithm
 
  1. Compute the correlation matrix `rho` with `ce`, and take its absolute value when `absolute` is `true`.
- 2. When `scores` is `nothing`, collapse each column of `rho` with `measure` into `summary_rho`, the default drop score. Otherwise take `summary_rho` from `scores`.
+ 2. When `scores` is `nothing`, collapse the finite entries of each column of `rho` with `measure` into `summary_rho`, the default drop score, through [`finite_vec_to_real_measure`](@ref). The correlation with a constant column is not defined. A `ce` that returns it as `NaN`, such as `Covariance()`, puts one `NaN` in each column for each constant column, and the summary skips it. Otherwise take `summary_rho` from `scores`.
  3. Read the strict lower triangle of `rho` into `tril_idx`, so that each pair occurs one time.
  4. Keep the pairs whose correlation is at least `t`, and sort them from the most to the least correlated.
- 5. When `scores` is given, remove every asset whose score is not finite. A `NaN` score marks an asset that has no score, and that asset never survives. Step 6 then skips each pair of that asset, so its partner survives that pair. Two non-finite scores in one pair remove both assets. The default drop score of step 2 does not take this step. The correlation with a constant column is not defined. A `ce` that returns it as `NaN`, such as `Covariance()`, makes the summary of every column `NaN`, and that `NaN` does not mark an asset with no score.
+ 5. When `scores` is given, remove every asset whose score is not finite. A `NaN` score marks an asset that has no score, and that asset never survives. Step 6 then skips each pair of that asset, so its partner survives that pair. Two non-finite scores in one pair remove both assets. The default drop score of step 2 does not take this step.
  6. Go through that list in order. For a pair whose two assets are both still present, remove the asset with the higher drop score. When the two scores are equal, remove both assets. This is the tie policy of the library: if the function cannot tell two assets apart, it keeps neither of them. Two identical columns leave no survivor.
  7. Return the indices that steps 5 and 6 did not remove, in ascending order.
 
@@ -410,7 +410,7 @@ could keep.
   - $(arg_dict[:ce])
   - `t`: The correlation threshold. Two assets with a correlation of `t` or more are too correlated.
   - `absolute`: If `true`, the function compares the absolute value of the correlation.
-  - `measure`: The summary measure that the function applies to each column of the correlation matrix, for example the mean. The result is the default drop score. The function ignores `measure` if `scores` is given.
+  - `measure`: The summary measure that the function applies to the finite entries of each column of the correlation matrix, for example the mean. The result is the default drop score. The function ignores `measure` if `scores` is given.
   - `scores`: The drop score of each asset. From a correlated pair, the function removes the asset with the higher score. The function removes an asset with a non-finite score in every case, also when the asset is in no correlated pair.
 
 # Validation
@@ -428,6 +428,7 @@ could keep.
   - [`PortfolioOptimisersCovariance`](@ref)
   - [`Num_VecToScaM`](@ref)
   - [`MeanValue`](@ref)
+  - [`finite_vec_to_real_measure`](@ref)
 """
 function find_uncorrelated_indices(X::MatNum;
                                    ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
@@ -441,7 +442,7 @@ function find_uncorrelated_indices(X::MatNum;
                   DimensionMismatch("find_uncorrelated_indices got $(length(scores)) scores for $N assets"))
     end
     summary_rho, unscored = if isnothing(scores)
-        [vec_to_real_measure(measure, x) for x in eachcol(rho)], Int[]
+        [finite_vec_to_real_measure(measure, x) for x in eachcol(rho)], Int[]
     else
         scores, findall(!isfinite, scores)
     end

@@ -447,6 +447,46 @@ struct UnresolvedProbeWeights <: PortfolioOptimisers.DynamicAbstractWeights end
                                                                        v)
     end
 end
+@testset "finite_vec_to_real_measure skips the non-finite entries and their weights (#2004)" begin
+    using PortfolioOptimisers, Test, Statistics, StatsBase
+    PO = PortfolioOptimisers
+    #=
+    Issue #2004. The correlation with a constant column is NaN under a `ce` with no repair, so
+    the summary of every column of the correlation matrix was NaN. The summary now reads the
+    finite entries alone, and a weighted measure loses the weight of each skipped entry.
+    =#
+    v = [1.0, NaN, 3.0, Inf, 4.0]
+    f = [1.0, 3.0, 4.0]
+    fin = isfinite.(v)
+    wv = [1.0, 5.0, 3.0, 7.0, 2.0]
+    # A vector with every entry finite gives the value of the measure on the full vector.
+    for M in (MeanValue(), MedianValue(), StdValue(), MaxValue(), sum, 0.5)
+        @test PO.finite_vec_to_real_measure(M, f) == PO.vec_to_real_measure(M, f)
+        @test PO.finite_vec_to_real_measure(M, v) == PO.vec_to_real_measure(M, f)
+    end
+    # The fixed weights of each weighted measure lose the weights of the skipped entries.
+    for W in (aweights, pweights), M in (MeanValue, MedianValue)
+        @test PO.finite_vec_to_real_measure(M(; w = W(wv)), v) ==
+              PO.vec_to_real_measure(M(; w = W(wv[fin])), f)
+    end
+    for M in (StdValue, VarValue), corrected in (true, false)
+        @test PO.finite_vec_to_real_measure(M(; w = aweights(wv), corrected = corrected),
+                                            v) ==
+              PO.vec_to_real_measure(M(; w = aweights(wv[fin]), corrected = corrected), f)
+    end
+    # The weighted mean of the entries 1, 3 and 4 under the weights 1, 3 and 2.
+    @test PO.finite_vec_to_real_measure(MeanValue(; w = aweights(wv)), v) ==
+          (1 + 9 + 8) / (1 + 3 + 2)
+    # A composed measure cuts the weights of each of its parts.
+    @test PO.finite_vec_to_real_measure(factory(StandardisedValue(), aweights(wv)), v) ==
+          PO.vec_to_real_measure(factory(StandardisedValue(), aweights(wv[fin])), f)
+    # A dynamic weight stays, and resolves on the finite entries.
+    @test PO.finite_vec_to_real_measure(MeanValue(; w = RampProbeWeights()), v) ==
+          PO.vec_to_real_measure(MeanValue(; w = pweights([1.0, 2.0, 3.0])), f)
+    # A vector with no finite entry has no entry to skip to, and the measure reads it whole.
+    @test isnan(PO.finite_vec_to_real_measure(MeanValue(), [NaN, NaN]))
+    @test PO.finite_vec_to_real_measure(0.5, [NaN, NaN]) == 0.5
+end
 @testset "The view and index seam selects the axis its verb names" begin
     using PortfolioOptimisers, Test, StatsBase, LinearAlgebra
     PO = PortfolioOptimisers

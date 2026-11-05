@@ -2238,10 +2238,10 @@ struct UnimplementedRedundancy <: PortfolioOptimisers.AbstractRedundancyAlgorith
         # Two NaN drop both, and an unpaired NaN asset does not survive either.
         @test POx.find_uncorrelated_indices(X; t = 0.9, scores = [NaN, NaN, 2.0]) == [3]
         @test POx.find_uncorrelated_indices(X; t = 0.9, scores = [1.0, 2.0, NaN]) == [1]
-        # The rule reads a given score alone. A constant column makes the default summary
-        # of every column NaN under a `ce` with no repair. The summary marks no asset as
-        # unscored, so no pair reaches the threshold and every asset survives, as before
-        # #1933. Before R30 of #1817, every asset left and the selector threw.
+        # The rule reads a given score alone. A constant column puts a NaN in every column of
+        # the correlation matrix under a `ce` with no repair. The default summary marks no
+        # asset as unscored, no pair reaches the threshold, and every asset survives. Before
+        # R30 of #1817, every asset left and the selector threw.
         Xc = hcat(randn(rng, 200, 2), zeros(200), randn(rng, 200))
         rdc = ReturnsResult(; nx = ["A", "B", "C", "D"], X = Xc)
         @test all(isnan, [mean(c) for c in eachcol(cor(Covariance(), Xc))])
@@ -2257,6 +2257,55 @@ struct UnimplementedRedundancy <: PortfolioOptimisers.AbstractRedundancyAlgorith
                                           [NaN, 5.0, 2.0], true)) == [2, 3]
         @test findall(POx.redundancy_keep(CorrelationComponents(; t = 0.9), rd,
                                           [NaN, 5.0, 2.0], true)) == [2, 3]
+    end
+
+    @testset "a constant column does not make the default drop score NaN (#2004)" begin
+        #=
+        Issue #2004. The correlation with a constant column D is NaN under `Covariance()`,
+        and the default summary of every column was NaN. `PairwiseCorrelation` then removed
+        both assets of the pair A, B through the tie branch, and `CorrelationComponents`
+        kept no asset and threw. The summary now skips the undefined correlation, so the
+        result is the result without D, plus D.
+        =#
+        rng = StableRNG(2004)
+        a = randn(rng, 200)
+        X = hcat(a, a .+ 0.01 .* randn(rng, 200), randn(rng, 200), zeros(200))
+        rd = ReturnsResult(; nx = ["A", "B", "C", "D"], X = X)
+        rd3 = ReturnsResult(; nx = ["A", "B", "C"], X = X[:, 1:3])
+        rho = cor(Covariance(), X)
+        @test all(isnan, rho[1:3, 4]) && rho[4, 4] == 1
+        for m in (MeanValue(), MeanValue(; w = aweights([1.0, 2.0, 3.0, 4.0])))
+            s = [POx.finite_vec_to_real_measure(m, c) for c in eachcol(rho)]
+            @test all(isfinite, s)
+            # The member of the pair A, B with the lower summary survives, and C and D have
+            # no partner. A tie would remove both members, so the data must not tie.
+            @test s[1] != s[2]
+            k = s[1] < s[2] ? 1 : 2
+            @test POx.find_uncorrelated_indices(X; ce = Covariance(), t = 0.9,
+                                                measure = m) == [k, 3, 4]
+            for alg in (PairwiseCorrelation, CorrelationComponents)
+                sel = fit_preprocessing(RedundancySelector(;
+                                                           alg = alg(; ce = Covariance(),
+                                                                     t = 0.9, measure = m)),
+                                        rd)
+                @test sel.nx == rd.nx[[k, 3, 4]]
+            end
+        end
+        # The result without D is the same pair member and C.
+        s3 = [mean(c) for c in eachcol(cor(Covariance(), X[:, 1:3]))]
+        k3 = s3[1] < s3[2] ? 1 : 2
+        @test k3 == (if POx.finite_vec_to_real_measure(MeanValue(), rho[:, 1]) <
+                        POx.finite_vec_to_real_measure(MeanValue(), rho[:, 2])
+                         1
+                     else
+                         2
+                     end)
+        for alg in (PairwiseCorrelation, CorrelationComponents)
+            sel3 = fit_preprocessing(RedundancySelector(;
+                                                        alg = alg(; ce = Covariance(),
+                                                                  t = 0.9)), rd3)
+            @test sel3.nx == rd3.nx[[k3, 3]]
+        end
     end
 
     @testset "pipeline integration" begin
