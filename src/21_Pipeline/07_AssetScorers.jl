@@ -1032,8 +1032,182 @@ end
 function bigger_is_better(::WeightMassScorer)::Bool
     return true
 end
+"""
+$(DocStringExtensions.TYPEDEF)
 
-export FoldRiskScorer, WeightMassScorer, MeanFoldScore, MedianFoldScore, WorstFoldScore,
-       Value, Rank
+Scores each asset by a statistic of its Panel Fields over the observations of the returns data.
+
+The score reads the Asset Panel `rd.pnl`, not the returns. At each observation, the value of an asset is the product of the Panel Fields in `fields`. `stat` then reduces the values of the asset over the observations to its score. With a price and a traded volume in `fields` and `stat = MedianValue()`, the score is the median traded amount of the asset, and a [`ThresholdRule`](@ref) with a bound `lo` is a liquidity floor. With one market capitalisation in `fields`, the same rule is a floor of size.
+
+Inside a [`ScoreSelector`](@ref), `rd` is the training window, and its panel holds the observations of that window only. So the score moves with the window, and no observation after the window reaches it.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+v_{t i} &= \\prod_{k = 1}^{K} z^{(k)}_{t i}\\,, \\\\
+s_{i} &= S\\left(\\left\\{ v_{t i} : t \\in \\mathcal{O}_{i} \\right\\}\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``v_{t i}``: The value of asset ``i`` at observation ``t``.
+  - ``z^{(k)}_{t i}``: The value of the ``k``-th Panel Field of `fields` for asset ``i`` at observation ``t``.
+  - ``K``: The number of Panel Fields in `fields`.
+  - ``\\mathcal{O}_{i}``: The observations at which ``v_{t i}`` is finite.
+  - ``S``: The statistic `stat`.
+  - ``s_{i}``: The score of asset ``i``.
+
+A value is `NaN` where the asset is outside the universe, and where a fill policy of the panel wrote one of its Panel Fields. A filled volume is not a trade, so the statistic reads only the observed values. An asset with fewer than `min_obs` finite values has the score `NaN`, and every selection rule and every redundancy algorithm drops it. An asset with no observed value then leaves the selection, and the run does not stop.
+
+`stat` reads the finite values of one asset in the order of the observations, through [`finite_vec_to_real_measure`](@ref). A measure that holds observation weights, such as `MedianValue(; w)`, holds one weight for each observation of `rd`, and the function cuts them to the finite values, so each value keeps its own weight.
+
+With `bib = nothing`, the orientation of the score is the orientation of its statistic, [`bigger_is_better`](@ref) of `stat`. A statistic of location, such as [`MedianValue`](@ref), answers `true`, so a bigger traded amount is a better score. A statistic of dispersion, [`StdValue`](@ref) or [`VarValue`](@ref), answers `false`, as a risk does. A plain function answers `true`. The orientation of a Panel Field can differ from that of the statistic: a bigger median leverage is worse. A `Bool` in `bib` then overrides the statistic.
+
+# Algorithm
+
+ 1. Read the product of the Panel Fields of `fields` at each observation and asset with [`ew_ratio_values`](@ref), the reader of the product side of an [`EWVolumeRatio`](@ref).
+ 2. Count the finite values of each asset.
+ 3. Reduce the finite values of each asset that holds at least `min_obs` of them with [`finite_vec_to_real_measure`](@ref) under `stat`. Write `NaN` at every other asset. [`min_folds_scores`](@ref) does this step.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    PanelFieldScorer(;
+        fields::VecStr,
+        stat::Union{VectorToScalarMeasure, Function} = MedianValue(),
+        bib::Option{<:Bool} = nothing,
+        min_obs::Integer = 1,
+    ) -> PanelFieldScorer
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `!isempty(fields)`, and no name in `fields` is the empty string. Raises an [`IsEmptyError`](@ref).
+  - `min_obs >= 1`. Raises a `DomainError`.
+  - When the scorer scores, the rules of [`descriptor_field_values`](@ref) for each Panel Field of `fields`: `rd.pnl` is a time-varying [`AssetPanel`](@ref), and each name is a [`NumericPanelField`](@ref) of it.
+
+# Examples
+
+```jldoctest
+julia> pnl = asset_panel([NumericPanelInput(; name = \"close\",
+                                            vals = [10.0 2.0; 11.0 2.0; 12.0 NaN],
+                                            alg = ForwardPanelFill()),
+                          NumericPanelInput(; name = \"volume\",
+                                            vals = [100.0 50.0; 300.0 70.0; 200.0 60.0])];
+                         amsk = trues(3, 2), emsk = trues(3, 2));
+
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = zeros(3, 2), pnl = pnl);
+
+julia> s = PanelFieldScorer(; fields = [\"close\", \"volume\"]);
+
+julia> PortfolioOptimisers.asset_scores(s, rd)
+2-element Vector{Float64}:
+ 2400.0
+  120.0
+
+julia> PortfolioOptimisers.bigger_is_better(s)
+true
+```
+
+The close of `B` at the third observation is a fill, so the median of `B` reads its first two traded amounts, `100` and `140`.
+
+# Related
+
+  - [`AbstractAssetScorer`](@ref)
+  - [`ScoreSelector`](@ref)
+  - [`ThresholdRule`](@ref)
+  - [`VectorToScalarMeasure`](@ref)
+  - [`AssetPanel`](@ref)
+  - [`EWVolumeRatio`](@ref)
+  - [`FoldRiskScorer`](@ref)
+"""
+@concrete struct PanelFieldScorer <: AbstractAssetScorer
+    """
+    The names of the Panel Fields whose product is the value of an asset at each observation.
+    """
+    fields
+    """
+    The [`VectorToScalarMeasure`](@ref) or the function that reduces the finite values of one asset over the observations to its score.
+    """
+    stat
+    """
+    The orientation of the score: `true` when a bigger score is better. `nothing` takes the [`bigger_is_better`](@ref) of `stat`.
+    """
+    bib
+    """
+    The smallest number of finite values that an asset must hold. An asset that holds fewer has the score `NaN`.
+    """
+    min_obs
+    function PanelFieldScorer(fields::VecStr, stat::Union{VectorToScalarMeasure, Function},
+                              bib::Option{<:Bool}, min_obs::Integer)
+        @argcheck(!isempty(fields),
+                  IsEmptyError("fields names the Panel Fields of the score, so it needs at least one name"))
+        for (k, name) in enumerate(fields)
+            assert_panel_terms(name, "name $k of fields")
+        end
+        @argcheck(min_obs >= 1,
+                  DomainError(min_obs,
+                              "min_obs must be at least one, got min_obs = $min_obs"))
+        return new{typeof(fields), typeof(stat), typeof(bib), typeof(min_obs)}(fields, stat,
+                                                                               bib, min_obs)
+    end
+end
+function PanelFieldScorer(; fields::VecStr,
+                          stat::Union{VectorToScalarMeasure, Function} = MedianValue(),
+                          bib::Option{<:Bool} = nothing,
+                          min_obs::Integer = 1)::PanelFieldScorer
+    return PanelFieldScorer(fields, stat, bib, min_obs)
+end
+function asset_scores(s::PanelFieldScorer, rd::AbstractReturnsResult)
+    V = ew_ratio_values(rd, s.fields)
+    counts = [count(isfinite, view(V, :, i)) for i in axes(V, 2)]
+    return min_folds_scores(i -> finite_vec_to_real_measure(s.stat, view(V, :, i)), counts,
+                            s.min_obs, eltype(V))
+end
+function bigger_is_better(s::PanelFieldScorer)::Bool
+    return something(s.bib, bigger_is_better(s.stat))
+end
+"""
+    bigger_is_better(stat::VectorToScalarMeasure) -> Bool
+    bigger_is_better(stat::Union{StdValue, VarValue}) -> Bool
+    bigger_is_better(stat::Function) -> Bool
+
+Return whether a bigger value of the statistic `stat` is a better score.
+
+A [`PanelFieldScorer`](@ref) with `bib = nothing` takes the orientation of its score from its statistic. A statistic of location or of size, such as the minimum, the mean, the median, the maximum, the sum or the product, answers `true`: a bigger traded amount or a bigger capitalisation is better. A statistic of dispersion, [`StdValue`](@ref) or [`VarValue`](@ref), answers `false`, because a dispersion is a risk, as a variance is for a risk measure. A plain function has no type that can state a trait, and it answers `true`.
+
+A subtype of [`VectorToScalarMeasure`](@ref) whose smaller values are better adds a method that answers `false`.
+
+# Arguments
+
+  - `stat`: The statistic.
+
+# Returns
+
+  - `bib::Bool`: `true` when a bigger value of `stat` is better.
+
+# Related
+
+  - [`PanelFieldScorer`](@ref)
+  - [`VectorToScalarMeasure`](@ref)
+"""
+function bigger_is_better(::VectorToScalarMeasure)::Bool
+    return true
+end
+function bigger_is_better(::Union{StdValue, VarValue})::Bool
+    return false
+end
+function bigger_is_better(::Function)::Bool
+    return true
+end
+
+export FoldRiskScorer, WeightMassScorer, PanelFieldScorer, MeanFoldScore, MedianFoldScore,
+       WorstFoldScore, Value, Rank
 public AbstractFoldStatistic, AbstractFoldAggregation, fold_statistic,
        statistic_bigger_is_better, fold_aggregate

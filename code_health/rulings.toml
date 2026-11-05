@@ -270,6 +270,22 @@ sites where a loop of scalar rows had replaced it to avoid the report. Affirmed 
 recommended package, and to the union split of a local that the dependency always assigns, on \
 2026-11-05. Affirmed against Julia 1.13.3 and JET 0.13.1."""
 
+[rationale.a-union-split-that-loses-the-type-of-its-value]
+text = """
+The report is a defect of JET. A constructor takes an argument `x` of a small union of concrete \
+types, such as `Option{<:Bool}`, and builds `new{typeof(x)}(x)`, the form of every struct of the \
+library. The running code gives the concrete parameter of each value: `nothing` builds a \
+parameter `Nothing`, and `true` builds a parameter `Bool`, so the struct never holds a union. JET \
+splits the union of `typeof(x)` and the union of `x` apart, and loses the link between them. It \
+checks each pair of a type and a value, and it reports the pair that the running code cannot make, \
+such as `convert(::Type{Bool}, ::Nothing)` with a `union split`. The library keeps its form, \
+and a change made only to silence the report is rejected. The Rationale covers only that pair: a \
+constructor whose parameter is the `typeof` of the argument that it stores. A probe of a struct \
+with one field and no code of the library gives the same report, and a constructor that takes the \
+parameter as a static parameter, `x::X where {X}`, gives none. The maintainer stated the rule on \
+2026-11-05, for the `bib` field of `PanelFieldScorer`. Affirmed against Julia 1.13.3 and JET \
+0.13.1."""
+
 # --- exemptions ------------------------------------------------------------
 #
 # Keyed (path, definition, metric), dropped before the file's maximum is taken. An Exemption binds
@@ -1033,6 +1049,17 @@ kind = "BuiltinErrorReport"
 message = "invalid builtin function call: getfield"
 count = 2
 rationale = "a-form-its-package-recommends"
+
+# The inner constructor of `PanelFieldScorer` takes `bib::Option{<:Bool}` and builds
+# `new{…, typeof(bib), …}(…, bib, …)`, the form of every struct of the library. JET splits
+# `typeof(bib)` and `bib` apart, and reports the pair of the type `Bool` with the value `nothing`.
+# Measured on 2026-11-05 with Julia 1.13.3 and JET 0.13.1: the report is the only one of the file.
+[[dismissal]]
+file = "src/21_Pipeline/07_AssetScorers.jl"
+kind = "MethodErrorReport"
+message = "no matching method found `convert(::Type{Bool}, ::Nothing)` (1/4 union split)"
+count = 1
+rationale = "a-union-split-that-loses-the-type-of-its-value"
 
 # --- performance dismissals ------------------------------------------------
 #

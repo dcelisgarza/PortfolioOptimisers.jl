@@ -327,4 +327,101 @@ struct NoOrientationScorer <: PortfolioOptimisers.AbstractAssetScorer end
         @test tuned.opt.steps[1].score.agg in
               (MeanFoldScore(), WorstFoldScore(; alg = Rank()))
     end
+
+    @testset "PanelFieldScorer is a statistic of the product of its Panel Fields" begin
+        T, N = 40, 5
+        prng = StableRNG(6301)
+        P = 10 .+ rand(prng, T, N)
+        Q = 100 .* rand(prng, T, N)
+        P[5, 2] = NaN          # a blank close, filled forward, so not a trade
+        Q[7:9, 3] .= NaN       # three blank volumes
+        Q[:, 5] .= NaN         # an asset with no observed volume
+        amsk = trues(T, N)
+        amsk[1:10, 4] .= false # a late listing
+        pnl = asset_panel([NumericPanelInput(; name = "close", vals = P,
+                                             alg = ForwardPanelFill()),
+                           NumericPanelInput(; name = "volume", vals = Q,
+                                             alg = ForwardPanelFill())]; amsk = amsk,
+                          emsk = amsk)
+        Xp = 0.01 .* randn(prng, T, N)
+        Xp[.!amsk] .= NaN
+        rdp = ReturnsResult(; nx = string.('A':'E'), X = Xp, pnl = pnl)
+        # The traded amount by hand: NaN outside the universe and at every blank of a field.
+        V = P .* Q
+        V[.!amsk] .= NaN
+        hand(f, rows) = [(v = filter(isfinite, V[rows, i]); isempty(v) ? NaN : f(v))
+                         for i in 1:N]
+        same(a, b) = all(isapprox.(a, b; nans = true))
+
+        s = PanelFieldScorer(; fields = ["close", "volume"])
+        sc = PO.asset_scores(s, rdp)
+        @test same(sc, hand(median, 1:T))
+        @test isnan(sc[5])
+        @test same(PO.asset_scores(PanelFieldScorer(; fields = ["close", "volume"],
+                                                    stat = maximum), rdp),
+                   hand(maximum, 1:T))
+        # Asset D holds 30 traded amounts and asset C holds 37.
+        sc35 = PO.asset_scores(PanelFieldScorer(; fields = ["close", "volume"],
+                                                min_obs = 35), rdp)
+        @test isnan(sc35[4]) && isfinite(sc35[3])
+        Qh = copy(Q)
+        Qh[.!amsk] .= NaN
+        @test same(PO.asset_scores(PanelFieldScorer(; fields = ["volume"],
+                                                    stat = MeanValue()), rdp),
+                   [(v = filter(isfinite, Qh[:, i]); isempty(v) ? NaN : mean(v))
+                    for i in 1:N])
+        # A weighted statistic keeps the weight of each finite value, and loses the weight of
+        # each gap.
+        wv = collect(1.0:T)
+        wsc = PO.asset_scores(PanelFieldScorer(; fields = ["close", "volume"],
+                                               stat = MeanValue(; w = aweights(wv))), rdp)
+        whand = [(f = isfinite.(V[:, i]);
+                  any(f) ? sum(wv[f] .* V[f, i]) / sum(wv[f]) : NaN) for i in 1:N]
+        @test same(wsc, whand)
+
+        # A floor reads the training window alone, and drops the asset with no score.
+        lo = median(filter(isfinite, sc))
+        sel = ScoreSelector(; score = s, rule = ThresholdRule(; lo = lo))
+        @test PO.select_assets(sel, rdp) == (isfinite.(sc) .& (sc .>= lo))
+        k = 20
+        @test same(PO.asset_scores(s, PO.port_opt_view(rdp, 1:k, :)), hand(median, 1:k))
+        pipe = Pipeline(; steps = ("select" => sel, "opt" => EqualWeighted()))
+        cv = KFold(; n = 2)
+        pr = cross_val_predict(pipe, rdp, cv)
+        cvr = split(cv, rdp)
+        for (j, p) in enumerate(pr.pred)
+            sc_j = hand(median, cvr.train_idx[j])
+            @test issubset(p.rd.nx, rdp.nx[isfinite.(sc_j) .& (sc_j .>= lo)])
+        end
+
+        # The orientation is a trait of the statistic, and `bib` overrides it.
+        for m in
+            (MinValue(), MeanValue(), MedianValue(), MaxValue(), SumValue(), ProdValue(),
+             ModeValue(), StandardisedValue())
+            @test PO.bigger_is_better(m)
+            @test PO.bigger_is_better(PanelFieldScorer(; fields = ["close"], stat = m))
+        end
+        for m in (StdValue(), VarValue())
+            @test !PO.bigger_is_better(m)
+            @test !PO.bigger_is_better(PanelFieldScorer(; fields = ["close"], stat = m))
+        end
+        @test PO.bigger_is_better(maximum)
+        @test !PO.bigger_is_better(PanelFieldScorer(; fields = ["close"], bib = false))
+        @test PO.bigger_is_better(PanelFieldScorer(; fields = ["close"], stat = StdValue(),
+                                                   bib = true))
+        # An ordinal rule takes the best end that the trait states.
+        best = PO.rule_keep(RankRule(; best = 1), sc, PO.bigger_is_better(s))
+        @test findall(best) == [argmax(replace(sc, NaN => -Inf))]
+        sd = PanelFieldScorer(; fields = ["close"], stat = StdValue())
+        sd_sc = PO.asset_scores(sd, rdp)
+        @test findall(PO.rule_keep(RankRule(; best = 1), sd_sc, PO.bigger_is_better(sd))) ==
+              [argmin(replace(sd_sc, NaN => Inf))]
+
+        # Validation, at construction and at the read of the panel.
+        @test_throws PO.IsEmptyError PanelFieldScorer(; fields = String[])
+        @test_throws PO.IsEmptyError PanelFieldScorer(; fields = ["close", ""])
+        @test_throws DomainError PanelFieldScorer(; fields = ["close"], min_obs = 0)
+        @test_throws PO.IsNothingError PO.asset_scores(s, rd)
+        @test_throws KeyError PO.asset_scores(PanelFieldScorer(; fields = ["nope"]), rdp)
+    end
 end

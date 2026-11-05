@@ -22,6 +22,18 @@ To implement a new vector-to-scalar measure, subtype `VectorToScalarMeasure` and
 
   - `score::Number`: The scalar result.
 
+## Orientation method
+
+  - `bigger_is_better(measure::VectorToScalarMeasure) -> Bool`: Optional. States whether a bigger result is a better score, when a [`PanelFieldScorer`](@ref) with no `bib` of its own scores the assets with the measure. The fallback answers `true`, as for a statistic of location. Add a method that answers `false` for a statistic whose smaller values are better, as [`StdValue`](@ref) and [`VarValue`](@ref) do.
+
+### Arguments
+
+  - `measure`: An instance of the concrete subtype.
+
+### Returns
+
+  - `bib::Bool`: `true` when a bigger result is better.
+
 # Related
 
   - [`MinValue`](@ref)
