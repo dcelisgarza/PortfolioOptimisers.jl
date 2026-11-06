@@ -76,21 +76,26 @@ DataFrame(; window = ["train", "test"],
 #=
 ### 2.1 Sizes as counts or fractions
 
-A size is an `Integer` count of rows, or an `AbstractFloat` fraction of the rows, strictly
-between 0 and 1. `test_size = 250` means the last 250 rows, and `test_size = 0.25` means the
-last quarter. A fraction rounds down to a whole number of rows.
+A size is a `CountOf` of rows or a `FractionOf` of the rows. `test_size = CountOf(250)` means the
+last 250 rows, and `test_size = FractionOf(0.25)` means the last quarter. A fraction rounds down
+to a whole number of rows. A plain number is a shorthand: an `Integer` is a count, and any other
+real number is a fraction. Prefer the wrapper. A search grid promotes `[250, 0.25]` to
+`[250.0, 0.25]`, and the plain `250.0` then reads as a fraction, which the split refuses.
 
 If you give one size, the other window takes the remaining rows. If you give neither, the
-training window takes 75 % of the rows. The cell prints the window sizes of four calls. A fraction
-rounds down on the side you give, so `test_size = 0.2` and `train_size = 0.8` differ by one
-row.
+training window takes 75 % of the rows. The cell prints the window sizes of five calls. A fraction
+rounds down on the side you give, so `test_size = FractionOf(0.2)` and `train_size = FractionOf(0.8)`
+differ by one row.
 =#
 
 N = size(values(X), 1)
 
 spellings = ["train_test_split(pr)" => (nothing, nothing),
-             "train_test_split(pr; test_size = 0.2)" => (nothing, 0.2),
-             "train_test_split(pr; train_size = 0.8)" => (0.8, nothing),
+             "train_test_split(pr; test_size = FractionOf(0.2))" =>
+                 (nothing, FractionOf(0.2)),
+             "train_test_split(pr; train_size = FractionOf(0.8))" =>
+                 (FractionOf(0.8), nothing),
+             "train_test_split(pr; test_size = CountOf(202))" => (nothing, CountOf(202)),
              "train_test_split(pr; test_size = 202)" => (nothing, 202)]
 
 sizes = DataFrame(; spelling = String[], train = Int[], test = Int[])

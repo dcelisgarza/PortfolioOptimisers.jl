@@ -289,7 +289,7 @@ end
         rs = RecordingDistance(FeatureDistance())
         cross_val_predict(HierarchicalRiskParity(; opt = hopt(rs)), rd_sq, cv; ex = seq)
         ss = split(cv, rd_sq)
-        @test all(size(z) == (cv.subset_size, cv.subset_size) for z in rs.seen)
+        @test all(size(z) == (cv.subset_size.val, cv.subset_size.val) for z in rs.seen)
         @test all(rs.seen[i] == Zsq[ss.asset_idx[i], ss.asset_idx[i]]
                   for i in eachindex(ss.train_idx))
     end
@@ -366,7 +366,7 @@ end
                                 prs)
         ss = split(mrs, prs)
         @test length(rg.seen) == length(ss.train_idx)
-        @test all(size(z) == (mrs.subset_size, mrs.subset_size) for z in rg.seen)
+        @test all(size(z) == (mrs.subset_size.val, mrs.subset_size.val) for z in rg.seen)
         @test all(any(z == Zsqp[c, c] for c in unique(ss.asset_idx)) for z in rg.seen)
     end
 

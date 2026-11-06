@@ -8,7 +8,7 @@ jet = "0.13.1"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "StatsPlots"]
-commit = "64069d56b1"
+commit = "66930ae688"
 
 [run.main]
 load_set = ["GraphRecipes", "StatsPlots"]
@@ -59,6 +59,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/01_Base/15_Online_b.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/16_CoveragePolicy.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/17_ReturnsSource.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/18_CountFraction.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools/01_Operators.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools/02_ArrayViews.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools/03_TypeUtilities.jl" = { raw = 0, reviewed = 0 }
@@ -490,6 +491,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/01_Base/15_Online_b.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/16_CoveragePolicy.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/17_ReturnsSource.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/18_CountFraction.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools/01_Operators.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools/02_ArrayViews.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools/03_TypeUtilities.jl" = { raw = 0, reviewed = 0 }

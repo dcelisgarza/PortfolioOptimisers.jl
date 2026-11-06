@@ -800,10 +800,10 @@ end
     @test PO.ep_sbar(nothing, T, ep_a, ep_w0, ord) ==
           max(2 * ceil(Int, ep_a * T), ceil(Int, 2 * ep_a * T))
     @test PO.ep_sbar(nothing, T, ep_a, ep_w0, ord) == 102
-    @test PO.ep_sbar(5, T) == 5
-    @test PO.ep_sbar(2 * T, T) == T
-    @test PO.ep_sbar(0.1, T) == ceil(Int, 0.1 * T)
-    @test PO.ep_sbar(1e-6, T) == 1
+    @test PO.ep_sbar(CountOf(5), T) == 5
+    @test PO.ep_sbar(CountOf(2 * T), T) == T
+    @test PO.ep_sbar(FractionOf(0.1), T) == ceil(Int, 0.1 * T)
+    @test PO.ep_sbar(FractionOf(1e-6), T) == 1
 
     # `ep_assert_reachable_view` is the open band between the best and the worst
     # realisation. Both ends are refused, and everything strictly inside passes and binds.

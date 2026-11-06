@@ -320,8 +320,7 @@ The loop inside `SubsetResampling` is over asset subsets, not over time folds. N
   - `opt` passes [`assert_internal_optimiser`](@ref). A schedule applies the check to each entry and to its `default`.
   - If `wb` is keyed by name ([`name_keyed`](@ref)), `sets` is not `nothing`. The constructor throws an [`IsNothingError`](@ref) otherwise.
   - If `fees` is a [`FeesEstimator`](@ref), `sets` is not `nothing`. The constructor throws an [`IsNothingError`](@ref) otherwise.
-  - If `subset_size` is an `Integer`: `subset_size >= 1`.
-  - If `subset_size` is any other real number: `0 < subset_size < 1`.
+  - A plain number in `subset_size` passes [`count_or_fraction`](@ref), and the field then holds a [`CountOf`](@ref) or a [`FractionOf`](@ref).
   - If `n_subsets` is an `Integer`: `n_subsets >= 2`.
   - `max_comb > 0` and finite.
   - A schedule in `opt` or `fb` has `bind !== :nearest`. Each entry of a schedule passes the check of its field.
@@ -452,11 +451,7 @@ $(val_dict[:count_fraction_grid])
         if isa(fees, FeesEstimator)
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
-        if isa(subset_size, Integer)
-            assert_nonempty_nonneg_finite_val(subset_size - 1, "subset_size - 1")
-        elseif isa(subset_size, Real)
-            assert_unit_interval(subset_size, :subset_size)
-        end
+        subset_size = maybe_count_or_fraction(subset_size)
         if isa(n_subsets, Integer)
             assert_nonempty_nonneg_finite_val(n_subsets - 2, "n_subsets - 2")
         end

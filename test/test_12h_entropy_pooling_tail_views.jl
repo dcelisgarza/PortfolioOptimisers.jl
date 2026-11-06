@@ -643,8 +643,8 @@ end
     @test ValueatRiskView(; views = v).alpha == 0.05
     @test ConditionalValueatRiskView(; views = v, alpha = 0.01).alpha == 0.01
     @test ConditionalValueatRiskView(; views = v,
-                                     alg = IntegerConditionalValueatRiskView(; sbar = 40)).alg.sbar ==
-          40
+                                     alg = IntegerConditionalValueatRiskView(; sbar = 40)).alg.sbar ===
+          CountOf(40)
     @test EntropicValueatRiskView(; views = v, alg = GridTailView(; pct = 0.8, K = 21)).alg.K ==
           21
 
@@ -841,11 +841,13 @@ end
 
 @testset "tail view formulation constructors" begin
     @test IntegerConditionalValueatRiskView().sbar === nothing
-    @test IntegerConditionalValueatRiskView(; sbar = 25).sbar == 25
+    @test IntegerConditionalValueatRiskView(; sbar = 25).sbar === CountOf(25)
+    @test IntegerConditionalValueatRiskView(; sbar = FractionOf(1)).sbar === FractionOf(1)
     @test_throws DomainError IntegerConditionalValueatRiskView(; sbar = 0)
     @test_throws DomainError IntegerConditionalValueatRiskView(; sbar = 1.5)
+    @test_throws DomainError IntegerConditionalValueatRiskView(; sbar = 1.0)
     # `sbar` is a count or a fraction, so a complex number has no reading.
-    @test IntegerConditionalValueatRiskView(; sbar = 1 // 2).sbar == 1 // 2
+    @test IntegerConditionalValueatRiskView(; sbar = 1 // 2).sbar === FractionOf(1 // 2)
     @test_throws TypeError IntegerConditionalValueatRiskView(; sbar = 0.5 + 0im)
     @test GridTailView().K == 11
     @test_throws DomainError GridTailView(; K = 10)
@@ -884,9 +886,10 @@ end
     # from the end. Pin the count itself, which is what fixes the direction of the scan.
     ord = sortperm(-rd.X[:, 1])
     s = findfirst(>=(ep_a), cumsum(ep_w0[reverse(ord)]))
-    @test PO.ep_sbar(37, T) == 37
-    @test PO.ep_sbar(10 * T, T) == T
-    @test PO.ep_sbar(0.25, T) == ceil(Int, 0.25 * T)
+    @test PO.ep_sbar(CountOf(37), T) == 37
+    @test PO.ep_sbar(CountOf(10 * T), T) == T
+    @test PO.ep_sbar(FractionOf(0.25), T) == ceil(Int, 0.25 * T)
+    @test PO.ep_sbar(FractionOf(1), T) == T
     @test PO.ep_sbar(nothing, T, ep_a, ep_w0, ord) ==
           min(T, max(2 * s, ceil(Int, 2 * ep_a * T), 1))
     @test PO.ep_sbar(nothing, T, ep_a, ep_w0, ord) >= ceil(Int, 2 * ep_a * T)

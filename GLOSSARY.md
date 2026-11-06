@@ -153,6 +153,10 @@ The Algorithm distinction that runs through all of moment estimation. `FullMomen
 **Moment Target**
 The value from which a moment risk measure measures the deviations of the net portfolio returns. `calc_moment_target` selects it from the `mu` slot of the measure: the mean of the returns, weighted by the observation weights when the measure holds them, when `mu` is `nothing`. It is the expected portfolio return net of the mean fee per period when `mu` holds expected asset returns, and the number itself when `mu` is a number. A number is a minimum acceptable return, so it takes no fee.
 
+**Count or Fraction**
+The size of a part of a set, such as the assets that a subset draws, the rows of a window or the neighbours of a period. `CountOf(n)` states `n` members, an `Integer` of at least one. `FractionOf(f)` states a share of the set, with `f` in `(0, 1]`, and `FractionOf(1)` is the whole set. The wrapper and not the type of the number selects the reading, so a search grid that promotes its values keeps each one. A field of this kind also takes a plain number as a shorthand, and `count_or_fraction` reads an `Integer` as a count and any other real number as a fraction. A plain `1.0` is refused, because a grid promotes the count `1` to it. The pair does no rounding. Each reader rounds a fraction of its own set, by the rule of its source (#2013).
+*Avoid*: a field that reads the type of a plain number as its meaning, with no wrapper.
+
 ## 2. Data
 
 **ReturnsResult**

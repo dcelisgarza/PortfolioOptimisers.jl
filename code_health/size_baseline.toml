@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.3"
 julia_syntax = "1.0.2"
-commit = "64069d56b1"
+commit = "66930ae688"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { code = 287, doc = 0, comment = 12, blank = 2, total = 301 }
@@ -54,6 +54,7 @@ commit = "64069d56b1"
 "src/01_Base/15_Online_b.jl" = { code = 184, doc = 451, comment = 7, blank = 228, total = 870 }
 "src/01_Base/16_CoveragePolicy.jl" = { code = 384, doc = 810, comment = 6, blank = 372, total = 1572 }
 "src/01_Base/17_ReturnsSource.jl" = { code = 95, doc = 320, comment = 0, blank = 165, total = 580 }
+"src/01_Base/18_CountFraction.jl" = { code = 46, doc = 110, comment = 0, blank = 53, total = 209 }
 "src/02_Tools/01_Operators.jl" = { code = 44, doc = 310, comment = 0, blank = 109, total = 463 }
 "src/02_Tools/02_ArrayViews.jl" = { code = 100, doc = 345, comment = 0, blank = 152, total = 597 }
 "src/02_Tools/03_TypeUtilities.jl" = { code = 24, doc = 111, comment = 0, blank = 60, total = 195 }

@@ -160,10 +160,12 @@ end
         pr5 = prior(EmpiricalPrior(), ReturnsResult(; nx = rd.nx[1:5], X = X[:, 1:5]))
         pr6 = prior(EmpiricalPrior(), rd6)
         # `round` takes the even integer at a tie: `0.5 * 5 = 2.5` gives 2.
-        @test PO.get_subset_size(0.5, pr5) == 2
-        @test PO.get_subset_size(eps(), pr6) == 1
+        @test PO.get_subset_size(FractionOf(0.5), pr5) == 2
+        @test PO.get_subset_size(FractionOf(eps()), pr6) == 1
         @test PO.get_subset_size(pr -> 3, pr6) == 3
-        @test PO.get_subset_size(1 // 2, pr6) == 3
+        @test PO.get_subset_size(FractionOf(1 // 2), pr6) == 3
+        @test PO.get_subset_size(CountOf(4), pr6) == 4
+        @test_throws ArgumentError PO.get_subset_size(CountOf(7), pr6)
         # A `Rational` size is a fraction of the assets, as a float is.
         rq = optimise(SubsetResampling(; opt = InverseVolatility(), subset_size = 1 // 2,
                                        ex = seq, seed = 2), rd6)
@@ -175,10 +177,29 @@ end
         @test_throws TypeError SubsetResampling(; opt = InverseVolatility(),
                                                 subset_size = 0.5 + 0im)
         wf = IndexWalkForward(20, 10)
-        @test MultipleRandomised(wf; subset_size = 1 // 2).subset_size == 1 // 2
+        @test MultipleRandomised(wf; subset_size = 1 // 2).subset_size ===
+              FractionOf(1 // 2)
         @test_throws DomainError MultipleRandomised(wf; subset_size = 3 // 2)
         @test_throws DomainError MultipleRandomised(wf; window_size = 3 // 2)
-        @test PO.get_window_size(1 // 2, rd6) == 40
+        @test PO.get_window_size(FractionOf(1 // 2), rd6) == 40
+        # Issue #2013: the plain form is read by its type, and the wrapper keeps its own.
+        @test MultipleRandomised(wf; subset_size = 2, window_size = 30).window_size ===
+              CountOf(30)
+        @test PO.get_window_size(CountOf(30), rd6) == 30
+        @test_throws DomainError MultipleRandomised(wf; window_size = CountOf(1))
+        @test SubsetResampling(; opt = InverseVolatility(), subset_size = 3).subset_size ===
+              CountOf(3)
+        @test_throws DomainError SubsetResampling(; opt = InverseVolatility(),
+                                                  subset_size = 1.0)
+        # Issue #2013: a search grid sets each value through the constructor. Julia
+        # promotes the plain `[1, 0.5]` to `[1.0, 0.5]`, and the plain `1.0` is refused,
+        # where the wrappers keep each value at its own member.
+        sr0 = SubsetResampling(; opt = InverseVolatility())
+        lens = (PO.Accessors.PropertyLens(:subset_size),)
+        @test eltype([1, 0.5]) == Float64
+        @test_throws DomainError PO.search_candidate(sr0, lens, ([1, 0.5][1],))
+        vals = [CountOf(1), FractionOf(0.5)]
+        @test [PO.search_candidate(sr0, lens, (v,)).subset_size for v in vals] == vals
     end
     @testset "the default subset size is a power of the number of assets" begin
         # shen2017 sizes a subset as `n^0.8` in its simulation study and as `n^0.7` in its
