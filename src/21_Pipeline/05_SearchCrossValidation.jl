@@ -57,7 +57,7 @@ pipeline_asset_view(data::AbstractPricesResult, cols) = port_opt_view(data, :, c
 
 Return the element type of the score matrices of a Pipeline search over the data `rd` or `pr`.
 
-The type comes from the data. The carriers of the data hold floating-point values, so the type holds the `NaN` of a failed fold.
+The type comes from the data. A [`ReturnsResult`](@ref) and a [`PricesResult`](@ref) hold floating-point values, so the type holds the `NaN` of a failed fold.
 
 # Arguments
 

@@ -532,9 +532,9 @@ earns its place for two reasons only:
   ambiguity that no narrower signature removes.
 
 A new form of an input is a new method of its reader and of its check, not a new function in
-front of them. #2005 is the case. `ew_ratio_values` sent two of its four forms to
-`descriptor_field_values` and held the other two, and `assert_ew_ratio_side` did the same for
-`assert_panel_terms`. Both went, and the generic functions took their methods. The census flags a
+front of them. #2005 is the case. A reader of the inputs of a scorer sent two of its four forms
+to `descriptor_field_values` and held the other two, and its check did the same for
+`assert_panel_terms`. Both wrappers went, and the generic functions took their methods. The census flags a
 one-method forward only, so a wrapper of more than one method holds by review.
 
 ## The simple form wins

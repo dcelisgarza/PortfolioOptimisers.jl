@@ -2498,6 +2498,11 @@ end
     hf = PO.cross_sectional_history_backing(Float64, 4, 3, 5, Zf)
     @test hf.Ms isa Array{Float64, 3}
     @test hf.Zo === Zf
+    # Two views of different arrays, and two arrays, join by a copy.
+    Jv = PO.cross_sectional_joined_exposures(view(hf.Ms, :, :, 2:4), view(Zf, :, :, 2:4))
+    @test !isa(Jv, SubArray)
+    @test isequal(Jv, cat(hf.Ms[:, :, 2:4], Zf[:, :, 2:4]; dims = 2))
+    @test isequal(PO.cross_sectional_joined_exposures(hf.Ms, Zf), cat(hf.Ms, Zf; dims = 2))
     h0 = PO.cross_sectional_history_backing(Float64, 4, 3, 5, nothing)
     @test h0.Ms isa Array{Float64, 3} && size(h0.Ms) == (3, 5, 4)
     @test isnothing(h0.Zo)
@@ -2507,4 +2512,12 @@ end
     w = PO.cross_sectional_scenario_weights(StatsBase.fweights([1, 2, 1]))
     @test w isa StatsBase.AnalyticWeights
     @test w ≈ [0.25, 0.5, 0.25]
+end
+
+@testset "the coverage error names an observed factor only where its return is NaN" begin
+    PO = PortfolioOptimisers
+    cb = (; nf = ["mkt", "fx"], R = [0.1 NaN; 0.2 0.3])
+    @test PO.cross_sectional_observed_gap(cb, 2) == ""
+    @test occursin("[\"fx\"]", PO.cross_sectional_observed_gap(cb, 1))
+    @test PO.cross_sectional_observed_gap(nothing, 1) == ""
 end

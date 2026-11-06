@@ -791,7 +791,7 @@ end
 
 Return `est` cut at the observations of the buffer `state` that a fit keeps, with [`obs_weights_view`](@ref).
 
-[`shared_series_buffer_fit`](@ref) calls it, and a host that refits one member on the buffer calls it for that member. A host passes the cut member as the `batch` of [`read_member`](@ref), so a member that folds still reads its own state, and a member that refits on the buffer loses the weights of the dropped observations.
+[`shared_series_buffer_fit`](@ref) calls it, and a prior that refits one member on the buffer calls it for that member. Such a prior passes the cut member as the `batch` of [`read_member`](@ref), so a member that folds still reads its own state, and a member that refits on the buffer loses the weights of the dropped observations.
 
 # Algorithm
 

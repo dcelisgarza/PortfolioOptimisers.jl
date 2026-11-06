@@ -848,6 +848,14 @@ definition = "pipe_target_paths"
 misses = 1
 rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
 
+# Run 42092565579: the `function` line of the `BitVector` method reads 0 while its body runs 54
+# times, through the gapped universe of `FactorPrior` in `test_54_coverage_universe.jl`.
+[[coverage_exemption]]
+path = "src/10_Prior/03_FactorPrior.jl"
+definition = "coverage_regression"
+misses = 1
+rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
+
 # --- JET dismissals --------------------------------------------------------
 #
 # Keyed (file, kind, message), ADR 0071. A Dismissal matches every report of its fingerprint in

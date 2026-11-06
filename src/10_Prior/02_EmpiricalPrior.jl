@@ -507,18 +507,18 @@ end
 """
     buffer_refit_member(est, state::SampleBufferState) -> typeof(est)
 
-Return a member of a carrying host as the host reads it after a Shared Series gap.
+Return a member of a carrying prior as the prior reads it after a Shared Series gap.
 
-A member that folds reads its own state, which never folded a marked observation, so it comes back with no change. A member that refits on the buffer reads the buffer with the marked observations dropped, so its fixed observation weights must drop them too. It comes back cut with [`shared_series_buffer_estimator`](@ref). The host then reads both kinds through [`read_member`](@ref), and states their counts from the same members.
+A member that folds reads its own state, which never folded a marked observation, so it comes back with no change. A member that refits on the buffer reads the buffer with the marked observations dropped, so its fixed observation weights must drop them too. It comes back cut with [`shared_series_buffer_estimator`](@ref). The prior then reads both kinds through [`read_member`](@ref), and states their counts from the same members.
 
 # Arguments
 
-  - `est`: The member of the host.
-  - `state`: The buffer of the host.
+  - `est`: The member of the prior.
+  - `state`: The buffer of the prior.
 
 # Returns
 
-  - `est`: The member that the host reads.
+  - `est`: The member that the prior reads.
 
 # Related
 
@@ -533,9 +533,9 @@ end
     buffer_refit_members(pe::EmpiricalPrior, state::SampleBufferState)
         -> Tuple{EmpiricalPrior, SampleBufferState}
 
-Return the carrying [`EmpiricalPrior`](@ref) with each member as [`buffer_refit_member`](@ref) reads it after a Shared Series gap, and the buffer that the read-out reads.
+Return the carrying [`EmpiricalPrior`](@ref) with each member as [`buffer_refit_member`](@ref) reads it after a Shared Series gap, and the buffer that [`prior`](@ref) reads.
 
-The read-out of the carry reads `pe.me` and `pe.ce`, and it states their counts with [`scenario_moment_counts`](@ref), so one rebuilt prior serves both. The state of the prior stays in `cache`.
+The method of [`prior`](@ref) on a carrying prior reads `pe.me` and `pe.ce`, and it states their counts with [`scenario_moment_counts`](@ref), so one rebuilt prior serves both. The state of the prior stays in `cache`.
 
 # Algorithm
 
@@ -550,7 +550,7 @@ The read-out of the carry reads `pe.me` and `pe.ce`, and it states their counts 
 
 # Returns
 
-  - `pe::EmpiricalPrior`: The prior whose members the read-out reads.
+  - `pe::EmpiricalPrior`: The prior whose members [`prior`](@ref) reads.
   - `buf::SampleBufferState`: The buffer at the kept observations.
 
 # Related

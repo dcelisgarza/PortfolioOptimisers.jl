@@ -3291,6 +3291,12 @@ const SUMMARY_ALIGN_CASES = ["Book" => ["book_equity"],
                              "SalesBook" => ["sales_ttm", "book_equity"],
                              "Industry" => ["industry"]]
 
+@testset "a static tensor Panel Field counts its missing labels for each asset" begin
+    f = TensorPanelField(; name = "beta", axis = "factor", labels = ["size", "value"],
+                         vals = zeros(3, 2), omsk = Bool[1 1; 0 1; 0 0])
+    @test PortfolioOptimisers.panel_field_missing(f) == [0, 1, 2]
+end
+
 @testset "describe counts the filled cells of each Panel Field" begin
     pnl = summary_small_panel()
     df = describe(pnl)

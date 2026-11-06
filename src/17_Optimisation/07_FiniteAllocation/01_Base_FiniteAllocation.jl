@@ -626,7 +626,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     AssetRedistribution(;
-        idx::Union{<:Integer, <:VecInt}
+        idx::Union{Integer, VecInt}
     ) -> AssetRedistribution
 
 Keywords correspond to the struct's fields.
@@ -666,13 +666,13 @@ julia> AssetRedistribution(; idx = 4)([0.5, 0.3, 0.2, 0.0], [false, false, true,
     Index, or vector of indices, of the assets that take the weight of the Unpriced Assets, in the order of `w`.
     """
     idx
-    function AssetRedistribution(idx::Union{<:Integer, <:VecInt})
+    function AssetRedistribution(idx::Union{Integer, VecInt})
         @argcheck(!isempty(idx), IsEmptyError("idx cannot be empty"))
         @argcheck(all(>(0), idx), DomainError(idx, "every entry of idx must be > 0"))
         return new{typeof(idx)}(idx)
     end
 end
-function AssetRedistribution(; idx::Union{<:Integer, <:VecInt})::AssetRedistribution
+function AssetRedistribution(; idx::Union{Integer, VecInt})::AssetRedistribution
     return AssetRedistribution(idx)
 end
 function (upw::AssetRedistribution)(w::VecNum, umsk::AbstractVector{Bool})
