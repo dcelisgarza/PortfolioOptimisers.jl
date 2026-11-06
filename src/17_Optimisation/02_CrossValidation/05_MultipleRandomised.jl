@@ -167,9 +167,9 @@ const WindowSizeEC = Union{WindowSizeEstimator, Function}
 """
     const SubsetSizeE
 
-Union of a concrete subset-size value or an estimator/function for it.
+Union of a subset size, as a [`CountOf`](@ref) of assets, a [`FractionOf`](@ref) of the assets or a plain number that [`count_or_fraction`](@ref) reads, or an estimator or a function that computes it.
 """
-const SubsetSizeE = Union{Real, SubsetSizeEC}
+const SubsetSizeE = Union{Real_CountFraction, SubsetSizeEC}
 """
     const NumberSubsetsE
 
@@ -179,9 +179,9 @@ const NumberSubsetsE = Union{Integer, NumberSubsetsEC}
 """
     const WindowSizeE
 
-Union of a concrete window-size value or an estimator/function for it.
+Union of a window size, as a [`CountOf`](@ref) of observations, a [`FractionOf`](@ref) of the observations or a plain number that [`count_or_fraction`](@ref) reads, or an estimator or a function that computes it.
 """
-const WindowSizeE = Union{Real, WindowSizeEC}
+const WindowSizeE = Union{Real_CountFraction, WindowSizeEC}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -197,7 +197,7 @@ $(DocStringExtensions.FIELDS)
 
     MultipleRandomised(
         cv::WalkForward_Onl;
-        subset_size::SubsetSizeE = 1,
+        subset_size::SubsetSizeE = CountOf(1),
         n_subsets::NumberSubsetsE = 2,
         max_comb::Integer = 1_000_000_000,
         window_size::Option{<:WindowSizeE} = nothing,
@@ -205,16 +205,15 @@ $(DocStringExtensions.FIELDS)
         seed::Option{<:Integer} = nothing
     ) -> MultipleRandomised
 
-`cv` is positional; remaining arguments are keyword and correspond to the struct's fields.
+`cv` is positional; remaining arguments are keyword and correspond to the struct's fields. A plain number in `subset_size` or `window_size` is read through [`count_or_fraction`](@ref), so the field holds a [`CountOf`](@ref) or a [`FractionOf`](@ref).
 
 ## Validation
 
-  - If `subset_size` is an `Integer`: `subset_size >= 1`.
-  - If `subset_size` is any other real number: `0 < subset_size < 1`.
+  - A plain number in `subset_size` passes [`count_or_fraction`](@ref).
   - If `n_subsets` is an `Integer`: `n_subsets >= 2`.
   - `max_comb > 0` and finite.
-  - If `window_size` is an `Integer`: `window_size >= 2`.
-  - If `window_size` is any other real number: `0 < window_size < 1`.
+  - A plain number in `window_size` passes [`count_or_fraction`](@ref).
+  - If `window_size` is a [`CountOf`](@ref): `window_size.val >= 2`.
 
 $(val_dict[:count_fraction_grid])
 
@@ -264,19 +263,14 @@ $(val_dict[:count_fraction_grid])
                                 n_subsets::NumberSubsetsE, max_comb::Integer,
                                 window_size::Option{<:WindowSizeE}, rng::Random.AbstractRNG,
                                 seed::Option{<:Integer})
-        if isa(subset_size, Integer)
-            assert_nonempty_nonneg_finite_val(subset_size - 1, "subset_size - 1")
-        elseif isa(subset_size, Real)
-            assert_unit_interval(subset_size, :subset_size)
-        end
+        subset_size = maybe_count_or_fraction(subset_size)
         if isa(n_subsets, Integer)
             assert_nonempty_nonneg_finite_val(n_subsets - 2, "n_subsets - 2")
         end
         assert_nonempty_gt0_finite_val(max_comb, :max_comb)
-        if isa(window_size, Integer)
-            assert_nonempty_nonneg_finite_val(window_size - 2, "window_size - 2")
-        elseif isa(window_size, Real)
-            assert_unit_interval(window_size, :window_size)
+        window_size = maybe_count_or_fraction(window_size)
+        if isa(window_size, CountOf)
+            assert_nonempty_nonneg_finite_val(window_size.val - 2, "window_size - 2")
         end
         return new{typeof(cv), typeof(subset_size), typeof(n_subsets), typeof(max_comb),
                    typeof(window_size), typeof(rng), typeof(seed)}(cv, subset_size,
@@ -284,7 +278,7 @@ $(val_dict[:count_fraction_grid])
                                                                    window_size, rng, seed)
     end
 end
-function MultipleRandomised(cv::WalkForward_Onl; subset_size::SubsetSizeE = 1,
+function MultipleRandomised(cv::WalkForward_Onl; subset_size::SubsetSizeE = CountOf(1),
                             n_subsets::NumberSubsetsE = 2,
                             max_comb::Integer = 1_000_000_000,
                             window_size::Option{<:WindowSizeE} = nothing,
@@ -499,11 +493,11 @@ end
 
 Get the actual asset subset size for multiple-randomised cross-validation.
 
-Resolves the subset size from either an integer (direct count) or a fraction of the total assets.
+Resolves the subset size from a [`CountOf`](@ref) of assets, a [`FractionOf`](@ref) of the assets, or a callable. A fraction rounds to the nearest asset, and it gives at least one asset.
 
 # Arguments
 
-  - `subset_size`: An integer count of assets, any other real number as a fraction of the assets, or a callable.
+  - `subset_size`: A [`CountOf`](@ref) of assets, a [`FractionOf`](@ref) of the assets, or a callable.
   - `rd`: Returns result or prior.
   - `args...`: Additional arguments.
 
@@ -516,15 +510,15 @@ Resolves the subset size from either an integer (direct count) or a fraction of 
   - [`MultipleRandomised`](@ref)
   - [`sample_unique_assets`](@ref)
 """
-function get_subset_size(subset_size::Integer, rd::Union{Pr_RR, AbstractPricesResult},
+function get_subset_size(subset_size::CountOf, rd::Union{Pr_RR, AbstractPricesResult},
                          args...)
-    @argcheck(subset_size <= size(rd.X, 2),
+    @argcheck(subset_size.val <= size(rd.X, 2),
               "subset_size must not be greater than the number of assets")
-    return subset_size
+    return subset_size.val
 end
-function get_subset_size(subset_size::Real, rd::Union{Pr_RR, AbstractPricesResult}, args...)
-    subset_size = max(round(Int, subset_size * size(rd.X, 2)), 1)
-    return subset_size
+function get_subset_size(subset_size::FractionOf, rd::Union{Pr_RR, AbstractPricesResult},
+                         args...)
+    return max(round(Int, subset_size.val * size(rd.X, 2)), 1)
 end
 function get_subset_size(subset_size::SubsetSizeEC, rd::Union{Pr_RR, AbstractPricesResult})
     res = subset_size(rd)
@@ -538,11 +532,11 @@ end
 
 Get the actual rolling window size for multiple-randomised cross-validation.
 
-Resolves the window size from `nothing` (no windowing), an integer (direct count), any other real number (fraction of observations), or a callable.
+Resolves the window size from `nothing` (no windowing), a [`CountOf`](@ref) of observations, a [`FractionOf`](@ref) of the observations, or a callable. A fraction rounds to the nearest observation, and it gives at least two observations.
 
 # Arguments
 
-  - `window_size`: Window size specification (`nothing`, an integer, any other real number, or a callable).
+  - `window_size`: Window size specification (`nothing`, a [`CountOf`](@ref), a [`FractionOf`](@ref), or a callable).
   - `rd`: Returns result or prior.
   - `args...`: Additional arguments.
 
@@ -558,16 +552,17 @@ Resolves the window size from `nothing` (no windowing), an integer (direct count
 function get_window_size(::Nothing, args...)
     return nothing
 end
-function get_window_size(window_size::Integer, rd::Union{Pr_RR, AbstractPricesResult},
+function get_window_size(window_size::CountOf, rd::Union{Pr_RR, AbstractPricesResult},
                          args...)
     # Every row count in this file is the whole sample a cross-validation window is cut out
     # of. It is not the model-wide `:T` of any one fit, which covers a single window.
-    @argcheck(window_size <= size(rd.X, 1),
+    @argcheck(window_size.val <= size(rd.X, 1),
               "window_size must not be greater than the number of observations")
-    return window_size
+    return window_size.val
 end
-function get_window_size(window_size::Real, rd::Union{Pr_RR, AbstractPricesResult}, args...)
-    window_size = max(round(Int, window_size * size(rd.X, 1)), 2)
+function get_window_size(window_size::FractionOf, rd::Union{Pr_RR, AbstractPricesResult},
+                         args...)
+    window_size = max(round(Int, window_size.val * size(rd.X, 1)), 2)
     @argcheck(window_size <= size(rd.X, 1),
               "window_size must not be greater than the number of observations")
     return window_size

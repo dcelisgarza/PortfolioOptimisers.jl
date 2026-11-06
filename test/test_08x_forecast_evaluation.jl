@@ -1054,6 +1054,9 @@ end
         @test WildBootstrapMeanTest(; n_sim = 19).n_sim == 19
         @test_throws DomainError WildBootstrapMeanTest(; min_obs = 1)
         @test_throws DomainError WildBootstrapMeanTest(; min_periods = 0)
+        # Issue #2013: `min_periods` is a count of windows, so it is an `Integer`.
+        @test_throws TypeError WildBootstrapMeanTest(; min_periods = 2.5)
+        @test_throws TypeError OverlapMeanTest(; min_periods = 2.5)
         o = OverlapMeanTest()
         @test o.q == 0.05 && isnothing(o.min_obs) && isnothing(o.min_periods)
         @test o.law isa NullMomentLaw

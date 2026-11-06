@@ -822,7 +822,7 @@
             @test train_idx[idx] == train0
             @test test_idx[idx] == test0
             @test all(path_ids[idx] .== i)
-            @test all(length.(asset_idx[idx]) .== cv.subset_size)
+            @test all(length.(asset_idx[idx]) .== cv.subset_size.val)
         end
         @test n_splits(cv, rd) == n_splits(cv_res) == length(path_ids)
 
@@ -855,7 +855,7 @@
         @test length(train_idx) == length(train_idx) == N
         @test all(length.(train_idx) .== cv.cv.train_size)
         @test all(length.(test_idx) .== cv.cv.test_size)
-        @test all(length.(asset_idx) .== cv.subset_size)
+        @test all(length.(asset_idx) .== cv.subset_size.val)
         @test unique(asset_idx) == asset_idx
         @test unique.(asset_idx) == asset_idx
         # The window draw and the asset draw swapped order in the one stream the seed governs
@@ -871,7 +871,7 @@
         @test length(train_idx) == length(train_idx) == cv.n_subsets * N
         @test all(length.(train_idx) .== cv.cv.train_size)
         @test all(length.(test_idx) .== cv.cv.test_size)
-        @test all(length.(asset_idx) .== cv.subset_size)
+        @test all(length.(asset_idx) .== cv.subset_size.val)
         @test unique(asset_idx) != asset_idx
         @test unique.(asset_idx) == asset_idx
 
@@ -969,7 +969,7 @@
         # Every drawn column is live throughout the whole sample, which is every path's
         # window here, and every subset holds exactly `subset_size` of them.
         for cols in resm.asset_idx
-            @test length(cols) == cvm.subset_size
+            @test length(cols) == cvm.subset_size.val
             @test cols == unique(cols)
             @test isempty(intersect(cols, [3, 7]))
         end

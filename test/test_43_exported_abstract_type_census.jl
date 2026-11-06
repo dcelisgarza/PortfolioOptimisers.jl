@@ -112,6 +112,9 @@
     (issue #1950): the rule of `FiniteAllocationInput` for the weight of an Unpriced Asset.
     `AbstractWeightBoundsEstimator` joined with its `# Interfaces` section on 2026-11-05
     (issue #2006): `WeightBoundsEstimator` and `ScoreWeightBounds` subtype it.
+    `AbstractCountOrFraction` joined with its `# Interfaces` section on 2026-11-06
+    (issue #2013): `CountOf` and `FractionOf` subtype it, and each field of a part of a set
+    holds one of them.
     They are held to their own list for the same reason — public is API too.
     =#
     #! format: off
@@ -133,6 +136,7 @@
         :AbstractConfidenceUpdate,
         :AbstractConstraintEstimator,
         :AbstractConstraintResult,
+        :AbstractCountOrFraction,
         :AbstractConstraintSpace,
         :AbstractCorrelationVolatility,
         :AbstractCovarianceEstimator,

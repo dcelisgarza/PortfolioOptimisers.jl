@@ -313,8 +313,8 @@ Find the number of largest losses that the integer conditional value-at-risk for
 
 # Algorithm
 
- 1. An `Integer` `sbar` is a count. Return it, at most `T`.
- 2. Any other number is a fraction of `T`. Return `ceil(Int, sbar * T)`, at least one and at most `T`.
+ 1. A [`CountOf`](@ref) is a number of losses. Return `sbar.val`, at most `T`.
+ 2. A [`FractionOf`](@ref) is a fraction of `T`. Return `ceil(Int, sbar.val * T)`, at least one and at most `T`.
  3. `nothing` uses the rule of thumb of [EPTail](@cite). Go through the losses from the largest down, and add their prior probabilities. Stop at the position `s` at which the sum first reaches `alpha`.
  4. Return two times `s`, at least `ceil(Int, 2 * alpha * T)`, at least one and at most `T`.
 
@@ -322,7 +322,7 @@ Find the number of largest losses that the integer conditional value-at-risk for
 
 # Arguments
 
-  - `sbar`: The setting that [`IntegerConditionalValueatRiskView`](@ref) holds. An `Integer` is a count, a fraction in `(0, 1)` is a fraction of `T`, and `nothing` uses the rule of thumb of [EPTail](@cite).
+  - `sbar`: The setting that [`IntegerConditionalValueatRiskView`](@ref) holds. A [`CountOf`](@ref) is a number of losses, a [`FractionOf`](@ref) is a fraction of `T`, and `nothing` uses the rule of thumb of [EPTail](@cite).
   - `T`: The number of observations.
   - `alpha`: The significance level of the view.
   - `w`: The prior probability weights.
@@ -353,11 +353,11 @@ function ep_sbar(sbar::Nothing, T::Integer, alpha::Number, w::VecNum, ord::VecIn
     end
     return min(T, max(2 * s, ceil(Int, 2 * alpha * T), 1))
 end
-function ep_sbar(sbar::Integer, T::Integer, args...)
-    return min(T, sbar)
+function ep_sbar(sbar::CountOf, T::Integer, args...)
+    return min(T, Int(sbar.val))
 end
-function ep_sbar(sbar::Number, T::Integer, args...)
-    return min(T, max(1, ceil(Int, sbar * T)))
+function ep_sbar(sbar::FractionOf, T::Integer, args...)
+    return min(T, max(1, ceil(Int, sbar.val * T)))
 end
 """
     ep_assert_reachable_view(op::Symbol, rhs::Number, x::AbstractVector{<:VecNum},

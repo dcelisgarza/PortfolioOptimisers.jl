@@ -511,7 +511,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Selects the periods whose preceding windows are the `neighbours` nearest to the latest window (BNN).
 
-This is the nearest-neighbour rule of [gyorfi2008](@citet), in the Euclidean norm of the flattened windows. [lihoi2014](@citet) call its log-optimal rule BNN. The rule of [gyorfi2008](@cite) invests at period ``n = t + 1`` with ``\\lfloor p\\, n \\rfloor`` neighbours, a count that grows with the history. So `neighbours` is an `Integer` count or a fraction in `(0, 1)`. The fraction applies to the ``t - w`` candidates and not to the period, so the count never exceeds the candidates. It is below the count of [gyorfi2008](@cite) by at most ``\\lceil p (w + 1) \\rceil``. A fraction that rounds down to zero gives the empty sample. [gyorfi2008](@citet) assume that ties have zero probability. Here the earlier period wins a tie at the boundary.
+This is the nearest-neighbour rule of [gyorfi2008](@citet), in the Euclidean norm of the flattened windows. [lihoi2014](@citet) call its log-optimal rule BNN. The rule of [gyorfi2008](@cite) invests at period ``n = t + 1`` with ``\\lfloor p\\, n \\rfloor`` neighbours, a count that grows with the history. So `neighbours` is a [`CountOf`](@ref) or a [`FractionOf`](@ref). The fraction applies to the ``t - w`` candidates and not to the period, so the count never exceeds the candidates. It is below the count of [gyorfi2008](@cite) by at most ``\\lceil p (w + 1) \\rceil``. A fraction that rounds down to zero gives the empty sample. [gyorfi2008](@citet) assume that ties have zero probability. Here the earlier period wins a tie at the boundary.
 
 # Mathematical definition
 
@@ -528,8 +528,8 @@ Where:
   - $(math_dict[:w_win])
   - $(math_dict[:x_win])
   - ``\\ell``: Neighbour count at period ``t``.
-  - ``k``: Count, the `neighbours` field when it is an `Integer`.
-  - ``p``: Fraction, the `neighbours` field when it is a real in `(0, 1)`.
+  - ``k``: Count, the `val` of the `neighbours` field when it is a [`CountOf`](@ref).
+  - ``p``: Fraction, the `val` of the `neighbours` field when it is a [`FractionOf`](@ref).
   - $(math_dict[:t_period])
 
 The distance between two windows is the Euclidean norm of their difference.
@@ -540,14 +540,15 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    NearestNeighbourMatch(; window::Integer = 5, neighbours::Real = 0.1) -> NearestNeighbourMatch
+    NearestNeighbourMatch(; window::Integer = 5,
+                          neighbours::Real_CountFraction = FractionOf(0.1)) -> NearestNeighbourMatch
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. A plain `neighbours` is read through [`count_or_fraction`](@ref).
 
 ## Validation
 
   - `window >= 1`. A `DomainError` is thrown otherwise.
-  - `neighbours >= 1` for an `Integer`, and `0 < neighbours < 1` for another real. A `DomainError` is thrown otherwise.
+  - `neighbours` passes [`count_or_fraction`](@ref).
 
 $(val_dict[:count_fraction_grid])
 
@@ -557,7 +558,8 @@ $(val_dict[:count_fraction_grid])
 julia> NearestNeighbourMatch()
 NearestNeighbourMatch
       window ┼ Int64: 5
-  neighbours ┴ Float64: 0.1
+  neighbours ┼ FractionOf
+             │   val ┴ Float64: 0.1
 ```
 
 # Related
@@ -577,49 +579,43 @@ NearestNeighbourMatch
     """
     window
     """
-    The number of neighbours to keep, an `Integer` count or a fraction in `(0, 1)` of the candidate rows.
+    The number of neighbours to keep, a [`CountOf`](@ref) or a [`FractionOf`](@ref) of the candidate rows.
     """
     neighbours
-    function NearestNeighbourMatch(window::Integer, neighbours::Real)
+    function NearestNeighbourMatch(window::Integer, neighbours::Real_CountFraction)
         assert_pattern_window(window)
-        if isa(neighbours, Integer)
-            @argcheck(neighbours >= 1,
-                      DomainError(neighbours, "a count must be at least 1"))
-        else
-            @argcheck(zero(neighbours) < neighbours < one(neighbours),
-                      DomainError(neighbours, "a fraction must lie in (0, 1)"))
-        end
+        neighbours = count_or_fraction(neighbours)
         return new{typeof(window), typeof(neighbours)}(window, neighbours)
     end
 end
 function NearestNeighbourMatch(; window::Integer = 5,
-                               neighbours::Real = 0.1)::NearestNeighbourMatch
+                               neighbours::Real_CountFraction = FractionOf(0.1))::NearestNeighbourMatch
     return NearestNeighbourMatch(window, neighbours)
 end
 """
-    neighbour_count(neighbours::Integer, n::Integer)
-    neighbour_count(neighbours::Real, n::Integer)
+    neighbour_count(neighbours::CountOf, n::Integer)
+    neighbour_count(neighbours::FractionOf, n::Integer)
 
 Returns the number of neighbours that a nearest-neighbour selector keeps out of `n` candidates.
 
 # Arguments
 
-  - `neighbours`: The count, an `Integer`, or the fraction, a real in `(0, 1)`.
+  - `neighbours`: The [`CountOf`](@ref) or the [`FractionOf`](@ref) of the candidates.
   - `n`: The number of candidates.
 
 # Returns
 
-  - `l::Integer`: `min(neighbours, n)` for a count, and `floor(Int, neighbours * n)` for a fraction.
+  - `l::Integer`: `min(neighbours.val, n)` for a count, and `floor(Int, neighbours.val * n)` for a fraction.
 
 # Related
 
   - [`NearestNeighbourMatch`](@ref)
 """
-function neighbour_count(neighbours::Integer, n::Integer)
-    return min(neighbours, n)
+function neighbour_count(neighbours::CountOf, n::Integer)
+    return min(neighbours.val, n)
 end
-function neighbour_count(neighbours::Real, n::Integer)
-    return floor(Int, neighbours * n)
+function neighbour_count(neighbours::FractionOf, n::Integer)
+    return floor(Int, neighbours.val * n)
 end
 function matched_rows(sel::NearestNeighbourMatch, ::AbstractMatrix, cands::AbstractVector,
                       latest::AbstractVector)

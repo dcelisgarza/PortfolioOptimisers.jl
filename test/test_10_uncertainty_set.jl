@@ -61,9 +61,21 @@ end
             @test_throws DomainError ActiveAssetsUncertaintyAlgorithm(; active = 0)
             @test_throws DomainError ActiveAssetsUncertaintyAlgorithm(; active = 0.0)
             @test_throws DomainError ActiveAssetsUncertaintyAlgorithm(; active = 1.0)
-            # A `Rational` fraction was refused with a `MethodError`.
-            @test ActiveAssetsUncertaintyAlgorithm(; active = 1 // 5).active == 1 // 5
+            # A `Rational` fraction was refused with a `MethodError`. Issue #2013: the
+            # constructor passed it, and `l1_active_count` then threw a `MethodError`,
+            # because it took only `Union{Integer, AbstractFloat}`.
+            @test ActiveAssetsUncertaintyAlgorithm(; active = 1 // 5).active ===
+                  FractionOf(1 // 5)
+            @test PortfolioOptimisers.l1_active_count(FractionOf(1 // 5), 10) == 2
             @test_throws DomainError ActiveAssetsUncertaintyAlgorithm(; active = 3 // 2)
+            # Issue #2013: the wrapper keeps its type, and the plain form is read by type.
+            @test ActiveAssetsUncertaintyAlgorithm(; active = 3).active === CountOf(3)
+            @test ActiveAssetsUncertaintyAlgorithm(; active = CountOf(3)).active ===
+                  CountOf(3)
+            @test ActiveAssetsUncertaintyAlgorithm(; active = FractionOf(1.0)).active ===
+                  FractionOf(1.0)
+            @test PortfolioOptimisers.l1_active_pairs(CountOf(7), 10) == 3
+            @test PortfolioOptimisers.l1_active_pairs(FractionOf(0.7), 10) == 4
             # alg must be one of the two L1 shapes.
             @test_throws ArgumentError CharacteristicUncertaintySet(;
                                                                     alg = BoxUncertaintySetAlgorithm())

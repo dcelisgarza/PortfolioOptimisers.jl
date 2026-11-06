@@ -291,15 +291,14 @@ The window is the only restriction. If the tail of mass ``\\alpha`` of a posteri
 # Constructors
 
     IntegerConditionalValueatRiskView(;
-        sbar::Option{<:Real} = nothing
+        sbar::Option{<:Real_CountFraction} = nothing
     ) -> IntegerConditionalValueatRiskView
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. `sbar` is a [`CountOf`](@ref) of losses, a [`FractionOf`](@ref) of the observations, or `nothing`. A plain number is read through [`count_or_fraction`](@ref). `FractionOf(1)` names the whole sample.
 
 ## Validation
 
-  - If `sbar` is an `Integer`, `sbar >= 1`.
-  - If `sbar` is not an `Integer`, `0 < sbar < 1`. Use an `Integer` to name the whole sample.
+  - `sbar` passes [`count_or_fraction`](@ref) when it is not `nothing`.
 
 $(val_dict[:count_fraction_grid])
 
@@ -327,17 +326,13 @@ IntegerConditionalValueatRiskView
     $(field_dict[:sbar])
     """
     sbar
-    function IntegerConditionalValueatRiskView(sbar::Option{<:Real})
-        if isa(sbar, Integer)
-            @argcheck(sbar >= one(sbar), DomainError(sbar, "sbar must be >= 1"))
-        elseif !isnothing(sbar)
-            assert_unit_interval(sbar, :sbar)
-        end
+    function IntegerConditionalValueatRiskView(sbar::Option{<:Real_CountFraction})
+        sbar = isnothing(sbar) ? sbar : count_or_fraction(sbar)
         return new{typeof(sbar)}(sbar)
     end
 end
 function IntegerConditionalValueatRiskView(;
-                                           sbar::Option{<:Real} = nothing)::IntegerConditionalValueatRiskView
+                                           sbar::Option{<:Real_CountFraction} = nothing)::IntegerConditionalValueatRiskView
     return IntegerConditionalValueatRiskView(sbar)
 end
 """

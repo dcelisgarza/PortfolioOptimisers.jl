@@ -2419,22 +2419,36 @@ end
         split_count = PortfolioOptimisers.split_count
 
         # A count saturates at the observation total.
-        @test split_count(3, 10, :train_size) == 3
-        @test split_count(10, 10, :train_size) == 10
-        @test split_count(15, 10, :train_size) == 10
+        @test split_count(CountOf(3), 10) == 3
+        @test split_count(CountOf(10), 10) == 10
+        @test split_count(CountOf(15), 10) == 10
 
         # A fraction that lands exactly on an integer takes that integer, and one that
         # floors below one row is clamped up to one, so rounding alone never empties a
-        # window.
-        @test split_count(0.5, 10, :train_size) == 5
-        @test split_count(0.01, 10, :train_size) == 1
-        @test split_count(0.9999, 10, :train_size) == 9
+        # window. The whole set is a fraction of one.
+        @test split_count(FractionOf(0.5), 10) == 5
+        @test split_count(FractionOf(0.01), 10) == 1
+        @test split_count(FractionOf(0.9999), 10) == 9
+        @test split_count(FractionOf(1.0), 10) == 10
 
-        # A count must be positive, and a fraction must lie strictly inside (0, 1).
-        @test_throws DomainError split_count(0, 10, :train_size)
-        @test_throws DomainError split_count(-1, 10, :train_size)
-        @test_throws DomainError split_count(0.0, 10, :train_size)
-        @test_throws DomainError split_count(1.0, 10, :train_size)
+        # Issue #2013: a count is an `Integer` and a fraction lies in (0, 1]. The pair
+        # checks the range, and a plain `1.0` is refused, because a search grid promotes
+        # the count `1` to it.
+        @test_throws DomainError CountOf(0)
+        @test_throws DomainError CountOf(-1)
+        @test_throws MethodError CountOf(5.0)
+        @test_throws MethodError FractionOf(0.5 + 0im)
+        @test CountOf(; val = 3) === CountOf(3)
+        @test FractionOf(; val = 1 // 4) === FractionOf(1 // 4)
+        @test_throws DomainError FractionOf(0.0)
+        @test_throws DomainError FractionOf(1.5)
+        @test_throws DomainError PortfolioOptimisers.count_or_fraction(1.0)
+        @test_throws DomainError TrainTestSplit(; test_size = 1.0)
+        @test_throws DomainError TrainTestSplit(; test_size = 5.0)
+        @test TrainTestSplit(; train_size = 10, test_size = 0.2).train_size === CountOf(10)
+        @test TrainTestSplit(; train_size = 10, test_size = 0.2).test_size ===
+              FractionOf(0.2)
+        @test safe_index(CountOf(80), FractionOf(0.2), 100) == (1:80, 81:100)
     end
 
     @testset "train_test_split free function" begin
@@ -2581,17 +2595,17 @@ end
 
         # a fraction rounds down to whole rows in exact arithmetic: 0.29 * 100 is
         # 28.999999999999996, and a floor of that product lost the 29th row
-        @test all(k -> split_count(k / 100, 100, :train_size) == k, 1:99)
-        @test all(k -> split_count(Float32(k / 100), 100, :train_size) == k, 1:99)
-        @test all(k -> split_count(k / 7, 7, :train_size) == k, 1:6)
-        @test split_count(0.295, 100, :train_size) == 29
-        @test split_count(0.305, 100, :train_size) == 30
+        @test all(k -> split_count(FractionOf(k / 100), 100) == k, 1:99)
+        @test all(k -> split_count(FractionOf(Float32(k / 100)), 100) == k, 1:99)
+        @test all(k -> split_count(FractionOf(k / 7), 7) == k, 1:6)
+        @test split_count(FractionOf(0.295), 100) == 29
+        @test split_count(FractionOf(0.305), 100) == 30
         @test safe_index(0.29, nothing, 100) == (1:29, 30:100)
 
-        # a fraction is any Real in (0, 1), so an exact Rational resolves exactly
-        @test split_count(29 // 100, 100, :train_size) == 29
-        @test split_count(1 // 3, 10, :train_size) == 3
-        @test_throws DomainError split_count(3 // 2, 10, :train_size)
+        # a fraction is any Real in (0, 1], so an exact Rational resolves exactly
+        @test split_count(FractionOf(29 // 100), 100) == 29
+        @test split_count(FractionOf(1 // 3), 10) == 3
+        @test_throws DomainError FractionOf(3 // 2)
         rd10 = ReturnsResult(; nx = ["A"], X = reshape(collect(0.1:0.1:1.0), 10, 1))
         tr, te = train_test_split(rd10; test_size = 1 // 5)
         @test (size(tr.X, 1), size(te.X, 1)) == (8, 2)

@@ -12,17 +12,14 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     ActiveAssetsUncertaintyAlgorithm(;
-        active::Real = 0.2
+        active::Real_CountFraction = FractionOf(0.2)
     ) -> ActiveAssetsUncertaintyAlgorithm
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. `active` is a [`CountOf`](@ref) of assets or a [`FractionOf`](@ref) of the universe. A plain number is read through [`count_or_fraction`](@ref).
 
 ## Validation
 
-  - If `active` is an `Integer`: `active >= 1`.
-  - If `active` is any other real number: `0 < active < 1`.
-
-The type of `active` selects the rule. The constructor accepts `active = 1`, a count of one asset. It throws a `DomainError` on `active = 1.0`, a fraction equal to the whole universe.
+  - `active` passes [`count_or_fraction`](@ref).
 
 $(val_dict[:count_fraction_grid])
 
@@ -31,7 +28,12 @@ $(val_dict[:count_fraction_grid])
 ```jldoctest
 julia> ActiveAssetsUncertaintyAlgorithm()
 ActiveAssetsUncertaintyAlgorithm
-  active ┴ Float64: 0.2
+  active ┼ FractionOf
+         │   val ┴ Float64: 0.2
+
+julia> ActiveAssetsUncertaintyAlgorithm(; active = CountOf(3)).active
+CountOf
+  val ┴ Int64: 3
 ```
 
 # Related
@@ -52,20 +54,13 @@ ActiveAssetsUncertaintyAlgorithm
     $(field_dict[:active_ucs])
     """
     active
-    function ActiveAssetsUncertaintyAlgorithm(active::Real)
-        if isa(active, Integer)
-            @argcheck(active >= one(active),
-                      DomainError(active, "active must be >= 1 when given as a count"))
-        else
-            @argcheck(zero(active) < active < one(active),
-                      DomainError(active,
-                                  "active must be in (0, 1) when given as a fraction"))
-        end
+    function ActiveAssetsUncertaintyAlgorithm(active::Real_CountFraction)
+        active = count_or_fraction(active)
         return new{typeof(active)}(active)
     end
 end
 function ActiveAssetsUncertaintyAlgorithm(;
-                                          active::Real = 0.2)::ActiveAssetsUncertaintyAlgorithm
+                                          active::Real_CountFraction = FractionOf(0.2))::ActiveAssetsUncertaintyAlgorithm
     return ActiveAssetsUncertaintyAlgorithm(active)
 end
 """
@@ -503,7 +498,8 @@ Keywords correspond to the struct's fields.
 julia> L1UncertaintySetAlgorithm()
 L1UncertaintySetAlgorithm
   method ┼ ActiveAssetsUncertaintyAlgorithm
-         │   active ┴ Float64: 0.2
+         │   active ┼ FractionOf
+         │          │   val ┴ Float64: 0.2
   scaled ┼ Bool: false
   paired ┴ Bool: false
 ```
@@ -580,9 +576,11 @@ Keywords correspond to the struct's fields.
 julia> SignedL1UncertaintySetAlgorithm()
 SignedL1UncertaintySetAlgorithm
       mp ┼ ActiveAssetsUncertaintyAlgorithm
-         │   active ┴ Float64: 0.2
+         │   active ┼ FractionOf
+         │          │   val ┴ Float64: 0.2
       mm ┼ ActiveAssetsUncertaintyAlgorithm
-         │   active ┴ Float64: 0.2
+         │   active ┼ FractionOf
+         │          │   val ┴ Float64: 0.2
   scaled ┴ Bool: true
 ```
 
@@ -788,21 +786,22 @@ function l1_activation_ladder(mu::VecNum, sd::Option{<:VecNum})
             for k in 1:N]
 end
 """
-    l1_active_count(active::Union{Integer, AbstractFloat}, N::Int)
+    l1_active_count(active::CountOf, N::Integer)
+    l1_active_count(active::FractionOf, N::Integer)
 
 Convert an `active` target, a count or a fraction of the universe, to a number of assets in `1:N`.
 
-The type of `active` selects the rule. The function clamps a target outside `1:N`, and it does not throw an error. A count above `N` becomes `N`, and a fraction that rounds to zero becomes `1`.
+The member of [`AbstractCountOrFraction`](@ref) selects the rule. The function clamps a target outside `1:N`, and it does not throw an error. A count above `N` becomes `N`, and a fraction that rounds to zero becomes `1`.
 
 # Algorithm
 
- 1. If `active` is an `Integer`, use it as the count `q`.
- 2. Else, take `q = round(Int, active * N)`, the fraction of the universe rounded to the nearest asset.
+ 1. For a [`CountOf`](@ref), use `active.val` as the count `q`.
+ 2. For a [`FractionOf`](@ref), take `q = round(Int, active.val * N)`, the fraction of the universe rounded to the nearest asset.
  3. Return `clamp(q, 1, N)`, a count that the ranking can give.
 
 # Arguments
 
-  - `active`: Target number of active assets. An `Integer` is a count, and an `AbstractFloat` is a fraction of the universe.
+  - `active`: Target number of active assets, as a [`CountOf`](@ref) of assets or a [`FractionOf`](@ref) of the universe.
   - `N`: Number of assets in the universe.
 
 # Returns
@@ -812,13 +811,13 @@ The type of `active` selects the rule. The function clamps a target outside `1:N
 # Examples
 
 ```jldoctest
-julia> PortfolioOptimisers.l1_active_count(3, 10)
+julia> PortfolioOptimisers.l1_active_count(CountOf(3), 10)
 3
 
-julia> PortfolioOptimisers.l1_active_count(0.2, 10)
+julia> PortfolioOptimisers.l1_active_count(FractionOf(0.2), 10)
 2
 
-julia> PortfolioOptimisers.l1_active_count(20, 10)
+julia> PortfolioOptimisers.l1_active_count(CountOf(20), 10)
 10
 ```
 
@@ -831,9 +830,59 @@ julia> PortfolioOptimisers.l1_active_count(20, 10)
 
   - $(ref_dict[:quintile])
 """
-function l1_active_count(active::Union{Integer, AbstractFloat}, N::Int)
-    q = isa(active, Integer) ? Int(active) : round(Int, active * N)
-    return clamp(q, 1, N)
+function l1_active_count(active::CountOf, N::Integer)
+    return clamp(Int(active.val), 1, N)
+end
+function l1_active_count(active::FractionOf, N::Integer)
+    return clamp(round(Int, active.val * N), 1, N)
+end
+"""
+    l1_active_pairs(active::CountOf, N::Integer)
+    l1_active_pairs(active::FractionOf, N::Integer)
+
+Convert an `active` target, a count or a fraction of the universe, to a number of long and short pairs for the paired ladder of [`l1_resolve_eps`](@ref).
+
+`active` counts assets, and each entry of the paired ladder activates a pair of one long asset and one short asset. A count and the equal fraction give the same number of pairs when the count is even. For an odd count, the integer division rounds down and the fraction rounds to the nearest integer, so the two can differ by one pair. For example, with `N = 10`, `CountOf(7)` gives three pairs, and `FractionOf(0.7)` gives four.
+
+# Algorithm
+
+ 1. For a [`CountOf`](@ref), return `max(active.val ÷ 2, 1)`.
+ 2. For a [`FractionOf`](@ref), return `clamp(round(Int, active.val * N / 2), 1, N ÷ 2)`.
+
+# Arguments
+
+  - `active`: Target number of active assets, as a [`CountOf`](@ref) of assets or a [`FractionOf`](@ref) of the universe.
+  - `N`: Number of assets in the universe.
+
+# Returns
+
+  - `q::Int`: The target number of pairs.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.l1_active_pairs(CountOf(7), 10)
+3
+
+julia> PortfolioOptimisers.l1_active_pairs(FractionOf(0.7), 10)
+4
+```
+
+# Related
+
+  - [`l1_resolve_eps`](@ref)
+  - [`l1_active_count`](@ref)
+  - [`ActiveAssetsUncertaintyAlgorithm`](@ref)
+
+# References
+
+  - $(ref_dict[:quintile]) Corollary 7.
+"""
+function l1_active_pairs(active::CountOf, ::Integer)
+    return max(Int(active.val) ÷ 2, 1)
+end
+function l1_active_pairs(active::FractionOf, N::Integer)
+    return clamp(round(Int, active.val * N / 2), 1, N ÷ 2)
 end
 """
     l1_eps_from_ladder(method, ladder::VecNum, q::Int)
@@ -948,7 +997,7 @@ A radius in ``(F_q,\\, F_{q+1})`` makes the top ``q`` assets long and the bottom
  3. If `paired` is `false`, build the long-only ladder with [`l1_activation_ladder`](@ref), and convert `method.active` to a count with [`l1_active_count`](@ref). Return the radius that [`l1_eps_from_ladder`](@ref) finds from the ladder and the count.
  4. Else, read `half = N ÷ 2`, the number of pairs that the universe has.
  5. Add the ladder of `mus` to the ladder of the reversed, negated ranking. Keep the first `half` entries as `ladder`, the paired ladder.
- 6. Convert the target to a number of pairs. An `Integer` `active` is a count of assets, and it gives `max(active ÷ 2, 1)` pairs. An `AbstractFloat` `active` is a fraction of the universe, and it gives `clamp(round(Int, active * N / 2), 1, half)` pairs. A count and the equal fraction give the same number of pairs when the count is even. For an odd count, the integer division rounds down and the fraction rounds to the nearest integer. So the two can differ by one pair. For example, with `N = 10`, `active = 7` gives three pairs, and `active = 0.7` gives four.
+ 6. Convert the target to a number of pairs with [`l1_active_pairs`](@ref).
  7. Return the radius that [`l1_eps_from_ladder`](@ref) finds from `ladder` and the number of pairs.
 
 # Arguments
@@ -1022,13 +1071,7 @@ function l1_resolve_eps(method::ActiveAssetsUncertaintyAlgorithm, mus::VecNum,
                                                                   else
                                                                       reverse(sds)
                                                                   end))[1:half]
-    # `active` counts assets, but each paired ladder entry activates a long/short pair.
-    q = if isa(method.active, Integer)
-        max(Int(method.active) ÷ 2, 1)
-    else
-        clamp(round(Int, method.active * N / 2), 1, half)
-    end
-    return l1_eps_from_ladder(method, ladder, q)
+    return l1_eps_from_ladder(method, ladder, l1_active_pairs(method.active, N))
 end
 """
     mu_ucs(ue::CharacteristicUncertaintySet, X::MatNum,

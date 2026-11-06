@@ -916,7 +916,7 @@ $(DocStringExtensions.FIELDS)
         law::AbstractOverlapStudentLaw = NullMomentLaw(),
         q::Real = 0.05,
         min_obs::Option{<:Integer} = nothing,
-        min_periods::Option{<:Real} = nothing,
+        min_periods::Option{<:Integer} = nothing,
     ) -> OverlapMeanTest
 
 Keywords correspond to the struct's fields.
@@ -968,7 +968,7 @@ julia> PortfolioOptimisers.mean_test(OverlapMeanTest(), [0.1, -0.2, 0.3, 0.2, Na
     """
     min_periods
     function OverlapMeanTest(law::AbstractOverlapStudentLaw, q::Real,
-                             min_obs::Option{<:Integer}, min_periods::Option{<:Real})
+                             min_obs::Option{<:Integer}, min_periods::Option{<:Integer})
         assert_mean_test_rules(q, min_obs, min_periods)
         return new{typeof(law), typeof(q), typeof(min_obs), typeof(min_periods)}(law, q,
                                                                                  min_obs,
@@ -977,7 +977,7 @@ julia> PortfolioOptimisers.mean_test(OverlapMeanTest(), [0.1, -0.2, 0.3, 0.2, Na
 end
 function OverlapMeanTest(; law::AbstractOverlapStudentLaw = NullMomentLaw(), q::Real = 0.05,
                          min_obs::Option{<:Integer} = nothing,
-                         min_periods::Option{<:Real} = nothing)::OverlapMeanTest
+                         min_periods::Option{<:Integer} = nothing)::OverlapMeanTest
     return OverlapMeanTest(law, q, min_obs, min_periods)
 end
 """
@@ -1037,7 +1037,7 @@ $(DocStringExtensions.FIELDS)
         n_sim::Integer = 1_999,
         q::Real = 0.05,
         min_obs::Option{<:Integer} = nothing,
-        min_periods::Option{<:Real} = nothing,
+        min_periods::Option{<:Integer} = nothing,
         rng::Random.AbstractRNG = Random.default_rng(),
         seed::Option{<:Integer} = nothing,
     ) -> WildBootstrapMeanTest
@@ -1138,7 +1138,7 @@ true
                                    alg::AbstractBootstrapDraws, b::Real,
                                    span::AbstractMeanTestSpan, ddof::Integer,
                                    n_sim::Integer, q::Real, min_obs::Option{<:Integer},
-                                   min_periods::Option{<:Real}, rng::Random.AbstractRNG,
+                                   min_periods::Option{<:Integer}, rng::Random.AbstractRNG,
                                    seed::Option{<:Integer})
         assert_bootstrap_draws(kernel, alg)
         @argcheck(zero(b) < b <= one(b),
@@ -1162,14 +1162,14 @@ function WildBootstrapMeanTest(; kernel::AbstractLongRunKernel = BartlettKernel(
                                span::AbstractMeanTestSpan = FiniteEntrySpan(),
                                ddof::Integer = 0, n_sim::Integer = 1_999, q::Real = 0.05,
                                min_obs::Option{<:Integer} = nothing,
-                               min_periods::Option{<:Real} = nothing,
+                               min_periods::Option{<:Integer} = nothing,
                                rng::Random.AbstractRNG = Random.default_rng(),
                                seed::Option{<:Integer} = nothing)::WildBootstrapMeanTest
     return WildBootstrapMeanTest(kernel, alg, b, span, ddof, n_sim, q, min_obs, min_periods,
                                  rng, seed)
 end
 """
-    assert_mean_test_rules(q::Real, min_obs::Option{<:Integer}, min_periods::Option{<:Real})
+    assert_mean_test_rules(q::Real, min_obs::Option{<:Integer}, min_periods::Option{<:Integer})
 
 Refuse a significance level or a minimum-data rule that no series can meet.
 
@@ -1194,7 +1194,7 @@ Refuse a significance level or a minimum-data rule that no series can meet.
   - [`WildBootstrapMeanTest`](@ref)
 """
 function assert_mean_test_rules(q::Real, min_obs::Option{<:Integer},
-                                min_periods::Option{<:Real})::Nothing
+                                min_periods::Option{<:Integer})::Nothing
     assert_unit_interval(q, :q)
     if !isnothing(min_obs)
         @argcheck(min_obs >= 2, DomainError(min_obs, "min_obs must be >= 2"))
