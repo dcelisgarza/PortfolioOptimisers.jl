@@ -12,7 +12,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     ActiveAssetsUncertaintyAlgorithm(;
-        active::Union{Integer, AbstractFloat} = 0.2
+        active::Real = 0.2
     ) -> ActiveAssetsUncertaintyAlgorithm
 
 Keywords correspond to the struct's fields.
@@ -20,9 +20,11 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `active` is an `Integer`: `active >= 1`.
-  - If `active` is an `AbstractFloat`: `0 < active < 1`.
+  - If `active` is any other real number: `0 < active < 1`.
 
 The type of `active` selects the rule. The constructor accepts `active = 1`, a count of one asset. It throws a `DomainError` on `active = 1.0`, a fraction equal to the whole universe.
+
+$(val_dict[:count_fraction_grid])
 
 # Examples
 
@@ -50,7 +52,7 @@ ActiveAssetsUncertaintyAlgorithm
     $(field_dict[:active_ucs])
     """
     active
-    function ActiveAssetsUncertaintyAlgorithm(active::Union{Integer, AbstractFloat})
+    function ActiveAssetsUncertaintyAlgorithm(active::Real)
         if isa(active, Integer)
             @argcheck(active >= one(active),
                       DomainError(active, "active must be >= 1 when given as a count"))
@@ -63,7 +65,7 @@ ActiveAssetsUncertaintyAlgorithm
     end
 end
 function ActiveAssetsUncertaintyAlgorithm(;
-                                          active::Union{Integer, AbstractFloat} = 0.2)::ActiveAssetsUncertaintyAlgorithm
+                                          active::Real = 0.2)::ActiveAssetsUncertaintyAlgorithm
     return ActiveAssetsUncertaintyAlgorithm(active)
 end
 """

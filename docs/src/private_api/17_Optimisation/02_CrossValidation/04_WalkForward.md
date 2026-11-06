@@ -12,6 +12,7 @@ OptCVE_Onl
 DatesUnionPeriod
 DateAdjType
 IntPeriodDateRange
+assert_positive_period
 walk_forward_date_range
 date_index_positions
 date_walk_forward_train_starts

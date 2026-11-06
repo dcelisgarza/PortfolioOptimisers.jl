@@ -298,7 +298,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
 
 ## Validation
 
-  - If `wb` is an [`AbstractWeightBoundsEstimator`](@ref): `!isnothing(sets)`.
+  - If `wb` is keyed by name ([`name_keyed`](@ref)): `!isnothing(sets)`. A [`ScoreWeightBounds`](@ref) with a number or a vector of numbers in `val` names no asset and needs no sets.
   - If `fees` is a [`FeesEstimator`](@ref): `!isnothing(sets)`.
   - `fb` schedules: `bind !== :nearest`.
   - A reader that states no source and reads the raw returns data, beside a reader that states `x_src = ExcessSource()`, logs one warning that names its path, see [`warn_raw_readers`](@ref). The head then builds as configured.
@@ -431,9 +431,9 @@ InverseVolatility
                                fb::TDO_Option{<:OptE_Opt}, sq::Bool, strict::Bool,
                                cache::Option{<:ReturnsBufferState})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :InverseVolatility)
-        if isa(wb, AbstractWeightBoundsEstimator)
+        if name_keyed(wb)
             @argcheck(!isnothing(sets),
-                      IsNothingError("sets cannot be nothing when wb is an AbstractWeightBoundsEstimator"))
+                      IsNothingError("sets cannot be nothing when wb is keyed by name"))
         end
         if isa(fees, FeesEstimator)
             @argcheck(!isnothing(sets),
@@ -626,7 +626,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
 
 ## Validation
 
-  - If `wb` is an [`AbstractWeightBoundsEstimator`](@ref): `!isnothing(sets)`.
+  - If `wb` is keyed by name ([`name_keyed`](@ref)): `!isnothing(sets)`. A [`ScoreWeightBounds`](@ref) with a number or a vector of numbers in `val` names no asset and needs no sets.
   - If `fees` is a [`FeesEstimator`](@ref): `!isnothing(sets)`.
   - `fb` schedules: `bind !== :nearest`.
 
@@ -708,9 +708,9 @@ EqualWeighted
                            fb::TDO_Option{<:OptE_Opt}, strict::Bool,
                            cache::Option{<:ReturnsBufferState})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :EqualWeighted)
-        if isa(wb, AbstractWeightBoundsEstimator)
+        if name_keyed(wb)
             @argcheck(!isnothing(sets),
-                      IsNothingError("sets cannot be nothing when wb is an AbstractWeightBoundsEstimator"))
+                      IsNothingError("sets cannot be nothing when wb is keyed by name"))
         end
         if isa(fees, FeesEstimator)
             @argcheck(!isnothing(sets),
@@ -855,7 +855,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
 ## Validation
 
   - `alpha`: non-empty, and every element is positive and finite.
-  - If `wb` is an [`AbstractWeightBoundsEstimator`](@ref): `!isnothing(sets)`.
+  - If `wb` is keyed by name ([`name_keyed`](@ref)): `!isnothing(sets)`. A [`ScoreWeightBounds`](@ref) with a number or a vector of numbers in `val` names no asset and needs no sets.
   - If `fees` is a [`FeesEstimator`](@ref): `!isnothing(sets)`.
   - `fb` schedules: `bind !== :nearest`.
 
@@ -953,9 +953,9 @@ RandomWeighted
                             strict::Bool, cache::Option{<:ReturnsBufferState})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :RandomWeighted)
         assert_nonempty_gt0_finite_val(alpha, :alpha)
-        if isa(wb, AbstractWeightBoundsEstimator)
+        if name_keyed(wb)
             @argcheck(!isnothing(sets),
-                      IsNothingError("sets cannot be nothing when wb is an AbstractWeightBoundsEstimator"))
+                      IsNothingError("sets cannot be nothing when wb is keyed by name"))
         end
         if isa(fees, FeesEstimator)
             @argcheck(!isnothing(sets),
@@ -1139,7 +1139,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
 
 ## Validation
 
-  - If `wb` is an [`AbstractWeightBoundsEstimator`](@ref): `!isnothing(sets)`.
+  - If `wb` is keyed by name ([`name_keyed`](@ref)): `!isnothing(sets)`. A [`ScoreWeightBounds`](@ref) with a number or a vector of numbers in `val` names no asset and needs no sets.
   - If `fees` is a [`FeesEstimator`](@ref): `!isnothing(sets)`.
   - `fb` schedules: `bind !== :nearest`.
   - `iters > 0`.
@@ -1243,9 +1243,9 @@ BestConstantRebalancedPortfolio
                                              tol::Number, strict::Bool,
                                              cache::Option{<:ReturnsBufferState})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :BestConstantRebalancedPortfolio)
-        if isa(wb, AbstractWeightBoundsEstimator)
+        if name_keyed(wb)
             @argcheck(!isnothing(sets),
-                      IsNothingError("sets cannot be nothing when wb is an AbstractWeightBoundsEstimator"))
+                      IsNothingError("sets cannot be nothing when wb is keyed by name"))
         end
         if isa(fees, FeesEstimator)
             @argcheck(!isnothing(sets),

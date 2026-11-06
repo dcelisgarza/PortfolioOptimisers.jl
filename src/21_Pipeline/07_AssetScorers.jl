@@ -688,6 +688,8 @@ Keywords correspond to the struct's fields. `p` takes a vector of parameter sets
   - `min_folds >= 1`.
   - Every candidate of `p` passes the checks of the search: the optimiser checks for an estimator, and the hold-out check for a [`Pipeline`](@ref).
 
+$(val_dict[:count_fraction_grid])
+
 # Examples
 
 ```jldoctest

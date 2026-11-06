@@ -470,7 +470,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref) or [`TD_O
 
 ## Validation
 
-  - If `wb` is an [`AbstractWeightBoundsEstimator`](@ref): `!isnothing(sets)`.
+  - If `wb` is keyed by name ([`name_keyed`](@ref)): `!isnothing(sets)`. A [`ScoreWeightBounds`](@ref) with a number or a vector of numbers in `val` names no asset and needs no sets.
   - If a field holds a [`TimeDependent`](@ref) schedule: the constructor runs again with each value of the schedule in that field, so a value that the constructor refuses raises here and not in a later fold.
 
 ## Propagated parameters
@@ -624,7 +624,7 @@ HierarchicalOptimiser
                                    sets::TD_Option{<:UniverseSets},
                                    wf::TD{<:WeightFinaliser}, strict::Bool,
                                    cache::Option{<:ReturnsBufferState})
-        if isa(wb, AbstractWeightBoundsEstimator)
+        if name_keyed(wb)
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
         assert_time_dependent_substitution(HierarchicalOptimiser,

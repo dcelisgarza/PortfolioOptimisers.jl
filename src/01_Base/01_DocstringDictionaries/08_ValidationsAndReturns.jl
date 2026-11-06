@@ -70,7 +70,8 @@ unique_key_dict!(val_dict, :val_dict, :oow => "If `w` is not `nothing`, `!isempt
                  :regime_lohi_mult => "If `regime_lohi_mult` is not `nothing`, `0 < regime_lohi_mult[1] < regime_lohi_mult[2]`.",#
                  :ra_x => "`x > 0`, and `x` is finite.",#
                  :ra_y => "`y > 0`, and `y` is finite.",#
-                 :relax => "The encoding is not exact: the entries below bound the quantity instead of reproducing it, and the bound is tight only under the condition stated here.")
+                 :relax => "The encoding is not exact: the entries below bound the quantity instead of reproducing it, and the bound is tight only under the condition stated here.",#
+                 :count_fraction_grid => "!!! warning \"A search grid can turn a count into a fraction\"\n\n    A field that reads an `Integer` as a count and any other real number as a fraction can lose its count in a search grid. Julia promotes the elements of a vector literal to one type before the library reads them. So `[\"opt.ret.ucs.alg.method.active\" => [3, 5, 8], \"r.alpha\" => [0.05, 0.1]]` is a `Vector{Pair{String, Vector{Float64}}}`, and the counts arrive as `3.0`, `5.0` and `8.0`. The field then reads them as fractions, and its check refuses them. Write the grid as `Pair{String, Vector}[...]` or as a `Dict`, which keep each value vector at its own type. A value vector that mixes a count and a fraction, such as `[3, 0.2]`, is a `Vector{Float64}` before any container reads it. Give it an explicit element type, such as `Union{Int, Float64}[3, 0.2]`.")
 unique_key_dict!(ret_dict, :ret_dict,
                  :mu => "`mu::ArrNum`: Expected returns vector `assets x 1` if the `dims` keyword does not exist or `dims = 2`, `1 x assets` if `dims = 1`.",#
                  :sigma => "`sigma::MatNum`: Covariance matrix `assets x assets`.",#

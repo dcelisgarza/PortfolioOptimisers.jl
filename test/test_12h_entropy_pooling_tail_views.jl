@@ -844,6 +844,9 @@ end
     @test IntegerConditionalValueatRiskView(; sbar = 25).sbar == 25
     @test_throws DomainError IntegerConditionalValueatRiskView(; sbar = 0)
     @test_throws DomainError IntegerConditionalValueatRiskView(; sbar = 1.5)
+    # `sbar` is a count or a fraction, so a complex number has no reading.
+    @test IntegerConditionalValueatRiskView(; sbar = 1 // 2).sbar == 1 // 2
+    @test_throws TypeError IntegerConditionalValueatRiskView(; sbar = 0.5 + 0im)
     @test GridTailView().K == 11
     @test_throws DomainError GridTailView(; K = 10)
     @test_throws DomainError GridTailView(; pct = 1.5)

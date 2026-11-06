@@ -826,7 +826,7 @@ Keywords correspond to the struct's fields. `L` and `slv` are required: a budget
 
   - `0 <= L` and `1 <= p`. A `DomainError` is thrown otherwise.
   - A vector `slv` is not empty. An `IsEmptyError` is thrown otherwise.
-  - If `wb` is an [`AbstractWeightBoundsEstimator`](@ref): `!isnothing(sets)`. An `IsNothingError` is thrown otherwise.
+  - If `wb` is keyed by name ([`name_keyed`](@ref)): `!isnothing(sets)`. An `IsNothingError` is thrown otherwise.
 
 ## View parameters
 
@@ -907,9 +907,9 @@ BudgetedHindsightPath
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        if isa(wb, AbstractWeightBoundsEstimator)
+        if name_keyed(wb)
             @argcheck(!isnothing(sets),
-                      IsNothingError("sets cannot be nothing when wb is an AbstractWeightBoundsEstimator"))
+                      IsNothingError("sets cannot be nothing when wb is keyed by name"))
         end
         return new{typeof(L), typeof(p), typeof(wb), typeof(sets), typeof(strict),
                    typeof(slv), typeof(fb)}(L, p, wb, sets, strict, slv, fb)

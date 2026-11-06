@@ -28,7 +28,18 @@
         @test swb isa PO.AbstractWeightBoundsEstimator
         @test swb.val == 1 && isnothing(swb.dval) && swb.wb == WeightBounds()
         @test swb.symmetric && swb.nonfinite == 0
-        @test PO.name_keyed(swb)
+        # Issue #2008: a number or a vector of numbers in `val` names no asset, so the
+        # estimator is keyed by name only through a named `val` or a named static bound.
+        @test !PO.name_keyed(swb)
+        @test !PO.name_keyed(ScoreWeightBounds(; score = s, val = [1.0, 2.0], wb = nothing))
+        named = ScoreWeightBounds(; score = s, val = Dict("A" => 0.1))
+        @test PO.name_keyed(named)
+        @test PO.name_keyed(ScoreWeightBounds(; score = s, val = "A" => 0.1))
+        @test PO.name_keyed(ScoreWeightBounds(; score = s,
+                                              wb = WeightBoundsEstimator(;
+                                                                         ub = Dict("A" =>
+                                                                                       0.5))))
+        @test PO.name_keyed(ScoreWeightBounds(; score = s, wb = named))
         @test ScoreWeightBounds(; score = SCM()).score == SCM()
         @test_throws ArgumentError ScoreWeightBounds(; score = Variance())
         @test_throws DomainError ScoreWeightBounds(; score = s, val = -1.0)
@@ -38,12 +49,22 @@
         @test ScoreWeightBounds(; score = s, dval = Inf).dval == Inf
         @test_throws DomainError ScoreWeightBounds(; score = s, nonfinite = -0.1)
         @test isnothing(ScoreWeightBounds(; score = s, nonfinite = nothing).nonfinite)
-        # Every holder of a batch fit needs `sets`, because `val` resolves against it.
-        @test_throws PO.IsNothingError EqualWeighted(; wb = swb)
-        @test_throws PO.IsNothingError InverseVolatility(; wb = swb)
-        @test_throws PO.IsNothingError JuMPOptimiser(; slv = slv, wb = swb)
-        @test_throws PO.IsNothingError HierarchicalOptimiser(; wb = swb)
-        @test_throws PO.IsNothingError BudgetedHindsightPath(; L = 0.1, p = 1, wb = swb,
+        # Every holder of a batch fit needs `sets` for a named bound, because `val` resolves
+        # against it.
+        @test_throws PO.IsNothingError EqualWeighted(; wb = named)
+        @test_throws PO.IsNothingError InverseVolatility(; wb = named)
+        @test_throws PO.IsNothingError RandomWeighted(; wb = named)
+        @test_throws PO.IsNothingError BestConstantRebalancedPortfolio(; wb = named)
+        @test_throws PO.IsNothingError JuMPOptimiser(; slv = slv, wb = named)
+        @test_throws PO.IsNothingError HierarchicalOptimiser(; wb = named)
+        @test_throws PO.IsNothingError NestedClustered(; wb = named, opti = EqualWeighted(),
+                                                       opto = EqualWeighted())
+        @test_throws PO.IsNothingError Stacking(; wb = named,
+                                                opti = [EqualWeighted(),
+                                                        InverseVolatility()],
+                                                opto = EqualWeighted())
+        @test_throws PO.IsNothingError SubsetResampling(; wb = named, opt = EqualWeighted())
+        @test_throws PO.IsNothingError BudgetedHindsightPath(; L = 0.1, p = 1, wb = named,
                                                              slv = slv)
         # An Allocation Set of an online head resolves once for a block of rows, so a
         # bound that reads the returns of the block would put a look-ahead in the pass.
@@ -115,6 +136,18 @@
                                                                   ub = [0.1, 0.2, 0.3, 0.4,
                                                                         0.5])), [1, 3])
         @test vv.val == [1.0, 3.0] && vv.wb.ub == [0.1, 0.3] && vv.score === s
+        # Issue #2008: a bound that names no asset resolves with no sets, and gives the
+        # bounds that it gives with sets.
+        @test weight_bounds_constraints(swb, nothing; rd = rd).ub ≈ wb.ub
+        @test weight_bounds_constraints(v, nothing; rd = rd).ub ≈ wv.ub
+        @test weight_bounds_constraints(a, nothing; rd = rd).lb == wa.lb
+        @test_throws DimensionMismatch weight_bounds_constraints(ScoreWeightBounds(;
+                                                                                   score = s,
+                                                                                   val = [1.0,
+                                                                                          2.0]),
+                                                                 nothing; rd = rd)
+        @test_throws PO.IsNothingError weight_bounds_constraints(d, nothing; rd = rd)
+        @test_throws PO.IsNothingError weight_bounds_constraints(n, nothing; rd = rd)
     end
 
     @testset "an optimiser resolves the bound on its own fit" begin
@@ -149,6 +182,21 @@
                        rd)
         @test res.pa.wb.ub ≈ cap
         @test all(res.w .<= cap .+ 1e-6)
+        # Issue #2008: a bound that names no asset needs no sets in any holder.
+        hn = HierarchicalOptimiser(; wb = swb)
+        for opt in (EqualWeighted(; wb = swb), InverseVolatility(; wb = swb),
+                    RandomWeighted(; wb = swb, seed = 1),
+                    BestConstantRebalancedPortfolio(; wb = swb),
+                    HierarchicalRiskParity(; opt = hn),
+                    NestedClustered(; wb = swb, opti = EqualWeighted(), opto = EqualWeighted()),
+                    Stacking(; wb = swb, opti = [EqualWeighted(), InverseVolatility()],
+                             opto = EqualWeighted()),
+                    SubsetResampling(; wb = swb, opt = EqualWeighted(), seed = 1),
+                    BudgetedHindsightPath(; L = 0.5, p = 1, wb = swb, slv = slv))
+            @test optimise(opt, rd).wb.ub ≈ cap
+        end
+        res = optimise(MeanRisk(; opt = JuMPOptimiser(; slv = slv, wb = swb)), rd)
+        @test res.pa.wb.ub ≈ cap
         # The two online sets still take a bound that reads only names.
         wbe = WeightBoundsEstimator(; ub = Dict("A" => 0.5))
         @test BoundedAllocationSet(; wb = wbe, sets = sets).wb === wbe

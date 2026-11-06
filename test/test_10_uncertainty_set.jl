@@ -61,6 +61,9 @@ end
             @test_throws DomainError ActiveAssetsUncertaintyAlgorithm(; active = 0)
             @test_throws DomainError ActiveAssetsUncertaintyAlgorithm(; active = 0.0)
             @test_throws DomainError ActiveAssetsUncertaintyAlgorithm(; active = 1.0)
+            # A `Rational` fraction was refused with a `MethodError`.
+            @test ActiveAssetsUncertaintyAlgorithm(; active = 1 // 5).active == 1 // 5
+            @test_throws DomainError ActiveAssetsUncertaintyAlgorithm(; active = 3 // 2)
             # alg must be one of the two L1 shapes.
             @test_throws ArgumentError CharacteristicUncertaintySet(;
                                                                     alg = BoxUncertaintySetAlgorithm())

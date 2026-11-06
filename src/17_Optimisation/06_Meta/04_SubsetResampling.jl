@@ -318,7 +318,7 @@ The loop inside `SubsetResampling` is over asset subsets, not over time folds. N
 ## Validation
 
   - `opt` passes [`assert_internal_optimiser`](@ref). A schedule applies the check to each entry and to its `default`.
-  - If `wb` is an [`AbstractWeightBoundsEstimator`](@ref), `sets` is not `nothing`. The constructor throws an [`IsNothingError`](@ref) otherwise.
+  - If `wb` is keyed by name ([`name_keyed`](@ref)), `sets` is not `nothing`. The constructor throws an [`IsNothingError`](@ref) otherwise.
   - If `fees` is a [`FeesEstimator`](@ref), `sets` is not `nothing`. The constructor throws an [`IsNothingError`](@ref) otherwise.
   - If `subset_size` is an `Integer`: `subset_size >= 1`.
   - If `subset_size` is any other real number: `0 < subset_size < 1`.
@@ -326,6 +326,8 @@ The loop inside `SubsetResampling` is over asset subsets, not over time folds. N
   - `max_comb > 0` and finite.
   - A schedule in `opt` or `fb` has `bind !== :nearest`. Each entry of a schedule passes the check of its field.
   - A reader that states no source and reads the raw returns data, beside a reader that states `x_src = ExcessSource()`, logs one warning that names its path, see [`warn_raw_readers`](@ref). The head then builds as configured.
+
+$(val_dict[:count_fraction_grid])
 
 ## Propagated parameters
 
@@ -444,7 +446,7 @@ The loop inside `SubsetResampling` is over asset subsets, not over time folds. N
         assert_no_nearest_bind_optimiser_schedule(opt, :opt, :SubsetResampling)
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :SubsetResampling)
         assert_internal_optimiser(opt)
-        if isa(wb, AbstractWeightBoundsEstimator)
+        if name_keyed(wb)
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
         if isa(fees, FeesEstimator)

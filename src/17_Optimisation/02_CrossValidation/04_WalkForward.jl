@@ -518,6 +518,38 @@ Matches either a plain `Function` or a [`DateAdjusterEstimator`](@ref) for adjus
 """
 const DateAdjType = Union{Function, DateAdjusterEstimator}
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assert that the period `p` moves a date forward.
+
+A `Dates.Period` must be greater than zero. A `Dates.CompoundPeriod` must hold at least one positive part, so a form such as `Month(1) - Day(1)` passes. A compound period whose parts are all zero or negative moves no date forward.
+
+# Arguments
+
+  - `p`: The period to check ([`DatesUnionPeriod`](@ref)).
+  - $(arg_dict[:sym_msg])
+
+# Validation
+
+  - A positive period, as above, which raises a `DomainError` that names `sym` and `p`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`DateWalkForward`](@ref)
+  - [`DatesUnionPeriod`](@ref)
+"""
+function assert_positive_period(p::DatesUnionPeriod, sym::Sym_Str)::Nothing
+    parts = isa(p, Dates.CompoundPeriod) ? p.periods : (p,)
+    @argcheck(any(x -> x > zero(x), parts),
+              DomainError(p,
+                          "$sym ($p) must be a positive period, so that it moves a date forward"))
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Implements date-based walk-forward cross-validation for time series, supporting flexible windowing, purging, and custom date adjustment.
@@ -572,6 +604,8 @@ Each switch is `nothing` by default. An unset `pws` follows `wd`, so `wd` alone 
   - `test_size` must be non-empty, greater than zero, and finite.
   - `purged_size` must be non-empty, non-negative, and finite.
   - If `train_size` is an integer, it must be non-empty, greater than zero, and finite. A training window of zero dates holds no observation.
+  - If `train_size` is a period, it must be positive, through [`assert_positive_period`](@ref). A training window of a zero or a negative period holds no observation.
+  - `period` must be positive, through [`assert_positive_period`](@ref). A zero step gives no date range, and a negative step gives an empty one.
   - [`Base.split(dwf::DateWalkForward, rd::Prices_RR)`](@ref) and [`n_splits`](@ref) throw an [`IsEmptyError`](@ref) if a fold of the data has a training window that is empty after the purge. They drop a fold whose test window holds no observation, which happens when many dates of the range map to one timestamp, for example the two days of a weekend under a daily `period` over business-day data.
 
 # Examples
@@ -678,7 +712,10 @@ DateWalkForward
         assert_nonempty_gt0_finite_val(test_size, :test_size)
         if isa(train_size, Integer)
             assert_nonempty_gt0_finite_val(train_size, :train_size)
+        else
+            assert_positive_period(train_size, :train_size)
         end
+        assert_positive_period(period, :period)
         assert_nonempty_nonneg_finite_val(purged_size, :purged_size)
         return new{typeof(train_size), typeof(test_size), typeof(period),
                    typeof(period_offset), typeof(purged_size), typeof(adjuster),

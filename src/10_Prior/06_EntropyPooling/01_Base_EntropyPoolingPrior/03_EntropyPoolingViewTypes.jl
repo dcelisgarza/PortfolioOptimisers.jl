@@ -291,7 +291,7 @@ The window is the only restriction. If the tail of mass ``\\alpha`` of a posteri
 # Constructors
 
     IntegerConditionalValueatRiskView(;
-        sbar::Option{<:Number} = nothing
+        sbar::Option{<:Real} = nothing
     ) -> IntegerConditionalValueatRiskView
 
 Keywords correspond to the struct's fields.
@@ -300,6 +300,8 @@ Keywords correspond to the struct's fields.
 
   - If `sbar` is an `Integer`, `sbar >= 1`.
   - If `sbar` is not an `Integer`, `0 < sbar < 1`. Use an `Integer` to name the whole sample.
+
+$(val_dict[:count_fraction_grid])
 
 # Examples
 
@@ -325,7 +327,7 @@ IntegerConditionalValueatRiskView
     $(field_dict[:sbar])
     """
     sbar
-    function IntegerConditionalValueatRiskView(sbar::Option{<:Number})
+    function IntegerConditionalValueatRiskView(sbar::Option{<:Real})
         if isa(sbar, Integer)
             @argcheck(sbar >= one(sbar), DomainError(sbar, "sbar must be >= 1"))
         elseif !isnothing(sbar)
@@ -335,7 +337,7 @@ IntegerConditionalValueatRiskView
     end
 end
 function IntegerConditionalValueatRiskView(;
-                                           sbar::Option{<:Number} = nothing)::IntegerConditionalValueatRiskView
+                                           sbar::Option{<:Real} = nothing)::IntegerConditionalValueatRiskView
     return IntegerConditionalValueatRiskView(sbar)
 end
 """

@@ -745,6 +745,19 @@
         # An integer `train_size` of zero dates is empty on any data.
         @test_throws DomainError DateWalkForward(0, 1)
         @test DateWalkForward(1, 1) isa DateWalkForward
+        # Issue #2012: a period `train_size` of zero or less passed the constructor and failed
+        # at the split, and a zero or a negative `period` failed with a message that did not
+        # name it.
+        for train_size in (Day(0), Day(-5), Month(0), Day(-1) + Month(0))
+            @test_throws DomainError DateWalkForward(train_size, 1)
+        end
+        for period in (Day(0), Day(-1), Month(0), Day(-1) - Month(1))
+            @test_throws DomainError DateWalkForward(10, 1; period = period)
+            @test_throws DomainError OnlineDateWalkForward(10, 1; period = period)
+        end
+        # A compound period with one positive part moves a date forward.
+        @test DateWalkForward(Month(1) - Day(1), 1; period = Month(1) - Day(1)) isa
+              DateWalkForward
     end
     @testset "A scheme with a shuffle property set to true is refused" begin
         # No scheme of the library shuffles, but a scheme a user defines can carry a
@@ -785,6 +798,13 @@
         @test_throws DomainError KFold(; purged_size = -1)
         @test_throws DomainError KFold(; embargo_size = -1)
         @test KFold(; purged_size = 0, embargo_size = 0) isa KFold
+        # Issue #2012: one fold is the test set of its own split and leaves it no training
+        # rows. The split then failed with "reducing over an empty collection".
+        @test_throws DomainError KFold(; n = 1)
+        @test_throws DomainError KFold(; n = 0)
+        @test_throws DomainError KFold(; n = -3)
+        @test KFold(; n = 2) isa KFold
+        @test all(!isempty, split(KFold(; n = 2), rd).train_idx)
     end
     @testset "MultipleRandomised" begin
         cv = IndexWalkForward(127, 171)

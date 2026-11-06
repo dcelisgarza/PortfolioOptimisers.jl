@@ -573,7 +573,7 @@ end
 
 Tells whether a constraint slot holds an estimator that resolves its names over `sets`.
 
-The owner of such a slot must carry `sets`. The estimators are every [`AbstractWeightBoundsEstimator`](@ref), [`LinearConstraintEstimator`](@ref), [`ExposureConstraintEstimator`](@ref), [`ThresholdEstimator`](@ref), [`AssetSetsMatrixEstimator`](@ref) and [`TurnoverEstimator`](@ref). A vector is keyed by name when one of its entries is.
+The owner of such a slot must carry `sets`. The estimators are every [`AbstractWeightBoundsEstimator`](@ref), [`LinearConstraintEstimator`](@ref), [`ExposureConstraintEstimator`](@ref), [`ThresholdEstimator`](@ref), [`AssetSetsMatrixEstimator`](@ref) and [`TurnoverEstimator`](@ref). A [`ScoreWeightBounds`](@ref) is the exception: it is keyed by name only when its `val` or its static bounds name assets. A vector is keyed by name when one of its entries is.
 
 # Returns
 

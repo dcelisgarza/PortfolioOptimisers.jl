@@ -216,6 +216,8 @@ $(DocStringExtensions.FIELDS)
   - If `window_size` is an `Integer`: `window_size >= 2`.
   - If `window_size` is any other real number: `0 < window_size < 1`.
 
+$(val_dict[:count_fraction_grid])
+
 # Related
 
   - [`cross_val_predict`](@ref)

@@ -549,6 +549,8 @@ Keywords correspond to the struct's fields.
   - `window >= 1`. A `DomainError` is thrown otherwise.
   - `neighbours >= 1` for an `Integer`, and `0 < neighbours < 1` for another real. A `DomainError` is thrown otherwise.
 
+$(val_dict[:count_fraction_grid])
+
 # Examples
 
 ```jldoctest

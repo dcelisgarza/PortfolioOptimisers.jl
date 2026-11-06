@@ -196,6 +196,8 @@ Positional and keyword arguments correspond to fields above. The outer construct
   - `n_best > 0` and finite.
   - If `scorer` is a function: `n_best == 1`, because a function returns one index and cannot order more candidates.
 
+$(val_dict[:count_fraction_grid])
+
 # Examples
 
 ```jldoctest
@@ -370,6 +372,8 @@ The search draws its trials from `rng`, so the trials, and the order of the `n_b
   - `n_iter > 0` and finite.
   - `n_best > 0` and finite.
   - If `scorer` is a function: `n_best == 1`, because a function returns one index and cannot order more candidates.
+
+$(val_dict[:count_fraction_grid])
 
 # Examples
 

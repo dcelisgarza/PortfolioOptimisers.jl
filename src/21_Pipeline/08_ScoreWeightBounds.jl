@@ -239,7 +239,27 @@ function score_bounds(wb::WeightBounds, c::VecNum, symmetric::Bool)::WeightBound
     return WeightBounds(; lb = lb, ub = min.(wb.ub, c))
 end
 """
-    weight_bounds_constraints(wb::ScoreWeightBounds, sets::UniverseSets;
+    name_keyed(wb::ScoreWeightBounds) -> Bool
+
+Tell whether a [`ScoreWeightBounds`](@ref) resolves a name over `sets`.
+
+A number or a vector of numbers in `val` names no asset, so it resolves without `sets`. A pair, a dictionary, a vector of pairs or a value algorithm in `val` reads the universe of `sets`. The estimator also needs `sets` when its static bounds `wb` do.
+
+# Returns
+
+  - `::Bool`: `true` when `val` is not a number or a vector of numbers, or when `wb.wb` is keyed by name.
+
+# Related
+
+  - [`name_keyed`](@ref)
+  - [`ScoreWeightBounds`](@ref)
+  - [`weight_bounds_constraints`](@ref)
+"""
+function name_keyed(wb::ScoreWeightBounds)
+    return !isa(wb.val, Num_VecNum) || name_keyed(wb.wb)
+end
+"""
+    weight_bounds_constraints(wb::ScoreWeightBounds, sets::Option{<:UniverseSets};
                               rd::Option{<:ReturnsResult} = nothing, N::Integer = 0,
                               strict::Bool = false, datatype::DataType = Float64, kwargs...)
 
@@ -249,14 +269,14 @@ Resolve a [`ScoreWeightBounds`](@ref) on the returns of a fit.
 
  1. Score the assets of `rd` with [`asset_scores`](@ref), giving `s`. A zero `N` takes the length of `s`.
  2. Resolve `wb.wb` with `weight_bounds_constraints` on the same arguments, then expand it to `N` entries on each side.
- 3. Resolve `wb.val` against `sets` with [`estimator_to_val`](@ref), giving `v`. An asset that `wb.val` does not name takes `wb.dval`, or `one(datatype)` when `wb.dval` is `nothing`.
+ 3. Resolve `wb.val`, giving `v`. With `sets`, [`estimator_to_val`](@ref) resolves it against the universe, and an asset that `wb.val` does not name takes `wb.dval`, or `one(datatype)` when `wb.dval` is `nothing`. With no sets, `wb.val` names no asset, so the number or the vector of numbers is `v`.
  4. Compute the score bound of each asset with [`score_cap`](@ref), giving `c`. An asset whose score is not finite takes `wb.nonfinite`, or `+Inf` when `wb.nonfinite` is `nothing`.
  5. Join the static bounds with `c` through [`score_bounds`](@ref).
 
 # Arguments
 
   - `wb`: The estimator.
-  - `sets`: [`UniverseSets`](@ref) of the assets of the fit.
+  - `sets`: [`UniverseSets`](@ref) of the assets of the fit, or `nothing` when the estimator is not keyed by name ([`name_keyed`](@ref)).
   - `rd`: The returns of the fit, in the order of the assets of `sets`.
   - `N`: The number of assets. A zero takes the number of assets of `rd`.
   - $(arg_dict[:strict_opt])
@@ -266,7 +286,9 @@ Resolve a [`ScoreWeightBounds`](@ref) on the returns of a fit.
 # Validation
 
   - `rd` is not `nothing`. An [`IsNothingError`](@ref) is thrown otherwise. The scores need the returns of the fit.
+  - `sets` is not `nothing` when the estimator is keyed by name ([`name_keyed`](@ref)). An [`IsNothingError`](@ref) is thrown otherwise.
   - `length(s) == N`. A `DimensionMismatch` is thrown otherwise.
+  - With no sets, a vector of numbers in `wb.val` holds `N` entries. A `DimensionMismatch` is thrown otherwise.
   - The checks of [`score_bounds`](@ref): no score bound is negative, and no static lower bound is above its score bound. A `DomainError` is thrown otherwise.
 
 # Returns
@@ -305,12 +327,14 @@ The third volume of `C` is a fill and not a trade, so `C` holds two volumes, few
   - [`score_cap`](@ref)
   - [`score_bounds`](@ref)
 """
-function weight_bounds_constraints(wb::ScoreWeightBounds, sets::UniverseSets;
+function weight_bounds_constraints(wb::ScoreWeightBounds, sets::Option{<:UniverseSets};
                                    rd::Option{<:ReturnsResult} = nothing, N::Integer = 0,
                                    strict::Bool = false, datatype::DataType = Float64,
                                    kwargs...)::WeightBounds
     @argcheck(!isnothing(rd),
               IsNothingError("a `ScoreWeightBounds` scores the assets on the returns of the fit, and this route carries no returns. Pass them as `weight_bounds_constraints(wb, sets; rd = rd)`, or put the estimator in the `wb` field of an optimiser, which passes the returns of each fit."))
+    @argcheck(!(isnothing(sets) && name_keyed(wb)),
+              IsNothingError("sets cannot be nothing when a `ScoreWeightBounds` is keyed by name: its `val` or its static bounds `wb` name assets, and only a UniverseSets resolves a name"))
     s = asset_scores(wb.score, rd)
     N = ifelse(iszero(N), length(s), N)
     @argcheck(length(s) == N,
@@ -318,8 +342,15 @@ function weight_bounds_constraints(wb::ScoreWeightBounds, sets::UniverseSets;
     swb = weight_bounds_constraints(wb.wb, sets; rd = rd, N = N, strict = strict,
                                     datatype = datatype)
     swb = weight_bounds_constraints(swb; N = N, datatype = datatype)
-    v = estimator_to_val(wb.val, sets, ifelse(isnothing(wb.dval), one(datatype), wb.dval);
+    v = if isnothing(sets)
+        # The guard above leaves a number or a vector of numbers here.
+        @argcheck(isa(wb.val, Number) || length(wb.val) == N,
+                  DimensionMismatch("val holds $(length(wb.val)) multiples, and the bounds must cover $N assets"))
+        wb.val
+    else
+        estimator_to_val(wb.val, sets, ifelse(isnothing(wb.dval), one(datatype), wb.dval);
                          datatype = datatype, strict = strict)
+    end
     nf = ifelse(isnothing(wb.nonfinite), convert(datatype, Inf), wb.nonfinite)
     return score_bounds(swb, score_cap.(v, s, nf), wb.symmetric)
 end

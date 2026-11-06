@@ -511,6 +511,10 @@ Where:
 
 The outer optimiser solves for ``\\boldsymbol{v}`` over ``\\mathbf{X}^{o}``. The weight of asset ``i`` in ``C_k`` is ``w_i = v_k w^{(k)}_{i}``. The sample mean of ``\\mathbf{X}^{o}`` is ``\\mathbf{W}^\\intercal \\hat{\\boldsymbol{\\mu}}`` and its sample covariance is ``\\mathbf{W}^\\intercal \\hat{\\mathbf{\\Sigma}} \\mathbf{W}``, where ``\\hat{\\boldsymbol{\\mu}}`` and ``\\hat{\\mathbf{\\Sigma}}`` are the sample moments of ``\\mathbf{X}``. These are the reduced moments of Snippet 4 of [lopezdeprado2019robust](@cite), so an outer optimiser that estimates sample moments solves its inter-cluster problem.
 
+!!! note "One cluster"
+
+    The outer optimiser fits also when the clustering finds one cluster. Its problem then has one synthetic asset, and its own constraints set the weight of that asset, so the weight is `1` only under a budget of `1`. An outer estimator that refuses one asset throws in this case. A prior with a [`ShrunkExpectedReturns`](@ref) mean is an example, because its James-Stein intensity is not defined at `N = 1`. A clustering can find one cluster in some folds of a cross-validation and several clusters in other folds. When the data can form one cluster, give the outer optimiser estimators that accept one asset.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -550,7 +554,7 @@ An entry of a schedule in `opti` or `opto` must be an estimator, as the static v
   - When `cv` is present, `opti` passes `assert_external_optimiser`.
   - `scorer` is `nothing` unless `cv` is a [`CombinatorialCrossValidation`](@ref). The constructor throws an `ArgumentError` otherwise, through [`assert_meta_scorer`](@ref).
   - A schedule in `opto` or `fb` does not bind `:nearest`. A schedule in `opti` that binds `:nearest` has an explicit `default`, and `cv` is present.
-  - An [`AbstractWeightBoundsEstimator`](@ref) in `wb`, or a `FeesEstimator` in `fees`, needs `sets`. The constructor throws an `IsNothingError` otherwise.
+  - A `wb` that is keyed by name ([`name_keyed`](@ref)), or a `FeesEstimator` in `fees`, needs `sets`. The constructor throws an `IsNothingError` otherwise.
   - A vector schedule holds no precomputed result, see [`assert_time_dependent_substitution`](@ref).
   - A reader that states no source and reads the raw returns data, beside a reader that states `x_src = ExcessSource()`, logs one warning that names its path, see [`warn_raw_readers`](@ref). The head then builds as configured.
 
@@ -686,7 +690,7 @@ An entry of a schedule in `opti` or `opto` must be an estimator, as the static v
         if !isnothing(cv)
             assert_external_optimiser(opti)
         end
-        if isa(wb, AbstractWeightBoundsEstimator)
+        if name_keyed(wb)
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
         if isa(fees, FeesEstimator)
