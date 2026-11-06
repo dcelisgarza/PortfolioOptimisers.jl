@@ -6,7 +6,7 @@ Abstract supertype for the rules that turn the scores of the assets into a keep-
 A selection rule is an [`AbstractAlgorithm`](@ref). A [`ScoreSelector`](@ref) uses it, and it has no use on its own. There are two kinds of rule.
 
   - **Literal.** [`ThresholdRule`](@ref) compares a score with absolute bounds, and it ignores [`bigger_is_better`](@ref). A threshold on a variance is the variance that it states. The rule does not read it as "keep the better assets". That change inverts the purpose of a [`ZeroVarianceFilter`](@ref).
-  - **Ordinal.** [`RankRule`](@ref) and [`QuantileRule`](@ref) sort the assets from the best to the worst, and take a count or a fraction from each end. [`bigger_is_better`](@ref) sets the order, so `:best` is the lowest risk for a risk measure and the highest value for a return measure.
+  - **Ordinal.** [`RankRule`](@ref) sorts the assets from the best to the worst, and takes a [`CountOf`](@ref) or a [`FractionOf`](@ref) from each end. [`bigger_is_better`](@ref) sets the order, so `:best` is the lowest risk for a risk measure and the highest value for a return measure.
 
 # Interfaces
 
@@ -29,7 +29,6 @@ To add a selection rule, subtype `AbstractSelectionRule`, put every parameter of
   - [`ScoreSelector`](@ref)
   - [`ThresholdRule`](@ref)
   - [`RankRule`](@ref)
-  - [`QuantileRule`](@ref)
 """
 abstract type AbstractSelectionRule <: AbstractAlgorithm end
 """
@@ -117,9 +116,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Take a number of assets from each end of the order of the scores, then keep them or drop them.
 
-`best` and `worst` are **counts that the rule takes from each end**, not positions. `best = 20` means twenty assets, not the asset at rank twenty. [`bigger_is_better`](@ref) of the score sets which end is the best. For a risk measure, `RankRule(; best = 20)` keeps the twenty assets with the lowest risk. For `MeanReturn`, it keeps the twenty with the highest return. A rule with both counts takes both ends. `action = :drop` takes the complement of the selection. With it, a rule can drop the five worst assets with no knowledge of the size of the universe.
+`best` and `worst` are **sizes of the part that the rule takes from each end**, not positions. Each is a [`CountOf`](@ref) of assets or a [`FractionOf`](@ref) of the assets with a finite score. `best = CountOf(20)` means twenty assets, not the asset at rank twenty, and `best = FractionOf(0.2)` means a fifth of the scored assets. A plain number is read through [`count_or_fraction`](@ref). [`bigger_is_better`](@ref) of the score sets which end is the best. For a risk measure, `RankRule(; best = 20)` keeps the twenty assets with the lowest risk. For `MeanReturn`, it keeps the twenty with the highest return. A rule with both tails takes both ends. `action = :drop` takes the complement of the selection. With it, a rule can drop the five worst assets with no knowledge of the size of the universe.
 
-A count **saturates** at the number of assets. On a window of 30 assets, `best = 50` keeps all 30 and does not throw. A hyperparameter search over `best` then does not fail at its largest value.
+A count **saturates** at the number of assets. On a window of 30 assets, `best = 50` keeps all 30 and does not throw. A hyperparameter search over `best` then does not fail at its largest value. A fraction becomes a count on the window that the rule fits, with `round(Int, f * n, RoundNearestTiesUp)` over the `n` assets with a finite score. An exact half rounds **up**. For example, `best = FractionOf(0.625)` on a window of 4 assets takes 3 assets, and not the 2 that the default `RoundNearest` of Julia gives. An asset with no score does not count in the size of the universe.
 
 !!! warning
 
@@ -151,7 +150,7 @@ Where:
   - ``\\mathcal{T}(k)``: The tail of size ``k``, at the end that the subscript names.
   - ``a_{i}``: The number of assets in ``\\mathcal{F}`` whose score is strictly better than ``s_{i}``. At the `best` end, a larger score is better when [`bigger_is_better`](@ref) is `true`, and a smaller score is better when it is `false`. The `worst` end reverses this order.
   - ``e_{i}``: The number of assets in ``\\mathcal{F}`` whose score is equal to ``s_{i}``. The number includes asset ``i``, so ``e_{i} \\geq 1``.
-  - ``k_{b}``, ``k_{w}``: The counts `best` and `worst`, each saturated to ``[0,\\, N_{\\mathcal{F}}]``. An omitted count is ``0``.
+  - ``k_{b}``, ``k_{w}``: The counts of `best` and `worst` from [`rule_tail_count`](@ref), each saturated to ``[0,\\, N_{\\mathcal{F}}]``. A tail of `nothing` is ``0``. A [`CountOf`](@ref) is its `val`. A [`FractionOf`](@ref) ``f`` is ``\\left\\lfloor f N_{\\mathcal{F}} + \\frac{1}{2} \\right\\rfloor``, the rounding mode `RoundNearestTiesUp`.
   - ``\\mathcal{S}``: The union of the two tails, before the rule applies `action`.
 
 Three facts follow from this definition. A tail admits asset ``i`` only when the whole tied block of ``i`` fits in ``k``. A tail excludes a block that crosses the cut, so ``\\left| \\mathcal{T}(k) \\right| \\leq k``. If all the finite scores are equal, ``a_{i} + e_{i} = N_{\\mathcal{F}}`` for every asset of ``\\mathcal{F}``, so every tail of size ``k < N_{\\mathcal{F}}`` is empty. An asset outside ``\\mathcal{F}`` is in no tail and in neither keep-set, so an asset with no score never survives the rule.
@@ -163,155 +162,123 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     RankRule(;
-        best::Option{<:Integer} = nothing,
-        worst::Option{<:Integer} = nothing,
+        best::Option{<:Real_CountFraction} = nothing,
+        worst::Option{<:Real_CountFraction} = nothing,
         action::Symbol = :keep,
     ) -> RankRule
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. The constructor reads a plain `best` or `worst` through [`count_or_fraction`](@ref), so each field holds a [`CountOf`](@ref), a [`FractionOf`](@ref) or `nothing`.
 
 ## Validation
 
-  - At least one of `best`, `worst` is not `nothing`.
-  - Every given count is `>= 0`, and at least one count is `> 0`.
+  - At least one of `best`, `worst` is not `nothing`. Otherwise an `IsNothingError`.
+  - Every plain tail passes [`count_or_fraction`](@ref). A count is at least one, so `nothing` states a tail that takes no asset.
   - `action in (:keep, :drop)`.
 
 # Examples
 
 ```jldoctest
-julia> RankRule(; worst = 5, action = :drop)   # drop the five worst
+julia> RankRule(; worst = CountOf(5), action = :drop)   # drop the five worst
 RankRule
     best ┼ nothing
-   worst ┼ Int64: 5
+   worst ┼ CountOf
+         │   val ┴ Int64: 5
   action ┴ Symbol: :drop
+
+julia> RankRule(; best = FractionOf(0.1)).best   # keep the best decile
+FractionOf
+  val ┴ Float64: 0.1
 ```
 
 # Related
 
   - [`AbstractSelectionRule`](@ref)
-  - [`QuantileRule`](@ref)
+  - [`CountOf`](@ref)
+  - [`FractionOf`](@ref)
+  - [`rule_tail_count`](@ref)
   - [`bigger_is_better`](@ref)
 """
 @concrete struct RankRule <: AbstractSelectionRule
     """
-    The number of assets to take from the best end. `nothing` takes no asset.
+    The part to take from the best end, as a [`CountOf`](@ref) or a [`FractionOf`](@ref). `nothing` takes no asset.
     """
     best
     """
-    The number of assets to take from the worst end. `nothing` takes no asset.
+    The part to take from the worst end, as a [`CountOf`](@ref) or a [`FractionOf`](@ref). `nothing` takes no asset.
     """
     worst
     """
     $(field_dict[:pre_action])
     """
     action
-    function RankRule(best::Option{<:Integer}, worst::Option{<:Integer}, action::Symbol)
-        assert_tail_counts(best, worst, :RankRule)
+    function RankRule(best::Option{<:Real_CountFraction},
+                      worst::Option{<:Real_CountFraction}, action::Symbol)
+        @argcheck(!(isnothing(best) && isnothing(worst)),
+                  IsNothingError("a RankRule needs at least one of best, worst"))
+        best = maybe_count_or_fraction(best)
+        worst = maybe_count_or_fraction(worst)
         assert_selection_action(action)
         return new{typeof(best), typeof(worst), typeof(action)}(best, worst, action)
     end
 end
-function RankRule(; best::Option{<:Integer} = nothing, worst::Option{<:Integer} = nothing,
+function RankRule(; best::Option{<:Real_CountFraction} = nothing,
+                  worst::Option{<:Real_CountFraction} = nothing,
                   action::Symbol = :keep)::RankRule
     return RankRule(best, worst, action)
 end
 """
-$(DocStringExtensions.TYPEDEF)
+    rule_tail_count(tail::Nothing, n::Integer)
+    rule_tail_count(tail::CountOf, n::Integer)
+    rule_tail_count(tail::FractionOf, n::Integer)
 
-A [`RankRule`](@ref) whose tail sizes are *fractions* of the asset universe.
+Convert one tail of a [`RankRule`](@ref) to the number of assets that it takes from its end.
 
-`best` and `worst` are fractions in `(0, 1)`. The rule converts each fraction to a count with `round(Int, fraction * n, RoundNearestTiesUp)` on the window that it fits. `n` is the number of assets with a finite score, so an asset with no score does not count in the size of the universe. An exact half rounds **up**. For example, `best = 0.625` on a window of 4 assets takes 3 assets, and not the 2 that the default `RoundNearest` of Julia gives.
+`n` is the number of assets with a finite score, so an asset with no score does not count in the size of the universe. [`tail_mask`](@ref) saturates the count at `n`.
 
-The other behaviour is the same as for [`RankRule`](@ref). [`bigger_is_better`](@ref) sets the order, `action = :drop` takes the complement, a count saturates, and the rule excludes a tied block that crosses the cut.
+# Algorithm
 
-Fractions and counts have separate types on purpose. If one rule took both, `best = 1` is one asset and `best = 1.0` is the whole universe. Only the type of the literal tells the two apart.
+ 1. Return `nothing` for a tail of `nothing`.
+ 2. Return `tail.val` for a [`CountOf`](@ref).
+ 3. Return `round(Int, tail.val * n, RoundNearestTiesUp)` for a [`FractionOf`](@ref). An exact half rounds up.
 
-# Mathematical definition
+# Arguments
 
-```math
-\\begin{align}
-k &= \\left\\lfloor f N_{\\mathcal{F}} + \\frac{1}{2} \\right\\rfloor\\,.
-\\end{align}
-```
+  - `tail`: The `best` or the `worst` field of the rule.
+  - `n`: The number of assets with a finite score.
 
-Where:
+# Returns
 
-  - $(math_dict[:k_tail_count])
-  - $(math_dict[:N_F_finite_count])
-  - ``f``: The fraction `best` or `worst`, in ``(0,\\, 1)``.
-
-The floor of ``f N_{\\mathcal{F}} + 1/2`` is the rounding mode `RoundNearestTiesUp`. An exact half rounds **up**, and not to the even neighbour that the default `RoundNearest` of Julia selects. The two counts are then the ``k_{b}`` and the ``k_{w}`` of [`RankRule`](@ref), which states the admitted set.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    QuantileRule(;
-        best::Option{<:Real} = nothing,
-        worst::Option{<:Real} = nothing,
-        action::Symbol = :keep,
-    ) -> QuantileRule
-
-Keywords correspond to the struct's fields.
-
-## Validation
-
-  - At least one of `best`, `worst` is not `nothing`.
-  - Every given fraction is in `(0, 1)`.
-  - `action in (:keep, :drop)`.
+  - `k::Option{<:Integer}`: The number of assets that the tail takes, or `nothing`.
 
 # Examples
 
 ```jldoctest
-julia> QuantileRule(; worst = 0.1, action = :drop)   # drop the worst decile
-QuantileRule
-    best ┼ nothing
-   worst ┼ Float64: 0.1
-  action ┴ Symbol: :drop
+julia> PortfolioOptimisers.rule_tail_count(FractionOf(0.625), 4)
+3
+
+julia> PortfolioOptimisers.rule_tail_count(CountOf(50), 30)
+50
 ```
 
 # Related
 
-  - [`AbstractSelectionRule`](@ref)
   - [`RankRule`](@ref)
+  - [`rule_keep`](@ref)
+  - [`tail_mask`](@ref)
 """
-@concrete struct QuantileRule <: AbstractSelectionRule
-    """
-    The fraction of the universe to take from the best end. `nothing` takes no asset.
-    """
-    best
-    """
-    The fraction of the universe to take from the worst end. `nothing` takes no asset.
-    """
-    worst
-    """
-    $(field_dict[:pre_action])
-    """
-    action
-    function QuantileRule(best::Option{<:Real}, worst::Option{<:Real}, action::Symbol)
-        @argcheck(!(isnothing(best) && isnothing(worst)),
-                  IsNothingError("a QuantileRule needs at least one of best, worst"))
-        for (v, s) in ((best, :best), (worst, :worst))
-            if !isnothing(v)
-                @argcheck(zero(v) < v < one(v),
-                          DomainError(v,
-                                      "the $s fraction of a QuantileRule must lie in (0, 1)"))
-            end
-        end
-        assert_selection_action(action)
-        return new{typeof(best), typeof(worst), typeof(action)}(best, worst, action)
-    end
+function rule_tail_count(::Nothing, ::Integer)
+    return nothing
 end
-function QuantileRule(; best::Option{<:Real} = nothing, worst::Option{<:Real} = nothing,
-                      action::Symbol = :keep)::QuantileRule
-    return QuantileRule(best, worst, action)
+function rule_tail_count(tail::CountOf, ::Integer)
+    return tail.val
+end
+function rule_tail_count(tail::FractionOf, n::Integer)
+    return round(Int, tail.val * n, RoundNearestTiesUp)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Check the `action` field that the ordinal selection rules share.
+Check the `action` field of an ordinal selection rule.
 
 # Arguments
 
@@ -328,52 +295,10 @@ Check the `action` field that the ordinal selection rules share.
 # Related
 
   - [`RankRule`](@ref)
-  - [`QuantileRule`](@ref)
 """
 function assert_selection_action(action::Symbol)::Nothing
     @argcheck(action in (:keep, :drop),
               ArgumentError("the action of a selection rule must be :keep or :drop, got $(repr(action))"))
-    return nothing
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Check the tail counts `best` and `worst` of a [`RankRule`](@ref).
-
-[`QuantileRule`](@ref) takes fractions, and its constructor checks them itself.
-
-# Arguments
-
-  - `best`: The number of assets to take from the best end, or `nothing`.
-  - `worst`: The number of assets to take from the worst end, or `nothing`.
-  - `name`: The name of the rule that the caller constructs. Every exception message names it.
-
-# Validation
-
-  - At least one of `best` and `worst` is not `nothing`. Otherwise the function throws an `IsNothingError`.
-  - Every given count is `>= 0`. Otherwise the function throws a `DomainError`.
-  - The larger of the two counts is `> 0`. Otherwise the function throws a `DomainError`, because the rule takes no asset.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`RankRule`](@ref)
-  - [`QuantileRule`](@ref)
-"""
-function assert_tail_counts(best::Option{<:Integer}, worst::Option{<:Integer},
-                            name::Symbol)::Nothing
-    @argcheck(!(isnothing(best) && isnothing(worst)),
-              IsNothingError("a $name needs at least one of best, worst"))
-    for (v, s) in ((best, :best), (worst, :worst))
-        if !isnothing(v)
-            @argcheck(v >= zero(v), DomainError(v, "the $s count of a $name must be >= 0"))
-        end
-    end
-    @argcheck(max(isnothing(best) ? 0 : best, isnothing(worst) ? 0 : worst) > 0,
-              DomainError((best, worst), "a $name must take at least one asset"))
     return nothing
 end
 """
@@ -438,7 +363,7 @@ Turn the `scores` of the assets into a keep-mask under a selection rule.
 
 `bib` is the [`bigger_is_better`](@ref) flag of the score that gave `scores`. [`ThresholdRule`](@ref) ignores it.
 
-There is one method for each rule. The [`ThresholdRule`](@ref) method compares each score with the open band, and returns the mask. The [`RankRule`](@ref) method gives its two counts to [`tail_action_mask`](@ref). The [`QuantileRule`](@ref) method first converts each fraction to a count with `round(Int, f * n, RoundNearestTiesUp)`, where `n` is the number of finite scores. Then it gives the two counts to the same function.
+There is one method for each rule. The [`ThresholdRule`](@ref) method compares each score with the open band, and returns the mask. The [`RankRule`](@ref) method converts each tail to a count with [`rule_tail_count`](@ref), where `n` is the number of finite scores. Then it gives the two counts to [`tail_action_mask`](@ref).
 
 A non-finite score is outside every band and outside both tails, under each `action`. Each method returns `false` at a `NaN` and at an infinite score, so an asset with no score never survives the rule. A scorer can mark an asset that it cannot score with `NaN`, and the rule drops that asset with no exception. If no score is finite, the mask is empty, and [`fit_preprocessing`](@ref) throws.
 
@@ -464,13 +389,9 @@ function rule_keep(rule::ThresholdRule, scores::VecNum, ::Bool)::BitVector
                      for s in scores)
 end
 function rule_keep(rule::RankRule, scores::VecNum, bib::Bool)::BitVector
-    return tail_action_mask(rule.best, rule.worst, rule.action, scores, bib)
-end
-function rule_keep(rule::QuantileRule, scores::VecNum, bib::Bool)::BitVector
     n = count(isfinite, scores)
-    to_count(f) = isnothing(f) ? nothing : round(Int, f * n, RoundNearestTiesUp)
-    return tail_action_mask(to_count(rule.best), to_count(rule.worst), rule.action, scores,
-                            bib)
+    return tail_action_mask(rule_tail_count(rule.best, n), rule_tail_count(rule.worst, n),
+                            rule.action, scores, bib)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -709,7 +630,7 @@ Asset selector that scores every asset with a risk measure or an Asset Scorer, a
 
 `score` is an [`AbstractBaseRiskMeasure`](@ref) that can take the return series of one asset, or an [`AbstractAssetScorer`](@ref). The score of asset `i` under a risk measure is `score(X[:, i])`. The risk measures of the library cover the in-sample scores. [`ConditionalValueatRisk`](@ref) and the drawdown measures score risk, `SCM()` scores variance, and [`MeanReturn`](@ref) scores the mean return. [`FoldRiskScorer`](@ref) scores a risk measure over the test windows of a cross-validation scheme, and [`WeightMassScorer`](@ref) scores the weight that an optimiser gives each asset. [`bigger_is_better`](@ref) tells the ordinal rules which end is the best.
 
-`rule` sets what the selector does with the scores. A [`ThresholdRule`](@ref) keeps an absolute band. A [`RankRule`](@ref) or a [`QuantileRule`](@ref) takes a count or a fraction from the tails.
+`rule` sets what the selector does with the scores. A [`ThresholdRule`](@ref) keeps an absolute band. A [`RankRule`](@ref) takes a [`CountOf`](@ref) or a [`FractionOf`](@ref) from the tails.
 
 A `ScoreSelector` is safe in cross-validation. It fits its universe on the training window, and every test window uses that universe.
 
@@ -1584,7 +1505,7 @@ function select_assets(sel::RedundancySelector, rd::AbstractReturnsResult)::BitV
     return redundancy_keep(sel.alg, rd, scores, bib)
 end
 
-export ThresholdRule, RankRule, QuantileRule, ScoreSelector, CompleteAssetSelector,
-       PairwiseCorrelation, CorrelationComponents, ClusterGroups, RedundancySelector
+export ThresholdRule, RankRule, ScoreSelector, CompleteAssetSelector, PairwiseCorrelation,
+       CorrelationComponents, ClusterGroups, RedundancySelector
 public AbstractSelectionRule, AbstractRedundancyAlgorithm, AbstractAssetScorer,
        select_assets, asset_scores, rule_keep, redundancy_keep, requires_score

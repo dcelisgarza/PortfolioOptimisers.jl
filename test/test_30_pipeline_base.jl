@@ -1433,10 +1433,15 @@ end
         @test_throws DomainError RankRule(; best = 0, worst = 0)
         @test_throws ArgumentError RankRule(; best = 1, action = :nonsense)
 
-        @test_throws PO.IsNothingError QuantileRule()
-        @test_throws DomainError QuantileRule(; best = 0.0)
-        @test_throws DomainError QuantileRule(; worst = 1.0)
-        @test_throws ArgumentError QuantileRule(; best = 0.5, action = :nonsense)
+        # Issue #2013: one rule takes a count or a fraction at each tail, and the wrapper
+        # states which. A plain number is read by its type, and a plain `1.0` is refused,
+        # because a search grid promotes the count `1` to it.
+        @test RankRule(; best = 3, worst = 0.2).best === CountOf(3)
+        @test RankRule(; best = 3, worst = 0.2).worst === FractionOf(0.2)
+        @test RankRule(; best = FractionOf(1)).best === FractionOf(1)
+        @test_throws DomainError RankRule(; best = 0.0)
+        @test_throws DomainError RankRule(; worst = 1.0)
+        @test_throws ArgumentError RankRule(; best = FractionOf(0.5), action = :nonsense)
     end
 
     @testset "rule semantics" begin
@@ -1613,17 +1618,24 @@ end
         # an omitted bound disables that side alone
         @test findall(PO.rule_keep(ThresholdRule(; hi = 3.0), s, false)) == [1, 2]
 
-        # QuantileRule rounds an exact half UP: 0.05 of ten assets is one, not none
+        # A fraction rounds an exact half UP: 0.05 of ten assets is one, not none
         s10 = collect(1.0:10.0)
-        @test count(PO.rule_keep(QuantileRule(; best = 0.05), s10, false)) == 1
-        @test count(PO.rule_keep(QuantileRule(; best = 0.04), s10, false)) == 0
+        @test count(PO.rule_keep(RankRule(; best = FractionOf(0.05)), s10, false)) == 1
+        @test count(PO.rule_keep(RankRule(; best = FractionOf(0.04)), s10, false)) == 0
+        @test PO.rule_tail_count(FractionOf(0.625), 4) == 3
+        @test PO.rule_tail_count(CountOf(50), 30) == 50
+        @test isnothing(PO.rule_tail_count(nothing, 30))
 
         # `:drop` is the exact complement of `:keep` on the same rule and scores
         @test PO.rule_keep(RankRule(; best = 2, action = :drop), s, false) ==
               .!PO.rule_keep(RankRule(; best = 2), s, false)
-        @test PO.rule_keep(QuantileRule(; best = 0.4, worst = 0.2, action = :drop), s,
+        @test PO.rule_keep(RankRule(; best = FractionOf(0.4), worst = FractionOf(0.2),
+                                    action = :drop), s, false) ==
+              .!PO.rule_keep(RankRule(; best = FractionOf(0.4), worst = FractionOf(0.2)), s, false)
+        # One tail a count and the other a fraction, which two rules could not state.
+        @test PO.rule_keep(RankRule(; best = CountOf(2), worst = FractionOf(0.2)), s10,
                            false) ==
-              .!PO.rule_keep(QuantileRule(; best = 0.4, worst = 0.2), s, false)
+              PO.rule_keep(RankRule(; best = 2, worst = 2), s10, false)
     end
 
     @testset "a non-finite score is outside every tail and every band (#1933)" begin
@@ -1654,11 +1666,11 @@ end
               [1, 3, 4]
         @test !PO.rule_keep(RankRule(; best = 1, action = :drop), s, false)[2]
 
-        # QuantileRule converts with the four finite scores: 0.5 of 4 is 2, not 0.5 of 5 = 3.
-        @test findall(PO.rule_keep(QuantileRule(; best = 0.5), s, false)) == [3, 4]
-        @test findall(PO.rule_keep(QuantileRule(; best = 0.5), s, true)) == [1, 5]
-        @test findall(PO.rule_keep(QuantileRule(; worst = 0.25, action = :drop), s, false)) ==
-              [1, 3, 4]
+        # A fraction converts with the four finite scores: 0.5 of 4 is 2, not 0.5 of 5 = 3.
+        @test findall(PO.rule_keep(RankRule(; best = FractionOf(0.5)), s, false)) == [3, 4]
+        @test findall(PO.rule_keep(RankRule(; best = FractionOf(0.5)), s, true)) == [1, 5]
+        @test findall(PO.rule_keep(RankRule(; worst = FractionOf(0.25), action = :drop), s,
+                                   false)) == [1, 3, 4]
 
         # ThresholdRule drops a NaN and an infinite score, also on the side with no bound.
         @test findall(PO.rule_keep(ThresholdRule(; hi = 1.0), [0.3, NaN, -Inf, Inf, 0.4],
@@ -1669,19 +1681,19 @@ end
         # With no finite score, every rule keeps no asset, so fit_preprocessing throws.
         @test !any(PO.rule_keep(RankRule(; best = 2), [NaN, NaN], false))
         @test !any(PO.rule_keep(RankRule(; best = 1, action = :drop), [NaN, NaN], false))
-        @test !any(PO.rule_keep(QuantileRule(; best = 0.5), [NaN, NaN], false))
+        @test !any(PO.rule_keep(RankRule(; best = FractionOf(0.5)), [NaN, NaN], false))
         @test !any(PO.rule_keep(ThresholdRule(; lo = 0.0), [NaN, NaN], false))
     end
 
     @testset "selection rule validators" begin
-        @test_throws PO.IsNothingError PO.assert_tail_counts(nothing, nothing, :RankRule)
-        @test_throws DomainError PO.assert_tail_counts(-1, nothing, :RankRule)
-        @test_throws DomainError PO.assert_tail_counts(nothing, -1, :RankRule)
-        @test_throws DomainError PO.assert_tail_counts(0, 0, :RankRule)
-        # a zero on one side is legal: the rule still takes an asset from the other
-        @test isnothing(PO.assert_tail_counts(0, 2, :RankRule))
-        @test findall(PO.rule_keep(RankRule(; best = 0, worst = 2), [1.0, 2.0, 3.0, 4.0],
-                                   false)) == [3, 4]
+        @test_throws PO.IsNothingError RankRule(nothing, nothing, :keep)
+        @test_throws DomainError RankRule(-1, nothing, :keep)
+        @test_throws DomainError RankRule(nothing, -1, :keep)
+        # Issue #2013: a count is at least one, so a tail of zero is refused, and
+        # `nothing` states a tail that takes no asset.
+        @test_throws DomainError RankRule(0, 2, :keep)
+        @test findall(PO.rule_keep(RankRule(; worst = 2), [1.0, 2.0, 3.0, 4.0], false)) ==
+              [3, 4]
 
         @test_throws ArgumentError PO.assert_selection_action(:nonsense)
         @test isnothing(PO.assert_selection_action(:keep))

@@ -91,7 +91,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return whether every element of `rs` shares the same polarity, and throw when they do not.
 
-The scalarised value of a mixed vector such as `[Variance(), ExpectedReturn()]` has **no** defined orientation, so neither `all` nor `any` is correct. Both are wrong in silence, and the consumers are load-bearing: [`RankRule`](@ref) and [`QuantileRule`](@ref) take counts from each tail, and the flag decides which tail is best.
+The scalarised value of a mixed vector such as `[Variance(), ExpectedReturn()]` has **no** defined orientation, so neither `all` nor `any` is correct. Both are wrong in silence, and the consumers are load-bearing: [`RankRule`](@ref) takes a count or a fraction from each tail, and the flag decides which tail is best.
 
 # Validation
 

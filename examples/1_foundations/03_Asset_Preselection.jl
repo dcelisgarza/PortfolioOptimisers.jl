@@ -131,10 +131,11 @@ with the bounds `(lo, hi)`, both optional and both exclusive, and ignores `bigge
 filter for zero variance must drop the assets of low variance, and a rule that kept the better
 assets by the trait would keep those assets instead.
 
-An ordinal rule compares the scores with each other. [`RankRule`](@ref) and
-[`QuantileRule`](@ref) sort the assets from best to worst by `bigger_is_better`, and take a count or
-a fraction of assets from each end. A rule takes counts, not positions, and it can take the two
-ends at once. `action = :drop` inverts the selection, so the rule drops the assets it names and
+An ordinal rule compares the scores with each other. [`RankRule`](@ref) sorts the assets from
+best to worst by `bigger_is_better`, and takes a [`CountOf`](@ref) or a [`FractionOf`](@ref) of
+the assets from each end. A plain `5` is a count and a plain `0.25` is a fraction, but the wrapper
+states the reading in a search grid too, where Julia promotes `[5, 0.25]` to `[5.0, 0.25]`. A rule
+takes sizes, not positions, and it can take the two ends at once. `action = :drop` inverts the selection, so the rule drops the assets it names and
 keeps the rest. With it you can drop the worst five without knowing how many assets there are.
 =#
 
@@ -142,7 +143,7 @@ rules = ["RankRule(best = 5)" => RankRule(; best = 5),
          "RankRule(worst = 5)" => RankRule(; worst = 5),
          "RankRule(worst = 3, action = :drop)" => RankRule(; worst = 3, action = :drop),
          "RankRule(best = 2, worst = 2)" => RankRule(; best = 2, worst = 2),
-         "QuantileRule(best = 0.25)" => QuantileRule(; best = 0.25)]
+         "RankRule(best = FractionOf(0.25))" => RankRule(; best = FractionOf(0.25))]
 
 rows = map(rules) do (label, rule)
     kept = fit_preprocessing(ScoreSelector(; score = ConditionalValueatRisk(), rule = rule),
@@ -474,11 +475,12 @@ pretty_table(sort(DataFrame(; asset = rd.nx, mean_weight = w_mass), :mean_weight
                   rev = true); formatters = [resfmt])
 
 #=
-A bigger weight is better, so `QuantileRule(; best = 0.2)` keeps the four assets with the largest
-mean weight.
+A bigger weight is better, so `RankRule(; best = FractionOf(0.2))` keeps the four assets with the
+largest mean weight.
 =#
 
-fit_preprocessing(ScoreSelector(; score = mass, rule = QuantileRule(; best = 0.2)), rd).nx
+fit_preprocessing(ScoreSelector(; score = mass, rule = RankRule(; best = FractionOf(0.2))),
+                  rd).nx
 
 #=
 ## 9. Plot the two decisions
@@ -533,8 +535,8 @@ plot!(; xlabel = "|correlation| threshold", ylabel = "assets kept",
     of `best` and `worst`, so you pass no flag for it. [`Variance`](@ref) cannot score an asset,
     and `SCM()` replaces it.
   - [`ThresholdRule`](@ref) compares each score with fixed bounds and ignores the direction.
-    [`RankRule`](@ref) and [`QuantileRule`](@ref) rank the assets and take counts or fractions
-    from each end, so you can drop the worst five without knowing how many assets there are.
+    [`RankRule`](@ref) ranks the assets and takes a `CountOf` or a `FractionOf` from each end, so
+    you can drop the worst five without knowing how many assets there are.
   - A rule keeps neither of two tied assets and never splits a tied block. `RankRule(; best = k)`
     can return fewer than `k` assets, and two identical columns both leave the universe.
   - [`PairwiseCorrelation`](@ref) keeps no pair above the threshold.
@@ -564,6 +566,6 @@ plot!(; xlabel = "|correlation| threshold", ylabel = "assets kept",
 #src - Section 8 (asset scorers, ADR 0225), verified under Kaimon on the same slice, KFold(n = 5):
 #src     * RankRule(best = 10): in sample keeps MSFT, the mean CVaR over the folds keeps JPM,
 #src       and the mean rank keeps HD; the other nine assets are common to all three.
-#src     * WeightMassScorer(MeanRisk) with QuantileRule(best = 0.2) keeps JNJ, KO, MRK, WMT.
+#src     * WeightMassScorer(MeanRisk) with RankRule(best = FractionOf(0.2)) keeps JNJ, KO, MRK, WMT.
 #src - No new docs/Project.toml deps: CSV, TimeSeries, Clarabel, StatsPlots, PrettyTables,
 #src   DataFrames all already present.

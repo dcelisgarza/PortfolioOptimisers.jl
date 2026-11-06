@@ -31,15 +31,14 @@ PortfolioOptimisers.AbstractAssetScorer
 
 ## Selection rules
 
-A rule turns the scores into a mask of the assets to keep. [`ThresholdRule`](@ref) compares the raw scores with fixed bounds, and ignores which end is better, because a zero-variance filter must drop the assets with low variance. [`RankRule`](@ref) and [`QuantileRule`](@ref) read [`bigger_is_better`](@ref), and take a count or a fraction of the assets from each end.
+A rule turns the scores into a mask of the assets to keep. [`ThresholdRule`](@ref) compares the raw scores with fixed bounds, and ignores which end is better, because a zero-variance filter must drop the assets with low variance. [`RankRule`](@ref) reads [`bigger_is_better`](@ref), and takes a [`CountOf`](@ref) or a [`FractionOf`](@ref) of the assets from each end.
 
-An ordinal rule drops every asset of a tie at its cut, so it can keep fewer assets than you ask for. If the 20th and 21st assets have the same score, `RankRule(; best = 20)` keeps 19. The rule drops both tied assets, because it has no reason to keep one of them and not the other.
+An ordinal rule drops every asset of a tie at its cut, so it can keep fewer assets than you ask for. If the 20th and 21st assets have the same score, `RankRule(; best = CountOf(20))` keeps 19. The rule drops both tied assets, because it has no reason to keep one of them and not the other.
 
 ```@docs
 PortfolioOptimisers.AbstractSelectionRule
 ThresholdRule
 RankRule
-QuantileRule
 ```
 
 ## Discarding redundant assets
